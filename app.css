@@ -1,25 +1,77 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-@theme {
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  --color-surface: #FAFAF9;
-  --color-surface-raised: #FFFFFF;
-  --color-border: #E7E5E4;
-  --color-border-subtle: #F0EEEC;
-  --color-ink: #1C1917;
-  --color-ink-muted: #78716C;
-  --color-ink-faint: #A8A29E;
-  --color-accent: #1C1917;
-  --color-accent-soft: #F5F5F4;
-  --color-tool-bg: #FFFBEB;
-  --color-tool-border: #FDE68A;
-  --color-tool-ink: #92400E;
-  --color-result-bg: #F5F5F4;
-  --color-error-bg: #FEF2F2;
-  --color-error-border: #FECACA;
-  --color-error-ink: #991B1B;
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-tool-bg: var(--tool-bg);
+  --color-tool-border: var(--tool-border);
+  --color-tool-ink: var(--tool-ink);
+  --color-result-bg: var(--result-bg);
+  --color-error-bg: var(--error-bg);
+  --color-error-border: var(--error-border);
+  --color-error-ink: var(--error-ink);
+
+  --radius-xs: calc(var(--radius) - 4px);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 6px);
+}
+
+:root {
+  --radius: 0.625rem;
+
+  --surface: #FAFAF9;
+  --surface-raised: #FFFFFF;
+  --border: #E7E5E4;
+  --border-subtle: #F0EEEC;
+  --ink: #1C1917;
+  --ink-muted: #78716C;
+  --ink-faint: #A8A29E;
+  --accent: #1C1917;
+  --accent-soft: #F5F5F4;
+  --tool-bg: #FFFBEB;
+  --tool-border: #FDE68A;
+  --tool-ink: #92400E;
+  --result-bg: #F5F5F4;
+  --error-bg: #FEF2F2;
+  --error-border: #FECACA;
+  --error-ink: #991B1B;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-surface text-ink;
+  }
+
+  *,
+  *::before,
+  *::after {
+    @apply box-border;
+  }
+
+  img,
+  video {
+    @apply h-auto max-w-full;
+  }
 }
 
 @keyframes pulse-dot {
