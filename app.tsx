@@ -2,13 +2,17 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import "./app.css";
 import { cn } from "./shared/cn";
-import type { ChatMessage, StatusMessage, HistoryMessage } from "./shared/types";
+import type {
+  ChatMessage,
+  StatusMessage,
+  HistoryMessage,
+} from "./shared/types";
 import {
-  ArrowRightIcon,
-  ChatBubbleLeftIcon,
-  ChevronRightIcon,
-  CpuChipIcon,
-} from "@heroicons/react/16/solid";
+  ArrowRight,
+  MessageChatCircle,
+  ChevronRight,
+  CpuChip01,
+} from "@untitledui/icons";
 
 type Message = ChatMessage;
 
@@ -83,7 +87,7 @@ function App() {
           <div
             className={cn(
               "w-1.5 h-1.5 rounded-full transition-colors duration-300",
-              processing ? "bg-amber-500" : "bg-emerald-500"
+              processing ? "bg-amber-500" : "bg-emerald-500",
             )}
           />
           <span className="text-xs text-ink-muted">
@@ -136,7 +140,12 @@ function App() {
               aria-label="Stop agent"
               className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-error-ink text-white rounded-xl transition-opacity hover:opacity-80"
             >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 16 16"
+                fill="currentColor"
+              >
                 <rect x="3" y="3" width="10" height="10" rx="1.5" />
               </svg>
             </button>
@@ -147,7 +156,7 @@ function App() {
               aria-label="Send message"
               className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-accent text-white rounded-xl transition-opacity disabled:opacity-15 disabled:cursor-not-allowed hover:opacity-80"
             >
-              <ArrowRightIcon className="w-4 h-4" />
+              <ArrowRight size={16} />
             </button>
           )}
         </form>
@@ -163,7 +172,7 @@ function EmptyState() {
       style={{ animation: "fade-in 0.4s ease-out" }}
     >
       <div className="w-10 h-10 rounded-full bg-accent-soft border border-border flex items-center justify-center">
-        <ChatBubbleLeftIcon className="w-4.5 h-4.5 text-ink-muted" />
+        <MessageChatCircle size={18} className="text-ink-muted" />
       </div>
       <p className="text-sm text-ink-muted">
         Start a conversation with the agent
@@ -217,7 +226,7 @@ function MessageBlock({ msg }: { msg: Message }) {
         >
           <div className="flex items-center gap-2 mb-1.5">
             <div className="w-5 h-5 rounded-full bg-accent-soft border border-border flex items-center justify-center">
-              <CpuChipIcon className="w-3 h-3 text-ink-muted" />
+              <CpuChip01 size={12} className="text-ink-muted" />
             </div>
             <span className="text-xs font-medium text-ink-muted">Agent</span>
           </div>
@@ -235,7 +244,10 @@ function MessageBlock({ msg }: { msg: Message }) {
         >
           <details className="group">
             <summary className="flex items-center gap-2 cursor-pointer py-1.5 select-none">
-              <ChevronRightIcon className="w-3 h-3 text-ink-faint chevron transition-transform duration-150" />
+              <ChevronRight
+                size={12}
+                className="text-ink-faint chevron transition-transform duration-150"
+              />
               <span className="text-xs font-mono font-medium text-tool-ink">
                 {msg.name}
               </span>
@@ -314,9 +326,7 @@ function MessageBlock({ msg }: { msg: Message }) {
           style={{ animation: "fade-in 0.3s ease-out" }}
         >
           <div className="flex-1 h-px bg-border" />
-          <span className="text-[11px] font-mono text-ink-faint">
-            Stopped
-          </span>
+          <span className="text-[11px] font-mono text-ink-faint">Stopped</span>
           <div className="flex-1 h-px bg-border" />
         </div>
       );
