@@ -107,7 +107,7 @@ function App() {
       {/* Sidebar chat — always in DOM, width animates to push workspace */}
       <div
         className={cn(
-          'h-full shrink-0 overflow-hidden transition-all ease-in-out',
+          'h-full shrink-0 transition-all ease-in-out',
           showSidebar
             ? 'w-[464px] translate-x-0 opacity-100 duration-0'
             : 'w-0 translate-x-full opacity-0 duration-200'
