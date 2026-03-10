@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
-import { AnimatePresence, motion } from 'motion/react'
+import { motion } from 'motion/react'
 
 import { createRoot } from 'react-dom/client'
 
@@ -96,8 +96,11 @@ function App() {
     return <div className="h-screen">{chatPanel}</div>
   }
 
+  const showSidebar = layoutMode === 'sidebar'
+  const spring = { type: 'spring' as const, stiffness: 300, damping: 30 }
+
   return (
-    <div className="flex h-screen items-start justify-center gap-16 p-10">
+    <div className="flex h-screen items-start justify-center p-10">
       {/* Workspace always visible in sidebar/popup modes */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -108,20 +111,24 @@ function App() {
         <Workspace />
       </motion.div>
 
-      {/* Sidebar chat */}
-      <AnimatePresence>
-        {layoutMode === 'sidebar' && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="h-full max-w-[440px] min-w-[400px] flex-1"
-          >
-            {chatPanel}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Sidebar chat — always in DOM, width animates to push workspace */}
+      <motion.div
+        animate={{ width: showSidebar ? 464 : 0 }}
+        transition={spring}
+        className="h-full shrink-0 overflow-hidden"
+      >
+        <motion.div
+          animate={{
+            x: showSidebar ? 0 : 200,
+            opacity: showSidebar ? 1 : 0,
+          }}
+          transition={showSidebar ? { duration: 0 } : spring}
+          className="h-full pl-16"
+          style={{ width: 464 }}
+        >
+          {chatPanel}
+        </motion.div>
+      </motion.div>
 
       {/* Popup chat */}
       {layoutMode === 'popup' && (

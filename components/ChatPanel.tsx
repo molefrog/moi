@@ -108,7 +108,6 @@ function EmptyState() {
   return (
     <div
       className="flex min-h-[60vh] flex-1 flex-col items-center justify-center gap-3"
-      style={{ animation: 'fade-in 0.4s ease-out' }}
     >
       <div className="bg-muted border-border flex h-10 w-10 items-center justify-center rounded-full border">
         <MessageChatCircle size={18} className="text-ink-muted" />
@@ -141,7 +140,6 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
       return (
         <p
           className="text-ink ml-8 self-end rounded-md bg-black/[0.07] px-4 py-2 text-base leading-normal wrap-break-word whitespace-pre-wrap"
-          style={{ animation: 'fade-in 0.2s ease-out' }}
         >
           {msg.content}
         </p>
@@ -149,7 +147,7 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
 
     case 'assistant':
       return (
-        <div style={{ animation: 'fade-in 0.2s ease-out' }}>
+        <div>
           <div className="text-ink prose-inline text-base leading-normal wrap-break-word">
             <FormattedText text={msg.content} />
           </div>
@@ -160,7 +158,6 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
       return (
         <div
           className="border-border-subtle my-0.5 ml-7 border-l-2 pl-3"
-          style={{ animation: 'fade-in 0.15s ease-out' }}
         >
           <details className="group">
             <summary className="flex cursor-pointer items-center gap-2 py-1.5 select-none">
@@ -191,7 +188,6 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
       return (
         <div
           className="border-border-subtle my-0.5 ml-7 border-l-2 pl-3"
-          style={{ animation: 'fade-in 0.15s ease-out' }}
         >
           {msg.is_error ? (
             <div className="bg-error-bg border-error-border ml-4 rounded-md border px-3 py-2">
@@ -236,7 +232,6 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
       return (
         <div
           className="bg-error-bg border-error-border text-error-ink my-1 ml-7 rounded-lg border px-3.5 py-2.5 text-sm"
-          style={{ animation: 'fade-in 0.2s ease-out' }}
         >
           {msg.content}
         </div>
