@@ -4,9 +4,9 @@ import { createRoot } from 'react-dom/client'
 
 import './app.css'
 import { ChatPanel } from './components/ChatPanel'
-import { cn } from './shared/cn'
 import { ChatPopup } from './components/ChatPopup'
 import { Workspace } from './components/Workspace'
+import { cn } from './shared/cn'
 import type { ChatMessage } from './shared/types'
 
 type Message = ChatMessage
@@ -99,26 +99,19 @@ function App() {
 
   return (
     <div className="flex h-screen items-start justify-center p-10">
-      {/* Workspace always visible in sidebar/popup modes */}
       <div className="w-full max-w-[640px]">
         <Workspace />
       </div>
 
-      {/* Sidebar chat — always in DOM, width animates to push workspace */}
       <div
         className={cn(
-          'h-full shrink-0 overflow-hidden transition-all ease-in-out',
-          showSidebar
-            ? 'w-[464px] opacity-100 duration-0'
-            : 'w-0 opacity-0 duration-200'
+          'h-full shrink-0 transition-all ease-in-out',
+          showSidebar ? 'w-[464px] opacity-100 duration-0' : 'w-0 opacity-0 duration-200'
         )}
       >
-        <div className="h-full w-[464px] pl-16">
-          {chatPanel}
-        </div>
+        <div className="h-full w-[464px] pl-16">{chatPanel}</div>
       </div>
 
-      {/* Popup chat */}
       {layoutMode === 'popup' && (
         <ChatPopup>
           {onClose => (
