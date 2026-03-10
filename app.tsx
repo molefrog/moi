@@ -107,7 +107,7 @@ function App() {
             animate={{ width: 420, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="shrink-0 border-l border-border overflow-hidden"
+            className="shrink-0 overflow-hidden"
           >
             <div className="w-[420px] h-full">
               {chatPanel}

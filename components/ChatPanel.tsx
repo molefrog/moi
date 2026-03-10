@@ -56,32 +56,20 @@ export function ChatPanel({
   return (
     <div className="flex flex-col h-full bg-surface font-sans">
       {/* Header */}
-      <header className="flex items-center justify-between px-5 py-3 border-b border-border bg-surface-raised">
-        <div className="flex items-baseline gap-3">
-          <h1
-            className={cn(
-              "font-semibold tracking-tight text-ink",
-              isCentered ? "text-[15px]" : "text-sm",
-            )}
-          >
-            none.computer
-          </h1>
-          <span className="text-xs text-ink-faint font-mono">~/workspace</span>
-        </div>
+      <header className="flex items-center justify-between px-5 py-3">
+        <h1
+          className={cn(
+            "font-semibold tracking-tight text-ink",
+            isCentered ? "text-[15px]" : "text-sm",
+          )}
+        >
+          New chat
+        </h1>
         <div className="flex items-center gap-2">
-          <div
-            className={cn(
-              "w-1.5 h-1.5 rounded-full transition-colors duration-300",
-              processing ? "bg-amber-500" : "bg-emerald-500",
-            )}
-          />
-          <span className="text-xs text-ink-muted">
-            {processing ? "Working\u2026" : "Ready"}
-          </span>
           {layoutMode === "sidebar" && onCollapse && (
             <button
               onClick={onCollapse}
-              className="ml-1 p-1.5 rounded-lg hover:bg-accent-soft transition-colors"
+              className="p-1.5 rounded-lg hover:bg-accent-soft transition-colors"
               aria-label="Collapse chat"
             >
               <Minimize01 size={14} className="text-ink-muted" />
@@ -90,7 +78,7 @@ export function ChatPanel({
           {layoutMode === "popup" && onExpand && (
             <button
               onClick={onExpand}
-              className="ml-1 p-1.5 rounded-lg hover:bg-accent-soft transition-colors"
+              className="p-1.5 rounded-lg hover:bg-accent-soft transition-colors"
               aria-label="Expand to sidebar"
             >
               <Expand06 size={14} className="text-ink-muted" />
@@ -117,7 +105,7 @@ export function ChatPanel({
       </div>
 
       {/* Input */}
-      <div className="border-t border-border bg-surface-raised">
+      <div>
         <form
           className={cn(
             "flex items-end gap-3 px-5 py-3",
@@ -322,30 +310,10 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
       );
 
     case "done":
-      return (
-        <div
-          className="flex items-center gap-3 py-3 mt-2"
-          style={{ animation: "fade-in 0.3s ease-out" }}
-        >
-          <div className="flex-1 h-px bg-border" />
-          <span className="text-[11px] font-mono text-ink-faint tabular-nums">
-            {msg.turns} turns &middot; ${msg.cost.toFixed(4)}
-          </span>
-          <div className="flex-1 h-px bg-border" />
-        </div>
-      );
+      return null;
 
     case "stopped":
-      return (
-        <div
-          className="flex items-center gap-3 py-3 mt-2"
-          style={{ animation: "fade-in 0.3s ease-out" }}
-        >
-          <div className="flex-1 h-px bg-border" />
-          <span className="text-[11px] font-mono text-ink-faint">Stopped</span>
-          <div className="flex-1 h-px bg-border" />
-        </div>
-      );
+      return null;
 
     case "error":
       return (
