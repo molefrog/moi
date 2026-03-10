@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { ArrowRight } from "@untitledui/icons";
+import { ArrowUp } from "@untitledui/icons";
 import { Button } from "./ui/button";
 
 type ChatInputProps = {
@@ -22,8 +22,7 @@ export function ChatInput({
   useEffect(() => {
     if (ref.current) {
       ref.current.style.height = "auto";
-      ref.current.style.height =
-        Math.min(ref.current.scrollHeight, 160) + "px";
+      ref.current.style.height = Math.min(ref.current.scrollHeight, 160) + "px";
     }
   }, [value]);
 
@@ -69,7 +68,7 @@ export function ChatInput({
           disabled={!value.trim()}
           aria-label="Send message"
         >
-          <ArrowRight />
+          <ArrowUp />
         </Button>
       )}
     </form>
