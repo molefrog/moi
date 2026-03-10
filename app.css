@@ -25,25 +25,12 @@
   --ring: oklch(0.708 0 0);
   --radius: 1rem;
 
-  /* App-specific tokens */
-  --border-subtle: oklch(0.95 0 0);
-  --ink: oklch(0.145 0 0);
-  --ink-muted: oklch(0.556 0 0);
-  --ink-faint: oklch(0.708 0 0);
-  --tool-bg: #fffbeb;
-  --tool-border: #fde68a;
-  --tool-ink: #92400e;
-  --result-bg: oklch(0.97 0 0);
-  --error-bg: #fef2f2;
-  --error-border: #fecaca;
-  --error-ink: #991b1b;
 }
 
 @theme inline {
   --font-sans: ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  /* shadcn tokens */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -62,19 +49,6 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-
-  /* App-specific tokens */
-  --color-border-subtle: var(--border-subtle);
-  --color-ink: var(--ink);
-  --color-ink-muted: var(--ink-muted);
-  --color-ink-faint: var(--ink-faint);
-  --color-tool-bg: var(--tool-bg);
-  --color-tool-border: var(--tool-border);
-  --color-tool-ink: var(--tool-ink);
-  --color-result-bg: var(--result-bg);
-  --color-error-bg: var(--error-bg);
-  --color-error-border: var(--error-border);
-  --color-error-ink: var(--error-ink);
 
   --radius-sm: calc(var(--radius) * 0.625);
   --radius-md: calc(var(--radius) * 0.75);

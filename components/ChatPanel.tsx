@@ -47,13 +47,13 @@ export function ChatPanel({
     <div className="flex h-full flex-col font-sans">
       {/* Header */}
       <header className="flex items-center justify-between pb-6">
-        <h1 className={cn('text-ink text-xl leading-normal font-semibold tracking-tight')}>
+        <h1 className="text-lg leading-normal font-semibold tracking-tight">
           New chat
         </h1>
         <div className="flex items-center gap-2">
           {layoutMode === 'sidebar' && onCollapse && (
             <Button variant="ghost" size="icon" onClick={onCollapse} aria-label="Collapse chat">
-              <XClose className="text-ink-muted" />
+              <XClose className="text-muted-foreground" />
             </Button>
           )}
           {layoutMode === 'popup' && (
@@ -65,12 +65,12 @@ export function ChatPanel({
                   onClick={onExpand}
                   aria-label="Expand to sidebar"
                 >
-                  <Expand06 className="text-ink-muted" />
+                  <Expand06 className="text-muted-foreground" />
                 </Button>
               )}
               {onClose && (
                 <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close chat">
-                  <XClose className="text-ink-muted" />
+                  <XClose className="text-muted-foreground" />
                 </Button>
               )}
             </>
@@ -106,13 +106,11 @@ export function ChatPanel({
 
 function EmptyState() {
   return (
-    <div
-      className="flex min-h-[60vh] flex-1 flex-col items-center justify-center gap-3"
-    >
+    <div className="flex min-h-[60vh] flex-1 flex-col items-center justify-center gap-3">
       <div className="bg-muted border-border flex h-10 w-10 items-center justify-center rounded-full border">
-        <MessageChatCircle size={18} className="text-ink-muted" />
+        <MessageChatCircle size={18} className="text-muted-foreground" />
       </div>
-      <p className="text-ink-muted text-sm">Start a conversation with the agent</p>
+      <p className="text-muted-foreground text-sm">Start a conversation with the agent</p>
     </div>
   )
 }
@@ -123,7 +121,7 @@ function ThinkingIndicator() {
       {[0, 1, 2].map(i => (
         <span
           key={i}
-          className="bg-ink-faint block h-1.5 w-1.5 rounded-full"
+          className="bg-ring block h-1.5 w-1.5 rounded-full"
           style={{
             animation: 'pulse-dot 1.4s ease-in-out infinite',
             animationDelay: `${i * 0.2}s`
@@ -138,9 +136,7 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
   switch (msg.type) {
     case 'user':
       return (
-        <p
-          className="text-ink ml-8 self-end rounded-md bg-black/[0.07] px-4 py-2 text-base leading-normal wrap-break-word whitespace-pre-wrap"
-        >
+        <p className="ml-8 self-end rounded-md bg-black/[0.07] px-4 py-2 text-base leading-normal wrap-break-word whitespace-pre-wrap">
           {msg.content}
         </p>
       )
@@ -148,7 +144,7 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
     case 'assistant':
       return (
         <div>
-          <div className="text-ink prose-inline text-base leading-normal wrap-break-word">
+          <div className="prose-inline text-base leading-normal wrap-break-word">
             <FormattedText text={msg.content} />
           </div>
         </div>
@@ -156,27 +152,25 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
 
     case 'tool_use':
       return (
-        <div
-          className="border-border-subtle my-0.5 ml-7 border-l-2 pl-3"
-        >
+        <div className="border-border my-0.5 ml-7 border-l-2 pl-3">
           <details className="group">
             <summary className="flex cursor-pointer items-center gap-2 py-1.5 select-none">
               <ChevronRight
                 size={12}
-                className="text-ink-faint chevron transition-transform duration-150"
+                className="text-ring chevron transition-transform duration-150"
               />
-              <span className="text-tool-ink font-mono text-xs font-medium">{msg.name}</span>
+              <span className="text-amber-800 font-mono text-xs font-medium">{msg.name}</span>
               <span
                 className={cn(
-                  'text-ink-faint truncate font-mono text-[11px]',
+                  'text-ring truncate font-mono text-[11px]',
                   compact ? 'max-w-[200px]' : 'max-w-[400px]'
                 )}
               >
                 {formatInputBrief(msg.name, msg.input)}
               </span>
             </summary>
-            <div className="bg-tool-bg border-tool-border mt-1 ml-4 rounded-md border px-3 py-2.5">
-              <pre className="text-tool-ink max-h-[200px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
+            <div className="bg-amber-50 border-amber-200 mt-1 ml-4 rounded-md border px-3 py-2.5">
+              <pre className="text-amber-800 max-h-[200px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
                 {formatInput(msg.name, msg.input)}
               </pre>
             </div>
@@ -186,12 +180,10 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
 
     case 'tool_result':
       return (
-        <div
-          className="border-border-subtle my-0.5 ml-7 border-l-2 pl-3"
-        >
+        <div className="border-border my-0.5 ml-7 border-l-2 pl-3">
           {msg.is_error ? (
-            <div className="bg-error-bg border-error-border ml-4 rounded-md border px-3 py-2">
-              <pre className="text-error-ink max-h-[160px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
+            <div className="bg-red-50 border-red-200 ml-4 rounded-md border px-3 py-2">
+              <pre className="text-red-800 max-h-[160px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
                 {msg.content || '(empty)'}
               </pre>
             </div>
@@ -203,17 +195,17 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
                   height="10"
                   viewBox="0 0 24 24"
                   fill="currentColor"
-                  className="text-ink-faint chevron transition-transform duration-150"
+                  className="text-ring chevron transition-transform duration-150"
                 >
                   <path d="M9 18l6-6-6-6" />
                 </svg>
-                <span className="text-ink-faint font-mono text-[11px]">
+                <span className="text-ring font-mono text-[11px]">
                   Result
                   {msg.content ? ` \u00B7 ${msg.content.length} chars` : ' \u00B7 empty'}
                 </span>
               </summary>
-              <div className="bg-result-bg border-border-subtle mt-1 ml-4 rounded-md border px-3 py-2.5">
-                <pre className="text-ink-muted max-h-[200px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
+              <div className="bg-muted border-border mt-1 ml-4 rounded-md border px-3 py-2.5">
+                <pre className="text-muted-foreground max-h-[200px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
                   {msg.content || '(empty)'}
                 </pre>
               </div>
@@ -230,9 +222,7 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
 
     case 'error':
       return (
-        <div
-          className="bg-error-bg border-error-border text-error-ink my-1 ml-7 rounded-lg border px-3.5 py-2.5 text-sm"
-        >
+        <div className="bg-red-50 border-red-200 text-red-800 my-1 ml-7 rounded-lg border px-3.5 py-2.5 text-sm">
           {msg.content}
         </div>
       )
