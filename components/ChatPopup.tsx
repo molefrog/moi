@@ -32,6 +32,7 @@ export function ChatPopup({ children }: ChatPopupProps) {
         align="end"
         alignOffset={-8}
         className="flex h-[calc(100vh-96px)] w-[440px] flex-col gap-0 rounded-3xl p-4"
+        keepMounted
       >
         {children(onClose)}
       </PopoverContent>
