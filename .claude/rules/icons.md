@@ -1,6 +1,6 @@
 ---
 description: Use @untitledui/icons for all icons.
-globs: "*.tsx, *.jsx"
+globs: '*.tsx, *.jsx'
 alwaysApply: false
 ---
 

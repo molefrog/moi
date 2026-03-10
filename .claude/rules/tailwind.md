@@ -1,6 +1,6 @@
 ---
 description: Use Tailwind CSS for all styling.
-globs: "*.tsx, *.jsx, *.html, *.css"
+globs: '*.tsx, *.jsx, *.html, *.css'
 alwaysApply: false
 ---
 

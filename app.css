@@ -1,6 +1,6 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -30,13 +30,13 @@
   --ink: oklch(0.145 0 0);
   --ink-muted: oklch(0.556 0 0);
   --ink-faint: oklch(0.708 0 0);
-  --tool-bg: #FFFBEB;
-  --tool-border: #FDE68A;
-  --tool-ink: #92400E;
+  --tool-bg: #fffbeb;
+  --tool-border: #fde68a;
+  --tool-ink: #92400e;
   --result-bg: oklch(0.97 0 0);
-  --error-bg: #FEF2F2;
-  --error-border: #FECACA;
-  --error-ink: #991B1B;
+  --error-bg: #fef2f2;
+  --error-border: #fecaca;
+  --error-ink: #991b1b;
 }
 
 @theme inline {
@@ -96,18 +96,37 @@
 }
 
 @keyframes pulse-dot {
-  0%, 100% { opacity: 0.2; transform: scale(0.85); }
-  50% { opacity: 1; transform: scale(1); }
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slide-up {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Scrollbar */
@@ -118,11 +137,11 @@
   background: transparent;
 }
 .chat-scroll::-webkit-scrollbar-thumb {
-  background: #D6D3D1;
+  background: #d6d3d1;
   border-radius: 3px;
 }
 .chat-scroll::-webkit-scrollbar-thumb:hover {
-  background: #A8A29E;
+  background: #a8a29e;
 }
 
 /* Tool details toggle */

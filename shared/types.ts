@@ -1,7 +1,5 @@
 // Client → Server messages
-export type ClientMessage =
-  | { type: "chat"; content: string }
-  | { type: "stop" };
+export type ClientMessage = { type: 'chat'; content: string } | { type: 'stop' }
 
 // Persistable message (stored in messages.json)
 export type ChatMessage =
@@ -11,60 +9,57 @@ export type ChatMessage =
   | ToolResultMessage
   | DoneMessage
   | ErrorMessage
-  | StoppedMessage;
+  | StoppedMessage
 
 // Server → Client messages
-export type ServerMessage =
-  | ChatMessage
-  | StatusMessage
-  | HistoryMessage;
+export type ServerMessage = ChatMessage | StatusMessage | HistoryMessage
 
 export type HistoryMessage = {
-  type: "history";
-  messages: ChatMessage[];
-};
+  type: 'history'
+  messages: ChatMessage[]
+}
 
 export type UserMessage = {
-  type: "user";
-  content: string;
-};
+  type: 'user'
+  content: string
+}
 
 export type AssistantMessage = {
-  type: "assistant";
-  content: string;
-};
+  type: 'assistant'
+  content: string
+}
 
 export type ToolUseMessage = {
-  type: "tool_use";
-  id: string;
-  name: string;
-  input: Record<string, unknown>;
-};
+  type: 'tool_use'
+  id: string
+  name: string
+  input: Record<string, unknown>
+}
 
 export type ToolResultMessage = {
-  type: "tool_result";
-  tool_use_id: string;
-  content: string;
-  is_error: boolean;
-};
+  type: 'tool_result'
+  tool_use_id: string
+  content: string
+  is_error: boolean
+}
 
 export type DoneMessage = {
-  type: "done";
-  cost: number;
-  turns: number;
-  session_id: string;
-};
+  type: 'done'
+  cost: number
+  turns: number
+  session_id: string
+}
 
 export type ErrorMessage = {
-  type: "error";
-  content: string;
-};
+  type: 'error'
+  content: string
+}
 
 export type StoppedMessage = {
-  type: "stopped";
-};
+  type: 'stopped'
+}
 
 export type StatusMessage = {
-  type: "status";
-  processing: boolean;
-};
+  type: 'status'
+  processing: boolean
+}

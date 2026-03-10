@@ -1,79 +1,82 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { createRoot } from "react-dom/client";
-import { motion, AnimatePresence } from "motion/react";
-import "./app.css";
-import type { ChatMessage } from "./shared/types";
-import { ChatPanel } from "./components/ChatPanel";
-import { Workspace } from "./components/Workspace";
-import { ChatPopup } from "./components/ChatPopup";
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 
-type Message = ChatMessage;
+import { AnimatePresence, motion } from 'motion/react'
 
-const MESSAGE_THRESHOLD = 5;
-const SPLIT_MIN_WIDTH = 1184; // 40 + 640 + 64 + 400 + 40
+import { createRoot } from 'react-dom/client'
+
+import './app.css'
+import { ChatPanel } from './components/ChatPanel'
+import { ChatPopup } from './components/ChatPopup'
+import { Workspace } from './components/Workspace'
+import type { ChatMessage } from './shared/types'
+
+type Message = ChatMessage
+
+const MESSAGE_THRESHOLD = 5
+const SPLIT_MIN_WIDTH = 1184 // 40 + 640 + 64 + 400 + 40
 
 function useCanFitSidebar() {
-  const [fits, setFits] = useState(() => window.innerWidth >= SPLIT_MIN_WIDTH);
+  const [fits, setFits] = useState(() => window.innerWidth >= SPLIT_MIN_WIDTH)
   useEffect(() => {
-    const mq = window.matchMedia(`(min-width: ${SPLIT_MIN_WIDTH}px)`);
-    const handler = (e: MediaQueryListEvent) => setFits(e.matches);
-    mq.addEventListener("change", handler);
-    setFits(mq.matches);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return fits;
+    const mq = window.matchMedia(`(min-width: ${SPLIT_MIN_WIDTH}px)`)
+    const handler = (e: MediaQueryListEvent) => setFits(e.matches)
+    mq.addEventListener('change', handler)
+    setFits(mq.matches)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+  return fits
 }
 
 function App() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
-  const [processing, setProcessing] = useState(false);
-  const [chatCollapsed, setChatCollapsed] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
-  const canFitSidebar = useCanFitSidebar();
+  const [messages, setMessages] = useState<Message[]>([])
+  const [input, setInput] = useState('')
+  const [processing, setProcessing] = useState(false)
+  const [chatCollapsed, setChatCollapsed] = useState(false)
+  const wsRef = useRef<WebSocket | null>(null)
+  const canFitSidebar = useCanFitSidebar()
 
   const layoutMode =
     messages.length < MESSAGE_THRESHOLD
-      ? "centered"
+      ? 'centered'
       : chatCollapsed || !canFitSidebar
-        ? "popup"
-        : "sidebar";
+        ? 'popup'
+        : 'sidebar'
 
   useEffect(() => {
-    const ws = new WebSocket(`ws://${location.host}/ws`);
-    wsRef.current = ws;
+    const ws = new WebSocket(`ws://${location.host}/ws`)
+    wsRef.current = ws
 
-    ws.onmessage = (e) => {
-      const data = JSON.parse(e.data);
-      if (data.type === "status") {
-        setProcessing(data.processing);
-        return;
+    ws.onmessage = e => {
+      const data = JSON.parse(e.data)
+      if (data.type === 'status') {
+        setProcessing(data.processing)
+        return
       }
-      if (data.type === "history") {
-        setMessages(data.messages);
-        return;
+      if (data.type === 'history') {
+        setMessages(data.messages)
+        return
       }
-      setMessages((prev) => [...prev, data]);
-    };
+      setMessages(prev => [...prev, data])
+    }
 
     ws.onclose = () => {
-      setTimeout(() => location.reload(), 2000);
-    };
+      setTimeout(() => location.reload(), 2000)
+    }
 
-    return () => ws.close();
-  }, []);
+    return () => ws.close()
+  }, [])
 
   const send = useCallback(() => {
-    const text = input.trim();
-    if (!text || !wsRef.current || processing) return;
-    wsRef.current.send(JSON.stringify({ type: "chat", content: text }));
-    setInput("");
-  }, [input, processing]);
+    const text = input.trim()
+    if (!text || !wsRef.current || processing) return
+    wsRef.current.send(JSON.stringify({ type: 'chat', content: text }))
+    setInput('')
+  }, [input, processing])
 
   const stop = useCallback(() => {
-    if (!wsRef.current || !processing) return;
-    wsRef.current.send(JSON.stringify({ type: "stop" }));
-  }, [processing]);
+    if (!wsRef.current || !processing) return
+    wsRef.current.send(JSON.stringify({ type: 'stop' }))
+  }, [processing])
 
   const chatPanel = (
     <ChatPanel
@@ -87,18 +90,14 @@ function App() {
       onCollapse={() => setChatCollapsed(true)}
       onExpand={() => setChatCollapsed(false)}
     />
-  );
+  )
 
-  if (layoutMode === "centered") {
-    return (
-      <div className="h-screen">
-        {chatPanel}
-      </div>
-    );
+  if (layoutMode === 'centered') {
+    return <div className="h-screen">{chatPanel}</div>
   }
 
   return (
-    <div className="flex gap-16 items-start justify-center p-10 h-screen">
+    <div className="flex h-screen items-start justify-center gap-16 p-10">
       {/* Workspace always visible in sidebar/popup modes */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -111,13 +110,13 @@ function App() {
 
       {/* Sidebar chat */}
       <AnimatePresence>
-        {layoutMode === "sidebar" && (
+        {layoutMode === 'sidebar' && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="flex-1 min-w-[400px] max-w-[440px] h-full"
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="h-full max-w-[440px] min-w-[400px] flex-1"
           >
             {chatPanel}
           </motion.div>
@@ -125,9 +124,9 @@ function App() {
       </AnimatePresence>
 
       {/* Popup chat */}
-      {layoutMode === "popup" && (
+      {layoutMode === 'popup' && (
         <ChatPopup>
-          {(onClose) => (
+          {onClose => (
             <ChatPanel
               messages={messages}
               input={input}
@@ -144,7 +143,7 @@ function App() {
         </ChatPopup>
       )}
     </div>
-  );
+  )
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById('root')!).render(<App />)
