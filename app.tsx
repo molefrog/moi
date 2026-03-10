@@ -100,17 +100,17 @@ function App() {
   return (
     <div className="flex h-screen items-start justify-center p-10">
       {/* Workspace always visible in sidebar/popup modes */}
-      <div className="w-[640px] shrink-0">
+      <div className="w-full max-w-[640px]">
         <Workspace />
       </div>
 
       {/* Sidebar chat — always in DOM, width animates to push workspace */}
       <div
         className={cn(
-          'h-full shrink-0 transition-all ease-in-out',
+          'h-full shrink-0 overflow-hidden transition-all ease-in-out',
           showSidebar
-            ? 'w-[464px] translate-x-0 opacity-100 duration-0'
-            : 'w-0 translate-x-full opacity-0 duration-200'
+            ? 'w-[464px] opacity-100 duration-0'
+            : 'w-0 opacity-0 duration-200'
         )}
       >
         <div className="h-full w-[464px] pl-16">
