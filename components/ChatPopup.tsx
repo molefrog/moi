@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 
-import { MessageChatCircle, XClose } from '@untitledui/icons'
+import { MessageSquare02, XClose } from '@untitledui/icons'
 
 import { Button } from './ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
@@ -22,7 +22,7 @@ export function ChatPopup({ children }: ChatPopupProps) {
           <XClose />
         ) : (
           <>
-            <MessageChatCircle /> Chat
+            <MessageSquare02 /> Chat
           </>
         )}
       </PopoverTrigger>
@@ -31,7 +31,7 @@ export function ChatPopup({ children }: ChatPopupProps) {
         sideOffset={-48}
         align="end"
         alignOffset={-8}
-        className="flex h-[calc(100vh-96px)] w-[400px] flex-col gap-0 rounded-2xl p-6"
+        className="flex h-[calc(100vh-96px)] w-[440px] flex-col gap-0 rounded-3xl p-4"
       >
         {children(onClose)}
       </PopoverContent>

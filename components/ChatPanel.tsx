@@ -1,6 +1,12 @@
 import React, { useEffect, useRef } from 'react'
 
-import { ChevronRight, ChevronRightDouble, Expand06, MessageChatCircle, XClose } from '@untitledui/icons'
+import {
+  ChevronRight,
+  ChevronRightDouble,
+  LayoutRight,
+  MessageSquare02,
+  XClose
+} from '@untitledui/icons'
 
 import { cn } from '../shared/cn'
 import type { ChatMessage } from '../shared/types'
@@ -46,9 +52,9 @@ export function ChatPanel({
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between pb-2 pl-3">
-        <h1 className="text-lg font-semibold">New chat</h1>
-        <div className="flex items-center gap-2">
+      <header className="flex items-center justify-between pb-2 pl-2">
+        <h1 className="text-sm font-medium">New workspace</h1>
+        <div className="flex items-center gap-0.5">
           {layoutMode === 'sidebar' && onCollapse && (
             <Button variant="ghost" size="icon" onClick={onCollapse} aria-label="Collapse chat">
               <ChevronRightDouble className="text-muted-foreground" />
@@ -63,7 +69,7 @@ export function ChatPanel({
                   onClick={onExpand}
                   aria-label="Expand to sidebar"
                 >
-                  <Expand06 className="text-muted-foreground" />
+                  <LayoutRight className="text-muted-foreground" />
                 </Button>
               )}
               {onClose && (
@@ -76,8 +82,8 @@ export function ChatPanel({
         </div>
       </header>
 
-      <ScrollFade className="flex-1 px-3 pt-6 pb-6">
-        <div className={cn('flex flex-col gap-6', isCentered && 'mx-auto max-w-[720px]')}>
+      <ScrollFade className="flex-1 px-2 pt-4 pb-4">
+        <div className={cn('flex flex-col gap-4', isCentered && 'mx-auto max-w-[720px]')}>
           {messages.length === 0 && !processing && <EmptyState />}
           {messages.map((msg, i) => (
             <MessageBlock key={i} msg={msg} compact={!isCentered} />
@@ -106,7 +112,7 @@ function EmptyState() {
   return (
     <div className="flex min-h-[60vh] flex-1 flex-col items-center justify-center gap-3">
       <div className="bg-muted border-border flex h-10 w-10 items-center justify-center rounded-full border">
-        <MessageChatCircle size={18} className="text-muted-foreground" />
+        <MessageSquare02 size={20} className="text-muted-foreground" />
       </div>
       <p className="text-muted-foreground text-sm">Start a conversation with the agent</p>
     </div>
@@ -134,7 +140,7 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
   switch (msg.type) {
     case 'user':
       return (
-        <p className="ml-8 self-end rounded-md bg-black/[0.07] px-4 py-2 text-base leading-normal wrap-break-word whitespace-pre-wrap">
+        <p className="ml-8 self-end rounded-md bg-black/[0.07] px-4 py-2 text-sm leading-normal wrap-break-word whitespace-pre-wrap">
           {msg.content}
         </p>
       )
@@ -142,7 +148,7 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
     case 'assistant':
       return (
         <div>
-          <div className="prose-inline text-base leading-normal wrap-break-word">
+          <div className="prose-inline text-sm leading-normal wrap-break-word">
             <FormattedText text={msg.content} />
           </div>
         </div>

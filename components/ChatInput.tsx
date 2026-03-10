@@ -33,7 +33,7 @@ export function ChatInput({ value, onChange, onSend, onStop, processing }: ChatI
         e.preventDefault()
         ref.current?.focus()
       }}
-      className="border-input focus-within:border-ring focus-within:ring-ring bg-background flex w-full cursor-text flex-col gap-1 rounded-xl border p-2 shadow-sm transition-[color,box-shadow] outline-none focus-within:ring-2"
+      className="border-input bg-background flex w-full cursor-text flex-col gap-1 rounded-xl border p-2 shadow-xs transition-[color,box-shadow] outline-none focus-within:shadow-sm"
     >
       <textarea
         ref={ref}
@@ -51,7 +51,7 @@ export function ChatInput({ value, onChange, onSend, onStop, processing }: ChatI
         disabled={processing}
         autoFocus
         rows={1}
-        className="placeholder:text-muted-foreground w-full resize-none bg-transparent px-2 py-1 text-base leading-relaxed outline-none disabled:opacity-50"
+        className="placeholder:text-muted-foreground w-full resize-none bg-transparent px-2 py-1 text-sm leading-relaxed outline-none disabled:opacity-50"
       />
       <div className="flex justify-end pt-0">
         {processing ? (
