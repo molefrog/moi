@@ -47,9 +47,7 @@ export function ChatPanel({
     <div className="flex h-full flex-col font-sans">
       {/* Header */}
       <header className="flex items-center justify-between pb-6">
-        <h1 className="text-lg leading-normal font-semibold tracking-tight">
-          New chat
-        </h1>
+        <h1 className="text-lg leading-normal font-semibold tracking-tight">New chat</h1>
         <div className="flex items-center gap-2">
           {layoutMode === 'sidebar' && onCollapse && (
             <Button variant="ghost" size="icon" onClick={onCollapse} aria-label="Collapse chat">
@@ -79,7 +77,7 @@ export function ChatPanel({
       </header>
 
       {/* Messages */}
-      <div className="chat-scroll flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto">
         <div className={cn('flex flex-col gap-6', isCentered && 'mx-auto max-w-[720px]')}>
           {messages.length === 0 && !processing && <EmptyState />}
           {messages.map((msg, i) => (
@@ -159,7 +157,7 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
                 size={12}
                 className="text-ring chevron transition-transform duration-150"
               />
-              <span className="text-amber-800 font-mono text-xs font-medium">{msg.name}</span>
+              <span className="font-mono text-xs font-medium text-amber-800">{msg.name}</span>
               <span
                 className={cn(
                   'text-ring truncate font-mono text-[11px]',
@@ -169,8 +167,8 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
                 {formatInputBrief(msg.name, msg.input)}
               </span>
             </summary>
-            <div className="bg-amber-50 border-amber-200 mt-1 ml-4 rounded-md border px-3 py-2.5">
-              <pre className="text-amber-800 max-h-[200px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
+            <div className="mt-1 ml-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5">
+              <pre className="max-h-[200px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-amber-800">
                 {formatInput(msg.name, msg.input)}
               </pre>
             </div>
@@ -182,8 +180,8 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
       return (
         <div className="border-border my-0.5 ml-7 border-l-2 pl-3">
           {msg.is_error ? (
-            <div className="bg-red-50 border-red-200 ml-4 rounded-md border px-3 py-2">
-              <pre className="text-red-800 max-h-[160px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
+            <div className="ml-4 rounded-md border border-red-200 bg-red-50 px-3 py-2">
+              <pre className="max-h-[160px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-red-800">
                 {msg.content || '(empty)'}
               </pre>
             </div>
@@ -222,7 +220,7 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
 
     case 'error':
       return (
-        <div className="bg-red-50 border-red-200 text-red-800 my-1 ml-7 rounded-lg border px-3.5 py-2.5 text-sm">
+        <div className="my-1 ml-7 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-800">
           {msg.content}
         </div>
       )
