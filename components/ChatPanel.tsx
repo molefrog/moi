@@ -1,10 +1,11 @@
 import React, { useEffect, useRef } from 'react'
 
-import { ChevronRight, Expand06, MessageChatCircle, XClose } from '@untitledui/icons'
+import { ChevronRight, ChevronRightDouble, Expand06, MessageChatCircle, XClose } from '@untitledui/icons'
 
 import { cn } from '../shared/cn'
 import type { ChatMessage } from '../shared/types'
 import { ChatInput } from './ChatInput'
+import { ScrollFade } from './ScrollFade'
 import { Button } from './ui/button'
 
 type Message = ChatMessage
@@ -44,14 +45,13 @@ export function ChatPanel({
   const isCentered = layoutMode === 'centered'
 
   return (
-    <div className="flex h-full flex-col font-sans">
-      {/* Header */}
-      <header className="flex items-center justify-between pb-6">
-        <h1 className="text-lg leading-normal font-semibold tracking-tight">New chat</h1>
+    <div className="flex h-full flex-col">
+      <header className="flex items-center justify-between pb-2 pl-3">
+        <h1 className="text-lg font-semibold">New chat</h1>
         <div className="flex items-center gap-2">
           {layoutMode === 'sidebar' && onCollapse && (
             <Button variant="ghost" size="icon" onClick={onCollapse} aria-label="Collapse chat">
-              <XClose className="text-muted-foreground" />
+              <ChevronRightDouble className="text-muted-foreground" />
             </Button>
           )}
           {layoutMode === 'popup' && (
@@ -76,8 +76,7 @@ export function ChatPanel({
         </div>
       </header>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto">
+      <ScrollFade className="flex-1 px-3 pt-6 pb-6">
         <div className={cn('flex flex-col gap-6', isCentered && 'mx-auto max-w-[720px]')}>
           {messages.length === 0 && !processing && <EmptyState />}
           {messages.map((msg, i) => (
@@ -86,17 +85,18 @@ export function ChatPanel({
           {processing && <ThinkingIndicator />}
           <div ref={bottomRef} />
         </div>
-      </div>
+      </ScrollFade>
 
-      {/* Input */}
-      <div className={cn('pt-4', isCentered && 'mx-auto max-w-[720px] py-4')}>
-        <ChatInput
-          value={input}
-          onChange={setInput}
-          onSend={send}
-          onStop={stop}
-          processing={processing}
-        />
+      <div className="relative">
+        <div className={cn(isCentered && 'mx-auto max-w-[720px]')}>
+          <ChatInput
+            value={input}
+            onChange={setInput}
+            onSend={send}
+            onStop={stop}
+            processing={processing}
+          />
+        </div>
       </div>
     </div>
   )

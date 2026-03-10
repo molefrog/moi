@@ -31,7 +31,7 @@ export function ChatPopup({ children }: ChatPopupProps) {
         sideOffset={-48}
         align="end"
         alignOffset={-8}
-        className="flex h-[calc(100vh-96px)] w-[400px] flex-col gap-0 rounded-xl p-6"
+        className="flex h-[calc(100vh-96px)] w-[400px] flex-col gap-0 rounded-2xl p-6"
       >
         {children(onClose)}
       </PopoverContent>

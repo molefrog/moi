@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 
-import { ArrowUp } from '@untitledui/icons'
+import { ArrowUp, StopSquare } from '@untitledui/icons'
 
 import { Button } from './ui/button'
 
@@ -33,7 +33,7 @@ export function ChatInput({ value, onChange, onSend, onStop, processing }: ChatI
         e.preventDefault()
         ref.current?.focus()
       }}
-      className="border-input focus-within:border-ring focus-within:ring-ring/50 flex w-full cursor-text flex-col gap-1 rounded-xl border bg-transparent p-2 shadow-xs transition-[color,box-shadow] outline-none focus-within:ring-[3px]"
+      className="border-input focus-within:border-ring focus-within:ring-ring bg-background flex w-full cursor-text flex-col gap-1 rounded-xl border p-2 shadow-sm transition-[color,box-shadow] outline-none focus-within:ring-2"
     >
       <textarea
         ref={ref}
@@ -47,18 +47,16 @@ export function ChatInput({ value, onChange, onSend, onStop, processing }: ChatI
             onSend()
           }
         }}
-        placeholder="Ask the agent..."
+        placeholder="Ask anything..."
         disabled={processing}
         autoFocus
         rows={1}
-        className="placeholder:text-muted-foreground w-full resize-none bg-transparent px-2 py-1 text-sm leading-relaxed outline-none disabled:opacity-50"
+        className="placeholder:text-muted-foreground w-full resize-none bg-transparent px-2 py-1 text-base leading-relaxed outline-none disabled:opacity-50"
       />
       <div className="flex justify-end pt-0">
         {processing ? (
           <Button type="button" size="icon" onClick={onStop} aria-label="Stop agent">
-            <svg viewBox="0 0 16 16" fill="currentColor">
-              <rect x="3" y="3" width="10" height="10" rx="1.5" />
-            </svg>
+            <StopSquare />
           </Button>
         ) : (
           <Button type="submit" size="icon" disabled={!value.trim()} aria-label="Send message">
