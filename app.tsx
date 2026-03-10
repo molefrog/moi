@@ -1,11 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
-import { motion } from 'motion/react'
-
 import { createRoot } from 'react-dom/client'
 
 import './app.css'
 import { ChatPanel } from './components/ChatPanel'
+import { cn } from './shared/cn'
 import { ChatPopup } from './components/ChatPopup'
 import { Workspace } from './components/Workspace'
 import type { ChatMessage } from './shared/types'
@@ -97,38 +96,27 @@ function App() {
   }
 
   const showSidebar = layoutMode === 'sidebar'
-  const spring = { type: 'spring' as const, stiffness: 300, damping: 30 }
 
   return (
     <div className="flex h-screen items-start justify-center p-10">
       {/* Workspace always visible in sidebar/popup modes */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-        className="w-[640px] shrink-0"
-      >
+      <div className="w-[640px] shrink-0">
         <Workspace />
-      </motion.div>
+      </div>
 
       {/* Sidebar chat — always in DOM, width animates to push workspace */}
-      <motion.div
-        animate={{ width: showSidebar ? 464 : 0 }}
-        transition={spring}
-        className="h-full shrink-0 overflow-hidden"
+      <div
+        className={cn(
+          'h-full shrink-0 overflow-hidden transition-all ease-in-out',
+          showSidebar
+            ? 'w-[464px] translate-x-0 opacity-100 duration-0'
+            : 'w-0 translate-x-full opacity-0 duration-200'
+        )}
       >
-        <motion.div
-          animate={{
-            x: showSidebar ? 0 : 200,
-            opacity: showSidebar ? 1 : 0,
-          }}
-          transition={showSidebar ? { duration: 0 } : spring}
-          className="h-full pl-16"
-          style={{ width: 464 }}
-        >
+        <div className="h-full w-[464px] pl-16">
           {chatPanel}
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
 
       {/* Popup chat */}
       {layoutMode === 'popup' && (
