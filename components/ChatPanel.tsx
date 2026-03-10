@@ -5,7 +5,6 @@ import {
   ArrowRight,
   MessageChatCircle,
   ChevronRight,
-  CpuChip01,
   Minimize01,
   Expand06,
 } from "@untitledui/icons";
@@ -56,11 +55,10 @@ export function ChatPanel({
   return (
     <div className="flex flex-col h-full bg-surface font-sans">
       {/* Header */}
-      <header className="flex items-center justify-between px-5 py-3">
+      <header className="flex items-center justify-between pb-6">
         <h1
           className={cn(
-            "font-semibold tracking-tight text-ink",
-            isCentered ? "text-[15px]" : "text-sm",
+            "font-semibold tracking-tight text-ink text-xl leading-normal",
           )}
         >
           New chat
@@ -91,7 +89,7 @@ export function ChatPanel({
       <div className="flex-1 overflow-y-auto chat-scroll">
         <div
           className={cn(
-            "px-6 py-6 flex flex-col gap-1",
+            "flex flex-col gap-6",
             isCentered && "max-w-[720px] mx-auto",
           )}
         >
@@ -105,61 +103,54 @@ export function ChatPanel({
       </div>
 
       {/* Input */}
-      <div>
-        <form
-          className={cn(
-            "flex items-end gap-3 px-5 py-3",
-            isCentered && "max-w-[720px] mx-auto px-6 py-4",
-          )}
-          onSubmit={(e) => {
-            e.preventDefault();
-            send();
+      <form
+        className={cn(
+          "flex items-end gap-3 pt-4",
+          isCentered && "max-w-[720px] mx-auto py-4",
+        )}
+        onSubmit={(e) => {
+          e.preventDefault();
+          send();
+        }}
+      >
+        <textarea
+          ref={inputRef}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              send();
+            }
           }}
-        >
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            placeholder="Ask the agent..."
-            disabled={processing}
-            autoFocus
-            rows={1}
-            className="flex-1 px-4 py-3 bg-surface border border-border rounded-xl text-sm text-ink leading-relaxed outline-none resize-none transition-colors placeholder:text-ink-faint focus:border-ink-muted disabled:opacity-50 font-sans"
-          />
-          {processing ? (
-            <button
-              type="button"
-              onClick={stop}
-              aria-label="Stop agent"
-              className="w-10 h-10 shrink-0 flex items-center justify-center bg-error-ink text-white rounded-xl transition-opacity hover:opacity-80"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 16 16"
-                fill="currentColor"
-              >
-                <rect x="3" y="3" width="10" height="10" rx="1.5" />
-              </svg>
-            </button>
-          ) : (
-            <button
-              type="submit"
-              disabled={!input.trim()}
-              aria-label="Send message"
-              className="w-10 h-10 shrink-0 flex items-center justify-center bg-accent text-white rounded-xl transition-opacity disabled:opacity-15 disabled:cursor-not-allowed hover:opacity-80"
-            >
-              <ArrowRight size={16} />
-            </button>
-          )}
-        </form>
-      </div>
+          placeholder="Ask the agent..."
+          disabled={processing}
+          autoFocus
+          rows={1}
+          className="flex-1 px-4 py-3 bg-surface border border-border rounded-xl text-sm text-ink leading-relaxed outline-none resize-none transition-colors placeholder:text-ink-faint focus:border-ink-muted disabled:opacity-50 font-sans"
+        />
+        {processing ? (
+          <button
+            type="button"
+            onClick={stop}
+            aria-label="Stop agent"
+            className="w-10 h-10 shrink-0 flex items-center justify-center bg-error-ink text-white rounded-xl transition-opacity hover:opacity-80"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+              <rect x="3" y="3" width="10" height="10" rx="1.5" />
+            </svg>
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={!input.trim()}
+            aria-label="Send message"
+            className="w-10 h-10 shrink-0 flex items-center justify-center bg-accent text-white rounded-xl transition-opacity disabled:opacity-15 disabled:cursor-not-allowed hover:opacity-80"
+          >
+            <ArrowRight size={16} />
+          </button>
+        )}
+      </form>
     </div>
   );
 }
@@ -201,35 +192,18 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
   switch (msg.type) {
     case "user":
       return (
-        <div
-          className="mt-4 mb-1"
+        <p
+          className="ml-8 self-end bg-black/[0.07] rounded-xl px-4 py-2 text-base text-ink leading-normal whitespace-pre-wrap break-words"
           style={{ animation: "fade-in 0.2s ease-out" }}
         >
-          <div className="flex items-center gap-2 mb-1.5">
-            <div className="w-5 h-5 rounded-full bg-accent text-white flex items-center justify-center text-[10px] font-semibold">
-              Y
-            </div>
-            <span className="text-xs font-medium text-ink-muted">You</span>
-          </div>
-          <div className="pl-7 text-sm text-ink leading-relaxed whitespace-pre-wrap break-words">
-            {msg.content}
-          </div>
-        </div>
+          {msg.content}
+        </p>
       );
 
     case "assistant":
       return (
-        <div
-          className="mt-4 mb-1"
-          style={{ animation: "fade-in 0.2s ease-out" }}
-        >
-          <div className="flex items-center gap-2 mb-1.5">
-            <div className="w-5 h-5 rounded-full bg-accent-soft border border-border flex items-center justify-center">
-              <CpuChip01 size={12} className="text-ink-muted" />
-            </div>
-            <span className="text-xs font-medium text-ink-muted">Agent</span>
-          </div>
-          <div className="pl-7 text-sm text-ink leading-[1.7] break-words prose-inline">
+        <div style={{ animation: "fade-in 0.2s ease-out" }}>
+          <div className="text-base text-ink leading-normal break-words prose-inline">
             <FormattedText text={msg.content} />
           </div>
         </div>

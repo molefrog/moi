@@ -10,6 +10,19 @@ import { ChatPopup } from "./components/ChatPopup";
 type Message = ChatMessage;
 
 const MESSAGE_THRESHOLD = 5;
+const SPLIT_MIN_WIDTH = 1184; // 40 + 640 + 64 + 400 + 40
+
+function useCanFitSidebar() {
+  const [fits, setFits] = useState(() => window.innerWidth >= SPLIT_MIN_WIDTH);
+  useEffect(() => {
+    const mq = window.matchMedia(`(min-width: ${SPLIT_MIN_WIDTH}px)`);
+    const handler = (e: MediaQueryListEvent) => setFits(e.matches);
+    mq.addEventListener("change", handler);
+    setFits(mq.matches);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return fits;
+}
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -18,11 +31,12 @@ function App() {
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [popupOpen, setPopupOpen] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
+  const canFitSidebar = useCanFitSidebar();
 
   const layoutMode =
     messages.length < MESSAGE_THRESHOLD
       ? "centered"
-      : chatCollapsed
+      : chatCollapsed || !canFitSidebar
         ? "popup"
         : "sidebar";
 
@@ -88,13 +102,13 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen">
+    <div className="flex gap-16 items-start justify-center p-10 h-screen">
       {/* Workspace always visible in sidebar/popup modes */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.3 }}
-        className="flex-1 min-w-0"
+        className="w-[640px] shrink-0"
       >
         <Workspace />
       </motion.div>
@@ -103,15 +117,13 @@ function App() {
       <AnimatePresence>
         {layoutMode === "sidebar" && (
           <motion.div
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 420, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="shrink-0 overflow-hidden"
+            className="flex-1 min-w-[400px] max-w-[440px] h-full"
           >
-            <div className="w-[420px] h-full">
-              {chatPanel}
-            </div>
+            {chatPanel}
           </motion.div>
         )}
       </AnimatePresence>
