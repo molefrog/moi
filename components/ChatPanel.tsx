@@ -2,12 +2,13 @@ import React, { useEffect, useRef } from "react";
 import { cn } from "../shared/cn";
 import type { ChatMessage } from "../shared/types";
 import {
-  ArrowRight,
   MessageChatCircle,
   ChevronRight,
   Minimize01,
   Expand06,
 } from "@untitledui/icons";
+import { Button } from "./ui/button";
+import { ChatInput } from "./ChatInput";
 
 type Message = ChatMessage;
 export type LayoutMode = "centered" | "sidebar" | "popup";
@@ -36,24 +37,15 @@ export function ChatPanel({
   onExpand,
 }: ChatPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.style.height = "auto";
-      inputRef.current.style.height =
-        Math.min(inputRef.current.scrollHeight, 160) + "px";
-    }
-  }, [input]);
-
   const isCentered = layoutMode === "centered";
 
   return (
-    <div className="flex flex-col h-full bg-surface font-sans">
+    <div className="flex flex-col h-full font-sans">
       {/* Header */}
       <header className="flex items-center justify-between pb-6">
         <h1
@@ -65,22 +57,24 @@ export function ChatPanel({
         </h1>
         <div className="flex items-center gap-2">
           {layoutMode === "sidebar" && onCollapse && (
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={onCollapse}
-              className="p-1.5 rounded-lg hover:bg-accent-soft transition-colors"
               aria-label="Collapse chat"
             >
-              <Minimize01 size={14} className="text-ink-muted" />
-            </button>
+              <Minimize01 className="text-ink-muted" />
+            </Button>
           )}
           {layoutMode === "popup" && onExpand && (
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={onExpand}
-              className="p-1.5 rounded-lg hover:bg-accent-soft transition-colors"
               aria-label="Expand to sidebar"
             >
-              <Expand06 size={14} className="text-ink-muted" />
-            </button>
+              <Expand06 className="text-ink-muted" />
+            </Button>
           )}
         </div>
       </header>
@@ -103,54 +97,20 @@ export function ChatPanel({
       </div>
 
       {/* Input */}
-      <form
+      <div
         className={cn(
-          "flex items-end gap-3 pt-4",
+          "pt-4",
           isCentered && "max-w-[720px] mx-auto py-4",
         )}
-        onSubmit={(e) => {
-          e.preventDefault();
-          send();
-        }}
       >
-        <textarea
-          ref={inputRef}
+        <ChatInput
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              send();
-            }
-          }}
-          placeholder="Ask the agent..."
-          disabled={processing}
-          autoFocus
-          rows={1}
-          className="flex-1 px-4 py-3 bg-surface border border-border rounded-xl text-sm text-ink leading-relaxed outline-none resize-none transition-colors placeholder:text-ink-faint focus:border-ink-muted disabled:opacity-50 font-sans"
+          onChange={setInput}
+          onSend={send}
+          onStop={stop}
+          processing={processing}
         />
-        {processing ? (
-          <button
-            type="button"
-            onClick={stop}
-            aria-label="Stop agent"
-            className="w-10 h-10 shrink-0 flex items-center justify-center bg-error-ink text-white rounded-xl transition-opacity hover:opacity-80"
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-              <rect x="3" y="3" width="10" height="10" rx="1.5" />
-            </svg>
-          </button>
-        ) : (
-          <button
-            type="submit"
-            disabled={!input.trim()}
-            aria-label="Send message"
-            className="w-10 h-10 shrink-0 flex items-center justify-center bg-accent text-white rounded-xl transition-opacity disabled:opacity-15 disabled:cursor-not-allowed hover:opacity-80"
-          >
-            <ArrowRight size={16} />
-          </button>
-        )}
-      </form>
+      </div>
     </div>
   );
 }
@@ -161,7 +121,7 @@ function EmptyState() {
       className="flex flex-col items-center justify-center flex-1 min-h-[60vh] gap-3"
       style={{ animation: "fade-in 0.4s ease-out" }}
     >
-      <div className="w-10 h-10 rounded-full bg-accent-soft border border-border flex items-center justify-center">
+      <div className="w-10 h-10 rounded-full bg-muted border border-border flex items-center justify-center">
         <MessageChatCircle size={18} className="text-ink-muted" />
       </div>
       <p className="text-sm text-ink-muted">
@@ -317,7 +277,7 @@ function FormattedText({ text }: { text: string }) {
           return (
             <code
               key={i}
-              className="px-1.5 py-0.5 bg-accent-soft rounded text-[13px] font-mono"
+              className="px-1.5 py-0.5 bg-muted rounded text-[13px] font-mono"
             >
               {part.slice(1, -1)}
             </code>
