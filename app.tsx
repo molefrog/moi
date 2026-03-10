@@ -29,7 +29,6 @@ function App() {
   const [input, setInput] = useState("");
   const [processing, setProcessing] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
-  const [popupOpen, setPopupOpen] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const canFitSidebar = useCanFitSidebar();
 
@@ -86,10 +85,7 @@ function App() {
       stop={stop}
       layoutMode={layoutMode}
       onCollapse={() => setChatCollapsed(true)}
-      onExpand={() => {
-        setChatCollapsed(false);
-        setPopupOpen(false);
-      }}
+      onExpand={() => setChatCollapsed(false)}
     />
   );
 
@@ -130,11 +126,21 @@ function App() {
 
       {/* Popup chat */}
       {layoutMode === "popup" && (
-        <ChatPopup
-          open={popupOpen}
-          onToggle={() => setPopupOpen((prev) => !prev)}
-        >
-          {chatPanel}
+        <ChatPopup>
+          {(onClose) => (
+            <ChatPanel
+              messages={messages}
+              input={input}
+              setInput={setInput}
+              processing={processing}
+              send={send}
+              stop={stop}
+              layoutMode={layoutMode}
+              onCollapse={() => setChatCollapsed(true)}
+              onExpand={() => setChatCollapsed(false)}
+              onClose={onClose}
+            />
+          )}
         </ChatPopup>
       )}
     </div>

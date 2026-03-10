@@ -4,7 +4,7 @@ import type { ChatMessage } from "../shared/types";
 import {
   MessageChatCircle,
   ChevronRight,
-  Minimize01,
+  XClose,
   Expand06,
 } from "@untitledui/icons";
 import { Button } from "./ui/button";
@@ -23,6 +23,7 @@ type ChatPanelProps = {
   layoutMode: LayoutMode;
   onCollapse?: () => void;
   onExpand?: () => void;
+  onClose?: () => void;
 };
 
 export function ChatPanel({
@@ -35,6 +36,7 @@ export function ChatPanel({
   layoutMode,
   onCollapse,
   onExpand,
+  onClose,
 }: ChatPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -63,18 +65,32 @@ export function ChatPanel({
               onClick={onCollapse}
               aria-label="Collapse chat"
             >
-              <Minimize01 className="text-ink-muted" />
+              <XClose className="text-ink-muted" />
             </Button>
           )}
-          {layoutMode === "popup" && onExpand && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onExpand}
-              aria-label="Expand to sidebar"
-            >
-              <Expand06 className="text-ink-muted" />
-            </Button>
+          {layoutMode === "popup" && (
+            <>
+              {onExpand && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onExpand}
+                  aria-label="Expand to sidebar"
+                >
+                  <Expand06 className="text-ink-muted" />
+                </Button>
+              )}
+              {onClose && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onClose}
+                  aria-label="Close chat"
+                >
+                  <XClose className="text-ink-muted" />
+                </Button>
+              )}
+            </>
           )}
         </div>
       </header>
