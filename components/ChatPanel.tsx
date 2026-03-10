@@ -1,12 +1,12 @@
 import React, { useEffect, useRef } from 'react'
 
 import {
-  ChevronRight,
-  ChevronRightDouble,
-  LayoutRight,
-  MessageSquare02,
-  XClose
-} from '@untitledui/icons'
+  IconChevronRight,
+  IconChevronsRight,
+  IconLayoutSidebarRightFilled,
+  IconMessage,
+  IconX
+} from '@tabler/icons-react'
 
 import { cn } from '../shared/cn'
 import type { ChatMessage } from '../shared/types'
@@ -57,7 +57,7 @@ export function ChatPanel({
         <div className="flex items-center gap-0.5">
           {layoutMode === 'sidebar' && onCollapse && (
             <Button variant="ghost" size="icon" onClick={onCollapse} aria-label="Collapse chat">
-              <ChevronRightDouble className="text-muted-foreground" />
+              <IconChevronsRight className="text-muted-foreground" />
             </Button>
           )}
           {layoutMode === 'popup' && (
@@ -69,12 +69,12 @@ export function ChatPanel({
                   onClick={onExpand}
                   aria-label="Expand to sidebar"
                 >
-                  <LayoutRight className="text-muted-foreground" />
+                  <IconLayoutSidebarRightFilled className="text-muted-foreground" />
                 </Button>
               )}
               {onClose && (
                 <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close chat">
-                  <XClose className="text-muted-foreground" />
+                  <IconX className="text-muted-foreground" />
                 </Button>
               )}
             </>
@@ -112,7 +112,7 @@ function EmptyState() {
   return (
     <div className="flex min-h-[60vh] flex-1 flex-col items-center justify-center gap-3">
       <div className="bg-muted border-border flex h-10 w-10 items-center justify-center rounded-full border">
-        <MessageSquare02 size={20} className="text-muted-foreground" />
+        <IconMessage size={20} className="text-muted-foreground" />
       </div>
       <p className="text-muted-foreground text-sm">Start a conversation with the agent</p>
     </div>
@@ -159,7 +159,7 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
         <div className="border-border my-0.5 ml-7 border-l-2 pl-3">
           <details className="group">
             <summary className="flex cursor-pointer items-center gap-2 py-1.5 select-none">
-              <ChevronRight
+              <IconChevronRight
                 size={12}
                 className="text-ring chevron transition-transform duration-150"
               />

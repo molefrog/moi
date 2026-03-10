@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 
-import { MessageSquare02, XClose } from '@untitledui/icons'
+import { IconMessage, IconX } from '@tabler/icons-react'
 
 import { Button } from './ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
@@ -19,10 +19,10 @@ export function ChatPopup({ children }: ChatPopupProps) {
         render={<Button variant="outline" size="lg" className="fixed right-6 bottom-6" />}
       >
         {open ? (
-          <XClose />
+          <IconX />
         ) : (
           <>
-            <MessageSquare02 /> Chat
+            <IconMessage /> Chat
           </>
         )}
       </PopoverTrigger>

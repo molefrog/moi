@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 
-import { ArrowUp, StopSquare } from '@untitledui/icons'
+import { IconArrowUp, IconPlayerStop } from '@tabler/icons-react'
 
 import { Button } from './ui/button'
 
@@ -56,11 +56,11 @@ export function ChatInput({ value, onChange, onSend, onStop, processing }: ChatI
       <div className="flex justify-end pt-0">
         {processing ? (
           <Button type="button" size="icon" onClick={onStop} aria-label="Stop agent">
-            <StopSquare />
+            <IconPlayerStop />
           </Button>
         ) : (
           <Button type="submit" size="icon" disabled={!value.trim()} aria-label="Send message">
-            <ArrowUp />
+            <IconArrowUp />
           </Button>
         )}
       </div>
