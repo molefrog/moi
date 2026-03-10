@@ -113,12 +113,7 @@ export function ChatPanel({
       </div>
 
       {/* Input */}
-      <div
-        className={cn(
-          "pt-4",
-          isCentered && "max-w-[720px] mx-auto py-4",
-        )}
-      >
+      <div className={cn("pt-4", isCentered && "max-w-[720px] mx-auto py-4")}>
         <ChatInput
           value={input}
           onChange={setInput}
@@ -169,7 +164,7 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
     case "user":
       return (
         <p
-          className="ml-8 self-end bg-black/[0.07] rounded-xl px-4 py-2 text-base text-ink leading-normal whitespace-pre-wrap break-words"
+          className="ml-8 self-end bg-black/[0.07] rounded-md px-4 py-2 text-base text-ink leading-normal whitespace-pre-wrap wrap-break-word"
           style={{ animation: "fade-in 0.2s ease-out" }}
         >
           {msg.content}
@@ -179,7 +174,7 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
     case "assistant":
       return (
         <div style={{ animation: "fade-in 0.2s ease-out" }}>
-          <div className="text-base text-ink leading-normal break-words prose-inline">
+          <div className="text-base text-ink leading-normal wrap-break-word prose-inline">
             <FormattedText text={msg.content} />
           </div>
         </div>
@@ -209,7 +204,7 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
                 {formatInputBrief(msg.name, msg.input)}
               </span>
             </summary>
-            <div className="mt-1 ml-4 px-3 py-2.5 bg-tool-bg border border-tool-border rounded-lg">
+            <div className="mt-1 ml-4 px-3 py-2.5 bg-tool-bg border border-tool-border rounded-md">
               <pre className="font-mono text-xs text-tool-ink whitespace-pre-wrap break-all max-h-[200px] overflow-y-auto leading-relaxed">
                 {formatInput(msg.name, msg.input)}
               </pre>
@@ -225,7 +220,7 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
           style={{ animation: "fade-in 0.15s ease-out" }}
         >
           {msg.is_error ? (
-            <div className="ml-4 px-3 py-2 bg-error-bg border border-error-border rounded-lg">
+            <div className="ml-4 px-3 py-2 bg-error-bg border border-error-border rounded-md">
               <pre className="font-mono text-xs text-error-ink whitespace-pre-wrap break-all max-h-[160px] overflow-y-auto leading-relaxed">
                 {msg.content || "(empty)"}
               </pre>
@@ -249,7 +244,7 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
                     : " \u00B7 empty"}
                 </span>
               </summary>
-              <div className="mt-1 ml-4 px-3 py-2.5 bg-result-bg border border-border-subtle rounded-lg">
+              <div className="mt-1 ml-4 px-3 py-2.5 bg-result-bg border border-border-subtle rounded-md">
                 <pre className="font-mono text-xs text-ink-muted whitespace-pre-wrap break-all max-h-[200px] overflow-y-auto leading-relaxed">
                   {msg.content || "(empty)"}
                 </pre>
@@ -268,7 +263,7 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
     case "error":
       return (
         <div
-          className="ml-7 my-1 px-3.5 py-2.5 bg-error-bg border border-error-border rounded-xl text-sm text-error-ink"
+          className="ml-7 my-1 px-3.5 py-2.5 bg-error-bg border border-error-border rounded-lg text-sm text-error-ink"
           style={{ animation: "fade-in 0.2s ease-out" }}
         >
           {msg.content}

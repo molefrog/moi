@@ -32,7 +32,7 @@ export function ChatInput({
         e.preventDefault();
         onSend();
       }}
-      className="flex items-end gap-2 w-full rounded-md border border-input bg-transparent px-3 py-2 shadow-xs transition-[color,box-shadow] outline-none focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50"
+      className="flex items-end gap-2 w-full rounded-sm border border-input bg-transparent px-3 py-2 shadow-xs transition-[color,box-shadow] outline-none focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50"
     >
       <textarea
         ref={ref}
