@@ -64,15 +64,17 @@ export function ChatPanel({
         <div className="flex items-center gap-0.5">
           {onModeChange && (
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Change layout mode">
-                  {layoutMode === 'sidebar' ? (
-                    <IconLayoutSidebarRightFilled className="text-muted-foreground" />
-                  ) : (
-                    <IconPictureInPictureFilled className="text-muted-foreground" />
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
+              <DropdownMenuTrigger
+                render={
+                  <Button variant="ghost" size="icon" aria-label="Change layout mode">
+                    {layoutMode === 'sidebar' ? (
+                      <IconLayoutSidebarRightFilled className="text-muted-foreground" />
+                    ) : (
+                      <IconPictureInPictureFilled className="text-muted-foreground" />
+                    )}
+                  </Button>
+                }
+              />
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => onModeChange('sidebar')}>
                   <IconLayoutSidebarRightFilled size={16} />
