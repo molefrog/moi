@@ -95,20 +95,16 @@ function App() {
     />
   )
 
-  if (layoutMode === 'centered') {
-    return <div className="h-screen">{chatPanel}</div>
-  }
-
   const showSidebar = layoutMode === 'sidebar'
 
   return (
     <div className="h-screen overflow-x-hidden px-4 py-4 sm:px-6 sm:py-6 lg:p-10">
       <div className="mx-auto flex h-full w-full max-w-[1184px] justify-center">
-        <div className="w-full max-w-[640px] min-w-0">
-          <Workspace />
+        <div className={cn('min-w-0', layoutMode === 'centered' ? 'w-full max-w-[720px]' : 'w-full max-w-[640px]')}>
+          {layoutMode === 'centered' ? chatPanel : <Workspace />}
         </div>
 
-        {canFitSidebar && (
+        {canFitSidebar && layoutMode !== 'centered' && (
           <div
             className={cn(
               'h-full shrink-0 transition-all ease-in-out',

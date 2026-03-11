@@ -111,7 +111,7 @@ export function ChatPanel({
           !showTopFade && showBottomFade && 'mask-fade-bottom'
         )}
       >
-        <div className={cn('flex flex-col gap-4', isCentered && 'mx-auto max-w-[720px]')}>
+        <div className="flex flex-col gap-4">
           {messages.length === 0 && !processing && <EmptyState />}
           {messages.map((msg, i) => (
             <MessageBlock key={i} msg={msg} compact={!isCentered} />
@@ -121,7 +121,7 @@ export function ChatPanel({
       </div>
 
       <div className="relative shrink-0">
-        <div className={cn(isCentered && 'mx-auto max-w-[720px]')}>
+        <div>
           <ChatInput
             value={input}
             onChange={setInput}
