@@ -101,7 +101,7 @@ export function ChatPanel({
         </div>
       </div>
 
-      <div className="relative">
+      <div className="relative shrink-0">
         <div className={cn(isCentered && 'mx-auto max-w-[720px]')}>
           <ChatInput
             value={input}

@@ -17,7 +17,11 @@ export function ChatPopup({ children }: ChatPopupProps) {
     <Popover open={open} onOpenChange={o => setOpen(o)}>
       <PopoverTrigger
         render={
-          <Button variant="outline" size="lg" className="fixed right-4 bottom-4 sm:right-6 sm:bottom-6" />
+          <Button
+            variant="outline"
+            size="lg"
+            className="fixed right-4 bottom-4 sm:right-6 sm:bottom-6"
+          />
         }
       >
         {open ? (

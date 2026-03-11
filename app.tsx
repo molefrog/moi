@@ -104,14 +104,16 @@ function App() {
           <Workspace />
         </div>
 
-        <div
-          className={cn(
-            'h-full shrink-0 overflow-hidden transition-all ease-in-out',
-            showSidebar ? 'w-[464px] opacity-100 duration-0' : 'w-0 opacity-0 duration-200'
-          )}
-        >
-          <div className="h-full w-[464px] pl-6 lg:pl-16">{chatPanel}</div>
-        </div>
+        {canFitSidebar && (
+          <div
+            className={cn(
+              'h-full shrink-0 transition-all ease-in-out',
+              showSidebar ? 'w-[464px] opacity-100 duration-0' : 'w-0 opacity-0 duration-200'
+            )}
+          >
+            <div className="h-full w-[464px] pl-6 lg:pl-16">{chatPanel}</div>
+          </div>
+        )}
       </div>
 
       {layoutMode === 'popup' && (

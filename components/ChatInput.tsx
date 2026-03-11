@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useRef } from 'react'
 
 import { IconArrowUp, IconPlayerStop } from '@tabler/icons-react'
 
@@ -14,13 +14,6 @@ type ChatInputProps = {
 
 export function ChatInput({ value, onChange, onSend, onStop, processing }: ChatInputProps) {
   const ref = useRef<HTMLTextAreaElement>(null)
-
-  useEffect(() => {
-    if (ref.current) {
-      ref.current.style.height = 'auto'
-      ref.current.style.height = Math.min(ref.current.scrollHeight, 160) + 'px'
-    }
-  }, [value])
 
   return (
     <form
@@ -51,7 +44,7 @@ export function ChatInput({ value, onChange, onSend, onStop, processing }: ChatI
         disabled={processing}
         autoFocus
         rows={1}
-        className="placeholder:text-muted-foreground w-full resize-none bg-transparent px-2 py-1 text-sm leading-relaxed outline-none disabled:opacity-50"
+        className="placeholder:text-muted-foreground field-sizing-content max-h-40 w-full resize-none bg-transparent px-2 py-1 text-sm leading-relaxed outline-none disabled:opacity-50"
       />
       <div className="flex justify-end pt-0">
         {processing ? (
