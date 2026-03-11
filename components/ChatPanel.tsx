@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect } from 'react'
 
 import {
   IconChevronRight,
@@ -8,8 +8,8 @@ import {
   IconX
 } from '@tabler/icons-react'
 
-import { cn, useScrollFade } from '../shared/utils'
 import type { ChatMessage } from '../shared/types'
+import { cn, useScrollFade } from '../shared/utils'
 import { ChatInput } from './ChatInput'
 import { Button } from './ui/button'
 
@@ -41,11 +41,10 @@ export function ChatPanel({
   onExpand,
   onClose
 }: ChatPanelProps) {
-  const bottomRef = useRef<HTMLDivElement>(null)
   const { ref: scrollRef, showTopFade, showBottomFade } = useScrollFade()
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'instant' })
   }, [messages])
 
   const isCentered = layoutMode === 'centered'
@@ -85,7 +84,7 @@ export function ChatPanel({
       <div
         ref={scrollRef}
         className={cn(
-          'flex-1 overflow-y-auto px-2 pt-4 pb-4',
+          'flex-1 overflow-y-auto px-2 pt-4 pb-12',
           showTopFade && showBottomFade && 'mask-fade-y',
           showTopFade && !showBottomFade && 'mask-fade-top',
           !showTopFade && showBottomFade && 'mask-fade-bottom'
@@ -97,7 +96,6 @@ export function ChatPanel({
             <MessageBlock key={i} msg={msg} compact={!isCentered} />
           ))}
           {processing && <ThinkingIndicator />}
-          <div ref={bottomRef} />
         </div>
       </div>
 
