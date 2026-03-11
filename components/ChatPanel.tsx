@@ -1,10 +1,12 @@
 import React, { useEffect } from 'react'
 
 import {
+  IconCheck,
   IconChevronRight,
   IconChevronsRight,
   IconLayoutSidebarRightFilled,
   IconMessage,
+  IconPictureInPictureFilled,
   IconX
 } from '@tabler/icons-react'
 
@@ -12,6 +14,12 @@ import type { ChatMessage } from '../shared/types'
 import { cn, useScrollFade } from '../shared/utils'
 import { ChatInput } from './ChatInput'
 import { Button } from './ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from './ui/dropdown-menu'
 
 type Message = ChatMessage
 export type LayoutMode = 'centered' | 'sidebar' | 'popup'
@@ -24,8 +32,8 @@ type ChatPanelProps = {
   send: () => void
   stop: () => void
   layoutMode: LayoutMode
+  onModeChange?: (mode: 'sidebar' | 'floating') => void
   onCollapse?: () => void
-  onExpand?: () => void
   onClose?: () => void
 }
 
@@ -37,8 +45,8 @@ export function ChatPanel({
   send,
   stop,
   layoutMode,
+  onModeChange,
   onCollapse,
-  onExpand,
   onClose
 }: ChatPanelProps) {
   const { ref: scrollRef, showTopFade, showBottomFade } = useScrollFade()
@@ -54,29 +62,40 @@ export function ChatPanel({
       <header className="flex items-center justify-between pb-2 pl-2">
         <h1 className="text-sm font-medium">New workspace</h1>
         <div className="flex items-center gap-0.5">
+          {onModeChange && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Change layout mode">
+                  {layoutMode === 'sidebar' ? (
+                    <IconLayoutSidebarRightFilled className="text-muted-foreground" />
+                  ) : (
+                    <IconPictureInPictureFilled className="text-muted-foreground" />
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onModeChange('sidebar')}>
+                  <IconLayoutSidebarRightFilled size={16} />
+                  Sidebar
+                  {layoutMode === 'sidebar' && <IconCheck size={16} className="ml-auto" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onModeChange('floating')}>
+                  <IconPictureInPictureFilled size={16} />
+                  Floating
+                  {layoutMode !== 'sidebar' && <IconCheck size={16} className="ml-auto" />}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           {layoutMode === 'sidebar' && onCollapse && (
             <Button variant="ghost" size="icon" onClick={onCollapse} aria-label="Collapse chat">
               <IconChevronsRight className="text-muted-foreground" />
             </Button>
           )}
-          {layoutMode === 'popup' && (
-            <>
-              {onExpand && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onExpand}
-                  aria-label="Expand to sidebar"
-                >
-                  <IconLayoutSidebarRightFilled className="text-muted-foreground" />
-                </Button>
-              )}
-              {onClose && (
-                <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close chat">
-                  <IconX className="text-muted-foreground" />
-                </Button>
-              )}
-            </>
+          {layoutMode === 'popup' && onClose && (
+            <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close chat">
+              <IconX className="text-muted-foreground" />
+            </Button>
           )}
         </div>
       </header>

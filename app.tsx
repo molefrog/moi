@@ -77,6 +77,10 @@ function App() {
     wsRef.current.send(JSON.stringify({ type: 'stop' }))
   }, [processing])
 
+  const handleModeChange = canFitSidebar
+    ? (mode: 'sidebar' | 'floating') => setChatCollapsed(mode === 'floating')
+    : undefined
+
   const chatPanel = (
     <ChatPanel
       messages={messages}
@@ -86,8 +90,8 @@ function App() {
       send={send}
       stop={stop}
       layoutMode={layoutMode}
+      onModeChange={handleModeChange}
       onCollapse={() => setChatCollapsed(true)}
-      onExpand={() => setChatCollapsed(false)}
     />
   )
 
@@ -127,8 +131,7 @@ function App() {
               send={send}
               stop={stop}
               layoutMode={layoutMode}
-              onCollapse={() => setChatCollapsed(true)}
-              onExpand={canFitSidebar ? () => setChatCollapsed(false) : undefined}
+              onModeChange={handleModeChange}
               onClose={onClose}
             />
           )}
