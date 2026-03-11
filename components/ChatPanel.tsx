@@ -8,10 +8,9 @@ import {
   IconX
 } from '@tabler/icons-react'
 
-import { cn } from '../shared/cn'
+import { cn, useScrollFade } from '../shared/utils'
 import type { ChatMessage } from '../shared/types'
 import { ChatInput } from './ChatInput'
-import { ScrollFade } from './ScrollFade'
 import { Button } from './ui/button'
 
 type Message = ChatMessage
@@ -43,6 +42,7 @@ export function ChatPanel({
   onClose
 }: ChatPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
+  const { ref: scrollRef, showTopFade, showBottomFade } = useScrollFade()
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -82,7 +82,15 @@ export function ChatPanel({
         </div>
       </header>
 
-      <ScrollFade className="flex-1 px-2 pt-4 pb-4">
+      <div
+        ref={scrollRef}
+        className={cn(
+          'flex-1 overflow-y-auto px-2 pt-4 pb-4',
+          showTopFade && showBottomFade && 'mask-fade-y',
+          showTopFade && !showBottomFade && 'mask-fade-top',
+          !showTopFade && showBottomFade && 'mask-fade-bottom'
+        )}
+      >
         <div className={cn('flex flex-col gap-4', isCentered && 'mx-auto max-w-[720px]')}>
           {messages.length === 0 && !processing && <EmptyState />}
           {messages.map((msg, i) => (
@@ -91,7 +99,7 @@ export function ChatPanel({
           {processing && <ThinkingIndicator />}
           <div ref={bottomRef} />
         </div>
-      </ScrollFade>
+      </div>
 
       <div className="relative">
         <div className={cn(isCentered && 'mx-auto max-w-[720px]')}>

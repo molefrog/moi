@@ -16,7 +16,9 @@ export function ChatPopup({ children }: ChatPopupProps) {
   return (
     <Popover open={open} onOpenChange={o => setOpen(o)}>
       <PopoverTrigger
-        render={<Button variant="outline" size="lg" className="fixed right-6 bottom-6" />}
+        render={
+          <Button variant="outline" size="lg" className="fixed right-4 bottom-4 sm:right-6 sm:bottom-6" />
+        }
       >
         {open ? (
           <IconX />
@@ -31,7 +33,7 @@ export function ChatPopup({ children }: ChatPopupProps) {
         sideOffset={-48}
         align="end"
         alignOffset={-8}
-        className="flex h-[calc(100vh-96px)] w-[440px] flex-col gap-0 rounded-3xl p-4"
+        className="flex h-[calc(100vh-32px)] w-[min(440px,calc(100vw-16px))] flex-col gap-0 rounded-3xl p-3 sm:h-[calc(100vh-96px)] sm:w-[min(440px,calc(100vw-32px))] sm:p-4"
         keepMounted
       >
         {children(onClose)}
