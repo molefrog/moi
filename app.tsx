@@ -128,7 +128,7 @@ function App() {
               stop={stop}
               layoutMode={layoutMode}
               onCollapse={() => setChatCollapsed(true)}
-              onExpand={() => setChatCollapsed(false)}
+              onExpand={canFitSidebar ? () => setChatCollapsed(false) : undefined}
               onClose={onClose}
             />
           )}
