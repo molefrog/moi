@@ -104,30 +104,26 @@ export function ChatPanel({
       <div
         ref={scrollRef}
         className={cn(
-          'flex-1 overflow-y-auto px-2 pt-4 pb-12',
+          'flex flex-1 flex-col gap-4 overflow-y-auto px-2 pt-4 pb-12',
           showTopFade && showBottomFade && 'mask-fade-y',
           showTopFade && !showBottomFade && 'mask-fade-top',
           !showTopFade && showBottomFade && 'mask-fade-bottom'
         )}
       >
-        <div className="flex flex-col gap-4">
-          {messages.length === 0 && !processing && <EmptyState />}
-          {messages.map((msg, i) => (
-            <MessageBlock key={i} msg={msg} compact={!isCentered} />
-          ))}
-          {processing && <ThinkingIndicator />}
-        </div>
+        {messages.length === 0 && !processing && <EmptyState />}
+        {messages.map((msg, i) => (
+          <MessageBlock key={i} msg={msg} compact={!isCentered} />
+        ))}
+        {processing && <ThinkingIndicator />}
       </div>
 
-      <div className="shrink-0">
-        <ChatInput
-          value={input}
-          onChange={setInput}
-          onSend={send}
-          onStop={stop}
-          processing={processing}
-        />
-      </div>
+      <ChatInput
+        value={input}
+        onChange={setInput}
+        onSend={send}
+        onStop={stop}
+        processing={processing}
+      />
     </div>
   )
 }

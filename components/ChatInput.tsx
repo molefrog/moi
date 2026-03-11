@@ -46,7 +46,7 @@ export function ChatInput({ value, onChange, onSend, onStop, processing }: ChatI
         rows={1}
         className="field-sizing-content max-h-40 w-full resize-none bg-transparent px-2 py-1 text-sm leading-relaxed outline-none placeholder:text-muted-foreground disabled:opacity-50"
       />
-      <div className="flex justify-end pt-0">
+      <div className="flex justify-end">
         {processing ? (
           <Button type="button" size="icon" onClick={onStop} aria-label="Stop agent">
             <IconPlayerStop />

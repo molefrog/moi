@@ -44,10 +44,8 @@ export function MessageBlock({ msg, compact }: { msg: ChatMessage; compact?: boo
 
     case 'assistant':
       return (
-        <div>
-          <div className="prose-inline text-sm leading-normal wrap-break-word">
-            <FormattedText text={msg.content} />
-          </div>
+        <div className="prose-inline text-sm leading-normal wrap-break-word">
+          <FormattedText text={msg.content} />
         </div>
       )
 
@@ -91,15 +89,10 @@ export function MessageBlock({ msg, compact }: { msg: ChatMessage; compact?: boo
           ) : (
             <details className="group">
               <summary className="ml-4 flex cursor-pointer items-center gap-2 py-1 select-none">
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
+                <IconChevronRight
+                  size={12}
                   className="chevron text-ring transition-transform duration-150"
-                >
-                  <path d="M9 18l6-6-6-6" />
-                </svg>
+                />
                 <span className="font-mono text-[11px] text-ring">
                   Result
                   {msg.content ? ` \u00B7 ${msg.content.length} chars` : ' \u00B7 empty'}
