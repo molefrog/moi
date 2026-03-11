@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import type { ReactNode } from 'react'
+import { useState } from 'react'
 
 import { IconMessage, IconX } from '@tabler/icons-react'
 
@@ -6,7 +7,7 @@ import { Button } from './ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 
 type ChatPopupProps = {
-  children: (onClose: () => void) => React.ReactNode
+  children: (onClose: () => void) => ReactNode
 }
 
 export function ChatPopup({ children }: ChatPopupProps) {

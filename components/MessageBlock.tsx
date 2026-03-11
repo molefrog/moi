@@ -1,5 +1,3 @@
-import React from 'react'
-
 import { IconChevronRight, IconMessage } from '@tabler/icons-react'
 
 import type { ChatMessage } from '../lib/types'

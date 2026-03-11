@@ -1,5 +1,3 @@
-import React from 'react'
-
 export function Workspace() {
   return (
     <div className="grid grid-cols-2 grid-rows-[136px_136px_auto] gap-6">
