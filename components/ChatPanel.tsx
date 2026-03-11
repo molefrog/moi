@@ -59,7 +59,7 @@ export function ChatPanel({
       <header className="flex items-center justify-between pb-2 pl-2">
         <h1 className="text-sm font-medium">New workspace</h1>
         <div className="flex items-center gap-0.5">
-          {onModeChange && (
+          {chatMode !== 'solo' && onModeChange && (
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={

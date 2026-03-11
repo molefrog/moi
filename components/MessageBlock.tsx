@@ -4,14 +4,7 @@ import { cn } from '../lib/cn'
 import type { ChatMessage } from '../lib/types'
 
 export function EmptyState() {
-  return (
-    <div className="flex min-h-[60vh] flex-1 flex-col items-center justify-center gap-3">
-      <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted">
-        <IconMessage size={20} className="text-muted-foreground" />
-      </div>
-      <p className="text-sm text-muted-foreground">Start a conversation with the agent</p>
-    </div>
-  )
+  return <div className="flex flex-1 flex-col items-center justify-center" />
 }
 
 export function ThinkingIndicator() {

@@ -47,7 +47,7 @@ function App() {
   return (
     <div className="h-screen overflow-x-hidden px-4 py-4 sm:px-6 sm:py-6 lg:p-10">
       <div className="mx-auto flex h-full w-full max-w-[1184px] justify-center">
-        <div className={cn('min-w-0', chatMode === 'solo' ? 'w-full max-w-[720px]' : 'w-full max-w-[640px]')}>
+        <div className="w-full max-w-160 min-w-0">
           {chatMode === 'solo' ? chatPanel : <Workspace />}
         </div>
 
