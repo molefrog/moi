@@ -136,10 +136,10 @@ export function ChatPanel({
 function EmptyState() {
   return (
     <div className="flex min-h-[60vh] flex-1 flex-col items-center justify-center gap-3">
-      <div className="bg-muted border-border flex h-10 w-10 items-center justify-center rounded-full border">
+      <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted">
         <IconMessage size={20} className="text-muted-foreground" />
       </div>
-      <p className="text-muted-foreground text-sm">Start a conversation with the agent</p>
+      <p className="text-sm text-muted-foreground">Start a conversation with the agent</p>
     </div>
   )
 }
@@ -150,7 +150,7 @@ function ThinkingIndicator() {
       {[0, 1, 2].map(i => (
         <span
           key={i}
-          className="bg-ring block h-1.5 w-1.5 rounded-full"
+          className="block h-1.5 w-1.5 rounded-full bg-ring"
           style={{
             animation: 'pulse-dot 1.4s ease-in-out infinite',
             animationDelay: `${i * 0.2}s`
@@ -181,17 +181,17 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
 
     case 'tool_use':
       return (
-        <div className="border-border my-0.5 ml-7 border-l-2 pl-3">
+        <div className="my-0.5 ml-7 border-l-2 border-border pl-3">
           <details className="group">
             <summary className="flex cursor-pointer items-center gap-2 py-1.5 select-none">
               <IconChevronRight
                 size={12}
-                className="text-ring chevron transition-transform duration-150"
+                className="chevron text-ring transition-transform duration-150"
               />
               <span className="font-mono text-xs font-medium text-amber-800">{msg.name}</span>
               <span
                 className={cn(
-                  'text-ring truncate font-mono text-[11px]',
+                  'truncate font-mono text-[11px] text-ring',
                   compact ? 'max-w-[200px]' : 'max-w-[400px]'
                 )}
               >
@@ -209,7 +209,7 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
 
     case 'tool_result':
       return (
-        <div className="border-border my-0.5 ml-7 border-l-2 pl-3">
+        <div className="my-0.5 ml-7 border-l-2 border-border pl-3">
           {msg.is_error ? (
             <div className="ml-4 rounded-md border border-red-200 bg-red-50 px-3 py-2">
               <pre className="max-h-[160px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-red-800">
@@ -224,17 +224,17 @@ function MessageBlock({ msg, compact }: { msg: Message; compact?: boolean }) {
                   height="10"
                   viewBox="0 0 24 24"
                   fill="currentColor"
-                  className="text-ring chevron transition-transform duration-150"
+                  className="chevron text-ring transition-transform duration-150"
                 >
                   <path d="M9 18l6-6-6-6" />
                 </svg>
-                <span className="text-ring font-mono text-[11px]">
+                <span className="font-mono text-[11px] text-ring">
                   Result
                   {msg.content ? ` \u00B7 ${msg.content.length} chars` : ' \u00B7 empty'}
                 </span>
               </summary>
-              <div className="bg-muted border-border mt-1 ml-4 rounded-md border px-3 py-2.5">
-                <pre className="text-muted-foreground max-h-[200px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
+              <div className="mt-1 ml-4 rounded-md border border-border bg-muted px-3 py-2.5">
+                <pre className="max-h-[200px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-muted-foreground">
                   {msg.content || '(empty)'}
                 </pre>
               </div>
@@ -272,7 +272,7 @@ function FormattedText({ text }: { text: string }) {
         }
         if (part.startsWith('`') && part.endsWith('`')) {
           return (
-            <code key={i} className="bg-muted rounded px-1.5 py-0.5 font-mono text-[13px]">
+            <code key={i} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[13px]">
               {part.slice(1, -1)}
             </code>
           )
