@@ -1,7 +1,5 @@
 import { type RefObject, useEffect, useRef, useState } from 'react'
 
-export { cn } from './cn'
-
 type ScrollFadeState = {
   ref: RefObject<HTMLDivElement | null>
   showTopFade: boolean

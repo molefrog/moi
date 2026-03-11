@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useState } from 'react'
 
 import { createRoot } from 'react-dom/client'
 
@@ -6,32 +6,15 @@ import './app.css'
 import { ChatPanel } from './components/ChatPanel'
 import { ChatPopup } from './components/ChatPopup'
 import { Workspace } from './components/Workspace'
-import { cn } from './shared/cn'
-import type { ChatMessage } from './shared/types'
-
-type Message = ChatMessage
+import { useCanFitSidebar } from './hooks/useCanFitSidebar'
+import { useChat } from './hooks/useChat'
+import { cn } from './lib/cn'
 
 const MESSAGE_THRESHOLD = 5
-const SPLIT_MIN_WIDTH = 1184 // 40 + 640 + 64 + 400 + 40
-
-function useCanFitSidebar() {
-  const [fits, setFits] = useState(() => window.innerWidth >= SPLIT_MIN_WIDTH)
-  useEffect(() => {
-    const mq = window.matchMedia(`(min-width: ${SPLIT_MIN_WIDTH}px)`)
-    const handler = (e: MediaQueryListEvent) => setFits(e.matches)
-    mq.addEventListener('change', handler)
-    setFits(mq.matches)
-    return () => mq.removeEventListener('change', handler)
-  }, [])
-  return fits
-}
 
 function App() {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
-  const [processing, setProcessing] = useState(false)
+  const { messages, input, setInput, processing, send, stop } = useChat()
   const [chatCollapsed, setChatCollapsed] = useState(false)
-  const wsRef = useRef<WebSocket | null>(null)
   const canFitSidebar = useCanFitSidebar()
 
   const layoutMode =
@@ -40,42 +23,6 @@ function App() {
       : chatCollapsed || !canFitSidebar
         ? 'popup'
         : 'sidebar'
-
-  useEffect(() => {
-    const ws = new WebSocket(`ws://${location.host}/ws`)
-    wsRef.current = ws
-
-    ws.onmessage = e => {
-      const data = JSON.parse(e.data)
-      if (data.type === 'status') {
-        setProcessing(data.processing)
-        return
-      }
-      if (data.type === 'history') {
-        setMessages(data.messages)
-        return
-      }
-      setMessages(prev => [...prev, data])
-    }
-
-    ws.onclose = () => {
-      setTimeout(() => location.reload(), 2000)
-    }
-
-    return () => ws.close()
-  }, [])
-
-  const send = useCallback(() => {
-    const text = input.trim()
-    if (!text || !wsRef.current || processing) return
-    wsRef.current.send(JSON.stringify({ type: 'chat', content: text }))
-    setInput('')
-  }, [input, processing])
-
-  const stop = useCallback(() => {
-    if (!wsRef.current || !processing) return
-    wsRef.current.send(JSON.stringify({ type: 'stop' }))
-  }, [processing])
 
   const handleModeChange = canFitSidebar
     ? (mode: 'sidebar' | 'floating') => setChatCollapsed(mode === 'floating')

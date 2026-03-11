@@ -3,7 +3,7 @@ import { readFileSync } from 'fs'
 import * as path from 'path'
 
 import index from './index.html'
-import type { ChatMessage, ClientMessage, ServerMessage } from './shared/types'
+import type { ChatMessage, ClientMessage, ServerMessage } from './lib/types'
 
 const WORKSPACE = path.join(import.meta.dir, 'workspace')
 const MESSAGES_PATH = path.join(WORKSPACE, 'messages.json')
