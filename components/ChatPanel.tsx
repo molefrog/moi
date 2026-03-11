@@ -9,8 +9,8 @@ import {
 } from '@tabler/icons-react'
 
 import { useScrollFade } from '../hooks/useScrollFade'
-import type { ChatMessage } from '../lib/types'
 import { cn } from '../lib/cn'
+import type { ChatMessage } from '../lib/types'
 import { ChatInput } from './ChatInput'
 import { EmptyState, MessageBlock, ThinkingIndicator } from './MessageBlock'
 import { Button } from './ui/button'
@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger
 } from './ui/dropdown-menu'
 
-export type LayoutMode = 'centered' | 'sidebar' | 'popup'
+export type ChatMode = 'solo' | 'sidebar' | 'floating'
 
 type ChatPanelProps = {
   messages: ChatMessage[]
@@ -30,7 +30,7 @@ type ChatPanelProps = {
   processing: boolean
   send: () => void
   stop: () => void
-  layoutMode: LayoutMode
+  chatMode: ChatMode
   onModeChange?: (mode: 'sidebar' | 'floating') => void
   onCollapse?: () => void
   onClose?: () => void
@@ -43,7 +43,7 @@ export function ChatPanel({
   processing,
   send,
   stop,
-  layoutMode,
+  chatMode,
   onModeChange,
   onCollapse,
   onClose
@@ -54,8 +54,6 @@ export function ChatPanel({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'instant' })
   }, [messages])
 
-  const isCentered = layoutMode === 'centered'
-
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between pb-2 pl-2">
@@ -65,8 +63,8 @@ export function ChatPanel({
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
-                  <Button variant="ghost" size="icon" aria-label="Change layout mode">
-                    {layoutMode === 'sidebar' ? (
+                  <Button variant="ghost" size="icon" aria-label="Switch chat mode">
+                    {chatMode === 'sidebar' ? (
                       <IconLayoutSidebarRightFilled className="text-muted-foreground" />
                     ) : (
                       <IconPictureInPictureFilled className="text-muted-foreground" />
@@ -78,22 +76,22 @@ export function ChatPanel({
                 <DropdownMenuItem onClick={() => onModeChange('sidebar')}>
                   <IconLayoutSidebarRightFilled size={16} />
                   Sidebar
-                  {layoutMode === 'sidebar' && <IconCheck size={16} className="ml-auto" />}
+                  {chatMode === 'sidebar' && <IconCheck size={16} className="ml-auto" />}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onModeChange('floating')}>
                   <IconPictureInPictureFilled size={16} />
                   Floating
-                  {layoutMode !== 'sidebar' && <IconCheck size={16} className="ml-auto" />}
+                  {chatMode !== 'sidebar' && <IconCheck size={16} className="ml-auto" />}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          {layoutMode === 'sidebar' && onCollapse && (
+          {chatMode === 'sidebar' && onCollapse && (
             <Button variant="ghost" size="icon" onClick={onCollapse} aria-label="Collapse chat">
               <IconChevronsRight className="text-muted-foreground" />
             </Button>
           )}
-          {layoutMode === 'popup' && onClose && (
+          {chatMode === 'floating' && onClose && (
             <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close chat">
               <IconX className="text-muted-foreground" />
             </Button>
@@ -112,7 +110,7 @@ export function ChatPanel({
       >
         {messages.length === 0 && !processing && <EmptyState />}
         {messages.map((msg, i) => (
-          <MessageBlock key={i} msg={msg} compact={!isCentered} />
+          <MessageBlock key={i} msg={msg} />
         ))}
         {processing && <ThinkingIndicator />}
       </div>

@@ -17,11 +17,11 @@ function App() {
   const [chatCollapsed, setChatCollapsed] = useState(false)
   const canFitSidebar = useCanFitSidebar()
 
-  const layoutMode =
+  const chatMode =
     messages.length < MESSAGE_THRESHOLD
-      ? 'centered'
+      ? 'solo'
       : chatCollapsed || !canFitSidebar
-        ? 'popup'
+        ? 'floating'
         : 'sidebar'
 
   const handleModeChange = canFitSidebar
@@ -36,22 +36,22 @@ function App() {
       processing={processing}
       send={send}
       stop={stop}
-      layoutMode={layoutMode}
+      chatMode={chatMode}
       onModeChange={handleModeChange}
       onCollapse={() => setChatCollapsed(true)}
     />
   )
 
-  const showSidebar = layoutMode === 'sidebar'
+  const showSidebar = chatMode === 'sidebar'
 
   return (
     <div className="h-screen overflow-x-hidden px-4 py-4 sm:px-6 sm:py-6 lg:p-10">
       <div className="mx-auto flex h-full w-full max-w-[1184px] justify-center">
-        <div className={cn('min-w-0', layoutMode === 'centered' ? 'w-full max-w-[720px]' : 'w-full max-w-[640px]')}>
-          {layoutMode === 'centered' ? chatPanel : <Workspace />}
+        <div className={cn('min-w-0', chatMode === 'solo' ? 'w-full max-w-[720px]' : 'w-full max-w-[640px]')}>
+          {chatMode === 'solo' ? chatPanel : <Workspace />}
         </div>
 
-        {canFitSidebar && layoutMode !== 'centered' && (
+        {canFitSidebar && chatMode !== 'solo' && (
           <div
             className={cn(
               'h-full shrink-0 transition-all ease-in-out',
@@ -63,7 +63,7 @@ function App() {
         )}
       </div>
 
-      {layoutMode === 'popup' && (
+      {chatMode === 'floating' && (
         <ChatPopup>
           {onClose => (
             <ChatPanel
@@ -73,7 +73,7 @@ function App() {
               processing={processing}
               send={send}
               stop={stop}
-              layoutMode={layoutMode}
+              chatMode={chatMode}
               onModeChange={handleModeChange}
               onClose={onClose}
             />

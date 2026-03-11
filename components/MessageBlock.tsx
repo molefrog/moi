@@ -1,7 +1,7 @@
 import { IconChevronRight, IconMessage } from '@tabler/icons-react'
 
-import type { ChatMessage } from '../lib/types'
 import { cn } from '../lib/cn'
+import type { ChatMessage } from '../lib/types'
 
 export function EmptyState() {
   return (
@@ -31,7 +31,7 @@ export function ThinkingIndicator() {
   )
 }
 
-export function MessageBlock({ msg, compact }: { msg: ChatMessage; compact?: boolean }) {
+export function MessageBlock({ msg }: { msg: ChatMessage }) {
   switch (msg.type) {
     case 'user':
       return (
@@ -57,12 +57,7 @@ export function MessageBlock({ msg, compact }: { msg: ChatMessage; compact?: boo
                 className="chevron text-ring transition-transform duration-150"
               />
               <span className="font-mono text-xs font-medium text-amber-800">{msg.name}</span>
-              <span
-                className={cn(
-                  'truncate font-mono text-[11px] text-ring',
-                  compact ? 'max-w-[200px]' : 'max-w-[400px]'
-                )}
-              >
+              <span className={cn('truncate font-mono text-[11px] text-ring')}>
                 {formatInputBrief(msg.name, msg.input)}
               </span>
             </summary>
