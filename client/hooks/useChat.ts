@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { ChatMessage } from '../lib/types'
+import type { ChatMessage } from '@/lib/types'
 
 export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([])

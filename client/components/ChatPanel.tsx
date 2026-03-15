@@ -8,9 +8,10 @@ import {
   IconX
 } from '@tabler/icons-react'
 
-import { useScrollFade } from '../hooks/useScrollFade'
-import { cn } from '../lib/cn'
-import type { ChatMessage } from '../lib/types'
+import { useScrollFade } from '@/client/hooks/useScrollFade'
+import { cn } from '@/client/lib/cn'
+import type { ChatMessage } from '@/lib/types'
+
 import { ChatInput } from './ChatInput'
 import { EmptyState, MessageBlock, ThinkingIndicator } from './MessageBlock'
 import { Button } from './ui/button'

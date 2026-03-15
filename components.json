@@ -5,7 +5,7 @@
   "tsx": true,
   "tailwind": {
     "config": "",
-    "css": "app.css",
+    "css": "client/index.css",
     "baseColor": "neutral",
     "cssVariables": true,
     "prefix": ""
@@ -13,11 +13,11 @@
   "iconLibrary": "tabler",
   "rtl": false,
   "aliases": {
-    "components": "@/components",
-    "ui": "@/components/ui",
-    "hooks": "@/hooks",
-    "lib": "@/lib",
-    "utils": "@/lib/cn"
+    "components": "@/client/components",
+    "ui": "@/client/components/ui",
+    "hooks": "@/client/hooks",
+    "lib": "@/client/lib",
+    "utils": "@/client/lib/cn"
   },
   "registries": {}
 }

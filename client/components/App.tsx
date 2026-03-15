@@ -1,19 +1,18 @@
 import { useState } from 'react'
 
 import { Agentation } from 'agentation'
-import { createRoot } from 'react-dom/client'
 
-import './app.css'
-import { ChatPanel } from './components/ChatPanel'
-import { ChatPopup } from './components/ChatPopup'
-import { Workspace } from './components/Workspace'
-import { useCanFitSidebar } from './hooks/useCanFitSidebar'
-import { useChat } from './hooks/useChat'
-import { cn } from './lib/cn'
+import { useCanFitSidebar } from '@/client/hooks/useCanFitSidebar'
+import { useChat } from '@/client/hooks/useChat'
+import { cn } from '@/client/lib/cn'
+
+import { ChatPanel } from './ChatPanel'
+import { ChatPopup } from './ChatPopup'
+import { Workspace } from './Workspace'
 
 const MESSAGE_THRESHOLD = 5
 
-function App() {
+export function App() {
   const { messages, input, setInput, processing, send, stop } = useChat()
   const [chatCollapsed, setChatCollapsed] = useState(false)
   const canFitSidebar = useCanFitSidebar()
@@ -87,5 +86,3 @@ function App() {
     </>
   )
 }
-
-createRoot(document.getElementById('root')!).render(<App />)

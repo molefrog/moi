@@ -11,7 +11,7 @@ const commonLanguageOptions = {
 
 export default tseslint.config(
   {
-    ignores: ['node_modules/**', 'workspace/**']
+    ignores: ['node_modules/**', 'server/workspace/**']
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -35,7 +35,7 @@ export default tseslint.config(
     }
   },
   {
-    files: ['server.ts'],
+    files: ['server/**/*.ts'],
     languageOptions: {
       ...commonLanguageOptions,
       globals: {

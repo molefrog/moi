@@ -1,42 +1,19 @@
 import { type Options, query } from '@anthropic-ai/claude-agent-sdk'
-import { readFileSync } from 'fs'
 import * as path from 'path'
 
-import index from './index.html'
-import type { ChatMessage, ClientMessage, ServerMessage } from './lib/types'
+import {
+  abortController,
+  broadcast,
+  processing,
+  record,
+  saveState,
+  sessionId,
+  setAbortController,
+  setProcessing,
+  setSessionId
+} from './state'
 
 const WORKSPACE = path.join(import.meta.dir, 'workspace')
-const MESSAGES_PATH = path.join(WORKSPACE, 'messages.json')
-
-// --- Persistence ---
-type StoredState = {
-  sessionId: string | null
-  messages: ChatMessage[]
-}
-
-function loadState(): StoredState {
-  try {
-    // Bun.file().json() is async, use text() sync workaround isn't available
-    // so we read synchronously via node compat
-    const text = readFileSync(MESSAGES_PATH, 'utf-8')
-    return JSON.parse(text)
-  } catch {
-    return { sessionId: null, messages: [] }
-  }
-}
-
-function saveState() {
-  const data = JSON.stringify({ sessionId, messages }, null, 2)
-  Bun.write(MESSAGES_PATH, data)
-}
-
-// Load persisted state
-const storedState = loadState()
-let { sessionId } = storedState
-const { messages } = storedState
-let processing = false
-let abortController: AbortController | null = null
-const clients = new Set<Bun.ServerWebSocket<unknown>>()
 
 type TextContentBlock = {
   type: 'text'
@@ -54,48 +31,25 @@ function isTextContentBlock(block: unknown): block is TextContentBlock {
   )
 }
 
-function isClientMessage(value: unknown): value is ClientMessage {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'type' in value &&
-    ((value.type === 'chat' && 'content' in value && typeof value.content === 'string') ||
-      value.type === 'stop')
-  )
-}
-
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message
   return 'Unknown error'
 }
 
-function broadcast(msg: ServerMessage) {
-  const json = JSON.stringify(msg)
-  for (const ws of clients) {
-    ws.send(json)
-  }
-}
-
-function record(msg: ChatMessage) {
-  messages.push(msg)
-  saveState()
-  broadcast(msg)
-}
-
-async function handleChat(content: string) {
+export async function handleChat(content: string) {
   if (processing) {
     broadcast({ type: 'error', content: 'Already processing a message' })
     return
   }
 
-  processing = true
-  abortController = new AbortController()
+  setProcessing(true)
+  setAbortController(new AbortController())
   broadcast({ type: 'status', processing: true })
   record({ type: 'user', content })
 
   try {
     const options: Options = {
-      abortController,
+      abortController: abortController!,
       maxTurns: 50,
       cwd: WORKSPACE,
       model: 'sonnet',
@@ -126,7 +80,7 @@ async function handleChat(content: string) {
     for await (const msg of q) {
       // Capture session ID
       if (msg.type === 'system' && msg.subtype === 'init') {
-        sessionId = msg.session_id
+        setSessionId(msg.session_id)
         saveState()
       }
 
@@ -157,7 +111,7 @@ async function handleChat(content: string) {
                 : Array.isArray(block.content)
                   ? block.content
                       .filter(isTextContentBlock)
-                      .map(c => c.text)
+                      .map((c: TextContentBlock) => c.text)
                       .join('\n')
                   : ''
             const cleaned = text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '').trim()
@@ -187,49 +141,15 @@ async function handleChat(content: string) {
       record({ type: 'error', content: getErrorMessage(err) })
     }
   } finally {
-    processing = false
-    abortController = null
+    setProcessing(false)
+    setAbortController(null)
     broadcast({ type: 'status', processing: false })
   }
 }
 
-Bun.serve({
-  port: 3000,
-  routes: {
-    '/': index
-  },
-  fetch(req, server) {
-    const url = new URL(req.url)
-    if (url.pathname === '/ws') {
-      if (server.upgrade(req)) return new Response(null, { status: 101 })
-      return new Response('Upgrade failed', { status: 500 })
-    }
-    return new Response('Not found', { status: 404 })
-  },
-  websocket: {
-    open(ws) {
-      clients.add(ws)
-      // Send history + current status to new client
-      ws.send(JSON.stringify({ type: 'history', messages }))
-      ws.send(JSON.stringify({ type: 'status', processing }))
-    },
-    message(ws, message) {
-      try {
-        const data = JSON.parse(String(message))
-        if (!isClientMessage(data)) return
-        if (data.type === 'chat' && data.content?.trim()) {
-          handleChat(data.content.trim())
-        }
-        if (data.type === 'stop' && abortController) {
-          abortController.abort()
-          record({ type: 'stopped' })
-        }
-      } catch {}
-    },
-    close(ws) {
-      clients.delete(ws)
-    }
+export function stopChat() {
+  if (abortController) {
+    abortController.abort()
+    record({ type: 'stopped' })
   }
-})
-
-console.log('Agent chat running at http://localhost:3000')
+}
