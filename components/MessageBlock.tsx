@@ -42,56 +42,50 @@ export function MessageBlock({ msg }: { msg: ChatMessage }) {
 
     case 'tool_use':
       return (
-        <div className="my-0.5 ml-7 border-l-2 border-border pl-3">
-          <details className="group">
-            <summary className="flex cursor-pointer items-center gap-2 py-1.5 select-none">
-              <IconChevronRight
-                size={12}
-                className="chevron text-ring transition-transform duration-150"
-              />
-              <span className="font-mono text-xs font-medium text-amber-800">{msg.name}</span>
-              <span className={cn('truncate font-mono text-[11px] text-ring')}>
-                {formatInputBrief(msg.name, msg.input)}
-              </span>
-            </summary>
-            <div className="mt-1 ml-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5">
-              <pre className="max-h-[200px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-amber-800">
-                {formatInput(msg.name, msg.input)}
-              </pre>
-            </div>
-          </details>
-        </div>
+        <details className="group">
+          <summary className="flex cursor-pointer items-center gap-2 py-1.5 select-none">
+            <IconChevronRight
+              size={12}
+              className="chevron text-ring transition-transform duration-150"
+            />
+            <span className="text-xs font-medium">{msg.name}</span>
+            <span className={cn('truncate text-[11px] text-ring')}>
+              {formatInputBrief(msg.name, msg.input)}
+            </span>
+          </summary>
+          <div className="mt-1 ml-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5">
+            <pre className="max-h-[200px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
+              {formatInput(msg.name, msg.input)}
+            </pre>
+          </div>
+        </details>
       )
 
     case 'tool_result':
-      return (
-        <div className="my-0.5 ml-7 border-l-2 border-border pl-3">
-          {msg.is_error ? (
-            <div className="ml-4 rounded-md border border-red-200 bg-red-50 px-3 py-2">
-              <pre className="max-h-[160px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-red-800">
-                {msg.content || '(empty)'}
-              </pre>
-            </div>
-          ) : (
-            <details className="group">
-              <summary className="ml-4 flex cursor-pointer items-center gap-2 py-1 select-none">
-                <IconChevronRight
-                  size={12}
-                  className="chevron text-ring transition-transform duration-150"
-                />
-                <span className="font-mono text-[11px] text-ring">
-                  Result
-                  {msg.content ? ` \u00B7 ${msg.content.length} chars` : ' \u00B7 empty'}
-                </span>
-              </summary>
-              <div className="mt-1 ml-4 rounded-md border border-border bg-muted px-3 py-2.5">
-                <pre className="max-h-[200px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-muted-foreground">
-                  {msg.content || '(empty)'}
-                </pre>
-              </div>
-            </details>
-          )}
+      return msg.is_error ? (
+        <div className="ml-4 rounded-md border border-red-200 bg-red-50 px-3 py-2">
+          <pre className="max-h-[160px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-red-800">
+            {msg.content || '(empty)'}
+          </pre>
         </div>
+      ) : (
+        <details className="group">
+          <summary className="ml-4 flex cursor-pointer items-center gap-2 py-1 select-none">
+            <IconChevronRight
+              size={12}
+              className="chevron text-ring transition-transform duration-150"
+            />
+            <span className="text-[11px] text-ring">
+              Result
+              {msg.content ? ` \u00B7 ${msg.content.length} chars` : ' \u00B7 empty'}
+            </span>
+          </summary>
+          <div className="mt-1 ml-4 rounded-md border border-border bg-muted px-3 py-2.5">
+            <pre className="max-h-[200px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-muted-foreground">
+              {msg.content || '(empty)'}
+            </pre>
+          </div>
+        </details>
       )
 
     case 'done':
@@ -100,7 +94,7 @@ export function MessageBlock({ msg }: { msg: ChatMessage }) {
 
     case 'error':
       return (
-        <div className="my-1 ml-7 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-800">
+        <div className="my-1 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-800">
           {msg.content}
         </div>
       )
