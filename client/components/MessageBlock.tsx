@@ -1,7 +1,7 @@
-import { IconChevronRight, IconMessage } from '@tabler/icons-react'
+import { IconChevronRight } from '@tabler/icons-react'
 
-import { cn } from '../lib/cn'
-import type { ChatMessage } from '../lib/types'
+import { cn } from '@/client/lib/cn'
+import type { ChatMessage } from '@/lib/types'
 
 export function EmptyState() {
   return <div className="flex flex-1 flex-col items-center justify-center" />
