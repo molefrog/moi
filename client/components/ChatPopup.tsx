@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
 import { useState } from 'react'
 
-import { IconMessage, IconX } from '@tabler/icons-react'
+import { motion } from 'motion/react'
+
+import { IconRobotFace } from '@tabler/icons-react'
 
 import { Button } from './ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
@@ -18,21 +20,18 @@ export function ChatPopup({ children }: ChatPopupProps) {
     <Popover open={open} onOpenChange={o => setOpen(o)}>
       <PopoverTrigger
         render={
-          <Button
-            variant="outline"
-            size="lg"
-            className="fixed right-4 bottom-4 sm:right-6 sm:bottom-6"
-          />
+          <motion.div
+            className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6"
+            initial={{ opacity: 0, scale: 0.8, filter: 'blur(4px)' }}
+            animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+            transition={{ type: 'spring', duration: 0.2, delay: 0.3, bounce: 0 }}
+          >
+            <Button variant="outline" size="lg">
+              <IconRobotFace /> Agent
+            </Button>
+          </motion.div>
         }
-      >
-        {open ? (
-          <IconX stroke={1.75} />
-        ) : (
-          <>
-            <IconMessage stroke={1.75} /> Chat
-          </>
-        )}
-      </PopoverTrigger>
+      />
       <PopoverContent
         side="top"
         sideOffset={-48}

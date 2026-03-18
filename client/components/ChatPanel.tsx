@@ -59,7 +59,7 @@ export function ChatPanel({
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between pb-2 pl-2">
-        {chatMode === 'solo' ? <SpaceName /> : <h1 className="text-sm font-medium">Chat</h1>}
+        {chatMode === 'solo' ? <SpaceName /> : <h1 className="text-sm font-medium">Agent</h1>}
         <div className="flex items-center gap-0.5">
           {chatMode !== 'solo' && onModeChange && (
             <DropdownMenu>
