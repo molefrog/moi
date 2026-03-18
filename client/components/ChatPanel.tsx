@@ -13,6 +13,7 @@ import { cn } from '@/client/lib/cn'
 import type { ChatMessage } from '@/lib/types'
 
 import { ChatInput } from './ChatInput'
+import { SpaceName } from './SpaceName'
 import { EmptyState, MessageBlock, ThinkingIndicator } from './MessageBlock'
 import { Button } from './ui/button'
 import {
@@ -58,7 +59,7 @@ export function ChatPanel({
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between pb-2 pl-2">
-        <h1 className="text-sm font-medium">New workspace</h1>
+        {chatMode === 'solo' ? <SpaceName /> : <h1 className="text-sm font-medium">Chat</h1>}
         <div className="flex items-center gap-0.5">
           {chatMode !== 'solo' && onModeChange && (
             <DropdownMenu>
@@ -103,7 +104,7 @@ export function ChatPanel({
       <div
         ref={scrollRef}
         className={cn(
-          'flex flex-1 flex-col gap-4 overflow-y-auto px-2 pt-4 pb-12',
+          'flex flex-1 flex-col gap-4 overflow-y-auto px-2 pb-12 pt-4',
           showTopFade && showBottomFade && 'mask-fade-y',
           showTopFade && !showBottomFade && 'mask-fade-top',
           !showTopFade && showBottomFade && 'mask-fade-bottom'
