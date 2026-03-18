@@ -6,7 +6,7 @@ import { cn } from '@/client/lib/cn'
 
 import { ChatPanel } from './ChatPanel'
 import { ChatPopup } from './ChatPopup'
-import { Workspace } from './Workspace'
+import { Widgets } from './Widgets'
 
 const MESSAGE_THRESHOLD = 5
 
@@ -46,7 +46,7 @@ export function App() {
     <div className="h-screen overflow-x-hidden px-4 py-4 sm:px-6 sm:py-6 lg:p-10">
       <div className="mx-auto flex h-full w-full max-w-[1184px] justify-center">
         <div className="max-w-160 w-full min-w-0">
-          {chatMode === 'solo' ? chatPanel : <Workspace />}
+          {chatMode === 'solo' ? chatPanel : <Widgets />}
         </div>
 
         {canFitSidebar && chatMode !== 'solo' && (

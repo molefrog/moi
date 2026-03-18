@@ -1,6 +1,6 @@
 import { SpaceName } from './SpaceName'
 
-export function Workspace() {
+export function Widgets() {
   return (
     <div className="flex h-full flex-col">
       <header className="pb-6">
