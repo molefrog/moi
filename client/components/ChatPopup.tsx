@@ -22,8 +22,13 @@ export function ChatPopup({ children }: ChatPopupProps) {
         render={
           <motion.div
             className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6"
-            initial={{ opacity: 0, scale: 0.8, filter: 'blur(4px)' }}
-            animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+            variants={{
+              from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
+              to: { opacity: 1, scale: 1, filter: 'blur(0px)' },
+              invisible: { opacity: 0, scale: 1, filter: 'blur(4px)' }
+            }}
+            initial="from"
+            animate={open ? 'invisible' : 'to'}
             transition={{ type: 'spring', duration: 0.2, delay: 0.3, bounce: 0 }}
           >
             <Button variant="outline" size="lg">

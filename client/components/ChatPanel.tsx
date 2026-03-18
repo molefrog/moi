@@ -5,6 +5,7 @@ import {
   IconChevronsRight,
   IconLayoutSidebarRightFilled,
   IconPictureInPictureFilled,
+  IconSelector,
   IconX
 } from '@tabler/icons-react'
 
@@ -65,15 +66,25 @@ export function ChatPanel({
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
-                  <Button variant="ghost" size="icon" aria-label="Switch chat mode">
-                    {chatMode === 'sidebar' ? (
-                      <IconLayoutSidebarRightFilled
-                        className="text-muted-foreground"
-                        stroke={1.75}
-                      />
-                    ) : (
-                      <IconPictureInPictureFilled className="text-muted-foreground" stroke={1.75} />
-                    )}
+                  <Button
+                    className="pl-1.5! pr-1! gap-0"
+                    variant="ghost"
+                    aria-label="Switch chat mode"
+                  >
+                    <>
+                      {chatMode === 'sidebar' ? (
+                        <IconLayoutSidebarRightFilled
+                          className="text-muted-foreground"
+                          stroke={1.75}
+                        />
+                      ) : (
+                        <IconPictureInPictureFilled
+                          className="text-muted-foreground"
+                          stroke={1.75}
+                        />
+                      )}
+                      <IconSelector className="size-4! text-muted-foreground/50" stroke={2.25} />
+                    </>
                   </Button>
                 }
               />
@@ -97,7 +108,8 @@ export function ChatPanel({
           )}
           {chatMode === 'sidebar' && onCollapse && (
             <Button variant="ghost" size="icon" onClick={onCollapse} aria-label="Collapse chat">
-              <IconChevronsRight className="text-muted-foreground" stroke={1.75} />
+              {/* Tabler icon with double chevrons has a really weird optical size, hence the adjustments */}
+              <IconChevronsRight className="text-muted-foreground size-6.5!" stroke={1.7} />
             </Button>
           )}
           {chatMode === 'floating' && onClose && (
@@ -111,7 +123,7 @@ export function ChatPanel({
       <div
         ref={scrollRef}
         className={cn(
-          'flex flex-1 flex-col gap-4 overflow-y-auto px-2 pb-12 pt-4',
+          'flex flex-1 flex-col gap-6 overflow-y-auto px-2 pb-12 pt-4',
           showTopFade && showBottomFade && 'mask-fade-y',
           showTopFade && !showBottomFade && 'mask-fade-top',
           !showTopFade && showBottomFade && 'mask-fade-bottom'
