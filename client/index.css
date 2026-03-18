@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+@import 'highlight.js/styles/github.css';
 @import 'shadcn/tailwind.css';
 
 @plugin "@tailwindcss/typography";
@@ -82,6 +83,16 @@
     opacity: 1;
     transform: scale(1);
   }
+}
+
+@utility prose-inherit {
+  --tw-prose-body: inherit;
+  --tw-prose-headings: inherit;
+  --tw-prose-lead: inherit;
+  --tw-prose-links: inherit;
+  --tw-prose-bold: inherit;
+  --tw-prose-counters: inherit;
+  --tw-prose-bullets: inherit;
 }
 
 @utility mask-fade-bottom {
