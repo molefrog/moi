@@ -1,12 +1,6 @@
 import { useEffect } from 'react'
 
-import {
-  IconChevronsRight,
-  IconLayoutSidebarRightFilled,
-  IconPictureInPictureFilled,
-  IconSelector,
-  IconX
-} from '@tabler/icons-react'
+import { IconChevronsRight, IconSelector, IconX } from '@tabler/icons-react'
 
 import { useScrollFade } from '@/client/hooks/useScrollFade'
 import { cn } from '@/client/lib/cn'
@@ -25,6 +19,44 @@ import {
 } from './ui/dropdown-menu'
 
 export type ChatMode = 'solo' | 'sidebar' | 'floating'
+
+type ChatModeIconProps = {
+  className?: string
+}
+
+function ChatModeIconSidebar({ className }: ChatModeIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      strokeWidth="1.5"
+      className={className}
+    >
+      <rect x="1.75" y="3.75" width="20.5" height="16.5" rx="2.25" stroke="currentColor" />
+      <rect x="11.5" y="5.5" width="9" height="13" rx="1" fill="currentColor" />
+    </svg>
+  )
+}
+
+function ChatModeIconFloating({ className }: ChatModeIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      strokeWidth="1.5"
+      className={className}
+    >
+      <rect x="1.75" y="3.75" width="20.5" height="16.5" rx="2.25" stroke="currentColor" />
+      <rect x="12.5" y="11.5" width="8" height="7" rx="1" fill="currentColor" />
+    </svg>
+  )
+}
 
 type ChatPanelProps = {
   messages: ChatMessage[]
@@ -57,8 +89,7 @@ export function ChatPanel({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'instant' })
   }, [messages])
 
-  const TriggerIcon =
-    chatMode === 'sidebar' ? IconLayoutSidebarRightFilled : IconPictureInPictureFilled
+  const TriggerIcon = chatMode === 'sidebar' ? ChatModeIconSidebar : ChatModeIconFloating
 
   return (
     <div className="flex h-full flex-col">
@@ -70,25 +101,25 @@ export function ChatPanel({
               <DropdownMenuTrigger
                 render={
                   <Button
-                    className="pl-1.5! pr-1! gap-0"
+                    className="pl-2! pr-1! gap-0"
                     variant="ghost"
                     aria-label="Switch chat mode"
                   >
                     <>
-                      <TriggerIcon className="text-muted-foreground" stroke={1.75} />
-                      <IconSelector className="size-4! text-muted-foreground/50" stroke={2.25} />
+                      <TriggerIcon className="text-muted-foreground" />
+                      <IconSelector className="size-4! text-muted-foreground/50" stroke={2} />
                     </>
                   </Button>
                 }
               />
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="min-w-40">
                 <DropdownMenuRadioGroup value={chatMode} onValueChange={onModeChange}>
                   <DropdownMenuRadioItem value="sidebar" closeOnClick>
-                    <IconLayoutSidebarRightFilled stroke={1.75} />
+                    <ChatModeIconSidebar />
                     Sidebar
                   </DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="floating" closeOnClick>
-                    <IconPictureInPictureFilled stroke={1.75} />
+                    <ChatModeIconFloating />
                     Floating
                   </DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
@@ -98,12 +129,12 @@ export function ChatPanel({
           {chatMode === 'sidebar' && onCollapse && (
             <Button variant="ghost" size="icon" onClick={onCollapse} aria-label="Collapse chat">
               {/* Tabler icon with double chevrons has a really weird optical size, hence the adjustments */}
-              <IconChevronsRight className="text-muted-foreground size-6.5!" stroke={1.7} />
+              <IconChevronsRight className="text-muted-foreground size-6!" stroke={1.5} />
             </Button>
           )}
           {chatMode === 'floating' && onClose && (
             <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close chat">
-              <IconX className="text-muted-foreground" stroke={1.75} />
+              <IconX className="text-muted-foreground" stroke={1.5} />
             </Button>
           )}
         </div>

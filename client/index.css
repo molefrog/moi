@@ -54,6 +54,7 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
+  --radius-xs: calc(var(--radius) * 0.5);
   --radius-sm: calc(var(--radius) * 0.625);
   --radius-md: calc(var(--radius) * 0.75);
   --radius-lg: calc(var(--radius) * 0.875);

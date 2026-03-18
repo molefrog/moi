@@ -32,7 +32,7 @@ export function ChatPopup({ children }: ChatPopupProps) {
             transition={{ type: 'spring', duration: 0.2, delay: 0.3, bounce: 0 }}
           >
             <Button variant="outline" size="lg">
-              <IconRobotFace /> Agent
+              <IconRobotFace stroke={1.75} /> Agent
             </Button>
           </motion.div>
         }
