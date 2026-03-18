@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 
 import {
-  IconCheck,
   IconChevronsRight,
   IconLayoutSidebarRightFilled,
   IconPictureInPictureFilled,
@@ -20,7 +19,8 @@ import { Button } from './ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger
 } from './ui/dropdown-menu'
 
@@ -57,6 +57,9 @@ export function ChatPanel({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'instant' })
   }, [messages])
 
+  const TriggerIcon =
+    chatMode === 'sidebar' ? IconLayoutSidebarRightFilled : IconPictureInPictureFilled
+
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between pb-2 pl-2">
@@ -72,37 +75,23 @@ export function ChatPanel({
                     aria-label="Switch chat mode"
                   >
                     <>
-                      {chatMode === 'sidebar' ? (
-                        <IconLayoutSidebarRightFilled
-                          className="text-muted-foreground"
-                          stroke={1.75}
-                        />
-                      ) : (
-                        <IconPictureInPictureFilled
-                          className="text-muted-foreground"
-                          stroke={1.75}
-                        />
-                      )}
+                      <TriggerIcon className="text-muted-foreground" stroke={1.75} />
                       <IconSelector className="size-4! text-muted-foreground/50" stroke={2.25} />
                     </>
                   </Button>
                 }
               />
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onModeChange('sidebar')}>
-                  <IconLayoutSidebarRightFilled size={16} stroke={1.75} />
-                  Sidebar
-                  {chatMode === 'sidebar' && (
-                    <IconCheck size={16} className="ml-auto" stroke={1.75} />
-                  )}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onModeChange('floating')}>
-                  <IconPictureInPictureFilled size={16} stroke={1.75} />
-                  Floating
-                  {chatMode !== 'sidebar' && (
-                    <IconCheck size={16} className="ml-auto" stroke={1.75} />
-                  )}
-                </DropdownMenuItem>
+                <DropdownMenuRadioGroup value={chatMode} onValueChange={onModeChange}>
+                  <DropdownMenuRadioItem value="sidebar" closeOnClick>
+                    <IconLayoutSidebarRightFilled stroke={1.75} />
+                    Sidebar
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="floating" closeOnClick>
+                    <IconPictureInPictureFilled stroke={1.75} />
+                    Floating
+                  </DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
