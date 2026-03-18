@@ -86,6 +86,11 @@
   }
 }
 
+@utility rounded-full {
+  border-radius: calc(infinity * 1px);
+  corner-shape: round;
+}
+
 @utility prose-inherit {
   --tw-prose-body: inherit;
   --tw-prose-headings: inherit;

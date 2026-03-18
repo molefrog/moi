@@ -1,12 +1,75 @@
 import { useState } from 'react'
 
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
+
+import { IconMinus, IconPlus } from '@tabler/icons-react'
 
 import { SpaceName } from './SpaceName'
 import { Button } from './ui/button'
 
+type Widget = { id: string; name: string; colSpan: 2 | 1; hidden: boolean }
+
+type WidgetCardProps = {
+  widget: Widget
+  editing: boolean
+  onToggle: (id: string) => void
+}
+
+function WidgetCard({ widget, editing, onToggle }: WidgetCardProps) {
+  const isHidden = widget.hidden
+
+  return (
+    <motion.div
+      key={widget.id}
+      layoutId={widget.id}
+      transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
+      className={`group/widget bg-black/4 relative flex rounded-xl ${widget.colSpan === 2 ? 'col-span-2' : ''} ${isHidden ? 'h-[136px] cursor-pointer' : ''}`}
+      onClick={isHidden ? () => onToggle(widget.id) : undefined}
+    >
+      <span className="text-muted-foreground p-3 text-sm">{widget.name}</span>
+      {editing && (
+        <Button
+          size="icon-sm"
+          variant="outline"
+          className="absolute -right-2 -top-2 size-7 rounded-md opacity-0 transition-opacity group-hover/widget:opacity-100"
+          onClick={
+            isHidden
+              ? e => {
+                  e.stopPropagation()
+                  onToggle(widget.id)
+                }
+              : () => onToggle(widget.id)
+          }
+        >
+          {isHidden ? <IconPlus stroke={1.5} /> : <IconMinus stroke={1.5} />}
+        </Button>
+      )}
+    </motion.div>
+  )
+}
+
+const initialWidgets: Widget[] = [
+  { id: 'w1', name: 'Widget 1', colSpan: 2, hidden: false },
+  { id: 'w2', name: 'Widget 2', colSpan: 1, hidden: false },
+  { id: 'w3', name: 'Widget 3', colSpan: 1, hidden: false },
+  { id: 'w4', name: 'Widget 4', colSpan: 2, hidden: false }
+]
+
 export function Widgets() {
   const [editing, setEditing] = useState(false)
+  const [widgets, setWidgets] = useState<Widget[]>(initialWidgets)
+
+  const visibleWidgets = widgets.filter(w => !w.hidden)
+  const hiddenWidgets = widgets.filter(w => w.hidden)
+
+  function toggleWidget(id: string) {
+    setWidgets(prev => {
+      const widget = prev.find(w => w.id === id)
+      if (!widget) return prev
+      const toggled = { ...widget, hidden: !widget.hidden }
+      return [...prev.filter(w => w.id !== id), toggled]
+    })
+  }
 
   return (
     <div className="group flex h-full flex-col">
@@ -38,12 +101,24 @@ export function Widgets() {
           </motion.div>
         </AnimatePresence>
       </header>
-      <div className="grid grid-cols-2 grid-rows-[136px_136px_auto] gap-4">
-        <div className="bg-black/4 col-span-2 rounded-xl" />
-        <div className="bg-black/4 rounded-xl" />
-        <div className="bg-black/4 rounded-xl" />
-        <div className="bg-black/4 col-span-2 rounded-xl" />
-      </div>
+      <LayoutGroup>
+        <motion.div layout className="grid auto-rows-[136px] grid-cols-2 gap-4">
+          {visibleWidgets.map(w => (
+            <WidgetCard key={w.id} widget={w} editing={editing} onToggle={toggleWidget} />
+          ))}
+        </motion.div>
+
+        {editing && hiddenWidgets.length > 0 && (
+          <div>
+            <p className="text-muted-foreground mb-2 mt-4 text-xs font-medium">Hidden</p>
+            <div className="grid grid-cols-2 gap-4">
+              {hiddenWidgets.map(w => (
+                <WidgetCard key={w.id} widget={w} editing={editing} onToggle={toggleWidget} />
+              ))}
+            </div>
+          </div>
+        )}
+      </LayoutGroup>
     </div>
   )
 }
