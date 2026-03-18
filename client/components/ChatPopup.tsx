@@ -26,10 +26,10 @@ export function ChatPopup({ children }: ChatPopupProps) {
         }
       >
         {open ? (
-          <IconX />
+          <IconX stroke={1.75} />
         ) : (
           <>
-            <IconMessage /> Chat
+            <IconMessage stroke={1.75} /> Chat
           </>
         )}
       </PopoverTrigger>

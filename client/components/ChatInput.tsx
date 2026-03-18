@@ -49,11 +49,11 @@ export function ChatInput({ value, onChange, onSend, onStop, processing }: ChatI
       <div className="flex justify-end">
         {processing ? (
           <Button type="button" size="icon" onClick={onStop} aria-label="Stop agent">
-            <IconPlayerStop />
+            <IconPlayerStop stroke={1.75} />
           </Button>
         ) : (
           <Button type="submit" size="icon" disabled={!value.trim()} aria-label="Send message">
-            <IconArrowUp />
+            <IconArrowUp stroke={1.75} />
           </Button>
         )}
       </div>

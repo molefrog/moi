@@ -13,8 +13,8 @@ import { cn } from '@/client/lib/cn'
 import type { ChatMessage } from '@/lib/types'
 
 import { ChatInput } from './ChatInput'
-import { SpaceName } from './SpaceName'
 import { EmptyState, MessageBlock, ThinkingIndicator } from './MessageBlock'
+import { SpaceName } from './SpaceName'
 import { Button } from './ui/button'
 import {
   DropdownMenu,
@@ -67,35 +67,42 @@ export function ChatPanel({
                 render={
                   <Button variant="ghost" size="icon" aria-label="Switch chat mode">
                     {chatMode === 'sidebar' ? (
-                      <IconLayoutSidebarRightFilled className="text-muted-foreground" />
+                      <IconLayoutSidebarRightFilled
+                        className="text-muted-foreground"
+                        stroke={1.75}
+                      />
                     ) : (
-                      <IconPictureInPictureFilled className="text-muted-foreground" />
+                      <IconPictureInPictureFilled className="text-muted-foreground" stroke={1.75} />
                     )}
                   </Button>
                 }
               />
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => onModeChange('sidebar')}>
-                  <IconLayoutSidebarRightFilled size={16} />
+                  <IconLayoutSidebarRightFilled size={16} stroke={1.75} />
                   Sidebar
-                  {chatMode === 'sidebar' && <IconCheck size={16} className="ml-auto" />}
+                  {chatMode === 'sidebar' && (
+                    <IconCheck size={16} className="ml-auto" stroke={1.75} />
+                  )}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onModeChange('floating')}>
-                  <IconPictureInPictureFilled size={16} />
+                  <IconPictureInPictureFilled size={16} stroke={1.75} />
                   Floating
-                  {chatMode !== 'sidebar' && <IconCheck size={16} className="ml-auto" />}
+                  {chatMode !== 'sidebar' && (
+                    <IconCheck size={16} className="ml-auto" stroke={1.75} />
+                  )}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
           {chatMode === 'sidebar' && onCollapse && (
             <Button variant="ghost" size="icon" onClick={onCollapse} aria-label="Collapse chat">
-              <IconChevronsRight className="text-muted-foreground" />
+              <IconChevronsRight className="text-muted-foreground" stroke={1.75} />
             </Button>
           )}
           {chatMode === 'floating' && onClose && (
             <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close chat">
-              <IconX className="text-muted-foreground" />
+              <IconX className="text-muted-foreground" stroke={1.75} />
             </Button>
           )}
         </div>

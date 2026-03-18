@@ -46,6 +46,7 @@ export function MessageBlock({ msg }: { msg: ChatMessage }) {
           <summary className="flex cursor-pointer items-center gap-2 py-1.5 select-none">
             <IconChevronRight
               size={12}
+              stroke={1.75}
               className="chevron text-ring transition-transform duration-150"
             />
             <span className="text-xs font-medium">{msg.name}</span>
@@ -73,6 +74,7 @@ export function MessageBlock({ msg }: { msg: ChatMessage }) {
           <summary className="ml-4 flex cursor-pointer items-center gap-2 py-1 select-none">
             <IconChevronRight
               size={12}
+              stroke={1.75}
               className="chevron text-ring transition-transform duration-150"
             />
             <span className="text-[11px] text-ring">
