@@ -27,6 +27,9 @@ Bun.serve({
     }
     return new Response('Not found', { status: 404 })
   },
+  development: {
+    hmr: true
+  },
   websocket: {
     open(ws) {
       clients.add(ws)
