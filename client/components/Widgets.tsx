@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useState } from 'react'
 
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
@@ -8,8 +9,18 @@ import { cn } from '@/client/lib/cn'
 
 import { SpaceName } from './SpaceName'
 import { Button } from './ui/button'
+import { ActivityWidget } from './widgets/ActivityWidget'
+import { HeartRateWidget } from './widgets/HeartRateWidget'
+import { SleepWidget } from './widgets/SleepWidget'
+import { StepsWidget } from './widgets/StepsWidget'
 
-type Widget = { id: string; name: string; colSpan: 2 | 1; hidden: boolean }
+type Widget = {
+  id: string
+  name: string
+  colSpan: 2 | 1
+  hidden: boolean
+  content: ReactNode
+}
 
 type WidgetCardProps = {
   widget: Widget
@@ -26,13 +37,15 @@ function WidgetCard({ widget, editing, onToggle }: WidgetCardProps) {
       layoutId={widget.id}
       transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
       className={cn(
-        'group/widget bg-primary relative flex rounded-xl [corner-shape:superellipse(1.2)]',
+        'group/widget relative flex',
         widget.colSpan === 2 && 'col-span-2',
         isHidden && 'h-[136px] cursor-pointer'
       )}
       onClick={isHidden ? () => onToggle(widget.id) : undefined}
     >
-      <span className="text-primary-foreground p-4 text-sm">{widget.name}</span>
+      <div className="flex-1 overflow-clip rounded-xl [corner-shape:superellipse(1.2)]">
+        {widget.content}
+      </div>
       {editing && (
         <Button
           size="icon-sm"
@@ -55,10 +68,34 @@ function WidgetCard({ widget, editing, onToggle }: WidgetCardProps) {
 }
 
 const initialWidgets: Widget[] = [
-  { id: 'w1', name: 'Widget 1', colSpan: 2, hidden: false },
-  { id: 'w2', name: 'Widget 2', colSpan: 1, hidden: false },
-  { id: 'w3', name: 'Widget 3', colSpan: 1, hidden: false },
-  { id: 'w4', name: 'Widget 4', colSpan: 2, hidden: false }
+  {
+    id: 'steps',
+    name: 'Steps',
+    colSpan: 2,
+    hidden: false,
+    content: <StepsWidget />
+  },
+  {
+    id: 'heart-rate',
+    name: 'Heart Rate',
+    colSpan: 1,
+    hidden: false,
+    content: <HeartRateWidget />
+  },
+  {
+    id: 'sleep',
+    name: 'Sleep',
+    colSpan: 1,
+    hidden: false,
+    content: <SleepWidget />
+  },
+  {
+    id: 'activity',
+    name: 'Activity',
+    colSpan: 2,
+    hidden: false,
+    content: <ActivityWidget />
+  }
 ]
 
 export function Widgets() {
