@@ -28,7 +28,6 @@
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
   --radius: 1rem;
-
 }
 
 @theme inline {
@@ -62,6 +61,10 @@
   --radius-2xl: calc(var(--radius) * 1.25);
   --radius-3xl: calc(var(--radius) * 1.5);
   --radius-4xl: calc(var(--radius) * 2);
+
+  --shadow-xs:
+    0px 0px 0px 1px rgba(0, 0, 0, 0.06), 0px 1px 2px -1px rgba(0, 0, 0, 0.06),
+    0px 2px 4px 0px rgba(0, 0, 0, 0.04);
 }
 
 @layer base {
@@ -111,7 +114,12 @@
 }
 
 @utility mask-fade-y {
-  mask-image: linear-gradient(transparent 0%, black 24px, black calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(
+    transparent 0%,
+    black 24px,
+    black calc(100% - 24px),
+    transparent 100%
+  );
   mask-size: 100% 100%;
   mask-position: 0px 0px;
   mask-repeat: no-repeat;
