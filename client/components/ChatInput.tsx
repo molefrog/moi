@@ -26,7 +26,7 @@ export function ChatInput({ value, onChange, onSend, onStop, processing }: ChatI
         e.preventDefault()
         ref.current?.focus()
       }}
-      className="border-input bg-background shadow-xs flex w-full cursor-text flex-col gap-1 rounded-xl border p-2 outline-none transition-[color,box-shadow] focus-within:shadow-sm"
+      className="bg-background shadow-xs flex w-full cursor-text flex-col gap-1 rounded-lg p-2 outline-none transition-[color,box-shadow] focus-within:shadow-sm"
     >
       <textarea
         ref={ref}
