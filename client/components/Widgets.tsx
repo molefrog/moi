@@ -3,7 +3,7 @@ import { useState } from 'react'
 
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 
-import { IconMinus, IconPlus } from '@tabler/icons-react'
+import { IconMinus, IconPencil, IconPlus } from '@tabler/icons-react'
 
 import { cn } from '@/client/lib/cn'
 
@@ -47,21 +47,33 @@ function WidgetCard({ widget, editing, onToggle }: WidgetCardProps) {
         {widget.content}
       </div>
       {editing && (
-        <Button
-          size="icon-sm"
-          variant="outline"
-          className="absolute -right-2 -top-2 size-7 rounded-full opacity-0 transition-opacity group-hover/widget:opacity-100"
-          onClick={
-            isHidden
-              ? e => {
-                  e.stopPropagation()
-                  onToggle(widget.id)
-                }
-              : () => onToggle(widget.id)
-          }
-        >
-          {isHidden ? <IconPlus stroke={1.5} /> : <IconMinus stroke={1.5} />}
-        </Button>
+        <div className="absolute -right-2 -top-2 flex gap-1 opacity-0 transition-opacity group-hover/widget:opacity-100">
+          {!isHidden && (
+            <Button
+              size="icon-sm"
+              variant="outline"
+              className="size-7 rounded-full"
+              onClick={() => {}}
+            >
+              <IconPencil stroke={1.5} />
+            </Button>
+          )}
+          <Button
+            size="icon-sm"
+            variant="outline"
+            className="size-7 rounded-full"
+            onClick={
+              isHidden
+                ? e => {
+                    e.stopPropagation()
+                    onToggle(widget.id)
+                  }
+                : () => onToggle(widget.id)
+            }
+          >
+            {isHidden ? <IconPlus stroke={1.5} /> : <IconMinus stroke={1.5} />}
+          </Button>
+        </div>
       )}
     </motion.div>
   )
