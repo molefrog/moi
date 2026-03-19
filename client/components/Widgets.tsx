@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { useState } from 'react'
 
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
@@ -24,10 +24,9 @@ type WidgetPosition = {
 type Widget = {
   id: string
   name: string
-  colSpan: 2 | 1
-  hidden: boolean
   content: ReactNode
-  position?: WidgetPosition
+  position: WidgetPosition
+  hidden?: boolean
 }
 
 type WidgetCardProps = {
@@ -39,16 +38,18 @@ type WidgetCardProps = {
 function WidgetCard({ widget, editing, onToggle }: WidgetCardProps) {
   const isHidden = widget.hidden
 
+  const styles: CSSProperties = {
+    gridRow: `span ${widget.position.rowSpan}`,
+    gridColumn: `span ${widget.position.colSpan}`
+  }
+
   return (
     <motion.div
       key={widget.id}
       layoutId={widget.id}
       transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
-      className={cn(
-        'group/widget relative flex',
-        widget.colSpan === 2 && 'col-span-2',
-        isHidden && 'h-[136px] cursor-pointer'
-      )}
+      className={cn('group/widget relative flex', isHidden && 'cursor-pointer')}
+      style={styles}
       onClick={isHidden ? () => onToggle(widget.id) : undefined}
     >
       <div className="flex-1 overflow-clip rounded-2xl shadow-sm [corner-shape:superellipse(1.2)]">
@@ -91,30 +92,26 @@ const initialWidgets: Widget[] = [
   {
     id: 'steps',
     name: 'Steps',
-    colSpan: 2,
-    hidden: false,
-    content: <StepsWidget />
+    content: <StepsWidget />,
+    position: { rowSpan: 1, colSpan: 4 }
   },
   {
     id: 'heart-rate',
     name: 'Heart Rate',
-    colSpan: 1,
-    hidden: false,
-    content: <HeartRateWidget />
+    content: <HeartRateWidget />,
+    position: { rowSpan: 1, colSpan: 2 }
   },
   {
     id: 'sleep',
     name: 'Sleep',
-    colSpan: 1,
-    hidden: false,
-    content: <SleepWidget />
+    content: <SleepWidget />,
+    position: { rowSpan: 1, colSpan: 2 }
   },
   {
     id: 'activity',
     name: 'Activity',
-    colSpan: 2,
-    hidden: false,
-    content: <ActivityWidget />
+    content: <ActivityWidget />,
+    position: { rowSpan: 1, colSpan: 4 }
   }
 ]
 
@@ -165,7 +162,7 @@ export function Widgets() {
         </AnimatePresence>
       </header>
       <LayoutGroup>
-        <motion.div layout className="grid flex-1 auto-rows-[136px] grid-cols-2 gap-4">
+        <motion.div layout className="grid flex-1 auto-rows-[136px] grid-cols-4 gap-4">
           {visibleWidgets.map(w => (
             <WidgetCard key={w.id} widget={w} editing={editing} onToggle={toggleWidget} />
           ))}
@@ -185,7 +182,7 @@ export function Widgets() {
               transition={{ type: 'spring', duration: 0.2, bounce: 0 }}
             >
               <p className="text-muted-foreground mb-4 text-sm font-medium">Hidden</p>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 {hiddenWidgets.map(w => (
                   <WidgetCard key={w.id} widget={w} editing={editing} onToggle={toggleWidget} />
                 ))}
