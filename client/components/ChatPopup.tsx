@@ -29,7 +29,7 @@ export function ChatPopup({ children }: ChatPopupProps) {
             }}
             initial="from"
             animate={open ? 'invisible' : 'to'}
-            transition={{ type: 'spring', duration: 0.2, delay: 0.3, bounce: 0 }}
+            transition={{ type: 'spring', duration: 0.3, delay: 0.2, bounce: 0 }}
           >
             <Button variant="outline" size="lg">
               <IconRobotFace stroke={1.75} /> Agent
@@ -42,7 +42,7 @@ export function ChatPopup({ children }: ChatPopupProps) {
         sideOffset={-48}
         align="end"
         alignOffset={-8}
-        className="flex h-[calc(100vh-32px)] w-[min(440px,calc(100vw-16px))] flex-col gap-0 rounded-3xl p-3 sm:h-[calc(100vh-96px)] sm:w-[min(440px,calc(100vw-32px))] sm:p-4"
+        className="flex h-[calc(100vh-2rem)] w-[min(440px,calc(100vw-1rem))] flex-col gap-0 rounded-3xl p-3 sm:h-[calc(100vh-8rem)] sm:w-[min(440px,calc(100vw-2rem))] sm:p-4"
         keepMounted
       >
         {children(onClose)}

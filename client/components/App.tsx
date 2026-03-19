@@ -43,16 +43,16 @@ export function App() {
   const showSidebar = chatMode === 'sidebar'
 
   return (
-    <div className="h-screen overflow-x-hidden px-4 py-4 sm:px-6 sm:py-6 lg:p-10">
-      <div className="mx-auto flex h-full w-full max-w-[1184px] justify-center">
-        <div className="max-w-160 w-full min-w-0">
+    <div className="min-h-screen px-4 py-4 sm:px-6 sm:py-6 lg:p-8">
+      <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[1184px] justify-center sm:min-h-[calc(100vh-3rem)] lg:min-h-[calc(100vh-4rem)]">
+        <div className="max-w-160 flex w-full min-w-0 flex-1 flex-col">
           {chatMode === 'solo' ? chatPanel : <Widgets />}
         </div>
 
         {canFitSidebar && chatMode !== 'solo' && (
           <div
             className={cn(
-              'h-full shrink-0 transition-all ease-in-out',
+              'sticky top-10 h-[calc(100vh-4rem)] shrink-0 self-start transition-all ease-in-out',
               showSidebar ? 'w-[464px] opacity-100 duration-0' : 'w-0 opacity-0 duration-200'
             )}
           >

@@ -86,13 +86,15 @@ export function ChatPanel({
   const { ref: scrollRef, showTopFade, showBottomFade } = useScrollFade()
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'instant' })
-  }, [messages])
+    const ref = chatMode === 'solo' ? document.body : scrollRef.current
+
+    ref?.scrollTo({ top: ref.scrollHeight, behavior: 'instant' })
+  }, [messages, chatMode])
 
   const TriggerIcon = chatMode === 'sidebar' ? ChatModeIconSidebar : ChatModeIconFloating
 
   return (
-    <div className="flex h-full flex-col">
+    <div className={cn('flex flex-col', chatMode === 'solo' ? 'min-h-full' : 'h-full')}>
       <header className="flex items-center justify-between pb-2 pl-2">
         {chatMode === 'solo' ? <SpaceName /> : <h1 className="text-sm font-medium">Agent</h1>}
         <div className="flex items-center gap-0.5">
@@ -141,12 +143,13 @@ export function ChatPanel({
       </header>
 
       <div
-        ref={scrollRef}
+        ref={chatMode !== 'solo' ? scrollRef : undefined}
         className={cn(
-          'flex flex-1 flex-col gap-6 overflow-y-auto px-2 pb-12 pt-4',
-          showTopFade && showBottomFade && 'mask-fade-y',
-          showTopFade && !showBottomFade && 'mask-fade-top',
-          !showTopFade && showBottomFade && 'mask-fade-bottom'
+          'flex flex-col gap-6 overscroll-contain px-2 pb-12 pt-4',
+          chatMode === 'solo' ? 'flex-1' : 'flex-1 overflow-y-auto',
+          chatMode !== 'solo' && showTopFade && showBottomFade && 'mask-fade-y',
+          chatMode !== 'solo' && showTopFade && !showBottomFade && 'mask-fade-top',
+          chatMode !== 'solo' && !showTopFade && showBottomFade && 'mask-fade-bottom'
         )}
       >
         {messages.length === 0 && !processing && <EmptyState />}
