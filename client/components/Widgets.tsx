@@ -14,12 +14,20 @@ import { HeartRateWidget } from './widgets/HeartRateWidget'
 import { SleepWidget } from './widgets/SleepWidget'
 import { StepsWidget } from './widgets/StepsWidget'
 
+type WidgetPosition = {
+  row?: number
+  rowSpan: 1 | 2 | 3 | 4
+  col?: number
+  colSpan: 1 | 2 | 3 | 4
+}
+
 type Widget = {
   id: string
   name: string
   colSpan: 2 | 1
   hidden: boolean
   content: ReactNode
+  position?: WidgetPosition
 }
 
 type WidgetCardProps = {
