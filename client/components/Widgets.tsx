@@ -108,7 +108,7 @@ export function Widgets() {
         </AnimatePresence>
       </header>
       <LayoutGroup>
-        <motion.div layout className="grid auto-rows-[136px] grid-cols-2 gap-4">
+        <motion.div layout className="grid flex-1 auto-rows-[136px] grid-cols-2 gap-4">
           {visibleWidgets.map(w => (
             <WidgetCard key={w.id} widget={w} editing={editing} onToggle={toggleWidget} />
           ))}
