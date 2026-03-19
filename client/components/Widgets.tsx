@@ -47,6 +47,18 @@ function WidgetCard({ widget, editing, onToggle }: WidgetCardProps) {
     <motion.div
       key={widget.id}
       layoutId={widget.id}
+      variants={{
+        idle: {
+          rotate: 0
+        },
+        wiggle: {
+          rotate: [0.5, -0.5],
+          transition: {
+            rotate: { repeat: Infinity, repeatType: 'reverse', duration: 0.15, ease: 'easeInOut' }
+          }
+        }
+      }}
+      animate={editing ? 'wiggle' : 'idle'}
       transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
       className={cn('group/widget relative flex', isHidden && 'cursor-pointer')}
       style={styles}
