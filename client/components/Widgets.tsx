@@ -5,6 +5,7 @@ import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 import { IconMinus, IconPlus } from '@tabler/icons-react'
 
 import { cn } from '@/client/lib/cn'
+
 import { SpaceName } from './SpaceName'
 import { Button } from './ui/button'
 
@@ -25,18 +26,18 @@ function WidgetCard({ widget, editing, onToggle }: WidgetCardProps) {
       layoutId={widget.id}
       transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
       className={cn(
-        'group/widget bg-black/4 relative flex rounded-xl [corner-shape:superellipse(1.2)]',
+        'group/widget bg-primary relative flex rounded-xl [corner-shape:superellipse(1.2)]',
         widget.colSpan === 2 && 'col-span-2',
         isHidden && 'h-[136px] cursor-pointer'
       )}
       onClick={isHidden ? () => onToggle(widget.id) : undefined}
     >
-      <span className="text-muted-foreground p-3 text-sm">{widget.name}</span>
+      <span className="text-primary-foreground p-4 text-sm">{widget.name}</span>
       {editing && (
         <Button
           size="icon-sm"
           variant="outline"
-          className="absolute -right-2 -top-2 size-7 rounded-md opacity-0 transition-opacity group-hover/widget:opacity-100"
+          className="absolute -right-2 -top-2 size-7 rounded-full opacity-0 transition-opacity group-hover/widget:opacity-100"
           onClick={
             isHidden
               ? e => {
@@ -113,16 +114,28 @@ export function Widgets() {
           ))}
         </motion.div>
 
-        {editing && hiddenWidgets.length > 0 && (
-          <div className="bg-muted rounded-t-4xl -m-8 mt-20 p-8">
-            <p className="text-muted-foreground mb-4 text-sm font-medium">Hidden</p>
-            <div className="grid grid-cols-2 gap-4">
-              {hiddenWidgets.map(w => (
-                <WidgetCard key={w.id} widget={w} editing={editing} onToggle={toggleWidget} />
-              ))}
-            </div>
-          </div>
-        )}
+        <AnimatePresence>
+          {editing && hiddenWidgets.length > 0 && (
+            <motion.div
+              className="bg-muted rounded-t-4xl -m-8 mt-20 p-8"
+              variants={{
+                from: { opacity: 0, y: 40, filter: 'blur(4px)' },
+                to: { opacity: 1, y: 0, filter: 'blur(0px)' }
+              }}
+              initial="from"
+              animate="to"
+              exit="from"
+              transition={{ type: 'spring', duration: 0.2, bounce: 0 }}
+            >
+              <p className="text-muted-foreground mb-4 text-sm font-medium">Hidden</p>
+              <div className="grid grid-cols-2 gap-4">
+                {hiddenWidgets.map(w => (
+                  <WidgetCard key={w.id} widget={w} editing={editing} onToggle={toggleWidget} />
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </LayoutGroup>
     </div>
   )
