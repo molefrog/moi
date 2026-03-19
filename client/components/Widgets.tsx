@@ -43,7 +43,7 @@ function WidgetCard({ widget, editing, onToggle }: WidgetCardProps) {
       )}
       onClick={isHidden ? () => onToggle(widget.id) : undefined}
     >
-      <div className="flex-1 overflow-clip rounded-xl [corner-shape:superellipse(1.2)]">
+      <div className="flex-1 overflow-clip rounded-2xl shadow-sm [corner-shape:superellipse(1.2)]">
         {widget.content}
       </div>
       {editing && (
@@ -154,7 +154,7 @@ export function Widgets() {
         <AnimatePresence>
           {editing && hiddenWidgets.length > 0 && (
             <motion.div
-              className="bg-muted rounded-t-4xl -m-8 mt-20 p-8"
+              className="-m-8 mt-20 rounded-t-2xl p-8 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04),inset_0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_4px_16px_-4px_rgba(0,0,0,0.06)]"
               variants={{
                 from: { opacity: 0, y: 40, filter: 'blur(4px)' },
                 to: { opacity: 1, y: 0, filter: 'blur(0px)' }
