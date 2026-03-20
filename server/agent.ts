@@ -13,7 +13,7 @@ import {
   setSessionId
 } from './state'
 
-const WORKSPACE = path.join(import.meta.dir, 'workspace')
+const WORKSPACE = path.join(import.meta.dir, '..', 'workspace')
 
 type TextContentBlock = {
   type: 'text'

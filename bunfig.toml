@@ -1,3 +1,3 @@
 
 [serve.static]
-plugins = ["bun-plugin-tailwind"]
+plugins = ["bun-plugin-tailwind", "./client/externalize-react.ts"]

@@ -3,7 +3,7 @@ import * as path from 'path'
 
 import type { ChatMessage, ServerMessage } from '@/lib/types'
 
-const WORKSPACE = path.join(import.meta.dir, 'workspace')
+const WORKSPACE = path.join(import.meta.dir, '..', 'workspace')
 const MESSAGES_PATH = path.join(WORKSPACE, 'messages.json')
 
 // --- Persistence ---
