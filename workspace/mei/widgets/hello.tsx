@@ -5,7 +5,7 @@ export default function HelloWidget() {
 
   return (
     <div className="flex flex-col items-center justify-center gap-3 p-6">
-      <h2 className="text-lg font-semibold">Hello from Widget v3!</h2>
+      <h2 className="text-lg font-semibold">Dummy Counter</h2>
       <p className="text-muted-foreground text-sm">Clicked {count} times</p>
       <button
         onClick={() => setCount((c) => c + 1)}
