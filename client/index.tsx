@@ -1,16 +1,9 @@
-import { createRoot } from 'react-dom/client'
-import { Agentation } from 'agentation'
-
 import './index.css'
-import { App } from './components/App'
 
-function Root() {
-  return (
-    <>
-      <App />
-      {process.env.NODE_ENV === 'development' && <Agentation />}
-    </>
-  )
+export async function init(el: HTMLElement) {
+  const { mount } = await import('./main')
+  mount(el)
 }
 
-createRoot(document.getElementById('root')!).render(<Root />)
+// Expose init globally so the preload script can call it
+globalThis.__init = init

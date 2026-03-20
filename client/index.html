@@ -10,10 +10,39 @@
       href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://esm.sh/react@19?dev",
+          "react/jsx-runtime": "https://esm.sh/react@19/jsx-runtime?dev",
+          "react/jsx-dev-runtime": "https://esm.sh/react@19/jsx-dev-runtime?dev",
+          "react-dom": "https://esm.sh/react-dom@19?dev",
+          "react-dom/client": "https://esm.sh/react-dom@19/client?dev"
+        }
+      }
+    </script>
     <link rel="stylesheet" href="./index.css" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
+    <script type="module">
+      const [react, jsxRuntime, jsxDevRuntime, reactDom, reactDomClient] = await Promise.all([
+        import("react"),
+        import("react/jsx-runtime"),
+        import("react/jsx-dev-runtime"),
+        import("react-dom"),
+        import("react-dom/client"),
+      ]);
+      globalThis.__esm = {
+        "react": react,
+        "react/jsx-runtime": jsxRuntime,
+        "react/jsx-dev-runtime": jsxDevRuntime,
+        "react-dom": reactDom,
+        "react-dom/client": reactDomClient,
+      };
+      globalThis.__init(document.getElementById("root"));
+      //# sourceURL=react-preload.js
+    </script>
   </body>
 </html>
