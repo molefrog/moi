@@ -1,5 +1,6 @@
 import { IconChevronRight } from '@tabler/icons-react'
 
+import { MarkdownContent } from '@/client/components/MarkdownContent'
 import { cn } from '@/client/lib/cn'
 import type { ChatMessage } from '@/lib/types'
 
@@ -13,7 +14,7 @@ export function ThinkingIndicator() {
       {[0, 1, 2].map(i => (
         <span
           key={i}
-          className="block h-1.5 w-1.5 rounded-full bg-ring"
+          className="bg-ring block h-1.5 w-1.5 rounded-full"
           style={{
             animation: 'pulse-dot 1.4s ease-in-out infinite',
             animationDelay: `${i * 0.2}s`
@@ -28,33 +29,30 @@ export function MessageBlock({ msg }: { msg: ChatMessage }) {
   switch (msg.type) {
     case 'user':
       return (
-        <p className="ml-8 self-end rounded-md bg-black/[0.07] px-4 py-2 text-sm leading-normal wrap-break-word whitespace-pre-wrap">
+        <p className="ml-8 self-end whitespace-pre-wrap rounded-md bg-black/[0.07] px-4 py-2 text-sm leading-normal">
           {msg.content}
         </p>
       )
 
     case 'assistant':
-      return (
-        <div className="prose-inline text-sm leading-normal wrap-break-word">
-          <FormattedText text={msg.content} />
-        </div>
-      )
+      return <MarkdownContent content={msg.content} />
 
     case 'tool_use':
       return (
         <details className="group">
-          <summary className="flex cursor-pointer items-center gap-2 py-1.5 select-none">
+          <summary className="flex cursor-pointer select-none items-center gap-2 py-1.5">
             <IconChevronRight
               size={12}
+              stroke={1.5}
               className="chevron text-ring transition-transform duration-150"
             />
             <span className="text-xs font-medium">{msg.name}</span>
-            <span className={cn('truncate text-[11px] text-ring')}>
+            <span className={cn('text-ring truncate text-[11px]')}>
               {formatInputBrief(msg.name, msg.input)}
             </span>
           </summary>
-          <div className="mt-1 ml-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5">
-            <pre className="max-h-[200px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
+          <div className="ml-4 mt-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5">
+            <pre className="max-h-[200px] overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs leading-relaxed">
               {formatInput(msg.name, msg.input)}
             </pre>
           </div>
@@ -64,24 +62,25 @@ export function MessageBlock({ msg }: { msg: ChatMessage }) {
     case 'tool_result':
       return msg.is_error ? (
         <div className="ml-4 rounded-md border border-red-200 bg-red-50 px-3 py-2">
-          <pre className="max-h-[160px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-red-800">
+          <pre className="max-h-[160px] overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs leading-relaxed text-red-800">
             {msg.content || '(empty)'}
           </pre>
         </div>
       ) : (
         <details className="group">
-          <summary className="ml-4 flex cursor-pointer items-center gap-2 py-1 select-none">
+          <summary className="ml-4 flex cursor-pointer select-none items-center gap-2 py-1">
             <IconChevronRight
               size={12}
+              stroke={1.5}
               className="chevron text-ring transition-transform duration-150"
             />
-            <span className="text-[11px] text-ring">
+            <span className="text-ring text-[11px]">
               Result
               {msg.content ? ` \u00B7 ${msg.content.length} chars` : ' \u00B7 empty'}
             </span>
           </summary>
-          <div className="mt-1 ml-4 rounded-md border border-border bg-muted px-3 py-2.5">
-            <pre className="max-h-[200px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-muted-foreground">
+          <div className="border-border bg-muted ml-4 mt-1 rounded-md border px-3 py-2.5">
+            <pre className="text-muted-foreground max-h-[200px] overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs leading-relaxed">
               {msg.content || '(empty)'}
             </pre>
           </div>
@@ -99,31 +98,6 @@ export function MessageBlock({ msg }: { msg: ChatMessage }) {
         </div>
       )
   }
-}
-
-function FormattedText({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g)
-  return (
-    <span className="whitespace-pre-wrap">
-      {parts.map((part, i) => {
-        if (part.startsWith('**') && part.endsWith('**')) {
-          return (
-            <strong key={i} className="font-semibold">
-              {part.slice(2, -2)}
-            </strong>
-          )
-        }
-        if (part.startsWith('`') && part.endsWith('`')) {
-          return (
-            <code key={i} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[13px]">
-              {part.slice(1, -1)}
-            </code>
-          )
-        }
-        return <span key={i}>{part}</span>
-      })}
-    </span>
-  )
 }
 
 function getInputValue(input: Record<string, unknown>, key: string): string {

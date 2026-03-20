@@ -1,12 +1,6 @@
 import { useEffect } from 'react'
 
-import {
-  IconCheck,
-  IconChevronsRight,
-  IconLayoutSidebarRightFilled,
-  IconPictureInPictureFilled,
-  IconX
-} from '@tabler/icons-react'
+import { IconChevronsRight, IconSelector, IconX } from '@tabler/icons-react'
 
 import { useScrollFade } from '@/client/hooks/useScrollFade'
 import { cn } from '@/client/lib/cn'
@@ -14,15 +8,55 @@ import type { ChatMessage } from '@/lib/types'
 
 import { ChatInput } from './ChatInput'
 import { EmptyState, MessageBlock, ThinkingIndicator } from './MessageBlock'
+import { SpaceName } from './SpaceName'
 import { Button } from './ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger
 } from './ui/dropdown-menu'
 
 export type ChatMode = 'solo' | 'sidebar' | 'floating'
+
+type ChatModeIconProps = {
+  className?: string
+}
+
+function ChatModeIconSidebar({ className }: ChatModeIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      strokeWidth="1.5"
+      className={className}
+    >
+      <rect x="1.75" y="3.75" width="20.5" height="16.5" rx="2.25" stroke="currentColor" />
+      <rect x="11.5" y="5.5" width="9" height="13" rx="1" fill="currentColor" />
+    </svg>
+  )
+}
+
+function ChatModeIconFloating({ className }: ChatModeIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      strokeWidth="1.5"
+      className={className}
+    >
+      <rect x="1.75" y="3.75" width="20.5" height="16.5" rx="2.25" stroke="currentColor" />
+      <rect x="12.5" y="11.5" width="8" height="7" rx="1" fill="currentColor" />
+    </svg>
+  )
+}
 
 type ChatPanelProps = {
   messages: ChatMessage[]
@@ -52,61 +86,70 @@ export function ChatPanel({
   const { ref: scrollRef, showTopFade, showBottomFade } = useScrollFade()
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'instant' })
-  }, [messages])
+    const ref = chatMode === 'solo' ? document.body : scrollRef.current
+
+    ref?.scrollTo({ top: ref.scrollHeight, behavior: 'instant' })
+  }, [messages, chatMode])
+
+  const TriggerIcon = chatMode === 'sidebar' ? ChatModeIconSidebar : ChatModeIconFloating
 
   return (
-    <div className="flex h-full flex-col">
+    <div className={cn('flex flex-col', chatMode === 'solo' ? 'min-h-full' : 'h-full')}>
       <header className="flex items-center justify-between pb-2 pl-2">
-        <h1 className="text-sm font-medium">New workspace</h1>
+        {chatMode === 'solo' ? <SpaceName /> : <h1 className="text-sm font-medium">Agent</h1>}
         <div className="flex items-center gap-0.5">
           {chatMode !== 'solo' && onModeChange && (
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
-                  <Button variant="ghost" size="icon" aria-label="Switch chat mode">
-                    {chatMode === 'sidebar' ? (
-                      <IconLayoutSidebarRightFilled className="text-muted-foreground" />
-                    ) : (
-                      <IconPictureInPictureFilled className="text-muted-foreground" />
-                    )}
+                  <Button
+                    className="pl-2! pr-1! gap-0"
+                    variant="ghost"
+                    aria-label="Switch chat mode"
+                  >
+                    <>
+                      <TriggerIcon className="text-muted-foreground" />
+                      <IconSelector className="size-4! text-muted-foreground/50" stroke={2} />
+                    </>
                   </Button>
                 }
               />
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onModeChange('sidebar')}>
-                  <IconLayoutSidebarRightFilled size={16} />
-                  Sidebar
-                  {chatMode === 'sidebar' && <IconCheck size={16} className="ml-auto" />}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onModeChange('floating')}>
-                  <IconPictureInPictureFilled size={16} />
-                  Floating
-                  {chatMode !== 'sidebar' && <IconCheck size={16} className="ml-auto" />}
-                </DropdownMenuItem>
+              <DropdownMenuContent align="end" className="min-w-40">
+                <DropdownMenuRadioGroup value={chatMode} onValueChange={onModeChange}>
+                  <DropdownMenuRadioItem value="sidebar" closeOnClick>
+                    <ChatModeIconSidebar />
+                    Sidebar
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="floating" closeOnClick>
+                    <ChatModeIconFloating />
+                    Floating
+                  </DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
           {chatMode === 'sidebar' && onCollapse && (
             <Button variant="ghost" size="icon" onClick={onCollapse} aria-label="Collapse chat">
-              <IconChevronsRight className="text-muted-foreground" />
+              {/* Tabler icon with double chevrons has a really weird optical size, hence the adjustments */}
+              <IconChevronsRight className="text-muted-foreground size-6!" stroke={1.5} />
             </Button>
           )}
           {chatMode === 'floating' && onClose && (
             <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close chat">
-              <IconX className="text-muted-foreground" />
+              <IconX className="text-muted-foreground" stroke={1.5} />
             </Button>
           )}
         </div>
       </header>
 
       <div
-        ref={scrollRef}
+        ref={chatMode !== 'solo' ? scrollRef : undefined}
         className={cn(
-          'flex flex-1 flex-col gap-4 overflow-y-auto px-2 pt-4 pb-12',
-          showTopFade && showBottomFade && 'mask-fade-y',
-          showTopFade && !showBottomFade && 'mask-fade-top',
-          !showTopFade && showBottomFade && 'mask-fade-bottom'
+          'flex flex-col gap-6 overscroll-contain px-2 pb-12 pt-4',
+          chatMode === 'solo' ? 'flex-1' : 'flex-1 overflow-y-auto',
+          chatMode !== 'solo' && showTopFade && showBottomFade && 'mask-fade-y',
+          chatMode !== 'solo' && showTopFade && !showBottomFade && 'mask-fade-top',
+          chatMode !== 'solo' && !showTopFade && showBottomFade && 'mask-fade-bottom'
         )}
       >
         {messages.length === 0 && !processing && <EmptyState />}

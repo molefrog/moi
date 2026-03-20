@@ -9,3 +9,4 @@ alwaysApply: false
 - Prefer existing Tailwind utility classes over custom values. Check https://tailwindcss.com/docs/ before reaching for a custom value.
 - Use arbitrary values (e.g. `w-[123px]`, `text-[#ff0000]`) only when no default utility class can achieve the result.
 - Do not use `@apply` to create shorthands for combinations of utilities — compose classes directly in JSX/HTML.
+- Use `cn()` from `@/client/lib/cn` with multiple arguments for conditional classes. Never use template literals with ternaries for `className` — use `cn('base', condition && 'conditional')` instead.
