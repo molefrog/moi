@@ -36,3 +36,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # workspace state
 server/workspace
 !server/workspace/CLAUDE.md
+
+# widget build output
+workspace/mei/.build
