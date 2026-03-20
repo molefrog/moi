@@ -26,7 +26,7 @@ export function ChatInput({ value, onChange, onSend, onStop, processing }: ChatI
         e.preventDefault()
         ref.current?.focus()
       }}
-      className="flex w-full cursor-text flex-col gap-1 rounded-xl border border-input bg-background p-2 shadow-xs transition-[color,box-shadow] outline-none focus-within:shadow-sm"
+      className="bg-background shadow-xs flex w-full cursor-text flex-col gap-1 rounded-lg p-2 outline-none transition-[color,box-shadow] focus-within:shadow-sm"
     >
       <textarea
         ref={ref}
@@ -44,16 +44,16 @@ export function ChatInput({ value, onChange, onSend, onStop, processing }: ChatI
         disabled={processing}
         autoFocus
         rows={1}
-        className="field-sizing-content max-h-40 w-full resize-none bg-transparent px-2 py-1 text-sm leading-relaxed outline-none placeholder:text-muted-foreground disabled:opacity-50"
+        className="field-sizing-content placeholder:text-muted-foreground max-h-40 w-full resize-none bg-transparent px-2 py-1 text-sm leading-relaxed outline-none disabled:opacity-50"
       />
       <div className="flex justify-end">
         {processing ? (
           <Button type="button" size="icon" onClick={onStop} aria-label="Stop agent">
-            <IconPlayerStop />
+            <IconPlayerStop stroke={1.5} />
           </Button>
         ) : (
           <Button type="submit" size="icon" disabled={!value.trim()} aria-label="Send message">
-            <IconArrowUp />
+            <IconArrowUp stroke={1.5} />
           </Button>
         )}
       </div>
