@@ -3,6 +3,7 @@ import type { ClientMessage } from '@/lib/types'
 import index from '../client/index.html'
 import { handleChat, stopChat } from './agent'
 import { PORT } from './constants'
+import './control'
 import { clients, messages, processing } from './state'
 import { listWidgets, serveWidget } from './widgets'
 
@@ -30,13 +31,14 @@ function upgrade(server: Upgradable, req: Request, data: WsData) {
 
 export const app = Bun.serve<WsData>({
   port: PORT,
+  development: { hmr: true },
   routes: {
     '/': index,
     '/_mei/widgets': () => listWidgets(),
-    '/_mei/widgets/*': (req) => {
+    '/_mei/widgets/*': req => {
       const name = new URL(req.url).pathname.split('/').pop()?.replace(/\.js$/, '')
       return name ? serveWidget(name) : new Response('Not found', { status: 404 })
-    },
+    }
   },
   fetch(req, server) {
     const path = new URL(req.url).pathname
@@ -66,12 +68,10 @@ export const app = Bun.serve<WsData>({
     close(ws) {
       if (ws.data.channel === 'chat') clients.delete(ws)
       else ws.unsubscribe(MEI_TOPIC)
-    },
-  },
+    }
+  }
 })
 
 export function publishMei(msg: unknown) {
   app.publish(MEI_TOPIC, JSON.stringify(msg))
 }
-
-import './control'
