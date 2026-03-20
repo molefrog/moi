@@ -9,32 +9,34 @@ import { Button } from './ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 
 type ChatPopupProps = {
+  defaultOpen?: boolean
   children: (onClose: () => void) => ReactNode
 }
 
-export function ChatPopup({ children }: ChatPopupProps) {
-  const [open, setOpen] = useState(false)
+export function ChatPopup({ defaultOpen = false, children }: ChatPopupProps) {
+  const [open, setOpen] = useState(defaultOpen)
   const onClose = () => setOpen(false)
 
   return (
     <Popover open={open} onOpenChange={o => setOpen(o)}>
       <PopoverTrigger
         render={
-          <motion.div
-            className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6"
-            variants={{
-              from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
-              to: { opacity: 1, scale: 1, filter: 'blur(0px)' },
-              invisible: { opacity: 0, scale: 1, filter: 'blur(4px)' }
-            }}
-            initial="from"
-            animate={open ? 'invisible' : 'to'}
-            transition={{ type: 'spring', duration: 0.3, delay: 0.2, bounce: 0 }}
-          >
-            <Button variant="outline" size="lg">
-              <IconRobotFace stroke={1.75} /> Agent
-            </Button>
-          </motion.div>
+          <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6">
+            <motion.div
+              variants={{
+                from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
+                to: { opacity: 1, scale: 1, filter: 'blur(0px)' },
+                invisible: { opacity: 0, scale: 1, filter: 'blur(4px)' }
+              }}
+              initial="from"
+              animate={open ? 'invisible' : 'to'}
+              transition={{ type: 'spring', duration: 0.3, delay: 0.2, bounce: 0 }}
+            >
+              <Button variant="outline" size="lg">
+                <IconRobotFace stroke={1.75} /> Agent
+              </Button>
+            </motion.div>
+          </div>
         }
       />
       <PopoverContent

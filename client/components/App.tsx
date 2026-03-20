@@ -62,7 +62,7 @@ export function App() {
       </div>
 
       {chatMode === 'floating' && (
-        <ChatPopup>
+        <ChatPopup defaultOpen={chatCollapsed}>
           {onClose => (
             <ChatPanel
               messages={messages}
