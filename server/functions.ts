@@ -1,8 +1,8 @@
 // Parent-side manager for the functions worker child process.
-// Provides callFunction() and reloadModules() for use by the web server.
 import { join } from 'path'
 
 const WORKER_PATH = join(import.meta.dir, 'functions-worker.ts')
+const CALL_TIMEOUT_MS = 30_000
 
 function getMeiDir() {
   return process.env.MEI_FUNCTIONS_DIR ?? join(import.meta.dir, '..', 'workspace', 'mei')
@@ -11,20 +11,27 @@ function getMeiDir() {
 type Pending = {
   resolve: (data: string) => void
   reject: (err: Error) => void
+  timer: ReturnType<typeof setTimeout>
 }
 
 let worker: ReturnType<typeof Bun.spawn> | null = null
 let readyPromise: Promise<void> | null = null
+let spawning = false
 const pending = new Map<string, Pending>()
 
 function rejectAll(reason: string) {
-  for (const [id, { reject }] of pending) {
+  const entries = [...pending.values()]
+  pending.clear()
+  for (const { reject, timer } of entries) {
+    clearTimeout(timer)
     reject(new Error(reason))
-    pending.delete(id)
   }
 }
 
 function spawn() {
+  if (spawning) return
+  spawning = true
+
   let readyResolve: () => void
   readyPromise = new Promise(r => (readyResolve = r))
 
@@ -36,15 +43,17 @@ function spawn() {
     onExit(_proc, code) {
       worker = null
       readyPromise = null
+      spawning = false
       if (code !== 0 && code !== null) {
-        console.error(`[mei] Functions worker exited with code ${code}, will respawn on next call`)
-        rejectAll('Functions worker crashed')
+        console.error(`[mei] Functions worker exited with code ${code}`)
       }
+      rejectAll('Functions worker exited')
     },
     ipc(message) {
       const msg = message as { type: string; id?: string; data?: string; message?: string }
 
       if (msg.type === 'ready') {
+        spawning = false
         readyResolve()
         return
       }
@@ -53,6 +62,7 @@ function spawn() {
         const p = pending.get(msg.id)
         if (!p) return
         pending.delete(msg.id)
+        clearTimeout(p.timer)
 
         if (msg.type === 'result') {
           p.resolve(msg.data!)
@@ -65,7 +75,7 @@ function spawn() {
 }
 
 async function ensureWorker() {
-  if (!worker) spawn()
+  if (!worker && !spawning) spawn()
   await readyPromise
 }
 
@@ -74,13 +84,28 @@ export async function callFunction(module: string, name: string, args: string): 
 
   const id = crypto.randomUUID()
   return new Promise((resolve, reject) => {
-    pending.set(id, { resolve, reject })
-    worker!.send({ id, type: 'call', module, name, args })
+    const timer = setTimeout(() => {
+      pending.delete(id)
+      reject(new Error(`Function call timed out: ${module}/${name}`))
+    }, CALL_TIMEOUT_MS)
+
+    pending.set(id, { resolve, reject, timer })
+
+    try {
+      if (!worker) throw new Error('Worker not available')
+      worker.send({ id, type: 'call', module, name, args })
+    } catch (err) {
+      pending.delete(id)
+      clearTimeout(timer)
+      reject(err instanceof Error ? err : new Error('Failed to send to worker'))
+    }
   })
 }
 
 export function reloadModules(modules: string[]) {
   if (worker && modules.length > 0) {
-    worker.send({ type: 'reload', modules })
+    try {
+      worker.send({ type: 'reload', modules })
+    } catch {}
   }
 }

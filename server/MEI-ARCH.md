@@ -13,8 +13,6 @@ workspace/
     .build/
       widgets/
         :name.js      <-- pre-built ESM modules with injected tailwind CSS
-      functions/
-        :name.server.js <-- pre-built server functions (target: bun, deps inlined)
 
 everything is flat, no subdirectories. one file per widget, one file per server module.
 
@@ -43,13 +41,15 @@ server functions:
 - during widget build, a Bun plugin rewrites .server.ts imports into fetch() proxies:
     import { getWeather } from './weather.server'  →  POST /_mei/fn/weather/getWeather
 - at build time, non-function exports from .server.ts raise an error
-- the real .server.ts runs in a separate Bun process (isolation from web server)
+- the real .server.ts runs in a separate Bun child process (isolation from web server)
 - communication between web and functions process via Bun IPC
+- server functions are loaded directly from source (not compiled) — Bun runs TypeScript natively
 - functions are long-lived modules (singleton per version), persistent state (open DBs, caches) survives between requests
 - on bundle, changed function modules are evicted and re-imported (optional dispose() export for cleanup)
-- functions are bundled with target: 'bun' to .build/functions/ (deps inlined, no separate node_modules)
+- module cache busting via ?t=mtime query string on dynamic import
 - arg serialization uses devalue (handles Date, Map, Set, Error etc.)
-- streaming: async generator functions yield multiple results, transported as sequences of IPC messages
+- call timeout: 30s per function call, rejects with error if exceeded
+- worker auto-respawns on crash, rejects all pending calls
 
 frontend:
 - WidgetDashboard component fetches /_mei/widgets to discover all widgets

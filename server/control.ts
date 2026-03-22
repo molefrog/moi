@@ -4,6 +4,7 @@ import { handleBundle } from './widgets'
 
 export const control = Bun.serve({
   port: CONTROL_PORT,
+  hostname: '127.0.0.1',
   fetch(req, server) {
     return server.upgrade(req)
       ? new Response(null, { status: 101 })
@@ -18,6 +19,6 @@ export const control = Bun.serve({
         const results = await handleBundle(publishMei)
         ws.send(JSON.stringify(results))
       } catch {}
-    },
-  },
+    }
+  }
 })

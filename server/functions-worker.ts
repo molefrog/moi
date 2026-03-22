@@ -7,6 +7,14 @@ const MEI_DIR = process.env.MEI_FUNCTIONS_DIR ?? join(import.meta.dir, '..', 'wo
 
 const moduleCache = new Map<string, Record<string, unknown>>()
 
+function send(msg: unknown) {
+  try {
+    process.send!(msg)
+  } catch {
+    // IPC channel closed — parent died
+  }
+}
+
 async function loadModule(name: string): Promise<Record<string, unknown>> {
   const cached = moduleCache.get(name)
   if (cached) return cached
@@ -30,7 +38,9 @@ async function evictModule(name: string) {
   if (typeof mod.dispose === 'function') {
     try {
       await (mod.dispose as () => Promise<void>)()
-    } catch {}
+    } catch (err) {
+      console.error(`[mei] dispose error in ${name}.server.ts:`, err)
+    }
   }
 
   moduleCache.delete(name)
@@ -51,6 +61,11 @@ process.on('message', async (raw: IncomingMessage) => {
   if (raw.type === 'call') {
     const { id, module: moduleName, name, args } = raw
 
+    if (!id || !moduleName || !name) {
+      send({ id, type: 'error', message: 'Malformed call message' })
+      return
+    }
+
     try {
       const mod = await loadModule(moduleName)
       const fn = mod[name]
@@ -62,12 +77,12 @@ process.on('message', async (raw: IncomingMessage) => {
       const parsedArgs = parse(args) as unknown[]
       const result = await fn(...parsedArgs)
 
-      process.send!({ id, type: 'result', data: stringify(result) })
+      send({ id, type: 'result', data: stringify(result) })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
-      process.send!({ id, type: 'error', message })
+      send({ id, type: 'error', message })
     }
   }
 })
 
-process.send!({ type: 'ready' })
+send({ type: 'ready' })
