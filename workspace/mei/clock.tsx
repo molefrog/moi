@@ -10,12 +10,8 @@ export default function ClockWidget() {
 
   return (
     <div className="flex flex-col items-center justify-center gap-1 p-6">
-      <span className="font-mono text-2xl font-bold tabular-nums">
-        {time.toLocaleTimeString()}
-      </span>
-      <span className="text-xs text-muted-foreground">
-        {time.toLocaleDateString()}
-      </span>
+      <span className="font-mono text-2xl font-bold tabular-nums">{time.toLocaleTimeString()}</span>
+      <span className="text-muted-foreground text-xs">{time.toLocaleDateString()}</span>
     </div>
   )
 }

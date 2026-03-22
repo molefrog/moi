@@ -1,24 +1,31 @@
 mei app (server)
 
-bun server/index.ts -> launches main process with web server and control server
-bun server/cli.ts bundle -> sends a signal to main process to scan widgets and rebuild changed ones
+bun server/cli.ts serve -> launches web server and control server
+bun server/cli.ts bundle -> sends a signal to main process to scan and rebuild changed files
+./mei/cmd bundle -> same, from workspace
 
 workspace/
   mei/
-    package.json   <-- deps for widgets
+    package.json      <-- deps for widgets and server functions
+    cmd               <-- executable, shortcut for `bun server/cli.ts`
+    :name.tsx         <-- widget, exports a default react component
+    :name.server.ts   <-- server functions for the widget (or shared)
     .build/
       widgets/
-        :name.js   <-- pre-built ESM modules with injected tailwind CSS
-    widgets/
-      :name.tsx <-- user writes these and they export a default react component
+        :name.js      <-- pre-built ESM modules with injected tailwind CSS
+      functions/
+        :name.server.js <-- pre-built server functions (target: bun, deps inlined)
+
+everything is flat, no subdirectories. one file per widget, one file per server module.
 
 web server API:
-  /_mei/widgets/:name.js ESM module served from .build/
-  /_mei/widgets          list all widgets as JSON { widgets: ["hello", ...] }
-  /_mei/ws               websocket for pushing events to the frontend when widgets are updated
+  /_mei/widgets/:name.js    ESM module served from .build/widgets/
+  /_mei/widgets             list all widgets as JSON { widgets: ["hello", ...] }
+  /_mei/fn/:module/:name    POST, calls a server function, returns JSON
+  /_mei/ws                  websocket for pushing events to the frontend
 
-control server (port 9901):
-  WS-only, accepts { type: "bundle" }, responds with { type: "bundle:done", built, skipped, failed }
+control server (port 13059):
+  WS-only, accepts { type: "bundle" }, responds with build results array
 
 widget build:
 - uses Bun.build() with format: 'esm', target: 'browser'
@@ -26,8 +33,23 @@ widget build:
 - tailwind css utilities-only (@import 'tailwindcss/utilities') injected into JS as a <style data-widget=":name"> tag
 - no preflight, no theme reset -- widgets inherit host's theme vars (--color-primary etc)
 - inline sourcemaps for debugging
-- output written to workspace/mei/.build/widgets/:name.js
-- incremental: skips widgets where source mtime <= built mtime
+- output written to .build/widgets/:name.js
+- incremental: skips files where source mtime <= built mtime
+
+server functions:
+- widgets import from `./:name.server` — e.g. `import { getWeather } from './weather.server'`
+- only `async function` can be exported from .server.ts (not const, not sync function, not class)
+- this ensures TypeScript types match reality: both the real function and the proxy return Promise<T>
+- during widget build, a Bun plugin rewrites .server.ts imports into fetch() proxies:
+    import { getWeather } from './weather.server'  →  POST /_mei/fn/weather/getWeather
+- at build time, non-function exports from .server.ts raise an error
+- the real .server.ts runs in a separate Bun process (isolation from web server)
+- communication between web and functions process via Bun IPC
+- functions are long-lived modules (singleton per version), persistent state (open DBs, caches) survives between requests
+- on bundle, changed function modules are evicted and re-imported (optional dispose() export for cleanup)
+- functions are bundled with target: 'bun' to .build/functions/ (deps inlined, no separate node_modules)
+- arg serialization uses devalue (handles Date, Map, Set, Error etc.)
+- streaming: async generator functions yield multiple results, transported as sequences of IPC messages
 
 frontend:
 - WidgetDashboard component fetches /_mei/widgets to discover all widgets
@@ -39,7 +61,7 @@ frontend:
 
 
 stories:
-- when frontend requests list of widgets -> scans all .tsx/.ts in widgets/ and returns names
+- when frontend requests list of widgets -> scans all .tsx/.ts in mei/ and returns names
 - when CLI sends `bun server/cli.ts bundle`:
   - connects to control server via WS
   - sends { type: "bundle" }

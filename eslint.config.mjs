@@ -11,7 +11,7 @@ const commonLanguageOptions = {
 
 export default tseslint.config(
   {
-    ignores: ['node_modules/**', 'server/workspace/**', 'workspace/**']
+    ignores: ['node_modules/**', 'server/workspace/**', 'server/test/__fixtures__/**', 'workspace/**']
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
