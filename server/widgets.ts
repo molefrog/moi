@@ -2,6 +2,7 @@ import { mkdir, readdir } from 'node:fs/promises'
 import { join } from 'path'
 
 import { buildWidget } from './build-widget'
+import { reloadModules } from './functions'
 
 const MEI_DIR = join(import.meta.dir, '..', 'workspace', 'mei')
 const SOURCE_DIR = MEI_DIR
@@ -40,6 +41,7 @@ export type WidgetBuildResult = {
   name: string
   status: 'built' | 'skipped' | 'failed'
   error?: string
+  serverModules?: string[]
 }
 
 export async function buildAllWidgets(): Promise<WidgetBuildResult[]> {
@@ -64,7 +66,11 @@ export async function buildAllWidgets(): Promise<WidgetBuildResult[]> {
       await mkdir(BUILD_DIR, { recursive: true })
       await Bun.write(join(BUILD_DIR, `${name}.js`), artifact.js)
 
-      results.push({ name, status: 'built' })
+      results.push({
+        name,
+        status: 'built',
+        serverModules: artifact.serverModules.map(m => m.name)
+      })
     } catch (err) {
       results.push({
         name,
@@ -98,9 +104,18 @@ export async function handleBundle(publish: (msg: unknown) => void) {
   const after = await listBuiltWidgets()
   const layoutChanged = before.join(',') !== after.join(',')
 
+  const changedServerModules = new Set<string>()
   for (const r of results) {
-    if (r.status === 'built') publish({ type: 'widget:updated', name: r.name })
+    if (r.status === 'built') {
+      publish({ type: 'widget:updated', name: r.name })
+      for (const m of r.serverModules ?? []) changedServerModules.add(m)
+    }
   }
+
+  if (changedServerModules.size > 0) {
+    reloadModules([...changedServerModules])
+  }
+
   if (layoutChanged) {
     publish({ type: 'widget-layout:updated' })
   }

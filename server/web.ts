@@ -4,6 +4,7 @@ import index from '../client/index.html'
 import { handleChat, stopChat } from './agent'
 import { PORT } from './constants'
 import './control'
+import { callFunction } from './functions'
 import { clients, messages, processing } from './state'
 import { listWidgets, serveWidget } from './widgets'
 
@@ -44,6 +45,11 @@ export const app = Bun.serve<WsData>({
     const path = new URL(req.url).pathname
     if (path === '/ws') return upgrade(server, req, { channel: 'chat' })
     if (path === '/_mei/ws') return upgrade(server, req, { channel: 'mei' })
+
+    if (req.method === 'POST' && path.startsWith('/_mei/fn/')) {
+      return handleFunctionCall(req, path)
+    }
+
     return new Response('Not found', { status: 404 })
   },
   websocket: {
@@ -71,6 +77,25 @@ export const app = Bun.serve<WsData>({
     }
   }
 })
+
+async function handleFunctionCall(req: Request, path: string): Promise<Response> {
+  const parts = path.replace('/_mei/fn/', '').split('/')
+  if (parts.length !== 2) return new Response('Bad request', { status: 400 })
+
+  const [module, name] = parts
+  if (!/^[a-zA-Z0-9_$-]+$/.test(module) || !/^[a-zA-Z0-9_$]+$/.test(name)) {
+    return new Response('Invalid module or function name', { status: 400 })
+  }
+
+  try {
+    const args = await req.text()
+    const result = await callFunction(module, name, args)
+    return new Response(result, { headers: { 'Content-Type': 'application/json' } })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    return new Response(message, { status: 500 })
+  }
+}
 
 export function publishMei(msg: unknown) {
   app.publish(MEI_TOPIC, JSON.stringify(msg))
