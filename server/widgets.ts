@@ -1,56 +1,18 @@
-import type { BunPlugin } from 'bun'
-import { join } from 'path'
 import { mkdir, readdir } from 'node:fs/promises'
-import tailwind from 'bun-plugin-tailwind'
+import { join } from 'path'
+
+import { buildWidget } from './build-widget'
 
 const MEI_DIR = join(import.meta.dir, '..', 'workspace', 'mei')
-const WIDGETS_DIR = join(MEI_DIR, 'widgets')
+const SOURCE_DIR = MEI_DIR
 const BUILD_DIR = join(MEI_DIR, '.build', 'widgets')
-
-const EXTERNAL_MODULES = [
-  'react',
-  'react/jsx-runtime',
-  'react/jsx-dev-runtime',
-  'react-dom',
-  'react-dom/client',
-]
-
-function widgetCssPlugin(widgetPath: string): BunPlugin {
-  return {
-    name: 'widget-css',
-    setup(build) {
-      build.onResolve({ filter: /^__widget-entry$/ }, () => ({
-        path: '__widget-entry',
-        namespace: 'widget-entry',
-      }))
-
-      build.onLoad({ filter: /.*/, namespace: 'widget-entry' }, () => ({
-        contents: [
-          `import "widget-tailwind.css";`,
-          `export { default } from ${JSON.stringify(widgetPath)};`,
-        ].join('\n'),
-        loader: 'js',
-      }))
-
-      build.onResolve({ filter: /^widget-tailwind\.css$/ }, () => ({
-        path: join(widgetPath, '..', 'widget-tailwind.css'),
-        namespace: 'widget-tw',
-      }))
-
-      build.onLoad({ filter: /.*/, namespace: 'widget-tw' }, () => ({
-        contents: `@import 'tailwindcss/utilities';`,
-        loader: 'css',
-      }))
-    },
-  }
-}
 
 async function scanWidgets(): Promise<string[]> {
   try {
-    const entries = await readdir(WIDGETS_DIR)
+    const entries = await readdir(SOURCE_DIR)
     return entries
-      .filter((f) => f.endsWith('.tsx') || f.endsWith('.ts'))
-      .map((f) => f.replace(/\.tsx?$/, ''))
+      .filter(f => /\.(tsx|ts)$/.test(f) && !f.endsWith('.server.ts'))
+      .map(f => f.replace(/\.tsx?$/, ''))
   } catch {
     return []
   }
@@ -58,59 +20,10 @@ async function scanWidgets(): Promise<string[]> {
 
 async function resolveWidgetSource(name: string): Promise<string | null> {
   for (const ext of ['.tsx', '.ts']) {
-    const path = join(WIDGETS_DIR, `${name}${ext}`)
+    const path = join(SOURCE_DIR, `${name}${ext}`)
     if (await Bun.file(path).exists()) return path
   }
   return null
-}
-
-async function buildWidget(name: string): Promise<{ ok: boolean; error?: string }> {
-  const srcPath = await resolveWidgetSource(name)
-  if (!srcPath) return { ok: false, error: `Source file not found for "${name}"` }
-
-  const result = await Bun.build({
-    entrypoints: ['__widget-entry'],
-    format: 'esm',
-    target: 'browser',
-    sourcemap: 'inline',
-    external: EXTERNAL_MODULES,
-    plugins: [widgetCssPlugin(srcPath), tailwind],
-  })
-
-  if (!result.success) {
-    const errors = result.logs.map((l) => l.message).join('\n')
-    return { ok: false, error: errors }
-  }
-
-  const jsOutput = result.outputs.find((o) => o.path.endsWith('.js'))
-  const cssOutput = result.outputs.find((o) => o.path.endsWith('.css'))
-
-  if (!jsOutput) {
-    return { ok: false, error: 'Build produced no JS output' }
-  }
-
-  let code = await jsOutput.text()
-
-  if (cssOutput) {
-    const css = await cssOutput.text()
-    if (css.trim()) {
-      const injection = [
-        `((css, id) => {`,
-        `  if (document.querySelector(\`style[data-widget="\${id}"]\`)) return;`,
-        `  const s = document.createElement("style");`,
-        `  s.dataset.widget = id;`,
-        `  s.textContent = css;`,
-        `  document.head.appendChild(s);`,
-        `})(${JSON.stringify(css)}, ${JSON.stringify(name)});`,
-      ].join('\n')
-      code = injection + '\n' + code
-    }
-  }
-
-  await mkdir(BUILD_DIR, { recursive: true })
-  await Bun.write(join(BUILD_DIR, `${name}.js`), code)
-
-  return { ok: true }
 }
 
 async function needsRebuild(name: string): Promise<boolean> {
@@ -139,12 +52,26 @@ export async function buildAllWidgets(): Promise<WidgetBuildResult[]> {
       continue
     }
 
-    const result = await buildWidget(name)
-    results.push(
-      result.ok
-        ? { name, status: 'built' }
-        : { name, status: 'failed', error: result.error ?? 'Unknown error' }
-    )
+    const srcPath = await resolveWidgetSource(name)
+    if (!srcPath) {
+      results.push({ name, status: 'failed', error: 'Source file not found' })
+      continue
+    }
+
+    try {
+      const artifact = await buildWidget(srcPath)
+
+      await mkdir(BUILD_DIR, { recursive: true })
+      await Bun.write(join(BUILD_DIR, `${name}.js`), artifact.js)
+
+      results.push({ name, status: 'built' })
+    } catch (err) {
+      results.push({
+        name,
+        status: 'failed',
+        error: err instanceof Error ? err.message : 'Unknown error'
+      })
+    }
   }
 
   return results
@@ -153,7 +80,7 @@ export async function buildAllWidgets(): Promise<WidgetBuildResult[]> {
 export async function listBuiltWidgets(): Promise<string[]> {
   try {
     const entries = await readdir(BUILD_DIR)
-    return entries.filter((f) => f.endsWith('.js')).map((f) => f.replace(/\.js$/, ''))
+    return entries.filter(f => f.endsWith('.js')).map(f => f.replace(/\.js$/, ''))
   } catch {
     return []
   }
@@ -190,12 +117,12 @@ export async function serveWidget(name: string): Promise<Response> {
   const file = Bun.file(buildPath)
 
   if (!(await file.exists())) {
-    return new Response(`Widget "${name}" not built. Run: bun server/index.ts bundle`, {
-      status: 404,
+    return new Response(`Widget "${name}" not built. Run: ./mei/cmd bundle`, {
+      status: 404
     })
   }
 
   return new Response(file, {
-    headers: { 'Content-Type': 'application/javascript' },
+    headers: { 'Content-Type': 'application/javascript' }
   })
 }
