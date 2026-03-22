@@ -1,4 +1,4 @@
-import { mkdir, readdir } from 'node:fs/promises'
+import { mkdir, readdir, unlink } from 'node:fs/promises'
 import { join } from 'path'
 
 import { buildWidget } from './build-widget'
@@ -27,14 +27,22 @@ async function resolveWidgetSource(name: string): Promise<string | null> {
   return null
 }
 
-async function needsRebuild(name: string): Promise<boolean> {
-  const srcPath = await resolveWidgetSource(name)
-  if (!srcPath) return false
-
+async function needsRebuild(name: string, srcPath: string): Promise<boolean> {
   const built = Bun.file(join(BUILD_DIR, `${name}.js`))
   if (!(await built.exists())) return true
+  return Bun.file(srcPath).lastModified >= built.lastModified
+}
 
-  return Bun.file(srcPath).lastModified > built.lastModified
+// Remove built files that no longer have a source
+async function pruneStaleBuilds(sourceNames: Set<string>) {
+  const built = await listBuiltWidgets()
+  for (const name of built) {
+    if (!sourceNames.has(name)) {
+      try {
+        await unlink(join(BUILD_DIR, `${name}.js`))
+      } catch {}
+    }
+  }
 }
 
 export type WidgetBuildResult = {
@@ -48,22 +56,23 @@ export async function buildAllWidgets(): Promise<WidgetBuildResult[]> {
   const names = await scanWidgets()
   const results: WidgetBuildResult[] = []
 
-  for (const name of names) {
-    if (!(await needsRebuild(name))) {
-      results.push({ name, status: 'skipped' })
-      continue
-    }
+  await mkdir(BUILD_DIR, { recursive: true })
+  await pruneStaleBuilds(new Set(names))
 
+  for (const name of names) {
     const srcPath = await resolveWidgetSource(name)
     if (!srcPath) {
       results.push({ name, status: 'failed', error: 'Source file not found' })
       continue
     }
 
+    if (!(await needsRebuild(name, srcPath))) {
+      results.push({ name, status: 'skipped' })
+      continue
+    }
+
     try {
       const artifact = await buildWidget(srcPath)
-
-      await mkdir(BUILD_DIR, { recursive: true })
       await Bun.write(join(BUILD_DIR, `${name}.js`), artifact.js)
 
       results.push({
@@ -98,11 +107,14 @@ export async function listWidgets(): Promise<Response> {
 }
 
 export async function handleBundle(publish: (msg: unknown) => void) {
-  const before = await listBuiltWidgets()
+  const before = new Set(await listBuiltWidgets())
   const results = await buildAllWidgets()
+  const after = new Set(await listBuiltWidgets())
 
-  const after = await listBuiltWidgets()
-  const layoutChanged = before.join(',') !== after.join(',')
+  const layoutChanged =
+    before.size !== after.size ||
+    [...before].some(n => !after.has(n)) ||
+    [...after].some(n => !before.has(n))
 
   const changedServerModules = new Set<string>()
   for (const r of results) {

@@ -32,6 +32,7 @@ function upgrade(server: Upgradable, req: Request, data: WsData) {
 
 export const app = Bun.serve<WsData>({
   port: PORT,
+  hostname: process.env.HOST ?? '127.0.0.1',
   development: { hmr: true },
   routes: {
     '/': index,
@@ -39,17 +40,16 @@ export const app = Bun.serve<WsData>({
     '/_mei/widgets/*': req => {
       const name = new URL(req.url).pathname.split('/').pop()?.replace(/\.js$/, '')
       return name ? serveWidget(name) : new Response('Not found', { status: 404 })
+    },
+    '/_mei/fn/*': req => {
+      if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })
+      return handleFunctionCall(req, new URL(req.url).pathname)
     }
   },
   fetch(req, server) {
     const path = new URL(req.url).pathname
     if (path === '/ws') return upgrade(server, req, { channel: 'chat' })
     if (path === '/_mei/ws') return upgrade(server, req, { channel: 'mei' })
-
-    if (req.method === 'POST' && path.startsWith('/_mei/fn/')) {
-      return handleFunctionCall(req, path)
-    }
-
     return new Response('Not found', { status: 404 })
   },
   websocket: {
@@ -88,6 +88,10 @@ async function handleFunctionCall(req: Request, path: string): Promise<Response>
   }
 
   try {
+    const contentLength = Number(req.headers.get('content-length') ?? 0)
+    if (contentLength > 1_000_000) {
+      return new Response('Request body too large', { status: 413 })
+    }
     const args = await req.text()
     const result = await callFunction(module, name, args)
     return new Response(result, { headers: { 'Content-Type': 'application/json' } })
