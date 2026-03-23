@@ -2,25 +2,21 @@ import { useState } from 'react'
 
 import { useCanFitSidebar } from '@/client/hooks/useCanFitSidebar'
 import { useChat } from '@/client/hooks/useChat'
+import { useWidgetList } from '@/client/hooks/useWidgetList'
 import { cn } from '@/client/lib/cn'
 
 import { ChatPanel } from './ChatPanel'
 import { ChatPopup } from './ChatPopup'
 import { Widgets } from './Widgets'
 
-const MESSAGE_THRESHOLD = 5
-
 export function App() {
   const { messages, input, setInput, processing, send, stop } = useChat()
   const [chatCollapsed, setChatCollapsed] = useState(false)
   const canFitSidebar = useCanFitSidebar()
+  const widgetNames = useWidgetList()
+  const hasWidgets = widgetNames.length > 0
 
-  const chatMode =
-    messages.length < MESSAGE_THRESHOLD
-      ? 'solo'
-      : chatCollapsed || !canFitSidebar
-        ? 'floating'
-        : 'sidebar'
+  const chatMode = !hasWidgets ? 'solo' : chatCollapsed || !canFitSidebar ? 'floating' : 'sidebar'
 
   const handleModeChange = canFitSidebar
     ? (mode: 'sidebar' | 'floating') => setChatCollapsed(mode === 'floating')
