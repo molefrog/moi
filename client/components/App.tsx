@@ -39,8 +39,13 @@ export function App() {
   const showSidebar = chatMode === 'sidebar'
 
   return (
-    <div className="min-h-screen px-4 py-4 sm:px-6 sm:py-6 lg:p-8">
-      <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[1184px] justify-center sm:min-h-[calc(100vh-3rem)] lg:min-h-[calc(100vh-4rem)]">
+    <div className="min-h-screen p-8 max-lg:px-6 max-lg:py-6 max-sm:px-4 max-sm:py-4">
+      <div
+        className={cn(
+          'mx-auto flex w-full max-w-[1184px] justify-center',
+          'min-h-[calc(100vh-4rem) max-lg:min-h-[calc(100vh-3rem)] max-sm:min-h-[calc(100vh-2rem)]'
+        )}
+      >
         <div className="max-w-160 flex w-full min-w-0 flex-1 flex-col">
           {chatMode === 'solo' ? chatPanel : <Widgets />}
         </div>
@@ -48,7 +53,8 @@ export function App() {
         {canFitSidebar && chatMode !== 'solo' && (
           <div
             className={cn(
-              'sticky top-10 h-[calc(100vh-4rem)] shrink-0 self-start transition-all ease-in-out',
+              'sticky top-10 shrink-0 self-start transition-all ease-in-out',
+              'h-[calc(100vh-4rem)] max-lg:h-[calc(100vh-3rem)] max-sm:h-[calc(100vh-2rem)]',
               showSidebar ? 'w-[464px] opacity-100 duration-200' : 'w-0 opacity-0 duration-200'
             )}
           >
