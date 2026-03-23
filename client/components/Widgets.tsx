@@ -203,7 +203,7 @@ export function Widgets() {
                   <WidgetCard
                     key={name}
                     name={name}
-                    position={{ rowSpan: 1, colSpan: 2 }}
+                    position={{ rowSpan: 1, colSpan: 4 }}
                     hidden
                     editing={editing}
                     onToggle={toggleWidget}
