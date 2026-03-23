@@ -47,6 +47,8 @@ type WidgetCardProps = {
 
 function WidgetCard({ name, position, hidden, editing, onToggle }: WidgetCardProps) {
   const styles: CSSProperties = {
+    // Explicit height so framer-motion layoutId measures correctly during cross-grid animations
+    height: `calc(${position.rowSpan} * var(--widget-grid-row-height) + ${position.rowSpan - 1} * var(--widget-grid-gap))`,
     gridRow: `span ${position.rowSpan}`,
     gridColumn: `span ${position.colSpan}`
   }
@@ -142,7 +144,12 @@ export function Widgets() {
   }
 
   return (
-    <div className="group flex h-full flex-col">
+    <div
+      className={cn(
+        'group flex h-full flex-col',
+        '[--widget-grid-gap:1rem] [--widget-grid-row-height:8.5rem]'
+      )}
+    >
       <header className="flex items-center justify-between pb-4">
         <SpaceName />
         <AnimatePresence mode="popLayout" initial={false}>
@@ -172,7 +179,10 @@ export function Widgets() {
         </AnimatePresence>
       </header>
       <LayoutGroup>
-        <motion.div layout className="grid flex-1 auto-rows-[136px] grid-cols-4 gap-4">
+        <motion.div
+          layout
+          className="auto-rows-(--widget-grid-row-height) gap-(--widget-grid-gap) grid flex-1 grid-cols-4"
+        >
           {visibleWidgets.map(name => (
             <WidgetCard
               key={name}
@@ -198,7 +208,7 @@ export function Widgets() {
               transition={{ type: 'spring', duration: 0.2, bounce: 0 }}
             >
               <p className="text-muted-foreground mb-4 text-sm font-medium">Hidden</p>
-              <div className="grid grid-cols-4 gap-4">
+              <div className="gap-(--widget-grid-gap) grid grid-cols-4">
                 {hiddenWidgets.map(name => (
                   <WidgetCard
                     key={name}
