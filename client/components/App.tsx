@@ -43,7 +43,7 @@ export function App() {
       <div
         className={cn(
           'mx-auto flex w-full max-w-[1184px] justify-center',
-          'min-h-[calc(100vh-4rem) max-lg:min-h-[calc(100vh-3rem)] max-sm:min-h-[calc(100vh-2rem)]'
+          'min-h-[calc(100vh-4rem)] max-lg:min-h-[calc(100vh-3rem)] max-sm:min-h-[calc(100vh-2rem)]'
         )}
       >
         <div className="max-w-160 flex w-full min-w-0 flex-1 flex-col">
