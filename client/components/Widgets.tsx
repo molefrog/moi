@@ -147,7 +147,7 @@ export function Widgets() {
     <div
       className={cn(
         'group flex h-full flex-col',
-        '[--widget-grid-gap:1rem] [--widget-grid-row-height:8.5rem]'
+        '[--widget-grid-gap:1rem] [--widget-grid-row-height:10rem]'
       )}
     >
       <header className="flex items-center justify-between pb-4">
