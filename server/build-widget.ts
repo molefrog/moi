@@ -123,7 +123,11 @@ function serverProxyPlugin(sourceDir: string): {
   return { plugin, serverModules }
 }
 
+const WIDGET_CSS = `@import 'tailwindcss/theme';\n@import 'tailwindcss/utilities';`
+
 function widgetEntryPlugin(widgetPath: string): BunPlugin {
+  const cssPath = join(dirname(widgetPath), '.widget-tailwind.css')
+
   return {
     name: 'widget-entry',
     setup(build) {
@@ -132,23 +136,16 @@ function widgetEntryPlugin(widgetPath: string): BunPlugin {
         namespace: 'widget-entry'
       }))
 
-      build.onLoad({ filter: /.*/, namespace: 'widget-entry' }, () => ({
-        contents: [
-          `import "widget-tailwind.css";`,
-          `export { default } from ${JSON.stringify(widgetPath)};`
-        ].join('\n'),
-        loader: 'js'
-      }))
-
-      build.onResolve({ filter: /^widget-tailwind\.css$/ }, () => ({
-        path: join(widgetPath, '..', 'widget-tailwind.css'),
-        namespace: 'widget-tw'
-      }))
-
-      build.onLoad({ filter: /.*/, namespace: 'widget-tw' }, () => ({
-        contents: `@import 'tailwindcss/utilities';`,
-        loader: 'css'
-      }))
+      build.onLoad({ filter: /.*/, namespace: 'widget-entry' }, async () => {
+        await Bun.write(cssPath, WIDGET_CSS)
+        return {
+          contents: [
+            `import ${JSON.stringify(cssPath)};`,
+            `export { default } from ${JSON.stringify(widgetPath)};`
+          ].join('\n'),
+          loader: 'js'
+        }
+      })
     }
   }
 }
