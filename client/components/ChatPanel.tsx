@@ -163,7 +163,7 @@ export function ChatPanel({
       >
         {messages.length === 0 && !processing && <EmptyState />}
         {messages.map((msg, i) => (
-          <MessageBlock key={i} msg={msg} />
+          <MessageBlock key={i} msg={msg} messages={messages} index={i} />
         ))}
         {processing && <ThinkingIndicator />}
       </div>
