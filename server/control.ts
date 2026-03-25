@@ -1,3 +1,6 @@
+import { watch } from 'node:fs'
+import { join } from 'path'
+
 import { CONTROL_PORT } from './constants'
 import { publishMei } from './web'
 import { handleBundle } from './widgets'
@@ -21,4 +24,26 @@ export const control = Bun.serve({
       } catch {}
     }
   }
+})
+
+// Auto-bundle when widget source files change
+const MEI_DIR = join(import.meta.dir, '..', 'workspace', 'mei')
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+let bundling = false
+
+watch(MEI_DIR, (event, filename) => {
+  if (!filename) return
+  if (!(/\.(tsx|ts)$/.test(filename) && !filename.endsWith('.server.ts'))) return
+  if (filename.startsWith('.build')) return
+
+  if (debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(async () => {
+    if (bundling) return
+    bundling = true
+    try {
+      await handleBundle(publishMei)
+    } finally {
+      bundling = false
+    }
+  }, 300)
 })
