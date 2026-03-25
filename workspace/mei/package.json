@@ -1,4 +1,7 @@
 {
   "name": "mei-widgets",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "@tabler/icons-react": "^3.40.0"
+  }
 }
