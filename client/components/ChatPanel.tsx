@@ -95,7 +95,16 @@ export function ChatPanel({
 
   return (
     <div className={cn('flex flex-col', chatMode === 'solo' ? 'min-h-full' : 'h-full')}>
-      <header className="flex items-center justify-between pb-2 pl-2">
+      <header
+        className={cn(
+          'flex items-center justify-between pb-2 pl-2',
+          chatMode === 'solo' &&
+            cn(
+              'bg-background sticky top-0',
+              '-mt-8 pt-8 max-lg:-mt-6 max-lg:pt-6 max-sm:-mt-4 max-sm:pt-4'
+            )
+        )}
+      >
         {chatMode === 'solo' ? <SpaceName /> : <h1 className="text-sm font-medium">Agent</h1>}
         <div className="flex items-center gap-0.5">
           {chatMode !== 'solo' && onModeChange && (
@@ -145,8 +154,8 @@ export function ChatPanel({
       <div
         ref={chatMode !== 'solo' ? scrollRef : undefined}
         className={cn(
-          'flex flex-col gap-6 overscroll-contain px-2 pb-12 pt-4',
-          chatMode === 'solo' ? 'flex-1' : 'flex-1 overflow-y-auto',
+          'flex flex-1 flex-col gap-6 overscroll-contain px-2 pb-12 pt-4',
+          chatMode !== 'solo' && 'overflow-y-auto',
           chatMode !== 'solo' && showTopFade && showBottomFade && 'mask-fade-y',
           chatMode !== 'solo' && showTopFade && !showBottomFade && 'mask-fade-top',
           chatMode !== 'solo' && !showTopFade && showBottomFade && 'mask-fade-bottom'
@@ -154,18 +163,28 @@ export function ChatPanel({
       >
         {messages.length === 0 && !processing && <EmptyState />}
         {messages.map((msg, i) => (
-          <MessageBlock key={i} msg={msg} />
+          <MessageBlock key={i} msg={msg} messages={messages} index={i} />
         ))}
         {processing && <ThinkingIndicator />}
       </div>
 
-      <ChatInput
-        value={input}
-        onChange={setInput}
-        onSend={send}
-        onStop={stop}
-        processing={processing}
-      />
+      <div
+        className={cn(
+          chatMode === 'solo' &&
+            cn(
+              'bg-background sticky bottom-0',
+              '-mb-8 pb-8 max-lg:-mb-6 max-lg:pb-6 max-sm:-mb-4 max-sm:pb-4'
+            )
+        )}
+      >
+        <ChatInput
+          value={input}
+          onChange={setInput}
+          onSend={send}
+          onStop={stop}
+          processing={processing}
+        />
+      </div>
     </div>
   )
 }

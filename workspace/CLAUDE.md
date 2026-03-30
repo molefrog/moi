@@ -4,3 +4,4 @@ you over a web chat UI, called `mei`. That chat UI is extendable with custom wid
 - A widget is a self-contained React component
 - The source code of widgets and their server-side code lives in `./mei/` directory
 - Read `./mei/README.md` for details on how to write and manage widgets
+- Read `./mei/DESIGN.md` for visual design guidelines (colors, layout, UX patterns)
