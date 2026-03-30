@@ -1,6 +1,13 @@
+import type {
+  ExportNamedDeclaration,
+  VariableDeclarator
+} from '@typescript-eslint/types/dist/generated/ast-spec'
+import { parse } from '@typescript-eslint/typescript-estree'
 import type { BunPlugin } from 'bun'
 import tailwind from 'bun-plugin-tailwind'
 import { basename, dirname, join } from 'path'
+
+import type { WidgetConfig } from '@/lib/types'
 
 const EXTERNAL_MODULES = [
   'react',
@@ -18,6 +25,53 @@ type ServerModule = {
 export type WidgetArtifact = {
   js: string
   serverModules: ServerModule[]
+  config: WidgetConfig | null
+}
+
+const DEFAULT_CONFIG: WidgetConfig = { rowSpan: 1, colSpan: 2 }
+const VALID_SPANS = [1, 2, 3, 4] as const
+
+export async function extractWidgetConfig(srcPath: string): Promise<WidgetConfig | null> {
+  const source = await Bun.file(srcPath).text()
+  const widgetName = basename(srcPath).replace(/\.tsx?$/, '')
+
+  const ast = parse(source, { jsx: true, errorOnUnknownASTType: false })
+
+  const exportDecl = ast.body.find(
+    node =>
+      node.type === 'ExportNamedDeclaration' &&
+      node.declaration?.type === 'VariableDeclaration' &&
+      node.declaration.declarations.some(d => d.id.type === 'Identifier' && d.id.name === 'config')
+  ) as ExportNamedDeclaration | undefined
+  if (!exportDecl) return null
+
+  const varDecl = exportDecl.declaration
+  if (varDecl?.type !== 'VariableDeclaration') return null
+
+  const decl = varDecl.declarations.find(
+    (d): d is VariableDeclarator & { id: { type: 'Identifier'; name: string } } =>
+      d.id.type === 'Identifier' && d.id.name === 'config'
+  )
+  const init = decl?.init
+  if (init?.type !== 'ObjectExpression') return null
+
+  const result: Partial<WidgetConfig> = {}
+
+  for (const prop of init.properties) {
+    if (prop.type !== 'Property' || prop.key?.type !== 'Identifier') continue
+    const key = prop.key.name as string
+    if (key !== 'rowSpan' && key !== 'colSpan') continue
+    if (prop.value?.type !== 'Literal' || typeof prop.value.value !== 'number') continue
+
+    const val = prop.value.value
+    if (!(VALID_SPANS as readonly number[]).includes(val)) {
+      console.warn(`[mei] "${widgetName}": config.${key}=${val} is out of 1–4 range, using default`)
+      continue
+    }
+    result[key] = val as 1 | 2 | 3 | 4
+  }
+
+  return { ...DEFAULT_CONFIG, ...result }
 }
 
 function escapeRegex(s: string): string {
@@ -219,5 +273,6 @@ export async function buildWidget(entrypoint: string): Promise<WidgetArtifact> {
     js = injectCss(js, css, widgetName)
   }
 
-  return { js, serverModules }
+  const config = await extractWidgetConfig(entrypoint)
+  return { js, serverModules, config }
 }

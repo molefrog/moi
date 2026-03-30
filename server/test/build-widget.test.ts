@@ -1,7 +1,7 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, spyOn, test } from 'bun:test'
 import { join } from 'path'
 
-import { buildWidget } from '../build-widget'
+import { buildWidget, extractWidgetConfig } from '../build-widget'
 
 const FIXTURES = join(import.meta.dir, '__fixtures__')
 
@@ -129,5 +129,40 @@ describe('buildWidget', () => {
 
   test('handles widget with syntax error', async () => {
     await expect(buildWidget(join(FIXTURES, 'syntax-error.tsx'))).rejects.toThrow()
+  })
+
+  test('extracts config from artifact when widget exports config', async () => {
+    const result = await buildWidget(join(FIXTURES, 'with-config.tsx'))
+    expect(result.config).toEqual({ rowSpan: 2, colSpan: 4 })
+  })
+
+  test('artifact config is null when widget has no config export', async () => {
+    const result = await buildWidget(join(FIXTURES, 'hello.tsx'))
+    expect(result.config).toBeNull()
+  })
+})
+
+describe('extractWidgetConfig', () => {
+  test('extracts rowSpan and colSpan from exported config object', async () => {
+    const config = await extractWidgetConfig(join(FIXTURES, 'with-config.tsx'))
+    expect(config).toEqual({ rowSpan: 2, colSpan: 4 })
+  })
+
+  test('returns null when no config export', async () => {
+    const config = await extractWidgetConfig(join(FIXTURES, 'hello.tsx'))
+    expect(config).toBeNull()
+  })
+
+  test('uses defaults for missing keys (partial config)', async () => {
+    const config = await extractWidgetConfig(join(FIXTURES, 'with-partial-config.tsx'))
+    expect(config).toEqual({ rowSpan: 1, colSpan: 3 })
+  })
+
+  test('warns and uses defaults for out-of-range values', async () => {
+    const warn = spyOn(console, 'warn')
+    const config = await extractWidgetConfig(join(FIXTURES, 'with-bad-config.tsx'))
+    expect(config).toEqual({ rowSpan: 1, colSpan: 2 })
+    expect(warn).toHaveBeenCalledTimes(2)
+    warn.mockRestore()
   })
 })
