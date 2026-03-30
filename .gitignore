@@ -36,4 +36,3 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # workspace (agent working directory)
 workspace/messages.json
 workspace/mei/.build
-workspace/mei/.widget-tailwind.css
