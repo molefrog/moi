@@ -146,7 +146,7 @@ function widgetEntryPlugin(widgetPath: string): BunPlugin {
       }))
 
       build.onLoad({ filter: /.*/, namespace: 'widget-tw' }, () => ({
-        contents: `@import 'tailwindcss/utilities';`,
+        contents: `@import 'tailwindcss/theme';\n@import 'tailwindcss/utilities';`,
         loader: 'css'
       }))
     }

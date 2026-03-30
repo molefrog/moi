@@ -74,7 +74,13 @@ function WidgetCard({ name, position, hidden, editing, onToggle }: WidgetCardPro
       style={styles}
       onClick={hidden ? () => onToggle(name) : undefined}
     >
-      <div className="flex flex-1 items-center justify-center overflow-clip rounded-2xl shadow-sm [corner-shape:superellipse(1.2)]">
+      <div
+        className={cn(
+          'dark',
+          'flex flex-1 items-center justify-center overflow-clip rounded-2xl shadow-sm [corner-shape:superellipse(1.2)]',
+          'bg-background text-foreground'
+        )}
+      >
         <WidgetContent name={name} />
       </div>
       {editing && (

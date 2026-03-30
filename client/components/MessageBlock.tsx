@@ -25,7 +25,13 @@ export function ThinkingIndicator() {
   )
 }
 
-export function MessageBlock({ msg }: { msg: ChatMessage }) {
+type MessageBlockProps = {
+  msg: ChatMessage
+  messages: ChatMessage[]
+  index: number
+}
+
+export function MessageBlock({ msg, messages, index }: MessageBlockProps) {
   switch (msg.type) {
     case 'user':
       return (
@@ -37,7 +43,12 @@ export function MessageBlock({ msg }: { msg: ChatMessage }) {
     case 'assistant':
       return <MarkdownContent content={msg.content} />
 
-    case 'tool_use':
+    case 'tool_use': {
+      const result = messages[index + 1]
+      const hasResult = result?.type === 'tool_result'
+      const isError = hasResult && result.is_error
+      const resultContent = hasResult ? result.content : ''
+
       return (
         <details className="group">
           <summary className="flex cursor-pointer select-none items-center gap-2 py-1.5">
@@ -47,45 +58,33 @@ export function MessageBlock({ msg }: { msg: ChatMessage }) {
               className="chevron text-ring transition-transform duration-150"
             />
             <span className="text-xs font-medium">{msg.name}</span>
-            <span className={cn('text-ring truncate text-[11px]')}>
+            <span className="text-ring truncate text-[11px]">
               {formatInputBrief(msg.name, msg.input)}
             </span>
           </summary>
-          <div className="ml-4 mt-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5">
-            <pre className="max-h-[200px] overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs leading-relaxed">
-              {formatInput(msg.name, msg.input)}
-            </pre>
-          </div>
+          {hasResult && (
+            <div
+              className={cn(
+                'ml-4 mt-1 rounded-md border px-3 py-2.5',
+                isError ? 'border-red-200 bg-red-50' : 'border-border bg-muted'
+              )}
+            >
+              <pre
+                className={cn(
+                  'max-h-[200px] overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs leading-relaxed',
+                  isError ? 'text-red-800' : 'text-muted-foreground'
+                )}
+              >
+                {resultContent || '(empty)'}
+              </pre>
+            </div>
+          )}
         </details>
       )
+    }
 
     case 'tool_result':
-      return msg.is_error ? (
-        <div className="ml-4 rounded-md border border-red-200 bg-red-50 px-3 py-2">
-          <pre className="max-h-[160px] overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs leading-relaxed text-red-800">
-            {msg.content || '(empty)'}
-          </pre>
-        </div>
-      ) : (
-        <details className="group">
-          <summary className="ml-4 flex cursor-pointer select-none items-center gap-2 py-1">
-            <IconChevronRight
-              size={12}
-              stroke={1.5}
-              className="chevron text-ring transition-transform duration-150"
-            />
-            <span className="text-ring text-[11px]">
-              Result
-              {msg.content ? ` \u00B7 ${msg.content.length} chars` : ' \u00B7 empty'}
-            </span>
-          </summary>
-          <div className="border-border bg-muted ml-4 mt-1 rounded-md border px-3 py-2.5">
-            <pre className="text-muted-foreground max-h-[200px] overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs leading-relaxed">
-              {msg.content || '(empty)'}
-            </pre>
-          </div>
-        </details>
-      )
+      return null
 
     case 'done':
     case 'stopped':
@@ -112,13 +111,4 @@ function formatInputBrief(tool: string, input: Record<string, unknown>): string 
   if (tool === 'Glob') return getInputValue(input, 'pattern')
   if (tool === 'Grep') return `/${getInputValue(input, 'pattern')}/ ${getInputValue(input, 'path')}`
   return ''
-}
-
-function formatInput(tool: string, input: Record<string, unknown>): string {
-  if (tool === 'Bash') return `$ ${getInputValue(input, 'command')}`
-  if (tool === 'Read') return getInputValue(input, 'file_path')
-  if (tool === 'Write' || tool === 'Edit') return getInputValue(input, 'file_path')
-  if (tool === 'Glob') return getInputValue(input, 'pattern')
-  if (tool === 'Grep') return `/${getInputValue(input, 'pattern')}/ ${getInputValue(input, 'path')}`
-  return JSON.stringify(input, null, 2)
 }
