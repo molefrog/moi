@@ -1,12 +1,31 @@
 import { mkdir, readdir, unlink } from 'node:fs/promises'
 import { join } from 'path'
 
+import type { WidgetConfig, WidgetInfo } from '@/lib/types'
+
 import { buildWidget } from './build-widget'
 import { reloadModules } from './functions'
 
 const MEI_DIR = join(import.meta.dir, '..', 'workspace', 'mei')
 const SOURCE_DIR = MEI_DIR
 const BUILD_DIR = join(MEI_DIR, '.build', 'widgets')
+const MANIFEST_PATH = join(BUILD_DIR, 'manifest.json')
+
+const DEFAULT_CONFIG: WidgetConfig = { rowSpan: 1, colSpan: 2 }
+const VALID_SPANS = [1, 2, 3, 4]
+
+async function readManifest(): Promise<Record<string, WidgetConfig>> {
+  try {
+    const data = JSON.parse(await Bun.file(MANIFEST_PATH).text())
+    return data.config ?? {}
+  } catch {
+    return {}
+  }
+}
+
+async function writeManifest(configs: Record<string, WidgetConfig>): Promise<void> {
+  await Bun.write(MANIFEST_PATH, JSON.stringify({ config: configs }, null, 2))
+}
 
 async function scanWidgets(): Promise<string[]> {
   try {
@@ -50,6 +69,7 @@ export type WidgetBuildResult = {
   status: 'built' | 'skipped' | 'failed'
   error?: string
   serverModules?: string[]
+  config?: WidgetConfig | null
 }
 
 export async function buildAllWidgets(): Promise<WidgetBuildResult[]> {
@@ -58,6 +78,8 @@ export async function buildAllWidgets(): Promise<WidgetBuildResult[]> {
 
   await mkdir(BUILD_DIR, { recursive: true })
   await pruneStaleBuilds(new Set(names))
+
+  const manifest = await readManifest()
 
   for (const name of names) {
     const srcPath = await resolveWidgetSource(name)
@@ -75,10 +97,13 @@ export async function buildAllWidgets(): Promise<WidgetBuildResult[]> {
       const artifact = await buildWidget(srcPath)
       await Bun.write(join(BUILD_DIR, `${name}.js`), artifact.js)
 
+      manifest[name] = artifact.config ?? DEFAULT_CONFIG
+
       results.push({
         name,
         status: 'built',
-        serverModules: artifact.serverModules.map(m => m.name)
+        serverModules: artifact.serverModules.map(m => m.name),
+        config: artifact.config
       })
     } catch (err) {
       results.push({
@@ -88,6 +113,13 @@ export async function buildAllWidgets(): Promise<WidgetBuildResult[]> {
       })
     }
   }
+
+  // Prune manifest entries for deleted widgets
+  for (const key of Object.keys(manifest)) {
+    if (!names.includes(key)) delete manifest[key]
+  }
+
+  await writeManifest(manifest)
 
   return results
 }
@@ -102,7 +134,15 @@ export async function listBuiltWidgets(): Promise<string[]> {
 }
 
 export async function listWidgets(): Promise<Response> {
-  const widgets = await scanWidgets()
+  const [names, manifest] = await Promise.all([scanWidgets(), readManifest()])
+
+  const widgets: WidgetInfo[] = names.map(id => {
+    const raw = manifest[id] ?? {}
+    const rowSpan = VALID_SPANS.includes(raw.rowSpan) ? raw.rowSpan : DEFAULT_CONFIG.rowSpan
+    const colSpan = VALID_SPANS.includes(raw.colSpan) ? raw.colSpan : DEFAULT_CONFIG.colSpan
+    return { id, config: { rowSpan, colSpan } as WidgetConfig }
+  })
+
   return Response.json({ widgets })
 }
 
@@ -119,7 +159,7 @@ export async function handleBundle(publish: (msg: unknown) => void) {
   const changedServerModules = new Set<string>()
   for (const r of results) {
     if (r.status === 'built') {
-      publish({ type: 'widget:updated', name: r.name })
+      publish({ type: 'widget:updated', name: r.name, config: r.config ?? null })
       for (const m of r.serverModules ?? []) changedServerModules.add(m)
     }
   }

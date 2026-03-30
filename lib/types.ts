@@ -1,3 +1,13 @@
+export type WidgetConfig = {
+  rowSpan: 1 | 2 | 3 | 4
+  colSpan: 1 | 2 | 3 | 4
+}
+
+export type WidgetInfo = {
+  id: string
+  config: WidgetConfig
+}
+
 // Client → Server messages
 export type ClientMessage = { type: 'chat'; content: string } | { type: 'stop' }
 

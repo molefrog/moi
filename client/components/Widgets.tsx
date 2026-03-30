@@ -133,8 +133,8 @@ export function Widgets() {
     })
   }
 
-  const visibleWidgets = widgetNames.filter(name => !hiddenSet.has(name))
-  const hiddenWidgets = widgetNames.filter(name => hiddenSet.has(name))
+  const visibleWidgets = widgetNames.filter(({ id }) => !hiddenSet.has(id))
+  const hiddenWidgets = widgetNames.filter(({ id }) => hiddenSet.has(id))
 
   if (widgetNames.length === 0) {
     return (
@@ -189,11 +189,11 @@ export function Widgets() {
           layout
           className="auto-rows-(--widget-grid-row-height) gap-(--widget-grid-gap) grid flex-1 grid-cols-4"
         >
-          {visibleWidgets.map(name => (
+          {visibleWidgets.map(({ id, config }) => (
             <WidgetCard
-              key={name}
-              name={name}
-              position={{ rowSpan: 1, colSpan: 4 }}
+              key={id}
+              name={id}
+              position={config}
               editing={editing}
               onToggle={toggleWidget}
             />
@@ -215,11 +215,11 @@ export function Widgets() {
             >
               <p className="text-muted-foreground mb-4 text-sm font-medium">Hidden</p>
               <div className="gap-(--widget-grid-gap) grid grid-cols-4">
-                {hiddenWidgets.map(name => (
+                {hiddenWidgets.map(({ id, config }) => (
                   <WidgetCard
-                    key={name}
-                    name={name}
-                    position={{ rowSpan: 1, colSpan: 4 }}
+                    key={id}
+                    name={id}
+                    position={config}
                     hidden
                     editing={editing}
                     onToggle={toggleWidget}

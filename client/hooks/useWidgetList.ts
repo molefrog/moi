@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 
+import type { WidgetInfo } from '@/lib/types'
+
 import { useMeiEvent } from './useMeiEvents'
 
-export function useWidgetList(): string[] {
-  const [widgets, setWidgets] = useState<string[]>([])
+export function useWidgetList(): WidgetInfo[] {
+  const [widgets, setWidgets] = useState<WidgetInfo[]>([])
 
   const fetchList = useCallback(() => {
     fetch('/_mei/widgets')
-      .then((r) => r.json())
-      .then((data) => setWidgets(data.widgets))
+      .then(r => r.json())
+      .then(data => setWidgets(data.widgets))
       .catch(() => setWidgets([]))
   }, [])
 
@@ -17,7 +19,7 @@ export function useWidgetList(): string[] {
   }, [fetchList])
 
   // Re-fetch when widgets are added or removed
-  useMeiEvent((event) => {
+  useMeiEvent(event => {
     if (event.type === 'widget-layout:updated') {
       fetchList()
     }
