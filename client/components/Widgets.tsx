@@ -3,8 +3,10 @@ import { useState } from 'react'
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 
 import { useWidget } from '@/client/hooks/useWidget'
-import { useWidgetList } from '@/client/hooks/useWidgetList'
 import { cn } from '@/client/lib/cn'
+import { findFreePosition } from '@/client/lib/grid-pack'
+import { useWidgetsStore } from '@/client/store/widgets'
+import { useWorkspaceStore } from '@/client/store/workspace'
 
 import { HiddenPanel } from './HiddenPanel'
 import { SpaceName } from './SpaceName'
@@ -25,31 +27,37 @@ function renderItem(id: string) {
 }
 
 export function Widgets() {
-  const widgetList = useWidgetList()
+  const { widgets } = useWidgetsStore()
+  const { layout, setLayout } = useWorkspaceStore()
   const [editing, setEditing] = useState(false)
-  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
-  const allItems: GridItem[] = widgetList.map(({ id, config }) => ({
-    id,
-    w: config.colSpan,
-    h: config.rowSpan
-  }))
 
-  const visibleItems = allItems.filter(i => !hiddenIds.has(i.id))
-  const hiddenItems = allItems.filter(i => hiddenIds.has(i.id))
+  const gridIds = new Set(layout.widgetGrid.map(g => g.i))
+
+  const visibleItems: GridItem[] = layout.widgetGrid
+    .filter(g => widgets.some(w => w.id === g.i))
+    .map(g => ({ id: g.i, w: g.w, h: g.h, x: g.x, y: g.y }))
+
+  const hiddenItems: GridItem[] = widgets
+    .filter(w => !gridIds.has(w.id))
+    .map(w => ({ id: w.id, w: w.config.colSpan, h: w.config.rowSpan }))
 
   function hide(id: string) {
-    setHiddenIds(prev => new Set([...prev, id]))
+    setLayout({ widgetGrid: layout.widgetGrid.filter(g => g.i !== id) })
   }
 
   function restore(id: string) {
-    setHiddenIds(prev => {
-      const s = new Set(prev)
-      s.delete(id)
-      return s
+    const widget = widgets.find(w => w.id === id)
+    if (!widget) return
+    const pos = findFreePosition(layout.widgetGrid, widget.config.colSpan, widget.config.rowSpan, 4)
+    setLayout({
+      widgetGrid: [
+        ...layout.widgetGrid,
+        { i: id, x: pos.x, y: pos.y, w: widget.config.colSpan, h: widget.config.rowSpan }
+      ]
     })
   }
 
-  if (allItems.length === 0) {
+  if (widgets.length === 0) {
     return (
       <div className="group flex h-full flex-col">
         <header className="flex items-center justify-between pb-4">
@@ -100,6 +108,11 @@ export function Widgets() {
             editing={editing}
             renderItem={renderItem}
             onRemove={hide}
+            onLayoutChange={items =>
+              setLayout({
+                widgetGrid: items.map(i => ({ i: i.id, x: i.x ?? 0, y: i.y ?? 0, w: i.w, h: i.h }))
+              })
+            }
           />
         </div>
 
