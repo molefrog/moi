@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react'
 
+import type { WidgetInfo } from '@/lib/types'
+
 type MeiEvent =
   | { type: 'widget:updated'; name: string }
-  | { type: 'widget-layout:updated' }
+  | { type: 'widget-layout:updated'; widgets: WidgetInfo[] }
 
 type MeiEventHandler = (event: MeiEvent) => void
 
@@ -21,7 +23,7 @@ function ensureConnection() {
     connecting = false
   }
 
-  socket.onmessage = (event) => {
+  socket.onmessage = event => {
     try {
       const data = JSON.parse(event.data) as MeiEvent
       for (const handler of listeners) handler(data)
@@ -47,7 +49,7 @@ export function useMeiEvent(handler: MeiEventHandler) {
   handlerRef.current = handler
 
   useEffect(() => {
-    const wrapped: MeiEventHandler = (e) => handlerRef.current(e)
+    const wrapped: MeiEventHandler = e => handlerRef.current(e)
     listeners.add(wrapped)
     ensureConnection()
 

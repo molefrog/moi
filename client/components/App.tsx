@@ -6,6 +6,7 @@ import { useCanFitSidebar } from '@/client/hooks/useCanFitSidebar'
 import { useChat } from '@/client/hooks/useChat'
 import { useMeiEvent } from '@/client/hooks/useMeiEvents'
 import { cn } from '@/client/lib/cn'
+import { findFreePosition } from '@/client/lib/grid-pack'
 import { useWidgetsStore } from '@/client/store/widgets'
 import { useWorkspaceStore } from '@/client/store/workspace'
 
@@ -22,6 +23,23 @@ export function AppLoader() {
     useWidgetsStore.getState().load()
   }, [])
 
+  // Always-mounted handler — catches events even during loading
+  useMeiEvent(e => {
+    if (e.type !== 'widget-layout:updated') return
+    useWidgetsStore.setState({ widgets: e.widgets, status: 'ready' })
+    const { layout, setLayout } = useWorkspaceStore.getState()
+    const gridIds = new Set(layout.widgetGrid.map(g => g.i))
+    const newWidgets = e.widgets.filter(w => !gridIds.has(w.id))
+    if (newWidgets.length > 0) {
+      const grid = [...layout.widgetGrid]
+      for (const w of newWidgets) {
+        const pos = findFreePosition(grid, w.config.colSpan, w.config.rowSpan, 4)
+        grid.push({ i: w.id, x: pos.x, y: pos.y, w: w.config.colSpan, h: w.config.rowSpan })
+      }
+      setLayout({ widgetGrid: grid })
+    }
+  })
+
   if (workspaceStatus === 'loading' || widgetsStatus === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -36,13 +54,9 @@ export function AppLoader() {
 function App() {
   const { messages, input, setInput, processing, send, stop } = useChat()
   const { layout, setLayout } = useWorkspaceStore()
-  const { widgets, load: reloadWidgets } = useWidgetsStore()
+  const { widgets } = useWidgetsStore()
   const canFitSidebar = useCanFitSidebar()
   const hasWidgets = widgets.length > 0
-  useMeiEvent(e => {
-    if (e.type === 'widget-layout:updated') reloadWidgets()
-  })
-
   const chatMode = !hasWidgets
     ? 'solo'
     : layout.chatMode === 'floating' || !canFitSidebar
