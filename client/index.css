@@ -103,6 +103,25 @@
     0px 24px 48px -8px rgba(0, 0, 0, 0.12);
 }
 
+/* Lift all grid items so the placeholder (z-index: 0) stays behind them */
+.react-grid-item:not(.react-grid-placeholder) {
+  z-index: 1;
+}
+
+/* Dragged card floats above all others */
+.react-grid-item.react-draggable-dragging {
+  z-index: 10;
+}
+
+/* Drop placeholder shown while dragging a widget — matches card shape */
+.react-grid-item.react-grid-placeholder {
+  background: var(--muted);
+  opacity: 0.75;
+  border-radius: var(--radius-2xl);
+  corner-shape: superellipse(1.2);
+  z-index: 0;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

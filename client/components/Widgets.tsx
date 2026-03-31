@@ -1,142 +1,55 @@
-import type { CSSProperties } from 'react'
 import { useState } from 'react'
 
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
-
-import { IconMinus, IconPencil, IconPlus } from '@tabler/icons-react'
 
 import { useWidget } from '@/client/hooks/useWidget'
 import { useWidgetList } from '@/client/hooks/useWidgetList'
 import { cn } from '@/client/lib/cn'
 
+import { HiddenPanel } from './HiddenPanel'
 import { SpaceName } from './SpaceName'
+import type { GridItem } from './WidgetGrid'
+import { WidgetGrid } from './WidgetGrid'
 import { Button } from './ui/button'
 
-type WidgetPosition = {
-  row?: number
-  rowSpan: 1 | 2 | 3 | 4
-  col?: number
-  colSpan: 1 | 2 | 3 | 4
-}
-
-type WidgetContentProps = {
-  name: string
-}
-
-function WidgetContent({ name }: WidgetContentProps) {
+function WidgetContent({ name }: { name: string }) {
   const widget = useWidget(name)
-
-  if (widget.status === 'loading') {
-    return <p className="text-muted-foreground text-xs">Loading...</p>
-  }
-
-  if (widget.status === 'error') {
-    return <p className="text-destructive text-xs">{widget.error}</p>
-  }
-
+  if (widget.status === 'loading') return null
+  if (widget.status === 'error')
+    return <p className="text-destructive p-4 text-xs">{widget.error}</p>
   return <widget.Component />
 }
 
-type WidgetCardProps = {
-  name: string
-  position: WidgetPosition
-  hidden?: boolean
-  editing: boolean
-  onToggle: (name: string) => void
-}
-
-function WidgetCard({ name, position, hidden, editing, onToggle }: WidgetCardProps) {
-  const styles: CSSProperties = {
-    // Explicit height so framer-motion layoutId measures correctly during cross-grid animations
-    height: `calc(${position.rowSpan} * var(--widget-grid-row-height) + ${position.rowSpan - 1} * var(--widget-grid-gap))`,
-    gridRow: `span ${position.rowSpan}`,
-    gridColumn: `span ${position.colSpan}`
-  }
-
-  return (
-    <motion.div
-      key={name}
-      layoutId={name}
-      variants={{
-        idle: {
-          rotate: 0
-        },
-        wiggle: {
-          rotate: [0.5, -0.5],
-          transition: {
-            rotate: { repeat: Infinity, repeatType: 'reverse', duration: 0.15, ease: 'easeInOut' }
-          }
-        }
-      }}
-      animate={editing ? 'wiggle' : 'idle'}
-      transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
-      className={cn('group/widget relative flex', hidden && 'cursor-pointer')}
-      style={styles}
-      onClick={hidden ? () => onToggle(name) : undefined}
-    >
-      <div
-        className={cn(
-          'dark',
-          'flex flex-1 items-center justify-center overflow-clip rounded-2xl shadow-sm [corner-shape:superellipse(1.2)]',
-          'bg-background text-foreground'
-        )}
-      >
-        <WidgetContent name={name} />
-      </div>
-      {editing && (
-        <div className="absolute -right-2 -top-2 flex gap-1 opacity-0 transition-opacity group-hover/widget:opacity-100">
-          {!hidden && (
-            <Button
-              size="icon-sm"
-              variant="outline"
-              className="size-7 rounded-full"
-              onClick={() => {}}
-            >
-              <IconPencil stroke={1.5} />
-            </Button>
-          )}
-          <Button
-            size="icon-sm"
-            variant="outline"
-            className="size-7 rounded-full"
-            onClick={
-              hidden
-                ? e => {
-                    e.stopPropagation()
-                    onToggle(name)
-                  }
-                : () => onToggle(name)
-            }
-          >
-            {hidden ? <IconPlus stroke={1.5} /> : <IconMinus stroke={1.5} />}
-          </Button>
-        </div>
-      )}
-    </motion.div>
-  )
+function renderItem(id: string) {
+  return <WidgetContent name={id} />
 }
 
 export function Widgets() {
-  const widgetNames = useWidgetList()
+  const widgetList = useWidgetList()
   const [editing, setEditing] = useState(false)
-  const [hiddenSet, setHiddenSet] = useState<Set<string>>(new Set())
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
+  const allItems: GridItem[] = widgetList.map(({ id, config }) => ({
+    id,
+    w: config.colSpan,
+    h: config.rowSpan
+  }))
 
-  function toggleWidget(name: string) {
-    setHiddenSet(prev => {
-      const next = new Set(prev)
-      if (next.has(name)) {
-        next.delete(name)
-      } else {
-        next.add(name)
-      }
-      return next
+  const visibleItems = allItems.filter(i => !hiddenIds.has(i.id))
+  const hiddenItems = allItems.filter(i => hiddenIds.has(i.id))
+
+  function hide(id: string) {
+    setHiddenIds(prev => new Set([...prev, id]))
+  }
+
+  function restore(id: string) {
+    setHiddenIds(prev => {
+      const s = new Set(prev)
+      s.delete(id)
+      return s
     })
   }
 
-  const visibleWidgets = widgetNames.filter(({ id }) => !hiddenSet.has(id))
-  const hiddenWidgets = widgetNames.filter(({ id }) => hiddenSet.has(id))
-
-  if (widgetNames.length === 0) {
+  if (allItems.length === 0) {
     return (
       <div className="group flex h-full flex-col">
         <header className="flex items-center justify-between pb-4">
@@ -150,12 +63,7 @@ export function Widgets() {
   }
 
   return (
-    <div
-      className={cn(
-        'group flex h-full flex-col',
-        '[--widget-grid-gap:1rem] [--widget-grid-row-height:10rem]'
-      )}
-    >
+    <div className={cn('group flex h-full flex-col')}>
       <header className="flex items-center justify-between pb-4">
         <SpaceName />
         <AnimatePresence mode="popLayout" initial={false}>
@@ -184,49 +92,20 @@ export function Widgets() {
           </motion.div>
         </AnimatePresence>
       </header>
+
       <LayoutGroup>
-        <motion.div
-          layout
-          className="auto-rows-(--widget-grid-row-height) gap-(--widget-grid-gap) grid flex-1 grid-cols-4"
-        >
-          {visibleWidgets.map(({ id, config }) => (
-            <WidgetCard
-              key={id}
-              name={id}
-              position={config}
-              editing={editing}
-              onToggle={toggleWidget}
-            />
-          ))}
-        </motion.div>
+        <div className="flex-1">
+          <WidgetGrid
+            items={visibleItems}
+            editing={editing}
+            renderItem={renderItem}
+            onRemove={hide}
+          />
+        </div>
 
         <AnimatePresence>
-          {editing && hiddenWidgets.length > 0 && (
-            <motion.div
-              className="-m-8 mt-20 rounded-t-2xl p-8 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04),inset_0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_4px_16px_-4px_rgba(0,0,0,0.06)]"
-              variants={{
-                from: { opacity: 0, y: 40, filter: 'blur(4px)' },
-                to: { opacity: 1, y: 0, filter: 'blur(0px)' }
-              }}
-              initial="from"
-              animate="to"
-              exit="from"
-              transition={{ type: 'spring', duration: 0.2, bounce: 0 }}
-            >
-              <p className="text-muted-foreground mb-4 text-sm font-medium">Hidden</p>
-              <div className="gap-(--widget-grid-gap) grid grid-cols-4">
-                {hiddenWidgets.map(({ id, config }) => (
-                  <WidgetCard
-                    key={id}
-                    name={id}
-                    position={config}
-                    hidden
-                    editing={editing}
-                    onToggle={toggleWidget}
-                  />
-                ))}
-              </div>
-            </motion.div>
+          {editing && hiddenItems.length > 0 && (
+            <HiddenPanel items={hiddenItems} renderItem={renderItem} onRestore={restore} />
           )}
         </AnimatePresence>
       </LayoutGroup>
