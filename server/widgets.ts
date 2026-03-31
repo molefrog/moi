@@ -133,17 +133,18 @@ export async function listBuiltWidgets(): Promise<string[]> {
   }
 }
 
-export async function listWidgets(): Promise<Response> {
+async function getWidgetList(): Promise<WidgetInfo[]> {
   const [names, manifest] = await Promise.all([scanWidgets(), readManifest()])
-
-  const widgets: WidgetInfo[] = names.map(id => {
+  return names.map(id => {
     const raw = manifest[id] ?? {}
     const rowSpan = VALID_SPANS.includes(raw.rowSpan) ? raw.rowSpan : DEFAULT_CONFIG.rowSpan
     const colSpan = VALID_SPANS.includes(raw.colSpan) ? raw.colSpan : DEFAULT_CONFIG.colSpan
     return { id, config: { rowSpan, colSpan } as WidgetConfig }
   })
+}
 
-  return Response.json({ widgets })
+export async function listWidgets(): Promise<Response> {
+  return Response.json({ widgets: await getWidgetList() })
 }
 
 export async function handleBundle(publish: (msg: unknown) => void) {
@@ -169,7 +170,8 @@ export async function handleBundle(publish: (msg: unknown) => void) {
   }
 
   if (layoutChanged) {
-    publish({ type: 'widget-layout:updated' })
+    const widgets = await getWidgetList()
+    publish({ type: 'widget-layout:updated', widgets })
   }
 
   return results
