@@ -1,25 +1,56 @@
-import { useState } from 'react'
+import { useEffect } from 'react'
+
+import { IconLoader2 } from '@tabler/icons-react'
 
 import { useCanFitSidebar } from '@/client/hooks/useCanFitSidebar'
 import { useChat } from '@/client/hooks/useChat'
-import { useWidgetList } from '@/client/hooks/useWidgetList'
+import { useMeiEvent } from '@/client/hooks/useMeiEvents'
 import { cn } from '@/client/lib/cn'
+import { useWidgetsStore } from '@/client/store/widgets'
+import { useWorkspaceStore } from '@/client/store/workspace'
 
 import { ChatPanel } from './ChatPanel'
 import { ChatPopup } from './ChatPopup'
 import { Widgets } from './Widgets'
 
-export function App() {
-  const { messages, input, setInput, processing, send, stop } = useChat()
-  const [chatCollapsed, setChatCollapsed] = useState(false)
-  const canFitSidebar = useCanFitSidebar()
-  const widgetNames = useWidgetList()
-  const hasWidgets = widgetNames.length > 0
+export function AppLoader() {
+  const workspaceStatus = useWorkspaceStore(s => s.status)
+  const widgetsStatus = useWidgetsStore(s => s.status)
 
-  const chatMode = !hasWidgets ? 'solo' : chatCollapsed || !canFitSidebar ? 'floating' : 'sidebar'
+  useEffect(() => {
+    useWorkspaceStore.getState().load()
+    useWidgetsStore.getState().load()
+  }, [])
+
+  if (workspaceStatus === 'loading' || widgetsStatus === 'loading') {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <IconLoader2 size={20} stroke={1.5} className="text-muted-foreground animate-spin" />
+      </div>
+    )
+  }
+
+  return <App />
+}
+
+function App() {
+  const { messages, input, setInput, processing, send, stop } = useChat()
+  const { layout, setLayout } = useWorkspaceStore()
+  const { widgets, load: reloadWidgets } = useWidgetsStore()
+  const canFitSidebar = useCanFitSidebar()
+  const hasWidgets = widgets.length > 0
+  useMeiEvent(e => {
+    if (e.type === 'widget-layout:updated') reloadWidgets()
+  })
+
+  const chatMode = !hasWidgets
+    ? 'solo'
+    : layout.chatMode === 'floating' || !canFitSidebar
+      ? 'floating'
+      : 'sidebar'
 
   const handleModeChange = canFitSidebar
-    ? (mode: 'sidebar' | 'floating') => setChatCollapsed(mode === 'floating')
+    ? (mode: 'sidebar' | 'floating') => setLayout({ chatMode: mode })
     : undefined
 
   const chatPanel = (
@@ -32,7 +63,7 @@ export function App() {
       stop={stop}
       chatMode={chatMode}
       onModeChange={handleModeChange}
-      onCollapse={() => setChatCollapsed(true)}
+      onCollapse={() => setLayout({ chatMode: 'floating' })}
     />
   )
 
@@ -64,7 +95,7 @@ export function App() {
       </div>
 
       {chatMode === 'floating' && (
-        <ChatPopup defaultOpen={chatCollapsed}>
+        <ChatPopup defaultOpen={layout.chatMode === 'floating' && canFitSidebar}>
           {onClose => (
             <ChatPanel
               messages={messages}

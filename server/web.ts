@@ -5,6 +5,7 @@ import { handleChat, stopChat } from './agent'
 import { PORT } from './constants'
 import './control'
 import { callFunction } from './functions'
+import { loadLayout, saveLayout } from './layout'
 import { clients, messages, processing } from './state'
 import { listWidgets, serveWidget } from './widgets'
 
@@ -40,6 +41,16 @@ export const app = Bun.serve<WsData>({
     '/_mei/widgets/*': req => {
       const name = new URL(req.url).pathname.split('/').pop()?.replace(/\.js$/, '')
       return name ? serveWidget(name) : new Response('Not found', { status: 404 })
+    },
+    '/_mei/:workspaceId/layout': async req => {
+      if (req.method === 'GET') return Response.json(await loadLayout())
+      if (req.method === 'PUT') {
+        const body = await req.json()
+        if (!body || body.version !== 1) return new Response('Bad request', { status: 400 })
+        await saveLayout(body)
+        return new Response(null, { status: 204 })
+      }
+      return new Response('Method not allowed', { status: 405 })
     },
     '/_mei/fn/*': req => {
       if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })

@@ -73,3 +73,14 @@ export type StatusMessage = {
   type: 'status'
   processing: boolean
 }
+
+// Workspace layout persistence
+export type LayoutGridItem = { i: string; x: number; y: number; w: number; h: number }
+
+export type ChatMode = 'sidebar' | 'floating'
+
+export type WorkspaceLayout = {
+  version: 1
+  widgetGrid: LayoutGridItem[]
+  chatMode: ChatMode
+}
