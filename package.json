@@ -12,7 +12,7 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "latest",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.90",
     "@base-ui/react": "^1.2.0",
     "@dnd-kit/core": "^6.3.1",
     "@tabler/icons-react": "^3.40.0",
@@ -29,6 +29,7 @@
     "rehype-highlight": "^7.0.2",
     "shadcn": "^4.0.2",
     "tailwind-merge": "^3.5.0",
+    "wouter": "^3.9.0",
     "zustand": "^5.0.12"
   },
   "lint-staged": {
