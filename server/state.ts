@@ -57,45 +57,41 @@ function extractText(content: unknown): string {
   return ''
 }
 
-function transformMessages(
-  rawMessages: Awaited<ReturnType<typeof getSessionMessages>>
-): ChatMessage[] {
+export function transformMessage(msg: { type: string; message: unknown }): ChatMessage[] {
   const result: ChatMessage[] = []
-  for (const msg of rawMessages) {
-    const content = (msg.message as { content?: unknown })?.content
-    if (msg.type === 'user') {
-      if (Array.isArray(content)) {
-        for (const b of content as ContentBlock[]) {
-          if (b.type === 'text' && b.text && !b.text.startsWith('<')) {
-            result.push({ type: 'user', content: b.text })
-          }
-          if (b.type === 'tool_result') {
-            result.push({
-              type: 'tool_result',
-              tool_use_id: b.tool_use_id!,
-              content: extractText(b.content).slice(0, 2000),
-              is_error: !!b.is_error
-            })
-          }
+  const content = (msg.message as { content?: unknown })?.content
+  if (msg.type === 'user') {
+    if (Array.isArray(content)) {
+      for (const b of content as ContentBlock[]) {
+        if (b.type === 'text' && b.text && !b.text.startsWith('<')) {
+          result.push({ type: 'user', content: b.text })
         }
-      } else if (typeof content === 'string' && !content.startsWith('<')) {
-        result.push({ type: 'user', content })
+        if (b.type === 'tool_result') {
+          result.push({
+            type: 'tool_result',
+            tool_use_id: b.tool_use_id!,
+            content: extractText(b.content).slice(0, 2000),
+            is_error: !!b.is_error
+          })
+        }
       }
+    } else if (typeof content === 'string' && !content.startsWith('<')) {
+      result.push({ type: 'user', content })
     }
-    if (msg.type === 'assistant') {
-      if (Array.isArray(content)) {
-        for (const b of content as ContentBlock[]) {
-          if (b.type === 'text' && b.text) {
-            result.push({ type: 'assistant', content: b.text })
-          }
-          if (b.type === 'tool_use') {
-            result.push({
-              type: 'tool_use',
-              id: b.id!,
-              name: b.name!,
-              input: (b.input ?? {}) as Record<string, unknown>
-            })
-          }
+  }
+  if (msg.type === 'assistant') {
+    if (Array.isArray(content)) {
+      for (const b of content as ContentBlock[]) {
+        if (b.type === 'text' && b.text) {
+          result.push({ type: 'assistant', content: b.text })
+        }
+        if (b.type === 'tool_use') {
+          result.push({
+            type: 'tool_use',
+            id: b.id!,
+            name: b.name!,
+            input: (b.input ?? {}) as Record<string, unknown>
+          })
         }
       }
     }
@@ -113,7 +109,7 @@ export async function initState() {
   sessionId = latest.sessionId
   console.log(`[state] resuming session ${sessionId} (${latest.summary.slice(0, 60)})`)
   const rawMessages = await getSessionMessages(sessionId, { dir: WORKSPACE })
-  const loaded = transformMessages(rawMessages)
+  const loaded = rawMessages.flatMap(transformMessage)
   messages.push(...loaded)
   console.log(`[state] loaded ${loaded.length} messages`)
 }
