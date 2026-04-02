@@ -1,4 +1,5 @@
 import { type Options, query } from '@anthropic-ai/claude-agent-sdk'
+import type { McpServerStatus } from '@anthropic-ai/claude-agent-sdk'
 import * as path from 'path'
 
 import {
@@ -9,26 +10,11 @@ import {
   sessionId,
   setAbortController,
   setProcessing,
-  setSessionId
+  setSessionId,
+  transformMessage
 } from './state'
 
 const WORKSPACE = path.join(import.meta.dir, '..', 'workspace')
-
-type TextContentBlock = {
-  type: 'text'
-  text: string
-}
-
-function isTextContentBlock(block: unknown): block is TextContentBlock {
-  return (
-    typeof block === 'object' &&
-    block !== null &&
-    'type' in block &&
-    block.type === 'text' &&
-    'text' in block &&
-    typeof block.text === 'string'
-  )
-}
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message
@@ -80,47 +66,16 @@ export async function handleChat(content: string) {
       // Capture session ID
       if (msg.type === 'system' && msg.subtype === 'init') {
         setSessionId(msg.session_id)
+
+        // this was insanely slow, todo: figure out a better way to get up to date mcp status
+        // q.mcpServerStatus().then(s => {
+        //   mcpCache = s
+        //   console.log('[mcp]', s.map(m => `${m.name}:${m.status}`).join(', '))
+        // }).catch(() => {})
       }
 
-      // Assistant message — extract text and tool_use blocks
-      if (msg.type === 'assistant' && msg.message) {
-        for (const block of msg.message.content) {
-          if (block.type === 'text' && block.text) {
-            record({ type: 'assistant', content: block.text })
-          }
-          if (block.type === 'tool_use') {
-            record({
-              type: 'tool_use',
-              id: block.id,
-              name: block.name,
-              input: block.input as Record<string, unknown>
-            })
-          }
-        }
-      }
-
-      // Tool results
-      if (msg.type === 'user' && msg.message) {
-        for (const block of msg.message.content) {
-          if (block.type === 'tool_result') {
-            const text =
-              typeof block.content === 'string'
-                ? block.content
-                : Array.isArray(block.content)
-                  ? block.content
-                      .filter(isTextContentBlock)
-                      .map((c: TextContentBlock) => c.text)
-                      .join('\n')
-                  : ''
-            const cleaned = text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '').trim()
-            record({
-              type: 'tool_result',
-              tool_use_id: block.tool_use_id,
-              content: cleaned.slice(0, 2000),
-              is_error: !!block.is_error
-            })
-          }
-        }
+      if (msg.type === 'assistant' || msg.type === 'user') {
+        for (const m of transformMessage(msg)) record(m)
       }
 
       // Final result
@@ -152,7 +107,9 @@ export function stopChat() {
   }
 }
 
-export async function getMcpStatus() {
+let mcpCache: McpServerStatus[] | null = null
+
+async function fetchMcpStatus(): Promise<McpServerStatus[]> {
   const q = query({
     prompt: '',
     options: {
@@ -162,9 +119,13 @@ export async function getMcpStatus() {
       env: { ...process.env, CLAUDECODE: undefined }
     }
   })
-
   const status = await q.mcpServerStatus()
   await q.close()
   console.log('[mcp]', status.map(s => `${s.name}:${s.status}`).join(', '))
   return status
+}
+
+export async function getMcpStatus(): Promise<McpServerStatus[]> {
+  if (!mcpCache) mcpCache = await fetchMcpStatus()
+  return mcpCache
 }
