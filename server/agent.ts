@@ -6,7 +6,6 @@ import {
   broadcast,
   processing,
   record,
-  saveState,
   sessionId,
   setAbortController,
   setProcessing,
@@ -66,7 +65,7 @@ export async function handleChat(content: string) {
       ],
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
-      settingSources: ['project'],
+      settingSources: ['user', 'project'],
       env: { ...process.env, CLAUDECODE: undefined },
       stderr: (data: string) => console.error('[SDK stderr]', data)
     }
@@ -81,7 +80,6 @@ export async function handleChat(content: string) {
       // Capture session ID
       if (msg.type === 'system' && msg.subtype === 'init') {
         setSessionId(msg.session_id)
-        saveState()
       }
 
       // Assistant message — extract text and tool_use blocks
@@ -152,4 +150,21 @@ export function stopChat() {
     abortController.abort()
     record({ type: 'stopped' })
   }
+}
+
+export async function getMcpStatus() {
+  const q = query({
+    prompt: '',
+    options: {
+      cwd: WORKSPACE,
+      persistSession: false,
+      settingSources: ['user', 'project'],
+      env: { ...process.env, CLAUDECODE: undefined }
+    }
+  })
+
+  const status = await q.mcpServerStatus()
+  await q.close()
+  console.log('[mcp]', status.map(s => `${s.name}:${s.status}`).join(', '))
+  return status
 }
