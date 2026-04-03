@@ -6,6 +6,7 @@ import type { ChatMessage, ServerMessage } from '@/lib/types'
 export const WORKSPACE = path.join(import.meta.dir, '..', 'workspace')
 
 export let sessionId: string | null = null
+export let cwd: string | null = null
 export const messages: ChatMessage[] = []
 export let processing = false
 export let abortController: AbortController | null = null
@@ -13,6 +14,10 @@ export const clients = new Set<Bun.ServerWebSocket<unknown>>()
 
 export function setSessionId(id: string) {
   sessionId = id
+}
+
+export function setCwd(dir: string) {
+  cwd = dir
 }
 
 export function setProcessing(value: boolean) {
@@ -107,7 +112,8 @@ export async function initState() {
   }
   const latest = sessions[0]
   sessionId = latest.sessionId
-  console.log(`[state] resuming session ${sessionId} (${latest.summary.slice(0, 60)})`)
+  cwd = latest.cwd ?? null
+  console.log(`[state] resuming session ${sessionId} cwd=${cwd} (${latest.summary.slice(0, 60)})`)
   const rawMessages = await getSessionMessages(sessionId, { dir: WORKSPACE })
   const loaded = rawMessages.flatMap(transformMessage)
   messages.push(...loaded)

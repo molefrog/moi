@@ -9,6 +9,7 @@ import {
   record,
   sessionId,
   setAbortController,
+  setCwd,
   setProcessing,
   setSessionId,
   transformMessage
@@ -66,6 +67,7 @@ export async function handleChat(content: string) {
       // Capture session ID
       if (msg.type === 'system' && msg.subtype === 'init') {
         setSessionId(msg.session_id)
+        setCwd(msg.cwd)
 
         // this was insanely slow, todo: figure out a better way to get up to date mcp status
         // q.mcpServerStatus().then(s => {

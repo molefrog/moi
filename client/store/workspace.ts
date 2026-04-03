@@ -12,6 +12,7 @@ const DEFAULT_LAYOUT: WorkspaceLayout = {
 
 type WorkspaceStore = {
   id: string
+  cwd: string | null
   layout: WorkspaceLayout
   status: 'loading' | 'ready' | 'error'
   load: () => Promise<void>
@@ -22,6 +23,7 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 
 export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   id: WORKSPACE_ID,
+  cwd: null,
   layout: DEFAULT_LAYOUT,
   status: 'loading',
 
@@ -29,7 +31,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
     try {
       const res = await fetch(`/_mei/${WORKSPACE_ID}/layout`)
       if (!res.ok) throw new Error()
-      set({ layout: await res.json(), status: 'ready' })
+      const { cwd, ...layout } = await res.json()
+      set({ cwd: cwd ?? null, layout, status: 'ready' })
     } catch {
       set({ status: 'error' })
     }
