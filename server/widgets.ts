@@ -149,10 +149,18 @@ export async function listWidgets(): Promise<Response> {
 
 export async function handleBundle(publish: (msg: unknown) => void) {
   const before = new Set(await listBuiltWidgets())
+  const manifestBefore = await readManifest()
   const results = await buildAllWidgets()
   const after = new Set(await listBuiltWidgets())
 
+  const configChanged = results.some(r => {
+    if (r.status !== 'built' || !r.config) return false
+    const old = manifestBefore[r.name]
+    return !old || old.rowSpan !== r.config.rowSpan || old.colSpan !== r.config.colSpan
+  })
+
   const layoutChanged =
+    configChanged ||
     before.size !== after.size ||
     [...before].some(n => !after.has(n)) ||
     [...after].some(n => !before.has(n))

@@ -51,8 +51,11 @@ export function WidgetGrid({
   if (prevItems !== items) {
     setPrevItems(items)
     setLayout(prev => {
-      const ids = new Set(items.map(i => i.id))
-      const kept = prev.filter(l => ids.has(l.i))
+      const prevMap = new Map(prev.map(l => [l.i, l]))
+      // Preserve x/y from RGL state but always take w/h from items (source of truth)
+      const kept = items
+        .filter(i => prevMap.has(i.id))
+        .map(i => ({ ...prevMap.get(i.id)!, w: i.w, h: i.h }))
       const keptIds = new Set(kept.map(l => l.i))
       const added = packItems(
         items.filter(i => !keptIds.has(i.id)),

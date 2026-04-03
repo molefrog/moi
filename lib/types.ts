@@ -75,7 +75,7 @@ export type StatusMessage = {
 }
 
 // Workspace layout persistence
-export type LayoutGridItem = { i: string; x: number; y: number; w: number; h: number }
+export type LayoutGridItem = { i: string; x: number; y: number }
 
 export type ChatMode = 'sidebar' | 'floating'
 
