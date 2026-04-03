@@ -2,6 +2,11 @@
 @import 'tw-animate-css';
 
 @import 'highlight.js/styles/github.css';
+
+.hljs {
+  background: transparent;
+  padding: 0;
+}
 @import 'shadcn/tailwind.css';
 
 @plugin "@tailwindcss/typography";
