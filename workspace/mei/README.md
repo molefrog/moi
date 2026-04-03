@@ -42,6 +42,9 @@ export default function Counter() {
 - React is external — don't install it, just import it
 - Imports: widgets are self-contained, so when importing TSX/JSX modules you can only import them from 
   the same folder OR packages available in `mei/package.json`. Hence, no `@/` imports allowed.
+- Bundled with Bun — JSON, TOML, YAML, binary assets, and `.txt` files can be imported
+- Binary assets are loaded via `file` loader (returns path)
+- Docs: https://bun.com/docs/
 
 After writing/editing/deleting a widget/widgets, run `./cmd bundle`. Everything will be rebundled
 and automatically updated in the UI (no page reload needed).
