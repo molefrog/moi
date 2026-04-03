@@ -4,9 +4,8 @@ import { IconLoader2 } from '@tabler/icons-react'
 
 import { useCanFitSidebar } from '@/client/hooks/useCanFitSidebar'
 import { useChat } from '@/client/hooks/useChat'
-import { useMeiEvent } from '@/client/hooks/useMeiEvents'
+import { useWidgetSync } from '@/client/hooks/useWidgetSync'
 import { cn } from '@/client/lib/cn'
-import { findFreePosition } from '@/client/lib/grid-pack'
 import { useWidgetsStore } from '@/client/store/widgets'
 import { useWorkspaceStore } from '@/client/store/workspace'
 
@@ -23,22 +22,8 @@ export function AppLoader() {
     useWidgetsStore.getState().load()
   }, [])
 
-  // Always-mounted handler — catches events even during loading
-  useMeiEvent(e => {
-    if (e.type !== 'widget-layout:updated') return
-    useWidgetsStore.setState({ widgets: e.widgets, status: 'ready' })
-    const { layout, setLayout } = useWorkspaceStore.getState()
-    const gridIds = new Set(layout.widgetGrid.map(g => g.i))
-    const newWidgets = e.widgets.filter(w => !gridIds.has(w.id))
-    if (newWidgets.length > 0) {
-      const grid = [...layout.widgetGrid]
-      for (const w of newWidgets) {
-        const pos = findFreePosition(grid, w.config.colSpan, w.config.rowSpan, 4)
-        grid.push({ i: w.id, x: pos.x, y: pos.y, w: w.config.colSpan, h: w.config.rowSpan })
-      }
-      setLayout({ widgetGrid: grid })
-    }
-  })
+  // Syncs widget list and grid layout when bundles change
+  useWidgetSync()
 
   if (workspaceStatus === 'loading' || widgetsStatus === 'loading') {
     return (

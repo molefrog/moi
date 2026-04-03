@@ -35,7 +35,10 @@ export function Widgets() {
 
   const visibleItems: GridItem[] = layout.widgetGrid
     .filter(g => widgets.some(w => w.id === g.i))
-    .map(g => ({ id: g.i, w: g.w, h: g.h, x: g.x, y: g.y }))
+    .map(g => {
+      const widget = widgets.find(w => w.id === g.i)!
+      return { id: g.i, w: widget.config.colSpan, h: widget.config.rowSpan, x: g.x, y: g.y }
+    })
 
   const hiddenItems: GridItem[] = widgets
     .filter(w => !gridIds.has(w.id))
@@ -48,13 +51,12 @@ export function Widgets() {
   function restore(id: string) {
     const widget = widgets.find(w => w.id === id)
     if (!widget) return
-    const pos = findFreePosition(layout.widgetGrid, widget.config.colSpan, widget.config.rowSpan, 4)
-    setLayout({
-      widgetGrid: [
-        ...layout.widgetGrid,
-        { i: id, x: pos.x, y: pos.y, w: widget.config.colSpan, h: widget.config.rowSpan }
-      ]
+    const gridWithSizes = layout.widgetGrid.map(g => {
+      const w = widgets.find(w => w.id === g.i)
+      return { ...g, w: w?.config.colSpan ?? 1, h: w?.config.rowSpan ?? 1 }
     })
+    const pos = findFreePosition(gridWithSizes, widget.config.colSpan, widget.config.rowSpan, 4)
+    setLayout({ widgetGrid: [...layout.widgetGrid, { i: id, x: pos.x, y: pos.y }] })
   }
 
   if (widgets.length === 0) {
@@ -110,7 +112,7 @@ export function Widgets() {
             onRemove={hide}
             onLayoutChange={items =>
               setLayout({
-                widgetGrid: items.map(i => ({ i: i.id, x: i.x ?? 0, y: i.y ?? 0, w: i.w, h: i.h }))
+                widgetGrid: items.map(i => ({ i: i.id, x: i.x ?? 0, y: i.y ?? 0 }))
               })
             }
           />
