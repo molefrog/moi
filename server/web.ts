@@ -6,7 +6,7 @@ import { PORT } from './constants'
 import './control'
 import { callFunction } from './functions'
 import { loadLayout, saveLayout } from './layout'
-import { clients, initState, messages, processing } from './state'
+import { clients, cwd, initState, messages, processing } from './state'
 import { listWidgets, serveWidget } from './widgets'
 
 await initState()
@@ -46,7 +46,7 @@ export const app = Bun.serve<WsData>({
     },
     '/_mei/:workspaceId/mcp': async () => Response.json(await getMcpStatus()),
     '/_mei/:workspaceId/layout': async req => {
-      if (req.method === 'GET') return Response.json(await loadLayout())
+      if (req.method === 'GET') return Response.json({ ...(await loadLayout()), cwd })
       if (req.method === 'PUT') {
         const body = await req.json()
         if (!body || body.version !== 1) return new Response('Bad request', { status: 400 })

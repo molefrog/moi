@@ -1,7 +1,9 @@
 import { IconChevronRight } from '@tabler/icons-react'
+import { relative } from 'pathe'
 
 import { MarkdownContent } from '@/client/components/MarkdownContent'
 import { cn } from '@/client/lib/cn'
+import { useWorkspaceStore } from '@/client/store/workspace'
 import type { ChatMessage } from '@/lib/types'
 
 export function EmptyState() {
@@ -32,6 +34,7 @@ type MessageBlockProps = {
 }
 
 export function MessageBlock({ msg, messages, index }: MessageBlockProps) {
+  const cwd = useWorkspaceStore(s => s.cwd)
   switch (msg.type) {
     case 'user':
       return (
@@ -59,7 +62,7 @@ export function MessageBlock({ msg, messages, index }: MessageBlockProps) {
             />
             <span className="text-xs font-medium">{msg.name}</span>
             <span className="text-ring truncate text-[11px]">
-              {formatInputBrief(msg.name, msg.input)}
+              {formatInputBrief(msg.name, msg.input, cwd)}
             </span>
           </summary>
           {hasResult && (
@@ -104,11 +107,29 @@ function getInputValue(input: Record<string, unknown>, key: string): string {
   return typeof value === 'string' ? value : ''
 }
 
-function formatInputBrief(tool: string, input: Record<string, unknown>): string {
-  if (tool === 'Bash') return `$ ${getInputValue(input, 'command')}`
-  if (tool === 'Read') return getInputValue(input, 'file_path')
-  if (tool === 'Write' || tool === 'Edit') return getInputValue(input, 'file_path')
-  if (tool === 'Glob') return getInputValue(input, 'pattern')
-  if (tool === 'Grep') return `/${getInputValue(input, 'pattern')}/ ${getInputValue(input, 'path')}`
+// Returns a function that shortens absolute paths in a string relative to cwd.
+// e.g. cwd="/foo/bar", "/foo/bar/baz/file.ts" → "baz/file.ts"
+// Fallback for paths outside cwd: show last 2 segments.
+function makeShortenPaths(cwd: string | null) {
+  return (s: string) =>
+    s.replace(/\/[^\s"']+/g, p => {
+      if (!cwd) return p
+      const rel = relative(cwd, p)
+      return rel.startsWith('..') ? p : rel
+    })
+}
+
+function formatInputBrief(
+  tool: string,
+  input: Record<string, unknown>,
+  cwd: string | null
+): string {
+  const shorten = makeShortenPaths(cwd)
+  if (tool === 'Bash') return shorten(`$ ${getInputValue(input, 'command')}`)
+  if (tool === 'Read') return shorten(getInputValue(input, 'file_path'))
+  if (tool === 'Write' || tool === 'Edit') return shorten(getInputValue(input, 'file_path'))
+  if (tool === 'Glob') return shorten(getInputValue(input, 'pattern'))
+  if (tool === 'Grep')
+    return `/${getInputValue(input, 'pattern')}/ ${shorten(getInputValue(input, 'path'))}`
   return ''
 }
