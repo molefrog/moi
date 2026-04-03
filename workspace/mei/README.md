@@ -40,9 +40,21 @@ export default function Counter() {
 - Use React (hooks, JSX — all standard)
 - Use Tailwind classes for styling
 - React is external — don't install it, just import it
+- Imports: widgets are self-contained, so when importing TSX/JSX modules you can only import them from 
+  the same folder OR packages available in `mei/package.json`. Hence, no `@/` imports allowed.
 
 After writing/editing/deleting a widget/widgets, run `./cmd bundle`. Everything will be rebundled
 and automatically updated in the UI (no page reload needed).
+
+### Defining widget configuration
+Widget can export `config` object to define it's metadata, e.g. how it will look in the layout.
+
+```tsx
+export const config = { 
+  rowSpan: 1, // how many rows widget occupies on the grid (def: 1)
+  colSpan: 1  // how many cols widget occupies on the grid (def: 1)
+} as const
+```
 
 ## Server functions
 
