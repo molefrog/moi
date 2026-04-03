@@ -10,8 +10,12 @@ Widget design guidelines. Follow these when creating or modifying widgets.
 
 ## Layout & Grid
 
-- Widgets live on a 4-column grid. All widgets are full-width (4 columns) and 160px tall (1 row).
-- **Widgets are compact.** Design everything to fit within 160px height. Use space efficiently — no oversized text, no excessive padding, no wasted vertical space.
+- Widgets live on a 4-column grid. 
+- 1 cell is approximately 160x160 px.
+- Widget can define a row/col span (default is 1x1) by exporting a `config` object (see example below).
+  - `export const config = { rowSpan: 2, colSpan: 1} as const`
+- These dimensions MUST BE selected based on the widget purpose.
+- **Widgets are compact.** Design everything to fit within their size. Use space efficiently — no oversized text, no excessive padding, no wasted vertical space.
 - The widget's root element must fill the entire card: use `w-full h-full` so it stretches to the grid cell boundaries.
 - Pad content with `p-4` or `p-6` inside the root element. Never let content touch the card edges.
 - Center content vertically and horizontally when the widget has a single focal element (e.g. a clock, a stat). Use `flex flex-col items-center justify-center w-full h-full`.
