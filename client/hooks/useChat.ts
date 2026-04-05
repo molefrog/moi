@@ -44,5 +44,10 @@ export function useChat() {
     wsRef.current.send(JSON.stringify({ type: 'stop' }))
   }, [processing])
 
-  return { messages, input, setInput, processing, send, stop }
+  const switchThread = useCallback((sessionId: string | null) => {
+    if (!wsRef.current) return
+    wsRef.current.send(JSON.stringify({ type: 'switch', sessionId }))
+  }, [])
+
+  return { messages, input, setInput, processing, send, stop, switchThread }
 }

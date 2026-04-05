@@ -1,7 +1,7 @@
 import { getSessionMessages, listSessions } from '@anthropic-ai/claude-agent-sdk'
 import * as path from 'path'
 
-import type { ChatMessage, ServerMessage } from '@/lib/types'
+import type { ChatMessage, ServerMessage, SessionInfo } from '@/lib/types'
 
 export const WORKSPACE = path.join(import.meta.dir, '..', 'workspace')
 
@@ -118,4 +118,29 @@ export async function initState() {
   const loaded = rawMessages.flatMap(transformMessage)
   messages.push(...loaded)
   console.log(`[state] loaded ${loaded.length} messages`)
+}
+
+export async function getSessions(): Promise<SessionInfo[]> {
+  const sessions = await listSessions({ dir: WORKSPACE })
+  return sessions.map(s => ({
+    sessionId: s.sessionId,
+    summary: s.summary,
+    lastModified: s.lastModified,
+    cwd: s.cwd
+  }))
+}
+
+export async function switchSession(newSessionId: string | null) {
+  messages.length = 0
+  if (newSessionId) {
+    sessionId = newSessionId
+    const rawMessages = await getSessionMessages(newSessionId, { dir: WORKSPACE })
+    const loaded = rawMessages.flatMap(transformMessage)
+    messages.push(...loaded)
+    console.log(`[state] switched to session ${newSessionId}, loaded ${loaded.length} messages`)
+  } else {
+    sessionId = null
+    console.log('[state] started new thread')
+  }
+  broadcast({ type: 'history', messages })
 }

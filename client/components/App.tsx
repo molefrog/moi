@@ -52,7 +52,7 @@ function AppLoaderInner() {
 }
 
 function App() {
-  const { messages, input, setInput, processing, send, stop } = useChat()
+  const { messages, input, setInput, processing, send, stop, switchThread } = useChat()
   const { layout, setLayout } = useWorkspaceStore()
   const { widgets } = useWidgetsStore()
   const canFitSidebar = useCanFitSidebar()
@@ -76,6 +76,7 @@ function App() {
       send={send}
       stop={stop}
       chatMode={chatMode}
+      onSwitchThread={switchThread}
       onModeChange={handleModeChange}
       onCollapse={() => setLayout({ chatMode: 'floating' })}
     />
@@ -92,7 +93,7 @@ function App() {
         )}
       >
         <div className="max-w-160 flex w-full min-w-0 flex-1 flex-col">
-          {chatMode === 'solo' ? chatPanel : <Widgets />}
+          {chatMode === 'solo' ? chatPanel : <Widgets onSwitchThread={switchThread} />}
         </div>
 
         {canFitSidebar && chatMode !== 'solo' && (
@@ -119,6 +120,7 @@ function App() {
               send={send}
               stop={stop}
               chatMode={chatMode}
+              onSwitchThread={switchThread}
               onModeChange={handleModeChange}
               onClose={onClose}
             />

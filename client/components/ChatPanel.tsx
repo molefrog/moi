@@ -8,7 +8,7 @@ import type { ChatMessage } from '@/lib/types'
 
 import { ChatInput } from './ChatInput'
 import { EmptyState, MessageBlock, ThinkingIndicator } from './MessageBlock'
-import { SpaceName } from './SpaceName'
+import { ThreadSelector } from './ThreadSelector'
 import { Button } from './ui/button'
 import {
   DropdownMenu,
@@ -66,6 +66,7 @@ type ChatPanelProps = {
   send: () => void
   stop: () => void
   chatMode: ChatMode
+  onSwitchThread: (sessionId: string | null) => void
   onModeChange?: (mode: 'sidebar' | 'floating') => void
   onCollapse?: () => void
   onClose?: () => void
@@ -79,6 +80,7 @@ export function ChatPanel({
   send,
   stop,
   chatMode,
+  onSwitchThread,
   onModeChange,
   onCollapse,
   onClose
@@ -89,7 +91,7 @@ export function ChatPanel({
     const ref = chatMode === 'solo' ? document.body : scrollRef.current
 
     ref?.scrollTo({ top: ref.scrollHeight, behavior: 'instant' })
-  }, [messages, chatMode])
+  }, [scrollRef, messages, chatMode])
 
   const TriggerIcon = chatMode === 'sidebar' ? ChatModeIconSidebar : ChatModeIconFloating
 
@@ -105,7 +107,11 @@ export function ChatPanel({
             )
         )}
       >
-        {chatMode === 'solo' ? <SpaceName /> : <h1 className="text-sm font-medium">Agent</h1>}
+        {chatMode === 'solo' ? (
+          <ThreadSelector onSwitch={onSwitchThread} />
+        ) : (
+          <h1 className="text-sm font-medium">Agent</h1>
+        )}
         <div className="flex items-center gap-0.5">
           {chatMode !== 'solo' && onModeChange && (
             <DropdownMenu>
