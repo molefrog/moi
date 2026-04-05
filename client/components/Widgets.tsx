@@ -9,14 +9,9 @@ import { useWidgetsStore } from '@/client/store/widgets'
 import { useWorkspaceStore } from '@/client/store/workspace'
 
 import { HiddenPanel } from './HiddenPanel'
-import { ThreadSelector } from './ThreadSelector'
 import type { GridItem } from './WidgetGrid'
 import { WidgetGrid } from './WidgetGrid'
 import { Button } from './ui/button'
-
-type WidgetsProps = {
-  onSwitchThread: (sessionId: string | null) => void
-}
 
 function WidgetContent({ name }: { name: string }) {
   const widget = useWidget(name)
@@ -30,7 +25,7 @@ function renderItem(id: string) {
   return <WidgetContent name={id} />
 }
 
-export function Widgets({ onSwitchThread }: WidgetsProps) {
+export function Widgets() {
   const { widgets } = useWidgetsStore()
   const { layout, setLayout } = useWorkspaceStore()
   const [editing, setEditing] = useState(false)
@@ -67,7 +62,7 @@ export function Widgets({ onSwitchThread }: WidgetsProps) {
     return (
       <div className="group flex h-full flex-col">
         <header className="flex items-center justify-between pb-4">
-          <ThreadSelector onSwitch={onSwitchThread} />
+          <h1 className="text-sm font-medium">Widgets</h1>
         </header>
         <div className="flex flex-1 items-center justify-center">
           <p className="text-muted-foreground text-sm">No widgets found</p>
@@ -79,7 +74,7 @@ export function Widgets({ onSwitchThread }: WidgetsProps) {
   return (
     <div className={cn('group flex h-full flex-col')}>
       <header className="flex items-center justify-between pb-4">
-        <ThreadSelector onSwitch={onSwitchThread} />
+        <h1 className="text-sm font-medium">Widgets</h1>
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.div
             key={editing ? 'done' : 'edit'}
