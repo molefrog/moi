@@ -93,7 +93,7 @@ function App() {
         )}
       >
         <div className="max-w-160 flex w-full min-w-0 flex-1 flex-col">
-          {chatMode === 'solo' ? chatPanel : <Widgets onSwitchThread={switchThread} />}
+          {chatMode === 'solo' ? chatPanel : <Widgets />}
         </div>
 
         {canFitSidebar && chatMode !== 'solo' && (

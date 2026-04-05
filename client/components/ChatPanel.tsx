@@ -107,11 +107,7 @@ export function ChatPanel({
             )
         )}
       >
-        {chatMode === 'solo' ? (
-          <ThreadSelector onSwitch={onSwitchThread} />
-        ) : (
-          <h1 className="text-sm font-medium">Agent</h1>
-        )}
+        <ThreadSelector onSwitch={onSwitchThread} />
         <div className="flex items-center gap-0.5">
           {chatMode !== 'solo' && onModeChange && (
             <DropdownMenu>

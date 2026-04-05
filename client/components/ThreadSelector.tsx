@@ -11,8 +11,6 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger
 } from './ui/dropdown-menu'
@@ -37,24 +35,26 @@ function formatDate(ms: number) {
 export function ThreadSelector({ onSwitch }: ThreadSelectorProps) {
   const [sessions, setSessions] = useState<SessionInfo[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [hasSelected, setHasSelected] = useState(false)
 
   const fetchSessions = useCallback(async () => {
     try {
       const res = await fetch('/_mei/sessions')
       const data: SessionInfo[] = await res.json()
       setSessions(data)
-      if (!activeId && data.length > 0) setActiveId(data[0].sessionId)
+      if (!hasSelected && !activeId && data.length > 0) setActiveId(data[0].sessionId)
     } catch {}
-  }, [activeId])
+  }, [activeId, hasSelected])
 
   useEffect(() => {
     fetchSessions()
-  }, [])
+  }, [fetchSessions])
 
   const active = sessions.find(s => s.sessionId === activeId)
   const label = active?.summary ?? 'New thread'
 
   function handleSelect(sessionId: string | null) {
+    setHasSelected(true)
     setActiveId(sessionId)
     onSwitch(sessionId)
   }
@@ -63,21 +63,22 @@ export function ThreadSelector({ onSwitch }: ThreadSelectorProps) {
     <DropdownMenu onOpenChange={open => open && fetchSessions()}>
       <DropdownMenuTrigger
         render={
-          <Button variant="ghost" className="-ml-2">
+          <Button variant="ghost" className="-mx-3">
             <span className="max-w-64 truncate">{label}</span>
             <IconChevronDown stroke={1.5} className="text-muted-foreground" />
           </Button>
         }
       />
       <DropdownMenuContent align="start" className="max-h-80 w-80 overflow-y-auto">
-        <DropdownMenuItem onClick={() => handleSelect(null)}>
+        <DropdownMenuItem
+          className="text-muted-foreground! **:text-muted-foreground!"
+          onClick={() => handleSelect(null)}
+        >
           <IconPlus size={16} stroke={1.5} />
           New thread
         </DropdownMenuItem>
-        {sessions.length > 0 && <DropdownMenuSeparator />}
         {sessions.length > 0 && (
           <DropdownMenuGroup>
-            <DropdownMenuLabel>Recent</DropdownMenuLabel>
             {sessions.map(s => (
               <DropdownMenuItem
                 key={s.sessionId}
