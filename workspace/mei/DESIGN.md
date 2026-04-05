@@ -10,7 +10,7 @@ Widget design guidelines. Follow these when creating or modifying widgets.
 
 ## Layout & Grid
 
-- Widgets live on a 4-column grid. 
+- Widgets live on a 4-column grid.
 - 1 cell is approximately 160x160 px.
 - Widget can define a row/col span (default is 1x1) by exporting a `config` object (see example below).
   - `export const config = { rowSpan: 2, colSpan: 1} as const`
