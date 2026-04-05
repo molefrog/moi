@@ -9,7 +9,18 @@ export type WidgetInfo = {
 }
 
 // Client → Server messages
-export type ClientMessage = { type: 'chat'; content: string } | { type: 'stop' }
+export type ClientMessage =
+  | { type: 'chat'; content: string }
+  | { type: 'stop' }
+  | { type: 'switch'; sessionId: string | null }
+
+// Session info returned by list endpoint
+export type SessionInfo = {
+  sessionId: string
+  summary: string
+  lastModified: number
+  cwd?: string
+}
 
 // Persistable message (stored in messages.json)
 export type ChatMessage =

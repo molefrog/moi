@@ -6,7 +6,7 @@ import { PORT } from './constants'
 import './control'
 import { callFunction } from './functions'
 import { loadLayout, saveLayout } from './layout'
-import { clients, cwd, initState, messages, processing } from './state'
+import { clients, cwd, getSessions, initState, messages, processing, switchSession } from './state'
 import { listWidgets, serveWidget } from './widgets'
 
 await initState()
@@ -21,7 +21,8 @@ function isClientMessage(value: unknown): value is ClientMessage {
     value !== null &&
     'type' in value &&
     ((value.type === 'chat' && 'content' in value && typeof value.content === 'string') ||
-      value.type === 'stop')
+      value.type === 'stop' ||
+      (value.type === 'switch' && 'sessionId' in value))
   )
 }
 
@@ -44,6 +45,7 @@ export const app = Bun.serve<WsData>({
       const name = new URL(req.url).pathname.split('/').pop()?.replace(/\.js$/, '')
       return name ? serveWidget(name) : new Response('Not found', { status: 404 })
     },
+    '/_mei/sessions': async () => Response.json(await getSessions()),
     '/_mei/:workspaceId/mcp': async () => Response.json(await getMcpStatus()),
     '/_mei/:workspaceId/layout': async req => {
       if (req.method === 'GET') return Response.json({ ...(await loadLayout()), cwd })
@@ -85,6 +87,7 @@ export const app = Bun.serve<WsData>({
         if (!isClientMessage(data)) return
         if (data.type === 'chat' && data.content?.trim()) handleChat(data.content.trim())
         if (data.type === 'stop') stopChat()
+        if (data.type === 'switch') switchSession(data.sessionId)
       } catch {}
     },
     close(ws) {
