@@ -33,3 +33,11 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Finder (MacOS) folder config
 .DS_Store
 
+# workspace (agent working directory)
+workspace/mei
+!workspace/mei/README.md
+!workspace/mei/DESIGN.md
+!workspace/mei/package.json
+!workspace/mei/bun.lock
+!workspace/mei/cmd
+
