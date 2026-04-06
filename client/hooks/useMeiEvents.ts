@@ -5,6 +5,7 @@ import type { WidgetInfo } from '@/lib/types'
 type MeiEvent =
   | { type: 'widget:updated'; name: string }
   | { type: 'widget-layout:updated'; widgets: WidgetInfo[] }
+  | { type: 'theme:updated' }
 
 type MeiEventHandler = (event: MeiEvent) => void
 

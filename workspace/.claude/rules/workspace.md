@@ -5,3 +5,5 @@ The user interacts with you through a web chat UI called **mei**. This UI runs i
 - To create or modify widgets, edit files in `./mei/` and bundle them (the UI picks up changes automatically)
 - Read `./mei/DESIGN.md` for visual design guidelines before creating or modifying any widget
 - IMPORTANT: Always read `./mei/README.md` before writing widgets or customising the workspace!
+
+- To customise the workspace (e.g. fonts, themes), see `./mei/README.md` for available commands

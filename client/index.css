@@ -56,10 +56,14 @@
   --ring: oklch(0.556 0 0);
 }
 
-@theme inline {
+/* Font vars are NOT inline so Tailwind generates var(--font-*) references,
+   allowing runtime overrides via document.documentElement.style.setProperty */
+@theme {
   --font-sans: ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-mono: ui-monospace, monospace;
+}
 
+@theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

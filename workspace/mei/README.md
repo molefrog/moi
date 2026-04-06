@@ -49,6 +49,16 @@ export default function Counter() {
 After writing/editing/deleting a widget/widgets, run `./cmd bundle`. Everything will be rebundled
 and automatically updated in the UI (no page reload needed).
 
+## CLI commands
+
+```bash
+./cmd bundle              # rebuild changed widgets
+./cmd theme               # show available font themes and current selection
+./cmd theme --font=<key>  # apply a font theme (browser updates live)
+```
+
+When the user asks to change the font or theme, run `./cmd theme` first to see options, then apply with `--font=<key>`. Never edit `.workspace.json` directly.
+
 ### Defining widget configuration
 Widget can export `config` object to define it's metadata, e.g. how it will look in the layout.
 
