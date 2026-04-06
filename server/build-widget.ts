@@ -114,7 +114,8 @@ import { stringify, parse } from "devalue";
 
 export function rpc(module, name) {
   return async (...args) => {
-    const res = await fetch("/_mei/fn/" + module + "/" + name, {
+    const ws = window.__MEI_WS__ || "default";
+    const res = await fetch("/_mei/" + ws + "/fn/" + module + "/" + name, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: stringify(args),

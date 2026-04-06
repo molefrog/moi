@@ -39,8 +39,8 @@ export const app = Bun.serve<WsData>({
   development: { hmr: true },
   routes: {
     '/': index,
-    '/_mei/widgets': () => listWidgets(),
-    '/_mei/widgets/*': req => {
+    '/_mei/:workspaceId/widgets': () => listWidgets(),
+    '/_mei/:workspaceId/widgets/*': req => {
       const name = new URL(req.url).pathname.split('/').pop()?.replace(/\.js$/, '')
       return name ? serveWidget(name) : new Response('Not found', { status: 404 })
     },
@@ -55,9 +55,11 @@ export const app = Bun.serve<WsData>({
       }
       return new Response('Method not allowed', { status: 405 })
     },
-    '/_mei/fn/*': req => {
+    '/_mei/:workspaceId/fn/*': req => {
       if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })
-      return handleFunctionCall(req, new URL(req.url).pathname)
+      const prefix = `/_mei/${req.params.workspaceId}/fn/`
+      const tail = new URL(req.url).pathname.slice(prefix.length)
+      return handleFunctionCall(req, tail)
     }
   },
   fetch(req, server) {
@@ -92,8 +94,8 @@ export const app = Bun.serve<WsData>({
   }
 })
 
-async function handleFunctionCall(req: Request, path: string): Promise<Response> {
-  const parts = path.replace('/_mei/fn/', '').split('/')
+async function handleFunctionCall(req: Request, tail: string): Promise<Response> {
+  const parts = tail.split('/')
   if (parts.length !== 2) return new Response('Bad request', { status: 400 })
 
   const [module, name] = parts

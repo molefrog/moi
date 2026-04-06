@@ -1,6 +1,8 @@
 import type { ComponentType } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 
+import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
+
 import { useMeiEvent } from './useMeiEvents'
 
 type WidgetState =
@@ -11,37 +13,39 @@ type WidgetState =
 const moduleCache = new Map<string, Promise<ComponentType>>()
 let version = 0
 
-function loadWidget(name: string, bust: boolean): Promise<ComponentType> {
+function loadWidget(workspaceId: string, name: string, bust: boolean): Promise<ComponentType> {
+  const key = `${workspaceId}/${name}`
   if (bust) {
-    moduleCache.delete(name)
+    moduleCache.delete(key)
     version++
   }
 
-  const existing = moduleCache.get(name)
+  const existing = moduleCache.get(key)
   if (existing) return existing
 
   // Cache-busting query param so the browser fetches fresh
-  const url = `/_mei/widgets/${name}.js?v=${version}`
-  const promise = import(/* @vite-ignore */ url).then((mod) => {
+  const url = `/_mei/${workspaceId}/widgets/${name}.js?v=${version}`
+  const promise = import(/* @vite-ignore */ url).then(mod => {
     if (!mod.default) throw new Error(`Widget "${name}" has no default export`)
     return mod.default as ComponentType
   })
 
-  moduleCache.set(name, promise)
+  moduleCache.set(key, promise)
   return promise
 }
 
 export function useWidget(name: string): WidgetState {
+  const workspaceId = useWorkspaceId()
   const [state, setState] = useState<WidgetState>({ status: 'loading' })
 
   const load = useCallback(
     (bust = false) => {
       setState({ status: 'loading' })
-      loadWidget(name, bust)
-        .then((Component) => setState({ status: 'ready', Component }))
-        .catch((err) => setState({ status: 'error', error: String(err) }))
+      loadWidget(workspaceId, name, bust)
+        .then(Component => setState({ status: 'ready', Component }))
+        .catch(err => setState({ status: 'error', error: String(err) }))
     },
-    [name]
+    [workspaceId, name]
   )
 
   useEffect(() => {
@@ -49,7 +53,7 @@ export function useWidget(name: string): WidgetState {
   }, [load])
 
   // Reload when server says this widget was updated
-  useMeiEvent((event) => {
+  useMeiEvent(event => {
     if (event.type === 'widget:updated' && event.name === name) {
       load(true)
     }
