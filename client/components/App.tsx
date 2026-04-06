@@ -1,5 +1,3 @@
-import { useEffect } from 'react'
-
 import { IconLoader2 } from '@tabler/icons-react'
 
 import { useCanFitSidebar } from '@/client/hooks/useCanFitSidebar'
@@ -7,6 +5,7 @@ import { useChat } from '@/client/hooks/useChat'
 import { useMeiEvent } from '@/client/hooks/useMeiEvents'
 import { useWidgetSync } from '@/client/hooks/useWidgetSync'
 import { useWorkspaceTheme } from '@/client/hooks/useWorkspaceTheme'
+import { Workspace } from '@/client/lib/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
 import { useWidgetsStore } from '@/client/store/widgets'
 import { useWorkspaceStore } from '@/client/store/workspace'
@@ -16,13 +15,16 @@ import { ChatPopup } from './ChatPopup'
 import { Widgets } from './Widgets'
 
 export function AppLoader() {
+  return (
+    <Workspace id="default">
+      <AppLoaderInner />
+    </Workspace>
+  )
+}
+
+function AppLoaderInner() {
   const workspaceStatus = useWorkspaceStore(s => s.status)
   const widgetsStatus = useWidgetsStore(s => s.status)
-
-  useEffect(() => {
-    useWorkspaceStore.getState().load()
-    useWidgetsStore.getState().load()
-  }, [])
 
   // Syncs widget list and grid layout when bundles change
   useWidgetSync()
@@ -32,7 +34,10 @@ export function AppLoader() {
 
   // Reload layout when theme or other server-side changes occur
   useMeiEvent(e => {
-    if (e.type === 'theme:updated') useWorkspaceStore.getState().load()
+    if (e.type === 'theme:updated') {
+      const { id } = useWorkspaceStore.getState()
+      useWorkspaceStore.getState().load(id)
+    }
   })
 
   if (workspaceStatus === 'loading' || widgetsStatus === 'loading') {
