@@ -4,7 +4,9 @@ import { IconLoader2 } from '@tabler/icons-react'
 
 import { useCanFitSidebar } from '@/client/hooks/useCanFitSidebar'
 import { useChat } from '@/client/hooks/useChat'
+import { useMeiEvent } from '@/client/hooks/useMeiEvents'
 import { useWidgetSync } from '@/client/hooks/useWidgetSync'
+import { useWorkspaceTheme } from '@/client/hooks/useWorkspaceTheme'
 import { cn } from '@/client/lib/cn'
 import { useWidgetsStore } from '@/client/store/widgets'
 import { useWorkspaceStore } from '@/client/store/workspace'
@@ -24,6 +26,14 @@ export function AppLoader() {
 
   // Syncs widget list and grid layout when bundles change
   useWidgetSync()
+
+  // Applies font theme CSS vars
+  useWorkspaceTheme()
+
+  // Reload layout when theme or other server-side changes occur
+  useMeiEvent(e => {
+    if (e.type === 'theme:updated') useWorkspaceStore.getState().load()
+  })
 
   if (workspaceStatus === 'loading' || widgetsStatus === 'loading') {
     return (

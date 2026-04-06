@@ -79,8 +79,11 @@ export type LayoutGridItem = { i: string; x: number; y: number }
 
 export type ChatMode = 'sidebar' | 'floating'
 
+export type { FontTheme } from './themes'
+
 export type WorkspaceLayout = {
   version: 1
   widgetGrid: LayoutGridItem[]
   chatMode: ChatMode
+  theme?: { font: import('./themes').FontTheme }
 }
