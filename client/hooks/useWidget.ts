@@ -6,9 +6,9 @@ import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
 import { useMeiEvent } from './useMeiEvents'
 
 type WidgetState =
-  | { status: 'loading' }
-  | { status: 'ready'; Component: ComponentType }
-  | { status: 'error'; error: string }
+  | { status: 'loading'; version: number }
+  | { status: 'ready'; Component: ComponentType; version: number }
+  | { status: 'error'; error: string; version: number }
 
 const moduleCache = new Map<string, Promise<ComponentType>>()
 let version = 0
@@ -36,14 +36,18 @@ function loadWidget(workspaceId: string, name: string, bust: boolean): Promise<C
 
 export function useWidget(name: string): WidgetState {
   const workspaceId = useWorkspaceId()
-  const [state, setState] = useState<WidgetState>({ status: 'loading' })
+  const [state, setState] = useState<WidgetState>({ status: 'loading', version: 0 })
 
   const load = useCallback(
     (bust = false) => {
-      setState({ status: 'loading' })
+      setState(prev => ({ status: 'loading', version: prev.version }))
       loadWidget(workspaceId, name, bust)
-        .then(Component => setState({ status: 'ready', Component }))
-        .catch(err => setState({ status: 'error', error: String(err) }))
+        .then(Component =>
+          setState(prev => ({ status: 'ready', Component, version: prev.version + 1 }))
+        )
+        .catch(err =>
+          setState(prev => ({ status: 'error', error: String(err), version: prev.version + 1 }))
+        )
     },
     [workspaceId, name]
   )

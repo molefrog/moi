@@ -9,6 +9,7 @@ import { useWidgetsStore } from '@/client/store/widgets'
 import { useWorkspaceStore } from '@/client/store/workspace'
 
 import { HiddenPanel } from './HiddenPanel'
+import { WidgetErrorBoundary } from './WidgetErrorBoundary'
 import type { GridItem } from './WidgetGrid'
 import { WidgetGrid } from './WidgetGrid'
 import { Button } from './ui/button'
@@ -18,7 +19,11 @@ function WidgetContent({ name }: { name: string }) {
   if (widget.status === 'loading') return null
   if (widget.status === 'error')
     return <p className="text-destructive p-4 text-xs">{widget.error}</p>
-  return <widget.Component />
+  return (
+    <WidgetErrorBoundary name={name} resetKey={widget.version}>
+      <widget.Component />
+    </WidgetErrorBoundary>
+  )
 }
 
 function renderItem(id: string) {
