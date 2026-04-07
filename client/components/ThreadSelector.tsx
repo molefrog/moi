@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { IconChevronDown, IconPlus } from '@tabler/icons-react'
 
+import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
 import type { SessionInfo } from '@/lib/types'
 
@@ -33,18 +34,19 @@ function formatDate(ms: number) {
 }
 
 export function ThreadSelector({ onSwitch }: ThreadSelectorProps) {
+  const workspaceId = useWorkspaceId()
   const [sessions, setSessions] = useState<SessionInfo[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [hasSelected, setHasSelected] = useState(false)
 
   const fetchSessions = useCallback(async () => {
     try {
-      const res = await fetch('/_mei/sessions')
+      const res = await fetch(`/_mei/${workspaceId}/sessions`)
       const data: SessionInfo[] = await res.json()
       setSessions(data)
       if (!hasSelected && !activeId && data.length > 0) setActiveId(data[0].sessionId)
     } catch {}
-  }, [activeId, hasSelected])
+  }, [workspaceId, activeId, hasSelected])
 
   useEffect(() => {
     fetchSessions()
