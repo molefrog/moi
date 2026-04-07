@@ -7,6 +7,7 @@ import { useWidgetSync } from '@/client/hooks/useWidgetSync'
 import { useWorkspaceTheme } from '@/client/hooks/useWorkspaceTheme'
 import { Workspace } from '@/client/lib/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
+import { useSessionsStore } from '@/client/store/sessions'
 import { useWidgetsStore } from '@/client/store/widgets'
 import { useWorkspaceStore } from '@/client/store/workspace'
 
@@ -25,6 +26,7 @@ export function AppLoader() {
 function AppLoaderInner() {
   const workspaceStatus = useWorkspaceStore(s => s.status)
   const widgetsStatus = useWidgetsStore(s => s.status)
+  const sessionsStatus = useSessionsStore(s => s.status)
 
   // Syncs widget list and grid layout when bundles change
   useWidgetSync()
@@ -40,7 +42,10 @@ function AppLoaderInner() {
     }
   })
 
-  if (workspaceStatus === 'loading' || widgetsStatus === 'loading') {
+  const isLoading =
+    workspaceStatus === 'loading' || widgetsStatus === 'loading' || sessionsStatus === 'loading'
+
+  if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <IconLoader2 size={20} stroke={1.5} className="text-muted-foreground animate-spin" />

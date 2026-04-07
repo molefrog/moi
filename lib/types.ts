@@ -10,9 +10,8 @@ export type WidgetInfo = {
 
 // Client → Server messages
 export type ClientMessage =
-  | { type: 'chat'; content: string }
-  | { type: 'stop' }
-  | { type: 'switch'; sessionId: string | null }
+  | { type: 'chat'; content: string; sessionId: string; isNew: boolean }
+  | { type: 'stop'; sessionId: string }
 
 // Session info returned by list endpoint
 export type SessionInfo = {
@@ -32,12 +31,16 @@ export type ChatMessage =
   | ErrorMessage
   | StoppedMessage
 
-// Server → Client messages
-export type ServerMessage = ChatMessage | StatusMessage | HistoryMessage
+// Server → Client messages — everything is tagged with sessionId
+export type ServerMessage =
+  | (ChatMessage & { sessionId: string })
+  | StatusMessage
+  | SessionRenamedMessage
 
-export type HistoryMessage = {
-  type: 'history'
-  messages: ChatMessage[]
+export type SessionRenamedMessage = {
+  type: 'session_renamed'
+  from: string
+  to: string
 }
 
 export type UserMessage = {
@@ -82,6 +85,7 @@ export type StoppedMessage = {
 
 export type StatusMessage = {
   type: 'status'
+  sessionId: string
   processing: boolean
 }
 

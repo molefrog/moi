@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
-
 import { IconChevronDown, IconPlus } from '@tabler/icons-react'
 
 import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
-import type { SessionInfo } from '@/lib/types'
+import { useSessionsStore } from '@/client/store/sessions'
+import { useWorkspaceStore } from '@/client/store/workspace'
 
 import { Button } from './ui/button'
 import {
@@ -35,34 +34,22 @@ function formatDate(ms: number) {
 
 export function ThreadSelector({ onSwitch }: ThreadSelectorProps) {
   const workspaceId = useWorkspaceId()
-  const [sessions, setSessions] = useState<SessionInfo[]>([])
-  const [activeId, setActiveId] = useState<string | null>(null)
-  const [hasSelected, setHasSelected] = useState(false)
+  const sessions = useSessionsStore(s => s.list)
+  const activeSessionId = useWorkspaceStore(s => s.activeSessionId)
 
-  const fetchSessions = useCallback(async () => {
-    try {
-      const res = await fetch(`/_mei/${workspaceId}/sessions`)
-      const data: SessionInfo[] = await res.json()
-      setSessions(data)
-      if (!hasSelected && !activeId && data.length > 0) setActiveId(data[0].sessionId)
-    } catch {}
-  }, [workspaceId, activeId, hasSelected])
-
-  useEffect(() => {
-    fetchSessions()
-  }, [fetchSessions])
-
-  const active = sessions.find(s => s.sessionId === activeId)
+  const active = sessions.find(s => s.sessionId === activeSessionId)
   const label = active?.summary ?? 'New thread'
 
   function handleSelect(sessionId: string | null) {
-    setHasSelected(true)
-    setActiveId(sessionId)
     onSwitch(sessionId)
   }
 
   return (
-    <DropdownMenu onOpenChange={open => open && fetchSessions()}>
+    <DropdownMenu
+      onOpenChange={open => {
+        if (open) useSessionsStore.getState().loadList(workspaceId)
+      }}
+    >
       <DropdownMenuTrigger
         render={
           <Button variant="ghost" className="-mx-3">
@@ -84,7 +71,7 @@ export function ThreadSelector({ onSwitch }: ThreadSelectorProps) {
             {sessions.map(s => (
               <DropdownMenuItem
                 key={s.sessionId}
-                className={cn(activeId === s.sessionId && 'bg-accent')}
+                className={cn(activeSessionId === s.sessionId && 'bg-accent')}
                 onClick={() => handleSelect(s.sessionId)}
               >
                 <span className="truncate">{s.summary}</span>

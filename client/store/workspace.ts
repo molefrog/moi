@@ -13,8 +13,10 @@ type WorkspaceStore = {
   cwd: string | null
   layout: WorkspaceLayout
   status: 'loading' | 'ready' | 'error'
+  activeSessionId: string | null
   load: (id: string) => Promise<void>
   setLayout: (update: Partial<WorkspaceLayout>) => void
+  setActiveSession: (sessionId: string | null) => void
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -24,6 +26,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   cwd: null,
   layout: DEFAULT_LAYOUT,
   status: 'loading',
+  activeSessionId: null,
 
   load: async (id: string) => {
     set({ id })
@@ -51,5 +54,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         body: JSON.stringify(next)
       }).catch(() => {})
     }, 600)
-  }
+  },
+
+  setActiveSession: sessionId => set({ activeSessionId: sessionId })
 }))

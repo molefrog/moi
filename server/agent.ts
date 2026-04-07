@@ -2,18 +2,7 @@ import { type Options, query } from '@anthropic-ai/claude-agent-sdk'
 import type { McpServerStatus } from '@anthropic-ai/claude-agent-sdk'
 import * as path from 'path'
 
-import {
-  abortController,
-  broadcast,
-  processing,
-  record,
-  sessionId,
-  setAbortController,
-  setCwd,
-  setProcessing,
-  setSessionId,
-  transformMessage
-} from './state'
+import { broadcast, getAgent, renameAgent, transformMessage } from './state'
 
 const WORKSPACE = path.join(import.meta.dir, '..', 'workspace')
 
@@ -22,20 +11,26 @@ function getErrorMessage(error: unknown) {
   return 'Unknown error'
 }
 
-export async function handleChat(content: string) {
-  if (processing) {
-    broadcast({ type: 'error', content: 'Already processing a message' })
+export async function handleChat(content: string, sessionId: string, isNew: boolean) {
+  const agent = getAgent(sessionId)
+
+  if (agent.processing) {
+    broadcast({ type: 'error', sessionId, content: 'Already processing a message' })
     return
   }
 
-  setProcessing(true)
-  setAbortController(new AbortController())
-  broadcast({ type: 'status', processing: true })
-  record({ type: 'user', content })
+  const ctrl = new AbortController()
+  agent.processing = true
+  agent.abortController = ctrl
+  broadcast({ type: 'status', sessionId, processing: true })
+  broadcast({ type: 'user', sessionId, content })
+
+  // currentId gets updated after system/init for new sessions
+  let currentId = sessionId
 
   try {
     const options: Options = {
-      abortController: abortController!,
+      abortController: ctrl,
       maxTurns: 50,
       cwd: WORKSPACE,
       model: 'sonnet',
@@ -57,33 +52,32 @@ export async function handleChat(content: string) {
       stderr: (data: string) => console.error('[SDK stderr]', data)
     }
 
-    if (sessionId) {
-      options.resume = sessionId
-    }
+    if (!isNew) options.resume = sessionId
 
     const q = query({ prompt: content, options })
 
     for await (const msg of q) {
-      // Capture session ID
       if (msg.type === 'system' && msg.subtype === 'init') {
-        setSessionId(msg.session_id)
-        setCwd(msg.cwd)
+        const realId = msg.session_id
 
-        // this was insanely slow, todo: figure out a better way to get up to date mcp status
-        // q.mcpServerStatus().then(s => {
-        //   mcpCache = s
-        //   console.log('[mcp]', s.map(m => `${m.name}:${m.status}`).join(', '))
-        // }).catch(() => {})
+        // New session: migrate agent state from temp ID to real ID
+        if (isNew && realId !== currentId) {
+          renameAgent(currentId, realId)
+          broadcast({ type: 'session_renamed', from: currentId, to: realId })
+          currentId = realId
+        }
       }
 
       if (msg.type === 'assistant' || msg.type === 'user') {
-        for (const m of transformMessage(msg)) record(m)
+        for (const m of transformMessage(msg)) {
+          broadcast({ ...m, sessionId: currentId })
+        }
       }
 
-      // Final result
       if (msg.type === 'result') {
-        record({
+        broadcast({
           type: 'done',
+          sessionId: currentId,
           cost: msg.total_cost_usd,
           turns: msg.num_turns,
           session_id: msg.session_id
@@ -91,21 +85,23 @@ export async function handleChat(content: string) {
       }
     }
   } catch (err: unknown) {
-    // Don't record abort as an error
     if (!(err instanceof Error && err.name === 'AbortError')) {
-      record({ type: 'error', content: getErrorMessage(err) })
+      broadcast({ type: 'error', sessionId: currentId, content: getErrorMessage(err) })
     }
   } finally {
-    setProcessing(false)
-    setAbortController(null)
-    broadcast({ type: 'status', processing: false })
+    // Look up by currentId (may have been renamed)
+    const finalAgent = getAgent(currentId)
+    finalAgent.processing = false
+    finalAgent.abortController = null
+    broadcast({ type: 'status', sessionId: currentId, processing: false })
   }
 }
 
-export function stopChat() {
-  if (abortController) {
-    abortController.abort()
-    record({ type: 'stopped' })
+export function stopChat(sessionId: string) {
+  const agent = getAgent(sessionId)
+  if (agent.abortController) {
+    agent.abortController.abort()
+    broadcast({ type: 'stopped', sessionId })
   }
 }
 

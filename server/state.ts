@@ -1,44 +1,45 @@
-import { getSessionMessages, listSessions } from '@anthropic-ai/claude-agent-sdk'
+import { listSessions } from '@anthropic-ai/claude-agent-sdk'
 import * as path from 'path'
 
-import type { ChatMessage, ServerMessage, SessionInfo } from '@/lib/types'
+import type { ServerMessage, SessionInfo } from '@/lib/types'
 
 export const WORKSPACE = path.join(import.meta.dir, '..', 'workspace')
+export const cwd = WORKSPACE
 
-export let sessionId: string | null = null
-export let cwd: string | null = null
-export const messages: ChatMessage[] = []
-export let processing = false
-export let abortController: AbortController | null = null
 export const clients = new Set<Bun.ServerWebSocket<unknown>>()
 
-export function setSessionId(id: string) {
-  sessionId = id
+// Per-session agent state — the ONLY mutable state
+type Agent = { processing: boolean; abortController: AbortController | null }
+const agents = new Map<string, Agent>()
+
+export function getAgent(id: string): Agent {
+  if (!agents.has(id)) agents.set(id, { processing: false, abortController: null })
+  return agents.get(id)!
 }
 
-export function setCwd(dir: string) {
-  cwd = dir
+export function renameAgent(from: string, to: string) {
+  const a = agents.get(from)
+  if (!a) return
+  agents.set(to, a)
+  agents.delete(from)
 }
 
-export function setProcessing(value: boolean) {
-  processing = value
-}
-
-export function setAbortController(controller: AbortController | null) {
-  abortController = controller
+export function getProcessingSessions(): string[] {
+  const result: string[] = []
+  for (const [id, a] of agents) if (a.processing) result.push(id)
+  return result
 }
 
 export function broadcast(msg: ServerMessage) {
   const json = JSON.stringify(msg)
-  for (const ws of clients) {
-    ws.send(json)
-  }
+  for (const ws of clients) ws.send(json)
 }
 
-export function record(msg: ChatMessage) {
-  messages.push(msg)
-  broadcast(msg)
+export function sendToClient(ws: Bun.ServerWebSocket<unknown>, msg: ServerMessage) {
+  ws.send(JSON.stringify(msg))
 }
+
+// ---- transformMessage: SDK → ChatMessage[] ----
 
 type ContentBlock = {
   type: string
@@ -62,8 +63,16 @@ function extractText(content: unknown): string {
   return ''
 }
 
-export function transformMessage(msg: { type: string; message: unknown }): ChatMessage[] {
-  const result: ChatMessage[] = []
+export function transformMessage(msg: {
+  type: string
+  message: unknown
+}): Array<
+  | { type: 'user'; content: string }
+  | { type: 'assistant'; content: string }
+  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
+  | { type: 'tool_result'; tool_use_id: string; content: string; is_error: boolean }
+> {
+  const result: ReturnType<typeof transformMessage> = []
   const content = (msg.message as { content?: unknown })?.content
   if (msg.type === 'user') {
     if (Array.isArray(content)) {
@@ -104,22 +113,6 @@ export function transformMessage(msg: { type: string; message: unknown }): ChatM
   return result
 }
 
-export async function initState() {
-  const sessions = await listSessions({ dir: WORKSPACE })
-  if (sessions.length === 0) {
-    console.log('[state] no sessions found')
-    return
-  }
-  const latest = sessions[0]
-  sessionId = latest.sessionId
-  cwd = latest.cwd ?? null
-  console.log(`[state] resuming session ${sessionId} cwd=${cwd} (${latest.summary.slice(0, 60)})`)
-  const rawMessages = await getSessionMessages(sessionId, { dir: WORKSPACE })
-  const loaded = rawMessages.flatMap(transformMessage)
-  messages.push(...loaded)
-  console.log(`[state] loaded ${loaded.length} messages`)
-}
-
 export async function getSessions(): Promise<SessionInfo[]> {
   const sessions = await listSessions({ dir: WORKSPACE })
   return sessions.map(s => ({
@@ -128,19 +121,4 @@ export async function getSessions(): Promise<SessionInfo[]> {
     lastModified: s.lastModified,
     cwd: s.cwd
   }))
-}
-
-export async function switchSession(newSessionId: string | null) {
-  messages.length = 0
-  if (newSessionId) {
-    sessionId = newSessionId
-    const rawMessages = await getSessionMessages(newSessionId, { dir: WORKSPACE })
-    const loaded = rawMessages.flatMap(transformMessage)
-    messages.push(...loaded)
-    console.log(`[state] switched to session ${newSessionId}, loaded ${loaded.length} messages`)
-  } else {
-    sessionId = null
-    console.log('[state] started new thread')
-  }
-  broadcast({ type: 'history', messages })
 }

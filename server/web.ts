@@ -1,3 +1,5 @@
+import { getSessionMessages } from '@anthropic-ai/claude-agent-sdk'
+
 import type { ClientMessage } from '@/lib/types'
 
 import index from '../client/index.html'
@@ -6,24 +8,32 @@ import { PORT } from './constants'
 import './control'
 import { callFunction } from './functions'
 import { loadLayout, saveLayout } from './layout'
-import { clients, cwd, getSessions, initState, messages, processing, switchSession } from './state'
+import {
+  WORKSPACE,
+  clients,
+  cwd,
+  getProcessingSessions,
+  getSessions,
+  sendToClient,
+  transformMessage
+} from './state'
 import { listWidgets, serveWidget } from './widgets'
-
-await initState()
 
 const MEI_TOPIC = 'mei'
 
 type WsData = { channel: 'chat' | 'mei' }
 
 function isClientMessage(value: unknown): value is ClientMessage {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'type' in value &&
-    ((value.type === 'chat' && 'content' in value && typeof value.content === 'string') ||
-      value.type === 'stop' ||
-      (value.type === 'switch' && 'sessionId' in value))
-  )
+  if (typeof value !== 'object' || value === null || !('type' in value)) return false
+  const v = value as { type: string; sessionId?: unknown; content?: unknown; isNew?: unknown }
+  if (v.type === 'chat')
+    return (
+      typeof v.content === 'string' &&
+      typeof v.sessionId === 'string' &&
+      typeof v.isNew === 'boolean'
+    )
+  if (v.type === 'stop') return typeof v.sessionId === 'string'
+  return false
 }
 
 type Upgradable = { upgrade(req: Request, opts: { data: WsData }): boolean }
@@ -46,6 +56,15 @@ export const app = Bun.serve<WsData>({
       return name ? serveWidget(name) : new Response('Not found', { status: 404 })
     },
     '/_mei/:workspaceId/sessions': async () => Response.json(await getSessions()),
+    '/_mei/:workspaceId/sessions/:sessionId/messages': async req => {
+      const sid = req.params.sessionId
+      try {
+        const raw = await getSessionMessages(sid, { dir: WORKSPACE })
+        return Response.json(raw.flatMap(transformMessage))
+      } catch {
+        return Response.json([])
+      }
+    },
     '/_mei/:workspaceId/mcp': async () => Response.json(await getMcpStatus()),
     '/_mei/:workspaceId/layout': async req => {
       if (req.method === 'GET') return Response.json({ ...(await loadLayout()), cwd })
@@ -74,20 +93,26 @@ export const app = Bun.serve<WsData>({
     open(ws) {
       if (ws.data.channel === 'chat') {
         clients.add(ws)
-        ws.send(JSON.stringify({ type: 'history', messages }))
-        ws.send(JSON.stringify({ type: 'status', processing }))
+        // Re-send current processing status for any active agents
+        for (const sid of getProcessingSessions()) {
+          sendToClient(ws, { type: 'status', sessionId: sid, processing: true })
+        }
       } else {
         ws.subscribe(MEI_TOPIC)
       }
     },
-    message(ws, message) {
+    async message(ws, message) {
       if (ws.data.channel !== 'chat') return
       try {
         const data = JSON.parse(String(message))
         if (!isClientMessage(data)) return
-        if (data.type === 'chat' && data.content?.trim()) handleChat(data.content.trim())
-        if (data.type === 'stop') stopChat()
-        if (data.type === 'switch') switchSession(data.sessionId)
+
+        if (data.type === 'chat' && data.content?.trim()) {
+          handleChat(data.content.trim(), data.sessionId, data.isNew)
+        }
+        if (data.type === 'stop') {
+          stopChat(data.sessionId)
+        }
       } catch {}
     },
     close(ws) {

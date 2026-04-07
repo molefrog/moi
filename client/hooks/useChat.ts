@@ -1,53 +1,65 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
+import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
+import { connectWs, disconnectWs, sendWs } from '@/client/lib/ws'
+import { useSessionsStore } from '@/client/store/sessions'
+import { useWorkspaceStore } from '@/client/store/workspace'
 import type { ChatMessage } from '@/lib/types'
 
+const EMPTY: ChatMessage[] = []
+
 export function useChat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const workspaceId = useWorkspaceId()
   const [input, setInput] = useState('')
-  const [processing, setProcessing] = useState(false)
-  const wsRef = useRef<WebSocket | null>(null)
 
+  const activeSessionId = useWorkspaceStore(s => s.activeSessionId)
+  const setActiveSession = useWorkspaceStore(s => s.setActiveSession)
+
+  const messages = useSessionsStore(s => s.messages[activeSessionId ?? ''] ?? EMPTY)
+  const processing = useSessionsStore(s => s.processing[activeSessionId ?? ''] ?? false)
+
+  // Persistent WS for live events
   useEffect(() => {
-    const ws = new WebSocket(`ws://${location.host}/ws`)
-    wsRef.current = ws
-
-    ws.onmessage = e => {
-      const data = JSON.parse(e.data)
-      if (data.type === 'status') {
-        setProcessing(data.processing)
-        return
-      }
-      if (data.type === 'history') {
-        setMessages(data.messages)
-        return
-      }
-      setMessages(prev => [...prev, data])
-    }
-
-    ws.onclose = () => {
-      setTimeout(() => location.reload(), 2000)
-    }
-
-    return () => ws.close()
+    connectWs()
+    return () => disconnectWs()
   }, [])
+
+  // When active session changes and we don't have its messages cached, fetch them
+  useEffect(() => {
+    if (!activeSessionId) return
+    if (useSessionsStore.getState().messages[activeSessionId] !== undefined) return
+    useSessionsStore.getState().loadMessages(workspaceId, activeSessionId)
+  }, [workspaceId, activeSessionId])
 
   const send = useCallback(() => {
     const text = input.trim()
-    if (!text || !wsRef.current || processing) return
-    wsRef.current.send(JSON.stringify({ type: 'chat', content: text }))
+    if (!text || processing) return
+
+    let sid = activeSessionId
+    let isNew = false
+    if (!sid) {
+      // Client-generated temp UUID for a new session — server will rename on init
+      sid = crypto.randomUUID()
+      isNew = true
+      useSessionsStore.getState().setMessages(sid, [])
+      setActiveSession(sid)
+    }
+
+    sendWs({ type: 'chat', content: text, sessionId: sid, isNew })
     setInput('')
-  }, [input, processing])
+  }, [input, processing, activeSessionId, setActiveSession])
 
   const stop = useCallback(() => {
-    if (!wsRef.current || !processing) return
-    wsRef.current.send(JSON.stringify({ type: 'stop' }))
-  }, [processing])
+    if (!processing || !activeSessionId) return
+    sendWs({ type: 'stop', sessionId: activeSessionId })
+  }, [processing, activeSessionId])
 
-  const switchThread = useCallback((sessionId: string | null) => {
-    if (!wsRef.current) return
-    wsRef.current.send(JSON.stringify({ type: 'switch', sessionId }))
-  }, [])
+  const switchThread = useCallback(
+    (sessionId: string | null) => {
+      setActiveSession(sessionId)
+    },
+    [setActiveSession]
+  )
 
-  return { messages, input, setInput, processing, send, stop, switchThread }
+  return { messages, processing, input, setInput, send, stop, switchThread }
 }
