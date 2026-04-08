@@ -19,7 +19,7 @@ export const control = Bun.serve({
         const data = JSON.parse(String(message))
 
         if (data.type === 'bundle') {
-          const results = await handleBundle(publishMei)
+          const results = await handleBundle(publishMei, !!data.force)
           ws.send(JSON.stringify(results))
           return
         }

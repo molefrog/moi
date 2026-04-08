@@ -72,7 +72,7 @@ export type WidgetBuildResult = {
   config?: WidgetConfig | null
 }
 
-export async function buildAllWidgets(): Promise<WidgetBuildResult[]> {
+export async function buildAllWidgets(force = false): Promise<WidgetBuildResult[]> {
   const names = await scanWidgets()
   const results: WidgetBuildResult[] = []
 
@@ -88,7 +88,7 @@ export async function buildAllWidgets(): Promise<WidgetBuildResult[]> {
       continue
     }
 
-    if (!(await needsRebuild(name, srcPath))) {
+    if (!force && !(await needsRebuild(name, srcPath))) {
       results.push({ name, status: 'skipped' })
       continue
     }
@@ -147,10 +147,10 @@ export async function listWidgets(): Promise<Response> {
   return Response.json({ widgets: await getWidgetList() })
 }
 
-export async function handleBundle(publish: (msg: unknown) => void) {
+export async function handleBundle(publish: (msg: unknown) => void, force = false) {
   const before = new Set(await listBuiltWidgets())
   const manifestBefore = await readManifest()
-  const results = await buildAllWidgets()
+  const results = await buildAllWidgets(force)
   const after = new Set(await listBuiltWidgets())
 
   const configChanged = results.some(r => {

@@ -25,10 +25,17 @@ function colorStatus(status: string) {
 
 const bundle = defineCommand({
   meta: { description: 'Rebuild changed widgets' },
-  run() {
+  args: {
+    force: {
+      type: 'boolean',
+      description: 'Rebuild all widgets, ignoring file modification times',
+      default: false
+    }
+  },
+  run({ args }) {
     const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
 
-    ws.onopen = () => ws.send(JSON.stringify({ type: 'bundle' }))
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'bundle', force: args.force }))
 
     ws.onmessage = event => {
       const results = JSON.parse(String(event.data))
