@@ -73,46 +73,53 @@ export type WidgetBuildResult = {
 }
 
 export async function buildAllWidgets(force = false): Promise<WidgetBuildResult[]> {
+  const t0 = performance.now()
   const names = await scanWidgets()
-  const results: WidgetBuildResult[] = []
 
   await mkdir(BUILD_DIR, { recursive: true })
   await pruneStaleBuilds(new Set(names))
 
   const manifest = await readManifest()
 
-  for (const name of names) {
-    const srcPath = await resolveWidgetSource(name)
-    if (!srcPath) {
-      results.push({ name, status: 'failed', error: 'Source file not found' })
-      continue
-    }
+  // Resolve + filter widgets in parallel (cheap)
+  const jobs = await Promise.all(
+    names.map(async name => {
+      const srcPath = await resolveWidgetSource(name)
+      if (!srcPath) {
+        return { name, status: 'failed' as const, error: 'Source file not found' }
+      }
+      if (!force && !(await needsRebuild(name, srcPath))) {
+        return { name, status: 'skipped' as const }
+      }
+      return { name, srcPath, status: 'pending' as const }
+    })
+  )
 
-    if (!force && !(await needsRebuild(name, srcPath))) {
-      results.push({ name, status: 'skipped' })
-      continue
-    }
+  // Build all pending widgets in parallel
+  const buildResults = await Promise.all(
+    jobs.map(async (job): Promise<WidgetBuildResult> => {
+      if (job.status === 'failed') return { name: job.name, status: 'failed', error: job.error }
+      if (job.status === 'skipped') return { name: job.name, status: 'skipped' }
 
-    try {
-      const artifact = await buildWidget(srcPath)
-      await Bun.write(join(BUILD_DIR, `${name}.js`), artifact.js)
-
-      manifest[name] = artifact.config ?? DEFAULT_CONFIG
-
-      results.push({
-        name,
-        status: 'built',
-        serverModules: artifact.serverModules.map(m => m.name),
-        config: artifact.config
-      })
-    } catch (err) {
-      results.push({
-        name,
-        status: 'failed',
-        error: err instanceof Error ? err.message : 'Unknown error'
-      })
-    }
-  }
+      try {
+        const artifact = await buildWidget(job.srcPath!)
+        await Bun.write(join(BUILD_DIR, `${job.name}.js`), artifact.js)
+        manifest[job.name] = artifact.config ?? DEFAULT_CONFIG
+        return {
+          name: job.name,
+          status: 'built',
+          serverModules: artifact.serverModules.map(m => m.name),
+          config: artifact.config
+        }
+      } catch (err) {
+        return {
+          name: job.name,
+          status: 'failed',
+          error: err instanceof Error ? err.message : 'Unknown error'
+        }
+      }
+    })
+  )
 
   // Prune manifest entries for deleted widgets
   for (const key of Object.keys(manifest)) {
@@ -121,7 +128,13 @@ export async function buildAllWidgets(force = false): Promise<WidgetBuildResult[
 
   await writeManifest(manifest)
 
-  return results
+  const builtCount = buildResults.filter(r => r.status === 'built').length
+  console.log(
+    `[bundle] ${builtCount}/${names.length} built in ${Math.round(performance.now() - t0)}ms` +
+      (force ? ' (forced)' : '')
+  )
+
+  return buildResults
 }
 
 export async function listBuiltWidgets(): Promise<string[]> {
