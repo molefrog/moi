@@ -6,8 +6,8 @@ import { AnimatePresence, motion } from 'motion/react'
 import { cn } from '@/client/lib/cn'
 import { packItems } from '@/client/lib/grid-pack'
 
+import { WidgetFrame } from './WidgetFrame'
 import type { GridItem } from './WidgetGrid'
-import { WidgetGridItem } from './WidgetGridItem'
 
 // Static maps so Tailwind includes these classes (dynamic strings get purged)
 const COL_START: Record<number, string> = {
@@ -76,9 +76,9 @@ export function HiddenPanel({ items, renderItem, onRestore }: HiddenPanelProps) 
               )}
               transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
             >
-              <WidgetGridItem editing onRemove={() => onRestore(item.i)} hidden>
+              <WidgetFrame editing onRemove={() => onRestore(item.i)} hidden>
                 {renderItem(item.i)}
-              </WidgetGridItem>
+              </WidgetFrame>
             </motion.div>
           ))}
         </AnimatePresence>

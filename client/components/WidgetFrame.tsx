@@ -8,14 +8,14 @@ import { cn } from '@/client/lib/cn'
 
 import { Button } from './ui/button'
 
-type WidgetGridItemProps = {
+type WidgetFrameProps = {
   editing?: boolean
   hidden?: boolean
   onRemove?: () => void
   children?: ReactNode
 }
 
-export function WidgetGridItem({ editing, hidden, onRemove, children }: WidgetGridItemProps) {
+export function WidgetFrame({ editing, hidden, onRemove, children }: WidgetFrameProps) {
   return (
     <motion.div
       variants={{
@@ -29,12 +29,12 @@ export function WidgetGridItem({ editing, hidden, onRemove, children }: WidgetGr
       }}
       animate={editing ? 'wiggle' : 'idle'}
       transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
-      className="group/widget relative flex size-full flex-col"
+      className="group/widget relative size-full"
     >
       <div
         className={cn(
-          'dark flex flex-1 flex-col overflow-clip rounded-2xl shadow-sm [corner-shape:superellipse(1.2)]',
-          'bg-background text-foreground',
+          'dark absolute inset-0 overflow-hidden rounded-2xl shadow-sm [corner-shape:superellipse(1.2)]',
+          'bg-muted text-foreground',
           editing && 'pointer-events-none'
         )}
       >

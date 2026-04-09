@@ -2,32 +2,19 @@ import { useState } from 'react'
 
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 
-import { useWidget } from '@/client/hooks/useWidget'
 import { cn } from '@/client/lib/cn'
 import { findFreePosition } from '@/client/lib/grid-pack'
 import { useWidgetsStore } from '@/client/store/widgets'
 import { useWorkspaceStore } from '@/client/store/workspace'
 
 import { HiddenPanel } from './HiddenPanel'
-import { WidgetErrorBoundary } from './WidgetErrorBoundary'
 import type { GridItem } from './WidgetGrid'
 import { WidgetGrid } from './WidgetGrid'
+import { WidgetShell } from './WidgetShell'
 import { Button } from './ui/button'
 
-function WidgetContent({ name }: { name: string }) {
-  const widget = useWidget(name)
-  if (widget.status === 'loading') return null
-  if (widget.status === 'error')
-    return <p className="text-destructive p-4 text-xs">{widget.error}</p>
-  return (
-    <WidgetErrorBoundary name={name} resetKey={widget.version}>
-      <widget.Component />
-    </WidgetErrorBoundary>
-  )
-}
-
 function renderItem(id: string) {
-  return <WidgetContent name={id} />
+  return <WidgetShell name={id} />
 }
 
 export function Widgets() {

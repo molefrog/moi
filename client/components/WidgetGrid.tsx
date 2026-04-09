@@ -10,7 +10,7 @@ import 'react-resizable/css/styles.css'
 
 import { packItems } from '@/client/lib/grid-pack'
 
-import { WidgetGridItem } from './WidgetGridItem'
+import { WidgetFrame } from './WidgetFrame'
 
 const GridLayout = WidthProvider(ReactGridLayout)
 
@@ -96,12 +96,9 @@ export function WidgetGrid({
             className="size-full"
             transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
           >
-            <WidgetGridItem
-              editing={editing}
-              onRemove={onRemove ? () => onRemove(item.i) : undefined}
-            >
+            <WidgetFrame editing={editing} onRemove={onRemove ? () => onRemove(item.i) : undefined}>
               {renderItem(item.i)}
-            </WidgetGridItem>
+            </WidgetFrame>
           </motion.div>
         </div>
       ))}
