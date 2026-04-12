@@ -33,6 +33,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Finder (MacOS) folder config
 .DS_Store
 
+# Playwright MCP
+.playwright-mcp/
+
 # workspace (agent working directory)
 workspace/mei
 !workspace/mei/README.md
