@@ -7,11 +7,14 @@ import { findFreePosition } from '@/client/lib/grid-pack'
 import { useWidgetsStore } from '@/client/store/widgets'
 import { useWorkspaceStore } from '@/client/store/workspace'
 
+import { CustomizePanel } from './CustomizePanel'
 import { HiddenPanel } from './HiddenPanel'
 import type { GridItem } from './WidgetGrid'
 import { WidgetGrid } from './WidgetGrid'
 import { WidgetShell } from './WidgetShell'
 import { Button } from './ui/button'
+
+type Mode = 'idle' | 'editing' | 'customizing'
 
 function renderItem(id: string) {
   return <WidgetShell name={id} />
@@ -20,7 +23,7 @@ function renderItem(id: string) {
 export function Widgets() {
   const { widgets } = useWidgetsStore()
   const { layout, setLayout } = useWorkspaceStore()
-  const [editing, setEditing] = useState(false)
+  const [mode, setMode] = useState<Mode>('idle')
 
   const gridIds = new Set(layout.widgetGrid.map(g => g.i))
 
@@ -68,29 +71,49 @@ export function Widgets() {
       <header className="flex items-center justify-between pb-4">
         <h1 className="text-sm font-medium">Widgets</h1>
         <AnimatePresence mode="popLayout" initial={false}>
-          <motion.div
-            key={editing ? 'done' : 'edit'}
-            variants={{
-              from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
-              to: { opacity: 1, scale: 1, filter: 'blur(0px)' }
-            }}
-            initial="from"
-            animate="to"
-            exit="from"
-            transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
-          >
-            {editing ? (
-              <Button onClick={() => setEditing(false)}>Done</Button>
-            ) : (
+          {mode !== 'idle' ? (
+            <motion.div
+              key="done"
+              variants={{
+                from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
+                to: { opacity: 1, scale: 1, filter: 'blur(0px)' }
+              }}
+              initial="from"
+              animate="to"
+              exit="from"
+              transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+            >
+              <Button onClick={() => setMode('idle')}>Done</Button>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="actions"
+              className="flex items-center gap-1"
+              variants={{
+                from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
+                to: { opacity: 1, scale: 1, filter: 'blur(0px)' }
+              }}
+              initial="from"
+              animate="to"
+              exit="from"
+              transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+            >
               <Button
                 variant="ghost"
                 className="text-muted-foreground group-hover:opacity-100 [@media(hover:hover)]:opacity-0"
-                onClick={() => setEditing(true)}
+                onClick={() => setMode('customizing')}
+              >
+                Customize
+              </Button>
+              <Button
+                variant="ghost"
+                className="text-muted-foreground group-hover:opacity-100 [@media(hover:hover)]:opacity-0"
+                onClick={() => setMode('editing')}
               >
                 Edit widgets
               </Button>
-            )}
-          </motion.div>
+            </motion.div>
+          )}
         </AnimatePresence>
       </header>
 
@@ -98,7 +121,7 @@ export function Widgets() {
         <div className="flex-1">
           <WidgetGrid
             items={visibleItems}
-            editing={editing}
+            editing={mode === 'editing'}
             renderItem={renderItem}
             onRemove={hide}
             onLayoutChange={items =>
@@ -110,10 +133,12 @@ export function Widgets() {
         </div>
 
         <AnimatePresence>
-          {editing && hiddenItems.length > 0 && (
+          {mode === 'editing' && hiddenItems.length > 0 && (
             <HiddenPanel items={hiddenItems} renderItem={renderItem} onRestore={restore} />
           )}
         </AnimatePresence>
+
+        <AnimatePresence>{mode === 'customizing' && <CustomizePanel />}</AnimatePresence>
       </LayoutGroup>
     </div>
   )

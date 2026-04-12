@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { cn } from '@/client/lib/cn'
 import { packItems } from '@/client/lib/grid-pack'
 
+import { BottomPanel } from './BottomPanel'
 import { WidgetFrame } from './WidgetFrame'
 import type { GridItem } from './WidgetGrid'
 
@@ -49,18 +50,7 @@ export function HiddenPanel({ items, renderItem, onRestore }: HiddenPanelProps) 
   const layout = useMemo(() => packItems(items), [items])
 
   return (
-    <motion.div
-      className="-mx-8 -mb-8 mt-8 rounded-t-2xl p-8 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04),inset_0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_4px_16px_-4px_rgba(0,0,0,0.06)]"
-      variants={{
-        hidden: { opacity: 0, y: 40, filter: 'blur(4px)' },
-        visible: { opacity: 1, y: 0, filter: 'blur(0px)' }
-      }}
-      initial="hidden"
-      animate="visible"
-      exit="hidden"
-      transition={{ type: 'spring', duration: 0.25, bounce: 0 }}
-    >
-      <p className="text-muted-foreground mb-4 text-sm font-medium">Hidden</p>
+    <BottomPanel title="Hidden">
       {/* gap-4 + grid-cols-4 + [grid-auto-rows:160px] matches RGL's margin/rowHeight exactly */}
       <div className="grid grid-cols-4 gap-4 [grid-auto-rows:160px]">
         <AnimatePresence>
@@ -83,6 +73,6 @@ export function HiddenPanel({ items, renderItem, onRestore }: HiddenPanelProps) 
           ))}
         </AnimatePresence>
       </div>
-    </motion.div>
+    </BottomPanel>
   )
 }

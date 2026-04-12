@@ -100,5 +100,9 @@ export type WorkspaceLayout = {
   version: 1
   widgetGrid: LayoutGridItem[]
   chatMode: ChatMode
-  theme?: { font: import('./themes').FontTheme }
+  theme?: {
+    font: import('./themes').FontTheme
+    background?: string
+    foreground?: string
+  }
 }

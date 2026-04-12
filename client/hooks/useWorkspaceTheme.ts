@@ -3,8 +3,11 @@ import { useEffect } from 'react'
 import { useWorkspaceStore } from '@/client/store/workspace'
 import { FONT_THEMES } from '@/lib/themes'
 
+const COLOR_OVERRIDES = ['background', 'foreground'] as const
+
 export function useWorkspaceTheme() {
-  const font = useWorkspaceStore(s => s.layout.theme?.font ?? 'system')
+  const theme = useWorkspaceStore(s => s.layout.theme)
+  const font = theme?.font ?? 'system'
 
   useEffect(() => {
     const config = FONT_THEMES[font] ?? FONT_THEMES.system
@@ -30,4 +33,16 @@ export function useWorkspaceTheme() {
       document.head.appendChild(link)
     }
   }, [font])
+
+  useEffect(() => {
+    const root = document.documentElement
+    for (const key of COLOR_OVERRIDES) {
+      const value = theme?.[key]
+      if (value) {
+        root.style.setProperty(`--${key}`, value)
+      } else {
+        root.style.removeProperty(`--${key}`)
+      }
+    }
+  }, [theme?.background, theme?.foreground])
 }
