@@ -105,28 +105,19 @@ const init = defineCommand({
 
     await mkdir(target, { recursive: true })
 
-    // Copy .claude/rules/ — overwrite existing files
-    const rulesTarget = join(target, '.claude', 'rules')
-    await mkdir(rulesTarget, { recursive: true })
-    await cp(join(TEMPLATE_DIR, '.claude', 'rules'), rulesTarget, { recursive: true, force: true })
-
-    // Copy .widgets/ — overwrite, skip .build and .workspace.json
-    const widgetsTarget = join(target, '.widgets')
-    await mkdir(widgetsTarget, { recursive: true })
-    await cp(join(TEMPLATE_DIR, '.widgets'), widgetsTarget, {
+    // Copy .claude/skills/ — overwrite existing files
+    const skillsTarget = join(target, '.claude', 'skills')
+    await mkdir(skillsTarget, { recursive: true })
+    await cp(join(TEMPLATE_DIR, '.claude', 'skills'), skillsTarget, {
       recursive: true,
-      force: true,
-      filter: src => {
-        const base = src.split('/').pop() ?? ''
-        return base !== '.build' && base !== '.workspace.json'
-      }
+      force: true
     })
 
     // Always register the workspace in the persistent registry
     const entry = await registerWorkspace(target)
 
     console.log('\n' + pc.green('✓') + ' Initialized ' + pc.bold(target))
-    console.log('  Copied .claude/rules/ and .widgets/\n')
+    console.log('  Skills installed — ask Claude to build a widget to get started\n')
 
     // If --web and server not running, start it (stay alive as wrapper)
     let running = await isServerRunning()
