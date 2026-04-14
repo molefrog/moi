@@ -4,16 +4,24 @@ import type { ChatMessage, ClientMessage } from '@/lib/types'
 
 let ws: WebSocket | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+let currentWorkspaceId = ''
 const queue: ClientMessage[] = []
 
-export function connectWs() {
+export function connectWs(workspaceId: string) {
+  // Reconnect if workspace changed
+  if (ws && currentWorkspaceId !== workspaceId) disconnectWs()
   if (ws) return
+
+  currentWorkspaceId = workspaceId
+
   if (reconnectTimer) {
     clearTimeout(reconnectTimer)
     reconnectTimer = null
   }
 
-  const socket = new WebSocket(`ws://${location.host}/ws`)
+  const socket = new WebSocket(
+    `ws://${location.host}/ws?workspace=${encodeURIComponent(workspaceId)}`
+  )
 
   socket.onopen = () => {
     ws = socket
@@ -40,8 +48,13 @@ export function connectWs() {
         return
       }
 
+      case 'workspace:switch': {
+        // Notify any registered handler (e.g. to navigate)
+        onWorkspaceSwitch?.(data.workspaceId as string)
+        return
+      }
+
       default: {
-        // Regular chat event — append by sessionId
         const sid = data.sessionId as string | undefined
         if (!sid) return
         store.append(sid, data as unknown as ChatMessage)
@@ -51,7 +64,7 @@ export function connectWs() {
 
   socket.onclose = () => {
     ws = null
-    reconnectTimer = setTimeout(connectWs, 1000)
+    reconnectTimer = setTimeout(() => connectWs(currentWorkspaceId), 1000)
   }
 
   socket.onerror = () => {
@@ -77,4 +90,10 @@ export function disconnectWs() {
     ws = null
   }
   queue.length = 0
+}
+
+let onWorkspaceSwitch: ((workspaceId: string) => void) | null = null
+
+export function setWorkspaceSwitchHandler(fn: ((workspaceId: string) => void) | null) {
+  onWorkspaceSwitch = fn
 }

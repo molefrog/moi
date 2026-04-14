@@ -36,6 +36,18 @@ export type ServerMessage =
   | (ChatMessage & { sessionId: string })
   | StatusMessage
   | SessionRenamedMessage
+  | WorkspaceSwitchMessage
+
+export type WorkspaceSwitchMessage = {
+  type: 'workspace:switch'
+  workspaceId: string
+}
+
+export type WorkspaceEntry = {
+  id: string
+  path: string
+  addedAt: string
+}
 
 export type SessionRenamedMessage = {
   type: 'session_renamed'

@@ -52,7 +52,9 @@ export async function extractWidgetConfig(srcPath: string): Promise<WidgetConfig
     (d): d is VariableDeclarator & { id: { type: 'Identifier'; name: string } } =>
       d.id.type === 'Identifier' && d.id.name === 'config'
   )
-  const init = decl?.init
+  const rawInit = decl?.init
+  // Unwrap `as const` — AST wraps the object in TSAsExpression
+  const init = rawInit?.type === 'TSAsExpression' ? rawInit.expression : rawInit
   if (init?.type !== 'ObjectExpression') return null
 
   const result: Partial<WidgetConfig> = {}

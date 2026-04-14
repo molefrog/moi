@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
 @import 'highlight.js/styles/github.css';
 
@@ -7,7 +8,6 @@
   background: transparent;
   padding: 0;
 }
-@import 'shadcn/tailwind.css';
 
 @plugin "@tailwindcss/typography";
 

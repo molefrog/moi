@@ -1,12 +1,18 @@
 import { listSessions } from '@anthropic-ai/claude-agent-sdk'
-import * as path from 'path'
 
 import type { ServerMessage, SessionInfo } from '@/lib/types'
 
-export const WORKSPACE = path.join(import.meta.dir, '..', 'workspace')
-export const cwd = WORKSPACE
+// Per-workspace connected chat clients
+const clientsByWorkspace = new Map<string, Set<Bun.ServerWebSocket<unknown>>>()
 
-export const clients = new Set<Bun.ServerWebSocket<unknown>>()
+export function addClient(workspaceId: string, ws: Bun.ServerWebSocket<unknown>) {
+  if (!clientsByWorkspace.has(workspaceId)) clientsByWorkspace.set(workspaceId, new Set())
+  clientsByWorkspace.get(workspaceId)!.add(ws)
+}
+
+export function removeClient(workspaceId: string, ws: Bun.ServerWebSocket<unknown>) {
+  clientsByWorkspace.get(workspaceId)?.delete(ws)
+}
 
 // Per-session agent state — the ONLY mutable state
 type Agent = { processing: boolean; abortController: AbortController | null }
@@ -24,15 +30,27 @@ export function renameAgent(from: string, to: string) {
   agents.delete(from)
 }
 
-export function getProcessingSessions(): string[] {
+export function getProcessingSessions(workspaceId: string): string[] {
+  // Agent state is keyed by sessionId globally; we return all processing ones
+  // (caller can filter by workspace if needed)
+  void workspaceId
   const result: string[] = []
   for (const [id, a] of agents) if (a.processing) result.push(id)
   return result
 }
 
-export function broadcast(msg: ServerMessage) {
+// Broadcast to all clients of a specific workspace
+export function broadcast(workspaceId: string, msg: ServerMessage) {
   const json = JSON.stringify(msg)
-  for (const ws of clients) ws.send(json)
+  for (const ws of clientsByWorkspace.get(workspaceId) ?? []) ws.send(json)
+}
+
+// Broadcast to every connected client across all workspaces
+export function broadcastAll(msg: ServerMessage) {
+  const json = JSON.stringify(msg)
+  for (const clients of clientsByWorkspace.values()) {
+    for (const ws of clients) ws.send(json)
+  }
 }
 
 export function sendToClient(ws: Bun.ServerWebSocket<unknown>, msg: ServerMessage) {
@@ -113,8 +131,8 @@ export function transformMessage(msg: {
   return result
 }
 
-export async function getSessions(): Promise<SessionInfo[]> {
-  const sessions = await listSessions({ dir: WORKSPACE })
+export async function getSessions(workspacePath: string): Promise<SessionInfo[]> {
+  const sessions = await listSessions({ dir: workspacePath })
   return sessions.map(s => ({
     sessionId: s.sessionId,
     summary: s.summary,

@@ -1,29 +1,32 @@
 import { type Options, query } from '@anthropic-ai/claude-agent-sdk'
 import type { McpServerStatus } from '@anthropic-ai/claude-agent-sdk'
-import * as path from 'path'
 
 import { broadcast, getAgent, renameAgent, transformMessage } from './state'
-
-const WORKSPACE = path.join(import.meta.dir, '..', 'workspace')
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message
   return 'Unknown error'
 }
 
-export async function handleChat(content: string, sessionId: string, isNew: boolean) {
+export async function handleChat(
+  content: string,
+  sessionId: string,
+  isNew: boolean,
+  workspaceId: string,
+  workspacePath: string
+) {
   const agent = getAgent(sessionId)
 
   if (agent.processing) {
-    broadcast({ type: 'error', sessionId, content: 'Already processing a message' })
+    broadcast(workspaceId, { type: 'error', sessionId, content: 'Already processing a message' })
     return
   }
 
   const ctrl = new AbortController()
   agent.processing = true
   agent.abortController = ctrl
-  broadcast({ type: 'status', sessionId, processing: true })
-  broadcast({ type: 'user', sessionId, content })
+  broadcast(workspaceId, { type: 'status', sessionId, processing: true })
+  broadcast(workspaceId, { type: 'user', sessionId, content })
 
   // currentId gets updated after system/init for new sessions
   let currentId = sessionId
@@ -32,7 +35,7 @@ export async function handleChat(content: string, sessionId: string, isNew: bool
     const options: Options = {
       abortController: ctrl,
       maxTurns: 50,
-      cwd: WORKSPACE,
+      cwd: workspacePath,
       model: 'sonnet',
       allowedTools: [
         'Bash',
@@ -60,22 +63,21 @@ export async function handleChat(content: string, sessionId: string, isNew: bool
       if (msg.type === 'system' && msg.subtype === 'init') {
         const realId = msg.session_id
 
-        // New session: migrate agent state from temp ID to real ID
         if (isNew && realId !== currentId) {
           renameAgent(currentId, realId)
-          broadcast({ type: 'session_renamed', from: currentId, to: realId })
+          broadcast(workspaceId, { type: 'session_renamed', from: currentId, to: realId })
           currentId = realId
         }
       }
 
       if (msg.type === 'assistant' || msg.type === 'user') {
         for (const m of transformMessage(msg)) {
-          broadcast({ ...m, sessionId: currentId })
+          broadcast(workspaceId, { ...m, sessionId: currentId })
         }
       }
 
       if (msg.type === 'result') {
-        broadcast({
+        broadcast(workspaceId, {
           type: 'done',
           sessionId: currentId,
           cost: msg.total_cost_usd,
@@ -86,32 +88,36 @@ export async function handleChat(content: string, sessionId: string, isNew: bool
     }
   } catch (err: unknown) {
     if (!(err instanceof Error && err.name === 'AbortError')) {
-      broadcast({ type: 'error', sessionId: currentId, content: getErrorMessage(err) })
+      broadcast(workspaceId, {
+        type: 'error',
+        sessionId: currentId,
+        content: getErrorMessage(err)
+      })
     }
   } finally {
-    // Look up by currentId (may have been renamed)
     const finalAgent = getAgent(currentId)
     finalAgent.processing = false
     finalAgent.abortController = null
-    broadcast({ type: 'status', sessionId: currentId, processing: false })
+    broadcast(workspaceId, { type: 'status', sessionId: currentId, processing: false })
   }
 }
 
-export function stopChat(sessionId: string) {
+export function stopChat(sessionId: string, workspaceId: string) {
   const agent = getAgent(sessionId)
   if (agent.abortController) {
     agent.abortController.abort()
-    broadcast({ type: 'stopped', sessionId })
+    broadcast(workspaceId, { type: 'stopped', sessionId })
   }
 }
 
-let mcpCache: McpServerStatus[] | null = null
+// Per-workspace MCP cache
+const mcpCache = new Map<string, McpServerStatus[]>()
 
-async function fetchMcpStatus(): Promise<McpServerStatus[]> {
+async function fetchMcpStatus(workspacePath: string): Promise<McpServerStatus[]> {
   const q = query({
     prompt: '',
     options: {
-      cwd: WORKSPACE,
+      cwd: workspacePath,
       persistSession: false,
       settingSources: ['user', 'project'],
       env: { ...process.env, CLAUDECODE: undefined }
@@ -123,7 +129,10 @@ async function fetchMcpStatus(): Promise<McpServerStatus[]> {
   return status
 }
 
-export async function getMcpStatus(): Promise<McpServerStatus[]> {
-  if (!mcpCache) mcpCache = await fetchMcpStatus()
-  return mcpCache
+export async function getMcpStatus(workspacePath: string): Promise<McpServerStatus[]> {
+  const cached = mcpCache.get(workspacePath)
+  if (cached) return cached
+  const status = await fetchMcpStatus(workspacePath)
+  mcpCache.set(workspacePath, status)
+  return status
 }

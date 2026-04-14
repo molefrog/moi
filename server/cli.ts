@@ -1,19 +1,205 @@
 #!/usr/bin/env bun
 import { defineCommand, runMain } from 'citty'
 import Table from 'cli-table3'
+import { cp, mkdir } from 'node:fs/promises'
+import { join, resolve } from 'path'
 import pc from 'picocolors'
 
 import { FONT_THEMES } from '@/lib/themes'
 import type { FontTheme } from '@/lib/themes'
 
 import { CONTROL_PORT, PORT } from './constants'
+import { registerWorkspace } from './registry'
 
-const serve = defineCommand({
-  meta: { description: 'Start web + control servers' },
-  async run() {
+// ---- helpers ----------------------------------------------------------------
+
+async function isServerRunning(): Promise<boolean> {
+  return new Promise(resolve => {
+    const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
+    const timer = setTimeout(() => {
+      ws.close()
+      resolve(false)
+    }, 600)
+    ws.onopen = () => {
+      clearTimeout(timer)
+      ws.close()
+      resolve(true)
+    }
+    ws.onerror = () => {
+      clearTimeout(timer)
+      resolve(false)
+    }
+  })
+}
+
+async function waitForServer(timeoutMs = 10_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (await isServerRunning()) return true
+    await Bun.sleep(200)
+  }
+  return false
+}
+
+async function registerViaControl(absPath: string): Promise<string> {
+  return new Promise((res, rej) => {
+    const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'workspace:register', path: absPath }))
+    ws.onmessage = event => {
+      const data = JSON.parse(String(event.data))
+      if (data.id) {
+        ws.close()
+        res(data.id)
+      }
+    }
+    ws.onerror = () => rej(new Error('Could not connect to control server'))
+  })
+}
+
+async function openBrowser(url: string) {
+  try {
+    if (process.platform === 'darwin') await Bun.$`open ${url}`.quiet()
+    else if (process.platform === 'linux') await Bun.$`xdg-open ${url}`.quiet()
+  } catch {}
+}
+
+// Spawn the server as a child with cwd=projectRoot so bunfig.toml is found at Bun startup.
+// bunfig.toml is read before any JS runs, so process.chdir() is too late.
+function spawnServer(
+  projectRoot: string,
+  hot: boolean,
+  env: Record<string, string | undefined> = process.env
+): ReturnType<typeof Bun.spawn> {
+  const bunFlags = hot ? ['--hot'] : []
+  return Bun.spawn(['bun', ...bunFlags, import.meta.filename, 'start'], {
+    stdin: 'inherit',
+    stdout: 'inherit',
+    stderr: 'inherit',
+    cwd: projectRoot,
+    env: { ...env, MOI_SERVER: '1' }
+  })
+}
+
+// Template dir: always resolved relative to this source file so symlinked bins work
+const TEMPLATE_DIR = join(import.meta.dir, '..', 'workspace')
+
+// ---- commands ---------------------------------------------------------------
+
+const init = defineCommand({
+  meta: { description: 'Initialize a workspace directory and optionally open it in the browser' },
+  args: {
+    dir: {
+      type: 'positional',
+      default: '.',
+      description: 'Target directory (default: current)'
+    },
+    web: {
+      type: 'boolean',
+      default: false,
+      description: 'Start the web server if not already running'
+    }
+  },
+  async run({ args }) {
+    const target = resolve(args.dir)
+    const projectRoot = join(import.meta.dir, '..')
+
+    await mkdir(target, { recursive: true })
+
+    // Copy .claude/rules/ — overwrite existing files
+    const rulesTarget = join(target, '.claude', 'rules')
+    await mkdir(rulesTarget, { recursive: true })
+    await cp(join(TEMPLATE_DIR, '.claude', 'rules'), rulesTarget, { recursive: true, force: true })
+
+    // Copy .widgets/ — overwrite, skip .build and .workspace.json
+    const widgetsTarget = join(target, '.widgets')
+    await mkdir(widgetsTarget, { recursive: true })
+    await cp(join(TEMPLATE_DIR, '.widgets'), widgetsTarget, {
+      recursive: true,
+      force: true,
+      filter: src => {
+        const base = src.split('/').pop() ?? ''
+        return base !== '.build' && base !== '.workspace.json'
+      }
+    })
+
+    // Always register the workspace in the persistent registry
+    const entry = await registerWorkspace(target)
+
+    console.log('\n' + pc.green('✓') + ' Initialized ' + pc.bold(target))
+    console.log('  Copied .claude/rules/ and .widgets/\n')
+
+    // If --web and server not running, start it (stay alive as wrapper)
+    let running = await isServerRunning()
+
+    if (!running && args.web) {
+      console.log(pc.dim('  Starting server…'))
+      const proc = spawnServer(projectRoot, false)
+      running = await waitForServer()
+      if (!running) {
+        console.error(pc.red('  Server failed to start\n'))
+        await proc.exited
+        process.exit(1)
+      }
+      const url = `http://localhost:${PORT}/workspace/${entry.id}`
+      console.log(pc.green('✓') + ' Server started on http://localhost:' + PORT)
+      console.log('  Opening ' + pc.bold(url))
+      console.log(pc.dim('  Press Ctrl+C to stop\n'))
+      await openBrowser(url)
+      await proc.exited
+      process.exit(proc.exitCode ?? 0)
+    }
+
+    if (running) {
+      // Server already running — notify it and open
+      await registerViaControl(target)
+      const url = `http://localhost:${PORT}/workspace/${entry.id}`
+      console.log('  Opening ' + pc.bold(url) + '\n')
+      await openBrowser(url)
+      process.exit(0)
+    }
+
+    // Server not running and --web not passed
+    console.log('  Run ' + pc.bold('moi start') + ' to open in the browser\n')
+  }
+})
+
+const start = defineCommand({
+  meta: { description: 'Start the moi web server' },
+  args: {
+    hot: {
+      type: 'boolean',
+      default: false,
+      description: 'Enable hot reload for server code (dev mode)'
+    },
+    port: {
+      type: 'string',
+      description: 'HTTP port to listen on (default: 3000)'
+    }
+  },
+  async run({ args }) {
+    const projectRoot = join(import.meta.dir, '..')
+
+    if (await isServerRunning()) {
+      console.log(
+        '\n' + pc.yellow('◆') + ' Server is already running on http://localhost:' + PORT + '\n'
+      )
+      process.exit(0)
+    }
+
+    // Spawn server with correct cwd so bunfig.toml is picked up at Bun startup.
+    // MOI_SERVER=1 tells the child it is the actual server process.
+    if (!process.env.MOI_SERVER) {
+      const env = args.port ? { ...process.env, PORT: args.port } : process.env
+      const proc = spawnServer(projectRoot, args.hot, env)
+      await proc.exited
+      process.exit(proc.exitCode ?? 0)
+    }
+
+    // This IS the server process (MOI_SERVER=1, cwd=projectRoot, bunfig.toml loaded)
     await import('./web')
-    console.log(`Web server on http://localhost:${PORT}`)
-    console.log(`Control server on port ${CONTROL_PORT}`)
+    console.log(`\n${pc.green('✓')} Server started on http://localhost:${PORT}`)
+    console.log(pc.dim('  Press Ctrl+C to stop\n'))
+    // Stay alive as the server
   }
 })
 
@@ -26,6 +212,11 @@ function colorStatus(status: string) {
 const bundle = defineCommand({
   meta: { description: 'Rebuild changed widgets' },
   args: {
+    dir: {
+      type: 'positional',
+      default: '.',
+      description: 'Workspace directory (default: current)'
+    },
     force: {
       type: 'boolean',
       description: 'Rebuild all widgets, ignoring file modification times',
@@ -33,9 +224,10 @@ const bundle = defineCommand({
     }
   },
   run({ args }) {
+    const path = resolve(args.dir)
     const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
 
-    ws.onopen = () => ws.send(JSON.stringify({ type: 'bundle', force: args.force }))
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'bundle', path, force: args.force }))
 
     ws.onmessage = event => {
       const results = JSON.parse(String(event.data))
@@ -72,12 +264,18 @@ const bundle = defineCommand({
 const theme = defineCommand({
   meta: { description: 'Show or set the workspace font theme' },
   args: {
+    dir: {
+      type: 'positional',
+      default: '.',
+      description: 'Workspace directory (default: current)'
+    },
     font: { type: 'string', description: 'Font theme key to apply' }
   },
   run({ args }) {
+    const path = resolve(args.dir)
     const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
 
-    ws.onopen = () => ws.send(JSON.stringify({ type: 'theme', font: args.font ?? null }))
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'theme', path, font: args.font ?? null }))
 
     ws.onmessage = event => {
       const res = JSON.parse(String(event.data))
@@ -102,10 +300,9 @@ const theme = defineCommand({
         process.exit(0)
       }
 
-      // Listing mode — show table
       const current: FontTheme = res.currentFont ?? 'system'
-      console.log('\n' + pc.bold('mei theme') + ' — workspace font themes')
-      console.log(pc.dim('  Usage: ./cmd theme --font=<key>') + '\n')
+      console.log('\n' + pc.bold('moi theme') + ' — workspace font themes')
+      console.log(pc.dim('  Usage: moi theme --font=<key>') + '\n')
 
       const table = new Table({
         head: ['', 'key', 'label', 'sans', 'mono', 'feel'].map(h => pc.bold(h)),
@@ -139,9 +336,49 @@ const theme = defineCommand({
   }
 })
 
+const status = defineCommand({
+  meta: { description: 'Show server status and registered workspaces' },
+  async run() {
+    const running = await isServerRunning()
+
+    if (!running) {
+      console.log('\n' + pc.dim('○') + ' Server is ' + pc.bold('not running') + '\n')
+      process.exit(0)
+    }
+
+    console.log(
+      '\n' +
+        pc.green('●') +
+        ' Server is ' +
+        pc.bold('running') +
+        pc.dim(`  (http port: ${PORT}, control port: ${CONTROL_PORT})`)
+    )
+
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
+
+      ws.onopen = () => ws.send(JSON.stringify({ type: 'workspace:list' }))
+
+      ws.onmessage = event => {
+        const res = JSON.parse(String(event.data))
+        const workspaces: { id: string; path: string; addedAt: string }[] = res.workspaces ?? []
+        const n = workspaces.length
+        console.log(pc.dim(`  ${n} workspace${n === 1 ? '' : 's'} registered\n`))
+
+        ws.close()
+        resolve()
+      }
+
+      ws.onerror = () => reject(new Error('Could not connect to control server'))
+    })
+
+    process.exit(0)
+  }
+})
+
 const main = defineCommand({
-  meta: { name: 'mei', version: '0.1.0', description: 'MEI widget system' },
-  subCommands: { serve, bundle, theme }
+  meta: { name: 'moi', version: '0.1.0', description: 'moi — local AI workspace' },
+  subCommands: { init, start, bundle, theme, status }
 })
 
 runMain(main)

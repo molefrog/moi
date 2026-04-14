@@ -8,12 +8,12 @@ import { PORT } from './constants'
 import './control'
 import { callFunction } from './functions'
 import { loadLayout, saveLayout } from './layout'
+import { discoverFromCC, getWorkspace, listWorkspaces, registerWorkspace } from './registry'
 import {
-  WORKSPACE,
-  clients,
-  cwd,
+  addClient,
   getProcessingSessions,
   getSessions,
+  removeClient,
   sendToClient,
   transformMessage
 } from './state'
@@ -21,7 +21,7 @@ import { listWidgets, serveWidget } from './widgets'
 
 const MEI_TOPIC = 'mei'
 
-type WsData = { channel: 'chat' | 'mei' }
+type WsData = { channel: 'chat' | 'mei'; workspaceId: string }
 
 function isClientMessage(value: unknown): value is ClientMessage {
   if (typeof value !== 'object' || value === null || !('type' in value)) return false
@@ -49,52 +49,95 @@ export const app = Bun.serve<WsData>({
   hostname: process.env.HOST ?? '127.0.0.1',
   development: { hmr: true },
   routes: {
+    // Client-side routes — serve the SPA shell
     '/': index,
-    '/_mei/:workspaceId/widgets': () => listWidgets(),
-    '/_mei/:workspaceId/widgets/*': req => {
-      const name = new URL(req.url).pathname.split('/').pop()?.replace(/\.js$/, '')
-      return name ? serveWidget(name) : new Response('Not found', { status: 404 })
+    '/workspace/*': index,
+
+    // Workspace registry API
+    '/api/workspaces': async req => {
+      if (req.method === 'GET') return Response.json(await listWorkspaces())
+      if (req.method === 'POST') {
+        const body = await req.json()
+        if (!body?.path) return new Response('Missing path', { status: 400 })
+        const entry = await registerWorkspace(String(body.path))
+        return Response.json(entry, { status: 201 })
+      }
+      return new Response('Method not allowed', { status: 405 })
     },
-    '/_mei/:workspaceId/sessions': async () => Response.json(await getSessions()),
+    '/api/workspaces/discover': async () => Response.json(await discoverFromCC()),
+
+    // Per-workspace MEI API
+    '/_mei/:workspaceId/widgets': async req => {
+      const ws = await getWorkspace(req.params.workspaceId)
+      if (!ws) return new Response('Workspace not found', { status: 404 })
+      return listWidgets(ws.path)
+    },
+    '/_mei/:workspaceId/widgets/*': async req => {
+      const ws = await getWorkspace(req.params.workspaceId)
+      if (!ws) return new Response('Workspace not found', { status: 404 })
+      const name = new URL(req.url).pathname.split('/').pop()?.replace(/\.js$/, '')
+      return name ? serveWidget(name, ws.path) : new Response('Not found', { status: 404 })
+    },
+    '/_mei/:workspaceId/sessions': async req => {
+      const ws = await getWorkspace(req.params.workspaceId)
+      if (!ws) return new Response('Workspace not found', { status: 404 })
+      return Response.json(await getSessions(ws.path))
+    },
     '/_mei/:workspaceId/sessions/:sessionId/messages': async req => {
+      const ws = await getWorkspace(req.params.workspaceId)
+      if (!ws) return new Response('Workspace not found', { status: 404 })
       const sid = req.params.sessionId
       try {
-        const raw = await getSessionMessages(sid, { dir: WORKSPACE })
+        const raw = await getSessionMessages(sid, { dir: ws.path })
         return Response.json(raw.flatMap(transformMessage))
       } catch {
         return Response.json([])
       }
     },
-    '/_mei/:workspaceId/mcp': async () => Response.json(await getMcpStatus()),
+    '/_mei/:workspaceId/mcp': async req => {
+      const ws = await getWorkspace(req.params.workspaceId)
+      if (!ws) return new Response('Workspace not found', { status: 404 })
+      return Response.json(await getMcpStatus(ws.path))
+    },
     '/_mei/:workspaceId/layout': async req => {
-      if (req.method === 'GET') return Response.json({ ...(await loadLayout()), cwd })
+      const ws = await getWorkspace(req.params.workspaceId)
+      if (!ws) return new Response('Workspace not found', { status: 404 })
+      if (req.method === 'GET') {
+        return Response.json({ ...(await loadLayout(ws.path)), cwd: ws.path })
+      }
       if (req.method === 'PUT') {
         const body = await req.json()
         if (!body || body.version !== 1) return new Response('Bad request', { status: 400 })
-        await saveLayout(body)
+        await saveLayout(body, ws.path)
         return new Response(null, { status: 204 })
       }
       return new Response('Method not allowed', { status: 405 })
     },
-    '/_mei/:workspaceId/fn/*': req => {
+    '/_mei/:workspaceId/fn/*': async req => {
       if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })
+      const ws = await getWorkspace(req.params.workspaceId)
+      if (!ws) return new Response('Workspace not found', { status: 404 })
       const prefix = `/_mei/${req.params.workspaceId}/fn/`
       const tail = new URL(req.url).pathname.slice(prefix.length)
-      return handleFunctionCall(req, tail)
+      return handleFunctionCall(req, tail, ws.path)
     }
   },
   fetch(req, server) {
-    const path = new URL(req.url).pathname
-    if (path === '/ws') return upgrade(server, req, { channel: 'chat' })
-    if (path === '/_mei/ws') return upgrade(server, req, { channel: 'mei' })
+    const url = new URL(req.url)
+    if (url.pathname === '/ws') {
+      const workspaceId = url.searchParams.get('workspace') ?? ''
+      return upgrade(server, req, { channel: 'chat', workspaceId })
+    }
+    if (url.pathname === '/_mei/ws') {
+      return upgrade(server, req, { channel: 'mei', workspaceId: '' })
+    }
     return new Response('Not found', { status: 404 })
   },
   websocket: {
     open(ws) {
       if (ws.data.channel === 'chat') {
-        clients.add(ws)
-        // Re-send current processing status for any active agents
-        for (const sid of getProcessingSessions()) {
+        addClient(ws.data.workspaceId, ws)
+        for (const sid of getProcessingSessions(ws.data.workspaceId)) {
           sendToClient(ws, { type: 'status', sessionId: sid, processing: true })
         }
       } else {
@@ -108,21 +151,33 @@ export const app = Bun.serve<WsData>({
         if (!isClientMessage(data)) return
 
         if (data.type === 'chat' && data.content?.trim()) {
-          handleChat(data.content.trim(), data.sessionId, data.isNew)
+          const workspace = await getWorkspace(ws.data.workspaceId)
+          if (!workspace) return
+          handleChat(
+            data.content.trim(),
+            data.sessionId,
+            data.isNew,
+            ws.data.workspaceId,
+            workspace.path
+          )
         }
         if (data.type === 'stop') {
-          stopChat(data.sessionId)
+          stopChat(data.sessionId, ws.data.workspaceId)
         }
       } catch {}
     },
     close(ws) {
-      if (ws.data.channel === 'chat') clients.delete(ws)
+      if (ws.data.channel === 'chat') removeClient(ws.data.workspaceId, ws)
       else ws.unsubscribe(MEI_TOPIC)
     }
   }
 })
 
-async function handleFunctionCall(req: Request, tail: string): Promise<Response> {
+async function handleFunctionCall(
+  req: Request,
+  tail: string,
+  workspacePath: string
+): Promise<Response> {
   const parts = tail.split('/')
   if (parts.length !== 2) return new Response('Bad request', { status: 400 })
 
@@ -137,7 +192,7 @@ async function handleFunctionCall(req: Request, tail: string): Promise<Response>
       return new Response('Request body too large', { status: 413 })
     }
     const args = await req.text()
-    const result = await callFunction(module, name, args)
+    const result = await callFunction(module, name, args, workspacePath)
     return new Response(result, { headers: { 'Content-Type': 'application/json' } })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'

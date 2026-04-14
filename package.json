@@ -1,10 +1,13 @@
 {
-  "name": "bun-react-template",
+  "name": "moi",
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "moi": "./server/cli.ts"
+  },
   "scripts": {
-    "dev": "bun --hot server/cli.ts serve",
+    "dev": "bun --hot server/web.ts",
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
     "format": "prettier --write .",
@@ -22,6 +25,7 @@
     "cli-table3": "^0.6.5",
     "clsx": "^2.1.1",
     "devalue": "^5.6.4",
+    "env-paths": "^4.0.0",
     "motion": "^12.35.1",
     "pathe": "^2.0.3",
     "picocolors": "^1.1.1",

@@ -18,11 +18,11 @@ export function useChat() {
   const messages = useSessionsStore(s => s.messages[activeSessionId ?? ''] ?? EMPTY)
   const processing = useSessionsStore(s => s.processing[activeSessionId ?? ''] ?? false)
 
-  // Persistent WS for live events
+  // Persistent WS for live events — reconnects if workspace changes
   useEffect(() => {
-    connectWs()
+    connectWs(workspaceId)
     return () => disconnectWs()
-  }, [])
+  }, [workspaceId])
 
   // When active session changes and we don't have its messages cached, fetch them
   useEffect(() => {

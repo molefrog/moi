@@ -6,30 +6,38 @@ import type { WidgetConfig, WidgetInfo } from '@/lib/types'
 import { buildWidget } from './build-widget'
 import { reloadModules } from './functions'
 
-const MEI_DIR = join(import.meta.dir, '..', 'workspace', 'mei')
-const SOURCE_DIR = MEI_DIR
-const BUILD_DIR = join(MEI_DIR, '.build', 'widgets')
-const MANIFEST_PATH = join(BUILD_DIR, 'manifest.json')
-
 const DEFAULT_CONFIG: WidgetConfig = { rowSpan: 1, colSpan: 2 }
 const VALID_SPANS = [1, 2, 3, 4]
 
-async function readManifest(): Promise<Record<string, WidgetConfig>> {
+function getWidgetPaths(workspacePath: string) {
+  const sourceDir = join(workspacePath, '.widgets')
+  const buildDir = join(sourceDir, '.build', 'widgets')
+  const manifestPath = join(buildDir, 'manifest.json')
+  return { sourceDir, buildDir, manifestPath }
+}
+
+async function readManifest(workspacePath: string): Promise<Record<string, WidgetConfig>> {
+  const { manifestPath } = getWidgetPaths(workspacePath)
   try {
-    const data = JSON.parse(await Bun.file(MANIFEST_PATH).text())
+    const data = JSON.parse(await Bun.file(manifestPath).text())
     return data.config ?? {}
   } catch {
     return {}
   }
 }
 
-async function writeManifest(configs: Record<string, WidgetConfig>): Promise<void> {
-  await Bun.write(MANIFEST_PATH, JSON.stringify({ config: configs }, null, 2))
+async function writeManifest(
+  workspacePath: string,
+  configs: Record<string, WidgetConfig>
+): Promise<void> {
+  const { manifestPath } = getWidgetPaths(workspacePath)
+  await Bun.write(manifestPath, JSON.stringify({ config: configs }, null, 2))
 }
 
-async function scanWidgets(): Promise<string[]> {
+async function scanWidgets(workspacePath: string): Promise<string[]> {
+  const { sourceDir } = getWidgetPaths(workspacePath)
   try {
-    const entries = await readdir(SOURCE_DIR)
+    const entries = await readdir(sourceDir)
     return entries
       .filter(f => /\.(tsx|ts)$/.test(f) && !f.endsWith('.server.ts'))
       .map(f => f.replace(/\.tsx?$/, ''))
@@ -38,27 +46,33 @@ async function scanWidgets(): Promise<string[]> {
   }
 }
 
-async function resolveWidgetSource(name: string): Promise<string | null> {
+async function resolveWidgetSource(workspacePath: string, name: string): Promise<string | null> {
+  const { sourceDir } = getWidgetPaths(workspacePath)
   for (const ext of ['.tsx', '.ts']) {
-    const path = join(SOURCE_DIR, `${name}${ext}`)
+    const path = join(sourceDir, `${name}${ext}`)
     if (await Bun.file(path).exists()) return path
   }
   return null
 }
 
-async function needsRebuild(name: string, srcPath: string): Promise<boolean> {
-  const built = Bun.file(join(BUILD_DIR, `${name}.js`))
+async function needsRebuild(
+  workspacePath: string,
+  name: string,
+  srcPath: string
+): Promise<boolean> {
+  const { buildDir } = getWidgetPaths(workspacePath)
+  const built = Bun.file(join(buildDir, `${name}.js`))
   if (!(await built.exists())) return true
   return Bun.file(srcPath).lastModified >= built.lastModified
 }
 
-// Remove built files that no longer have a source
-async function pruneStaleBuilds(sourceNames: Set<string>) {
-  const built = await listBuiltWidgets()
+async function pruneStaleBuilds(workspacePath: string, sourceNames: Set<string>) {
+  const built = await listBuiltWidgets(workspacePath)
+  const { buildDir } = getWidgetPaths(workspacePath)
   for (const name of built) {
     if (!sourceNames.has(name)) {
       try {
-        await unlink(join(BUILD_DIR, `${name}.js`))
+        await unlink(join(buildDir, `${name}.js`))
       } catch {}
     }
   }
@@ -72,38 +86,41 @@ export type WidgetBuildResult = {
   config?: WidgetConfig | null
 }
 
-export async function buildAllWidgets(force = false): Promise<WidgetBuildResult[]> {
+export async function buildAllWidgets(
+  workspacePath: string,
+  force = false
+): Promise<WidgetBuildResult[]> {
   const t0 = performance.now()
-  const names = await scanWidgets()
+  const { buildDir } = getWidgetPaths(workspacePath)
+  const names = await scanWidgets(workspacePath)
 
-  await mkdir(BUILD_DIR, { recursive: true })
-  await pruneStaleBuilds(new Set(names))
+  await mkdir(buildDir, { recursive: true })
+  await pruneStaleBuilds(workspacePath, new Set(names))
 
-  const manifest = await readManifest()
+  const manifest = await readManifest(workspacePath)
 
-  // Resolve + filter widgets in parallel (cheap)
   const jobs = await Promise.all(
     names.map(async name => {
-      const srcPath = await resolveWidgetSource(name)
+      const srcPath = await resolveWidgetSource(workspacePath, name)
       if (!srcPath) {
         return { name, status: 'failed' as const, error: 'Source file not found' }
       }
-      if (!force && !(await needsRebuild(name, srcPath))) {
+      if (!force && !(await needsRebuild(workspacePath, name, srcPath))) {
         return { name, status: 'skipped' as const }
       }
       return { name, srcPath, status: 'pending' as const }
     })
   )
 
-  // Build all pending widgets in parallel
   const buildResults = await Promise.all(
     jobs.map(async (job): Promise<WidgetBuildResult> => {
       if (job.status === 'failed') return { name: job.name, status: 'failed', error: job.error }
       if (job.status === 'skipped') return { name: job.name, status: 'skipped' }
 
+      const { buildDir: bd } = getWidgetPaths(workspacePath)
       try {
         const artifact = await buildWidget(job.srcPath!)
-        await Bun.write(join(BUILD_DIR, `${job.name}.js`), artifact.js)
+        await Bun.write(join(bd, `${job.name}.js`), artifact.js)
         manifest[job.name] = artifact.config ?? DEFAULT_CONFIG
         return {
           name: job.name,
@@ -121,12 +138,11 @@ export async function buildAllWidgets(force = false): Promise<WidgetBuildResult[
     })
   )
 
-  // Prune manifest entries for deleted widgets
   for (const key of Object.keys(manifest)) {
     if (!names.includes(key)) delete manifest[key]
   }
 
-  await writeManifest(manifest)
+  await writeManifest(workspacePath, manifest)
 
   const builtCount = buildResults.filter(r => r.status === 'built').length
   console.log(
@@ -137,17 +153,21 @@ export async function buildAllWidgets(force = false): Promise<WidgetBuildResult[
   return buildResults
 }
 
-export async function listBuiltWidgets(): Promise<string[]> {
+export async function listBuiltWidgets(workspacePath: string): Promise<string[]> {
+  const { buildDir } = getWidgetPaths(workspacePath)
   try {
-    const entries = await readdir(BUILD_DIR)
+    const entries = await readdir(buildDir)
     return entries.filter(f => f.endsWith('.js')).map(f => f.replace(/\.js$/, ''))
   } catch {
     return []
   }
 }
 
-async function getWidgetList(): Promise<WidgetInfo[]> {
-  const [names, manifest] = await Promise.all([scanWidgets(), readManifest()])
+async function getWidgetList(workspacePath: string): Promise<WidgetInfo[]> {
+  const [names, manifest] = await Promise.all([
+    listBuiltWidgets(workspacePath),
+    readManifest(workspacePath)
+  ])
   return names.map(id => {
     const raw = manifest[id] ?? {}
     const rowSpan = VALID_SPANS.includes(raw.rowSpan) ? raw.rowSpan : DEFAULT_CONFIG.rowSpan
@@ -156,15 +176,19 @@ async function getWidgetList(): Promise<WidgetInfo[]> {
   })
 }
 
-export async function listWidgets(): Promise<Response> {
-  return Response.json({ widgets: await getWidgetList() })
+export async function listWidgets(workspacePath: string): Promise<Response> {
+  return Response.json({ widgets: await getWidgetList(workspacePath) })
 }
 
-export async function handleBundle(publish: (msg: unknown) => void, force = false) {
-  const before = new Set(await listBuiltWidgets())
-  const manifestBefore = await readManifest()
-  const results = await buildAllWidgets(force)
-  const after = new Set(await listBuiltWidgets())
+export async function handleBundle(
+  publish: (msg: unknown) => void,
+  workspacePath: string,
+  force = false
+) {
+  const before = new Set(await listBuiltWidgets(workspacePath))
+  const manifestBefore = await readManifest(workspacePath)
+  const results = await buildAllWidgets(workspacePath, force)
+  const after = new Set(await listBuiltWidgets(workspacePath))
 
   const configChanged = results.some(r => {
     if (r.status !== 'built' || !r.config) return false
@@ -187,29 +211,28 @@ export async function handleBundle(publish: (msg: unknown) => void, force = fals
   }
 
   if (changedServerModules.size > 0) {
-    reloadModules([...changedServerModules])
+    reloadModules([...changedServerModules], workspacePath)
   }
 
   if (layoutChanged) {
-    const widgets = await getWidgetList()
+    const widgets = await getWidgetList(workspacePath)
     publish({ type: 'widget-layout:updated', widgets })
   }
 
   return results
 }
 
-export async function serveWidget(name: string): Promise<Response> {
+export async function serveWidget(name: string, workspacePath: string): Promise<Response> {
   if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
     return new Response('Invalid widget name', { status: 400 })
   }
 
-  const buildPath = join(BUILD_DIR, `${name}.js`)
+  const { buildDir } = getWidgetPaths(workspacePath)
+  const buildPath = join(buildDir, `${name}.js`)
   const file = Bun.file(buildPath)
 
   if (!(await file.exists())) {
-    return new Response(`Widget "${name}" not built. Run: ./mei/cmd bundle`, {
-      status: 404
-    })
+    return new Response(`Widget "${name}" not built. Run: moi bundle`, { status: 404 })
   }
 
   return new Response(file, {

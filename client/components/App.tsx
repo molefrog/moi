@@ -1,4 +1,7 @@
+import { useEffect } from 'react'
+
 import { IconLoader2 } from '@tabler/icons-react'
+import { Route, Switch, useLocation } from 'wouter'
 
 import { useCanFitSidebar } from '@/client/hooks/useCanFitSidebar'
 import { useChat } from '@/client/hooks/useChat'
@@ -7,6 +10,7 @@ import { useWidgetSync } from '@/client/hooks/useWidgetSync'
 import { useWorkspaceTheme } from '@/client/hooks/useWorkspaceTheme'
 import { Workspace } from '@/client/lib/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
+import { setWorkspaceSwitchHandler } from '@/client/lib/ws'
 import { useSessionsStore } from '@/client/store/sessions'
 import { useWidgetsStore } from '@/client/store/widgets'
 import { useWorkspaceStore } from '@/client/store/workspace'
@@ -14,27 +18,41 @@ import { useWorkspaceStore } from '@/client/store/workspace'
 import { ChatPanel } from './ChatPanel'
 import { ChatPopup } from './ChatPopup'
 import { Widgets } from './Widgets'
+import { WorkspacesPage } from './WorkspacesPage'
 
-export function AppLoader() {
+// Top-level router — sets up all client-side routes
+export function AppRouter() {
+  const [, navigate] = useLocation()
+
+  // When the server broadcasts a workspace:switch (e.g. from `moi start`),
+  // navigate to that workspace
+  useEffect(() => {
+    setWorkspaceSwitchHandler(id => navigate(`/workspace/${id}`))
+    return () => setWorkspaceSwitchHandler(null)
+  }, [navigate])
+
   return (
-    <Workspace id="default">
-      <AppLoaderInner />
-    </Workspace>
+    <Switch>
+      <Route path="/" component={WorkspacesPage} />
+      <Route path="/workspace/:id">
+        {(params: { id: string }) => (
+          <Workspace id={params.id}>
+            <WorkspaceLoader />
+          </Workspace>
+        )}
+      </Route>
+    </Switch>
   )
 }
 
-function AppLoaderInner() {
+function WorkspaceLoader() {
   const workspaceStatus = useWorkspaceStore(s => s.status)
   const widgetsStatus = useWidgetsStore(s => s.status)
   const sessionsStatus = useSessionsStore(s => s.status)
 
-  // Syncs widget list and grid layout when bundles change
   useWidgetSync()
-
-  // Applies font theme CSS vars
   useWorkspaceTheme()
 
-  // Reload layout when theme or other server-side changes occur
   useMeiEvent(e => {
     if (e.type === 'theme:updated') {
       const { id } = useWorkspaceStore.getState()

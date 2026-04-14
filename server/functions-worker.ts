@@ -3,7 +3,8 @@
 import { parse, stringify } from 'devalue'
 import { join } from 'path'
 
-const MEI_DIR = process.env.MEI_FUNCTIONS_DIR ?? join(import.meta.dir, '..', 'workspace', 'mei')
+const MEI_DIR =
+  process.env.MEI_FUNCTIONS_DIR ?? join(import.meta.dir, '..', 'test-workspace', '.widgets')
 
 const moduleCache = new Map<string, Record<string, unknown>>()
 

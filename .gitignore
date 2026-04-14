@@ -36,11 +36,11 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Playwright MCP
 .playwright-mcp/
 
-# workspace (agent working directory)
-workspace/mei
-!workspace/mei/README.md
-!workspace/mei/DESIGN.md
-!workspace/mei/package.json
-!workspace/mei/bun.lock
-!workspace/mei/cmd
+# workspace template — ignore build artifacts and local state
+workspace/.widgets/.build
+workspace/.widgets/.workspace.json
+workspace/.env
+
+# test-workspace is gitignored entirely (local dev only, create with: moi init test-workspace)
+test-workspace/
 

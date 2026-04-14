@@ -4,8 +4,8 @@ import { join } from 'path'
 const WORKER_PATH = join(import.meta.dir, 'functions-worker.ts')
 const CALL_TIMEOUT_MS = 30_000
 
-function getMeiDir() {
-  return process.env.MEI_FUNCTIONS_DIR ?? join(import.meta.dir, '..', 'workspace', 'mei')
+function getMeiDir(workspacePath: string) {
+  return join(workspacePath, '.widgets')
 }
 
 type Pending = {
@@ -17,6 +17,7 @@ type Pending = {
 let worker: ReturnType<typeof Bun.spawn> | null = null
 let readyPromise: Promise<void> | null = null
 let spawning = false
+let currentWorkspacePath: string | null = null
 const pending = new Map<string, Pending>()
 
 function rejectAll(reason: string) {
@@ -28,14 +29,26 @@ function rejectAll(reason: string) {
   }
 }
 
-function spawn() {
+function killWorker() {
+  if (worker) {
+    try {
+      worker.kill()
+    } catch {}
+    worker = null
+    readyPromise = null
+    spawning = false
+  }
+  rejectAll('Worker killed for workspace switch')
+}
+
+function spawn(workspacePath: string) {
   if (spawning) return
   spawning = true
 
   let readyResolve: () => void
   readyPromise = new Promise(r => (readyResolve = r))
 
-  const meiDir = getMeiDir()
+  const meiDir = getMeiDir(workspacePath)
   worker = Bun.spawn([process.execPath, WORKER_PATH], {
     cwd: meiDir,
     env: { ...process.env, MEI_FUNCTIONS_DIR: meiDir },
@@ -74,13 +87,23 @@ function spawn() {
   })
 }
 
-async function ensureWorker() {
-  if (!worker && !spawning) spawn()
+async function ensureWorker(workspacePath: string) {
+  if (!worker && !spawning) spawn(workspacePath)
   await readyPromise
 }
 
-export async function callFunction(module: string, name: string, args: string): Promise<string> {
-  await ensureWorker()
+export async function callFunction(
+  module: string,
+  name: string,
+  args: string,
+  workspacePath: string
+): Promise<string> {
+  if (workspacePath !== currentWorkspacePath) {
+    killWorker()
+    currentWorkspacePath = workspacePath
+  }
+
+  await ensureWorker(workspacePath)
 
   const id = crypto.randomUUID()
   return new Promise((resolve, reject) => {
@@ -102,7 +125,11 @@ export async function callFunction(module: string, name: string, args: string): 
   })
 }
 
-export function reloadModules(modules: string[]) {
+export function reloadModules(modules: string[], workspacePath: string) {
+  if (workspacePath !== currentWorkspacePath) {
+    killWorker()
+    currentWorkspacePath = workspacePath
+  }
   if (worker && modules.length > 0) {
     try {
       worker.send({ type: 'reload', modules })
