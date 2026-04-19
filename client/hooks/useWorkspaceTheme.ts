@@ -7,10 +7,10 @@ const COLOR_OVERRIDES = ['background', 'foreground'] as const
 
 export function useWorkspaceTheme() {
   const theme = useWorkspaceStore(s => s.layout.theme)
-  const font = theme?.font ?? 'system'
+  const font = theme?.font ?? 'default'
 
   useEffect(() => {
-    const config = FONT_THEMES[font] ?? FONT_THEMES.system
+    const config = FONT_THEMES[font] ?? FONT_THEMES.default
 
     document.documentElement.style.setProperty('--font-sans', config.sans)
     document.documentElement.style.setProperty('--font-mono', config.mono)

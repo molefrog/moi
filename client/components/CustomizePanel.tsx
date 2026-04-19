@@ -1,9 +1,28 @@
+import { useEffect } from 'react'
+
 import { cn } from '@/client/lib/cn'
 import { useWorkspaceStore } from '@/client/store/workspace'
 import { FONT_THEMES } from '@/lib/themes'
 import type { FontTheme } from '@/lib/types'
 
 import { BottomPanel } from './BottomPanel'
+
+const ALL_FONT_PREVIEW_ID = 'mei-font-previews'
+const ALL_FONTS_QUERY = Object.values(FONT_THEMES)
+  .map(f => f.googleFontsQuery)
+  .filter(Boolean)
+  .join('&family=')
+
+function usePreloadAllFonts() {
+  useEffect(() => {
+    if (document.getElementById(ALL_FONT_PREVIEW_ID)) return
+    const link = document.createElement('link')
+    link.id = ALL_FONT_PREVIEW_ID
+    link.rel = 'stylesheet'
+    link.href = `https://fonts.googleapis.com/css2?family=${ALL_FONTS_QUERY}&display=swap`
+    document.head.appendChild(link)
+  }, [])
+}
 
 const FONT_OPTIONS = Object.entries(FONT_THEMES) as [FontTheme, (typeof FONT_THEMES)[FontTheme]][]
 
@@ -28,8 +47,9 @@ function presetMatches(preset: ColorPreset, bg?: string, fg?: string): boolean {
 }
 
 export function CustomizePanel() {
+  usePreloadAllFonts()
   const { layout, setLayout } = useWorkspaceStore()
-  const currentFont = layout.theme?.font ?? 'system'
+  const currentFont = layout.theme?.font ?? 'default'
   const currentBg = layout.theme?.background
   const currentFg = layout.theme?.foreground
 
@@ -42,19 +62,20 @@ export function CustomizePanel() {
       <div className="flex flex-col gap-6">
         {/* Font picker */}
         <div className="flex flex-col gap-2">
-          <p className="text-muted-foreground text-xs">Font</p>
-          <div className="grid grid-cols-4 gap-2">
+          <p className="text-muted-foreground text-xs font-medium">Font</p>
+          <div className="grid grid-cols-3 gap-2">
             {FONT_OPTIONS.map(([key, config]) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => setTheme({ font: key })}
                 className={cn(
-                  'flex flex-col items-start rounded-xl border px-3 py-2 text-left transition-colors',
+                  'flex flex-col items-start rounded-md px-3 py-2 text-left transition-colors',
                   key === currentFont
-                    ? 'border-primary bg-primary/5'
+                    ? 'ring-primary bg-primary/5 ring-2'
                     : 'hover:bg-muted border-transparent'
                 )}
+                style={{ fontFamily: config.sans }}
               >
                 <span className="text-sm font-medium">{config.label}</span>
                 <span className="text-muted-foreground text-xs">{config.feel}</span>
@@ -65,8 +86,8 @@ export function CustomizePanel() {
 
         {/* Color palette */}
         <div className="flex flex-col gap-2">
-          <p className="text-muted-foreground text-xs">Colors</p>
-          <div className="flex flex-wrap gap-2">
+          <p className="text-muted-foreground text-xs font-medium">Colors</p>
+          <div className="grid grid-cols-3 gap-2">
             {COLOR_PRESETS.map(preset => {
               const active = presetMatches(preset, currentBg, currentFg)
               return (
@@ -77,8 +98,10 @@ export function CustomizePanel() {
                     setTheme({ background: preset.background, foreground: preset.foreground })
                   }
                   className={cn(
-                    'flex items-center gap-2 rounded-xl border px-3 py-2 transition-colors',
-                    active ? 'border-primary bg-primary/5' : 'hover:bg-muted border-transparent'
+                    'flex items-center gap-2 rounded-md border px-3 py-2 transition-colors',
+                    active
+                      ? 'ring-primary bg-primary/5 ring-2'
+                      : 'hover:bg-muted border-transparent'
                   )}
                 >
                   <span

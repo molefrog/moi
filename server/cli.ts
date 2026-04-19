@@ -299,7 +299,7 @@ const theme = defineCommand({
         process.exit(0)
       }
 
-      const current: FontTheme = res.currentFont ?? 'system'
+      const current: FontTheme = res.currentFont ?? 'default'
       console.log('\n' + pc.bold('moi theme') + ' — workspace font themes')
       console.log(pc.dim('  Usage: moi theme --font=<key>') + '\n')
 

@@ -59,7 +59,7 @@ export const control = Bun.serve({
           const workspacePath = String(data.path ?? workspaces[0].path)
           const layout = await loadLayout(workspacePath)
           if (!data.font) {
-            ws.send(JSON.stringify({ currentFont: layout.theme?.font ?? 'system' }))
+            ws.send(JSON.stringify({ currentFont: layout.theme?.font ?? 'default' }))
             return
           }
           if (!(data.font in FONT_THEMES)) {
