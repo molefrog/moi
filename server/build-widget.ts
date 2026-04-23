@@ -226,6 +226,15 @@ function injectCss(js: string, css: string, widgetName: string): string {
   return injection + '\n' + js
 }
 
+function formatBuildLog(log: BuildMessage | ResolveMessage): string {
+  const prefix = log.level === 'error' ? 'error' : log.level
+  const loc = log.position
+    ? `${log.position.file}:${log.position.line}:${log.position.column}: `
+    : ''
+  const lineText = log.position?.lineText ? `\n    ${log.position.lineText.trim()}` : ''
+  return `${loc}${prefix}: ${log.message}${lineText}`
+}
+
 async function prevalidateServerFiles(entrypoint: string): Promise<void> {
   const sourceDir = dirname(entrypoint)
   const source = await Bun.file(entrypoint).text()
@@ -248,17 +257,30 @@ export async function buildWidget(entrypoint: string): Promise<WidgetArtifact> {
 
   const { plugin: serverProxy, serverModules } = serverProxyPlugin(sourceDir)
 
-  const result = await Bun.build({
-    entrypoints: ['__widget-entry'],
-    format: 'esm',
-    target: 'browser',
-    sourcemap: 'inline',
-    external: EXTERNAL_MODULES,
-    plugins: [widgetEntryPlugin(entrypoint), serverProxy, tailwind]
-  })
+  let result: Awaited<ReturnType<typeof Bun.build>>
+  try {
+    result = await Bun.build({
+      entrypoints: ['__widget-entry'],
+      format: 'esm',
+      target: 'browser',
+      sourcemap: 'inline',
+      external: EXTERNAL_MODULES,
+      plugins: [widgetEntryPlugin(entrypoint), serverProxy, tailwind]
+    })
+  } catch (err) {
+    // Bun.build throws AggregateError on failure (default throw: true).
+    // The message is a generic "Bundle failed"; the real diagnostics live on `.errors`.
+    const logs = (err as { errors?: (BuildMessage | ResolveMessage)[] }).errors ?? []
+    const formatted = logs.length
+      ? logs.map(formatBuildLog).join('\n')
+      : err instanceof Error
+        ? err.message
+        : String(err)
+    throw new Error(`Build failed for "${widgetName}":\n${formatted}`)
+  }
 
   if (!result.success) {
-    const errors = result.logs.map(l => l.message).join('\n')
+    const errors = result.logs.map(formatBuildLog).join('\n')
     throw new Error(`Build failed for "${widgetName}":\n${errors}`)
   }
 
