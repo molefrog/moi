@@ -145,10 +145,15 @@ export async function buildAllWidgets(
   await writeManifest(workspacePath, manifest)
 
   const builtCount = buildResults.filter(r => r.status === 'built').length
+  const failed = buildResults.filter(r => r.status === 'failed')
   console.log(
     `[bundle] ${builtCount}/${names.length} built in ${Math.round(performance.now() - t0)}ms` +
+      (failed.length ? `, ${failed.length} failed` : '') +
       (force ? ' (forced)' : '')
   )
+  for (const r of failed) {
+    console.error(`[bundle] ${r.name}:\n${r.error}`)
+  }
 
   return buildResults
 }

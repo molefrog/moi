@@ -70,7 +70,10 @@ export const control = Bun.serve({
           publishMei({ type: 'theme:updated' })
           ws.send(JSON.stringify({ ok: true, font: data.font }))
         }
-      } catch {}
+      } catch (err) {
+        console.error('[control]', err)
+        ws.send(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }))
+      }
     }
   }
 })

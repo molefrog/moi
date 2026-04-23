@@ -86,7 +86,10 @@ const TEMPLATE_DIR = join(import.meta.dir, '..', 'workspace')
 // ---- commands ---------------------------------------------------------------
 
 const init = defineCommand({
-  meta: { description: 'Initialize a workspace directory and optionally open it in the browser' },
+  meta: {
+    name: 'init',
+    description: 'Initialize workspace, copy skills and scaffold folder with widgets'
+  },
   args: {
     dir: {
       type: 'positional',
@@ -102,6 +105,7 @@ const init = defineCommand({
   async run({ args }) {
     const target = resolve(args.dir)
     const projectRoot = join(import.meta.dir, '..')
+    const isInteractive = process.stdout.isTTY
 
     await mkdir(target, { recursive: true })
 
@@ -133,19 +137,23 @@ const init = defineCommand({
       }
       const url = `http://localhost:${PORT}/workspace/${entry.id}`
       console.log(pc.green('✓') + ' Server started on http://localhost:' + PORT)
-      console.log('  Opening ' + pc.bold(url))
+      if (isInteractive) console.log('  Opening ' + pc.bold(url))
       console.log(pc.dim('  Press Ctrl+C to stop\n'))
-      await openBrowser(url)
+      if (isInteractive) await openBrowser(url)
       await proc.exited
       process.exit(proc.exitCode ?? 0)
     }
 
     if (running) {
-      // Server already running — notify it and open
+      // Server already running — notify it and open (browser only in interactive mode)
       await registerViaControl(target)
       const url = `http://localhost:${PORT}/workspace/${entry.id}`
-      console.log('  Opening ' + pc.bold(url) + '\n')
-      await openBrowser(url)
+      if (isInteractive) {
+        console.log('  Opening ' + pc.bold(url) + '\n')
+        await openBrowser(url)
+      } else {
+        console.log('  Ready at ' + pc.bold(url) + '\n')
+      }
       process.exit(0)
     }
 
@@ -155,7 +163,7 @@ const init = defineCommand({
 })
 
 const start = defineCommand({
-  meta: { description: 'Start the moi web server' },
+  meta: { name: 'start', description: 'Start the moi web server' },
   args: {
     hot: {
       type: 'boolean',
@@ -201,7 +209,7 @@ function colorStatus(status: string) {
 }
 
 const bundle = defineCommand({
-  meta: { description: 'Rebuild changed widgets' },
+  meta: { name: 'bundle', description: 'Rebuild changed widgets' },
   args: {
     dir: {
       type: 'positional',
@@ -253,7 +261,7 @@ const bundle = defineCommand({
 })
 
 const theme = defineCommand({
-  meta: { description: 'Show or set the workspace font theme' },
+  meta: { name: 'theme', description: 'Show or set the workspace font theme' },
   args: {
     dir: {
       type: 'positional',
@@ -328,7 +336,7 @@ const theme = defineCommand({
 })
 
 const status = defineCommand({
-  meta: { description: 'Show server status and registered workspaces' },
+  meta: { name: 'status', description: 'Show server status and registered workspaces' },
   async run() {
     const running = await isServerRunning()
 
@@ -368,7 +376,7 @@ const status = defineCommand({
 })
 
 const main = defineCommand({
-  meta: { name: 'moi', version: '0.1.0', description: 'moi — local AI workspace' },
+  meta: { name: 'moi', description: 'moi — local AI workspace' },
   subCommands: { init, start, bundle, theme, status }
 })
 
