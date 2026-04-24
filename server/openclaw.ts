@@ -10,6 +10,39 @@ export type OpenClawAgent = {
   lastRunAt?: string
 }
 
+// Subset of the session row returned by `sessions.list`. The gateway ships
+// more fields, but these are the ones we map to our SessionInfo/StreamEvent.
+export type OpenClawSessionRow = {
+  key: string
+  sessionId: string
+  updatedAt: number
+  lastMessagePreview?: string
+  displayName?: string
+  label?: string
+  model?: string
+  modelProvider?: string
+  status?: string
+}
+
+// Shape returned by `sessions.get({ key })` — the full transcript, unlike
+// `sessions.preview` which is capped at ~11 items regardless of maxChars.
+export type OpenClawContentBlock =
+  | { type: 'text'; text: string; textSignature?: string }
+  | { type: 'thinking'; thinking: string; thinkingSignature?: string }
+  | { type: 'toolCall'; id: string; name: string; arguments: unknown }
+  | { type: string; [k: string]: unknown }
+
+export type OpenClawMessage = {
+  role: 'user' | 'assistant' | 'toolResult' | string
+  content: OpenClawContentBlock[] | string
+  timestamp?: number
+  __openclaw?: { id?: string; seq?: number }
+}
+
+export type OpenClawSessionDetail = {
+  messages: OpenClawMessage[]
+}
+
 const TIMEOUT_MS = 2000
 
 type AgentsList = {
@@ -43,23 +76,27 @@ function parseIdentityName(md: string | undefined): string | undefined {
   return m ? m[1].trim() : undefined
 }
 
-export async function discoverOpenClawAgents(): Promise<OpenClawAgent[]> {
+type Rpc = <T>(method: string, params?: Record<string, unknown>) => Promise<T>
+
+// Connect, hand the scoped `rpc(method, params)` to `fn`, then stop the client.
+// Any connect/auth/timeout failure → returns `null` silently (caller's choice).
+async function withGatewayClient<T>(fn: (rpc: Rpc) => Promise<T>): Promise<T | null> {
   let cfg: { gateway?: { port?: number; auth?: { token?: string } } }
   try {
     const raw = await readFile(join(homedir(), '.openclaw/openclaw.json'), 'utf8')
     cfg = JSON.parse(raw)
   } catch {
-    return []
+    return null
   }
   const port = cfg.gateway?.port
   const token = cfg.gateway?.auth?.token
-  if (!port || !token) return []
+  if (!port || !token) return null
 
   let GatewayClient: typeof import('openclaw/plugin-sdk/gateway-runtime').GatewayClient
   try {
     ;({ GatewayClient } = await import('openclaw/plugin-sdk/gateway-runtime'))
   } catch {
-    return []
+    return null
   }
 
   const client = new GatewayClient({
@@ -78,10 +115,18 @@ export async function discoverOpenClawAgents(): Promise<OpenClawAgent[]> {
   try {
     client.start()
     await withTimeout(connect, TIMEOUT_MS, 'connect')
+    const rpc: Rpc = (method, params = {}) =>
+      withTimeout(client.request(method, params), TIMEOUT_MS, method)
+    return await fn(rpc)
+  } catch {
+    return null
+  } finally {
+    client.stop()
+  }
+}
 
-    const rpc = <T>(method: string, params: Record<string, unknown> = {}) =>
-      withTimeout(client.request(method, params) as Promise<T>, TIMEOUT_MS, method)
-
+export async function discoverOpenClawAgents(): Promise<OpenClawAgent[]> {
+  const out = await withGatewayClient(async rpc => {
     const [agents, sessions] = await Promise.all([
       rpc<AgentsList>('agents.list'),
       rpc<SessionsList>('sessions.list', { includeGlobal: true })
@@ -89,10 +134,7 @@ export async function discoverOpenClawAgents(): Promise<OpenClawAgent[]> {
 
     const identities = await Promise.all(
       agents.agents.map(a =>
-        rpc<FileGet>('agents.files.get', {
-          agentId: a.id,
-          name: 'IDENTITY.md'
-        }).catch(() => null)
+        rpc<FileGet>('agents.files.get', { agentId: a.id, name: 'IDENTITY.md' }).catch(() => null)
       )
     )
 
@@ -114,9 +156,51 @@ export async function discoverOpenClawAgents(): Promise<OpenClawAgent[]> {
         lastRunAt: ts ? new Date(ts).toISOString() : undefined
       }
     })
-  } catch {
-    return []
-  } finally {
-    client.stop()
-  }
+  })
+  return out ?? []
+}
+
+// Resolve an OpenClaw agentId for a workspace path. Used when the saved
+// workspace entry was registered before we started capturing agentId.
+async function resolveAgentIdForPath(rpc: Rpc, path: string): Promise<string | undefined> {
+  const agents = await rpc<AgentsList>('agents.list')
+  return agents.agents.find(a => resolve(a.workspace) === resolve(path))?.id
+}
+
+export async function getOpenClawSessions(
+  workspacePath: string,
+  agentId?: string
+): Promise<OpenClawSessionRow[]> {
+  const out = await withGatewayClient(async rpc => {
+    const id = agentId ?? (await resolveAgentIdForPath(rpc, workspacePath))
+    if (!id) return []
+    const res = await rpc<{ sessions: OpenClawSessionRow[] }>('sessions.list', {
+      agentId: id,
+      includeLastMessage: true
+    })
+    return res.sessions
+  })
+  return out ?? []
+}
+
+export async function getOpenClawSessionMessages(
+  sessionId: string,
+  workspacePath: string,
+  agentId?: string
+): Promise<OpenClawSessionDetail | null> {
+  const out = await withGatewayClient(async rpc => {
+    const id = agentId ?? (await resolveAgentIdForPath(rpc, workspacePath))
+    if (!id) return null
+
+    // sessionId → key. `sessions.get` needs the composite key, not sessionId.
+    const resolved = await rpc<{ key?: string }>('sessions.resolve', {
+      sessionId,
+      agentId: id
+    }).catch(() => null)
+    const key = resolved?.key
+    if (!key) return null
+
+    return await rpc<OpenClawSessionDetail>('sessions.get', { key })
+  })
+  return out ?? null
 }

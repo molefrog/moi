@@ -6,6 +6,8 @@ import { PORT } from './constants'
 import './control'
 import { callFunction } from './functions'
 import { loadLayout, saveLayout } from './layout'
+import { getOpenClawSessionMessages, getOpenClawSessions } from './openclaw'
+import { toSessionInfo, toStreamEvents } from './openclaw-adapter'
 import {
   discoverWorkspaces,
   getWorkspace,
@@ -108,11 +110,19 @@ export const app = Bun.serve<WsData>({
     '/_mei/:workspaceId/sessions': async req => {
       const ws = await getWorkspace(req.params.workspaceId)
       if (!ws) return new Response('Workspace not found', { status: 404 })
+      if (ws.type === 'openclaw') {
+        const rows = await getOpenClawSessions(ws.path, ws.agentId)
+        return Response.json(rows.map(r => toSessionInfo(r, ws.path)))
+      }
       return Response.json(await getSessions(ws.path))
     },
     '/_mei/:workspaceId/sessions/:sessionId/events': async req => {
       const ws = await getWorkspace(req.params.workspaceId)
       if (!ws) return new Response('Workspace not found', { status: 404 })
+      if (ws.type === 'openclaw') {
+        const preview = await getOpenClawSessionMessages(req.params.sessionId, ws.path, ws.agentId)
+        return Response.json(toStreamEvents(preview))
+      }
       return Response.json(await getSessionEvents(req.params.sessionId, ws.path))
     },
     '/_mei/:workspaceId/mcp': async req => {
