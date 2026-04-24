@@ -1,16 +1,9 @@
 import { type Options, query } from '@anthropic-ai/claude-agent-sdk'
 import type { McpServerStatus } from '@anthropic-ai/claude-agent-sdk'
-import { appendFile } from 'node:fs/promises'
 
 import { ClaudeAdapter } from '@/lib/claude-adapter'
 
 import { broadcast, getAgent, renameAgent } from './state'
-
-const RAW_LOG_PATH = `${process.cwd()}/workspace/raw-sdk-messages.jsonl`
-
-async function appendRawLog(entry: unknown) {
-  await appendFile(RAW_LOG_PATH, JSON.stringify(entry) + '\n')
-}
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message
@@ -74,8 +67,6 @@ export async function handleChat(
     const q = query({ prompt: content, options })
 
     for await (const msg of q) {
-      await appendRawLog({ ts: new Date().toISOString(), sessionId: currentId, msg })
-
       if (msg.type === 'system' && msg.subtype === 'init') {
         const realId = msg.session_id
         if (isNew && realId !== currentId) {
