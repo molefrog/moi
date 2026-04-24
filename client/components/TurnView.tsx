@@ -420,5 +420,17 @@ function formatInputBrief(
   if (tool === 'Glob') return shorten(getInputValue(input, 'pattern'))
   if (tool === 'Grep')
     return `/${getInputValue(input, 'pattern')}/ ${shorten(getInputValue(input, 'path'))}`
+  if (tool === 'update_plan') {
+    const plan = input.plan
+    if (Array.isArray(plan)) {
+      const inProgress = plan.find(
+        (p): p is { step: string } =>
+          !!p && typeof p === 'object' && (p as { status?: unknown }).status === 'in_progress'
+      )
+      const step = inProgress?.step ?? (plan[0] as { step?: unknown })?.step
+      if (typeof step === 'string') return step
+    }
+    return ''
+  }
   return ''
 }
