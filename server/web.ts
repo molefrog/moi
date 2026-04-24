@@ -1,5 +1,3 @@
-import { getSessionMessages } from '@anthropic-ai/claude-agent-sdk'
-
 import type { ClientMessage } from '@/lib/types'
 
 import index from '../client/index.html'
@@ -12,10 +10,10 @@ import { discoverFromCC, getWorkspace, listWorkspaces, registerWorkspace } from 
 import {
   addClient,
   getProcessingSessions,
+  getSessionEvents,
   getSessions,
   removeClient,
-  sendToClient,
-  transformMessage
+  sendToClient
 } from './state'
 import { listWidgets, serveWidget } from './widgets'
 
@@ -25,12 +23,19 @@ type WsData = { channel: 'chat' | 'mei'; workspaceId: string }
 
 function isClientMessage(value: unknown): value is ClientMessage {
   if (typeof value !== 'object' || value === null || !('type' in value)) return false
-  const v = value as { type: string; sessionId?: unknown; content?: unknown; isNew?: unknown }
+  const v = value as {
+    type: string
+    sessionId?: unknown
+    content?: unknown
+    isNew?: unknown
+    optimisticId?: unknown
+  }
   if (v.type === 'chat')
     return (
       typeof v.content === 'string' &&
       typeof v.sessionId === 'string' &&
-      typeof v.isNew === 'boolean'
+      typeof v.isNew === 'boolean' &&
+      (v.optimisticId === undefined || typeof v.optimisticId === 'string')
     )
   if (v.type === 'stop') return typeof v.sessionId === 'string'
   return false
@@ -83,16 +88,10 @@ export const app = Bun.serve<WsData>({
       if (!ws) return new Response('Workspace not found', { status: 404 })
       return Response.json(await getSessions(ws.path))
     },
-    '/_mei/:workspaceId/sessions/:sessionId/messages': async req => {
+    '/_mei/:workspaceId/sessions/:sessionId/events': async req => {
       const ws = await getWorkspace(req.params.workspaceId)
       if (!ws) return new Response('Workspace not found', { status: 404 })
-      const sid = req.params.sessionId
-      try {
-        const raw = await getSessionMessages(sid, { dir: ws.path })
-        return Response.json(raw.flatMap(transformMessage))
-      } catch {
-        return Response.json([])
-      }
+      return Response.json(await getSessionEvents(req.params.sessionId, ws.path))
     },
     '/_mei/:workspaceId/mcp': async req => {
       const ws = await getWorkspace(req.params.workspaceId)
@@ -158,7 +157,8 @@ export const app = Bun.serve<WsData>({
             data.sessionId,
             data.isNew,
             ws.data.workspaceId,
-            workspace.path
+            workspace.path,
+            data.optimisticId
           )
         }
         if (data.type === 'stop') {

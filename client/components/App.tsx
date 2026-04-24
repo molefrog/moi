@@ -75,7 +75,7 @@ function WorkspaceLoader() {
 }
 
 function App() {
-  const { messages, input, setInput, processing, send, stop, switchThread } = useChat()
+  const { view, input, setInput, processing, send, stop, switchThread } = useChat()
   const { layout, setLayout } = useWorkspaceStore()
   const { widgets } = useWidgetsStore()
   const canFitSidebar = useCanFitSidebar()
@@ -92,7 +92,7 @@ function App() {
 
   const chatPanel = (
     <ChatPanel
-      messages={messages}
+      view={view}
       input={input}
       setInput={setInput}
       processing={processing}
@@ -132,7 +132,7 @@ function App() {
         <ChatPopup defaultOpen={layout.chatMode === 'floating' && canFitSidebar}>
           {onClose => (
             <ChatPanel
-              messages={messages}
+              view={view}
               input={input}
               setInput={setInput}
               processing={processing}

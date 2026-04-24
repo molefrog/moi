@@ -4,11 +4,11 @@ import { IconChevronsRight, IconSelector, IconX } from '@tabler/icons-react'
 
 import { useScrollFade } from '@/client/hooks/useScrollFade'
 import { cn } from '@/client/lib/cn'
-import type { ChatMessage } from '@/lib/types'
+import type { ViewState } from '@/lib/types'
 
 import { ChatInput } from './ChatInput'
-import { EmptyState, MessageBlock, ThinkingIndicator } from './MessageBlock'
 import { ThreadSelector } from './ThreadSelector'
+import { EmptyState, ThinkingIndicator, TurnView } from './TurnView'
 import { Button } from './ui/button'
 import {
   DropdownMenu,
@@ -59,7 +59,7 @@ function ChatModeIconFloating({ className }: ChatModeIconProps) {
 }
 
 type ChatPanelProps = {
-  messages: ChatMessage[]
+  view: ViewState
   input: string
   setInput: (v: string) => void
   processing: boolean
@@ -73,7 +73,7 @@ type ChatPanelProps = {
 }
 
 export function ChatPanel({
-  messages,
+  view,
   input,
   setInput,
   processing,
@@ -86,12 +86,13 @@ export function ChatPanel({
   onClose
 }: ChatPanelProps) {
   const { ref: scrollRef, showTopFade, showBottomFade } = useScrollFade()
+  const turns = view.turns
 
   useEffect(() => {
     const ref = chatMode === 'solo' ? document.body : scrollRef.current
 
     ref?.scrollTo({ top: ref.scrollHeight, behavior: 'instant' })
-  }, [scrollRef, messages, chatMode])
+  }, [scrollRef, turns, chatMode])
 
   const TriggerIcon = chatMode === 'sidebar' ? ChatModeIconSidebar : ChatModeIconFloating
 
@@ -160,9 +161,9 @@ export function ChatPanel({
           chatMode !== 'solo' && !showTopFade && showBottomFade && 'mask-fade-bottom'
         )}
       >
-        {messages.length === 0 && !processing && <EmptyState />}
-        {messages.map((msg, i) => (
-          <MessageBlock key={i} msg={msg} messages={messages} index={i} />
+        {turns.length === 0 && !processing && <EmptyState />}
+        {turns.map(turn => (
+          <TurnView key={turn.id} turn={turn} />
         ))}
         {processing && <ThinkingIndicator />}
       </div>

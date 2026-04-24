@@ -1,7 +1,16 @@
 import { type Options, query } from '@anthropic-ai/claude-agent-sdk'
 import type { McpServerStatus } from '@anthropic-ai/claude-agent-sdk'
+import { appendFile } from 'node:fs/promises'
 
-import { broadcast, getAgent, renameAgent, transformMessage } from './state'
+import { ClaudeAdapter } from '@/lib/claude-adapter'
+
+import { broadcast, getAgent, renameAgent } from './state'
+
+const RAW_LOG_PATH = `${process.cwd()}/workspace/raw-sdk-messages.jsonl`
+
+async function appendRawLog(entry: unknown) {
+  await appendFile(RAW_LOG_PATH, JSON.stringify(entry) + '\n')
+}
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message
@@ -13,12 +22,17 @@ export async function handleChat(
   sessionId: string,
   isNew: boolean,
   workspaceId: string,
-  workspacePath: string
+  workspacePath: string,
+  optimisticId?: string
 ) {
   const agent = getAgent(sessionId)
 
   if (agent.processing) {
-    broadcast(workspaceId, { type: 'error', sessionId, content: 'Already processing a message' })
+    broadcast(workspaceId, {
+      kind: 'error',
+      sessionId,
+      content: 'Already processing a message'
+    })
     return
   }
 
@@ -26,10 +40,10 @@ export async function handleChat(
   agent.processing = true
   agent.abortController = ctrl
   broadcast(workspaceId, { type: 'status', sessionId, processing: true })
-  broadcast(workspaceId, { type: 'user', sessionId, content })
 
-  // currentId gets updated after system/init for new sessions
   let currentId = sessionId
+  const adapter = new ClaudeAdapter()
+  if (optimisticId) adapter.expectUserEcho(optimisticId, content)
 
   try {
     const options: Options = {
@@ -60,9 +74,10 @@ export async function handleChat(
     const q = query({ prompt: content, options })
 
     for await (const msg of q) {
+      await appendRawLog({ ts: new Date().toISOString(), sessionId: currentId, msg })
+
       if (msg.type === 'system' && msg.subtype === 'init') {
         const realId = msg.session_id
-
         if (isNew && realId !== currentId) {
           renameAgent(currentId, realId)
           broadcast(workspaceId, { type: 'session_renamed', from: currentId, to: realId })
@@ -70,26 +85,14 @@ export async function handleChat(
         }
       }
 
-      if (msg.type === 'assistant' || msg.type === 'user') {
-        for (const m of transformMessage(msg)) {
-          broadcast(workspaceId, { ...m, sessionId: currentId })
-        }
-      }
-
-      if (msg.type === 'result') {
-        broadcast(workspaceId, {
-          type: 'done',
-          sessionId: currentId,
-          cost: msg.total_cost_usd,
-          turns: msg.num_turns,
-          session_id: msg.session_id
-        })
+      for (const ev of adapter.ingest(msg)) {
+        broadcast(workspaceId, { ...ev, sessionId: currentId })
       }
     }
   } catch (err: unknown) {
     if (!(err instanceof Error && err.name === 'AbortError')) {
       broadcast(workspaceId, {
-        type: 'error',
+        kind: 'error',
         sessionId: currentId,
         content: getErrorMessage(err)
       })
@@ -106,7 +109,7 @@ export function stopChat(sessionId: string, workspaceId: string) {
   const agent = getAgent(sessionId)
   if (agent.abortController) {
     agent.abortController.abort()
-    broadcast(workspaceId, { type: 'stopped', sessionId })
+    broadcast(workspaceId, { kind: 'stopped', sessionId })
   }
 }
 

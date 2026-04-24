@@ -1,24 +1,37 @@
 import { create } from 'zustand'
 
-import type { ChatMessage, SessionInfo } from '@/lib/types'
+import { applyEvent, emptyViewState } from '@/lib/format'
+import type { SessionInfo, StreamEvent, ViewState } from '@/lib/types'
 
 type SessionsStore = {
-  messages: Record<string, ChatMessage[]>
+  events: Record<string, StreamEvent[]>
+  views: Record<string, ViewState>
   processing: Record<string, boolean>
   list: SessionInfo[]
   status: 'loading' | 'ready' | 'error'
   initialSessionId: string | null
-  setMessages: (sessionId: string, msgs: ChatMessage[]) => void
-  append: (sessionId: string, msg: ChatMessage) => void
+  setEvents: (sessionId: string, evs: StreamEvent[]) => void
+  append: (sessionId: string, ev: StreamEvent) => void
   setProcessing: (sessionId: string, value: boolean) => void
   renameSession: (from: string, to: string) => void
   loadList: (workspaceId: string) => Promise<void>
-  loadMessages: (workspaceId: string, sessionId: string) => Promise<void>
+  loadEvents: (workspaceId: string, sessionId: string) => Promise<void>
   loadInitial: (workspaceId: string) => Promise<void>
 }
 
+async function fetchEvents(workspaceId: string, sessionId: string): Promise<StreamEvent[]> {
+  const res = await fetch(`/_mei/${workspaceId}/sessions/${sessionId}/events`)
+  if (!res.ok) return []
+  return (await res.json()) as StreamEvent[]
+}
+
+function materialize(events: StreamEvent[]): ViewState {
+  return events.reduce(applyEvent, emptyViewState())
+}
+
 export const useSessionsStore = create<SessionsStore>()(set => ({
-  messages: {},
+  events: {},
+  views: {},
   processing: {},
   list: [],
   status: 'loading',
@@ -33,16 +46,14 @@ export const useSessionsStore = create<SessionsStore>()(set => ({
     } catch {}
   },
 
-  loadMessages: async (workspaceId: string, sessionId: string) => {
-    try {
-      const res = await fetch(`/_mei/${workspaceId}/sessions/${sessionId}/messages`)
-      if (!res.ok) return
-      const msgs: ChatMessage[] = await res.json()
-      set(s => ({ messages: { ...s.messages, [sessionId]: msgs } }))
-    } catch {}
+  loadEvents: async (workspaceId: string, sessionId: string) => {
+    const evs = await fetchEvents(workspaceId, sessionId)
+    set(s => ({
+      events: { ...s.events, [sessionId]: evs },
+      views: { ...s.views, [sessionId]: materialize(evs) }
+    }))
   },
 
-  // Initial app load: fetch sessions list + messages for the latest session in parallel
   loadInitial: async (workspaceId: string) => {
     try {
       const listRes = await fetch(`/_mei/${workspaceId}/sessions`)
@@ -55,13 +66,12 @@ export const useSessionsStore = create<SessionsStore>()(set => ({
       }
 
       const latestId = list[0].sessionId
-      const msgsRes = await fetch(`/_mei/${workspaceId}/sessions/${latestId}/messages`)
-      if (!msgsRes.ok) throw new Error()
-      const msgs: ChatMessage[] = await msgsRes.json()
+      const evs = await fetchEvents(workspaceId, latestId)
 
       set(s => ({
         list,
-        messages: { ...s.messages, [latestId]: msgs },
+        events: { ...s.events, [latestId]: evs },
+        views: { ...s.views, [latestId]: materialize(evs) },
         status: 'ready',
         initialSessionId: latestId
       }))
@@ -70,31 +80,42 @@ export const useSessionsStore = create<SessionsStore>()(set => ({
     }
   },
 
-  setMessages: (sessionId, msgs) => set(s => ({ messages: { ...s.messages, [sessionId]: msgs } })),
-
-  append: (sessionId, msg) =>
+  setEvents: (sessionId, evs) =>
     set(s => ({
-      messages: {
-        ...s.messages,
-        [sessionId]: [...(s.messages[sessionId] ?? []), msg]
-      }
+      events: { ...s.events, [sessionId]: evs },
+      views: { ...s.views, [sessionId]: materialize(evs) }
     })),
+
+  append: (sessionId, ev) =>
+    set(s => {
+      const prior = s.events[sessionId] ?? []
+      const priorView = s.views[sessionId] ?? emptyViewState()
+      return {
+        events: { ...s.events, [sessionId]: [...prior, ev] },
+        views: { ...s.views, [sessionId]: applyEvent(priorView, ev) }
+      }
+    }),
 
   setProcessing: (sessionId, value) =>
     set(s => ({ processing: { ...s.processing, [sessionId]: value } })),
 
   renameSession: (from, to) =>
     set(s => {
-      const messages = { ...s.messages }
+      const events = { ...s.events }
+      const views = { ...s.views }
       const processing = { ...s.processing }
-      if (from in messages) {
-        messages[to] = messages[from]
-        delete messages[from]
+      if (from in events) {
+        events[to] = events[from]
+        delete events[from]
+      }
+      if (from in views) {
+        views[to] = views[from]
+        delete views[from]
       }
       if (from in processing) {
         processing[to] = processing[from]
         delete processing[from]
       }
-      return { messages, processing }
+      return { events, views, processing }
     })
 }))

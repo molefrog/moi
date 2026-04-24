@@ -1,49 +1,43 @@
-import { useEffect, useState } from 'react'
-
-import { IconClockHour4, IconDots, IconLoader2, IconPlus } from '@tabler/icons-react'
+import { IconDots, IconLoader2, IconPlus } from '@tabler/icons-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'wouter'
 
+import claudeIcon from '@/client/assets/claude.svg'
+import { Button } from '@/client/components/ui/button'
 import { cn } from '@/client/lib/cn'
 import type { WorkspaceEntry } from '@/lib/types'
 
-type PageState = 'loading' | 'ready' | 'error'
+const workspacesKey = ['workspaces'] as const
+const discoverKey = ['workspaces', 'discover'] as const
 
 export function WorkspacesPage() {
-  const [workspaces, setWorkspaces] = useState<WorkspaceEntry[]>([])
-  const [discovered, setDiscovered] = useState<string[]>([])
-  const [state, setState] = useState<PageState>('loading')
-  const [importing, setImporting] = useState<string | null>(null)
+  const workspacesQuery = useQuery<WorkspaceEntry[]>({
+    queryKey: workspacesKey,
+    queryFn: () => fetch('/api/workspaces').then(r => r.json())
+  })
 
-  useEffect(() => {
-    Promise.all([
-      fetch('/api/workspaces').then(r => r.json()),
-      fetch('/api/workspaces/discover').then(r => r.json())
-    ])
-      .then(([ws, disc]) => {
-        setWorkspaces(ws)
-        setDiscovered(disc)
-        setState('ready')
-      })
-      .catch(() => setState('error'))
-  }, [])
+  const discoveredQuery = useQuery<string[]>({
+    queryKey: discoverKey,
+    queryFn: () => fetch('/api/workspaces/discover').then(r => r.json())
+  })
 
-  async function importWorkspace(path: string) {
-    setImporting(path)
-    try {
+  const qc = useQueryClient()
+  const importMutation = useMutation<WorkspaceEntry, Error, string>({
+    mutationFn: async path => {
       const res = await fetch('/api/workspaces', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path })
       })
-      const entry: WorkspaceEntry = await res.json()
-      setWorkspaces(prev => [...prev, entry])
-      setDiscovered(prev => prev.filter(p => p !== path))
-    } finally {
-      setImporting(null)
+      return res.json()
+    },
+    onSuccess: (entry, path) => {
+      qc.setQueryData<WorkspaceEntry[]>(workspacesKey, prev => [...(prev ?? []), entry])
+      qc.setQueryData<string[]>(discoverKey, prev => (prev ?? []).filter(p => p !== path))
     }
-  }
+  })
 
-  if (state === 'loading') {
+  if (workspacesQuery.isPending || discoveredQuery.isPending) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <IconLoader2 size={20} stroke={1.5} className="text-muted-foreground animate-spin" />
@@ -51,7 +45,7 @@ export function WorkspacesPage() {
     )
   }
 
-  if (state === 'error') {
+  if (workspacesQuery.isError || discoveredQuery.isError) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <p className="text-muted-foreground text-sm">Could not load workspaces.</p>
@@ -59,13 +53,16 @@ export function WorkspacesPage() {
     )
   }
 
+  const workspaces = workspacesQuery.data
+  const discovered = discoveredQuery.data
   const count = workspaces.length
+  const importingPath = importMutation.isPending ? importMutation.variables : null
 
   return (
     <div className="mx-auto w-full max-w-3xl px-8 pb-16 pt-14">
       <header className="mb-10 flex flex-col gap-1.5">
-        <h1 className="text-foreground text-[22px] font-semibold tracking-tight">Workspaces</h1>
-        <p className="text-muted-foreground text-[14px]">
+        <h1 className="text-foreground text-xl font-semibold tracking-tight">Workspaces</h1>
+        <p className="text-muted-foreground text-sm">
           {count} connected workspace{count === 1 ? '' : 's'}
         </p>
       </header>
@@ -89,12 +86,10 @@ export function WorkspacesPage() {
       {discovered.length > 0 && (
         <section>
           <div className="mb-4">
-            <h2 className="text-foreground mb-1.5 text-[15px] font-semibold">
-              Found on your machine
-            </h2>
-            <p className="text-muted-foreground text-[13px]">
+            <h2 className="text-foreground mb-1.5 text-sm font-semibold">Found on your machine</h2>
+            <p className="text-muted-foreground text-xs">
               Discovered via{' '}
-              <span className="text-foreground/70 font-mono text-[12px]">~/.claude/projects</span>
+              <span className="text-foreground/70 font-mono">~/.claude/projects</span>
             </p>
           </div>
           <ul className="border-border border-t">
@@ -102,8 +97,8 @@ export function WorkspacesPage() {
               <SuggestedRow
                 key={path}
                 path={path}
-                onAdd={importWorkspace}
-                loading={importing === path}
+                onAdd={p => importMutation.mutate(p)}
+                loading={importingPath === path}
               />
             ))}
           </ul>
@@ -133,26 +128,25 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
-            <IconClockHour4 size={14} stroke={1.8} className="shrink-0 text-[#C96B3F]" />
-            <span className="text-foreground truncate text-[15px] font-semibold tracking-[-0.005em]">
-              {name}
-            </span>
+            <img src={claudeIcon} alt="" aria-hidden className="size-4 shrink-0" />
+            <span className="text-foreground truncate text-sm font-semibold">{name}</span>
           </div>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={e => {
               e.preventDefault()
               e.stopPropagation()
             }}
-            className="text-muted-foreground hover:bg-muted flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md"
+            className="text-muted-foreground -mr-1 -mt-0.5"
             aria-label="More actions"
           >
-            <IconDots size={14} stroke={2} />
-          </button>
+            <IconDots stroke={1.5} />
+          </Button>
         </div>
-        <div className="text-muted-foreground truncate font-mono text-[11px]">{workspace.path}</div>
+        <div className="text-muted-foreground truncate font-mono text-xs">{workspace.path}</div>
         <div className="flex-1" />
-        <div className="text-muted-foreground text-[11px]">{meta}</div>
+        <div className="text-muted-foreground text-xs">{meta}</div>
       </div>
     </Link>
   )
@@ -160,13 +154,13 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
 
 function PreviewSkeleton() {
   return (
-    <div className="bg-muted flex h-[92px] w-[92px] shrink-0 flex-col gap-[5px] rounded-lg p-2">
+    <div className="bg-muted flex size-24 shrink-0 flex-col gap-1 rounded-lg p-2">
       <div className="flex h-2 items-center gap-1">
-        <div className="bg-muted-foreground/25 h-2 w-2 rounded-full" />
+        <div className="bg-muted-foreground/25 size-2 rounded-full" />
         <div className="bg-muted-foreground/25 h-1 flex-1 rounded-[2px]" />
       </div>
-      <div className="flex flex-1 gap-[5px]">
-        <div className="flex w-[18px] flex-col gap-[3px]">
+      <div className="flex flex-1 gap-1">
+        <div className="flex w-4 flex-col gap-0.5">
           <div className="bg-muted-foreground/25 h-1 w-full rounded-[2px]" />
           <div className="bg-muted-foreground/25 h-1 w-full rounded-[2px]" />
           <div className="bg-muted-foreground/15 h-1 w-full rounded-[2px]" />
@@ -176,7 +170,7 @@ function PreviewSkeleton() {
             <div className="bg-muted-foreground/25 h-3.5 flex-[2] rounded-[3px]" />
             <div className="bg-muted-foreground/15 h-3.5 flex-1 rounded-[3px]" />
           </div>
-          <div className="bg-muted-foreground/15 h-[18px] rounded-[3px]" />
+          <div className="bg-muted-foreground/15 h-4 rounded-[3px]" />
           <div className="bg-foreground/10 h-2.5 rounded-[3px]" />
         </div>
       </div>
@@ -194,27 +188,19 @@ function SuggestedRow({ path, onAdd, loading }: SuggestedRowProps) {
   const name = path.split('/').pop() || path
   return (
     <li className="border-border flex items-center gap-3 border-b px-1 py-2.5">
-      <IconClockHour4 size={14} stroke={1.8} className="shrink-0 text-[#C96B3F]/70" />
-      <span className="text-foreground/80 shrink-0 text-[13px] font-medium">{name}</span>
-      <span className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-[11px]">
+      <img src={claudeIcon} alt="" aria-hidden className="size-4 shrink-0 opacity-70" />
+      <span className="text-foreground/80 shrink-0 text-sm font-medium">{name}</span>
+      <span className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs">
         {path}
       </span>
-      <button
-        type="button"
-        onClick={() => onAdd(path)}
-        disabled={loading}
-        className={cn(
-          'border-border bg-background text-foreground hover:bg-muted inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-medium',
-          'disabled:opacity-50'
-        )}
-      >
+      <Button variant="outline" size="sm" onClick={() => onAdd(path)} disabled={loading}>
         {loading ? (
-          <IconLoader2 size={10} stroke={2} className="animate-spin" />
+          <IconLoader2 stroke={1.5} className="animate-spin" />
         ) : (
-          <IconPlus size={10} stroke={2} />
+          <IconPlus stroke={1.5} />
         )}
         Add
-      </button>
+      </Button>
     </li>
   )
 }

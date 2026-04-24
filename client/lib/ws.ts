@@ -1,6 +1,6 @@
 import { useSessionsStore } from '@/client/store/sessions'
 import { useWorkspaceStore } from '@/client/store/workspace'
-import type { ChatMessage, ClientMessage } from '@/lib/types'
+import type { ClientMessage, StreamEvent } from '@/lib/types'
 
 let ws: WebSocket | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -34,32 +34,35 @@ export function connectWs(workspaceId: string) {
     const store = useSessionsStore.getState()
     const workspace = useWorkspaceStore.getState()
 
-    switch (data.type) {
-      case 'status': {
-        store.setProcessing(data.sessionId as string, data.processing as boolean)
-        return
-      }
-
-      case 'session_renamed': {
-        const from = data.from as string
-        const to = data.to as string
-        store.renameSession(from, to)
-        if (workspace.activeSessionId === from) workspace.setActiveSession(to)
-        return
-      }
-
-      case 'workspace:switch': {
-        // Notify any registered handler (e.g. to navigate)
-        onWorkspaceSwitch?.(data.workspaceId as string)
-        return
-      }
-
-      default: {
-        const sid = data.sessionId as string | undefined
-        if (!sid) return
-        store.append(sid, data as unknown as ChatMessage)
-      }
+    // Control frames first
+    if (data.type === 'status') {
+      store.setProcessing(data.sessionId as string, data.processing as boolean)
+      return
     }
+    if (data.type === 'session_renamed') {
+      const from = data.from as string
+      const to = data.to as string
+      store.renameSession(from, to)
+      if (workspace.activeSessionId === from) workspace.setActiveSession(to)
+      return
+    }
+    if (data.type === 'workspace:switch') {
+      onWorkspaceSwitch?.(data.workspaceId as string)
+      return
+    }
+
+    // StreamEvent frames are tagged by `kind` and carry a sessionId
+    const sid = data.sessionId as string | undefined
+    if (!sid) return
+    if (
+      data.kind === 'snapshot' ||
+      data.kind === 'turn' ||
+      data.kind === 'notice' ||
+      data.kind === 'result'
+    ) {
+      store.append(sid, data as unknown as StreamEvent)
+    }
+    // `error` and `stopped` frames are ignored for now by the UI — surface later if needed
   }
 
   socket.onclose = () => {

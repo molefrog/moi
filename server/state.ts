@@ -1,6 +1,7 @@
-import { listSessions } from '@anthropic-ai/claude-agent-sdk'
+import { getSessionMessages, listSessions } from '@anthropic-ai/claude-agent-sdk'
 
-import type { ServerMessage, SessionInfo } from '@/lib/types'
+import { ClaudeAdapter } from '@/lib/claude-adapter'
+import type { ServerMessage, SessionInfo, StreamEvent } from '@/lib/types'
 
 // Per-workspace connected chat clients
 const clientsByWorkspace = new Map<string, Set<Bun.ServerWebSocket<unknown>>>()
@@ -31,21 +32,17 @@ export function renameAgent(from: string, to: string) {
 }
 
 export function getProcessingSessions(workspaceId: string): string[] {
-  // Agent state is keyed by sessionId globally; we return all processing ones
-  // (caller can filter by workspace if needed)
   void workspaceId
   const result: string[] = []
   for (const [id, a] of agents) if (a.processing) result.push(id)
   return result
 }
 
-// Broadcast to all clients of a specific workspace
 export function broadcast(workspaceId: string, msg: ServerMessage) {
   const json = JSON.stringify(msg)
   for (const ws of clientsByWorkspace.get(workspaceId) ?? []) ws.send(json)
 }
 
-// Broadcast to every connected client across all workspaces
 export function broadcastAll(msg: ServerMessage) {
   const json = JSON.stringify(msg)
   for (const clients of clientsByWorkspace.values()) {
@@ -57,80 +54,6 @@ export function sendToClient(ws: Bun.ServerWebSocket<unknown>, msg: ServerMessag
   ws.send(JSON.stringify(msg))
 }
 
-// ---- transformMessage: SDK → ChatMessage[] ----
-
-type ContentBlock = {
-  type: string
-  text?: string
-  name?: string
-  id?: string
-  input?: unknown
-  tool_use_id?: string
-  content?: unknown
-  is_error?: boolean
-}
-
-function extractText(content: unknown): string {
-  if (typeof content === 'string') return content
-  if (Array.isArray(content)) {
-    return (content as ContentBlock[])
-      .filter(b => b.type === 'text')
-      .map(b => b.text ?? '')
-      .join('\n')
-  }
-  return ''
-}
-
-export function transformMessage(msg: {
-  type: string
-  message: unknown
-}): Array<
-  | { type: 'user'; content: string }
-  | { type: 'assistant'; content: string }
-  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
-  | { type: 'tool_result'; tool_use_id: string; content: string; is_error: boolean }
-> {
-  const result: ReturnType<typeof transformMessage> = []
-  const content = (msg.message as { content?: unknown })?.content
-  if (msg.type === 'user') {
-    if (Array.isArray(content)) {
-      for (const b of content as ContentBlock[]) {
-        if (b.type === 'text' && b.text && !b.text.startsWith('<')) {
-          result.push({ type: 'user', content: b.text })
-        }
-        if (b.type === 'tool_result') {
-          result.push({
-            type: 'tool_result',
-            tool_use_id: b.tool_use_id!,
-            content: extractText(b.content).slice(0, 2000),
-            is_error: !!b.is_error
-          })
-        }
-      }
-    } else if (typeof content === 'string' && !content.startsWith('<')) {
-      result.push({ type: 'user', content })
-    }
-  }
-  if (msg.type === 'assistant') {
-    if (Array.isArray(content)) {
-      for (const b of content as ContentBlock[]) {
-        if (b.type === 'text' && b.text) {
-          result.push({ type: 'assistant', content: b.text })
-        }
-        if (b.type === 'tool_use') {
-          result.push({
-            type: 'tool_use',
-            id: b.id!,
-            name: b.name!,
-            input: (b.input ?? {}) as Record<string, unknown>
-          })
-        }
-      }
-    }
-  }
-  return result
-}
-
 export async function getSessions(workspacePath: string): Promise<SessionInfo[]> {
   const sessions = await listSessions({ dir: workspacePath })
   return sessions.map(s => ({
@@ -139,4 +62,26 @@ export async function getSessions(workspacePath: string): Promise<SessionInfo[]>
     lastModified: s.lastModified,
     cwd: s.cwd
   }))
+}
+
+/**
+ * Replay a session's persisted raw messages through a fresh adapter and
+ * return the resulting StreamEvents. Events are carefully NOT deduplicated —
+ * the client reducer is idempotent under upsert-by-id.
+ */
+export async function getSessionEvents(
+  sessionId: string,
+  workspacePath: string
+): Promise<StreamEvent[]> {
+  const adapter = new ClaudeAdapter()
+  const events: StreamEvent[] = []
+  try {
+    const raw = await getSessionMessages(sessionId, { dir: workspacePath })
+    for (const msg of raw) {
+      for (const ev of adapter.ingest(msg)) events.push(ev)
+    }
+  } catch {
+    // session file missing or unreadable — return whatever we have (often [])
+  }
+  return events
 }
