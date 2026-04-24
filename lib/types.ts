@@ -106,7 +106,7 @@ export type LayoutGridItem = { i: string; x: number; y: number }
 
 export type ChatMode = 'sidebar' | 'floating'
 
-export type { FontTheme } from './themes'
+export type { FontTheme, ColorTheme } from './themes'
 
 export type WorkspaceLayout = {
   version: 1

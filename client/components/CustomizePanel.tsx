@@ -2,8 +2,8 @@ import { useEffect } from 'react'
 
 import { cn } from '@/client/lib/cn'
 import { useWorkspaceStore } from '@/client/store/workspace'
-import { FONT_THEMES } from '@/lib/themes'
-import type { FontTheme } from '@/lib/types'
+import { COLOR_THEMES, type ColorThemeConfig, FONT_THEMES } from '@/lib/themes'
+import type { ColorTheme, FontTheme } from '@/lib/types'
 
 import { BottomPanel } from './BottomPanel'
 
@@ -26,23 +26,9 @@ function usePreloadAllFonts() {
 
 const FONT_OPTIONS = Object.entries(FONT_THEMES) as [FontTheme, (typeof FONT_THEMES)[FontTheme]][]
 
-type ColorPreset = {
-  label: string
-  background?: string
-  foreground?: string
-}
+const COLOR_OPTIONS = Object.entries(COLOR_THEMES) as [ColorTheme, ColorThemeConfig][]
 
-const COLOR_PRESETS: ColorPreset[] = [
-  { label: 'Default' },
-  { label: 'Paper', background: '#faf8f5', foreground: '#2c2825' },
-  { label: 'Sand', background: '#f5f0e8', foreground: '#3d3529' },
-  { label: 'Rose', background: '#fdf2f4', foreground: '#3b1c26' },
-  { label: 'Lavender', background: '#f4f2fb', foreground: '#2b2640' },
-  { label: 'Mint', background: '#f0faf6', foreground: '#1a3028' },
-  { label: 'Sky', background: '#f0f6fc', foreground: '#1a2a3b' }
-]
-
-function presetMatches(preset: ColorPreset, bg?: string, fg?: string): boolean {
+function presetMatches(preset: ColorThemeConfig, bg?: string, fg?: string): boolean {
   return (preset.background ?? undefined) === bg && (preset.foreground ?? undefined) === fg
 }
 
@@ -88,11 +74,11 @@ export function CustomizePanel() {
         <div className="flex flex-col gap-2">
           <p className="text-muted-foreground text-xs font-medium">Colors</p>
           <div className="grid grid-cols-3 gap-2">
-            {COLOR_PRESETS.map(preset => {
+            {COLOR_OPTIONS.map(([key, preset]) => {
               const active = presetMatches(preset, currentBg, currentFg)
               return (
                 <button
-                  key={preset.label}
+                  key={key}
                   type="button"
                   onClick={() =>
                     setTheme({ background: preset.background, foreground: preset.foreground })

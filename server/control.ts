@@ -1,11 +1,10 @@
 import { resolve } from 'path'
 
-import { FONT_THEMES } from '@/lib/themes'
-
 import { CONTROL_PORT } from './constants'
 import { loadLayout, saveLayout } from './layout'
 import { listWorkspaces, registerWorkspace } from './registry'
 import { broadcastAll } from './state'
+import { applyThemeUpdate, matchColorTheme } from './theme'
 import { publishMei } from './web'
 import { handleBundle } from './widgets'
 
@@ -58,17 +57,27 @@ export const control = Bun.serve({
           }
           const workspacePath = String(data.path ?? workspaces[0].path)
           const layout = await loadLayout(workspacePath)
-          if (!data.font) {
-            ws.send(JSON.stringify({ currentFont: layout.theme?.font ?? 'default' }))
+
+          // Listing mode — neither axis requested
+          if (!data.font && !data.color) {
+            ws.send(
+              JSON.stringify({
+                currentFont: layout.theme?.font ?? 'default',
+                currentColor: matchColorTheme(layout.theme?.background, layout.theme?.foreground)
+              })
+            )
             return
           }
-          if (!(data.font in FONT_THEMES)) {
-            ws.send(JSON.stringify({ error: `Unknown font theme: ${data.font}` }))
+
+          const result = applyThemeUpdate(layout.theme, { font: data.font, color: data.color })
+          if (!result.ok) {
+            ws.send(JSON.stringify({ error: result.error }))
             return
           }
-          await saveLayout({ ...layout, theme: { font: data.font } }, workspacePath)
+
+          await saveLayout({ ...layout, theme: result.theme }, workspacePath)
           publishMei({ type: 'theme:updated' })
-          ws.send(JSON.stringify({ ok: true, font: data.font }))
+          ws.send(JSON.stringify({ ok: true, ...result.applied }))
         }
       } catch (err) {
         console.error('[control]', err)

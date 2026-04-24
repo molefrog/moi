@@ -5,8 +5,8 @@ import { cp, mkdir } from 'node:fs/promises'
 import { join, resolve } from 'path'
 import pc from 'picocolors'
 
-import { FONT_THEMES } from '@/lib/themes'
-import type { FontTheme } from '@/lib/themes'
+import { COLOR_THEMES, FONT_THEMES } from '@/lib/themes'
+import type { ColorTheme, FontTheme } from '@/lib/themes'
 
 import { CONTROL_PORT, PORT } from './constants'
 import { registerWorkspace } from './registry'
@@ -260,21 +260,44 @@ const bundle = defineCommand({
   }
 })
 
+function hexToRgb(h: string): [number, number, number] {
+  const n = parseInt(h.replace('#', ''), 16)
+  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff]
+}
+
+// Truecolor swatch using raw ANSI 24-bit escapes (picocolors maxes at 8 colors).
+// Falls back to blank spaces when stdout is not a TTY, keeping piped output clean.
+function swatch(bg?: string, fg?: string): string {
+  if (!process.stdout.isTTY || !bg) return '    '
+  const [br, bgg, bb] = hexToRgb(bg)
+  const [fr, fgg, fb] = hexToRgb(fg ?? '#000000')
+  return `\x1b[48;2;${br};${bgg};${bb}m\x1b[38;2;${fr};${fgg};${fb}m Aa \x1b[0m`
+}
+
 const theme = defineCommand({
-  meta: { name: 'theme', description: 'Show or set the workspace font theme' },
+  meta: { name: 'theme', description: 'Show or set the workspace font and color themes' },
   args: {
     dir: {
       type: 'positional',
       default: '.',
       description: 'Workspace directory (default: current)'
     },
-    font: { type: 'string', description: 'Font theme key to apply' }
+    font: { type: 'string', description: 'Font theme key to apply' },
+    color: { type: 'string', description: 'Color preset key to apply' }
   },
   run({ args }) {
     const path = resolve(args.dir)
     const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
 
-    ws.onopen = () => ws.send(JSON.stringify({ type: 'theme', path, font: args.font ?? null }))
+    ws.onopen = () =>
+      ws.send(
+        JSON.stringify({
+          type: 'theme',
+          path,
+          font: args.font ?? null,
+          color: args.color ?? null
+        })
+      )
 
     ws.onmessage = event => {
       const res = JSON.parse(String(event.data))
@@ -286,44 +309,68 @@ const theme = defineCommand({
       }
 
       if (res.ok) {
-        const config = FONT_THEMES[res.font as FontTheme]
-        console.log(
-          '\n' +
+        console.log()
+        if (res.font) {
+          const config = FONT_THEMES[res.font as FontTheme]
+          console.log(
             pc.green('✓') +
-            ' Font theme set to ' +
-            pc.bold(config.label) +
-            pc.dim(` (${config.sans} / ${config.mono})`) +
-            '\n'
-        )
+              ' Font set to ' +
+              pc.bold(config.label) +
+              pc.dim(` (${config.sans} / ${config.mono})`)
+          )
+        }
+        if (res.color) {
+          const preset = COLOR_THEMES[res.color as ColorTheme]
+          const chip = swatch(preset.background, preset.foreground)
+          console.log(pc.green('✓') + ' Color set to ' + pc.bold(preset.label) + ' ' + chip)
+        }
+        console.log()
         ws.close()
         process.exit(0)
       }
 
-      const current: FontTheme = res.currentFont ?? 'default'
-      console.log('\n' + pc.bold('moi theme') + ' — workspace font themes')
-      console.log(pc.dim('  Usage: moi theme --font=<key>') + '\n')
+      const currentFont: FontTheme = res.currentFont ?? 'default'
+      const currentColor: ColorTheme | null = res.currentColor ?? null
+      console.log('\n' + pc.bold('moi theme') + ' — workspace appearance')
+      console.log(pc.dim('  Usage: moi theme --font=<key> --color=<key>') + '\n')
 
-      const table = new Table({
+      const fontTable = new Table({
         head: ['', 'key', 'label', 'sans', 'mono', 'feel'].map(h => pc.bold(h)),
         style: { border: [], head: [] }
       })
-
       for (const key of Object.keys(FONT_THEMES) as FontTheme[]) {
         const f = FONT_THEMES[key]
-        const selected = key === current
-        const marker = selected ? pc.green('→') : ''
-        const row = [
-          marker,
+        const selected = key === currentFont
+        fontTable.push([
+          selected ? pc.green('→') : '',
           selected ? pc.bold(key) : key,
           f.label,
           pc.dim(f.sans),
           pc.dim(f.mono),
           pc.dim(f.feel)
-        ]
-        table.push(row)
+        ])
       }
+      console.log(pc.dim('  Fonts'))
+      console.log(fontTable.toString() + '\n')
 
-      console.log(table.toString() + '\n')
+      const colorTable = new Table({
+        head: ['', 'key', 'label', 'swatch', 'feel'].map(h => pc.bold(h)),
+        style: { border: [], head: [] }
+      })
+      for (const key of Object.keys(COLOR_THEMES) as ColorTheme[]) {
+        const c = COLOR_THEMES[key]
+        const selected = key === currentColor
+        colorTable.push([
+          selected ? pc.green('→') : '',
+          selected ? pc.bold(key) : key,
+          c.label,
+          swatch(c.background, c.foreground),
+          pc.dim(c.feel)
+        ])
+      }
+      console.log(pc.dim('  Colors'))
+      console.log(colorTable.toString() + '\n')
+
       ws.close()
       process.exit(0)
     }

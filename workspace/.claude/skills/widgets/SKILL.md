@@ -8,6 +8,14 @@ description: Build and modify user workspace. Workspace is the web UI user is ch
 You are working inside a **moi workspace**.
 Widgets are React components (`.tsx` files in `.widgets/`) displayed as live cards on the browser dashboard.
 
+## About `moi`
+
+Treat `moi` as an external command — you cannot inspect or modify its sources. Use only the documented subcommands (`moi bundle`, `moi bundle --force`, etc.).
+
+## Managing dependencies
+
+You are allowed to add packages to `.widgets/package.json` and run `bun install` whenever it's needed (e.g. after editing `package.json`, or before bundling if `node_modules/` looks stale). **Always use `bun`** — never `npm`, `yarn`, or `pnpm`.
+
 ## First-time setup
 
 If `.widgets/` does not exist yet, create it and install dependencies:
@@ -19,10 +27,19 @@ If `.widgets/` does not exist yet, create it and install dependencies:
   "name": "widgets",
   "private": true,
   "dependencies": {
-    "@tabler/icons-react": "^3.40.0"
+    "@tabler/icons-react": "^3.40.0",
+    "tailwindcss": "^4.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
   }
 }
 ```
+
+`react` and `react-dom` are stubs — at runtime they're resolved from esm.sh via the browser importmap. They're listed here only so editors pick up the correct types.
 
 2. Run `cd .widgets && bun install`
 
@@ -128,9 +145,10 @@ Always handle three states: loading → skeleton, error → error state with ret
 - `moi bundle` — compile changed widgets
 - `moi bundle --force` — rebuild all widgets (use after changing `config`)
 - `moi theme --font=<key>` — change font theme (omit `--font` to list options)
+- `moi theme --color=<key>` — change color preset (omit `--color` to list options)
 
 ## Rules
 
 - Never read or modify files outside this workspace directory.
 - Do not start, stop, or inspect the web server — it is managed externally.
-- Only use `moi` commands listed above — no arbitrary `bun`, `node`, or server commands.
+- Only use `moi` commands listed above plus `bun` / `bun install` for dependencies — no `node`, `npm`, `yarn`, `pnpm`, or other server commands.
