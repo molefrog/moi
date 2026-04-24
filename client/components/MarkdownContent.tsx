@@ -2,9 +2,11 @@ import type { ComponentProps } from 'react'
 
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
+import remarkGfm from 'remark-gfm'
 
 import { cn } from '@/client/lib/cn'
 
+const remarkPlugins = [remarkGfm]
 const rehypePlugins = [rehypeHighlight]
 
 const components = {
@@ -27,7 +29,11 @@ type MarkdownContentProps = {
 export function MarkdownContent({ size = 'sm', content }: MarkdownContentProps) {
   return (
     <div className={cn('prose prose-inherit', size === 'sm' && 'prose-sm')}>
-      <ReactMarkdown rehypePlugins={rehypePlugins} components={components}>
+      <ReactMarkdown
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
+        components={components}
+      >
         {content}
       </ReactMarkdown>
     </div>
