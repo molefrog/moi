@@ -1,3 +1,5 @@
+import type { StreamEvent } from './format'
+
 export type WidgetConfig = {
   rowSpan: 1 | 2 | 3 | 4
   colSpan: 1 | 2 | 3 | 4
@@ -10,7 +12,16 @@ export type WidgetInfo = {
 
 // Client → Server messages
 export type ClientMessage =
-  | { type: 'chat'; content: string; sessionId: string; isNew: boolean }
+  | {
+      type: 'chat'
+      content: string
+      sessionId: string
+      isNew: boolean
+      // Client-chosen stable id for the user's turn. The server tells the
+      // adapter to use this id when the SDK echoes the user input back, so
+      // the optimistic bubble the client rendered gets upserted in place.
+      optimisticId?: string
+    }
   | { type: 'stop'; sessionId: string }
 
 // Session info returned by list endpoint
@@ -21,22 +32,34 @@ export type SessionInfo = {
   cwd?: string
 }
 
-// Persistable message (stored in messages.json)
-export type ChatMessage =
-  | UserMessage
-  | AssistantMessage
-  | ToolUseMessage
-  | ToolResultMessage
-  | DoneMessage
-  | ErrorMessage
-  | StoppedMessage
+// Re-export the display format
+export type {
+  Citation,
+  Part,
+  ResultSummary,
+  SessionSnapshot,
+  StreamEvent,
+  SubagentRecord,
+  SubagentStatus,
+  SystemNotice,
+  ToolCall,
+  ToolCaller,
+  ToolState,
+  Turn,
+  TurnOrigin,
+  ViewState
+} from './format'
 
-// Server → Client messages — everything is tagged with sessionId
+// Server → Client messages.
+// Every conversation-related frame carries a sessionId so the client can
+// route it to the correct session.
 export type ServerMessage =
-  | (ChatMessage & { sessionId: string })
+  | (StreamEvent & { sessionId: string })
   | StatusMessage
   | SessionRenamedMessage
   | WorkspaceSwitchMessage
+  | ErrorFrame
+  | StoppedFrame
 
 export type WorkspaceSwitchMessage = {
   type: 'workspace:switch'
@@ -55,44 +78,15 @@ export type SessionRenamedMessage = {
   to: string
 }
 
-export type UserMessage = {
-  type: 'user'
+export type ErrorFrame = {
+  kind: 'error'
+  sessionId: string
   content: string
 }
 
-export type AssistantMessage = {
-  type: 'assistant'
-  content: string
-}
-
-export type ToolUseMessage = {
-  type: 'tool_use'
-  id: string
-  name: string
-  input: Record<string, unknown>
-}
-
-export type ToolResultMessage = {
-  type: 'tool_result'
-  tool_use_id: string
-  content: string
-  is_error: boolean
-}
-
-export type DoneMessage = {
-  type: 'done'
-  cost: number
-  turns: number
-  session_id: string
-}
-
-export type ErrorMessage = {
-  type: 'error'
-  content: string
-}
-
-export type StoppedMessage = {
-  type: 'stopped'
+export type StoppedFrame = {
+  kind: 'stopped'
+  sessionId: string
 }
 
 export type StatusMessage = {
