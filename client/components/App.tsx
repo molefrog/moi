@@ -108,9 +108,24 @@ function App() {
   const showSidebar = chatMode === 'sidebar'
 
   return (
-    <div className="h-dvh overflow-hidden p-[var(--page-pad)]">
-      <div className="mx-auto flex h-full w-full max-w-[var(--content-w)] justify-center">
-        <div className="flex h-full min-h-0 w-full min-w-0 max-w-[var(--column-w)] flex-1 flex-col">
+    <div
+      className={cn(
+        'p-[var(--page-pad)]',
+        chatMode === 'solo' ? 'min-h-dvh' : 'h-dvh overflow-hidden'
+      )}
+    >
+      <div
+        className={cn(
+          'mx-auto flex w-full max-w-[var(--content-w)] justify-center',
+          chatMode === 'solo' ? 'min-h-[calc(100dvh-var(--page-pad)*2)]' : 'h-full'
+        )}
+      >
+        <div
+          className={cn(
+            'flex w-full min-w-0 max-w-[var(--column-w)] flex-1 flex-col',
+            chatMode === 'solo' ? 'min-h-full' : 'h-full min-h-0'
+          )}
+        >
           {chatMode === 'solo' ? chatPanel : <Widgets />}
         </div>
 
