@@ -7,7 +7,7 @@
     "moi": "./server/cli.ts"
   },
   "scripts": {
-    "dev": "bun --hot server/web.ts",
+    "dev": "MOI_DEV=1 bun --hot server/web.ts",
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
     "format": "prettier --write .",

@@ -182,7 +182,7 @@ function GenericToolCard({ call }: GenericToolCardProps) {
         <IconChevronRight
           size={12}
           stroke={1.5}
-          className="chevron text-ring transition-transform duration-150 group-open:rotate-90"
+          className="chevron text-ring shrink-0 transition-transform duration-150 group-open:rotate-90"
         />
         <CallerBadge call={call} />
         <span className="text-xs font-medium">{call.name}</span>

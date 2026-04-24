@@ -1,8 +1,26 @@
 import envPaths from 'env-paths'
 import { mkdir } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { join, resolve } from 'path'
 
-import type { WorkspaceEntry } from '@/lib/types'
+import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
+
+import { type OpenClawAgent, discoverOpenClawAgents } from './openclaw'
+
+// Replace the home-dir prefix with `~` for display. Keeps the original
+// absolute path in place; callers should put the result in `displayPath`.
+function tildify(absPath: string): string {
+  const home = homedir()
+  if (!home) return absPath
+  if (absPath === home) return '~'
+  const prefix = home.endsWith('/') ? home : home + '/'
+  if (absPath.startsWith(prefix)) return '~/' + absPath.slice(prefix.length)
+  return absPath
+}
+
+function withDisplayPath<T extends { path: string }>(entry: T): T & { displayPath: string } {
+  return { ...entry, displayPath: tildify(entry.path) }
+}
 
 const DATA_DIR = envPaths('moi', { suffix: false }).data
 export const DEFAULT_REGISTRY_PATH = join(DATA_DIR, 'workspaces.json')
@@ -27,7 +45,18 @@ async function writeRegistry(entries: WorkspaceEntry[]): Promise<void> {
   await Bun.write(_registryPath, JSON.stringify(entries, null, 2))
 }
 
-export async function registerWorkspace(absPath: string): Promise<WorkspaceEntry> {
+export type RegisterOptions = {
+  type?: WorkspaceType
+  name?: string
+  agentId?: string
+  isDefault?: boolean
+  lastRunAt?: string
+}
+
+export async function registerWorkspace(
+  absPath: string,
+  opts: RegisterOptions = {}
+): Promise<WorkspaceEntry> {
   const normalPath = resolve(absPath)
   const entries = await readRegistry()
   const existing = entries.find(e => e.path === normalPath)
@@ -35,10 +64,15 @@ export async function registerWorkspace(absPath: string): Promise<WorkspaceEntry
   const entry: WorkspaceEntry = {
     id: crypto.randomUUID(),
     path: normalPath,
-    addedAt: new Date().toISOString()
+    addedAt: new Date().toISOString(),
+    ...(opts.type ? { type: opts.type } : {}),
+    ...(opts.name ? { name: opts.name } : {}),
+    ...(opts.agentId ? { agentId: opts.agentId } : {}),
+    ...(opts.isDefault ? { isDefault: opts.isDefault } : {}),
+    ...(opts.lastRunAt ? { lastRunAt: opts.lastRunAt } : {})
   }
   await writeRegistry([...entries, entry])
-  return entry
+  return withDisplayPath(entry)
 }
 
 export async function getWorkspace(id: string): Promise<WorkspaceEntry | null> {
@@ -55,15 +89,14 @@ export async function removeWorkspace(id: string): Promise<boolean> {
 }
 
 export async function listWorkspaces(): Promise<WorkspaceEntry[]> {
-  return readRegistry()
+  const entries = await readRegistry()
+  return entries.map(withDisplayPath)
 }
 
 // Discover CC-active directories not yet in the registry
-export async function discoverFromCC(): Promise<string[]> {
-  const { listSessions } = await import('@anthropic-ai/claude-agent-sdk')
-  const registeredPaths = new Set((await listWorkspaces()).map(e => e.path))
-
+async function discoverFromCC(registeredPaths: Set<string>): Promise<string[]> {
   try {
+    const { listSessions } = await import('@anthropic-ai/claude-agent-sdk')
     const sessions = await listSessions({})
     const { stat } = await import('node:fs/promises')
     const paths = new Set<string>()
@@ -80,4 +113,38 @@ export async function discoverFromCC(): Promise<string[]> {
   } catch {
     return []
   }
+}
+
+// Discover OpenClaw agents via the gateway WebSocket (2s timeout). Returns []
+// if the gateway is unreachable, auth is missing, or probes time out.
+async function discoverFromOpenClaw(registeredPaths: Set<string>): Promise<OpenClawAgent[]> {
+  const agents = await discoverOpenClawAgents()
+  return agents.filter(a => !registeredPaths.has(a.path))
+}
+
+export async function discoverWorkspaces(): Promise<DiscoveredWorkspace[]> {
+  const registeredPaths = new Set((await readRegistry()).map(e => e.path))
+  const [ccPaths, openclawAgents] = await Promise.all([
+    discoverFromCC(registeredPaths),
+    discoverFromOpenClaw(registeredPaths)
+  ])
+  const openclawByPath = new Map(openclawAgents.map(a => [a.path, a]))
+  const out: DiscoveredWorkspace[] = []
+  for (const a of openclawAgents) {
+    out.push(
+      withDisplayPath({
+        path: a.path,
+        type: 'openclaw',
+        ...(a.name ? { name: a.name } : {}),
+        ...(a.agentId ? { agentId: a.agentId } : {}),
+        ...(a.isDefault ? { isDefault: a.isDefault } : {}),
+        ...(a.lastRunAt ? { lastRunAt: a.lastRunAt } : {})
+      })
+    )
+  }
+  for (const p of ccPaths) {
+    if (openclawByPath.has(p)) continue
+    out.push(withDisplayPath({ path: p, type: 'claude-code' }))
+  }
+  return out
 }

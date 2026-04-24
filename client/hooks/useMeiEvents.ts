@@ -6,6 +6,7 @@ type MeiEvent =
   | { type: 'widget:updated'; name: string }
   | { type: 'widget-layout:updated'; widgets: WidgetInfo[] }
   | { type: 'theme:updated' }
+  | { type: 'dev:reload' }
 
 type MeiEventHandler = (event: MeiEvent) => void
 
@@ -27,6 +28,10 @@ function ensureConnection() {
   socket.onmessage = event => {
     try {
       const data = JSON.parse(event.data) as MeiEvent
+      if (data.type === 'dev:reload' && process.env.NODE_ENV === 'development') {
+        location.reload()
+        return
+      }
       for (const handler of listeners) handler(data)
     } catch {}
   }

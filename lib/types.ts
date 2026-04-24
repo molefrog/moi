@@ -66,10 +66,34 @@ export type WorkspaceSwitchMessage = {
   workspaceId: string
 }
 
+export type WorkspaceType = 'claude-code' | 'openclaw'
+
 export type WorkspaceEntry = {
   id: string
   path: string
   addedAt: string
+  type?: WorkspaceType
+  // Display name captured at add time (e.g. OpenClaw IDENTITY.md "Name:" or
+  // basename). Persisted so we don't re-probe the gateway for each listing.
+  name?: string
+  // Home-relative rendering of `path` (e.g. "~/.openclaw/workspace"). Set by
+  // the server on the wire — clients render it as-is.
+  displayPath?: string
+  // OpenClaw-specific metadata captured at add time. "lastRunAt" is a snapshot,
+  // not live — refresh on demand if it ever needs to stay accurate.
+  agentId?: string
+  isDefault?: boolean
+  lastRunAt?: string
+}
+
+export type DiscoveredWorkspace = {
+  path: string
+  type: WorkspaceType
+  name?: string
+  displayPath?: string
+  agentId?: string
+  isDefault?: boolean
+  lastRunAt?: string
 }
 
 export type SessionRenamedMessage = {

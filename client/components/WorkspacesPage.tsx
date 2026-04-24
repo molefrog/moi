@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'wouter'
 
 import claudeIcon from '@/client/assets/claude.svg'
+import openclawIcon from '@/client/assets/openclaw.svg'
 import { Button } from '@/client/components/ui/button'
 import {
   DropdownMenu,
@@ -11,7 +12,28 @@ import {
   DropdownMenuTrigger
 } from '@/client/components/ui/dropdown-menu'
 import { cn } from '@/client/lib/cn'
-import type { WorkspaceEntry } from '@/lib/types'
+import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
+
+const typeIconSrc: Record<WorkspaceType, string> = {
+  'claude-code': claudeIcon,
+  openclaw: openclawIcon
+}
+
+const typeLabel: Record<WorkspaceType, string> = {
+  'claude-code': 'Claude Code',
+  openclaw: 'OpenClaw'
+}
+
+function TypeIcon({ type, className }: { type: WorkspaceType; className?: string }) {
+  return (
+    <img
+      src={typeIconSrc[type]}
+      alt=""
+      aria-label={typeLabel[type]}
+      className={cn('size-4 shrink-0', className)}
+    />
+  )
+}
 
 const workspacesKey = ['workspaces'] as const
 const discoverKey = ['workspaces', 'discover'] as const
@@ -22,24 +44,26 @@ export function WorkspacesPage() {
     queryFn: () => fetch('/api/workspaces').then(r => r.json())
   })
 
-  const discoveredQuery = useQuery<string[]>({
+  const discoveredQuery = useQuery<DiscoveredWorkspace[]>({
     queryKey: discoverKey,
     queryFn: () => fetch('/api/workspaces/discover').then(r => r.json())
   })
 
   const qc = useQueryClient()
-  const importMutation = useMutation<WorkspaceEntry, Error, string>({
-    mutationFn: async path => {
+  const importMutation = useMutation<WorkspaceEntry, Error, DiscoveredWorkspace>({
+    mutationFn: async discovered => {
       const res = await fetch('/api/workspaces', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path })
+        body: JSON.stringify(discovered)
       })
       return res.json()
     },
-    onSuccess: (entry, path) => {
+    onSuccess: (entry, suggestion) => {
       qc.setQueryData<WorkspaceEntry[]>(workspacesKey, prev => [...(prev ?? []), entry])
-      qc.setQueryData<string[]>(discoverKey, prev => (prev ?? []).filter(p => p !== path))
+      qc.setQueryData<DiscoveredWorkspace[]>(discoverKey, prev =>
+        (prev ?? []).filter(s => s.path !== suggestion.path)
+      )
     }
   })
 
@@ -75,7 +99,8 @@ export function WorkspacesPage() {
   const workspaces = workspacesQuery.data
   const discovered = discoveredQuery.data
   const count = workspaces.length
-  const importingPath = importMutation.isPending ? importMutation.variables : null
+  const importingPath =
+    importMutation.isPending && importMutation.variables ? importMutation.variables.path : null
 
   return (
     <div className="mx-auto w-full max-w-3xl px-8 pb-16 pt-14">
@@ -110,18 +135,15 @@ export function WorkspacesPage() {
         <section>
           <div className="mb-4">
             <h2 className="text-foreground mb-1.5 text-sm font-semibold">Found on your machine</h2>
-            <p className="text-muted-foreground text-xs">
-              Discovered via{' '}
-              <span className="text-foreground/70 font-mono">~/.claude/projects</span>
-            </p>
+            <p className="text-muted-foreground text-xs">Discovered via Claude Code and OpenClaw</p>
           </div>
           <ul className="border-border border-t">
-            {discovered.map(path => (
+            {discovered.map(item => (
               <SuggestedRow
-                key={path}
-                path={path}
-                onAdd={p => importMutation.mutate(p)}
-                loading={importingPath === path}
+                key={item.path}
+                suggestion={item}
+                onAdd={s => importMutation.mutate(s)}
+                loading={importingPath === item.path}
               />
             ))}
           </ul>
@@ -137,11 +159,11 @@ type WorkspaceCardProps = {
 }
 
 function WorkspaceCard({ workspace, onRemove }: WorkspaceCardProps) {
-  const name = workspace.path.split('/').pop() || workspace.path
+  const name = displayName(workspace)
   const meta = formatAddedAt(workspace.addedAt)
 
   function handleRemove() {
-    const message = `Remove "${name}" from your workspaces?\n\nThis only removes it from your list. The folder and its Claude Code sessions stay on disk — you can add it back any time.`
+    const message = `Remove "${name}" from your workspaces?\n\nThis only removes it from your list. The folder and its sessions stay on disk — you can add it back any time.`
     if (window.confirm(message)) onRemove(workspace)
   }
 
@@ -157,7 +179,7 @@ function WorkspaceCard({ workspace, onRemove }: WorkspaceCardProps) {
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
-            <img src={claudeIcon} alt="" aria-hidden className="size-4 shrink-0" />
+            <TypeIcon type={workspace.type ?? 'claude-code'} />
             <span className="text-foreground truncate text-sm font-semibold">{name}</span>
           </div>
           <DropdownMenu>
@@ -192,7 +214,9 @@ function WorkspaceCard({ workspace, onRemove }: WorkspaceCardProps) {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        <div className="text-muted-foreground truncate font-mono text-xs">{workspace.path}</div>
+        <div title={workspace.path} className="text-muted-foreground truncate font-mono text-xs">
+          {workspace.displayPath ?? workspace.path}
+        </div>
         <div className="flex-1" />
         <div className="text-muted-foreground text-xs">{meta}</div>
       </div>
@@ -227,21 +251,25 @@ function PreviewSkeleton() {
 }
 
 type SuggestedRowProps = {
-  path: string
-  onAdd: (path: string) => void
+  suggestion: DiscoveredWorkspace
+  onAdd: (suggestion: DiscoveredWorkspace) => void
   loading: boolean
 }
 
-function SuggestedRow({ path, onAdd, loading }: SuggestedRowProps) {
-  const name = path.split('/').pop() || path
+function SuggestedRow({ suggestion, onAdd, loading }: SuggestedRowProps) {
+  const { path, type } = suggestion
+  const name = displayName(suggestion)
   return (
     <li className="border-border flex items-center gap-3 border-b px-1 py-2.5">
-      <img src={claudeIcon} alt="" aria-hidden className="size-4 shrink-0 opacity-70" />
+      <TypeIcon type={type} className="opacity-70" />
       <span className="text-foreground/80 shrink-0 text-sm font-medium">{name}</span>
-      <span className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs">
-        {path}
+      <span
+        title={path}
+        className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs"
+      >
+        {suggestion.displayPath ?? path}
       </span>
-      <Button variant="outline" size="sm" onClick={() => onAdd(path)} disabled={loading}>
+      <Button variant="outline" size="sm" onClick={() => onAdd(suggestion)} disabled={loading}>
         {loading ? (
           <IconLoader2 stroke={1.5} className="animate-spin" />
         ) : (
@@ -251,6 +279,12 @@ function SuggestedRow({ path, onAdd, loading }: SuggestedRowProps) {
       </Button>
     </li>
   )
+}
+
+function displayName(ws: Pick<WorkspaceEntry, 'name' | 'path' | 'type' | 'agentId'>): string {
+  if (ws.name) return ws.name
+  if (ws.type === 'openclaw') return ws.agentId ?? 'OpenClaw agent'
+  return ws.path.split('/').pop() || ws.path
 }
 
 function formatAddedAt(iso: string): string {

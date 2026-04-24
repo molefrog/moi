@@ -7,7 +7,7 @@ import './control'
 import { callFunction } from './functions'
 import { loadLayout, saveLayout } from './layout'
 import {
-  discoverFromCC,
+  discoverWorkspaces,
   getWorkspace,
   listWorkspaces,
   registerWorkspace,
@@ -70,12 +70,20 @@ export const app = Bun.serve<WsData>({
       if (req.method === 'POST') {
         const body = await req.json()
         if (!body?.path) return new Response('Missing path', { status: 400 })
-        const entry = await registerWorkspace(String(body.path))
+        const rawType = body?.type
+        const type = rawType === 'claude-code' || rawType === 'openclaw' ? rawType : undefined
+        const entry = await registerWorkspace(String(body.path), {
+          type,
+          name: typeof body?.name === 'string' ? body.name : undefined,
+          agentId: typeof body?.agentId === 'string' ? body.agentId : undefined,
+          isDefault: typeof body?.isDefault === 'boolean' ? body.isDefault : undefined,
+          lastRunAt: typeof body?.lastRunAt === 'string' ? body.lastRunAt : undefined
+        })
         return Response.json(entry, { status: 201 })
       }
       return new Response('Method not allowed', { status: 405 })
     },
-    '/api/workspaces/discover': async () => Response.json(await discoverFromCC()),
+    '/api/workspaces/discover': async () => Response.json(await discoverWorkspaces()),
     '/api/workspaces/:id': async req => {
       if (req.method === 'DELETE') {
         const ok = await removeWorkspace(req.params.id)
@@ -216,4 +224,11 @@ async function handleFunctionCall(
 
 export function publishMei(msg: unknown) {
   app.publish(MEI_TOPIC, JSON.stringify(msg))
+}
+
+// Dev-only: broadcast a reload signal on every module re-exec so the browser
+// refreshes after `bun --hot` reloads server code. Fires on first boot too,
+// with no subscribers — which is a no-op.
+if (process.env.MOI_DEV === '1') {
+  publishMei({ type: 'dev:reload' })
 }

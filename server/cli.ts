@@ -67,16 +67,16 @@ async function openBrowser(url: string) {
 // bunfig.toml is read before any JS runs, so process.chdir() is too late.
 function spawnServer(
   projectRoot: string,
-  hot: boolean,
+  dev: boolean,
   env: Record<string, string | undefined> = process.env
 ): ReturnType<typeof Bun.spawn> {
-  const bunFlags = hot ? ['--hot'] : []
+  const bunFlags = dev ? ['--hot'] : []
   return Bun.spawn(['bun', ...bunFlags, import.meta.filename, 'start'], {
     stdin: 'inherit',
     stdout: 'inherit',
     stderr: 'inherit',
     cwd: projectRoot,
-    env: { ...env, MOI_SERVER: '1' }
+    env: { ...env, MOI_SERVER: '1', ...(dev ? { MOI_DEV: '1' } : {}) }
   })
 }
 
@@ -165,11 +165,6 @@ const init = defineCommand({
 const start = defineCommand({
   meta: { name: 'start', description: 'Start the moi web server' },
   args: {
-    hot: {
-      type: 'boolean',
-      default: false,
-      description: 'Enable hot reload for server code (dev mode)'
-    },
     port: {
       type: 'string',
       description: 'HTTP port to listen on (default: 3000)'
@@ -177,6 +172,8 @@ const start = defineCommand({
   },
   async run({ args }) {
     const projectRoot = join(import.meta.dir, '..')
+    // Undocumented: --dev enables bun --hot on the spawned server process.
+    const dev = process.argv.includes('--dev')
 
     if (await isServerRunning()) {
       console.log(
@@ -189,7 +186,7 @@ const start = defineCommand({
     // MOI_SERVER=1 tells the child it is the actual server process.
     if (!process.env.MOI_SERVER) {
       const env = args.port ? { ...process.env, PORT: args.port } : process.env
-      const proc = spawnServer(projectRoot, args.hot, env)
+      const proc = spawnServer(projectRoot, dev, env)
       await proc.exited
       process.exit(proc.exitCode ?? 0)
     }
