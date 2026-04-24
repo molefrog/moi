@@ -46,6 +46,14 @@ export async function getWorkspace(id: string): Promise<WorkspaceEntry | null> {
   return entries.find(e => e.id === id) ?? null
 }
 
+export async function removeWorkspace(id: string): Promise<boolean> {
+  const entries = await readRegistry()
+  const next = entries.filter(e => e.id !== id)
+  if (next.length === entries.length) return false
+  await writeRegistry(next)
+  return true
+}
+
 export async function listWorkspaces(): Promise<WorkspaceEntry[]> {
   return readRegistry()
 }

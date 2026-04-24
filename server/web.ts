@@ -6,7 +6,13 @@ import { PORT } from './constants'
 import './control'
 import { callFunction } from './functions'
 import { loadLayout, saveLayout } from './layout'
-import { discoverFromCC, getWorkspace, listWorkspaces, registerWorkspace } from './registry'
+import {
+  discoverFromCC,
+  getWorkspace,
+  listWorkspaces,
+  registerWorkspace,
+  removeWorkspace
+} from './registry'
 import {
   addClient,
   getProcessingSessions,
@@ -70,6 +76,14 @@ export const app = Bun.serve<WsData>({
       return new Response('Method not allowed', { status: 405 })
     },
     '/api/workspaces/discover': async () => Response.json(await discoverFromCC()),
+    '/api/workspaces/:id': async req => {
+      if (req.method === 'DELETE') {
+        const ok = await removeWorkspace(req.params.id)
+        if (!ok) return new Response('Workspace not found', { status: 404 })
+        return new Response(null, { status: 204 })
+      }
+      return new Response('Method not allowed', { status: 405 })
+    },
 
     // Per-workspace MEI API
     '/_mei/:workspaceId/widgets': async req => {

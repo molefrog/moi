@@ -1,9 +1,15 @@
-import { IconDots, IconLoader2, IconPlus } from '@tabler/icons-react'
+import { IconDots, IconLoader2, IconPlus, IconTrash } from '@tabler/icons-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'wouter'
 
 import claudeIcon from '@/client/assets/claude.svg'
 import { Button } from '@/client/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/client/components/ui/dropdown-menu'
 import { cn } from '@/client/lib/cn'
 import type { WorkspaceEntry } from '@/lib/types'
 
@@ -34,6 +40,19 @@ export function WorkspacesPage() {
     onSuccess: (entry, path) => {
       qc.setQueryData<WorkspaceEntry[]>(workspacesKey, prev => [...(prev ?? []), entry])
       qc.setQueryData<string[]>(discoverKey, prev => (prev ?? []).filter(p => p !== path))
+    }
+  })
+
+  const removeMutation = useMutation<void, Error, WorkspaceEntry>({
+    mutationFn: async entry => {
+      const res = await fetch(`/api/workspaces/${entry.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to remove workspace')
+    },
+    onSuccess: (_void, entry) => {
+      qc.setQueryData<WorkspaceEntry[]>(workspacesKey, prev =>
+        (prev ?? []).filter(w => w.id !== entry.id)
+      )
+      qc.invalidateQueries({ queryKey: discoverKey })
     }
   })
 
@@ -70,7 +89,11 @@ export function WorkspacesPage() {
       {count > 0 && (
         <div className="mb-10 grid grid-cols-2 gap-3">
           {workspaces.map(ws => (
-            <WorkspaceCard key={ws.id} workspace={ws} />
+            <WorkspaceCard
+              key={ws.id}
+              workspace={ws}
+              onRemove={entry => removeMutation.mutate(entry)}
+            />
           ))}
         </div>
       )}
@@ -110,11 +133,17 @@ export function WorkspacesPage() {
 
 type WorkspaceCardProps = {
   workspace: WorkspaceEntry
+  onRemove: (workspace: WorkspaceEntry) => void
 }
 
-function WorkspaceCard({ workspace }: WorkspaceCardProps) {
+function WorkspaceCard({ workspace, onRemove }: WorkspaceCardProps) {
   const name = workspace.path.split('/').pop() || workspace.path
   const meta = formatAddedAt(workspace.addedAt)
+
+  function handleRemove() {
+    const message = `Remove "${name}" from your workspaces?\n\nThis only removes it from your list. The folder and its Claude Code sessions stay on disk — you can add it back any time.`
+    if (window.confirm(message)) onRemove(workspace)
+  }
 
   return (
     <Link
@@ -131,18 +160,37 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
             <img src={claudeIcon} alt="" aria-hidden className="size-4 shrink-0" />
             <span className="text-foreground truncate text-sm font-semibold">{name}</span>
           </div>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={e => {
-              e.preventDefault()
-              e.stopPropagation()
-            }}
-            className="text-muted-foreground -mr-1 -mt-0.5"
-            aria-label="More actions"
-          >
-            <IconDots stroke={1.5} />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={e => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                  className="text-muted-foreground -mr-1 -mt-0.5"
+                  aria-label="More actions"
+                >
+                  <IconDots stroke={1.5} />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end" sideOffset={4} className="min-w-40">
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={e => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleRemove()
+                }}
+              >
+                <IconTrash stroke={1.5} />
+                Remove
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         <div className="text-muted-foreground truncate font-mono text-xs">{workspace.path}</div>
         <div className="flex-1" />
