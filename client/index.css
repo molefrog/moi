@@ -33,6 +33,28 @@
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
   --radius: 1rem;
+
+  /* Layout tokens — single source of truth for page chrome.
+     Other components read these; do not hardcode equivalents. */
+  --page-pad: 2rem;
+  --content-w: 1184px;
+  --column-w: 40rem;
+  --sidebar-w: 464px;
+  --sidebar-gap: 4rem;
+  --panel-h: 26rem;
+}
+
+@media (max-width: 1024px) {
+  :root {
+    --page-pad: 1.5rem;
+    --sidebar-gap: 1.5rem;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --page-pad: 1rem;
+  }
 }
 
 .dark {

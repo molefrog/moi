@@ -101,10 +101,7 @@ export function ChatPanel({
         className={cn(
           'flex items-center justify-between pb-2 pl-2',
           chatMode === 'solo' &&
-            cn(
-              'bg-background sticky top-0',
-              '-mt-8 pt-8 max-lg:-mt-6 max-lg:pt-6 max-sm:-mt-4 max-sm:pt-4'
-            )
+            'bg-background sticky top-0 mt-[calc(var(--page-pad)*-1)] pt-[var(--page-pad)]'
         )}
       >
         <ThreadSelector onSwitch={onSwitchThread} />
@@ -173,10 +170,7 @@ export function ChatPanel({
       <div
         className={cn(
           chatMode === 'solo' &&
-            cn(
-              'bg-background sticky bottom-0',
-              '-mb-8 pb-8 max-lg:-mb-6 max-lg:pb-6 max-sm:-mb-4 max-sm:pb-4'
-            )
+            'bg-background sticky bottom-0 mb-[calc(var(--page-pad)*-1)] pb-[var(--page-pad)]'
         )}
       >
         <ChatInput

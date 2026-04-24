@@ -38,6 +38,8 @@ export function Widgets() {
     .filter(w => !gridIds.has(w.id))
     .map(w => ({ id: w.id, w: w.config.colSpan, h: w.config.rowSpan }))
 
+  const panelOpen = mode === 'customizing' || (mode === 'editing' && hiddenItems.length > 0)
+
   function hide(id: string) {
     setLayout({ widgetGrid: layout.widgetGrid.filter(g => g.i !== id) })
   }
@@ -55,8 +57,8 @@ export function Widgets() {
 
   if (widgets.length === 0) {
     return (
-      <div className="group flex h-full flex-col">
-        <header className="flex items-center justify-between pb-4">
+      <div className="group flex h-full min-h-0 flex-col">
+        <header className="flex shrink-0 items-center justify-between pb-4">
           <h1 className="text-sm font-medium">Widgets</h1>
         </header>
         <div className="flex flex-1 items-center justify-center">
@@ -67,8 +69,8 @@ export function Widgets() {
   }
 
   return (
-    <div className={cn('group flex h-full flex-col')}>
-      <header className="flex items-center justify-between pb-4">
+    <div className={cn('group relative flex h-full min-h-0 flex-col')}>
+      <header className="flex shrink-0 items-center justify-between pb-4">
         <h1 className="text-sm font-medium">Widgets</h1>
         <AnimatePresence mode="popLayout" initial={false}>
           {mode !== 'idle' ? (
@@ -118,7 +120,11 @@ export function Widgets() {
       </header>
 
       <LayoutGroup>
-        <div className="flex-1">
+        <motion.div
+          className="min-h-0 flex-1 overflow-y-auto"
+          animate={{ paddingBottom: panelOpen ? 'var(--panel-h)' : '0px' }}
+          transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+        >
           <WidgetGrid
             items={visibleItems}
             editing={mode === 'editing'}
@@ -130,7 +136,7 @@ export function Widgets() {
               })
             }
           />
-        </div>
+        </motion.div>
 
         <AnimatePresence>
           {mode === 'editing' && hiddenItems.length > 0 && (

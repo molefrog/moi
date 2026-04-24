@@ -108,26 +108,22 @@ function App() {
   const showSidebar = chatMode === 'sidebar'
 
   return (
-    <div className="min-h-screen p-8 max-lg:px-6 max-lg:py-6 max-sm:px-4 max-sm:py-4">
-      <div
-        className={cn(
-          'mx-auto flex w-full max-w-[1184px] justify-center',
-          'min-h-[calc(100vh-4rem)] max-lg:min-h-[calc(100vh-3rem)] max-sm:min-h-[calc(100vh-2rem)]'
-        )}
-      >
-        <div className="max-w-160 flex w-full min-w-0 flex-1 flex-col">
+    <div className="h-dvh overflow-hidden p-[var(--page-pad)]">
+      <div className="mx-auto flex h-full w-full max-w-[var(--content-w)] justify-center">
+        <div className="flex h-full min-h-0 w-full min-w-0 max-w-[var(--column-w)] flex-1 flex-col">
           {chatMode === 'solo' ? chatPanel : <Widgets />}
         </div>
 
         {canFitSidebar && chatMode !== 'solo' && (
           <div
             className={cn(
-              'sticky top-10 shrink-0 self-start transition-all ease-in-out',
-              'h-[calc(100vh-4rem)] max-lg:h-[calc(100vh-3rem)] max-sm:h-[calc(100vh-2rem)]',
-              showSidebar ? 'w-[464px] opacity-100 duration-200' : 'w-0 opacity-0 duration-200'
+              'h-full shrink-0 transition-all ease-in-out',
+              showSidebar
+                ? 'w-[var(--sidebar-w)] opacity-100 duration-200'
+                : 'w-0 opacity-0 duration-200'
             )}
           >
-            <div className="h-full w-[464px] pl-6 lg:pl-16">{chatPanel}</div>
+            <div className="h-full w-[var(--sidebar-w)] pl-[var(--sidebar-gap)]">{chatPanel}</div>
           </div>
         )}
       </div>
