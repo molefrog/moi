@@ -7,12 +7,16 @@ type SessionsStore = {
   events: Record<string, StreamEvent[]>
   views: Record<string, ViewState>
   processing: Record<string, boolean>
+  // Last server-emitted error per session — surfaced as a dismissable banner
+  // above the chat. Cleared when the user types or stops the run.
+  errors: Record<string, string | null>
   list: SessionInfo[]
   status: 'loading' | 'ready' | 'error'
   initialSessionId: string | null
   setEvents: (sessionId: string, evs: StreamEvent[]) => void
   append: (sessionId: string, ev: StreamEvent) => void
   setProcessing: (sessionId: string, value: boolean) => void
+  setError: (sessionId: string, message: string | null) => void
   renameSession: (from: string, to: string) => void
   loadList: (workspaceId: string) => Promise<void>
   loadEvents: (workspaceId: string, sessionId: string) => Promise<void>
@@ -33,6 +37,7 @@ export const useSessionsStore = create<SessionsStore>()(set => ({
   events: {},
   views: {},
   processing: {},
+  errors: {},
   list: [],
   status: 'loading',
   initialSessionId: null,
@@ -99,11 +104,14 @@ export const useSessionsStore = create<SessionsStore>()(set => ({
   setProcessing: (sessionId, value) =>
     set(s => ({ processing: { ...s.processing, [sessionId]: value } })),
 
+  setError: (sessionId, message) => set(s => ({ errors: { ...s.errors, [sessionId]: message } })),
+
   renameSession: (from, to) =>
     set(s => {
       const events = { ...s.events }
       const views = { ...s.views }
       const processing = { ...s.processing }
+      const errors = { ...s.errors }
       if (from in events) {
         events[to] = events[from]
         delete events[from]
@@ -116,6 +124,10 @@ export const useSessionsStore = create<SessionsStore>()(set => ({
         processing[to] = processing[from]
         delete processing[from]
       }
-      return { events, views, processing }
+      if (from in errors) {
+        errors[to] = errors[from]
+        delete errors[from]
+      }
+      return { events, views, processing, errors }
     })
 }))

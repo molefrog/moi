@@ -61,7 +61,15 @@ export type TurnOrigin =
       reason: 'skill-body' | 'system-reminder' | 'hook-output' | 'slash-command' | 'other'
     }
   | { kind: 'subagent-prompt'; parentToolCallId: string }
+  | { kind: 'inter-session' }
   | { kind: 'replay' }
+
+export type TurnMeta = {
+  model?: string
+  provider?: string
+  stopReason?: string
+  usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number; costUsd?: number }
+}
 
 export type Turn = {
   id: string
@@ -70,6 +78,11 @@ export type Turn = {
   parentTaskId?: string
   parts: Part[]
   timestamp?: string
+  // Stable monotonic ordering hint when the source provides one (OpenClaw's
+  // `__openclaw.seq`). Used as a tiebreaker when timestamps collide; the UI
+  // is free to ignore it.
+  seq?: number
+  meta?: TurnMeta
 }
 
 export type McpServerInfo = { name: string; status: string }

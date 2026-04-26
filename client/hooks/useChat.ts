@@ -19,6 +19,7 @@ export function useChat() {
 
   const view = useSessionsStore(s => s.views[activeSessionId ?? ''] ?? EMPTY)
   const processing = useSessionsStore(s => s.processing[activeSessionId ?? ''] ?? false)
+  const error = useSessionsStore(s => s.errors[activeSessionId ?? ''] ?? null)
 
   // Persistent WS for live events — reconnects if workspace changes
   useEffect(() => {
@@ -61,8 +62,14 @@ export function useChat() {
     })
 
     sendWs({ type: 'chat', content: text, sessionId: sid, isNew, optimisticId })
+    useSessionsStore.getState().setError(sid, null)
     setInput('')
   }, [input, processing, activeSessionId, setActiveSession])
+
+  const dismissError = useCallback(() => {
+    if (!activeSessionId) return
+    useSessionsStore.getState().setError(activeSessionId, null)
+  }, [activeSessionId])
 
   const stop = useCallback(() => {
     if (!processing || !activeSessionId) return
@@ -76,5 +83,5 @@ export function useChat() {
     [setActiveSession]
   )
 
-  return { view, processing, input, setInput, send, stop, switchThread }
+  return { view, processing, error, input, setInput, send, stop, switchThread, dismissError }
 }

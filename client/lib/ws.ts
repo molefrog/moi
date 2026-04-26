@@ -5,6 +5,7 @@ import type { ClientMessage, StreamEvent } from '@/lib/types'
 let ws: WebSocket | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let currentWorkspaceId = ''
+let hasConnectedBefore = false
 const queue: ClientMessage[] = []
 
 export function connectWs(workspaceId: string) {
@@ -27,6 +28,17 @@ export function connectWs(workspaceId: string) {
     ws = socket
     for (const msg of queue) socket.send(JSON.stringify(msg))
     queue.length = 0
+    // Reconnect after a drop: re-pull events for the active session so we
+    // pick up any turns / status updates emitted while we were offline. The
+    // initial connect doesn't trigger this — `useChat` already loads events
+    // when activeSessionId becomes set.
+    if (hasConnectedBefore) {
+      const activeSessionId = useWorkspaceStore.getState().activeSessionId
+      if (activeSessionId) {
+        useSessionsStore.getState().loadEvents(currentWorkspaceId, activeSessionId)
+      }
+    }
+    hasConnectedBefore = true
   }
 
   socket.onmessage = e => {
@@ -62,7 +74,14 @@ export function connectWs(workspaceId: string) {
     ) {
       store.append(sid, data as unknown as StreamEvent)
     }
-    // `error` and `stopped` frames are ignored for now by the UI — surface later if needed
+    if (data.kind === 'error' && typeof data.content === 'string') {
+      store.setError(sid, data.content)
+    }
+    if (data.kind === 'stopped') {
+      // Server confirmed abort — make sure the spinner is cleared even if
+      // the trailing `status` frame is delayed or lost.
+      store.setProcessing(sid, false)
+    }
   }
 
   socket.onclose = () => {
@@ -93,6 +112,7 @@ export function disconnectWs() {
     ws = null
   }
   queue.length = 0
+  hasConnectedBefore = false
 }
 
 let onWorkspaceSwitch: ((workspaceId: string) => void) | null = null

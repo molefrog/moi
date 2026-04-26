@@ -9,6 +9,13 @@ import { loadLayout, saveLayout } from './layout'
 import { getOpenClawSessionMessages, getOpenClawSessions } from './openclaw'
 import { toSessionInfo, toStreamEvents } from './openclaw-adapter'
 import {
+  abortOpenClawRun,
+  ensureOpenClawSessionLive,
+  getLiveOpenClawEvents,
+  getOpenClawProcessingSessions,
+  sendOpenClawMessage
+} from './openclaw-session'
+import {
   discoverWorkspaces,
   getWorkspace,
   listWorkspaces,
@@ -120,6 +127,25 @@ export const app = Bun.serve<WsData>({
       const ws = await getWorkspace(req.params.workspaceId)
       if (!ws) return new Response('Workspace not found', { status: 404 })
       if (ws.type === 'openclaw') {
+        // Prefer the live view if we already hold one — keeps REST + WS in
+        // agreement for any reload that lands while a run is active. The
+        // first cold call also primes the live subscription so subsequent
+        // WS frames upsert into the same view.
+        const live = getLiveOpenClawEvents(req.params.workspaceId, req.params.sessionId)
+        if (live) return Response.json(live)
+        if (ws.agentId) {
+          try {
+            const evs = await ensureOpenClawSessionLive({
+              workspaceId: req.params.workspaceId,
+              workspacePath: ws.path,
+              agentId: ws.agentId,
+              sessionId: req.params.sessionId
+            })
+            return Response.json(evs)
+          } catch {
+            // fall through to static path
+          }
+        }
         const preview = await getOpenClawSessionMessages(req.params.sessionId, ws.path, ws.agentId)
         return Response.json(toStreamEvents(preview))
       }
@@ -168,7 +194,13 @@ export const app = Bun.serve<WsData>({
     open(ws) {
       if (ws.data.channel === 'chat') {
         addClient(ws.data.workspaceId, ws)
+        const seen = new Set<string>()
         for (const sid of getProcessingSessions(ws.data.workspaceId)) {
+          seen.add(sid)
+          sendToClient(ws, { type: 'status', sessionId: sid, processing: true })
+        }
+        for (const sid of getOpenClawProcessingSessions(ws.data.workspaceId)) {
+          if (seen.has(sid)) continue
           sendToClient(ws, { type: 'status', sessionId: sid, processing: true })
         }
       } else {
@@ -184,17 +216,34 @@ export const app = Bun.serve<WsData>({
         if (data.type === 'chat' && data.content?.trim()) {
           const workspace = await getWorkspace(ws.data.workspaceId)
           if (!workspace) return
-          handleChat(
-            data.content.trim(),
-            data.sessionId,
-            data.isNew,
-            ws.data.workspaceId,
-            workspace.path,
-            data.optimisticId
-          )
+          if (workspace.type === 'openclaw' && workspace.agentId) {
+            sendOpenClawMessage({
+              workspaceId: ws.data.workspaceId,
+              workspacePath: workspace.path,
+              agentId: workspace.agentId,
+              sessionId: data.sessionId,
+              isNew: data.isNew,
+              content: data.content.trim(),
+              optimisticId: data.optimisticId
+            })
+          } else {
+            handleChat(
+              data.content.trim(),
+              data.sessionId,
+              data.isNew,
+              ws.data.workspaceId,
+              workspace.path,
+              data.optimisticId
+            )
+          }
         }
         if (data.type === 'stop') {
-          stopChat(data.sessionId, ws.data.workspaceId)
+          const workspace = await getWorkspace(ws.data.workspaceId)
+          if (workspace?.type === 'openclaw') {
+            abortOpenClawRun({ workspaceId: ws.data.workspaceId, sessionId: data.sessionId })
+          } else {
+            stopChat(data.sessionId, ws.data.workspaceId)
+          }
         }
       } catch {}
     },

@@ -46,6 +46,7 @@ export type {
   ToolCaller,
   ToolState,
   Turn,
+  TurnMeta,
   TurnOrigin,
   ViewState
 } from './format'

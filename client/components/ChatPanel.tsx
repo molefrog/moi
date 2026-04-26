@@ -63,6 +63,8 @@ type ChatPanelProps = {
   input: string
   setInput: (v: string) => void
   processing: boolean
+  error?: string | null
+  onDismissError?: () => void
   send: () => void
   stop: () => void
   chatMode: ChatMode
@@ -77,6 +79,8 @@ export function ChatPanel({
   input,
   setInput,
   processing,
+  error,
+  onDismissError,
   send,
   stop,
   chatMode,
@@ -174,6 +178,21 @@ export function ChatPanel({
             'bg-background sticky bottom-0 mb-[calc(var(--page-pad)*-1)] pb-[var(--page-pad)]'
         )}
       >
+        {error && (
+          <div className="mb-2 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+            <span className="flex-1 break-words">{error}</span>
+            {onDismissError && (
+              <button
+                type="button"
+                onClick={onDismissError}
+                className="text-red-600 hover:text-red-900"
+                aria-label="Dismiss error"
+              >
+                <IconX size={14} stroke={1.5} />
+              </button>
+            )}
+          </div>
+        )}
         <ChatInput
           value={input}
           onChange={setInput}

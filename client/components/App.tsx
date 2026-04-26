@@ -75,7 +75,8 @@ function WorkspaceLoader() {
 }
 
 function App() {
-  const { view, input, setInput, processing, send, stop, switchThread } = useChat()
+  const { view, input, setInput, processing, error, send, stop, switchThread, dismissError } =
+    useChat()
   const { layout, setLayout } = useWorkspaceStore()
   const { widgets } = useWidgetsStore()
   const canFitSidebar = useCanFitSidebar()
@@ -96,6 +97,8 @@ function App() {
       input={input}
       setInput={setInput}
       processing={processing}
+      error={error}
+      onDismissError={dismissError}
       send={send}
       stop={stop}
       chatMode={chatMode}
@@ -151,6 +154,8 @@ function App() {
               input={input}
               setInput={setInput}
               processing={processing}
+              error={error}
+              onDismissError={dismissError}
               send={send}
               stop={stop}
               chatMode={chatMode}
