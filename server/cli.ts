@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { defineCommand, runMain } from 'citty'
 import Table from 'cli-table3'
-import { cp, mkdir } from 'node:fs/promises'
+import { mkdir } from 'node:fs/promises'
 import { join, resolve } from 'path'
 import pc from 'picocolors'
 
@@ -9,7 +9,9 @@ import { COLOR_THEMES, FONT_THEMES } from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/themes'
 
 import { CONTROL_PORT, PORT } from './constants'
+import { type OpenClawAgent, discoverOpenClawAgents } from './openclaw'
 import { registerWorkspace } from './registry'
+import { installBundledSkills } from './skills-template'
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -80,9 +82,6 @@ function spawnServer(
   })
 }
 
-// Template dir: always resolved relative to this source file so symlinked bins work
-const TEMPLATE_DIR = join(import.meta.dir, '..', 'workspace')
-
 // ---- commands ---------------------------------------------------------------
 
 const init = defineCommand({
@@ -108,14 +107,7 @@ const init = defineCommand({
     const isInteractive = process.stdout.isTTY
 
     await mkdir(target, { recursive: true })
-
-    // Copy .claude/skills/ — overwrite existing files
-    const skillsTarget = join(target, '.claude', 'skills')
-    await mkdir(skillsTarget, { recursive: true })
-    await cp(join(TEMPLATE_DIR, '.claude', 'skills'), skillsTarget, {
-      recursive: true,
-      force: true
-    })
+    await installBundledSkills(join(target, '.claude', 'skills'))
 
     // Always register the workspace in the persistent registry
     const entry = await registerWorkspace(target)
@@ -419,9 +411,130 @@ const status = defineCommand({
   }
 })
 
+// ---- openclaw subcommands ---------------------------------------------------
+
+// Match an `agent` argument against `agentId` (exact) or `name`
+// (case-insensitive). Returns the matching agent or null.
+function findAgent(agents: OpenClawAgent[], query: string): OpenClawAgent | null {
+  const exact = agents.find(a => a.agentId === query)
+  if (exact) return exact
+  const q = query.toLowerCase()
+  return agents.find(a => a.name?.toLowerCase() === q) ?? null
+}
+
+function printAgentTable(agents: OpenClawAgent[]) {
+  const table = new Table({
+    head: ['', pc.bold('agentId'), pc.bold('name'), pc.bold('workspace')],
+    style: { border: [], head: [] }
+  })
+  for (const a of agents) {
+    table.push([
+      a.isDefault ? pc.green('●') : '',
+      a.isDefault ? pc.bold(a.agentId) : a.agentId,
+      a.name ?? pc.dim('—'),
+      pc.dim(a.path)
+    ])
+  }
+  console.log(table.toString())
+}
+
+const openclawInit = defineCommand({
+  meta: {
+    name: 'init',
+    description:
+      'Install moi skills into an OpenClaw agent workspace. Run without args to list discovered agents.'
+  },
+  args: {
+    agent: {
+      type: 'positional',
+      required: false,
+      description: 'Agent id or name (omit to list agents)'
+    }
+  },
+  async run({ args }) {
+    const agents = await discoverOpenClawAgents()
+    if (agents.length === 0) {
+      console.error(
+        '\n' +
+          pc.red('✗') +
+          ' No OpenClaw agents discovered.\n' +
+          pc.dim(
+            '  Make sure the OpenClaw gateway is running and ~/.openclaw/openclaw.json is set.\n'
+          )
+      )
+      process.exit(1)
+    }
+
+    if (!args.agent) {
+      console.log('\n' + pc.bold('OpenClaw agents'))
+      console.log(
+        pc.dim('  Run ' + pc.bold('moi openclaw init <agentId>') + ' to install skills.\n')
+      )
+      printAgentTable(agents)
+      console.log()
+      process.exit(0)
+    }
+
+    const target = findAgent(agents, args.agent)
+    if (!target) {
+      console.error('\n' + pc.red('✗') + ' Agent not found: ' + pc.bold(args.agent) + '\n')
+      console.log('  Available:\n')
+      printAgentTable(agents)
+      console.log()
+      process.exit(1)
+    }
+
+    // Copy each shipped skill folder into <agent-workspace>/skills/<name>/.
+    // OpenClaw resolves <workspace>/skills with the highest precedence, so
+    // these win over any same-named bundled or per-user skill.
+    const skillsRoot = join(target.path, 'skills')
+    await installBundledSkills(skillsRoot)
+
+    // Register in the moi registry so the agent's workspace appears in the
+    // UI workspace list. Mirrors what `moi init` does for Claude Code.
+    const entry = await registerWorkspace(target.path, {
+      type: 'openclaw',
+      name: target.name,
+      agentId: target.agentId,
+      isDefault: target.isDefault,
+      lastRunAt: target.lastRunAt
+    })
+
+    console.log('\n' + pc.green('✓') + ' Installed skills to ' + pc.bold(skillsRoot))
+    console.log(
+      pc.dim('  Agent: ') +
+        pc.bold(target.agentId) +
+        (target.name ? pc.dim(' (' + target.name + ')') : '')
+    )
+    const isInteractive = process.stdout.isTTY
+    const running = await isServerRunning()
+    if (running) {
+      const url = `http://localhost:${PORT}/workspace/${entry.id}`
+      // Notify the running server so it picks up the new entry without a
+      // restart, then open (browser only in interactive mode) — same shape
+      // as `moi init`'s already-running branch.
+      await registerViaControl(target.path)
+      if (isInteractive) {
+        console.log('  Opening ' + pc.bold(url) + '\n')
+        await openBrowser(url)
+      } else {
+        console.log('  Ready at ' + pc.bold(url) + '\n')
+      }
+    } else {
+      console.log('  Run ' + pc.bold('moi start') + ' to open in the browser\n')
+    }
+    process.exit(0)
+  }
+})
+
+const openclaw = defineCommand({
+  meta: { name: 'openclaw', description: 'OpenClaw integration commands' },
+  subCommands: { init: openclawInit }
+})
+
 const main = defineCommand({
   meta: { name: 'moi', description: 'moi — local AI workspace' },
-  subCommands: { init, start, bundle, theme, status }
+  subCommands: { init, start, bundle, theme, status, openclaw }
 })
 
 runMain(main)
