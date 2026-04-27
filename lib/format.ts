@@ -32,6 +32,11 @@ export type ToolCall = {
   toolCallId: string
   name: string
   caller: ToolCaller
+  // Origin platform — lets the UI pick the right display label and brief
+  // for the same canonical action (`read` vs `Read`, `exec` vs `Bash`).
+  // Adapters are responsible for setting it; UI defaults to a generic
+  // rendering when absent.
+  provider?: 'claude-code' | 'openclaw'
   mcpServer?: string
   state: ToolState
   input: unknown

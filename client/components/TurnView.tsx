@@ -185,10 +185,8 @@ function GenericToolCard({ call }: GenericToolCardProps) {
           className="chevron text-ring shrink-0 transition-transform duration-150 group-open:rotate-90"
         />
         <CallerBadge call={call} />
-        <span className="text-xs font-medium">{call.name}</span>
-        <span className="text-ring truncate text-[11px]">
-          {formatInputBrief(call.name, (call.input as Record<string, unknown>) ?? {}, cwd)}
-        </span>
+        <span className="whitespace-nowrap text-xs font-medium">{getToolDisplayName(call)}</span>
+        <span className="text-ring truncate text-[11px]">{formatInputBrief(call, cwd)}</span>
         {isRunning && <IconLoader2 size={12} stroke={1.5} className="text-ring animate-spin" />}
       </summary>
       {(output || isError) && (
@@ -408,18 +406,103 @@ function makeShortenPaths(cwd: string | null) {
     })
 }
 
-function formatInputBrief(
+// Tool name → user-facing label, picked per provider. Adapters send the
+// raw upstream tool name; the UI is the only place that humanizes it. Names
+// not in either map fall through to the raw name (so unknown / plugin tools
+// still render something).
+const OPENCLAW_TOOL_LABELS: Record<string, string> = {
+  read: 'Read file',
+  write: 'Write file',
+  edit: 'Edit file',
+  apply_patch: 'Edit',
+  exec: 'Bash',
+  process: 'Manage process',
+  web_search: 'Web search',
+  web_fetch: 'Fetch',
+  sessions_list: 'List sessions',
+  sessions_history: 'Recall session',
+  sessions_yield: 'Yield to session',
+  sessions_send: 'Send to session',
+  sessions_spawn: 'Spawn session',
+  subagents: 'Run sub-agent',
+  agents_list: 'List agents',
+  session_status: 'Session status',
+  image: 'Analyze image',
+  image_generate: 'Generate image',
+  memory_get: 'Read memory',
+  memory_search: 'Search memory',
+  update_plan: 'Update plan',
+  message: 'Send message',
+  browser: 'Browser',
+  canvas: 'Canvas',
+  cron: 'Cron',
+  gateway: 'Gateway',
+  code_execution: 'Run Python',
+  tts: 'Text-to-speech',
+  music_generate: 'Generate music',
+  video_generate: 'Generate video',
+  x_search: 'Search X'
+}
+
+function getToolDisplayName(call: ToolCall): string {
+  if (call.provider === 'openclaw') return OPENCLAW_TOOL_LABELS[call.name] ?? call.name
+  return call.name
+}
+
+function formatInputBrief(call: ToolCall, cwd: string | null): string {
+  const input = (call.input as Record<string, unknown>) ?? {}
+  const shorten = makeShortenPaths(cwd)
+  if (call.provider === 'openclaw') {
+    return formatOpenClawBrief(call.name, input, shorten)
+  }
+  return formatClaudeBrief(call.name, input, shorten)
+}
+
+function formatClaudeBrief(
   tool: string,
   input: Record<string, unknown>,
-  cwd: string | null
+  shorten: (s: string) => string
 ): string {
-  const shorten = makeShortenPaths(cwd)
   if (tool === 'Bash') return shorten(`$ ${getInputValue(input, 'command')}`)
-  if (tool === 'Read') return shorten(getInputValue(input, 'file_path'))
-  if (tool === 'Write' || tool === 'Edit') return shorten(getInputValue(input, 'file_path'))
+  if (tool === 'Read' || tool === 'Write' || tool === 'Edit')
+    return shorten(getInputValue(input, 'file_path'))
   if (tool === 'Glob') return shorten(getInputValue(input, 'pattern'))
   if (tool === 'Grep')
     return `/${getInputValue(input, 'pattern')}/ ${shorten(getInputValue(input, 'path'))}`
+  return ''
+}
+
+function formatOpenClawBrief(
+  tool: string,
+  input: Record<string, unknown>,
+  shorten: (s: string) => string
+): string {
+  // File I/O — `path` is the canonical key.
+  if (tool === 'read' || tool === 'write' || tool === 'edit')
+    return shorten(getInputValue(input, 'path'))
+  if (tool === 'apply_patch') {
+    const patch = getInputValue(input, 'patch')
+    const firstLine = patch.split('\n').find(l => l.startsWith('*** ')) ?? patch.split('\n')[0]
+    return shorten(firstLine ?? '')
+  }
+  if (tool === 'exec') return shorten(`$ ${getInputValue(input, 'command')}`)
+  if (tool === 'process') {
+    const action = getInputValue(input, 'action')
+    const name = getInputValue(input, 'name')
+    return [action, name].filter(Boolean).join(' ') || shorten(getInputValue(input, 'command'))
+  }
+  if (tool === 'web_search' || tool === 'x_search') return getInputValue(input, 'query')
+  if (tool === 'web_fetch') return getInputValue(input, 'url')
+  if (tool === 'memory_search') return getInputValue(input, 'query')
+  if (tool === 'memory_get') return getInputValue(input, 'key') || getInputValue(input, 'name')
+  if (tool === 'sessions_history' || tool === 'sessions_send' || tool === 'sessions_yield')
+    return getInputValue(input, 'sessionKey') || getInputValue(input, 'agentId')
+  if (tool === 'sessions_list' || tool === 'agents_list') return getInputValue(input, 'agentId')
+  if (tool === 'subagents' || tool === 'sessions_spawn')
+    return getInputValue(input, 'task') || getInputValue(input, 'agentId')
+  if (tool === 'image' || tool === 'image_generate')
+    return getInputValue(input, 'prompt') || shorten(getInputValue(input, 'path'))
+  if (tool === 'message') return getInputValue(input, 'recipient') || getInputValue(input, 'to')
   if (tool === 'update_plan') {
     const plan = input.plan
     if (Array.isArray(plan)) {

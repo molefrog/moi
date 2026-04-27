@@ -322,6 +322,7 @@ export class ClaudeAdapter {
             toolCallId: b.id,
             name: b.name,
             caller: callerFromBlockType(b.type, b.name),
+            provider: 'claude-code',
             mcpServer: b.type === 'mcp_tool_use' ? b.server_name : undefined,
             state: 'running',
             input: b.input ?? {}

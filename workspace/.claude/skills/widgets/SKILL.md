@@ -49,6 +49,9 @@ If `.widgets/` does not exist yet, create it and install dependencies:
 |------|---------|
 | `.widgets/<name>.tsx` | Widget React component (required) |
 | `.widgets/<name>.server.ts` | Server-side async functions the widget can call (optional) |
+| `.widgets/.workspace.json` | **Auto-generated. Do NOT read, edit, or `cat` this file.** |
+
+`.widgets/.workspace.json` is owned by `moi` and rewritten on its own. Use the `moi` CLI to inspect or change anything it contains — never read or edit the file directly.
 
 ## Workflow
 

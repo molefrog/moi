@@ -86,36 +86,6 @@ function collectToolResults(messages: OpenClawMessage[]): Map<string, ToolResult
   return map
 }
 
-// OpenClaw agents expose lowercase tool names (`read`, `edit`, `exec`,
-// `update_plan`) with `path`/`command` arg keys. The client's tool cards were
-// written for Claude Code's PascalCase names (`Read`, `Bash`) with
-// `file_path`/`command`. We normalize here so the UI doesn't have to branch.
-const TOOL_NAME_ALIASES: Record<string, string> = {
-  read: 'Read',
-  write: 'Write',
-  edit: 'Edit',
-  exec: 'Bash',
-  glob: 'Glob',
-  grep: 'Grep'
-}
-
-function normalizeToolName(name: string): string {
-  return TOOL_NAME_ALIASES[name] ?? name
-}
-
-function normalizeToolInput(openclawName: string, input: unknown): unknown {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) return input
-  const src = input as Record<string, unknown>
-  if (
-    (openclawName === 'read' || openclawName === 'write' || openclawName === 'edit') &&
-    typeof src.path === 'string' &&
-    typeof src.file_path !== 'string'
-  ) {
-    return { ...src, file_path: src.path }
-  }
-  return input
-}
-
 function blockToPart(
   block: OpenClawContentBlock,
   role: OpenClawMessage['role'],
@@ -153,10 +123,11 @@ function blockToPart(
       if (result) state = result.isError ? 'error' : 'success'
       const call: ToolCall = {
         toolCallId: id,
-        name: normalizeToolName(name),
+        name,
         caller: 'model',
+        provider: 'openclaw',
         state,
-        input: normalizeToolInput(name, (block as { arguments?: unknown }).arguments)
+        input: (block as { arguments?: unknown }).arguments
       }
       if (result) {
         if (result.isError) call.errorText = result.output
