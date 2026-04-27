@@ -60,10 +60,18 @@ async function needsRebuild(
   name: string,
   srcPath: string
 ): Promise<boolean> {
-  const { buildDir } = getWidgetPaths(workspacePath)
+  const { sourceDir, buildDir } = getWidgetPaths(workspacePath)
   const built = Bun.file(join(buildDir, `${name}.js`))
   if (!(await built.exists())) return true
-  return Bun.file(srcPath).lastModified >= built.lastModified
+  // Also stat the sibling `<name>.server.ts` if it exists. The main `.tsx`
+  // imports `./<name>.server` and the build inlines RPC stubs for its
+  // exports, so a server-only edit must trigger a rebuild — but its mtime
+  // lives on a different file than `srcPath`.
+  const serverPath = join(sourceDir, `${name}.server.ts`)
+  const serverFile = Bun.file(serverPath)
+  const serverMtime = (await serverFile.exists()) ? serverFile.lastModified : 0
+  const sourceMtime = Math.max(Bun.file(srcPath).lastModified, serverMtime)
+  return sourceMtime >= built.lastModified
 }
 
 async function pruneStaleBuilds(workspacePath: string, sourceNames: Set<string>) {
