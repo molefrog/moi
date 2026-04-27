@@ -160,7 +160,12 @@ export const app = Bun.serve<WsData>({
       const ws = await getWorkspace(req.params.workspaceId)
       if (!ws) return new Response('Workspace not found', { status: 404 })
       if (req.method === 'GET') {
-        return Response.json({ ...(await loadLayout(ws.path)), cwd: ws.path })
+        return Response.json({
+          ...(await loadLayout(ws.path)),
+          cwd: ws.path,
+          name: ws.name,
+          agentId: ws.agentId
+        })
       }
       if (req.method === 'PUT') {
         const body = await req.json()

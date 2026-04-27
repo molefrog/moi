@@ -11,6 +11,7 @@ const DEFAULT_LAYOUT: WorkspaceLayout = {
 type WorkspaceStore = {
   id: string
   cwd: string | null
+  name: string | null
   layout: WorkspaceLayout
   status: 'loading' | 'ready' | 'error'
   activeSessionId: string | null
@@ -24,6 +25,7 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   id: 'default',
   cwd: null,
+  name: null,
   layout: DEFAULT_LAYOUT,
   status: 'loading',
   activeSessionId: null,
@@ -33,8 +35,12 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
     try {
       const res = await fetch(`/_mei/${id}/layout`)
       if (!res.ok) throw new Error()
-      const { cwd, ...layout } = await res.json()
-      set({ cwd: cwd ?? null, layout, status: 'ready' })
+      const { cwd, name, ...layout } = await res.json()
+      // Strip the server-only `agentId` so it doesn't end up in the
+      // persisted layout object (rest carries `version`, `widgetGrid`,
+      // `chatMode`, `theme`).
+      delete (layout as Record<string, unknown>).agentId
+      set({ cwd: cwd ?? null, name: name ?? null, layout, status: 'ready' })
     } catch {
       set({ status: 'error' })
     }

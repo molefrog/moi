@@ -1,6 +1,5 @@
 import { IconDots, IconLoader2, IconPlus, IconTrash } from '@tabler/icons-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'wouter'
 
 import claudeIcon from '@/client/assets/claude.svg'
 import openclawIcon from '@/client/assets/openclaw.svg'
@@ -168,7 +167,7 @@ function WorkspaceCard({ workspace, onRemove }: WorkspaceCardProps) {
   }
 
   return (
-    <Link
+    <a
       href={`/workspace/${workspace.id}`}
       className={cn(
         'border-border bg-card hover:bg-muted/40 group flex gap-3.5 rounded-xl border p-3.5',
@@ -220,7 +219,7 @@ function WorkspaceCard({ workspace, onRemove }: WorkspaceCardProps) {
         <div className="flex-1" />
         <div className="text-muted-foreground text-xs">{meta}</div>
       </div>
-    </Link>
+    </a>
   )
 }
 

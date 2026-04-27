@@ -2,6 +2,8 @@ import { useState } from 'react'
 
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 
+import { IconHome } from '@tabler/icons-react'
+
 import { cn } from '@/client/lib/cn'
 import { findFreePosition } from '@/client/lib/grid-pack'
 import { useWidgetsStore } from '@/client/store/widgets'
@@ -12,7 +14,27 @@ import { HiddenPanel } from './HiddenPanel'
 import type { GridItem } from './WidgetGrid'
 import { WidgetGrid } from './WidgetGrid'
 import { WidgetShell } from './WidgetShell'
-import { Button } from './ui/button'
+import { Button, buttonVariants } from './ui/button'
+
+// Plain `<a href="/">` so the browser does a full page navigation back to
+// the workspaces list — wouter's client-side routing causes a flash of
+// stale data while everything reloads, which is worse than a full reload.
+function HomeLink() {
+  const name = useWorkspaceStore(s => s.name)
+  return (
+    <a
+      href="/"
+      aria-label={name ? `Home (${name})` : 'Home'}
+      className={cn(
+        buttonVariants({ variant: 'ghost', size: 'icon' }),
+        name && 'w-auto gap-2 px-2'
+      )}
+    >
+      <IconHome className="text-muted-foreground" stroke={1.5} />
+      {name && <span className="text-sm font-medium">{name}</span>}
+    </a>
+  )
+}
 
 type Mode = 'idle' | 'editing' | 'customizing'
 
@@ -59,7 +81,7 @@ export function Widgets() {
     return (
       <div className="group flex h-full min-h-0 flex-col">
         <header className="flex shrink-0 items-center justify-between pb-4">
-          <h1 className="text-sm font-medium">Widgets</h1>
+          <HomeLink />
         </header>
         <div className="flex flex-1 items-center justify-center">
           <p className="text-muted-foreground text-sm">No widgets found</p>
@@ -71,7 +93,7 @@ export function Widgets() {
   return (
     <div className={cn('group relative flex h-full min-h-0 flex-col')}>
       <header className="flex shrink-0 items-center justify-between pb-4">
-        <h1 className="text-sm font-medium">Widgets</h1>
+        <HomeLink />
         <AnimatePresence mode="popLayout" initial={false}>
           {mode !== 'idle' ? (
             <motion.div
