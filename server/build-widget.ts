@@ -180,7 +180,47 @@ function serverProxyPlugin(sourceDir: string): {
   return { plugin, serverModules }
 }
 
-function widgetEntryPlugin(widgetPath: string): BunPlugin {
+// Path to the host's `@theme inline` block — shared with `client/index.css`.
+// Inlined into the widget's synthetic CSS at build time so Tailwind sees the
+// theme tokens.
+const HOST_THEME_PATH = join(import.meta.dir, '..', 'client', 'theme.css')
+
+// Three things matter for widget styling:
+//   1. The umbrella `@import 'tailwindcss'` brings in @layer theme + base +
+//      utilities — which is what spacing/color utilities like `left-2.5`,
+//      `gap-1.5`, `text-amber-500` need to resolve. The split
+//      `theme`/`utilities` imports skip the `@layer theme` wrapper and theme
+//      variables aren't in scope at compile time.
+//   2. The host's `@theme inline` block (inlined from theme.css) teaches
+//      Tailwind about host-owned tokens (`--color-background`,
+//      `--color-foreground`, etc.) so widgets compile classes like
+//      `bg-foreground/20`, `text-muted`, `rounded-xl`. The `inline` keyword
+//      means the widget's CSS does NOT redefine the underlying
+//      `--background`/`--foreground` variables — those stay host-owned and
+//      the widget picks them up from `:root` at runtime.
+//   3. Tailwind's auto-detection treats `.widgets/` as a hidden directory
+//      and skips it. An explicit `@source` bypasses the dot-dir + gitignore
+//      filters.
+//
+// Important: the synthetic CSS must live on disk in the `file` namespace
+// because `bun-plugin-tailwind`'s `onLoad` only matches that namespace —
+// custom-namespace CSS is treated as raw text and our `@theme inline` block
+// is left unprocessed. We materialize it inside `<sourceDir>/.build/` and
+// have the entry import it by absolute path.
+async function writeSyntheticTailwindCss(widgetPath: string): Promise<string> {
+  const sourceDir = dirname(widgetPath)
+  const buildDir = join(sourceDir, '.build')
+  const cssPath = join(buildDir, 'widget-tailwind.css')
+  const contents = [
+    `@import 'tailwindcss';`,
+    await Bun.file(HOST_THEME_PATH).text(),
+    `@source "${sourceDir}";`
+  ].join('\n')
+  await Bun.write(cssPath, contents)
+  return cssPath
+}
+
+function widgetEntryPlugin(widgetPath: string, syntheticCssPath: string): BunPlugin {
   return {
     name: 'widget-entry',
     setup(build) {
@@ -191,29 +231,10 @@ function widgetEntryPlugin(widgetPath: string): BunPlugin {
 
       build.onLoad({ filter: /.*/, namespace: 'widget-entry' }, () => ({
         contents: [
-          `import "widget-tailwind.css";`,
+          `import ${JSON.stringify(syntheticCssPath)};`,
           `export { default } from ${JSON.stringify(widgetPath)};`
         ].join('\n'),
         loader: 'js'
-      }))
-
-      build.onResolve({ filter: /^widget-tailwind\.css$/ }, () => ({
-        path: join(widgetPath, '..', 'widget-tailwind.css'),
-        namespace: 'widget-tw'
-      }))
-
-      build.onLoad({ filter: /.*/, namespace: 'widget-tw' }, () => ({
-        // Two things matter for widget styling:
-        //   1. The umbrella `@import 'tailwindcss'` brings in @layer theme +
-        //      base + utilities — which is what spacing/color utilities like
-        //      `left-2.5`, `gap-1.5`, `text-amber-500` need to resolve. The
-        //      split `theme`/`utilities` imports skip the `@layer theme`
-        //      wrapper and theme variables aren't in scope at compile time.
-        //   2. Tailwind's auto-detection treats `.widgets/` as a hidden
-        //      directory and skips it. An explicit @source bypasses the
-        //      dot-dir + gitignore filters.
-        contents: [`@import 'tailwindcss';`, `@source "${join(widgetPath, '..')}";`].join('\n'),
-        loader: 'css'
       }))
     }
   }
@@ -265,6 +286,7 @@ export async function buildWidget(entrypoint: string): Promise<WidgetArtifact> {
   await prevalidateServerFiles(entrypoint)
 
   const { plugin: serverProxy, serverModules } = serverProxyPlugin(sourceDir)
+  const syntheticCssPath = await writeSyntheticTailwindCss(entrypoint)
 
   let result: Awaited<ReturnType<typeof Bun.build>>
   try {
@@ -279,7 +301,7 @@ export async function buildWidget(entrypoint: string): Promise<WidgetArtifact> {
       // Without this, oxide scans `none-computer/` (the parent server's
       // cwd) instead of the workspace's `.widgets/`.
       root: sourceDir,
-      plugins: [widgetEntryPlugin(entrypoint), serverProxy, tailwind]
+      plugins: [widgetEntryPlugin(entrypoint, syntheticCssPath), serverProxy, tailwind]
     })
   } catch (err) {
     // Bun.build throws AggregateError on failure (default throw: true).
