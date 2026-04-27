@@ -48,6 +48,16 @@ export const control = Bun.serve({
           return
         }
 
+        if (data.type === 'widget:refresh') {
+          // Tell every connected widget to re-import its module (cache-bust)
+          // and re-run its data fetches. No rebuild, no page reload — the
+          // existing `useWidget` hook handles `widgets:refresh` identically
+          // to `widget:updated` (load with bust=true).
+          publishMei({ type: 'widgets:refresh' })
+          ws.send(JSON.stringify({ ok: true }))
+          return
+        }
+
         if (data.type === 'theme') {
           // Theme is per-workspace
           const workspaces = await listWorkspaces()

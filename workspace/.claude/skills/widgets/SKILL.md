@@ -147,6 +147,7 @@ Always handle three states: loading → skeleton, error → error state with ret
 
 - `moi bundle` — compile changed widgets
 - `moi bundle --force` — rebuild all widgets (use after changing `config`)
+- `moi refresh` — re-fetch widget data without rebuilding (use after you mutated data the widgets read — DB rows, files, external API records — so the displayed values catch up)
 - `moi theme --font=<key>` — change font theme (omit `--font` to list options)
 - `moi theme --color=<key>` — change color preset (omit `--color` to list options)
 

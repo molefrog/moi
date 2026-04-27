@@ -56,9 +56,14 @@ export function useWidget(name: string): WidgetState {
     load()
   }, [load])
 
-  // Reload when server says this widget was updated
+  // Reload when server says this widget was updated, OR when the agent
+  // triggered a global data refresh (`moi refresh`). Both paths cache-bust
+  // the import URL so the component remounts and useEffect-driven `rpc()`
+  // calls re-execute against fresh data.
   useMeiEvent(event => {
     if (event.type === 'widget:updated' && event.name === name) {
+      load(true)
+    } else if (event.type === 'widgets:refresh') {
       load(true)
     }
   })

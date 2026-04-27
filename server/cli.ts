@@ -249,6 +249,36 @@ const bundle = defineCommand({
   }
 })
 
+const refresh = defineCommand({
+  meta: {
+    name: 'refresh',
+    description:
+      'Refresh widget data without rebuilding. Use after the agent mutates underlying data.'
+  },
+  run() {
+    const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
+
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'widget:refresh' }))
+
+    ws.onmessage = event => {
+      const data = JSON.parse(String(event.data))
+      if (data.error) {
+        console.error('\n' + pc.red('✗') + ' ' + data.error + '\n')
+        ws.close()
+        process.exit(1)
+      }
+      console.log('\n' + pc.green('✓') + ' Refresh signal sent\n')
+      ws.close()
+      process.exit(0)
+    }
+
+    ws.onerror = () => {
+      console.error('Could not connect to control server. Is the main process running?')
+      process.exit(1)
+    }
+  }
+})
+
 function hexToRgb(h: string): [number, number, number] {
   const n = parseInt(h.replace('#', ''), 16)
   return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff]
@@ -534,7 +564,7 @@ const openclaw = defineCommand({
 
 const main = defineCommand({
   meta: { name: 'moi', description: 'moi — local AI workspace' },
-  subCommands: { init, start, bundle, theme, status, openclaw }
+  subCommands: { init, start, bundle, refresh, theme, status, openclaw }
 })
 
 runMain(main)
