@@ -203,7 +203,16 @@ function widgetEntryPlugin(widgetPath: string): BunPlugin {
       }))
 
       build.onLoad({ filter: /.*/, namespace: 'widget-tw' }, () => ({
-        contents: `@import 'tailwindcss/theme';\n@import 'tailwindcss/utilities';`,
+        // Two things matter for widget styling:
+        //   1. The umbrella `@import 'tailwindcss'` brings in @layer theme +
+        //      base + utilities — which is what spacing/color utilities like
+        //      `left-2.5`, `gap-1.5`, `text-amber-500` need to resolve. The
+        //      split `theme`/`utilities` imports skip the `@layer theme`
+        //      wrapper and theme variables aren't in scope at compile time.
+        //   2. Tailwind's auto-detection treats `.widgets/` as a hidden
+        //      directory and skips it. An explicit @source bypasses the
+        //      dot-dir + gitignore filters.
+        contents: [`@import 'tailwindcss';`, `@source "${join(widgetPath, '..')}";`].join('\n'),
         loader: 'css'
       }))
     }
@@ -265,6 +274,11 @@ export async function buildWidget(entrypoint: string): Promise<WidgetArtifact> {
       target: 'browser',
       sourcemap: 'inline',
       external: EXTERNAL_MODULES,
+      // bun-plugin-tailwind uses `build.config.root` as the auto-detect
+      // project root (`projectRoot = build.config?.root ?? process.cwd()`).
+      // Without this, oxide scans `none-computer/` (the parent server's
+      // cwd) instead of the workspace's `.widgets/`.
+      root: sourceDir,
       plugins: [widgetEntryPlugin(entrypoint), serverProxy, tailwind]
     })
   } catch (err) {
