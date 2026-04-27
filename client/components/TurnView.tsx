@@ -5,6 +5,7 @@ import {
   IconBrain,
   IconChevronRight,
   IconLoader2,
+  IconPlug,
   IconSparkles,
   IconUsersGroup,
   IconX
@@ -13,6 +14,7 @@ import { relative } from 'pathe'
 
 import { MarkdownContent } from '@/client/components/MarkdownContent'
 import { cn } from '@/client/lib/cn'
+import { formatMcpServerName, getMcpIcon } from '@/client/lib/mcp-icons'
 import { useWorkspaceStore } from '@/client/store/workspace'
 import type { Part, SubagentRecord, ToolCall, Turn } from '@/lib/types'
 
@@ -162,6 +164,11 @@ function ToolCallCard({ call }: ToolCallCardProps) {
   if (call.name === 'Skill' && call.skill) {
     return <SkillCard call={call} />
   }
+  // Mcporter calls are shell commands like
+  //   `mcporter call notion.notion-search --args '...'`
+  // We render them as a server-branded card instead of a raw Bash line.
+  const mcp = parseMcporterCall(call)
+  if (mcp) return <MCPCallCard call={call} mcp={mcp} />
   return <GenericToolCard call={call} />
 }
 
@@ -187,6 +194,86 @@ function GenericToolCard({ call }: GenericToolCardProps) {
         <CallerBadge call={call} />
         <span className="whitespace-nowrap text-xs font-medium">{getToolDisplayName(call)}</span>
         <span className="text-ring truncate text-[11px]">{formatInputBrief(call, cwd)}</span>
+        {isRunning && <IconLoader2 size={12} stroke={1.5} className="text-ring animate-spin" />}
+      </summary>
+      {(output || isError) && (
+        <div
+          className={cn(
+            'ml-4 mt-1 rounded-md border px-3 py-2.5',
+            isError ? 'border-red-200 bg-red-50' : 'border-border bg-muted'
+          )}
+        >
+          <pre
+            className={cn(
+              'max-h-[200px] overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs leading-relaxed',
+              isError ? 'text-red-800' : 'text-muted-foreground'
+            )}
+          >
+            {output || '(empty)'}
+          </pre>
+        </div>
+      )}
+    </details>
+  )
+}
+
+// -----------------------------------------------------------------------
+// MCP call card (mcporter)
+// -----------------------------------------------------------------------
+
+type McporterCall = { server: string; tool: string; rest: string }
+
+// Detect `mcporter call <server>.<tool> [args...]` inside a shell command,
+// optionally prefixed with `env VAR=value …`. Returns null for anything
+// that's not a `call` invocation (config, list, etc. — those keep the
+// Generic Bash card).
+function parseMcporterCall(call: ToolCall): McporterCall | null {
+  const isShell = call.name === 'Bash' || call.name === 'exec'
+  if (!isShell) return null
+  const input = (call.input as Record<string, unknown>) ?? {}
+  const command = typeof input.command === 'string' ? input.command : ''
+  if (!command) return null
+  // Drop any `env VAR=… VAR=… ` prefix the agent prepends to set PATH etc.
+  const stripped = command.replace(
+    /^\s*env\s+(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S+)\s+)+/,
+    ''
+  )
+  const m = stripped.match(/^mcporter\s+call\s+([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)(?:\s+(.+))?$/)
+  if (!m) return null
+  return { server: m[1], tool: m[2], rest: (m[3] ?? '').trim() }
+}
+
+type MCPCallCardProps = { call: ToolCall; mcp: McporterCall }
+function MCPCallCard({ call, mcp }: MCPCallCardProps) {
+  const isError = call.state === 'error'
+  const isRunning = call.state === 'running' || call.state === 'pending'
+  const output = isError
+    ? (call.errorText ?? '')
+    : typeof call.output === 'string'
+      ? call.output
+      : ''
+  const iconSrc = getMcpIcon(mcp.server)
+  const brief = mcp.rest ? `${mcp.tool} ${mcp.rest}` : mcp.tool
+
+  return (
+    <details className="group">
+      <summary className="flex cursor-pointer select-none items-center gap-2 py-1.5">
+        <IconChevronRight
+          size={12}
+          stroke={1.5}
+          className="chevron text-ring shrink-0 transition-transform duration-150 group-open:rotate-90"
+        />
+        <span className="bg-muted block size-4 shrink-0 overflow-hidden rounded-[3px]">
+          {iconSrc ? (
+            <img src={iconSrc} alt="" className="size-full object-cover" />
+          ) : (
+            <IconPlug size={12} stroke={1.5} className="text-muted-foreground m-0.5" />
+          )}
+        </span>
+        <span className="whitespace-nowrap text-xs font-medium">
+          {formatMcpServerName(mcp.server)} MCP
+        </span>
+        <span className="text-ring truncate text-[11px]">{brief}</span>
         {isRunning && <IconLoader2 size={12} stroke={1.5} className="text-ring animate-spin" />}
       </summary>
       {(output || isError) && (
