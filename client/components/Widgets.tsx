@@ -121,7 +121,10 @@ export function Widgets() {
 
       <LayoutGroup>
         <motion.div
-          className="min-h-0 flex-1 overflow-y-auto"
+          // p-1 / -m-1 give widget shadows room at the scroll container's
+          // edges without shifting the visible bounds; the padding lives
+          // inside the scroll viewport so dragged shadows stay visible.
+          className="-m-1 min-h-0 flex-1 overflow-y-auto p-1"
           animate={{ paddingBottom: panelOpen ? 'var(--panel-h)' : '0px' }}
           transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
         >

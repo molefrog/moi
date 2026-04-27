@@ -36,7 +36,7 @@ export type WidgetGridProps = {
 export function WidgetGrid({
   cols = 4,
   rowHeight = 160,
-  gap = 16,
+  gap = 8,
   items,
   editing,
   renderItem,
