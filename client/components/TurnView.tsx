@@ -65,10 +65,21 @@ export function TurnView({ turn }: TurnViewProps) {
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      {turn.parts.map((part, i) => (
-        <PartRenderer key={i} part={part} />
-      ))}
+    <div className="flex flex-col">
+      {turn.parts.map((part, i) => {
+        // Default 12px between siblings, tightened to 4px when both this
+        // part and the previous one are tool-call cards. Lets a chain of
+        // tool calls (especially after the groupTurns merge) read as a
+        // single sequence instead of a sparse list.
+        const prev = i > 0 ? turn.parts[i - 1] : null
+        const tightToolPair = prev?.type === 'tool-call' && part.type === 'tool-call'
+        const spacing = i === 0 ? '' : tightToolPair ? 'mt-1' : 'mt-3'
+        return (
+          <div key={i} className={spacing}>
+            <PartRenderer part={part} />
+          </div>
+        )
+      })}
     </div>
   )
 }

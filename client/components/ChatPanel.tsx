@@ -1,9 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 
 import { IconChevronsRight, IconSelector, IconX } from '@tabler/icons-react'
 
 import { useScrollFade } from '@/client/hooks/useScrollFade'
 import { cn } from '@/client/lib/cn'
+import { groupTurns } from '@/client/lib/group-turns'
 import type { ViewState } from '@/lib/types'
 
 import { ChatInput } from './ChatInput'
@@ -91,6 +92,11 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const { ref: scrollRef, showTopFade, showBottomFade } = useScrollFade()
   const turns = view.turns
+  // Visual grouping: fold consecutive tool-only assistant turns into one
+  // synthetic turn so OpenAI Codex–style traces (which serialize one
+  // assistant message per agent step) don't render with the wider
+  // inter-turn gap between every tool call. See `dev/turn-spacing.md`.
+  const groupedTurns = useMemo(() => groupTurns(turns), [turns])
 
   useEffect(() => {
     const ref = chatMode === 'solo' ? document.body : scrollRef.current
@@ -166,7 +172,7 @@ export function ChatPanel({
         )}
       >
         {turns.length === 0 && !processing && <EmptyState />}
-        {turns.map(turn => (
+        {groupedTurns.map(turn => (
           <TurnView key={turn.id} turn={turn} />
         ))}
         {processing && <ThinkingIndicator />}
