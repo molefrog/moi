@@ -243,9 +243,13 @@ function widgetEntryPlugin(widgetPath: string, syntheticCssPath: string): BunPlu
 function injectCss(js: string, css: string, widgetName: string): string {
   if (!css.trim()) return js
 
+  // After `moi bundle` rebuilds the widget, the new JS module re-runs in the
+  // browser. Always replace any prior <style data-widget="<id>"> tag so the
+  // freshly-built CSS takes effect; the previous "skip if already present"
+  // guard left stale rules in place after edits.
   const injection = [
     `((css, id) => {`,
-    `  if (document.querySelector(\`style[data-widget="\${id}"]\`)) return;`,
+    `  document.querySelector(\`style[data-widget="\${id}"]\`)?.remove();`,
     `  const s = document.createElement("style");`,
     `  s.dataset.widget = id;`,
     `  s.textContent = css;`,

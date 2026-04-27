@@ -223,22 +223,23 @@ function GenericToolCard({ call }: GenericToolCardProps) {
 
 type McporterCall = { server: string; tool: string; rest: string }
 
-// Detect `mcporter call <server>.<tool> [args...]` inside a shell command,
-// optionally prefixed with `env VAR=value …`. Returns null for anything
-// that's not a `call` invocation (config, list, etc. — those keep the
-// Generic Bash card).
+// Detect a `mcporter call <server>.<tool> [args...]` invocation inside a
+// shell command. We accept any prefix (env VAR=…, absolute paths to a Node
+// binary, `$(which mcporter)`, `npx mcporter`, etc.) and look for the
+// `mcporter call <server>.<tool>` token sequence anywhere in the line. We
+// stop at the first command separator (`&&`, `||`, `;`, `|`) so a
+// follow-up command in a chain doesn't bleed into `rest`. Returns null for
+// anything that's not a `call` invocation (`mcporter config`, `--version`,
+// etc. — those keep the Generic Bash card).
 function parseMcporterCall(call: ToolCall): McporterCall | null {
   const isShell = call.name === 'Bash' || call.name === 'exec'
   if (!isShell) return null
   const input = (call.input as Record<string, unknown>) ?? {}
   const command = typeof input.command === 'string' ? input.command : ''
   if (!command) return null
-  // Drop any `env VAR=… VAR=… ` prefix the agent prepends to set PATH etc.
-  const stripped = command.replace(
-    /^\s*env\s+(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S+)\s+)+/,
-    ''
+  const m = command.match(
+    /(?:^|\s|\$\()mcporter(?:\)?)\s+call\s+([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)((?:\s+(?!&&|\|\||;|\|)\S+)*)/
   )
-  const m = stripped.match(/^mcporter\s+call\s+([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)(?:\s+(.+))?$/)
   if (!m) return null
   return { server: m[1], tool: m[2], rest: (m[3] ?? '').trim() }
 }
