@@ -112,6 +112,13 @@
     @apply border-border outline-ring/50;
   }
 
+  /* Tailwind v4 dropped the default antialiasing from preflight; opt in
+     globally so text matches the lighter "modern web app" look. */
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
   body {
     @apply bg-background text-foreground;
   }
