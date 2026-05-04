@@ -47,11 +47,15 @@ type SessionRecord = {
   // mid-seed are queued and applied after.
   seeded: boolean
   pendingFrames: OpenClawMessage[]
-  // Optimistic id rendezvous: when the client just sent a message, we
-  // remember the optimistic id + text so the next durable user-row gets
-  // re-emitted with that id (preventing a duplicate bubble).
-  pendingUserEcho: { optimisticId: string; text: string } | null
+  // Optimistic id rendezvous: when the client sends a message we push the
+  // optimistic id + text onto this FIFO. The next matching durable user-row
+  // consumes the head entry and is re-emitted with that id (preventing a
+  // duplicate bubble). A queue rather than a single slot so two rapid sends
+  // don't lose the first rendezvous when the gateway echo lags ~6s behind.
+  pendingUserEchoes: { optimisticId: string; text: string }[]
 }
+
+const MAX_PENDING_USER_ECHOES = 16
 
 const sessions = new Map<string, SessionRecord>() // key: `${workspaceId}:${sessionId}`
 const openclawAgents = new Map<
@@ -162,11 +166,14 @@ function emitTurn(rec: SessionRecord, msg: OpenClawMessage, idx: number): void {
   // Optimistic-id rendezvous: if this is the first user-text turn that
   // matches what the client just sent, re-id it to the optimistic id so the
   // optimistic bubble upserts in place instead of duplicating.
-  if (rec.pendingUserEcho && turn.role === 'user') {
+  if (rec.pendingUserEchoes.length > 0 && turn.role === 'user') {
     const text = turn.parts.find(p => p.type === 'text')?.text?.trim()
-    if (text === rec.pendingUserEcho.text.trim()) {
-      turn.id = rec.pendingUserEcho.optimisticId
-      rec.pendingUserEcho = null
+    if (text !== undefined) {
+      const idx = rec.pendingUserEchoes.findIndex(e => e.text.trim() === text)
+      if (idx >= 0) {
+        turn.id = rec.pendingUserEchoes[idx].optimisticId
+        rec.pendingUserEchoes.splice(idx, 1)
+      }
     }
   }
   rec.view = applyEvent(rec.view, { kind: 'turn', turn })
@@ -331,7 +338,7 @@ export async function getOrCreateOpenClawSession(input: {
     activeRunId: null,
     seeded: false,
     pendingFrames: [],
-    pendingUserEcho: null
+    pendingUserEchoes: []
   }
   sessions.set(k, rec)
   await ensureSubscribed(rec)
@@ -399,7 +406,10 @@ export async function sendOpenClawMessage(input: {
   }
 
   if (input.optimisticId) {
-    rec.pendingUserEcho = { optimisticId: input.optimisticId, text: input.content }
+    rec.pendingUserEchoes.push({ optimisticId: input.optimisticId, text: input.content })
+    if (rec.pendingUserEchoes.length > MAX_PENDING_USER_ECHOES) {
+      rec.pendingUserEchoes.shift()
+    }
   }
   // Flip processing immediately — the run starts within ~100ms of `sessions.send`
   // resolving, but we don't want the UI's send button to flicker.
@@ -414,7 +424,10 @@ export async function sendOpenClawMessage(input: {
     if (resp?.runId) setProcessing(rec, true, resp.runId)
   } catch (err) {
     setProcessing(rec, false, null)
-    rec.pendingUserEcho = null
+    if (input.optimisticId) {
+      const idx = rec.pendingUserEchoes.findIndex(e => e.optimisticId === input.optimisticId)
+      if (idx >= 0) rec.pendingUserEchoes.splice(idx, 1)
+    }
     broadcast(rec.workspaceId, {
       kind: 'error',
       sessionId: rec.sessionId,
