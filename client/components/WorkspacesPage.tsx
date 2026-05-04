@@ -2,6 +2,8 @@ import { IconDots, IconLoader2, IconPlus, IconTrash } from '@tabler/icons-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import claudeIcon from '@/client/assets/claude.svg'
+import hermesIcon from '@/client/assets/hermes-nous.png'
+import moiLogo from '@/client/assets/moi-logo.svg'
 import openclawIcon from '@/client/assets/openclaw.svg'
 import { Button } from '@/client/components/ui/button'
 import {
@@ -13,14 +15,18 @@ import {
 import { cn } from '@/client/lib/cn'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
+import { WorkspacePreview } from './WorkspacePreview'
+
 const typeIconSrc: Record<WorkspaceType, string> = {
   'claude-code': claudeIcon,
-  openclaw: openclawIcon
+  openclaw: openclawIcon,
+  hermes: hermesIcon
 }
 
 const typeLabel: Record<WorkspaceType, string> = {
   'claude-code': 'Claude Code',
-  openclaw: 'OpenClaw'
+  openclaw: 'OpenClaw',
+  hermes: 'Hermes'
 }
 
 function TypeIcon({ type, className }: { type: WorkspaceType; className?: string }) {
@@ -103,6 +109,7 @@ export function WorkspacesPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-8 pb-16 pt-14">
+      <img src={moiLogo} alt="moi" className="fixed left-4 top-2 size-9" />
       <header className="mb-10 flex flex-col gap-1.5">
         <h1 className="text-foreground text-xl font-semibold tracking-tight">Workspaces</h1>
         <p className="text-muted-foreground text-sm">
@@ -170,12 +177,12 @@ function WorkspaceCard({ workspace, onRemove }: WorkspaceCardProps) {
     <a
       href={`/workspace/${workspace.id}`}
       className={cn(
-        'border-border bg-card hover:bg-muted/40 group flex gap-3.5 rounded-xl border p-3.5',
+        'border-border bg-card hover:bg-muted/40 group flex gap-3.5 rounded-xl border p-2',
         'transition-colors'
       )}
     >
-      <PreviewSkeleton />
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+      <WorkspacePreview workspaceId={workspace.id} />
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 py-1 pl-1 pr-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <TypeIcon type={workspace.type ?? 'claude-code'} />
@@ -220,32 +227,6 @@ function WorkspaceCard({ workspace, onRemove }: WorkspaceCardProps) {
         <div className="text-muted-foreground text-xs">{meta}</div>
       </div>
     </a>
-  )
-}
-
-function PreviewSkeleton() {
-  return (
-    <div className="bg-muted flex size-24 shrink-0 flex-col gap-1 rounded-lg p-2">
-      <div className="flex h-2 items-center gap-1">
-        <div className="bg-muted-foreground/25 size-2 rounded-full" />
-        <div className="bg-muted-foreground/25 h-1 flex-1 rounded-[2px]" />
-      </div>
-      <div className="flex flex-1 gap-1">
-        <div className="flex w-4 flex-col gap-0.5">
-          <div className="bg-muted-foreground/25 h-1 w-full rounded-[2px]" />
-          <div className="bg-muted-foreground/25 h-1 w-full rounded-[2px]" />
-          <div className="bg-muted-foreground/15 h-1 w-full rounded-[2px]" />
-        </div>
-        <div className="flex flex-1 flex-col gap-1">
-          <div className="flex gap-1">
-            <div className="bg-muted-foreground/25 h-3.5 flex-[2] rounded-[3px]" />
-            <div className="bg-muted-foreground/15 h-3.5 flex-1 rounded-[3px]" />
-          </div>
-          <div className="bg-muted-foreground/15 h-4 rounded-[3px]" />
-          <div className="bg-foreground/10 h-2.5 rounded-[3px]" />
-        </div>
-      </div>
-    </div>
   )
 }
 

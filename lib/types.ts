@@ -67,7 +67,7 @@ export type WorkspaceSwitchMessage = {
   workspaceId: string
 }
 
-export type WorkspaceType = 'claude-code' | 'openclaw'
+export type WorkspaceType = 'claude-code' | 'openclaw' | 'hermes'
 
 export type WorkspaceEntry = {
   id: string
@@ -136,4 +136,9 @@ export type WorkspaceLayout = {
     background?: string
     foreground?: string
   }
+}
+
+export type WorkspacePreview = {
+  cols: number
+  items: { x: number; y: number; w: number; h: number }[]
 }

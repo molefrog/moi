@@ -5,7 +5,7 @@ import { getMcpStatus, handleChat, stopChat } from './agent'
 import { PORT } from './constants'
 import './control'
 import { callFunction } from './functions'
-import { loadLayout, saveLayout } from './layout'
+import { getWorkspacePreview, loadLayout, saveLayout } from './layout'
 import { getOpenClawSessionMessages, getOpenClawSessions } from './openclaw'
 import { toSessionInfo, toStreamEvents } from './openclaw-adapter'
 import {
@@ -93,6 +93,11 @@ export const app = Bun.serve<WsData>({
       return new Response('Method not allowed', { status: 405 })
     },
     '/api/workspaces/discover': async () => Response.json(await discoverWorkspaces()),
+    '/api/workspaces/:id/preview': async req => {
+      const ws = await getWorkspace(req.params.id)
+      if (!ws) return Response.json({ cols: 4, items: [] })
+      return Response.json(await getWorkspacePreview(ws.path))
+    },
     '/api/workspaces/:id': async req => {
       if (req.method === 'DELETE') {
         const ok = await removeWorkspace(req.params.id)
