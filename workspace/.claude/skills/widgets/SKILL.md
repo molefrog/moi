@@ -88,7 +88,7 @@ export default function Hello() {
 ```
 
 Key rules:
-- Use `w-full h-full` on the root element to fill the card.
+- The widget root is content-only: a plain `w-full h-full` rectangle. Never apply card chrome — no `rounded-*`, `shadow-*`, outer `border`, or background that mimics a card surface — the host dashboard owns the shell, spacing, radius, border, and elevation.
 - Tailwind is available. Never use `style={{}}` or custom CSS.
 - Import only from the same folder or `package.json` deps. No `@/` path aliases.
 - For conditional classes, define a local `cx()` helper (widgets can't import from the project root):
