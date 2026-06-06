@@ -27,6 +27,7 @@
     "clsx": "^2.1.1",
     "devalue": "^5.6.4",
     "env-paths": "^4.0.0",
+    "lru-cache": "^11.3.5",
     "motion": "^12.35.1",
     "pathe": "^2.0.3",
     "picocolors": "^1.1.1",

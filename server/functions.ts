@@ -1,12 +1,23 @@
-// Parent-side manager for the functions worker child process.
+// Per-workspace pool of functions worker subprocesses.
+//
+// Each entry in the LRU cache owns one child process running
+// `functions-worker.ts`, scoped to a single workspace. Workers are spawned
+// lazily on first call, kept warm for `WORKER_IDLE_TTL_MS`, then reaped by
+// the LRU TTL. Up to `MAX_WORKERS` slots coexist; an LRU eviction kills the
+// oldest. Switching workspaces no longer kills anything — multiple tabs
+// against multiple workspaces stay isolated.
+//
+// CWD contract: workers run with `cwd = workspacePath` (the workspace root,
+// where the agent works), NOT `.widgets/`. The `.widgets/` location is
+// passed to the worker as `MEI_FUNCTIONS_DIR` so it can locate `.server.ts`
+// files. This is the contract documented in the widgets SKILL.
+import { LRUCache } from 'lru-cache'
 import { join } from 'path'
 
 const WORKER_PATH = join(import.meta.dir, 'functions-worker.ts')
 const CALL_TIMEOUT_MS = 30_000
-
-function getMeiDir(workspacePath: string) {
-  return join(workspacePath, '.widgets')
-}
+const WORKER_IDLE_TTL_MS = 10 * 60_000
+const MAX_WORKERS = 8
 
 type Pending = {
   resolve: (data: string) => void
@@ -14,67 +25,79 @@ type Pending = {
   timer: ReturnType<typeof setTimeout>
 }
 
-let worker: ReturnType<typeof Bun.spawn> | null = null
-let readyPromise: Promise<void> | null = null
-let spawning = false
-let currentWorkspacePath: string | null = null
-const pending = new Map<string, Pending>()
+type Slot = {
+  workspacePath: string
+  worker: ReturnType<typeof Bun.spawn>
+  readyPromise: Promise<void>
+  pending: Map<string, Pending>
+  killed: boolean
+}
 
-function rejectAll(reason: string) {
-  const entries = [...pending.values()]
-  pending.clear()
-  for (const { reject, timer } of entries) {
+function rejectAndClearPending(slot: Slot, reason: string) {
+  for (const { reject, timer } of slot.pending.values()) {
     clearTimeout(timer)
     reject(new Error(reason))
   }
+  slot.pending.clear()
 }
 
-function killWorker() {
-  if (worker) {
-    try {
-      worker.kill()
-    } catch {}
-    worker = null
-    readyPromise = null
-    spawning = false
+function killSlot(slot: Slot, reason: string) {
+  if (slot.killed) return
+  slot.killed = true
+  rejectAndClearPending(slot, reason)
+  try {
+    slot.worker.kill()
+  } catch {}
+}
+
+const slots = new LRUCache<string, Slot>({
+  max: MAX_WORKERS,
+  ttl: WORKER_IDLE_TTL_MS,
+  ttlAutopurge: true,
+  updateAgeOnGet: true,
+  dispose: slot => killSlot(slot, 'Functions worker idle-evicted')
+})
+
+function spawnSlot(workspacePath: string): Slot {
+  const meiDir = join(workspacePath, '.widgets')
+
+  let readyResolve: () => void = () => {}
+  const readyPromise = new Promise<void>(r => (readyResolve = r))
+
+  const slot: Slot = {
+    workspacePath,
+    worker: undefined as never,
+    readyPromise,
+    pending: new Map(),
+    killed: false
   }
-  rejectAll('Worker killed for workspace switch')
-}
 
-function spawn(workspacePath: string) {
-  if (spawning) return
-  spawning = true
-
-  let readyResolve: () => void
-  readyPromise = new Promise(r => (readyResolve = r))
-
-  const meiDir = getMeiDir(workspacePath)
-  worker = Bun.spawn([process.execPath, WORKER_PATH], {
-    cwd: meiDir,
+  slot.worker = Bun.spawn([process.execPath, WORKER_PATH], {
+    cwd: workspacePath,
     env: { ...process.env, MEI_FUNCTIONS_DIR: meiDir },
     stderr: 'inherit',
     onExit(_proc, code) {
-      worker = null
-      readyPromise = null
-      spawning = false
       if (code !== 0 && code !== null) {
-        console.error(`[mei] Functions worker exited with code ${code}`)
+        console.error(`[mei] functions worker for ${workspacePath} exited with code ${code}`)
       }
-      rejectAll('Functions worker exited')
+      // Mark slot dead and reject pending. Then drop from cache without
+      // re-disposing (the worker is already gone).
+      slot.killed = true
+      rejectAndClearPending(slot, 'Functions worker exited')
+      if (slots.peek(workspacePath) === slot) slots.delete(workspacePath)
     },
     ipc(message) {
       const msg = message as { type: string; id?: string; data?: string; message?: string }
 
       if (msg.type === 'ready') {
-        spawning = false
         readyResolve()
         return
       }
 
       if (msg.id) {
-        const p = pending.get(msg.id)
+        const p = slot.pending.get(msg.id)
         if (!p) return
-        pending.delete(msg.id)
+        slot.pending.delete(msg.id)
         clearTimeout(p.timer)
 
         if (msg.type === 'result') {
@@ -85,11 +108,17 @@ function spawn(workspacePath: string) {
       }
     }
   })
+
+  return slot
 }
 
-async function ensureWorker(workspacePath: string) {
-  if (!worker && !spawning) spawn(workspacePath)
-  await readyPromise
+function getOrSpawn(workspacePath: string): Slot {
+  const existing = slots.get(workspacePath)
+  if (existing && !existing.killed) return existing
+
+  const fresh = spawnSlot(workspacePath)
+  slots.set(workspacePath, fresh)
+  return fresh
 }
 
 export async function callFunction(
@@ -98,27 +127,22 @@ export async function callFunction(
   args: string,
   workspacePath: string
 ): Promise<string> {
-  if (workspacePath !== currentWorkspacePath) {
-    killWorker()
-    currentWorkspacePath = workspacePath
-  }
-
-  await ensureWorker(workspacePath)
+  const slot = getOrSpawn(workspacePath)
+  await slot.readyPromise
 
   const id = crypto.randomUUID()
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
-      pending.delete(id)
+      slot.pending.delete(id)
       reject(new Error(`Function call timed out: ${module}/${name}`))
     }, CALL_TIMEOUT_MS)
 
-    pending.set(id, { resolve, reject, timer })
+    slot.pending.set(id, { resolve, reject, timer })
 
     try {
-      if (!worker) throw new Error('Worker not available')
-      worker.send({ id, type: 'call', module, name, args })
+      slot.worker.send({ id, type: 'call', module, name, args })
     } catch (err) {
-      pending.delete(id)
+      slot.pending.delete(id)
       clearTimeout(timer)
       reject(err instanceof Error ? err : new Error('Failed to send to worker'))
     }
@@ -126,13 +150,12 @@ export async function callFunction(
 }
 
 export function reloadModules(modules: string[], workspacePath: string) {
-  if (workspacePath !== currentWorkspacePath) {
-    killWorker()
-    currentWorkspacePath = workspacePath
-  }
-  if (worker && modules.length > 0) {
-    try {
-      worker.send({ type: 'reload', modules })
-    } catch {}
-  }
+  if (modules.length === 0) return
+  // peek: don't refresh TTL just because files changed. If the worker was
+  // already idle-evicted, the next callFunction will re-spawn fresh anyway.
+  const slot = slots.peek(workspacePath)
+  if (!slot || slot.killed) return
+  try {
+    slot.worker.send({ type: 'reload', modules })
+  } catch {}
 }
