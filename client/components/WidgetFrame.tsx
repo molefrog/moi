@@ -34,11 +34,14 @@ export function WidgetFrame({ editing, hidden, onRemove, children }: WidgetFrame
       <div
         className={cn(
           'dark absolute inset-0 overflow-hidden rounded-2xl [corner-shape:superellipse(1.2)]',
-          // Outer drop shadow stays as before; the 1px stroke moves to
-          // `inset` so it sits OVER the widget content. On colored widgets
-          // (yellow bg, etc.) the corner pixel becomes content + 8% black
-          // instead of an unrelated gray ring around the box.
-          'shadow-[inset_0_0_0_1px_rgba(0,0,0,0.1),0_1px_2px_-1px_rgba(0,0,0,0.08),0_2px_4px_0_rgba(0,0,0,0.06)]',
+          // Outer drop shadow on the wrapper itself.
+          'shadow-[0_1px_2px_-1px_rgba(0,0,0,0.08),0_2px_4px_0_rgba(0,0,0,0.03)]',
+          // 1px inset stroke painted on a pseudo so it lands ON TOP of the
+          // widget content (e.g. coloured backgrounds) rather than being
+          // covered by the child filling the frame.
+          'after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit]',
+          "after:content-[''] after:[corner-shape:inherit]",
+          'after:shadow-[inset_0_0_0_1px_rgba(0,0,0,0.05)]',
           'text-foreground',
           editing && 'pointer-events-none'
         )}
