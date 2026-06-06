@@ -103,6 +103,24 @@ function cx(...classes: (string | false | undefined | null)[]) {
 
 Create a `.server.ts` alongside the widget. Export named `async function`s only — no `const`, sync, or class. They run on the Bun server with full access to `process.env` and the filesystem (including files outside `.widgets/`).
 
+**Working directory:** server functions run with `cwd = <workspace root>` (the parent of `.widgets/` — same directory the agent operates in). Use plain relative paths to read workspace files:
+
+```ts
+// ✓ workspace-root files: just use relative paths
+new Database('local.db', { readonly: true })
+await Bun.file('./data/notes.json').text()
+```
+
+For files inside `.widgets/` itself, anchor on the file's own location:
+
+```ts
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
+
+const here = dirname(fileURLToPath(import.meta.url)) // resolves to .widgets/
+const fixturePath = join(here, 'fixture.json')
+```
+
 ```ts
 // hello.server.ts
 export async function fetchData(): Promise<{ value: number }> {
