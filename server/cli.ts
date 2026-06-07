@@ -67,19 +67,75 @@ async function openBrowser(url: string) {
 
 // Spawn the server as a child with cwd=projectRoot so bunfig.toml is found at Bun startup.
 // bunfig.toml is read before any JS runs, so process.chdir() is too late.
+// MOI_SERVER=1 tells the child it is the actual server process. No `--hot`:
+// frontend HMR comes from Bun.serve's dev bundler, and server reloads are a
+// full process restart driven by the dev supervisor (see runDevSupervisor).
 function spawnServer(
   projectRoot: string,
-  dev: boolean,
   env: Record<string, string | undefined> = process.env
 ): ReturnType<typeof Bun.spawn> {
-  const bunFlags = dev ? ['--hot'] : []
-  return Bun.spawn(['bun', ...bunFlags, import.meta.filename, 'start'], {
+  return Bun.spawn(['bun', import.meta.filename, 'start'], {
     stdin: 'inherit',
     stdout: 'inherit',
     stderr: 'inherit',
     cwd: projectRoot,
-    env: { ...env, MOI_SERVER: '1', ...(dev ? { MOI_DEV: '1' } : {}) }
+    env: { ...env, MOI_SERVER: '1' }
   })
+}
+
+// Dev supervisor: run the server as a child WITHOUT `bun --hot`, watch the
+// server-side source (`server/`, `lib/`) and full-restart the child on change.
+// Client files are intentionally not watched here — Bun.serve owns frontend HMR
+// and patches the browser in place. The child shuts down gracefully on SIGTERM
+// (closing servers + killing function workers), so restarts leak nothing.
+async function runDevSupervisor(
+  projectRoot: string,
+  env: Record<string, string | undefined>
+): Promise<void> {
+  const { watch } = await import('node:fs')
+
+  let child = spawnServer(projectRoot, env)
+  let restarting = false
+  let debounce: ReturnType<typeof setTimeout> | undefined
+
+  async function restart(reason: string) {
+    if (restarting) return
+    restarting = true
+    console.log(pc.dim(`\n↻ ${reason} — restarting server…`))
+    try {
+      child.kill('SIGTERM')
+    } catch {}
+    const sigkill = setTimeout(() => {
+      try {
+        child.kill('SIGKILL')
+      } catch {}
+    }, 3000)
+    await child.exited
+    clearTimeout(sigkill)
+    restarting = false
+    child = spawnServer(projectRoot, env)
+  }
+
+  for (const dir of ['server', 'lib']) {
+    watch(join(projectRoot, dir), { recursive: true }, (_event, file) => {
+      if (!file || !file.endsWith('.ts')) return
+      clearTimeout(debounce)
+      debounce = setTimeout(() => restart(`${file} changed`), 100)
+    })
+  }
+
+  // Forward termination to the child, then exit the supervisor.
+  for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+    process.on(sig, () => {
+      try {
+        child.kill('SIGTERM')
+      } catch {}
+      process.exit(0)
+    })
+  }
+
+  // Keep the supervisor alive indefinitely.
+  await new Promise<void>(() => {})
 }
 
 // ---- commands ---------------------------------------------------------------
@@ -120,7 +176,7 @@ const init = defineCommand({
 
     if (!running && args.web) {
       console.log(pc.dim('  Starting server…'))
-      const proc = spawnServer(projectRoot, false)
+      const proc = spawnServer(projectRoot)
       running = await waitForServer()
       if (!running) {
         console.error(pc.red('  Server failed to start\n'))
@@ -164,26 +220,32 @@ const start = defineCommand({
   },
   async run({ args }) {
     const projectRoot = join(import.meta.dir, '..')
-    // Undocumented: --dev enables bun --hot on the spawned server process.
+    // Undocumented: --dev runs the watch-and-full-restart dev supervisor.
     const dev = process.argv.includes('--dev')
 
-    if (await isServerRunning()) {
-      console.log(
-        '\n' + pc.yellow('◆') + ' Server is already running on http://localhost:' + PORT + '\n'
-      )
-      process.exit(0)
-    }
-
-    // Spawn server with correct cwd so bunfig.toml is picked up at Bun startup.
-    // MOI_SERVER=1 tells the child it is the actual server process.
+    // Launcher path: we are the CLI, not the server. Decide whether to bail
+    // (a server is already up), run the dev supervisor, or spawn a one-shot
+    // server. Skipped when MOI_SERVER=1 (we are the spawned server itself).
     if (!process.env.MOI_SERVER) {
+      if (await isServerRunning()) {
+        console.log(
+          '\n' + pc.yellow('◆') + ' Server is already running on http://localhost:' + PORT + '\n'
+        )
+        process.exit(0)
+      }
+
+      // Spawn server with correct cwd so bunfig.toml is picked up at Bun startup.
       const env = args.port ? { ...process.env, PORT: args.port } : process.env
-      const proc = spawnServer(projectRoot, dev, env)
+      if (dev) {
+        await runDevSupervisor(projectRoot, env)
+        return
+      }
+      const proc = spawnServer(projectRoot, env)
       await proc.exited
       process.exit(proc.exitCode ?? 0)
     }
 
-    // This IS the server process (MOI_SERVER=1, cwd=projectRoot, bunfig.toml loaded)
+    // This IS the server process (MOI_SERVER=1, cwd=projectRoot, bunfig.toml loaded).
     await import('./web')
     console.log(`\n${pc.green('✓')} Server started on http://localhost:${PORT}`)
     console.log(pc.dim('  Press Ctrl+C to stop\n'))

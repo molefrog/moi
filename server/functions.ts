@@ -149,6 +149,14 @@ export async function callFunction(
   })
 }
 
+// Kill every live worker. Called from the server's shutdown handler so a
+// dev-supervisor restart (or Ctrl-C) never orphans worker child processes.
+// killSlot is idempotent, so a dispose() racing in via clear() is harmless.
+export function killAllWorkers() {
+  for (const slot of slots.values()) killSlot(slot, 'Server shutting down')
+  slots.clear()
+}
+
 export function reloadModules(modules: string[], workspacePath: string) {
   if (modules.length === 0) return
   // peek: don't refresh TTL just because files changed. If the worker was

@@ -3,8 +3,8 @@ import type { ClientMessage } from '@/lib/types'
 import index from '../client/index.html'
 import { getMcpStatus, handleChat, stopChat } from './agent'
 import { PORT } from './constants'
-import './control'
-import { callFunction } from './functions'
+import { control } from './control'
+import { callFunction, killAllWorkers } from './functions'
 import { getWorkspacePreview, loadLayout, saveLayout } from './layout'
 import { getOpenClawSessionMessages, getOpenClawSessions } from './openclaw'
 import { toSessionInfo, toStreamEvents } from './openclaw-adapter'
@@ -71,6 +71,7 @@ export const app = Bun.serve<WsData>({
   routes: {
     // Client-side routes — serve the SPA shell
     '/': index,
+    '/playground': index,
     '/workspace/*': index,
 
     // Workspace registry API
@@ -295,9 +296,18 @@ export function publishMei(msg: unknown) {
   app.publish(MEI_TOPIC, JSON.stringify(msg))
 }
 
-// Dev-only: broadcast a reload signal on every module re-exec so the browser
-// refreshes after `bun --hot` reloads server code. Fires on first boot too,
-// with no subscribers — which is a no-op.
-if (process.env.MOI_DEV === '1') {
-  publishMei({ type: 'dev:reload' })
+// Graceful shutdown. In dev the supervisor sends SIGTERM on server-file
+// changes; in any context Ctrl-C sends SIGINT. Close both servers and kill the
+// per-workspace function workers so no child processes are orphaned.
+function shutdown() {
+  try {
+    app.stop(true)
+  } catch {}
+  try {
+    control.stop(true)
+  } catch {}
+  killAllWorkers()
+  process.exit(0)
 }
+process.on('SIGTERM', shutdown)
+process.on('SIGINT', shutdown)
