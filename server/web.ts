@@ -72,6 +72,7 @@ export const app = Bun.serve<WsData>({
     // Client-side routes — serve the SPA shell
     '/': index,
     '/playground': index,
+    '/sidebar': index,
     '/workspace/*': index,
 
     // Workspace registry API

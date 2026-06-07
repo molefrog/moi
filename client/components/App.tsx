@@ -19,6 +19,8 @@ import { ChatPanel } from './ChatPanel'
 import { ChatPopup } from './ChatPopup'
 import { Widgets } from './Widgets'
 import { WorkspacesPage } from './WorkspacesPage'
+import { SidebarLayoutPage } from './layout/SidebarLayoutPage'
+import { PlaygroundPage } from './playground/PlaygroundPage'
 
 // Top-level router — sets up all client-side routes
 export function AppRouter() {
@@ -34,6 +36,8 @@ export function AppRouter() {
   return (
     <Switch>
       <Route path="/" component={WorkspacesPage} />
+      <Route path="/playground" component={PlaygroundPage} />
+      <Route path="/sidebar" component={SidebarLayoutPage} />
       <Route path="/workspace/:id">
         {(params: { id: string }) => (
           <Workspace id={params.id}>
