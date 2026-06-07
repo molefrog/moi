@@ -2,11 +2,16 @@ import { useState } from 'react'
 
 import { cn } from '@/client/lib/cn'
 
-import { LedLogo, type LedMode } from './LedLogo'
+import { type Effect, LedLogo, type Sprite } from './LedLogo'
+import { PixelPainter } from './PixelPainter'
 
-const MODES: { value: LedMode; label: string }[] = [
-  { value: 'moi', label: 'MOI' },
-  { value: 'moi2', label: 'MOI 2' },
+const SPRITES: { value: Sprite; label: string }[] = [
+  { value: 'moi', label: 'M' },
+  { value: 'moi-full', label: 'MOI' }
+]
+
+const EFFECTS: { value: Effect | 'none'; label: string }[] = [
+  { value: 'none', label: 'None' },
   { value: 'wave', label: 'Wave' },
   { value: 'chaos', label: 'Random' }
 ]
@@ -39,7 +44,8 @@ function Segmented<T extends string | number>({ options, value, onChange }: Segm
 
 // Scratch route for UI experiments. Add new experiments here over time.
 export function PlaygroundPage() {
-  const [mode, setMode] = useState<LedMode>('moi')
+  const [sprite, setSprite] = useState<Sprite>('moi')
+  const [effect, setEffect] = useState<Effect | 'none'>('none')
 
   return (
     <div className="relative flex min-h-dvh flex-col items-center justify-center gap-8 bg-[#f2f1ee]">
@@ -47,9 +53,19 @@ export function PlaygroundPage() {
         Playground
       </span>
 
-      <LedLogo mode={mode} pixelSize={3} gap={1} />
+      <PixelPainter />
 
-      <Segmented options={MODES} value={mode} onChange={setMode} />
+      <LedLogo
+        sprite={sprite}
+        effect={effect === 'none' ? undefined : effect}
+        pixelSize={3}
+        gap={0.5}
+      />
+
+      <div className="flex flex-col items-center gap-2">
+        <Segmented options={SPRITES} value={sprite} onChange={setSprite} />
+        <Segmented options={EFFECTS} value={effect} onChange={setEffect} />
+      </div>
     </div>
   )
 }

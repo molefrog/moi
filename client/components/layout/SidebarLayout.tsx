@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 
 import { AnimatePresence, motion } from 'motion/react'
 
@@ -16,7 +16,7 @@ import { useWorkspaces } from '@/client/api/workspaces'
 import claudeIcon from '@/client/assets/claude.svg'
 import hermesIcon from '@/client/assets/hermes-nous.png'
 import openclawIcon from '@/client/assets/openclaw.svg'
-import { LedLogo } from '@/client/components/playground/LedLogo'
+import { type Effect, LedLogo } from '@/client/components/playground/LedLogo'
 import { cn } from '@/client/lib/cn'
 import { useUiStore } from '@/client/store/ui'
 import type { WorkspaceEntry, WorkspaceType } from '@/lib/types'
@@ -54,6 +54,14 @@ export function SidebarLayout({ title, children }: SidebarLayoutProps) {
   // passed down ready, so they don't re-subscribe/refetch or flicker on collapse.
   const { data: workspaces } = useWorkspaces()
 
+  // Boot-up: on mount the logo runs the noise effect for 0.75s, then settles to
+  // the sprite. Kept here (not in the remounting Sidebar) so it fires once.
+  const [booting, setBooting] = useState(true)
+  useEffect(() => {
+    const id = setTimeout(() => setBooting(false), 750)
+    return () => clearTimeout(id)
+  }, [])
+
   return (
     <div className="flex h-dvh bg-[#f6f7f8]">
       {/* Width animates; the Sidebar crossfades on collapse via AnimatePresence.
@@ -81,7 +89,11 @@ export function SidebarLayout({ title, children }: SidebarLayoutProps) {
                 : { duration: 0.2, ease: 'easeIn' }
             }}
           >
-            <Sidebar collapsed={collapsed} workspaces={workspaces ?? []} />
+            <Sidebar
+              collapsed={collapsed}
+              workspaces={workspaces ?? []}
+              logoEffect={booting ? 'chaos' : undefined}
+            />
           </motion.div>
         </AnimatePresence>
       </motion.div>
@@ -126,14 +138,20 @@ type SidebarProps = {
   // workspaces header stay invisible but occupy space) and rows drop their text.
   collapsed?: boolean
   workspaces: WorkspaceEntry[]
+  logoEffect?: Effect
 }
 
-function Sidebar({ collapsed, workspaces }: SidebarProps) {
+function Sidebar({ collapsed, workspaces, logoEffect }: SidebarProps) {
   return (
     <aside className={cn('flex h-full shrink-0 flex-col px-2.5', collapsed ? 'w-[54px]' : 'w-60')}>
       {/* Logo */}
-      <div className={cn('mb-3.5 flex h-12 items-center px-1', collapsed && 'invisible')}>
-        <LedLogo pixelSize={2.5} gap={1} mode="chaos" />
+      <div className="mb-3.5 flex h-12 items-center px-2">
+        <LedLogo
+          pixelSize={3}
+          gap={0.5}
+          sprite={collapsed ? 'moi' : 'moi-full'}
+          effect={logoEffect}
+        />
       </div>
 
       {/* Home */}
