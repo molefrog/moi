@@ -2,7 +2,15 @@ import { type ReactNode } from 'react'
 
 import { AnimatePresence, motion } from 'motion/react'
 
-import { IconHome, IconLayoutSidebar, IconPlus, IconSettings } from '@tabler/icons-react'
+import {
+  IconHome,
+  IconLayoutSidebar,
+  IconLayoutSidebarLeftCollapse,
+  IconLayoutSidebarLeftExpand,
+  IconPlus,
+  IconSettings
+} from '@tabler/icons-react'
+import { Link } from 'wouter'
 
 import { useWorkspaces } from '@/client/api/workspaces'
 import claudeIcon from '@/client/assets/claude.svg'
@@ -10,6 +18,7 @@ import hermesIcon from '@/client/assets/hermes-nous.png'
 import openclawIcon from '@/client/assets/openclaw.svg'
 import { LedLogo } from '@/client/components/playground/LedLogo'
 import { cn } from '@/client/lib/cn'
+import { useUiStore } from '@/client/store/ui'
 import type { WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
 const PROVIDER_ICON: Record<WorkspaceType, string> = {
@@ -29,13 +38,17 @@ const EXPANDED_WIDTH = 240
 const COLLAPSED_WIDTH = 54
 
 type SidebarLayoutProps = {
+  // Shown in the panel header next to the collapse toggle.
+  title?: ReactNode
+  // Panel body — the page content. Scrolls independently of the header.
   children?: ReactNode
-  collapsed?: boolean
 }
 
-// App shell: a sidebar beside an elevated white content panel.
-// `children` renders inside the panel, so the same shell wraps any page.
-export function SidebarLayout({ children, collapsed }: SidebarLayoutProps) {
+// App shell: a sidebar beside an elevated white content panel. Owns the
+// collapse state (persisted `ui` store) and the panel header, so any page just
+// supplies a `title` + `children`.
+export function SidebarLayout({ title, children }: SidebarLayoutProps) {
+  const collapsed = useUiStore(s => s.sidebarCollapsed)
   // Loaded once at this stable boundary — this component does NOT remount on
   // toggle (only the keyed <Sidebar> inside AnimatePresence does). The rows are
   // passed down ready, so they don't re-subscribe/refetch or flicker on collapse.
@@ -72,10 +85,39 @@ export function SidebarLayout({ children, collapsed }: SidebarLayoutProps) {
           </motion.div>
         </AnimatePresence>
       </motion.div>
-      <main className="bg-background min-w-0 flex-1 overflow-hidden rounded-l-md border-l border-gray-200 shadow-[1px_0px_3px_0px_rgba(0,0,0,0.1)]">
-        {children}
+      <main className="bg-background flex min-w-0 flex-1 flex-col overflow-hidden rounded-l-md border-l border-gray-200 shadow-[1px_0px_3px_0px_rgba(0,0,0,0.1)]">
+        <PanelHeader title={title} />
+        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
       </main>
     </div>
+  )
+}
+
+type PanelHeaderProps = {
+  title?: ReactNode
+}
+
+function PanelHeader({ title }: PanelHeaderProps) {
+  const collapsed = useUiStore(s => s.sidebarCollapsed)
+  const toggle = useUiStore(s => s.toggleSidebar)
+  const ToggleIcon = collapsed ? IconLayoutSidebarLeftExpand : IconLayoutSidebarLeftCollapse
+
+  return (
+    <header className="border-border flex h-12 shrink-0 items-center gap-2.5 border-b px-3">
+      <button
+        type="button"
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        onClick={toggle}
+        className={cn(
+          'text-muted-foreground hover:bg-muted hover:text-foreground flex size-7 items-center justify-center rounded-sm',
+          collapsed ? 'cursor-e-resize' : 'cursor-w-resize'
+        )}
+      >
+        <ToggleIcon size={20} strokeWidth={1.5} />
+      </button>
+      {title != null && <span className="text-foreground text-sm font-medium">{title}</span>}
+    </header>
   )
 }
 
@@ -97,6 +139,8 @@ function Sidebar({ collapsed, workspaces }: SidebarProps) {
       {/* Home */}
       <nav className="flex flex-col gap-0.5">
         <NavRow
+          href="/"
+          spa
           icon={<IconHome size={18} className="text-foreground shrink-0" />}
           label="Home"
           active
@@ -108,19 +152,20 @@ function Sidebar({ collapsed, workspaces }: SidebarProps) {
       <div className="mt-5 flex flex-col gap-2">
         <div className={cn('flex items-center justify-between pl-2', collapsed && 'invisible')}>
           <span className="text-muted-foreground text-[13px] font-medium">Workspaces</span>
-          <button
-            type="button"
+          <Link
+            href="/"
             aria-label="Add workspace"
             className="border-border bg-background text-foreground/60 hover:bg-muted hover:text-foreground flex size-6 items-center justify-center rounded-[6px] border"
           >
             <IconPlus size={16} />
-          </button>
+          </Link>
         </div>
 
         <nav className="flex flex-col gap-0.5">
           {workspaces.map(ws => (
             <NavRow
               key={ws.id}
+              href={`/workspace/${ws.id}`}
               icon={
                 <img
                   src={PROVIDER_ICON[ws.type ?? 'claude-code']}
@@ -163,26 +208,37 @@ function Sidebar({ collapsed, workspaces }: SidebarProps) {
 }
 
 type NavRowProps = {
+  href: string
   icon: ReactNode
   label: string
   active?: boolean
   collapsed?: boolean
+  // Internal nav (Home) uses wouter <Link> for SPA navigation.
+  // Workspaces stay a plain <a> (full nav) for now.
+  spa?: boolean
 }
 
-function NavRow({ icon, label, active, collapsed }: NavRowProps) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      className={cn(
-        'flex h-8 items-center gap-2.5 rounded-sm px-2 text-sm font-medium',
-        active
-          ? 'bg-foreground/[0.07] text-foreground'
-          : 'text-foreground/65 hover:bg-foreground/[0.04] hover:text-foreground'
-      )}
-    >
+function NavRow({ href, icon, label, active, collapsed, spa }: NavRowProps) {
+  const className = cn(
+    'flex h-8 items-center gap-2.5 rounded-sm px-2 text-sm font-medium',
+    active
+      ? 'bg-foreground/[0.07] text-foreground'
+      : 'text-foreground/65 hover:bg-foreground/[0.04] hover:text-foreground'
+  )
+  const inner = (
+    <>
       {icon}
       {!collapsed && <span className="truncate">{label}</span>}
-    </button>
+    </>
+  )
+
+  return spa ? (
+    <Link href={href} aria-label={label} className={className}>
+      {inner}
+    </Link>
+  ) : (
+    <a href={href} aria-label={label} className={className}>
+      {inner}
+    </a>
   )
 }

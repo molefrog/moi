@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import type { DiscoveredWorkspace, WorkspaceEntry } from '@/lib/types'
+import type { DiscoveredWorkspace, WorkspaceEntry, WorkspacePreview } from '@/lib/types'
 
 // Central query-key registry for the workspaces domain. Both the `/` view and
 // the sidebar read from these keys, so the cache is shared.
 export const workspaceKeys = {
   all: ['workspaces'] as const,
-  discover: ['workspaces', 'discover'] as const
+  discover: ['workspaces', 'discover'] as const,
+  preview: (id: string) => ['workspaces', 'preview', id] as const
 }
 
 // Registered workspaces (the contents of workspaces.json).
@@ -22,6 +23,15 @@ export function useWorkspaces() {
     queryFn: () => fetch('/api/workspaces').then(r => r.json()),
     staleTime: Infinity,
     refetchOnMount: 'always'
+  })
+}
+
+// Per-workspace dashboard preview (widget grid thumbnail).
+export function useWorkspacePreview(workspaceId: string) {
+  return useQuery<WorkspacePreview>({
+    queryKey: workspaceKeys.preview(workspaceId),
+    queryFn: () => fetch(`/api/workspaces/${workspaceId}/preview`).then(r => r.json()),
+    staleTime: 60_000
   })
 }
 

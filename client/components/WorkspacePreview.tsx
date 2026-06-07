@@ -1,18 +1,13 @@
 import { IconRobotFace } from '@tabler/icons-react'
-import { useQuery } from '@tanstack/react-query'
 
-import type { WorkspacePreview as WorkspacePreviewData } from '@/lib/types'
+import { useWorkspacePreview } from '@/client/api/workspaces'
 
 type WorkspacePreviewProps = {
   workspaceId: string
 }
 
 export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
-  const query = useQuery<WorkspacePreviewData>({
-    queryKey: ['workspaces', 'preview', workspaceId],
-    queryFn: () => fetch(`/api/workspaces/${workspaceId}/preview`).then(r => r.json()),
-    staleTime: 60_000
-  })
+  const query = useWorkspacePreview(workspaceId)
 
   const items = query.data?.items ?? []
   const cols = query.data?.cols ?? 4

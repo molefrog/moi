@@ -17,8 +17,8 @@ import { useWorkspaceStore } from '@/client/store/workspace'
 
 import { ChatPanel } from './ChatPanel'
 import { ChatPopup } from './ChatPopup'
+import { HomePage } from './HomePage'
 import { Widgets } from './Widgets'
-import { WorkspacesPage } from './WorkspacesPage'
 import { SidebarLayoutPage } from './layout/SidebarLayoutPage'
 import { PlaygroundPage } from './playground/PlaygroundPage'
 
@@ -35,7 +35,7 @@ export function AppRouter() {
 
   return (
     <Switch>
-      <Route path="/" component={WorkspacesPage} />
+      <Route path="/" component={HomePage} />
       <Route path="/playground" component={PlaygroundPage} />
       <Route path="/sidebar" component={SidebarLayoutPage} />
       <Route path="/workspace/:id">

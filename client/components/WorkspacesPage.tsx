@@ -8,7 +8,6 @@ import {
 } from '@/client/api/workspaces'
 import claudeIcon from '@/client/assets/claude.svg'
 import hermesIcon from '@/client/assets/hermes-nous.png'
-import moiLogo from '@/client/assets/moi-logo.svg'
 import openclawIcon from '@/client/assets/openclaw.svg'
 import { Button } from '@/client/components/ui/button'
 import {
@@ -53,7 +52,7 @@ export function WorkspacesPage() {
 
   if (workspacesQuery.isPending || discoveredQuery.isPending) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-[50vh] items-center justify-center">
         <IconLoader2 size={20} stroke={1.5} className="text-muted-foreground animate-spin" />
       </div>
     )
@@ -61,7 +60,7 @@ export function WorkspacesPage() {
 
   if (workspacesQuery.isError || discoveredQuery.isError) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-[50vh] items-center justify-center">
         <p className="text-muted-foreground text-sm">Could not load workspaces.</p>
       </div>
     )
@@ -75,14 +74,6 @@ export function WorkspacesPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-8 pb-16 pt-14">
-      <img src={moiLogo} alt="moi" className="fixed left-4 top-2 size-9" />
-      <header className="mb-10 flex flex-col gap-1.5">
-        <h1 className="text-foreground text-xl font-semibold tracking-tight">Workspaces</h1>
-        <p className="text-muted-foreground text-sm">
-          {count} connected workspace{count === 1 ? '' : 's'}
-        </p>
-      </header>
-
       {count > 0 && (
         <div className="mb-10 grid grid-cols-2 gap-3">
           {workspaces.map(ws => (
