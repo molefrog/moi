@@ -1,6 +1,11 @@
 import { IconDots, IconLoader2, IconPlus, IconTrash } from '@tabler/icons-react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
+import {
+  useAddWorkspace,
+  useDiscoveredWorkspaces,
+  useRemoveWorkspace,
+  useWorkspaces
+} from '@/client/api/workspaces'
 import claudeIcon from '@/client/assets/claude.svg'
 import hermesIcon from '@/client/assets/hermes-nous.png'
 import moiLogo from '@/client/assets/moi-logo.svg'
@@ -40,50 +45,11 @@ function TypeIcon({ type, className }: { type: WorkspaceType; className?: string
   )
 }
 
-const workspacesKey = ['workspaces'] as const
-const discoverKey = ['workspaces', 'discover'] as const
-
 export function WorkspacesPage() {
-  const workspacesQuery = useQuery<WorkspaceEntry[]>({
-    queryKey: workspacesKey,
-    queryFn: () => fetch('/api/workspaces').then(r => r.json())
-  })
-
-  const discoveredQuery = useQuery<DiscoveredWorkspace[]>({
-    queryKey: discoverKey,
-    queryFn: () => fetch('/api/workspaces/discover').then(r => r.json())
-  })
-
-  const qc = useQueryClient()
-  const importMutation = useMutation<WorkspaceEntry, Error, DiscoveredWorkspace>({
-    mutationFn: async discovered => {
-      const res = await fetch('/api/workspaces', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(discovered)
-      })
-      return res.json()
-    },
-    onSuccess: (entry, suggestion) => {
-      qc.setQueryData<WorkspaceEntry[]>(workspacesKey, prev => [...(prev ?? []), entry])
-      qc.setQueryData<DiscoveredWorkspace[]>(discoverKey, prev =>
-        (prev ?? []).filter(s => s.path !== suggestion.path)
-      )
-    }
-  })
-
-  const removeMutation = useMutation<void, Error, WorkspaceEntry>({
-    mutationFn: async entry => {
-      const res = await fetch(`/api/workspaces/${entry.id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to remove workspace')
-    },
-    onSuccess: (_void, entry) => {
-      qc.setQueryData<WorkspaceEntry[]>(workspacesKey, prev =>
-        (prev ?? []).filter(w => w.id !== entry.id)
-      )
-      qc.invalidateQueries({ queryKey: discoverKey })
-    }
-  })
+  const workspacesQuery = useWorkspaces()
+  const discoveredQuery = useDiscoveredWorkspaces()
+  const importMutation = useAddWorkspace()
+  const removeMutation = useRemoveWorkspace()
 
   if (workspacesQuery.isPending || discoveredQuery.isPending) {
     return (

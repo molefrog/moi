@@ -1,15 +1,15 @@
-import { useState } from 'react'
-
 import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from '@tabler/icons-react'
 
 import { cn } from '@/client/lib/cn'
+import { useUiStore } from '@/client/store/ui'
 
 import { SidebarLayout } from './SidebarLayout'
 
 // Test route for the sidebar layout shell. The panel content here is just a
 // placeholder — the shell is the component under test.
 export function SidebarLayoutPage() {
-  const [collapsed, setCollapsed] = useState(false)
+  const collapsed = useUiStore(s => s.sidebarCollapsed)
+  const toggle = useUiStore(s => s.toggleSidebar)
   const Icon = collapsed ? IconLayoutSidebarLeftExpand : IconLayoutSidebarLeftCollapse
 
   return (
@@ -20,7 +20,7 @@ export function SidebarLayoutPage() {
             type="button"
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            onClick={() => setCollapsed(c => !c)}
+            onClick={toggle}
             className={cn(
               'text-muted-foreground hover:bg-muted hover:text-foreground flex size-7 items-center justify-center rounded-sm',
               collapsed ? 'cursor-e-resize' : 'cursor-w-resize'
