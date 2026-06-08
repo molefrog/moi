@@ -1,12 +1,47 @@
 {
-  "name": "moi",
-  "version": "0.1.0",
-  "private": true,
+  "name": "moi-computer",
+  "version": "0.0.1",
+  "description": "Local AI workspace powered by the Claude Agent SDK, Bun, React, and Tailwind. Requires Bun.",
   "license": "Elastic-2.0",
   "type": "module",
-  "bin": {
-    "moi": "./server/cli.ts"
+  "homepage": "https://github.com/molefrog/moi#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/molefrog/moi.git"
   },
+  "bugs": {
+    "url": "https://github.com/molefrog/moi/issues"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "claude",
+    "claude-agent-sdk",
+    "bun",
+    "workspace",
+    "cli"
+  ],
+  "engines": {
+    "bun": ">=1.3"
+  },
+  "bin": {
+    "moi": "./bin/moi.mjs"
+  },
+  "files": [
+    "bin",
+    "server",
+    "client",
+    "lib",
+    "workspace",
+    "bunfig.toml",
+    "tsconfig.json",
+    "!**/*.test.ts",
+    "!**/*.test.tsx",
+    "!server/test",
+    "!workspace/.env",
+    "!workspace/.claude/settings.local.json",
+    "!workspace/.widgets"
+  ],
   "scripts": {
     "dev": "bun server/cli.ts start --dev",
     "lint": "eslint .",
@@ -20,7 +55,9 @@
     "@base-ui/react": "^1.2.0",
     "@dnd-kit/core": "^6.3.1",
     "@tabler/icons-react": "^3.40.0",
+    "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-query": "^5.100.1",
+    "agentation": "^2.3.3",
     "bun-plugin-tailwind": "^0.1.2",
     "citty": "^0.2.1",
     "class-variance-authority": "^0.7.1",
@@ -28,6 +65,7 @@
     "clsx": "^2.1.1",
     "devalue": "^5.6.4",
     "env-paths": "^4.0.0",
+    "highlight.js": "^10.7.3",
     "lru-cache": "^11.3.5",
     "motion": "^12.35.1",
     "pathe": "^2.0.3",
@@ -36,12 +74,18 @@
     "react-dom": "^19",
     "react-grid-layout": "^2.2.3",
     "react-markdown": "^10.1.0",
+    "react-resizable": "^3.1.3",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
     "shadcn": "^4.0.2",
     "tailwind-merge": "^3.5.0",
+    "tailwindcss": "^4.1.11",
+    "tw-animate-css": "^1.4.0",
     "wouter": "^3.9.0",
     "zustand": "^5.0.12"
+  },
+  "optionalDependencies": {
+    "openclaw": "2026.4.22"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
@@ -54,25 +98,20 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
-    "@tailwindcss/typography": "^0.5.19",
     "@trivago/prettier-plugin-sort-imports": "^5.2.2",
     "@types/bun": "latest",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-grid-layout": "^2.1.0",
     "@typescript-eslint/typescript-estree": "^8.57.2",
-    "agentation": "^2.3.3",
     "eslint": "^9.22.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-react-hooks": "^5.2.0",
     "globals": "^16.0.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "openclaw": "2026.4.22",
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.6.11",
-    "tailwindcss": "^4.1.11",
-    "tw-animate-css": "^1.4.0",
     "typescript-eslint": "^8.26.1"
   }
 }

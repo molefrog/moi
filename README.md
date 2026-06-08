@@ -1,29 +1,44 @@
 # moi
 
-Local AI workspace powered by Claude Agent SDK, Bun, React, and Tailwind.
+Local AI workspace powered by the Claude Agent SDK, Bun, React, and Tailwind.
 
-## Setup
+> Published on npm as **`moi-computer`**; the installed command is **`moi`**.
 
-Install dependencies:
+> **Requires [Bun](https://bun.sh).** moi is Bun-only — it uses `Bun.serve`, the
+> Bun bundler, and other Bun APIs. Running it under Node prints an install hint
+> and exits.
+
+## Install
+
+Install globally so the `moi` command is always on your PATH — the agent calls
+`moi` from your workspaces, so this is the recommended setup:
 
 ```sh
-bun install
+bun i -g moi-computer
+moi start
 ```
 
-Link the `moi` binary globally so it's available in any terminal session — and so the agent can call it from any workspace directory:
+If you don't have Bun yet:
 
 ```sh
-bun link
+curl -fsSL https://bun.sh/install | bash
 ```
 
-This registers the package from `package.json#bin` and makes `moi` available on your `PATH`.
+You can also run it once without installing:
+
+```sh
+bunx moi-computer init [dir]
+```
+
+`bunx` works for a single invocation but leaves no persistent `moi` command, so
+it prints a reminder to install globally.
 
 ## Usage
 
 Initialize a workspace directory:
 
 ```sh
-moi init [dir]          # scaffold .claude/rules/ and .widgets/ into dir (default: .)
+moi init [dir]          # scaffold .claude/skills into dir (default: .)
 moi init [dir] --web    # also start the server and open the browser
 ```
 
@@ -31,19 +46,26 @@ Start the web server:
 
 ```sh
 moi start               # http://localhost:3000
-moi start --hot         # with hot reload (dev mode)
+moi start --port=4000   # custom port
 ```
 
 Other commands:
 
 ```sh
 moi bundle [dir]        # rebuild changed widgets
-moi theme [dir]         # show or set font theme (--font=<key>)
+moi refresh             # refresh widget data without rebuilding
+moi theme [dir]         # show or set font/color themes (--font=<key> --color=<key>)
 moi status              # show server status and registered workspaces
+moi openclaw init       # install moi skills into an OpenClaw agent workspace
 ```
 
-## Development
+## Development (from source)
 
 ```sh
-bun run dev             # start dev server with hot reload on port 3000
+bun install
+bun run dev             # watch-and-restart dev server on port 3000
 ```
+
+`bun run dev` starts a supervisor that hot-reloads the frontend in place and
+full-restarts the server on changes to `server/` or `lib/`. Do not run the
+server with `bun --hot` — see `CLAUDE.md` for why.
