@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { AnimatePresence, motion } from 'motion/react'
 
@@ -52,8 +52,8 @@ function WorkspaceLoader({ id }: WorkspaceLoaderProps) {
   const widgets = useWorkspaceWidgets(id)
   const sessions = useWorkspaceSessions(id)
 
-  // Apply theme + keep the grid balanced as widgets come and go.
-  useWorkspaceTheme(layout.theme)
+  // Keep the grid balanced as widgets come and go. (Theme is applied inside
+  // WorkspaceView, scoped to the panel — see useWorkspaceTheme there.)
   useGridReconcile(id, widgets.data, layout, setLayout)
 
   // Workspace metadata the chat layer reads from the store (TurnView uses cwd).
@@ -169,6 +169,11 @@ function WorkspaceView({ widgets }: WorkspaceViewProps) {
   const { ref: rowRef, fits: canFitSidebar } = useFitsSidebar<HTMLDivElement>()
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
 
+  // Theme is scoped to this wrapper, not :root — the sidebar keeps the default
+  // tokens. The floating chat portals into the same element so it inherits them.
+  const themeRef = useRef<HTMLDivElement>(null)
+  useWorkspaceTheme(layout.theme, themeRef)
+
   const hasWidgets = widgets.length > 0
   // The chat always lives in the panel; "floating" only applies when there are
   // widgets to clear room for. With no widgets it fills the panel (LHS hidden).
@@ -200,7 +205,13 @@ function WorkspaceView({ widgets }: WorkspaceViewProps) {
   )
 
   return (
-    <>
+    // Themed wrapper: scoped CSS vars (bg/fg/font) live here so the panel — and
+    // the portaled floating chat — pick up the workspace theme, while the
+    // sidebar outside stays default.
+    <div
+      ref={themeRef}
+      className="bg-background text-foreground flex h-full min-h-0 flex-col font-sans"
+    >
       {/* Two-pane panel split. LHS = workspace header + scrollable widgets;
           RHS = the chat (its own header included). With no widgets the LHS is
           dropped and the chat fills the whole panel. */}
@@ -240,7 +251,10 @@ function WorkspaceView({ widgets }: WorkspaceViewProps) {
       </div>
 
       {chatMode === 'floating' && (
-        <ChatPopup defaultOpen={layout.chatMode === 'floating' && canFitSidebar}>
+        <ChatPopup
+          defaultOpen={layout.chatMode === 'floating' && canFitSidebar}
+          container={themeRef}
+        >
           {onClose => (
             <ChatPanel
               view={view}
@@ -259,6 +273,6 @@ function WorkspaceView({ widgets }: WorkspaceViewProps) {
           )}
         </ChatPopup>
       )}
-    </>
+    </div>
   )
 }
