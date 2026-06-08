@@ -235,7 +235,13 @@ const start = defineCommand({
       }
 
       // Spawn server with correct cwd so bunfig.toml is picked up at Bun startup.
-      const env = args.port ? { ...process.env, PORT: args.port } : process.env
+      // MOI_DEV tells the server to use the live bundler + HMR even if a stale
+      // `dist/` exists in the tree (prod serves prebuilt `dist/` statically).
+      const env = {
+        ...process.env,
+        ...(args.port ? { PORT: args.port } : {}),
+        ...(dev ? { MOI_DEV: '1' } : {})
+      }
       if (dev) {
         await runDevSupervisor(projectRoot, env)
         return

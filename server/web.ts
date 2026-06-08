@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs'
+import { join, sep } from 'node:path'
+
 import type { ClientMessage } from '@/lib/types'
 
 import index from '../client/index.html'
@@ -56,6 +59,31 @@ function isClientMessage(value: unknown): value is ClientMessage {
   return false
 }
 
+// Production (published/global install) ships a prebuilt client in `dist/`
+// (see scripts/build-client.ts). When present we serve it as static files,
+// because Bun's runtime bundler won't run plugins on source under the global
+// install tree. In dev there is no `dist/`, so we fall back to the imported
+// HTML route + Bun.serve's live bundler (HMR). `import.meta.dir` is server/.
+const DIST_DIR = join(import.meta.dir, '..', 'dist')
+const DIST_INDEX = join(DIST_DIR, 'index.html')
+// Serve prebuilt static assets when `dist/` exists — but never in dev mode
+// (MOI_DEV is set by the dev supervisor), so `bun run dev` always uses the
+// live bundler + HMR even if a stale `dist/` is lying around the working tree.
+const serveStatic = !process.env.MOI_DEV && existsSync(DIST_INDEX)
+
+// The SPA shell: prebuilt index.html in prod, the live-bundled HTML in dev.
+const shell = serveStatic ? () => new Response(Bun.file(DIST_INDEX)) : index
+
+// Serve a hashed asset (`/chunk-….js`, `/favicon-….png`, …) from `dist/`.
+// Returns null when the path isn't a real file under dist (path-traversal safe).
+async function serveDistAsset(pathname: string): Promise<Response | null> {
+  if (!serveStatic) return null
+  const filePath = join(DIST_DIR, pathname)
+  if (filePath !== DIST_DIR && !filePath.startsWith(DIST_DIR + sep)) return null
+  const file = Bun.file(filePath)
+  return (await file.exists()) ? new Response(file) : null
+}
+
 type Upgradable = { upgrade(req: Request, opts: { data: WsData }): boolean }
 
 function upgrade(server: Upgradable, req: Request, data: WsData) {
@@ -67,12 +95,13 @@ function upgrade(server: Upgradable, req: Request, data: WsData) {
 export const app = Bun.serve<WsData>({
   port: PORT,
   hostname: process.env.HOST ?? '127.0.0.1',
-  development: { hmr: true },
+  // HMR only in dev; prod serves prebuilt static assets (no bundler).
+  development: serveStatic ? false : { hmr: true },
   routes: {
     // Client-side routes — serve the SPA shell
-    '/': index,
-    '/playground': index,
-    '/workspace/*': index,
+    '/': shell,
+    '/playground': shell,
+    '/workspace/*': shell,
 
     // Workspace registry API
     '/api/workspaces': async req => {
@@ -199,13 +228,19 @@ export const app = Bun.serve<WsData>({
       return handleFunctionCall(req, tail, ws.path)
     }
   },
-  fetch(req, server) {
+  async fetch(req, server) {
     const url = new URL(req.url)
     // Chat websocket (per-workspace). The widget-event websocket lives in the
     // routes table at /api/workspaces/ws.
     if (url.pathname === '/ws') {
       const workspaceId = url.searchParams.get('workspace') ?? ''
       return upgrade(server, req, { channel: 'chat', workspaceId })
+    }
+    // Prod: serve prebuilt hashed assets (/chunk-….js, /favicon-….png, …).
+    // No-op in dev (the live bundler serves assets via the HTML route).
+    if (req.method === 'GET') {
+      const asset = await serveDistAsset(url.pathname)
+      if (asset) return asset
     }
     return new Response('Not found', { status: 404 })
   },
