@@ -3,8 +3,7 @@ import { useState } from 'react'
 
 import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
 import { connectWs, disconnectWs, sendWs } from '@/client/lib/ws'
-import { useSessionsStore } from '@/client/store/sessions'
-import { useWorkspaceStore } from '@/client/store/workspace'
+import { useChatStore } from '@/client/store/chat'
 import { emptyViewState } from '@/lib/format'
 import type { ViewState } from '@/lib/types'
 
@@ -14,12 +13,12 @@ export function useChat() {
   const workspaceId = useWorkspaceId()
   const [input, setInput] = useState('')
 
-  const activeSessionId = useWorkspaceStore(s => s.activeSessionId)
-  const setActiveSession = useWorkspaceStore(s => s.setActiveSession)
+  const activeSessionId = useChatStore(s => s.activeSessionId)
+  const setActiveSession = useChatStore(s => s.setActiveSession)
 
-  const view = useSessionsStore(s => s.views[activeSessionId ?? ''] ?? EMPTY)
-  const processing = useSessionsStore(s => s.processing[activeSessionId ?? ''] ?? false)
-  const error = useSessionsStore(s => s.errors[activeSessionId ?? ''] ?? null)
+  const view = useChatStore(s => s.views[activeSessionId ?? ''] ?? EMPTY)
+  const processing = useChatStore(s => s.processing[activeSessionId ?? ''] ?? false)
+  const error = useChatStore(s => s.errors[activeSessionId ?? ''] ?? null)
 
   // Persistent WS for live events — reconnects if workspace changes
   useEffect(() => {
@@ -30,8 +29,8 @@ export function useChat() {
   // When active session changes and we don't have its events cached, fetch them
   useEffect(() => {
     if (!activeSessionId) return
-    if (useSessionsStore.getState().events[activeSessionId] !== undefined) return
-    useSessionsStore.getState().loadEvents(workspaceId, activeSessionId)
+    if (useChatStore.getState().events[activeSessionId] !== undefined) return
+    useChatStore.getState().loadEvents(workspaceId, activeSessionId)
   }, [workspaceId, activeSessionId])
 
   const send = useCallback(() => {
@@ -43,14 +42,14 @@ export function useChat() {
     if (!sid) {
       sid = crypto.randomUUID()
       isNew = true
-      useSessionsStore.getState().setEvents(sid, [])
+      useChatStore.getState().setEvents(sid, [])
       setActiveSession(sid)
     }
 
     // Optimistic user turn — rendered immediately, upserted in place when the
     // SDK echoes it back via expectUserEcho on the server.
     const optimisticId = `optimistic:${crypto.randomUUID()}`
-    useSessionsStore.getState().append(sid, {
+    useChatStore.getState().append(sid, {
       kind: 'turn',
       turn: {
         id: optimisticId,
@@ -62,13 +61,13 @@ export function useChat() {
     })
 
     sendWs({ type: 'chat', content: text, sessionId: sid, isNew, optimisticId })
-    useSessionsStore.getState().setError(sid, null)
+    useChatStore.getState().setError(sid, null)
     setInput('')
   }, [input, processing, activeSessionId, setActiveSession])
 
   const dismissError = useCallback(() => {
     if (!activeSessionId) return
-    useSessionsStore.getState().setError(activeSessionId, null)
+    useChatStore.getState().setError(activeSessionId, null)
   }, [activeSessionId])
 
   const stop = useCallback(() => {

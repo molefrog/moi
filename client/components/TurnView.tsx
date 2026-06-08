@@ -15,7 +15,7 @@ import { relative } from 'pathe'
 import { MarkdownContent } from '@/client/components/MarkdownContent'
 import { cn } from '@/client/lib/cn'
 import { formatMcpServerName, getMcpIcon } from '@/client/lib/mcp-icons'
-import { useWorkspaceStore } from '@/client/store/workspace'
+import { useChatStore } from '@/client/store/chat'
 import type { Part, SubagentRecord, ToolCall, Turn } from '@/lib/types'
 
 export function EmptyState() {
@@ -185,7 +185,7 @@ function ToolCallCard({ call }: ToolCallCardProps) {
 
 type GenericToolCardProps = { call: ToolCall }
 function GenericToolCard({ call }: GenericToolCardProps) {
-  const cwd = useWorkspaceStore(s => s.cwd)
+  const cwd = useChatStore(s => s.cwd)
   const isError = call.state === 'error'
   const isRunning = call.state === 'running' || call.state === 'pending'
   const output = isError

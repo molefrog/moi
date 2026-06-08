@@ -20,8 +20,7 @@ import { useWorkspaceTheme } from '@/client/hooks/useWorkspaceTheme'
 import { Workspace } from '@/client/lib/WorkspaceContext'
 import { WorkspaceLayoutProvider, useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
-import { useSessionsStore } from '@/client/store/sessions'
-import { useWorkspaceStore } from '@/client/store/workspace'
+import { useChatStore } from '@/client/store/chat'
 import type { WidgetInfo } from '@/lib/types'
 
 type WorkspaceRouteProps = {
@@ -48,7 +47,7 @@ type WorkspaceLoaderProps = {
 
 function WorkspaceLoader({ id }: WorkspaceLoaderProps) {
   const qc = useQueryClient()
-  const { layout, setLayout, name, cwd, isLoading: layoutLoading } = useWorkspaceLayoutCtx()
+  const { layout, setLayout, cwd, isLoading: layoutLoading } = useWorkspaceLayoutCtx()
   const widgets = useWorkspaceWidgets(id)
   const sessions = useWorkspaceSessions(id)
 
@@ -56,21 +55,21 @@ function WorkspaceLoader({ id }: WorkspaceLoaderProps) {
   // WorkspaceView, scoped to the panel — see useWorkspaceTheme there.)
   useGridReconcile(id, widgets.data, layout, setLayout)
 
-  // Workspace metadata the chat layer reads from the store (TurnView uses cwd).
+  // The chat layer reads cwd from the store (TurnView).
   useEffect(() => {
-    useWorkspaceStore.setState({ id, cwd, name })
-  }, [id, cwd, name])
+    useChatStore.setState({ cwd })
+  }, [cwd])
 
-  // Seed the chat stores from the sessions query: populate the thread list and
+  // Seed the chat store from the sessions query: populate the thread list and
   // pick an active session (reset when switching to a workspace that doesn't
   // contain the currently-active one).
   useEffect(() => {
     if (!sessions.data) return
-    useSessionsStore.setState({ list: sessions.data, status: 'ready' })
-    const active = useWorkspaceStore.getState().activeSessionId
+    useChatStore.setState({ list: sessions.data })
+    const active = useChatStore.getState().activeSessionId
     const stillValid = active && sessions.data.some(s => s.sessionId === active)
     if (!stillValid) {
-      useWorkspaceStore.getState().setActiveSession(sessions.data[0]?.sessionId ?? null)
+      useChatStore.getState().setActiveSession(sessions.data[0]?.sessionId ?? null)
     }
   }, [sessions.data])
 

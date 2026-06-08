@@ -5,7 +5,6 @@ import { Route, Switch, useLocation } from 'wouter'
 import { setWorkspaceSwitchHandler } from '@/client/lib/ws'
 
 import { HomePage } from './HomePage'
-import { SidebarLayoutPage } from './layout/SidebarLayoutPage'
 import { PlaygroundPage } from './playground/PlaygroundPage'
 import { WorkspaceRoute } from './routes/workspace/[id]'
 
@@ -24,7 +23,6 @@ export function AppRouter() {
     <Switch>
       <Route path="/" component={HomePage} />
       <Route path="/playground" component={PlaygroundPage} />
-      <Route path="/sidebar" component={SidebarLayoutPage} />
       <Route path="/workspace/:id">
         {(params: { id: string }) => <WorkspaceRoute id={params.id} />}
       </Route>

@@ -2,8 +2,7 @@ import { IconChevronDown, IconPlus } from '@tabler/icons-react'
 
 import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
-import { useSessionsStore } from '@/client/store/sessions'
-import { useWorkspaceStore } from '@/client/store/workspace'
+import { useChatStore } from '@/client/store/chat'
 
 import { Button } from './ui/button'
 import {
@@ -34,8 +33,8 @@ function formatDate(ms: number) {
 
 export function ThreadSelector({ onSwitch }: ThreadSelectorProps) {
   const workspaceId = useWorkspaceId()
-  const sessions = useSessionsStore(s => s.list)
-  const activeSessionId = useWorkspaceStore(s => s.activeSessionId)
+  const sessions = useChatStore(s => s.list)
+  const activeSessionId = useChatStore(s => s.activeSessionId)
 
   const active = sessions.find(s => s.sessionId === activeSessionId)
   const label = active?.summary ?? 'New thread'
@@ -47,7 +46,7 @@ export function ThreadSelector({ onSwitch }: ThreadSelectorProps) {
   return (
     <DropdownMenu
       onOpenChange={open => {
-        if (open) useSessionsStore.getState().loadList(workspaceId)
+        if (open) useChatStore.getState().loadList(workspaceId)
       }}
     >
       <DropdownMenuTrigger

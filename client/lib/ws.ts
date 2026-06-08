@@ -1,5 +1,4 @@
-import { useSessionsStore } from '@/client/store/sessions'
-import { useWorkspaceStore } from '@/client/store/workspace'
+import { useChatStore } from '@/client/store/chat'
 import type { ClientMessage, StreamEvent } from '@/lib/types'
 
 let ws: WebSocket | null = null
@@ -33,9 +32,9 @@ export function connectWs(workspaceId: string) {
     // initial connect doesn't trigger this — `useChat` already loads events
     // when activeSessionId becomes set.
     if (hasConnectedBefore) {
-      const activeSessionId = useWorkspaceStore.getState().activeSessionId
+      const activeSessionId = useChatStore.getState().activeSessionId
       if (activeSessionId) {
-        useSessionsStore.getState().loadEvents(currentWorkspaceId, activeSessionId)
+        useChatStore.getState().loadEvents(currentWorkspaceId, activeSessionId)
       }
     }
     hasConnectedBefore = true
@@ -43,8 +42,7 @@ export function connectWs(workspaceId: string) {
 
   socket.onmessage = e => {
     const data = JSON.parse(e.data) as Record<string, unknown>
-    const store = useSessionsStore.getState()
-    const workspace = useWorkspaceStore.getState()
+    const store = useChatStore.getState()
 
     // Control frames first
     if (data.type === 'status') {
@@ -55,7 +53,7 @@ export function connectWs(workspaceId: string) {
       const from = data.from as string
       const to = data.to as string
       store.renameSession(from, to)
-      if (workspace.activeSessionId === from) workspace.setActiveSession(to)
+      if (store.activeSessionId === from) store.setActiveSession(to)
       return
     }
     if (data.type === 'workspace:switch') {

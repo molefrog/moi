@@ -3,16 +3,27 @@ import { create } from 'zustand'
 import { applyEvent, emptyViewState } from '@/lib/format'
 import type { SessionInfo, StreamEvent, ViewState } from '@/lib/types'
 
-type SessionsStore = {
+// Client-side chat state for a workspace: which thread is active, the thread
+// list, and per-session events/views/status. Layout + widgets live in React
+// Query; this holds everything the chat UI reads and the websocket writes.
+type ChatStore = {
+  // The agent's working directory (workspace path), shown in turn metadata.
+  cwd: string | null
+
+  // The session/thread currently shown.
+  activeSessionId: string | null
+  setActiveSession: (sessionId: string | null) => void
+
+  // Per-session state, keyed by sessionId.
   events: Record<string, StreamEvent[]>
   views: Record<string, ViewState>
   processing: Record<string, boolean>
   // Last server-emitted error per session — surfaced as a dismissable banner
   // above the chat. Cleared when the user types or stops the run.
   errors: Record<string, string | null>
+  // The thread list (seeded from the sessions query; refreshed on demand).
   list: SessionInfo[]
-  status: 'loading' | 'ready' | 'error'
-  initialSessionId: string | null
+
   setEvents: (sessionId: string, evs: StreamEvent[]) => void
   append: (sessionId: string, ev: StreamEvent) => void
   setProcessing: (sessionId: string, value: boolean) => void
@@ -20,7 +31,6 @@ type SessionsStore = {
   renameSession: (from: string, to: string) => void
   loadList: (workspaceId: string) => Promise<void>
   loadEvents: (workspaceId: string, sessionId: string) => Promise<void>
-  loadInitial: (workspaceId: string) => Promise<void>
 }
 
 async function fetchEvents(workspaceId: string, sessionId: string): Promise<StreamEvent[]> {
@@ -33,14 +43,17 @@ function materialize(events: StreamEvent[]): ViewState {
   return events.reduce(applyEvent, emptyViewState())
 }
 
-export const useSessionsStore = create<SessionsStore>()(set => ({
+export const useChatStore = create<ChatStore>()(set => ({
+  cwd: null,
+
+  activeSessionId: null,
+  setActiveSession: sessionId => set({ activeSessionId: sessionId }),
+
   events: {},
   views: {},
   processing: {},
   errors: {},
   list: [],
-  status: 'loading',
-  initialSessionId: null,
 
   loadList: async (workspaceId: string) => {
     try {
@@ -57,32 +70,6 @@ export const useSessionsStore = create<SessionsStore>()(set => ({
       events: { ...s.events, [sessionId]: evs },
       views: { ...s.views, [sessionId]: materialize(evs) }
     }))
-  },
-
-  loadInitial: async (workspaceId: string) => {
-    try {
-      const listRes = await fetch(`/api/workspaces/${workspaceId}/sessions`)
-      if (!listRes.ok) throw new Error()
-      const list: SessionInfo[] = await listRes.json()
-
-      if (list.length === 0) {
-        set({ list, status: 'ready', initialSessionId: null })
-        return
-      }
-
-      const latestId = list[0].sessionId
-      const evs = await fetchEvents(workspaceId, latestId)
-
-      set(s => ({
-        list,
-        events: { ...s.events, [latestId]: evs },
-        views: { ...s.views, [latestId]: materialize(evs) },
-        status: 'ready',
-        initialSessionId: latestId
-      }))
-    } catch {
-      set({ status: 'error' })
-    }
   },
 
   setEvents: (sessionId, evs) =>
