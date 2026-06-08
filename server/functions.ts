@@ -74,7 +74,9 @@ function spawnSlot(workspacePath: string): Slot {
 
   slot.worker = Bun.spawn([process.execPath, WORKER_PATH], {
     cwd: workspacePath,
-    env: { ...process.env, MEI_FUNCTIONS_DIR: meiDir },
+    // Default to the workspace's built functions dir, but let an explicitly-set
+    // MEI_FUNCTIONS_DIR win (used by tests to point the worker at fixtures).
+    env: { ...process.env, MEI_FUNCTIONS_DIR: process.env.MEI_FUNCTIONS_DIR ?? meiDir },
     stderr: 'inherit',
     onExit(_proc, code) {
       if (code !== 0 && code !== null) {

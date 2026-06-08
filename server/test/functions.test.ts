@@ -11,29 +11,31 @@ process.env.MEI_FUNCTIONS_DIR = FIXTURES
 
 describe('callFunction (via worker)', () => {
   test('calls a function and returns result', async () => {
-    const result = parse(await callFunction('with-server', 'getWeather', stringify(['NYC'])))
+    const result = parse(
+      await callFunction('with-server', 'getWeather', stringify(['NYC']), FIXTURES)
+    )
 
     expect(result).toEqual({ city: 'NYC', temp: 72 })
   })
 
   test('rejects on unknown module', async () => {
-    await expect(callFunction('nope', 'foo', stringify([]))).rejects.toThrow('not found')
+    await expect(callFunction('nope', 'foo', stringify([]), FIXTURES)).rejects.toThrow('not found')
   })
 
   test('rejects on unknown function', async () => {
-    await expect(callFunction('with-server', 'nonexistent', stringify([]))).rejects.toThrow(
-      'not a function'
-    )
+    await expect(
+      callFunction('with-server', 'nonexistent', stringify([]), FIXTURES)
+    ).rejects.toThrow('not a function')
   })
 
   test('rejects on function error', async () => {
-    await expect(callFunction('error', 'failHard', stringify([]))).rejects.toThrow(
+    await expect(callFunction('error', 'failHard', stringify([]), FIXTURES)).rejects.toThrow(
       'intentional test error'
     )
   })
 
   test('handles devalue types round-trip', async () => {
-    const result = parse(await callFunction('types', 'getDate', stringify([])))
+    const result = parse(await callFunction('types', 'getDate', stringify([]), FIXTURES))
     expect(result).toBeInstanceOf(Date)
   })
 })
@@ -59,7 +61,7 @@ describe('/_rpc/fn endpoint', () => {
 
           try {
             const args = await req.text()
-            const result = await callFunction(module, name, args)
+            const result = await callFunction(module, name, args, FIXTURES)
             return new Response(result, { headers: { 'Content-Type': 'application/json' } })
           } catch (err) {
             const message = err instanceof Error ? err.message : 'Unknown error'
