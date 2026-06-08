@@ -1,65 +1,104 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { AnimatePresence, motion } from 'motion/react'
 
-import { IconLayoutDashboard, IconLoader2, IconPalette } from '@tabler/icons-react'
+import { IconLayoutDashboard, IconPalette } from '@tabler/icons-react'
+import { useQueryClient } from '@tanstack/react-query'
 
+import { useWorkspaceSessions, useWorkspaceWidgets, workspaceKeys } from '@/client/api/workspaces'
 import { ChatPanel } from '@/client/components/ChatPanel'
 import { ChatPopup } from '@/client/components/ChatPopup'
 import { type WidgetMode, Widgets } from '@/client/components/Widgets'
 import { PanelHeader, SidebarLayout, SidebarToggle } from '@/client/components/layout/SidebarLayout'
+import { LedLogo } from '@/client/components/playground/LedLogo'
 import { Button } from '@/client/components/ui/button'
 import { useChat } from '@/client/hooks/useChat'
 import { useFitsSidebar } from '@/client/hooks/useFitsSidebar'
+import { useGridReconcile } from '@/client/hooks/useGridReconcile'
 import { useMeiEvent } from '@/client/hooks/useMeiEvents'
-import { useWidgetSync } from '@/client/hooks/useWidgetSync'
 import { useWorkspaceTheme } from '@/client/hooks/useWorkspaceTheme'
 import { Workspace } from '@/client/lib/WorkspaceContext'
+import { WorkspaceLayoutProvider, useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
 import { useSessionsStore } from '@/client/store/sessions'
-import { useWidgetsStore } from '@/client/store/widgets'
 import { useWorkspaceStore } from '@/client/store/workspace'
+import type { WidgetInfo } from '@/lib/types'
 
 type WorkspaceRouteProps = {
   id: string
 }
 
-// Route component for `/workspace/:id` — provides workspace context then loads.
+// Route component for `/workspace/:id` — provides workspace id + layout context,
+// then loads. Layout and widgets are React Query resources; chat (sessions,
+// events, websocket) still runs on the Zustand stores, seeded from the sessions
+// query below.
 export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
   return (
     <Workspace id={id}>
-      <WorkspaceLoader />
+      <WorkspaceLayoutProvider id={id}>
+        <WorkspaceLoader id={id} />
+      </WorkspaceLayoutProvider>
     </Workspace>
   )
 }
 
-function WorkspaceLoader() {
-  const workspaceStatus = useWorkspaceStore(s => s.status)
-  const widgetsStatus = useWidgetsStore(s => s.status)
-  const sessionsStatus = useSessionsStore(s => s.status)
+type WorkspaceLoaderProps = {
+  id: string
+}
 
-  useWidgetSync()
-  useWorkspaceTheme()
+function WorkspaceLoader({ id }: WorkspaceLoaderProps) {
+  const qc = useQueryClient()
+  const { layout, setLayout, name, cwd, isLoading: layoutLoading } = useWorkspaceLayoutCtx()
+  const widgets = useWorkspaceWidgets(id)
+  const sessions = useWorkspaceSessions(id)
 
+  // Apply theme + keep the grid balanced as widgets come and go.
+  useWorkspaceTheme(layout.theme)
+  useGridReconcile(id, widgets.data, layout, setLayout)
+
+  // Workspace metadata the chat layer reads from the store (TurnView uses cwd).
+  useEffect(() => {
+    useWorkspaceStore.setState({ id, cwd, name })
+  }, [id, cwd, name])
+
+  // Seed the chat stores from the sessions query: populate the thread list and
+  // pick an active session (reset when switching to a workspace that doesn't
+  // contain the currently-active one).
+  useEffect(() => {
+    if (!sessions.data) return
+    useSessionsStore.setState({ list: sessions.data, status: 'ready' })
+    const active = useWorkspaceStore.getState().activeSessionId
+    const stillValid = active && sessions.data.some(s => s.sessionId === active)
+    if (!stillValid) {
+      useWorkspaceStore.getState().setActiveSession(sessions.data[0]?.sessionId ?? null)
+    }
+  }, [sessions.data])
+
+  // Server-pushed changes invalidate the matching query so the next render
+  // revalidates (theme re-applies; the grid reconcile places any new widget).
   useMeiEvent(e => {
     if (e.type === 'theme:updated') {
-      const { id } = useWorkspaceStore.getState()
-      useWorkspaceStore.getState().load(id)
+      qc.invalidateQueries({ queryKey: workspaceKeys.layout(id) })
+    } else if (e.type === 'widget-layout:updated') {
+      qc.invalidateQueries({ queryKey: workspaceKeys.widgets(id) })
     }
   })
 
-  const isLoading =
-    workspaceStatus === 'loading' || widgetsStatus === 'loading' || sessionsStatus === 'loading'
+  // Fresh visit (nothing cached) → centered MOI logo in the panel. Switch-back
+  // shows cached data immediately while it revalidates, so no loader then.
+  const fresh = layoutLoading || widgets.isLoading
 
-  if (isLoading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <IconLoader2 size={20} stroke={1.5} className="text-muted-foreground animate-spin" />
-      </div>
-    )
-  }
-
-  return <WorkspaceView />
+  return (
+    <SidebarLayout>
+      {fresh ? (
+        <div className="flex h-full items-center justify-center">
+          <LedLogo sprite="moi" effect="chaos" />
+        </div>
+      ) : (
+        <WorkspaceView widgets={widgets.data ?? []} />
+      )}
+    </SidebarLayout>
+  )
 }
 
 const ACTION_VARIANTS = {
@@ -119,11 +158,14 @@ function WidgetActions({ mode, onMode }: WidgetActionsProps) {
   )
 }
 
-function WorkspaceView() {
+type WorkspaceViewProps = {
+  widgets: WidgetInfo[]
+}
+
+function WorkspaceView({ widgets }: WorkspaceViewProps) {
   const { view, input, setInput, processing, error, send, stop, switchThread, dismissError } =
     useChat()
-  const { layout, setLayout, name } = useWorkspaceStore()
-  const { widgets } = useWidgetsStore()
+  const { layout, setLayout, name } = useWorkspaceLayoutCtx()
   const { ref: rowRef, fits: canFitSidebar } = useFitsSidebar<HTMLDivElement>()
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
 
@@ -158,7 +200,7 @@ function WorkspaceView() {
   )
 
   return (
-    <SidebarLayout>
+    <>
       {/* Two-pane panel split. LHS = workspace header + scrollable widgets;
           RHS = the chat (its own header included). With no widgets the LHS is
           dropped and the chat fills the whole panel. */}
@@ -171,7 +213,7 @@ function WorkspaceView() {
               <div className="flex-1" />
               <WidgetActions mode={widgetMode} onMode={setWidgetMode} />
             </PanelHeader>
-            <Widgets mode={widgetMode} />
+            <Widgets mode={widgetMode} widgets={widgets} />
           </div>
         )}
 
@@ -217,6 +259,6 @@ function WorkspaceView() {
           )}
         </ChatPopup>
       )}
-    </SidebarLayout>
+    </>
   )
 }

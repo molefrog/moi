@@ -10,7 +10,7 @@ export function useWidgetList(): WidgetInfo[] {
   const [widgets, setWidgets] = useState<WidgetInfo[]>([])
 
   const fetchList = useCallback(() => {
-    fetch(`/_mei/${workspaceId}/widgets`)
+    fetch(`/api/workspaces/${workspaceId}/widgets`)
       .then(r => r.json())
       .then(data => setWidgets(data.widgets))
       .catch(() => setWidgets([]))

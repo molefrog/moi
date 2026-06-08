@@ -165,10 +165,8 @@ function Sidebar({ collapsed, workspaces, logoEffect }: SidebarProps) {
       <nav className="flex flex-col gap-0.5">
         <NavRow
           href="/"
-          spa
           icon={<IconHome size={18} className="text-foreground shrink-0" />}
           label="Home"
-          active
           collapsed={collapsed}
         />
       </nav>
@@ -236,34 +234,27 @@ type NavRowProps = {
   href: string
   icon: ReactNode
   label: string
-  active?: boolean
   collapsed?: boolean
-  // Internal nav (Home) uses wouter <Link> for SPA navigation.
-  // Workspaces stay a plain <a> (full nav) for now.
-  spa?: boolean
 }
 
-function NavRow({ href, icon, label, active, collapsed, spa }: NavRowProps) {
-  const className = cn(
-    'flex h-8 items-center gap-2.5 rounded-sm px-2 text-sm font-medium',
-    active
-      ? 'bg-foreground/[0.07] text-foreground'
-      : 'text-foreground/65 hover:bg-foreground/[0.04] hover:text-foreground'
-  )
-  const inner = (
-    <>
+function NavRow({ href, icon, label, collapsed }: NavRowProps) {
+  // wouter resolves `active` by matching `href` against the current location
+  // (exact match — a workspace row lights up only on its own route).
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      className={active =>
+        cn(
+          'flex h-8 items-center gap-2.5 rounded-sm px-2 text-sm font-medium',
+          active
+            ? 'bg-foreground/[0.07] text-foreground'
+            : 'text-foreground/65 hover:bg-foreground/[0.04] hover:text-foreground'
+        )
+      }
+    >
       {icon}
       {!collapsed && <span className="truncate">{label}</span>}
-    </>
-  )
-
-  return spa ? (
-    <Link href={href} aria-label={label} className={className}>
-      {inner}
     </Link>
-  ) : (
-    <a href={href} aria-label={label} className={className}>
-      {inner}
-    </a>
   )
 }

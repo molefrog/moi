@@ -44,7 +44,7 @@ export const useSessionsStore = create<SessionsStore>()(set => ({
 
   loadList: async (workspaceId: string) => {
     try {
-      const res = await fetch(`/_mei/${workspaceId}/sessions`)
+      const res = await fetch(`/api/workspaces/${workspaceId}/sessions`)
       if (!res.ok) return
       const list: SessionInfo[] = await res.json()
       set({ list })
@@ -61,7 +61,7 @@ export const useSessionsStore = create<SessionsStore>()(set => ({
 
   loadInitial: async (workspaceId: string) => {
     try {
-      const listRes = await fetch(`/_mei/${workspaceId}/sessions`)
+      const listRes = await fetch(`/api/workspaces/${workspaceId}/sessions`)
       if (!listRes.ok) throw new Error()
       const list: SessionInfo[] = await listRes.json()
 

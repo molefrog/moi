@@ -2,9 +2,9 @@ import { useCallback, useState } from 'react'
 
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 
+import { useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
 import { findFreePosition } from '@/client/lib/grid-pack'
-import { useWidgetsStore } from '@/client/store/widgets'
-import { useWorkspaceStore } from '@/client/store/workspace'
+import type { WidgetInfo } from '@/lib/types'
 
 import { CustomizePanel } from './CustomizePanel'
 import { HiddenPanel } from './HiddenPanel'
@@ -37,11 +37,12 @@ function usePanelHeight() {
 type WidgetsProps = {
   // Owned by the page (its header renders the controls); Widgets only reacts.
   mode: WidgetMode
+  // Authoritative widget set from the widgets query; positions come from layout.
+  widgets: WidgetInfo[]
 }
 
-export function Widgets({ mode }: WidgetsProps) {
-  const { widgets } = useWidgetsStore()
-  const { layout, setLayout } = useWorkspaceStore()
+export function Widgets({ mode, widgets }: WidgetsProps) {
+  const { layout, setLayout } = useWorkspaceLayoutCtx()
 
   const gridIds = new Set(layout.widgetGrid.map(g => g.i))
 

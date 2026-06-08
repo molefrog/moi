@@ -100,6 +100,39 @@ export const app = Bun.serve<WsData>({
       if (!ws) return Response.json({ cols: 4, items: [] })
       return Response.json(await getWorkspacePreview(ws.path))
     },
+    '/api/workspaces/:id/layout': async req => {
+      const ws = await getWorkspace(req.params.id)
+      if (!ws) return new Response('Workspace not found', { status: 404 })
+      if (req.method === 'GET') {
+        return Response.json({
+          ...(await loadLayout(ws.path)),
+          cwd: ws.path,
+          name: ws.name,
+          agentId: ws.agentId
+        })
+      }
+      if (req.method === 'PUT') {
+        const body = await req.json()
+        if (!body || body.version !== 1) return new Response('Bad request', { status: 400 })
+        await saveLayout(body, ws.path)
+        return new Response(null, { status: 204 })
+      }
+      return new Response('Method not allowed', { status: 405 })
+    },
+    '/api/workspaces/:id/widgets': async req => {
+      const ws = await getWorkspace(req.params.id)
+      if (!ws) return new Response('Workspace not found', { status: 404 })
+      return listWidgets(ws.path)
+    },
+    '/api/workspaces/:id/sessions': async req => {
+      const ws = await getWorkspace(req.params.id)
+      if (!ws) return new Response('Workspace not found', { status: 404 })
+      if (ws.type === 'openclaw') {
+        const rows = await getOpenClawSessions(ws.path, ws.agentId)
+        return Response.json(rows.map(r => toSessionInfo(r, ws.path)))
+      }
+      return Response.json(await getSessions(ws.path))
+    },
     '/api/workspaces/:id': async req => {
       if (req.method === 'DELETE') {
         const ok = await removeWorkspace(req.params.id)
@@ -109,26 +142,14 @@ export const app = Bun.serve<WsData>({
       return new Response('Method not allowed', { status: 405 })
     },
 
-    // Per-workspace MEI API
-    '/_mei/:workspaceId/widgets': async req => {
-      const ws = await getWorkspace(req.params.workspaceId)
-      if (!ws) return new Response('Workspace not found', { status: 404 })
-      return listWidgets(ws.path)
-    },
+    // Per-workspace MEI runtime API (widget bundles, live events, fn calls).
+    // Resource reads (layout / widgets list / sessions list) live under
+    // /api/workspaces/:id/* above and are consumed via React Query.
     '/_mei/:workspaceId/widgets/*': async req => {
       const ws = await getWorkspace(req.params.workspaceId)
       if (!ws) return new Response('Workspace not found', { status: 404 })
       const name = new URL(req.url).pathname.split('/').pop()?.replace(/\.js$/, '')
       return name ? serveWidget(name, ws.path) : new Response('Not found', { status: 404 })
-    },
-    '/_mei/:workspaceId/sessions': async req => {
-      const ws = await getWorkspace(req.params.workspaceId)
-      if (!ws) return new Response('Workspace not found', { status: 404 })
-      if (ws.type === 'openclaw') {
-        const rows = await getOpenClawSessions(ws.path, ws.agentId)
-        return Response.json(rows.map(r => toSessionInfo(r, ws.path)))
-      }
-      return Response.json(await getSessions(ws.path))
     },
     '/_mei/:workspaceId/sessions/:sessionId/events': async req => {
       const ws = await getWorkspace(req.params.workspaceId)
@@ -162,25 +183,6 @@ export const app = Bun.serve<WsData>({
       const ws = await getWorkspace(req.params.workspaceId)
       if (!ws) return new Response('Workspace not found', { status: 404 })
       return Response.json(await getMcpStatus(ws.path))
-    },
-    '/_mei/:workspaceId/layout': async req => {
-      const ws = await getWorkspace(req.params.workspaceId)
-      if (!ws) return new Response('Workspace not found', { status: 404 })
-      if (req.method === 'GET') {
-        return Response.json({
-          ...(await loadLayout(ws.path)),
-          cwd: ws.path,
-          name: ws.name,
-          agentId: ws.agentId
-        })
-      }
-      if (req.method === 'PUT') {
-        const body = await req.json()
-        if (!body || body.version !== 1) return new Response('Bad request', { status: 400 })
-        await saveLayout(body, ws.path)
-        return new Response(null, { status: 204 })
-      }
-      return new Response('Method not allowed', { status: 405 })
     },
     '/_mei/:workspaceId/fn/*': async req => {
       if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })

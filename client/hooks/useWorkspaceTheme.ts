@@ -1,12 +1,13 @@
 import { useEffect } from 'react'
 
-import { useWorkspaceStore } from '@/client/store/workspace'
 import { FONT_THEMES } from '@/lib/themes'
+import type { WorkspaceLayout } from '@/lib/types'
 
 const COLOR_OVERRIDES = ['background', 'foreground'] as const
 
-export function useWorkspaceTheme() {
-  const theme = useWorkspaceStore(s => s.layout.theme)
+// Applies the workspace theme (font + color overrides) to the document. Driven
+// by the theme from the layout query — pass `layout.theme`.
+export function useWorkspaceTheme(theme: WorkspaceLayout['theme']) {
   const font = theme?.font ?? 'default'
 
   useEffect(() => {

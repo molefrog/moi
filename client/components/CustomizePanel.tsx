@@ -1,7 +1,7 @@
 import { type Ref, useEffect } from 'react'
 
+import { useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
-import { useWorkspaceStore } from '@/client/store/workspace'
 import { COLOR_THEMES, type ColorThemeConfig, FONT_THEMES } from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/types'
 
@@ -38,7 +38,7 @@ type CustomizePanelProps = {
 
 export function CustomizePanel({ ref }: CustomizePanelProps) {
   usePreloadAllFonts()
-  const { layout, setLayout } = useWorkspaceStore()
+  const { layout, setLayout } = useWorkspaceLayoutCtx()
   const currentFont = layout.theme?.font ?? 'default'
   const currentBg = layout.theme?.background
   const currentFg = layout.theme?.foreground

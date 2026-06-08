@@ -1,13 +1,31 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import type { DiscoveredWorkspace, WorkspaceEntry, WorkspacePreview } from '@/lib/types'
+import type {
+  DiscoveredWorkspace,
+  SessionInfo,
+  WidgetInfo,
+  WorkspaceEntry,
+  WorkspaceLayout,
+  WorkspacePreview
+} from '@/lib/types'
+
+// Layout endpoint payload: the persisted layout plus server-resolved metadata
+// (`cwd`, `name`, `agentId`) merged in by the route.
+export type WorkspaceLayoutResponse = WorkspaceLayout & {
+  cwd: string
+  name: string
+  agentId?: string
+}
 
 // Central query-key registry for the workspaces domain. Both the `/` view and
 // the sidebar read from these keys, so the cache is shared.
 export const workspaceKeys = {
   all: ['workspaces'] as const,
   discover: ['workspaces', 'discover'] as const,
-  preview: (id: string) => ['workspaces', 'preview', id] as const
+  preview: (id: string) => ['workspaces', 'preview', id] as const,
+  layout: (id: string) => ['workspaces', 'layout', id] as const,
+  widgets: (id: string) => ['workspaces', 'widgets', id] as const,
+  sessions: (id: string) => ['workspaces', 'sessions', id] as const
 }
 
 // Registered workspaces (the contents of workspaces.json).
@@ -32,6 +50,63 @@ export function useWorkspacePreview(workspaceId: string) {
     queryKey: workspaceKeys.preview(workspaceId),
     queryFn: () => fetch(`/api/workspaces/${workspaceId}/preview`).then(r => r.json()),
     staleTime: 60_000
+  })
+}
+
+// Shared freshness policy for a workspace's resources: always considered stale
+// (`staleTime: 0`) so every (re)mount and window-focus refetches in the
+// background, while `gcTime` keeps the data cached when you switch to another
+// workspace and back — so the panel shows instantly, then revalidates.
+const WORKSPACE_RESOURCE_OPTS = {
+  staleTime: 0,
+  gcTime: 5 * 60_000,
+  refetchOnMount: true,
+  refetchOnWindowFocus: true
+} as const
+
+// Persisted layout + workspace metadata for a single workspace.
+export function useWorkspaceLayout(workspaceId: string) {
+  return useQuery<WorkspaceLayoutResponse>({
+    queryKey: workspaceKeys.layout(workspaceId),
+    queryFn: () => fetch(`/api/workspaces/${workspaceId}/layout`).then(r => r.json()),
+    ...WORKSPACE_RESOURCE_OPTS
+  })
+}
+
+// Widgets declared in a workspace (the endpoint wraps them in `{ widgets }`).
+export function useWorkspaceWidgets(workspaceId: string) {
+  return useQuery<WidgetInfo[]>({
+    queryKey: workspaceKeys.widgets(workspaceId),
+    queryFn: () =>
+      fetch(`/api/workspaces/${workspaceId}/widgets`)
+        .then(r => r.json())
+        .then((d: { widgets: WidgetInfo[] }) => d.widgets),
+    ...WORKSPACE_RESOURCE_OPTS
+  })
+}
+
+// Sessions (chat threads) available in a workspace, latest first.
+export function useWorkspaceSessions(workspaceId: string) {
+  return useQuery<SessionInfo[]>({
+    queryKey: workspaceKeys.sessions(workspaceId),
+    queryFn: () => fetch(`/api/workspaces/${workspaceId}/sessions`).then(r => r.json()),
+    ...WORKSPACE_RESOURCE_OPTS
+  })
+}
+
+// Persist a workspace's layout (widget grid, chat mode, theme). Callers update
+// the layout query cache optimistically and use this to write through to the
+// server, so it's a plain fire-and-forget PUT with no extra cache work.
+export function useSaveLayout(workspaceId: string) {
+  return useMutation<void, Error, WorkspaceLayout>({
+    mutationFn: async layout => {
+      const res = await fetch(`/api/workspaces/${workspaceId}/layout`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(layout)
+      })
+      if (!res.ok) throw new Error('Failed to save layout')
+    }
   })
 }
 

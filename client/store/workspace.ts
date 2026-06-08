@@ -33,7 +33,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   load: async (id: string) => {
     set({ id })
     try {
-      const res = await fetch(`/_mei/${id}/layout`)
+      const res = await fetch(`/api/workspaces/${id}/layout`)
       if (!res.ok) throw new Error()
       const { cwd, name, ...layout } = await res.json()
       // Strip the server-only `agentId` so it doesn't end up in the
@@ -54,7 +54,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(() => {
       saveTimer = null
-      fetch(`/_mei/${id}/layout`, {
+      fetch(`/api/workspaces/${id}/layout`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(next)

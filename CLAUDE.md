@@ -12,7 +12,18 @@ Client connects via WebSocket. Agent responses stream back and are broadcast to 
 
 ## Commands
 
-- `bun run dev` — Start dev server with hot reload on port 3000
+- `bun run dev` — Start the dev server on port 3000 (alias for `bun server/cli.ts start --dev`).
+
+### Dev mode
+
+`bun run dev` starts a small supervisor that runs the server **without `bun --hot`**:
+
+- **Frontend (`client/`)** — hot-reloaded in place by `Bun.serve`'s dev bundler (HMR). Edit a React component and the browser updates; no restart.
+- **Server (`server/`, `lib/`)** — the supervisor watches these and does a **full process restart** on change (graceful `SIGTERM` → close servers, kill function workers, respawn). Module state is rebuilt cleanly each time.
+
+Do **not** start the server with `bun --hot server/web.ts` or the old `moi start --dev` path: `bun --hot` soft-reloads server modules in place, which churns the dev bundler's chunk hashes and serves **stale frontend bundles** (the symptom: edits don't show up, browser keeps old code). The supervisor exists specifically to avoid this.
+
+Only one server runs at a time — it binds port 3000 (HTTP) and 13059 (control). To restart, kill the existing `bun run dev` process and start it again; a second instance fails on the control port.
 
 ## Session Storage Notes
 
