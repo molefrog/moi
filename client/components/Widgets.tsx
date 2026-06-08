@@ -1,10 +1,7 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 
-import { IconHome } from '@tabler/icons-react'
-
-import { cn } from '@/client/lib/cn'
 import { findFreePosition } from '@/client/lib/grid-pack'
 import { useWidgetsStore } from '@/client/store/widgets'
 import { useWorkspaceStore } from '@/client/store/workspace'
@@ -14,38 +11,37 @@ import { HiddenPanel } from './HiddenPanel'
 import type { GridItem } from './WidgetGrid'
 import { WidgetGrid } from './WidgetGrid'
 import { WidgetShell } from './WidgetShell'
-import { Button, buttonVariants } from './ui/button'
 
-// Plain `<a href="/">` so the browser does a full page navigation back to
-// the workspaces list — wouter's client-side routing causes a flash of
-// stale data while everything reloads, which is worse than a full reload.
-function HomeLink() {
-  const name = useWorkspaceStore(s => s.name)
-  return (
-    <a
-      href="/"
-      aria-label={name ? `Home (${name})` : 'Home'}
-      className={cn(
-        buttonVariants({ variant: 'ghost', size: 'icon' }),
-        name && 'w-auto gap-2 px-2'
-      )}
-    >
-      <IconHome className="text-muted-foreground" stroke={1.5} />
-      {name && <span className="text-sm font-medium">{name}</span>}
-    </a>
-  )
-}
-
-type Mode = 'idle' | 'editing' | 'customizing'
+export type WidgetMode = 'idle' | 'editing' | 'customizing'
 
 function renderItem(id: string) {
   return <WidgetShell name={id} />
 }
 
-export function Widgets() {
+// Tracks the rendered (border-box) height of whichever bottom panel is open, so
+// the grid can reserve matching space below it and every card stays reachable.
+function usePanelHeight() {
+  const [height, setHeight] = useState(0)
+  const ref = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return
+    const ro = new ResizeObserver(([entry]) => {
+      const box = entry.borderBoxSize?.[0]
+      setHeight(box ? box.blockSize : entry.contentRect.height)
+    })
+    ro.observe(node)
+    return () => ro.disconnect()
+  }, [])
+  return [ref, height] as const
+}
+
+type WidgetsProps = {
+  // Owned by the page (its header renders the controls); Widgets only reacts.
+  mode: WidgetMode
+}
+
+export function Widgets({ mode }: WidgetsProps) {
   const { widgets } = useWidgetsStore()
   const { layout, setLayout } = useWorkspaceStore()
-  const [mode, setMode] = useState<Mode>('idle')
 
   const gridIds = new Set(layout.widgetGrid.map(g => g.i))
 
@@ -60,6 +56,7 @@ export function Widgets() {
     .filter(w => !gridIds.has(w.id))
     .map(w => ({ id: w.id, w: w.config.colSpan, h: w.config.rowSpan }))
 
+  const [panelRef, panelHeight] = usePanelHeight()
   const panelOpen = mode === 'customizing' || (mode === 'editing' && hiddenItems.length > 0)
 
   function hide(id: string) {
@@ -79,97 +76,55 @@ export function Widgets() {
 
   if (widgets.length === 0) {
     return (
-      <div className="group flex h-full min-h-0 flex-col">
-        <header className="flex shrink-0 items-center justify-between pb-4">
-          <HomeLink />
-        </header>
-        <div className="flex flex-1 items-center justify-center">
-          <p className="text-muted-foreground text-sm">No widgets found</p>
-        </div>
+      <div className="flex min-h-0 flex-1 items-center justify-center">
+        <p className="text-muted-foreground text-sm">No widgets found</p>
       </div>
     )
   }
 
   return (
-    <div className={cn('group relative flex h-full min-h-0 flex-col')}>
-      <header className="flex shrink-0 items-center justify-between pb-4">
-        <HomeLink />
-        <AnimatePresence mode="popLayout" initial={false}>
-          {mode !== 'idle' ? (
-            <motion.div
-              key="done"
-              variants={{
-                from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
-                to: { opacity: 1, scale: 1, filter: 'blur(0px)' }
-              }}
-              initial="from"
-              animate="to"
-              exit="from"
-              transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
-            >
-              <Button onClick={() => setMode('idle')}>Done</Button>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="actions"
-              className="flex items-center gap-1"
-              variants={{
-                from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
-                to: { opacity: 1, scale: 1, filter: 'blur(0px)' }
-              }}
-              initial="from"
-              animate="to"
-              exit="from"
-              transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
-            >
-              <Button
-                variant="ghost"
-                className="text-muted-foreground group-hover:opacity-100 [@media(hover:hover)]:opacity-0"
-                onClick={() => setMode('customizing')}
-              >
-                Customize
-              </Button>
-              <Button
-                variant="ghost"
-                className="text-muted-foreground group-hover:opacity-100 [@media(hover:hover)]:opacity-0"
-                onClick={() => setMode('editing')}
-              >
-                Edit widgets
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </header>
-
+    // Working area: everything below the header. It scrolls, and it's the
+    // positioning context for the bottom panel (which is anchored to this box,
+    // not to the grid). The grid lives in a centered max-w container and grows
+    // to its natural height.
+    <div className="relative min-h-0 flex-1">
       <LayoutGroup>
-        <motion.div
-          // p-1 / -m-1 give widget shadows room at the scroll container's
-          // edges without shifting the visible bounds; the padding lives
-          // inside the scroll viewport so dragged shadows stay visible.
-          className="-m-1 min-h-0 flex-1 overflow-y-auto p-1"
-          animate={{ paddingBottom: panelOpen ? 'var(--panel-h)' : '0px' }}
-          transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
-        >
-          <WidgetGrid
-            items={visibleItems}
-            editing={mode === 'editing'}
-            renderItem={renderItem}
-            onRemove={hide}
-            onLayoutChange={items =>
-              setLayout({
-                widgetGrid: items.map(i => ({ i: i.id, x: i.x ?? 0, y: i.y ?? 0 }))
-              })
-            }
-          />
-        </motion.div>
+        <div className="h-full overflow-y-auto px-[var(--page-pad)] pb-[calc(var(--page-pad)*2)] pt-[var(--page-pad)]">
+          {/* Bottom reservation = 2× page-pad (the pb above) + the open panel's
+              height (this margin), so the last cards scroll clear of it. */}
+          <motion.div
+            className="mx-auto w-full max-w-[var(--column-w)]"
+            animate={{ marginBottom: panelOpen ? panelHeight : 0 }}
+            transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+          >
+            <WidgetGrid
+              items={visibleItems}
+              editing={mode === 'editing'}
+              renderItem={renderItem}
+              onRemove={hide}
+              onLayoutChange={items =>
+                setLayout({
+                  widgetGrid: items.map(i => ({ i: i.id, x: i.x ?? 0, y: i.y ?? 0 }))
+                })
+              }
+            />
+          </motion.div>
+        </div>
 
         <AnimatePresence>
           {mode === 'editing' && hiddenItems.length > 0 && (
-            <HiddenPanel items={hiddenItems} renderItem={renderItem} onRestore={restore} />
+            <HiddenPanel
+              ref={panelRef}
+              items={hiddenItems}
+              renderItem={renderItem}
+              onRestore={restore}
+            />
           )}
         </AnimatePresence>
 
-        <AnimatePresence>{mode === 'customizing' && <CustomizePanel />}</AnimatePresence>
+        <AnimatePresence>
+          {mode === 'customizing' && <CustomizePanel ref={panelRef} />}
+        </AnimatePresence>
       </LayoutGroup>
     </div>
   )

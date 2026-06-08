@@ -38,16 +38,15 @@ const EXPANDED_WIDTH = 240
 const COLLAPSED_WIDTH = 54
 
 type SidebarLayoutProps = {
-  // Shown in the panel header next to the collapse toggle.
-  title?: ReactNode
-  // Panel body — the page content. Scrolls independently of the header.
+  // Full panel content — the page supplies its own header (compose it with
+  // <PanelHeader> + <SidebarToggle>) and body.
   children?: ReactNode
 }
 
 // App shell: a sidebar beside an elevated white content panel. Owns the
-// collapse state (persisted `ui` store) and the panel header, so any page just
-// supplies a `title` + `children`.
-export function SidebarLayout({ title, children }: SidebarLayoutProps) {
+// collapse state (persisted `ui` store) and the sidebar; the page owns the
+// panel's header and body.
+export function SidebarLayout({ children }: SidebarLayoutProps) {
   const collapsed = useUiStore(s => s.sidebarCollapsed)
   // Loaded once at this stable boundary — this component does NOT remount on
   // toggle (only the keyed <Sidebar> inside AnimatePresence does). The rows are
@@ -98,38 +97,46 @@ export function SidebarLayout({ title, children }: SidebarLayoutProps) {
         </AnimatePresence>
       </motion.div>
       <main className="bg-background flex min-w-0 flex-1 flex-col overflow-hidden rounded-l-md border-l border-gray-200 shadow-[1px_0px_3px_0px_rgba(0,0,0,0.1)]">
-        <PanelHeader title={title} />
-        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+        {children}
       </main>
     </div>
   )
 }
 
+// Styling-only header bar. Pages compose their header inside it, typically
+// starting with <SidebarToggle />.
 type PanelHeaderProps = {
-  title?: ReactNode
+  children?: ReactNode
 }
 
-function PanelHeader({ title }: PanelHeaderProps) {
+export function PanelHeader({ children }: PanelHeaderProps) {
+  return (
+    <header className="border-border flex h-12 shrink-0 items-center gap-2.5 border-b px-3">
+      {children}
+    </header>
+  )
+}
+
+// The sidebar collapse/expand button — self-wired to the ui store. The one
+// header piece shared across pages.
+export function SidebarToggle() {
   const collapsed = useUiStore(s => s.sidebarCollapsed)
   const toggle = useUiStore(s => s.toggleSidebar)
   const ToggleIcon = collapsed ? IconLayoutSidebarLeftExpand : IconLayoutSidebarLeftCollapse
 
   return (
-    <header className="border-border flex h-12 shrink-0 items-center gap-2.5 border-b px-3">
-      <button
-        type="button"
-        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        onClick={toggle}
-        className={cn(
-          'text-muted-foreground hover:bg-muted hover:text-foreground flex size-7 items-center justify-center rounded-sm',
-          collapsed ? 'cursor-e-resize' : 'cursor-w-resize'
-        )}
-      >
-        <ToggleIcon size={20} strokeWidth={1.5} />
-      </button>
-      {title != null && <span className="text-foreground text-sm font-medium">{title}</span>}
-    </header>
+    <button
+      type="button"
+      aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      onClick={toggle}
+      className={cn(
+        'text-muted-foreground hover:bg-muted hover:text-foreground flex size-7 items-center justify-center rounded-sm',
+        collapsed ? 'cursor-e-resize' : 'cursor-w-resize'
+      )}
+    >
+      <ToggleIcon size={20} strokeWidth={1.5} />
+    </button>
   )
 }
 
@@ -205,7 +212,7 @@ function Sidebar({ collapsed, workspaces, logoEffect }: SidebarProps) {
         <button
           type="button"
           className={cn(
-            'hover:bg-foreground/[0.05] hover:text-foreground text-foreground flex h-8 items-center gap-2 rounded-[6px] pl-1.5 text-sm',
+            'hover:bg-foreground/[0.05] hover:text-foreground text-foreground flex h-8 items-center gap-2 rounded-sm pl-1.5 text-sm',
             collapsed ? 'pr-1.5' : 'pr-2.5'
           )}
         >

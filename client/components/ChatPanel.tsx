@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { type ReactNode, useEffect, useMemo } from 'react'
 
 import { IconChevronsRight, IconSelector, IconX } from '@tabler/icons-react'
 
@@ -19,7 +19,7 @@ import {
   DropdownMenuTrigger
 } from './ui/dropdown-menu'
 
-export type ChatMode = 'solo' | 'sidebar' | 'floating'
+export type ChatMode = 'sidebar' | 'floating'
 
 type ChatModeIconProps = {
   className?: string
@@ -73,6 +73,9 @@ type ChatPanelProps = {
   onModeChange?: (mode: 'sidebar' | 'floating') => void
   onCollapse?: () => void
   onClose?: () => void
+  // Rendered at the start of the chat header. Solo mode passes the sidebar
+  // toggle here since there's no separate workspace header beside the chat.
+  leading?: ReactNode
 }
 
 export function ChatPanel({
@@ -88,7 +91,8 @@ export function ChatPanel({
   onSwitchThread,
   onModeChange,
   onCollapse,
-  onClose
+  onClose,
+  leading
 }: ChatPanelProps) {
   const { ref: scrollRef, showTopFade, showBottomFade } = useScrollFade()
   const turns = view.turns
@@ -99,25 +103,21 @@ export function ChatPanel({
   const groupedTurns = useMemo(() => groupTurns(turns), [turns])
 
   useEffect(() => {
-    const ref = chatMode === 'solo' ? document.body : scrollRef.current
-
-    ref?.scrollTo({ top: ref.scrollHeight, behavior: 'instant' })
-  }, [scrollRef, turns, chatMode])
+    const el = scrollRef.current
+    el?.scrollTo({ top: el.scrollHeight, behavior: 'instant' })
+  }, [scrollRef, turns])
 
   const TriggerIcon = chatMode === 'sidebar' ? ChatModeIconSidebar : ChatModeIconFloating
 
   return (
-    <div className={cn('flex flex-col', chatMode === 'solo' ? 'min-h-full' : 'h-full')}>
-      <header
-        className={cn(
-          'flex items-center justify-between pb-2 pl-2',
-          chatMode === 'solo' &&
-            'bg-background sticky top-0 mt-[calc(var(--page-pad)*-1)] pt-[var(--page-pad)]'
-        )}
-      >
-        <ThreadSelector onSwitch={onSwitchThread} />
+    <div className="flex h-full flex-col">
+      <header className="flex items-center justify-between pb-2 pl-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          {leading}
+          <ThreadSelector onSwitch={onSwitchThread} />
+        </div>
         <div className="flex items-center gap-0.5">
-          {chatMode !== 'solo' && onModeChange && (
+          {onModeChange && (
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
@@ -162,13 +162,12 @@ export function ChatPanel({
       </header>
 
       <div
-        ref={chatMode !== 'solo' ? scrollRef : undefined}
+        ref={scrollRef}
         className={cn(
-          'flex flex-1 flex-col gap-6 overscroll-contain px-2 pb-12 pt-4',
-          chatMode !== 'solo' && 'overflow-y-auto',
-          chatMode !== 'solo' && showTopFade && showBottomFade && 'mask-fade-y',
-          chatMode !== 'solo' && showTopFade && !showBottomFade && 'mask-fade-top',
-          chatMode !== 'solo' && !showTopFade && showBottomFade && 'mask-fade-bottom'
+          'flex flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-2 pb-12 pt-4',
+          showTopFade && showBottomFade && 'mask-fade-y',
+          showTopFade && !showBottomFade && 'mask-fade-top',
+          !showTopFade && showBottomFade && 'mask-fade-bottom'
         )}
       >
         {turns.length === 0 && !processing && <EmptyState />}
@@ -178,12 +177,7 @@ export function ChatPanel({
         {processing && <ThinkingIndicator />}
       </div>
 
-      <div
-        className={cn(
-          chatMode === 'solo' &&
-            'bg-background sticky bottom-0 mb-[calc(var(--page-pad)*-1)] pb-[var(--page-pad)]'
-        )}
-      >
+      <div>
         {error && (
           <div className="mb-2 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
             <span className="flex-1 break-words">{error}</span>

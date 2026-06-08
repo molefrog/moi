@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { type Ref, useEffect } from 'react'
 
 import { cn } from '@/client/lib/cn'
 import { useWorkspaceStore } from '@/client/store/workspace'
@@ -32,7 +32,11 @@ function presetMatches(preset: ColorThemeConfig, bg?: string, fg?: string): bool
   return (preset.background ?? undefined) === bg && (preset.foreground ?? undefined) === fg
 }
 
-export function CustomizePanel() {
+type CustomizePanelProps = {
+  ref?: Ref<HTMLDivElement>
+}
+
+export function CustomizePanel({ ref }: CustomizePanelProps) {
   usePreloadAllFonts()
   const { layout, setLayout } = useWorkspaceStore()
   const currentFont = layout.theme?.font ?? 'default'
@@ -44,7 +48,7 @@ export function CustomizePanel() {
   }
 
   return (
-    <BottomPanel title="Customize">
+    <BottomPanel ref={ref} title="Customize">
       <div className="flex flex-col gap-6">
         {/* Font picker */}
         <div className="flex flex-col gap-2">

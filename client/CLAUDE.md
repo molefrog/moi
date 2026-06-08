@@ -3,8 +3,8 @@ React SPA connecting to the server via WebSocket (`useChat` hook).
 ## Entities
 
 - **Space** — Top-level container. Has a name and contains widgets and a chat. One space is active at a time.
-- **Widget** — A configurable card inside the space's main area. Displayed in a grid. Visible when the chat has moved out of solo mode.
-- **Chat** — The agent conversation. Contains a scrollable message list and an input. Three modes: solo (centered, no widgets), sidebar (pinned right of widgets), floating (popover). Starts solo, switches after 5 messages based on viewport width.
+- **Widget** — A configurable card inside the space's main area. Displayed in a grid. When there are no widgets, the chat fills the whole panel.
+- **Chat** — The agent conversation. Contains a scrollable message list and an input. Always lives in the panel. Two modes: sidebar (a bounded pane beside the widgets, or the full panel when there are no widgets) and floating (popover). Floating only applies when there are widgets and they need the room.
 
 ## Conventions
 

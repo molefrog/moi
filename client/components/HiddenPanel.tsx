@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 import { useMemo } from 'react'
 
 import { AnimatePresence, motion } from 'motion/react'
@@ -44,13 +44,14 @@ type HiddenPanelProps = {
   items: GridItem[]
   renderItem: (id: string) => ReactNode
   onRestore: (id: string) => void
+  ref?: Ref<HTMLDivElement>
 }
 
-export function HiddenPanel({ items, renderItem, onRestore }: HiddenPanelProps) {
+export function HiddenPanel({ items, renderItem, onRestore, ref }: HiddenPanelProps) {
   const layout = useMemo(() => packItems(items), [items])
 
   return (
-    <BottomPanel title="Hidden">
+    <BottomPanel ref={ref} title="Hidden">
       {/* gap-2 + grid-cols-4 + [grid-auto-rows:160px] matches RGL's margin/rowHeight exactly */}
       <div className="grid grid-cols-4 gap-2 [grid-auto-rows:160px]">
         <AnimatePresence>

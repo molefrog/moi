@@ -32,7 +32,9 @@ export function ChatPopup({ defaultOpen = false, children }: ChatPopupProps) {
               animate={open ? 'invisible' : 'to'}
               transition={{ type: 'spring', duration: 0.3, delay: 0.2, bounce: 0 }}
             >
-              <Button variant="outline" size="lg">
+              {/* Floating over a themed workspace — pin to white so it stays
+                  legible regardless of the active theme's --background. */}
+              <Button variant="outline" size="lg" className="bg-white hover:bg-white">
                 <IconRobotFace stroke={1.75} /> Agent
               </Button>
             </motion.div>

@@ -34,20 +34,18 @@
   --ring: oklch(0.708 0 0);
   --radius: 1rem;
 
-  /* Layout tokens — single source of truth for page chrome.
-     Other components read these; do not hardcode equivalents. */
-  --page-pad: 2rem;
-  --content-w: 1184px;
-  --column-w: 40rem;
-  --sidebar-w: 464px;
-  --sidebar-gap: 4rem;
-  --panel-h: 26rem;
+  /* Workspace page layout — single source of truth for the widget/chat panel.
+     Read by routes/workspace/[id].tsx and useFitsSidebar.ts; don't hardcode
+     equivalents. (The app sidebar's own widths live in SidebarLayout.tsx.) */
+  --page-pad: 2rem; /* padding around the working area */
+  --column-w: 40rem; /* grid content width; also the widget area's min before the chat yields */
+  --chat-min: 400px; /* docked chat min width — narrower than this and it floats */
+  --chat-max: 520px; /* docked chat max width on wide screens */
 }
 
 @media (max-width: 1024px) {
   :root {
     --page-pad: 1.5rem;
-    --sidebar-gap: 1.5rem;
   }
 }
 
