@@ -49,10 +49,11 @@ describe('buildWidget', () => {
     expect(result.js).toContain('parse')
   })
 
-  test('rpc function constructs /_mei/fn/ URL', async () => {
+  test('rpc function constructs /_rpc/fn/ URL', async () => {
     const result = await buildWidget(join(FIXTURES, 'with-server.tsx'))
 
-    expect(result.js).toContain('"/_mei/fn/"')
+    expect(result.js).toContain('"/_rpc/"')
+    expect(result.js).toContain('"/fn/"')
     expect(result.js).toContain('"POST"')
   })
 

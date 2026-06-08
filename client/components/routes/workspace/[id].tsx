@@ -20,8 +20,8 @@ import { useWorkspaceTheme } from '@/client/hooks/useWorkspaceTheme'
 import { Workspace } from '@/client/lib/WorkspaceContext'
 import { WorkspaceLayoutProvider, useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
-import { useChatStore } from '@/client/store/chat'
-import type { WidgetInfo } from '@/lib/types'
+import { ChatStoreProvider, useChatStoreApi } from '@/client/store/chat'
+import type { SessionInfo, WidgetInfo } from '@/lib/types'
 
 type WorkspaceRouteProps = {
   id: string
@@ -55,24 +55,6 @@ function WorkspaceLoader({ id }: WorkspaceLoaderProps) {
   // WorkspaceView, scoped to the panel — see useWorkspaceTheme there.)
   useGridReconcile(id, widgets.data, layout, setLayout)
 
-  // The chat layer reads cwd from the store (TurnView).
-  useEffect(() => {
-    useChatStore.setState({ cwd })
-  }, [cwd])
-
-  // Seed the chat store from the sessions query: populate the thread list and
-  // pick an active session (reset when switching to a workspace that doesn't
-  // contain the currently-active one).
-  useEffect(() => {
-    if (!sessions.data) return
-    useChatStore.setState({ list: sessions.data })
-    const active = useChatStore.getState().activeSessionId
-    const stillValid = active && sessions.data.some(s => s.sessionId === active)
-    if (!stillValid) {
-      useChatStore.getState().setActiveSession(sessions.data[0]?.sessionId ?? null)
-    }
-  }, [sessions.data])
-
   // Server-pushed changes invalidate the matching query so the next render
   // revalidates (theme re-applies; the grid reconcile places any new widget).
   useMeiEvent(e => {
@@ -87,17 +69,40 @@ function WorkspaceLoader({ id }: WorkspaceLoaderProps) {
   // shows cached data immediately while it revalidates, so no loader then.
   const fresh = layoutLoading || widgets.isLoading
 
+  // One chat store per workspace mount: switching workspaces unmounts this and
+  // discards its chat state cleanly. cwd flows in so turn metadata can show it.
   return (
-    <SidebarLayout>
-      {fresh ? (
-        <div className="flex h-full items-center justify-center">
-          <LedLogo sprite="moi" effect="chaos" />
-        </div>
-      ) : (
-        <WorkspaceView widgets={widgets.data ?? []} />
-      )}
-    </SidebarLayout>
+    <ChatStoreProvider cwd={cwd}>
+      <SeedActiveSession sessions={sessions.data} />
+      <SidebarLayout>
+        {fresh ? (
+          <div className="flex h-full items-center justify-center">
+            <LedLogo sprite="moi" effect="chaos" />
+          </div>
+        ) : (
+          <WorkspaceView widgets={widgets.data ?? []} />
+        )}
+      </SidebarLayout>
+    </ChatStoreProvider>
   )
+}
+
+type SeedActiveSessionProps = {
+  sessions: SessionInfo[] | undefined
+}
+
+// Picks an active thread once the sessions query resolves. A freshly-mounted
+// workspace store starts with `activeSessionId: null`, so this selects the most
+// recent thread; it also re-selects if the current one vanished from the list.
+function SeedActiveSession({ sessions }: SeedActiveSessionProps) {
+  const store = useChatStoreApi()
+  useEffect(() => {
+    if (!sessions) return
+    const active = store.getState().activeSessionId
+    const stillValid = active && sessions.some(s => s.sessionId === active)
+    if (!stillValid) store.getState().setActiveSession(sessions[0]?.sessionId ?? null)
+  }, [sessions, store])
+  return null
 }
 
 const ACTION_VARIANTS = {

@@ -1,0 +1,69 @@
+@import 'tailwindcss';
+/*
+ * Shared design-token map for both the host app (client/index.css) and
+ * widget bundles (server/build-widget.ts emits an `@import` to this file
+ * into the widget's synthetic CSS).
+ *
+ * The actual CSS variables (`--background`, `--foreground`, `--card`, etc.)
+ * are owned by the host and declared on `:root` / `.dark` in
+ * `client/index.css`. This file only maps Tailwind's `--color-*` /
+ * `--radius-*` tokens onto those host-owned variables via `@theme inline`,
+ * which:
+ *   - generates utilities like `.bg-background { background-color: var(--background) }`
+ *   - does NOT emit `--color-background` or `--background` into the output
+ *
+ * Net effect: widgets compile classes like `bg-foreground/20`, `text-muted`,
+ * `rounded-xl`, and pick up the host's runtime theme without redefining
+ * any variable themselves.
+ */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-xs: calc(var(--radius) * 0.5);
+  --radius-sm: calc(var(--radius) * 0.625);
+  --radius-md: calc(var(--radius) * 0.75);
+  --radius-lg: calc(var(--radius) * 0.875);
+  --radius-xl: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.25);
+  --radius-3xl: calc(var(--radius) * 1.5);
+  --radius-4xl: calc(var(--radius) * 2);
+
+  --shadow-xs:
+    0px 0px 0px 1px rgba(0, 0, 0, 0.06), 0px 1px 2px -1px rgba(0, 0, 0, 0.06),
+    0px 2px 4px 0px rgba(0, 0, 0, 0.04);
+  --shadow-sm:
+    0px 0px 0px 1px rgba(0, 0, 0, 0.08), 0px 1px 2px -1px rgba(0, 0, 0, 0.08),
+    0px 2px 4px 0px rgba(0, 0, 0, 0.06);
+  --shadow-md:
+    0px 0px 0px 1px rgba(0, 0, 0, 0.06), 0px 2px 4px -1px rgba(0, 0, 0, 0.08),
+    0px 6px 12px -2px rgba(0, 0, 0, 0.06);
+  --shadow-lg:
+    0px 0px 0px 1px rgba(0, 0, 0, 0.05), 0px 3px 6px -1px rgba(0, 0, 0, 0.08),
+    0px 10px 20px -4px rgba(0, 0, 0, 0.08);
+  --shadow-xl:
+    0px 0px 0px 1px rgba(0, 0, 0, 0.04), 0px 4px 8px -2px rgba(0, 0, 0, 0.08),
+    0px 16px 32px -6px rgba(0, 0, 0, 0.1);
+  --shadow-2xl:
+    0px 0px 0px 1px rgba(0, 0, 0, 0.04), 0px 6px 12px -2px rgba(0, 0, 0, 0.08),
+    0px 24px 48px -8px rgba(0, 0, 0, 0.12);
+}
+
+@source "/Users/molefrog/git/none-computer/server/test/__fixtures__";

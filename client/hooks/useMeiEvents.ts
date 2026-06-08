@@ -17,7 +17,7 @@ function ensureConnection() {
   if (ws || connecting) return
   connecting = true
 
-  const socket = new WebSocket(`ws://${location.host}/_mei/ws`)
+  const socket = new WebSocket(`ws://${location.host}/api/workspaces/ws`)
 
   socket.onopen = () => {
     ws = socket

@@ -38,7 +38,7 @@ describe('callFunction (via worker)', () => {
   })
 })
 
-describe('/_mei/fn endpoint', () => {
+describe('/_rpc/fn endpoint', () => {
   let server: ReturnType<typeof Bun.serve>
   let baseUrl: string
 
@@ -48,8 +48,8 @@ describe('/_mei/fn endpoint', () => {
       async fetch(req) {
         const path = new URL(req.url).pathname
 
-        if (req.method === 'POST' && path.startsWith('/_mei/fn/')) {
-          const parts = path.replace('/_mei/fn/', '').split('/')
+        if (req.method === 'POST' && path.startsWith('/_rpc/fn/')) {
+          const parts = path.replace('/_rpc/fn/', '').split('/')
           if (parts.length !== 2) return new Response('Bad request', { status: 400 })
 
           const [module, name] = parts
@@ -78,7 +78,7 @@ describe('/_mei/fn endpoint', () => {
   })
 
   test('POST returns function result', async () => {
-    const res = await fetch(`${baseUrl}/_mei/fn/with-server/getWeather`, {
+    const res = await fetch(`${baseUrl}/_rpc/fn/with-server/getWeather`, {
       method: 'POST',
       body: stringify(['NYC'])
     })
@@ -89,7 +89,7 @@ describe('/_mei/fn endpoint', () => {
   })
 
   test('returns 400 for invalid module name', async () => {
-    const res = await fetch(`${baseUrl}/_mei/fn/bad%20name/foo`, {
+    const res = await fetch(`${baseUrl}/_rpc/fn/bad%20name/foo`, {
       method: 'POST',
       body: stringify([])
     })
@@ -98,7 +98,7 @@ describe('/_mei/fn endpoint', () => {
   })
 
   test('returns 500 for unknown module', async () => {
-    const res = await fetch(`${baseUrl}/_mei/fn/nope/foo`, {
+    const res = await fetch(`${baseUrl}/_rpc/fn/nope/foo`, {
       method: 'POST',
       body: stringify([])
     })
@@ -109,7 +109,7 @@ describe('/_mei/fn endpoint', () => {
   })
 
   test('GET returns 404 (only POST)', async () => {
-    const res = await fetch(`${baseUrl}/_mei/fn/with-server/getWeather`)
+    const res = await fetch(`${baseUrl}/_rpc/fn/with-server/getWeather`)
 
     expect(res.status).toBe(404)
   })

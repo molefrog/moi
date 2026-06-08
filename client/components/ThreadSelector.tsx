@@ -1,5 +1,6 @@
 import { IconChevronDown, IconPlus } from '@tabler/icons-react'
 
+import { useWorkspaceSessions } from '@/client/api/workspaces'
 import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
 import { useChatStore } from '@/client/store/chat'
@@ -33,7 +34,7 @@ function formatDate(ms: number) {
 
 export function ThreadSelector({ onSwitch }: ThreadSelectorProps) {
   const workspaceId = useWorkspaceId()
-  const sessions = useChatStore(s => s.list)
+  const { data: sessions = [], refetch } = useWorkspaceSessions(workspaceId)
   const activeSessionId = useChatStore(s => s.activeSessionId)
 
   const active = sessions.find(s => s.sessionId === activeSessionId)
@@ -46,7 +47,7 @@ export function ThreadSelector({ onSwitch }: ThreadSelectorProps) {
   return (
     <DropdownMenu
       onOpenChange={open => {
-        if (open) useChatStore.getState().loadList(workspaceId)
+        if (open) refetch()
       }}
     >
       <DropdownMenuTrigger

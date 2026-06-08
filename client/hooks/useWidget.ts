@@ -24,7 +24,7 @@ function loadWidget(workspaceId: string, name: string, bust: boolean): Promise<C
   if (existing) return existing
 
   // Cache-busting query param so the browser fetches fresh
-  const url = `/_mei/${workspaceId}/widgets/${name}.js?v=${version}`
+  const url = `/api/workspaces/${workspaceId}/widgets/${name}.js?v=${version}`
   const promise = import(/* @vite-ignore */ url).then(mod => {
     if (!mod.default) throw new Error(`Widget "${name}" has no default export`)
     return mod.default as ComponentType

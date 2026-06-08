@@ -1,15 +1,20 @@
-import { useChatStore } from '@/client/store/chat'
+import type { ChatStoreApi } from '@/client/store/chat'
 import type { ClientMessage, StreamEvent } from '@/lib/types'
 
 let ws: WebSocket | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let currentWorkspaceId = ''
 let hasConnectedBefore = false
+// The chat store for the connected workspace. Passed in by `useChat` (the store
+// is per-workspace now), so this non-React layer writes into the right instance
+// instead of a global singleton.
+let chatStore: ChatStoreApi | null = null
 const queue: ClientMessage[] = []
 
-export function connectWs(workspaceId: string) {
+export function connectWs(workspaceId: string, store: ChatStoreApi) {
   // Reconnect if workspace changed
   if (ws && currentWorkspaceId !== workspaceId) disconnectWs()
+  chatStore = store
   if (ws) return
 
   currentWorkspaceId = workspaceId
@@ -31,10 +36,10 @@ export function connectWs(workspaceId: string) {
     // pick up any turns / status updates emitted while we were offline. The
     // initial connect doesn't trigger this — `useChat` already loads events
     // when activeSessionId becomes set.
-    if (hasConnectedBefore) {
-      const activeSessionId = useChatStore.getState().activeSessionId
+    if (hasConnectedBefore && chatStore) {
+      const activeSessionId = chatStore.getState().activeSessionId
       if (activeSessionId) {
-        useChatStore.getState().loadEvents(currentWorkspaceId, activeSessionId)
+        chatStore.getState().loadEvents(currentWorkspaceId, activeSessionId)
       }
     }
     hasConnectedBefore = true
@@ -42,7 +47,8 @@ export function connectWs(workspaceId: string) {
 
   socket.onmessage = e => {
     const data = JSON.parse(e.data) as Record<string, unknown>
-    const store = useChatStore.getState()
+    if (!chatStore) return
+    const store = chatStore.getState()
 
     // Control frames first
     if (data.type === 'status') {
@@ -84,7 +90,9 @@ export function connectWs(workspaceId: string) {
 
   socket.onclose = () => {
     ws = null
-    reconnectTimer = setTimeout(() => connectWs(currentWorkspaceId), 1000)
+    reconnectTimer = setTimeout(() => {
+      if (chatStore) connectWs(currentWorkspaceId, chatStore)
+    }, 1000)
   }
 
   socket.onerror = () => {
@@ -111,6 +119,7 @@ export function disconnectWs() {
   }
   queue.length = 0
   hasConnectedBefore = false
+  chatStore = null
 }
 
 let onWorkspaceSwitch: ((workspaceId: string) => void) | null = null

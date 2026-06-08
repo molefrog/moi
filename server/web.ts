@@ -132,38 +132,29 @@ export const app = Bun.serve<WsData>({
       }
       return Response.json(await getSessions(ws.path))
     },
-    '/api/workspaces/:id': async req => {
-      if (req.method === 'DELETE') {
-        const ok = await removeWorkspace(req.params.id)
-        if (!ok) return new Response('Workspace not found', { status: 404 })
-        return new Response(null, { status: 204 })
-      }
-      return new Response('Method not allowed', { status: 405 })
-    },
-
-    // Per-workspace MEI runtime API (widget bundles, live events, fn calls).
-    // Resource reads (layout / widgets list / sessions list) live under
-    // /api/workspaces/:id/* above and are consumed via React Query.
-    '/_mei/:workspaceId/widgets/*': async req => {
-      const ws = await getWorkspace(req.params.workspaceId)
+    // Widget bundle: the compiled ESM module for one widget, dynamically
+    // imported by the client (useWidget). Sits beside the GET .../widgets list
+    // above — the exact path lists, `/*` serves a bundle.
+    '/api/workspaces/:id/widgets/*': async req => {
+      const ws = await getWorkspace(req.params.id)
       if (!ws) return new Response('Workspace not found', { status: 404 })
       const name = new URL(req.url).pathname.split('/').pop()?.replace(/\.js$/, '')
       return name ? serveWidget(name, ws.path) : new Response('Not found', { status: 404 })
     },
-    '/_mei/:workspaceId/sessions/:sessionId/events': async req => {
-      const ws = await getWorkspace(req.params.workspaceId)
+    '/api/workspaces/:id/sessions/:sessionId/events': async req => {
+      const ws = await getWorkspace(req.params.id)
       if (!ws) return new Response('Workspace not found', { status: 404 })
       if (ws.type === 'openclaw') {
         // Prefer the live view if we already hold one — keeps REST + WS in
         // agreement for any reload that lands while a run is active. The
         // first cold call also primes the live subscription so subsequent
         // WS frames upsert into the same view.
-        const live = getLiveOpenClawEvents(req.params.workspaceId, req.params.sessionId)
+        const live = getLiveOpenClawEvents(req.params.id, req.params.sessionId)
         if (live) return Response.json(live)
         if (ws.agentId) {
           try {
             const evs = await ensureOpenClawSessionLive({
-              workspaceId: req.params.workspaceId,
+              workspaceId: req.params.id,
               workspacePath: ws.path,
               agentId: ws.agentId,
               sessionId: req.params.sessionId
@@ -178,28 +169,43 @@ export const app = Bun.serve<WsData>({
       }
       return Response.json(await getSessionEvents(req.params.sessionId, ws.path))
     },
-    '/_mei/:workspaceId/mcp': async req => {
-      const ws = await getWorkspace(req.params.workspaceId)
+    '/api/workspaces/:id/mcp': async req => {
+      const ws = await getWorkspace(req.params.id)
       if (!ws) return new Response('Workspace not found', { status: 404 })
       return Response.json(await getMcpStatus(ws.path))
     },
-    '/_mei/:workspaceId/fn/*': async req => {
+    // Live widget-event stream (build/refresh pushes). A static path, so Bun
+    // routes it ahead of the `/api/workspaces/:id` param route below; the
+    // upgrade happens in-handler via the route's `server` argument.
+    '/api/workspaces/ws': (req, server) =>
+      upgrade(server, req, { channel: 'mei', workspaceId: '' }),
+    '/api/workspaces/:id': async req => {
+      if (req.method === 'DELETE') {
+        const ok = await removeWorkspace(req.params.id)
+        if (!ok) return new Response('Workspace not found', { status: 404 })
+        return new Response(null, { status: 204 })
+      }
+      return new Response('Method not allowed', { status: 405 })
+    },
+
+    // Widget RPC: a widget bundle POSTs here to call one of its `.server.ts`
+    // functions. Kept on its own internal `/_rpc/` prefix, off the public API.
+    '/_rpc/:wid/fn/*': async req => {
       if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })
-      const ws = await getWorkspace(req.params.workspaceId)
+      const ws = await getWorkspace(req.params.wid)
       if (!ws) return new Response('Workspace not found', { status: 404 })
-      const prefix = `/_mei/${req.params.workspaceId}/fn/`
+      const prefix = `/_rpc/${req.params.wid}/fn/`
       const tail = new URL(req.url).pathname.slice(prefix.length)
       return handleFunctionCall(req, tail, ws.path)
     }
   },
   fetch(req, server) {
     const url = new URL(req.url)
+    // Chat websocket (per-workspace). The widget-event websocket lives in the
+    // routes table at /api/workspaces/ws.
     if (url.pathname === '/ws') {
       const workspaceId = url.searchParams.get('workspace') ?? ''
       return upgrade(server, req, { channel: 'chat', workspaceId })
-    }
-    if (url.pathname === '/_mei/ws') {
-      return upgrade(server, req, { channel: 'mei', workspaceId: '' })
     }
     return new Response('Not found', { status: 404 })
   },

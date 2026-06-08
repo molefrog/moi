@@ -24,7 +24,11 @@ export function AppRouter() {
       <Route path="/" component={HomePage} />
       <Route path="/playground" component={PlaygroundPage} />
       <Route path="/workspace/:id">
-        {(params: { id: string }) => <WorkspaceRoute id={params.id} />}
+        {/* Key by id so switching workspaces mounts a fresh subtree — the
+            per-workspace chat store (and its websocket) tears down and resets
+            cleanly rather than leaking state across workspaces. Cached React
+            Query data keeps the remount instant. */}
+        {(params: { id: string }) => <WorkspaceRoute key={params.id} id={params.id} />}
       </Route>
     </Switch>
   )
