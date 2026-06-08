@@ -28,20 +28,20 @@ Control UI SPA and a tiny `/health` endpoint. Everything else is WebSocket.
 
 State root: `~/.openclaw/`.
 
-| What | Path |
-|---|---|
-| Config (gateway port, auth token, agent defaults, hooks, plugins) | `~/.openclaw/openclaw.json` |
-| Gateway HTTP+WS service | launchd `ai.openclaw.gateway`, loopback |
-| Agents (per-agent state, auth profiles, per-agent model catalog) | `~/.openclaw/agents/<id>/agent/` |
-| Per-agent session index | `~/.openclaw/agents/<id>/sessions/sessions.json` |
-| Per-session raw event log | `~/.openclaw/agents/<id>/sessions/<uuid>.jsonl` |
-| Sibling trajectory log | `~/.openclaw/agents/<id>/sessions/<uuid>.trajectory.jsonl` |
-| Default workspace (if agents share) | `~/.openclaw/workspace/` |
-| Memory DB | `~/.openclaw/memory/<id>.sqlite` |
-| Device keypair (handshake signing) | `~/.openclaw/identity/device.json` |
-| Issued device-auth role tokens | `~/.openclaw/identity/device-auth.json` |
-| Paired devices (control-UI, CLI, health) | `~/.openclaw/devices/paired.json` |
-| Pending pairing requests | `~/.openclaw/devices/pending.json` |
+| What                                                              | Path                                                       |
+| ----------------------------------------------------------------- | ---------------------------------------------------------- |
+| Config (gateway port, auth token, agent defaults, hooks, plugins) | `~/.openclaw/openclaw.json`                                |
+| Gateway HTTP+WS service                                           | launchd `ai.openclaw.gateway`, loopback                    |
+| Agents (per-agent state, auth profiles, per-agent model catalog)  | `~/.openclaw/agents/<id>/agent/`                           |
+| Per-agent session index                                           | `~/.openclaw/agents/<id>/sessions/sessions.json`           |
+| Per-session raw event log                                         | `~/.openclaw/agents/<id>/sessions/<uuid>.jsonl`            |
+| Sibling trajectory log                                            | `~/.openclaw/agents/<id>/sessions/<uuid>.trajectory.jsonl` |
+| Default workspace (if agents share)                               | `~/.openclaw/workspace/`                                   |
+| Memory DB                                                         | `~/.openclaw/memory/<id>.sqlite`                           |
+| Device keypair (handshake signing)                                | `~/.openclaw/identity/device.json`                         |
+| Issued device-auth role tokens                                    | `~/.openclaw/identity/device-auth.json`                    |
+| Paired devices (control-UI, CLI, health)                          | `~/.openclaw/devices/paired.json`                          |
+| Pending pairing requests                                          | `~/.openclaw/devices/pending.json`                         |
 
 Each agent has its **own workspace dir** (override with `openclaw agents add --workspace`)
 and its own agent-state dir. The default `~/.openclaw/workspace/` is only the
@@ -73,7 +73,7 @@ Three auth concepts stack on the gateway:
 1. **Gateway token** — shared secret from `openclaw.json → gateway.auth.token`.
    Required on every WebSocket connect; fail-closed by default.
 2. **Device identity** — an Ed25519 keypair in `~/.openclaw/identity/device.json`.
-   Signed in the `connect` handshake so the gateway knows *which* device is
+   Signed in the `connect` handshake so the gateway knows _which_ device is
    connecting (the token is shared, the key isn't).
 3. **Per-device role tokens & scopes** — each paired device holds its own
    operator-role token (`~/.openclaw/identity/device-auth.json`) with an
@@ -152,7 +152,7 @@ outside the integration surface we touched.
   `includeUnknown`, `includeDerivedTitles`, `includeLastMessage`, `label`,
   `spawnedBy`, `agentId`, `search` — **not** `allAgents` (the CLI flag is
   client-side aggregation). Pass `includeGlobal: true` to aggregate.
-- **`sessions.get`** exists in the method list, but for reading *messages*
+- **`sessions.get`** exists in the method list, but for reading _messages_
   what you want is `sessions.preview({ keys: [...], limit, maxChars })` which
   returns structured `{ role, text }` items, or `sessions.messages.subscribe`
   for a live stream.
@@ -160,7 +160,7 @@ outside the integration surface we touched.
   you see in `openclaw agents list --json` (`identityName`, `identityEmoji`,
   `agentDir`, `bindings`, `isDefault`, `routes`) is computed client-side by
   the CLI — the gateway returns `{ defaultId, mainKey, scope, agents: [{ id,
-  workspace, model }] }`. Short response.
+workspace, model }] }`. Short response.
 - **`agents.files.get`** uses `{ agentId, name }` — not `{ id, path }`. Easy
   to get wrong.
 - Scope errors return `INVALID_REQUEST` or `scope upgrade pending approval`
@@ -202,6 +202,7 @@ Also available at the same path: `createOperatorApprovalsGatewayClient`,
 `withOperatorApprovalsGatewayClient`, the `EventFrame` protocol type.
 
 `GatewayClient` handles:
+
 - Ed25519 device-identity loading & challenge signing
 - Token / password / deviceToken auth resolution
 - Challenge-response handshake with nonce
@@ -217,10 +218,10 @@ import { GatewayClient } from 'openclaw/plugin-sdk/gateway-runtime'
 
 const client = new GatewayClient({
   url: `ws://127.0.0.1:${port}`,
-  token,                     // from openclaw.json gateway.auth.token
+  token, // from openclaw.json gateway.auth.token
   role: 'operator',
   scopes: ['operator.admin', 'operator.read', 'operator.write'],
-  requestTimeoutMs: 2000,
+  requestTimeoutMs: 2000
 })
 
 await new Promise<void>((res, rej) => {
@@ -284,6 +285,7 @@ isDefault, lastRunAt? }`. Any failure (missing config, gateway down, timeout,
 malformed response) → empty array, silently.
 
 Pipeline:
+
 1. Read `~/.openclaw/openclaw.json` for port + token (sync filesystem)
 2. Lazy-import `GatewayClient` (keeps startup cost off the critical path if
    the feature's unused)

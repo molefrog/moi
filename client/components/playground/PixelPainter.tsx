@@ -60,7 +60,7 @@ export function PixelPainter() {
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <div className="grid w-fit select-none grid-cols-[repeat(5,28px)] gap-px bg-black/15 p-px">
+      <div className="grid w-fit grid-cols-[repeat(5,28px)] gap-px bg-black/15 p-px select-none">
         {grid.map((row, r) =>
           row.map((on, c) => (
             <div
@@ -73,7 +73,7 @@ export function PixelPainter() {
         )}
       </div>
 
-      <pre className="border-border rounded-md border bg-white px-3 py-2 text-center font-mono text-sm leading-snug text-neutral-900">
+      <pre className="rounded-md border border-border bg-white px-3 py-2 text-center font-mono text-sm leading-snug text-neutral-900">
         {ascii}
       </pre>
 

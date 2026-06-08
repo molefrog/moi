@@ -78,7 +78,7 @@ export function Widgets({ mode, widgets }: WidgetsProps) {
   if (widgets.length === 0) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center">
-        <p className="text-muted-foreground text-sm">No widgets found</p>
+        <p className="text-sm text-muted-foreground">No widgets found</p>
       </div>
     )
   }
@@ -90,7 +90,7 @@ export function Widgets({ mode, widgets }: WidgetsProps) {
     // to its natural height.
     <div className="relative min-h-0 flex-1">
       <LayoutGroup>
-        <div className="h-full overflow-y-auto px-[var(--page-pad)] pb-[calc(var(--page-pad)*2)] pt-[var(--page-pad)]">
+        <div className="h-full overflow-y-auto px-[var(--page-pad)] pt-[var(--page-pad)] pb-[calc(var(--page-pad)*2)]">
           {/* Bottom reservation = 2× page-pad (the pb above) + the open panel's
               height (this margin), so the last cards scroll clear of it. */}
           <motion.div

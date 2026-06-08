@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react"],
+  "categories": { "correctness": "error" },
+  "env": { "browser": true, "node": true, "builtin": true },
+  "ignorePatterns": ["node_modules", "workspace", "server/workspace", "server/test/__fixtures__"],
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "no-empty": ["error", { "allowEmptyCatch": true }],
+    "react-hooks/exhaustive-deps": "warn",
+    "react/no-did-update-set-state": "off"
+  }
+}

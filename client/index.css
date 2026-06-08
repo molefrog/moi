@@ -9,7 +9,7 @@
   padding: 0;
 }
 
-@plugin "@tailwindcss/typography";
+@plugin '@tailwindcss/typography';
 
 @custom-variant dark (&:is(.dark *));
 

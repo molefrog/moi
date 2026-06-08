@@ -122,7 +122,7 @@ export function ChatPanel({
               <DropdownMenuTrigger
                 render={
                   <Button
-                    className="pl-2! pr-1! gap-0"
+                    className="gap-0 pr-1! pl-2!"
                     variant="ghost"
                     aria-label="Switch chat mode"
                   >
@@ -150,7 +150,7 @@ export function ChatPanel({
           {chatMode === 'sidebar' && onCollapse && (
             <Button variant="ghost" size="icon" onClick={onCollapse} aria-label="Collapse chat">
               {/* Tabler icon with double chevrons has a really weird optical size, hence the adjustments */}
-              <IconChevronsRight className="text-muted-foreground size-6!" stroke={1.5} />
+              <IconChevronsRight className="size-6! text-muted-foreground" stroke={1.5} />
             </Button>
           )}
           {chatMode === 'floating' && onClose && (
@@ -164,7 +164,7 @@ export function ChatPanel({
       <div
         ref={scrollRef}
         className={cn(
-          'flex flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-2 pb-12 pt-4',
+          'flex flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-2 pt-4 pb-12',
           showTopFade && showBottomFade && 'mask-fade-y',
           showTopFade && !showBottomFade && 'mask-fade-top',
           !showTopFade && showBottomFade && 'mask-fade-bottom'

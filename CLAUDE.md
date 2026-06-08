@@ -28,6 +28,7 @@ Only one server runs at a time — it binds port 3000 (HTTP) and 13059 (control)
 ## Session Storage Notes
 
 Claude Code stores sessions as `.jsonl` files under:
+
 - **macOS/Linux**: `~/.claude/projects/<encoded-path>/`
 - **Windows**: `%USERPROFILE%\.claude\projects\<encoded-path>\`
 

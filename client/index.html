@@ -23,20 +23,20 @@
     <script type="module" src="./index.tsx"></script>
     <script type="module">
       const [react, jsxRuntime, jsxDevRuntime, reactDom, reactDomClient] = await Promise.all([
-        import("react"),
-        import("react/jsx-runtime"),
-        import("react/jsx-dev-runtime"),
-        import("react-dom"),
-        import("react-dom/client"),
-      ]);
+        import('react'),
+        import('react/jsx-runtime'),
+        import('react/jsx-dev-runtime'),
+        import('react-dom'),
+        import('react-dom/client')
+      ])
       globalThis.__esm = {
-        "react": react,
-        "react/jsx-runtime": jsxRuntime,
-        "react/jsx-dev-runtime": jsxDevRuntime,
-        "react-dom": reactDom,
-        "react-dom/client": reactDomClient,
-      };
-      globalThis.__init(document.getElementById("root"));
+        react: react,
+        'react/jsx-runtime': jsxRuntime,
+        'react/jsx-dev-runtime': jsxDevRuntime,
+        'react-dom': reactDom,
+        'react-dom/client': reactDomClient
+      }
+      globalThis.__init(document.getElementById('root'))
       //# sourceURL=react-preload.js
     </script>
   </body>

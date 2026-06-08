@@ -28,7 +28,7 @@ export function ThinkingIndicator() {
       {[0, 1, 2].map(i => (
         <span
           key={i}
-          className="bg-ring block h-1.5 w-1.5 rounded-full"
+          className="block h-1.5 w-1.5 rounded-full bg-ring"
           style={{
             animation: 'pulse-dot 1.4s ease-in-out infinite',
             animationDelay: `${i * 0.2}s`
@@ -58,7 +58,7 @@ export function TurnView({ turn }: TurnViewProps) {
       .join('\n')
     if (!text) return null
     return (
-      <p className="ml-8 self-end whitespace-pre-wrap rounded-md bg-black/[0.07] px-4 py-2 text-sm leading-normal">
+      <p className="ml-8 self-end rounded-md bg-black/[0.07] px-4 py-2 text-sm leading-normal whitespace-pre-wrap">
         {text}
       </p>
     )
@@ -114,7 +114,7 @@ function ReasoningPart({ text, redacted }: ReasoningPartProps) {
       open={open}
       onToggle={e => setOpen((e.target as HTMLDetailsElement).open)}
     >
-      <summary className="text-muted-foreground flex cursor-pointer select-none items-center gap-2 py-1 text-xs">
+      <summary className="flex cursor-pointer items-center gap-2 py-1 text-xs text-muted-foreground select-none">
         <IconChevronRight
           size={12}
           stroke={1.5}
@@ -124,7 +124,7 @@ function ReasoningPart({ text, redacted }: ReasoningPartProps) {
         <span>{redacted ? 'Redacted thinking' : 'Thinking'}</span>
       </summary>
       {!redacted && (
-        <div className="text-muted-foreground ml-4 mt-1 whitespace-pre-wrap text-xs italic leading-relaxed">
+        <div className="mt-1 ml-4 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground italic">
           {text}
         </div>
       )}
@@ -135,7 +135,7 @@ function ReasoningPart({ text, redacted }: ReasoningPartProps) {
 type FilePartProps = { mediaType: string; url: string; filename?: string }
 function FilePart({ mediaType, url, filename }: FilePartProps) {
   return (
-    <div className="text-muted-foreground text-xs">
+    <div className="text-xs text-muted-foreground">
       📎 {filename ?? url} ({mediaType})
     </div>
   )
@@ -154,8 +154,8 @@ type DataPartProps = { name: string; data: unknown }
 function DataPart({ name, data }: DataPartProps) {
   return (
     <details>
-      <summary className="text-muted-foreground cursor-pointer text-xs">data:{name}</summary>
-      <pre className="bg-muted text-muted-foreground mt-1 overflow-auto rounded p-2 text-xs">
+      <summary className="cursor-pointer text-xs text-muted-foreground">data:{name}</summary>
+      <pre className="mt-1 overflow-auto rounded bg-muted p-2 text-xs text-muted-foreground">
         {JSON.stringify(data, null, 2)}
       </pre>
     </details>
@@ -196,27 +196,27 @@ function GenericToolCard({ call }: GenericToolCardProps) {
 
   return (
     <details className="group">
-      <summary className="flex cursor-pointer select-none items-center gap-2 py-1.5">
+      <summary className="flex cursor-pointer items-center gap-2 py-1.5 select-none">
         <IconChevronRight
           size={12}
           stroke={1.5}
-          className="chevron text-ring shrink-0 transition-transform duration-150 group-open:rotate-90"
+          className="chevron shrink-0 text-ring transition-transform duration-150 group-open:rotate-90"
         />
         <CallerBadge call={call} />
-        <span className="whitespace-nowrap text-xs font-medium">{getToolDisplayName(call)}</span>
-        <span className="text-ring truncate text-[11px]">{formatInputBrief(call, cwd)}</span>
-        {isRunning && <IconLoader2 size={12} stroke={1.5} className="text-ring animate-spin" />}
+        <span className="text-xs font-medium whitespace-nowrap">{getToolDisplayName(call)}</span>
+        <span className="truncate text-[11px] text-ring">{formatInputBrief(call, cwd)}</span>
+        {isRunning && <IconLoader2 size={12} stroke={1.5} className="animate-spin text-ring" />}
       </summary>
       {(output || isError) && (
         <div
           className={cn(
-            'ml-4 mt-1 rounded-md border px-3 py-2.5',
+            'mt-1 ml-4 rounded-md border px-3 py-2.5',
             isError ? 'border-red-200 bg-red-50' : 'border-border bg-muted'
           )}
         >
           <pre
             className={cn(
-              'max-h-[200px] overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs leading-relaxed',
+              'max-h-[200px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap',
               isError ? 'text-red-800' : 'text-muted-foreground'
             )}
           >
@@ -269,35 +269,35 @@ function MCPCallCard({ call, mcp }: MCPCallCardProps) {
 
   return (
     <details className="group">
-      <summary className="flex cursor-pointer select-none items-center gap-2 py-1.5">
+      <summary className="flex cursor-pointer items-center gap-2 py-1.5 select-none">
         <IconChevronRight
           size={12}
           stroke={1.5}
-          className="chevron text-ring shrink-0 transition-transform duration-150 group-open:rotate-90"
+          className="chevron shrink-0 text-ring transition-transform duration-150 group-open:rotate-90"
         />
-        <span className="bg-muted block size-4 shrink-0 overflow-hidden rounded-[3px]">
+        <span className="block size-4 shrink-0 overflow-hidden rounded-[3px] bg-muted">
           {iconSrc ? (
             <img src={iconSrc} alt="" className="size-full object-cover" />
           ) : (
-            <IconPlug size={12} stroke={1.5} className="text-muted-foreground m-0.5" />
+            <IconPlug size={12} stroke={1.5} className="m-0.5 text-muted-foreground" />
           )}
         </span>
-        <span className="whitespace-nowrap text-xs font-medium">
+        <span className="text-xs font-medium whitespace-nowrap">
           {formatMcpServerName(mcp.server)} MCP
         </span>
-        <span className="text-ring truncate text-[11px]">{brief}</span>
-        {isRunning && <IconLoader2 size={12} stroke={1.5} className="text-ring animate-spin" />}
+        <span className="truncate text-[11px] text-ring">{brief}</span>
+        {isRunning && <IconLoader2 size={12} stroke={1.5} className="animate-spin text-ring" />}
       </summary>
       {(output || isError) && (
         <div
           className={cn(
-            'ml-4 mt-1 rounded-md border px-3 py-2.5',
+            'mt-1 ml-4 rounded-md border px-3 py-2.5',
             isError ? 'border-red-200 bg-red-50' : 'border-border bg-muted'
           )}
         >
           <pre
             className={cn(
-              'max-h-[200px] overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs leading-relaxed',
+              'max-h-[200px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap',
               isError ? 'text-red-800' : 'text-muted-foreground'
             )}
           >
@@ -324,20 +324,20 @@ function SkillCard({ call }: SkillCardProps) {
         <span className="text-xs font-medium">
           Loading skill <span className="font-mono">{skillName}</span>
         </span>
-        {isRunning && <IconLoader2 size={12} stroke={1.5} className="text-ring animate-spin" />}
+        {isRunning && <IconLoader2 size={12} stroke={1.5} className="animate-spin text-ring" />}
         {isError && <IconAlertTriangle size={12} stroke={1.5} className="text-red-600" />}
         {body && (
           <button
             type="button"
             onClick={() => setShowBody(v => !v)}
-            className="text-muted-foreground text-[11px] underline"
+            className="text-[11px] text-muted-foreground underline"
           >
             {showBody ? 'hide' : 'show'} instructions
           </button>
         )}
       </div>
       {showBody && body && (
-        <pre className="bg-muted text-muted-foreground max-h-[300px] overflow-y-auto whitespace-pre-wrap rounded p-3 font-mono text-xs leading-relaxed">
+        <pre className="max-h-[300px] overflow-y-auto rounded bg-muted p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
           {body}
         </pre>
       )}
@@ -356,7 +356,7 @@ function SubagentCard({ call, subagent }: SubagentCardProps) {
       : null
 
   const statusBadge = {
-    running: <IconLoader2 size={12} stroke={1.5} className="text-ring animate-spin" />,
+    running: <IconLoader2 size={12} stroke={1.5} className="animate-spin text-ring" />,
     completed: <span className="text-xs text-emerald-700">✓</span>,
     failed: <IconAlertTriangle size={12} stroke={1.5} className="text-red-600" />,
     stopped: <IconX size={12} stroke={1.5} className="text-muted-foreground" />
@@ -367,7 +367,7 @@ function SubagentCard({ call, subagent }: SubagentCardProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="border-border bg-muted/40 hover:bg-muted/70 flex items-center gap-2 rounded-md border px-3 py-2 text-left transition-colors"
+        className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-left transition-colors hover:bg-muted/70"
       >
         <IconUsersGroup size={14} stroke={1.5} className="shrink-0 text-blue-600" />
         <div className="min-w-0 flex-1">
@@ -378,10 +378,10 @@ function SubagentCard({ call, subagent }: SubagentCardProps) {
             {statusBadge}
           </div>
           {latest && (
-            <div className="text-muted-foreground mt-0.5 truncate text-[11px]">{latest}</div>
+            <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{latest}</div>
           )}
           {status !== 'running' && subagent.usage?.toolUses != null && (
-            <div className="text-muted-foreground mt-0.5 text-[11px]">
+            <div className="mt-0.5 text-[11px] text-muted-foreground">
               {subagent.usage.toolUses} tool call{subagent.usage.toolUses === 1 ? '' : 's'}
             </div>
           )}
@@ -405,16 +405,16 @@ function SubagentModal({ call, subagent, onClose }: SubagentModalProps) {
       onClick={onClose}
     >
       <div
-        className="bg-background flex max-h-[80vh] w-[min(800px,100%)] flex-col overflow-hidden rounded-lg shadow-xl"
+        className="flex max-h-[80vh] w-[min(800px,100%)] flex-col overflow-hidden rounded-lg bg-background shadow-xl"
         onClick={e => e.stopPropagation()}
       >
-        <header className="border-border flex items-start justify-between gap-3 border-b px-5 py-4">
+        <header className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <IconUsersGroup size={16} stroke={1.5} className="text-blue-600" />
               <h3 className="text-sm font-semibold">{subagent.description || 'Subagent task'}</h3>
             </div>
-            <div className="text-muted-foreground mt-0.5 text-[11px]">
+            <div className="mt-0.5 text-[11px] text-muted-foreground">
               status: {subagent.status}
               {subagent.usage?.durationMs != null &&
                 ` · ${Math.round(subagent.usage.durationMs / 1000)}s`}
@@ -432,13 +432,13 @@ function SubagentModal({ call, subagent, onClose }: SubagentModalProps) {
         </header>
 
         <div className="flex flex-1 gap-4 overflow-hidden px-5 py-4">
-          <aside className="border-border w-52 shrink-0 border-r pr-4">
-            <div className="text-muted-foreground mb-2 text-[11px] font-medium uppercase">
+          <aside className="w-52 shrink-0 border-r border-border pr-4">
+            <div className="mb-2 text-[11px] font-medium text-muted-foreground uppercase">
               Progress
             </div>
             <ol className="flex flex-col gap-1">
               {subagent.progress.map((p, i) => (
-                <li key={i} className="text-muted-foreground truncate text-[11px]">
+                <li key={i} className="truncate text-[11px] text-muted-foreground">
                   {i + 1}. {p}
                 </li>
               ))}
@@ -448,16 +448,16 @@ function SubagentModal({ call, subagent, onClose }: SubagentModalProps) {
           <div className="flex flex-1 flex-col gap-4 overflow-y-auto pr-2">
             {call.input != null && Object.keys(call.input as object).length > 0 && (
               <details>
-                <summary className="text-muted-foreground cursor-pointer text-[11px]">
+                <summary className="cursor-pointer text-[11px] text-muted-foreground">
                   Prompt
                 </summary>
-                <pre className="bg-muted text-muted-foreground mt-1 whitespace-pre-wrap rounded p-2 font-mono text-xs">
+                <pre className="mt-1 rounded bg-muted p-2 font-mono text-xs whitespace-pre-wrap text-muted-foreground">
                   {JSON.stringify(call.input, null, 2)}
                 </pre>
               </details>
             )}
             {subagent.transcript.length === 0 ? (
-              <div className="text-muted-foreground text-xs">No nested transcript captured.</div>
+              <div className="text-xs text-muted-foreground">No nested transcript captured.</div>
             ) : (
               subagent.transcript.map(nested => <TurnView key={nested.id} turn={nested} />)
             )}
@@ -472,14 +472,14 @@ type CallerBadgeProps = { call: ToolCall }
 function CallerBadge({ call }: CallerBadgeProps) {
   if (call.caller === 'mcp') {
     return (
-      <span className="border-border text-muted-foreground rounded border px-1 text-[9px] uppercase">
+      <span className="rounded border border-border px-1 text-[9px] text-muted-foreground uppercase">
         mcp{call.mcpServer ? `:${call.mcpServer.slice(0, 8)}` : ''}
       </span>
     )
   }
   if (call.caller === 'server-tool') {
     return (
-      <span className="border-border text-muted-foreground rounded border px-1 text-[9px] uppercase">
+      <span className="rounded border border-border px-1 text-[9px] text-muted-foreground uppercase">
         server
       </span>
     )

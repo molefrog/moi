@@ -24,8 +24,8 @@ export function BottomPanel({ title, children, ref }: BottomPanelProps) {
       exit="hidden"
       transition={{ type: 'spring', duration: 0.25, bounce: 0 }}
     >
-      <p className="text-muted-foreground mb-4 shrink-0 text-sm font-medium">{title}</p>
-      <div className="-my-1 flex-1 overflow-y-auto px-[var(--page-pad)] py-1 [margin-left:calc(var(--page-pad)*-1)] [margin-right:calc(var(--page-pad)*-1)]">
+      <p className="mb-4 shrink-0 text-sm font-medium text-muted-foreground">{title}</p>
+      <div className="-my-1 [margin-right:calc(var(--page-pad)*-1)] [margin-left:calc(var(--page-pad)*-1)] flex-1 overflow-y-auto px-[var(--page-pad)] py-1">
         {children}
       </div>
     </motion.div>

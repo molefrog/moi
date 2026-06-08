@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "semi": false,
+  "arrowParens": "avoid",
+  "singleQuote": true,
+  "tabWidth": 2,
+  "trailingComma": "none",
+  "bracketSpacing": true,
+  "printWidth": 100,
+  "sortTailwindcss": {
+    "stylesheet": "./client/index.css",
+    "functions": ["cn", "cva"]
+  },
+  "importOrder": ["^react$", "^motion", "<THIRD_PARTY_MODULES>", "^@/", "^[./]"],
+  "importOrderSeparation": true,
+  "importOrderSortSpecifiers": true,
+  "sortPackageJson": false,
+  "ignorePatterns": [".agents", "workspace", "server/test/__fixtures__", "**/.build"]
+}

@@ -96,7 +96,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
           </motion.div>
         </AnimatePresence>
       </motion.div>
-      <main className="bg-background flex min-w-0 flex-1 flex-col overflow-hidden rounded-l-md border-l border-gray-200 shadow-[1px_0px_3px_0px_rgba(0,0,0,0.1)]">
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-l-md border-l border-gray-200 bg-background shadow-[1px_0px_3px_0px_rgba(0,0,0,0.1)]">
         {children}
       </main>
     </div>
@@ -111,7 +111,7 @@ type PanelHeaderProps = {
 
 export function PanelHeader({ children }: PanelHeaderProps) {
   return (
-    <header className="border-border flex h-12 shrink-0 items-center gap-2.5 border-b px-3">
+    <header className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-3">
       {children}
     </header>
   )
@@ -131,7 +131,7 @@ export function SidebarToggle() {
       title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       onClick={toggle}
       className={cn(
-        'text-muted-foreground hover:bg-muted hover:text-foreground flex size-7 items-center justify-center rounded-sm',
+        'flex size-7 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground',
         collapsed ? 'cursor-e-resize' : 'cursor-w-resize'
       )}
     >
@@ -165,7 +165,7 @@ function Sidebar({ collapsed, workspaces, logoEffect }: SidebarProps) {
       <nav className="flex flex-col gap-0.5">
         <NavRow
           href="/"
-          icon={<IconHome size={18} className="text-foreground shrink-0" />}
+          icon={<IconHome size={18} className="shrink-0 text-foreground" />}
           label="Home"
           collapsed={collapsed}
         />
@@ -174,11 +174,11 @@ function Sidebar({ collapsed, workspaces, logoEffect }: SidebarProps) {
       {/* Workspaces */}
       <div className="mt-5 flex flex-col gap-2">
         <div className={cn('flex items-center justify-between pl-2', collapsed && 'invisible')}>
-          <span className="text-muted-foreground text-[13px] font-medium">Workspaces</span>
+          <span className="text-[13px] font-medium text-muted-foreground">Workspaces</span>
           <Link
             href="/"
             aria-label="Add workspace"
-            className="border-border bg-background text-foreground/60 hover:bg-muted hover:text-foreground flex size-6 items-center justify-center rounded-[6px] border"
+            className="flex size-6 items-center justify-center rounded-[6px] border border-border bg-background text-foreground/60 hover:bg-muted hover:text-foreground"
           >
             <IconPlus size={16} />
           </Link>
@@ -210,7 +210,7 @@ function Sidebar({ collapsed, workspaces, logoEffect }: SidebarProps) {
         <button
           type="button"
           className={cn(
-            'hover:bg-foreground/[0.05] hover:text-foreground text-foreground flex h-8 items-center gap-2 rounded-sm pl-1.5 text-sm',
+            'flex h-8 items-center gap-2 rounded-sm pl-1.5 text-sm text-foreground hover:bg-foreground/[0.05] hover:text-foreground',
             collapsed ? 'pr-1.5' : 'pr-2.5'
           )}
         >
@@ -221,7 +221,7 @@ function Sidebar({ collapsed, workspaces, logoEffect }: SidebarProps) {
         <button
           type="button"
           aria-label="Toggle sidebar"
-          className="text-foreground/45 hover:bg-foreground/[0.06] hover:text-foreground/80 hidden size-7 items-center justify-center rounded-[6px]"
+          className="hidden size-7 items-center justify-center rounded-[6px] text-foreground/45 hover:bg-foreground/[0.06] hover:text-foreground/80"
         >
           <IconLayoutSidebar size={16} />
         </button>

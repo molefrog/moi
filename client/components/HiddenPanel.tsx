@@ -53,7 +53,7 @@ export function HiddenPanel({ items, renderItem, onRestore, ref }: HiddenPanelPr
   return (
     <BottomPanel ref={ref} title="Hidden">
       {/* gap-2 + grid-cols-4 + [grid-auto-rows:160px] matches RGL's margin/rowHeight exactly */}
-      <div className="grid grid-cols-4 gap-2 [grid-auto-rows:160px]">
+      <div className="grid [grid-auto-rows:160px] grid-cols-4 gap-2">
         <AnimatePresence>
           {layout.map(item => (
             <motion.div

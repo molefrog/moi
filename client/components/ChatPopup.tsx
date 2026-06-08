@@ -24,7 +24,7 @@ export function ChatPopup({ defaultOpen = false, container, children }: ChatPopu
     <Popover open={open} onOpenChange={o => setOpen(o)}>
       <PopoverTrigger
         render={
-          <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6">
+          <div className="fixed right-4 bottom-4 sm:right-6 sm:bottom-6">
             <motion.div
               variants={{
                 from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },

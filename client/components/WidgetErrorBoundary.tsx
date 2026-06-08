@@ -31,11 +31,11 @@ export class WidgetErrorBoundary extends Component<Props, State> {
     if (this.state.error) {
       return (
         <div className="flex h-full w-full flex-col items-start justify-start gap-1.5 p-4 text-xs">
-          <div className="text-destructive flex items-center gap-1.5 font-semibold">
+          <div className="flex items-center gap-1.5 font-semibold text-destructive">
             <IconAlertTriangle size={14} stroke={1.5} />
             Widget crashed
           </div>
-          <div className="text-muted-foreground break-words font-mono">
+          <div className="font-mono break-words text-muted-foreground">
             {this.state.error.message}
           </div>
         </div>

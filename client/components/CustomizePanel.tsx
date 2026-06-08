@@ -52,7 +52,7 @@ export function CustomizePanel({ ref }: CustomizePanelProps) {
       <div className="flex flex-col gap-6">
         {/* Font picker */}
         <div className="flex flex-col gap-2">
-          <p className="text-muted-foreground text-xs font-medium">Font</p>
+          <p className="text-xs font-medium text-muted-foreground">Font</p>
           <div className="grid grid-cols-3 gap-2">
             {FONT_OPTIONS.map(([key, config]) => (
               <button
@@ -62,13 +62,13 @@ export function CustomizePanel({ ref }: CustomizePanelProps) {
                 className={cn(
                   'flex flex-col items-start rounded-md px-3 py-2 text-left transition-colors',
                   key === currentFont
-                    ? 'ring-primary bg-primary/5 ring-2'
-                    : 'hover:bg-muted border-transparent'
+                    ? 'bg-primary/5 ring-2 ring-primary'
+                    : 'border-transparent hover:bg-muted'
                 )}
                 style={{ fontFamily: config.sans }}
               >
                 <span className="text-sm font-medium">{config.label}</span>
-                <span className="text-muted-foreground text-xs">{config.feel}</span>
+                <span className="text-xs text-muted-foreground">{config.feel}</span>
               </button>
             ))}
           </div>
@@ -76,7 +76,7 @@ export function CustomizePanel({ ref }: CustomizePanelProps) {
 
         {/* Color palette */}
         <div className="flex flex-col gap-2">
-          <p className="text-muted-foreground text-xs font-medium">Colors</p>
+          <p className="text-xs font-medium text-muted-foreground">Colors</p>
           <div className="grid grid-cols-3 gap-2">
             {COLOR_OPTIONS.map(([key, preset]) => {
               const active = presetMatches(preset, currentBg, currentFg)
@@ -90,8 +90,8 @@ export function CustomizePanel({ ref }: CustomizePanelProps) {
                   className={cn(
                     'flex items-center gap-2 rounded-md border px-3 py-2 transition-colors',
                     active
-                      ? 'ring-primary bg-primary/5 ring-2'
-                      : 'hover:bg-muted border-transparent'
+                      ? 'bg-primary/5 ring-2 ring-primary'
+                      : 'border-transparent hover:bg-muted'
                   )}
                 >
                   <span
@@ -99,7 +99,7 @@ export function CustomizePanel({ ref }: CustomizePanelProps) {
                     style={{ backgroundColor: preset.background ?? 'oklch(1 0 0)' }}
                   >
                     <span
-                      className="flex size-full items-center justify-center text-[9px] font-bold leading-none"
+                      className="flex size-full items-center justify-center text-[9px] leading-none font-bold"
                       style={{ color: preset.foreground ?? 'oklch(0.145 0 0)' }}
                     >
                       A

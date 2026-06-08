@@ -30,7 +30,7 @@ export function WidgetShell({ name }: WidgetShellProps) {
       {widget.status === 'error' && (
         <motion.p
           key={`err-${widget.version}`}
-          className="text-destructive absolute inset-0 p-4 text-xs"
+          className="absolute inset-0 p-4 text-xs text-destructive"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

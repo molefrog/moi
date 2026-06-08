@@ -16,12 +16,12 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
   const isEmpty = query.data !== undefined && !hasItems
 
   return (
-    <div className="bg-muted flex size-24 shrink-0 items-center justify-center rounded-lg p-2">
+    <div className="flex size-24 shrink-0 items-center justify-center rounded-lg bg-muted p-2">
       {hasItems && (
         <svg
           viewBox={`0 0 ${cols} ${rows}`}
           preserveAspectRatio="none"
-          className="animate-in fade-in size-full duration-300"
+          className="size-full animate-in duration-300 fade-in"
         >
           {items.map((item, i) => (
             <rect
@@ -40,7 +40,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
         <IconRobotFace
           size={20}
           stroke={1.5}
-          className="text-muted-foreground/40 animate-in fade-in duration-300"
+          className="animate-in text-muted-foreground/40 duration-300 fade-in"
         />
       )}
     </div>

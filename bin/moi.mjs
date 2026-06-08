@@ -18,7 +18,9 @@ if (!process.versions.bun) {
 // installs from any package manager, unlike checking a hardcoded path.)
 if (!Bun.which('moi')) {
   console.error('Note: `moi` is not installed as a command — this run is temporary.')
-  console.error('Install it so the command stays available (the agent calls it from your workspaces):')
+  console.error(
+    'Install it so the command stays available (the agent calls it from your workspaces):'
+  )
   console.error('  bun i -g moi-computer\n')
 }
 

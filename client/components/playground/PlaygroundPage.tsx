@@ -49,7 +49,7 @@ export function PlaygroundPage() {
 
   return (
     <div className="relative flex min-h-dvh flex-col items-center justify-center gap-8 bg-[#f2f1ee]">
-      <span className="absolute left-5 top-5 text-[11px] font-medium uppercase tracking-widest text-black/30">
+      <span className="absolute top-5 left-5 text-[11px] font-medium tracking-widest text-black/30 uppercase">
         Playground
       </span>
 

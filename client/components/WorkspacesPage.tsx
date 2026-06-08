@@ -53,7 +53,7 @@ export function WorkspacesPage() {
   if (workspacesQuery.isPending || discoveredQuery.isPending) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <IconLoader2 size={20} stroke={1.5} className="text-muted-foreground animate-spin" />
+        <IconLoader2 size={20} stroke={1.5} className="animate-spin text-muted-foreground" />
       </div>
     )
   }
@@ -61,7 +61,7 @@ export function WorkspacesPage() {
   if (workspacesQuery.isError || discoveredQuery.isError) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <p className="text-muted-foreground text-sm">Could not load workspaces.</p>
+        <p className="text-sm text-muted-foreground">Could not load workspaces.</p>
       </div>
     )
   }
@@ -73,7 +73,7 @@ export function WorkspacesPage() {
     importMutation.isPending && importMutation.variables ? importMutation.variables.path : null
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-8 pb-16 pt-14">
+    <div className="mx-auto w-full max-w-3xl px-8 pt-14 pb-16">
       {count > 0 && (
         <div className="mb-10 grid grid-cols-2 gap-3">
           {workspaces.map(ws => (
@@ -87,9 +87,9 @@ export function WorkspacesPage() {
       )}
 
       {count === 0 && discovered.length === 0 && (
-        <p className="text-muted-foreground mb-10 text-sm">
+        <p className="mb-10 text-sm text-muted-foreground">
           No workspaces yet. Run{' '}
-          <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs">moi start</code> in a
+          <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">moi start</code> in a
           project directory.
         </p>
       )}
@@ -97,10 +97,10 @@ export function WorkspacesPage() {
       {discovered.length > 0 && (
         <section>
           <div className="mb-4">
-            <h2 className="text-foreground mb-1.5 text-sm font-semibold">Found on your machine</h2>
-            <p className="text-muted-foreground text-xs">Discovered via Claude Code and OpenClaw</p>
+            <h2 className="mb-1.5 text-sm font-semibold text-foreground">Found on your machine</h2>
+            <p className="text-xs text-muted-foreground">Discovered via Claude Code and OpenClaw</p>
           </div>
-          <ul className="border-border border-t">
+          <ul className="border-t border-border">
             {discovered.map(item => (
               <SuggestedRow
                 key={item.path}
@@ -134,16 +134,16 @@ function WorkspaceCard({ workspace, onRemove }: WorkspaceCardProps) {
     <a
       href={`/workspace/${workspace.id}`}
       className={cn(
-        'border-border bg-card hover:bg-muted/40 group flex gap-3.5 rounded-xl border p-2',
+        'group flex gap-3.5 rounded-xl border border-border bg-card p-2 hover:bg-muted/40',
         'transition-colors'
       )}
     >
       <WorkspacePreview workspaceId={workspace.id} />
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5 py-1 pl-1 pr-2">
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 py-1 pr-2 pl-1">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <TypeIcon type={workspace.type ?? 'claude-code'} />
-            <span className="text-foreground truncate text-sm font-semibold">{name}</span>
+            <span className="truncate text-sm font-semibold text-foreground">{name}</span>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -155,7 +155,7 @@ function WorkspaceCard({ workspace, onRemove }: WorkspaceCardProps) {
                     e.preventDefault()
                     e.stopPropagation()
                   }}
-                  className="text-muted-foreground -mr-1 -mt-0.5"
+                  className="-mt-0.5 -mr-1 text-muted-foreground"
                   aria-label="More actions"
                 >
                   <IconDots stroke={1.5} />
@@ -177,11 +177,11 @@ function WorkspaceCard({ workspace, onRemove }: WorkspaceCardProps) {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        <div title={workspace.path} className="text-muted-foreground truncate font-mono text-xs">
+        <div title={workspace.path} className="truncate font-mono text-xs text-muted-foreground">
           {workspace.displayPath ?? workspace.path}
         </div>
         <div className="flex-1" />
-        <div className="text-muted-foreground text-xs">{meta}</div>
+        <div className="text-xs text-muted-foreground">{meta}</div>
       </div>
     </a>
   )
@@ -197,12 +197,12 @@ function SuggestedRow({ suggestion, onAdd, loading }: SuggestedRowProps) {
   const { path, type } = suggestion
   const name = displayName(suggestion)
   return (
-    <li className="border-border flex items-center gap-3 border-b px-1 py-2.5">
+    <li className="flex items-center gap-3 border-b border-border px-1 py-2.5">
       <TypeIcon type={type} className="opacity-70" />
-      <span className="text-foreground/80 shrink-0 text-sm font-medium">{name}</span>
+      <span className="shrink-0 text-sm font-medium text-foreground/80">{name}</span>
       <span
         title={path}
-        className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs"
+        className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground"
       >
         {suggestion.displayPath ?? path}
       </span>

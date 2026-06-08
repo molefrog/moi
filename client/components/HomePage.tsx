@@ -7,7 +7,7 @@ export function HomePage() {
     <SidebarLayout>
       <PanelHeader>
         <SidebarToggle />
-        <span className="text-foreground text-sm font-medium">Home</span>
+        <span className="text-sm font-medium text-foreground">Home</span>
       </PanelHeader>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <WorkspacesPage />
