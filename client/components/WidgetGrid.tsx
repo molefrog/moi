@@ -3,16 +3,13 @@ import { useCallback, useState } from 'react'
 
 import { motion } from 'motion/react'
 
-import type { Layout } from 'react-grid-layout'
+import { GridLayout, type Layout, useContainerWidth, verticalCompactor } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
-import ReactGridLayout, { WidthProvider } from 'react-grid-layout/legacy'
 import 'react-resizable/css/styles.css'
 
 import { packItems } from '@/client/lib/grid-pack'
 
 import { WidgetFrame } from './WidgetFrame'
-
-const GridLayout = WidthProvider(ReactGridLayout)
 
 export type GridItem = {
   id: string
@@ -46,6 +43,11 @@ export function WidgetGrid({
   const [layout, setLayout] = useState<Layout>(() => packItems(items, []))
   const [prevItems, setPrevItems] = useState(items)
 
+  // v2 replaces the WidthProvider HOC with this hook. `measureBeforeMount` holds
+  // the grid back until the container is measured, so it never flashes at the
+  // wrong width; `containerRef` goes on the wrapper, `width` feeds the grid.
+  const { width, containerRef, mounted } = useContainerWidth({ measureBeforeMount: true })
+
   // Sync layout synchronously during render (not useEffect) so layoutId animations
   // fire in the same React commit as the hidden panel unmount/mount
   if (prevItems !== items) {
@@ -76,32 +78,36 @@ export function WidgetGrid({
   )
 
   return (
-    <GridLayout
-      measureBeforeMount
-      cols={cols}
-      rowHeight={rowHeight}
-      margin={[gap, gap]}
-      containerPadding={[0, 0]}
-      layout={layout}
-      isDraggable={editing}
-      isResizable={false}
-      compactType="vertical"
-      onLayoutChange={handleLayoutChange}
-    >
-      {layout.map(item => (
-        // Container div: purely structural, owned by RGL for positioning
-        <div key={item.i}>
-          <motion.div
-            layoutId={item.i}
-            className="size-full"
-            transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
-          >
-            <WidgetFrame editing={editing} onRemove={onRemove ? () => onRemove(item.i) : undefined}>
-              {renderItem(item.i)}
-            </WidgetFrame>
-          </motion.div>
-        </div>
-      ))}
-    </GridLayout>
+    <div ref={containerRef}>
+      {mounted && (
+        <GridLayout
+          width={width}
+          layout={layout}
+          gridConfig={{ cols, rowHeight, margin: [gap, gap], containerPadding: [0, 0] }}
+          dragConfig={{ enabled: !!editing }}
+          resizeConfig={{ enabled: false }}
+          compactor={verticalCompactor}
+          onLayoutChange={handleLayoutChange}
+        >
+          {layout.map(item => (
+            // Container div: purely structural, owned by RGL for positioning
+            <div key={item.i}>
+              <motion.div
+                layoutId={item.i}
+                className="size-full"
+                transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
+              >
+                <WidgetFrame
+                  editing={editing}
+                  onRemove={onRemove ? () => onRemove(item.i) : undefined}
+                >
+                  {renderItem(item.i)}
+                </WidgetFrame>
+              </motion.div>
+            </div>
+          ))}
+        </GridLayout>
+      )}
+    </div>
   )
 }
