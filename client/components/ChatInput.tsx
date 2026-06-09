@@ -2,6 +2,7 @@ import { useRef } from 'react'
 
 import { IconArrowUp, IconPlayerStop } from '@tabler/icons-react'
 
+import { ModelPicker } from './ModelPicker'
 import { Button } from './ui/button'
 
 type ChatInputProps = {
@@ -46,7 +47,8 @@ export function ChatInput({ value, onChange, onSend, onStop, processing }: ChatI
         rows={1}
         className="field-sizing-content max-h-40 w-full resize-none bg-transparent px-2 py-1 text-sm leading-relaxed outline-none placeholder:text-muted-foreground disabled:opacity-50"
       />
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-1.5">
+        <ModelPicker />
         {processing ? (
           <Button type="button" size="icon" onClick={onStop} aria-label="Stop agent">
             <IconPlayerStop stroke={1.5} />

@@ -9,6 +9,7 @@
 // that prefix is stripped before lookup so the underlying service resolves.
 // Unknown servers fall back to a generic tabler icon — see
 // `client/components/TurnView.tsx`.
+import agentationIcon from '@/client/assets/mcp/agentation.png'
 import airtableIcon from '@/client/assets/mcp/airtable.png'
 import apolloIcon from '@/client/assets/mcp/apollo.png'
 import asanaIcon from '@/client/assets/mcp/asana.png'
@@ -61,6 +62,7 @@ import vercelIcon from '@/client/assets/mcp/vercel.png'
 import zapierIcon from '@/client/assets/mcp/zapier.png'
 
 const ICONS: Record<string, string> = {
+  agentation: agentationIcon,
   airtable: airtableIcon,
   apollo: apolloIcon,
   asana: asanaIcon,

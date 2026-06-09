@@ -157,44 +157,28 @@ export type WorkspacePreview = {
 
 // Normalized capability flags shared across backends. An absent flag means
 // "unknown / not reported by this backend", not "unsupported".
-export type ModelCapabilities = {
-  // Adaptive thinking / reasoning support.
-  reasoning?: boolean
-  // Fast-mode support (Claude).
-  fastMode?: boolean
-  // Effort levels the model accepts, when it exposes effort selection (Claude).
-  // Typed as string[] on purpose: the SDK under-types this as
-  // ('low'|'medium'|'high'|'max')[] but at runtime returns more (e.g. 'xhigh'
-  // for Opus 4.8), so don't narrow it — let the client render whatever comes.
-  effortLevels?: string[]
-}
-
-// One model a workspace's agent backend can run, normalized so the client
-// renders a single shape regardless of provider.
-//   - Claude:   ModelInfo  → { value→id, displayName→name, vendor: 'anthropic', … }
-//   - OpenClaw: ModelChoice → { id, name, provider→vendor, contextWindow, reasoning }
-export type ModelOption = {
-  // Stable id passed back to select this model (alias or full id for Claude,
-  // catalog id for OpenClaw).
-  id: string
-  // Human-readable label.
-  name: string
-  // The model's serving vendor (e.g. 'anthropic', 'openai'). Distinct from the
-  // workspace's agent backend (`WorkspaceModels.provider`).
-  vendor?: string
-  // Description segments, unformatted, for the client to lay out as it likes.
-  // Claude joins these with " · " (version, tagline, pricing, …); we split them
-  // back apart rather than pass the pre-joined string. Empty/undefined when the
-  // backend reports no description (OpenClaw).
-  descriptionParts?: string[]
-  // Max context window in tokens, when known (OpenClaw catalog).
-  contextWindow?: number
-  capabilities?: ModelCapabilities
+// A model a workspace's agent backend can run — the raw shape from the Claude
+// Agent SDK's supportedModels(), passed through as-is (server/agent.ts). OpenClaw
+// maps its catalog onto value/displayName.
+export type Model = {
+  // Id used to select the model (Claude `value`; OpenClaw catalog id).
+  value: string
+  // Human-readable label (Claude `displayName`; OpenClaw `name`).
+  displayName: string
+  // " · "-joined blurb (Claude): "<headline> · <tagline> · …". Absent for OpenClaw.
+  description?: string
+  // Effort/reasoning support (Claude). `supportedEffortLevels` can include values
+  // the SDK under-types (e.g. 'xhigh'), so it stays string[].
+  supportsEffort?: boolean
+  supportedEffortLevels?: string[]
+  supportsAdaptiveThinking?: boolean
+  supportsFastMode?: boolean
+  supportsAutoMode?: boolean
 }
 
 // GET /api/workspaces/:id/models payload.
 export type WorkspaceModels = {
   // The agent backend that produced this list — matches the workspace provider.
   provider: WorkspaceType
-  models: ModelOption[]
+  models: Model[]
 }

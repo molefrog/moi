@@ -190,19 +190,19 @@ function WidgetActions({ mode, onMode }: WidgetActionsProps) {
         >
           <Button
             variant="ghost"
-            className="h-7 text-muted-foreground [&_svg]:size-[18px]"
+            className="h-7 text-muted-foreground @max-2xl:px-1.5! [&_svg]:size-[18px]"
             onClick={() => onMode('customizing')}
           >
             <IconPalette stroke={1.75} />
-            Customize
+            <span className="@max-2xl:hidden">Customize</span>
           </Button>
           <Button
             variant="ghost"
-            className="h-7 text-muted-foreground [&_svg]:size-[18px]"
+            className="h-7 text-muted-foreground @max-2xl:px-1.5! [&_svg]:size-[18px]"
             onClick={() => onMode('editing')}
           >
             <IconLayoutDashboard stroke={1.75} />
-            Edit widgets
+            <span className="@max-2xl:hidden">Edit widgets</span>
           </Button>
         </motion.div>
       )}

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 
-import type { ModelOption } from '@/lib/types'
+import type { Model } from '@/lib/types'
 
 export type OpenClawAgent = {
   path: string
@@ -218,16 +218,11 @@ type OpenClawModelChoice = {
   reasoning?: boolean
 }
 
-export async function getOpenClawModels(): Promise<ModelOption[]> {
+export async function getOpenClawModels(): Promise<Model[]> {
   const out = await withGatewayClient(async rpc => {
     const res = await rpc<{ models: OpenClawModelChoice[] }>('models.list')
     return res.models
   })
-  return (out ?? []).map(m => ({
-    id: m.id,
-    name: m.name,
-    vendor: m.provider,
-    contextWindow: m.contextWindow,
-    capabilities: m.reasoning === undefined ? undefined : { reasoning: m.reasoning }
-  }))
+  // Map the gateway catalog onto the raw Model shape (value/displayName).
+  return (out ?? []).map(m => ({ value: m.id, displayName: m.name }))
 }

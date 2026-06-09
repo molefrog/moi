@@ -111,7 +111,7 @@ type PanelHeaderProps = {
 
 export function PanelHeader({ children }: PanelHeaderProps) {
   return (
-    <header className="flex h-11 shrink-0 items-center gap-2.5 border-b border-border px-3">
+    <header className="@container flex h-11 shrink-0 items-center gap-2.5 border-b border-border px-3">
       {children}
     </header>
   )
