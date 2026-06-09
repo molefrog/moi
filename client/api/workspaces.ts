@@ -2,18 +2,23 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import type {
   DiscoveredWorkspace,
+  McpServer,
   SessionInfo,
   WidgetInfo,
   WorkspaceEntry,
   WorkspaceLayout,
-  WorkspacePreview
+  WorkspaceModels,
+  WorkspacePreview,
+  WorkspaceType
 } from '@/lib/types'
 
-// Layout endpoint payload: the persisted layout plus server-resolved metadata
-// (`cwd`, `name`, `agentId`) merged in by the route.
+// `/api/workspaces/:id` payload: the persisted layout plus server-resolved
+// metadata merged in by the route — `name` (settings override or folder name),
+// `cwd` (workspace folder), `provider` (agent backend), and `agentId`.
 export type WorkspaceLayoutResponse = WorkspaceLayout & {
   cwd: string
   name: string
+  provider?: WorkspaceType
   agentId?: string
 }
 
@@ -25,7 +30,9 @@ export const workspaceKeys = {
   preview: (id: string) => ['workspaces', 'preview', id] as const,
   layout: (id: string) => ['workspaces', 'layout', id] as const,
   widgets: (id: string) => ['workspaces', 'widgets', id] as const,
-  sessions: (id: string) => ['workspaces', 'sessions', id] as const
+  sessions: (id: string) => ['workspaces', 'sessions', id] as const,
+  mcp: (id: string) => ['workspaces', 'mcp', id] as const,
+  models: (id: string) => ['workspaces', 'models', id] as const
 }
 
 // Registered workspaces (the contents of workspaces.json).
@@ -68,7 +75,7 @@ const WORKSPACE_RESOURCE_OPTS = {
 export function useWorkspaceLayout(workspaceId: string) {
   return useQuery<WorkspaceLayoutResponse>({
     queryKey: workspaceKeys.layout(workspaceId),
-    queryFn: () => fetch(`/api/workspaces/${workspaceId}/layout`).then(r => r.json()),
+    queryFn: () => fetch(`/api/workspaces/${workspaceId}`).then(r => r.json()),
     ...WORKSPACE_RESOURCE_OPTS
   })
 }
@@ -94,13 +101,44 @@ export function useWorkspaceSessions(workspaceId: string) {
   })
 }
 
+// MCP servers configured for a workspace (Claude Code only). Fetching is
+// expensive — the server spawns an agent query to probe connection status — so
+// this is cache-first: `staleTime`/`gcTime` Infinity means it's fetched once and
+// then served from cache, surviving navigation between workspaces (no refetch on
+// remount/focus). `enabled` gates it to Claude workspaces.
+export function useWorkspaceMcp(workspaceId: string, enabled: boolean) {
+  return useQuery<McpServer[]>({
+    queryKey: workspaceKeys.mcp(workspaceId),
+    queryFn: () => fetch(`/api/workspaces/${workspaceId}/mcp`).then(r => r.json()),
+    enabled,
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false
+  })
+}
+
+// Models the workspace's agent backend can run (normalized across providers by
+// the server). Like MCP status, the list is stable per workspace, so it's
+// cache-first — fetched once and served from cache across navigation.
+export function useWorkspaceModels(workspaceId: string) {
+  return useQuery<WorkspaceModels>({
+    queryKey: workspaceKeys.models(workspaceId),
+    queryFn: () => fetch(`/api/workspaces/${workspaceId}/models`).then(r => r.json()),
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false
+  })
+}
+
 // Persist a workspace's layout (widget grid, chat mode, theme). Callers update
 // the layout query cache optimistically and use this to write through to the
 // server, so it's a plain fire-and-forget PUT with no extra cache work.
 export function useSaveLayout(workspaceId: string) {
   return useMutation<void, Error, WorkspaceLayout>({
     mutationFn: async layout => {
-      const res = await fetch(`/api/workspaces/${workspaceId}/layout`, {
+      const res = await fetch(`/api/workspaces/${workspaceId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(layout)

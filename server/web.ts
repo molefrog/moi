@@ -1,15 +1,15 @@
 import { existsSync } from 'node:fs'
-import { join, sep } from 'node:path'
+import { basename, join, sep } from 'node:path'
 
-import type { ClientMessage } from '@/lib/types'
+import type { ClientMessage, WorkspaceModels, WorkspaceType } from '@/lib/types'
 
 import index from '../client/index.html'
-import { getMcpStatus, handleChat, stopChat } from './agent'
+import { getClaudeModels, getMcpStatus, handleChat, stopChat } from './agent'
 import { PORT } from './constants'
 import { control } from './control'
 import { callFunction, killAllWorkers } from './functions'
 import { getWorkspacePreview, loadLayout, saveLayout } from './layout'
-import { getOpenClawSessionMessages, getOpenClawSessions } from './openclaw'
+import { getOpenClawModels, getOpenClawSessionMessages, getOpenClawSessions } from './openclaw'
 import { toSessionInfo, toStreamEvents } from './openclaw-adapter'
 import {
   abortOpenClawRun,
@@ -128,25 +128,6 @@ export const app = Bun.serve<WsData>({
       if (!ws) return Response.json({ cols: 4, items: [] })
       return Response.json(await getWorkspacePreview(ws.path))
     },
-    '/api/workspaces/:id/layout': async req => {
-      const ws = await getWorkspace(req.params.id)
-      if (!ws) return new Response('Workspace not found', { status: 404 })
-      if (req.method === 'GET') {
-        return Response.json({
-          ...(await loadLayout(ws.path)),
-          cwd: ws.path,
-          name: ws.name,
-          agentId: ws.agentId
-        })
-      }
-      if (req.method === 'PUT') {
-        const body = await req.json()
-        if (!body || body.version !== 1) return new Response('Bad request', { status: 400 })
-        await saveLayout(body, ws.path)
-        return new Response(null, { status: 204 })
-      }
-      return new Response('Method not allowed', { status: 405 })
-    },
     '/api/workspaces/:id/widgets': async req => {
       const ws = await getWorkspace(req.params.id)
       if (!ws) return new Response('Workspace not found', { status: 404 })
@@ -203,15 +184,48 @@ export const app = Bun.serve<WsData>({
       if (!ws) return new Response('Workspace not found', { status: 404 })
       return Response.json(await getMcpStatus(ws.path))
     },
+    // Models the workspace's agent backend can run, normalized across providers.
+    // OpenClaw queries the gateway catalog; everything else (Claude Code) reads
+    // the account-wide Agent SDK model list.
+    '/api/workspaces/:id/models': async req => {
+      const ws = await getWorkspace(req.params.id)
+      if (!ws) return new Response('Workspace not found', { status: 404 })
+      const provider: WorkspaceType = ws.type ?? 'claude-code'
+      const models =
+        provider === 'openclaw' ? await getOpenClawModels() : await getClaudeModels(ws.path)
+      return Response.json({ provider, models } satisfies WorkspaceModels)
+    },
     // Live widget-event stream (build/refresh pushes). A static path, so Bun
     // routes it ahead of the `/api/workspaces/:id` param route below; the
     // upgrade happens in-handler via the route's `server` argument.
     '/api/workspaces/ws': (req, server) =>
       upgrade(server, req, { channel: 'mei', workspaceId: '' }),
+    // All info about a single workspace: its persisted layout (widget grid,
+    // chat mode, theme) plus server-resolved metadata. GET reads, PUT writes
+    // the layout, DELETE unregisters.
     '/api/workspaces/:id': async req => {
       if (req.method === 'DELETE') {
         const ok = await removeWorkspace(req.params.id)
         if (!ok) return new Response('Workspace not found', { status: 404 })
+        return new Response(null, { status: 204 })
+      }
+      const ws = await getWorkspace(req.params.id)
+      if (!ws) return new Response('Workspace not found', { status: 404 })
+      if (req.method === 'GET') {
+        const layout = await loadLayout(ws.path)
+        return Response.json({
+          ...layout,
+          // Resolved display name: the settings override, or the folder name.
+          name: layout.name || basename(ws.path),
+          cwd: ws.path,
+          provider: ws.type,
+          agentId: ws.agentId
+        })
+      }
+      if (req.method === 'PUT') {
+        const body = await req.json()
+        if (!body || body.version !== 1) return new Response('Bad request', { status: 400 })
+        await saveLayout(body, ws.path)
         return new Response(null, { status: 204 })
       }
       return new Response('Method not allowed', { status: 405 })

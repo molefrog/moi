@@ -40,7 +40,7 @@
   --page-pad: 2rem; /* padding around the working area */
   --column-w: 40rem; /* grid content width; also the widget area's min before the chat yields */
   --chat-min: 400px; /* docked chat min width — narrower than this and it floats */
-  --chat-max: 520px; /* docked chat max width on wide screens */
+  --chat-max: 480px; /* docked chat max width on wide screens */
 }
 
 @media (max-width: 1024px) {
@@ -168,6 +168,15 @@
   mask-size: 100% 100%;
   mask-position: 0px 0px;
   mask-repeat: no-repeat;
+}
+
+/* Hide the scrollbar entirely (e.g. the MCP hover card, which signals overflow
+   with top/bottom mask fades instead — see useScrollFade + mask-fade-*). */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* Tool details toggle */

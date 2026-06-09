@@ -2,6 +2,7 @@ import { type Options, query } from '@anthropic-ai/claude-agent-sdk'
 import type { McpServerStatus } from '@anthropic-ai/claude-agent-sdk'
 
 import { ClaudeAdapter } from '@/lib/claude-adapter'
+import type { ModelOption } from '@/lib/types'
 
 import { broadcast, getAgent, renameAgent } from './state'
 
@@ -129,4 +130,47 @@ export async function getMcpStatus(workspacePath: string): Promise<McpServerStat
   const status = await fetchMcpStatus(workspacePath)
   mcpCache.set(workspacePath, status)
   return status
+}
+
+// Claude's available models come from the account/CLI, not the workspace, so
+// the list is identical everywhere. We still need a `cwd` to spin up a probe
+// query (mirrors fetchMcpStatus), but cache the result process-wide.
+async function fetchClaudeModels(cwd: string): Promise<ModelOption[]> {
+  const q = query({
+    prompt: '',
+    options: {
+      cwd,
+      persistSession: false,
+      settingSources: ['user', 'project'],
+      env: { ...process.env, CLAUDECODE: undefined }
+    }
+  })
+  const models = await q.supportedModels()
+  await q.close()
+  return models.map(m => ({
+    id: m.value,
+    name: m.displayName,
+    vendor: 'anthropic',
+    // The SDK hands us one " · "-joined string; split it so the client formats.
+    descriptionParts: m.description ? m.description.split(/\s*·\s*/) : undefined,
+    capabilities: {
+      reasoning: m.supportsAdaptiveThinking,
+      fastMode: m.supportsFastMode,
+      effortLevels: m.supportsEffort ? m.supportedEffortLevels : undefined
+    }
+  }))
+}
+
+// One in-flight/settled promise shared across all callers. On failure we clear
+// it so a later request can retry instead of caching the rejection forever.
+let claudeModelsPromise: Promise<ModelOption[]> | null = null
+
+export function getClaudeModels(cwd: string): Promise<ModelOption[]> {
+  if (!claudeModelsPromise) {
+    claudeModelsPromise = fetchClaudeModels(cwd).catch(err => {
+      claudeModelsPromise = null
+      throw err
+    })
+  }
+  return claudeModelsPromise
 }

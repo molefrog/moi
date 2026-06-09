@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 
+import type { ModelOption } from '@/lib/types'
+
 export type OpenClawAgent = {
   path: string
   agentId: string
@@ -203,4 +205,29 @@ export async function getOpenClawSessionMessages(
     return await rpc<OpenClawSessionDetail>('sessions.get', { key })
   })
   return out ?? null
+}
+
+// One entry from the gateway's `models.list` catalog. The catalog is
+// gateway-wide (no per-agent param) — the allowed model set filtered by config.
+type OpenClawModelChoice = {
+  id: string
+  name: string
+  provider: string
+  alias?: string
+  contextWindow?: number
+  reasoning?: boolean
+}
+
+export async function getOpenClawModels(): Promise<ModelOption[]> {
+  const out = await withGatewayClient(async rpc => {
+    const res = await rpc<{ models: OpenClawModelChoice[] }>('models.list')
+    return res.models
+  })
+  return (out ?? []).map(m => ({
+    id: m.id,
+    name: m.name,
+    vendor: m.provider,
+    contextWindow: m.contextWindow,
+    capabilities: m.reasoning === undefined ? undefined : { reasoning: m.reasoning }
+  }))
 }

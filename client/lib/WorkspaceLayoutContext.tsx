@@ -40,7 +40,7 @@ export function useWorkspaceLayoutCtx(): WorkspaceLayoutContextValue {
 // Strip the server-only metadata so what we PUT back (and expose as `layout`)
 // is just the persisted `WorkspaceLayout`.
 function stripMeta(data: WorkspaceLayoutResponse): WorkspaceLayout {
-  const { cwd: _cwd, name: _name, agentId: _agentId, ...layout } = data
+  const { cwd: _cwd, name: _name, provider: _provider, agentId: _agentId, ...layout } = data
   return layout
 }
 

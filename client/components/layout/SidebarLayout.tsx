@@ -3,7 +3,7 @@ import { type ReactNode, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 
 import {
-  IconHome,
+  IconHome2,
   IconLayoutSidebar,
   IconLayoutSidebarLeftCollapse,
   IconLayoutSidebarLeftExpand,
@@ -111,7 +111,7 @@ type PanelHeaderProps = {
 
 export function PanelHeader({ children }: PanelHeaderProps) {
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-3">
+    <header className="flex h-11 shrink-0 items-center gap-2.5 border-b border-border px-3">
       {children}
     </header>
   )
@@ -152,7 +152,7 @@ function Sidebar({ collapsed, workspaces, logoEffect }: SidebarProps) {
   return (
     <aside className={cn('flex h-full shrink-0 flex-col px-2.5', collapsed ? 'w-[54px]' : 'w-60')}>
       {/* Logo */}
-      <div className="mb-3.5 flex h-12 items-center px-2">
+      <div className="mb-3.5 flex h-11 items-center px-2">
         <LedLogo
           pixelSize={3}
           gap={0.5}
@@ -165,7 +165,7 @@ function Sidebar({ collapsed, workspaces, logoEffect }: SidebarProps) {
       <nav className="flex flex-col gap-0.5">
         <NavRow
           href="/"
-          icon={<IconHome size={18} className="shrink-0 text-foreground" />}
+          icon={<IconHome2 size={18} className="shrink-0 text-foreground" />}
           label="Home"
           collapsed={collapsed}
         />
