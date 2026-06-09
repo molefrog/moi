@@ -2,7 +2,8 @@
 // from logo.dev (free pk_ token) — drop a new `<server>.png` into the folder
 // and add an import + map entry below. Google product icons (Gmail/Drive/
 // Calendar) come from the official gstatic product art since logo.dev only
-// resolves company domains, not per-product brands.
+// resolves company domains, not per-product brands. A few are SVG (e.g.
+// `chrome.svg`) — Bun resolves both `.png` and `.svg` imports to a URL string.
 //
 // Server name lookup is case-insensitive so `Notion`, `notion`, and `NOTION`
 // all resolve. Claude-hosted MCPs arrive prefixed (`claude.ai Google Drive`) —
@@ -15,7 +16,7 @@ import apolloIcon from '@/client/assets/mcp/apollo.png'
 import asanaIcon from '@/client/assets/mcp/asana.png'
 import atlassianIcon from '@/client/assets/mcp/atlassian.png'
 import boxIcon from '@/client/assets/mcp/box.png'
-import chromeDevtoolsIcon from '@/client/assets/mcp/chrome-devtools.png'
+import chromeIcon from '@/client/assets/mcp/chrome.svg'
 import clickupIcon from '@/client/assets/mcp/clickup.png'
 import cloudflareIcon from '@/client/assets/mcp/cloudflare.png'
 import context7Icon from '@/client/assets/mcp/context7.png'
@@ -68,7 +69,8 @@ const ICONS: Record<string, string> = {
   asana: asanaIcon,
   atlassian: atlassianIcon,
   box: boxIcon,
-  'chrome-devtools': chromeDevtoolsIcon,
+  chrome: chromeIcon,
+  'chrome-devtools': chromeIcon,
   clickup: clickupIcon,
   cloudflare: cloudflareIcon,
   context7: context7Icon,
@@ -125,6 +127,7 @@ const ALIASES: Record<string, string> = {
   'apollo.io': 'apollo',
   'paper-desktop': 'paper',
   'granola-mcp': 'granola',
+  'claude-in-chrome': 'chrome',
   postgres: 'postgresql',
   'hugging face': 'huggingface',
   jira: 'atlassian',
