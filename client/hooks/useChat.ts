@@ -1,7 +1,9 @@
 import { useCallback, useEffect } from 'react'
 import { useState } from 'react'
 
+import { useWorkspaceModels } from '@/client/api/workspaces'
 import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
+import { useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
 import { connectWs, disconnectWs, sendWs } from '@/client/lib/ws'
 import { useChatStore, useChatStoreApi } from '@/client/store/chat'
 import { emptyViewState } from '@/lib/format'
@@ -12,6 +14,8 @@ const EMPTY: ViewState = emptyViewState()
 export function useChat() {
   const workspaceId = useWorkspaceId()
   const store = useChatStoreApi()
+  const { layout } = useWorkspaceLayoutCtx()
+  const models = useWorkspaceModels(workspaceId).data?.models
   const [input, setInput] = useState('')
 
   const activeSessionId = useChatStore(s => s.activeSessionId)
@@ -62,10 +66,16 @@ export function useChat() {
       }
     })
 
-    sendWs({ type: 'chat', content: text, sessionId: sid, isNew, optimisticId })
+    // The picker's persisted choice (layout); undefined runs on the SDK default.
+    // Drop it when the models list is loaded and no longer offers it (stale
+    // alias / hand-edited layout), matching the picker's display fallback so we
+    // don't send a model the SDK would reject with model_not_found.
+    const picked = layout.selectedModel
+    const model = picked && models && !models.some(m => m.value === picked) ? undefined : picked
+    sendWs({ type: 'chat', content: text, sessionId: sid, isNew, optimisticId, model })
     store.getState().setError(sid, null)
     setInput('')
-  }, [input, processing, activeSessionId, setActiveSession, store])
+  }, [input, processing, activeSessionId, setActiveSession, store, layout.selectedModel, models])
 
   const dismissError = useCallback(() => {
     if (!activeSessionId) return

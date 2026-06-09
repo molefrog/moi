@@ -36,7 +36,7 @@ type ContentBlock = {
 type SdkMessage = {
   type: string
   subtype?: string
-  message?: { role?: string; content?: unknown }
+  message?: { role?: string; content?: unknown; model?: string }
   parent_tool_use_id?: string | null
   tool_use_id?: string
   isSynthetic?: boolean
@@ -391,13 +391,18 @@ export class ClaudeAdapter {
       this.pendingUserEcho = null
     }
 
+    // The model that actually produced this turn (BetaMessage.model). Present
+    // on assistant messages; the most recent one is "the latest model used".
+    const model = msg.message?.model
+
     return {
       id,
       role,
       origin,
       parentTaskId: msg.parent_tool_use_id ?? undefined,
       parts,
-      timestamp: msg.timestamp
+      timestamp: msg.timestamp,
+      meta: model ? { model } : undefined
     }
   }
 

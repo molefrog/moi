@@ -47,13 +47,15 @@ function isClientMessage(value: unknown): value is ClientMessage {
     content?: unknown
     isNew?: unknown
     optimisticId?: unknown
+    model?: unknown
   }
   if (v.type === 'chat')
     return (
       typeof v.content === 'string' &&
       typeof v.sessionId === 'string' &&
       typeof v.isNew === 'boolean' &&
-      (v.optimisticId === undefined || typeof v.optimisticId === 'string')
+      (v.optimisticId === undefined || typeof v.optimisticId === 'string') &&
+      (v.model === undefined || typeof v.model === 'string')
     )
   if (v.type === 'stop') return typeof v.sessionId === 'string'
   return false
@@ -301,7 +303,8 @@ export const app = Bun.serve<WsData>({
               data.isNew,
               ws.data.workspaceId,
               workspace.path,
-              data.optimisticId
+              data.optimisticId,
+              data.model
             )
           }
         }

@@ -21,6 +21,10 @@ export type ClientMessage =
       // adapter to use this id when the SDK echoes the user input back, so
       // the optimistic bubble the client rendered gets upserted in place.
       optimisticId?: string
+      // Model id to run this turn with (from the picker / `supportedModels()`
+      // `value`). Omitted means the server's default. Applied per turn, so it
+      // can change between messages in the same session.
+      model?: string
     }
   | { type: 'stop'; sessionId: string }
 
@@ -143,6 +147,12 @@ export type WorkspaceLayout = {
   // User-set display-name override. When empty/undefined the API falls back to
   // the workspace folder name, so the resolved name always comes from the API.
   name?: string
+  // Model id chosen in the composer picker (`supportedModels()` `value`, an
+  // alias like `sonnet`). Persisted so the choice survives a reload. Sent with
+  // each chat frame; undefined means the agent runs on the SDK default. Note
+  // the transcript records the *resolved* id (e.g. `claude-sonnet-4-6`), which
+  // doesn't map back to these aliases — hence we persist the pick here.
+  selectedModel?: string
   theme?: {
     font: import('./themes').FontTheme
     background?: string

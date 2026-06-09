@@ -16,7 +16,10 @@ export async function handleChat(
   isNew: boolean,
   workspaceId: string,
   workspacePath: string,
-  optimisticId?: string
+  optimisticId?: string,
+  // Model id from the picker (`supportedModels()` `value`). Applied per turn;
+  // falls back to the default when omitted.
+  model?: string
 ) {
   const agent = getAgent(sessionId)
 
@@ -43,7 +46,8 @@ export async function handleChat(
       abortController: ctrl,
       maxTurns: 50,
       cwd: workspacePath,
-      model: 'sonnet',
+      // Omit entirely when unspecified so the SDK/CLI default model is used.
+      ...(model ? { model } : {}),
       allowedTools: [
         'Bash',
         'Read',

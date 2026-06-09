@@ -32,21 +32,26 @@ function capitalize(s: string): string {
 }
 
 // Model selector for the chat composer. Renders the workspace's available
-// models from `/api/workspaces/:id/models`. Not wired up yet — model/effort
-// selection and the fast-mode toggle are local-only and don't affect the run.
+// models from `/api/workspaces/:id/models`. The chosen model is persisted in
+// the workspace layout (so it survives reloads) and sent with each chat frame
+// (see useChat); leaving it untouched sends nothing, so the agent runs on the
+// SDK default. Effort and fast-mode remain local-only for now.
 export function ModelPicker() {
-  const { workspaceId } = useWorkspaceLayoutCtx()
+  const { workspaceId, layout, setLayout } = useWorkspaceLayoutCtx()
   const { data } = useWorkspaceModels(workspaceId)
   const models = data?.models ?? []
 
-  const [selected, setSelected] = useState<string | undefined>(undefined)
+  const selected = layout.selectedModel
+  const setSelected = (value: string) => setLayout({ selectedModel: value })
   const [effort, setEffort] = useState<string | undefined>(undefined)
   const [fastMode, setFastMode] = useState(false)
 
   if (models.length === 0) return null
 
-  // Default to the first model / its first effort level until the user picks.
-  const current = selected ?? models[0].value
+  // Show the persisted pick when it's still in the list; otherwise the first
+  // model. An unset pick sends no model id, so the run uses the SDK default.
+  const persisted = models.some(m => m.value === selected) ? selected : undefined
+  const current = persisted ?? models[0].value
   const model = models.find(m => m.value === current) ?? models[0]
   const effortLevels = model.supportsEffort ? (model.supportedEffortLevels ?? []) : []
   const currentEffort = effort && effortLevels.includes(effort) ? effort : effortLevels[0]
