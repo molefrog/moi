@@ -6,31 +6,27 @@ import { IconArtboard, IconLayoutDashboard, IconLayoutGrid, IconPalette } from '
 import { useQueryClient } from '@tanstack/react-query'
 
 import {
-  useWorkspaceLayout,
-  useWorkspaceMcp,
   useWorkspaceSessions,
   useWorkspaceWidgets,
   workspaceKeys
 } from '@/client/api/workspaces'
 import { ChatPanel } from '@/client/components/ChatPanel'
 import { ChatPopup } from '@/client/components/ChatPopup'
+import { McpMenu } from '@/client/components/McpMenu'
 import { type WidgetMode, Widgets } from '@/client/components/Widgets'
 import { PanelHeader, SidebarLayout, SidebarToggle } from '@/client/components/layout/SidebarLayout'
 import { LedLogo } from '@/client/components/playground/LedLogo'
 import { Button } from '@/client/components/ui/button'
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/client/components/ui/hover-card'
 import { useChat } from '@/client/hooks/useChat'
 import { useFitsSidebar } from '@/client/hooks/useFitsSidebar'
 import { useGridReconcile } from '@/client/hooks/useGridReconcile'
 import { useMeiEvent } from '@/client/hooks/useMeiEvents'
-import { useScrollFade } from '@/client/hooks/useScrollFade'
 import { useWorkspaceTheme } from '@/client/hooks/useWorkspaceTheme'
-import { formatMcpServerName, getMcpIcon } from '@/client/lib/mcp-icons'
-import { Workspace, useWorkspaceId } from '@/client/lib/WorkspaceContext'
+import { Workspace } from '@/client/lib/WorkspaceContext'
 import { WorkspaceLayoutProvider, useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
 import { ChatStoreProvider, useChatStoreApi } from '@/client/store/chat'
-import type { McpServer, SessionInfo, WidgetInfo } from '@/lib/types'
+import type { SessionInfo, WidgetInfo } from '@/lib/types'
 
 type WorkspaceRouteProps = {
   id: string
@@ -119,27 +115,6 @@ const ACTION_VARIANTS = {
   to: { opacity: 1, scale: 1, filter: 'blur(0px)' }
 }
 
-// MCP icon — supplied by design (not a Tabler glyph). Stroke inherits the
-// current text color; the parent button's `[&_svg]:size-[18px]` sizes it.
-function IconMcp({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M3.49994 11.7501L11.6717 3.57855C12.7762 2.47398 14.5672 2.47398 15.6717 3.57855C16.7762 4.68312 16.7762 6.47398 15.6717 7.57855M15.6717 7.57855L9.49994 13.7501M15.6717 7.57855C16.7762 6.47398 18.5672 6.47398 19.6717 7.57855C20.7762 8.68312 20.7762 10.474 19.6717 11.5785L12.7072 18.543C12.3167 18.9335 12.3167 19.5667 12.7072 19.9572L13.9999 21.2499" />
-      <path d="M17.4999 9.74921L11.3282 15.921C10.2238 17.0255 8.43275 17.0255 7.32825 15.921C6.22376 14.8164 6.22376 13.0255 7.32825 11.921L13.4999 5.74939" />
-    </svg>
-  )
-}
-
 // Workspace subpage tabs (widgets / Scratchpad). Selection state is owned by
 // WorkspaceView so the body can swap between the widget grid and the canvas.
 type WorkspaceTab = 'widgets' | 'canvas'
@@ -180,108 +155,6 @@ function WorkspaceTabs({ tab, onTab }: WorkspaceTabsProps) {
 function ScratchpadCanvas() {
   return (
     <div className="min-h-0 flex-1 bg-muted/40 bg-[radial-gradient(circle,var(--border)_1px,transparent_1px)] bg-[size:20px_20px] bg-[position:center]" />
-  )
-}
-
-function McpServerRow({ server }: { server: McpServer }) {
-  const icon = getMcpIcon(server.name)
-  const connected = server.status === 'connected'
-  return (
-    <div className="flex items-center gap-2.5 rounded-xs px-2 py-1 hover:bg-muted">
-      {icon ? (
-        <img src={icon} alt="" className="size-5 shrink-0 rounded ring-2 ring-background" />
-      ) : (
-        <span className="bg-muted text-muted-foreground flex size-5 shrink-0 items-center justify-center rounded ring-2 ring-background">
-          <IconMcp className="size-4" />
-        </span>
-      )}
-      <span className="text-foreground flex-1 truncate text-sm">
-        {formatMcpServerName(server.name)}
-      </span>
-      <span
-        className={cn('size-[5px] shrink-0 rounded-full', connected ? 'bg-emerald-500' : 'bg-yellow-500/75')}
-      />
-    </div>
-  )
-}
-
-// The scrollable server list. Its own component so `useScrollFade`'s effect runs
-// when the (portaled, mount-on-open) hover card opens — attaching the scroll ref.
-// Overflow is signalled with top/bottom mask fades; the scrollbar is hidden.
-function McpList({ servers }: { servers: McpServer[] }) {
-  const { ref, showTopFade, showBottomFade } = useScrollFade()
-  const fade =
-    showTopFade && showBottomFade
-      ? 'mask-fade-y'
-      : showTopFade
-        ? 'mask-fade-top'
-        : showBottomFade
-          ? 'mask-fade-bottom'
-          : undefined
-  return (
-    <div
-      ref={ref}
-      className={cn(
-        'scrollbar-none flex max-h-72 flex-col overflow-y-auto overscroll-contain',
-        fade
-      )}
-    >
-      {servers.map(server => (
-        <McpServerRow key={server.name} server={server} />
-      ))}
-    </div>
-  )
-}
-
-// MCP status hover card — Claude workspaces only (OpenClaw/Hermes use other
-// backends). Lists each MCP server with a green/red dot. The (expensive, cached)
-// status query: while it hasn't resolved the trigger is just a gray icon with no
-// dot and no hover card; once loaded the card opens on hover and the icon goes
-// dark + shows a dot badge when any server is connected.
-function McpMenu() {
-  const workspaceId = useWorkspaceId()
-  const { data: layout } = useWorkspaceLayout(workspaceId)
-  const isClaude = !!layout && layout.provider !== 'openclaw' && layout.provider !== 'hermes'
-  const { data: servers } = useWorkspaceMcp(workspaceId, isClaude)
-
-  if (!isClaude) return null
-
-  const anyConnected = servers?.some(s => s.status === 'connected') ?? false
-
-  const trigger = (
-    <Button
-      variant="ghost"
-      size="icon"
-      aria-label="MCP"
-      className={cn(
-        'relative size-7 [&_svg]:size-[20px]',
-        anyConnected ? 'text-foreground' : 'text-muted-foreground'
-      )}
-    >
-      <IconMcp />
-      {anyConnected && (
-        <span className="bg-foreground ring-background absolute bottom-1.5 right-[5px] size-[5px] rounded-full ring-1" />
-      )}
-    </Button>
-  )
-
-  // Not loaded yet → plain gray icon, no hover card.
-  if (!servers) return trigger
-
-  return (
-    <HoverCard delay={0} closeDelay={100}>
-      <HoverCardTrigger render={trigger} />
-      <HoverCardContent align="end" sideOffset={6} className="w-56 p-1">
-        <div className="text-muted-foreground px-2 pb-1.5 pt-1 text-xs font-medium">
-          Connected MCPs
-        </div>
-        {servers.length === 0 ? (
-          <div className="text-muted-foreground px-2 py-1 text-sm">No MCP servers</div>
-        ) : (
-          <McpList servers={servers} />
-        )}
-      </HoverCardContent>
-    </HoverCard>
   )
 }
 

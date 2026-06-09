@@ -26,6 +26,9 @@ type WorkspaceLayoutContextValue = {
   // Workspace metadata that rides along on the layout endpoint.
   name: string | null
   cwd: string | null
+  // The workspace's registry id (the route param), so descendants can key
+  // their own queries (e.g. the model picker) without prop-drilling.
+  workspaceId: string
   isLoading: boolean
 }
 
@@ -85,6 +88,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
     setLayout,
     name: query.data?.name ?? null,
     cwd: query.data?.cwd ?? null,
+    workspaceId: id,
     isLoading: query.isLoading
   }
 
