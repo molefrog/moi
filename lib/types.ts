@@ -10,10 +10,13 @@ export type WidgetInfo = {
   config: WidgetConfig
 }
 
-// Client → Server messages
+// Client → Server messages.
+// The chat WebSocket is app-wide (one socket for the whole client, not scoped to
+// a workspace), so every message carries the `workspaceId` it targets.
 export type ClientMessage =
   | {
       type: 'chat'
+      workspaceId: string
       content: string
       sessionId: string
       isNew: boolean
@@ -26,7 +29,7 @@ export type ClientMessage =
       // can change between messages in the same session.
       model?: string
     }
-  | { type: 'stop'; sessionId: string }
+  | { type: 'stop'; workspaceId: string; sessionId: string }
 
 // Session info returned by list endpoint
 export type SessionInfo = {
@@ -56,15 +59,35 @@ export type {
 } from './format'
 
 // Server → Client messages.
-// Every conversation-related frame carries a sessionId so the client can
-// route it to the correct session.
+// The chat socket is app-wide, so every conversation frame carries both a
+// `workspaceId` and a `sessionId` — the client routes each frame to the right
+// `(workspaceId, sessionId)` slice of its cache.
 export type ServerMessage =
-  | (StreamEvent & { sessionId: string })
+  | (StreamEvent & { sessionId: string; workspaceId: string })
   | StatusMessage
   | SessionRenamedMessage
   | WorkspaceSwitchMessage
   | ErrorFrame
   | StoppedFrame
+  | StatusSnapshotMessage
+
+// Frame as constructed by callers of `broadcast(workspaceId, frame)` — the
+// `workspaceId` is stamped on by `broadcast`, so callers omit it.
+export type BroadcastFrame =
+  | (StreamEvent & { sessionId: string })
+  | Omit<StatusMessage, 'workspaceId'>
+  | Omit<SessionRenamedMessage, 'workspaceId'>
+  | Omit<ErrorFrame, 'workspaceId'>
+  | Omit<StoppedFrame, 'workspaceId'>
+
+// Sent to a client right after it connects: the authoritative set of currently
+// running sessions across all workspaces. The client treats it as ground truth —
+// any session NOT listed is marked not-processing — which clears a spinner whose
+// terminal `status:false` was emitted while the client was disconnected.
+export type StatusSnapshotMessage = {
+  type: 'status_snapshot'
+  running: { workspaceId: string; sessionId: string }[]
+}
 
 export type WorkspaceSwitchMessage = {
   type: 'workspace:switch'
@@ -112,23 +135,27 @@ export type DiscoveredWorkspace = {
 
 export type SessionRenamedMessage = {
   type: 'session_renamed'
+  workspaceId: string
   from: string
   to: string
 }
 
 export type ErrorFrame = {
   kind: 'error'
+  workspaceId: string
   sessionId: string
   content: string
 }
 
 export type StoppedFrame = {
   kind: 'stopped'
+  workspaceId: string
   sessionId: string
 }
 
 export type StatusMessage = {
   type: 'status'
+  workspaceId: string
   sessionId: string
   processing: boolean
 }

@@ -132,10 +132,11 @@ export class ClaudeAdapter {
   // toolCallId of an Agent (subagent) tool_use → top-level Turn that owns it
   private subagentOwners = new Map<string, Turn>()
   private snapshot?: SessionSnapshot
-  // Client-chosen id to use for the next matching user-input echo, so the
-  // optimistic turn the client already rendered gets upserted instead of
-  // duplicated. Cleared once consumed.
-  private pendingUserEcho: { id: string; text: string } | null = null
+  // Client-chosen ids to use for matching user-input echoes, so optimistic
+  // turns the client already rendered get upserted instead of duplicated. A
+  // FIFO (not a single slot) because a streaming session can have several
+  // queued user messages in flight at once; each echo consumes its match.
+  private pendingUserEchoes: { id: string; text: string }[] = []
 
   /**
    * Tell the adapter that a user input with this text has already been
@@ -144,7 +145,9 @@ export class ClaudeAdapter {
    * `id` instead of the SDK's own uuid.
    */
   expectUserEcho(id: string, text: string) {
-    this.pendingUserEcho = { id, text: text.trim() }
+    this.pendingUserEchoes.push({ id, text: text.trim() })
+    // Bound the queue so a stream of non-matching sends can't grow it forever.
+    if (this.pendingUserEchoes.length > 32) this.pendingUserEchoes.shift()
   }
 
   ingest(raw: unknown): StreamEvent[] {
@@ -381,14 +384,13 @@ export class ClaudeAdapter {
     // If this is the user echo of an optimistic send, reuse the client-chosen
     // id so the optimistic bubble upserts in place.
     let id = turnId(msg)
-    if (
-      role === 'user' &&
-      origin.kind === 'user-input' &&
-      this.pendingUserEcho &&
-      firstText.trim() === this.pendingUserEcho.text
-    ) {
-      id = this.pendingUserEcho.id
-      this.pendingUserEcho = null
+    if (role === 'user' && origin.kind === 'user-input') {
+      const text = firstText.trim()
+      const idx = this.pendingUserEchoes.findIndex(e => e.text === text)
+      if (idx >= 0) {
+        id = this.pendingUserEchoes[idx].id
+        this.pendingUserEchoes.splice(idx, 1)
+      }
     }
 
     // The model that actually produced this turn (BetaMessage.model). Present
