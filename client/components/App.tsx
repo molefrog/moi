@@ -6,6 +6,7 @@ import { setWorkspaceSwitchHandler } from '@/client/lib/connection'
 
 import { HomePage } from './HomePage'
 import { PlaygroundPage } from './playground/PlaygroundPage'
+import { ToolCallsPage } from './playground/ToolCallsPage'
 import { WorkspaceRoute } from './routes/workspace/[id]'
 
 // Top-level router — sets up all client-side routes
@@ -22,6 +23,7 @@ export function AppRouter() {
   return (
     <Switch>
       <Route path="/" component={HomePage} />
+      <Route path="/playground/tool-calls" component={ToolCallsPage} />
       <Route path="/playground" component={PlaygroundPage} />
       <Route path="/workspace/:id">
         {/* Key by id so switching workspaces mounts a fresh subtree — the
