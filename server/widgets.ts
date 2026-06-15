@@ -194,8 +194,26 @@ async function getWidgetList(workspacePath: string): Promise<WidgetInfo[]> {
     const raw = manifest[id] ?? {}
     const rowSpan = VALID_SPANS.includes(raw.rowSpan) ? raw.rowSpan : DEFAULT_CONFIG.rowSpan
     const colSpan = VALID_SPANS.includes(raw.colSpan) ? raw.colSpan : DEFAULT_CONFIG.colSpan
-    return { id, config: { rowSpan, colSpan } as WidgetConfig }
+    const requiredEnv = Array.isArray(raw.requiredEnv) ? raw.requiredEnv : undefined
+    return {
+      id,
+      config: { rowSpan, colSpan, ...(requiredEnv ? { requiredEnv } : {}) } as WidgetConfig
+    }
   })
+}
+
+// Collect env vars declared via widget `config.requiredEnv`, mapping each key to
+// the widget ids that asked for it. Feeds the env API's "required" view.
+export async function collectRequiredEnv(workspacePath: string): Promise<Record<string, string[]>> {
+  const manifest = await readManifest(workspacePath)
+  const out: Record<string, string[]> = {}
+  for (const [id, cfg] of Object.entries(manifest)) {
+    if (!Array.isArray(cfg.requiredEnv)) continue
+    for (const key of cfg.requiredEnv) {
+      ;(out[key] ??= []).push(id)
+    }
+  }
+  return out
 }
 
 export async function listWidgets(workspacePath: string): Promise<Response> {

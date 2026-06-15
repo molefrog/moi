@@ -9,11 +9,12 @@ import {
   getCCRunningSessions,
   interruptCCSession,
   killAllCCSessions,
+  restartWorkspaceSessions,
   sendCCMessage
 } from './cc-session'
 import { PORT } from './constants'
 import { control } from './control'
-import { callFunction, killAllWorkers, parseFunctionPath } from './functions'
+import { callFunction, killAllWorkers, parseFunctionPath, restartWorker } from './functions'
 import { getWorkspacePreview, loadLayout, saveLayout } from './layout'
 import { getOpenClawModels, getOpenClawSessionMessages, getOpenClawSessions } from './openclaw'
 import { toSessionInfo, toStreamEvents } from './openclaw-adapter'
@@ -32,7 +33,8 @@ import {
   removeWorkspace
 } from './registry'
 import { addClient, getSessionEvents, getSessions, removeClient, sendToClient } from './state'
-import { listWidgets, serveWidget } from './widgets'
+import { getWorkspaceEnvView, isValidEnvKey, updateWorkspaceEnvSettings } from './workspace-env'
+import { collectRequiredEnv, listWidgets, serveWidget } from './widgets'
 
 const MEI_TOPIC = 'mei'
 
@@ -187,6 +189,54 @@ export const app = Bun.serve<WsData>({
       const ws = await getWorkspace(req.params.id)
       if (!ws) return new Response('Workspace not found', { status: 404 })
       return Response.json(await getMcpStatus(ws.path))
+    },
+    // Per-workspace env vars. GET returns the effective view (discovered `.env`
+    // + UI custom overrides + declared-required keys). PUT replaces the custom
+    // map and/or the inheritDotenv mode, then reaps the workspace's function
+    // worker and idle agent sessions so the next call/message picks up the
+    // change (env is frozen at spawn — a hard restart is the only way).
+    '/api/workspaces/:id/env': async req => {
+      const ws = await getWorkspace(req.params.id)
+      if (!ws) return new Response('Workspace not found', { status: 404 })
+
+      if (req.method === 'GET') {
+        const required = await collectRequiredEnv(ws.path)
+        return Response.json(await getWorkspaceEnvView(ws.path, required))
+      }
+      if (req.method === 'PUT') {
+        const body = await req.json().catch(() => null)
+        if (!body || typeof body !== 'object') {
+          return new Response('Bad request', { status: 400 })
+        }
+        const patch: { custom?: Record<string, string>; inheritDotenv?: boolean } = {}
+        if (body.custom !== undefined) {
+          if (typeof body.custom !== 'object' || body.custom === null) {
+            return new Response('custom must be an object', { status: 400 })
+          }
+          for (const [k, v] of Object.entries(body.custom)) {
+            if (!isValidEnvKey(k)) return new Response(`Invalid env key: ${k}`, { status: 400 })
+            if (typeof v !== 'string') {
+              return new Response(`Value for ${k} must be a string`, { status: 400 })
+            }
+          }
+          patch.custom = body.custom as Record<string, string>
+        }
+        if (body.inheritDotenv !== undefined) {
+          if (typeof body.inheritDotenv !== 'boolean') {
+            return new Response('inheritDotenv must be a boolean', { status: 400 })
+          }
+          patch.inheritDotenv = body.inheritDotenv
+        }
+
+        await updateWorkspaceEnvSettings(ws.path, patch)
+        // Frozen-at-spawn: reap workers/idle sessions so fresh env takes effect.
+        restartWorker(ws.path)
+        restartWorkspaceSessions(ws.path)
+
+        const required = await collectRequiredEnv(ws.path)
+        return Response.json(await getWorkspaceEnvView(ws.path, required))
+      }
+      return new Response('Method not allowed', { status: 405 })
     },
     // Models the workspace's agent backend can run, normalized across providers.
     // OpenClaw queries the gateway catalog; everything else (Claude Code) reads

@@ -227,4 +227,13 @@ describe('extractWidgetConfig', () => {
     expect(warn).toHaveBeenCalledTimes(2)
     warn.mockRestore()
   })
+
+  test('extracts requiredEnv string array alongside spans', async () => {
+    const config = await extractWidgetConfig(join(FIXTURES, 'with-required-env.tsx'))
+    expect(config).toEqual({
+      rowSpan: 2,
+      colSpan: 2,
+      requiredEnv: ['ELEVENLABS_API_KEY', 'ELEVENLABS_VOICE_ID']
+    })
+  })
 })
