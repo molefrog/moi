@@ -1,9 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
+import { applyEvents } from '@/lib/format'
 import type {
   DiscoveredWorkspace,
   McpServer,
   SessionInfo,
+  StreamEvent,
+  ViewState,
   WidgetInfo,
   WorkspaceEntry,
   WorkspaceLayout,
@@ -31,6 +34,10 @@ export const workspaceKeys = {
   layout: (id: string) => ['workspaces', 'layout', id] as const,
   widgets: (id: string) => ['workspaces', 'widgets', id] as const,
   sessions: (id: string) => ['workspaces', 'sessions', id] as const,
+  // Materialized transcript (ViewState) for one thread. The connection manager
+  // patches this cache with live WS deltas; the `['workspaces','events']`
+  // prefix lets it invalidate every thread on reconnect.
+  events: (id: string, sessionId: string) => ['workspaces', 'events', id, sessionId] as const,
   mcp: (id: string) => ['workspaces', 'mcp', id] as const,
   models: (id: string) => ['workspaces', 'models', id] as const
 }
@@ -98,6 +105,30 @@ export function useWorkspaceSessions(workspaceId: string) {
     queryKey: workspaceKeys.sessions(workspaceId),
     queryFn: () => fetch(`/api/workspaces/${workspaceId}/sessions`).then(r => r.json()),
     ...WORKSPACE_RESOURCE_OPTS
+  })
+}
+
+// A thread's materialized transcript (ViewState), fetched once from `/events`
+// and then kept live by WS deltas the connection manager folds in via
+// setQueryData. `staleTime: Infinity` + no focus/mount refetch is deliberate:
+// the app-wide socket never drops on navigation, so we never miss deltas while
+// navigating and must NOT refetch (which would clobber live state). A real
+// socket reconnect invalidates these queries to heal any offline gap. New
+// (unsent) sessions are primed via setQueryData, so this never fetches an empty
+// transcript over their optimistic turn.
+export function useSessionView(workspaceId: string, sessionId: string | null) {
+  return useQuery<ViewState>({
+    queryKey: workspaceKeys.events(workspaceId, sessionId ?? ''),
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${workspaceId}/sessions/${sessionId}/events`)
+      const evs: StreamEvent[] = res.ok ? await res.json() : []
+      return applyEvents(evs)
+    },
+    enabled: !!sessionId,
+    staleTime: Infinity,
+    gcTime: 5 * 60_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false
   })
 }
 

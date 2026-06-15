@@ -3,7 +3,7 @@ import { IconChevronDown, IconPlus } from '@tabler/icons-react'
 import { useWorkspaceSessions } from '@/client/api/workspaces'
 import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
-import { useChatStore } from '@/client/store/chat'
+import { useLive } from '@/client/store/live'
 
 import { Button } from './ui/button'
 import {
@@ -35,7 +35,7 @@ function formatDate(ms: number) {
 export function ThreadSelector({ onSwitch }: ThreadSelectorProps) {
   const workspaceId = useWorkspaceId()
   const { data: sessions = [], refetch } = useWorkspaceSessions(workspaceId)
-  const activeSessionId = useChatStore(s => s.activeSessionId)
+  const activeSessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
 
   const active = sessions.find(s => s.sessionId === activeSessionId)
   const label = active?.summary ?? 'New thread'

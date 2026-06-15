@@ -1,97 +1,101 @@
-import { useCallback, useEffect } from 'react'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 
-import { useWorkspaceModels } from '@/client/api/workspaces'
+import { useQueryClient } from '@tanstack/react-query'
+
+import { useSessionView, useWorkspaceModels, workspaceKeys } from '@/client/api/workspaces'
 import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
-import { connectWs, disconnectWs, sendWs } from '@/client/lib/ws'
-import { useChatStore, useChatStoreApi } from '@/client/store/chat'
-import { emptyViewState } from '@/lib/format'
+import { sendMessage } from '@/client/lib/connection'
+import { liveStore, useLive } from '@/client/store/live'
+import { applyEvent, emptyViewState } from '@/lib/format'
 import type { ViewState } from '@/lib/types'
 
 const EMPTY: ViewState = emptyViewState()
 
+// Thin projection over app-level state: the active thread + spinner/error come
+// from the live store; the transcript comes from the React Query cache (kept
+// current by the connection manager's WS deltas). No socket lifecycle here.
 export function useChat() {
   const workspaceId = useWorkspaceId()
-  const store = useChatStoreApi()
+  const qc = useQueryClient()
   const { layout } = useWorkspaceLayoutCtx()
   const models = useWorkspaceModels(workspaceId).data?.models
   const [input, setInput] = useState('')
 
-  const activeSessionId = useChatStore(s => s.activeSessionId)
-  const setActiveSession = useChatStore(s => s.setActiveSession)
+  const activeSessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
+  const processing = useLive(s =>
+    activeSessionId ? (s.processing[`${workspaceId}:${activeSessionId}`] ?? false) : false
+  )
+  const error = useLive(s =>
+    activeSessionId ? (s.errors[`${workspaceId}:${activeSessionId}`] ?? null) : null
+  )
 
-  const view = useChatStore(s => s.views[activeSessionId ?? ''] ?? EMPTY)
-  const processing = useChatStore(s => s.processing[activeSessionId ?? ''] ?? false)
-  const error = useChatStore(s => s.errors[activeSessionId ?? ''] ?? null)
-
-  // Persistent WS for live events — reconnects if workspace changes. Hands the
-  // workspace's chat store to the (non-React) socket layer so it writes there.
-  useEffect(() => {
-    connectWs(workspaceId, store)
-    return () => disconnectWs()
-  }, [workspaceId, store])
-
-  // When active session changes and we don't have its events cached, fetch them
-  useEffect(() => {
-    if (!activeSessionId) return
-    if (store.getState().events[activeSessionId] !== undefined) return
-    store.getState().loadEvents(workspaceId, activeSessionId)
-  }, [workspaceId, activeSessionId, store])
+  const view = useSessionView(workspaceId, activeSessionId).data ?? EMPTY
 
   const send = useCallback(() => {
     const text = input.trim()
-    if (!text || processing) return
+    // No `processing` guard: sending while a turn is in flight QUEUES the
+    // message into the same live server session (streaming-input mode).
+    if (!text) return
 
     let sid = activeSessionId
     let isNew = false
     if (!sid) {
       sid = crypto.randomUUID()
       isNew = true
-      store.getState().setEvents(sid, [])
-      setActiveSession(sid)
+      liveStore.getState().setActive(workspaceId, sid)
     }
 
-    // Optimistic user turn — rendered immediately, upserted in place when the
-    // SDK echoes it back via expectUserEcho on the server.
+    // Optimistic user turn — primed into the RQ transcript cache so it renders
+    // immediately. The server re-ids the SDK's user echo to optimisticId so it
+    // upserts in place rather than duplicating.
     const optimisticId = `optimistic:${crypto.randomUUID()}`
-    store.getState().append(sid, {
-      kind: 'turn',
-      turn: {
-        id: optimisticId,
-        role: 'user',
-        origin: { kind: 'user-input' },
-        parts: [{ type: 'text', text }],
-        timestamp: new Date().toISOString()
-      }
-    })
+    qc.setQueryData<ViewState>(workspaceKeys.events(workspaceId, sid), prev =>
+      applyEvent(prev ?? emptyViewState(), {
+        kind: 'turn',
+        turn: {
+          id: optimisticId,
+          role: 'user',
+          origin: { kind: 'user-input' },
+          parts: [{ type: 'text', text }],
+          timestamp: new Date().toISOString()
+        }
+      })
+    )
+    liveStore.getState().setProcessing(workspaceId, sid, true)
+    liveStore.getState().setError(workspaceId, sid, null)
 
-    // The picker's persisted choice (layout); undefined runs on the SDK default.
-    // Drop it when the models list is loaded and no longer offers it (stale
-    // alias / hand-edited layout), matching the picker's display fallback so we
-    // don't send a model the SDK would reject with model_not_found.
+    // The picker's persisted choice; drop it when the loaded models list no
+    // longer offers it (stale alias) so the SDK doesn't reject model_not_found.
     const picked = layout.selectedModel
     const model = picked && models && !models.some(m => m.value === picked) ? undefined : picked
-    sendWs({ type: 'chat', content: text, sessionId: sid, isNew, optimisticId, model })
-    store.getState().setError(sid, null)
+    sendMessage({
+      type: 'chat',
+      workspaceId,
+      content: text,
+      sessionId: sid,
+      isNew,
+      optimisticId,
+      model
+    })
     setInput('')
-  }, [input, processing, activeSessionId, setActiveSession, store, layout.selectedModel, models])
+  }, [input, activeSessionId, workspaceId, qc, layout.selectedModel, models])
 
   const dismissError = useCallback(() => {
     if (!activeSessionId) return
-    store.getState().setError(activeSessionId, null)
-  }, [activeSessionId, store])
+    liveStore.getState().setError(workspaceId, activeSessionId, null)
+  }, [activeSessionId, workspaceId])
 
   const stop = useCallback(() => {
     if (!processing || !activeSessionId) return
-    sendWs({ type: 'stop', sessionId: activeSessionId })
-  }, [processing, activeSessionId])
+    sendMessage({ type: 'stop', workspaceId, sessionId: activeSessionId })
+  }, [processing, activeSessionId, workspaceId])
 
   const switchThread = useCallback(
     (sessionId: string | null) => {
-      setActiveSession(sessionId)
+      liveStore.getState().setActive(workspaceId, sessionId)
     },
-    [setActiveSession]
+    [workspaceId]
   )
 
   return { view, processing, error, input, setInput, send, stop, switchThread, dismissError }

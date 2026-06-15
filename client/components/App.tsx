@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 
 import { Route, Switch, useLocation } from 'wouter'
 
-import { setWorkspaceSwitchHandler } from '@/client/lib/ws'
+import { setWorkspaceSwitchHandler } from '@/client/lib/connection'
 
 import { HomePage } from './HomePage'
 import { PlaygroundPage } from './playground/PlaygroundPage'

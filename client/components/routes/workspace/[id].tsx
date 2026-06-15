@@ -25,7 +25,7 @@ import { useWorkspaceTheme } from '@/client/hooks/useWorkspaceTheme'
 import { Workspace } from '@/client/lib/WorkspaceContext'
 import { WorkspaceLayoutProvider, useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
-import { ChatStoreProvider, useChatStoreApi } from '@/client/store/chat'
+import { liveStore } from '@/client/store/live'
 import type { SessionInfo, WidgetInfo } from '@/lib/types'
 
 type WorkspaceRouteProps = {
@@ -52,7 +52,7 @@ type WorkspaceLoaderProps = {
 
 function WorkspaceLoader({ id }: WorkspaceLoaderProps) {
   const qc = useQueryClient()
-  const { layout, setLayout, cwd, isLoading: layoutLoading } = useWorkspaceLayoutCtx()
+  const { layout, setLayout, isLoading: layoutLoading } = useWorkspaceLayoutCtx()
   const widgets = useWorkspaceWidgets(id)
   const sessions = useWorkspaceSessions(id)
 
@@ -74,11 +74,11 @@ function WorkspaceLoader({ id }: WorkspaceLoaderProps) {
   // shows cached data immediately while it revalidates, so no loader then.
   const fresh = layoutLoading || widgets.isLoading
 
-  // One chat store per workspace mount: switching workspaces unmounts this and
-  // discards its chat state cleanly. cwd flows in so turn metadata can show it.
+  // Chat state lives in app-level stores (RQ cache + live store), not here, so
+  // navigation never discards an in-flight run — we just seed the active thread.
   return (
-    <ChatStoreProvider cwd={cwd}>
-      <SeedActiveSession sessions={sessions.data} />
+    <>
+      <SeedActiveSession workspaceId={id} sessions={sessions.data} />
       <SidebarLayout>
         {fresh ? (
           <div className="flex h-full items-center justify-center">
@@ -88,25 +88,26 @@ function WorkspaceLoader({ id }: WorkspaceLoaderProps) {
           <WorkspaceView widgets={widgets.data ?? []} />
         )}
       </SidebarLayout>
-    </ChatStoreProvider>
+    </>
   )
 }
 
 type SeedActiveSessionProps = {
+  workspaceId: string
   sessions: SessionInfo[] | undefined
 }
 
-// Picks an active thread once the sessions query resolves. A freshly-mounted
-// workspace store starts with `activeSessionId: null`, so this selects the most
-// recent thread; it also re-selects if the current one vanished from the list.
-function SeedActiveSession({ sessions }: SeedActiveSessionProps) {
-  const store = useChatStoreApi()
+// Picks an active thread once the sessions query resolves. A workspace with no
+// active selection yet gets the most recent thread; it also re-selects if the
+// current one vanished from the list. Keyed per workspace in the live store, so
+// the choice persists across navigation.
+function SeedActiveSession({ workspaceId, sessions }: SeedActiveSessionProps) {
   useEffect(() => {
     if (!sessions) return
-    const active = store.getState().activeSessionId
+    const active = liveStore.getState().activeByWorkspace[workspaceId] ?? null
     const stillValid = active && sessions.some(s => s.sessionId === active)
-    if (!stillValid) store.getState().setActiveSession(sessions[0]?.sessionId ?? null)
-  }, [sessions, store])
+    if (!stillValid) liveStore.getState().setActive(workspaceId, sessions[0]?.sessionId ?? null)
+  }, [workspaceId, sessions])
   return null
 }
 

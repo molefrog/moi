@@ -41,8 +41,7 @@ export function ChatInput({ value, onChange, onSend, onStop, processing }: ChatI
             onSend()
           }
         }}
-        placeholder="Ask anything..."
-        disabled={processing}
+        placeholder={processing ? 'Queue a follow-up...' : 'Ask anything...'}
         autoFocus
         rows={1}
         className="field-sizing-content max-h-40 w-full resize-none bg-transparent px-2 py-1 text-sm leading-relaxed outline-none placeholder:text-muted-foreground disabled:opacity-50"
