@@ -16,6 +16,8 @@
 import { LRUCache } from 'lru-cache'
 import { join } from 'path'
 
+import { resolveWorkspaceEnv } from './workspace-env'
+
 const WORKER_PATH = join(import.meta.dir, 'functions-worker.ts')
 const CALL_TIMEOUT_MS = 30_000
 const WORKER_IDLE_TTL_MS = 10 * 60_000
@@ -60,7 +62,7 @@ const slots = new LRUCache<string, Slot>({
   dispose: slot => killSlot(slot, 'Functions worker idle-evicted')
 })
 
-function spawnSlot(workspacePath: string): Slot {
+function spawnSlot(workspacePath: string, workspaceEnv: Record<string, string>): Slot {
   const meiDir = join(workspacePath, '.moi')
 
   let readyResolve: () => void = () => {}
@@ -76,9 +78,15 @@ function spawnSlot(workspacePath: string): Slot {
 
   slot.worker = Bun.spawn([process.execPath, WORKER_PATH], {
     cwd: workspacePath,
-    // Default to the workspace's built functions dir, but let an explicitly-set
-    // MEI_FUNCTIONS_DIR win (used by tests to point the worker at fixtures).
-    env: { ...process.env, MEI_FUNCTIONS_DIR: process.env.MEI_FUNCTIONS_DIR ?? meiDir },
+    // Resolved workspace env (.env + UI custom overrides) is layered over the
+    // server's env so widget `.server.ts` functions can read workspace secrets.
+    // MEI_FUNCTIONS_DIR is applied last so a workspace .env can never clobber it;
+    // tests set it explicitly to point the worker at fixtures.
+    env: {
+      ...process.env,
+      ...workspaceEnv,
+      MEI_FUNCTIONS_DIR: process.env.MEI_FUNCTIONS_DIR ?? meiDir
+    },
     stderr: 'inherit',
     onExit(_proc, code) {
       if (code !== 0 && code !== null) {
@@ -116,11 +124,11 @@ function spawnSlot(workspacePath: string): Slot {
   return slot
 }
 
-function getOrSpawn(workspacePath: string): Slot {
+function getOrSpawn(workspacePath: string, workspaceEnv: Record<string, string>): Slot {
   const existing = slots.get(workspacePath)
   if (existing && !existing.killed) return existing
 
-  const fresh = spawnSlot(workspacePath)
+  const fresh = spawnSlot(workspacePath, workspaceEnv)
   slots.set(workspacePath, fresh)
   return fresh
 }
@@ -146,7 +154,11 @@ export async function callFunction(
   args: string,
   workspacePath: string
 ): Promise<string> {
-  const slot = getOrSpawn(workspacePath)
+  // Resolve the workspace env before (maybe) spawning, so a fresh worker picks
+  // up current .env + custom overrides. Env is fixed at spawn — an already-warm
+  // worker keeps its snapshot until restartWorker() reaps it.
+  const workspaceEnv = await resolveWorkspaceEnv(workspacePath)
+  const slot = getOrSpawn(workspacePath, workspaceEnv)
   await slot.readyPromise
 
   const id = crypto.randomUUID()
@@ -174,6 +186,16 @@ export async function callFunction(
 export function killAllWorkers() {
   for (const slot of slots.values()) killSlot(slot, 'Server shutting down')
   slots.clear()
+}
+
+// Reap a workspace's worker so the next callFunction spawns a fresh one with
+// up-to-date env. A running process can't pick up new env vars, so an env
+// change (UI override or .env edit) requires this hard restart — distinct from
+// reloadModules, which only swaps module code inside the live worker.
+export function restartWorker(workspacePath: string) {
+  const slot = slots.peek(workspacePath)
+  if (slot) killSlot(slot, 'Workspace env changed')
+  slots.delete(workspacePath)
 }
 
 export function reloadModules(modules: string[], workspacePath: string) {

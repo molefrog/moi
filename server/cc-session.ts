@@ -21,6 +21,7 @@ import {
 import { ClaudeAdapter } from '@/lib/claude-adapter'
 
 import { broadcast } from './state'
+import { resolveWorkspaceEnv } from './workspace-env'
 
 // Cap on concurrently-held live sessions (each = one claude subprocess). When
 // exceeded, the least-recently-active IDLE session is closed; a busy session is
@@ -236,6 +237,9 @@ function createLiveSession(input: {
   sessionId: string
   isNew: boolean
   model: string | undefined
+  // Resolved workspace env (.env + UI custom overrides), injected so the agent's
+  // Bash tool can use workspace secrets. Frozen at spawn — see restartWorkspaceSessions.
+  workspaceEnv: Record<string, string>
 }): LiveSession {
   evictIfNeeded()
 
@@ -253,7 +257,7 @@ function createLiveSession(input: {
     permissionMode: 'bypassPermissions',
     allowDangerouslySkipPermissions: true,
     settingSources: ['user', 'project'],
-    env: { ...process.env, CLAUDECODE: undefined },
+    env: { ...process.env, ...input.workspaceEnv, CLAUDECODE: undefined },
     stderr: (data: string) => console.error('[SDK stderr]', data)
   }
   if (!input.isNew) options.resume = input.sessionId
@@ -294,7 +298,8 @@ export async function sendCCMessage(input: {
       workspacePath: input.workspacePath,
       sessionId: input.sessionId,
       isNew: input.isNew,
-      model: input.model
+      model: input.model,
+      workspaceEnv: await resolveWorkspaceEnv(input.workspacePath)
     })
   } else {
     clearIdle(s)
@@ -352,6 +357,16 @@ export async function interruptCCSession(workspaceId: string, sessionId: string)
   broadcast(s.workspaceId, { kind: 'stopped', sessionId: s.sessionId })
   broadcastProcessing(s, false)
   armIdle(s)
+}
+
+// Tear down a workspace's IDLE sessions so the next message respawns the agent
+// with fresh env. A running claude subprocess can't pick up new env vars, and
+// mid-turn reload isn't supported — busy sessions keep their snapshot until the
+// turn ends (then idle-evict or get recreated on the next message via resume).
+export function restartWorkspaceSessions(workspacePath: string): void {
+  for (const s of [...sessions.values()]) {
+    if (s.workspacePath === workspacePath && s.pendingTurns === 0) teardown(s)
+  }
 }
 
 // Close every live session — called on server shutdown so no claude subprocess

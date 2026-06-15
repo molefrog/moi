@@ -63,6 +63,21 @@ export async function extractWidgetConfig(srcPath: string): Promise<WidgetConfig
   for (const prop of init.properties) {
     if (prop.type !== 'Property' || prop.key?.type !== 'Identifier') continue
     const key = prop.key.name as string
+
+    // requiredEnv: an array of string literals naming env vars the widget needs.
+    // Advisory only — surfaced in the env UI, never enforced at build/load.
+    if (key === 'requiredEnv') {
+      if (prop.value?.type !== 'ArrayExpression') continue
+      const names = prop.value.elements
+        .filter(
+          (el): el is { type: 'Literal'; value: string } =>
+            el?.type === 'Literal' && typeof el.value === 'string'
+        )
+        .map(el => el.value)
+      if (names.length) result.requiredEnv = names
+      continue
+    }
+
     if (key !== 'rowSpan' && key !== 'colSpan') continue
     if (prop.value?.type !== 'Literal' || typeof prop.value.value !== 'number') continue
 

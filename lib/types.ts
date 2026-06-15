@@ -3,6 +3,10 @@ import type { StreamEvent } from './format'
 export type WidgetConfig = {
   rowSpan: 1 | 2 | 3 | 4
   colSpan: 1 | 2 | 3 | 4
+  // Env vars this widget's `.server.ts` expects (e.g. `ELEVENLABS_API_KEY`).
+  // Purely advisory: it lets the UI surface a "missing key" hint. It never
+  // blocks loading — the server function still just reads `process.env`.
+  requiredEnv?: string[]
 }
 
 export type WidgetInfo = {
@@ -190,6 +194,38 @@ export type WorkspaceLayout = {
 export type WorkspacePreview = {
   cols: number
   items: { x: number; y: number; w: number; h: number }[]
+}
+
+// Persisted per-workspace env settings (stored outside the repo, in the OS data
+// dir). `custom` overrides discovered `.env` vars; `inheritDotenv` toggles
+// whether `.env` files feed the workspace at all.
+export type WorkspaceEnvSettings = {
+  custom: Record<string, string>
+  inheritDotenv: boolean
+}
+
+// One effective env var, as surfaced by GET /api/workspaces/:id/env.
+export type WorkspaceEnvVar = {
+  key: string
+  // `dotenv`: only from a `.env` file. `custom`: only a UI override.
+  // `both`: a UI override shadowing a `.env` value (custom wins).
+  source: 'dotenv' | 'custom' | 'both'
+  // Present only for custom-sourced keys (user-editable). `.env` values stay
+  // masked so the API never echoes secrets it merely discovered.
+  value?: string
+  // The `.env` files that declare this key (when dotenv-sourced).
+  files?: string[]
+}
+
+// GET /api/workspaces/:id/env payload — the env view for the future settings UI.
+export type WorkspaceEnvView = {
+  vars: WorkspaceEnvVar[]
+  // Discovered `.env` files with how many keys each holds (values masked).
+  files: { file: string; count: number }[]
+  inheritDotenv: boolean
+  // Keys declared via widget `config.requiredEnv`, with whether they're
+  // satisfied by the effective env and which widgets asked for them.
+  required: { key: string; satisfied: boolean; widgets: string[] }[]
 }
 
 // Normalized capability flags shared across backends. An absent flag means
