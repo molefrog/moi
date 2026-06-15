@@ -9,6 +9,7 @@ import { COLOR_THEMES, FONT_THEMES } from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/themes'
 
 import { CONTROL_PORT, PORT } from './constants'
+import { scaffoldMoiDir } from './moi-scaffold'
 import { type OpenClawAgent, discoverOpenClawAgents } from './openclaw'
 import { registerWorkspace } from './registry'
 import { installBundledSkills } from './skills-template'
@@ -165,10 +166,21 @@ const init = defineCommand({
     await mkdir(target, { recursive: true })
     await installBundledSkills(join(target, '.claude', 'skills'))
 
+    // Bootstrap the `.moi/` root (widgets dir + package.json + bun install)
+    // for a fresh workspace; an existing `.moi/` is left untouched.
+    console.log()
+    const scaffold = await scaffoldMoiDir(target)
+    if (scaffold !== 'exists') {
+      console.log(pc.dim('  Installed widget dependencies in .moi/'))
+      if (scaffold !== 0) {
+        console.warn(pc.yellow('  bun install failed — run it manually in .moi/'))
+      }
+    }
+
     // Always register the workspace in the persistent registry
     const entry = await registerWorkspace(target)
 
-    console.log('\n' + pc.green('✓') + ' Initialized ' + pc.bold(target))
+    console.log(pc.green('✓') + ' Initialized ' + pc.bold(target))
     console.log('  Skills installed — ask Claude to build a widget to get started\n')
 
     // If --web and server not running, start it (stay alive as wrapper)
@@ -587,6 +599,16 @@ const openclawInit = defineCommand({
     // these win over any same-named bundled or per-user skill.
     const skillsRoot = join(target.path, 'skills')
     await installBundledSkills(skillsRoot)
+
+    // Same `.moi/` bootstrap as `moi init` — the widgets skill assumes the
+    // folder and its dependencies exist. Existing `.moi/` stays untouched.
+    const scaffold = await scaffoldMoiDir(target.path)
+    if (scaffold !== 'exists') {
+      console.log('\n' + pc.dim('  Installed widget dependencies in .moi/'))
+      if (scaffold !== 0) {
+        console.warn(pc.yellow('  bun install failed — run it manually in .moi/'))
+      }
+    }
 
     // Register in the moi registry so the agent's workspace appears in the
     // UI workspace list. Mirrors what `moi init` does for Claude Code.
