@@ -1,10 +1,10 @@
 // MEI Functions Worker — child process that loads and executes .server.ts modules.
 // Spawned by the main process with IPC. Receives call/reload messages.
 import { parse, stringify } from 'devalue'
-import { join } from 'path'
+import { join, resolve, sep } from 'path'
 
 const MEI_DIR =
-  process.env.MEI_FUNCTIONS_DIR ?? join(import.meta.dir, '..', 'test-workspace', '.widgets')
+  process.env.MEI_FUNCTIONS_DIR ?? join(import.meta.dir, '..', 'test-workspace', '.moi')
 
 const moduleCache = new Map<string, Record<string, unknown>>()
 
@@ -20,7 +20,13 @@ async function loadModule(name: string): Promise<Record<string, unknown>> {
   const cached = moduleCache.get(name)
   if (cached) return cached
 
+  // Module keys are paths relative to MEI_DIR (the workspace's `.moi/`),
+  // e.g. "widgets/hello". Defense-in-depth: the route already rejects `..`
+  // segments, but never load a file that resolves outside MEI_DIR.
   const filePath = join(MEI_DIR, `${name}.server.ts`)
+  if (!resolve(filePath).startsWith(resolve(MEI_DIR) + sep)) {
+    throw new Error(`Server module "${name}" not found`)
+  }
   const file = Bun.file(filePath)
 
   if (!(await file.exists())) {

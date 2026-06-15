@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { join } from 'path'
 
-import { callFunction } from '../functions'
+import { callFunction, parseFunctionPath } from '../functions'
 
 const FIXTURES = join(import.meta.dir, '__fixtures__')
 
@@ -38,6 +38,46 @@ describe('callFunction (via worker)', () => {
     const result = parse(await callFunction('types', 'getDate', stringify([]), FIXTURES))
     expect(result).toBeInstanceOf(Date)
   })
+
+  test('calls a module keyed by a nested path', async () => {
+    const result = parse(await callFunction('nested/deep', 'getDeep', stringify([]), FIXTURES))
+    expect(result).toEqual({ source: 'deep' })
+  })
+})
+
+describe('parseFunctionPath', () => {
+  test('parses a flat module', () => {
+    expect(parseFunctionPath('weather/getWeather')).toEqual({
+      module: 'weather',
+      name: 'getWeather'
+    })
+  })
+
+  test('parses a nested module on the last slash', () => {
+    expect(parseFunctionPath('widgets/cat/getWeather')).toEqual({
+      module: 'widgets/cat',
+      name: 'getWeather'
+    })
+  })
+
+  test('allows $ _ - in module segments and $ _ in names', () => {
+    expect(parseFunctionPath('widgets/my-widget/get$Data')).toEqual({
+      module: 'widgets/my-widget',
+      name: 'get$Data'
+    })
+  })
+
+  test('rejects traversal and malformed paths', () => {
+    expect(parseFunctionPath('../etc/passwd')).toBeNull()
+    expect(parseFunctionPath('widgets/../secret/fn')).toBeNull()
+    expect(parseFunctionPath('widgets/./hello/fn')).toBeNull()
+    expect(parseFunctionPath('/widgets/hello/fn')).toBeNull()
+    expect(parseFunctionPath('widgets/hello/')).toBeNull()
+    expect(parseFunctionPath('widgets//hello/fn')).toBeNull()
+    expect(parseFunctionPath('noslash')).toBeNull()
+    expect(parseFunctionPath('widgets/hello/not a fn')).toBeNull()
+    expect(parseFunctionPath('bad name/fn')).toBeNull()
+  })
 })
 
 describe('/_rpc/fn endpoint', () => {
@@ -51,14 +91,12 @@ describe('/_rpc/fn endpoint', () => {
         const path = new URL(req.url).pathname
 
         if (req.method === 'POST' && path.startsWith('/_rpc/fn/')) {
-          const parts = path.replace('/_rpc/fn/', '').split('/')
-          if (parts.length !== 2) return new Response('Bad request', { status: 400 })
-
-          const [module, name] = parts
-          if (!/^[a-zA-Z0-9_$-]+$/.test(module) || !/^[a-zA-Z0-9_$]+$/.test(name)) {
+          const parsed = parseFunctionPath(path.replace('/_rpc/fn/', ''))
+          if (!parsed) {
             return new Response('Invalid module or function name', { status: 400 })
           }
 
+          const { module, name } = parsed
           try {
             const args = await req.text()
             const result = await callFunction(module, name, args, FIXTURES)

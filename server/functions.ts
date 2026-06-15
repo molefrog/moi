@@ -8,9 +8,11 @@
 // against multiple workspaces stay isolated.
 //
 // CWD contract: workers run with `cwd = workspacePath` (the workspace root,
-// where the agent works), NOT `.widgets/`. The `.widgets/` location is
-// passed to the worker as `MEI_FUNCTIONS_DIR` so it can locate `.server.ts`
-// files. This is the contract documented in the widgets SKILL.
+// where the agent works), NOT `.moi/`. The `.moi/` root is passed to the
+// worker as `MEI_FUNCTIONS_DIR` so it can locate `.server.ts` files — module
+// keys are paths relative to it (`"widgets/hello"` →
+// `.moi/widgets/hello.server.ts`). This is the contract documented in the
+// widgets SKILL.
 import { LRUCache } from 'lru-cache'
 import { join } from 'path'
 
@@ -59,7 +61,7 @@ const slots = new LRUCache<string, Slot>({
 })
 
 function spawnSlot(workspacePath: string): Slot {
-  const meiDir = join(workspacePath, '.widgets')
+  const meiDir = join(workspacePath, '.moi')
 
   let readyResolve: () => void = () => {}
   const readyPromise = new Promise<void>(r => (readyResolve = r))
@@ -121,6 +123,21 @@ function getOrSpawn(workspacePath: string): Slot {
   const fresh = spawnSlot(workspacePath)
   slots.set(workspacePath, fresh)
   return fresh
+}
+
+// Parse the `<module>/<fn>` tail of an RPC URL. The module key may itself
+// contain slashes (`widgets/hello/getWeather` → module `widgets/hello`, fn
+// `getWeather`), so split on the LAST slash. Returns null on anything that
+// isn't a clean path: empty or `..`-ish segments, leading/trailing slashes,
+// characters outside [A-Za-z0-9_$-].
+export function parseFunctionPath(tail: string): { module: string; name: string } | null {
+  const i = tail.lastIndexOf('/')
+  if (i === -1) return null
+  const module = tail.slice(0, i)
+  const name = tail.slice(i + 1)
+  if (!/^[A-Za-z0-9_$-]+(?:\/[A-Za-z0-9_$-]+)*$/.test(module)) return null
+  if (!/^[A-Za-z0-9_$]+$/.test(name)) return null
+  return { module, name }
 }
 
 export async function callFunction(

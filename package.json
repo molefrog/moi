@@ -41,7 +41,7 @@
     "!server/test",
     "!workspace/.env",
     "!workspace/.claude/settings.local.json",
-    "!workspace/.widgets"
+    "!workspace/.moi"
   ],
   "scripts": {
     "dev": "bun server/cli.ts start --dev",

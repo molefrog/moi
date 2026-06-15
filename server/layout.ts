@@ -14,7 +14,7 @@ const PREVIEW_COLS = 4
 const EMPTY_PREVIEW: WorkspacePreview = { cols: PREVIEW_COLS, items: [] }
 
 export function getLayoutPath(workspacePath: string): string {
-  return join(workspacePath, '.widgets', '.workspace.json')
+  return join(workspacePath, '.moi', '.workspace.json')
 }
 
 export async function loadLayout(workspacePath: string): Promise<WorkspaceLayout> {
@@ -32,7 +32,7 @@ export async function saveLayout(layout: WorkspaceLayout, workspacePath: string)
 
 async function scanWidgetIds(workspacePath: string): Promise<Set<string>> {
   try {
-    const entries = await readdir(join(workspacePath, '.widgets'))
+    const entries = await readdir(join(workspacePath, '.moi', 'widgets'))
     return new Set(
       entries
         .filter(f => /\.(tsx|ts)$/.test(f) && !f.endsWith('.server.ts'))
@@ -53,7 +53,7 @@ export async function getWorkspacePreview(workspacePath: string): Promise<Worksp
 
     let manifest: Record<string, WidgetConfig> = {}
     try {
-      const manifestPath = join(workspacePath, '.widgets', '.build', 'widgets', 'manifest.json')
+      const manifestPath = join(workspacePath, '.moi', '.build', 'widgets', 'manifest.json')
       const parsed = JSON.parse(await Bun.file(manifestPath).text())
       if (parsed && typeof parsed.config === 'object' && parsed.config !== null) {
         manifest = parsed.config as Record<string, WidgetConfig>

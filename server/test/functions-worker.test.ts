@@ -91,6 +91,22 @@ describe('functions-worker', () => {
     expect((msg as ErrorMsg).message).toContain('not found')
   })
 
+  test('loads a module keyed by a nested path', async () => {
+    const msg = await worker.call('nested/deep', 'getDeep')
+
+    expect(msg.type).toBe('result')
+    expect(parse((msg as ResultMsg).data)).toEqual({ source: 'deep' })
+  })
+
+  test('refuses module keys that resolve outside MEI_FUNCTIONS_DIR', async () => {
+    // ../outside.server.ts exists (server/test/outside.server.ts) but sits
+    // outside the fixtures root — the containment guard must reject it.
+    const msg = await worker.call('../outside', 'leak')
+
+    expect(msg.type).toBe('error')
+    expect((msg as ErrorMsg).message).toContain('not found')
+  })
+
   test('returns error for unknown function', async () => {
     const msg = await worker.call('with-server', 'nonexistentFn')
 

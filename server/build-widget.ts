@@ -5,7 +5,8 @@ import type {
 import { parse } from '@typescript-eslint/typescript-estree'
 import type { BunPlugin } from 'bun'
 import tailwind from 'bun-plugin-tailwind'
-import { basename, dirname, join } from 'path'
+import { realpathSync } from 'node:fs'
+import { basename, dirname, join, relative, sep } from 'path'
 
 import type { WidgetConfig } from '@/lib/types'
 
@@ -128,7 +129,35 @@ export function rpc(module, name) {
 }
 `
 
-function serverProxyPlugin(sourceDir: string): {
+// Server modules are keyed by their path relative to the moi root
+// (`.moi/widgets/hello.server.ts` → `"widgets/hello"`), posix-normalized so
+// keys are stable across platforms. Throws when the file escapes the root.
+// Both sides are canonicalized first: Bun's resolver returns realpaths
+// (e.g. `/tmp` → `/private/tmp` on macOS), and a symlinked root must not
+// look like an escape.
+function realpathOr(path: string): string {
+  try {
+    return realpathSync(path)
+  } catch {
+    return path
+  }
+}
+
+function serverModuleKey(serverPath: string, moiRoot: string): string {
+  const key = relative(realpathOr(moiRoot), realpathOr(serverPath))
+    .replace(/\.server\.ts$/, '')
+    .split(sep)
+    .join('/')
+  if (key === '..' || key.startsWith('../')) {
+    throw new Error(`Server file "${serverPath}" escapes the moi root "${moiRoot}"`)
+  }
+  return key
+}
+
+function serverProxyPlugin(
+  sourceDir: string,
+  moiRoot: string
+): {
   plugin: BunPlugin
   serverModules: ServerModule[]
 } {
@@ -148,11 +177,15 @@ function serverProxyPlugin(sourceDir: string): {
         loader: 'js'
       }))
 
-      // Intercept .server imports
+      // Intercept .server imports (relative only). Resolved against the
+      // importing file's directory — server files may live anywhere under
+      // the moi root, e.g. `../lib/db.server`.
       build.onResolve({ filter: /\.server(\.ts)?$/ }, args => {
         if (!args.path.startsWith('.')) return
+        const baseDir =
+          args.importer && args.importer.includes(sep) ? dirname(args.importer) : sourceDir
         return {
-          path: join(sourceDir, args.path.replace(/\.server(\.ts)?$/, '.server.ts')),
+          path: join(baseDir, args.path.replace(/\.server(\.ts)?$/, '.server.ts')),
           namespace: 'server-proxy'
         }
       })
@@ -160,7 +193,7 @@ function serverProxyPlugin(sourceDir: string): {
       // Generate proxy stubs using mei:rpc
       build.onLoad({ filter: /.*/, namespace: 'server-proxy' }, async args => {
         const exports = await validateServerExports(args.path)
-        const moduleName = basename(args.path, '.server.ts')
+        const moduleName = serverModuleKey(args.path, moiRoot)
 
         serverModules.push({ name: moduleName, exports })
 
@@ -198,18 +231,18 @@ const HOST_THEME_PATH = join(import.meta.dir, '..', 'client', 'theme.css')
 //      means the widget's CSS does NOT redefine the underlying
 //      `--background`/`--foreground` variables — those stay host-owned and
 //      the widget picks them up from `:root` at runtime.
-//   3. Tailwind's auto-detection treats `.widgets/` as a hidden directory
+//   3. Tailwind's auto-detection treats `.moi/` as a hidden directory
 //      and skips it. An explicit `@source` bypasses the dot-dir + gitignore
 //      filters.
 //
 // Important: the synthetic CSS must live on disk in the `file` namespace
 // because `bun-plugin-tailwind`'s `onLoad` only matches that namespace —
 // custom-namespace CSS is treated as raw text and our `@theme inline` block
-// is left unprocessed. We materialize it inside `<sourceDir>/.build/` and
+// is left unprocessed. We materialize it inside `<moiRoot>/.build/` and
 // have the entry import it by absolute path.
-async function writeSyntheticTailwindCss(widgetPath: string): Promise<string> {
+async function writeSyntheticTailwindCss(widgetPath: string, moiRoot: string): Promise<string> {
   const sourceDir = dirname(widgetPath)
-  const buildDir = join(sourceDir, '.build')
+  const buildDir = join(moiRoot, '.build')
   const cssPath = join(buildDir, 'widget-tailwind.css')
   const contents = [
     `@import 'tailwindcss';`,
@@ -269,28 +302,45 @@ function formatBuildLog(log: BuildMessage | ResolveMessage): string {
   return `${loc}${prefix}: ${log.message}${lineText}`
 }
 
+// Relative `.server` import specifiers in a widget source, `.server` suffix
+// stripped: `./hello`, `../lib/db`. Shared by prevalidation here and the
+// rebuild staleness check in widgets.ts.
+export function scanServerImports(source: string): string[] {
+  const importPattern = /from\s+['"](\.\.?\/[^'"]+?)\.server(?:\.ts)?['"]/g
+  const specifiers: string[] = []
+  let match
+  while ((match = importPattern.exec(source)) !== null) {
+    specifiers.push(match[1])
+  }
+  return specifiers
+}
+
 async function prevalidateServerFiles(entrypoint: string): Promise<void> {
   const sourceDir = dirname(entrypoint)
   const source = await Bun.file(entrypoint).text()
 
-  const importPattern = /from\s+['"]\.\/([^'"]+)\.server(?:\.ts)?['"]/g
-  let match
-  while ((match = importPattern.exec(source)) !== null) {
-    const serverPath = join(sourceDir, `${match[1]}.server.ts`)
+  for (const specifier of scanServerImports(source)) {
+    const serverPath = join(sourceDir, `${specifier}.server.ts`)
     if (await Bun.file(serverPath).exists()) {
       await validateServerExports(serverPath)
     }
   }
 }
 
-export async function buildWidget(entrypoint: string): Promise<WidgetArtifact> {
+// `moiRoot` is the directory server-module keys are relative to (the
+// workspace's `.moi/`). Defaults to the widget's own directory, which keeps
+// basename keys for callers that build a file directly (tests, fixtures).
+export async function buildWidget(
+  entrypoint: string,
+  moiRoot = dirname(entrypoint)
+): Promise<WidgetArtifact> {
   const sourceDir = dirname(entrypoint)
   const widgetName = basename(entrypoint).replace(/\.tsx?$/, '')
 
   await prevalidateServerFiles(entrypoint)
 
-  const { plugin: serverProxy, serverModules } = serverProxyPlugin(sourceDir)
-  const syntheticCssPath = await writeSyntheticTailwindCss(entrypoint)
+  const { plugin: serverProxy, serverModules } = serverProxyPlugin(sourceDir, moiRoot)
+  const syntheticCssPath = await writeSyntheticTailwindCss(entrypoint, moiRoot)
 
   let result: Awaited<ReturnType<typeof Bun.build>>
   try {
@@ -303,7 +353,7 @@ export async function buildWidget(entrypoint: string): Promise<WidgetArtifact> {
       // bun-plugin-tailwind uses `build.config.root` as the auto-detect
       // project root (`projectRoot = build.config?.root ?? process.cwd()`).
       // Without this, oxide scans `none-computer/` (the parent server's
-      // cwd) instead of the workspace's `.widgets/`.
+      // cwd) instead of the workspace's `.moi/widgets/`.
       root: sourceDir,
       plugins: [widgetEntryPlugin(entrypoint, syntheticCssPath), serverProxy, tailwind]
     })

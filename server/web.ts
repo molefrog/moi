@@ -7,7 +7,7 @@ import index from '../client/index.html'
 import { getClaudeModels, getMcpStatus, handleChat, stopChat } from './agent'
 import { PORT } from './constants'
 import { control } from './control'
-import { callFunction, killAllWorkers } from './functions'
+import { callFunction, killAllWorkers, parseFunctionPath } from './functions'
 import { getWorkspacePreview, loadLayout, saveLayout } from './layout'
 import { getOpenClawModels, getOpenClawSessionMessages, getOpenClawSessions } from './openclaw'
 import { toSessionInfo, toStreamEvents } from './openclaw-adapter'
@@ -330,13 +330,13 @@ async function handleFunctionCall(
   tail: string,
   workspacePath: string
 ): Promise<Response> {
-  const parts = tail.split('/')
-  if (parts.length !== 2) return new Response('Bad request', { status: 400 })
-
-  const [module, name] = parts
-  if (!/^[a-zA-Z0-9_$-]+$/.test(module) || !/^[a-zA-Z0-9_$]+$/.test(name)) {
+  // Module keys may contain slashes (`widgets/hello/getWeather`), so the
+  // tail is parsed on the last slash — see parseFunctionPath.
+  const parsed = parseFunctionPath(tail)
+  if (!parsed) {
     return new Response('Invalid module or function name', { status: 400 })
   }
+  const { module, name } = parsed
 
   try {
     const contentLength = Number(req.headers.get('content-length') ?? 0)

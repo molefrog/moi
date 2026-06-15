@@ -1,9 +1,19 @@
-import { describe, expect, spyOn, test } from 'bun:test'
+import { beforeAll, describe, expect, spyOn, test } from 'bun:test'
 import { join } from 'path'
 
 import { buildWidget, extractWidgetConfig } from '../build-widget'
 
 const FIXTURES = join(import.meta.dir, '__fixtures__')
+
+// Warmup: under `bun test` (and only there) the very FIRST Bun.build in the
+// process with this exact option combo (virtual entry + tailwind plugin +
+// root + inline sourcemap + esm) fails to resolve the entry's import with
+// "Could not resolve"; the identical second call succeeds. Pre-existing Bun
+// quirk (1.3.x), not reproducible outside the test runner — swallow one
+// throwaway build so every real test starts from the working state.
+beforeAll(async () => {
+  await buildWidget(join(FIXTURES, 'hello.tsx')).catch(() => {})
+})
 
 describe('buildWidget', () => {
   test('builds a basic widget with React externalized', async () => {
@@ -140,6 +150,57 @@ describe('buildWidget', () => {
   test('artifact config is null when widget has no config export', async () => {
     const result = await buildWidget(join(FIXTURES, 'hello.tsx'))
     expect(result.config).toBeNull()
+  })
+
+  test('keys server modules by path relative to moiRoot', async () => {
+    const result = await buildWidget(join(FIXTURES, 'nested', 'widget.tsx'), FIXTURES)
+
+    expect(result.serverModules).toHaveLength(1)
+    expect(result.serverModules[0].name).toBe('nested/deep')
+    expect(result.js).toContain('rpc("nested/deep", "getDeep")')
+  })
+
+  test('explicit moiRoot equal to the widget dir keeps basename keys', async () => {
+    const result = await buildWidget(join(FIXTURES, 'with-server.tsx'), FIXTURES)
+
+    expect(result.serverModules[0].name).toBe('with-server')
+    expect(result.js).toContain('rpc("with-server", "getWeather")')
+  })
+
+  test('rejects a server import that escapes the moi root', async () => {
+    await expect(
+      buildWidget(join(FIXTURES, 'nested', 'escape.tsx'), join(FIXTURES, 'nested'))
+    ).rejects.toThrow('escapes the moi root')
+  })
+
+  test('keys correctly when the moi root sits behind a symlink', async () => {
+    // On macOS `/tmp` → `/private/tmp`: Bun's resolver canonicalizes server
+    // file paths, so an un-canonicalized moiRoot must not read as an escape.
+    const { mkdtempSync, symlinkSync, rmSync, mkdirSync, writeFileSync } = await import('node:fs')
+
+    // Inside the repo tree (not os.tmpdir()) so the widget's `@import
+    // 'tailwindcss'` resolves against the repo's node_modules.
+    const realRoot = mkdtempSync(join(import.meta.dir, 'moi-real-'))
+    const linkRoot = realRoot + '-link'
+    symlinkSync(realRoot, linkRoot)
+    try {
+      mkdirSync(join(realRoot, 'widgets'))
+      writeFileSync(
+        join(realRoot, 'widgets', 'sym.server.ts'),
+        'export async function getSym() { return 1 }\n'
+      )
+      writeFileSync(
+        join(realRoot, 'widgets', 'sym.tsx'),
+        "import { getSym } from './sym.server'\n" +
+          'export default function Sym() { return <button onClick={() => getSym()}>s</button> }\n'
+      )
+
+      const result = await buildWidget(join(linkRoot, 'widgets', 'sym.tsx'), linkRoot)
+      expect(result.serverModules[0].name).toBe('widgets/sym')
+    } finally {
+      rmSync(linkRoot)
+      rmSync(realRoot, { recursive: true, force: true })
+    }
   })
 })
 
