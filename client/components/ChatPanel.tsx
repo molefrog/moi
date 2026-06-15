@@ -171,8 +171,12 @@ export function ChatPanel({
         )}
       >
         {turns.length === 0 && !processing && <EmptyState />}
-        {groupedTurns.map(turn => (
-          <TurnView key={turn.id} turn={turn} />
+        {groupedTurns.map((turn, i) => (
+          <TurnView
+            key={turn.id}
+            turn={turn}
+            processing={processing && i === groupedTurns.length - 1}
+          />
         ))}
         {processing && <ThinkingIndicator />}
       </div>

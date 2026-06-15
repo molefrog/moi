@@ -2,20 +2,15 @@ import { useState } from 'react'
 
 import {
   IconAlertTriangle,
-  IconBrain,
-  IconChevronRight,
   IconLoader2,
-  IconPlug,
   IconSparkles,
   IconUsersGroup,
   IconX
 } from '@tabler/icons-react'
-import { relative } from 'pathe'
 
 import { MarkdownContent } from '@/client/components/MarkdownContent'
-import { cn } from '@/client/lib/cn'
+import { ToolCallGroup } from '@/client/components/tool-group/ToolCallGroup'
 import { useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
-import { formatMcpServerName, getMcpIcon } from '@/client/lib/mcp-icons'
 import type { Part, SubagentRecord, ToolCall, Turn } from '@/lib/types'
 
 export function EmptyState() {
@@ -39,19 +34,53 @@ export function ThinkingIndicator() {
   )
 }
 
-type TurnViewProps = { turn: Turn }
+// A part either folds into a tool-group "run" (reasoning + ordinary tool calls,
+// rendered as one connected timeline) or stands alone (text, files, sources, and
+// the special subagent/skill cards, which own their own layout/modal).
+function isRunPart(part: Part): boolean {
+  if (part.type === 'reasoning') return true
+  if (part.type === 'tool-call') {
+    const c = part.call
+    if (c.caller === 'subagent' && c.subagent) return false
+    if (c.name === 'Skill' && c.skill) return false
+    return true
+  }
+  return false
+}
 
-export function TurnView({ turn }: TurnViewProps) {
+type Segment = { kind: 'run'; parts: Part[] } | { kind: 'single'; part: Part }
+
+// Split a turn's parts into runs (consecutive run-parts) and singles, preserving
+// order. Each run becomes one <ToolCallGroup>; singles render individually.
+function buildSegments(parts: Part[]): Segment[] {
+  const segments: Segment[] = []
+  for (const part of parts) {
+    if (isRunPart(part)) {
+      const last = segments[segments.length - 1]
+      if (last && last.kind === 'run') last.parts.push(part)
+      else segments.push({ kind: 'run', parts: [part] })
+    } else {
+      segments.push({ kind: 'single', part })
+    }
+  }
+  return segments
+}
+
+type TurnViewProps = { turn: Turn; processing?: boolean }
+
+export function TurnView({ turn, processing = false }: TurnViewProps) {
+  const cwd = useWorkspaceLayoutCtx().cwd
+
   if (turn.origin.kind === 'replay') return null
 
   // The SKILL.md body is captured as the owning Skill tool call's `skill.body`
-  // and not surfaced in the scroll (see ClaudeAdapter). Other synthetic turns
-  // (system reminders, hook output) stay hidden by default.
+  // and not surfaced in the scroll. Other synthetic turns (system reminders,
+  // hook output) and subagent prompts stay hidden by default.
   if (turn.origin.kind === 'synthetic') return null
   if (turn.origin.kind === 'subagent-prompt') return null
 
   if (turn.role === 'user' && turn.origin.kind === 'user-input') {
-    // Plain user input — right-aligned bubble (only text is typical here)
+    // Plain user input — right-aligned bubble (only text is typical here).
     const text = turn.parts
       .filter(p => p.type === 'text')
       .map(p => (p.type === 'text' ? p.text : ''))
@@ -64,19 +93,21 @@ export function TurnView({ turn }: TurnViewProps) {
     )
   }
 
+  const segments = buildSegments(turn.parts)
   return (
     <div className="flex flex-col">
-      {turn.parts.map((part, i) => {
-        // Default 12px between siblings, tightened to 4px when both this
-        // part and the previous one are tool-call cards. Lets a chain of
-        // tool calls (especially after the groupTurns merge) read as a
-        // single sequence instead of a sparse list.
-        const prev = i > 0 ? turn.parts[i - 1] : null
-        const tightToolPair = prev?.type === 'tool-call' && part.type === 'tool-call'
-        const spacing = i === 0 ? '' : tightToolPair ? 'mt-1' : 'mt-3'
+      {segments.map((seg, i) => {
+        const spacing = i === 0 ? '' : 'mt-3'
+        // `processing` belongs to the live last row, so only flow it into the
+        // final run — a trailing reasoning there reads as "Thinking".
+        const isLast = i === segments.length - 1
         return (
           <div key={i} className={spacing}>
-            <PartRenderer part={part} />
+            {seg.kind === 'run' ? (
+              <ToolCallGroup parts={seg.parts} cwd={cwd} processing={processing && isLast} />
+            ) : (
+              <PartRenderer part={seg.part} />
+            )}
           </div>
         )
       })}
@@ -86,12 +117,12 @@ export function TurnView({ turn }: TurnViewProps) {
 
 type PartRendererProps = { part: Part }
 
+// Renders the standalone parts. Reasoning + ordinary tool calls never reach here
+// — they're folded into a <ToolCallGroup> run by buildSegments.
 function PartRenderer({ part }: PartRendererProps) {
   switch (part.type) {
     case 'text':
       return <MarkdownContent content={part.text} />
-    case 'reasoning':
-      return <ReasoningPart text={part.text} redacted={part.redacted} />
     case 'tool-call':
       return <ToolCallCard call={part.call} />
     case 'file':
@@ -102,34 +133,18 @@ function PartRenderer({ part }: PartRendererProps) {
       return <SourceLink url="#" title={part.title} />
     case 'data':
       return <DataPart name={part.name} data={part.data} />
+    case 'reasoning':
+      return null
   }
 }
 
-type ReasoningPartProps = { text: string; redacted?: boolean }
-function ReasoningPart({ text, redacted }: ReasoningPartProps) {
-  const [open, setOpen] = useState(false)
-  return (
-    <details
-      className="group"
-      open={open}
-      onToggle={e => setOpen((e.target as HTMLDetailsElement).open)}
-    >
-      <summary className="flex cursor-pointer items-center gap-2 py-1 text-xs text-muted-foreground select-none">
-        <IconChevronRight
-          size={12}
-          stroke={1.5}
-          className="chevron transition-transform duration-150 group-open:rotate-90"
-        />
-        <IconBrain size={12} stroke={1.5} />
-        <span>{redacted ? 'Redacted thinking' : 'Thinking'}</span>
-      </summary>
-      {!redacted && (
-        <div className="mt-1 ml-4 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground italic">
-          {text}
-        </div>
-      )}
-    </details>
-  )
+// Only the special cards reach here (subagent, skill); ordinary tools render in a
+// ToolCallGroup run. The trailing fallback keeps an unexpected tool visible.
+function ToolCallCard({ call }: { call: ToolCall }) {
+  if (call.caller === 'subagent' && call.subagent)
+    return <SubagentCard call={call} subagent={call.subagent} />
+  if (call.name === 'Skill' && call.skill) return <SkillCard call={call} />
+  return <ToolCallGroup parts={[{ type: 'tool-call', call }]} cwd={null} />
 }
 
 type FilePartProps = { mediaType: string; url: string; filename?: string }
@@ -158,153 +173,6 @@ function DataPart({ name, data }: DataPartProps) {
       <pre className="mt-1 overflow-auto rounded bg-muted p-2 text-xs text-muted-foreground">
         {JSON.stringify(data, null, 2)}
       </pre>
-    </details>
-  )
-}
-
-// -----------------------------------------------------------------------
-// Tool call cards
-// -----------------------------------------------------------------------
-
-type ToolCallCardProps = { call: ToolCall }
-
-function ToolCallCard({ call }: ToolCallCardProps) {
-  if (call.caller === 'subagent' && call.subagent) {
-    return <SubagentCard call={call} subagent={call.subagent} />
-  }
-  if (call.name === 'Skill' && call.skill) {
-    return <SkillCard call={call} />
-  }
-  // Mcporter calls are shell commands like
-  //   `mcporter call notion.notion-search --args '...'`
-  // We render them as a server-branded card instead of a raw Bash line.
-  const mcp = parseMcporterCall(call)
-  if (mcp) return <MCPCallCard call={call} mcp={mcp} />
-  return <GenericToolCard call={call} />
-}
-
-type GenericToolCardProps = { call: ToolCall }
-function GenericToolCard({ call }: GenericToolCardProps) {
-  const cwd = useWorkspaceLayoutCtx().cwd
-  const isError = call.state === 'error'
-  const isRunning = call.state === 'running' || call.state === 'pending'
-  const output = isError
-    ? (call.errorText ?? '')
-    : typeof call.output === 'string'
-      ? call.output
-      : ''
-
-  return (
-    <details className="group">
-      <summary className="flex cursor-pointer items-center gap-2 py-1.5 select-none">
-        <IconChevronRight
-          size={12}
-          stroke={1.5}
-          className="chevron shrink-0 text-ring transition-transform duration-150 group-open:rotate-90"
-        />
-        <CallerBadge call={call} />
-        <span className="text-xs font-medium whitespace-nowrap">{getToolDisplayName(call)}</span>
-        <span className="truncate text-[11px] text-ring">{formatInputBrief(call, cwd)}</span>
-        {isRunning && <IconLoader2 size={12} stroke={1.5} className="animate-spin text-ring" />}
-      </summary>
-      {(output || isError) && (
-        <div
-          className={cn(
-            'mt-1 ml-4 rounded-md border px-3 py-2.5',
-            isError ? 'border-red-200 bg-red-50' : 'border-border bg-muted'
-          )}
-        >
-          <pre
-            className={cn(
-              'max-h-[200px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap',
-              isError ? 'text-red-800' : 'text-muted-foreground'
-            )}
-          >
-            {output || '(empty)'}
-          </pre>
-        </div>
-      )}
-    </details>
-  )
-}
-
-// -----------------------------------------------------------------------
-// MCP call card (mcporter)
-// -----------------------------------------------------------------------
-
-type McporterCall = { server: string; tool: string; rest: string }
-
-// Detect a `mcporter call <server>.<tool> [args...]` invocation inside a
-// shell command. We accept any prefix (env VAR=…, absolute paths to a Node
-// binary, `$(which mcporter)`, `npx mcporter`, etc.) and look for the
-// `mcporter call <server>.<tool>` token sequence anywhere in the line. We
-// stop at the first command separator (`&&`, `||`, `;`, `|`) so a
-// follow-up command in a chain doesn't bleed into `rest`. Returns null for
-// anything that's not a `call` invocation (`mcporter config`, `--version`,
-// etc. — those keep the Generic Bash card).
-function parseMcporterCall(call: ToolCall): McporterCall | null {
-  const isShell = call.name === 'Bash' || call.name === 'exec'
-  if (!isShell) return null
-  const input = (call.input as Record<string, unknown>) ?? {}
-  const command = typeof input.command === 'string' ? input.command : ''
-  if (!command) return null
-  const m = command.match(
-    /(?:^|\s|\$\()mcporter(?:\)?)\s+call\s+([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)((?:\s+(?!&&|\|\||;|\|)\S+)*)/
-  )
-  if (!m) return null
-  return { server: m[1], tool: m[2], rest: (m[3] ?? '').trim() }
-}
-
-type MCPCallCardProps = { call: ToolCall; mcp: McporterCall }
-function MCPCallCard({ call, mcp }: MCPCallCardProps) {
-  const isError = call.state === 'error'
-  const isRunning = call.state === 'running' || call.state === 'pending'
-  const output = isError
-    ? (call.errorText ?? '')
-    : typeof call.output === 'string'
-      ? call.output
-      : ''
-  const iconSrc = getMcpIcon(mcp.server)
-  const brief = mcp.rest ? `${mcp.tool} ${mcp.rest}` : mcp.tool
-
-  return (
-    <details className="group">
-      <summary className="flex cursor-pointer items-center gap-2 py-1.5 select-none">
-        <IconChevronRight
-          size={12}
-          stroke={1.5}
-          className="chevron shrink-0 text-ring transition-transform duration-150 group-open:rotate-90"
-        />
-        <span className="block size-4 shrink-0 overflow-hidden rounded-[3px] bg-muted">
-          {iconSrc ? (
-            <img src={iconSrc} alt="" className="size-full object-cover" />
-          ) : (
-            <IconPlug size={12} stroke={1.5} className="m-0.5 text-muted-foreground" />
-          )}
-        </span>
-        <span className="text-xs font-medium whitespace-nowrap">
-          {formatMcpServerName(mcp.server)} MCP
-        </span>
-        <span className="truncate text-[11px] text-ring">{brief}</span>
-        {isRunning && <IconLoader2 size={12} stroke={1.5} className="animate-spin text-ring" />}
-      </summary>
-      {(output || isError) && (
-        <div
-          className={cn(
-            'mt-1 ml-4 rounded-md border px-3 py-2.5',
-            isError ? 'border-red-200 bg-red-50' : 'border-border bg-muted'
-          )}
-        >
-          <pre
-            className={cn(
-              'max-h-[200px] overflow-y-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap',
-              isError ? 'text-red-800' : 'text-muted-foreground'
-            )}
-          >
-            {output || '(empty)'}
-          </pre>
-        </div>
-      )}
     </details>
   )
 }
@@ -466,153 +334,4 @@ function SubagentModal({ call, subagent, onClose }: SubagentModalProps) {
       </div>
     </div>
   )
-}
-
-type CallerBadgeProps = { call: ToolCall }
-function CallerBadge({ call }: CallerBadgeProps) {
-  if (call.caller === 'mcp') {
-    return (
-      <span className="rounded border border-border px-1 text-[9px] text-muted-foreground uppercase">
-        mcp{call.mcpServer ? `:${call.mcpServer.slice(0, 8)}` : ''}
-      </span>
-    )
-  }
-  if (call.caller === 'server-tool') {
-    return (
-      <span className="rounded border border-border px-1 text-[9px] text-muted-foreground uppercase">
-        server
-      </span>
-    )
-  }
-  return null
-}
-
-// -----------------------------------------------------------------------
-// Tool-input formatting
-// -----------------------------------------------------------------------
-
-function getInputValue(input: Record<string, unknown>, key: string): string {
-  const value = input[key]
-  return typeof value === 'string' ? value : ''
-}
-
-function makeShortenPaths(cwd: string | null) {
-  return (s: string) =>
-    s.replace(/\/[^\s"']+/g, p => {
-      if (!cwd) return p
-      const rel = relative(cwd, p)
-      return rel.startsWith('..') ? p : rel
-    })
-}
-
-// Tool name → user-facing label, picked per provider. Adapters send the
-// raw upstream tool name; the UI is the only place that humanizes it. Names
-// not in either map fall through to the raw name (so unknown / plugin tools
-// still render something).
-const OPENCLAW_TOOL_LABELS: Record<string, string> = {
-  read: 'Read file',
-  write: 'Write file',
-  edit: 'Edit file',
-  apply_patch: 'Edit',
-  exec: 'Bash',
-  process: 'Manage process',
-  web_search: 'Web search',
-  web_fetch: 'Fetch',
-  sessions_list: 'List sessions',
-  sessions_history: 'Recall session',
-  sessions_yield: 'Yield to session',
-  sessions_send: 'Send to session',
-  sessions_spawn: 'Spawn session',
-  subagents: 'Run sub-agent',
-  agents_list: 'List agents',
-  session_status: 'Session status',
-  image: 'Analyze image',
-  image_generate: 'Generate image',
-  memory_get: 'Read memory',
-  memory_search: 'Search memory',
-  update_plan: 'Update plan',
-  message: 'Send message',
-  browser: 'Browser',
-  canvas: 'Canvas',
-  cron: 'Cron',
-  gateway: 'Gateway',
-  code_execution: 'Run Python',
-  tts: 'Text-to-speech',
-  music_generate: 'Generate music',
-  video_generate: 'Generate video',
-  x_search: 'Search X'
-}
-
-function getToolDisplayName(call: ToolCall): string {
-  if (call.provider === 'openclaw') return OPENCLAW_TOOL_LABELS[call.name] ?? call.name
-  return call.name
-}
-
-function formatInputBrief(call: ToolCall, cwd: string | null): string {
-  const input = (call.input as Record<string, unknown>) ?? {}
-  const shorten = makeShortenPaths(cwd)
-  if (call.provider === 'openclaw') {
-    return formatOpenClawBrief(call.name, input, shorten)
-  }
-  return formatClaudeBrief(call.name, input, shorten)
-}
-
-function formatClaudeBrief(
-  tool: string,
-  input: Record<string, unknown>,
-  shorten: (s: string) => string
-): string {
-  if (tool === 'Bash') return shorten(`$ ${getInputValue(input, 'command')}`)
-  if (tool === 'Read' || tool === 'Write' || tool === 'Edit')
-    return shorten(getInputValue(input, 'file_path'))
-  if (tool === 'Glob') return shorten(getInputValue(input, 'pattern'))
-  if (tool === 'Grep')
-    return `/${getInputValue(input, 'pattern')}/ ${shorten(getInputValue(input, 'path'))}`
-  return ''
-}
-
-function formatOpenClawBrief(
-  tool: string,
-  input: Record<string, unknown>,
-  shorten: (s: string) => string
-): string {
-  // File I/O — `path` is the canonical key.
-  if (tool === 'read' || tool === 'write' || tool === 'edit')
-    return shorten(getInputValue(input, 'path'))
-  if (tool === 'apply_patch') {
-    const patch = getInputValue(input, 'patch')
-    const firstLine = patch.split('\n').find(l => l.startsWith('*** ')) ?? patch.split('\n')[0]
-    return shorten(firstLine ?? '')
-  }
-  if (tool === 'exec') return shorten(`$ ${getInputValue(input, 'command')}`)
-  if (tool === 'process') {
-    const action = getInputValue(input, 'action')
-    const name = getInputValue(input, 'name')
-    return [action, name].filter(Boolean).join(' ') || shorten(getInputValue(input, 'command'))
-  }
-  if (tool === 'web_search' || tool === 'x_search') return getInputValue(input, 'query')
-  if (tool === 'web_fetch') return getInputValue(input, 'url')
-  if (tool === 'memory_search') return getInputValue(input, 'query')
-  if (tool === 'memory_get') return getInputValue(input, 'key') || getInputValue(input, 'name')
-  if (tool === 'sessions_history' || tool === 'sessions_send' || tool === 'sessions_yield')
-    return getInputValue(input, 'sessionKey') || getInputValue(input, 'agentId')
-  if (tool === 'sessions_list' || tool === 'agents_list') return getInputValue(input, 'agentId')
-  if (tool === 'subagents' || tool === 'sessions_spawn')
-    return getInputValue(input, 'task') || getInputValue(input, 'agentId')
-  if (tool === 'image' || tool === 'image_generate')
-    return getInputValue(input, 'prompt') || shorten(getInputValue(input, 'path'))
-  if (tool === 'message') return getInputValue(input, 'recipient') || getInputValue(input, 'to')
-  if (tool === 'update_plan') {
-    const plan = input.plan
-    if (Array.isArray(plan)) {
-      const inProgress = plan.find(
-        (p): p is { step: string } =>
-          !!p && typeof p === 'object' && (p as { status?: unknown }).status === 'in_progress'
-      )
-      const step = inProgress?.step ?? (plan[0] as { step?: unknown })?.step
-      if (typeof step === 'string') return step
-    }
-    return ''
-  }
-  return ''
 }
