@@ -6,7 +6,7 @@ description: Build and modify user workspace. Workspace is the web UI user is ch
 # Widget development
 
 You are working inside a **moi workspace**.
-Widgets are React components (`.tsx` files in `.widgets/`) displayed as live cards on the browser dashboard.
+Widgets are React components (`.tsx` files in `.moi/widgets/`) displayed as live cards on the browser dashboard.
 
 ## About `moi`
 
@@ -14,49 +14,27 @@ Treat `moi` as an external command — you cannot inspect or modify its sources.
 
 ## Managing dependencies
 
-You are allowed to add packages to `.widgets/package.json` and run `bun install` whenever it's needed (e.g. after editing `package.json`, or before bundling if `node_modules/` looks stale). **Always use `bun`** — never `npm`, `yarn`, or `pnpm`.
+Widget dependencies live in `.moi/package.json` (created by `moi init`). To add a package, add it there and run `cd .moi && bun install`. **Always use `bun`** — never `npm`, `yarn`, or `pnpm`.
 
-## First-time setup
-
-If `.widgets/` does not exist yet, create it and install dependencies:
-
-1. Create `.widgets/package.json`:
-
-```json
-{
-  "name": "widgets",
-  "private": true,
-  "dependencies": {
-    "@tabler/icons-react": "^3.40.0",
-    "tailwindcss": "^4.0.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
-  },
-  "devDependencies": {
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0"
-  }
-}
-```
-
-`react` and `react-dom` are stubs — at runtime they're resolved from esm.sh via the browser importmap. They're listed here only so editors pick up the correct types.
-
-2. Run `cd .widgets && bun install`
+`react` and `react-dom` are stubs — at runtime they're resolved from esm.sh via the browser importmap. They're listed only so editors pick up the correct types.
 
 ## File structure
 
 | File | Purpose |
 |------|---------|
-| `.widgets/<name>.tsx` | Widget React component (required) |
-| `.widgets/<name>.server.ts` | Server-side async functions the widget can call (optional) |
-| `.widgets/.workspace.json` | **Auto-generated. Do NOT read, edit, or `cat` this file.** |
+| `.moi/widgets/<name>.tsx` | Widget React component (required) |
+| `.moi/widgets/<name>.server.ts` | Server-side async functions the widget can call (optional) |
+| `.moi/package.json` | Widget dependencies |
+| `.moi/.workspace.json` | **Auto-generated. Do NOT read, edit, or `cat` this file.** |
 
-`.widgets/.workspace.json` is owned by `moi` and rewritten on its own. Use the `moi` CLI to inspect or change anything it contains — never read or edit the file directly.
+Keep widgets **and** their `.server.ts` files together in `.moi/widgets/` — flat, no subfolders.
+
+`.moi/.workspace.json` is owned by `moi` and rewritten on its own. Use the `moi` CLI to inspect or change anything it contains — never read or edit the file directly.
 
 ## Workflow
 
 1. Read `.claude/skills/widgets/DESIGN.md` before creating or modifying any widget.
-2. Create or edit `.widgets/<name>.tsx` (and optionally `.widgets/<name>.server.ts`).
+2. Create or edit `.moi/widgets/<name>.tsx` (and optionally `.moi/widgets/<name>.server.ts`).
 3. Run `moi bundle` — the browser picks up changes automatically.
 4. If the widget exports a new `config` with a changed `colSpan`/`rowSpan`, run `moi bundle --force`.
 
@@ -101,9 +79,9 @@ function cx(...classes: (string | false | undefined | null)[]) {
 
 ## Server functions (optional)
 
-Create a `.server.ts` alongside the widget. Export named `async function`s only — no `const`, sync, or class. They run on the Bun server with full access to `process.env` and the filesystem (including files outside `.widgets/`).
+Create a `.server.ts` alongside the widget. Export named `async function`s only — no `const`, sync, or class. They run on the Bun server with full access to `process.env` and the filesystem (including files outside `.moi/`).
 
-**Working directory:** server functions run with `cwd = <workspace root>` (the parent of `.widgets/` — same directory the agent operates in). Use plain relative paths to read workspace files:
+**Working directory:** server functions run with `cwd = <workspace root>` (the parent of `.moi/` — same directory the agent operates in). Use plain relative paths to read workspace files:
 
 ```ts
 // ✓ workspace-root files: just use relative paths
@@ -111,13 +89,13 @@ new Database('local.db', { readonly: true })
 await Bun.file('./data/notes.json').text()
 ```
 
-For files inside `.widgets/` itself, anchor on the file's own location:
+For files inside `.moi/widgets/` itself, anchor on the file's own location:
 
 ```ts
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 
-const here = dirname(fileURLToPath(import.meta.url)) // resolves to .widgets/
+const here = dirname(fileURLToPath(import.meta.url)) // resolves to .moi/widgets/
 const fixturePath = join(here, 'fixture.json')
 ```
 
