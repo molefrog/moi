@@ -308,7 +308,29 @@ export async function sendCCMessage(input: {
     }
   }
 
+  // Streaming-input mode does NOT echo the pushed user message back in the
+  // output stream (string-prompt mode did — that's what expectUserEcho was
+  // for), so the adapter never emits a user turn. Synthesize and broadcast it
+  // ourselves so EVERY connected tab shows the user's bubble — not just the
+  // sender (which inserts it optimistically). Keyed by optimisticId, so the
+  // sender's optimistic turn upserts in place rather than duplicating.
+  const turnId = input.optimisticId ?? crypto.randomUUID()
+  broadcast(s.workspaceId, {
+    kind: 'turn',
+    sessionId: s.sessionId,
+    turn: {
+      id: turnId,
+      role: 'user',
+      origin: { kind: 'user-input' },
+      parts: [{ type: 'text', text: input.content }],
+      timestamp: new Date().toISOString()
+    }
+  })
+  // Safety net: if a future SDK does echo the user message, the adapter re-ids
+  // that echo to the same optimisticId so it collapses onto the turn above
+  // instead of duplicating.
   if (input.optimisticId) s.adapter.expectUserEcho(input.optimisticId, input.content)
+
   const wasIdle = s.pendingTurns === 0
   s.pendingTurns++
   if (wasIdle) broadcastProcessing(s, true)
