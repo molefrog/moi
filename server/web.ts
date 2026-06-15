@@ -4,7 +4,13 @@ import { basename, join, sep } from 'node:path'
 import type { ClientMessage, WorkspaceModels, WorkspaceType } from '@/lib/types'
 
 import index from '../client/index.html'
-import { getClaudeModels, getMcpStatus, handleChat, stopChat } from './agent'
+import { getClaudeModels, getMcpStatus } from './agent'
+import {
+  getCCRunningSessions,
+  interruptCCSession,
+  killAllCCSessions,
+  sendCCMessage
+} from './cc-session'
 import { PORT } from './constants'
 import { control } from './control'
 import { callFunction, killAllWorkers, parseFunctionPath } from './functions'
@@ -15,7 +21,7 @@ import {
   abortOpenClawRun,
   ensureOpenClawSessionLive,
   getLiveOpenClawEvents,
-  getOpenClawProcessingSessions,
+  getOpenClawRunningSessions,
   sendOpenClawMessage
 } from './openclaw-session'
 import {
@@ -25,14 +31,7 @@ import {
   registerWorkspace,
   removeWorkspace
 } from './registry'
-import {
-  addClient,
-  getProcessingSessions,
-  getSessionEvents,
-  getSessions,
-  removeClient,
-  sendToClient
-} from './state'
+import { addClient, getSessionEvents, getSessions, removeClient, sendToClient } from './state'
 import { listWidgets, serveWidget } from './widgets'
 
 const MEI_TOPIC = 'mei'
@@ -43,6 +42,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
   if (typeof value !== 'object' || value === null || !('type' in value)) return false
   const v = value as {
     type: string
+    workspaceId?: unknown
     sessionId?: unknown
     content?: unknown
     isNew?: unknown
@@ -51,13 +51,14 @@ function isClientMessage(value: unknown): value is ClientMessage {
   }
   if (v.type === 'chat')
     return (
+      typeof v.workspaceId === 'string' &&
       typeof v.content === 'string' &&
       typeof v.sessionId === 'string' &&
       typeof v.isNew === 'boolean' &&
       (v.optimisticId === undefined || typeof v.optimisticId === 'string') &&
       (v.model === undefined || typeof v.model === 'string')
     )
-  if (v.type === 'stop') return typeof v.sessionId === 'string'
+  if (v.type === 'stop') return typeof v.workspaceId === 'string' && typeof v.sessionId === 'string'
   return false
 }
 
@@ -246,11 +247,11 @@ export const app = Bun.serve<WsData>({
   },
   async fetch(req, server) {
     const url = new URL(req.url)
-    // Chat websocket (per-workspace). The widget-event websocket lives in the
-    // routes table at /api/workspaces/ws.
+    // Chat websocket — app-wide (one per client, not per workspace). Each chat
+    // frame carries its own workspaceId. The widget-event websocket lives in
+    // the routes table at /api/workspaces/ws.
     if (url.pathname === '/ws') {
-      const workspaceId = url.searchParams.get('workspace') ?? ''
-      return upgrade(server, req, { channel: 'chat', workspaceId })
+      return upgrade(server, req, { channel: 'chat', workspaceId: '' })
     }
     // Prod: serve prebuilt hashed assets (/chunk-….js, /favicon-….png, …).
     // No-op in dev (the live bundler serves assets via the HTML route).
@@ -263,16 +264,12 @@ export const app = Bun.serve<WsData>({
   websocket: {
     open(ws) {
       if (ws.data.channel === 'chat') {
-        addClient(ws.data.workspaceId, ws)
-        const seen = new Set<string>()
-        for (const sid of getProcessingSessions(ws.data.workspaceId)) {
-          seen.add(sid)
-          sendToClient(ws, { type: 'status', sessionId: sid, processing: true })
-        }
-        for (const sid of getOpenClawProcessingSessions(ws.data.workspaceId)) {
-          if (seen.has(sid)) continue
-          sendToClient(ws, { type: 'status', sessionId: sid, processing: true })
-        }
+        addClient(ws)
+        // Authoritative snapshot of every running session (CC + OpenClaw) so the
+        // client can light/clear spinners correctly even for runs whose status
+        // transitions it missed while disconnected.
+        const running = [...getCCRunningSessions(), ...getOpenClawRunningSessions()]
+        sendToClient(ws, { type: 'status_snapshot', running })
       } else {
         ws.subscribe(MEI_TOPIC)
       }
@@ -284,11 +281,11 @@ export const app = Bun.serve<WsData>({
         if (!isClientMessage(data)) return
 
         if (data.type === 'chat' && data.content?.trim()) {
-          const workspace = await getWorkspace(ws.data.workspaceId)
+          const workspace = await getWorkspace(data.workspaceId)
           if (!workspace) return
           if (workspace.type === 'openclaw' && workspace.agentId) {
             sendOpenClawMessage({
-              workspaceId: ws.data.workspaceId,
+              workspaceId: data.workspaceId,
               workspacePath: workspace.path,
               agentId: workspace.agentId,
               sessionId: data.sessionId,
@@ -297,29 +294,29 @@ export const app = Bun.serve<WsData>({
               optimisticId: data.optimisticId
             })
           } else {
-            handleChat(
-              data.content.trim(),
-              data.sessionId,
-              data.isNew,
-              ws.data.workspaceId,
-              workspace.path,
-              data.optimisticId,
-              data.model
-            )
+            sendCCMessage({
+              workspaceId: data.workspaceId,
+              workspacePath: workspace.path,
+              sessionId: data.sessionId,
+              isNew: data.isNew,
+              content: data.content.trim(),
+              optimisticId: data.optimisticId,
+              model: data.model
+            })
           }
         }
         if (data.type === 'stop') {
-          const workspace = await getWorkspace(ws.data.workspaceId)
+          const workspace = await getWorkspace(data.workspaceId)
           if (workspace?.type === 'openclaw') {
-            abortOpenClawRun({ workspaceId: ws.data.workspaceId, sessionId: data.sessionId })
+            abortOpenClawRun({ workspaceId: data.workspaceId, sessionId: data.sessionId })
           } else {
-            stopChat(data.sessionId, ws.data.workspaceId)
+            interruptCCSession(data.workspaceId, data.sessionId)
           }
         }
       } catch {}
     },
     close(ws) {
-      if (ws.data.channel === 'chat') removeClient(ws.data.workspaceId, ws)
+      if (ws.data.channel === 'chat') removeClient(ws)
       else ws.unsubscribe(MEI_TOPIC)
     }
   }
@@ -366,6 +363,7 @@ function shutdown() {
   try {
     control.stop(true)
   } catch {}
+  killAllCCSessions()
   killAllWorkers()
   process.exit(0)
 }

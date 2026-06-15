@@ -1,53 +1,31 @@
 import { getSessionMessages, listSessions } from '@anthropic-ai/claude-agent-sdk'
 
 import { ClaudeAdapter } from '@/lib/claude-adapter'
-import type { ServerMessage, SessionInfo, StreamEvent } from '@/lib/types'
+import type { BroadcastFrame, ServerMessage, SessionInfo, StreamEvent } from '@/lib/types'
 
-// Per-workspace connected chat clients
-const clientsByWorkspace = new Map<string, Set<Bun.ServerWebSocket<unknown>>>()
+// The chat socket is app-wide (one per client tab, not per workspace), so a
+// single set of all connected chat clients is enough. Each broadcast frame
+// carries its `workspaceId`, and the client routes it.
+const chatClients = new Set<Bun.ServerWebSocket<unknown>>()
 
-export function addClient(workspaceId: string, ws: Bun.ServerWebSocket<unknown>) {
-  if (!clientsByWorkspace.has(workspaceId)) clientsByWorkspace.set(workspaceId, new Set())
-  clientsByWorkspace.get(workspaceId)!.add(ws)
+export function addClient(ws: Bun.ServerWebSocket<unknown>) {
+  chatClients.add(ws)
 }
 
-export function removeClient(workspaceId: string, ws: Bun.ServerWebSocket<unknown>) {
-  clientsByWorkspace.get(workspaceId)?.delete(ws)
+export function removeClient(ws: Bun.ServerWebSocket<unknown>) {
+  chatClients.delete(ws)
 }
 
-// Per-session agent state — the ONLY mutable state
-type Agent = { processing: boolean; abortController: AbortController | null }
-const agents = new Map<string, Agent>()
-
-export function getAgent(id: string): Agent {
-  if (!agents.has(id)) agents.set(id, { processing: false, abortController: null })
-  return agents.get(id)!
-}
-
-export function renameAgent(from: string, to: string) {
-  const a = agents.get(from)
-  if (!a) return
-  agents.set(to, a)
-  agents.delete(from)
-}
-
-export function getProcessingSessions(workspaceId: string): string[] {
-  void workspaceId
-  const result: string[] = []
-  for (const [id, a] of agents) if (a.processing) result.push(id)
-  return result
-}
-
-export function broadcast(workspaceId: string, msg: ServerMessage) {
-  const json = JSON.stringify(msg)
-  for (const ws of clientsByWorkspace.get(workspaceId) ?? []) ws.send(json)
+// Stamp `workspaceId` onto the frame and fan it out to every connected chat
+// client. (Phase 1: broadcast-all; Phase 2 will scope by topic subscription.)
+export function broadcast(workspaceId: string, frame: BroadcastFrame) {
+  const json = JSON.stringify({ ...frame, workspaceId })
+  for (const ws of chatClients) ws.send(json)
 }
 
 export function broadcastAll(msg: ServerMessage) {
   const json = JSON.stringify(msg)
-  for (const clients of clientsByWorkspace.values()) {
-    for (const ws of clients) ws.send(json)
-  }
+  for (const ws of chatClients) ws.send(json)
 }
 
 export function sendToClient(ws: Bun.ServerWebSocket<unknown>, msg: ServerMessage) {

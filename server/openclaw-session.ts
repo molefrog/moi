@@ -12,7 +12,7 @@
 //   - Disk persistence — the gateway is the source of truth; we re-seed from
 //     `sessions.get` on cold start.
 import { applyEvent, emptyViewState } from '@/lib/format'
-import type { ServerMessage, StreamEvent, ViewState } from '@/lib/types'
+import type { StreamEvent, ViewState } from '@/lib/types'
 
 import {
   type OpenClawMessage,
@@ -80,12 +80,14 @@ function recKey(workspaceId: string, sessionId: string): string {
   return `${workspaceId}:${sessionId}`
 }
 
-export function getOpenClawProcessingSessions(workspaceId: string): string[] {
-  const out: string[] = []
+// All running OpenClaw sessions across every workspace, for the connect-time
+// status snapshot. Key is `${workspaceId}:${sessionId}` (both are colon-free).
+export function getOpenClawRunningSessions(): { workspaceId: string; sessionId: string }[] {
+  const out: { workspaceId: string; sessionId: string }[] = []
   for (const [k, v] of openclawAgents) {
     if (!v.processing) continue
-    if (!k.startsWith(workspaceId + ':')) continue
-    out.push(k.slice(workspaceId.length + 1))
+    const i = k.indexOf(':')
+    out.push({ workspaceId: k.slice(0, i), sessionId: k.slice(i + 1) })
   }
   return out
 }
@@ -177,11 +179,7 @@ function emitTurn(rec: SessionRecord, msg: OpenClawMessage, idx: number): void {
     }
   }
   rec.view = applyEvent(rec.view, { kind: 'turn', turn })
-  broadcast(rec.workspaceId, {
-    kind: 'turn',
-    turn,
-    sessionId: rec.sessionId
-  } as ServerMessage)
+  broadcast(rec.workspaceId, { kind: 'turn', turn, sessionId: rec.sessionId })
 }
 
 function ingest(rec: SessionRecord, msg: OpenClawMessage): void {
