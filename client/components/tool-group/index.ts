@@ -1,2 +1,9 @@
 export { ToolCallGroup } from './ToolCallGroup'
-export { FIXTURE_CWD, liveToolCalls, multipleToolCalls, singleToolCall } from './fixtures'
+export {
+  FIXTURE_CWD,
+  liveToolCalls,
+  multipleToolCalls,
+  singleToolCall,
+  subagentDoneTrace,
+  subagentTrace
+} from './fixtures'

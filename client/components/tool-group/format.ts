@@ -56,6 +56,17 @@ export function formatBytes(text: string): string {
   return n < 1024 ? `${n}B` : `${(n / 1024).toFixed(1)}KB`
 }
 
+// Compact wall-clock duration: sub-second → "850ms", under a minute → "3.2s" /
+// "11s", longer → "1m 5s". Used on the subagent card's duration badge.
+export function formatDuration(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)}ms`
+  const s = ms / 1000
+  if (s < 60) return `${s < 10 ? s.toFixed(1) : Math.round(s)}s`
+  const m = Math.floor(s / 60)
+  const rem = Math.round(s % 60)
+  return rem ? `${m}m ${rem}s` : `${m}m`
+}
+
 function makeShortenPaths(cwd: string | null) {
   return (s: string) =>
     s.replace(/\/[^\s"']+/g, p => {

@@ -6,13 +6,17 @@ import {
   liveToolCalls,
   multipleToolCalls,
   singleToolCall,
+  subagentDoneTrace,
+  subagentTrace,
   ToolCallGroup
 } from '@/client/components/tool-group'
 
 const VARIANTS = [
   { value: 'single', label: 'Single' },
   { value: 'multiple', label: 'Multiple' },
-  { value: 'live', label: 'Live' }
+  { value: 'live', label: 'Live' },
+  { value: 'subagent', label: 'Subagent' },
+  { value: 'subagent-done', label: 'Subagent done' }
 ] as const
 
 type Variant = (typeof VARIANTS)[number]['value']
@@ -47,7 +51,9 @@ function Segmented({ value, onChange }: SegmentedProps) {
 const FIXTURES: Record<Variant, typeof singleToolCall> = {
   single: singleToolCall,
   multiple: multipleToolCalls,
-  live: liveToolCalls
+  live: liveToolCalls,
+  subagent: subagentTrace,
+  'subagent-done': subagentDoneTrace
 }
 
 export function ToolCallsPage() {

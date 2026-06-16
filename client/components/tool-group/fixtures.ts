@@ -187,3 +187,129 @@ export const liveToolCalls: Part[] = [
     text: 'The test run is still going. Once it passes I will write the summary into docs/ and open a PR.'
   }
 ]
+
+// A *streaming* subagent (caller='subagent', name='Agent'), captured live from a
+// real Explore subagent run. The `subagent` record fills in incrementally from
+// `task_*` events (lib/claude-adapter.ts): `progress[]` accumulates one "latest
+// action" line per tool use (the last is what the collapsed card shows live),
+// alongside `status`, `usage`, and a growing `transcript`. None of it is
+// persisted — a finished/replayed Agent call has none of this, only a live one
+// does. Here it's mid-run (status 'running'): `input` and `progress` are real;
+// the transcript is a trimmed version of the work so far.
+const subagentCall: ToolCall = {
+  toolCallId: 'toolu_01Qievnpu7yZAt9TWejhzAHu',
+  name: 'Agent',
+  caller: 'subagent',
+  provider: 'claude-code',
+  state: 'running',
+  input: {
+    description: 'Explore lilmd-demo repo structure and purpose',
+    subagent_type: 'Explore',
+    prompt:
+      'Explore the lilmd-demo repository to understand what it is. Look at the repo structure, what lilmd is, example markdown, and the purpose. Give a comprehensive overview citing specific files.'
+  },
+  // Still streaming — no final result yet.
+  output: '',
+  subagent: {
+    taskId: 'task_explore_lilmd',
+    description: 'Explore lilmd-demo repo structure and purpose',
+    status: 'running',
+    usage: { totalTokens: 18407, toolUses: 8, durationMs: 10725 },
+    // Real captured progress — each entry is the "latest action" at that step.
+    progress: [
+      'Reading ~/git/lilmd-demo',
+      'Reading README.md',
+      'Reading package.json',
+      'Reading CLAUDE.md',
+      'Running ls -la /Users/molefrog/git/lilmd-demo/',
+      'Finding **/*.md',
+      'Finding **/*.{js,ts,jsx,tsx}',
+      'Running head -100 /Users/molefrog/git/lilmd-demo/challenger-report.md'
+    ],
+    transcript: [
+      {
+        id: 'sub-1',
+        role: 'assistant',
+        origin: { kind: 'user-input' },
+        parts: [
+          {
+            type: 'reasoning',
+            text: 'Let me map the repo: list the markdown files, read the README, then see what the lilmd binary does.'
+          },
+          {
+            type: 'tool-call',
+            call: {
+              toolCallId: 'sub-glob',
+              name: 'Glob',
+              caller: 'model',
+              provider: 'claude-code',
+              state: 'success',
+              input: { pattern: '**/*.md' },
+              output:
+                'README.md\ndocs/challenger-report.md\ndocs/sections/01-introduction.md\ndocs/sections/02-findings.md'
+            }
+          },
+          {
+            type: 'tool-call',
+            call: {
+              toolCallId: 'sub-bash',
+              name: 'Bash',
+              caller: 'model',
+              provider: 'claude-code',
+              state: 'success',
+              input: { command: 'lilmd --help' },
+              output:
+                'lilmd — navigate large markdown\n\nUSAGE: lilmd <file> <command>\n\nCOMMANDS:\n  toc       print the table of contents\n  read      read a section (fuzzy/regex/path selector)\n  search    full-text search'
+            }
+          }
+        ]
+      },
+      {
+        id: 'sub-2',
+        role: 'assistant',
+        origin: { kind: 'user-input' },
+        parts: [
+          {
+            type: 'text',
+            text: '## Comprehensive Overview of lilmd-demo\n\n**lilmd-demo** showcases **lilmd**, a CLI for large markdown documents, using the Challenger report as a large-document fixture.'
+          }
+        ]
+      }
+    ]
+  }
+}
+
+// The same subagent once it has finished: status 'completed', a final summary in
+// `output`, and the toolUses count shown in place of the latest-action line.
+const subagentDoneCall: ToolCall = {
+  ...subagentCall,
+  toolCallId: 'toolu_01Qievnpu7yZAt9TWejhzAHv',
+  state: 'success',
+  output:
+    'lilmd-demo showcases **lilmd**, a CLI for navigating large markdown documents. The repo is a demo harness: a single `challenger-report.md` fixture plus a thin CLI (`toc`/`read`/`search`) that fuzzy-selects sections. README and CLAUDE.md frame it as a worked example, not a library.',
+  subagent: {
+    ...subagentCall.subagent!,
+    taskId: 'task_explore_lilmd_done',
+    status: 'completed'
+  }
+}
+
+// Variant 4 — a streamed subagent call (the card we show when an Agent tool is
+// running). Iterate on it in /playground/tool-calls.
+export const subagentTrace: Part[] = [
+  {
+    type: 'reasoning',
+    text: 'This needs a deeper look — let me spin up an Explore subagent to map the repo while I keep going.'
+  },
+  { type: 'tool-call', call: subagentCall }
+]
+
+// Variant 5 — the same subagent after it finished, so we can style the completed
+// card (✓, tool-count sub-line, no shimmer) alongside the running one.
+export const subagentDoneTrace: Part[] = [
+  {
+    type: 'reasoning',
+    text: 'This needs a deeper look — let me spin up an Explore subagent to map the repo while I keep going.'
+  },
+  { type: 'tool-call', call: subagentDoneCall }
+]

@@ -134,6 +134,18 @@
   }
 }
 
+/* Text shimmer — a brighter band sweeps left→right across muted text to signal
+   activity. Pair with `bg-clip-text text-transparent` and a 200%-wide gradient
+   whose highlight sits in the middle (see <ShimmerText>). */
+@keyframes text-shimmer {
+  0% {
+    background-position: -100% center;
+  }
+  100% {
+    background-position: 100% center;
+  }
+}
+
 @utility prose-inherit {
   --tw-prose-body: inherit;
   --tw-prose-headings: inherit;
