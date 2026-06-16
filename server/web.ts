@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { basename, join, sep } from 'node:path'
 
-import type { ClientMessage, WorkspaceModels, WorkspaceType } from '@/lib/types'
+import type { ClientMessage, EnvScope, WorkspaceModels, WorkspaceType } from '@/lib/types'
 
 import index from '../client/index.html'
 import { getClaudeModels, getMcpStatus } from './agent'
@@ -33,8 +33,14 @@ import {
   removeWorkspace
 } from './registry'
 import { addClient, getSessionEvents, getSessions, removeClient, sendToClient } from './state'
-import { getWorkspaceEnvView, isValidEnvKey, updateWorkspaceEnvSettings } from './workspace-env'
+import {
+  getWorkspaceEnvView,
+  isValidEnvKey,
+  isValidScope,
+  updateWorkspaceEnv
+} from './workspace-env'
 import { collectRequiredEnv, listWidgets, serveWidget } from './widgets'
+import type { EnvUpdate } from './workspace-env'
 
 const MEI_TOPIC = 'mei'
 
@@ -191,10 +197,11 @@ export const app = Bun.serve<WsData>({
       return Response.json(await getMcpStatus(ws.path))
     },
     // Per-workspace env vars. GET returns the effective view (discovered `.env`
-    // + UI custom overrides + declared-required keys). PUT replaces the custom
-    // map and/or the inheritDotenv mode, then reaps the workspace's function
-    // worker and idle agent sessions so the next call/message picks up the
-    // change (env is frozen at spawn — a hard restart is the only way).
+    // + UI custom secrets + scopes + declared-required keys; values masked). PUT
+    // patches custom secrets (set/remove/scopes) and/or the inheritDotenv mode,
+    // then reaps the workspace's function worker and idle agent sessions so the
+    // next call/message picks up the change (env is frozen at spawn — a hard
+    // restart is the only way).
     '/api/workspaces/:id/env': async req => {
       const ws = await getWorkspace(req.params.id)
       if (!ws) return new Response('Workspace not found', { status: 404 })
@@ -208,18 +215,33 @@ export const app = Bun.serve<WsData>({
         if (!body || typeof body !== 'object') {
           return new Response('Bad request', { status: 400 })
         }
-        const patch: { custom?: Record<string, string>; inheritDotenv?: boolean } = {}
-        if (body.custom !== undefined) {
-          if (typeof body.custom !== 'object' || body.custom === null) {
-            return new Response('custom must be an object', { status: 400 })
+        const patch: EnvUpdate = {}
+        if (body.set !== undefined) {
+          if (typeof body.set !== 'object' || body.set === null) {
+            return new Response('set must be an object', { status: 400 })
           }
-          for (const [k, v] of Object.entries(body.custom)) {
+          for (const [k, v] of Object.entries(body.set)) {
             if (!isValidEnvKey(k)) return new Response(`Invalid env key: ${k}`, { status: 400 })
             if (typeof v !== 'string') {
               return new Response(`Value for ${k} must be a string`, { status: 400 })
             }
           }
-          patch.custom = body.custom as Record<string, string>
+          patch.set = body.set as Record<string, string>
+        }
+        if (body.remove !== undefined) {
+          if (!Array.isArray(body.remove) || body.remove.some(k => typeof k !== 'string')) {
+            return new Response('remove must be an array of strings', { status: 400 })
+          }
+          patch.remove = body.remove as string[]
+        }
+        if (body.scopes !== undefined) {
+          if (typeof body.scopes !== 'object' || body.scopes === null) {
+            return new Response('scopes must be an object', { status: 400 })
+          }
+          for (const [k, s] of Object.entries(body.scopes)) {
+            if (!isValidScope(s)) return new Response(`Invalid scope for ${k}`, { status: 400 })
+          }
+          patch.scopes = body.scopes as Record<string, EnvScope>
         }
         if (body.inheritDotenv !== undefined) {
           if (typeof body.inheritDotenv !== 'boolean') {
@@ -228,7 +250,7 @@ export const app = Bun.serve<WsData>({
           patch.inheritDotenv = body.inheritDotenv
         }
 
-        await updateWorkspaceEnvSettings(ws.path, patch)
+        await updateWorkspaceEnv(ws.path, patch)
         // Frozen-at-spawn: reap workers/idle sessions so fresh env takes effect.
         restartWorker(ws.path)
         restartWorkspaceSessions(ws.path)
