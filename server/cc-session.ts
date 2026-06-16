@@ -299,7 +299,8 @@ export async function sendCCMessage(input: {
       sessionId: input.sessionId,
       isNew: input.isNew,
       model: input.model,
-      workspaceEnv: await resolveWorkspaceEnv(input.workspacePath)
+      // The agent only sees secrets scoped to the 'agent' sink (plus .env).
+      workspaceEnv: await resolveWorkspaceEnv(input.workspacePath, 'agent')
     })
   } else {
     clearIdle(s)
