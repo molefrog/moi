@@ -8,12 +8,15 @@
 // against multiple workspaces stay isolated.
 //
 // CWD contract: workers run with `cwd = workspacePath` (the workspace root,
-// where the agent works), NOT `.moi/`. The `.moi/` root is passed to the
-// worker as `MEI_FUNCTIONS_DIR` so it can locate `.server.ts` files — module
-// keys are paths relative to it (`"widgets/hello"` →
-// `.moi/widgets/hello.server.ts`). This is the contract documented in the
-// widgets SKILL.
+// where the agent works), NOT `.moi/`. But we SPAWN from a neutral cwd and have
+// the worker `chdir` there at startup (via MEI_WORKSPACE_ROOT) — otherwise Bun
+// would auto-load the workspace's `.env` into the worker, bypassing moi's
+// inheritDotenv toggle and per-sink scoping. The `.moi/` root is passed as
+// `MEI_FUNCTIONS_DIR` so the worker can locate `.server.ts` files — module keys
+// are paths relative to it (`"widgets/hello"` → `.moi/widgets/hello.server.ts`).
+// This is the contract documented in the widgets SKILL.
 import { LRUCache } from 'lru-cache'
+import { tmpdir } from 'node:os'
 import { join } from 'path'
 
 import { resolveWorkspaceEnv } from './workspace-env'
@@ -77,14 +80,18 @@ function spawnSlot(workspacePath: string, workspaceEnv: Record<string, string>):
   }
 
   slot.worker = Bun.spawn([process.execPath, WORKER_PATH], {
-    cwd: workspacePath,
-    // Resolved workspace env (.env + UI custom overrides) is layered over the
-    // server's env so widget `.server.ts` functions can read workspace secrets.
-    // MEI_FUNCTIONS_DIR is applied last so a workspace .env can never clobber it;
-    // tests set it explicitly to point the worker at fixtures.
+    // Neutral cwd so Bun doesn't auto-load the workspace's `.env`; the worker
+    // chdir()s to MEI_WORKSPACE_ROOT at startup to restore cwd = workspace root.
+    cwd: tmpdir(),
+    // Resolved workspace env (.env + scope-filtered custom secrets) layered over
+    // the server's env — the AUTHORITATIVE source now that auto-load is off, so
+    // inheritDotenv and per-sink scoping actually hold. MEI_FUNCTIONS_DIR is
+    // applied last so a workspace .env can never clobber it; tests set it
+    // explicitly to point the worker at fixtures.
     env: {
       ...process.env,
       ...workspaceEnv,
+      MEI_WORKSPACE_ROOT: workspacePath,
       MEI_FUNCTIONS_DIR: process.env.MEI_FUNCTIONS_DIR ?? meiDir
     },
     stderr: 'inherit',

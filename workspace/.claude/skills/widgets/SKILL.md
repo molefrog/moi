@@ -141,7 +141,7 @@ Always handle three states: loading → skeleton, error → error state with ret
 
 ## Environment variables (server functions only)
 
-Read config and secrets from `process.env` inside `.server.ts`. This is the full environment of the process running the function (Bun also auto-loads workspace `.env` files). It is **server-only** — the widget `.tsx` runs in the browser and never sees these values, so keep API keys in `.server.ts`.
+Read config and secrets from `process.env` inside `.server.ts` — it holds all env vars of the process running the function. This is **server-only**: the widget `.tsx` runs in the browser and never sees these values, so keep API keys in `.server.ts`.
 
 ```ts
 // tts.server.ts
@@ -152,11 +152,12 @@ export async function speak(text: string) {
 }
 ```
 
-Two sources feed it, both per-workspace: **custom secrets** the user sets in moi's env settings, and **`.env` files** the user can optionally inherit.
+moi injects per-workspace values from two sources: **custom secrets** the user sets in moi's env settings, and the workspace's **`.env` files** the user can optionally inherit. (Both are also subject to moi's settings, e.g. inheritance can be turned off — so treat any key as possibly missing.)
 
-Optionally list the keys you need in `config.requiredEnv`. This is advisory — moi's UI uses it to tell the user which keys to set. It is **not** enforced: you can read any var that's defined even if undeclared, and a declared-but-unset key is just `undefined`, so handle the missing case yourself.
+In the **widget's `config`**, optionally declare the keys it needs via `requiredEnv`. This is advisory — moi's UI uses it to tell the user which keys to set. It is **not** enforced: you can read any var that's defined even if undeclared, and a declared-but-unset key is just `undefined`, so always handle the missing case yourself.
 
 ```ts
+// in the widget's .tsx
 export const config = {
   colSpan: 2,
   rowSpan: 1,
