@@ -139,6 +139,31 @@ export default function MyWidget() {
 
 Always handle three states: loading → skeleton, error → error state with retry, success → content.
 
+## Environment variables (server functions only)
+
+Read config and secrets from `process.env` inside `.server.ts`. This is the full environment of the process running the function (Bun also auto-loads workspace `.env` files). It is **server-only** — the widget `.tsx` runs in the browser and never sees these values, so keep API keys in `.server.ts`.
+
+```ts
+// tts.server.ts
+export async function speak(text: string) {
+  const key = process.env.ELEVENLABS_API_KEY
+  if (!key) throw new Error('ELEVENLABS_API_KEY not set for this workspace')
+  // …call the API with `key`
+}
+```
+
+Two sources feed it, both per-workspace: **custom secrets** the user sets in moi's env settings, and **`.env` files** the user can optionally inherit.
+
+Optionally list the keys you need in `config.requiredEnv`. This is advisory — moi's UI uses it to tell the user which keys to set. It is **not** enforced: you can read any var that's defined even if undeclared, and a declared-but-unset key is just `undefined`, so handle the missing case yourself.
+
+```ts
+export const config = {
+  colSpan: 2,
+  rowSpan: 1,
+  requiredEnv: ['ELEVENLABS_API_KEY', 'ELEVENLABS_VOICE_ID'] // optional, advisory
+} as const
+```
+
 ## Commands
 
 - `moi bundle` — compile changed widgets
