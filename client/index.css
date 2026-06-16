@@ -39,8 +39,9 @@
      equivalents. (The app sidebar's own widths live in SidebarLayout.tsx.) */
   --page-pad: 2rem; /* padding around the working area */
   --column-w: 40rem; /* grid content width; also the widget area's min before the chat yields */
-  --chat-min: 400px; /* docked chat min width — narrower than this and it floats */
-  --chat-max: 480px; /* docked chat max width on wide screens */
+  --chat-min: 380px; /* docked chat min width — narrower than this and it floats */
+  --chat-max: 460px; /* docked chat max width on wide screens */
+  --chat-max-container: 640px; /* contained ChatPanel: max width of the centered history + composer column */
 }
 
 @media (max-width: 1024px) {
@@ -188,6 +189,30 @@
   scrollbar-width: none;
   &::-webkit-scrollbar {
     display: none;
+  }
+}
+
+/* Slim, unobtrusive scrollbar — keeps a clear scroll affordance while taming
+   the chunky macOS "always show" scrollbar (a transparent border insets the
+   thumb into a thin floating pill). */
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(0 0 0 / 0.2) transparent;
+  &::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: rgb(0 0 0 / 0.2);
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: padding-box;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(0 0 0 / 0.32);
   }
 }
 

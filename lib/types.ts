@@ -167,7 +167,7 @@ export type StatusMessage = {
 // Workspace layout persistence
 export type LayoutGridItem = { i: string; x: number; y: number }
 
-export type ChatMode = 'sidebar' | 'floating'
+export type ChatMode = 'sidebar' | 'floating' | 'fullscreen'
 
 export type { FontTheme, ColorTheme } from './themes'
 

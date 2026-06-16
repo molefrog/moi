@@ -8,7 +8,7 @@ import {
   useWorkspaceLayout,
   workspaceKeys
 } from '@/client/api/workspaces'
-import type { WorkspaceLayout } from '@/lib/types'
+import type { WorkspaceLayout, WorkspaceType } from '@/lib/types'
 
 const DEFAULT_LAYOUT: WorkspaceLayout = {
   version: 1,
@@ -26,6 +26,11 @@ type WorkspaceLayoutContextValue = {
   // Workspace metadata that rides along on the layout endpoint.
   name: string | null
   cwd: string | null
+  // The agent backend (claude-code / openclaw / hermes …). Exposed here so
+  // components like McpMenu read it from the shared layout query instead of
+  // spawning their own observer (a second observer that remounts would trigger
+  // `refetchOnMount` and clobber an in-flight optimistic layout update).
+  provider: WorkspaceType | null
   // The workspace's registry id (the route param), so descendants can key
   // their own queries (e.g. the model picker) without prop-drilling.
   workspaceId: string
@@ -88,6 +93,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
     setLayout,
     name: query.data?.name ?? null,
     cwd: query.data?.cwd ?? null,
+    provider: query.data?.provider ?? null,
     workspaceId: id,
     isLoading: query.isLoading
   }

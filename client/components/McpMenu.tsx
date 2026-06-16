@@ -1,10 +1,11 @@
-import { useWorkspaceLayout, useWorkspaceMcp } from '@/client/api/workspaces'
+import { useWorkspaceMcp } from '@/client/api/workspaces'
 import { IconMcp } from '@/client/components/IconMcp'
 import { Button } from '@/client/components/ui/button'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/client/components/ui/hover-card'
 import { useScrollFade } from '@/client/hooks/useScrollFade'
 import { formatMcpServerName, getMcpIcon } from '@/client/lib/mcp-icons'
 import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
+import { useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
 import type { McpServer } from '@/lib/types'
 
@@ -68,8 +69,12 @@ function McpList({ servers }: { servers: McpServer[] }) {
 // dark + shows a dot badge when any server is connected.
 export function McpMenu() {
   const workspaceId = useWorkspaceId()
-  const { data: layout } = useWorkspaceLayout(workspaceId)
-  const isClaude = !!layout && layout.provider !== 'openclaw' && layout.provider !== 'hermes'
+  // Read provider from the shared layout context, not a second `useWorkspaceLayout`
+  // observer — a duplicate observer that remounts (e.g. when this menu moves
+  // between the fullscreen and two-pane headers) fires `refetchOnMount`, which
+  // overwrites an in-flight optimistic chat-mode change before it's persisted.
+  const { provider, isLoading } = useWorkspaceLayoutCtx()
+  const isClaude = !isLoading && provider !== 'openclaw' && provider !== 'hermes'
   const { data: servers } = useWorkspaceMcp(workspaceId, isClaude)
 
   if (!isClaude) return null

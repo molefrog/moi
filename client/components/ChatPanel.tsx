@@ -1,11 +1,11 @@
-import { type ReactNode, useEffect, useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 
 import { IconChevronsRight, IconSelector, IconX } from '@tabler/icons-react'
 
 import { useScrollFade } from '@/client/hooks/useScrollFade'
 import { cn } from '@/client/lib/cn'
 import { groupTurns } from '@/client/lib/group-turns'
-import type { ViewState } from '@/lib/types'
+import type { ChatMode, ViewState } from '@/lib/types'
 
 import { ChatInput } from './ChatInput'
 import { ThreadSelector } from './ThreadSelector'
@@ -18,8 +18,6 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger
 } from './ui/dropdown-menu'
-
-export type ChatMode = 'sidebar' | 'floating'
 
 type ChatModeIconProps = {
   className?: string
@@ -59,6 +57,23 @@ function ChatModeIconFloating({ className }: ChatModeIconProps) {
   )
 }
 
+function ChatModeIconFullscreen({ className }: ChatModeIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      strokeWidth="1.5"
+      className={className}
+    >
+      <rect x="1.75" y="3.75" width="20.5" height="16.5" rx="2.25" stroke="currentColor" />
+      <rect x="4.5" y="6.5" width="15" height="11" rx="1" fill="currentColor" />
+    </svg>
+  )
+}
+
 type ChatPanelProps = {
   view: ViewState
   input: string
@@ -69,13 +84,14 @@ type ChatPanelProps = {
   send: () => void
   stop: () => void
   chatMode: ChatMode
+  // Constrain the scrollable history and the composer to a centered max-width
+  // column (var --chat-max-container) while the header still spans full width.
+  // Always on for now; will be toggled per layout mode later.
+  contained?: boolean
   onSwitchThread: (sessionId: string | null) => void
-  onModeChange?: (mode: 'sidebar' | 'floating') => void
+  onModeChange?: (mode: ChatMode) => void
   onCollapse?: () => void
   onClose?: () => void
-  // Rendered at the start of the chat header. Solo mode passes the sidebar
-  // toggle here since there's no separate workspace header beside the chat.
-  leading?: ReactNode
 }
 
 export function ChatPanel({
@@ -88,11 +104,11 @@ export function ChatPanel({
   send,
   stop,
   chatMode,
+  contained = true,
   onSwitchThread,
   onModeChange,
   onCollapse,
-  onClose,
-  leading
+  onClose
 }: ChatPanelProps) {
   const { ref: scrollRef, showTopFade, showBottomFade } = useScrollFade()
   const turns = view.turns
@@ -107,13 +123,17 @@ export function ChatPanel({
     el?.scrollTo({ top: el.scrollHeight, behavior: 'instant' })
   }, [scrollRef, turns])
 
-  const TriggerIcon = chatMode === 'sidebar' ? ChatModeIconSidebar : ChatModeIconFloating
+  const TriggerIcon =
+    chatMode === 'sidebar'
+      ? ChatModeIconSidebar
+      : chatMode === 'floating'
+        ? ChatModeIconFloating
+        : ChatModeIconFullscreen
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between pb-2 pl-2">
+    <div className="flex h-full flex-col pt-2 pb-4">
+      <header className="flex items-center justify-between pr-2 pb-2 pl-5">
         <div className="flex min-w-0 items-center gap-2.5">
-          {leading}
           <ThreadSelector onSwitch={onSwitchThread} />
         </div>
         <div className="flex items-center gap-0.5">
@@ -143,6 +163,10 @@ export function ChatPanel({
                     <ChatModeIconFloating />
                     Floating
                   </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="fullscreen" closeOnClick>
+                    <ChatModeIconFullscreen />
+                    Fullscreen
+                  </DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -164,24 +188,31 @@ export function ChatPanel({
       <div
         ref={scrollRef}
         className={cn(
-          'flex flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-2 pt-4 pb-12',
+          'flex scrollbar-thin flex-1 flex-col overflow-y-auto overscroll-contain px-5 pt-4 pb-12',
           showTopFade && showBottomFade && 'mask-fade-y',
           showTopFade && !showBottomFade && 'mask-fade-top',
           !showTopFade && showBottomFade && 'mask-fade-bottom'
         )}
       >
-        {turns.length === 0 && !processing && <EmptyState />}
-        {groupedTurns.map((turn, i) => (
-          <TurnView
-            key={turn.id}
-            turn={turn}
-            processing={processing && i === groupedTurns.length - 1}
-          />
-        ))}
-        {processing && <ThinkingIndicator />}
+        <div
+          className={cn(
+            'flex flex-1 flex-col gap-6',
+            contained && 'mx-auto w-full max-w-[var(--chat-max-container)]'
+          )}
+        >
+          {turns.length === 0 && !processing && <EmptyState />}
+          {groupedTurns.map((turn, i) => (
+            <TurnView
+              key={turn.id}
+              turn={turn}
+              processing={processing && i === groupedTurns.length - 1}
+            />
+          ))}
+          {processing && <ThinkingIndicator />}
+        </div>
       </div>
 
-      <div>
+      <div className={cn(contained && 'mx-auto w-full max-w-[var(--chat-max-container)] px-3')}>
         {error && (
           <div className="mb-2 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
             <span className="flex-1 break-words">{error}</span>
