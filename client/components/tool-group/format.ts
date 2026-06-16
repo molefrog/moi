@@ -105,7 +105,9 @@ const OPENCLAW_TOOL_LABELS: Record<string, string> = {
 // Claude tool names are mostly already presentable (Read, Bash, …); only a few
 // need spacing/relabelling.
 const CLAUDE_TOOL_LABELS: Record<string, string> = {
-  ToolSearch: 'Tool Search'
+  ToolSearch: 'Tool Search',
+  WebSearch: 'Web Search',
+  WebFetch: 'Web Fetch'
 }
 
 export function getToolDisplayName(call: ToolCall): string {
@@ -140,6 +142,8 @@ function formatClaudeBrief(
   if (tool === 'Glob') return shorten(getInputValue(input, 'pattern'))
   if (tool === 'Grep')
     return `/${getInputValue(input, 'pattern')}/ ${shorten(getInputValue(input, 'path'))}`
+  if (tool === 'WebSearch') return getInputValue(input, 'query')
+  if (tool === 'WebFetch') return getInputValue(input, 'url')
   if (tool === 'ToolSearch') {
     const query = getInputValue(input, 'query')
     // `select:a,b,c` loads those tools → list their short names; otherwise it's a

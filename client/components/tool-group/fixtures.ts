@@ -132,14 +132,28 @@ const thinking: Part = {
   text: 'The user is greeting me casually with "Hey bro". This is a friendly greeting and they\'re not asking me to do anything specific yet. I should respond in a friendly, casual way and let them know I\'m ready to help with whatever they need.'
 }
 
+// A Skill launch (from the lilmd-demo thread). `name: 'Skill'` + a `skill`
+// sidecar; renders as a "Loading Skill" timeline row.
+const skillCall: ToolCall = {
+  toolCallId: 'toolu_01ADt4E1V39b8rhGUEuTQvdP',
+  name: 'Skill',
+  caller: 'model',
+  provider: 'claude-code',
+  state: 'success',
+  input: { skill: 'widgets' },
+  skill: { skillName: 'widgets' },
+  output: 'Launching skill: widgets'
+}
+
 // Variant 1 — a single tool call (the degenerate group).
 export const singleToolCall: Part[] = [{ type: 'tool-call', call: bash }]
 
-// Variant 2 — a realistic mixed timeline: thinking, tool search, 2 notion, read
-// file, bash, notion, then a github call.
+// Variant 2 — a realistic mixed timeline: thinking, tool search, skill, 2 notion,
+// read file, bash, notion, then a github call.
 export const multipleToolCalls: Part[] = [
   thinking,
   { type: 'tool-call', call: toolSearch },
+  { type: 'tool-call', call: skillCall },
   { type: 'tool-call', call: notionSearch },
   { type: 'tool-call', call: notionFetchOpenSource },
   { type: 'tool-call', call: readFile },

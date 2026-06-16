@@ -11,9 +11,10 @@
 // ./format and ./detect; the animation in ./Collapse; output in ./ToolOutput.
 import { type ReactNode, useState } from 'react'
 
-import { IconChevronRight, IconLoader2, IconPlug } from '@tabler/icons-react'
+import { IconChevronRight, IconLoader2, IconPackage } from '@tabler/icons-react'
 import { motion } from 'motion/react'
 
+import { IconMcp } from '@/client/components/IconMcp'
 import { cn } from '@/client/lib/cn'
 import { formatMcpServerName, getMcpIcon } from '@/client/lib/mcp-icons'
 import type { Part, ToolCall } from '@/lib/types'
@@ -173,7 +174,9 @@ function ToolRow({ isFirst, isLast, call, leading, marker, name, brief }: ToolRo
         >
           {leading}
           <span className="shrink-0 text-xs font-medium whitespace-nowrap">{name}</span>
-          {brief && <span className="min-w-0 truncate text-[11px] text-ring">{brief}</span>}
+          {brief && (
+            <span className="min-w-0 self-baseline truncate text-[12px] text-ring">{brief}</span>
+          )}
           {/* Dotted rows spin at the node instead; only icon (MCP) rows, whose
               node can't spin, keep a header spinner. */}
           {isRunning && marker && (
@@ -221,11 +224,26 @@ function ReasoningRow({ isFirst, isLast, text, inProgress = false }: ReasoningRo
   )
 }
 
-// Dispatch a tool call to the right row chrome: the server-branded card for an
-// MCP shape (`mcporter call …` Bash or a native `mcp__server__tool` name), else
-// a plain tool row.
+// Dispatch a tool call to the right row chrome: a "Loading Skill" row for a
+// Skill call, the server-branded card for an MCP shape (`mcporter call …` Bash
+// or a native `mcp__server__tool` name), else a plain tool row.
 type ToolCallCardProps = RowPosition & { call: ToolCall; cwd: string | null }
 function ToolCallCard({ call, cwd, isFirst, isLast }: ToolCallCardProps) {
+  if (call.name === 'Skill' && call.skill) {
+    // On success, swap the timeline dot for a package icon node (same box as the
+    // MCP logo). Running keeps the spinner node; an error keeps the red dot.
+    const succeeded = call.state === 'success'
+    return (
+      <ToolRow
+        isFirst={isFirst}
+        isLast={isLast}
+        call={call}
+        marker={succeeded ? <IconMarker icon={IconPackage} size={14} stroke={1.75} /> : undefined}
+        name="Loading Skill"
+        brief={call.skill.skillName}
+      />
+    )
+  }
   const mcp = parseMcporterCall(call) ?? parseNativeMcp(call)
   if (mcp) {
     const fn = formatMcpTool(mcp.server, mcp.tool)
@@ -252,17 +270,49 @@ function ToolCallCard({ call, cwd, isFirst, isLast }: ToolCallCardProps) {
   )
 }
 
-// The MCP server logo, used as the timeline node. The bg-colored ring carves it
-// out of the rule, matching the dot rows.
-function McpLogo({ src }: { src?: string }) {
+// A 16px rounded node box used as a timeline marker. The bg-colored ring carves
+// it out of the rule, matching the dot rows. Shared by the MCP logo and the
+// skill package node so they line up identically on the rail.
+function NodeBox({ children }: { children: ReactNode }) {
   return (
-    <span className="block size-4 overflow-hidden rounded-[3px] bg-muted ring-2 ring-background">
-      {src ? (
-        <img src={src} alt="" className="size-full object-cover" />
-      ) : (
-        <IconPlug size={12} stroke={1.5} className="m-0.5 text-muted-foreground" />
-      )}
+    <span className="flex size-4 items-center justify-center overflow-hidden rounded-[3px] bg-muted ring-2 ring-background">
+      {children}
     </span>
+  )
+}
+
+// A Tabler icon centered in the node box (e.g. the skill package node, or the
+// MCP fallback plug). size/stroke default to the plug's values; the skill node
+// overrides them.
+function IconMarker({
+  icon: Icon,
+  size = 12,
+  stroke = 1.5
+}: {
+  icon: typeof IconPackage
+  size?: number
+  stroke?: number
+}) {
+  return (
+    <NodeBox>
+      <Icon size={size} stroke={stroke} className="text-muted-foreground" />
+    </NodeBox>
+  )
+}
+
+// The MCP server logo, used as the timeline node. Falls back to the generic MCP
+// glyph (same as the workspace header) when the server has no known logo.
+function McpLogo({ src }: { src?: string }) {
+  if (!src)
+    return (
+      <NodeBox>
+        <IconMcp className="size-3 text-muted-foreground" />
+      </NodeBox>
+    )
+  return (
+    <NodeBox>
+      <img src={src} alt="" className="size-full object-cover" />
+    </NodeBox>
   )
 }
 

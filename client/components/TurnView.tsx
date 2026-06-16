@@ -1,12 +1,6 @@
 import { useState } from 'react'
 
-import {
-  IconAlertTriangle,
-  IconLoader2,
-  IconSparkles,
-  IconUsersGroup,
-  IconX
-} from '@tabler/icons-react'
+import { IconAlertTriangle, IconLoader2, IconUsersGroup, IconX } from '@tabler/icons-react'
 
 import { MarkdownContent } from '@/client/components/MarkdownContent'
 import { ToolCallGroup } from '@/client/components/tool-group/ToolCallGroup'
@@ -36,13 +30,13 @@ export function ThinkingIndicator() {
 
 // A part either folds into a tool-group "run" (reasoning + ordinary tool calls,
 // rendered as one connected timeline) or stands alone (text, files, sources, and
-// the special subagent/skill cards, which own their own layout/modal).
+// the subagent card, which owns its own modal). Skill calls fold into runs and
+// render as a normal timeline row.
 function isRunPart(part: Part): boolean {
   if (part.type === 'reasoning') return true
   if (part.type === 'tool-call') {
     const c = part.call
     if (c.caller === 'subagent' && c.subagent) return false
-    if (c.name === 'Skill' && c.skill) return false
     return true
   }
   return false
@@ -138,12 +132,11 @@ function PartRenderer({ part }: PartRendererProps) {
   }
 }
 
-// Only the special cards reach here (subagent, skill); ordinary tools render in a
-// ToolCallGroup run. The trailing fallback keeps an unexpected tool visible.
+// Only the subagent card reaches here; ordinary tools (and skill calls) render in
+// a ToolCallGroup run. The trailing fallback keeps an unexpected tool visible.
 function ToolCallCard({ call }: { call: ToolCall }) {
   if (call.caller === 'subagent' && call.subagent)
     return <SubagentCard call={call} subagent={call.subagent} />
-  if (call.name === 'Skill' && call.skill) return <SkillCard call={call} />
   return <ToolCallGroup parts={[{ type: 'tool-call', call }]} cwd={null} />
 }
 
@@ -174,42 +167,6 @@ function DataPart({ name, data }: DataPartProps) {
         {JSON.stringify(data, null, 2)}
       </pre>
     </details>
-  )
-}
-
-type SkillCardProps = { call: ToolCall }
-function SkillCard({ call }: SkillCardProps) {
-  const [showBody, setShowBody] = useState(false)
-  const skillName = call.skill?.skillName ?? 'unknown'
-  const body = call.skill?.body ?? ''
-  const isRunning = call.state === 'running'
-  const isError = call.state === 'error'
-
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-2 py-1">
-        <IconSparkles size={14} stroke={1.5} className="text-amber-600" />
-        <span className="text-xs font-medium">
-          Loading skill <span className="font-mono">{skillName}</span>
-        </span>
-        {isRunning && <IconLoader2 size={12} stroke={1.5} className="animate-spin text-ring" />}
-        {isError && <IconAlertTriangle size={12} stroke={1.5} className="text-red-600" />}
-        {body && (
-          <button
-            type="button"
-            onClick={() => setShowBody(v => !v)}
-            className="text-[11px] text-muted-foreground underline"
-          >
-            {showBody ? 'hide' : 'show'} instructions
-          </button>
-        )}
-      </div>
-      {showBody && body && (
-        <pre className="max-h-[300px] overflow-y-auto rounded bg-muted p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
-          {body}
-        </pre>
-      )}
-    </div>
   )
 }
 
