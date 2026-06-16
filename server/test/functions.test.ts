@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 
 import { callFunction, parseFunctionPath, restartWorker } from '../functions'
 import {
+  resetWorkspaceEnvForTest,
   setSecretStoreBackend,
   setWorkspaceEnvStorePath,
   updateWorkspaceEnv
@@ -182,7 +183,7 @@ describe('worker env isolation', () => {
   afterAll(async () => {
     await rm(join(FIXTURES, '.env'), { force: true })
     await rm(storeDir, { recursive: true, force: true })
-    setSecretStoreBackend('auto')
+    resetWorkspaceEnvForTest()
     restartWorker(FIXTURES)
   })
 

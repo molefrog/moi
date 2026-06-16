@@ -43,15 +43,54 @@ export function isValidScope(scope: unknown): scope is EnvScope {
 type Sink = 'widgets' | 'agent'
 
 const DATA_DIR = envPaths('moi', { suffix: false }).data
+const DEFAULT_META_PATH = join(DATA_DIR, 'workspace-env.json')
+const DEFAULT_SECRET_PATH = join(DATA_DIR, 'workspace-secrets.json')
 // Keychain namespace for Bun.secrets entries.
 const SECRET_SERVICE = 'com.molefrog.moi'
 
 // ---------------------------------------------------------------------------
-// Paths (overridable for tests)
+// JSON helpers
 // ---------------------------------------------------------------------------
 
-let _metaPath = join(DATA_DIR, 'workspace-env.json')
-let _secretFilePath = join(DATA_DIR, 'workspace-secrets.json')
+// Parse a JSON object, returning {} on any failure (missing/empty/malformed).
+function parseJsonObject<T extends object>(text: string | null): T {
+  if (!text) return {} as T
+  try {
+    const parsed = JSON.parse(text)
+    return parsed && typeof parsed === 'object' ? (parsed as T) : ({} as T)
+  } catch {
+    return {} as T
+  }
+}
+
+async function readJsonObjectFile<T extends object>(path: string): Promise<T> {
+  try {
+    return parseJsonObject<T>(await Bun.file(path).text())
+  } catch {
+    return {} as T
+  }
+}
+
+// Atomic, owner-only write: temp-then-rename so a crash or concurrent write
+// can't truncate the store; 0600 file in a 0700 dir.
+async function writeJsonAtomic(path: string, data: unknown): Promise<void> {
+  const dir = dirname(path)
+  await mkdir(dir, { recursive: true })
+  try {
+    await chmod(dir, 0o700)
+  } catch {}
+  const tmp = `${path}.${process.pid}.tmp`
+  await Bun.write(tmp, JSON.stringify(data, null, 2))
+  await chmod(tmp, 0o600)
+  await rename(tmp, path)
+}
+
+// ---------------------------------------------------------------------------
+// Paths + per-workspace write serialization (overridable for tests)
+// ---------------------------------------------------------------------------
+
+let _metaPath = DEFAULT_META_PATH
+let _secretFilePath = DEFAULT_SECRET_PATH
 
 export function setWorkspaceEnvStorePath(metaPath: string, secretPath?: string) {
   _metaPath = metaPath
@@ -59,21 +98,29 @@ export function setWorkspaceEnvStorePath(metaPath: string, secretPath?: string) 
   _storePromise = null
 }
 
-// ---------------------------------------------------------------------------
-// Atomic, owner-only JSON writes
-// ---------------------------------------------------------------------------
+// Reset module globals to defaults. Tests call this so path/backend overrides
+// don't leak across files.
+export function resetWorkspaceEnvForTest() {
+  _metaPath = DEFAULT_META_PATH
+  _secretFilePath = DEFAULT_SECRET_PATH
+  setSecretStoreBackend('auto')
+}
 
-async function writeJsonAtomic(path: string, data: unknown): Promise<void> {
-  const dir = dirname(path)
-  await mkdir(dir, { recursive: true })
-  try {
-    await chmod(dir, 0o700)
-  } catch {}
-  // Temp-then-rename so a crash or concurrent write can't truncate the store.
-  const tmp = `${path}.${process.pid}.tmp`
-  await Bun.write(tmp, JSON.stringify(data, null, 2))
-  await chmod(tmp, 0o600)
-  await rename(tmp, path)
+// Serialize writes per workspace path so two concurrent PUTs can't lose an
+// update — `updateWorkspaceEnv` is a read-modify-write over two files, and the
+// atomic write only prevents torn files, not lost updates.
+const _writeChains = new Map<string, Promise<unknown>>()
+
+function withWriteLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const prev = _writeChains.get(key) ?? Promise.resolve()
+  const run = prev.then(fn, fn)
+  // Swallow rejections on the chain tail so one failed write doesn't poison the
+  // next; callers still see their own promise's rejection via `run`.
+  _writeChains.set(
+    key,
+    run.catch(() => {})
+  )
+  return run
 }
 
 // ---------------------------------------------------------------------------
@@ -83,20 +130,10 @@ async function writeJsonAtomic(path: string, data: unknown): Promise<void> {
 // Per-workspace bag of `{ KEY: value }`. Stored as one opaque value per
 // workspace (keychain entry or file row). Values never leave this layer except
 // when injected into a spawn.
-interface SecretStore {
+type SecretStore = {
   readonly backend: 'keychain' | 'file'
   get(workspacePath: string): Promise<Record<string, string>>
   set(workspacePath: string, secrets: Record<string, string>): Promise<void>
-}
-
-function parseSecretBag(raw: string | null): Record<string, string> {
-  if (!raw) return {}
-  try {
-    const parsed = JSON.parse(raw)
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, string>) : {}
-  } catch {
-    return {}
-  }
 }
 
 // Primary: OS-native secure storage via Bun.secrets (Keychain / libsecret /
@@ -106,7 +143,7 @@ class KeychainSecretStore implements SecretStore {
 
   async get(workspacePath: string): Promise<Record<string, string>> {
     const raw = await Bun.secrets.get({ service: SECRET_SERVICE, name: resolve(workspacePath) })
-    return parseSecretBag(raw)
+    return parseJsonObject<Record<string, string>>(raw)
   }
 
   async set(workspacePath: string, secrets: Record<string, string>): Promise<void> {
@@ -127,13 +164,8 @@ class KeychainSecretStore implements SecretStore {
 class FileSecretStore implements SecretStore {
   readonly backend = 'file' as const
 
-  private async readAll(): Promise<Record<string, Record<string, string>>> {
-    try {
-      const parsed = JSON.parse(await Bun.file(_secretFilePath).text())
-      return parsed && typeof parsed === 'object' ? parsed : {}
-    } catch {
-      return {}
-    }
+  private readAll(): Promise<Record<string, Record<string, string>>> {
+    return readJsonObjectFile<Record<string, Record<string, string>>>(_secretFilePath)
   }
 
   async get(workspacePath: string): Promise<Record<string, string>> {
@@ -194,20 +226,9 @@ function secretStore(): Promise<SecretStore> {
 type EnvMeta = { inheritDotenv: boolean; scopes: Record<string, EnvScope> }
 type MetaStore = Record<string, EnvMeta>
 
-const DEFAULT_META: EnvMeta = { inheritDotenv: true, scopes: {} }
-
-async function readMetaStore(): Promise<MetaStore> {
-  try {
-    const parsed = JSON.parse(await Bun.file(_metaPath).text())
-    return parsed && typeof parsed === 'object' ? (parsed as MetaStore) : {}
-  } catch {
-    return {}
-  }
-}
-
 async function getMeta(workspacePath: string): Promise<EnvMeta> {
-  const e = (await readMetaStore())[resolve(workspacePath)]
-  if (!e || typeof e !== 'object') return { ...DEFAULT_META }
+  const e = (await readJsonObjectFile<MetaStore>(_metaPath))[resolve(workspacePath)]
+  if (!e || typeof e !== 'object') return { inheritDotenv: true, scopes: {} }
   return {
     inheritDotenv: e.inheritDotenv !== false,
     scopes: e.scopes && typeof e.scopes === 'object' ? e.scopes : {}
@@ -215,9 +236,14 @@ async function getMeta(workspacePath: string): Promise<EnvMeta> {
 }
 
 async function writeMeta(workspacePath: string, meta: EnvMeta): Promise<void> {
-  const store = await readMetaStore()
+  const store = await readJsonObjectFile<MetaStore>(_metaPath)
   store[resolve(workspacePath)] = meta
   await writeJsonAtomic(_metaPath, store)
+}
+
+// The scope of a custom key, defaulting to 'both' when unset.
+function scopeOf(meta: EnvMeta, key: string): EnvScope {
+  return meta.scopes[key] ?? 'both'
 }
 
 // ---------------------------------------------------------------------------
@@ -246,8 +272,31 @@ function mergeDotenv(files: DotenvFile[]): Record<string, string> {
   return merged
 }
 
-function scopeAllows(scope: EnvScope, sink: Sink): boolean {
-  return scope === 'both' || scope === sink
+// Read everything a workspace's env depends on, in parallel. `dotenv` is the
+// inheritDotenv-gated merge (the actual base env); `files` keeps per-file detail
+// for the view.
+type WorkspaceEnvState = {
+  meta: EnvMeta
+  files: DotenvFile[]
+  secrets: Record<string, string>
+  dotenv: Record<string, string>
+  backend: 'keychain' | 'file'
+}
+
+async function loadWorkspaceEnvState(workspacePath: string): Promise<WorkspaceEnvState> {
+  const store = await secretStore()
+  const [meta, files, secrets] = await Promise.all([
+    getMeta(workspacePath),
+    discoverDotenv(workspacePath),
+    store.get(workspacePath)
+  ])
+  return {
+    meta,
+    files,
+    secrets,
+    dotenv: meta.inheritDotenv ? mergeDotenv(files) : {},
+    backend: store.backend
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -262,18 +311,13 @@ export async function resolveWorkspaceEnv(
   workspacePath: string,
   sink: Sink
 ): Promise<Record<string, string>> {
-  const store = await secretStore()
-  const [meta, files, secrets] = await Promise.all([
-    getMeta(workspacePath),
-    discoverDotenv(workspacePath),
-    store.get(workspacePath)
-  ])
-  const base = meta.inheritDotenv ? mergeDotenv(files) : {}
+  const { meta, secrets, dotenv } = await loadWorkspaceEnvState(workspacePath)
   const scoped: Record<string, string> = {}
   for (const [k, v] of Object.entries(secrets)) {
-    if (scopeAllows(meta.scopes[k] ?? 'both', sink)) scoped[k] = v
+    const scope = scopeOf(meta, k)
+    if (scope === 'both' || scope === sink) scoped[k] = v
   }
-  return { ...base, ...scoped }
+  return { ...dotenv, ...scoped }
 }
 
 export type EnvUpdate = {
@@ -289,33 +333,35 @@ export type EnvUpdate = {
 
 // Apply a patch to a workspace's custom secrets + metadata. Patch (not replace)
 // semantics, because values are write-only — the UI can add/update one key
-// without resending the others.
-export async function updateWorkspaceEnv(workspacePath: string, patch: EnvUpdate): Promise<void> {
-  const store = await secretStore()
-  const secrets = await store.get(workspacePath)
+// without resending the others. Serialized per workspace to avoid lost updates.
+export function updateWorkspaceEnv(workspacePath: string, patch: EnvUpdate): Promise<void> {
+  return withWriteLock(resolve(workspacePath), async () => {
+    const store = await secretStore()
+    const secrets = await store.get(workspacePath)
 
-  if (patch.set) {
-    for (const [k, v] of Object.entries(patch.set)) {
-      if (isValidEnvKey(k) && typeof v === 'string') secrets[k] = v
+    if (patch.set) {
+      for (const [k, v] of Object.entries(patch.set)) {
+        if (isValidEnvKey(k) && typeof v === 'string') secrets[k] = v
+      }
     }
-  }
-  if (patch.remove) {
-    for (const k of patch.remove) delete secrets[k]
-  }
-  await store.set(workspacePath, secrets)
+    if (patch.remove) {
+      for (const k of patch.remove) delete secrets[k]
+    }
+    await store.set(workspacePath, secrets)
 
-  const meta = await getMeta(workspacePath)
-  const scopes: Record<string, EnvScope> = {}
-  // Keep a scope for every current secret key (default 'both'); drop the rest.
-  for (const k of Object.keys(secrets)) scopes[k] = meta.scopes[k] ?? 'both'
-  if (patch.scopes) {
-    for (const [k, s] of Object.entries(patch.scopes)) {
-      if (k in scopes && isValidScope(s)) scopes[k] = s
+    const meta = await getMeta(workspacePath)
+    const scopes: Record<string, EnvScope> = {}
+    // Keep a scope for every current secret key (default 'both'); drop the rest.
+    for (const k of Object.keys(secrets)) scopes[k] = scopeOf(meta, k)
+    if (patch.scopes) {
+      for (const [k, s] of Object.entries(patch.scopes)) {
+        if (k in scopes && isValidScope(s)) scopes[k] = s
+      }
     }
-  }
-  const inheritDotenv =
-    typeof patch.inheritDotenv === 'boolean' ? patch.inheritDotenv : meta.inheritDotenv
-  await writeMeta(workspacePath, { inheritDotenv, scopes })
+    const inheritDotenv =
+      typeof patch.inheritDotenv === 'boolean' ? patch.inheritDotenv : meta.inheritDotenv
+    await writeMeta(workspacePath, { inheritDotenv, scopes })
+  })
 }
 
 // The env view for the settings UI: every effective key with its source +
@@ -326,13 +372,7 @@ export async function getWorkspaceEnvView(
   workspacePath: string,
   required: Record<string, string[]> = {}
 ): Promise<WorkspaceEnvView> {
-  const store = await secretStore()
-  const [meta, files, secrets] = await Promise.all([
-    getMeta(workspacePath),
-    discoverDotenv(workspacePath),
-    store.get(workspacePath)
-  ])
-  const dotenv = meta.inheritDotenv ? mergeDotenv(files) : {}
+  const { meta, files, secrets, dotenv, backend } = await loadWorkspaceEnvState(workspacePath)
 
   const keys = new Set([...Object.keys(dotenv), ...Object.keys(secrets)])
   const vars = [...keys].sort().map(key => {
@@ -341,8 +381,8 @@ export async function getWorkspaceEnvView(
     const source = inCustom && fromDotenv ? 'both' : inCustom ? 'custom' : 'dotenv'
     return {
       key,
-      source: source as 'dotenv' | 'custom' | 'both',
-      ...(inCustom ? { scope: meta.scopes[key] ?? ('both' as EnvScope) } : {}),
+      source,
+      ...(inCustom ? { scope: scopeOf(meta, key) } : {}),
       ...(fromDotenv ? { files: files.filter(f => key in f.vars).map(f => f.file) } : {})
     }
   })
@@ -351,7 +391,7 @@ export async function getWorkspaceEnvView(
   // a `.env` value (if inherited) or a custom key scoped widgets/both.
   const widgetVisible = new Set(Object.keys(dotenv))
   for (const k of Object.keys(secrets)) {
-    if ((meta.scopes[k] ?? 'both') !== 'agent') widgetVisible.add(k)
+    if (scopeOf(meta, k) !== 'agent') widgetVisible.add(k)
   }
   const requiredView = Object.entries(required)
     .sort(([a], [b]) => a.localeCompare(b))
@@ -361,7 +401,7 @@ export async function getWorkspaceEnvView(
     vars,
     files: files.map(f => ({ file: f.file, count: Object.keys(f.vars).length })),
     inheritDotenv: meta.inheritDotenv,
-    backend: store.backend,
+    backend,
     required: requiredView
   }
 }

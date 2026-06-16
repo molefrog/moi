@@ -250,10 +250,19 @@ export const app = Bun.serve<WsData>({
           patch.inheritDotenv = body.inheritDotenv
         }
 
-        await updateWorkspaceEnv(ws.path, patch)
-        // Frozen-at-spawn: reap workers/idle sessions so fresh env takes effect.
-        restartWorker(ws.path)
-        restartWorkspaceSessions(ws.path)
+        // Skip the write + reaps for a no-op PUT (no recognized fields) so an
+        // empty body doesn't needlessly kill warm workers / idle sessions.
+        const hasChange =
+          patch.set !== undefined ||
+          patch.remove !== undefined ||
+          patch.scopes !== undefined ||
+          patch.inheritDotenv !== undefined
+        if (hasChange) {
+          await updateWorkspaceEnv(ws.path, patch)
+          // Frozen-at-spawn: reap workers/idle sessions so fresh env takes effect.
+          restartWorker(ws.path)
+          restartWorkspaceSessions(ws.path)
+        }
 
         const required = await collectRequiredEnv(ws.path)
         return Response.json(await getWorkspaceEnvView(ws.path, required))
