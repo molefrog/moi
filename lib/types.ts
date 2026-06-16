@@ -167,7 +167,13 @@ export type StatusMessage = {
 // Workspace layout persistence
 export type LayoutGridItem = { i: string; x: number; y: number }
 
-export type ChatMode = 'sidebar' | 'floating' | 'fullscreen'
+// Persisted chat dock position. Fullscreen is NOT a position — it's a transient
+// local view (the "Chat" tab) that overrides the position, so it isn't stored.
+export type ChatMode = 'sidebar' | 'floating'
+
+// How the chat is actually shown: its persisted position, or fullscreen while
+// the chat view is active.
+export type ChatDisplay = ChatMode | 'fullscreen'
 
 export type { FontTheme, ColorTheme } from './themes'
 

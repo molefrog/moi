@@ -5,7 +5,7 @@ import { IconChevronsRight, IconSelector, IconX } from '@tabler/icons-react'
 import { useScrollFade } from '@/client/hooks/useScrollFade'
 import { cn } from '@/client/lib/cn'
 import { groupTurns } from '@/client/lib/group-turns'
-import type { ChatMode, ViewState } from '@/lib/types'
+import type { ChatDisplay, ViewState } from '@/lib/types'
 
 import { ChatInput } from './ChatInput'
 import { ThreadSelector } from './ThreadSelector'
@@ -83,13 +83,17 @@ type ChatPanelProps = {
   onDismissError?: () => void
   send: () => void
   stop: () => void
-  chatMode: ChatMode
+  // How the chat is shown right now (position, or fullscreen). The mode switch
+  // and collapse/close affordances key off this; fullscreen shows neither.
+  chatMode: ChatDisplay
   // Constrain the scrollable history and the composer to a centered max-width
   // column (var --chat-max-container) while the header still spans full width.
   // Always on for now; will be toggled per layout mode later.
   contained?: boolean
   onSwitchThread: (sessionId: string | null) => void
-  onModeChange?: (mode: ChatMode) => void
+  // The chat display picker — sidebar / floating (position) and fullscreen (the
+  // transient view). The parent routes each to the right state.
+  onModeChange?: (mode: ChatDisplay) => void
   onCollapse?: () => void
   onClose?: () => void
 }

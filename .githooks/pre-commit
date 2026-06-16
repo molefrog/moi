@@ -1,2 +1,8 @@
 #!/bin/sh
-bun run format:check && bun run lint
+set -e
+
+# Auto-fix lint + format the whole tree, then stage the results so they land in
+# this commit. Lint errors that can't be auto-fixed still abort (set -e).
+bun run lint:fix
+bun run format
+git add -u

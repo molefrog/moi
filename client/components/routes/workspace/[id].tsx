@@ -35,7 +35,7 @@ import {
 } from "@/client/lib/WorkspaceLayoutContext";
 import { cn } from "@/client/lib/cn";
 import { liveStore } from "@/client/store/live";
-import type { ChatMode, SessionInfo, WidgetInfo } from "@/lib/types";
+import type { ChatDisplay, SessionInfo, WidgetInfo } from "@/lib/types";
 
 type WorkspaceRouteProps = {
   id: string;
@@ -125,13 +125,10 @@ const ACTION_VARIANTS = {
   to: { opacity: 1, scale: 1, filter: "blur(0px)" },
 };
 
-// Workspace nav: switches the panel body between the chat (fullscreen), the
-// widget grid, and the scratchpad. "chat" maps to fullscreen chat mode; the
-// other two are the body view shown while the chat is docked or floating.
+// Active view, held in WorkspaceView's local state (transient — never persisted).
+// "chat" shows the chat fullscreen, overriding its dock position; "widgets" /
+// "canvas" show that body with the chat in its persisted position beside it.
 type WorkspaceNav = "chat" | "widgets" | "canvas";
-// The non-chat body view. Owned by WorkspaceView so the panel can swap between
-// the widget grid and the canvas while the chat is docked/floating.
-type WorkspaceTab = "widgets" | "canvas";
 
 type WorkspaceTabsProps = {
   active: WorkspaceNav;
@@ -250,7 +247,11 @@ function WorkspaceView({ widgets }: WorkspaceViewProps) {
   const { layout, setLayout, name } = useWorkspaceLayoutCtx();
   const { ref: rowRef, fits: canFitSidebar } = useFitsSidebar<HTMLDivElement>();
   const [widgetMode, setWidgetMode] = useState<WidgetMode>("idle");
-  const [tab, setTab] = useState<WorkspaceTab>("widgets");
+  // Two orthogonal, transient local bits: which body view is selected, and
+  // whether the chat is fullscreen. Fullscreen overrides (never persists) the
+  // chat's dock position, and toggling it keeps the body view underneath.
+  const [bodyTab, setBodyTab] = useState<"widgets" | "canvas">("widgets");
+  const [fullscreen, setFullscreen] = useState(false);
 
   // Theme is scoped to this wrapper, not :root — the sidebar keeps the default
   // tokens. The floating chat portals into the same element so it inherits them.
@@ -258,38 +259,43 @@ function WorkspaceView({ widgets }: WorkspaceViewProps) {
   useWorkspaceTheme(layout.theme, themeRef);
 
   const hasWidgets = widgets.length > 0;
-  // Only a workspace with widgets offers a choice of chat placement; a solo
-  // chat is always fullscreen, so the mode switch (and nav) are hidden there.
+  // The persisted position switch (sidebar ⇄ floating) only matters with widgets
+  // to dock beside; a solo chat is always fullscreen.
   const canChangeChatMode = hasWidgets;
 
-  // Effective chat placement:
-  // - No widgets → always fullscreen (nothing to dock beside).
-  // - Widgets → the user's pick, except a docked sidebar that no longer fits
-  //   gracefully falls back to floating.
-  const chatMode: ChatMode = !hasWidgets
-    ? "fullscreen"
-    : layout.chatMode === "fullscreen"
+  // How the chat is shown: fullscreen (the chat view, or a solo chat), otherwise
+  // its persisted position — sidebar, or floating (also the fallback when a
+  // docked sidebar no longer fits). Fullscreen never touches the saved position.
+  const display: ChatDisplay =
+    !hasWidgets || fullscreen
       ? "fullscreen"
       : layout.chatMode === "floating" || !canFitSidebar
         ? "floating"
         : "sidebar";
 
-  const handleModeChange = canChangeChatMode
-    ? (mode: ChatMode) => setLayout({ chatMode: mode })
-    : undefined;
+  // The nav highlights whatever fills the main area.
+  const activeNav: WorkspaceNav = display === "fullscreen" ? "chat" : bodyTab;
 
-  // The nav mirrors what's in the body: "chat" while fullscreen, else the docked
-  // body view. Picking "chat" enters fullscreen; picking a body view leaves it
-  // for the docked sidebar (which itself falls back to floating if it can't fit).
-  const activeNav: WorkspaceNav = chatMode === "fullscreen" ? "chat" : tab;
-  const selectNav = (view: WorkspaceNav) => {
-    if (view === "chat") {
-      setLayout({ chatMode: "fullscreen" });
-    } else {
-      setTab(view);
-      if (chatMode === "fullscreen") setLayout({ chatMode: "sidebar" });
+  // Nav tabs: "chat" goes fullscreen; a body tab leaves fullscreen and shows it.
+  const selectNav = (v: WorkspaceNav) => {
+    if (v === "chat") setFullscreen(true);
+    else {
+      setBodyTab(v);
+      setFullscreen(false);
     }
   };
+
+  // The chat-mode picker switches the display: fullscreen is the transient view;
+  // sidebar/floating persist the dock position (and leave fullscreen).
+  const handleModeChange = canChangeChatMode
+    ? (mode: ChatDisplay) => {
+        if (mode === "fullscreen") setFullscreen(true);
+        else {
+          setLayout({ chatMode: mode });
+          setFullscreen(false);
+        }
+      }
+    : undefined;
 
   const chatPanel = (
     <ChatPanel
@@ -301,7 +307,7 @@ function WorkspaceView({ widgets }: WorkspaceViewProps) {
       onDismissError={dismissError}
       send={send}
       stop={stop}
-      chatMode={chatMode}
+      chatMode={display}
       onSwitchThread={switchThread}
       onModeChange={handleModeChange}
       onCollapse={() => setLayout({ chatMode: "floating" })}
@@ -316,62 +322,51 @@ function WorkspaceView({ widgets }: WorkspaceViewProps) {
       ref={themeRef}
       className="bg-background text-foreground flex h-full min-h-0 flex-col font-sans"
     >
-      {/* rowRef stays mounted across modes so the sidebar-fit measurement (full
-          panel width) survives switching to and from fullscreen. */}
-      <div ref={rowRef} className="flex h-full min-h-0 flex-col">
-        {chatMode === "fullscreen" ? (
-          // Fullscreen: the shared panel header (name + optional nav + mcp) above
-          // a full-width chat — same chrome as the widgets/scratchpad views.
-          <>
-            <PanelHeader>
-              <SidebarToggle />
-              {name && <span className="text-foreground truncate text-sm font-medium">{name}</span>}
-              {hasWidgets && (
-                <>
-                  <span className="text-muted-foreground/40 select-none text-sm">/</span>
-                  <WorkspaceTabs active={activeNav} onSelect={selectNav} />
-                </>
-              )}
-              <div className="flex-1" />
-              <McpMenu />
-            </PanelHeader>
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{chatPanel}</div>
-          </>
-        ) : (
-          // Two-pane split: widget grid / scratchpad on the left, docked chat on
-          // the right (floating chat is rendered as a popup below instead).
-          <div className="flex h-full min-h-0">
-            <div className="border-border flex min-h-0 min-w-[var(--column-w)] flex-1 flex-col border-r">
-              <PanelHeader>
-                <SidebarToggle />
-                {name && (
-                  <span className="text-foreground truncate text-sm font-medium">{name}</span>
-                )}
+      {/* One shared header always sits atop the main content area, whose body is
+          the chat (fullscreen), the widget grid, or the scratchpad per the active
+          nav. A docked chat is an extra column beside it. rowRef stays mounted so
+          the sidebar-fit measurement (full panel width) survives mode switches. */}
+      <div ref={rowRef} className="flex min-h-0 flex-1">
+        <div
+          className={cn(
+            "flex min-h-0 flex-1 flex-col",
+            // Border + min width only while a chat docks beside the main area.
+            display !== "fullscreen" && "border-border min-w-[var(--column-w)] border-r",
+          )}
+        >
+          <PanelHeader>
+            <SidebarToggle />
+            {name && <span className="text-foreground truncate text-sm font-medium">{name}</span>}
+            {hasWidgets && (
+              <>
                 <span className="text-muted-foreground/40 select-none text-sm">/</span>
                 <WorkspaceTabs active={activeNav} onSelect={selectNav} />
-                <div className="flex-1" />
-                {tab === "widgets" && <WidgetActions mode={widgetMode} onMode={setWidgetMode} />}
-                <McpMenu />
-              </PanelHeader>
-              {tab === "widgets" ? (
-                <Widgets mode={widgetMode} widgets={widgets} />
-              ) : (
-                <ScratchpadCanvas />
-              )}
-            </div>
-
-            {chatMode === "sidebar" && (
-              // Docked chat: caps at --chat-max on big screens (grow 0), shrinks
-              // down to --chat-min before the fit check flips it to floating.
-              <div className="flex min-h-0 min-w-[var(--chat-min)] flex-[0_1_var(--chat-max)] flex-col overflow-hidden">
-                <div className="flex min-h-0 w-full flex-1 flex-col">{chatPanel}</div>
-              </div>
+              </>
             )}
+            <div className="flex-1" />
+            {activeNav === "widgets" && <WidgetActions mode={widgetMode} onMode={setWidgetMode} />}
+            <McpMenu />
+          </PanelHeader>
+
+          {activeNav === "chat" ? (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{chatPanel}</div>
+          ) : activeNav === "widgets" ? (
+            <Widgets mode={widgetMode} widgets={widgets} />
+          ) : (
+            <ScratchpadCanvas />
+          )}
+        </div>
+
+        {display === "sidebar" && (
+          // Docked chat: caps at --chat-max on big screens (grow 0), shrinks down
+          // to --chat-min before the fit check flips it to floating.
+          <div className="flex min-h-0 min-w-[var(--chat-min)] flex-[0_1_var(--chat-max)] flex-col overflow-hidden">
+            <div className="flex min-h-0 w-full flex-1 flex-col">{chatPanel}</div>
           </div>
         )}
       </div>
 
-      {chatMode === "floating" && (
+      {display === "floating" && (
         <ChatPopup
           defaultOpen={layout.chatMode === "floating" && canFitSidebar}
           container={themeRef}
@@ -386,7 +381,7 @@ function WorkspaceView({ widgets }: WorkspaceViewProps) {
               onDismissError={dismissError}
               send={send}
               stop={stop}
-              chatMode={chatMode}
+              chatMode={display}
               onSwitchThread={switchThread}
               onModeChange={handleModeChange}
               onClose={onClose}
