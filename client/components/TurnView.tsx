@@ -1,11 +1,7 @@
-import { useState } from 'react'
-
-import { IconAlertTriangle, IconLoader2, IconUsersGroup, IconX } from '@tabler/icons-react'
-
 import { MarkdownContent } from '@/client/components/MarkdownContent'
 import { ToolCallGroup } from '@/client/components/tool-group/ToolCallGroup'
 import { useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
-import type { Part, SubagentRecord, ToolCall, Turn } from '@/lib/types'
+import type { Part, Turn } from '@/lib/types'
 
 export function EmptyState() {
   return <div className="flex flex-1 flex-col items-center justify-center" />
@@ -28,17 +24,12 @@ export function ThinkingIndicator() {
   )
 }
 
-// A part either folds into a tool-group "run" (reasoning + ordinary tool calls,
-// rendered as one connected timeline) or stands alone (text, files, sources, and
-// the subagent card, which owns its own modal). Skill calls fold into runs and
-// render as a normal timeline row.
+// A part either folds into a tool-group "run" (reasoning + tool calls — including
+// subagents and skills, which render as their own timeline rows) or stands alone
+// (text, files, sources, data).
 function isRunPart(part: Part): boolean {
   if (part.type === 'reasoning') return true
-  if (part.type === 'tool-call') {
-    const c = part.call
-    if (c.caller === 'subagent' && c.subagent) return false
-    return true
-  }
+  if (part.type === 'tool-call') return true
   return false
 }
 
@@ -111,14 +102,16 @@ export function TurnView({ turn, processing = false }: TurnViewProps) {
 
 type PartRendererProps = { part: Part }
 
-// Renders the standalone parts. Reasoning + ordinary tool calls never reach here
-// — they're folded into a <ToolCallGroup> run by buildSegments.
+// Renders the standalone parts. Reasoning + tool calls never reach here — they're
+// folded into a <ToolCallGroup> run by buildSegments.
 function PartRenderer({ part }: PartRendererProps) {
   switch (part.type) {
     case 'text':
       return <MarkdownContent content={part.text} />
     case 'tool-call':
-      return <ToolCallCard call={part.call} />
+      // Tool calls normally fold into a run; this is a defensive fallback for a
+      // lone tool-call segment, rendered as a one-row group.
+      return <ToolCallGroup parts={[part]} cwd={null} />
     case 'file':
       return <FilePart mediaType={part.mediaType} url={part.url} filename={part.filename} />
     case 'source-url':
@@ -130,14 +123,6 @@ function PartRenderer({ part }: PartRendererProps) {
     case 'reasoning':
       return null
   }
-}
-
-// Only the subagent card reaches here; ordinary tools (and skill calls) render in
-// a ToolCallGroup run. The trailing fallback keeps an unexpected tool visible.
-function ToolCallCard({ call }: { call: ToolCall }) {
-  if (call.caller === 'subagent' && call.subagent)
-    return <SubagentCard call={call} subagent={call.subagent} />
-  return <ToolCallGroup parts={[{ type: 'tool-call', call }]} cwd={null} />
 }
 
 type FilePartProps = { mediaType: string; url: string; filename?: string }
@@ -167,128 +152,5 @@ function DataPart({ name, data }: DataPartProps) {
         {JSON.stringify(data, null, 2)}
       </pre>
     </details>
-  )
-}
-
-type SubagentCardProps = { call: ToolCall; subagent: SubagentRecord }
-
-function SubagentCard({ call, subagent }: SubagentCardProps) {
-  const [open, setOpen] = useState(false)
-  const status = subagent.status
-  const latest =
-    status === 'running' && subagent.progress.length > 0
-      ? subagent.progress[subagent.progress.length - 1]
-      : null
-
-  const statusBadge = {
-    running: <IconLoader2 size={12} stroke={1.5} className="animate-spin text-ring" />,
-    completed: <span className="text-xs text-emerald-700">✓</span>,
-    failed: <IconAlertTriangle size={12} stroke={1.5} className="text-red-600" />,
-    stopped: <IconX size={12} stroke={1.5} className="text-muted-foreground" />
-  }[status]
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-left transition-colors hover:bg-muted/70"
-      >
-        <IconUsersGroup size={14} stroke={1.5} className="shrink-0 text-blue-600" />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-xs font-medium">
-              {subagent.description || 'Subtask'}
-            </span>
-            {statusBadge}
-          </div>
-          {latest && (
-            <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{latest}</div>
-          )}
-          {status !== 'running' && subagent.usage?.toolUses != null && (
-            <div className="mt-0.5 text-[11px] text-muted-foreground">
-              {subagent.usage.toolUses} tool call{subagent.usage.toolUses === 1 ? '' : 's'}
-            </div>
-          )}
-        </div>
-      </button>
-      {open && <SubagentModal call={call} subagent={subagent} onClose={() => setOpen(false)} />}
-    </>
-  )
-}
-
-type SubagentModalProps = {
-  call: ToolCall
-  subagent: SubagentRecord
-  onClose: () => void
-}
-
-function SubagentModal({ call, subagent, onClose }: SubagentModalProps) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="flex max-h-[80vh] w-[min(800px,100%)] flex-col overflow-hidden rounded-lg bg-background shadow-xl"
-        onClick={e => e.stopPropagation()}
-      >
-        <header className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <IconUsersGroup size={16} stroke={1.5} className="text-blue-600" />
-              <h3 className="text-sm font-semibold">{subagent.description || 'Subagent task'}</h3>
-            </div>
-            <div className="mt-0.5 text-[11px] text-muted-foreground">
-              status: {subagent.status}
-              {subagent.usage?.durationMs != null &&
-                ` · ${Math.round(subagent.usage.durationMs / 1000)}s`}
-              {subagent.usage?.totalTokens != null && ` · ${subagent.usage.totalTokens} tokens`}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground"
-            aria-label="Close"
-          >
-            <IconX size={18} stroke={1.5} />
-          </button>
-        </header>
-
-        <div className="flex flex-1 gap-4 overflow-hidden px-5 py-4">
-          <aside className="w-52 shrink-0 border-r border-border pr-4">
-            <div className="mb-2 text-[11px] font-medium text-muted-foreground uppercase">
-              Progress
-            </div>
-            <ol className="flex flex-col gap-1">
-              {subagent.progress.map((p, i) => (
-                <li key={i} className="truncate text-[11px] text-muted-foreground">
-                  {i + 1}. {p}
-                </li>
-              ))}
-            </ol>
-          </aside>
-
-          <div className="flex flex-1 flex-col gap-4 overflow-y-auto pr-2">
-            {call.input != null && Object.keys(call.input as object).length > 0 && (
-              <details>
-                <summary className="cursor-pointer text-[11px] text-muted-foreground">
-                  Prompt
-                </summary>
-                <pre className="mt-1 rounded bg-muted p-2 font-mono text-xs whitespace-pre-wrap text-muted-foreground">
-                  {JSON.stringify(call.input, null, 2)}
-                </pre>
-              </details>
-            )}
-            {subagent.transcript.length === 0 ? (
-              <div className="text-xs text-muted-foreground">No nested transcript captured.</div>
-            ) : (
-              subagent.transcript.map(nested => <TurnView key={nested.id} turn={nested} />)
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
   )
 }
