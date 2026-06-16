@@ -7,6 +7,7 @@ import {
   getWorkspaceEnvView,
   isValidEnvKey,
   isValidScope,
+  resetWorkspaceEnvForTest,
   resolveWorkspaceEnv,
   setSecretStoreBackend,
   setWorkspaceEnvStorePath,
@@ -27,7 +28,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  setSecretStoreBackend('auto')
+  resetWorkspaceEnvForTest()
   await rm(wsDir, { recursive: true, force: true })
   await rm(storeDir, { recursive: true, force: true })
 })
@@ -117,6 +118,16 @@ describe('updateWorkspaceEnv — patch semantics', () => {
     })
     const view = await getWorkspaceEnvView(wsDir)
     expect(view.vars.map(v => v.key)).toEqual(['GOOD'])
+  })
+
+  test('concurrent updates do not lose writes (serialized per workspace)', async () => {
+    await Promise.all(
+      Array.from({ length: 12 }, (_, i) =>
+        updateWorkspaceEnv(wsDir, { set: { [`K${i}`]: `${i}` } })
+      )
+    )
+    const env = await resolveWorkspaceEnv(wsDir, 'widgets')
+    expect(Object.keys(env).sort()).toEqual(Array.from({ length: 12 }, (_, i) => `K${i}`).sort())
   })
 })
 
