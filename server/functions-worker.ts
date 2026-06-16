@@ -6,6 +6,16 @@ import { join, resolve, sep } from 'path'
 const MEI_DIR =
   process.env.MEI_FUNCTIONS_DIR ?? join(import.meta.dir, '..', 'test-workspace', '.moi')
 
+// The parent spawns us from a neutral cwd so Bun never auto-loads the
+// workspace's `.env` into this process — moi injects the resolved, scope-filtered
+// env at spawn instead (see functions.ts). Restore the documented
+// `cwd = workspace root` so server functions can use plain relative paths.
+if (process.env.MEI_WORKSPACE_ROOT) {
+  try {
+    process.chdir(process.env.MEI_WORKSPACE_ROOT)
+  } catch {}
+}
+
 const moduleCache = new Map<string, Record<string, unknown>>()
 
 function send(msg: unknown) {

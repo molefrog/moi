@@ -1,8 +1,15 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { parse, stringify } from 'devalue'
-import { join } from 'path'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { basename, join } from 'node:path'
+import { tmpdir } from 'node:os'
 
-import { callFunction, parseFunctionPath } from '../functions'
+import { callFunction, parseFunctionPath, restartWorker } from '../functions'
+import {
+  setSecretStoreBackend,
+  setWorkspaceEnvStorePath,
+  updateWorkspaceEnv
+} from '../workspace-env'
 
 const FIXTURES = join(import.meta.dir, '__fixtures__')
 
@@ -152,5 +159,49 @@ describe('/_rpc/fn endpoint', () => {
     const res = await fetch(`${baseUrl}/_rpc/fn/with-server/getWeather`)
 
     expect(res.status).toBe(404)
+  })
+})
+
+describe('worker env isolation', () => {
+  let storeDir: string
+
+  beforeAll(async () => {
+    // Pin the file secret backend so the workspace-env store never hits the
+    // real OS keychain, and point it at a throwaway dir.
+    storeDir = await mkdtemp(join(tmpdir(), 'moi-fn-env-'))
+    setWorkspaceEnvStorePath(
+      join(storeDir, 'workspace-env.json'),
+      join(storeDir, 'workspace-secrets.json')
+    )
+    setSecretStoreBackend('file')
+    // A workspace .env that should ONLY reach the worker via moi's injection,
+    // never via Bun's auto-load-from-cwd.
+    await writeFile(join(FIXTURES, '.env'), 'MOI_LEAK_SENTINEL=leaked\n')
+  })
+
+  afterAll(async () => {
+    await rm(join(FIXTURES, '.env'), { force: true })
+    await rm(storeDir, { recursive: true, force: true })
+    setSecretStoreBackend('auto')
+    restartWorker(FIXTURES)
+  })
+
+  test('chdir restores cwd = workspace root after neutral spawn', async () => {
+    const cwd = parse(await callFunction('cwd', 'getCwd', stringify([]), FIXTURES)) as string
+    expect(basename(cwd)).toBe('__fixtures__')
+  })
+
+  test('workspace .env does NOT auto-load when inheritDotenv is off', async () => {
+    await updateWorkspaceEnv(FIXTURES, { inheritDotenv: false })
+    restartWorker(FIXTURES)
+    const v = parse(await callFunction('envprobe', 'readSentinel', stringify([]), FIXTURES))
+    expect(v).toBeNull()
+  })
+
+  test('moi injection still delivers .env when inheritDotenv is on', async () => {
+    await updateWorkspaceEnv(FIXTURES, { inheritDotenv: true })
+    restartWorker(FIXTURES)
+    const v = parse(await callFunction('envprobe', 'readSentinel', stringify([]), FIXTURES))
+    expect(v).toBe('leaked')
   })
 })
