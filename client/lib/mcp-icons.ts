@@ -134,25 +134,52 @@ const ALIASES: Record<string, string> = {
   confluence: 'atlassian'
 }
 
-// Strip the `claude.ai ` host prefix that Claude-hosted MCPs carry, leaving the
-// bare service name (`claude.ai Google Drive` → `Google Drive`). Other names
-// pass through unchanged.
+// Strip the `claude.ai` host prefix that Claude-hosted MCPs carry, leaving the
+// bare service name so the icon/label resolve to the real provider. Two forms:
+//   - spaced  `claude.ai Google Drive`        (adapter display name)
+//   - encoded `claude_ai_Google_Drive`        (Claude Code tool name, where the
+//     server is `mcp__claude_ai_<Server>__<tool>` and underscores stand in for
+//     spaces/dots in the service name)
+// For the encoded form, turn the separator underscores back into spaces so the
+// bare name matches `ICONS`/`ALIASES` (`Google_Drive` → `Google Drive`). Unknown
+// services (e.g. `claude_ai_Airbed` → `Airbed`) still unwrap and fall back to a
+// generic icon. Names without the prefix pass through unchanged.
 function stripHostPrefix(server: string): string {
-  return server.replace(/^claude\.ai\s+/i, '')
+  const m = server.match(/^claude[._]ai[._\s]+(.+)$/i)
+  if (!m) return server
+  return m[1].replace(/_/g, ' ')
 }
+
+// Collapse a server name to a comparison key: lowercase, drop every separator so
+// the registry name and the tool-name encoding of the same server compare equal
+// (`claude-in-chrome`, `Claude_in_Chrome`, `claude.in.chrome` → `claudeinchrome`).
+// The same server is encoded inconsistently across surfaces (the header reads it
+// from `mcpServerStatus()`, a tool call embeds it in `mcp__<server>__<tool>`), so
+// matching on the raw string misses; canonicalizing makes both resolve to the
+// same icon.
+function canon(name: string): string {
+  return name.toLowerCase().replace(/[\s._-]+/g, '')
+}
+
+// Canonicalized lookups, built once from the readable maps above. Alias values
+// are icon keys, so canonicalize both sides.
+const ICONS_BY_CANON = new Map(Object.entries(ICONS).map(([k, v]) => [canon(k), v]))
+const ALIASES_BY_CANON = new Map(Object.entries(ALIASES).map(([k, v]) => [canon(k), canon(v)]))
 
 export function getMcpIcon(server: string): string | undefined {
-  const name = stripHostPrefix(server).toLowerCase().trim()
-  const key = ALIASES[name] ?? name
-  return ICONS[key]
+  const key = canon(stripHostPrefix(server))
+  return ICONS_BY_CANON.get(ALIASES_BY_CANON.get(key) ?? key)
 }
 
-// Title-case the server name for display: `notion` → `Notion`, `granola` → `Granola`.
-// Names with hyphens or underscores stay readable: `my-server` → `My-Server`.
-// The Claude-hosted prefix is dropped first so `claude.ai Figma` shows as `Figma`.
+// Title-case the server name for display: `notion` → `Notion`, `granola` →
+// `Granola`. Separators (`-`, `_`, `.`, spaces) all become a single space so the
+// variants of one server read the same (`claude-in-chrome` and `Claude_in_Chrome`
+// → `Claude In Chrome`). The Claude-hosted prefix is dropped first so
+// `claude.ai Figma` / `claude_ai_Figma` show as `Figma`.
 export function formatMcpServerName(server: string): string {
   return stripHostPrefix(server)
-    .split(/([_-])/)
-    .map(part => (part.length > 1 ? part[0].toUpperCase() + part.slice(1) : part))
-    .join('')
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .map(part => part[0].toUpperCase() + part.slice(1))
+    .join(' ')
 }
