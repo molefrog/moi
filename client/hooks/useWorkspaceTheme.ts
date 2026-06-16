@@ -22,6 +22,11 @@ export function useWorkspaceTheme(
   target: RefObject<HTMLElement | null>
 ) {
   const font = theme?.font ?? 'default'
+  // Read the scoped color overrides up front so the color effect below depends
+  // on these exact values rather than the whole `theme` object (it accesses
+  // them via a dynamic key, which the deps linter can't see through).
+  const background = theme?.background
+  const foreground = theme?.foreground
 
   useEffect(() => {
     const el = target.current
@@ -58,8 +63,9 @@ export function useWorkspaceTheme(
   useEffect(() => {
     const el = target.current
     if (!el) return
+    const overrides = { background, foreground }
     for (const key of COLOR_OVERRIDES) {
-      const value = theme?.[key]
+      const value = overrides[key]
       if (value) {
         el.style.setProperty(`--${key}`, value)
       } else {
@@ -69,7 +75,7 @@ export function useWorkspaceTheme(
     return () => {
       for (const key of COLOR_OVERRIDES) el.style.removeProperty(`--${key}`)
     }
-  }, [theme?.background, theme?.foreground, target])
+  }, [background, foreground, target])
 
   // Drop the shared font <link> when the workspace unmounts.
   useEffect(() => () => document.getElementById(FONT_LINK_ID)?.remove(), [])
