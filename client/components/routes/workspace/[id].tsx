@@ -3,11 +3,14 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 
 import {
+  IconAppWindow,
   IconArtboard,
+  IconDots,
   IconLayoutDashboard,
   IconLayoutGrid,
   IconMessageCircle,
   IconPalette,
+  IconPlus,
 } from "@tabler/icons-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -23,6 +26,16 @@ import {
 } from "@/client/components/layout/SidebarLayout";
 import { LedLogo } from "@/client/components/playground/LedLogo";
 import { Button } from "@/client/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/client/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/client/components/ui/tooltip";
+import { WorkspaceSettings } from "@/client/components/settings/WorkspaceSettings";
 import { useChat } from "@/client/hooks/useChat";
 import { useFitsSidebar } from "@/client/hooks/useFitsSidebar";
 import { useGridReconcile } from "@/client/hooks/useGridReconcile";
@@ -34,6 +47,7 @@ import {
   useWorkspaceLayoutCtx,
 } from "@/client/lib/WorkspaceLayoutContext";
 import { cn } from "@/client/lib/cn";
+import { DEMO_VIEWS, type ViewDef } from "@/client/lib/views";
 import { liveStore } from "@/client/store/live";
 import type { ChatDisplay, SessionInfo, WidgetInfo } from "@/lib/types";
 
@@ -125,17 +139,24 @@ const ACTION_VARIANTS = {
   to: { opacity: 1, scale: 1, filter: "blur(0px)" },
 };
 
-// Active view, held in WorkspaceView's local state (transient — never persisted).
-// "chat" shows the chat fullscreen, overriding its dock position; "widgets" /
-// "canvas" show that body with the chat in its persisted position beside it.
-type WorkspaceNav = "chat" | "widgets" | "canvas";
+// A nav target: a fixed tab, or a view id. The `(string & {})` keeps editor
+// autocomplete for the fixed keys while still accepting arbitrary view ids.
+// Held in WorkspaceView's local state (transient — never persisted): "chat"
+// shows the chat fullscreen; "widgets" / "canvas" / a view id fill the main area
+// with the chat in its persisted position beside it.
+type WorkspaceNav = "chat" | "widgets" | "canvas" | (string & {});
+
+// How many view tabs render inline before the rest fold into the "…" menu.
+const INLINE_VIEWS = 2;
 
 type WorkspaceTabsProps = {
   active: WorkspaceNav;
-  onSelect: (view: WorkspaceNav) => void;
+  onSelect: (nav: WorkspaceNav) => void;
+  views: ViewDef[];
+  onCreateView: () => void;
 };
 
-function WorkspaceTabs({ active, onSelect }: WorkspaceTabsProps) {
+function WorkspaceTabs({ active, onSelect, views, onCreateView }: WorkspaceTabsProps) {
   // Active tab outline uses an inset shadow (not a border) so the box keeps the
   // exact h-7 footprint of the other header buttons — no 1px layout shift.
   const tabClass = (isActive: boolean) =>
@@ -146,32 +167,70 @@ function WorkspaceTabs({ active, onSelect }: WorkspaceTabsProps) {
         : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
     );
 
+  const tab = (key: WorkspaceNav, Icon: typeof IconMessageCircle, label: string) => (
+    <button key={key} type="button" className={tabClass(active === key)} onClick={() => onSelect(key)}>
+      <Icon stroke={1.75} />
+      {label}
+    </button>
+  );
+
+  // Icon-only tabs are square (w = h) and keep the active/hover treatment.
+  const iconTabClass = (isActive: boolean) => cn(tabClass(isActive), "size-7 justify-center px-0");
+
+  const inline = views.slice(0, INLINE_VIEWS);
+  const overflow = views.slice(INLINE_VIEWS);
+  // The "…" trigger is always shown (it hosts "Create View"); it lights up when
+  // one of the folded-away views is the active one.
+  const overflowActive = overflow.some((v) => v.id === active);
+
   return (
     <div className="flex items-center gap-1">
-      <button
-        type="button"
-        className={tabClass(active === "chat")}
-        onClick={() => onSelect("chat")}
-      >
-        <IconMessageCircle stroke={1.75} />
-        Chat
-      </button>
-      <button
-        type="button"
-        className={tabClass(active === "widgets")}
-        onClick={() => onSelect("widgets")}
-      >
-        <IconLayoutGrid stroke={1.75} />
-        Widgets
-      </button>
-      <button
-        type="button"
-        className={tabClass(active === "canvas")}
-        onClick={() => onSelect("canvas")}
-      >
-        <IconArtboard stroke={1.75} />
-        Scratchpad
-      </button>
+      <Tooltip delay={50}>
+        <TooltipTrigger
+          render={
+            <button
+              type="button"
+              className={iconTabClass(active === "chat")}
+              onClick={() => onSelect("chat")}
+              aria-label="Open fullscreen chat"
+            >
+              <IconMessageCircle stroke={1.75} />
+            </button>
+          }
+        />
+        <TooltipContent>Open fullscreen chat</TooltipContent>
+      </Tooltip>
+      {tab("widgets", IconLayoutGrid, "Widgets")}
+      {tab("canvas", IconArtboard, "Scratchpad")}
+      {inline.map((v) => tab(v.id, IconAppWindow, v.name))}
+
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <button type="button" className={iconTabClass(overflowActive)} aria-label="More views">
+              <IconDots stroke={1.75} />
+            </button>
+          }
+        />
+        <DropdownMenuContent align="start" className="min-w-48">
+          {overflow.map((v) => (
+            <DropdownMenuCheckboxItem
+              key={v.id}
+              checked={active === v.id}
+              closeOnClick
+              onClick={() => onSelect(v.id)}
+            >
+              <IconAppWindow stroke={1.75} />
+              {v.name}
+            </DropdownMenuCheckboxItem>
+          ))}
+          {overflow.length > 0 && <DropdownMenuSeparator />}
+          <DropdownMenuItem onClick={onCreateView}>
+            <IconPlus stroke={1.75} />
+            Create View
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
@@ -182,6 +241,22 @@ function WorkspaceTabs({ active, onSelect }: WorkspaceTabsProps) {
 function ScratchpadCanvas() {
   return (
     <div className="min-h-0 flex-1 bg-muted/40 bg-[radial-gradient(circle,var(--border)_1px,transparent_1px)] bg-[size:20px_20px] bg-[position:center]" />
+  );
+}
+
+type ViewAppProps = {
+  view: ViewDef;
+};
+
+// A view — an agent-defined app — rendered full-area like the scratchpad.
+// Placeholder for now; the real app content will mount here once wired up.
+function ViewApp({ view }: ViewAppProps) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 bg-muted/40 bg-[radial-gradient(circle,var(--border)_1px,transparent_1px)] bg-[size:20px_20px] bg-[position:center]">
+      <IconAppWindow size={32} stroke={1.5} className="text-muted-foreground/50" />
+      <div className="text-foreground text-sm font-medium">{view.name}</div>
+      <div className="text-muted-foreground/60 text-xs">View app · demo placeholder</div>
+    </div>
   );
 }
 
@@ -217,19 +292,19 @@ function WidgetActions({ mode, onMode }: WidgetActionsProps) {
         >
           <Button
             variant="ghost"
-            className="h-7 text-muted-foreground @max-2xl:px-1.5! [&_svg]:size-[18px]"
+            className="h-7 text-muted-foreground @max-3xl:px-1.5! [&_svg]:size-[18px]"
             onClick={() => onMode("customizing")}
           >
             <IconPalette stroke={1.75} />
-            <span className="@max-2xl:hidden">Customize</span>
+            <span className="@max-3xl:hidden">Customize</span>
           </Button>
           <Button
             variant="ghost"
-            className="h-7 text-muted-foreground @max-2xl:px-1.5! [&_svg]:size-[18px]"
+            className="h-7 text-muted-foreground @max-3xl:px-1.5! [&_svg]:size-[18px]"
             onClick={() => onMode("editing")}
           >
             <IconLayoutDashboard stroke={1.75} />
-            <span className="@max-2xl:hidden">Edit widgets</span>
+            <span className="@max-3xl:hidden">Edit widgets</span>
           </Button>
         </motion.div>
       )}
@@ -247,10 +322,13 @@ function WorkspaceView({ widgets }: WorkspaceViewProps) {
   const { layout, setLayout, name } = useWorkspaceLayoutCtx();
   const { ref: rowRef, fits: canFitSidebar } = useFitsSidebar<HTMLDivElement>();
   const [widgetMode, setWidgetMode] = useState<WidgetMode>("idle");
-  // Two orthogonal, transient local bits: which body view is selected, and
-  // whether the chat is fullscreen. Fullscreen overrides (never persists) the
-  // chat's dock position, and toggling it keeps the body view underneath.
-  const [bodyTab, setBodyTab] = useState<"widgets" | "canvas">("widgets");
+  // Agent-defined views (demo data; same for every workspace until wired up).
+  // Local state so Create/Delete are interactive in the demo.
+  const [views, setViews] = useState<ViewDef[]>(DEMO_VIEWS);
+  // Two orthogonal, transient local bits: which body is selected (a fixed tab or
+  // a view id), and whether the chat is fullscreen. Fullscreen overrides (never
+  // persists) the chat's dock position, and toggling it keeps the body beneath.
+  const [bodyTab, setBodyTab] = useState<string>("widgets");
   const [fullscreen, setFullscreen] = useState(false);
 
   // Theme is scoped to this wrapper, not :root — the sidebar keeps the default
@@ -276,7 +354,8 @@ function WorkspaceView({ widgets }: WorkspaceViewProps) {
   // The nav highlights whatever fills the main area.
   const activeNav: WorkspaceNav = display === "fullscreen" ? "chat" : bodyTab;
 
-  // Nav tabs: "chat" goes fullscreen; a body tab leaves fullscreen and shows it.
+  // Nav tabs: "chat" goes fullscreen; a body tab (widgets / canvas / view id)
+  // leaves fullscreen and shows it.
   const selectNav = (v: WorkspaceNav) => {
     if (v === "chat") setFullscreen(true);
     else {
@@ -284,6 +363,16 @@ function WorkspaceView({ widgets }: WorkspaceViewProps) {
       setFullscreen(false);
     }
   };
+
+  // Demo view management (local only — not persisted or synced anywhere).
+  const createView = () => {
+    const created: ViewDef = { id: crypto.randomUUID(), name: `View ${views.length + 1}` };
+    setViews([...views, created]);
+    setBodyTab(created.id);
+    setFullscreen(false);
+  };
+  // The active view, when a view (not a fixed tab) fills the main area.
+  const activeView = views.find((v) => v.id === bodyTab);
 
   // The chat-mode picker switches the display: fullscreen is the transient view;
   // sidebar/floating persist the dock position (and leave fullscreen).
@@ -340,18 +429,28 @@ function WorkspaceView({ widgets }: WorkspaceViewProps) {
             {hasWidgets && (
               <>
                 <span className="text-muted-foreground/40 select-none text-sm">/</span>
-                <WorkspaceTabs active={activeNav} onSelect={selectNav} />
+                <WorkspaceTabs
+                  active={activeNav}
+                  onSelect={selectNav}
+                  views={views}
+                  onCreateView={createView}
+                />
               </>
             )}
             <div className="flex-1" />
             {activeNav === "widgets" && <WidgetActions mode={widgetMode} onMode={setWidgetMode} />}
             <McpMenu />
+            <WorkspaceSettings />
           </PanelHeader>
 
           {activeNav === "chat" ? (
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{chatPanel}</div>
           ) : activeNav === "widgets" ? (
             <Widgets mode={widgetMode} widgets={widgets} />
+          ) : activeNav === "canvas" ? (
+            <ScratchpadCanvas />
+          ) : activeView ? (
+            <ViewApp view={activeView} />
           ) : (
             <ScratchpadCanvas />
           )}
