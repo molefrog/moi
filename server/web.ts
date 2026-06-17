@@ -4,7 +4,7 @@ import { basename, join, sep } from 'node:path'
 import type { ClientMessage, EnvScope, WorkspaceModels, WorkspaceType } from '@/lib/types'
 
 import index from '../client/index.html'
-import { getClaudeModels, getMcpStatus } from './agent'
+import { getClaudeModels } from './agent'
 import {
   getCCRunningSessions,
   interruptCCSession,
@@ -16,6 +16,7 @@ import { PORT } from './constants'
 import { control } from './control'
 import { callFunction, killAllWorkers, parseFunctionPath, restartWorker } from './functions'
 import { getWorkspacePreview, loadLayout, saveLayout } from './layout'
+import { getMcpStatus } from './mcp'
 import { getOpenClawModels, getOpenClawSessionMessages, getOpenClawSessions } from './openclaw'
 import { toSessionInfo, toStreamEvents } from './openclaw-adapter'
 import {
