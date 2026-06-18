@@ -1,0 +1,303 @@
+import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test'
+import { rmSync } from 'node:fs'
+import { join } from 'path'
+
+import { buildApplet, extractViewConfig, extractWidgetConfig } from '../build-applet'
+
+const FIXTURES = join(import.meta.dir, '__fixtures__')
+
+// Warmup: under `bun test` (and only there) the very FIRST Bun.build in the
+// process with this exact option combo (virtual entry + tailwind plugin +
+// root + inline sourcemap + esm) fails to resolve the entry's import with
+// "Could not resolve"; the identical second call succeeds. Pre-existing Bun
+// quirk (1.3.x), not reproducible outside the test runner — swallow one
+// throwaway build so every real test starts from the working state.
+beforeAll(async () => {
+  await buildApplet(join(FIXTURES, 'hello.tsx')).catch(() => {})
+})
+
+describe('buildApplet', () => {
+  test('builds a basic widget with React externalized', async () => {
+    const result = await buildApplet(join(FIXTURES, 'hello.tsx'))
+
+    expect(result.js).toBeTruthy()
+    expect(result.js).toContain('from "react"')
+    expect(result.js).toContain('HelloWidget')
+    expect(result.serverModules).toEqual([])
+  })
+
+  test('includes Tailwind CSS injected as a style tag', async () => {
+    const result = await buildApplet(join(FIXTURES, 'hello.tsx'))
+
+    expect(result.js).toContain('data-widget')
+    expect(result.js).toContain('document.createElement("style")')
+  })
+
+  test('derives widget name from filename for CSS injection', async () => {
+    const result = await buildApplet(join(FIXTURES, 'hello.tsx'))
+
+    expect(result.js).toContain(', "hello");')
+  })
+
+  test('rewrites .server.ts imports to rpc() stubs', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-server.tsx'))
+
+    // Should use rpc("with-server", "getWeather") pattern
+    expect(result.js).toContain('rpc("with-server", "getWeather")')
+    expect(result.js).not.toContain('temp: 72')
+
+    expect(result.serverModules).toHaveLength(1)
+    expect(result.serverModules[0].name).toBe('with-server')
+    expect(result.serverModules[0].exports.sort()).toEqual(['getForecast', 'getWeather'])
+  })
+
+  test('bundles devalue stringify/parse into the rpc module', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-server.tsx'))
+
+    // devalue's stringify should be used for request body
+    expect(result.js).toContain('stringify')
+    // devalue's parse should be used for response
+    expect(result.js).toContain('parse')
+  })
+
+  test('rpc function constructs /_rpc/fn/ URL', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-server.tsx'))
+
+    expect(result.js).toContain('"/_rpc/"')
+    expect(result.js).toContain('"/fn/"')
+    expect(result.js).toContain('"POST"')
+  })
+
+  test('tree-shakes unused server function proxies', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-server.tsx'))
+
+    expect(result.js).toContain('rpc("with-server", "getWeather")')
+    // getForecast still in serverModules even if tree-shaken from JS
+    expect(result.serverModules[0].exports).toContain('getForecast')
+  })
+
+  test('rejects sync function export from .server.ts', async () => {
+    await expect(buildApplet(join(FIXTURES, 'bad-sync.tsx'))).rejects.toThrow(
+      'not an async function'
+    )
+  })
+
+  test('rejects const export from .server.ts', async () => {
+    await expect(buildApplet(join(FIXTURES, 'bad-const.tsx'))).rejects.toThrow('"API_VERSION"')
+  })
+
+  test('produces inline source maps', async () => {
+    const result = await buildApplet(join(FIXTURES, 'hello.tsx'))
+
+    expect(result.js).toContain('//# sourceMappingURL=data:')
+  })
+
+  test('handles .ts widgets (not just .tsx)', async () => {
+    const result = await buildApplet(join(FIXTURES, 'plain.ts'))
+
+    expect(result.js).toContain('PlainWidget')
+    expect(result.js).toContain('export')
+  })
+
+  test('ignores type exports from .server.ts', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-types.tsx'))
+
+    expect(result.serverModules[0].exports).toEqual(['getWeather'])
+    expect(result.js).toContain('rpc("with-types", "getWeather")')
+  })
+
+  test('throws on nonexistent entrypoint', async () => {
+    await expect(buildApplet(join(FIXTURES, 'nope.tsx'))).rejects.toThrow()
+  })
+
+  test('resolves .server import without .ts extension', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-server.tsx'))
+    expect(result.js).toContain('rpc("with-server"')
+  })
+
+  test('handles widget importing multiple server modules', async () => {
+    const result = await buildApplet(join(FIXTURES, 'multi-server.tsx'))
+
+    expect(result.serverModules).toHaveLength(2)
+    const names = result.serverModules.map(m => m.name).sort()
+    expect(names).toEqual(['alpha', 'beta'])
+    expect(result.js).toContain('rpc("alpha"')
+    expect(result.js).toContain('rpc("beta"')
+  })
+
+  test('handles empty server module (no exports)', async () => {
+    const result = await buildApplet(join(FIXTURES, 'empty-server.tsx'))
+
+    expect(result.serverModules).toHaveLength(1)
+    expect(result.serverModules[0].exports).toEqual([])
+  })
+
+  test('handles server function with $ in name', async () => {
+    const result = await buildApplet(join(FIXTURES, 'dollar-fn.tsx'))
+
+    expect(result.js).toContain('rpc("dollar-fn", "get$Data")')
+    expect(result.serverModules[0].exports).toContain('get$Data')
+  })
+
+  test('handles widget with syntax error', async () => {
+    await expect(buildApplet(join(FIXTURES, 'syntax-error.tsx'))).rejects.toThrow()
+  })
+
+  test('extracts config from artifact when widget exports config', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-config.tsx'))
+    expect(result.config).toEqual({ rowSpan: 2, colSpan: 4 })
+  })
+
+  test('artifact config is null when widget has no config export', async () => {
+    const result = await buildApplet(join(FIXTURES, 'hello.tsx'))
+    expect(result.config).toBeNull()
+  })
+
+  test('keys server modules by path relative to moiRoot', async () => {
+    const result = await buildApplet(join(FIXTURES, 'nested', 'widget.tsx'), FIXTURES)
+
+    expect(result.serverModules).toHaveLength(1)
+    expect(result.serverModules[0].name).toBe('nested/deep')
+    expect(result.js).toContain('rpc("nested/deep", "getDeep")')
+  })
+
+  test('explicit moiRoot equal to the widget dir keeps basename keys', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-server.tsx'), FIXTURES)
+
+    expect(result.serverModules[0].name).toBe('with-server')
+    expect(result.js).toContain('rpc("with-server", "getWeather")')
+  })
+
+  test('rejects a server import that escapes the moi root', async () => {
+    await expect(
+      buildApplet(join(FIXTURES, 'nested', 'escape.tsx'), join(FIXTURES, 'nested'))
+    ).rejects.toThrow('escapes the moi root')
+  })
+
+  test('keys correctly when the moi root sits behind a symlink', async () => {
+    // On macOS `/tmp` → `/private/tmp`: Bun's resolver canonicalizes server
+    // file paths, so an un-canonicalized moiRoot must not read as an escape.
+    const { mkdtempSync, symlinkSync, rmSync, mkdirSync, writeFileSync } = await import('node:fs')
+
+    // Inside the repo tree (not os.tmpdir()) so the widget's `@import
+    // 'tailwindcss'` resolves against the repo's node_modules.
+    const realRoot = mkdtempSync(join(import.meta.dir, 'moi-real-'))
+    const linkRoot = realRoot + '-link'
+    symlinkSync(realRoot, linkRoot)
+    try {
+      mkdirSync(join(realRoot, 'widgets'))
+      writeFileSync(
+        join(realRoot, 'widgets', 'sym.server.ts'),
+        'export async function getSym() { return 1 }\n'
+      )
+      writeFileSync(
+        join(realRoot, 'widgets', 'sym.tsx'),
+        "import { getSym } from './sym.server'\n" +
+          'export default function Sym() { return <button onClick={() => getSym()}>s</button> }\n'
+      )
+
+      const result = await buildApplet(join(linkRoot, 'widgets', 'sym.tsx'), linkRoot)
+      expect(result.serverModules[0].name).toBe('widgets/sym')
+    } finally {
+      rmSync(linkRoot)
+      rmSync(realRoot, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('extractWidgetConfig', () => {
+  test('extracts rowSpan and colSpan from exported config object', async () => {
+    const config = await extractWidgetConfig(join(FIXTURES, 'with-config.tsx'))
+    expect(config).toEqual({ rowSpan: 2, colSpan: 4 })
+  })
+
+  test('returns null when no config export', async () => {
+    const config = await extractWidgetConfig(join(FIXTURES, 'hello.tsx'))
+    expect(config).toBeNull()
+  })
+
+  test('uses defaults for missing keys (partial config)', async () => {
+    const config = await extractWidgetConfig(join(FIXTURES, 'with-partial-config.tsx'))
+    expect(config).toEqual({ rowSpan: 1, colSpan: 3 })
+  })
+
+  test('warns and uses defaults for out-of-range values', async () => {
+    const warn = spyOn(console, 'warn')
+    const config = await extractWidgetConfig(join(FIXTURES, 'with-bad-config.tsx'))
+    expect(config).toEqual({ rowSpan: 1, colSpan: 2 })
+    expect(warn).toHaveBeenCalledTimes(2)
+    warn.mockRestore()
+  })
+
+  test('extracts requiredEnv string array alongside spans', async () => {
+    const config = await extractWidgetConfig(join(FIXTURES, 'with-required-env.tsx'))
+    expect(config).toEqual({
+      rowSpan: 2,
+      colSpan: 2,
+      requiredEnv: ['ELEVENLABS_API_KEY', 'ELEVENLABS_VOICE_ID']
+    })
+  })
+})
+
+describe('extractViewConfig', () => {
+  test('extracts title and requiredEnv', async () => {
+    const config = await extractViewConfig(join(FIXTURES, 'with-view-config.tsx'))
+    expect(config).toEqual({ title: 'My View', requiredEnv: ['API_KEY'] })
+  })
+
+  test('returns null when there is no config export', async () => {
+    expect(await extractViewConfig(join(FIXTURES, 'hello.tsx'))).toBeNull()
+  })
+
+  test('ignores widget-only span fields', async () => {
+    // with-config.tsx exports { rowSpan, colSpan } — none of which a view honors.
+    expect(await extractViewConfig(join(FIXTURES, 'with-config.tsx'))).toEqual({})
+  })
+})
+
+describe("buildApplet kind='view'", () => {
+  test('parses the view config (title + requiredEnv, no spans)', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-view-config.tsx'), undefined, 'view')
+    expect(result.config).toEqual({ title: 'My View', requiredEnv: ['API_KEY'] })
+  })
+
+  test('namespaces the injected <style> id with the view kind', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-view-config.tsx'), undefined, 'view')
+    // Prevents a widget and a view sharing a name from clobbering each other.
+    expect(result.js).toContain(', "view:with-view-config");')
+  })
+
+  test('widget kind keeps the bare name as the style id', async () => {
+    const result = await buildApplet(join(FIXTURES, 'hello.tsx'), undefined, 'widget')
+    expect(result.js).toContain(', "hello");')
+    expect(result.js).not.toContain('view:hello')
+  })
+})
+
+describe('mixed widget + view build (Tailwind isolation)', () => {
+  const ROOT = join(FIXTURES, 'kindmix')
+
+  afterAll(() => {
+    rmSync(join(ROOT, '.build'), { recursive: true, force: true })
+  })
+
+  // Regression guard for the shared-synthetic-CSS race: widgets and views build
+  // concurrently under one moiRoot but from different source dirs. Each kind
+  // must write its OWN `@source` (per-kind synthetic CSS file) so neither
+  // compiles against the other's directory.
+  test('each kind compiles only its own utilities', async () => {
+    const [widget, view] = await Promise.all([
+      buildApplet(join(ROOT, 'widgets', 'wmix.tsx'), ROOT, 'widget'),
+      buildApplet(join(ROOT, 'views', 'vmix.tsx'), ROOT, 'view')
+    ])
+    // Assert on the compiled utility SELECTOR (`.tabular-nums` / `.tracking-widest`),
+    // which is emitted only when that kind's @source actually saw the class — a
+    // leaked @source would produce the sibling's selector. (Bare property names
+    // like `letter-spacing` are unreliable: they also appear in Tailwind's
+    // preflight reset.)
+    expect(widget.js).toContain('.tabular-nums')
+    expect(widget.js).not.toContain('.tracking-widest')
+    expect(view.js).toContain('.tracking-widest')
+    expect(view.js).not.toContain('.tabular-nums')
+  })
+})
