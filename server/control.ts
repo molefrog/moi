@@ -5,6 +5,8 @@ import { processIcon } from './icon'
 import { loadLayout, saveLayout } from './layout'
 import { publishEvent } from './events'
 import { listWorkspaces, registerWorkspace } from './registry'
+import { readScratchpadShapes } from './scratchpad'
+import { relayScratchOp } from './scratchpad-relay'
 import { broadcastAll } from './state'
 import { applyThemeUpdate, matchColorTheme } from './theme'
 import { handleBundle } from './widgets'
@@ -156,6 +158,44 @@ export const control = Bun.serve({
               clearedIcon: clearIcon
             })
           )
+        }
+
+        if (data.type === 'scratch') {
+          const path = resolve(String(data.path ?? '.'))
+          const op = data.op
+          if (!op || typeof op.kind !== 'string') {
+            ws.send(JSON.stringify({ error: 'Missing scratch op' }))
+            return
+          }
+
+          // `read` is served straight off the disk snapshot — no live tab needed.
+          if (op.kind === 'read') {
+            ws.send(JSON.stringify({ shapes: await readScratchpadShapes(path) }))
+            return
+          }
+
+          // Everything else relays to a live editor. Resolve the workspace id so
+          // the broadcast targets the tab(s) showing *this* workspace's canvas.
+          const workspaces = await listWorkspaces()
+          const entry = workspaces.find(w => w.path === path)
+          if (!entry) {
+            ws.send(JSON.stringify({ error: `No workspace registered at ${path}` }))
+            return
+          }
+
+          // Assign add ops a stable name when the caller didn't (`--id`), so the
+          // derived tldraw shape id is deterministic across tabs.
+          if (op.kind.startsWith('add-') && !op.name) {
+            op.name = `s_${crypto.randomUUID().slice(0, 8)}`
+          }
+
+          try {
+            const result = await relayScratchOp(entry.id, op)
+            ws.send(JSON.stringify({ ok: true, result }))
+          } catch (err) {
+            ws.send(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }))
+          }
+          return
         }
       } catch (err) {
         console.error('[control]', err)

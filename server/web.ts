@@ -12,6 +12,7 @@ import { PORT } from './constants'
 import { control } from './control'
 import { EVENTS_TOPIC, setEventServer } from './events'
 import { killAllWorkers } from './functions'
+import { resolveScratchOp } from './scratchpad-relay'
 import {
   abortOpenClawRun,
   getOpenClawRunningSessions,
@@ -34,6 +35,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
     optimisticId?: unknown
     model?: unknown
     effort?: unknown
+    opId?: unknown
   }
   if (v.type === 'chat')
     return (
@@ -46,6 +48,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
       (v.effort === undefined || typeof v.effort === 'string')
     )
   if (v.type === 'stop') return typeof v.workspaceId === 'string' && typeof v.sessionId === 'string'
+  if (v.type === 'scratchpad:op-result') return typeof v.opId === 'string'
   return false
 }
 
@@ -142,6 +145,11 @@ export const app = Bun.serve<WsData>({
           } else {
             interruptCCSession(data.workspaceId, data.sessionId)
           }
+        }
+        // A tab's reply to a relayed Scratchpad op — settle the pending CLI
+        // request (first reply wins; later/duplicate replies are ignored).
+        if (data.type === 'scratchpad:op-result') {
+          resolveScratchOp(data.opId, data.result, data.error)
         }
       } catch {}
     },

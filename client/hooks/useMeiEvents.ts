@@ -10,6 +10,9 @@ export type MeiEvent =
   | { type: 'view-layout:updated'; views: ViewInfo[] }
   | { type: 'theme:updated' }
   | { type: 'workspace:updated' }
+  // The Scratchpad canvas for `workspaceId` was saved — open tabs reload from
+  // disk. `origin` is the tab that wrote it, so that tab can skip its own echo.
+  | { type: 'scratchpad:updated'; workspaceId: string; origin?: string }
 
 type MeiEventHandler = (event: MeiEvent) => void
 

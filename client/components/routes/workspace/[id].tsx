@@ -23,6 +23,7 @@ import {
 import { ChatPanel } from "@/client/components/ChatPanel";
 import { ChatPopup } from "@/client/components/ChatPopup";
 import { McpMenu } from "@/client/components/McpMenu";
+import { Scratchpad } from "@/client/components/Scratchpad";
 import { WidgetErrorBoundary } from "@/client/components/WidgetErrorBoundary";
 import { type WidgetMode, Widgets } from "@/client/components/Widgets";
 import {
@@ -245,15 +246,6 @@ function WorkspaceTabs({ active, onSelect, views, onCreateView }: WorkspaceTabsP
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
-  );
-}
-
-// Empty scratchpad canvas — a dotted-pattern page that fills the widget area.
-// Placeholder for the infinite canvas that will live here; the dot grid is a
-// repeating radial-gradient sized via background-size.
-function ScratchpadCanvas() {
-  return (
-    <div className="min-h-0 flex-1 bg-muted/40 bg-[radial-gradient(circle,var(--border)_1px,transparent_1px)] bg-[size:20px_20px] bg-[position:center]" />
   );
 }
 
@@ -495,12 +487,10 @@ function WorkspaceView({ widgets, views }: WorkspaceViewProps) {
           ) : activeNav === "widgets" ? (
             <Widgets mode={widgetMode} widgets={widgets} />
           ) : activeNav === "canvas" ? (
-            <ScratchpadCanvas />
+            <Scratchpad />
           ) : activeView ? (
             <ViewApp view={activeView} />
-          ) : (
-            <ScratchpadCanvas />
-          )}
+          ) : null}
         </div>
 
         {display === "sidebar" && (

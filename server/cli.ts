@@ -2,11 +2,13 @@
 import { defineCommand, runMain, showUsage } from 'citty'
 import Table from 'cli-table3'
 import { mkdir } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join, resolve } from 'path'
 import pc from 'picocolors'
 
 import { COLOR_THEMES, FONT_THEMES } from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/themes'
+import type { ScratchArrowEnd, ScratchOp } from '@/lib/types'
 
 import { CONTROL_PORT, PORT } from './constants'
 import { scaffoldMoiDir } from './moi-scaffold'
@@ -789,9 +791,246 @@ const config = defineCommand({
   }
 })
 
+// ---- scratch (Scratchpad canvas) --------------------------------------------
+
+// Parse a "x,y" coordinate pair (tldraw canvas space, y down).
+function parseXY(s: string): { x: number; y: number } {
+  const parts = s.split(',').map(p => Number(p.trim()))
+  if (parts.length !== 2 || !parts.every(n => Number.isFinite(n))) {
+    throw new Error(`Expected "x,y", got "${s}"`)
+  }
+  return { x: parts[0], y: parts[1] }
+}
+
+// An arrow endpoint: a bare "x,y" is a free point; anything else is a shape name
+// to bind to (so the arrow follows that shape).
+function parseEnd(s: string): ScratchArrowEnd {
+  if (/^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/.test(s)) return parseXY(s)
+  return { name: s }
+}
+
+type ScratchCliOp = ScratchOp | { kind: 'read' }
+
+// Round-trip one op through the control port and hand the reply to `onResult`.
+// Mirrors the `bundle`/`theme` commands: one socket per invocation, print, exit.
+function sendScratch(
+  path: string,
+  op: ScratchCliOp,
+  onResult: (res: Record<string, unknown>) => void | Promise<void>
+) {
+  const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
+  ws.onopen = () => ws.send(JSON.stringify({ type: 'scratch', path, op }))
+  ws.onmessage = async event => {
+    const res = JSON.parse(String(event.data))
+    if (res.error) {
+      console.error('\n' + pc.red('✗') + ' ' + res.error + '\n')
+      ws.close()
+      process.exit(1)
+    }
+    await onResult(res)
+    ws.close()
+    process.exit(0)
+  }
+  ws.onerror = () => {
+    console.error('Could not connect to control server. Is the main process running?')
+    process.exit(1)
+  }
+}
+
+// Print the name a draw op landed on, so the agent can address it later.
+function printAdded(res: Record<string, unknown>) {
+  const result = res.result as { name?: string } | undefined
+  console.log('\n' + pc.green('✓') + ' added ' + pc.bold(result?.name ?? '(shape)') + '\n')
+}
+
+const dirArg = {
+  type: 'string',
+  default: '.',
+  description: 'Workspace directory (default: current)'
+} as const
+
+const scratchRead = defineCommand({
+  meta: { name: 'read', description: 'Print the canvas shapes as JSON (served off disk)' },
+  args: { dir: dirArg },
+  run({ args }) {
+    sendScratch(resolve(args.dir), { kind: 'read' }, res => {
+      console.log(JSON.stringify(res.shapes ?? [], null, 2))
+    })
+  }
+})
+
+const scratchView = defineCommand({
+  meta: { name: 'view', description: 'Render the canvas to a PNG (needs an open Scratchpad tab)' },
+  args: {
+    dir: dirArg,
+    out: { type: 'string', description: 'Output PNG path (default: a temp file)' }
+  },
+  async run({ args }) {
+    sendScratch(resolve(args.dir), { kind: 'view' }, async res => {
+      const result = res.result as { image?: string } | undefined
+      if (!result?.image) {
+        console.error(pc.red('No image returned'))
+        process.exit(1)
+      }
+      const b64 = result.image.replace(/^data:image\/png;base64,/, '')
+      const outPath = args.out ? resolve(args.out) : join(tmpdir(), `moi-scratch-${Date.now()}.png`)
+      await Bun.write(outPath, Buffer.from(b64, 'base64'))
+      console.log(outPath)
+    })
+  }
+})
+
+const scratchAddText = defineCommand({
+  meta: { name: 'text', description: 'Add a text shape' },
+  args: {
+    at: { type: 'string', required: true, description: 'Position "x,y"' },
+    text: { type: 'string', required: true, description: 'Text content' },
+    id: { type: 'string', description: 'Stable name to address this shape later' },
+    dir: dirArg
+  },
+  run({ args }) {
+    const { x, y } = parseXY(args.at)
+    sendScratch(
+      resolve(args.dir),
+      { kind: 'add-text', name: args.id ?? '', x, y, text: args.text },
+      printAdded
+    )
+  }
+})
+
+const scratchAddRect = defineCommand({
+  meta: { name: 'rect', description: 'Add a rectangle' },
+  args: {
+    at: { type: 'string', required: true, description: 'Top-left position "x,y"' },
+    size: { type: 'string', required: true, description: 'Size "w,h"' },
+    text: { type: 'string', description: 'Optional label' },
+    id: { type: 'string', description: 'Stable name to address this shape later' },
+    dir: dirArg
+  },
+  run({ args }) {
+    const { x, y } = parseXY(args.at)
+    const { x: w, y: h } = parseXY(args.size)
+    sendScratch(
+      resolve(args.dir),
+      {
+        kind: 'add-rect',
+        name: args.id ?? '',
+        x,
+        y,
+        w,
+        h,
+        ...(args.text ? { text: args.text } : {})
+      },
+      printAdded
+    )
+  }
+})
+
+const scratchAddNote = defineCommand({
+  meta: { name: 'note', description: 'Add a sticky note' },
+  args: {
+    at: { type: 'string', required: true, description: 'Position "x,y"' },
+    text: { type: 'string', required: true, description: 'Note content' },
+    id: { type: 'string', description: 'Stable name to address this shape later' },
+    dir: dirArg
+  },
+  run({ args }) {
+    const { x, y } = parseXY(args.at)
+    sendScratch(
+      resolve(args.dir),
+      { kind: 'add-note', name: args.id ?? '', x, y, text: args.text },
+      printAdded
+    )
+  }
+})
+
+const scratchAddArrow = defineCommand({
+  meta: { name: 'arrow', description: 'Add an arrow between shapes or points' },
+  args: {
+    from: { type: 'string', required: true, description: 'Start: a shape name or "x,y"' },
+    to: { type: 'string', required: true, description: 'End: a shape name or "x,y"' },
+    id: { type: 'string', description: 'Stable name to address this shape later' },
+    dir: dirArg
+  },
+  run({ args }) {
+    sendScratch(
+      resolve(args.dir),
+      { kind: 'add-arrow', name: args.id ?? '', from: parseEnd(args.from), to: parseEnd(args.to) },
+      printAdded
+    )
+  }
+})
+
+const scratchAdd = defineCommand({
+  meta: { name: 'add', description: 'Add a shape: text, rect, note, or arrow' },
+  subCommands: {
+    text: scratchAddText,
+    rect: scratchAddRect,
+    note: scratchAddNote,
+    arrow: scratchAddArrow
+  }
+})
+
+const scratchMove = defineCommand({
+  meta: { name: 'move', description: 'Move a shape to a new position' },
+  args: {
+    id: { type: 'positional', required: true, description: 'Shape name' },
+    to: { type: 'string', required: true, description: 'New position "x,y"' },
+    dir: dirArg
+  },
+  run({ args }) {
+    const { x, y } = parseXY(args.to)
+    sendScratch(resolve(args.dir), { kind: 'move', name: args.id, x, y }, () =>
+      console.log('\n' + pc.green('✓') + ' moved ' + pc.bold(args.id) + '\n')
+    )
+  }
+})
+
+const scratchSet = defineCommand({
+  meta: { name: 'set', description: "Relabel / edit a shape's text" },
+  args: {
+    id: { type: 'positional', required: true, description: 'Shape name' },
+    text: { type: 'string', required: true, description: 'New text' },
+    dir: dirArg
+  },
+  run({ args }) {
+    sendScratch(resolve(args.dir), { kind: 'set', name: args.id, text: args.text }, () =>
+      console.log('\n' + pc.green('✓') + ' updated ' + pc.bold(args.id) + '\n')
+    )
+  }
+})
+
+const scratchDelete = defineCommand({
+  meta: { name: 'delete', description: 'Delete a shape' },
+  args: {
+    id: { type: 'positional', required: true, description: 'Shape name' },
+    dir: dirArg
+  },
+  run({ args }) {
+    sendScratch(resolve(args.dir), { kind: 'delete', name: args.id }, () =>
+      console.log('\n' + pc.green('✓') + ' deleted ' + pc.bold(args.id) + '\n')
+    )
+  }
+})
+
+const scratch = defineCommand({
+  meta: {
+    name: 'scratch',
+    description: 'Read and draw on the workspace Scratchpad canvas'
+  },
+  subCommands: {
+    read: scratchRead,
+    view: scratchView,
+    add: scratchAdd,
+    move: scratchMove,
+    set: scratchSet,
+    delete: scratchDelete
+  }
+})
+
 const main = defineCommand({
   meta: { name: 'moi', description: 'moi — local AI workspace' },
-  subCommands: { init, start, bundle, refresh, theme, config, status, openclaw }
+  subCommands: { init, start, bundle, refresh, theme, config, status, openclaw, scratch }
 })
 
 // Route `moi config --help` to the same terse cheat sheet as `moi config help`;

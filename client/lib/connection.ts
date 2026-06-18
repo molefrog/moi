@@ -1,9 +1,10 @@
 import type { QueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspaces'
+import { getScratchExecutor } from '@/client/lib/scratch-executor'
 import { liveStore } from '@/client/store/live'
 import { applyEvent } from '@/lib/format'
-import type { ClientMessage, StreamEvent, ThreadConfig, ViewState } from '@/lib/types'
+import type { ClientMessage, ScratchOp, StreamEvent, ThreadConfig, ViewState } from '@/lib/types'
 
 // App-wide chat connection: ONE WebSocket for the whole client, opened once at
 // startup and never torn down on navigation. Every server frame is tagged with
@@ -113,6 +114,26 @@ function handleFrame(data: Record<string, unknown>) {
   }
   if (data.type === 'workspace:switch') {
     onWorkspaceSwitch?.(data.workspaceId as string)
+    return
+  }
+
+  // A relayed Scratchpad op from `moi scratch`. Only run it if THIS tab has a
+  // live editor for that workspace; otherwise ignore (another tab — or none —
+  // handles it, and the server times out if no tab answers). Ids are
+  // deterministic, so if several tabs run it they converge; first reply wins.
+  if (data.type === 'scratchpad:op') {
+    const run = getScratchExecutor(data.workspaceId as string)
+    if (!run) return
+    const opId = data.opId as string
+    run(data.op as ScratchOp).then(
+      result => sendMessage({ type: 'scratchpad:op-result', opId, result }),
+      err =>
+        sendMessage({
+          type: 'scratchpad:op-result',
+          opId,
+          error: err instanceof Error ? err.message : String(err)
+        })
+    )
     return
   }
 

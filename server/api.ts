@@ -23,6 +23,7 @@ import {
   registerWorkspace,
   removeWorkspace
 } from './registry'
+import { loadScratchpadDoc, saveScratchpadDoc } from './scratchpad'
 import { DIST_DIR, prebuilt } from './static'
 import { getSessionEvents, getSessions } from './state'
 import { getThreadConfig, saveThreadConfig } from './thread-config'
@@ -314,6 +315,31 @@ one.put('/config', async c => {
   await setWorkspaceConfig(ws.path, { name })
   publishEvent({ type: 'workspace:updated' })
   return c.json(await getWorkspaceConfig(ws.path))
+})
+
+// Scratchpad canvas. GET returns the persisted tldraw document snapshot
+// ({ document } or { document: null } when empty) for hydration; PUT saves a new
+// snapshot ({ document, origin }) and broadcasts so other open tabs reload.
+// `origin` is the writing tab's id — echoed in the broadcast so that tab can
+// ignore its own save. The browser is the only writer here. See
+// docs/moi-scratchpad.md.
+one.get('/scratchpad', async c => {
+  return c.json(await loadScratchpadDoc(c.get('ws').path))
+})
+
+one.put('/scratchpad', async c => {
+  const ws = c.get('ws')
+  const body = await c.req.json().catch(() => null)
+  if (!body || typeof body !== 'object' || !body.document) {
+    return c.text('Expected { document }', 400)
+  }
+  await saveScratchpadDoc(body.document, ws.path)
+  publishEvent({
+    type: 'scratchpad:updated',
+    workspaceId: c.req.param('id'),
+    origin: typeof body.origin === 'string' ? body.origin : undefined
+  })
+  return c.body(null, 204)
 })
 
 // Workspace icon. PUT a raw image body (png/jpg/gif/webp) — the server resizes

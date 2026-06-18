@@ -29,6 +29,28 @@ export type ViewInfo = {
   config: ViewConfig
 }
 
+// A Scratchpad draw/view operation, relayed from `moi scratch` to a live tldraw
+// editor in a connected tab. The server assigns each add op a `name` (the
+// `--id`, or a generated one) so the derived tldraw shape id is deterministic —
+// every tab that executes the op converges to the same shape. Arrow endpoints
+// bind to a shape (by name) or sit at a free point. See docs/moi-scratchpad.md.
+export type ScratchPoint = { x: number; y: number }
+export type ScratchArrowEnd = { name: string } | ScratchPoint
+
+export type ScratchOp =
+  | { kind: 'add-text'; name: string; x: number; y: number; text: string }
+  | { kind: 'add-rect'; name: string; x: number; y: number; w: number; h: number; text?: string }
+  | { kind: 'add-note'; name: string; x: number; y: number; text: string }
+  | { kind: 'add-arrow'; name: string; from: ScratchArrowEnd; to: ScratchArrowEnd }
+  | { kind: 'move'; name: string; x: number; y: number }
+  | { kind: 'set'; name: string; text: string }
+  | { kind: 'delete'; name: string }
+  | { kind: 'view' }
+
+// What a tab returns after running an op: a shape's `name` for add ops, a PNG
+// data URL for `view`, or a bare ack for mutations.
+export type ScratchOpResult = { name: string } | { image: string } | { ok: true }
+
 // Client → Server messages.
 // The chat WebSocket is app-wide (one socket for the whole client, not scoped to
 // a workspace), so every message carries the `workspaceId` it targets.
@@ -53,6 +75,9 @@ export type ClientMessage =
       effort?: string
     }
   | { type: 'stop'; workspaceId: string; sessionId: string }
+  // Reply to a relayed Scratchpad op (see ScratchpadOpMessage). Carries the
+  // op's correlation id so the server settles the right pending CLI request.
+  | { type: 'scratchpad:op-result'; opId: string; result?: ScratchOpResult; error?: string }
 
 // Session info returned by list endpoint
 export type SessionInfo = {
@@ -103,6 +128,17 @@ export type ServerMessage =
   | ErrorFrame
   | StoppedFrame
   | StatusSnapshotMessage
+  | ScratchpadOpMessage
+
+// A Scratchpad op relayed to the tab(s) showing `workspaceId`'s canvas. Only a
+// tab with a live editor for that workspace executes it and replies with a
+// matching `scratchpad:op-result` (correlated by `opId`); others ignore it.
+export type ScratchpadOpMessage = {
+  type: 'scratchpad:op'
+  workspaceId: string
+  opId: string
+  op: ScratchOp
+}
 
 // Frame as constructed by callers of `broadcast(workspaceId, frame)` — the
 // `workspaceId` is stamped on by `broadcast`, so callers omit it.

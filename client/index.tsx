@@ -1,3 +1,6 @@
+// Must run before any tldraw module loads — see the file for why.
+import './structured-clone-shim'
+
 import './index.css'
 
 // React is externalized to esm.sh (see client/externalize-react.ts + the importmap
