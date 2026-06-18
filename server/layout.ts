@@ -30,6 +30,28 @@ export async function saveLayout(layout: WorkspaceLayout, workspacePath: string)
   await Bun.write(getLayoutPath(workspacePath), JSON.stringify(layout, null, 2))
 }
 
+// Merge a client-submitted layout over the stored one for persistence.
+//
+// Everything (grid, chat mode, theme, AND identity) shares one `.workspace.json`,
+// but the grid editor and `moi config` own different fields. The client's layout
+// PUT is authoritative for the editor fields (widgetGrid, chatMode, theme,
+// selectedModel) — but it strips `name` and round-trips a possibly-stale `icon`.
+// A blind overwrite therefore erases a `moi config`-set name (and could revert an
+// icon). So drop whatever identity the body carries and re-apply the server-owned
+// `name`/`icon` from `existing` — conditionally, so an absent field never
+// serializes as `name: undefined`.
+export function mergeLayoutForSave(
+  existing: WorkspaceLayout,
+  body: WorkspaceLayout
+): WorkspaceLayout {
+  const { name: _name, icon: _icon, ...editor } = body
+  return {
+    ...editor,
+    ...(existing.name !== undefined && { name: existing.name }),
+    ...(existing.icon !== undefined && { icon: existing.icon })
+  }
+}
+
 async function scanWidgetIds(workspacePath: string): Promise<Set<string>> {
   try {
     const entries = await readdir(join(workspacePath, '.moi', 'widgets'))

@@ -16,7 +16,7 @@ import { PORT } from './constants'
 import { control } from './control'
 import { callFunction, killAllWorkers, parseFunctionPath, restartWorker } from './functions'
 import { processIcon } from './icon'
-import { getWorkspacePreview, loadLayout, saveLayout } from './layout'
+import { getWorkspacePreview, loadLayout, mergeLayoutForSave, saveLayout } from './layout'
 import { getMcpStatus } from './mcp'
 import { getOpenClawModels, getOpenClawSessionMessages, getOpenClawSessions } from './openclaw'
 import { toSessionInfo, toStreamEvents } from './openclaw-adapter'
@@ -426,7 +426,10 @@ export const app = Bun.serve<WsData>({
       if (req.method === 'PUT') {
         const body = await req.json()
         if (!body || body.version !== 1) return new Response('Bad request', { status: 400 })
-        await saveLayout(body, ws.path)
+        // Preserve server-owned identity (name/icon) across a grid/theme save so
+        // the client's PUT can't erase a `moi config`-set name. See mergeLayoutForSave.
+        const existing = await loadLayout(ws.path)
+        await saveLayout(mergeLayoutForSave(existing, body), ws.path)
         return new Response(null, { status: 204 })
       }
       return new Response('Method not allowed', { status: 405 })
