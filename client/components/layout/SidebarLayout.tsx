@@ -10,9 +10,11 @@ import {
   IconPlus,
   IconSettings
 } from '@tabler/icons-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Link } from 'wouter'
 
-import { useWorkspaces } from '@/client/api/workspaces'
+import { useWorkspaces, workspaceKeys } from '@/client/api/workspaces'
+import { useMeiEvent } from '@/client/hooks/useMeiEvents'
 import claudeIcon from '@/client/assets/claude.svg'
 import hermesIcon from '@/client/assets/hermes-nous.png'
 import openclawIcon from '@/client/assets/openclaw.svg'
@@ -21,7 +23,7 @@ import { cn } from '@/client/lib/cn'
 import { useUiStore } from '@/client/store/ui'
 import type { WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
-const PROVIDER_ICON: Record<WorkspaceType, string> = {
+export const PROVIDER_ICON: Record<WorkspaceType, string> = {
   'claude-code': claudeIcon,
   openclaw: openclawIcon,
   hermes: hermesIcon
@@ -52,6 +54,13 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   // toggle (only the keyed <Sidebar> inside AnimatePresence does). The rows are
   // passed down ready, so they don't re-subscribe/refetch or flicker on collapse.
   const { data: workspaces } = useWorkspaces()
+
+  // `moi config` / the settings modal broadcast `workspace:updated`; refetch the
+  // list so the sidebar reflects new names/icons live.
+  const qc = useQueryClient()
+  useMeiEvent(e => {
+    if (e.type === 'workspace:updated') qc.invalidateQueries({ queryKey: workspaceKeys.all })
+  })
 
   // Boot-up: on mount the logo runs the noise effect for 0.75s, then settles to
   // the sprite. Kept here (not in the remounting Sidebar) so it fires once.
@@ -191,9 +200,9 @@ function Sidebar({ collapsed, workspaces, logoEffect }: SidebarProps) {
               href={`/workspace/${ws.id}`}
               icon={
                 <img
-                  src={PROVIDER_ICON[ws.type ?? 'claude-code']}
+                  src={ws.icon ?? PROVIDER_ICON[ws.type ?? 'claude-code']}
                   alt=""
-                  className="size-[18px] shrink-0"
+                  className="size-[18px] shrink-0 rounded-[3px]"
                 />
               }
               label={workspaceLabel(ws)}

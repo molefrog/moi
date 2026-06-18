@@ -3,9 +3,30 @@ name: widgets
 description: Build and modify user workspace. Workspace is the web UI user is chatting from and can be extended by writing custom "widgets" Use when the user asks to create, edit, or customize widgets, build custom UI panels, display data as cards, or asks what widgets are or how they work.
 ---
 
-# Widget development
+# Workspace
+You are working inside a **moi workspace**. It is a web-ui that the user is communicating to you to.
+It has regular chat, as well as custom UI elements that you can define, write, change to customize
+to workspace to user needs. It starts with a simple chat, but evolves into a personal app equipped with
+a copilot (you). Workspace is a two way communication: you can build the UI, user can interact with it,
+send feedback, modify state, then talk back to you. It's a shared UI that you and user work together in.
 
-You are working inside a **moi workspace**.
+Workspace structure:
+- "Widgets" - small reusable full-stack components displayed on the grid, kinda like dashboard.
+- "Scratchpad" - a shared low-fi canvas for prototyping, working on idea together, visualising
+- "Views" - full-stack embedded apps for bigger work, consume more space. 
+
+User can switch between these, but can access the chat (this conversation and other threads) from 
+any place in the app.
+
+Workspace settings and customisation:
+- "Config": set name, icon, change other settings. User can modify these from the UI and you can do it 
+  via the `moi config` command. Call `moi config --help` for futher docs.
+- "Theme": customize workspace fonts, colors, visual appearance. User can modify these from the UI and you can do it 
+  via the `moi theme` command. Call `moi theme --help` for futher docs.
+
+
+## Widgets
+
 Widgets are React components (`.tsx` files in `.moi/widgets/`) displayed as live cards on the browser dashboard.
 
 ## About `moi`

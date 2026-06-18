@@ -116,7 +116,11 @@ export type WorkspaceEntry = {
   type?: WorkspaceType
   // Display name captured at add time (e.g. OpenClaw IDENTITY.md "Name:" or
   // basename). Persisted so we don't re-probe the gateway for each listing.
+  // The list endpoint overrides this with the live layout `name` when set.
   name?: string
+  // Workspace icon override (base64 data URL), merged in from the layout by the
+  // list endpoint. Undefined → the sidebar uses the provider icon.
+  icon?: string
   // Home-relative rendering of `path` (e.g. "~/.openclaw/workspace"). Set by
   // the server on the wire — clients render it as-is.
   displayPath?: string
@@ -184,6 +188,9 @@ export type WorkspaceLayout = {
   // User-set display-name override. When empty/undefined the API falls back to
   // the workspace folder name, so the resolved name always comes from the API.
   name?: string
+  // Workspace icon override — a base64 data URL (128×128 transparent WebP,
+  // produced by the server). Undefined falls back to the provider icon.
+  icon?: string
   // Model id chosen in the composer picker (`supportedModels()` `value`, an
   // alias like `sonnet`). Persisted so the choice survives a reload. Sent with
   // each chat frame; undefined means the agent runs on the SDK default. Note

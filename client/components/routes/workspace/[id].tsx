@@ -21,6 +21,7 @@ import { McpMenu } from "@/client/components/McpMenu";
 import { type WidgetMode, Widgets } from "@/client/components/Widgets";
 import {
   PanelHeader,
+  PROVIDER_ICON,
   SidebarLayout,
   SidebarToggle,
 } from "@/client/components/layout/SidebarLayout";
@@ -86,7 +87,7 @@ function WorkspaceLoader({ id }: WorkspaceLoaderProps) {
   // Server-pushed changes invalidate the matching query so the next render
   // revalidates (theme re-applies; the grid reconcile places any new widget).
   useMeiEvent((e) => {
-    if (e.type === "theme:updated") {
+    if (e.type === "theme:updated" || e.type === "workspace:updated") {
       qc.invalidateQueries({ queryKey: workspaceKeys.layout(id) });
     } else if (e.type === "widget-layout:updated") {
       qc.invalidateQueries({ queryKey: workspaceKeys.widgets(id) });
@@ -319,7 +320,7 @@ type WorkspaceViewProps = {
 function WorkspaceView({ widgets }: WorkspaceViewProps) {
   const { view, input, setInput, processing, error, send, stop, switchThread, dismissError } =
     useChat();
-  const { layout, setLayout, name } = useWorkspaceLayoutCtx();
+  const { layout, setLayout, name, icon, provider } = useWorkspaceLayoutCtx();
   const { ref: rowRef, fits: canFitSidebar } = useFitsSidebar<HTMLDivElement>();
   const [widgetMode, setWidgetMode] = useState<WidgetMode>("idle");
   // Agent-defined views (demo data; same for every workspace until wired up).
@@ -425,6 +426,11 @@ function WorkspaceView({ widgets }: WorkspaceViewProps) {
         >
           <PanelHeader>
             <SidebarToggle />
+            <img
+              src={icon ?? PROVIDER_ICON[provider ?? "claude-code"]}
+              alt=""
+              className="size-5 shrink-0 rounded-[4px]"
+            />
             {name && <span className="text-foreground truncate text-sm font-medium">{name}</span>}
             {hasWidgets && (
               <>

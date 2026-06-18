@@ -1,12 +1,14 @@
 import { resolve } from 'path'
 
 import { CONTROL_PORT } from './constants'
+import { processIcon } from './icon'
 import { loadLayout, saveLayout } from './layout'
 import { listWorkspaces, registerWorkspace } from './registry'
 import { broadcastAll } from './state'
 import { applyThemeUpdate, matchColorTheme } from './theme'
 import { publishMei } from './web'
 import { handleBundle } from './widgets'
+import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
 
 export const control = Bun.serve({
   port: CONTROL_PORT,
@@ -88,6 +90,56 @@ export const control = Bun.serve({
           await saveLayout({ ...layout, theme: result.theme }, workspacePath)
           publishMei({ type: 'theme:updated' })
           ws.send(JSON.stringify({ ok: true, ...result.applied }))
+        }
+
+        if (data.type === 'config') {
+          // Workspace identity (name + icon) is per-workspace.
+          const workspaces = await listWorkspaces()
+          if (workspaces.length === 0) {
+            ws.send(JSON.stringify({ error: 'No workspaces registered' }))
+            return
+          }
+          const workspacePath = String(data.path ?? workspaces[0].path)
+          const hasName = typeof data.name === 'string'
+          const hasIcon = typeof data.iconPath === 'string'
+          const clearName = data.clearName === true
+          const clearIcon = data.clearIcon === true
+
+          // Listing mode — no field requested.
+          if (!hasName && !hasIcon && !clearName && !clearIcon) {
+            const cfg = await getWorkspaceConfig(workspacePath)
+            ws.send(
+              JSON.stringify({ name: cfg.name ?? null, hasIcon: !!cfg.icon, path: workspacePath })
+            )
+            return
+          }
+
+          // `null` clears a field; a value sets it; `undefined` leaves it unchanged.
+          const patch: { name?: string | null; icon?: string | null } = {}
+          if (clearName) patch.name = null
+          else if (hasName) patch.name = String(data.name)
+          if (clearIcon) patch.icon = null
+          else if (hasIcon) {
+            try {
+              patch.icon = await processIcon(String(data.iconPath))
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err)
+              ws.send(JSON.stringify({ error: `Could not read image: ${msg}` }))
+              return
+            }
+          }
+
+          await setWorkspaceConfig(workspacePath, patch)
+          publishMei({ type: 'workspace:updated' })
+          ws.send(
+            JSON.stringify({
+              ok: true,
+              name: patch.name ?? null,
+              icon: hasIcon,
+              clearedName: clearName,
+              clearedIcon: clearIcon
+            })
+          )
         }
       } catch (err) {
         console.error('[control]', err)

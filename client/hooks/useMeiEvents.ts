@@ -6,6 +6,7 @@ type MeiEvent =
   | { type: 'widget:updated'; name: string }
   | { type: 'widget-layout:updated'; widgets: WidgetInfo[] }
   | { type: 'theme:updated' }
+  | { type: 'workspace:updated' }
 
 type MeiEventHandler = (event: MeiEvent) => void
 

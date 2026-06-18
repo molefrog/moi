@@ -15,6 +15,7 @@ import {
 import { PORT } from './constants'
 import { control } from './control'
 import { callFunction, killAllWorkers, parseFunctionPath, restartWorker } from './functions'
+import { processIcon } from './icon'
 import { getWorkspacePreview, loadLayout, saveLayout } from './layout'
 import { getMcpStatus } from './mcp'
 import { getOpenClawModels, getOpenClawSessionMessages, getOpenClawSessions } from './openclaw'
@@ -42,6 +43,7 @@ import {
 } from './workspace-env'
 import { collectRequiredEnv, listWidgets, serveWidget } from './widgets'
 import type { EnvUpdate } from './workspace-env'
+import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
 
 const MEI_TOPIC = 'mei'
 
@@ -118,7 +120,18 @@ export const app = Bun.serve<WsData>({
 
     // Workspace registry API
     '/api/workspaces': async req => {
-      if (req.method === 'GET') return Response.json(await listWorkspaces())
+      if (req.method === 'GET') {
+        // Merge each workspace's live layout name/icon over the registry
+        // snapshot so the sidebar reflects `moi config` changes immediately.
+        const entries = await listWorkspaces()
+        const merged = await Promise.all(
+          entries.map(async e => {
+            const layout = await loadLayout(e.path)
+            return { ...e, name: layout.name ?? e.name, icon: layout.icon }
+          })
+        )
+        return Response.json(merged)
+      }
       if (req.method === 'POST') {
         const body = await req.json()
         if (!body?.path) return new Response('Missing path', { status: 400 })
@@ -280,6 +293,52 @@ export const app = Bun.serve<WsData>({
       const models =
         provider === 'openclaw' ? await getOpenClawModels() : await getClaudeModels(ws.path)
       return Response.json({ provider, models } satisfies WorkspaceModels)
+    },
+    // Workspace identity (name). GET returns the current {name, icon}; PUT a
+    // JSON `{ name }` sets it (or `null` clears it). Broadcasts so the sidebar
+    // and header update live. Icon is handled by the binary route below.
+    '/api/workspaces/:id/config': async req => {
+      const ws = await getWorkspace(req.params.id)
+      if (!ws) return new Response('Workspace not found', { status: 404 })
+      if (req.method === 'GET') return Response.json(await getWorkspaceConfig(ws.path))
+      if (req.method === 'PUT') {
+        const body = await req.json().catch(() => null)
+        const name = body?.name
+        if (name !== null && typeof name !== 'string') {
+          return new Response('Expected { name: string | null }', { status: 400 })
+        }
+        await setWorkspaceConfig(ws.path, { name })
+        publishMei({ type: 'workspace:updated' })
+        return Response.json(await getWorkspaceConfig(ws.path))
+      }
+      return new Response('Method not allowed', { status: 405 })
+    },
+    // Workspace icon. PUT a raw image body (png/jpg/gif/webp) — the server
+    // resizes it to a 128×128 transparent WebP and stores it as base64. DELETE
+    // resets to the provider default. Both broadcast for a live refresh.
+    '/api/workspaces/:id/icon': async req => {
+      const ws = await getWorkspace(req.params.id)
+      if (!ws) return new Response('Workspace not found', { status: 404 })
+      if (req.method === 'PUT') {
+        const bytes = new Uint8Array(await req.arrayBuffer())
+        if (bytes.length === 0) return new Response('Empty image body', { status: 400 })
+        let icon: string
+        try {
+          icon = await processIcon(bytes)
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          return new Response(`Invalid image: ${msg}`, { status: 400 })
+        }
+        await setWorkspaceConfig(ws.path, { icon })
+        publishMei({ type: 'workspace:updated' })
+        return Response.json({ icon })
+      }
+      if (req.method === 'DELETE') {
+        await setWorkspaceConfig(ws.path, { icon: null })
+        publishMei({ type: 'workspace:updated' })
+        return new Response(null, { status: 204 })
+      }
+      return new Response('Method not allowed', { status: 405 })
     },
     // Live widget-event stream (build/refresh pushes). A static path, so Bun
     // routes it ahead of the `/api/workspaces/:id` param route below; the

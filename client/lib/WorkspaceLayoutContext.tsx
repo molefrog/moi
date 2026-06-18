@@ -25,6 +25,8 @@ type WorkspaceLayoutContextValue = {
   setLayout: (update: Partial<WorkspaceLayout>) => void
   // Workspace metadata that rides along on the layout endpoint.
   name: string | null
+  // Custom workspace icon (base64 data URL), or null to use the provider icon.
+  icon: string | null
   cwd: string | null
   // The agent backend (claude-code / openclaw / hermes …). Exposed here so
   // components like McpMenu read it from the shared layout query instead of
@@ -92,6 +94,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
     layout: query.data ? stripMeta(query.data) : DEFAULT_LAYOUT,
     setLayout,
     name: query.data?.name ?? null,
+    icon: query.data?.icon ?? null,
     cwd: query.data?.cwd ?? null,
     provider: query.data?.provider ?? null,
     workspaceId: id,
