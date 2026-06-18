@@ -51,8 +51,11 @@ function loadApplet(
   const existing = moduleCache.get(key)
   if (existing) return existing
 
-  // Cache-busting query param so the browser fetches fresh
-  const url = `/api/workspaces/${workspaceId}/${kind.segment}/${name}.js?v=${version}`
+  // Import the bundle dir's `index.js`; assets + chunks resolve module-relative
+  // from there (via import.meta.url). Cache-busting query so the browser fetches
+  // fresh — `?v` is dropped by relative asset resolution, so assets aren't
+  // re-fetched needlessly (they're content-hashed anyway).
+  const url = `/api/workspaces/${workspaceId}/${kind.segment}/${name}/index.js?v=${version}`
   const promise = import(/* @vite-ignore */ url).then(mod => {
     if (!mod.default) throw new Error(`"${name}" has no default export`)
     return mod.default as ComponentType

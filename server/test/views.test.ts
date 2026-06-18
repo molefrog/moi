@@ -21,11 +21,15 @@ function buildDir(): string {
   return join(WS, '.moi', '.build', 'views')
 }
 
-// Seed built bundles (stub JS) + a manifest for the orchestration read paths.
+// Seed built bundles (stub dirs each holding an index.js) + a manifest for the
+// orchestration read paths. Mirrors the real layout: `.build/views/<name>/index.js`.
 function seed(jsNames: string[], manifest: object) {
   const dir = buildDir()
   mkdirSync(dir, { recursive: true })
-  for (const name of jsNames) writeFileSync(join(dir, `${name}.js`), `// ${name}`)
+  for (const name of jsNames) {
+    mkdirSync(join(dir, name), { recursive: true })
+    writeFileSync(join(dir, name, 'index.js'), `// ${name}`)
+  }
   writeFileSync(join(dir, 'manifest.json'), JSON.stringify(manifest))
 }
 
@@ -108,22 +112,29 @@ describe('collectViewRequiredEnv', () => {
 })
 
 describe('serveView', () => {
-  test('serves a built bundle as javascript', async () => {
+  const BASE = '/api/workspaces/test'
+
+  test('serves the entry as javascript', async () => {
     seed(['crm'], { config: { crm: {} }, order: ['crm'] })
-    const res = await serveView('crm', WS)
+    const res = await serveView('crm', 'index.js', WS, BASE)
     expect(res.status).toBe(200)
-    expect(res.headers.get('content-type')).toBe('application/javascript')
+    expect(res.headers.get('content-type')).toBe('text/javascript; charset=utf-8')
     expect(await res.text()).toBe('// crm')
   })
 
   test('404 for a view that is not built', async () => {
     seed(['crm'], { config: { crm: {} }, order: ['crm'] })
-    expect((await serveView('missing', WS)).status).toBe(404)
+    expect((await serveView('missing', 'index.js', WS, BASE)).status).toBe(404)
   })
 
   test('400 for an invalid name', async () => {
-    expect((await serveView('../etc', WS)).status).toBe(400)
-    expect((await serveView('a b', WS)).status).toBe(400)
+    expect((await serveView('../etc', 'index.js', WS, BASE)).status).toBe(400)
+    expect((await serveView('a b', 'index.js', WS, BASE)).status).toBe(400)
+  })
+
+  test('400 for a file with traversal', async () => {
+    seed(['crm'], { config: { crm: {} }, order: ['crm'] })
+    expect((await serveView('crm', '../manifest.json', WS, BASE)).status).toBe(400)
   })
 })
 

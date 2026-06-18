@@ -1,4 +1,4 @@
-import { type ReactNode, createContext, useContext, useEffect } from 'react'
+import { type ReactNode, createContext, useContext } from 'react'
 
 const WorkspaceContext = createContext<string>('default')
 
@@ -11,14 +11,11 @@ type WorkspaceProps = {
   children: ReactNode
 }
 
-// Provides the active workspace id to the tree (read by chat + widget hooks).
+// Provides the active workspace id to the tree (read by chat + applet hooks).
 // Data loading lives in React Query now (see WorkspaceLayoutProvider and the
-// useWorkspace* query hooks) — this only carries the id.
+// useWorkspace* query hooks) — this only carries the id. Applet bundles no
+// longer read a window global for their workspace: the serve route bakes the
+// API base into each bundle's RPC/fileUrl calls.
 export function Workspace({ id, children }: WorkspaceProps) {
-  useEffect(() => {
-    // Expose to widget RPC bundles
-    ;(window as unknown as Record<string, unknown>).__MEI_WS__ = id
-  }, [id])
-
   return <WorkspaceContext value={id}>{children}</WorkspaceContext>
 }

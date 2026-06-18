@@ -16,6 +16,21 @@ import type { ViewConfig, WidgetConfig } from '@/lib/types'
 // synthetic-CSS filename, and the injected `<style>` id namespace.
 export type AppletKind = 'widget' | 'view'
 
+// Baked into the bundle wherever a runtime URL needs the workspace's API base
+// (RPC + workspace files). The serve route string-replaces it with the real
+// `/api/workspaces/<id>` in every `.js` it returns, so the on-disk bundle stays
+// workspace-agnostic. Survives the build because we never minify — it lives as
+// a plain string literal. Assets don't use it: they self-locate via
+// `import.meta.url` (see the asset loader below).
+export const APPLET_API_BASE_SENTINEL = '%%MOI_APPLET_API_BASE%%'
+
+// Extensions an applet may `import` as a bundled asset. Each is emitted as a
+// content-hashed sibling of `index.js` and the import resolves to its URL via
+// `import.meta.url`. Deliberately images + fonts only: large media (video/audio)
+// belongs in the workspace and should stream via `fileUrl()`, not bloat the
+// bundle dir.
+const ASSET_EXTENSIONS = /\.(png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf)$/i
+
 const EXTERNAL_MODULES = [
   'react',
   'react/jsx-runtime',
@@ -29,8 +44,22 @@ type ServerModule = {
   exports: string[]
 }
 
+// One emitted file in an applet's served directory. `code` files (entry +
+// chunks) are sentinel-swapped and served as JS; `asset` files (images/fonts)
+// stream raw.
+export type AppletFile = {
+  name: string
+  data: string | Uint8Array
+  kind: 'code' | 'asset'
+}
+
 export type AppletArtifact = {
+  // The entry (`index.js`) source, post CSS-injection — a convenience alias for
+  // the `code` file named `index.js` in `files`.
   js: string
+  // Everything to write into `.build/<kind>/<name>/`: the entry, any code
+  // chunks, and bundled assets.
+  files: AppletFile[]
   serverModules: ServerModule[]
   config: WidgetConfig | ViewConfig | null
 }
@@ -177,15 +206,18 @@ async function validateServerExports(filePath: string): Promise<string[]> {
   return runtimeExports
 }
 
-// The mei:rpc virtual module — contains the RPC call logic with devalue serialization.
-// Bundled into the widget output once, shared by all server function stubs.
+// The mei:rpc virtual module — contains the RPC call logic with devalue
+// serialization. Bundled into the applet output once, shared by all server
+// function stubs. The base is the sentinel the serve route rewrites to
+// `/api/workspaces/<id>`, so a bundle carries no workspace id of its own.
 const RPC_MODULE_SOURCE = `
 import { stringify, parse } from "devalue";
 
+const BASE = ${JSON.stringify(APPLET_API_BASE_SENTINEL)};
+
 export function rpc(module, name) {
   return async (...args) => {
-    const ws = window.__MEI_WS__ || "default";
-    const res = await fetch("/_rpc/" + ws + "/fn/" + module + "/" + name, {
+    const res = await fetch(BASE + "/rpc/" + module + "/" + name, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: stringify(args),
@@ -193,6 +225,20 @@ export function rpc(module, name) {
     if (!res.ok) throw new Error(await res.text());
     return parse(await res.text());
   };
+}
+`
+
+// The `moi` virtual module — the applet-facing runtime API. Today just
+// `fileUrl(path)`, which maps a workspace-relative path to its streaming URL
+// (`/api/workspaces/<id>/fs/<path>`). Same sentinel base as RPC; the path is
+// per-segment URL-encoded so spaces / unicode in filenames survive. A leading
+// slash is stripped so both `clips/a.mp4` and `/clips/a.mp4` work.
+const MOI_MODULE_SOURCE = `
+const BASE = ${JSON.stringify(APPLET_API_BASE_SENTINEL)};
+
+export function fileUrl(path) {
+  const clean = String(path).replace(/^\\/+/, "");
+  return BASE + "/fs/" + clean.split("/").map(encodeURIComponent).join("/");
 }
 `
 
@@ -221,17 +267,25 @@ function serverModuleKey(serverPath: string, moiRoot: string): string {
   return key
 }
 
-function serverProxyPlugin(
+// The applet runtime plugin wires the three I/O transports into the bundle:
+//   • `.server` imports → RPC stubs (via the `mei:rpc` virtual module)
+//   • `moi` import      → the `fileUrl` runtime
+//   • asset imports     → content-hashed sibling files, referenced by URL
+// It returns the collected server modules (for hot-reload + env aggregation)
+// and the asset files the caller must emit next to `index.js`.
+function appletRuntimePlugin(
   sourceDir: string,
   moiRoot: string
 ): {
   plugin: BunPlugin
   serverModules: ServerModule[]
+  assets: AppletFile[]
 } {
   const serverModules: ServerModule[] = []
+  const assets: AppletFile[] = []
 
   const plugin: BunPlugin = {
-    name: 'server-proxy',
+    name: 'applet-runtime',
     setup(build) {
       // Resolve mei:rpc virtual module
       build.onResolve({ filter: /^mei:rpc$/ }, () => ({
@@ -243,6 +297,30 @@ function serverProxyPlugin(
         contents: RPC_MODULE_SOURCE,
         loader: 'js'
       }))
+
+      // The `moi` runtime module (fileUrl). A bare specifier, so match it exactly.
+      build.onResolve({ filter: /^moi$/ }, () => ({ path: 'moi', namespace: 'moi-runtime' }))
+      build.onLoad({ filter: /.*/, namespace: 'moi-runtime' }, () => ({
+        contents: MOI_MODULE_SOURCE,
+        loader: 'js'
+      }))
+
+      // Asset imports (images/fonts): emit a content-hashed sibling and resolve
+      // the import to its module-relative URL. Self-locating via import.meta.url,
+      // so it needs no API base — the asset sits next to the served entry.
+      build.onLoad({ filter: ASSET_EXTENSIONS }, async args => {
+        const bytes = new Uint8Array(await Bun.file(args.path).arrayBuffer())
+        const hash = Bun.hash(bytes).toString(16).slice(0, 8)
+        const dot = args.path.lastIndexOf('.')
+        const ext = args.path.slice(dot + 1).toLowerCase()
+        const stem = basename(args.path.slice(0, dot)).replace(/[^a-zA-Z0-9_-]/g, '-')
+        const name = `${stem}-${hash}.${ext}`
+        if (!assets.some(a => a.name === name)) assets.push({ name, data: bytes, kind: 'asset' })
+        return {
+          contents: `export default new URL(${JSON.stringify('./' + name)}, import.meta.url).href`,
+          loader: 'js'
+        }
+      })
 
       // Intercept .server imports (relative only). Resolved against the
       // importing file's directory — server files may live anywhere under
@@ -277,7 +355,7 @@ function serverProxyPlugin(
     }
   }
 
-  return { plugin, serverModules }
+  return { plugin, serverModules, assets }
 }
 
 // Path to the host's `@theme inline` block — shared with `client/index.css`.
@@ -389,6 +467,20 @@ export function scanServerImports(source: string): string[] {
   return specifiers
 }
 
+// Relative asset import specifiers in an applet source (`./logo.png`,
+// `../shared/icon.svg`). Used by the rebuild staleness check so editing an
+// imported image rebuilds the bundle even when the `.tsx` itself is untouched.
+const ASSET_IMPORT_RE =
+  /from\s+['"](\.\.?\/[^'"]+?\.(?:png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf))['"]/gi
+export function scanAssetImports(source: string): string[] {
+  const specifiers: string[] = []
+  let match
+  while ((match = ASSET_IMPORT_RE.exec(source)) !== null) {
+    specifiers.push(match[1])
+  }
+  return specifiers
+}
+
 async function prevalidateServerFiles(entrypoint: string): Promise<void> {
   const sourceDir = dirname(entrypoint)
   const source = await Bun.file(entrypoint).text()
@@ -416,7 +508,7 @@ export async function buildApplet(
 
   await prevalidateServerFiles(entrypoint)
 
-  const { plugin: serverProxy, serverModules } = serverProxyPlugin(sourceDir, moiRoot)
+  const { plugin: runtime, serverModules, assets } = appletRuntimePlugin(sourceDir, moiRoot)
   const syntheticCssPath = await writeSyntheticTailwindCss(entrypoint, moiRoot, kind)
 
   let result: Awaited<ReturnType<typeof Bun.build>>
@@ -427,12 +519,19 @@ export async function buildApplet(
       target: 'browser',
       sourcemap: 'inline',
       external: EXTERNAL_MODULES,
+      // The bundle is a directory: a fixed `index.js` entry (the client
+      // dynamic-imports it) plus content-hashed `chunk-*.js` for any dynamic
+      // imports. Assets are emitted by the runtime plugin, not here. `[ext]` is
+      // required — bun emits the entry's CSS sibling as an "entry" output too, so
+      // a literal `index.js` would collide with the `.css`; we inject that CSS
+      // into the JS and drop the file, keeping a clean `index.js`.
+      naming: { entry: 'index.[ext]', chunk: 'chunk-[hash].[ext]' },
       // bun-plugin-tailwind uses `build.config.root` as the auto-detect
       // project root (`projectRoot = build.config?.root ?? process.cwd()`).
       // Without this, oxide scans `none-computer/` (the parent server's
       // cwd) instead of the workspace's `.moi/widgets/`.
       root: sourceDir,
-      plugins: [widgetEntryPlugin(entrypoint, syntheticCssPath), serverProxy, tailwind]
+      plugins: [widgetEntryPlugin(entrypoint, syntheticCssPath), runtime, tailwind]
     })
   } catch (err) {
     // Bun.build throws AggregateError on failure (default throw: true).
@@ -451,14 +550,15 @@ export async function buildApplet(
     throw new Error(`Build failed for "${widgetName}":\n${errors}`)
   }
 
-  const jsOutput = result.outputs.find(o => o.path.endsWith('.js'))
-  const cssOutput = result.outputs.find(o => o.path.endsWith('.css'))
+  const entryOutput = result.outputs.find(o => o.kind === 'entry-point')
+  const chunkOutputs = result.outputs.filter(o => o.kind === 'chunk')
+  const cssOutput = result.outputs.find(o => o.kind === 'asset' && o.path.endsWith('.css'))
 
-  if (!jsOutput) {
+  if (!entryOutput) {
     throw new Error(`Build produced no JS output for "${widgetName}"`)
   }
 
-  let js = await jsOutput.text()
+  let js = await entryOutput.text()
 
   if (cssOutput) {
     const css = await cssOutput.text()
@@ -468,7 +568,13 @@ export async function buildApplet(
     js = injectCss(js, css, styleId)
   }
 
+  const files: AppletFile[] = [{ name: 'index.js', data: js, kind: 'code' }]
+  for (const chunk of chunkOutputs) {
+    files.push({ name: basename(chunk.path), data: await chunk.text(), kind: 'code' })
+  }
+  files.push(...assets)
+
   const config =
     kind === 'view' ? await extractViewConfig(entrypoint) : await extractWidgetConfig(entrypoint)
-  return { js, serverModules, config }
+  return { js, files, serverModules, config }
 }

@@ -4,10 +4,25 @@
 // as ESM. This module holds the kind-agnostic mechanics (paths, scan,
 // staleness, prune, serve, build loop); the per-kind manifest shape, config
 // schema, and MEI events live in `widgets.ts` / `views.ts`.
-import { mkdir, readdir, unlink } from 'node:fs/promises'
-import { dirname, join } from 'path'
+//
+// Each applet builds into its OWN directory `.build/<kind>/<name>/`, holding a
+// fixed `index.js` entry plus any code chunks and bundled assets (hashed
+// images/fonts). The client dynamic-imports `<name>/index.js`; assets and
+// chunks resolve module-relative from there. `.js` files carry the
+// `%%MOI_APPLET_API_BASE%%` sentinel (for RPC + `fileUrl`), swapped to the real
+// `/api/workspaces/<id>` base when served — so the on-disk bundle is
+// workspace-agnostic.
+import { realpathSync } from 'node:fs'
+import { mkdir, readdir, rm } from 'node:fs/promises'
+import { dirname, join, resolve, sep } from 'path'
 
-import { type AppletKind, buildApplet, scanServerImports } from './build-applet'
+import {
+  APPLET_API_BASE_SENTINEL,
+  type AppletKind,
+  buildApplet,
+  scanAssetImports,
+  scanServerImports
+} from './build-applet'
 
 export type AppletPaths = {
   moiRoot: string
@@ -45,56 +60,253 @@ async function resolveSource(sourceDir: string, name: string): Promise<string | 
   return null
 }
 
-// A bundle is stale if its `.js` is missing, or the source — or any `.server.ts`
-// it imports (whose RPC stubs are inlined) — is newer than the built output.
+// A bundle is stale if its entry `index.js` is missing, or the source — or any
+// `.server.ts` it imports (RPC stubs are inlined) or asset it imports (emitted
+// into the bundle dir) — is newer than the built entry.
 async function needsRebuild(buildDir: string, name: string, srcPath: string): Promise<boolean> {
-  const built = Bun.file(join(buildDir, `${name}.js`))
+  const built = Bun.file(join(buildDir, name, 'index.js'))
   if (!(await built.exists())) return true
   let sourceMtime = Bun.file(srcPath).lastModified
   const source = await Bun.file(srcPath).text()
+  const dir = dirname(srcPath)
   for (const specifier of scanServerImports(source)) {
-    const serverFile = Bun.file(join(dirname(srcPath), `${specifier}.server.ts`))
+    const serverFile = Bun.file(join(dir, `${specifier}.server.ts`))
     if (await serverFile.exists()) {
       sourceMtime = Math.max(sourceMtime, serverFile.lastModified)
+    }
+  }
+  for (const specifier of scanAssetImports(source)) {
+    const assetFile = Bun.file(join(dir, specifier))
+    if (await assetFile.exists()) {
+      sourceMtime = Math.max(sourceMtime, assetFile.lastModified)
     }
   }
   return sourceMtime >= built.lastModified
 }
 
+// Built applet names: subdirectories of `buildDir` that hold an `index.js`
+// entry. (`manifest.json` and any stray files are ignored.)
 export async function listBuilt(buildDir: string): Promise<string[]> {
   try {
-    const entries = await readdir(buildDir)
-    return entries.filter(f => f.endsWith('.js')).map(f => f.replace(/\.js$/, ''))
+    const entries = await readdir(buildDir, { withFileTypes: true })
+    const names: string[] = []
+    for (const e of entries) {
+      if (!e.isDirectory()) continue
+      if (await Bun.file(join(buildDir, e.name, 'index.js')).exists()) names.push(e.name)
+    }
+    return names
   } catch {
     return []
   }
 }
 
 async function pruneStaleBuilds(buildDir: string, sourceNames: Set<string>): Promise<void> {
-  for (const name of await listBuilt(buildDir)) {
-    if (!sourceNames.has(name)) {
-      try {
-        await unlink(join(buildDir, `${name}.js`))
-      } catch {}
+  let entries
+  try {
+    entries = await readdir(buildDir, { withFileTypes: true })
+  } catch {
+    return
+  }
+  for (const e of entries) {
+    // Drop build dirs whose source is gone…
+    if (e.isDirectory()) {
+      if (!sourceNames.has(e.name)) {
+        await rm(join(buildDir, e.name), { recursive: true, force: true }).catch(() => {})
+      }
+      continue
+    }
+    // …and sweep leftover flat `<name>.js` from the pre-directory layout (the
+    // new layout never writes `.js` directly under buildDir — entries live in
+    // `<name>/index.js`). manifest.json and other files are left alone.
+    if (e.isFile() && e.name.endsWith('.js')) {
+      await rm(join(buildDir, e.name), { force: true }).catch(() => {})
     }
   }
 }
 
-// Serve one compiled bundle (the ESM the client dynamic-imports).
+// Files an applet may serve from its build dir, by extension. JS is swapped +
+// served as code; everything else streams raw (Bun infers content-type and
+// supports range requests).
+const CODE_FILE_RE = /\.js$/
+// A single flat filename in the bundle dir: index.js, chunk-<hash>.js, or a
+// hashed asset. First char may be `_`/`-` (asset stems derive from the source
+// basename, e.g. `_icon.png` → `_icon-<hash>.png`) but never `.`, so no dotfile
+// can be requested; `..` is rejected separately.
+const ALLOWED_FILE_RE = /^[a-zA-Z0-9_-][a-zA-Z0-9._-]*$/
+
+// Serve one file from a compiled applet directory: the `index.js` entry, a code
+// chunk, or a bundled asset. `apiBase` is the workspace's `/api/workspaces/<id>`
+// prefix — substituted for the build-time sentinel in every `.js` so RPC and
+// `fileUrl` calls hit the right workspace. Assets stream untouched.
 export async function serveApplet(
   kind: AppletKind,
   name: string,
-  workspacePath: string
+  file: string,
+  workspacePath: string,
+  apiBase: string
 ): Promise<Response> {
   if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
     return new Response('Invalid name', { status: 400 })
   }
+  // Single path segment, no traversal — the bundle dir is flat.
+  if (!ALLOWED_FILE_RE.test(file) || file.includes('..')) {
+    return new Response('Invalid file', { status: 400 })
+  }
   const { buildDir } = getAppletPaths(workspacePath, kind)
-  const file = Bun.file(join(buildDir, `${name}.js`))
-  if (!(await file.exists())) {
+  const path = join(buildDir, name, file)
+  const bunFile = Bun.file(path)
+  if (!(await bunFile.exists())) {
     return new Response(`"${name}" not built. Run: moi bundle`, { status: 404 })
   }
-  return new Response(file, { headers: { 'Content-Type': 'application/javascript' } })
+  if (CODE_FILE_RE.test(file)) {
+    const swapped = (await bunFile.text()).replaceAll(APPLET_API_BASE_SENTINEL, apiBase)
+    return new Response(swapped, { headers: { 'Content-Type': 'text/javascript; charset=utf-8' } })
+  }
+  return new Response(bunFile)
+}
+
+// ---- route helpers ----------------------------------------------------------
+// Pure helpers behind the applet/fs/rpc HTTP routes, kept here (not web.ts) so
+// they're unit-testable without importing web.ts — which binds ports on load.
+
+// The API base a served bundle's sentinel is rewritten to. RPC + `fileUrl`
+// hang off it, matching what the compiled `rpc()` / `fileUrl()` prepend.
+export function apiBaseFor(id: string): string {
+  return `/api/workspaces/${id}`
+}
+
+// Split an applet file request `…/<segment>/<name>/<file>` into name + file. A
+// bare `…/<segment>/<name>` (or legacy `…/<name>.js`) targets the entry.
+export function parseAppletTail(
+  url: string,
+  id: string,
+  segment: 'widgets' | 'views'
+): { name: string; file: string } {
+  const tail = new URL(url).pathname.split(`/api/workspaces/${id}/${segment}/`)[1] ?? ''
+  const slash = tail.indexOf('/')
+  if (slash === -1) return { name: tail.replace(/\.js$/, ''), file: 'index.js' }
+  return { name: tail.slice(0, slash), file: tail.slice(slash + 1) }
+}
+
+// Extensions `fileUrl()` may stream from the workspace. Media + image/doc
+// assets only — deliberately excludes text/data (`.json`, `.env`, `.md`,
+// source) so the route can't be used to exfiltrate arbitrary workspace data.
+const FS_MEDIA_RE =
+  /\.(mp4|webm|mov|m4v|mkv|mp3|wav|ogg|oga|m4a|flac|aac|opus|png|jpe?g|gif|webp|avif|svg|ico|pdf|vtt|srt)$/i
+
+// Stream a media file from the workspace root. Hard guards (defense in depth):
+// reject empty/`.`/`..`/dotfile segments and anything resolving outside the
+// root, and require a media extension. The workspace holds secrets (`.env`,
+// `.moi/`) and this route is unauthenticated — these guards are the protection,
+// not the localhost bind.
+//
+// Range is handled explicitly (slice the BunFile, 206 + Content-Range): Bun's
+// implicit range handling for `new Response(Bun.file())` doesn't fire once any
+// headers object is attached, and <video>/<audio> seeking needs byte ranges.
+export async function serveWorkspaceFile(
+  workspaceRoot: string,
+  tail: string,
+  range?: string | null
+): Promise<Response> {
+  let rel: string
+  try {
+    rel = decodeURIComponent(tail)
+  } catch {
+    return new Response('Bad path', { status: 400 })
+  }
+  if (!rel || rel.includes('\0')) return new Response('Bad path', { status: 400 })
+
+  const segments = rel.split('/')
+  if (segments.some(s => s === '' || s === '.' || s === '..' || s.startsWith('.'))) {
+    return new Response('Forbidden', { status: 403 })
+  }
+  if (!FS_MEDIA_RE.test(rel)) return new Response('Unsupported file type', { status: 415 })
+
+  const root = resolve(workspaceRoot)
+  const target = resolve(workspaceRoot, rel)
+  if (target !== root && !target.startsWith(root + sep)) {
+    return new Response('Forbidden', { status: 403 })
+  }
+
+  // The lexical check above is not enough: a symlink that lives inside the root
+  // but points outside it would pass. Canonicalize both sides and re-check on
+  // the real paths — this blocks symlink escape while still allowing symlinks
+  // that stay within the workspace. realpathSync throws ENOENT for a missing
+  // file, which doubles as the existence check (→ 404). Both sides are
+  // canonicalized so a symlinked root (e.g. macOS /tmp → /private/tmp) isn't a
+  // false escape.
+  let realTarget: string
+  try {
+    realTarget = realpathSync(target)
+  } catch {
+    return new Response('Not found', { status: 404 })
+  }
+  let realRoot: string
+  try {
+    realRoot = realpathSync(root)
+  } catch {
+    return new Response('Forbidden', { status: 403 })
+  }
+  if (realTarget !== realRoot && !realTarget.startsWith(realRoot + sep)) {
+    return new Response('Forbidden', { status: 403 })
+  }
+  const file = Bun.file(realTarget)
+
+  const size = file.size
+  const type = file.type || 'application/octet-stream'
+  const parsed = range ? parseByteRange(range, size) : null
+
+  if (parsed === 'invalid') {
+    return new Response('Range Not Satisfiable', {
+      status: 416,
+      headers: { 'Content-Range': `bytes */${size}`, 'Accept-Ranges': 'bytes' }
+    })
+  }
+  if (parsed) {
+    const { start, end } = parsed
+    return new Response(file.slice(start, end + 1), {
+      status: 206,
+      headers: {
+        'Content-Type': type,
+        'Content-Length': String(end - start + 1),
+        'Content-Range': `bytes ${start}-${end}/${size}`,
+        'Accept-Ranges': 'bytes'
+      }
+    })
+  }
+  return new Response(file, {
+    headers: { 'Content-Type': type, 'Content-Length': String(size), 'Accept-Ranges': 'bytes' }
+  })
+}
+
+// Parse a single `bytes=start-end` (or suffix `bytes=-N`) range against a known
+// size. Returns the inclusive [start, end], null when there's no usable range
+// header, or 'invalid' for an unsatisfiable range (→ 416). Multi-range requests
+// are not supported (we serve the whole file instead — null).
+function parseByteRange(
+  header: string,
+  size: number
+): { start: number; end: number } | null | 'invalid' {
+  const m = /^bytes=(\d*)-(\d*)$/.exec(header.trim())
+  if (!m) return null
+  const hasStart = m[1] !== ''
+  const hasEnd = m[2] !== ''
+  if (!hasStart && !hasEnd) return null
+  if (size === 0) return 'invalid'
+
+  let start: number
+  let end: number
+  if (!hasStart) {
+    // Suffix range: the last N bytes.
+    const n = parseInt(m[2], 10)
+    start = Math.max(0, size - n)
+    end = size - 1
+  } else {
+    start = parseInt(m[1], 10)
+    end = hasEnd ? Math.min(parseInt(m[2], 10), size - 1) : size - 1
+  }
+  if (start > end || start >= size || start < 0) return 'invalid'
+  return { start, end }
 }
 
 export type AppletBuildResult<C> = {
@@ -106,9 +318,10 @@ export type AppletBuildResult<C> = {
 }
 
 // Build every stale (or all, when `force`) source for one kind: prunes orphaned
-// builds, writes fresh `.js` outputs, and returns per-entry results with the
-// parsed config and server-module names. Manifest persistence and MEI
-// broadcasting are the caller's responsibility — they differ per kind.
+// build dirs, writes fresh `<name>/` directories (entry + chunks + assets), and
+// returns per-entry results with the parsed config and server-module names.
+// Manifest persistence and MEI broadcasting are the caller's responsibility —
+// they differ per kind.
 export async function buildApplets<C>(
   workspacePath: string,
   kind: AppletKind,
@@ -138,7 +351,14 @@ export async function buildApplets<C>(
       if (job.status === 'skipped') return { name: job.name, status: 'skipped' }
       try {
         const artifact = await buildApplet(job.srcPath!, moiRoot, kind)
-        await Bun.write(join(buildDir, `${job.name}.js`), artifact.js)
+        // Clear the dir first so stale hashed assets from a prior build don't
+        // accumulate, then write the fresh entry + chunks + assets.
+        const dir = join(buildDir, job.name)
+        await rm(dir, { recursive: true, force: true })
+        await mkdir(dir, { recursive: true })
+        for (const f of artifact.files) {
+          await Bun.write(join(dir, f.name), f.data)
+        }
         return {
           name: job.name,
           status: 'built',

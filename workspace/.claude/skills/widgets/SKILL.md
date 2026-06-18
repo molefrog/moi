@@ -160,6 +160,41 @@ export default function MyWidget() {
 
 Always handle three states: loading → skeleton, error → error state with retry, success → content.
 
+## Assets & workspace files
+
+Two ways to pull non-code resources into a widget or view, beyond `.server.ts` data:
+
+**Bundled assets** — `import` an image or font that ships *with* the component:
+
+```tsx
+import logo from './logo.png' // resolves to a URL string at build time
+;<img src={logo} alt="logo" />
+```
+
+Put the file next to the `.tsx` (flat in `.moi/widgets/` or `.moi/views/`). Supported:
+`png jpg jpeg gif svg webp avif ico woff woff2 ttf otf`. Each is content-hashed and
+served beside the bundle — use this for small, component-owned art. Don't `import`
+large media (a video, a big audio file); stream it instead ↓.
+
+**Workspace files** — stream a file that lives in the workspace (video, audio, large
+images) with `fileUrl` from the `moi` module:
+
+```tsx
+import { fileUrl } from 'moi'
+;<video src={fileUrl('clips/001_intro.mp4')} controls />
+```
+
+`fileUrl(path)` takes a **workspace-root-relative** path (the same root your
+`.server.ts` reads from) and returns a streaming URL with HTTP range support, so
+`<video>`/`<audio>` seeking works and nothing gets base64-inlined. Only media/asset
+extensions are served; `.env`, `.json`, source, and dotfiles are rejected. The path is
+just data — a `.server.ts` can compute it and hand it back (e.g. `listClips()` returns
+`{ file: 'clips/001.mp4' }`), then the component renders `fileUrl(clip.file)`.
+
+Rule of thumb: component-owned small asset → `import`; structured data → `.server.ts`
+returns the value; large/streamable workspace media → `.server.ts` returns the **path**,
+render with `fileUrl()`.
+
 ## Environment variables (server functions only)
 
 Read config and secrets from `process.env` inside `.server.ts` — it holds all env vars of the process running the function. This is **server-only**: the widget `.tsx` runs in the browser and never sees these values, so keep API keys in `.server.ts`.

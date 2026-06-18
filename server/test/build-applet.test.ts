@@ -60,12 +60,16 @@ describe('buildApplet', () => {
     expect(result.js).toContain('parse')
   })
 
-  test('rpc function constructs /_rpc/fn/ URL', async () => {
+  test('rpc stub targets the workspace API base + /rpc/', async () => {
     const result = await buildApplet(join(FIXTURES, 'with-server.tsx'))
 
-    expect(result.js).toContain('"/_rpc/"')
-    expect(result.js).toContain('"/fn/"')
+    // The base is a sentinel the serve route rewrites to /api/workspaces/<id>.
+    expect(result.js).toContain('%%MOI_APPLET_API_BASE%%')
+    expect(result.js).toContain('"/rpc/"')
     expect(result.js).toContain('"POST"')
+    // The old global-lookup form is gone.
+    expect(result.js).not.toContain('/_rpc/')
+    expect(result.js).not.toContain('__MEI_WS__')
   })
 
   test('tree-shakes unused server function proxies', async () => {
@@ -271,6 +275,36 @@ describe("buildApplet kind='view'", () => {
     const result = await buildApplet(join(FIXTURES, 'hello.tsx'), undefined, 'widget')
     expect(result.js).toContain(', "hello");')
     expect(result.js).not.toContain('view:hello')
+  })
+})
+
+describe('asset imports', () => {
+  test('emits a hashed asset and references it via import.meta.url', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-asset.tsx'), undefined, 'view')
+    const asset = result.files.find(f => f.kind === 'asset')
+    expect(asset).toBeTruthy()
+    expect(asset!.name).toMatch(/^logo-[0-9a-f]+\.png$/)
+    expect(asset!.data).toBeInstanceOf(Uint8Array)
+    // Self-locating: resolved module-relative, so no API base is baked in.
+    expect(result.js).toContain('import.meta.url')
+    expect(result.js).toContain(asset!.name)
+    expect(result.js).not.toContain('%%MOI_APPLET_API_BASE%%')
+  })
+
+  test('the index.js entry is always a code file equal to .js', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-asset.tsx'), undefined, 'view')
+    const entry = result.files.find(f => f.name === 'index.js')
+    expect(entry?.kind).toBe('code')
+    expect(entry?.data).toBe(result.js)
+  })
+})
+
+describe('moi fileUrl module', () => {
+  test('compiles fileUrl against the sentinel base + /fs/', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-fileurl.tsx'), undefined, 'view')
+    expect(result.js).toContain('function fileUrl')
+    expect(result.js).toContain('%%MOI_APPLET_API_BASE%%')
+    expect(result.js).toContain('"/fs/"')
   })
 })
 

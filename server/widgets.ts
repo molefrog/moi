@@ -146,6 +146,11 @@ export async function handleBundle(
   return results
 }
 
-export function serveWidget(name: string, workspacePath: string): Promise<Response> {
-  return serveApplet('widget', name, workspacePath)
+export function serveWidget(
+  name: string,
+  file: string,
+  workspacePath: string,
+  apiBase: string
+): Promise<Response> {
+  return serveApplet('widget', name, file, workspacePath, apiBase)
 }

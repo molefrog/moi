@@ -1,17 +1,18 @@
 # Applet I/O — assets · server calls · files
 
-> Design memo (not built). How an applet (widget/view) reaches the outside:
-> bundled assets it imports, server functions, and workspace files. One base,
-> three transports.
+> Implemented. How an applet (widget/view) reaches the outside: bundled assets
+> it imports, server functions, and workspace files. One base, three transports.
+> Compiler: `server/build-applet.ts`; serve/guards: `server/applets.ts`; routes:
+> `server/web.ts`.
 
 ## One base, swapped at serve
 
-The build bakes one sentinel `%%MOI_API_BASE%%`; the serve route string-replaces
-it (it only needs the id) in every `.js` it returns. So the on-disk bundle is
-workspace-agnostic, and the served copy carries its base:
+The build bakes one sentinel `%%MOI_APPLET_API_BASE%%`; the serve route
+string-replaces it (it only needs the id) in every `.js` it returns. So the
+on-disk bundle is workspace-agnostic, and the served copy carries its base:
 
 ```
-%%MOI_API_BASE%%  →  /api/workspaces/<id>
+%%MOI_APPLET_API_BASE%%  →  /api/workspaces/<id>
 ```
 
 `rpc` and `fs` are **workspace-scoped** — they hang off this base. Bundle files
@@ -30,10 +31,10 @@ Kind is a **literal** segment (`widgets`/`views`), not a param — a param would
 shadow the sibling routes (`/sessions`, `/env`, …). The `*` tail is `<name>/<file>`:
 
 ```
-GET /api/workspaces/:id/widgets/*         ┐ applet file: <name>/<file>
-GET /api/workspaces/:id/views/*           ┘ (entry / chunk / asset)
-GET /api/workspaces/:id/fs/*              → workspace-root file (Bun.file: range)
-... /api/workspaces/:id/rpc/<module>/<fn> → workspace worker (run server fn)
+GET  /api/workspaces/:id/widgets/*         ┐ applet file: <name>/<file>
+GET  /api/workspaces/:id/views/*           ┘ (entry / chunk / asset)
+GET  /api/workspaces/:id/fs/*              → workspace-root file (explicit range)
+POST /api/workspaces/:id/rpc/<module>/<fn> → workspace worker (run server fn)
 ```
 
 Example paths (widget `clips`, workspace `wsab12`):
@@ -108,17 +109,24 @@ declare module '*.png' {
 - Keep the `.d.ts` at `.moi/` **root** — inside `widgets/`/`views/` it matches the
   `.ts` build glob and would be compiled as an applet.
 
-## To build
+## How it's built
 
-- **Build:** asset `onLoad` plugin; emit each applet into its own
-  `.build/<kind>/<name>/`; bake `%%MOI_APPLET_API_BASE%%` into the rpc stub +
-  `fileUrl`.
-- **Serve:** applet routes `…/widgets/*` and `…/views/*` (literal kind) parse the
-  tail as `<name>/<file>`, swap the sentinel in `.js` (entry **and** chunks), and
-  serve the file (`Bun.file` sets content-type by extension; only swapped `.js`
-  needs an explicit `text/javascript`). Separate `…/<id>/fs/*` (`Bun.file`) and
-  `…/<id>/rpc/<module>/<fn>` (worker) routes.
-- **`/fs` guards:** contain to workspace root (reject `..`), allowlist media
-  extensions. That's the secret-leak guard — localhost binding is not.
-- **Free:** dynamic `import()` chunks resolve module-relative; you only have to
-  serve them.
+- **Build** (`build-applet.ts`): asset `onLoad` plugin emits each imported image/
+  font as a content-hashed sibling and rewrites the import to
+  `new URL('./<name>-<hash>.<ext>', import.meta.url)`. The `mei:rpc` + `moi`
+  virtual modules bake `%%MOI_APPLET_API_BASE%%` into the rpc stub + `fileUrl`.
+  Output is a multi-file artifact written to `.build/<kind>/<name>/` (entry
+  `index.js`, `chunk-*.js`, assets). `naming.entry` must be `index.[ext]` — bun
+  emits the entry's CSS sibling as an "entry" output too, so a literal `index.js`
+  collides; we inject that CSS and drop the file.
+- **Serve** (`applets.ts` `serveApplet`): the `…/widgets/*` / `…/views/*` routes
+  (literal kind) parse the tail as `<name>/<file>`; `.js` is sentinel-swapped and
+  sent as `text/javascript`, anything else streams raw (`Bun.file` infers
+  content-type). `…/<id>/rpc/<module>/<fn>` reuses the existing worker call.
+- **`/fs`** (`applets.ts` `serveWorkspaceFile`): reject empty/`.`/`..`/dotfile
+  segments and anything resolving outside the root, allowlist media extensions —
+  the secret-leak guard, not the localhost bind. Range is handled **explicitly**
+  (slice the BunFile → 206 + `Content-Range`): bun's implicit range handling
+  stops firing once a `headers` object is attached to the response.
+- **Free:** dynamic `import()` chunks resolve module-relative; the serve route
+  already serves any file in the bundle dir.

@@ -41,6 +41,7 @@ import {
   isValidScope,
   updateWorkspaceEnv
 } from './workspace-env'
+import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from './applets'
 import { collectRequiredEnv, listWidgets, serveWidget } from './widgets'
 import { collectViewRequiredEnv, listViews, serveView } from './views'
 import type { EnvUpdate } from './workspace-env'
@@ -185,17 +186,19 @@ export const app = Bun.serve<WsData>({
       }
       return Response.json(await getSessions(ws.path))
     },
-    // Widget bundle: the compiled ESM module for one widget, dynamically
-    // imported by the client (useWidget). Sits beside the GET .../widgets list
-    // above — the exact path lists, `/*` serves a bundle.
+    // Widget bundle: the compiled ESM for one widget, dynamically imported by
+    // the client (useWidget). Sits beside the GET .../widgets list above — the
+    // exact path lists, `/*` serves a file from the bundle dir (`<name>/<file>`:
+    // index.js, a chunk, or a hashed asset).
     '/api/workspaces/:id/widgets/*': async req => {
       const ws = await getWorkspace(req.params.id)
       if (!ws) return new Response('Workspace not found', { status: 404 })
-      const name = new URL(req.url).pathname.split('/').pop()?.replace(/\.js$/, '')
-      return name ? serveWidget(name, ws.path) : new Response('Not found', { status: 404 })
+      const { name, file } = parseAppletTail(req.url, req.params.id, 'widgets')
+      if (!name) return new Response('Not found', { status: 404 })
+      return serveWidget(name, file, ws.path, apiBaseFor(req.params.id))
     },
     // Views — full-screen agent apps. Mirrors the widget pair above: the exact
-    // path lists (in manifest/nav order), `/*` serves one compiled bundle.
+    // path lists (in manifest/nav order), `/*` serves one bundle file.
     '/api/workspaces/:id/views': async req => {
       const ws = await getWorkspace(req.params.id)
       if (!ws) return new Response('Workspace not found', { status: 404 })
@@ -204,8 +207,31 @@ export const app = Bun.serve<WsData>({
     '/api/workspaces/:id/views/*': async req => {
       const ws = await getWorkspace(req.params.id)
       if (!ws) return new Response('Workspace not found', { status: 404 })
-      const name = new URL(req.url).pathname.split('/').pop()?.replace(/\.js$/, '')
-      return name ? serveView(name, ws.path) : new Response('Not found', { status: 404 })
+      const { name, file } = parseAppletTail(req.url, req.params.id, 'views')
+      if (!name) return new Response('Not found', { status: 404 })
+      return serveView(name, file, ws.path, apiBaseFor(req.params.id))
+    },
+    // Workspace file stream — an applet's `fileUrl(path)` resolves here. Streams
+    // a media file from the workspace root (range-enabled). Guarded: traversal
+    // and dotfiles (`.env`, `.moi`, `.git`) are rejected and only media/asset
+    // extensions are allowed — the workspace holds secrets, and this route is
+    // unauthenticated. localhost binding is NOT the guard.
+    '/api/workspaces/:id/fs/*': async req => {
+      const ws = await getWorkspace(req.params.id)
+      if (!ws) return new Response('Workspace not found', { status: 404 })
+      const tail = new URL(req.url).pathname.split(`/api/workspaces/${req.params.id}/fs/`)[1] ?? ''
+      return serveWorkspaceFile(ws.path, tail, req.headers.get('range'))
+    },
+    // Applet RPC — the home for server-function calls from a bundle. The bundle's
+    // sentinel base resolves to `/api/workspaces/<id>`, so it POSTs to
+    // `…/rpc/<module>/<fn>`. (The legacy `/_rpc/:wid/fn/*` below still works for
+    // any bundle built before this route existed.)
+    '/api/workspaces/:id/rpc/*': async req => {
+      if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })
+      const ws = await getWorkspace(req.params.id)
+      if (!ws) return new Response('Workspace not found', { status: 404 })
+      const tail = new URL(req.url).pathname.split(`/api/workspaces/${req.params.id}/rpc/`)[1] ?? ''
+      return handleFunctionCall(req, tail, ws.path)
     },
     '/api/workspaces/:id/sessions/:sessionId/events': async req => {
       const ws = await getWorkspace(req.params.id)
@@ -406,8 +432,9 @@ export const app = Bun.serve<WsData>({
       return new Response('Method not allowed', { status: 405 })
     },
 
-    // Widget RPC: a widget bundle POSTs here to call one of its `.server.ts`
-    // functions. Kept on its own internal `/_rpc/` prefix, off the public API.
+    // Legacy widget RPC. Superseded by `/api/workspaces/:id/rpc/*` (bundles now
+    // bake the workspace API base via sentinel). Kept so any bundle compiled
+    // before that route — still on disk, not yet rebuilt — keeps working.
     '/_rpc/:wid/fn/*': async req => {
       if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })
       const ws = await getWorkspace(req.params.wid)
