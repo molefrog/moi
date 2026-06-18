@@ -14,6 +14,21 @@ export type WidgetInfo = {
   config: WidgetConfig
 }
 
+// A view is a full-screen, agent-authored "app" (`.moi/views/<name>.tsx`),
+// shown one-at-a-time in the workspace nav. Same build/RPC machinery as a
+// widget, minus the grid: no sizing, the view owns its own layout and scroll.
+export type ViewConfig = {
+  // Nav tab label. Falls back to the file name when unset.
+  title?: string
+  // Advisory env hints, same semantics as WidgetConfig.requiredEnv.
+  requiredEnv?: string[]
+}
+
+export type ViewInfo = {
+  id: string
+  config: ViewConfig
+}
+
 // Client → Server messages.
 // The chat WebSocket is app-wide (one socket for the whole client, not scoped to
 // a workspace), so every message carries the `workspaceId` it targets.

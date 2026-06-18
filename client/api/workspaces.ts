@@ -6,6 +6,7 @@ import type {
   McpServer,
   SessionInfo,
   StreamEvent,
+  ViewInfo,
   ViewState,
   WidgetInfo,
   WorkspaceEntry,
@@ -33,6 +34,7 @@ export const workspaceKeys = {
   preview: (id: string) => ['workspaces', 'preview', id] as const,
   layout: (id: string) => ['workspaces', 'layout', id] as const,
   widgets: (id: string) => ['workspaces', 'widgets', id] as const,
+  views: (id: string) => ['workspaces', 'views', id] as const,
   sessions: (id: string) => ['workspaces', 'sessions', id] as const,
   // Materialized transcript (ViewState) for one thread. The connection manager
   // patches this cache with live WS deltas; the `['workspaces','events']`
@@ -95,6 +97,19 @@ export function useWorkspaceWidgets(workspaceId: string) {
       fetch(`/api/workspaces/${workspaceId}/widgets`)
         .then(r => r.json())
         .then((d: { widgets: WidgetInfo[] }) => d.widgets),
+    ...WORKSPACE_RESOURCE_OPTS
+  })
+}
+
+// Views declared in a workspace (the endpoint wraps them in `{ views }`), in
+// nav/manifest order.
+export function useWorkspaceViews(workspaceId: string) {
+  return useQuery<ViewInfo[]>({
+    queryKey: workspaceKeys.views(workspaceId),
+    queryFn: () =>
+      fetch(`/api/workspaces/${workspaceId}/views`)
+        .then(r => r.json())
+        .then((d: { views: ViewInfo[] }) => d.views),
     ...WORKSPACE_RESOURCE_OPTS
   })
 }

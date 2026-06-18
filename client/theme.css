@@ -1,7 +1,7 @@
 /*
  * Shared design-token map for both the host app (client/index.css) and
- * widget bundles (server/build-widget.ts emits an `@import` to this file
- * into the widget's synthetic CSS).
+ * applet bundles (server/build-applet.ts emits an `@import` to this file
+ * into the applet's synthetic CSS).
  *
  * The actual CSS variables (`--background`, `--foreground`, `--card`, etc.)
  * are owned by the host and declared on `:root` / `.dark` in

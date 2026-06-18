@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
 
-import { useWidget } from '@/client/hooks/useWidget'
+import { useWidget } from '@/client/hooks/useApplet'
 
 import { WidgetErrorBoundary } from './WidgetErrorBoundary'
 

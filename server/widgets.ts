@@ -1,27 +1,16 @@
-import { mkdir, readdir, unlink } from 'node:fs/promises'
-import { dirname, join } from 'path'
-
 import type { WidgetConfig, WidgetInfo } from '@/lib/types'
 
-import { buildWidget, scanServerImports } from './build-widget'
+import { buildApplets, getAppletPaths, listBuilt, serveApplet } from './applets'
 import { reloadModules } from './functions'
 
 const DEFAULT_CONFIG: WidgetConfig = { rowSpan: 1, colSpan: 2 }
 const VALID_SPANS = [1, 2, 3, 4]
 
-// All widget machinery lives under the workspace's `.moi/` root: widget
-// sources in `.moi/widgets/` (flat), compiled bundles + manifest in
-// `.moi/.build/widgets/`. Server-module keys are relative to `moiRoot`.
-function getWidgetPaths(workspacePath: string) {
-  const moiRoot = join(workspacePath, '.moi')
-  const sourceDir = join(moiRoot, 'widgets')
-  const buildDir = join(moiRoot, '.build', 'widgets')
-  const manifestPath = join(buildDir, 'manifest.json')
-  return { moiRoot, sourceDir, buildDir, manifestPath }
-}
-
+// The widget applet kind. Sources in `.moi/widgets/`, compiled output +
+// manifest in `.moi/.build/widgets/`; the shared mechanics live in
+// `applets.ts`. Manifest shape: `{ config: { <name>: WidgetConfig } }`.
 async function readManifest(workspacePath: string): Promise<Record<string, WidgetConfig>> {
-  const { manifestPath } = getWidgetPaths(workspacePath)
+  const { manifestPath } = getAppletPaths(workspacePath, 'widget')
   try {
     const data = JSON.parse(await Bun.file(manifestPath).text())
     return data.config ?? {}
@@ -34,65 +23,8 @@ async function writeManifest(
   workspacePath: string,
   configs: Record<string, WidgetConfig>
 ): Promise<void> {
-  const { manifestPath } = getWidgetPaths(workspacePath)
+  const { manifestPath } = getAppletPaths(workspacePath, 'widget')
   await Bun.write(manifestPath, JSON.stringify({ config: configs }, null, 2))
-}
-
-async function scanWidgets(workspacePath: string): Promise<string[]> {
-  const { sourceDir } = getWidgetPaths(workspacePath)
-  try {
-    const entries = await readdir(sourceDir)
-    return entries
-      .filter(f => /\.(tsx|ts)$/.test(f) && !f.endsWith('.server.ts'))
-      .map(f => f.replace(/\.tsx?$/, ''))
-  } catch {
-    return []
-  }
-}
-
-async function resolveWidgetSource(workspacePath: string, name: string): Promise<string | null> {
-  const { sourceDir } = getWidgetPaths(workspacePath)
-  for (const ext of ['.tsx', '.ts']) {
-    const path = join(sourceDir, `${name}${ext}`)
-    if (await Bun.file(path).exists()) return path
-  }
-  return null
-}
-
-async function needsRebuild(
-  workspacePath: string,
-  name: string,
-  srcPath: string
-): Promise<boolean> {
-  const { buildDir } = getWidgetPaths(workspacePath)
-  const built = Bun.file(join(buildDir, `${name}.js`))
-  if (!(await built.exists())) return true
-  // Also stat every `.server.ts` the widget imports. The build inlines RPC
-  // stubs for their exports, so a server-only edit must trigger a rebuild —
-  // but those mtimes live on different files than `srcPath`. Server files
-  // may live anywhere under `.moi/`, so resolve each import specifier
-  // relative to the widget file instead of assuming a colocated sibling.
-  let sourceMtime = Bun.file(srcPath).lastModified
-  const source = await Bun.file(srcPath).text()
-  for (const specifier of scanServerImports(source)) {
-    const serverFile = Bun.file(join(dirname(srcPath), `${specifier}.server.ts`))
-    if (await serverFile.exists()) {
-      sourceMtime = Math.max(sourceMtime, serverFile.lastModified)
-    }
-  }
-  return sourceMtime >= built.lastModified
-}
-
-async function pruneStaleBuilds(workspacePath: string, sourceNames: Set<string>) {
-  const built = await listBuiltWidgets(workspacePath)
-  const { buildDir } = getWidgetPaths(workspacePath)
-  for (const name of built) {
-    if (!sourceNames.has(name)) {
-      try {
-        await unlink(join(buildDir, `${name}.js`))
-      } catch {}
-    }
-  }
 }
 
 export type WidgetBuildResult = {
@@ -107,64 +39,21 @@ export async function buildAllWidgets(
   workspacePath: string,
   force = false
 ): Promise<WidgetBuildResult[]> {
-  const t0 = performance.now()
-  const { buildDir } = getWidgetPaths(workspacePath)
-  const names = await scanWidgets(workspacePath)
-
-  await mkdir(buildDir, { recursive: true })
-  await pruneStaleBuilds(workspacePath, new Set(names))
+  const { names, results, ms } = await buildApplets<WidgetConfig>(workspacePath, 'widget', force)
 
   const manifest = await readManifest(workspacePath)
-
-  const jobs = await Promise.all(
-    names.map(async name => {
-      const srcPath = await resolveWidgetSource(workspacePath, name)
-      if (!srcPath) {
-        return { name, status: 'failed' as const, error: 'Source file not found' }
-      }
-      if (!force && !(await needsRebuild(workspacePath, name, srcPath))) {
-        return { name, status: 'skipped' as const }
-      }
-      return { name, srcPath, status: 'pending' as const }
-    })
-  )
-
-  const buildResults = await Promise.all(
-    jobs.map(async (job): Promise<WidgetBuildResult> => {
-      if (job.status === 'failed') return { name: job.name, status: 'failed', error: job.error }
-      if (job.status === 'skipped') return { name: job.name, status: 'skipped' }
-
-      const { buildDir: bd, moiRoot } = getWidgetPaths(workspacePath)
-      try {
-        const artifact = await buildWidget(job.srcPath!, moiRoot)
-        await Bun.write(join(bd, `${job.name}.js`), artifact.js)
-        manifest[job.name] = artifact.config ?? DEFAULT_CONFIG
-        return {
-          name: job.name,
-          status: 'built',
-          serverModules: artifact.serverModules.map(m => m.name),
-          config: artifact.config
-        }
-      } catch (err) {
-        return {
-          name: job.name,
-          status: 'failed',
-          error: err instanceof Error ? err.message : 'Unknown error'
-        }
-      }
-    })
-  )
-
+  for (const r of results) {
+    if (r.status === 'built') manifest[r.name] = r.config ?? DEFAULT_CONFIG
+  }
   for (const key of Object.keys(manifest)) {
     if (!names.includes(key)) delete manifest[key]
   }
-
   await writeManifest(workspacePath, manifest)
 
-  const builtCount = buildResults.filter(r => r.status === 'built').length
-  const failed = buildResults.filter(r => r.status === 'failed')
+  const builtCount = results.filter(r => r.status === 'built').length
+  const failed = results.filter(r => r.status === 'failed')
   console.log(
-    `[bundle] ${builtCount}/${names.length} built in ${Math.round(performance.now() - t0)}ms` +
+    `[bundle] ${builtCount}/${names.length} widgets built in ${ms}ms` +
       (failed.length ? `, ${failed.length} failed` : '') +
       (force ? ' (forced)' : '')
   )
@@ -172,17 +61,12 @@ export async function buildAllWidgets(
     console.error(`[bundle] ${r.name}:\n${r.error}`)
   }
 
-  return buildResults
+  return results
 }
 
-export async function listBuiltWidgets(workspacePath: string): Promise<string[]> {
-  const { buildDir } = getWidgetPaths(workspacePath)
-  try {
-    const entries = await readdir(buildDir)
-    return entries.filter(f => f.endsWith('.js')).map(f => f.replace(/\.js$/, ''))
-  } catch {
-    return []
-  }
+export function listBuiltWidgets(workspacePath: string): Promise<string[]> {
+  const { buildDir } = getAppletPaths(workspacePath, 'widget')
+  return listBuilt(buildDir)
 }
 
 async function getWidgetList(workspacePath: string): Promise<WidgetInfo[]> {
@@ -262,20 +146,6 @@ export async function handleBundle(
   return results
 }
 
-export async function serveWidget(name: string, workspacePath: string): Promise<Response> {
-  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
-    return new Response('Invalid widget name', { status: 400 })
-  }
-
-  const { buildDir } = getWidgetPaths(workspacePath)
-  const buildPath = join(buildDir, `${name}.js`)
-  const file = Bun.file(buildPath)
-
-  if (!(await file.exists())) {
-    return new Response(`Widget "${name}" not built. Run: moi bundle`, { status: 404 })
-  }
-
-  return new Response(file, {
-    headers: { 'Content-Type': 'application/javascript' }
-  })
+export function serveWidget(name: string, workspacePath: string): Promise<Response> {
+  return serveApplet('widget', name, workspacePath)
 }

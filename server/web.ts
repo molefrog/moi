@@ -42,10 +42,27 @@ import {
   updateWorkspaceEnv
 } from './workspace-env'
 import { collectRequiredEnv, listWidgets, serveWidget } from './widgets'
+import { collectViewRequiredEnv, listViews, serveView } from './views'
 import type { EnvUpdate } from './workspace-env'
 import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
 
 const MEI_TOPIC = 'mei'
+
+// The env "required" view aggregates `config.requiredEnv` declared by both
+// widgets and views, each key mapped to the bundle ids that asked for it.
+async function requiredEnvFor(workspacePath: string): Promise<Record<string, string[]>> {
+  const [widgets, views] = await Promise.all([
+    collectRequiredEnv(workspacePath),
+    collectViewRequiredEnv(workspacePath)
+  ])
+  const out: Record<string, string[]> = {}
+  for (const map of [widgets, views]) {
+    for (const [key, ids] of Object.entries(map)) {
+      out[key] = [...(out[key] ?? []), ...ids]
+    }
+  }
+  return out
+}
 
 type WsData = { channel: 'chat' | 'mei'; workspaceId: string }
 
@@ -177,6 +194,19 @@ export const app = Bun.serve<WsData>({
       const name = new URL(req.url).pathname.split('/').pop()?.replace(/\.js$/, '')
       return name ? serveWidget(name, ws.path) : new Response('Not found', { status: 404 })
     },
+    // Views — full-screen agent apps. Mirrors the widget pair above: the exact
+    // path lists (in manifest/nav order), `/*` serves one compiled bundle.
+    '/api/workspaces/:id/views': async req => {
+      const ws = await getWorkspace(req.params.id)
+      if (!ws) return new Response('Workspace not found', { status: 404 })
+      return listViews(ws.path)
+    },
+    '/api/workspaces/:id/views/*': async req => {
+      const ws = await getWorkspace(req.params.id)
+      if (!ws) return new Response('Workspace not found', { status: 404 })
+      const name = new URL(req.url).pathname.split('/').pop()?.replace(/\.js$/, '')
+      return name ? serveView(name, ws.path) : new Response('Not found', { status: 404 })
+    },
     '/api/workspaces/:id/sessions/:sessionId/events': async req => {
       const ws = await getWorkspace(req.params.id)
       if (!ws) return new Response('Workspace not found', { status: 404 })
@@ -221,7 +251,7 @@ export const app = Bun.serve<WsData>({
       if (!ws) return new Response('Workspace not found', { status: 404 })
 
       if (req.method === 'GET') {
-        const required = await collectRequiredEnv(ws.path)
+        const required = await requiredEnvFor(ws.path)
         return Response.json(await getWorkspaceEnvView(ws.path, required))
       }
       if (req.method === 'PUT') {
@@ -278,7 +308,7 @@ export const app = Bun.serve<WsData>({
           restartWorkspaceSessions(ws.path)
         }
 
-        const required = await collectRequiredEnv(ws.path)
+        const required = await requiredEnvFor(ws.path)
         return Response.json(await getWorkspaceEnvView(ws.path, required))
       }
       return new Response('Method not allowed', { status: 405 })

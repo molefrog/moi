@@ -8,6 +8,7 @@ import { broadcastAll } from './state'
 import { applyThemeUpdate, matchColorTheme } from './theme'
 import { publishMei } from './web'
 import { handleBundle } from './widgets'
+import { handleBundleViews } from './views'
 import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
 
 export const control = Bun.serve({
@@ -45,8 +46,23 @@ export const control = Bun.serve({
             return
           }
           const workspacePath = String(data.path ?? workspaces[0].path)
-          const results = await handleBundle(publishMei, workspacePath, !!data.force)
-          ws.send(JSON.stringify(results))
+          const force = !!data.force
+          // `only` narrows to one kind; default builds both. Results carry a
+          // `kind` so the CLI can label each row.
+          const only = data.only === 'widgets' || data.only === 'views' ? data.only : undefined
+          const out: { kind: 'widget' | 'view'; name: string; status: string; error?: string }[] =
+            []
+          if (only !== 'views') {
+            for (const r of await handleBundle(publishMei, workspacePath, force)) {
+              out.push({ kind: 'widget', name: r.name, status: r.status, error: r.error })
+            }
+          }
+          if (only !== 'widgets') {
+            for (const r of await handleBundleViews(publishMei, workspacePath, force)) {
+              out.push({ kind: 'view', name: r.name, status: r.status, error: r.error })
+            }
+          }
+          ws.send(JSON.stringify(out))
           return
         }
 

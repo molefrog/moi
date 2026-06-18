@@ -14,10 +14,16 @@ import {
 } from "@tabler/icons-react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { useWorkspaceSessions, useWorkspaceWidgets, workspaceKeys } from "@/client/api/workspaces";
+import {
+  useWorkspaceSessions,
+  useWorkspaceViews,
+  useWorkspaceWidgets,
+  workspaceKeys,
+} from "@/client/api/workspaces";
 import { ChatPanel } from "@/client/components/ChatPanel";
 import { ChatPopup } from "@/client/components/ChatPopup";
 import { McpMenu } from "@/client/components/McpMenu";
+import { WidgetErrorBoundary } from "@/client/components/WidgetErrorBoundary";
 import { type WidgetMode, Widgets } from "@/client/components/Widgets";
 import {
   PanelHeader,
@@ -38,6 +44,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/client/components/ui/tooltip";
 import { WorkspaceSettings } from "@/client/components/settings/WorkspaceSettings";
 import { useChat } from "@/client/hooks/useChat";
+import { useView } from "@/client/hooks/useApplet";
 import { useFitsSidebar } from "@/client/hooks/useFitsSidebar";
 import { useGridReconcile } from "@/client/hooks/useGridReconcile";
 import { useMeiEvent } from "@/client/hooks/useMeiEvents";
@@ -48,9 +55,11 @@ import {
   useWorkspaceLayoutCtx,
 } from "@/client/lib/WorkspaceLayoutContext";
 import { cn } from "@/client/lib/cn";
-import { DEMO_VIEWS, type ViewDef } from "@/client/lib/views";
 import { liveStore } from "@/client/store/live";
-import type { ChatDisplay, SessionInfo, WidgetInfo } from "@/lib/types";
+import type { ChatDisplay, SessionInfo, ViewInfo, WidgetInfo } from "@/lib/types";
+
+// Tab label for a view: its configured title, or the file-name id as fallback.
+const viewLabel = (v: ViewInfo) => v.config.title || v.id;
 
 type WorkspaceRouteProps = {
   id: string;
@@ -78,6 +87,7 @@ function WorkspaceLoader({ id }: WorkspaceLoaderProps) {
   const qc = useQueryClient();
   const { layout, setLayout, isLoading: layoutLoading } = useWorkspaceLayoutCtx();
   const widgets = useWorkspaceWidgets(id);
+  const views = useWorkspaceViews(id);
   const sessions = useWorkspaceSessions(id);
 
   // Keep the grid balanced as widgets come and go. (Theme is applied inside
@@ -91,6 +101,8 @@ function WorkspaceLoader({ id }: WorkspaceLoaderProps) {
       qc.invalidateQueries({ queryKey: workspaceKeys.layout(id) });
     } else if (e.type === "widget-layout:updated") {
       qc.invalidateQueries({ queryKey: workspaceKeys.widgets(id) });
+    } else if (e.type === "view-layout:updated") {
+      qc.invalidateQueries({ queryKey: workspaceKeys.views(id) });
     }
   });
 
@@ -109,7 +121,7 @@ function WorkspaceLoader({ id }: WorkspaceLoaderProps) {
             <LedLogo sprite="moi" effect="chaos" />
           </div>
         ) : (
-          <WorkspaceView widgets={widgets.data ?? []} />
+          <WorkspaceView widgets={widgets.data ?? []} views={views.data ?? []} />
         )}
       </SidebarLayout>
     </>
@@ -153,7 +165,7 @@ const INLINE_VIEWS = 2;
 type WorkspaceTabsProps = {
   active: WorkspaceNav;
   onSelect: (nav: WorkspaceNav) => void;
-  views: ViewDef[];
+  views: ViewInfo[];
   onCreateView: () => void;
 };
 
@@ -203,7 +215,7 @@ function WorkspaceTabs({ active, onSelect, views, onCreateView }: WorkspaceTabsP
       </Tooltip>
       {tab("widgets", IconLayoutGrid, "Widgets")}
       {tab("canvas", IconArtboard, "Scratchpad")}
-      {inline.map((v) => tab(v.id, IconAppWindow, v.name))}
+      {inline.map((v) => tab(v.id, IconAppWindow, viewLabel(v)))}
 
       <DropdownMenu>
         <DropdownMenuTrigger
@@ -222,7 +234,7 @@ function WorkspaceTabs({ active, onSelect, views, onCreateView }: WorkspaceTabsP
               onClick={() => onSelect(v.id)}
             >
               <IconAppWindow stroke={1.75} />
-              {v.name}
+              {viewLabel(v)}
             </DropdownMenuCheckboxItem>
           ))}
           {overflow.length > 0 && <DropdownMenuSeparator />}
@@ -246,17 +258,45 @@ function ScratchpadCanvas() {
 }
 
 type ViewAppProps = {
-  view: ViewDef;
+  view: ViewInfo;
 };
 
-// A view — an agent-defined app — rendered full-area like the scratchpad.
-// Placeholder for now; the real app content will mount here once wired up.
+// A view — an agent-defined app — mounted full-area. The bundle owns its own
+// layout + scroll, so we give it a plain filled box and fade it in (mirroring
+// WidgetShell, but full-area instead of a grid cell).
 function ViewApp({ view }: ViewAppProps) {
+  const bundle = useView(view.id);
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 bg-muted/40 bg-[radial-gradient(circle,var(--border)_1px,transparent_1px)] bg-[size:20px_20px] bg-[position:center]">
-      <IconAppWindow size={32} stroke={1.5} className="text-muted-foreground/50" />
-      <div className="text-foreground text-sm font-medium">{view.name}</div>
-      <div className="text-muted-foreground/60 text-xs">View app · demo placeholder</div>
+    <div className="relative min-h-0 flex-1 overflow-hidden">
+      <AnimatePresence mode="wait" initial={false}>
+        {bundle.status === "ready" && (
+          <motion.div
+            key={bundle.version}
+            className="absolute inset-0 overflow-auto"
+            initial={{ opacity: 0, filter: "blur(4px)" }}
+            animate={{ opacity: 1, filter: "blur(0px)" }}
+            exit={{ opacity: 0, filter: "blur(4px)" }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+          >
+            <WidgetErrorBoundary name={view.id} resetKey={bundle.version}>
+              <bundle.Component />
+            </WidgetErrorBoundary>
+          </motion.div>
+        )}
+        {bundle.status === "error" && (
+          <motion.p
+            key={`err-${bundle.version}`}
+            className="text-destructive absolute inset-0 p-4 text-xs"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+          >
+            {bundle.error}
+          </motion.p>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -315,17 +355,15 @@ function WidgetActions({ mode, onMode }: WidgetActionsProps) {
 
 type WorkspaceViewProps = {
   widgets: WidgetInfo[];
+  views: ViewInfo[];
 };
 
-function WorkspaceView({ widgets }: WorkspaceViewProps) {
+function WorkspaceView({ widgets, views }: WorkspaceViewProps) {
   const { view, input, setInput, processing, error, send, stop, switchThread, dismissError } =
     useChat();
   const { layout, setLayout, name, icon, provider } = useWorkspaceLayoutCtx();
   const { ref: rowRef, fits: canFitSidebar } = useFitsSidebar<HTMLDivElement>();
   const [widgetMode, setWidgetMode] = useState<WidgetMode>("idle");
-  // Agent-defined views (demo data; same for every workspace until wired up).
-  // Local state so Create/Delete are interactive in the demo.
-  const [views, setViews] = useState<ViewDef[]>(DEMO_VIEWS);
   // Two orthogonal, transient local bits: which body is selected (a fixed tab or
   // a view id), and whether the chat is fullscreen. Fullscreen overrides (never
   // persists) the chat's dock position, and toggling it keeps the body beneath.
@@ -365,15 +403,18 @@ function WorkspaceView({ widgets }: WorkspaceViewProps) {
     }
   };
 
-  // Demo view management (local only — not persisted or synced anywhere).
-  const createView = () => {
-    const created: ViewDef = { id: crypto.randomUUID(), name: `View ${views.length + 1}` };
-    setViews([...views, created]);
-    setBodyTab(created.id);
-    setFullscreen(false);
-  };
+  // "Create View" is a no-op for now — views are authored by the agent via the
+  // CLI (`.moi/views/<name>.tsx` + `moi bundle`), not from the UI.
+  const createView = () => {};
   // The active view, when a view (not a fixed tab) fills the main area.
   const activeView = views.find((v) => v.id === bodyTab);
+
+  // If the active view's file was deleted (its bundle vanished from the list),
+  // `bodyTab` dangles — fall back to the widget grid so nothing renders blank.
+  const isViewTab = bodyTab !== "widgets" && bodyTab !== "canvas";
+  useEffect(() => {
+    if (isViewTab && !activeView) setBodyTab("widgets");
+  }, [isViewTab, activeView]);
 
   // The chat-mode picker switches the display: fullscreen is the transient view;
   // sidebar/floating persist the dock position (and leave fullscreen).

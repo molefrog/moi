@@ -1,10 +1,13 @@
 import { useEffect, useRef } from 'react'
 
-import type { WidgetInfo } from '@/lib/types'
+import type { ViewInfo, WidgetInfo } from '@/lib/types'
 
-type MeiEvent =
+export type MeiEvent =
   | { type: 'widget:updated'; name: string }
   | { type: 'widget-layout:updated'; widgets: WidgetInfo[] }
+  | { type: 'widgets:refresh' }
+  | { type: 'view:updated'; name: string }
+  | { type: 'view-layout:updated'; views: ViewInfo[] }
   | { type: 'theme:updated' }
   | { type: 'workspace:updated' }
 

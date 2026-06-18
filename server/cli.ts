@@ -278,7 +278,7 @@ function colorStatus(status: string) {
 }
 
 const bundle = defineCommand({
-  meta: { name: 'bundle', description: 'Rebuild changed widgets' },
+  meta: { name: 'bundle', description: 'Rebuild changed widgets and views' },
   args: {
     dir: {
       type: 'positional',
@@ -287,23 +287,33 @@ const bundle = defineCommand({
     },
     force: {
       type: 'boolean',
-      description: 'Rebuild all widgets, ignoring file modification times',
+      description: 'Rebuild everything, ignoring file modification times',
       default: false
+    },
+    only: {
+      type: 'string',
+      description: 'Narrow the build to "widgets" or "views" (default: both)'
     }
   },
   run({ args }) {
     const path = resolve(args.dir)
     const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
 
-    ws.onopen = () => ws.send(JSON.stringify({ type: 'bundle', path, force: args.force }))
+    ws.onopen = () =>
+      ws.send(JSON.stringify({ type: 'bundle', path, force: args.force, only: args.only }))
 
     ws.onmessage = event => {
       const results = JSON.parse(String(event.data))
       if (!Array.isArray(results)) return
 
-      const table = new Table({ head: [pc.bold('widget'), pc.bold('status')] })
-      for (const r of results as { name: string; status: string; error?: string }[]) {
-        table.push([r.name, colorStatus(r.status)])
+      const table = new Table({ head: [pc.bold('kind'), pc.bold('name'), pc.bold('status')] })
+      for (const r of results as {
+        kind?: string
+        name: string
+        status: string
+        error?: string
+      }[]) {
+        table.push([pc.dim(r.kind ?? ''), r.name, colorStatus(r.status)])
       }
       console.log('\n' + table.toString())
 
