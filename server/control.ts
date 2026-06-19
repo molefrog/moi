@@ -3,7 +3,7 @@ import { resolve } from 'path'
 import { CONTROL_PORT } from './constants'
 import { processIcon } from './icon'
 import { loadLayout, saveLayout } from './layout'
-import { publishMei } from './mei'
+import { publishEvent } from './events'
 import { listWorkspaces, registerWorkspace } from './registry'
 import { broadcastAll } from './state'
 import { applyThemeUpdate, matchColorTheme } from './theme'
@@ -53,12 +53,12 @@ export const control = Bun.serve({
           const out: { kind: 'widget' | 'view'; name: string; status: string; error?: string }[] =
             []
           if (only !== 'views') {
-            for (const r of await handleBundle(publishMei, workspacePath, force)) {
+            for (const r of await handleBundle(publishEvent, workspacePath, force)) {
               out.push({ kind: 'widget', name: r.name, status: r.status, error: r.error })
             }
           }
           if (only !== 'widgets') {
-            for (const r of await handleBundleViews(publishMei, workspacePath, force)) {
+            for (const r of await handleBundleViews(publishEvent, workspacePath, force)) {
               out.push({ kind: 'view', name: r.name, status: r.status, error: r.error })
             }
           }
@@ -71,7 +71,7 @@ export const control = Bun.serve({
           // and re-run its data fetches. No rebuild, no page reload — the
           // existing `useWidget` hook handles `widgets:refresh` identically
           // to `widget:updated` (load with bust=true).
-          publishMei({ type: 'widgets:refresh' })
+          publishEvent({ type: 'widgets:refresh' })
           ws.send(JSON.stringify({ ok: true }))
           return
         }
@@ -104,7 +104,7 @@ export const control = Bun.serve({
           }
 
           await saveLayout({ ...layout, theme: result.theme }, workspacePath)
-          publishMei({ type: 'theme:updated' })
+          publishEvent({ type: 'theme:updated' })
           ws.send(JSON.stringify({ ok: true, ...result.applied }))
         }
 
@@ -146,7 +146,7 @@ export const control = Bun.serve({
           }
 
           await setWorkspaceConfig(workspacePath, patch)
-          publishMei({ type: 'workspace:updated' })
+          publishEvent({ type: 'workspace:updated' })
           ws.send(
             JSON.stringify({
               ok: true,

@@ -10,8 +10,8 @@ import {
 } from './cc-session'
 import { PORT } from './constants'
 import { control } from './control'
+import { EVENTS_TOPIC, setEventServer } from './events'
 import { killAllWorkers } from './functions'
-import { MEI_TOPIC, setMeiServer } from './mei'
 import {
   abortOpenClawRun,
   getOpenClawRunningSessions,
@@ -19,9 +19,9 @@ import {
 } from './openclaw-session'
 import { getWorkspace } from './registry'
 import { addClient, removeClient, sendToClient } from './state'
-import { distShell, serveStatic } from './static'
+import { distShell, prebuilt } from './static'
 
-type WsData = { channel: 'chat' | 'mei'; workspaceId: string }
+type WsData = { channel: 'chat' | 'events'; workspaceId: string }
 
 function isClientMessage(value: unknown): value is ClientMessage {
   if (typeof value !== 'object' || value === null || !('type' in value)) return false
@@ -50,7 +50,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
 // The SPA shell: prebuilt index.html in prod (served statically), the
 // live-bundled HTML import in dev (Bun.serve's bundler + HMR). The HTML import
 // stays here, in the routes table, so Bun's dev bundler keys off it.
-const shell = serveStatic ? distShell : index
+const shell = prebuilt ? distShell : index
 
 type Upgradable = { upgrade(req: Request, opts: { data: WsData }): boolean }
 
@@ -67,7 +67,7 @@ export const app = Bun.serve<WsData>({
   port: PORT,
   hostname: process.env.HOST ?? '127.0.0.1',
   // HMR only in dev; prod serves prebuilt static assets (no bundler).
-  development: serveStatic ? false : { hmr: true },
+  development: prebuilt ? false : { hmr: true },
   routes: {
     // Client-side routes — serve the SPA shell.
     '/': shell,
@@ -82,7 +82,8 @@ export const app = Bun.serve<WsData>({
     // Live widget-event stream (build/refresh pushes). A static path, so Bun
     // routes it ahead of the Hono-served `/api/workspaces/:id`; the upgrade
     // happens in-handler via the route's `server` argument.
-    '/api/workspaces/ws': (req, server) => upgrade(server, req, { channel: 'mei', workspaceId: '' })
+    '/api/workspaces/ws': (req, server) =>
+      upgrade(server, req, { channel: 'events', workspaceId: '' })
   },
   // Anything not matched above (the whole HTTP API + prod static assets + 404)
   // is handled by Hono.
@@ -97,7 +98,7 @@ export const app = Bun.serve<WsData>({
         const running = [...getCCRunningSessions(), ...getOpenClawRunningSessions()]
         sendToClient(ws, { type: 'status_snapshot', running })
       } else {
-        ws.subscribe(MEI_TOPIC)
+        ws.subscribe(EVENTS_TOPIC)
       }
     },
     async message(ws, message) {
@@ -143,15 +144,15 @@ export const app = Bun.serve<WsData>({
     },
     close(ws) {
       if (ws.data.channel === 'chat') removeClient(ws)
-      else ws.unsubscribe(MEI_TOPIC)
+      else ws.unsubscribe(EVENTS_TOPIC)
     }
   }
 })
 
-// Wire the live-event publisher (`publishMei`) to this server instance now that
-// it exists. Kept in ./mei so control.ts and ./api can publish without importing
-// web.ts (which binds ports on load).
-setMeiServer(app)
+// Wire the live-event publisher (`publishEvent`) to this server instance now
+// that it exists. Kept in ./events so control.ts and ./api can publish without
+// importing web.ts (which binds ports on load).
+setEventServer(app)
 
 // Graceful shutdown. In dev the supervisor sends SIGTERM on server-file
 // changes; in any context Ctrl-C sends SIGINT. Close both servers and kill the
