@@ -25,6 +25,8 @@ import {
 } from './registry'
 import { DIST_DIR, prebuilt } from './static'
 import { getSessionEvents, getSessions } from './state'
+import { getThreadConfig, saveThreadConfig } from './thread-config'
+import type { ThreadConfigPatch } from './thread-config'
 import { collectViewRequiredEnv, listViews, serveView } from './views'
 import { collectRequiredEnv, listWidgets, serveWidget } from './widgets'
 import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
@@ -182,6 +184,31 @@ one.get('/sessions/:sessionId/events', async c => {
     return c.json(toStreamEvents(preview))
   }
   return c.json(await getSessionEvents(sessionId, ws.path))
+})
+
+// Per-thread agent settings (model + reasoning effort). GET returns the stored
+// config ({} for threads that never overrode the workspace defaults); PUT patches
+// it (a field as `null` clears it, omitted leaves it). The change takes effect on
+// the thread's next message — see ClientMessage/effort handling in cc-session.
+one.get('/sessions/:sessionId/config', async c => {
+  return c.json(await getThreadConfig(c.get('ws').path, c.req.param('sessionId')))
+})
+
+one.put('/sessions/:sessionId/config', async c => {
+  const body = await c.req.json().catch(() => null)
+  if (typeof body !== 'object' || body === null) {
+    return c.text('Expected a JSON object', 400)
+  }
+  const patch: ThreadConfigPatch = {}
+  for (const key of ['model', 'effort'] as const) {
+    if (!(key in body)) continue
+    const value = (body as Record<string, unknown>)[key]
+    if (value !== null && typeof value !== 'string') {
+      return c.text(`${key} must be a string or null`, 400)
+    }
+    patch[key] = value
+  }
+  return c.json(await saveThreadConfig(c.get('ws').path, c.req.param('sessionId'), patch))
 })
 
 one.get('/mcp', async c => {

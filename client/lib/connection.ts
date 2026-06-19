@@ -3,7 +3,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import { workspaceKeys } from '@/client/api/workspaces'
 import { liveStore } from '@/client/store/live'
 import { applyEvent } from '@/lib/format'
-import type { ClientMessage, StreamEvent, ViewState } from '@/lib/types'
+import type { ClientMessage, StreamEvent, ThreadConfig, ViewState } from '@/lib/types'
 
 // App-wide chat connection: ONE WebSocket for the whole client, opened once at
 // startup and never torn down on navigation. Every server frame is tagged with
@@ -98,6 +98,14 @@ function handleFrame(data: Record<string, unknown>) {
     if (prev !== undefined) {
       qc?.setQueryData(workspaceKeys.events(workspaceId, to), prev)
       qc?.removeQueries({ queryKey: workspaceKeys.events(workspaceId, from) })
+    }
+    // Likewise move any per-thread config the picker wrote under the temp id, so
+    // a model/effort change made before the rename lands isn't stranded. The
+    // server migrates the stored config in renameSession to match.
+    const cfg = qc?.getQueryData<ThreadConfig>(workspaceKeys.threadConfig(workspaceId, from))
+    if (cfg !== undefined) {
+      qc?.setQueryData(workspaceKeys.threadConfig(workspaceId, to), cfg)
+      qc?.removeQueries({ queryKey: workspaceKeys.threadConfig(workspaceId, from) })
     }
     // The real id now exists on disk — refresh the thread list so it appears.
     qc?.invalidateQueries({ queryKey: workspaceKeys.sessions(workspaceId) })

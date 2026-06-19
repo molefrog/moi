@@ -6,6 +6,7 @@ import type {
   McpServer,
   SessionInfo,
   StreamEvent,
+  ThreadConfig,
   ViewInfo,
   ViewState,
   WidgetInfo,
@@ -40,6 +41,8 @@ export const workspaceKeys = {
   // patches this cache with live WS deltas; the `['workspaces','events']`
   // prefix lets it invalidate every thread on reconnect.
   events: (id: string, sessionId: string) => ['workspaces', 'events', id, sessionId] as const,
+  threadConfig: (id: string, sessionId: string) =>
+    ['workspaces', 'threadConfig', id, sessionId] as const,
   mcp: (id: string) => ['workspaces', 'mcp', id] as const,
   models: (id: string) => ['workspaces', 'models', id] as const
 }
@@ -175,6 +178,47 @@ export function useWorkspaceModels(workspaceId: string) {
     gcTime: Infinity,
     refetchOnMount: false,
     refetchOnWindowFocus: false
+  })
+}
+
+// Per-thread agent settings (model + reasoning effort). Returns {} for threads
+// that never overrode the workspace defaults; the picker falls back to the
+// workspace layout defaults for display in that case. Gated on a sessionId so a
+// brand-new (unsent) chat — which has no thread id yet — never fetches.
+export function useThreadConfig(workspaceId: string, sessionId: string | null) {
+  return useQuery<ThreadConfig>({
+    queryKey: workspaceKeys.threadConfig(workspaceId, sessionId ?? ''),
+    queryFn: () =>
+      fetch(`/api/workspaces/${workspaceId}/sessions/${sessionId}/config`).then(r => r.json()),
+    enabled: !!sessionId,
+    // Cache-first: thread config only changes via this app's own PUTs (which
+    // write through the cache), so refetching on every picker (re)mount would
+    // just flash the workspace default before the GET resolves. Fetch once per
+    // thread, then serve from cache.
+    staleTime: Infinity,
+    gcTime: 5 * 60_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false
+  })
+}
+
+// Patch a thread's config (PUT returns the merged result). Writes the merged
+// config straight into the query cache so the picker reflects it immediately.
+export function useSaveThreadConfig(workspaceId: string) {
+  const qc = useQueryClient()
+  return useMutation<ThreadConfig, Error, { sessionId: string; patch: ThreadConfig }>({
+    mutationFn: async ({ patch, sessionId }) => {
+      const res = await fetch(`/api/workspaces/${workspaceId}/sessions/${sessionId}/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch)
+      })
+      if (!res.ok) throw new Error('Failed to save thread config')
+      return res.json()
+    },
+    onSuccess: (next, { sessionId }) => {
+      qc.setQueryData<ThreadConfig>(workspaceKeys.threadConfig(workspaceId, sessionId), next)
+    }
   })
 }
 
