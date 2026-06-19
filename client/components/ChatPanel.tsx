@@ -76,8 +76,6 @@ function ChatModeIconFullscreen({ className }: ChatModeIconProps) {
 
 type ChatPanelProps = {
   view: ViewState
-  input: string
-  setInput: (v: string) => void
   processing: boolean
   error?: string | null
   onDismissError?: () => void
@@ -100,8 +98,6 @@ type ChatPanelProps = {
 
 export function ChatPanel({
   view,
-  input,
-  setInput,
   processing,
   error,
   onDismissError,
@@ -232,13 +228,7 @@ export function ChatPanel({
             )}
           </div>
         )}
-        <ChatInput
-          value={input}
-          onChange={setInput}
-          onSend={send}
-          onStop={stop}
-          processing={processing}
-        />
+        <ChatInput onSend={send} onStop={stop} processing={processing} />
       </div>
     </div>
   )

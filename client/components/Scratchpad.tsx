@@ -151,6 +151,10 @@ export function Scratchpad() {
   // would race — consuming it in the listener is timing-independent.)
   const applyingRemote = useRef(false)
   const [loaded, setLoaded] = useState(false)
+  // App-wide tldraw license key (from the TLDRAW_LICENSE_KEY env var, surfaced by
+  // GET /api/client-config). With a watermark-tier key tldraw shows the neutral
+  // "made with tldraw" mark; unset → tldraw's default unlicensed watermark.
+  const [licenseKey, setLicenseKey] = useState<string | undefined>(undefined)
   const initialSnapshot = useRef<Partial<TLEditorSnapshot> | undefined>(undefined)
 
   const save = useCallback(() => {
@@ -177,21 +181,26 @@ export function Scratchpad() {
     save()
   }, [save])
 
-  // Hydrate once per workspace. `document: null` → start with an empty canvas.
+  // Hydrate once per workspace, and pull the tldraw license key. `document: null`
+  // → start with an empty canvas. Both are awaited before the editor mounts so a
+  // late license key can't force a remount (which would flash an unlicensed
+  // watermark first). A failed fetch falls back to an empty canvas / no key.
   useEffect(() => {
     let cancelled = false
     setLoaded(false)
     initialSnapshot.current = undefined
-    fetch(`/api/workspaces/${workspaceId}/scratchpad`)
-      .then(r => r.json())
-      .then((d: { document: TLEditorSnapshot['document'] | null }) => {
-        if (cancelled) return
-        if (d?.document) initialSnapshot.current = { document: d.document }
-        setLoaded(true)
-      })
-      .catch(() => {
-        if (!cancelled) setLoaded(true)
-      })
+    const docReq = fetch(`/api/workspaces/${workspaceId}/scratchpad`)
+      .then(r => r.json() as Promise<{ document: TLEditorSnapshot['document'] | null }>)
+      .catch(() => null)
+    const configReq = fetch('/api/client-config')
+      .then(r => r.json() as Promise<{ tldrawLicenseKey?: string | null }>)
+      .catch(() => null)
+    void Promise.all([docReq, configReq]).then(([doc, config]) => {
+      if (cancelled) return
+      if (doc?.document) initialSnapshot.current = { document: doc.document }
+      setLicenseKey(config?.tldrawLicenseKey ?? undefined)
+      setLoaded(true)
+    })
     return () => {
       cancelled = true
     }
@@ -244,7 +253,7 @@ export function Scratchpad() {
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden">
       <div className="absolute inset-0">
-        <Tldraw snapshot={initialSnapshot.current} onMount={onMount} />
+        <Tldraw snapshot={initialSnapshot.current} licenseKey={licenseKey} onMount={onMount} />
       </div>
     </div>
   )

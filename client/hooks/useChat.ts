@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -25,7 +25,6 @@ export function useChat() {
   const qc = useQueryClient()
   const { layout } = useWorkspaceLayoutCtx()
   const models = useWorkspaceModels(workspaceId).data?.models
-  const [input, setInput] = useState('')
 
   const activeSessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
   const processing = useLive(s =>
@@ -41,75 +40,80 @@ export function useChat() {
   // yet) this is empty and `send` falls back to the workspace defaults below.
   const threadCfg = useThreadConfig(workspaceId, activeSessionId).data
 
-  const send = useCallback(() => {
-    const text = input.trim()
-    // No `processing` guard: sending while a turn is in flight QUEUES the
-    // message into the same live server session (streaming-input mode).
-    if (!text) return
+  // The composer owns the draft (in the live store) and hands the text in, so a
+  // keystroke re-renders only the composer — not this hook's host (WorkspaceView)
+  // and its whole subtree. See `ChatInput`.
+  const send = useCallback(
+    (draft: string) => {
+      const text = draft.trim()
+      // No `processing` guard: sending while a turn is in flight QUEUES the
+      // message into the same live server session (streaming-input mode).
+      if (!text) return
 
-    let sid = activeSessionId
-    let isNew = false
-    if (!sid) {
-      sid = crypto.randomUUID()
-      isNew = true
-      liveStore.getState().setActive(workspaceId, sid)
-    }
+      let sid = activeSessionId
+      let isNew = false
+      if (!sid) {
+        sid = crypto.randomUUID()
+        isNew = true
+        liveStore.getState().setActive(workspaceId, sid)
+      }
 
-    // Optimistic user turn — primed into the RQ transcript cache so it renders
-    // immediately. The server re-ids the SDK's user echo to optimisticId so it
-    // upserts in place rather than duplicating.
-    const optimisticId = `optimistic:${crypto.randomUUID()}`
-    qc.setQueryData<ViewState>(workspaceKeys.events(workspaceId, sid), prev =>
-      applyEvent(prev ?? emptyViewState(), {
-        kind: 'turn',
-        turn: {
-          id: optimisticId,
-          role: 'user',
-          origin: { kind: 'user-input' },
-          parts: [{ type: 'text', text }],
-          timestamp: new Date().toISOString()
-        }
+      // Optimistic user turn — primed into the RQ transcript cache so it renders
+      // immediately. The server re-ids the SDK's user echo to optimisticId so it
+      // upserts in place rather than duplicating.
+      const optimisticId = `optimistic:${crypto.randomUUID()}`
+      qc.setQueryData<ViewState>(workspaceKeys.events(workspaceId, sid), prev =>
+        applyEvent(prev ?? emptyViewState(), {
+          kind: 'turn',
+          turn: {
+            id: optimisticId,
+            role: 'user',
+            origin: { kind: 'user-input' },
+            parts: [{ type: 'text', text }],
+            timestamp: new Date().toISOString()
+          }
+        })
+      )
+      liveStore.getState().setProcessing(workspaceId, sid, true)
+      liveStore.getState().setError(workspaceId, sid, null)
+
+      // The thread's persisted choice (workspace defaults for a new chat). Drop a
+      // model the loaded list no longer offers (stale alias) so the SDK doesn't
+      // reject model_not_found. Drop an effort the resolved model doesn't support
+      // (e.g. model changed under it); when the model is unknown/default we can't
+      // check, so pass it through — the SDK silently downgrades unsupported effort.
+      const pickedModel = threadCfg?.model ?? layout.selectedModel
+      const modelOk = !pickedModel || !models || models.some(m => m.value === pickedModel)
+      const model = modelOk ? pickedModel : undefined
+      const modelInfo = models?.find(m => m.value === model)
+      const pickedEffort = threadCfg?.effort ?? layout.selectedEffort
+      const effort =
+        pickedEffort &&
+        (!modelInfo || (modelInfo.supportedEffortLevels ?? []).includes(pickedEffort))
+          ? pickedEffort
+          : undefined
+      sendMessage({
+        type: 'chat',
+        workspaceId,
+        content: text,
+        sessionId: sid,
+        isNew,
+        optimisticId,
+        model,
+        effort
       })
-    )
-    liveStore.getState().setProcessing(workspaceId, sid, true)
-    liveStore.getState().setError(workspaceId, sid, null)
-
-    // The thread's persisted choice (workspace defaults for a new chat). Drop a
-    // model the loaded list no longer offers (stale alias) so the SDK doesn't
-    // reject model_not_found. Drop an effort the resolved model doesn't support
-    // (e.g. model changed under it); when the model is unknown/default we can't
-    // check, so pass it through — the SDK silently downgrades unsupported effort.
-    const pickedModel = threadCfg?.model ?? layout.selectedModel
-    const modelOk = !pickedModel || !models || models.some(m => m.value === pickedModel)
-    const model = modelOk ? pickedModel : undefined
-    const modelInfo = models?.find(m => m.value === model)
-    const pickedEffort = threadCfg?.effort ?? layout.selectedEffort
-    const effort =
-      pickedEffort && (!modelInfo || (modelInfo.supportedEffortLevels ?? []).includes(pickedEffort))
-        ? pickedEffort
-        : undefined
-    sendMessage({
-      type: 'chat',
+    },
+    [
+      activeSessionId,
       workspaceId,
-      content: text,
-      sessionId: sid,
-      isNew,
-      optimisticId,
-      model,
-      effort
-    })
-    setInput('')
-  }, [
-    input,
-    activeSessionId,
-    workspaceId,
-    qc,
-    layout.selectedModel,
-    layout.selectedEffort,
-    threadCfg?.model,
-    threadCfg?.effort,
-    models
-  ])
+      qc,
+      layout.selectedModel,
+      layout.selectedEffort,
+      threadCfg?.model,
+      threadCfg?.effort,
+      models
+    ]
+  )
 
   const dismissError = useCallback(() => {
     if (!activeSessionId) return
@@ -128,5 +132,5 @@ export function useChat() {
     [workspaceId]
   )
 
-  return { view, processing, error, input, setInput, send, stop, switchThread, dismissError }
+  return { view, processing, error, send, stop, switchThread, dismissError }
 }

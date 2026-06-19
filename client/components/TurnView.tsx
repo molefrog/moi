@@ -1,3 +1,5 @@
+import { memo } from 'react'
+
 import { MarkdownContent } from '@/client/components/MarkdownContent'
 import { ToolCallGroup } from '@/client/components/tool-group/ToolCallGroup'
 import { useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
@@ -53,7 +55,11 @@ function buildSegments(parts: Part[]): Segment[] {
 
 type TurnViewProps = { turn: Turn; processing?: boolean }
 
-export function TurnView({ turn, processing = false }: TurnViewProps) {
+// Memoized: the message list maps over grouped turns (stable identities — see
+// `groupTurns` in ChatPanel), so a parent re-render (e.g. the scroll-fade state
+// toggling on every scroll) no longer re-renders every row — only rows whose
+// `turn` or `processing` actually changed.
+export const TurnView = memo(function TurnView({ turn, processing = false }: TurnViewProps) {
   const cwd = useWorkspaceLayoutCtx().cwd
 
   if (turn.origin.kind === 'replay') return null
@@ -98,7 +104,7 @@ export function TurnView({ turn, processing = false }: TurnViewProps) {
       })}
     </div>
   )
-}
+})
 
 type PartRendererProps = { part: Part }
 

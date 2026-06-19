@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 
 import { IconChevronDown } from '@tabler/icons-react'
 
@@ -39,7 +39,10 @@ function capitalize(s: string): string {
 // edits the workspace defaults, which seed the new thread. Both are sent with
 // each chat frame (see useChat); leaving them untouched runs on the SDK default.
 // Fast mode remains local-only for now.
-export function ModelPicker() {
+// Memoized (no props): it lives inside ChatInput, which re-renders on every
+// keystroke, so memo keeps the picker from re-rendering with it — it updates
+// only on its own store/query changes (active thread, models, layout).
+export const ModelPicker = memo(function ModelPicker() {
   const { workspaceId, layout, setLayout } = useWorkspaceLayoutCtx()
   const { data } = useWorkspaceModels(workspaceId)
   const models = data?.models ?? []
@@ -141,4 +144,4 @@ export function ModelPicker() {
       </DropdownMenuContent>
     </DropdownMenu>
   )
-}
+})

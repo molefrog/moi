@@ -1,4 +1,4 @@
-import { type ReactNode, createContext, useCallback, useContext, useRef } from 'react'
+import { type ReactNode, createContext, useCallback, useContext, useMemo, useRef } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -90,16 +90,23 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
     [id, qc]
   )
 
-  const value: WorkspaceLayoutContextValue = {
-    layout: query.data ? stripMeta(query.data) : DEFAULT_LAYOUT,
-    setLayout,
-    name: query.data?.name ?? null,
-    icon: query.data?.icon ?? null,
-    cwd: query.data?.cwd ?? null,
-    provider: query.data?.provider ?? null,
-    workspaceId: id,
-    isLoading: query.isLoading
-  }
+  // Memoized so the context value keeps a stable identity across unrelated
+  // renders — otherwise every consumer (WorkspaceView, Widgets, ModelPicker,
+  // TurnView, …) would re-render whenever this provider re-renders. `setLayout`
+  // is already stable; the rest derive from `query.data`.
+  const value = useMemo<WorkspaceLayoutContextValue>(
+    () => ({
+      layout: query.data ? stripMeta(query.data) : DEFAULT_LAYOUT,
+      setLayout,
+      name: query.data?.name ?? null,
+      icon: query.data?.icon ?? null,
+      cwd: query.data?.cwd ?? null,
+      provider: query.data?.provider ?? null,
+      workspaceId: id,
+      isLoading: query.isLoading
+    }),
+    [query.data, query.isLoading, setLayout, id]
+  )
 
   return <WorkspaceLayoutContext value={value}>{children}</WorkspaceLayoutContext>
 }

@@ -19,10 +19,24 @@ function key(workspaceId: string, sessionId: string): string {
   return `${workspaceId}:${sessionId}`
 }
 
+// Draft text is keyed per thread. A brand-new chat has no session id yet, so it
+// gets a stable `'new'` sentinel; once `send` mints the real id the input reads
+// the (empty) draft under the new key. Exported so `ChatInput` builds the same
+// key it reads as the store writes.
+export function draftKey(workspaceId: string, sessionId: string | null): string {
+  return key(workspaceId, sessionId ?? 'new')
+}
+
 export type LiveStore = {
   activeByWorkspace: Record<string, string | null>
   processing: Record<string, boolean>
   errors: Record<string, string | null>
+  // Unsent composer text, keyed per thread (`${workspaceId}:${sessionId}`, with
+  // a `'new'` sentinel for a not-yet-created thread). Lives here — not in the
+  // chat component — so a keystroke re-renders only the composer (which alone
+  // subscribes), not the whole workspace, and the draft survives the chat
+  // panel's remounts on mode switch.
+  drafts: Record<string, string>
 
   setActive: (workspaceId: string, sessionId: string | null) => void
   setProcessing: (workspaceId: string, sessionId: string, value: boolean) => void
@@ -31,6 +45,7 @@ export type LiveStore = {
   // terminal status was emitted while we were disconnected).
   reconcileProcessing: (running: { workspaceId: string; sessionId: string }[]) => void
   setError: (workspaceId: string, sessionId: string, message: string | null) => void
+  setDraft: (workspaceId: string, sessionId: string | null, value: string) => void
   renameSession: (workspaceId: string, from: string, to: string) => void
 }
 
@@ -38,6 +53,7 @@ export const liveStore = createStore<LiveStore>()(set => ({
   activeByWorkspace: {},
   processing: {},
   errors: {},
+  drafts: {},
 
   setActive: (workspaceId, sessionId) =>
     set(s => ({ activeByWorkspace: { ...s.activeByWorkspace, [workspaceId]: sessionId } })),
@@ -52,6 +68,9 @@ export const liveStore = createStore<LiveStore>()(set => ({
 
   setError: (workspaceId, sessionId, message) =>
     set(s => ({ errors: { ...s.errors, [key(workspaceId, sessionId)]: message } })),
+
+  setDraft: (workspaceId, sessionId, value) =>
+    set(s => ({ drafts: { ...s.drafts, [draftKey(workspaceId, sessionId)]: value } })),
 
   renameSession: (workspaceId, from, to) =>
     set(s => {
