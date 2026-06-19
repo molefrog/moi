@@ -2,7 +2,12 @@ import { useCallback, useState } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
 
-import { useSessionView, useWorkspaceModels, workspaceKeys } from '@/client/api/workspaces'
+import {
+  useSessionView,
+  useThreadConfig,
+  useWorkspaceModels,
+  workspaceKeys
+} from '@/client/api/workspaces'
 import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
 import { sendMessage } from '@/client/lib/connection'
@@ -31,6 +36,10 @@ export function useChat() {
   )
 
   const view = useSessionView(workspaceId, activeSessionId).data ?? EMPTY
+
+  // The active thread's persisted model/effort. For a brand-new chat (no thread
+  // yet) this is empty and `send` falls back to the workspace defaults below.
+  const threadCfg = useThreadConfig(workspaceId, activeSessionId).data
 
   const send = useCallback(() => {
     const text = input.trim()
@@ -65,10 +74,20 @@ export function useChat() {
     liveStore.getState().setProcessing(workspaceId, sid, true)
     liveStore.getState().setError(workspaceId, sid, null)
 
-    // The picker's persisted choice; drop it when the loaded models list no
-    // longer offers it (stale alias) so the SDK doesn't reject model_not_found.
-    const picked = layout.selectedModel
-    const model = picked && models && !models.some(m => m.value === picked) ? undefined : picked
+    // The thread's persisted choice (workspace defaults for a new chat). Drop a
+    // model the loaded list no longer offers (stale alias) so the SDK doesn't
+    // reject model_not_found. Drop an effort the resolved model doesn't support
+    // (e.g. model changed under it); when the model is unknown/default we can't
+    // check, so pass it through — the SDK silently downgrades unsupported effort.
+    const pickedModel = threadCfg?.model ?? layout.selectedModel
+    const modelOk = !pickedModel || !models || models.some(m => m.value === pickedModel)
+    const model = modelOk ? pickedModel : undefined
+    const modelInfo = models?.find(m => m.value === model)
+    const pickedEffort = threadCfg?.effort ?? layout.selectedEffort
+    const effort =
+      pickedEffort && (!modelInfo || (modelInfo.supportedEffortLevels ?? []).includes(pickedEffort))
+        ? pickedEffort
+        : undefined
     sendMessage({
       type: 'chat',
       workspaceId,
@@ -76,10 +95,21 @@ export function useChat() {
       sessionId: sid,
       isNew,
       optimisticId,
-      model
+      model,
+      effort
     })
     setInput('')
-  }, [input, activeSessionId, workspaceId, qc, layout.selectedModel, models])
+  }, [
+    input,
+    activeSessionId,
+    workspaceId,
+    qc,
+    layout.selectedModel,
+    layout.selectedEffort,
+    threadCfg?.model,
+    threadCfg?.effort,
+    models
+  ])
 
   const dismissError = useCallback(() => {
     if (!activeSessionId) return

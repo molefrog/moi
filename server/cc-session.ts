@@ -21,6 +21,7 @@ import {
 import { ClaudeAdapter } from '@/lib/claude-adapter'
 
 import { broadcast } from './state'
+import { hasThreadConfig, renameThreadConfig, saveThreadConfig } from './thread-config'
 import { resolveWorkspaceEnv } from './workspace-env'
 
 // Cap on concurrently-held live sessions (each = one claude subprocess). When
@@ -60,6 +61,13 @@ type LiveSession = {
   // message; processing = pendingTurns > 0.
   pendingTurns: number
   model: string | undefined
+  // Reasoning effort the query was created with. The SDK has no live setter for
+  // it (unlike setModel), so a change tears the session down and resumes.
+  effort: string | undefined
+  // Effort the latest message asked for. When it diverges from `effort` while a
+  // turn is in flight (can't rebuild mid-turn), the session is torn down once it
+  // drains so the next message resumes with the requested effort.
+  desiredEffort: string | undefined
   idleTimer: ReturnType<typeof setTimeout> | null
   closed: boolean
 }
@@ -189,7 +197,22 @@ async function consume(s: LiveSession) {
     for await (const msg of s.q) {
       if (msg.type === 'system' && msg.subtype === 'init') {
         const realId = msg.session_id
-        if (realId && realId !== s.sessionId) renameSession(s, realId)
+        if (realId && realId !== s.sessionId) {
+          const from = s.sessionId
+          renameSession(s, realId)
+          // Carry any config the picker wrote under the temp id to the real id.
+          await renameThreadConfig(s.workspacePath, from, s.sessionId)
+        }
+        // Seed the thread's config from what it actually ran with — but only if
+        // it has none yet, so an explicit user PUT (or a migrated temp-id edit)
+        // always wins. A default run (no model/effort) leaves no file and falls
+        // back to the workspace defaults.
+        if ((s.model || s.effort) && !(await hasThreadConfig(s.workspacePath, s.sessionId))) {
+          await saveThreadConfig(s.workspacePath, s.sessionId, {
+            model: s.model,
+            effort: s.effort
+          })
+        }
       }
       for (const ev of s.adapter.ingest(msg)) {
         broadcast(s.workspaceId, { ...ev, sessionId: s.sessionId })
@@ -198,7 +221,10 @@ async function consume(s: LiveSession) {
         s.pendingTurns = Math.max(0, s.pendingTurns - 1)
         if (s.pendingTurns === 0) {
           broadcastProcessing(s, false)
-          armIdle(s)
+          // A mid-turn effort change couldn't be applied live; now that the
+          // queue has drained, tear down so the next message resumes with it.
+          if (s.desiredEffort !== s.effort) teardown(s)
+          else armIdle(s)
         }
       }
     }
@@ -237,6 +263,7 @@ function createLiveSession(input: {
   sessionId: string
   isNew: boolean
   model: string | undefined
+  effort: string | undefined
   // Resolved workspace env (.env + UI custom overrides), injected so the agent's
   // Bash tool can use workspace secrets. Frozen at spawn — see restartWorkspaceSessions.
   workspaceEnv: Record<string, string>
@@ -253,6 +280,10 @@ function createLiveSession(input: {
     maxTurns: 1000,
     cwd: input.workspacePath,
     ...(input.model ? { model: input.model } : {}),
+    // The picker only offers a model's own `supportedEffortLevels`, so the value
+    // is valid for the model; the SDK silently downgrades otherwise. Cast because
+    // the SDK under-types the union (no 'xhigh') vs our pass-through string.
+    ...(input.effort ? { effort: input.effort as Options['effort'] } : {}),
     allowedTools: ALLOWED_TOOLS,
     permissionMode: 'bypassPermissions',
     allowDangerouslySkipPermissions: true,
@@ -272,6 +303,8 @@ function createLiveSession(input: {
     abort,
     pendingTurns: 0,
     model: input.model,
+    effort: input.effort,
+    desiredEffort: input.effort,
     idleTimer: null,
     closed: false
   }
@@ -290,8 +323,17 @@ export async function sendCCMessage(input: {
   content: string
   optimisticId?: string
   model?: string
+  effort?: string
 }): Promise<void> {
   let s = sessions.get(liveKey(input.workspaceId, input.sessionId))
+  // Effort can't be changed on a running query (no SDK setter), so when it
+  // differs we tear the idle session down and fall through to recreate it via
+  // resume with the new effort — the change lands on this very turn. A busy
+  // session keeps its effort until the in-flight turn ends (then idle-evicts).
+  if (s && input.effort !== s.effort && s.pendingTurns === 0) {
+    teardown(s)
+    s = undefined
+  }
   if (!s) {
     s = createLiveSession({
       workspaceId: input.workspaceId,
@@ -299,6 +341,7 @@ export async function sendCCMessage(input: {
       sessionId: input.sessionId,
       isNew: input.isNew,
       model: input.model,
+      effort: input.effort,
       // The agent only sees secrets scoped to the 'agent' sink (plus .env).
       workspaceEnv: await resolveWorkspaceEnv(input.workspacePath, 'agent')
     })
@@ -312,6 +355,11 @@ export async function sendCCMessage(input: {
         console.error('[cc-session] setModel failed', err)
       }
     }
+    // Effort can't change on a running query; record the request so the session
+    // rebuilds once its turns drain (see the `result` handler). Reaching here
+    // with a divergent effort means the session is busy — an idle one was torn
+    // down above.
+    s.desiredEffort = input.effort
   }
 
   // Streaming-input mode does NOT echo the pushed user message back in the

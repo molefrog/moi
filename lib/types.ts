@@ -47,6 +47,10 @@ export type ClientMessage =
       // `value`). Omitted means the server's default. Applied per turn, so it
       // can change between messages in the same session.
       model?: string
+      // Reasoning effort for this turn (one of the model's `supportedEffortLevels`).
+      // Omitted means the SDK default. Unlike model, the SDK has no live setter,
+      // so a change forces the live session to resume (see server/cc-session.ts).
+      effort?: string
     }
   | { type: 'stop'; workspaceId: string; sessionId: string }
 
@@ -56,6 +60,15 @@ export type SessionInfo = {
   summary: string
   lastModified: number
   cwd?: string
+}
+
+// Per-thread agent settings, persisted server-side (one file per session) and
+// exposed via GET/PUT /api/workspaces/:id/sessions/:sessionId/config. A thread
+// reopens with the same model/effort it last ran with; a brand-new thread is
+// seeded from the workspace defaults (`WorkspaceLayout.selectedModel`/`selectedEffort`).
+export type ThreadConfig = {
+  model?: string
+  effort?: string
 }
 
 // Re-export the display format
@@ -211,7 +224,13 @@ export type WorkspaceLayout = {
   // each chat frame; undefined means the agent runs on the SDK default. Note
   // the transcript records the *resolved* id (e.g. `claude-sonnet-4-6`), which
   // doesn't map back to these aliases — hence we persist the pick here.
+  //
+  // This (and `selectedEffort`) is the *workspace default*: the value the picker
+  // edits when no thread is open, and the seed a brand-new thread copies. Once a
+  // thread exists it carries its own per-thread override (see `ThreadConfig`).
   selectedModel?: string
+  // Reasoning-effort default for new threads (a `supportedEffortLevels` value).
+  selectedEffort?: string
   theme?: {
     font: import('./themes').FontTheme
     background?: string

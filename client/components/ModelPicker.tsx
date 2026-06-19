@@ -2,8 +2,9 @@ import { useState } from 'react'
 
 import { IconChevronDown } from '@tabler/icons-react'
 
-import { useWorkspaceModels } from '@/client/api/workspaces'
+import { useSaveThreadConfig, useThreadConfig, useWorkspaceModels } from '@/client/api/workspaces'
 import { useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
+import { useLive } from '@/client/store/live'
 
 import { Button } from './ui/button'
 import {
@@ -32,19 +33,36 @@ function capitalize(s: string): string {
 }
 
 // Model selector for the chat composer. Renders the workspace's available
-// models from `/api/workspaces/:id/models`. The chosen model is persisted in
-// the workspace layout (so it survives reloads) and sent with each chat frame
-// (see useChat); leaving it untouched sends nothing, so the agent runs on the
-// SDK default. Effort and fast-mode remain local-only for now.
+// models from `/api/workspaces/:id/models`. Model + reasoning effort are
+// persisted PER THREAD (so a thread reopens with the settings it last ran with)
+// once a thread exists; while no thread is open (a brand-new chat) the picker
+// edits the workspace defaults, which seed the new thread. Both are sent with
+// each chat frame (see useChat); leaving them untouched runs on the SDK default.
+// Fast mode remains local-only for now.
 export function ModelPicker() {
   const { workspaceId, layout, setLayout } = useWorkspaceLayoutCtx()
   const { data } = useWorkspaceModels(workspaceId)
   const models = data?.models ?? []
 
-  const selected = layout.selectedModel
-  const setSelected = (value: string) => setLayout({ selectedModel: value })
-  const [effort, setEffort] = useState<string | undefined>(undefined)
+  // The active thread, if any. Its stored config is the source of truth; a new
+  // chat (no active thread) falls back to — and edits — the workspace defaults.
+  const activeSessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
+  const threadCfg = useThreadConfig(workspaceId, activeSessionId).data
+  const saveThreadCfg = useSaveThreadConfig(workspaceId)
   const [fastMode, setFastMode] = useState(false)
+
+  const selected = (activeSessionId ? threadCfg?.model : undefined) ?? layout.selectedModel
+  const selectedEffort = (activeSessionId ? threadCfg?.effort : undefined) ?? layout.selectedEffort
+  const setSelected = (value: string) => {
+    if (activeSessionId)
+      saveThreadCfg.mutate({ sessionId: activeSessionId, patch: { model: value } })
+    else setLayout({ selectedModel: value })
+  }
+  const setEffort = (value: string) => {
+    if (activeSessionId)
+      saveThreadCfg.mutate({ sessionId: activeSessionId, patch: { effort: value } })
+    else setLayout({ selectedEffort: value })
+  }
 
   if (models.length === 0) return null
 
@@ -54,7 +72,8 @@ export function ModelPicker() {
   const current = persisted ?? models[0].value
   const model = models.find(m => m.value === current) ?? models[0]
   const effortLevels = model.supportsEffort ? (model.supportedEffortLevels ?? []) : []
-  const currentEffort = effort && effortLevels.includes(effort) ? effort : effortLevels[0]
+  const currentEffort =
+    selectedEffort && effortLevels.includes(selectedEffort) ? selectedEffort : effortLevels[0]
   const showReasoning = effortLevels.length > 0
   // Fast mode is Claude-only (Opus); OpenClaw models never report supportsFastMode.
   const showFastMode = !!model.supportsFastMode
