@@ -1,6 +1,6 @@
 ---
-name: widgets
-description: Build and modify user workspace. Workspace is the web UI user is chatting from and can be extended by writing custom "widgets". Use when the user asks to create, edit, or customize widgets, build custom UI panels, display data as cards, or asks what widgets are or how they work.
+name: moi-workspace
+description: The moi workspace — the web UI the user chats from, extended with agent-authored applets (widgets, views) plus theme & config. Read this FIRST in two cases. (a) A message carries hidden <moi>…</moi> meta tags: it was fired from a moi workspace, so you are running inside one even if nothing else says so. (b) The user uses moi vocab — workspace, applet, widget, view, scratchpad, dashboard, or a `moi` command — or asks to build, edit, customize, or theme the workspace UI or its layout.
 ---
 
 # Workspace
