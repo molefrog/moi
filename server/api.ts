@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { serveStatic } from 'hono/bun'
 import { createMiddleware } from 'hono/factory'
 import { basename } from 'node:path'
 
@@ -11,7 +12,7 @@ import { callFunction, parseFunctionPath, restartWorker } from './functions'
 import { processIcon } from './icon'
 import { getWorkspacePreview, loadLayout, mergeLayoutForSave, saveLayout } from './layout'
 import { getMcpStatus } from './mcp'
-import { publishMei } from './mei'
+import { publishEvent } from './events'
 import { getOpenClawModels, getOpenClawSessionMessages, getOpenClawSessions } from './openclaw'
 import { toSessionInfo, toStreamEvents } from './openclaw-adapter'
 import { ensureOpenClawSessionLive, getLiveOpenClawEvents } from './openclaw-session'
@@ -22,7 +23,7 @@ import {
   registerWorkspace,
   removeWorkspace
 } from './registry'
-import { serveDistAsset } from './static'
+import { DIST_DIR, prebuilt } from './static'
 import { getSessionEvents, getSessions } from './state'
 import { collectViewRequiredEnv, listViews, serveView } from './views'
 import { collectRequiredEnv, listWidgets, serveWidget } from './widgets'
@@ -137,8 +138,7 @@ one.get('/fs/*', c => {
 
 // Applet RPC — the home for server-function calls from a bundle. The bundle's
 // sentinel base resolves to `/api/workspaces/<id>`, so it POSTs to
-// `…/rpc/<module>/<fn>`. (The legacy `/_rpc/:wid/fn/*` below still works for any
-// bundle built before this route existed.)
+// `…/rpc/<module>/<fn>`.
 one.post('/rpc/*', c => {
   const id = c.req.param('id')
   const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${id}/rpc/`)[1] ?? ''
@@ -285,7 +285,7 @@ one.put('/config', async c => {
     return c.text('Expected { name: string | null }', 400)
   }
   await setWorkspaceConfig(ws.path, { name })
-  publishMei({ type: 'workspace:updated' })
+  publishEvent({ type: 'workspace:updated' })
   return c.json(await getWorkspaceConfig(ws.path))
 })
 
@@ -304,13 +304,13 @@ one.put('/icon', async c => {
     return c.text(`Invalid image: ${msg}`, 400)
   }
   await setWorkspaceConfig(ws.path, { icon })
-  publishMei({ type: 'workspace:updated' })
+  publishEvent({ type: 'workspace:updated' })
   return c.json({ icon })
 })
 
 one.delete('/icon', async c => {
   await setWorkspaceConfig(c.get('ws').path, { icon: null })
-  publishMei({ type: 'workspace:updated' })
+  publishEvent({ type: 'workspace:updated' })
   return c.body(null, 204)
 })
 
@@ -390,20 +390,23 @@ export const api = new Hono()
 
 api.route('/api/workspaces', workspaces)
 
-// Legacy widget RPC. Superseded by `/api/workspaces/:id/rpc/*` (bundles now bake
-// the workspace API base via sentinel). Kept so any bundle compiled before that
-// route — still on disk, not yet rebuilt — keeps working.
-api.post('/_rpc/:wid/fn/*', async c => {
-  const wid = c.req.param('wid')
-  const ws = await getWorkspace(wid)
-  if (!ws) return c.text('Workspace not found', 404)
-  const prefix = `/_rpc/${wid}/fn/`
-  const tail = new URL(c.req.url).pathname.slice(prefix.length)
-  return handleFunctionCall(c.req.raw, tail, ws.path)
-})
-
-// Everything else: a prebuilt hashed asset from `dist/` in prod (/chunk-….js,
-// /favicon-….png, …), or 404. No-op in dev — the live bundler serves assets via
-// the HTML route before Bun's fetch ever delegates here.
-api.get('*', async c => (await serveDistAsset(c.req.path)) ?? c.text('Not found', 404))
+// Everything else: in production, serve the prebuilt client from `dist/` via
+// Hono's static handler (mime types, traversal-safe, optional precompression).
+// Hashed assets (`/chunk-….js`, `/favicon-….png`, …) are pinned immutable; the
+// unhashed `index.html` is not. Never mounted in dev — the live bundler serves
+// assets via the HTML route before Bun's `fetch` ever delegates here.
+if (prebuilt) {
+  api.get(
+    '*',
+    serveStatic({
+      root: DIST_DIR,
+      onFound: (path, c) => {
+        c.header(
+          'Cache-Control',
+          path.endsWith('index.html') ? 'no-cache' : 'public, max-age=31536000, immutable'
+        )
+      }
+    })
+  )
+}
 api.notFound(c => c.text('Not found', 404))
