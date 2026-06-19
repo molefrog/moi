@@ -443,15 +443,6 @@ export const api = new Hono()
 
 api.route('/api/workspaces', workspaces)
 
-// App-wide client config, read once at startup by the SPA. The tldraw license
-// key is embedded in the client by design — it's domain-scoped, not a secret.
-// Set TLDRAW_LICENSE_KEY (a free watermark/trial key from tldraw.dev) to swap
-// the Scratchpad's dev "Get a license for production" nag for the neutral "made
-// with tldraw" mark. Unset → null, and tldraw keeps its default behavior.
-api.get('/api/client-config', c =>
-  c.json({ tldrawLicenseKey: process.env.TLDRAW_LICENSE_KEY ?? null })
-)
-
 // Everything else: in production, serve the prebuilt client from `dist/` via
 // Hono's static handler (mime types, traversal-safe, optional precompression).
 // Hashed assets (`/chunk-….js`, `/favicon-….png`, …) are pinned immutable; the

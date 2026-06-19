@@ -22,6 +22,15 @@ import { getWorkspace } from './registry'
 import { addClient, removeClient, sendToClient } from './state'
 import { distShell, prebuilt } from './static'
 
+// Guarantee the public tldraw license key is *defined* before the dev bundler
+// inlines it (bunfig `[serve.static] env = "PUBLIC_*"`). Bun's prefix inlining
+// only replaces a `process.env.PUBLIC_…` reference when the var is set; an unset
+// one is left bare and throws `process is not defined` in the browser. Defaulting
+// to '' here means a clone without the key degrades to tldraw's watermark instead
+// of crashing the Scratchpad. (Prod builds default it the same way — see
+// scripts/build-client.ts.)
+process.env.PUBLIC_TLDRAW_LICENSE_KEY ??= ''
+
 type WsData = { channel: 'chat' | 'events'; workspaceId: string }
 
 function isClientMessage(value: unknown): value is ClientMessage {

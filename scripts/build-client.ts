@@ -26,7 +26,16 @@ const result = await Bun.build({
   minify: true,
   sourcemap: 'none',
   plugins: [tailwind, externalizeReact],
-  define: { 'process.env.NODE_ENV': '"production"' }
+  define: {
+    'process.env.NODE_ENV': '"production"',
+    // Inline the public tldraw license key. `define` (not `env: 'PUBLIC_*'`)
+    // because it always replaces the literal — `?? ''` guarantees an unset key
+    // degrades to an empty string (→ undefined client-side) instead of leaving a
+    // bare `process.env.…` that throws `process is not defined` in the browser.
+    'process.env.PUBLIC_TLDRAW_LICENSE_KEY': JSON.stringify(
+      process.env.PUBLIC_TLDRAW_LICENSE_KEY ?? ''
+    )
+  }
 })
 
 if (!result.success) {

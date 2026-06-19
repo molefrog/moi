@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { AnimatePresence, motion } from "motion/react";
 
@@ -160,9 +160,6 @@ const ACTION_VARIANTS = {
 // with the chat in its persisted position beside it.
 type WorkspaceNav = "chat" | "widgets" | "canvas" | (string & {});
 
-// How many view tabs render inline before the rest fold into the "…" menu.
-const INLINE_VIEWS = 2;
-
 type WorkspaceTabsProps = {
   active: WorkspaceNav;
   onSelect: (nav: WorkspaceNav) => void;
@@ -170,53 +167,158 @@ type WorkspaceTabsProps = {
   onCreateView: () => void;
 };
 
-function WorkspaceTabs({ active, onSelect, views, onCreateView }: WorkspaceTabsProps) {
-  // Active tab outline uses an inset shadow (not a border) so the box keeps the
-  // exact h-7 footprint of the other header buttons — no 1px layout shift.
-  const tabClass = (isActive: boolean) =>
-    cn(
-      "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-sm font-medium transition-colors [&_svg]:size-[18px]",
-      isActive
-        ? "bg-muted text-foreground shadow-[inset_0_0_0_1px_var(--border)]"
-        : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-    );
+// Shared geometry for every header tab. The active outline uses an inset shadow
+// (not a border) so the box keeps the exact h-7 footprint — no 1px layout shift.
+// Labels never wrap and the leading icon never shrinks, so a long view name keeps
+// its full footprint. No color transition: switching tabs swaps the bg/border
+// instantly.
+const TAB_BASE =
+  "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-sm font-medium whitespace-nowrap [&_svg]:size-[18px] [&_svg]:shrink-0";
 
-  const tab = (key: WorkspaceNav, Icon: typeof IconMessageCircle, label: string) => (
-    <button key={key} type="button" className={tabClass(active === key)} onClick={() => onSelect(key)}>
-      <Icon stroke={1.75} />
-      {label}
-    </button>
+// Square (w = h) geometry modifier for icon-only triggers.
+const ICON_TAB_SQUARE = "size-7 justify-center px-0";
+
+// Labeled tabs (and the chat icon) keep a constant foreground text color; only
+// the background and (when active) the inset-shadow border change between states.
+const tabClass = (isActive: boolean) =>
+  cn(
+    TAB_BASE,
+    "text-foreground",
+    isActive ? "bg-muted shadow-[inset_0_0_0_1px_var(--border)]" : "hover:bg-muted/60",
   );
 
-  // Icon-only tabs are square (w = h) and keep the active/hover treatment.
-  const iconTabClass = (isActive: boolean) => cn(tabClass(isActive), "size-7 justify-center px-0");
+// The "…" overflow trigger stays gray until active/hovered — it doesn't follow
+// the always-foreground rule the labeled tabs use.
+const iconTabClass = (isActive: boolean) =>
+  cn(
+    TAB_BASE,
+    ICON_TAB_SQUARE,
+    isActive
+      ? "bg-muted text-foreground shadow-[inset_0_0_0_1px_var(--border)]"
+      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+  );
 
-  const inline = views.slice(0, INLINE_VIEWS);
-  const overflow = views.slice(INLINE_VIEWS);
-  // The "…" trigger is always shown (it hosts "Create View"); it lights up when
-  // one of the folded-away views is the active one.
-  const overflowActive = overflow.some((v) => v.id === active);
+// A collapsible tab. `kind` groups the overflow menu: predefined tabs (widgets,
+// canvas) sit above the custom views, separated by a divider.
+type TabItem = {
+  key: WorkspaceNav;
+  Icon: typeof IconMessageCircle;
+  label: string;
+  kind: "fixed" | "view";
+};
+
+type OverflowTabsProps = {
+  tabs: TabItem[];
+  active: WorkspaceNav;
+  onSelect: (nav: WorkspaceNav) => void;
+  onCreateView: () => void;
+};
+
+// A horizontal strip of tabs that fills its available width and folds whatever
+// doesn't fit into a trailing "…" menu, recomputing on resize. It measures each
+// tab's natural width with a hidden mirror row (container queries can't see
+// variable label widths), tracks its own width via a ResizeObserver, then shows
+// as many tabs as fit and hides the rest — rightmost first — into the menu.
+function OverflowTabs({ tabs, active, onSelect, onCreateView }: OverflowTabsProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const mirrorRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const menuRef = useRef<HTMLButtonElement>(null);
+  const [avail, setAvail] = useState(0);
+  const [widths, setWidths] = useState<{ items: number[]; menu: number }>({ items: [], menu: 0 });
+
+  // Re-measure natural widths whenever the set of tabs (or their labels) changes.
+  const sig = tabs.map((t) => `${t.key}:${t.label}`).join("|");
+  useLayoutEffect(() => {
+    setWidths({
+      items: tabs.map((_, i) => mirrorRefs.current[i]?.offsetWidth ?? 0),
+      menu: menuRef.current?.offsetWidth ?? 0,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sig]);
+
+  // Track the strip's available width (it grows to fill the header's slack).
+  useLayoutEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const update = () => setAvail(el.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // How many tabs fit: the "…" trigger is always reserved, then add tabs L→R
+  // while they fit. GAP mirrors the `gap-1` (4px) between buttons.
+  const visibleCount = useMemo(() => {
+    const GAP = 4;
+    if (!avail || widths.items.length !== tabs.length) return tabs.length;
+    let used = widths.menu;
+    let count = 0;
+    for (const w of widths.items) {
+      if (used + w + GAP <= avail) {
+        used += w + GAP;
+        count++;
+      } else break;
+    }
+    return count;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [avail, widths, tabs.length]);
+
+  const overflow = tabs.slice(visibleCount);
+  const overflowFixed = overflow.filter((t) => t.kind === "fixed");
+  const overflowViews = overflow.filter((t) => t.kind === "view");
+  // The "…" trigger lights up when one of the folded-away tabs is the active one.
+  const overflowActive = overflow.some((t) => t.key === active);
+
+  const menuItem = ({ key, Icon, label }: TabItem) => (
+    <DropdownMenuCheckboxItem
+      key={key}
+      checked={active === key}
+      closeOnClick
+      onClick={() => onSelect(key)}
+    >
+      <Icon stroke={1.75} />
+      {label}
+    </DropdownMenuCheckboxItem>
+  );
 
   return (
-    <div className="flex items-center gap-1">
-      <Tooltip delay={50}>
-        <TooltipTrigger
-          render={
-            <button
-              type="button"
-              className={iconTabClass(active === "chat")}
-              onClick={() => onSelect("chat")}
-              aria-label="Open fullscreen chat"
-            >
-              <IconMessageCircle stroke={1.75} />
-            </button>
-          }
-        />
-        <TooltipContent>Open fullscreen chat</TooltipContent>
-      </Tooltip>
-      {tab("widgets", IconLayoutGrid, "Widgets")}
-      {tab("canvas", IconArtboard, "Scratchpad")}
-      {inline.map((v) => tab(v.id, IconAppWindow, viewLabel(v)))}
+    <div ref={rootRef} className="relative flex min-w-0 flex-1 items-center gap-1">
+      {/* Hidden mirror: every tab + the menu trigger at natural width, laid out
+          but invisible and out of flow, read via the refs above. */}
+      <div
+        aria-hidden
+        className="pointer-events-none invisible absolute left-0 top-0 flex items-center gap-1"
+      >
+        {tabs.map(({ key, Icon, label }, i) => (
+          <button
+            key={key}
+            ref={(el) => {
+              mirrorRefs.current[i] = el;
+            }}
+            type="button"
+            className={tabClass(false)}
+          >
+            <Icon stroke={1.75} />
+            {label}
+          </button>
+        ))}
+        <button ref={menuRef} type="button" className={iconTabClass(false)}>
+          <IconDots stroke={1.75} />
+        </button>
+      </div>
+
+      {tabs.slice(0, visibleCount).map(({ key, Icon, label }) => (
+        <button
+          key={key}
+          type="button"
+          className={tabClass(active === key)}
+          onClick={() => onSelect(key)}
+        >
+          <Icon stroke={1.75} />
+          {label}
+        </button>
+      ))}
 
       <DropdownMenu>
         <DropdownMenuTrigger
@@ -227,17 +329,9 @@ function WorkspaceTabs({ active, onSelect, views, onCreateView }: WorkspaceTabsP
           }
         />
         <DropdownMenuContent align="start" className="min-w-48">
-          {overflow.map((v) => (
-            <DropdownMenuCheckboxItem
-              key={v.id}
-              checked={active === v.id}
-              closeOnClick
-              onClick={() => onSelect(v.id)}
-            >
-              <IconAppWindow stroke={1.75} />
-              {viewLabel(v)}
-            </DropdownMenuCheckboxItem>
-          ))}
+          {overflowFixed.map(menuItem)}
+          {overflowFixed.length > 0 && overflowViews.length > 0 && <DropdownMenuSeparator />}
+          {overflowViews.map(menuItem)}
           {overflow.length > 0 && <DropdownMenuSeparator />}
           <DropdownMenuItem onClick={onCreateView}>
             <IconPlus stroke={1.75} />
@@ -245,6 +339,39 @@ function WorkspaceTabs({ active, onSelect, views, onCreateView }: WorkspaceTabsP
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+    </div>
+  );
+}
+
+// The workspace nav: a pinned fullscreen-chat icon, then the collapsible strip of
+// Widgets / Scratchpad / view tabs, which folds overflow into a "…" menu.
+function WorkspaceTabs({ active, onSelect, views, onCreateView }: WorkspaceTabsProps) {
+  const tabs: TabItem[] = [
+    { key: "widgets", Icon: IconLayoutGrid, label: "Widgets", kind: "fixed" },
+    { key: "canvas", Icon: IconArtboard, label: "Scratchpad", kind: "fixed" },
+    ...views.map(
+      (v): TabItem => ({ key: v.id, Icon: IconAppWindow, label: viewLabel(v), kind: "view" }),
+    ),
+  ];
+
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-1">
+      <Tooltip delay={50}>
+        <TooltipTrigger
+          render={
+            <button
+              type="button"
+              className={cn(tabClass(active === "chat"), ICON_TAB_SQUARE, "shrink-0")}
+              onClick={() => onSelect("chat")}
+              aria-label="Open fullscreen chat"
+            >
+              <IconMessageCircle stroke={1.75} />
+            </button>
+          }
+        />
+        <TooltipContent>Open fullscreen chat</TooltipContent>
+      </Tooltip>
+      <OverflowTabs tabs={tabs} active={active} onSelect={onSelect} onCreateView={onCreateView} />
     </div>
   );
 }
@@ -462,9 +589,12 @@ function WorkspaceView({ widgets, views }: WorkspaceViewProps) {
               className="size-5 shrink-0 rounded-[4px]"
             />
             {name && <span className="text-foreground truncate text-sm font-medium">{name}</span>}
-            {hasWidgets && (
+            {hasWidgets ? (
               <>
                 <span className="text-muted-foreground/40 select-none text-sm">/</span>
+                {/* The tabs strip grows to fill the header's slack and measures
+                    its own width to fold overflow into the "…" menu, so it owns
+                    the spacer role here. */}
                 <WorkspaceTabs
                   active={activeNav}
                   onSelect={selectNav}
@@ -472,8 +602,9 @@ function WorkspaceView({ widgets, views }: WorkspaceViewProps) {
                   onCreateView={createView}
                 />
               </>
+            ) : (
+              <div className="flex-1" />
             )}
-            <div className="flex-1" />
             {activeNav === "widgets" && <WidgetActions mode={widgetMode} onMode={setWidgetMode} />}
             <McpMenu />
             <WorkspaceSettings />
