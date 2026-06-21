@@ -73,9 +73,24 @@ Inconsistency: the sibling `moi scratch` control handler _did_ validate the path
      No widgets or views found in <ws>/.moi/
    ```
 
-3. **Tests** cover the resolution (`server/registry.test.ts` → `findWorkspaceForPath`:
-   root, subdir, nested-nearest-ancestor, prefix-not-boundary, empty registry) and the
-   no-scaffold/prune behavior (`server/test/applets.test.ts`).
+3. **Generalized to every workspace-scoped command.** `theme`, `config`, and `scratch`
+   shared the same unvalidated-path footgun (run from `.moi/`, `moi theme`/`moi config`
+   would write `<ws>/.moi/.moi/.workspace.json`; `scratch` errored). They now all route
+   through one `resolveWorkspace` helper (`server/control.ts`) built on
+   `findWorkspaceForPath`, so each lifts to the real root from any subdirectory and errors
+   consistently when outside a workspace.
+
+4. **`moi init` lifts to the workspace root and never nests.** Running `moi init` from
+   inside a `.moi/` (the reported cause of `.moi/.moi`) now lifts to the directory that
+   owns it via `liftToWorkspaceRoot` (`server/registry.ts`, pure — cuts at the _first_
+   `.moi` segment, so even an already-nested `.moi/.moi/…` resolves to the true root) and
+   prints what it did. `scaffoldMoiDir` (`server/moi-scaffold.ts`) additionally **refuses**
+   to scaffold a `.moi/` inside another `.moi/` as a backstop. `moi init` also flags a
+   pre-existing stray `.moi/.moi` with a one-line `rm -rf` to clean it up.
+
+5. **Tests** cover the resolution (`server/registry.test.ts` → `findWorkspaceForPath` and
+   `liftToWorkspaceRoot`), the no-scaffold/prune behavior (`server/test/applets.test.ts`),
+   and the scaffold backstop (`server/test/moi-scaffold.test.ts`).
 
 Verified end-to-end against a scratch workspace: bundle from the root, from inside
 `.moi/`, and from a deep subdirectory all target the real root (no `.moi/.moi`);
@@ -160,15 +175,21 @@ event is simply dropped (the next page load reads fresh bundles off disk). On a 
    the refresh-event plumbing above already exists, so the browser would update on its own.
 2. **Track transitive inputs** so shared-helper edits invalidate dependents without
    `--force` (see the staleness blind spot).
-3. **Unify path resolution.** `moi scratch` still validates an _exact_ path match;
-   it could reuse `findWorkspaceForPath` so it, too, works from a subdirectory.
+
+> Path resolution is now unified: `bundle`, `theme`, `config`, and `scratch` all resolve
+> through `findWorkspaceForPath`, and `moi init` lifts via `liftToWorkspaceRoot` — so every
+> command works from a subdirectory and none can create a nested `.moi/.moi`.
 
 ## Code references
 
-- `server/registry.ts` — `findWorkspaceForPath` (path → owning workspace).
-- `server/control.ts` — bundle branch: resolves the workspace, replies `{ ok, workspacePath, results }`.
+- `server/registry.ts` — `findWorkspaceForPath` (path → owning workspace) and
+  `liftToWorkspaceRoot` (lift a `.moi/` path to the workspace root).
+- `server/control.ts` — `resolveWorkspace` (shared by bundle/theme/config/scratch); the
+  bundle branch replies `{ ok, workspacePath, results }`.
+- `server/moi-scaffold.ts` — `scaffoldMoiDir` refuses to scaffold inside a `.moi/`.
+- `server/cli.ts` — `init` lifts to the workspace root + flags a stray `.moi/.moi`; `bundle`
+  plain tabular output + error handling.
 - `server/applets.ts` — `getAppletPaths`, `needsRebuild` (mtime cache), `buildApplets` (guarded `mkdir`).
 - `server/widgets.ts` / `server/views.ts` — manifest write gated on build-dir existence; live events.
-- `server/cli.ts` — `bundle` command (plain tabular output, error handling).
 - `server/cli-ui.ts` — `columns` / `keyValue` plain-text renderers.
 - `server/events.ts` — `publishEvent` (server→browser live events).

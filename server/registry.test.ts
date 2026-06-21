@@ -6,6 +6,7 @@ import { join } from 'path'
 import {
   findWorkspaceForPath,
   getWorkspace,
+  liftToWorkspaceRoot,
   listWorkspaces,
   registerWorkspace,
   setRegistryPath
@@ -104,6 +105,35 @@ describe('findWorkspaceForPath', () => {
 
   test('returns null for an empty registry', () => {
     expect(findWorkspaceForPath([], '/anywhere')).toBeNull()
+  })
+})
+
+describe('liftToWorkspaceRoot', () => {
+  test('lifts a path inside .moi to the workspace root', () => {
+    expect(liftToWorkspaceRoot('/Users/foo/proj/.moi')).toBe('/Users/foo/proj')
+    expect(liftToWorkspaceRoot('/Users/foo/proj/.moi/widgets')).toBe('/Users/foo/proj')
+    expect(liftToWorkspaceRoot('/Users/foo/proj/.moi/.build/views')).toBe('/Users/foo/proj')
+  })
+
+  test('lifts an accidentally-nested .moi/.moi all the way back', () => {
+    // Cuts at the FIRST `.moi` segment, so any nesting depth resolves to the
+    // true root — this is what prevents `moi init` inside `.moi` from deepening
+    // the nest.
+    expect(liftToWorkspaceRoot('/Users/foo/proj/.moi/.moi')).toBe('/Users/foo/proj')
+    expect(liftToWorkspaceRoot('/Users/foo/proj/.moi/.moi/.build')).toBe('/Users/foo/proj')
+  })
+
+  test('leaves a normal path unchanged', () => {
+    expect(liftToWorkspaceRoot('/Users/foo/proj')).toBe('/Users/foo/proj')
+    expect(liftToWorkspaceRoot('/Users/foo/proj/sub/deep')).toBe('/Users/foo/proj/sub/deep')
+  })
+
+  test('does not match a directory that merely starts with .moi', () => {
+    expect(liftToWorkspaceRoot('/Users/foo/.moimoi/x')).toBe('/Users/foo/.moimoi/x')
+  })
+
+  test('normalizes the path', () => {
+    expect(liftToWorkspaceRoot('/Users/foo/proj/.moi/..')).toBe('/Users/foo/proj')
   })
 })
 
