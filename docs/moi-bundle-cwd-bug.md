@@ -158,8 +158,13 @@ entry rebuilds when its built `index.js` is missing, or when the source — or a
 topic to every connected browser — fire-and-forget, no ack; with no browser connected the
 event is simply dropped (the next page load reads fresh bundles off disk). On a bundle:
 
-- `widget:updated` / `view:updated` per built applet → the client cache-busts and
-  re-imports that module (no page reload).
+- `widget:updated` / `view:updated` per built applet → the client bumps that applet's
+  `?v=` and re-imports the module (no page reload). The cache-bust is **mount-independent**
+  (`useAppletCacheInvalidation`, `client/hooks/useApplet.ts` + `client/lib/applet-cache.ts`):
+  a workspace shows one view (or the widget grid) at a time, so an applet rebuilt while its
+  tab is backgrounded must still be invalidated, or the browser's memoized `import()` serves
+  it stale on the next switch. (This was a real "edited a view, bundled, nothing updated"
+  bug — the old per-component listener only fired while the applet was on screen.)
 - `widget-layout:updated` / `view-layout:updated` only when membership / config / order
   changed → the client refetches the layout list.
 - Changed `.server.ts` modules → `reloadModules` hot-swaps code **inside** the live
