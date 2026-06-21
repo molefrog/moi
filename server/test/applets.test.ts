@@ -1,8 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'path'
 
-import { apiBaseFor, parseAppletTail, serveApplet, serveWorkspaceFile } from '../applets'
+import {
+  apiBaseFor,
+  buildApplets,
+  getAppletPaths,
+  parseAppletTail,
+  serveApplet,
+  serveWorkspaceFile
+} from '../applets'
 
 // These cover the kind-agnostic applet HTTP machinery without invoking
 // Bun.build: serving files from a compiled bundle dir (sentinel swap + asset
@@ -82,6 +89,29 @@ describe('serveApplet', () => {
     expect((await serveApplet('view', '../x', 'index.js', WS, BASE)).status).toBe(400)
     expect((await serveApplet('view', 'editor', '../manifest.json', WS, BASE)).status).toBe(400)
     expect((await serveApplet('view', 'editor', 'a/b.js', WS, BASE)).status).toBe(400)
+  })
+})
+
+describe('buildApplets (empty/orphan handling)', () => {
+  test('does not scaffold a build dir when there are no sources', async () => {
+    // The phantom-scaffold half of the cwd bug: a dir with no `.moi/widgets`
+    // sources must not create `.moi/.build/widgets` (which, run from inside
+    // `.moi/`, was the junk nested `.moi/.moi/.build`).
+    const { buildDir } = getAppletPaths(WS, 'widget')
+    const { names, results } = await buildApplets(WS, 'widget', false)
+    expect(names).toEqual([])
+    expect(results).toEqual([])
+    expect(existsSync(buildDir)).toBe(false)
+  })
+
+  test('still prunes orphaned builds when all sources are gone', async () => {
+    // Build dir already exists from a prior build; every source has since been
+    // deleted. We skip the mkdir but must still sweep the orphan.
+    const { buildDir } = getAppletPaths(WS, 'widget')
+    mkdirSync(join(buildDir, 'ghost'), { recursive: true })
+    writeFileSync(join(buildDir, 'ghost', 'index.js'), '//')
+    await buildApplets(WS, 'widget', false)
+    expect(existsSync(join(buildDir, 'ghost'))).toBe(false)
   })
 })
 

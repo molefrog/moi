@@ -331,7 +331,14 @@ export async function buildApplets<C>(
   const { sourceDir, buildDir, moiRoot } = getAppletPaths(workspacePath, kind)
   const names = await scanSources(sourceDir)
 
-  await mkdir(buildDir, { recursive: true })
+  // Only scaffold the build dir once there's something to build — never
+  // fabricate a `.build/` (and the phantom nested `.moi/.moi/` it implies) for a
+  // directory with no sources. When sources have all been deleted we skip the
+  // mkdir but still prune so orphaned build dirs are swept (pruneStaleBuilds
+  // no-ops if buildDir doesn't exist).
+  if (names.length > 0) {
+    await mkdir(buildDir, { recursive: true })
+  }
   await pruneStaleBuilds(buildDir, new Set(names))
 
   const jobs = await Promise.all(

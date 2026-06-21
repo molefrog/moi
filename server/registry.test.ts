@@ -3,7 +3,13 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'path'
 
-import { getWorkspace, listWorkspaces, registerWorkspace, setRegistryPath } from './registry'
+import {
+  findWorkspaceForPath,
+  getWorkspace,
+  listWorkspaces,
+  registerWorkspace,
+  setRegistryPath
+} from './registry'
 
 let tmpDir: string
 
@@ -57,6 +63,47 @@ describe('listWorkspaces', () => {
     expect(list).toHaveLength(2)
     expect(list.map(e => e.path)).toContain('/Users/foo/project-a')
     expect(list.map(e => e.path)).toContain('/Users/foo/project-b')
+  })
+})
+
+describe('findWorkspaceForPath', () => {
+  const ws = (path: string) => ({ path })
+
+  test('matches the workspace root exactly', () => {
+    const list = [ws('/Users/foo/proj')]
+    expect(findWorkspaceForPath(list, '/Users/foo/proj')).toEqual(ws('/Users/foo/proj'))
+  })
+
+  test('matches from a subdirectory (e.g. inside .moi/)', () => {
+    // The core bug: `moi bundle` run from inside `.moi/` must still resolve to
+    // the workspace root, not treat `.moi/` as its own workspace.
+    const list = [ws('/Users/foo/proj')]
+    expect(findWorkspaceForPath(list, '/Users/foo/proj/.moi')).toEqual(ws('/Users/foo/proj'))
+    expect(findWorkspaceForPath(list, '/Users/foo/proj/.moi/views')).toEqual(ws('/Users/foo/proj'))
+  })
+
+  test('returns null when the path is not inside any workspace', () => {
+    const list = [ws('/Users/foo/proj')]
+    expect(findWorkspaceForPath(list, '/Users/bar/other')).toBeNull()
+    // A sibling sharing a name prefix but not a path boundary must not match.
+    expect(findWorkspaceForPath(list, '/Users/foo/proj-2')).toBeNull()
+  })
+
+  test('picks the nearest ancestor when workspaces are nested', () => {
+    const list = [ws('/Users/foo/proj'), ws('/Users/foo/proj/nested')]
+    expect(findWorkspaceForPath(list, '/Users/foo/proj/nested/.moi')).toEqual(
+      ws('/Users/foo/proj/nested')
+    )
+    expect(findWorkspaceForPath(list, '/Users/foo/proj/other')).toEqual(ws('/Users/foo/proj'))
+  })
+
+  test('normalizes the requested path before matching', () => {
+    const list = [ws('/Users/foo/proj')]
+    expect(findWorkspaceForPath(list, '/Users/foo/proj/.moi/..')).toEqual(ws('/Users/foo/proj'))
+  })
+
+  test('returns null for an empty registry', () => {
+    expect(findWorkspaceForPath([], '/anywhere')).toBeNull()
   })
 })
 

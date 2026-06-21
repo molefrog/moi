@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 import { defineCommand, runMain, showUsage } from 'citty'
-import Table from 'cli-table3'
 import { mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'path'
@@ -10,6 +9,7 @@ import { COLOR_THEMES, FONT_THEMES } from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/themes'
 import type { ScratchArrowEnd, ScratchOp } from '@/lib/types'
 
+import { columns } from './cli-ui'
 import { CONTROL_PORT, PORT } from './constants'
 import { scaffoldMoiDir } from './moi-scaffold'
 import { type OpenClawAgent, discoverOpenClawAgents } from './openclaw'
@@ -305,29 +305,55 @@ const bundle = defineCommand({
       ws.send(JSON.stringify({ type: 'bundle', path, force: args.force, only: args.only }))
 
     ws.onmessage = event => {
-      const results = JSON.parse(String(event.data))
-      if (!Array.isArray(results)) return
+      const res = JSON.parse(String(event.data))
 
-      const table = new Table({ head: [pc.bold('kind'), pc.bold('name'), pc.bold('status')] })
-      for (const r of results as {
-        kind?: string
-        name: string
-        status: string
-        error?: string
-      }[]) {
-        table.push([pc.dim(r.kind ?? ''), r.name, colorStatus(r.status)])
+      // The server fails loudly when the path isn't inside a registered
+      // workspace (e.g. run from an unrelated dir) instead of silently no-op'ing.
+      if (res.error) {
+        console.error('\n' + pc.red(pc.bold('Error:')) + ' ' + res.error + '\n')
+        ws.close()
+        process.exit(1)
       }
-      console.log('\n' + table.toString())
 
-      const failed = results.filter(
-        (r: { status: string; error?: string }) => r.status === 'failed'
+      type Row = { kind?: string; name: string; status: string; error?: string }
+      const results: Row[] = Array.isArray(res.results) ? res.results : []
+      const where = typeof res.workspacePath === 'string' ? res.workspacePath : path
+
+      // Empty here means a *real* workspace with no widgets/views — not the old
+      // "wrong dir" footgun (that's an error above now). Say so plainly.
+      if (results.length === 0) {
+        console.log(
+          '\n' +
+            pc.bold('moi bundle') +
+            pc.dim(' — nothing to build') +
+            '\n\n' +
+            pc.dim(`  No widgets or views found in ${where}/.moi/`) +
+            '\n'
+        )
+        ws.close()
+        process.exit(0)
+      }
+
+      const counts: Record<string, number> = {}
+      for (const r of results) counts[r.status] = (counts[r.status] ?? 0) + 1
+      const summary = ['built', 'skipped', 'failed']
+        .filter(s => counts[s])
+        .map(s => `${counts[s]} ${s}`)
+        .join(' · ')
+
+      console.log('\n' + pc.bold('moi bundle') + pc.dim(` — ${summary}`) + '\n')
+      console.log(
+        columns(
+          ['kind', 'name', 'status'].map(h => pc.dim(h)),
+          results.map(r => [pc.dim(r.kind ?? ''), r.name, colorStatus(r.status)])
+        )
       )
-      if (failed.length) {
-        console.log()
-        for (const f of failed) {
-          console.log(pc.red(pc.bold(f.name + ':')))
-          console.log('  ' + f.error + '\n')
-        }
+
+      const failed = results.filter(r => r.status === 'failed')
+      console.log()
+      for (const f of failed) {
+        console.log(pc.red(pc.bold(f.name + ':')))
+        console.log('  ' + f.error + '\n')
       }
 
       ws.close()
@@ -445,42 +471,44 @@ const theme = defineCommand({
       console.log('\n' + pc.bold('moi theme') + ' — workspace appearance')
       console.log(pc.dim('  Usage: moi theme --font=<key> --color=<key>') + '\n')
 
-      const fontTable = new Table({
-        head: ['', 'key', 'label', 'sans', 'mono', 'feel'].map(h => pc.bold(h)),
-        style: { border: [], head: [] }
-      })
-      for (const key of Object.keys(FONT_THEMES) as FontTheme[]) {
+      const fontRows = (Object.keys(FONT_THEMES) as FontTheme[]).map(key => {
         const f = FONT_THEMES[key]
         const selected = key === currentFont
-        fontTable.push([
-          selected ? pc.green('→') : '',
+        return [
+          selected ? pc.green('→') : ' ',
           selected ? pc.bold(key) : key,
           f.label,
           pc.dim(f.sans),
           pc.dim(f.mono),
           pc.dim(f.feel)
-        ])
-      }
-      console.log(pc.dim('  Fonts'))
-      console.log(fontTable.toString() + '\n')
-
-      const colorTable = new Table({
-        head: ['', 'key', 'label', 'swatch', 'feel'].map(h => pc.bold(h)),
-        style: { border: [], head: [] }
+        ]
       })
-      for (const key of Object.keys(COLOR_THEMES) as ColorTheme[]) {
+      console.log(pc.dim('  Fonts'))
+      console.log(
+        columns(
+          ['', 'key', 'label', 'sans', 'mono', 'feel'].map(h => pc.dim(h)),
+          fontRows
+        ) + '\n'
+      )
+
+      const colorRows = (Object.keys(COLOR_THEMES) as ColorTheme[]).map(key => {
         const c = COLOR_THEMES[key]
         const selected = key === currentColor
-        colorTable.push([
-          selected ? pc.green('→') : '',
+        return [
+          selected ? pc.green('→') : ' ',
           selected ? pc.bold(key) : key,
           c.label,
           swatch(c.background, c.foreground),
           pc.dim(c.feel)
-        ])
-      }
+        ]
+      })
       console.log(pc.dim('  Colors'))
-      console.log(colorTable.toString() + '\n')
+      console.log(
+        columns(
+          ['', 'key', 'label', 'swatch', 'feel'].map(h => pc.dim(h)),
+          colorRows
+        ) + '\n'
+      )
 
       ws.close()
       process.exit(0)
@@ -545,19 +573,17 @@ function findAgent(agents: OpenClawAgent[], query: string): OpenClawAgent | null
 }
 
 function printAgentTable(agents: OpenClawAgent[]) {
-  const table = new Table({
-    head: ['', pc.bold('agentId'), pc.bold('name'), pc.bold('workspace')],
-    style: { border: [], head: [] }
-  })
-  for (const a of agents) {
-    table.push([
-      a.isDefault ? pc.green('●') : '',
-      a.isDefault ? pc.bold(a.agentId) : a.agentId,
-      a.name ?? pc.dim('—'),
-      pc.dim(a.path)
-    ])
-  }
-  console.log(table.toString())
+  console.log(
+    columns(
+      ['', 'agentId', 'name', 'workspace'].map(h => pc.dim(h)),
+      agents.map(a => [
+        a.isDefault ? pc.green('●') : ' ',
+        a.isDefault ? pc.bold(a.agentId) : a.agentId,
+        a.name ?? pc.dim('—'),
+        pc.dim(a.path)
+      ])
+    )
+  )
 }
 
 const openclawInit = defineCommand({
