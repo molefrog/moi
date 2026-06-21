@@ -19,20 +19,52 @@ export type SkillStatus = {
   bundled: string | null
 }
 
-// Read the skill version from a `SKILL.md` YAML frontmatter block. Lives under
-// `metadata.version` — the Agent Skills open-standard slot; Claude Code, the
-// SDK, and openclaw don't consume it, so it's ours alone. Deliberately tiny (no
-// YAML dependency): the indentation-tolerant match picks up the `version:` line
-// whether nested under `metadata:` or top-level. Returns `null` when the file
-// or field is missing.
+// Bun.YAML is built in (Bun ≥ 1.2.9) but isn't in this repo's bun-types yet, so
+// reach it through a narrow typed view rather than `any`.
+const yaml = (Bun as unknown as { YAML: { parse(src: string): unknown } }).YAML
+
+// Isolate the `metadata:` mapping from a frontmatter block and return it as a
+// standalone YAML document (child indentation stripped), or null if absent.
+// SKILL.md frontmatter is NOT reliably strict YAML — the free-text `description`
+// routinely contains `: ` and other tokens a strict parser rejects — so we feed
+// only this small block (which we control) to the parser, never the whole thing.
+function isolateMetadata(frontmatter: string): string | null {
+  const lines = frontmatter.split(/\r?\n/)
+  const start = lines.findIndex(l => /^metadata:/.test(l))
+  if (start === -1) return null
+  const inline = lines[start].slice('metadata:'.length).trim()
+  if (inline) return inline // flow form: `metadata: { version: 1.0.0 }`
+  // Block form: take the indented child lines until the next top-level key,
+  // stripping the indent so the result parses as a root-level mapping.
+  const body: string[] = []
+  for (const line of lines.slice(start + 1)) {
+    if (/^\s+\S/.test(line)) body.push(line.replace(/^\s+/, ''))
+    else if (line.trim() !== '') break
+  }
+  return body.length > 0 ? body.join('\n') : null
+}
+
+// Read the skill version from a `SKILL.md`'s `metadata.version` (the Agent
+// Skills standard slot). Returns `null` when the file, the metadata block, or
+// the version is missing or unparseable.
 export async function readSkillVersion(skillMdPath: string): Promise<string | null> {
   const file = Bun.file(skillMdPath)
   if (!(await file.exists())) return null
   const text = await file.text()
-  const fm = text.match(/^---\r?\n([\s\S]*?)\r?\n---/)
-  if (!fm) return null
-  const m = fm[1].match(/^\s*version:\s*["']?([^"'\s]+)["']?\s*$/m)
-  return m ? m[1] : null
+  const fence = text.match(/^---\r?\n([\s\S]*?)\r?\n---/)
+  if (!fence) return null
+  const metaYaml = isolateMetadata(fence[1])
+  if (!metaYaml) return null
+  let meta: unknown
+  try {
+    meta = yaml.parse(metaYaml)
+  } catch {
+    return null
+  }
+  if (typeof meta !== 'object' || meta === null) return null
+  const v = (meta as { version?: unknown }).version
+  if (typeof v === 'string') return v
+  return typeof v === 'number' ? String(v) : null
 }
 
 function parse(v: string): [number, number, number] {
