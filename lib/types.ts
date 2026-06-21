@@ -37,14 +37,55 @@ export type ViewInfo = {
 export type ScratchPoint = { x: number; y: number }
 export type ScratchArrowEnd = { name: string } | ScratchPoint
 
+// tldraw's named color palette (DefaultColorStyle). The CLI also accepts an
+// arbitrary hex and snaps it to the nearest of these — tldraw shapes can only
+// hold a palette color, not free hex.
+export type ScratchColor =
+  | 'black'
+  | 'grey'
+  | 'light-violet'
+  | 'violet'
+  | 'blue'
+  | 'light-blue'
+  | 'yellow'
+  | 'orange'
+  | 'green'
+  | 'light-green'
+  | 'light-red'
+  | 'red'
+  | 'white'
+
+// Stroke/size weight (DefaultSizeStyle): small → extra-large.
+export type ScratchSize = 's' | 'm' | 'l' | 'xl'
+
+// Optional styling carried by every add op. Omitted fields fall back to the
+// shape's tldraw default.
+export type ScratchStyle = { color?: ScratchColor; size?: ScratchSize }
+
 export type ScratchOp =
-  | { kind: 'add-text'; name: string; x: number; y: number; text: string }
-  | { kind: 'add-rect'; name: string; x: number; y: number; w: number; h: number; text?: string }
-  | { kind: 'add-note'; name: string; x: number; y: number; text: string }
-  | { kind: 'add-arrow'; name: string; from: ScratchArrowEnd; to: ScratchArrowEnd }
+  | ({ kind: 'add-text'; name: string; x: number; y: number; text: string } & ScratchStyle)
+  | ({
+      kind: 'add-rect'
+      name: string
+      x: number
+      y: number
+      w: number
+      h: number
+      text?: string
+    } & ScratchStyle)
+  | ({ kind: 'add-note'; name: string; x: number; y: number; text: string } & ScratchStyle)
+  | ({
+      kind: 'add-arrow'
+      name: string
+      from: ScratchArrowEnd
+      to: ScratchArrowEnd
+      // Right-angle (orthogonal) routing for clean diagrams; default is a curved arc.
+      elbow?: boolean
+    } & ScratchStyle)
   | { kind: 'move'; name: string; x: number; y: number }
   | { kind: 'set'; name: string; text: string }
   | { kind: 'delete'; name: string }
+  | { kind: 'clear' }
   | { kind: 'view' }
 
 // What a tab returns after running an op: a shape's `name` for add ops, a PNG
