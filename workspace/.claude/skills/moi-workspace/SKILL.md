@@ -101,7 +101,8 @@ my-agent-folder/
 
 Treat `moi` as an external command — you cannot inspect or modify its sources. Use only the
 documented subcommands (`moi bundle`, `moi bundle --force`, etc.). Call `moi help` for
-documentation. Call `moi` in the `.moi` folder.
+documentation. Run all `moi` commands from the **project root** — the folder that contains `.moi/`,
+never from inside `.moi/` itself. You don't pass paths; moi resolves the workspace from where it's run.
 
 - `moi bundle` — compile changed applets
 - `moi bundle --force` — rebuild all applets (use after changing `config`)
