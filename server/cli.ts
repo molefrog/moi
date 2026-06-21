@@ -8,7 +8,13 @@ import pc from 'picocolors'
 
 import { COLOR_THEMES, FONT_THEMES } from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/themes'
-import type { ScratchArrowEnd, ScratchColor, ScratchOp, ScratchSize } from '@/lib/types'
+import type {
+  ScratchArrowEnd,
+  ScratchColor,
+  ScratchImageQuality,
+  ScratchOp,
+  ScratchSize
+} from '@/lib/types'
 
 import { columns } from './cli-ui'
 import { CONTROL_PORT, PORT } from './constants'
@@ -936,6 +942,14 @@ function parseStroke(s: string): ScratchSize {
   return size
 }
 
+// Resize preset for `add image` — defaults to 'lo' (keep the canvas light).
+function parseImageQuality(s: string | undefined): ScratchImageQuality {
+  if (!s) return 'lo'
+  const q = s.trim().toLowerCase()
+  if (q === 'lo' || q === 'hi') return q
+  throw new Error(`Unknown quality "${s}". Use "lo" or "hi".`)
+}
+
 // Shared optional styling on every `add` command. Resolved into op props below.
 const colorArg = {
   type: 'string',
@@ -957,7 +971,7 @@ function styleArgs(args: { color?: string; stroke?: string }): {
   }
 }
 
-type ScratchCliOp = ScratchOp | { kind: 'read' }
+type ScratchCliOp = ScratchOp | { kind: 'read' } | { kind: 'read-image'; name: string }
 
 // Round-trip one op through the control port and hand the reply to `onResult`.
 // Mirrors the `bundle`/`theme` commands: one socket per invocation, print, exit.
@@ -1023,6 +1037,58 @@ const scratchView = defineCommand({
       const b64 = result.image.replace(/^data:image\/png;base64,/, '')
       const outPath = args.out ? resolve(args.out) : join(tmpdir(), `moi-scratch-${Date.now()}.png`)
       await Bun.write(outPath, Buffer.from(b64, 'base64'))
+      console.log(outPath)
+    })
+  }
+})
+
+// Image data URL mime → file extension, for naming the saved file.
+const IMAGE_EXT: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'image/svg+xml': 'svg'
+}
+
+const scratchReadImage = defineCommand({
+  meta: {
+    name: 'read-image',
+    description: 'Save an image shape to a file by id (served off disk)'
+  },
+  args: {
+    id: { type: 'positional', required: true, description: 'Image shape id (from `scratch read`)' },
+    out: { type: 'string', description: 'Output file path (default: a temp file)' },
+    dir: dirArg
+  },
+  async run({ args }) {
+    sendScratch(resolve(args.dir), { kind: 'read-image', name: args.id }, async res => {
+      const src = res.src as string | undefined
+      if (!src) {
+        console.error(pc.red('No image data'))
+        process.exit(1)
+      }
+      // A remote (http) asset has no local bytes to write — just print the URL.
+      if (/^https?:\/\//.test(src)) {
+        console.log(src)
+        return
+      }
+      const m = src.match(/^data:([^;,]+)(;base64)?,(.*)$/s)
+      if (!m) {
+        console.error(pc.red('Unrecognized image source'))
+        process.exit(1)
+      }
+      const [, mime, base64, data] = m
+      const bytes = base64
+        ? Buffer.from(data, 'base64')
+        : Buffer.from(decodeURIComponent(data), 'utf8')
+      const ext = IMAGE_EXT[mime] ?? 'bin'
+      const safeId = args.id.replace(/[^a-zA-Z0-9_-]/g, '_')
+      const outPath = args.out
+        ? resolve(args.out)
+        : join(tmpdir(), `moi-scratch-${safeId}-${Date.now()}.${ext}`)
+      await Bun.write(outPath, bytes)
       console.log(outPath)
     })
   }
@@ -1143,13 +1209,44 @@ const scratchAddArrow = defineCommand({
   }
 })
 
+const scratchAddImage = defineCommand({
+  meta: { name: 'image', description: 'Add an image from a file (resized to fit the canvas)' },
+  args: {
+    path: {
+      type: 'positional',
+      required: true,
+      description: 'Path to an image file (png/jpg/webp/gif)'
+    },
+    at: { type: 'string', description: 'Top-left position "x,y" (default: 0,0)' },
+    id: { type: 'string', description: 'Stable name to address this shape later' },
+    quality: { type: 'string', description: 'Resize: lo (default, smaller) or hi (sharper)' },
+    dir: dirArg
+  },
+  run({ args }) {
+    const { x, y } = args.at ? parseXY(args.at) : { x: 0, y: 0 }
+    sendScratch(
+      resolve(args.dir),
+      {
+        kind: 'add-image',
+        name: args.id ?? '',
+        x,
+        y,
+        path: resolve(args.path),
+        quality: parseImageQuality(args.quality)
+      },
+      printAdded
+    )
+  }
+})
+
 const scratchAdd = defineCommand({
-  meta: { name: 'add', description: 'Add a shape: text, rect, note, or arrow' },
+  meta: { name: 'add', description: 'Add a shape: text, rect, note, arrow, or image' },
   subCommands: {
     text: scratchAddText,
     rect: scratchAddRect,
     note: scratchAddNote,
-    arrow: scratchAddArrow
+    arrow: scratchAddArrow,
+    image: scratchAddImage
   }
 })
 
@@ -1212,6 +1309,7 @@ const scratch = defineCommand({
   },
   subCommands: {
     read: scratchRead,
+    'read-image': scratchReadImage,
     view: scratchView,
     add: scratchAdd,
     move: scratchMove,

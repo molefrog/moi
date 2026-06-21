@@ -1,8 +1,12 @@
+import { basename } from 'path'
+import sharp from 'sharp'
+
 import {
   type IndexKey,
   type TLPageId,
   type TLRecord,
   type TLStore,
+  AssetRecordType,
   ZERO_INDEX_KEY,
   createBindingId,
   createShapeId,
@@ -15,7 +19,7 @@ import {
   toRichText
 } from 'tldraw'
 
-import type { ScratchOp, ScratchOpResult, ScratchStyle } from '@/lib/types'
+import type { ScratchImageQuality, ScratchOp, ScratchOpResult, ScratchStyle } from '@/lib/types'
 
 import { publishEvent } from './events'
 import { type ScratchpadDoc, loadScratchpadDoc, saveScratchpadDoc } from './scratchpad'
@@ -133,6 +137,74 @@ function arrowBinding(
       snap: 'none'
     }
   } as unknown as TLRecord
+}
+
+// Resize an image file to fit the canvas and embed it as a webp data URL, never
+// enlarging — so a 10MB paste becomes a lightweight asset. `quality` picks the
+// preset: 'lo' caps the long side smaller (default), 'hi' keeps more pixels.
+// `.rotate()` bakes in EXIF orientation (phone photos).
+const IMAGE_PRESETS: Record<ScratchImageQuality, { dim: number; quality: number }> = {
+  lo: { dim: 1024, quality: 78 },
+  hi: { dim: 2048, quality: 88 }
+}
+const MAX_IMAGE_BYTES = 50 * 1024 * 1024
+
+async function processCanvasImage(
+  path: string,
+  quality: ScratchImageQuality
+): Promise<{ src: string; w: number; h: number; mimeType: string; name: string }> {
+  const file = Bun.file(path)
+  if (!(await file.exists())) throw new Error(`Image file not found: ${path}`)
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  if (bytes.length === 0) throw new Error(`Image file is empty: ${path}`)
+  if (bytes.length > MAX_IMAGE_BYTES) {
+    throw new Error(`Image is too large (${Math.round(bytes.length / 1e6)}MB, max 50MB): ${path}`)
+  }
+  const preset = IMAGE_PRESETS[quality]
+  const { data, info } = await sharp(bytes)
+    .rotate()
+    .resize(preset.dim, preset.dim, { fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: preset.quality })
+    .toBuffer({ resolveWithObject: true })
+  return {
+    src: `data:image/webp;base64,${data.toString('base64')}`,
+    w: info.width,
+    h: info.height,
+    mimeType: 'image/webp',
+    name: basename(path)
+  }
+}
+
+// Create an image shape and its backing asset from a file. Async — unlike the
+// other ops — because it decodes and resizes the image first.
+async function applyAddImage(
+  store: TLStore,
+  op: Extract<ScratchOp, { kind: 'add-image' }>
+): Promise<ScratchOpResult> {
+  const pageId = firstPageId(store)
+  const { src, w, h, mimeType, name } = await processCanvasImage(op.path, op.quality ?? 'lo')
+  const assetId = AssetRecordType.createId()
+  store.put([
+    {
+      id: assetId,
+      typeName: 'asset',
+      type: 'image',
+      meta: {},
+      props: { name, src, w, h, mimeType, isAnimated: false }
+    } as unknown as TLRecord
+  ])
+  store.put([
+    shapeRecord({
+      id: createShapeId(op.name),
+      type: 'image',
+      x: op.x,
+      y: op.y,
+      index: nextIndex(store, pageId),
+      parentId: pageId,
+      props: { ...defaultProps('image'), w, h, assetId }
+    })
+  ])
+  return { name: op.name }
 }
 
 // Apply one mutating op to the store. `read` and `view` are handled elsewhere
@@ -297,7 +369,8 @@ export function executeScratchOp(
   return withLock(workspacePath, async () => {
     const { document } = await loadScratchpadDoc(workspacePath)
     const store = buildStore(document)
-    const result = applyOp(store, op)
+    // add-image decodes/resizes the file first, so it's the one async op.
+    const result = op.kind === 'add-image' ? await applyAddImage(store, op) : applyOp(store, op)
     const next = getSnapshot(store).document as unknown as ScratchpadDoc
     await saveScratchpadDoc(next, workspacePath)
     publishEvent({ type: 'scratchpad:updated', workspaceId })

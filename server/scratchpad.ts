@@ -79,7 +79,44 @@ function extractText(props: unknown): string | undefined {
   return undefined
 }
 
-// Parse the saved snapshot into a flat shape listing — served straight off disk,
+// Resolve a single image shape's source by id, straight off the disk snapshot —
+// no browser. The shape references an `asset` record by `props.assetId`; we return
+// that asset's `src` (a `data:` URL for pasted/dropped images, or an `https:` URL).
+// `moi scratch read` deliberately omits these blobs, so this is how the agent pulls
+// the actual pixels for one image. Ids match with or without the `shape:` prefix
+// (read surfaces them stripped).
+export async function readScratchpadImage(
+  workspacePath: string,
+  id: string
+): Promise<{ src: string } | { error: string }> {
+  const { document } = await loadScratchpadDoc(workspacePath)
+  const store = document?.store
+  if (!store || typeof store !== 'object') return { error: `No shape named "${id}"` }
+
+  const target = id.replace(/^shape:/, '')
+  let assetId: string | undefined
+  let found = false
+  for (const record of Object.values(store)) {
+    if (!record || typeof record !== 'object') continue
+    const r = record as { typeName?: string; id?: string; props?: { assetId?: unknown } }
+    if (r.typeName !== 'shape' || (r.id ?? '').replace(/^shape:/, '') !== target) continue
+    found = true
+    if (typeof r.props?.assetId === 'string') assetId = r.props.assetId
+    break
+  }
+  if (!found) return { error: `No shape named "${id}"` }
+  if (!assetId) return { error: `Shape "${id}" is not an image` }
+
+  for (const record of Object.values(store)) {
+    if (!record || typeof record !== 'object') continue
+    const a = record as { typeName?: string; id?: string; props?: { src?: unknown } }
+    if (a.typeName === 'asset' && a.id === assetId && typeof a.props?.src === 'string') {
+      return { src: a.props.src }
+    }
+  }
+  return { error: `Image "${id}" has no stored data` }
+}
+
 // no browser needed. Ids are reported without tldraw's `shape:` prefix so they
 // round-trip with `createShapeId(name)` on the draw side.
 export async function readScratchpadShapes(workspacePath: string): Promise<ScratchShape[]> {

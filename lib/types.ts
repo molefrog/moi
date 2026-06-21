@@ -51,6 +51,10 @@ export type ScratchSize = 'm' | 'xl'
 // shape's tldraw default.
 export type ScratchStyle = { color?: ScratchColor; size?: ScratchSize }
 
+// Resize preset for `add image`: 'lo' caps the long side smaller (default, keeps
+// the canvas light), 'hi' allows more pixels when detail matters.
+export type ScratchImageQuality = 'lo' | 'hi'
+
 export type ScratchOp =
   | ({ kind: 'add-text'; name: string; x: number; y: number; text: string } & ScratchStyle)
   | ({
@@ -63,6 +67,17 @@ export type ScratchOp =
       text?: string
     } & ScratchStyle)
   | ({ kind: 'add-note'; name: string; x: number; y: number; text: string } & ScratchStyle)
+  // Add an image from a local file `path` — the server resizes it to fit the
+  // canvas and embeds it (color/stroke don't apply, so no ScratchStyle).
+  // `quality` picks the resize preset: 'lo' (default, smaller) or 'hi' (sharper).
+  | {
+      kind: 'add-image'
+      name: string
+      x: number
+      y: number
+      path: string
+      quality?: ScratchImageQuality
+    }
   | ({
       kind: 'add-arrow'
       name: string
