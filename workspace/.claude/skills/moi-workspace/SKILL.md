@@ -239,7 +239,7 @@ The inverse of a widget: a view **owns its whole page** — its own `h-full w-fu
 
 This skill is installed with moi (via the CLI or the UI) and can fall behind when the moi CLI updates.
 
-- **You'll know** — `moi` commands print a `⚠ moi skill outdated …` line.
+- **You'll know** — `moi` commands warn you when this skill is behind.
 - **To update** — run `moi skill update`. Never mid-task: finish first, or do it at the end (changes apply on the next skill load).
 - **Then** — if you updated, tell the user. If unsure whether you should, ask first, casually: "btw, a newer moi skill is available — want me to update it?"
 
