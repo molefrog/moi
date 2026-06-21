@@ -27,7 +27,9 @@ The agent works the canvas through a `moi scratch` CLI — it both **sees** and 
 
 - `moi scratch read` — dump the canvas as **structured JSON**: each shape with its `id`,
   `type`, position, size, and text. Use this to reason about exact shapes — what's where,
-  what to move, what to relabel. Works whether or not a browser tab is open.
+  what to move, what to relabel. Works whether or not a browser tab is open. Image shapes
+  carry a `src`, but **base64 data URLs are omitted** (reported as `base64:omitted`) — the
+  blob is huge and unreadable as text, so call `view` when you actually need to see it.
 - `moi scratch view` — render the canvas to a **PNG**. Use this to actually _see_ what the
   user drew (freehand, layout, anything structure can't capture).
 

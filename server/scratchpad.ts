@@ -20,6 +20,9 @@ export type ScratchShape = {
   w?: number
   h?: number
   text?: string
+  // Image/asset src. Base64 data URLs are omitted (see omitBase64) — the agent
+  // calls `moi scratch view` to actually see pixels; only the URL kind passes through.
+  src?: string
 }
 
 export function getScratchpadPath(workspacePath: string): string {
@@ -42,6 +45,16 @@ export async function saveScratchpadDoc(
   workspacePath: string
 ): Promise<void> {
   await Bun.write(getScratchpadPath(workspacePath), JSON.stringify({ document }, null, 2))
+}
+
+// tldraw embeds pasted/dropped images as `data:<mime>;base64,<blob>` URLs (on
+// asset records, and occasionally inline in rich text). Those blobs are huge and
+// useless for reasoning about structure, so we replace each one with a short
+// marker — the agent calls `moi scratch view` when it actually needs the pixels.
+// Non-base64 srcs (e.g. https URLs) pass through untouched.
+const BASE64_DATA_URL_RE = /data:[\w.+-]*\/?[\w.+-]*;base64,[A-Za-z0-9+/=]+/g
+function omitBase64(text: string): string {
+  return text.replace(BASE64_DATA_URL_RE, 'base64:omitted')
 }
 
 // Pull readable text out of a shape's props. tldraw stores labels as `richText`
@@ -74,6 +87,17 @@ export async function readScratchpadShapes(workspacePath: string): Promise<Scrat
   const store = document?.store
   if (!store || typeof store !== 'object') return []
 
+  // Images live as `asset` records (typeName 'asset'); a shape references one by
+  // `props.assetId`. Index asset src first so we can surface it on the shape —
+  // with base64 blobs omitted — without dumping the asset record itself.
+  const assetSrc = new Map<string, string>()
+  for (const record of Object.values(store)) {
+    if (!record || typeof record !== 'object') continue
+    const a = record as { typeName?: string; id?: string; props?: { src?: unknown } }
+    if (a.typeName !== 'asset' || typeof a.id !== 'string') continue
+    if (typeof a.props?.src === 'string') assetSrc.set(a.id, a.props.src)
+  }
+
   const shapes: ScratchShape[] = []
   for (const record of Object.values(store)) {
     if (!record || typeof record !== 'object') continue
@@ -83,11 +107,12 @@ export async function readScratchpadShapes(workspacePath: string): Promise<Scrat
       type?: string
       x?: number
       y?: number
-      props?: { w?: unknown; h?: unknown }
+      props?: { w?: unknown; h?: unknown; assetId?: unknown }
     }
     if (r.typeName !== 'shape') continue
     const w = typeof r.props?.w === 'number' ? r.props.w : undefined
     const h = typeof r.props?.h === 'number' ? r.props.h : undefined
+    const rawSrc = typeof r.props?.assetId === 'string' ? assetSrc.get(r.props.assetId) : undefined
     shapes.push({
       id: (r.id ?? '').replace(/^shape:/, ''),
       type: r.type ?? 'unknown',
@@ -97,8 +122,9 @@ export async function readScratchpadShapes(workspacePath: string): Promise<Scrat
       ...(h !== undefined ? { h } : {}),
       ...(() => {
         const text = extractText(r.props)
-        return text !== undefined ? { text } : {}
-      })()
+        return text !== undefined ? { text: omitBase64(text) } : {}
+      })(),
+      ...(rawSrc !== undefined ? { src: omitBase64(rawSrc) } : {})
     })
   }
   return shapes
