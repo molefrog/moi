@@ -144,7 +144,7 @@ function arrowBinding(
 // preset: 'lo' caps the long side smaller (default), 'hi' keeps more pixels.
 // `.rotate()` bakes in EXIF orientation (phone photos).
 const IMAGE_PRESETS: Record<ScratchImageQuality, { dim: number; quality: number }> = {
-  lo: { dim: 1024, quality: 78 },
+  lo: { dim: 768, quality: 78 },
   hi: { dim: 2048, quality: 88 }
 }
 const MAX_IMAGE_BYTES = 50 * 1024 * 1024
