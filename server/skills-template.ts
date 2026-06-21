@@ -9,12 +9,17 @@ import { join } from 'node:path'
 // symlinked CLI binaries still find the source tree.
 export const TEMPLATE_DIR = join(import.meta.dir, '..', 'workspace')
 
+// The folder holding the skill packages this CLI ships. Each subdirectory is
+// one skill (e.g. `moi-workspace/`) with its own `SKILL.md`. Source of truth
+// for what `moi skill update` copies and what versions it compares against.
+export const BUNDLED_SKILLS_DIR = join(TEMPLATE_DIR, '.claude', 'skills')
+
 // Copy each shipped skill folder into `targetSkillsDir`. Overwrites existing
 // files (e.g. on a re-install after a moi upgrade) but leaves unrelated
 // directories alone. Creates the target if missing.
 export async function installBundledSkills(targetSkillsDir: string): Promise<void> {
   await mkdir(targetSkillsDir, { recursive: true })
-  await cp(join(TEMPLATE_DIR, '.claude', 'skills'), targetSkillsDir, {
+  await cp(BUNDLED_SKILLS_DIR, targetSkillsDir, {
     recursive: true,
     force: true
   })

@@ -15,6 +15,13 @@ import { CONTROL_PORT, PORT } from './constants'
 import { scaffoldMoiDir } from './moi-scaffold'
 import { type OpenClawAgent, discoverOpenClawAgents } from './openclaw'
 import { liftToWorkspaceRoot, registerWorkspace } from './registry'
+import {
+  isBehind,
+  isMinorBehind,
+  resolveWorkspaceRoot,
+  skillStatuses,
+  staleSkillNotice
+} from './skill-version'
 import { installBundledSkills } from './skills-template'
 
 // ---- helpers ----------------------------------------------------------------
@@ -328,8 +335,11 @@ const bundle = defineCommand({
       description: 'Narrow the build to "widgets" or "views" (default: both)'
     }
   },
-  run({ args }) {
+  async run({ args }) {
     const path = resolve(args.dir)
+    // Computed locally up front so it can ride along in the success output; the
+    // agent reads this and knows to run `moi skill update`.
+    const notice = await staleSkillNotice(path)
     const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
 
     ws.onopen = () =>
@@ -361,6 +371,7 @@ const bundle = defineCommand({
             pc.dim(`  No widgets or views found in ${where}/.moi/`) +
             '\n'
         )
+        if (notice) console.log(pc.yellow(notice) + '\n')
         ws.close()
         process.exit(0)
       }
@@ -387,6 +398,7 @@ const bundle = defineCommand({
         console.log('  ' + f.error + '\n')
       }
 
+      if (notice) console.log(pc.yellow(notice) + '\n')
       ws.close()
       process.exit(failed.length > 0 ? 1 : 0)
     }
@@ -404,7 +416,8 @@ const refresh = defineCommand({
     description:
       'Refresh widget data without rebuilding. Use after the agent mutates underlying data.'
   },
-  run() {
+  async run() {
+    const notice = await staleSkillNotice(process.cwd())
     const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
 
     ws.onopen = () => ws.send(JSON.stringify({ type: 'widget:refresh' }))
@@ -417,6 +430,7 @@ const refresh = defineCommand({
         process.exit(1)
       }
       console.log('\n' + pc.green('✓') + ' Refresh signal sent\n')
+      if (notice) console.log(pc.yellow(notice) + '\n')
       ws.close()
       process.exit(0)
     }
@@ -1085,9 +1099,101 @@ const scratch = defineCommand({
   }
 })
 
+// Re-copy bundled skills into a workspace, then report what changed. Pure
+// filesystem op — no running server needed. Resolves the workspace root the
+// same way `moi bundle` does, so it works from `.moi/` or any subdirectory.
+async function runSkillUpdate(cwd: string): Promise<void> {
+  const root = await resolveWorkspaceRoot(cwd)
+  const before = await skillStatuses(root)
+  await installBundledSkills(join(root, '.claude', 'skills'))
+  const after = await skillStatuses(root)
+
+  console.log('\n' + pc.green('✓') + ' Skills updated in ' + pc.bold(root) + '\n')
+  console.log(
+    columns(
+      ['skill', 'from', 'to'].map(h => pc.dim(h)),
+      after.map(s => {
+        const prev = before.find(b => b.name === s.name)?.installed ?? null
+        const changed = prev !== s.installed
+        return [
+          s.name,
+          prev ?? pc.dim('none'),
+          changed ? pc.green(s.installed ?? '?') : pc.dim((s.installed ?? '?') + ' (no change)')
+        ]
+      })
+    )
+  )
+  console.log(
+    '\n' +
+      pc.dim(
+        '  Changes apply when the skill is next loaded (new session or next skill invocation).'
+      ) +
+      '\n'
+  )
+}
+
+// `dir` is a `--dir` option, not a positional: `moi skill` carries subcommands
+// (update/install), and citty treats a bare positional as an unknown
+// subcommand. Reuses the shared `dirArg` spec; defaults to the current dir.
+const skillUpdate = defineCommand({
+  meta: {
+    name: 'update',
+    description: 'Update this workspace’s skills to the version shipped with the CLI'
+  },
+  args: { dir: dirArg },
+  async run({ args }) {
+    await runSkillUpdate(resolve(args.dir))
+  }
+})
+
+// `install` is an alias of `update` — same operation, kept for naming symmetry
+// with how skills first land in a workspace.
+const skillInstall = defineCommand({
+  meta: { name: 'install', description: 'Alias for `moi skill update`' },
+  args: { dir: dirArg },
+  async run({ args }) {
+    await runSkillUpdate(resolve(args.dir))
+  }
+})
+
+const skill = defineCommand({
+  meta: { name: 'skill', description: 'Show or update the workspace skills shipped with moi' },
+  subCommands: { update: skillUpdate, install: skillInstall },
+  args: { dir: dirArg },
+  async run({ args, rawArgs }) {
+    // citty runs this parent handler even after dispatching a subcommand, so
+    // bail when one was given — otherwise `moi skill update` also prints status.
+    const sub = rawArgs.find(a => !a.startsWith('-'))
+    if (sub === 'update' || sub === 'install') return
+
+    const root = await resolveWorkspaceRoot(resolve(args.dir))
+    const statuses = await skillStatuses(root)
+
+    console.log('\n' + pc.bold('moi skill') + pc.dim(' — workspace skills') + '\n')
+    console.log(
+      columns(
+        ['skill', 'installed', 'bundled', 'status'].map(h => pc.dim(h)),
+        statuses.map(s => {
+          const minor = isMinorBehind(s.installed, s.bundled)
+          const state = minor
+            ? pc.yellow('update available')
+            : isBehind(s.installed, s.bundled)
+              ? pc.dim('patch behind')
+              : pc.green('up to date')
+          return [s.name, s.installed ?? pc.dim('—'), s.bundled ?? pc.dim('—'), state]
+        })
+      )
+    )
+    if (statuses.some(s => isBehind(s.installed, s.bundled))) {
+      console.log('\n' + pc.dim('  Run ') + pc.bold('moi skill update') + pc.dim(' to refresh.'))
+    }
+    console.log()
+  }
+})
+
 const main = defineCommand({
   meta: { name: 'moi', description: 'moi — local AI workspace' },
-  subCommands: { init, start, bundle, refresh, theme, config, status, openclaw, scratch }
+  subCommands: { init, start, bundle, refresh, theme, config, status, openclaw, scratch, skill }
 })
 
 // Route `moi config --help` to the same terse cheat sheet as `moi config help`;
