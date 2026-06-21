@@ -8,7 +8,7 @@ import pc from 'picocolors'
 
 import { COLOR_THEMES, FONT_THEMES } from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/themes'
-import type { ScratchArrowEnd, ScratchOp } from '@/lib/types'
+import type { ScratchArrowEnd, ScratchColor, ScratchOp, ScratchSize } from '@/lib/types'
 
 import { columns } from './cli-ui'
 import { CONTROL_PORT, PORT } from './constants'
@@ -881,6 +881,85 @@ function parseEnd(s: string): ScratchArrowEnd {
   return { name: s }
 }
 
+// tldraw's named palette and each color's light-theme solid hex — used to snap an
+// arbitrary `--color #rrggbb` to the nearest palette entry (tldraw shapes can't
+// hold free hex). Keep in sync with @tldraw/editor's default theme.
+const COLOR_HEX: Record<ScratchColor, string> = {
+  black: '#1d1d1d',
+  grey: '#9fa8b2',
+  'light-violet': '#e085f4',
+  violet: '#ae3ec9',
+  blue: '#4465e9',
+  'light-blue': '#4ba1f1',
+  yellow: '#f1ac4b',
+  orange: '#e16919',
+  green: '#099268',
+  'light-green': '#4cb05e',
+  'light-red': '#f87777',
+  red: '#e03131',
+  white: '#ffffff'
+}
+const COLOR_NAMES = Object.keys(COLOR_HEX) as ScratchColor[]
+const SCRATCH_SIZES: ScratchSize[] = ['s', 'm', 'l', 'xl']
+
+function hexToRgb(hex: string): [number, number, number] | null {
+  let h = hex.trim().replace(/^#/, '')
+  if (h.length === 3) h = h.replace(/(.)/g, '$1$1')
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]
+}
+
+// Accept a palette name as-is, or snap any hex to the nearest palette color by
+// squared RGB distance. Throws on anything else.
+function parseColor(s: string): ScratchColor {
+  const lower = s.trim().toLowerCase()
+  if ((COLOR_NAMES as string[]).includes(lower)) return lower as ScratchColor
+  const rgb = hexToRgb(s)
+  if (!rgb) {
+    throw new Error(
+      `Unknown color "${s}". Use a hex like "#4465e9" or one of: ${COLOR_NAMES.join(', ')}.`
+    )
+  }
+  let best: ScratchColor = 'black'
+  let bestDist = Infinity
+  for (const name of COLOR_NAMES) {
+    const [r, g, b] = hexToRgb(COLOR_HEX[name])!
+    const d = (r - rgb[0]) ** 2 + (g - rgb[1]) ** 2 + (b - rgb[2]) ** 2
+    if (d < bestDist) {
+      bestDist = d
+      best = name
+    }
+  }
+  return best
+}
+
+function parseSize(s: string): ScratchSize {
+  const lower = s.trim().toLowerCase()
+  if ((SCRATCH_SIZES as string[]).includes(lower)) return lower as ScratchSize
+  throw new Error(`Unknown size "${s}". Use one of: ${SCRATCH_SIZES.join(', ')}.`)
+}
+
+// Shared optional styling on every `add` command. Resolved into op props below.
+const colorArg = {
+  type: 'string',
+  description: 'Color: a palette name (e.g. blue) or any hex (e.g. #4465e9, snapped to nearest)'
+} as const
+const strokeArg = {
+  type: 'string',
+  description: `Stroke / size weight: ${SCRATCH_SIZES.join(', ')}`
+} as const
+
+// Build the optional { color?, size? } props from raw --color/--size args.
+function styleArgs(args: { color?: string; size?: string }): {
+  color?: ScratchColor
+  size?: ScratchSize
+} {
+  return {
+    ...(args.color ? { color: parseColor(args.color) } : {}),
+    ...(args.size ? { size: parseSize(args.size) } : {})
+  }
+}
+
 type ScratchCliOp = ScratchOp | { kind: 'read' }
 
 // Round-trip one op through the control port and hand the reply to `onResult`.
@@ -958,13 +1037,22 @@ const scratchAddText = defineCommand({
     at: { type: 'string', required: true, description: 'Position "x,y"' },
     text: { type: 'string', required: true, description: 'Text content' },
     id: { type: 'string', description: 'Stable name to address this shape later' },
+    color: colorArg,
+    stroke: strokeArg,
     dir: dirArg
   },
   run({ args }) {
     const { x, y } = parseXY(args.at)
     sendScratch(
       resolve(args.dir),
-      { kind: 'add-text', name: args.id ?? '', x, y, text: args.text },
+      {
+        kind: 'add-text',
+        name: args.id ?? '',
+        x,
+        y,
+        text: args.text,
+        ...styleArgs({ color: args.color, size: args.stroke })
+      },
       printAdded
     )
   }
@@ -977,6 +1065,8 @@ const scratchAddRect = defineCommand({
     size: { type: 'string', required: true, description: 'Size "w,h"' },
     text: { type: 'string', description: 'Optional label' },
     id: { type: 'string', description: 'Stable name to address this shape later' },
+    color: colorArg,
+    stroke: strokeArg,
     dir: dirArg
   },
   run({ args }) {
@@ -991,7 +1081,8 @@ const scratchAddRect = defineCommand({
         y,
         w,
         h,
-        ...(args.text ? { text: args.text } : {})
+        ...(args.text ? { text: args.text } : {}),
+        ...styleArgs({ color: args.color, size: args.stroke })
       },
       printAdded
     )
@@ -1004,30 +1095,52 @@ const scratchAddNote = defineCommand({
     at: { type: 'string', required: true, description: 'Position "x,y"' },
     text: { type: 'string', required: true, description: 'Note content' },
     id: { type: 'string', description: 'Stable name to address this shape later' },
+    color: colorArg,
+    stroke: strokeArg,
     dir: dirArg
   },
   run({ args }) {
     const { x, y } = parseXY(args.at)
     sendScratch(
       resolve(args.dir),
-      { kind: 'add-note', name: args.id ?? '', x, y, text: args.text },
+      {
+        kind: 'add-note',
+        name: args.id ?? '',
+        x,
+        y,
+        text: args.text,
+        ...styleArgs({ color: args.color, size: args.stroke })
+      },
       printAdded
     )
   }
 })
 
 const scratchAddArrow = defineCommand({
-  meta: { name: 'arrow', description: 'Add an arrow between shapes or points' },
+  meta: { name: 'arrow', description: 'Add an arrow connecting shapes or points' },
   args: {
     from: { type: 'string', required: true, description: 'Start: a shape name or "x,y"' },
     to: { type: 'string', required: true, description: 'End: a shape name or "x,y"' },
     id: { type: 'string', description: 'Stable name to address this shape later' },
+    elbow: {
+      type: 'boolean',
+      description: 'Right-angle (squared) routing for diagrams; default is a curved arc'
+    },
+    color: colorArg,
+    stroke: strokeArg,
     dir: dirArg
   },
   run({ args }) {
     sendScratch(
       resolve(args.dir),
-      { kind: 'add-arrow', name: args.id ?? '', from: parseEnd(args.from), to: parseEnd(args.to) },
+      {
+        kind: 'add-arrow',
+        name: args.id ?? '',
+        from: parseEnd(args.from),
+        to: parseEnd(args.to),
+        ...(args.elbow ? { elbow: true } : {}),
+        ...styleArgs({ color: args.color, size: args.stroke })
+      },
       printAdded
     )
   }
@@ -1085,6 +1198,16 @@ const scratchDelete = defineCommand({
   }
 })
 
+const scratchClear = defineCommand({
+  meta: { name: 'clear', description: 'Delete every shape — wipe the whole canvas' },
+  args: { dir: dirArg },
+  run({ args }) {
+    sendScratch(resolve(args.dir), { kind: 'clear' }, () =>
+      console.log('\n' + pc.green('✓') + ' cleared the canvas\n')
+    )
+  }
+})
+
 const scratch = defineCommand({
   meta: {
     name: 'scratch',
@@ -1096,7 +1219,8 @@ const scratch = defineCommand({
     add: scratchAdd,
     move: scratchMove,
     set: scratchSet,
-    delete: scratchDelete
+    delete: scratchDelete,
+    clear: scratchClear
   }
 })
 

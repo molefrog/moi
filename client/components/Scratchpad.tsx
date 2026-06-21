@@ -44,7 +44,7 @@ import { cn } from '@/client/lib/cn'
 import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
 import { setScratchExecutor } from '@/client/lib/scratch-executor'
 import { type MeiEvent, useMeiEvent } from '@/client/hooks/useMeiEvents'
-import type { ScratchOp, ScratchOpResult } from '@/lib/types'
+import type { ScratchOp, ScratchOpResult, ScratchStyle } from '@/lib/types'
 
 // Identifies this tab's writes so it can ignore the `scratchpad:updated` echo of
 // its own save (see the MEI reload below). Per page load.
@@ -64,6 +64,15 @@ const LICENSE_KEY = process.env.PUBLIC_TLDRAW_LICENSE_KEY || undefined
 // mutation we flush an immediate save so a following `moi scratch read` (served
 // off disk) is consistent. Returns the shape name (add), a PNG data URL (view),
 // or a bare ack.
+// Map a relayed op's optional color/size onto tldraw shape props. Omitted
+// fields are left off so the shape keeps its tldraw default.
+function styleProps(style: ScratchStyle) {
+  return {
+    ...(style.color ? { color: style.color } : {}),
+    ...(style.size ? { size: style.size } : {})
+  }
+}
+
 function makeExecutor(editor: Editor, flushSave: () => void) {
   return async (op: ScratchOp): Promise<ScratchOpResult> => {
     switch (op.kind) {
@@ -77,6 +86,7 @@ function makeExecutor(editor: Editor, flushSave: () => void) {
             geo: 'rectangle',
             w: op.w,
             h: op.h,
+            ...styleProps(op),
             ...(op.text ? { richText: toRichText(op.text) } : {})
           }
         })
@@ -89,7 +99,7 @@ function makeExecutor(editor: Editor, flushSave: () => void) {
           type: 'text',
           x: op.x,
           y: op.y,
-          props: { richText: toRichText(op.text) }
+          props: { richText: toRichText(op.text), ...styleProps(op) }
         })
         flushSave()
         return { name: op.name }
@@ -100,7 +110,7 @@ function makeExecutor(editor: Editor, flushSave: () => void) {
           type: 'note',
           x: op.x,
           y: op.y,
-          props: { richText: toRichText(op.text) }
+          props: { richText: toRichText(op.text), ...styleProps(op) }
         })
         flushSave()
         return { name: op.name }
@@ -108,13 +118,16 @@ function makeExecutor(editor: Editor, flushSave: () => void) {
       case 'add-arrow': {
         const id = createShapeId(op.name)
         // Arrow at the canvas origin: point endpoints carry absolute coords;
-        // bound endpoints get placeholders that the binding then drives.
+        // bound endpoints get placeholders that the binding then drives. `elbow`
+        // routes with right angles (diagram-style); default is a curved arc.
         editor.createShape({
           id,
           type: 'arrow',
           x: 0,
           y: 0,
           props: {
+            ...styleProps(op),
+            ...(op.elbow ? { kind: 'elbow' } : {}),
             start: 'name' in op.from ? { x: 0, y: 0 } : { x: op.from.x, y: op.from.y },
             end: 'name' in op.to ? { x: 100, y: 0 } : { x: op.to.x, y: op.to.y }
           }
@@ -157,6 +170,12 @@ function makeExecutor(editor: Editor, flushSave: () => void) {
       }
       case 'delete': {
         editor.deleteShape(createShapeId(op.name))
+        flushSave()
+        return { ok: true }
+      }
+      case 'clear': {
+        const ids = [...editor.getCurrentPageShapeIds()]
+        if (ids.length > 0) editor.deleteShapes(ids)
         flushSave()
         return { ok: true }
       }
