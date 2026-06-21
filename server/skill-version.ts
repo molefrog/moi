@@ -19,16 +19,19 @@ export type SkillStatus = {
   bundled: string | null
 }
 
-// Parse the `version:` field out of a `SKILL.md` YAML frontmatter block.
-// Deliberately tiny (no YAML dependency) — frontmatter here is flat. Returns
-// `null` when the file or the field is missing.
+// Read the skill version from a `SKILL.md` YAML frontmatter block. Lives under
+// `metadata.version` — the Agent Skills open-standard slot; Claude Code, the
+// SDK, and openclaw don't consume it, so it's ours alone. Deliberately tiny (no
+// YAML dependency): the indentation-tolerant match picks up the `version:` line
+// whether nested under `metadata:` or top-level. Returns `null` when the file
+// or field is missing.
 export async function readSkillVersion(skillMdPath: string): Promise<string | null> {
   const file = Bun.file(skillMdPath)
   if (!(await file.exists())) return null
   const text = await file.text()
   const fm = text.match(/^---\r?\n([\s\S]*?)\r?\n---/)
   if (!fm) return null
-  const m = fm[1].match(/^version:\s*["']?([^"'\s]+)["']?\s*$/m)
+  const m = fm[1].match(/^\s*version:\s*["']?([^"'\s]+)["']?\s*$/m)
   return m ? m[1] : null
 }
 
@@ -37,30 +40,30 @@ function parse(v: string): [number, number, number] {
   return [a || 0, b || 0, c || 0]
 }
 
-// True when `bundled` is a newer MINOR-or-major release than `installed`. Patch
-// bumps are intentionally silent — they don't change behavior worth surfacing,
-// and `moi skill update` brings them along on the next minor update anyway. A
-// missing `installed` counts as behind (legacy workspace, no stamp yet).
-export function isMinorBehind(installed: string | null, bundled: string | null): boolean {
+// True when `bundled` is a newer release than `installed`, comparing only the
+// first `depth` components (2 = minor-or-major, 3 = any incl. patch). A missing
+// `installed` counts as behind (legacy workspace, no stamp yet); a missing
+// `bundled` never does.
+function behind(installed: string | null, bundled: string | null, depth: number): boolean {
   if (!bundled) return false
   if (!installed) return true
-  const [ia, ib] = parse(installed)
-  const [ba, bb] = parse(bundled)
-  if (ba !== ia) return ba > ia
-  return bb > ib
+  const a = parse(installed)
+  const b = parse(bundled)
+  for (let i = 0; i < depth; i++) {
+    if (b[i] !== a[i]) return b[i] > a[i]
+  }
+  return false
 }
 
-// Any difference at all, patch included. Used to decide whether `moi skill
-// update` would change anything for status display.
-export function isBehind(installed: string | null, bundled: string | null): boolean {
-  if (!bundled) return false
-  if (!installed) return true
-  const [ia, ib, ic] = parse(installed)
-  const [ba, bb, bc] = parse(bundled)
-  if (ba !== ia) return ba > ia
-  if (bb !== ib) return bb > ib
-  return bc > ic
-}
+// Bundled is a MINOR-or-major release ahead — surfaced to the agent. Patch bumps
+// stay silent and ride along on the next minor update.
+export const isMinorBehind = (installed: string | null, bundled: string | null): boolean =>
+  behind(installed, bundled, 2)
+
+// Any difference at all, patch included — decides whether `moi skill update`
+// would change anything, for status display.
+export const isBehind = (installed: string | null, bundled: string | null): boolean =>
+  behind(installed, bundled, 3)
 
 // Skills shipped with this CLI — directory names under the bundled skills dir.
 export async function bundledSkillNames(): Promise<string[]> {

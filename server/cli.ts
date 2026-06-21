@@ -16,6 +16,7 @@ import { scaffoldMoiDir } from './moi-scaffold'
 import { type OpenClawAgent, discoverOpenClawAgents } from './openclaw'
 import { liftToWorkspaceRoot, registerWorkspace } from './registry'
 import {
+  type SkillStatus,
   isBehind,
   isMinorBehind,
   resolveWorkspaceRoot,
@@ -1132,39 +1133,44 @@ async function runSkillUpdate(cwd: string): Promise<void> {
   )
 }
 
-// `dir` is a `--dir` option, not a positional: `moi skill` carries subcommands
-// (update/install), and citty treats a bare positional as an unknown
-// subcommand. Reuses the shared `dirArg` spec; defaults to the current dir.
-const skillUpdate = defineCommand({
-  meta: {
-    name: 'update',
-    description: 'Update this workspace’s skills to the version shipped with the CLI'
-  },
-  args: { dir: dirArg },
-  async run({ args }) {
-    await runSkillUpdate(resolve(args.dir))
-  }
-})
+// Colored status label for one skill row: minor+ behind is actionable, a patch
+// gap is informational, otherwise current.
+function skillState(s: SkillStatus): string {
+  if (isMinorBehind(s.installed, s.bundled)) return pc.yellow('update available')
+  if (isBehind(s.installed, s.bundled)) return pc.dim('patch behind')
+  return pc.green('up to date')
+}
 
-// `install` is an alias of `update` — same operation, kept for naming symmetry
-// with how skills first land in a workspace.
-const skillInstall = defineCommand({
-  meta: { name: 'install', description: 'Alias for `moi skill update`' },
-  args: { dir: dirArg },
-  async run({ args }) {
-    await runSkillUpdate(resolve(args.dir))
-  }
-})
+// `update` and `install` are the same operation under two names (install kept
+// for symmetry with how skills first land in a workspace). `dir` is a `--dir`
+// option, not a positional: citty treats a bare positional on a command that
+// carries subcommands as an unknown subcommand. Reuses the shared `dirArg`.
+const defineSkillUpdate = (name: string, description: string) =>
+  defineCommand({
+    meta: { name, description },
+    args: { dir: dirArg },
+    async run({ args }) {
+      await runSkillUpdate(resolve(args.dir))
+    }
+  })
+
+const skillSubCommands = {
+  update: defineSkillUpdate(
+    'update',
+    'Update this workspace’s skills to the version shipped with the CLI'
+  ),
+  install: defineSkillUpdate('install', 'Alias for `moi skill update`')
+}
 
 const skill = defineCommand({
   meta: { name: 'skill', description: 'Show or update the workspace skills shipped with moi' },
-  subCommands: { update: skillUpdate, install: skillInstall },
+  subCommands: skillSubCommands,
   args: { dir: dirArg },
   async run({ args, rawArgs }) {
     // citty runs this parent handler even after dispatching a subcommand, so
     // bail when one was given — otherwise `moi skill update` also prints status.
     const sub = rawArgs.find(a => !a.startsWith('-'))
-    if (sub === 'update' || sub === 'install') return
+    if (sub && sub in skillSubCommands) return
 
     const root = await resolveWorkspaceRoot(resolve(args.dir))
     const statuses = await skillStatuses(root)
@@ -1173,15 +1179,12 @@ const skill = defineCommand({
     console.log(
       columns(
         ['skill', 'installed', 'bundled', 'status'].map(h => pc.dim(h)),
-        statuses.map(s => {
-          const minor = isMinorBehind(s.installed, s.bundled)
-          const state = minor
-            ? pc.yellow('update available')
-            : isBehind(s.installed, s.bundled)
-              ? pc.dim('patch behind')
-              : pc.green('up to date')
-          return [s.name, s.installed ?? pc.dim('—'), s.bundled ?? pc.dim('—'), state]
-        })
+        statuses.map(s => [
+          s.name,
+          s.installed ?? pc.dim('—'),
+          s.bundled ?? pc.dim('—'),
+          skillState(s)
+        ])
       )
     )
     if (statuses.some(s => isBehind(s.installed, s.bundled))) {
