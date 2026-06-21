@@ -1,6 +1,14 @@
 import type { ComponentType } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 
+import {
+  type AppletSegment,
+  appletKey,
+  appletUrl,
+  getCachedApplet,
+  invalidateApplet,
+  setCachedApplet
+} from '@/client/lib/applet-cache'
 import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
 
 import { type MeiEvent, useMeiEvent } from './useMeiEvents'
@@ -15,7 +23,7 @@ type AppletState =
 // cache-busting — is shared. An applet is an agent-authored UI unit loaded as an
 // ESM module and mounted into the workspace.
 type AppletKind = {
-  segment: 'widgets' | 'views'
+  segment: AppletSegment
   // True when this MEI event means the named applet should cache-bust + reload.
   shouldReload: (event: MeiEvent, name: string) => boolean
 }
@@ -31,37 +39,24 @@ const VIEW_KIND: AppletKind = {
   shouldReload: (e, name) => e.type === 'view:updated' && e.name === name
 }
 
-const moduleCache = new Map<string, Promise<ComponentType>>()
-let version = 0
-
 function loadApplet(
-  kind: AppletKind,
+  segment: AppletSegment,
   workspaceId: string,
-  name: string,
-  bust: boolean
+  name: string
 ): Promise<ComponentType> {
-  // Namespace the cache key by kind so a widget and a view sharing a name don't
-  // collide on the same entry.
-  const key = `${kind.segment}/${workspaceId}/${name}`
-  if (bust) {
-    moduleCache.delete(key)
-    version++
-  }
-
-  const existing = moduleCache.get(key)
+  const key = appletKey(segment, workspaceId, name)
+  const existing = getCachedApplet(key) as Promise<ComponentType> | undefined
   if (existing) return existing
 
-  // Import the bundle dir's `index.js`; assets + chunks resolve module-relative
-  // from there (via import.meta.url). Cache-busting query so the browser fetches
-  // fresh — `?v` is dropped by relative asset resolution, so assets aren't
-  // re-fetched needlessly (they're content-hashed anyway).
-  const url = `/api/workspaces/${workspaceId}/${kind.segment}/${name}/index.js?v=${version}`
-  const promise = import(/* @vite-ignore */ url).then(mod => {
+  // Import the bundle dir's `index.js` at its current `?v`; the version is bumped
+  // (and this entry dropped) by `invalidateApplet` on every rebuild — including
+  // while this applet is unmounted — so a backgrounded tab never serves stale.
+  const promise = import(/* @vite-ignore */ appletUrl(segment, workspaceId, name)).then(mod => {
     if (!mod.default) throw new Error(`"${name}" has no default export`)
     return mod.default as ComponentType
   })
 
-  moduleCache.set(key, promise)
+  setCachedApplet(key, promise)
   return promise
 }
 
@@ -69,29 +64,32 @@ function useApplet(kind: AppletKind, name: string): AppletState {
   const workspaceId = useWorkspaceId()
   const [state, setState] = useState<AppletState>({ status: 'loading', version: 0 })
 
-  const load = useCallback(
-    (bust = false) => {
-      setState(prev => ({ status: 'loading', version: prev.version }))
-      loadApplet(kind, workspaceId, name, bust)
-        .then(Component =>
-          setState(prev => ({ status: 'ready', Component, version: prev.version + 1 }))
-        )
-        .catch(err =>
-          setState(prev => ({ status: 'error', error: String(err), version: prev.version + 1 }))
-        )
-    },
-    [kind, workspaceId, name]
-  )
+  const load = useCallback(() => {
+    setState(prev => ({ status: 'loading', version: prev.version }))
+    loadApplet(kind.segment, workspaceId, name)
+      .then(Component =>
+        setState(prev => ({ status: 'ready', Component, version: prev.version + 1 }))
+      )
+      .catch(err =>
+        setState(prev => ({ status: 'error', error: String(err), version: prev.version + 1 }))
+      )
+  }, [kind.segment, workspaceId, name])
 
   useEffect(() => {
     load()
   }, [load])
 
-  // Reload when the server says this bundle was updated, OR (widgets only) when
-  // the agent triggered a global data refresh (`moi refresh`). Both cache-bust
-  // the import URL so the component remounts and its `rpc()` calls re-run.
+  // Reload the MOUNTED applet the moment the server says its bundle changed (or,
+  // widgets only, `moi refresh`). Invalidate first so we don't re-read a stale
+  // cache entry — `useAppletCacheInvalidation` may already have done so for the
+  // unmounted case, but doing it here keeps this self-sufficient and
+  // order-independent. The bumped version remounts the component and re-runs its
+  // `rpc()` calls.
   useMeiEvent(event => {
-    if (kind.shouldReload(event, name)) load(true)
+    if (kind.shouldReload(event, name)) {
+      invalidateApplet(kind.segment, workspaceId, name)
+      load()
+    }
   })
 
   return state
@@ -103,4 +101,17 @@ export function useWidget(name: string): AppletState {
 
 export function useView(name: string): AppletState {
   return useApplet(VIEW_KIND, name)
+}
+
+// Mount once per workspace (in the workspace route). Invalidates the shared
+// applet module cache on every `*:updated` event, regardless of what's currently
+// mounted — so an applet edited while its tab is backgrounded is fetched fresh on
+// the next mount instead of served stale. The per-applet listener above only
+// fires while that applet is on screen; this covers the (common) rest.
+export function useAppletCacheInvalidation(): void {
+  const workspaceId = useWorkspaceId()
+  useMeiEvent(event => {
+    if (event.type === 'view:updated') invalidateApplet('views', workspaceId, event.name)
+    else if (event.type === 'widget:updated') invalidateApplet('widgets', workspaceId, event.name)
+  })
 }

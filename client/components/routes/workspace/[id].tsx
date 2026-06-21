@@ -45,7 +45,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/client/components/ui/tooltip";
 import { WorkspaceSettings } from "@/client/components/settings/WorkspaceSettings";
 import { useChat } from "@/client/hooks/useChat";
-import { useView } from "@/client/hooks/useApplet";
+import { useAppletCacheInvalidation, useView } from "@/client/hooks/useApplet";
 import { useFitsSidebar } from "@/client/hooks/useFitsSidebar";
 import { useGridReconcile } from "@/client/hooks/useGridReconcile";
 import { useMeiEvent } from "@/client/hooks/useMeiEvents";
@@ -94,6 +94,11 @@ function WorkspaceLoader({ id }: WorkspaceLoaderProps) {
   // Keep the grid balanced as widgets come and go. (Theme is applied inside
   // WorkspaceView, scoped to the panel — see useWorkspaceTheme there.)
   useGridReconcile(id, widgets.data, layout, setLayout);
+
+  // Invalidate the shared applet module cache on every rebuild, even for views /
+  // widgets whose tab is currently backgrounded — so switching to them later
+  // loads the fresh bundle instead of a stale cached module.
+  useAppletCacheInvalidation();
 
   // Server-pushed changes invalidate the matching query so the next render
   // revalidates (theme re-applies; the grid reconcile places any new widget).
