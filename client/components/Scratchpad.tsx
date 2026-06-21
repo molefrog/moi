@@ -38,6 +38,7 @@ import {
   IconTypography
 } from '@tabler/icons-react'
 
+import { useScratchpad } from '@/client/api/workspaces'
 import { cn } from '@/client/lib/cn'
 import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
 import { setScratchExecutor } from '@/client/lib/scratch-executor'
@@ -610,10 +611,12 @@ export function Scratchpad() {
   // listeners fire on the next frame, not synchronously, so a timer-based clear
   // would race — consuming it in the listener is timing-independent.)
   const applyingRemote = useRef(false)
-  const [loaded, setLoaded] = useState(false)
   // Reactive handle to the mounted editor, used to render the custom tool bar.
   const [editor, setEditor] = useState<Editor | null>(null)
-  const initialSnapshot = useRef<Partial<TLEditorSnapshot> | undefined>(undefined)
+  // Initial canvas snapshot, fetched fresh per mount (tldraw's store owns it after).
+  // `isPending` gates the placeholder and, on workspace switch, forces tldraw to
+  // remount with the new snapshot. See useScratchpad — not RQ-cached by design.
+  const { data: scratchpad, isPending } = useScratchpad(workspaceId)
 
   const save = useCallback(() => {
     const editor = editorRef.current
@@ -629,26 +632,6 @@ export function Scratchpad() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ document, origin: ORIGIN_ID })
     }).catch(() => {})
-  }, [workspaceId])
-
-  // Hydrate once per workspace. `document: null` → start with an empty canvas.
-  useEffect(() => {
-    let cancelled = false
-    setLoaded(false)
-    initialSnapshot.current = undefined
-    fetch(`/api/workspaces/${workspaceId}/scratchpad`)
-      .then(r => r.json())
-      .then((d: { document: TLEditorSnapshot['document'] | null }) => {
-        if (cancelled) return
-        if (d?.document) initialSnapshot.current = { document: d.document }
-        setLoaded(true)
-      })
-      .catch(() => {
-        if (!cancelled) setLoaded(true)
-      })
-    return () => {
-      cancelled = true
-    }
   }, [workspaceId])
 
   // A remote save (another tab, or an agent draw landing in another tab) — pull
@@ -733,13 +716,13 @@ export function Scratchpad() {
     [workspaceId, save]
   )
 
-  if (!loaded) return <div className="min-h-0 flex-1 bg-muted/40" />
+  if (isPending) return <div className="min-h-0 flex-1 bg-muted/40" />
 
   return (
     <div ref={rootRef} className="relative min-h-0 flex-1 overflow-hidden">
       <div className="absolute inset-0">
         <Tldraw
-          snapshot={initialSnapshot.current}
+          snapshot={scratchpad?.document ? { document: scratchpad.document } : undefined}
           licenseKey={LICENSE_KEY}
           onMount={onMount}
           components={SCRATCH_COMPONENTS}

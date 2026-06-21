@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { TLEditorSnapshot } from 'tldraw'
 
 import { applyEvents } from '@/lib/format'
 import type {
@@ -33,6 +34,7 @@ export const workspaceKeys = {
   all: ['workspaces'] as const,
   discover: ['workspaces', 'discover'] as const,
   preview: (id: string) => ['workspaces', 'preview', id] as const,
+  scratchpad: (id: string) => ['workspaces', 'scratchpad', id] as const,
   layout: (id: string) => ['workspaces', 'layout', id] as const,
   widgets: (id: string) => ['workspaces', 'widgets', id] as const,
   views: (id: string) => ['workspaces', 'views', id] as const,
@@ -69,6 +71,25 @@ export function useWorkspacePreview(workspaceId: string) {
     queryKey: workspaceKeys.preview(workspaceId),
     queryFn: () => fetch(`/api/workspaces/${workspaceId}/preview`).then(r => r.json()),
     staleTime: 60_000
+  })
+}
+
+// `/api/workspaces/:id/scratchpad` payload: a tldraw document snapshot, or `null`
+// for an empty canvas.
+export type ScratchpadResponse = { document: TLEditorSnapshot['document'] | null }
+
+// Hydration snapshot for the Scratchpad canvas. Deliberately *not* cached like the
+// other resources: once mounted, tldraw's own store owns the canvas, so all this
+// query does is seed a fresh snapshot per mount. `gcTime: 0` drops it the moment the
+// canvas unmounts (one consumer — nothing to share), so every (re)mount re-reads
+// disk; `staleTime: Infinity` then suppresses background refetches that tldraw would
+// ignore anyway. Live updates arrive via the MEI `scratchpad:updated` event, not RQ.
+export function useScratchpad(workspaceId: string) {
+  return useQuery<ScratchpadResponse>({
+    queryKey: workspaceKeys.scratchpad(workspaceId),
+    queryFn: () => fetch(`/api/workspaces/${workspaceId}/scratchpad`).then(r => r.json()),
+    staleTime: Infinity,
+    gcTime: 0
   })
 }
 
