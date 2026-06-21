@@ -1,8 +1,6 @@
 ---
 name: moi-workspace
 description: The moi workspace — the web UI the user chats from, extended with agent-authored applets (widgets, views) plus theme & config. Read this FIRST in two cases. (a) A message carries hidden <moi>…</moi> meta tags: it was fired from a moi workspace, so you are running inside one even if nothing else says so. (b) The user uses moi vocab — workspace, applet, widget, view, scratchpad, dashboard, or a `moi` command — or asks to build, edit, customize, or theme the workspace UI or its layout.
-metadata:
-  version: 0.1.0
 ---
 
 # Workspace
@@ -246,3 +244,6 @@ export const config = {
 
 The inverse of a widget: a view **owns its whole page** — its own `h-full w-full` layout, scrolling
 (`overflow-auto`), padding, and chrome. Build it to read like an app screen. See `VIEW-DESIGN.md`.
+
+<!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
+<moi-skill version="0.1.0" />
