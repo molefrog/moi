@@ -25,8 +25,11 @@ export type ScratchShape = {
   src?: string
 }
 
+// The snapshot is a hidden dotfile (like `.moi/.workspace.json`): it's moi-internal
+// state, and the agent must read it only through `moi scratch read`, never by
+// opening the file.
 export function getScratchpadPath(workspacePath: string): string {
-  return join(workspacePath, '.moi', 'scratchpad.json')
+  return join(workspacePath, '.moi', '.scratchpad.json')
 }
 
 export async function loadScratchpadDoc(workspacePath: string): Promise<ScratchpadSnapshot> {

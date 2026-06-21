@@ -99,7 +99,7 @@ describe('executeScratchOp (headless)', () => {
     ).rejects.toThrow(/ghost/)
   })
 
-  test('persists nothing but a single scratchpad.json under .moi', async () => {
+  test('persists nothing but a single .scratchpad.json under .moi', async () => {
     await run({ kind: 'add-rect', name: 'box', x: 0, y: 0, w: 10, h: 10 })
     expect(await Bun.file(getScratchpadPath(WS)).exists()).toBe(true)
   })

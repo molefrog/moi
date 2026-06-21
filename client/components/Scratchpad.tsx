@@ -594,7 +594,7 @@ function ScratchStyleBar({ editor }: ScratchStyleBarProps) {
 }
 
 // The Scratchpad surface: a real tldraw editor, hydrated from and autosaved to
-// `.moi/scratchpad.json` via REST. One canvas shared by the user and the agent —
+// `.moi/.scratchpad.json` via REST. One canvas shared by the user and the agent —
 // the agent reaches it through `moi scratch` (relayed ops execute here). See
 // docs/moi-scratchpad.md.
 export function Scratchpad() {

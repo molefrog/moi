@@ -86,7 +86,7 @@ doesn't need that tab open to draw: every `moi scratch` op except `view` runs ag
 snapshot, either by parsing it (`read`) or by replaying it through a **headless tldraw store**
 on the server (the mutations). Only `view` — rendering pixels — genuinely requires the browser.
 
-- **Persistence.** `.moi/scratchpad.json` holds a tldraw document snapshot (owned by moi — not
+- **Persistence.** `.moi/.scratchpad.json` holds a tldraw document snapshot (owned by moi — not
   hand-edited). The browser autosaves it ~500ms after you stop drawing; the server writes it
   after each agent mutation. Either writer publishes a "canvas updated" signal, and every open
   tab reloads from disk, so all viewers converge.
@@ -121,7 +121,7 @@ on the server (the mutations). Only `view` — rendering pixels — genuinely re
 Lean on what's already here rather than inventing plumbing. The canvas is a `<Tldraw>` mounted
 in the existing Scratchpad slot; add `tldraw` as a dep (pin a React-19-compatible version) and
 load its CSS. The server side mirrors the widget pattern — a small disk module for
-`.moi/scratchpad.json` (like `layout.ts`), `GET`/`PUT` routes for the snapshot, the `moi scratch`
+`.moi/.scratchpad.json` (like `layout.ts`), `GET`/`PUT` routes for the snapshot, the `moi scratch`
 CLI hung off the control port next to `bundle`/`config`, and the existing MEI pub/sub for the
 "canvas updated" nudge. Persist the snapshot's `document` only (drop the per-tab `session`), and
 autosave off `store.listen({ source: 'user' })` so remote reloads don't echo. Build it in slices:
