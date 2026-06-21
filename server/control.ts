@@ -4,7 +4,7 @@ import { CONTROL_PORT } from './constants'
 import { processIcon } from './icon'
 import { loadLayout, saveLayout } from './layout'
 import { publishEvent } from './events'
-import { listWorkspaces, registerWorkspace } from './registry'
+import { findWorkspaceForPath, listWorkspaces, registerWorkspace } from './registry'
 import { readScratchpadShapes } from './scratchpad'
 import { relayScratchOp } from './scratchpad-relay'
 import { broadcastAll } from './state'
@@ -47,24 +47,43 @@ export const control = Bun.serve({
             ws.send(JSON.stringify({ error: 'No workspaces registered' }))
             return
           }
-          const workspacePath = String(data.path ?? workspaces[0].path)
+          // Resolve the requested path (the CLI sends the CWD) to the registered
+          // workspace that contains it — itself or its nearest ancestor — so
+          // `moi bundle` works from `.moi/` or any subdirectory and never targets
+          // a phantom nested `.moi/.moi`. Fail loudly when it's nowhere near a
+          // registered workspace instead of silently no-op'ing.
+          const reqPath = resolve(String(data.path ?? workspaces[0].path))
+          const match = findWorkspaceForPath(workspaces, reqPath)
+          if (!match) {
+            ws.send(
+              JSON.stringify({
+                error: `${reqPath} is not inside a registered moi workspace. Open it in moi, or run from the workspace root.`
+              })
+            )
+            return
+          }
+          const workspacePath = match.path
           const force = !!data.force
           // `only` narrows to one kind; default builds both. Results carry a
           // `kind` so the CLI can label each row.
           const only = data.only === 'widgets' || data.only === 'views' ? data.only : undefined
-          const out: { kind: 'widget' | 'view'; name: string; status: string; error?: string }[] =
-            []
+          const results: {
+            kind: 'widget' | 'view'
+            name: string
+            status: string
+            error?: string
+          }[] = []
           if (only !== 'views') {
             for (const r of await handleBundle(publishEvent, workspacePath, force)) {
-              out.push({ kind: 'widget', name: r.name, status: r.status, error: r.error })
+              results.push({ kind: 'widget', name: r.name, status: r.status, error: r.error })
             }
           }
           if (only !== 'widgets') {
             for (const r of await handleBundleViews(publishEvent, workspacePath, force)) {
-              out.push({ kind: 'view', name: r.name, status: r.status, error: r.error })
+              results.push({ kind: 'view', name: r.name, status: r.status, error: r.error })
             }
           }
-          ws.send(JSON.stringify(out))
+          ws.send(JSON.stringify({ ok: true, workspacePath, results }))
           return
         }
 

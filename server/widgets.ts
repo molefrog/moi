@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+
 import type { WidgetConfig, WidgetInfo } from '@/lib/types'
 
 import { buildApplets, getAppletPaths, listBuilt, serveApplet } from './applets'
@@ -48,7 +50,13 @@ export async function buildAllWidgets(
   for (const key of Object.keys(manifest)) {
     if (!names.includes(key)) delete manifest[key]
   }
-  await writeManifest(workspacePath, manifest)
+  // Persist only when there's a build dir to hold the manifest. `buildApplets`
+  // creates it only when ≥1 source exists; skipping the write here keeps a
+  // workspace with no widgets a true no-op on disk (no scaffolded `.build/`),
+  // while a previously-built workspace whose sources were all deleted still gets
+  // its emptied manifest rewritten.
+  const { buildDir } = getAppletPaths(workspacePath, 'widget')
+  if (existsSync(buildDir)) await writeManifest(workspacePath, manifest)
 
   const builtCount = results.filter(r => r.status === 'built').length
   const failed = results.filter(r => r.status === 'failed')

@@ -1,6 +1,6 @@
 # Bug: `moi bundle` silently no-ops from the wrong directory
 
-**Status:** open · diagnosed 2026-06-19 (from the Faroe Lightroom workspace thread)
+**Status:** fixed 2026-06-21 · diagnosed 2026-06-19 (from the Faroe Lightroom workspace thread)
 **Severity:** high — agents/users "build" repeatedly while nothing rebuilds, and it
 scaffolds a junk nested `.moi/.moi/` directory.
 
@@ -19,10 +19,10 @@ the workspace root.
 ## Root cause
 
 `moi bundle [DIR]` defaults `DIR` to `.` and sends `path = resolve(args.dir)` (the CWD)
-to the server (`server/cli.ts:301`). The control handler uses that path **directly as
+to the server (`server/cli.ts`). The control handler used that path **directly as
 the workspace root, with no validation** (`server/control.ts`, bundle branch:
 `workspacePath = String(data.path ?? workspaces[0].path)`), and `getAppletPaths` blindly
-joins `.moi` onto it (`server/applets.ts:34-40`):
+joins `.moi` onto it (`server/applets.ts`):
 
 ```ts
 const moiRoot = join(workspacePath, '.moi') // <path>/.moi
@@ -30,72 +30,145 @@ const sourceDir = join(moiRoot, 'views') // <path>/.moi/views
 const buildDir = join(moiRoot, '.build', 'views') // <path>/.moi/.build/views
 ```
 
-Run from inside `.moi/`, `workspacePath = <ws>/.moi`, so it targets the **phantom nested**
+Run from inside `.moi/`, `workspacePath = <ws>/.moi`, so it targeted the **phantom nested**
 `<ws>/.moi/.moi/views` (no sources) and `<ws>/.moi/.moi/.build/views`.
 
 The failure chain:
 
-1. **Silent false success** — no sources → empty table, **exit 0**. Looks like it worked.
-2. **Junk scaffold** — `buildApplets` runs `mkdir(buildDir, {recursive:true})`
-   _unconditionally_ (`server/applets.ts:334`), creating the nested `.moi/.moi/.build/`.
-3. The real build (`<ws>/.moi/.build/views/<name>`) is never touched → stays stale; the
-   open view keeps showing the old bundle.
+1. **Silent false success** — no sources → empty table, **exit 0**. Looked like it worked.
+2. **Junk scaffold** — `buildApplets` ran `mkdir(buildDir, {recursive:true})`
+   _unconditionally_, creating the nested `.moi/.moi/.build/`.
+3. The real build (`<ws>/.moi/.build/views/<name>`) was never touched → stayed stale; the
+   open view kept showing the old bundle.
 
-Inconsistency: the sibling `moi scratch` control handler _does_ validate the path
+Inconsistency: the sibling `moi scratch` control handler _did_ validate the path
 (`workspaces.find(w => w.path === path)` → errors `No workspace registered at ${path}`).
-`bundle` skips that check.
+`bundle` skipped that check.
 
-## Contributing issues
+## Fix (implemented)
 
-- **Empty discovery reads as success** — zero applets prints an empty table and exits 0
-  with no warning, masking both "wrong dir" and "not a workspace".
-- **No auto-rebundle ("forgot to rebundle")** — the dev supervisor watches only `server/`
-  - `lib/` (`server/cli.ts:122`); Bun HMR covers `client/` but **not** workspace
-    `.moi/views` / `.moi/widgets`. Every applet edit needs a manual `moi bundle`, with no
-    signal that the build is now stale. (Live-refresh itself works: `handleBundleViews`
-    publishes `view:updated` / `view-layout:updated`, `server/views.ts:151,162`.)
+1. **Resolve to the real workspace root.** `findWorkspaceForPath` (`server/registry.ts`)
+   maps the requested path to the registered workspace that contains it — itself or its
+   nearest registered ancestor (longest matching prefix, git-style). The bundle control
+   handler (`server/control.ts`) uses it, so `moi bundle` works from `.moi/` or any
+   subdirectory, and **fails loudly** when the path is nowhere near a registered
+   workspace:
 
-## Proposed fix
-
-1. **Resolve to the real workspace root** (the actual bug). In the bundle control handler,
-   resolve the requested path to the registered workspace it lives in — match the path or
-   its nearest ancestor (git-style), error clearly otherwise:
-
-   ```ts
-   const reqPath = resolve(String(data.path ?? '.'))
-   const ws = workspaces.find(w => reqPath === w.path || reqPath.startsWith(w.path + sep))
-   if (!ws) {
-     send({
-       error: `${reqPath} is not inside a registered moi workspace — open it in moi, or run from the workspace root.`
-     })
-     return
-   }
-   // bundle ws.path
+   ```
+   Error: /tmp is not inside a registered moi workspace. Open it in moi, or run from the workspace root.
    ```
 
-   Makes `moi bundle` work from `.moi/` or any subdirectory, and fail loudly when it's
-   nowhere near a workspace.
+   The handler now replies with `{ ok, workspacePath, results }` (or `{ error }`); the CLI
+   prints the error and exits non-zero instead of silently swallowing a non-array reply.
 
-2. **Don't fake success / don't scaffold junk** — if discovery finds 0 sources, warn and
-   exit non-zero; only `mkdir(buildDir)` after ≥1 source is found.
+2. **Don't fake success / don't scaffold junk.** `buildApplets` (`server/applets.ts`)
+   only `mkdir`s the build dir when ≥1 source exists (it still prunes an existing one when
+   every source was deleted). The per-kind manifest write (`server/widgets.ts`,
+   `server/views.ts`) is gated on the build dir existing — so a workspace with **no**
+   widgets/views is a true on-disk no-op. The CLI reports it plainly:
 
-3. **Auto-rebundle in dev** (closes "forgot to rebundle") — a `moi bundle --watch`, or have
-   the dev supervisor watch each registered workspace's `.moi/views` + `.moi/widgets` and
-   debounce-rebuild on change (the refresh-event plumbing already exists).
+   ```
+   moi bundle — nothing to build
+
+     No widgets or views found in <ws>/.moi/
+   ```
+
+3. **Tests** cover the resolution (`server/registry.test.ts` → `findWorkspaceForPath`:
+   root, subdir, nested-nearest-ancestor, prefix-not-boundary, empty registry) and the
+   no-scaffold/prune behavior (`server/test/applets.test.ts`).
+
+Verified end-to-end against a scratch workspace: bundle from the root, from inside
+`.moi/`, and from a deep subdirectory all target the real root (no `.moi/.moi`);
+staleness, `--force`, `--only`, prune-on-delete, the unrelated-dir error, and the empty
+workspace all behave as above.
+
+## CLI output: plain tabular mode
+
+`moi bundle` (and `moi theme`, `moi openclaw`) rendered with `cli-table3`, which colors
+its borders/headers **unconditionally** — even into a pipe. An agent capturing
+`moi bundle 2>&1` got literal `[90m`/`[31m` escape noise instead of a table. These now use
+a borderless, alignment-only renderer (`server/cli-ui.ts`: `columns`, `keyValue`) that
+looks the same on a TTY or a pipe, matching the `moi config` style. Colors are applied
+only via picocolors (which no-ops off-TTY, so they never reach the agent). `cli-table3`
+was dropped from `package.json`.
 
 ## Cleanup
 
-Remove the stray nested dir the misfires created:
+If you hit this before the fix, remove the stray nested dir the misfires created:
 
 ```sh
-rm -rf /Users/molefrog/git/faroe-lightroom/.moi/.moi
+rm -rf <workspace>/.moi/.moi
 ```
+
+---
+
+# Review: the bundle cache & event model
+
+## How a bundle flows
+
+1. **CLI → control** (`server/cli.ts` → `server/control.ts`): `moi bundle` sends
+   `{ type:'bundle', path, force, only }` over the control WebSocket. The handler resolves
+   `path` to the owning workspace and calls `handleBundle` (widgets) + `handleBundleViews`
+   (views).
+2. **Kind-agnostic core** (`buildApplets`, `server/applets.ts`):
+   - `scanSources` lists `.moi/<kind>/*.tsx|*.ts` (minus `*.server.ts`).
+   - `pruneStaleBuilds` drops build dirs whose source is gone (and sweeps legacy flat
+     `<name>.js`).
+   - `needsRebuild` decides staleness per entry; stale entries compile through
+     `buildApplet` (Bun.build) into `.build/<kind>/<name>/{index.js, chunk-*.js, assets}`.
+3. **Per-kind wrap-up** (`server/widgets.ts`, `server/views.ts`): update the manifest
+   (`config`; views also keep a first-seen `order`), reload changed server modules, and
+   publish live events.
+
+## The cache (staleness) model
+
+It is **file-mtime based, per entry** — no content hashing, no sidecar cache file. An
+entry rebuilds when its built `index.js` is missing, or when the source — or any
+`.server.ts` / asset it **directly** imports — has an mtime `>=` the built entry's
+(`needsRebuild`). `--force` ignores mtimes entirely.
+
+- **Good:** zero extra state, survives restarts, trivially correct for the common
+  "edit a widget, rebundle" loop.
+- **Blind spot — transitive deps.** `needsRebuild` only scans the _entry source_ for
+  `.server.ts` and asset imports (`scanServerImports` / `scanAssetImports`). A shared
+  helper imported by the entry (a plain local `.ts` that's neither a `.server.ts` nor an
+  asset), or a file imported _by_ a `.server.ts`, is **not** tracked — editing it won't
+  mark the entry stale, so you need `--force`. A content-hash of the full input graph (or
+  walking Bun.build's module graph) would close this.
+- mtime comparison is `>=`, so same-second edits err toward rebuilding (safe).
+
+## The event model
+
+`publishEvent` (`server/events.ts`) broadcasts JSON over the `/api/workspaces/ws` pub/sub
+topic to every connected browser — fire-and-forget, no ack; with no browser connected the
+event is simply dropped (the next page load reads fresh bundles off disk). On a bundle:
+
+- `widget:updated` / `view:updated` per built applet → the client cache-busts and
+  re-imports that module (no page reload).
+- `widget-layout:updated` / `view-layout:updated` only when membership / config / order
+  changed → the client refetches the layout list.
+- Changed `.server.ts` modules → `reloadModules` hot-swaps code **inside** the live
+  functions worker (distinct from `restartWorker`, which fully respawns on an env change).
+
+## What could be done differently
+
+1. **Auto-rebundle in dev (the "forgot to rebundle" gap).** The dev supervisor watches
+   only `server/` + `lib/` (`server/cli.ts`); Bun HMR covers `client/` but **not**
+   workspace `.moi/views` / `.moi/widgets`. Every applet edit needs a manual `moi bundle`,
+   with no signal the build is now stale. A `moi bundle --watch` (or having the server
+   watch each registered workspace's source dirs and debounce-rebuild) would close it —
+   the refresh-event plumbing above already exists, so the browser would update on its own.
+2. **Track transitive inputs** so shared-helper edits invalidate dependents without
+   `--force` (see the staleness blind spot).
+3. **Unify path resolution.** `moi scratch` still validates an _exact_ path match;
+   it could reuse `findWorkspaceForPath` so it, too, works from a subdirectory.
 
 ## Code references
 
-- `server/cli.ts:301` — `bundle` sends `path = resolve(args.dir)` (the CWD).
-- `server/cli.ts:122` — dev supervisor watches only `server/` + `lib/`.
-- `server/control.ts` — bundle branch uses `data.path` unvalidated (vs. `scratch` which validates).
-- `server/applets.ts:34-40` — `getAppletPaths` joins `.moi` onto the given path.
-- `server/applets.ts:334` — `buildApplets` `mkdir(buildDir)` unconditionally.
-- `server/views.ts:151,162` — view live-refresh events (these work).
+- `server/registry.ts` — `findWorkspaceForPath` (path → owning workspace).
+- `server/control.ts` — bundle branch: resolves the workspace, replies `{ ok, workspacePath, results }`.
+- `server/applets.ts` — `getAppletPaths`, `needsRebuild` (mtime cache), `buildApplets` (guarded `mkdir`).
+- `server/widgets.ts` / `server/views.ts` — manifest write gated on build-dir existence; live events.
+- `server/cli.ts` — `bundle` command (plain tabular output, error handling).
+- `server/cli-ui.ts` — `columns` / `keyValue` plain-text renderers.
+- `server/events.ts` — `publishEvent` (server→browser live events).

@@ -1,7 +1,7 @@
 import envPaths from 'env-paths'
 import { mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join, resolve } from 'path'
+import { join, resolve, sep } from 'path'
 
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
@@ -91,6 +91,22 @@ export async function removeWorkspace(id: string): Promise<boolean> {
 export async function listWorkspaces(): Promise<WorkspaceEntry[]> {
   const entries = await readRegistry()
   return entries.map(withDisplayPath)
+}
+
+// Resolve a path to the registered workspace that *contains* it: the entry
+// whose path equals `reqPath` or is its nearest ancestor (longest matching
+// prefix, git-style). This lets workspace-scoped commands (e.g. `moi bundle`)
+// run from `.moi/` or any subdirectory and still target the real root, instead
+// of treating the CWD as a workspace and scaffolding a phantom nested `.moi/`.
+// Returns null when the path is not inside any registered workspace.
+export function findWorkspaceForPath<T extends { path: string }>(
+  workspaces: T[],
+  reqPath: string
+): T | null {
+  const normal = resolve(reqPath)
+  const matches = workspaces.filter(w => normal === w.path || normal.startsWith(w.path + sep))
+  if (matches.length === 0) return null
+  return matches.reduce((best, w) => (w.path.length > best.path.length ? w : best))
 }
 
 // Discover CC-active directories not yet in the registry
