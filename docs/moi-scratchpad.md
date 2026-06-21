@@ -68,8 +68,10 @@ moi scratch clear                           # wipe the whole canvas
   The agent's options deliberately match what the user can pick by hand — neither surface can
   make something the other can't.
 - `add image <path>` embeds a local image file. The server **resizes it to fit the canvas** —
-  `--quality lo` (default, long side ≤1024px) or `hi` (≤2048px) — re-encoding to WebP so a 10MB
-  paste never lands on the canvas whole. EXIF orientation is baked in; images are never enlarged.
+  `--quality lo` (default, long side ≤768px) or `hi` (≤2048px) — re-encoding to WebP so a 10MB
+  paste never lands on the canvas whole. `lo` keeps the constantly-rewritten snapshot light and
+  is well within Claude's vision budget; reach for `hi` only when fine detail (e.g. screenshot
+  text) matters. EXIF orientation is baked in; images are never enlarged.
 - `clear` deletes every shape on the canvas in one shot.
 - Coordinates are tldraw canvas space (origin top-left, y down).
 

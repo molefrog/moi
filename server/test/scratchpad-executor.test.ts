@@ -117,8 +117,8 @@ describe('executeScratchOp (headless)', () => {
 
     expect(await assertLoadable()).toBe(1)
     const shape = (await readScratchpadShapes(WS)).find(s => s.id === 'pic')
-    // Default 'lo' caps the long side at 1024, aspect preserved (2:1 → 1024×512).
-    expect(shape).toMatchObject({ type: 'image', x: 40, y: 50, w: 1024, h: 512 })
+    // Default 'lo' caps the long side at 768, aspect preserved (2:1 → 768×384).
+    expect(shape).toMatchObject({ type: 'image', x: 40, y: 50, w: 768, h: 384 })
     // read omits the blob; read-image returns the actual (re-encoded webp) data URL.
     expect(shape?.src).toBe('base64:omitted')
     const img = await readScratchpadImage(WS, 'pic')
