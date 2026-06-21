@@ -114,16 +114,6 @@ documentation. Call `moi` in the `.moi` folder.
 
 For more options, commands, use `moi help`.
 
-## Keeping the skill current
-
-This skill is shipped with the `moi` CLI and copied into the workspace. When the CLI is upgraded, the
-copy here can fall behind. `moi` commands surface this: if you ever see a line like
-`⚠ moi skill outdated: moi-workspace (… → …) — run \`moi skill update\` to refresh.` in command
-output, run `moi skill update` to bring this skill up to date. The update only rewrites the bundled
-skill files — your `.moi` applets, deps, and config are untouched. Changes take effect the next time
-the skill is loaded (a new session or next invocation), not mid-task, so finish what you're doing
-first. Only minor+ updates are surfaced; patch differences are pulled in silently on the next update.
-
 # Critical constraints when interacting with moi
 
 - Never read or modify files outside the `.moi` directory, unless the user explicitly asks. If you
@@ -244,6 +234,14 @@ export const config = {
 
 The inverse of a widget: a view **owns its whole page** — its own `h-full w-full` layout, scrolling
 (`overflow-auto`), padding, and chrome. Build it to read like an app screen. See `VIEW-DESIGN.md`.
+
+# Keeping this skill current
+
+This skill is installed with moi (via the CLI or the UI) and can fall behind when the moi CLI updates.
+
+- **You'll know** — `moi` commands print a `⚠ moi skill outdated …` line.
+- **To update** — run `moi skill update`. Never mid-task: finish first, or do it at the end (changes apply on the next skill load).
+- **Then** — if you updated, tell the user. If unsure whether you should, ask first, casually: "btw, a newer moi skill is available — want me to update it?"
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
 <moi-skill version="0.1.0" />
