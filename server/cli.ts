@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import './cli-colors' // must precede citty: sets NO_COLOR before its color flag is computed
 import { defineCommand, runMain, showUsage } from 'citty'
 import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
