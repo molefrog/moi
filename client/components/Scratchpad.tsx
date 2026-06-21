@@ -19,11 +19,9 @@ import {
   DefaultVerticalAlignStyle,
   GeoShapeGeoStyle,
   Tldraw,
-  createShapeId,
   getSnapshot,
   loadSnapshot,
-  react,
-  toRichText
+  react
 } from 'tldraw'
 import 'tldraw/tldraw.css'
 import { motion } from 'motion/react'
@@ -44,7 +42,7 @@ import { cn } from '@/client/lib/cn'
 import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
 import { setScratchExecutor } from '@/client/lib/scratch-executor'
 import { type MeiEvent, useMeiEvent } from '@/client/hooks/useMeiEvents'
-import type { ScratchOp, ScratchOpResult, ScratchStyle } from '@/lib/types'
+import type { ScratchOp, ScratchOpResult } from '@/lib/types'
 
 // Identifies this tab's writes so it can ignore the `scratchpad:updated` echo of
 // its own save (see the MEI reload below). Per page load.
@@ -59,137 +57,23 @@ const AUTOSAVE_MS = 500
 // tldraw's default unlicensed watermark. See docs/moi-scratchpad.md.
 const LICENSE_KEY = process.env.PUBLIC_TLDRAW_LICENSE_KEY || undefined
 
-// Map a relayed op onto the tldraw Editor API. Shape names → deterministic ids
-// via createShapeId, so the same op run in two tabs converges. After any
-// mutation we flush an immediate save so a following `moi scratch read` (served
-// off disk) is consistent. Returns the shape name (add), a PNG data URL (view),
-// or a bare ack.
-// Map a relayed op's optional color/size onto tldraw shape props. Omitted
-// fields are left off so the shape keeps its tldraw default.
-function styleProps(style: ScratchStyle) {
-  return {
-    ...(style.color ? { color: style.color } : {}),
-    ...(style.size ? { size: style.size } : {})
-  }
-}
-
-function makeExecutor(editor: Editor, flushSave: () => void) {
+// Execute a relayed op in this tab. Only `view` is relayed now — rasterizing the
+// canvas to a PNG needs the browser (`editor.toImageDataUrl`); every mutation runs
+// server-side against the disk snapshot (see server/scratchpad-executor.ts), so a
+// non-view op arriving here is unexpected.
+function makeExecutor(editor: Editor) {
   return async (op: ScratchOp): Promise<ScratchOpResult> => {
-    switch (op.kind) {
-      case 'add-rect': {
-        editor.createShape({
-          id: createShapeId(op.name),
-          type: 'geo',
-          x: op.x,
-          y: op.y,
-          props: {
-            geo: 'rectangle',
-            w: op.w,
-            h: op.h,
-            ...styleProps(op),
-            ...(op.text ? { richText: toRichText(op.text) } : {})
-          }
-        })
-        flushSave()
-        return { name: op.name }
-      }
-      case 'add-text': {
-        editor.createShape({
-          id: createShapeId(op.name),
-          type: 'text',
-          x: op.x,
-          y: op.y,
-          props: { richText: toRichText(op.text), ...styleProps(op) }
-        })
-        flushSave()
-        return { name: op.name }
-      }
-      case 'add-note': {
-        editor.createShape({
-          id: createShapeId(op.name),
-          type: 'note',
-          x: op.x,
-          y: op.y,
-          props: { richText: toRichText(op.text), ...styleProps(op) }
-        })
-        flushSave()
-        return { name: op.name }
-      }
-      case 'add-arrow': {
-        const id = createShapeId(op.name)
-        // Arrow at the canvas origin: point endpoints carry absolute coords;
-        // bound endpoints get placeholders that the binding then drives. `elbow`
-        // routes with right angles (diagram-style); default is a curved arc.
-        editor.createShape({
-          id,
-          type: 'arrow',
-          x: 0,
-          y: 0,
-          props: {
-            ...styleProps(op),
-            ...(op.elbow ? { kind: 'elbow' } : {}),
-            start: 'name' in op.from ? { x: 0, y: 0 } : { x: op.from.x, y: op.from.y },
-            end: 'name' in op.to ? { x: 100, y: 0 } : { x: op.to.x, y: op.to.y }
-          }
-        })
-        const bind = (end: { name: string }, terminal: 'start' | 'end') =>
-          editor.createBinding({
-            type: 'arrow',
-            fromId: id,
-            toId: createShapeId(end.name),
-            props: {
-              terminal,
-              normalizedAnchor: { x: 0.5, y: 0.5 },
-              isPrecise: false,
-              isExact: false,
-              snap: 'none'
-            }
-          })
-        if ('name' in op.from) bind(op.from, 'start')
-        if ('name' in op.to) bind(op.to, 'end')
-        flushSave()
-        return { name: op.name }
-      }
-      case 'move': {
-        const shape = editor.getShape(createShapeId(op.name))
-        if (!shape) throw new Error(`No shape named "${op.name}"`)
-        editor.updateShape({ id: shape.id, type: shape.type, x: op.x, y: op.y })
-        flushSave()
-        return { ok: true }
-      }
-      case 'set': {
-        const shape = editor.getShape(createShapeId(op.name))
-        if (!shape) throw new Error(`No shape named "${op.name}"`)
-        editor.updateShape({
-          id: shape.id,
-          type: shape.type,
-          props: { richText: toRichText(op.text) }
-        })
-        flushSave()
-        return { ok: true }
-      }
-      case 'delete': {
-        editor.deleteShape(createShapeId(op.name))
-        flushSave()
-        return { ok: true }
-      }
-      case 'clear': {
-        const ids = [...editor.getCurrentPageShapeIds()]
-        if (ids.length > 0) editor.deleteShapes(ids)
-        flushSave()
-        return { ok: true }
-      }
-      case 'view': {
-        const ids = [...editor.getCurrentPageShapeIds()]
-        if (ids.length === 0) throw new Error('Canvas is empty — nothing to view.')
-        const { url } = await editor.toImageDataUrl(ids, {
-          format: 'png',
-          background: true,
-          padding: 32
-        })
-        return { image: url }
-      }
+    if (op.kind !== 'view') {
+      throw new Error(`Scratchpad op "${op.kind}" runs on the server, not the browser.`)
     }
+    const ids = [...editor.getCurrentPageShapeIds()]
+    if (ids.length === 0) throw new Error('Canvas is empty — nothing to view.')
+    const { url } = await editor.toImageDataUrl(ids, {
+      format: 'png',
+      background: true,
+      padding: 32
+    })
+    return { image: url }
   }
 }
 
@@ -747,14 +631,6 @@ export function Scratchpad() {
     }).catch(() => {})
   }, [workspaceId])
 
-  const flushSave = useCallback(() => {
-    if (saveTimer.current) {
-      clearTimeout(saveTimer.current)
-      saveTimer.current = null
-    }
-    save()
-  }, [save])
-
   // Hydrate once per workspace. `document: null` → start with an empty canvas.
   useEffect(() => {
     let cancelled = false
@@ -819,7 +695,7 @@ export function Scratchpad() {
         },
         { source: 'user', scope: 'document' }
       )
-      setScratchExecutor(workspaceId, makeExecutor(editor, flushSave))
+      setScratchExecutor(workspaceId, makeExecutor(editor))
       // Focus management: tldraw only fires keyboard shortcuts while the editor's
       // instance `isFocused` is set, but with `autoFocus={false}` it never flips
       // that on its own. We drive it from where the pointer lands — a pointerdown
@@ -854,7 +730,7 @@ export function Scratchpad() {
         editorRef.current = null
       }
     },
-    [workspaceId, save, flushSave]
+    [workspaceId, save]
   )
 
   if (!loaded) return <div className="min-h-0 flex-1 bg-muted/40" />

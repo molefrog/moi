@@ -7,6 +7,7 @@ import { processIcon } from './icon'
 import { loadLayout, saveLayout } from './layout'
 import { publishEvent } from './events'
 import { findWorkspaceForPath, listWorkspaces, registerWorkspace } from './registry'
+import { executeScratchOp } from './scratchpad-executor'
 import { readScratchpadShapes } from './scratchpad'
 import { relayScratchOp } from './scratchpad-relay'
 import { broadcastAll } from './state'
@@ -208,16 +209,20 @@ export const control = Bun.serve({
             return
           }
 
-          // Everything else relays to a live editor, keyed by the workspace id so
-          // the broadcast targets the tab(s) showing *this* workspace's canvas.
           // Assign add ops a stable name when the caller didn't (`--id`), so the
-          // derived tldraw shape id is deterministic across tabs.
+          // derived tldraw shape id is deterministic and addressable later.
           if (op.kind.startsWith('add-') && !op.name) {
             op.name = `s_${crypto.randomUUID().slice(0, 8)}`
           }
 
           try {
-            const result = await relayScratchOp(match.id, op)
+            // `view` renders pixels — only the browser can do that, so it relays to
+            // a live tab (and fails if none is open). Every mutation runs headlessly
+            // against the disk snapshot, so drawing never needs an open canvas.
+            const result =
+              op.kind === 'view'
+                ? await relayScratchOp(match.id, op)
+                : await executeScratchOp(match.path, match.id, op)
             ws.send(JSON.stringify({ ok: true, result }))
           } catch (err) {
             ws.send(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }))

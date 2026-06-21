@@ -1,10 +1,10 @@
 import { join } from 'path'
 
-// The Scratchpad is a shared tldraw canvas per workspace. The browser is the
-// only writer to disk — it autosaves a tldraw *document* snapshot here (the
-// per-tab `session` is intentionally dropped). The server is a relay + store:
-// it serves this file for hydration and parses it for `moi scratch read`, but
-// never reconstructs tldraw shapes itself. See docs/moi-scratchpad.md.
+// The Scratchpad is a shared tldraw canvas per workspace, persisted as a tldraw
+// *document* snapshot here (the per-tab `session` is intentionally dropped). Two
+// writers: the browser autosaves on user edits, and the server writes on agent
+// draws (see scratchpad-executor.ts). This module owns the on-disk shape: load,
+// save, and the `moi scratch read` parser. See docs/moi-scratchpad.md.
 
 // A tldraw document snapshot: `getSnapshot(store).document`. Opaque to us apart
 // from `.store` (the record map) which `read` walks. `null` means empty canvas.

@@ -63,7 +63,7 @@ moi scratch clear                           # wipe the whole canvas
   `small` or `large`, mirroring the toolbar's two sizes. Omit either to keep tldraw's default.
   The agent's options deliberately match what the user can pick by hand — neither surface can
   make something the other can't.
-- `clear` deletes every shape on the canvas in one shot (needs a live tab, like the draw ops).
+- `clear` deletes every shape on the canvas in one shot.
 - Coordinates are tldraw canvas space (origin top-left, y down).
 
 The set is deliberately small — text, rect, note, arrow (with color/stroke), plus
@@ -72,31 +72,39 @@ tldraw API.
 
 ## How it works
 
-The canvas is a real tldraw editor running in the **browser** — that's where all drawing and
-rendering happens, exactly like tldraw's own [Make Real](https://makereal.tldraw.com). The
-moi server is a **relay and a disk store**, not a tldraw runtime; it never tries to
-reconstruct tldraw shapes itself.
+The canvas the **user** sees is a real tldraw editor in the browser. The **agent**, though,
+doesn't need that tab open to draw: every `moi scratch` op except `view` runs against the disk
+snapshot, either by parsing it (`read`) or by replaying it through a **headless tldraw store**
+on the server (the mutations). Only `view` — rendering pixels — genuinely requires the browser.
 
-- **Persistence.** The browser autosaves the canvas to `.moi/scratchpad.json` (a tldraw
-  document snapshot, owned by moi — not hand-edited). Saves are **debounced — about 500ms
-  after you stop drawing**, not on every stroke — and each one writes the whole snapshot.
-  Reloading rehydrates from it; a "canvas updated" signal pushes other open tabs to reload,
-  so everyone converges.
-- **Reading** (`moi scratch read`) is served straight from that snapshot on disk — the server
-  parses the saved shapes into a compact listing. No browser required.
-- **Drawing and viewing** (`add`/`move`/`set`/`delete`/`view`) are **relayed to the live
-  editor** in a connected tab: the browser runs the op against tldraw (`createShape`,
-  `updateShape`, `toImage`, …) and sends back the result (a new shape id, or a PNG). This is
-  why draws produce valid shapes and `view` is pixel-faithful — tldraw itself does the work.
+- **Persistence.** `.moi/scratchpad.json` holds a tldraw document snapshot (owned by moi — not
+  hand-edited). The browser autosaves it ~500ms after you stop drawing; the server writes it
+  after each agent mutation. Either writer publishes a "canvas updated" signal, and every open
+  tab reloads from disk, so all viewers converge.
+- **Reading** (`moi scratch read`) parses that snapshot straight off disk into a compact shape
+  listing. No browser, no tldraw runtime.
+- **Drawing** (`add`/`move`/`set`/`delete`/`clear`) runs on the server: it loads the snapshot
+  into a headless `tldraw` store (`createTLStore` + the default shape/binding utils), applies
+  the op as store records — using each shape's `getDefaultProps()` so records are schema-valid —
+  writes the snapshot back, and nudges open tabs to reload. **No live tab required.** The store
+  validates every record on `put`, so a malformed shape throws instead of corrupting the file.
+  (We drive the store, not an `Editor`, because the Editor needs a DOM + text measurement that
+  the server runtime doesn't have. See `server/scratchpad-executor.ts`.)
+- **Viewing** (`moi scratch view`) is the one op still relayed to a connected tab: only the
+  browser can rasterize the canvas (`editor.toImageDataUrl`). With no tab showing **this**
+  workspace's scratchpad it returns "No live canvas" — every other op still works off disk.
 - **Each command targets its own workspace's canvas.** The CLI runs in a workspace directory,
-  which resolves to that workspace; the relayed op carries that identity, and only a tab
-  showing **that workspace's** scratchpad runs it. So `moi scratch view` from one workspace
-  never returns another's canvas. "No live canvas" therefore means no tab is showing _this_
-  workspace's scratchpad — `read` (off disk) still works regardless.
-- **Concurrency is last-write-wins.** The browser is the only writer to disk, and the agent's
-  draws run _inside_ that same editor, so they persist through the same autosave. If the user
-  and agent touch the canvas at the same moment, the later save wins — edits are cheap and
-  visible, so a clobbered change is easy to redo. No merging, no locking.
+  which resolves to that workspace; reads, writes, and the relayed `view` all key off that
+  identity, so one workspace never touches another's canvas.
+- **Concurrency is last-write-wins.** Now there are two writers — the browser and the server —
+  each writing the whole snapshot. Server writes are serialized per workspace (load → mutate →
+  save under a lock) and reload open tabs; a simultaneous user stroke and agent draw can still
+  clobber one another, but edits are cheap and visible, so a lost change is easy to redo. No
+  merging, no locking across the browser/server boundary.
+
+> Earlier this worked differently: _all_ mutations were relayed to a live tab too, so the agent
+> couldn't draw to a closed canvas. The write path moved server-side so drawing no longer
+> depends on the user keeping the Scratchpad open.
 
 ## Building it
 
