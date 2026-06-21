@@ -101,7 +101,8 @@ my-agent-folder/
 
 Treat `moi` as an external command — you cannot inspect or modify its sources. Use only the
 documented subcommands (`moi bundle`, `moi bundle --force`, etc.). Call `moi help` for
-documentation. Call `moi` in the `.moi` folder.
+documentation. Run all `moi` commands from the **project root** — the folder that contains `.moi/`,
+never from inside `.moi/` itself. You don't pass paths; moi resolves the workspace from where it's run.
 
 - `moi bundle` — compile changed applets
 - `moi bundle --force` — rebuild all applets (use after changing `config`)
@@ -110,6 +111,7 @@ documentation. Call `moi` in the `.moi` folder.
 - `moi theme --font=<key>` — change font theme (omit `--font` to list options)
 - `moi theme --color=<key>` — change color preset (omit `--color` to list options)
 - `moi config` — set the workspace name & icon (`moi config --help` for usage)
+- `moi skill` — show installed vs bundled skill versions; `moi skill update` to refresh
 
 For more options, commands, use `moi help`.
 
@@ -233,3 +235,14 @@ export const config = {
 
 The inverse of a widget: a view **owns its whole page** — its own `h-full w-full` layout, scrolling
 (`overflow-auto`), padding, and chrome. Build it to read like an app screen. See `VIEW-DESIGN.md`.
+
+# Keeping this skill current
+
+This skill is installed with moi (via the CLI or the UI) and can fall behind when the moi CLI updates.
+
+- **You'll know** — `moi` commands warn you when this skill is behind.
+- **To update** — run `moi skill update`. Never mid-task: finish first, or do it at the end (changes apply on the next skill load).
+- **Then** — if you updated, mention it.
+
+<!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
+<moi-skill version="0.1.0" />
