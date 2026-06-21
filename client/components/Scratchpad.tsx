@@ -28,6 +28,7 @@ import {
 import 'tldraw/tldraw.css'
 import { motion } from 'motion/react'
 import {
+  IconArrowUpRight,
   IconEraser,
   IconHandStop,
   IconHighlight,
@@ -180,12 +181,15 @@ function makeExecutor(editor: Editor, flushSave: () => void) {
 // (contextual) style panel and zoom control are kept as-is for now; style
 // trimming is a follow-up.
 
-// Drop the menus/panels we don't want. `null` removes a component entirely.
-// Kept on defaults: StylePanel (contextual), NavigationPanel (zoom), ContextMenu,
-// KeyboardShortcutsDialog.
+// Drop tldraw's built-in chrome we replace with custom overlays (tool bar, style
+// bar). `null` removes a component entirely. NavigationPanel is kept — we like its
+// native zoom control — but Minimap is nulled, which also strips its toggle button
+// from the panel, leaving just the zoom menu. Kept on defaults: NavigationPanel
+// (zoom), ContextMenu, KeyboardShortcutsDialog.
 const SCRATCH_COMPONENTS: TLComponents = {
   Toolbar: null,
   StylePanel: null,
+  Minimap: null,
   MainMenu: null,
   PageMenu: null,
   ActionsMenu: null,
@@ -233,6 +237,7 @@ const TOOL_ENTRIES: ToolEntry[] = [
   { kind: 'tool', id: 'note', label: 'Sticker', Icon: IconSticker2 },
   { kind: 'tool', id: 'text', label: 'Text', Icon: IconTypography },
   { kind: 'tool', id: 'line', label: 'Line', Icon: IconLine },
+  { kind: 'tool', id: 'arrow', label: 'Arrow', Icon: IconArrowUpRight },
   { kind: 'sep' },
   { kind: 'tool', id: 'highlight', label: 'Highlighter', Icon: IconHighlight },
   { kind: 'tool', id: 'eraser', label: 'Eraser', Icon: IconEraser }
@@ -287,6 +292,10 @@ function applyToolLocks(editor: Editor, toolId: string) {
     editor.setStyleForNextShapes(DefaultVerticalAlignStyle, 'middle')
   } else if (toolId === 'highlight') {
     ensurePaletteColor(editor, 'highlight', 'yellow')
+  } else if (toolId === 'arrow') {
+    // Arrows don't expose dash — pin it rough to match the hand-drawn look and
+    // never inherit a dashed/solid stroke from a previous tool.
+    editor.setStyleForNextShapes(DefaultDashStyle, 'draw')
   } else if (toolId === 'draw' || toolId === 'line') {
     // Pen/line only offer rough or dashed — if we're arriving from a rect's
     // 'solid', fall back to rough so a valid dash is always selected.
@@ -387,7 +396,8 @@ const CONTROLS_BY_TOOL: Record<string, StyleControl[]> = {
   note: ['color', 'size'],
   text: ['color', 'size'],
   line: ['color', 'dash', 'size'],
-  highlight: ['color', 'size']
+  highlight: ['color', 'size'],
+  arrow: ['color', 'size']
 }
 
 // Controls exposed per selected shape type (Select tool with a selection).
@@ -415,10 +425,10 @@ const PALETTES: Record<PaletteKind, Palette> = {
     swatches: [
       { value: 'black', klass: 'bg-[#1d1d1d]' },
       { value: 'red', klass: 'bg-[#e03131]' },
-      { value: 'orange', klass: 'bg-[#e16919]' },
       { value: 'yellow', klass: 'bg-[#f1ac4b]' },
       { value: 'green', klass: 'bg-[#099268]' },
-      { value: 'blue', klass: 'bg-[#4465e9]' }
+      { value: 'blue', klass: 'bg-[#4465e9]' },
+      { value: 'grey', klass: 'bg-[#9fa8b2]' }
     ]
   },
   highlight: {
@@ -462,10 +472,18 @@ function ensurePaletteColor(editor: Editor, kind: PaletteKind, fallback: TLDefau
   }
 }
 
-// Two sizes only — small→'m', large→'xl'.
-const SIZE_OPTIONS: { value: TLDefaultSizeStyle; label: string; dot: string }[] = [
-  { value: 'm', label: 'Small', dot: 'size-1.5' },
-  { value: 'xl', label: 'Large', dot: 'size-3' }
+// Two sizes only — small→'m', large→'xl'. Each option carries previews for the
+// three size renderings (see sizeGlyphKind): `dot` blob for most tools, `stroke`
+// pen-icon weight for the pencil, `glyph` letter px for text.
+const SIZE_OPTIONS: {
+  value: TLDefaultSizeStyle
+  label: string
+  dot: string
+  stroke: number
+  glyph: number
+}[] = [
+  { value: 'm', label: 'Small', dot: 'size-1.5', stroke: 1.5, glyph: 14 },
+  { value: 'xl', label: 'Large', dot: 'size-3', stroke: 3, glyph: 22 }
 ]
 
 // Rough (hand-drawn) vs dashed stroke.
@@ -526,11 +544,29 @@ function activeControls(editor: Editor): StyleControl[] {
   return CONTROL_ORDER.filter(control => set.has(control))
 }
 
+// How the size control previews itself, matched to what "size" means for the
+// active tool: the pencil's is a stroke weight (pen glyph at varying strokes),
+// text's is a font size (a letter at varying sizes), everything else a plain blob.
+// Keyed off the active tool, or a uniform selection under the Select tool.
+function sizeGlyphKind(editor: Editor): 'pen' | 'letter' | 'dot' {
+  const toolId = editor.getCurrentToolId()
+  if (toolId === 'draw') return 'pen'
+  if (toolId === 'text') return 'letter'
+  const ids = editor.getSelectedShapeIds()
+  const types = new Set(ids.map(id => editor.getShape(id)?.type))
+  if (types.size === 1) {
+    if (types.has('draw')) return 'pen'
+    if (types.has('text')) return 'letter'
+  }
+  return 'dot'
+}
+
 type StyleBarState = {
   controls: StyleControl[]
   palette: Palette
   color: TLDefaultColorStyle | undefined
   size: TLDefaultSizeStyle | undefined
+  sizeGlyph: 'pen' | 'letter' | 'dot'
   dash: TLDefaultDashStyle | undefined
   fill: TLDefaultFillStyle | undefined
 }
@@ -541,6 +577,7 @@ function readStyleBarState(editor: Editor): StyleBarState {
     palette: PALETTES[paletteKind(editor)],
     color: readStyleValue(editor, DefaultColorStyle),
     size: readStyleValue(editor, DefaultSizeStyle),
+    sizeGlyph: sizeGlyphKind(editor),
     dash: readStyleValue(editor, DefaultDashStyle),
     fill: readStyleValue(editor, DefaultFillStyle)
   }
@@ -590,7 +627,13 @@ function ScratchStyleBar({ editor }: ScratchStyleBarProps) {
                 'bg-muted-foreground/25 text-primary hover:bg-muted-foreground/25'
             )}
           >
-            <span className={cn('rounded-full bg-current', s.dot)} />
+            {state.sizeGlyph === 'pen' ? (
+              <IconSketching size={18} stroke={s.stroke} />
+            ) : state.sizeGlyph === 'letter' ? (
+              <IconTypography size={s.glyph} stroke={1.5} />
+            ) : (
+              <span className={cn('rounded-full bg-current', s.dot)} />
+            )}
           </button>
         ))}
       </div>
@@ -654,6 +697,10 @@ function ScratchStyleBar({ editor }: ScratchStyleBarProps) {
 export function Scratchpad() {
   const workspaceId = useWorkspaceId()
   const editorRef = useRef<Editor | null>(null)
+  // The whole scratchpad region (canvas + tool bar + style bar). Focus is driven
+  // off whether a pointerdown lands inside this, so clicking a tool keeps the
+  // editor focused — see the pointerdown handler in onMount.
+  const rootRef = useRef<HTMLDivElement>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Set before a remote `loadSnapshot`; the autosave listener consumes it on the
   // first (throttled) flush so the load doesn't echo back out as a save. (Store
@@ -737,6 +784,10 @@ export function Scratchpad() {
         editor.setStyleForNextShapes(DefaultFontStyle, 'draw')
         editor.setStyleForNextShapes(DefaultHorizontalAlignStyle, 'middle')
         editor.setStyleForNextShapes(DefaultVerticalAlignStyle, 'middle')
+        // Rectangles start solid-filled. Still user-adjustable via the style bar —
+        // applyToolLocks deliberately never re-pins fill, so this is a default, not
+        // a lock. ('fill' = the style bar's "Solid"; 'solid' there means "Semi".)
+        editor.setStyleForNextShapes(DefaultFillStyle, 'fill')
       })
       const unlisten = editor.store.listen(
         () => {
@@ -750,8 +801,34 @@ export function Scratchpad() {
         { source: 'user', scope: 'document' }
       )
       setScratchExecutor(workspaceId, makeExecutor(editor, flushSave))
+      // Focus management: tldraw only fires keyboard shortcuts while the editor's
+      // instance `isFocused` is set, but with `autoFocus={false}` it never flips
+      // that on its own. We drive it from where the pointer lands — a pointerdown
+      // inside the scratchpad (canvas, tool bar, or style bar, all under rootRef)
+      // focuses the editor; one anywhere else (e.g. the chat) blurs it, so hotkeys
+      // are live only when the scratchpad is the active surface. Guarded on the
+      // current state so a click already inside (e.g. double-click to edit a
+      // shape's text) doesn't re-focus the container and steal focus from the
+      // text field. Capture phase so we see it regardless of downstream handlers.
+      const onPointerDown = (e: PointerEvent) => {
+        const target = e.target as Node | null
+        const inside = !!target && !!rootRef.current?.contains(target)
+        if (inside) {
+          if (!editor.getIsFocused()) editor.focus()
+        } else if (editor.getIsFocused()) {
+          editor.blur()
+        }
+      }
+      const doc = editor.getContainerDocument()
+      doc.addEventListener('pointerdown', onPointerDown, true)
+      // First open: grab focus so the user can reach for the keyboard right away.
+      // `focus()` both sets `isFocused` and DOM-focuses the canvas container, so it
+      // becomes the active element — clearing tldraw's secondary guard that mutes
+      // shortcuts while an input/textarea (e.g. the chat) holds focus.
+      editor.focus()
       return () => {
         unlisten()
+        doc.removeEventListener('pointerdown', onPointerDown, true)
         if (saveTimer.current) clearTimeout(saveTimer.current)
         setScratchExecutor(workspaceId, null)
         setEditor(null)
@@ -764,7 +841,7 @@ export function Scratchpad() {
   if (!loaded) return <div className="min-h-0 flex-1 bg-muted/40" />
 
   return (
-    <div className="relative min-h-0 flex-1 overflow-hidden">
+    <div ref={rootRef} className="relative min-h-0 flex-1 overflow-hidden">
       <div className="absolute inset-0">
         <Tldraw
           snapshot={initialSnapshot.current}
@@ -773,10 +850,10 @@ export function Scratchpad() {
           components={SCRATCH_COMPONENTS}
           overrides={SCRATCH_OVERRIDES}
           options={SCRATCH_OPTIONS}
-          // Only handle keyboard shortcuts when the canvas itself is focused —
-          // otherwise tldraw listens window-wide and hotkeys fire while you're in
-          // the toolbar or chat. tldraw's recommended fix (clicking the canvas
-          // focuses it; clicking elsewhere blurs it).
+          // Hand focus control entirely to us: tldraw's own `autoFocus` only seeds
+          // the `isFocused` flag (hotkeys would fire window-wide, even from the
+          // chat) without ever DOM-focusing the canvas. Instead onMount focuses
+          // the editor on open and a pointerdown handler toggles it thereafter.
           autoFocus={false}
         />
       </div>
