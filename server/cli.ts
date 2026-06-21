@@ -881,26 +881,23 @@ function parseEnd(s: string): ScratchArrowEnd {
   return { name: s }
 }
 
-// tldraw's named palette and each color's light-theme solid hex — used to snap an
-// arbitrary `--color #rrggbb` to the nearest palette entry (tldraw shapes can't
-// hold free hex). Keep in sync with @tldraw/editor's default theme.
+// The Scratchpad palette (matches the UI toolbar's six swatches) and each color's
+// light-theme solid hex — used to snap an arbitrary `--color #rrggbb` to the nearest
+// palette entry (tldraw shapes can't hold free hex). Keep in sync with the swatches
+// in client/components/Scratchpad.tsx.
 const COLOR_HEX: Record<ScratchColor, string> = {
   black: '#1d1d1d',
-  grey: '#9fa8b2',
-  'light-violet': '#e085f4',
-  violet: '#ae3ec9',
-  blue: '#4465e9',
-  'light-blue': '#4ba1f1',
-  yellow: '#f1ac4b',
-  orange: '#e16919',
-  green: '#099268',
-  'light-green': '#4cb05e',
-  'light-red': '#f87777',
   red: '#e03131',
-  white: '#ffffff'
+  yellow: '#f1ac4b',
+  green: '#099268',
+  blue: '#4465e9',
+  grey: '#9fa8b2'
 }
 const COLOR_NAMES = Object.keys(COLOR_HEX) as ScratchColor[]
-const SCRATCH_SIZES: ScratchSize[] = ['s', 'm', 'l', 'xl']
+
+// The UI offers two opinionated sizes; the CLI mirrors them by name.
+const STROKE_SIZES: Record<string, ScratchSize> = { small: 'm', large: 'xl' }
+const STROKE_NAMES = Object.keys(STROKE_SIZES)
 
 function hexToRgb(hex: string): [number, number, number] | null {
   let h = hex.trim().replace(/^#/, '')
@@ -933,30 +930,30 @@ function parseColor(s: string): ScratchColor {
   return best
 }
 
-function parseSize(s: string): ScratchSize {
-  const lower = s.trim().toLowerCase()
-  if ((SCRATCH_SIZES as string[]).includes(lower)) return lower as ScratchSize
-  throw new Error(`Unknown size "${s}". Use one of: ${SCRATCH_SIZES.join(', ')}.`)
+function parseStroke(s: string): ScratchSize {
+  const size = STROKE_SIZES[s.trim().toLowerCase()]
+  if (!size) throw new Error(`Unknown stroke "${s}". Use one of: ${STROKE_NAMES.join(', ')}.`)
+  return size
 }
 
 // Shared optional styling on every `add` command. Resolved into op props below.
 const colorArg = {
   type: 'string',
-  description: 'Color: a palette name (e.g. blue) or any hex (e.g. #4465e9, snapped to nearest)'
+  description: `Color: ${COLOR_NAMES.join(', ')}, or any hex (snapped to nearest)`
 } as const
 const strokeArg = {
   type: 'string',
-  description: `Stroke / size weight: ${SCRATCH_SIZES.join(', ')}`
+  description: `Stroke weight: ${STROKE_NAMES.join(', ')}`
 } as const
 
-// Build the optional { color?, size? } props from raw --color/--size args.
-function styleArgs(args: { color?: string; size?: string }): {
+// Build the optional { color?, size? } props from raw --color/--stroke args.
+function styleArgs(args: { color?: string; stroke?: string }): {
   color?: ScratchColor
   size?: ScratchSize
 } {
   return {
     ...(args.color ? { color: parseColor(args.color) } : {}),
-    ...(args.size ? { size: parseSize(args.size) } : {})
+    ...(args.stroke ? { size: parseStroke(args.stroke) } : {})
   }
 }
 
@@ -1051,7 +1048,7 @@ const scratchAddText = defineCommand({
         x,
         y,
         text: args.text,
-        ...styleArgs({ color: args.color, size: args.stroke })
+        ...styleArgs({ color: args.color, stroke: args.stroke })
       },
       printAdded
     )
@@ -1082,7 +1079,7 @@ const scratchAddRect = defineCommand({
         w,
         h,
         ...(args.text ? { text: args.text } : {}),
-        ...styleArgs({ color: args.color, size: args.stroke })
+        ...styleArgs({ color: args.color, stroke: args.stroke })
       },
       printAdded
     )
@@ -1109,7 +1106,7 @@ const scratchAddNote = defineCommand({
         x,
         y,
         text: args.text,
-        ...styleArgs({ color: args.color, size: args.stroke })
+        ...styleArgs({ color: args.color, stroke: args.stroke })
       },
       printAdded
     )
@@ -1139,7 +1136,7 @@ const scratchAddArrow = defineCommand({
         from: parseEnd(args.from),
         to: parseEnd(args.to),
         ...(args.elbow ? { elbow: true } : {}),
-        ...styleArgs({ color: args.color, size: args.stroke })
+        ...styleArgs({ color: args.color, stroke: args.stroke })
       },
       printAdded
     )
