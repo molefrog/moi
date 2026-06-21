@@ -38,7 +38,6 @@ import {
   IconTypography
 } from '@tabler/icons-react'
 
-import { useScratchpad } from '@/client/api/workspaces'
 import { cn } from '@/client/lib/cn'
 import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
 import { setScratchExecutor } from '@/client/lib/scratch-executor'
@@ -594,6 +593,41 @@ function ScratchStyleBar({ editor }: ScratchStyleBarProps) {
   )
 }
 
+// Hydrate the saved canvas once per workspace from the REST snapshot endpoint.
+// Returns a STABLE snapshot reference (held in a ref, never a fresh object per
+// render): tldraw rebuilds its entire store whenever the `snapshot` prop identity
+// changes, so handing it a new object each render loops it forever — remounting the
+// store and re-fetching fonts/translations endlessly. `document: null` → empty
+// canvas; `loaded` gates the placeholder until the fetch settles.
+function useScratchpadSnapshot(workspaceId: string): {
+  loaded: boolean
+  snapshot: Partial<TLEditorSnapshot> | undefined
+} {
+  const [loaded, setLoaded] = useState(false)
+  const snapshot = useRef<Partial<TLEditorSnapshot> | undefined>(undefined)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoaded(false)
+    snapshot.current = undefined
+    fetch(`/api/workspaces/${workspaceId}/scratchpad`)
+      .then(r => r.json())
+      .then((d: { document: TLEditorSnapshot['document'] | null }) => {
+        if (cancelled) return
+        if (d?.document) snapshot.current = { document: d.document }
+        setLoaded(true)
+      })
+      .catch(() => {
+        if (!cancelled) setLoaded(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [workspaceId])
+
+  return { loaded, snapshot: snapshot.current }
+}
+
 // The Scratchpad surface: a real tldraw editor, hydrated from and autosaved to
 // `.moi/.scratchpad.json` via REST. One canvas shared by the user and the agent —
 // the agent reaches it through `moi scratch` (relayed ops execute here). See
@@ -613,10 +647,7 @@ export function Scratchpad() {
   const applyingRemote = useRef(false)
   // Reactive handle to the mounted editor, used to render the custom tool bar.
   const [editor, setEditor] = useState<Editor | null>(null)
-  // Initial canvas snapshot, fetched fresh per mount (tldraw's store owns it after).
-  // `isPending` gates the placeholder and, on workspace switch, forces tldraw to
-  // remount with the new snapshot. See useScratchpad — not RQ-cached by design.
-  const { data: scratchpad, isPending } = useScratchpad(workspaceId)
+  const { loaded, snapshot } = useScratchpadSnapshot(workspaceId)
 
   const save = useCallback(() => {
     const editor = editorRef.current
@@ -716,13 +747,13 @@ export function Scratchpad() {
     [workspaceId, save]
   )
 
-  if (isPending) return <div className="min-h-0 flex-1 bg-muted/40" />
+  if (!loaded) return <div className="min-h-0 flex-1 bg-muted/40" />
 
   return (
     <div ref={rootRef} className="relative min-h-0 flex-1 overflow-hidden">
       <div className="absolute inset-0">
         <Tldraw
-          snapshot={scratchpad?.document ? { document: scratchpad.document } : undefined}
+          snapshot={snapshot}
           licenseKey={LICENSE_KEY}
           onMount={onMount}
           components={SCRATCH_COMPONENTS}
