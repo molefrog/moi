@@ -37,26 +37,15 @@ export type ViewInfo = {
 export type ScratchPoint = { x: number; y: number }
 export type ScratchArrowEnd = { name: string } | ScratchPoint
 
-// tldraw's named color palette (DefaultColorStyle). The CLI also accepts an
-// arbitrary hex and snaps it to the nearest of these — tldraw shapes can only
-// hold a palette color, not free hex.
-export type ScratchColor =
-  | 'black'
-  | 'grey'
-  | 'light-violet'
-  | 'violet'
-  | 'blue'
-  | 'light-blue'
-  | 'yellow'
-  | 'orange'
-  | 'green'
-  | 'light-green'
-  | 'light-red'
-  | 'red'
-  | 'white'
+// The Scratchpad's color palette — the same six swatches the UI toolbar offers,
+// so the agent can only paint what the user can. The CLI also accepts an arbitrary
+// hex and snaps it to the nearest of these (tldraw shapes hold a palette color, not
+// free hex).
+export type ScratchColor = 'black' | 'grey' | 'blue' | 'green' | 'yellow' | 'red'
 
-// Stroke/size weight (DefaultSizeStyle): small → extra-large.
-export type ScratchSize = 's' | 'm' | 'l' | 'xl'
+// Stroke weight — the UI's two opinionated sizes (small, large), mapped onto
+// tldraw's DefaultSizeStyle. The CLI takes `small`/`large`; ops carry the tldraw value.
+export type ScratchSize = 'm' | 'xl'
 
 // Optional styling carried by every add op. Omitted fields fall back to the
 // shape's tldraw default.

@@ -57,11 +57,12 @@ moi scratch clear                           # wipe the whole canvas
 - `arrow --from <id> --to <id>` binds endpoints to shapes, so the arrow **follows** when the
   shapes move — that's the connector you reach for in a diagram. Add `--elbow` for
   right-angle (squared) routing instead of the default curved arc.
-- `--color` takes a palette name (`black`, `grey`, `blue`, `light-blue`, `red`, `light-red`,
-  `green`, `light-green`, `yellow`, `orange`, `violet`, `light-violet`, `white`) **or any
-  hex** (e.g. `#4465e9`) — a hex is snapped to the nearest palette color, since tldraw shapes
-  only hold palette colors. `--stroke` is the size/weight: `s`, `m`, `l`, `xl`. Omit either to
-  keep tldraw's default.
+- `--color` takes one of the **six palette names the UI toolbar offers** — `black`, `red`,
+  `yellow`, `green`, `blue`, `grey` — **or any hex** (e.g. `#4465e9`), which is snapped to the
+  nearest of those six (tldraw shapes only hold palette colors). `--stroke` is the weight,
+  `small` or `large`, mirroring the toolbar's two sizes. Omit either to keep tldraw's default.
+  The agent's options deliberately match what the user can pick by hand — neither surface can
+  make something the other can't.
 - `clear` deletes every shape on the canvas in one shot (needs a live tab, like the draw ops).
 - Coordinates are tldraw canvas space (origin top-left, y down).
 
