@@ -1,5 +1,7 @@
 import { resolve } from 'path'
 
+import type { WorkspaceEntry } from '@/lib/types'
+
 import { CONTROL_PORT } from './constants'
 import { processIcon } from './icon'
 import { loadLayout, saveLayout } from './layout'
@@ -12,6 +14,36 @@ import { applyThemeUpdate, matchColorTheme } from './theme'
 import { handleBundle } from './widgets'
 import { handleBundleViews } from './views'
 import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
+
+type ControlSocket = { send(data: string): void }
+
+// Resolve a control request's `path` to the registered workspace that contains
+// it — the entry itself or its nearest registered ancestor — so every
+// workspace-scoped command (bundle/theme/config/scratch) works from `.moi/` or
+// any subdirectory instead of operating on a phantom nested path. Sends a clear
+// error and returns null when nothing is registered, or the path is outside
+// every workspace.
+async function resolveWorkspace(
+  ws: ControlSocket,
+  rawPath: unknown
+): Promise<WorkspaceEntry | null> {
+  const workspaces = await listWorkspaces()
+  if (workspaces.length === 0) {
+    ws.send(JSON.stringify({ error: 'No workspaces registered' }))
+    return null
+  }
+  const reqPath = resolve(String(rawPath ?? workspaces[0].path))
+  const match = findWorkspaceForPath(workspaces, reqPath)
+  if (!match) {
+    ws.send(
+      JSON.stringify({
+        error: `${reqPath} is not inside a registered moi workspace. Open it in moi, or run from the workspace root.`
+      })
+    )
+    return null
+  }
+  return match
+}
 
 export const control = Bun.serve({
   port: CONTROL_PORT,
@@ -41,27 +73,11 @@ export const control = Bun.serve({
         }
 
         if (data.type === 'bundle') {
-          // Bundle needs a workspace path — default to first registered workspace
-          const workspaces = await listWorkspaces()
-          if (workspaces.length === 0) {
-            ws.send(JSON.stringify({ error: 'No workspaces registered' }))
-            return
-          }
-          // Resolve the requested path (the CLI sends the CWD) to the registered
-          // workspace that contains it — itself or its nearest ancestor — so
-          // `moi bundle` works from `.moi/` or any subdirectory and never targets
-          // a phantom nested `.moi/.moi`. Fail loudly when it's nowhere near a
-          // registered workspace instead of silently no-op'ing.
-          const reqPath = resolve(String(data.path ?? workspaces[0].path))
-          const match = findWorkspaceForPath(workspaces, reqPath)
-          if (!match) {
-            ws.send(
-              JSON.stringify({
-                error: `${reqPath} is not inside a registered moi workspace. Open it in moi, or run from the workspace root.`
-              })
-            )
-            return
-          }
+          // Resolve to the real workspace root (works from `.moi/` or any
+          // subdir; errors when outside every registered workspace) so a bundle
+          // never targets a phantom nested `.moi/.moi`.
+          const match = await resolveWorkspace(ws, data.path)
+          if (!match) return
           const workspacePath = match.path
           const force = !!data.force
           // `only` narrows to one kind; default builds both. Results carry a
@@ -98,13 +114,10 @@ export const control = Bun.serve({
         }
 
         if (data.type === 'theme') {
-          // Theme is per-workspace
-          const workspaces = await listWorkspaces()
-          if (workspaces.length === 0) {
-            ws.send(JSON.stringify({ error: 'No workspaces registered' }))
-            return
-          }
-          const workspacePath = String(data.path ?? workspaces[0].path)
+          // Theme is per-workspace — resolve to the real root (subdir-safe).
+          const match = await resolveWorkspace(ws, data.path)
+          if (!match) return
+          const workspacePath = match.path
           const layout = await loadLayout(workspacePath)
 
           // Listing mode — neither axis requested
@@ -127,16 +140,14 @@ export const control = Bun.serve({
           await saveLayout({ ...layout, theme: result.theme }, workspacePath)
           publishEvent({ type: 'theme:updated' })
           ws.send(JSON.stringify({ ok: true, ...result.applied }))
+          return
         }
 
         if (data.type === 'config') {
-          // Workspace identity (name + icon) is per-workspace.
-          const workspaces = await listWorkspaces()
-          if (workspaces.length === 0) {
-            ws.send(JSON.stringify({ error: 'No workspaces registered' }))
-            return
-          }
-          const workspacePath = String(data.path ?? workspaces[0].path)
+          // Workspace identity (name + icon) is per-workspace — subdir-safe.
+          const match = await resolveWorkspace(ws, data.path)
+          if (!match) return
+          const workspacePath = match.path
           const hasName = typeof data.name === 'string'
           const hasIcon = typeof data.iconPath === 'string'
           const clearName = data.clearName === true
@@ -177,31 +188,28 @@ export const control = Bun.serve({
               clearedIcon: clearIcon
             })
           )
+          return
         }
 
         if (data.type === 'scratch') {
-          const path = resolve(String(data.path ?? '.'))
           const op = data.op
           if (!op || typeof op.kind !== 'string') {
             ws.send(JSON.stringify({ error: 'Missing scratch op' }))
             return
           }
+          // Resolve to the real workspace root (subdir-safe) — both the on-disk
+          // read and the live relay use it.
+          const match = await resolveWorkspace(ws, data.path)
+          if (!match) return
 
           // `read` is served straight off the disk snapshot — no live tab needed.
           if (op.kind === 'read') {
-            ws.send(JSON.stringify({ shapes: await readScratchpadShapes(path) }))
+            ws.send(JSON.stringify({ shapes: await readScratchpadShapes(match.path) }))
             return
           }
 
-          // Everything else relays to a live editor. Resolve the workspace id so
+          // Everything else relays to a live editor, keyed by the workspace id so
           // the broadcast targets the tab(s) showing *this* workspace's canvas.
-          const workspaces = await listWorkspaces()
-          const entry = workspaces.find(w => w.path === path)
-          if (!entry) {
-            ws.send(JSON.stringify({ error: `No workspace registered at ${path}` }))
-            return
-          }
-
           // Assign add ops a stable name when the caller didn't (`--id`), so the
           // derived tldraw shape id is deterministic across tabs.
           if (op.kind.startsWith('add-') && !op.name) {
@@ -209,7 +217,7 @@ export const control = Bun.serve({
           }
 
           try {
-            const result = await relayScratchOp(entry.id, op)
+            const result = await relayScratchOp(match.id, op)
             ws.send(JSON.stringify({ ok: true, result }))
           } catch (err) {
             ws.send(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }))

@@ -109,6 +109,20 @@ export function findWorkspaceForPath<T extends { path: string }>(
   return matches.reduce((best, w) => (w.path.length > best.path.length ? w : best))
 }
 
+// If `p` lies inside a workspace's `.moi/` directory, return the workspace root
+// (the directory that contains that `.moi`); otherwise return `p` unchanged.
+// Cuts at the FIRST `.moi` segment, so an accidentally-nested `.moi/.moi/…`
+// path lifts all the way back to the real root. Pure (no filesystem access) —
+// `moi init` uses it so running from inside `.moi` never creates a nested
+// workspace, and the command always targets the real workspace root.
+export function liftToWorkspaceRoot(p: string): string {
+  const normal = resolve(p)
+  const segments = normal.split(sep)
+  const i = segments.indexOf('.moi')
+  if (i === -1) return normal
+  return segments.slice(0, i).join(sep) || sep
+}
+
 // Discover CC-active directories not yet in the registry
 async function discoverFromCC(registeredPaths: Set<string>): Promise<string[]> {
   try {

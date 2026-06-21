@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { defineCommand, runMain, showUsage } from 'citty'
+import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'path'
@@ -13,7 +14,7 @@ import { columns } from './cli-ui'
 import { CONTROL_PORT, PORT } from './constants'
 import { scaffoldMoiDir } from './moi-scaffold'
 import { type OpenClawAgent, discoverOpenClawAgents } from './openclaw'
-import { registerWorkspace } from './registry'
+import { liftToWorkspaceRoot, registerWorkspace } from './registry'
 import { installBundledSkills } from './skills-template'
 
 // ---- helpers ----------------------------------------------------------------
@@ -161,7 +162,37 @@ const init = defineCommand({
     }
   },
   async run({ args }) {
-    const target = resolve(args.dir)
+    const requested = resolve(args.dir)
+    // Locate the workspace root first: if invoked from inside a `.moi/` (or a
+    // deeper accidental `.moi/.moi/…`), lift to the directory that owns it
+    // instead of scaffolding a nested workspace. This is what stops the
+    // `.moi/.moi` bug at the source.
+    const target = liftToWorkspaceRoot(requested)
+    if (target !== requested) {
+      console.log(
+        '\n' +
+          pc.yellow('◆') +
+          ' Ran inside ' +
+          pc.bold('.moi') +
+          ' — using the workspace root ' +
+          pc.bold(target) +
+          ' instead (no nested .moi created).'
+      )
+    }
+    // Flag a stray nested `.moi/.moi` left by the old cwd bug — harmless but
+    // confusing, and easy to remove.
+    const stray = join(target, '.moi', '.moi')
+    if (existsSync(stray)) {
+      console.log(
+        '\n' +
+          pc.yellow('⚠') +
+          ' Found a stray nested ' +
+          pc.bold('.moi/.moi') +
+          ' (from an older bug). Safe to remove:\n' +
+          pc.dim('  rm -rf ' + stray)
+      )
+    }
+
     const projectRoot = join(import.meta.dir, '..')
     const isInteractive = process.stdout.isTTY
 

@@ -3,7 +3,7 @@
 // dependency manifest, and installs dependencies — so the agent never has to
 // bootstrap the folder itself.
 import { mkdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 
 // Dependency set available to widgets. `react`/`react-dom` are stubs — at
 // runtime they resolve from esm.sh via the browser importmap; they're listed
@@ -57,6 +57,16 @@ declare module '*.svg' { const s: string; export default s }
 // `.moi/` (their deps, widgets, lockfile) completely untouched.
 // Returns 'exists' when skipped, otherwise the `bun install` exit code.
 export async function scaffoldMoiDir(workspacePath: string): Promise<'exists' | number> {
+  // Backstop against the nested-workspace bug: never scaffold a `.moi/` *inside*
+  // another workspace's `.moi/` (which produces the junk `.moi/.moi`). Callers
+  // (`moi init`) lift to the workspace root via `liftToWorkspaceRoot` first, so
+  // this only fires on a programmer error.
+  if (resolve(workspacePath).split(sep).includes('.moi')) {
+    throw new Error(
+      `Refusing to scaffold a workspace inside a .moi directory: ${workspacePath}. ` +
+        'Run from the workspace root.'
+    )
+  }
   const moiDir = join(workspacePath, '.moi')
   if (await Bun.file(join(moiDir, 'package.json')).exists()) return 'exists'
   // A bare `.moi/` dir without package.json counts as not-bootstrapped —
