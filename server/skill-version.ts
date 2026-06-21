@@ -34,35 +34,51 @@ export async function readSkillVersion(skillMdPath: string): Promise<string | nu
   return m ? m[1] : null
 }
 
-function parse(v: string): [number, number, number] {
-  const [a, b, c] = v.split('.').map(n => parseInt(n, 10))
-  return [a || 0, b || 0, c || 0]
+// Bun.semver (built-in: `order` + `satisfies`) isn't in this repo's bun-types
+// yet, so reach it through a narrow typed view rather than `any`.
+const semver = (
+  Bun as unknown as {
+    semver: {
+      order(a: string, b: string): -1 | 0 | 1
+      satisfies(v: string, range: string): boolean
+    }
+  }
+).semver
+
+function isValidVersion(v: string): boolean {
+  try {
+    semver.order(v, v)
+    return true
+  } catch {
+    return false
+  }
 }
 
-// True when `bundled` is a newer release than `installed`, comparing only the
-// first `depth` components (2 = minor-or-major, 3 = any incl. patch). A missing
-// `installed` counts as behind (legacy workspace, no stamp yet); a missing
-// `bundled` never does.
-function behind(installed: string | null, bundled: string | null, depth: number): boolean {
-  if (!bundled) return false
-  if (!installed) return true
-  const a = parse(installed)
-  const b = parse(bundled)
-  for (let i = 0; i < depth; i++) {
-    if (b[i] !== a[i]) return b[i] > a[i]
-  }
-  return false
+// Compare an installed version against the bundled one with Bun's semver.
+// `behind` = bundled is strictly newer; `minorBehind` = that gap is at least a
+// minor bump (patch gaps stay silent). `~installed` spans installed's whole
+// major.minor, so a bundled version outside it is a minor-or-major bump. A
+// missing/invalid installed counts as behind (legacy or broken stamp → prompt);
+// a missing/invalid bundled never does (don't nag on our own broken ship).
+function compare(
+  installed: string | null,
+  bundled: string | null
+): { behind: boolean; minorBehind: boolean } {
+  if (!bundled || !isValidVersion(bundled)) return { behind: false, minorBehind: false }
+  if (!installed || !isValidVersion(installed)) return { behind: true, minorBehind: true }
+  const behind = semver.order(installed, bundled) < 0
+  return { behind, minorBehind: behind && !semver.satisfies(bundled, `~${installed}`) }
 }
 
 // Bundled is a MINOR-or-major release ahead — surfaced to the agent. Patch bumps
 // stay silent and ride along on the next minor update.
 export const isMinorBehind = (installed: string | null, bundled: string | null): boolean =>
-  behind(installed, bundled, 2)
+  compare(installed, bundled).minorBehind
 
 // Any difference at all, patch included — decides whether `moi skill update`
 // would change anything, for status display.
 export const isBehind = (installed: string | null, bundled: string | null): boolean =>
-  behind(installed, bundled, 3)
+  compare(installed, bundled).behind
 
 // Skills shipped with this CLI — directory names under the bundled skills dir.
 export async function bundledSkillNames(): Promise<string[]> {
