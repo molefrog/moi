@@ -1,7 +1,8 @@
 ---
 name: moi-workspace
-version: 0.1.0
 description: The moi workspace — the web UI the user chats from, extended with agent-authored applets (widgets, views) plus theme & config. Read this FIRST in two cases. (a) A message carries hidden <moi>…</moi> meta tags: it was fired from a moi workspace, so you are running inside one even if nothing else says so. (b) The user uses moi vocab — workspace, applet, widget, view, scratchpad, dashboard, or a `moi` command — or asks to build, edit, customize, or theme the workspace UI or its layout.
+metadata:
+  version: 0.1.0
 ---
 
 # Workspace
