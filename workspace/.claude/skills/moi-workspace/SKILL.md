@@ -241,7 +241,10 @@ The inverse of a widget: a view **owns its whole page** — its own `h-full w-fu
 This skill is installed with moi (via the CLI or the UI) and can fall behind when the moi CLI updates.
 
 - **You'll know** — `moi` commands warn you when this skill is behind.
-- **To update** — run `moi skill update`. Never mid-task: finish first, or do it at the end (changes apply on the next skill load).
+- **To update** — run `moi skill update`. Never mid-task: finish first, or do it at the end.
+- **Re-read after updating** — `moi skill update` rewrites `SKILL.md` and its companion docs
+  (`DESIGN.md`, `VIEW-DESIGN.md`, `SCRATCHPAD.md`) on disk, so the copy already in your context is
+  stale. Re-read this `SKILL.md` before you rely on it again — don't act on the old version.
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->

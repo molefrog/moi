@@ -468,8 +468,9 @@ const theme = defineCommand({
     font: { type: 'string', description: 'Font theme key to apply' },
     color: { type: 'string', description: 'Color preset key to apply' }
   },
-  run({ args }) {
+  async run({ args }) {
     const path = resolve(args.dir)
+    const notice = await staleSkillNotice(path)
     const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
 
     ws.onopen = () =>
@@ -508,6 +509,7 @@ const theme = defineCommand({
           console.log(pc.green('✓') + ' Color set to ' + pc.bold(preset.label) + ' ' + chip)
         }
         console.log()
+        if (notice) console.log(pc.yellow(notice) + '\n')
         ws.close()
         process.exit(0)
       }
@@ -556,6 +558,7 @@ const theme = defineCommand({
         ) + '\n'
       )
 
+      if (notice) console.log(pc.yellow(notice) + '\n')
       ws.close()
       process.exit(0)
     }
@@ -571,6 +574,7 @@ const status = defineCommand({
   meta: { name: 'status', description: 'Show server status and registered workspaces' },
   async run() {
     const running = await isServerRunning()
+    const notice = await staleSkillNotice(process.cwd())
 
     if (!running) {
       console.log('\n' + pc.dim('○') + ' Server is ' + pc.bold('not running') + '\n')
@@ -603,6 +607,7 @@ const status = defineCommand({
       ws.onerror = () => reject(new Error('Could not connect to control server'))
     })
 
+    if (notice) console.log(pc.yellow(notice) + '\n')
     process.exit(0)
   }
 })
@@ -736,13 +741,14 @@ const openclaw = defineCommand({
   subCommands: { init: openclawInit }
 })
 
-function sendConfig(payload: {
+async function sendConfig(payload: {
   path: string
   name?: string
   iconPath?: string
   clearName?: boolean
   clearIcon?: boolean
 }) {
+  const notice = await staleSkillNotice(payload.path)
   const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
   ws.onopen = () => ws.send(JSON.stringify({ type: 'config', ...payload }))
   ws.onmessage = event => {
@@ -772,6 +778,7 @@ function sendConfig(payload: {
       )
     }
     console.log()
+    if (notice) console.log(pc.yellow(notice) + '\n')
     ws.close()
     process.exit(0)
   }
@@ -900,6 +907,10 @@ function sendScratch(
       process.exit(1)
     }
     await onResult(res)
+    // The stale-skill notice rides on stderr so it never corrupts a command's
+    // structured stdout (read's JSON, view's PNG path) while the agent still sees it.
+    const notice = await staleSkillNotice(path)
+    if (notice) console.error('\n' + pc.yellow(notice) + '\n')
     ws.close()
     process.exit(0)
   }
