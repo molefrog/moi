@@ -29,11 +29,14 @@ The agent works the canvas through a `moi scratch` CLI — it both **sees** and 
   `type`, position, size, and text. Use this to reason about exact shapes — what's where,
   what to move, what to relabel. Works whether or not a browser tab is open. Image shapes
   carry a `src`, but **base64 data URLs are omitted** (reported as `base64:omitted`) — the
-  blob is huge and unreadable as text, so call `view` when you actually need to see it.
-- `moi scratch view` — render the canvas to a **PNG**. Use this to actually _see_ what the
-  user drew (freehand, layout, anything structure can't capture).
+  blob is huge and unreadable as text, so use `read-image` or `view` for the pixels.
+- `moi scratch read-image <id>` — save a single image shape's bytes to a file (prints the
+  path). Served off disk, like `read` — this is how the agent pulls the pixels of one image
+  that `read` omitted. A remote (`http`) asset prints its URL instead.
+- `moi scratch view` — render the **whole canvas** to a **PNG**. Use this to actually _see_
+  what the user drew (freehand, layout, anything structure can't capture).
 
-`read` is for logic; `view` is for vision.
+`read` is for logic; `view` / `read-image` are for vision.
 
 ### Drawing
 
@@ -46,6 +49,7 @@ moi scratch add text   --at <x,y> --text "..."          [--id NAME] [--color C] 
 moi scratch add rect   --at <x,y> --size <w,h> [--text]  [--id NAME] [--color C] [--stroke S]
 moi scratch add note   --at <x,y> --text "..."           [--id NAME] [--color C] [--stroke S]
 moi scratch add arrow  --from <id|x,y> --to <id|x,y>     [--id NAME] [--color C] [--stroke S] [--elbow]
+moi scratch add image  <path>                            [--at <x,y>] [--id NAME] [--quality lo|hi]
 moi scratch move   <id> --to <x,y>
 moi scratch set    <id> --text "..."        # relabel / edit
 moi scratch delete <id>
@@ -63,6 +67,9 @@ moi scratch clear                           # wipe the whole canvas
   `small` or `large`, mirroring the toolbar's two sizes. Omit either to keep tldraw's default.
   The agent's options deliberately match what the user can pick by hand — neither surface can
   make something the other can't.
+- `add image <path>` embeds a local image file. The server **resizes it to fit the canvas** —
+  `--quality lo` (default, long side ≤1024px) or `hi` (≤2048px) — re-encoding to WebP so a 10MB
+  paste never lands on the canvas whole. EXIF orientation is baked in; images are never enlarged.
 - `clear` deletes every shape on the canvas in one shot.
 - Coordinates are tldraw canvas space (origin top-left, y down).
 
@@ -81,15 +88,16 @@ on the server (the mutations). Only `view` — rendering pixels — genuinely re
   hand-edited). The browser autosaves it ~500ms after you stop drawing; the server writes it
   after each agent mutation. Either writer publishes a "canvas updated" signal, and every open
   tab reloads from disk, so all viewers converge.
-- **Reading** (`moi scratch read`) parses that snapshot straight off disk into a compact shape
-  listing. No browser, no tldraw runtime.
+- **Reading** (`moi scratch read`, `read-image`) parses that snapshot straight off disk — the
+  shape listing, or one image's bytes. No browser, no tldraw runtime.
 - **Drawing** (`add`/`move`/`set`/`delete`/`clear`) runs on the server: it loads the snapshot
   into a headless `tldraw` store (`createTLStore` + the default shape/binding utils), applies
   the op as store records — using each shape's `getDefaultProps()` so records are schema-valid —
   writes the snapshot back, and nudges open tabs to reload. **No live tab required.** The store
   validates every record on `put`, so a malformed shape throws instead of corrupting the file.
-  (We drive the store, not an `Editor`, because the Editor needs a DOM + text measurement that
-  the server runtime doesn't have. See `server/scratchpad-executor.ts`.)
+  `add image` additionally resizes the file through `sharp` (the same dep the icon pipeline uses)
+  before embedding it. (We drive the store, not an `Editor`, because the Editor needs a DOM + text
+  measurement the server runtime doesn't have. See `server/scratchpad-executor.ts`.)
 - **Viewing** (`moi scratch view`) is the one op still relayed to a connected tab: only the
   browser can rasterize the canvas (`editor.toImageDataUrl`). With no tab showing **this**
   workspace's scratchpad it returns "No live canvas" — every other op still works off disk.

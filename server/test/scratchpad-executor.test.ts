@@ -1,13 +1,19 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'path'
+import sharp from 'sharp'
 
 import { createTLStore, defaultBindingUtils, defaultShapeUtils, loadSnapshot } from 'tldraw'
 
 import type { ScratchOp } from '@/lib/types'
 
 import { executeScratchOp } from '../scratchpad-executor'
-import { getScratchpadPath, loadScratchpadDoc, readScratchpadShapes } from '../scratchpad'
+import {
+  getScratchpadPath,
+  loadScratchpadDoc,
+  readScratchpadImage,
+  readScratchpadShapes
+} from '../scratchpad'
 
 // The headless write path: `executeScratchOp` must produce a snapshot that (a)
 // `read` reflects and (b) the *browser* could load — i.e. it survives a fresh
@@ -96,5 +102,48 @@ describe('executeScratchOp (headless)', () => {
   test('persists nothing but a single scratchpad.json under .moi', async () => {
     await run({ kind: 'add-rect', name: 'box', x: 0, y: 0, w: 10, h: 10 })
     expect(await Bun.file(getScratchpadPath(WS)).exists()).toBe(true)
+  })
+
+  test('add-image resizes to fit, embeds it, and read-image pulls it back', async () => {
+    // A 4000×2000 source — larger than both presets, so it's always scaled down.
+    const file = join(WS, 'big.png')
+    await sharp({
+      create: { width: 4000, height: 2000, channels: 3, background: { r: 10, g: 120, b: 200 } }
+    })
+      .png()
+      .toFile(file)
+
+    await run({ kind: 'add-image', name: 'pic', x: 40, y: 50, path: file })
+
+    expect(await assertLoadable()).toBe(1)
+    const shape = (await readScratchpadShapes(WS)).find(s => s.id === 'pic')
+    // Default 'lo' caps the long side at 1024, aspect preserved (2:1 → 1024×512).
+    expect(shape).toMatchObject({ type: 'image', x: 40, y: 50, w: 1024, h: 512 })
+    // read omits the blob; read-image returns the actual (re-encoded webp) data URL.
+    expect(shape?.src).toBe('base64:omitted')
+    const img = await readScratchpadImage(WS, 'pic')
+    expect(img).toEqual({ src: expect.stringMatching(/^data:image\/webp;base64,/) })
+  })
+
+  test('add-image --quality hi keeps more pixels', async () => {
+    const file = join(WS, 'big.png')
+    await sharp({
+      create: { width: 4000, height: 2000, channels: 3, background: { r: 200, g: 40, b: 90 } }
+    })
+      .png()
+      .toFile(file)
+
+    await run({ kind: 'add-image', name: 'sharp', x: 0, y: 0, path: file, quality: 'hi' })
+    // 'hi' caps the long side at 2048 (2:1 → 2048×1024).
+    const shape = (await readScratchpadShapes(WS)).find(s => s.id === 'sharp')
+    expect(shape).toMatchObject({ type: 'image', w: 2048, h: 1024 })
+  })
+
+  test('read-image errors clearly for a missing or non-image shape', async () => {
+    await run({ kind: 'add-rect', name: 'box', x: 0, y: 0, w: 10, h: 10 })
+    expect(await readScratchpadImage(WS, 'nope')).toEqual({ error: expect.stringMatching(/nope/) })
+    expect(await readScratchpadImage(WS, 'box')).toEqual({
+      error: expect.stringMatching(/not an image/)
+    })
   })
 })

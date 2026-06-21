@@ -8,7 +8,7 @@ import { loadLayout, saveLayout } from './layout'
 import { publishEvent } from './events'
 import { findWorkspaceForPath, listWorkspaces, registerWorkspace } from './registry'
 import { executeScratchOp } from './scratchpad-executor'
-import { readScratchpadShapes } from './scratchpad'
+import { readScratchpadImage, readScratchpadShapes } from './scratchpad'
 import { relayScratchOp } from './scratchpad-relay'
 import { broadcastAll } from './state'
 import { applyThemeUpdate, matchColorTheme } from './theme'
@@ -206,6 +206,13 @@ export const control = Bun.serve({
           // `read` is served straight off the disk snapshot — no live tab needed.
           if (op.kind === 'read') {
             ws.send(JSON.stringify({ shapes: await readScratchpadShapes(match.path) }))
+            return
+          }
+
+          // `read-image` resolves one image shape's data off disk too — `read`
+          // omits the blob, so this is how the agent pulls a specific image.
+          if (op.kind === 'read-image') {
+            ws.send(JSON.stringify(await readScratchpadImage(match.path, String(op.name))))
             return
           }
 
