@@ -29,10 +29,10 @@ export type ViewInfo = {
   config: ViewConfig
 }
 
-// A Scratchpad draw/view operation, relayed from `moi scratch` to a live tldraw
-// editor in a connected tab. The server assigns each add op a `name` (the
-// `--id`, or a generated one) so the derived tldraw shape id is deterministic —
-// every tab that executes the op converges to the same shape. Arrow endpoints
+// A Scratchpad draw/view operation issued by `moi scratch`. Mutations run
+// server-side against a headless tldraw store; `view` relays to a live tab. The
+// server assigns each add op a `name` (the `--id`, or a generated one) so the
+// derived tldraw shape id is deterministic and addressable later. Arrow endpoints
 // bind to a shape (by name) or sit at a free point. See docs/moi-scratchpad.md.
 export type ScratchPoint = { x: number; y: number }
 export type ScratchArrowEnd = { name: string } | ScratchPoint
@@ -160,9 +160,10 @@ export type ServerMessage =
   | StatusSnapshotMessage
   | ScratchpadOpMessage
 
-// A Scratchpad op relayed to the tab(s) showing `workspaceId`'s canvas. Only a
-// tab with a live editor for that workspace executes it and replies with a
-// matching `scratchpad:op-result` (correlated by `opId`); others ignore it.
+// A Scratchpad op relayed to the tab(s) showing `workspaceId`'s canvas. Only
+// `view` travels this way now (rendering needs the browser); mutations run
+// server-side. The tab with a live editor for that workspace executes it and
+// replies with a matching `scratchpad:op-result` (correlated by `opId`).
 export type ScratchpadOpMessage = {
   type: 'scratchpad:op'
   workspaceId: string

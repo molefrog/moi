@@ -321,8 +321,8 @@ one.put('/config', async c => {
 // ({ document } or { document: null } when empty) for hydration; PUT saves a new
 // snapshot ({ document, origin }) and broadcasts so other open tabs reload.
 // `origin` is the writing tab's id — echoed in the broadcast so that tab can
-// ignore its own save. The browser is the only writer here. See
-// docs/moi-scratchpad.md.
+// ignore its own save. This is the browser's write path; the agent's draws are
+// written server-side (see scratchpad-executor.ts). See docs/moi-scratchpad.md.
 one.get('/scratchpad', async c => {
   return c.json(await loadScratchpadDoc(c.get('ws').path))
 })

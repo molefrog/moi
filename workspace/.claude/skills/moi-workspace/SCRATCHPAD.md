@@ -51,12 +51,13 @@ can't pick by hand; neither side should be able to make something the other can'
 
 ## How it works
 
-The canvas is a real tldraw editor in the **browser** — that's where drawing and rendering happen.
-The moi server is a relay and disk store, not a tldraw runtime.
+Almost everything works **without the Scratchpad tab open** — the user can close it and you can
+still draw. The disk snapshot (`.moi/scratchpad.json`) is the source of truth.
 
-- **`read`** is parsed straight off the saved snapshot on disk — no browser needed.
-- **`view` and the draw ops** (`add`/`move`/`set`/`delete`/`clear`) relay to the live editor in a
-  connected tab, which runs them against tldraw and replies. If no tab is showing **this**
-  workspace's Scratchpad, those commands report "No live canvas" — ask the user to open the
-  Scratchpad tab. (`read` still works off disk.)
-- Edits are **last-write-wins** and autosaved; a clobbered change is cheap to redo. No locking.
+- **`read`** parses the saved snapshot straight off disk — no browser.
+- **Drawing** (`add`/`move`/`set`/`delete`/`clear`) runs on the server against a headless tldraw
+  store, writes the snapshot, and nudges any open tab to reload. No live tab needed.
+- **`view`** is the one exception: rasterizing the canvas needs the browser, so it relays to a
+  connected tab. With none showing **this** workspace's Scratchpad it reports "No live canvas" —
+  ask the user to open the Scratchpad tab. Every other command still works off disk.
+- Edits are **last-write-wins** between you and the user; a clobbered change is cheap to redo.
