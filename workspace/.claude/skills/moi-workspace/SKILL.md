@@ -1,5 +1,6 @@
 ---
 name: moi-workspace
+version: 0.1.0
 description: The moi workspace — the web UI the user chats from, extended with agent-authored applets (widgets, views) plus theme & config. Read this FIRST in two cases. (a) A message carries hidden <moi>…</moi> meta tags: it was fired from a moi workspace, so you are running inside one even if nothing else says so. (b) The user uses moi vocab — workspace, applet, widget, view, scratchpad, dashboard, or a `moi` command — or asks to build, edit, customize, or theme the workspace UI or its layout.
 ---
 
@@ -110,8 +111,19 @@ documentation. Call `moi` in the `.moi` folder.
 - `moi theme --font=<key>` — change font theme (omit `--font` to list options)
 - `moi theme --color=<key>` — change color preset (omit `--color` to list options)
 - `moi config` — set the workspace name & icon (`moi config --help` for usage)
+- `moi skill` — show installed vs bundled skill versions; `moi skill update` to refresh
 
 For more options, commands, use `moi help`.
+
+## Keeping the skill current
+
+This skill is shipped with the `moi` CLI and copied into the workspace. When the CLI is upgraded, the
+copy here can fall behind. `moi` commands surface this: if you ever see a line like
+`⚠ moi skill outdated: moi-workspace (… → …) — run \`moi skill update\` to refresh.` in command
+output, run `moi skill update` to bring this skill up to date. The update only rewrites the bundled
+skill files — your `.moi` applets, deps, and config are untouched. Changes take effect the next time
+the skill is loaded (a new session or next invocation), not mid-task, so finish what you're doing
+first. Only minor+ updates are surfaced; patch differences are pulled in silently on the next update.
 
 # Critical constraints when interacting with moi
 
