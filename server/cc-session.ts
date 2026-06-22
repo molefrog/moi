@@ -19,10 +19,63 @@ import {
 } from '@anthropic-ai/claude-agent-sdk'
 
 import { ClaudeAdapter } from '@/lib/claude-adapter'
+import type { Part } from '@/lib/format'
 
 import { broadcast } from './state'
 import { hasThreadConfig, renameThreadConfig, saveThreadConfig } from './thread-config'
+import { type StoredUpload, resolveUploads, uploadToDisplayPart } from './uploads'
 import { resolveWorkspaceEnv } from './workspace-env'
+
+// Media types Claude vision accepts; uploads.ts guarantees every image upload is
+// normalized to one of these, so the cast on `media_type` below is sound.
+type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
+
+// What the SDK's streaming-input prompt accepts for one message's content:
+// a plain string or an array of Anthropic content blocks (text/image/…).
+type MessageContent = SDKUserMessage['message']['content']
+
+// Turn a typed text + resolved uploads into (a) the content the agent receives
+// and (b) the display parts we broadcast for the user's bubble. Images become
+// base64 vision blocks; other files are referenced by their temp path so the
+// agent can Read them. Display text stays the user's text (no path note).
+function buildUserMessage(
+  text: string,
+  uploads: StoredUpload[]
+): { content: MessageContent; parts: Part[] } {
+  const parts: Part[] = []
+  for (const u of uploads) {
+    const part = uploadToDisplayPart(u)
+    if (part) parts.push(part)
+  }
+  if (text) parts.push({ type: 'text', text })
+
+  if (uploads.length === 0) return { content: text, parts }
+
+  const blocks: Exclude<MessageContent, string> = []
+  for (const u of uploads) {
+    if (u.kind === 'image' && u.data) {
+      blocks.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: u.mediaType as ImageMediaType,
+          data: u.data.toString('base64')
+        }
+      })
+    }
+  }
+
+  const files = uploads.filter(u => u.kind === 'file' && u.path)
+  let agentText = text
+  if (files.length > 0) {
+    const list = files.map(f => `- ${f.filename}: ${f.path}`).join('\n')
+    agentText =
+      `${text}\n\nThe user attached the following file(s); read them as needed:\n${list}`.trim()
+  }
+  // Always end with a text block so an image-only message still has a prompt.
+  blocks.push({ type: 'text', text: agentText || '(see attached files)' })
+  return { content: blocks, parts }
+}
 
 // Cap on concurrently-held live sessions (each = one claude subprocess). When
 // exceeded, the least-recently-active IDLE session is closed; a busy session is
@@ -44,7 +97,7 @@ const ALLOWED_TOOLS = [
 
 type InputQueue = {
   iterator: AsyncGenerator<SDKUserMessage>
-  push: (text: string) => void
+  push: (content: MessageContent) => void
   clear: () => void
   close: () => void
 }
@@ -125,10 +178,10 @@ function createInputQueue(): InputQueue {
 
   return {
     iterator: gen(),
-    push(text: string) {
+    push(content: MessageContent) {
       buffer.push({
         type: 'user',
-        message: { role: 'user', content: text },
+        message: { role: 'user', content },
         parent_tool_use_id: null
       })
       wake?.()
@@ -321,6 +374,8 @@ export async function sendCCMessage(input: {
   sessionId: string
   isNew: boolean
   content: string
+  // Upload ids attached to this turn (resolved from the upload store here).
+  attachments?: string[]
   optimisticId?: string
   model?: string
   effort?: string
@@ -362,6 +417,13 @@ export async function sendCCMessage(input: {
     s.desiredEffort = input.effort
   }
 
+  // Resolve any attachments into agent content blocks + display parts. Unknown
+  // or expired ids are silently dropped (resolveUploads filters them).
+  const uploads = input.attachments?.length
+    ? resolveUploads(input.workspaceId, input.attachments)
+    : []
+  const { content, parts } = buildUserMessage(input.content, uploads)
+
   // Streaming-input mode does NOT echo the pushed user message back in the
   // output stream (string-prompt mode did — that's what expectUserEcho was
   // for), so the adapter never emits a user turn. Synthesize and broadcast it
@@ -376,7 +438,7 @@ export async function sendCCMessage(input: {
       id: turnId,
       role: 'user',
       origin: { kind: 'user-input' },
-      parts: [{ type: 'text', text: input.content }],
+      parts,
       timestamp: new Date().toISOString()
     }
   })
@@ -388,7 +450,7 @@ export async function sendCCMessage(input: {
   const wasIdle = s.pendingTurns === 0
   s.pendingTurns++
   if (wasIdle) broadcastProcessing(s, true)
-  s.input.push(input.content)
+  s.input.push(content)
 }
 
 // Interrupt the current turn and drop any queued messages, but keep the session

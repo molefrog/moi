@@ -44,6 +44,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
     optimisticId?: unknown
     model?: unknown
     effort?: unknown
+    attachments?: unknown
     opId?: unknown
   }
   if (v.type === 'chat')
@@ -54,7 +55,9 @@ function isClientMessage(value: unknown): value is ClientMessage {
       typeof v.isNew === 'boolean' &&
       (v.optimisticId === undefined || typeof v.optimisticId === 'string') &&
       (v.model === undefined || typeof v.model === 'string') &&
-      (v.effort === undefined || typeof v.effort === 'string')
+      (v.effort === undefined || typeof v.effort === 'string') &&
+      (v.attachments === undefined ||
+        (Array.isArray(v.attachments) && v.attachments.every(a => typeof a === 'string')))
     )
   if (v.type === 'stop') return typeof v.workspaceId === 'string' && typeof v.sessionId === 'string'
   if (v.type === 'scratchpad:op-result') return typeof v.opId === 'string'
@@ -121,7 +124,8 @@ export const app = Bun.serve<WsData>({
         const data = JSON.parse(String(message))
         if (!isClientMessage(data)) return
 
-        if (data.type === 'chat' && data.content?.trim()) {
+        // Allow a message that carries only attachments (no text).
+        if (data.type === 'chat' && (data.content?.trim() || data.attachments?.length)) {
           const workspace = await getWorkspace(data.workspaceId)
           if (!workspace) return
           if (workspace.type === 'openclaw' && workspace.agentId) {
@@ -132,6 +136,7 @@ export const app = Bun.serve<WsData>({
               sessionId: data.sessionId,
               isNew: data.isNew,
               content: data.content.trim(),
+              attachments: data.attachments,
               optimisticId: data.optimisticId
             })
           } else {
@@ -141,6 +146,7 @@ export const app = Bun.serve<WsData>({
               sessionId: data.sessionId,
               isNew: data.isNew,
               content: data.content.trim(),
+              attachments: data.attachments,
               optimisticId: data.optimisticId,
               model: data.model,
               effort: data.effort

@@ -31,6 +31,13 @@ type ContentBlock = {
   media_type?: string
   filename?: string
   source_id?: string
+  // Image/document blocks carry their payload here (base64) or as a bare `url`.
+  source?: {
+    type?: string
+    media_type?: string
+    data?: string
+    url?: string
+  }
 }
 
 type SdkMessage = {
@@ -339,16 +346,26 @@ export class ClaudeAdapter {
         }
         case 'file':
         case 'image':
-        case 'document':
-          if (b.url) {
-            parts.push({
-              type: 'file',
-              mediaType: b.media_type ?? b.type,
-              url: b.url,
-              filename: b.filename
-            })
+        case 'document': {
+          // A bare `url` (legacy) or an Anthropic source block: base64 → data
+          // URL so the persisted attachment re-renders on cold load, or a
+          // source `url` passed through as-is.
+          const src = b.source
+          let url = b.url
+          let mediaType = b.media_type ?? src?.media_type ?? b.type
+          if (!url && src) {
+            if (src.type === 'base64' && src.data && src.media_type) {
+              url = `data:${src.media_type};base64,${src.data}`
+              mediaType = src.media_type
+            } else if (src.url) {
+              url = src.url
+            }
+          }
+          if (url) {
+            parts.push({ type: 'file', mediaType, url, filename: b.filename })
           }
           break
+        }
       }
     }
 

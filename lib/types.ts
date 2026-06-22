@@ -96,6 +96,24 @@ export type ScratchOp =
 // data URL for `view`, or a bare ack for mutations.
 export type ScratchOpResult = { name: string } | { image: string } | { ok: true }
 
+// An attachment uploaded ahead of a chat message. The bytes live server-side in
+// an in-memory upload store (see server/uploads.ts); a chat frame references it
+// by `id`. `kind` splits the two delivery paths: an `image` is inlined as a
+// base64 vision block in the agent message, a `file` is written to a temp path
+// the agent can `Read`. Returned by POST /api/workspaces/:id/uploads.
+export type UploadKind = 'image' | 'file'
+export type UploadInfo = {
+  id: string
+  kind: UploadKind
+  // Normalized media type (images are re-encoded to a vision-safe type).
+  mediaType: string
+  filename: string
+  size: number
+  // Pixel dimensions, for images only — lets the composer reserve space.
+  width?: number
+  height?: number
+}
+
 // Client → Server messages.
 // The chat WebSocket is app-wide (one socket for the whole client, not scoped to
 // a workspace), so every message carries the `workspaceId` it targets.
@@ -106,6 +124,10 @@ export type ClientMessage =
       content: string
       sessionId: string
       isNew: boolean
+      // Upload ids (from POST .../uploads) to attach to this turn. The server
+      // resolves each from its upload store and turns it into a vision block
+      // (image) or a temp-file path reference (other files). Order is preserved.
+      attachments?: string[]
       // Client-chosen stable id for the user's turn. The server tells the
       // adapter to use this id when the SDK echoes the user input back, so
       // the optimistic bubble the client rendered gets upserted in place.

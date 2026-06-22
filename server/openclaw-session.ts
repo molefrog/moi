@@ -27,6 +27,7 @@ import {
 } from './openclaw-adapter'
 import { getGateway, onGatewayReconnected } from './openclaw-gateway'
 import { broadcast } from './state'
+import { materializeToPath, resolveUploads } from './uploads'
 
 type OpenClawSessionKey = string // the gateway-side composite key, e.g. `agent:main:main`
 
@@ -360,6 +361,37 @@ export function viewAsEvents(rec: SessionRecord): StreamEvent[] {
 }
 
 export async function sendOpenClawMessage(input: {
+  workspaceId: string
+  workspacePath: string
+  agentId: string
+  sessionId: string
+  isNew: boolean
+  content: string
+  // Upload ids. Basic support: the gateway's `sessions.send` only takes a string
+  // message, so we materialize each upload to a temp file and append the paths
+  // for the agent to read. Rich vision blocks await a gateway content-block API
+  // (see dev/file-uploads.md).
+  attachments?: string[]
+  optimisticId?: string
+}): Promise<void> {
+  // Fold any attachments into the message text as file-path references.
+  let content = input.content
+  if (input.attachments?.length) {
+    const uploads = resolveUploads(input.workspaceId, input.attachments)
+    const paths: string[] = []
+    for (const u of uploads) {
+      const p = await materializeToPath(u)
+      if (p) paths.push(`- ${u.filename}: ${p}`)
+    }
+    if (paths.length > 0) {
+      content =
+        `${input.content}\n\nThe user attached the following file(s); read them as needed:\n${paths.join('\n')}`.trim()
+    }
+  }
+  return sendOpenClawMessageImpl({ ...input, content })
+}
+
+async function sendOpenClawMessageImpl(input: {
   workspaceId: string
   workspacePath: string
   agentId: string

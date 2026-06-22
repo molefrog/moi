@@ -11,9 +11,9 @@ import {
 import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
 import { sendMessage } from '@/client/lib/connection'
-import { liveStore, useLive } from '@/client/store/live'
+import { draftKey, liveStore, useLive } from '@/client/store/live'
 import { applyEvent, emptyViewState } from '@/lib/format'
-import type { ViewState } from '@/lib/types'
+import type { Part, ViewState } from '@/lib/types'
 
 const EMPTY: ViewState = emptyViewState()
 
@@ -46,9 +46,14 @@ export function useChat() {
   const send = useCallback(
     (draft: string) => {
       const text = draft.trim()
+      // Attachments for the active thread, keyed exactly like the draft. Only
+      // fully-uploaded ones are sent; the composer disables send while any are
+      // still uploading, so in practice they're all ready here.
+      const pending = liveStore.getState().attachments[draftKey(workspaceId, activeSessionId)] ?? []
+      const ready = pending.filter(a => a.status === 'ready' && a.upload)
       // No `processing` guard: sending while a turn is in flight QUEUES the
       // message into the same live server session (streaming-input mode).
-      if (!text) return
+      if (!text && ready.length === 0) return
 
       let sid = activeSessionId
       let isNew = false
@@ -60,8 +65,19 @@ export function useChat() {
 
       // Optimistic user turn — primed into the RQ transcript cache so it renders
       // immediately. The server re-ids the SDK's user echo to optimisticId so it
-      // upserts in place rather than duplicating.
+      // upserts in place rather than duplicating. Image attachments render from
+      // their local object URL until the server's broadcast (with a data URL)
+      // upserts in place.
       const optimisticId = `optimistic:${crypto.randomUUID()}`
+      const parts: Part[] = []
+      for (const a of ready) {
+        if (a.upload?.kind === 'image' && a.previewUrl) {
+          parts.push({ type: 'file', mediaType: a.mediaType, url: a.previewUrl, filename: a.name })
+        } else {
+          parts.push({ type: 'file', mediaType: a.mediaType, url: '', filename: a.name })
+        }
+      }
+      if (text) parts.push({ type: 'text', text })
       qc.setQueryData<ViewState>(workspaceKeys.events(workspaceId, sid), prev =>
         applyEvent(prev ?? emptyViewState(), {
           kind: 'turn',
@@ -69,7 +85,7 @@ export function useChat() {
             id: optimisticId,
             role: 'user',
             origin: { kind: 'user-input' },
-            parts: [{ type: 'text', text }],
+            parts,
             timestamp: new Date().toISOString()
           }
         })
@@ -100,8 +116,13 @@ export function useChat() {
         isNew,
         optimisticId,
         model,
-        effort
+        effort,
+        ...(ready.length > 0 ? { attachments: ready.map(a => a.upload!.id) } : {})
       })
+      // Drop the thread's attachments now that they've been sent (revokes the
+      // preview object URLs). Keyed by the pre-mint id, matching where they were
+      // stored by the composer.
+      liveStore.getState().clearAttachments(workspaceId, activeSessionId)
     },
     [
       activeSessionId,
