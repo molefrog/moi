@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { applyEvents } from '@/lib/format'
 import type {
   DiscoveredWorkspace,
+  EnvScope,
   McpServer,
   SessionInfo,
   StreamEvent,
@@ -11,6 +12,7 @@ import type {
   ViewState,
   WidgetInfo,
   WorkspaceEntry,
+  WorkspaceEnvView,
   WorkspaceLayout,
   WorkspaceModels,
   WorkspacePreview,
@@ -44,7 +46,8 @@ export const workspaceKeys = {
   threadConfig: (id: string, sessionId: string) =>
     ['workspaces', 'threadConfig', id, sessionId] as const,
   mcp: (id: string) => ['workspaces', 'mcp', id] as const,
-  models: (id: string) => ['workspaces', 'models', id] as const
+  models: (id: string) => ['workspaces', 'models', id] as const,
+  env: (id: string) => ['workspaces', 'env', id] as const
 }
 
 // Registered workspaces (the contents of workspaces.json).
@@ -234,6 +237,102 @@ export function useSaveLayout(workspaceId: string) {
         body: JSON.stringify(layout)
       })
       if (!res.ok) throw new Error('Failed to save layout')
+    }
+  })
+}
+
+// A workspace's effective env view (masked values + scopes + discovered `.env`).
+export function useWorkspaceEnv(workspaceId: string) {
+  return useQuery<WorkspaceEnvView>({
+    queryKey: workspaceKeys.env(workspaceId),
+    queryFn: () => fetch(`/api/workspaces/${workspaceId}/env`).then(r => r.json()),
+    ...WORKSPACE_RESOURCE_OPTS
+  })
+}
+
+// Patch of a workspace's env: set/remove custom secrets, change scopes, or
+// toggle `.env` inheritance. The PUT returns the fresh view (see useUpdateEnv).
+export type EnvPatch = {
+  set?: Record<string, string>
+  remove?: string[]
+  scopes?: Record<string, EnvScope>
+  inheritDotenv?: boolean
+}
+
+// Apply an env patch. The endpoint returns the recomputed view, which we write
+// straight into the cache so the list reflects the change immediately.
+export function useUpdateEnv(workspaceId: string) {
+  const qc = useQueryClient()
+  return useMutation<WorkspaceEnvView, Error, EnvPatch>({
+    mutationFn: async patch => {
+      const res = await fetch(`/api/workspaces/${workspaceId}/env`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch)
+      })
+      if (!res.ok) throw new Error(await res.text())
+      return res.json()
+    },
+    onSuccess: next => {
+      qc.setQueryData<WorkspaceEnvView>(workspaceKeys.env(workspaceId), next)
+    }
+  })
+}
+
+// Set (or clear, with `null`) the workspace display-name override. The server
+// broadcasts `workspace:updated`, but we also invalidate locally so the modal,
+// header, and sidebar reflect the change without waiting on the socket.
+export function useSaveWorkspaceName(workspaceId: string) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, string | null>({
+    mutationFn: async name => {
+      const res = await fetch(`/api/workspaces/${workspaceId}/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      })
+      if (!res.ok) throw new Error('Failed to save name')
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })
+      qc.invalidateQueries({ queryKey: workspaceKeys.all })
+    }
+  })
+}
+
+// Upload a raw image as the workspace icon (the server resizes to a 128×128
+// WebP and returns the data URL). Used for direct uploads and for the canvas
+// rasterized from an emoji/glyph + background.
+export function useSaveWorkspaceIcon(workspaceId: string) {
+  const qc = useQueryClient()
+  return useMutation<{ icon: string }, Error, Blob>({
+    mutationFn: async blob => {
+      const res = await fetch(`/api/workspaces/${workspaceId}/icon`, {
+        method: 'PUT',
+        headers: { 'Content-Type': blob.type || 'application/octet-stream' },
+        body: blob
+      })
+      if (!res.ok) throw new Error(await res.text())
+      return res.json()
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })
+      qc.invalidateQueries({ queryKey: workspaceKeys.all })
+    }
+  })
+}
+
+// Reset the icon back to the provider default.
+export function useResetWorkspaceIcon(workspaceId: string) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, void>({
+    mutationFn: async () => {
+      const res = await fetch(`/api/workspaces/${workspaceId}/icon`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to reset icon')
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })
+      qc.invalidateQueries({ queryKey: workspaceKeys.all })
     }
   })
 }

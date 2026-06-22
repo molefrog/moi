@@ -1,20 +1,19 @@
 import { useState } from 'react'
 
-import { IconKey, IconSettings, IconSparkles, IconX } from '@tabler/icons-react'
+import { IconKey, IconSettings, IconX } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/client/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { cn } from '@/client/lib/cn'
 
-import { EnvironmentSettings, FeaturesSettings, GeneralSettings } from './SettingsPages'
+import { EnvironmentSettings, GeneralSettings } from './SettingsPages'
 
-type SettingsNav = 'general' | 'environment' | 'features'
+type SettingsNav = 'general' | 'environment'
 
 const NAV: { id: SettingsNav; label: string; icon: typeof IconSettings }[] = [
   { id: 'general', label: 'General', icon: IconSettings },
-  { id: 'environment', label: 'Environment', icon: IconKey },
-  { id: 'features', label: 'Features', icon: IconSparkles }
+  { id: 'environment', label: 'Environment', icon: IconKey }
 ]
 
 export function WorkspaceSettings() {
@@ -80,13 +79,7 @@ export function WorkspaceSettings() {
               }
             />
             <div className="px-9 py-8">
-              {page === 'general' ? (
-                <GeneralSettings />
-              ) : page === 'environment' ? (
-                <EnvironmentSettings />
-              ) : (
-                <FeaturesSettings />
-              )}
+              {page === 'general' ? <GeneralSettings /> : <EnvironmentSettings />}
             </div>
           </div>
         </DialogContent>
