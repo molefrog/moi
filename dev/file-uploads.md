@@ -1,121 +1,161 @@
-# File / image attachments
+# File uploads — the one plan
 
-Drag-drop, paste, or attach files in the chat composer — like the Claude Code
-desktop app. This documents how it works, what the Agent SDK expects, and how the
-pipeline extends to OpenClaw and future adapters.
+This is the canonical spec for how attachments work in moi: how Claude Code
+itself does it (verified empirically, CLI + desktop), the one constraint we can't
+design around, the target design for moi, and an honest gap analysis against
+what's shipped today.
 
-## What Claude Code / the Agent SDK expects
+---
 
-A streaming-input session yields `SDKUserMessage`s whose `message` is an Anthropic
-`MessageParam`:
+## Part 1 — Ground truth: how Claude Code handles uploads
 
-```ts
-type MessageParam = { role: 'user' | 'assistant'; content: string | ContentBlockParam[] }
+There are **two completely separate mechanisms**. Conflating them is the source
+of every "wait, is it copied or read live?" confusion.
+
+|                                  | **A. Image / binary attach** (paste, drag, ⌘-attach)                                                                   | **B. `@`-mention** (typed path)                                                                                                                          |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Trigger                          | Paste/drag an image into the prompt                                                                                    | Type `@"/path/to/file"`                                                                                                                                  |
+| How the model receives it        | Decoded pixels **inline, same turn** — `{"source":{"type":"base64","media_type":"image/png","data":…}}`. No tool call. | File **text inline, same turn** — expanded into an `attachment` record of `type:"file"` (`content.file.content`, `filename`, `displayPath`, `numLines`). |
+| Live vs snapshot                 | **Snapshot** — frozen at send time; survives deleting the original                                                     | **Live read** at send time; edit + re-reference → new content. Re-reference → `already_read_file` dedup record.                                          |
+| Disk copy outside the transcript | **CLI: yes** → `~/.claude/image-cache/<session>/<N>.png`. **Desktop: no.**                                             | Neither — no `/tmp`, no staging, original path only                                                                                                      |
+| In the transcript `.jsonl`       | Full base64 embedded inline (both clients)                                                                             | Text embedded once                                                                                                                                       |
+| Non-image / huge file            | (attach is image-oriented)                                                                                             | Lands as raw/garbled text — no special handling                                                                                                          |
+
+**CLI ↔ desktop divergence (the only real one):** both deliver images to the
+model identically (inline base64 — seen instantly, no tool call). They differ
+only in the _extra_ on-disk artifact:
+
+- **Desktop:** inline base64 in the `.jsonl` is the **only** copy.
+- **CLI:** _additionally_ writes `~/.claude/image-cache/<session>/<N>.png` —
+  re-encoded to PNG, mode `0600`, `<N>` is a **session-global counter** (not
+  per-message), **no dedup**, and the cache is **ephemeral** (GC'd between
+  sessions). The message also carries an `[Image: source: …/N.png]` path token
+  alongside the base64.
+
+**What reaches the model each turn:** images → decoded pixels inline (both
+clients); `@`-mentions → file text inline. A tool call only fires when the agent
+_chooses_ to `Read`/`ls` to verify disk state — never to receive the content.
+
+**Where it persists:**
+
+```
+~/.claude/projects/<encoded-cwd>/<session>.jsonl   durable: text + full base64 of
+                                                   every image + expanded mention text
+~/.claude/image-cache/<session>/<N>.png            CLI only: 0600, ephemeral
+[Anthropic API]                                    all of the above, sent per turn
 ```
 
-`content` may be a plain string **or** an array of content blocks. For
-attachments the relevant blocks are:
+**Three verified rough edges** (true of both clients):
 
-- `ImageBlockParam` — `{ type: 'image', source: { type: 'base64', media_type, data } }`
-  (also accepts a `url` source). `media_type` is one of
-  `image/jpeg | image/png | image/gif | image/webp`.
-- `DocumentBlockParam` — PDFs (`application/pdf` base64) and plain-text sources.
+1. **Base64 is inlined into the transcript** → a couple of screenshots bloated a
+   real session to ~1.5 MB.
+2. **No dedup anywhere** → a bit-for-bit identical image re-pasted is stored a
+   second full copy (verified: same SHA-256, two/three full base64 blocks).
+3. **No lifecycle / redaction** → uploads are unencrypted-on-disk (CLI) +
+   in-transcript + sent-to-API with no GC or scrub. `@`-mentioning a sensitive
+   file writes its plaintext into the `.jsonl` even though no temp copy is made.
 
-The SDK persists whatever blocks you send into the session `.jsonl`, so an
-attached image is stored inline as base64 in the transcript — there is no
-separate sidecar file. That means **persistence and cold-reload come for free**:
-we only need the adapter to parse those blocks back out when replaying a session.
+---
 
-Anthropic's guidance: downscale images to a long edge ≤ 1568px for the best
-cost/latency (no quality loss for the model), keep ≤ ~5MB per image, and inline
-small images as base64 rather than round-tripping the Files API.
+## Part 2 — The one constraint we can't design around
 
-## moi's pipeline (Claude Code)
+The model sees an image **only** if the bytes are in the message content as a
+base64 `image` block (or a URL/`file_id` source). The Agent SDK then **persists
+whatever blocks we send into the session `.jsonl`** — that transcript is
+SDK-owned, not moi-owned.
 
-```
-composer (drop/paste/attach)
-  → POST /api/workspaces/:id/uploads        (multipart, one or many files)
-      → server/uploads.ts: sharp downscale/transcode, stash bytes in-memory (TTL)
-      ← UploadInfo[] { id, kind, mediaType, filename, size, width?, height? }
-  → WS chat frame { content, attachments: uploadId[] }
-      → server/cc-session.ts: resolveUploads → build SDKUserMessage content:
-          images  → base64 image blocks (native vision)
-          files   → written to a temp path, referenced in the prompt text
-        and broadcast the user turn with `file` display parts (data URLs)
-  → agent runs; SDK persists the image blocks to the session .jsonl
-  → on reload, state.ts replays the .jsonl through ClaudeAdapter, which turns
-    base64 image blocks back into `file` parts → thumbnails render again
-```
+So for any agent that runs through the SDK, **base64 in the transcript is
+unavoidable for vision** — exactly why both Claude Code clients do it. moi cannot
+dedup or de-inline the _SDK transcript_ without intercepting SDK persistence
+(fragile, out of scope).
 
-Why an HTTP upload instead of base64 over the WebSocket:
+The design lever moi _does_ control is **its own layers** — upload storage,
+WebSocket transport, the React Query cache, and the rendered display. Those
+should never re-inline base64; that's where the bloat is fixable.
 
-- Keeps chat frames (and the user-turn broadcast that fans out to every tab)
-  small — a 4MB screenshot would otherwise bloat every frame.
-- Lets us downscale once, server-side, with `sharp` (already a dependency).
-- Gives non-image files a real path the agent can `Read`.
+---
 
-Upload bytes are short-lived (a 30-minute TTL in the in-memory store); the
-durable copy is the base64 block the SDK writes to the `.jsonl`.
+## Part 3 — Target design for moi
 
-### Key files
+Three input pipelines, mirroring Claude Code's mental model but adapted to moi's
+WS + adapter architecture.
 
-- `server/uploads.ts` — upload store, `sharp` processing, `resolveUploads`,
-  display-part / data-URL / `materializeToPath` helpers.
-- `server/api.ts` — `POST /api/workspaces/:id/uploads`.
-- `server/cc-session.ts` — `buildUserMessage()` turns text + uploads into the
-  SDK content blocks and the broadcast display parts.
-- `lib/claude-adapter.ts` — parses persisted `image`/`document` blocks
-  (base64 or url source) into `file` parts.
-- `client/lib/uploads.ts` — `uploadFiles()`.
-- `client/store/live.ts` — per-thread `attachments` state (mirrors `drafts`).
-- `client/components/ChatInput.tsx` — attach button, paste, drag-drop, thumbnails.
-- `client/components/TurnView.tsx` — renders image/file parts in the bubble.
+### Pipeline 1 — Image / binary attach (paste, drag, attach button)
 
-## OpenClaw (basic support today)
+1. **Upload** to `POST /api/workspaces/:id/uploads` (multipart). Server:
+   - downscales images with `sharp` (≤1568px long edge), normalizes to a
+     vision-safe media type (or PNG);
+   - **content-addresses** the bytes: `id = sha256(bytes-after-processing)`, so a
+     re-pasted identical image resolves to the same stored entry (**dedup**);
+   - stores bytes in the in-memory TTL store; non-images go to a temp path.
+2. **Transport:** the chat WS frame carries only upload **ids** (never base64).
+3. **To the agent:** `cc-session` builds base64 `image` blocks + text. _(This — and
+   only this — inlines base64, because the SDK transcript requires it.)_
+4. **Display:** the broadcast user turn references images by a **served URL**
+   (`GET /api/workspaces/:id/uploads/:id`), **not** a data URL — so base64 never
+   travels over the WS broadcast or sits in the RQ cache. On cold reload the
+   adapter reconstructs from the `.jsonl` base64 (the one place it must).
 
-The OpenClaw gateway's `sessions.send` RPC currently accepts only a **string**
-message — there is no content-block channel. So `sendOpenClawMessage` does the
-honest minimal thing: it materializes each upload to a temp file
-(`materializeToPath`) and appends the paths to the message text, so an OpenClaw
-agent with file/vision tools can open them. There is no inline vision and the
-appended paths are visible in the rendered turn.
+### Pipeline 2 — Path / workspace-file reference (the `@`-mention analogue) — _new_
 
-To make OpenClaw first-class, the gateway needs a content-block message API
-(images as base64 or file ids, à la the Anthropic shape). When that lands:
+For files **already in the workspace**, copying bytes is wasteful and loses the
+"live read" semantics. Add an `@`-style picker / path token that:
 
-1. Extend the `sessions.send` payload with a `content` array (text + image/file
-   blocks), keeping `message` for back-compat.
-2. In `sendOpenClawMessage`, build blocks from `resolveUploads` instead of
-   appending paths (reuse the `buildUserMessage` logic, factored into a shared
-   helper).
-3. Teach `server/openclaw-adapter.ts` `blockToPart` to map the gateway's stored
-   image/file blocks into `file` parts (it already has the `default: return null`
-   slot where image blocks are currently dropped), so reloads render thumbnails.
+- inserts a path reference (no upload, no copy);
+- the agent reads **live** via its `Read` tool at use time (sees current content);
+- displays as a file chip, not a thumbnail.
 
-## Adding a new adapter
+This is the cheap, correct path for repo files — it's how power users expect it to
+work and it sidesteps base64 entirely.
+
+### Pipeline 3 — Non-image files (PDF, csv, binaries)
+
+Written to a temp path; the path is referenced in the prompt so the agent
+`Read`s it. PDFs can later upgrade to native `document` blocks (the plumbing
+already supports a `kind`).
+
+### Cross-cutting: lifecycle & redaction
+
+- Upload store: TTL eviction (already 30 min); content-addressed entries dedup
+  naturally.
+- Temp files: namespaced under `$TMPDIR/moi-uploads/<id>/`; GC on TTL.
+- Redaction: a "remove attachment from thread" affordance that drops the display
+  reference. (The SDK `.jsonl` copy is SDK-owned; document that limitation rather
+  than pretend we can scrub it.)
+
+---
+
+## Part 4 — Gap analysis: shipped (PR #13) vs. target
+
+| Area                                            | Shipped today                                  | Target                                     | Action                                               |
+| ----------------------------------------------- | ---------------------------------------------- | ------------------------------------------ | ---------------------------------------------------- |
+| Upload transport                                | HTTP multipart + WS carries ids only ✅        | same                                       | done                                                 |
+| Image downscale/normalize (`sharp`)             | ✅                                             | same                                       | done                                                 |
+| Agent vision (base64 blocks)                    | ✅                                             | same (unavoidable)                         | done                                                 |
+| Persist/reload (adapter parses `.jsonl` base64) | ✅                                             | same                                       | done                                                 |
+| **Dedup**                                       | ❌ random-UUID keys                            | content-hash (`sha256`) keys               | **change `addUpload` to hash**                       |
+| **Display transport**                           | ❌ inlines base64 data URLs over WS + RQ cache | served URL (`GET …/uploads/:id`)           | **add GET route; `uploadToDisplayPart` returns URL** |
+| **Path / `@`-mention**                          | ❌ not supported                               | workspace-file reference, live read        | **new feature (pipeline 2)**                         |
+| Lifecycle TTL                                   | ✅ 30 min                                      | same                                       | done                                                 |
+| Redaction affordance                            | ❌                                             | remove-from-thread                         | nice-to-have                                         |
+| OpenClaw                                        | basic (temp path appended to string message)   | content-block API when gateway supports it | tracked                                              |
+
+**Net:** the transport and agent-vision halves match the target. The three
+fixable rough edges Claude Code exhibits — **base64 bloat in moi's own
+display/transport, no dedup, no path-mention** — are exactly the items still open
+for moi. The first two are small, well-scoped changes (content-hash keys + a GET
+route + return a URL from `uploadToDisplayPart`); the third (`@`-mention) is the
+one genuinely new feature.
+
+---
+
+## Part 5 — Adding a new adapter
 
 The display format is agent-agnostic: a `Part` of `{ type: 'file', mediaType,
-url, filename }` is all the UI needs (`url` may be a data URL or a served URL).
-For a new backend:
-
-1. **Inbound** — convert resolved uploads into whatever the backend's message API
-   accepts (base64 blocks preferred; a file path or upload id otherwise). The
-   `StoredUpload` record exposes `data` (image bytes), `path` (file uploads), and
-   `materializeToPath()` to cover both.
-2. **Display** — emit a `file` part for the user's turn (use
-   `uploadToDisplayPart` for live turns).
-3. **Persistence/reload** — in the adapter that replays the backend's transcript,
-   map its stored image/document blocks back into `file` parts so attachments
-   survive a reload.
-
-The client (`ChatInput`, the live-store `attachments`, `useChat.send`) is fully
-adapter-independent — it always uploads via the same endpoint and sends upload
-ids. Only the server-side send path and the replay adapter are per-backend.
-
-## Limits & follow-ups
-
-- Images are downscaled to ≤ 1568px long edge; non-vision image types transcode
-  to PNG; GIFs pass through. Per-file cap: 32MB raw upload.
-- Not yet done: PDF `document` blocks (the plumbing supports it — add a `kind`
-  and a `DocumentBlockParam` branch in `buildUserMessage`), a dedicated GET route
-  to stream uploads (we inline data URLs instead), and richer non-image previews.
+url, filename }` (url = served URL preferred, data URL only as a reload
+fallback). For a new backend: (1) convert resolved uploads into the backend's
+message shape (base64 blocks preferred; path/file-id otherwise — `StoredUpload`
+exposes `data`, `path`, and `materializeToPath()`); (2) emit `file` display
+parts; (3) in the replay adapter, map the backend's stored image/document blocks
+back into `file` parts so reloads render. The client (`ChatInput`, the live-store
+`attachments`, `useChat.send`) is fully backend-independent.
