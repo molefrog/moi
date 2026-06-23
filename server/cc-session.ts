@@ -38,7 +38,8 @@ type MessageContent = SDKUserMessage['message']['content']
 // and (b) the display parts we broadcast for the user's bubble. Images become
 // base64 vision blocks; other files are referenced by their temp path so the
 // agent can Read them. Display text stays the user's text (no path note).
-function buildUserMessage(
+// Exported for unit tests.
+export function buildUserMessage(
   text: string,
   uploads: StoredUpload[]
 ): { content: MessageContent; parts: Part[] } {
