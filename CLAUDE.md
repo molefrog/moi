@@ -27,7 +27,7 @@ Only one server runs at a time — it binds port 3000 (HTTP) and 13059 (control)
 
 ## Browser testing in cloud sandboxes
 
-To load the app in a real Chromium inside Claude Code on the web (Playwright or agent-browser), see `docs/browser-testing-cloud.md`. Short version: the sandbox's egress proxy kills the browser's TLS handshakes, so run `node scripts/esm-mirror.mjs` (serves esm.sh locally on 127.0.0.1:443) and launch Chromium with `--no-proxy-server --host-resolver-rules="MAP esm.sh 127.0.0.1"` plus ignored HTTPS errors.
+To load the app in a real Chromium inside Claude Code on the web (Playwright or agent-browser), see `docs/browser-testing-cloud.md`. React is vendored (`/vendor/react/*`), so the browser needs no external network: launch the preinstalled `/opt/pw-browsers/chromium` with no special flags (for agent-browser, set `AGENT_BROWSER_EXECUTABLE_PATH=/opt/pw-browsers/chromium`).
 
 ## Session Storage Notes
 
