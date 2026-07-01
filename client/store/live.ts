@@ -1,7 +1,21 @@
 import { useStore } from 'zustand'
 import { createStore } from 'zustand/vanilla'
 
-import type { PreviewBlock, PreviewFrame } from '@/lib/types'
+import type { PreviewBlock, PreviewFrame, UploadInfo } from '@/lib/types'
+
+// One composer attachment, tracked per thread until the message is sent. It is
+// uploaded as soon as it's added (drop/paste/pick); `status` reflects that
+// in-flight upload, and `upload` holds the server handle once ready. `previewUrl`
+// is a local object URL for image thumbnails (revoked on remove/clear).
+export type ChatAttachment = {
+  localId: string
+  name: string
+  mediaType: string
+  previewUrl?: string
+  status: 'uploading' | 'ready' | 'error'
+  upload?: UploadInfo
+  error?: string
+}
 
 // App-level ephemeral chat state — the bits that are *pushed* from the server
 // over the WebSocket and can't be re-fetched as request/response data:
@@ -54,6 +68,9 @@ export type LiveStore = {
   // subscribes), not the whole workspace, and the draft survives the chat
   // panel's remounts on mode switch.
   drafts: Record<string, string>
+  // Composer attachments, keyed per thread exactly like `drafts` (so they follow
+  // the active thread and survive composer remounts). Cleared on send.
+  attachments: Record<string, ChatAttachment[]>
 
   setActive: (workspaceId: string, sessionId: string | null) => void
   setProcessing: (workspaceId: string, sessionId: string, value: boolean) => void
@@ -63,6 +80,15 @@ export type LiveStore = {
   reconcileProcessing: (running: { workspaceId: string; sessionId: string }[]) => void
   setError: (workspaceId: string, sessionId: string, message: string | null) => void
   setDraft: (workspaceId: string, sessionId: string | null, value: string) => void
+  addAttachments: (workspaceId: string, sessionId: string | null, items: ChatAttachment[]) => void
+  updateAttachment: (
+    workspaceId: string,
+    sessionId: string | null,
+    localId: string,
+    patch: Partial<ChatAttachment>
+  ) => void
+  removeAttachment: (workspaceId: string, sessionId: string | null, localId: string) => void
+  clearAttachments: (workspaceId: string, sessionId: string | null) => void
   renameSession: (workspaceId: string, from: string, to: string) => void
 
   // Upsert a preview snapshot (last write wins — blocks are cumulative).
@@ -85,6 +111,7 @@ export const liveStore = createStore<LiveStore>()(set => ({
   errors: {},
   drafts: {},
   previews: {},
+  attachments: {},
 
   setActive: (workspaceId, sessionId) =>
     set(s => ({ activeByWorkspace: { ...s.activeByWorkspace, [workspaceId]: sessionId } })),
@@ -146,6 +173,46 @@ export const liveStore = createStore<LiveStore>()(set => ({
         else rest[id] = p
       }
       return changed ? { previews: rest } : s
+    }),
+
+  addAttachments: (workspaceId, sessionId, items) =>
+    set(s => {
+      const k = draftKey(workspaceId, sessionId)
+      return { attachments: { ...s.attachments, [k]: [...(s.attachments[k] ?? []), ...items] } }
+    }),
+
+  updateAttachment: (workspaceId, sessionId, localId, patch) =>
+    set(s => {
+      const k = draftKey(workspaceId, sessionId)
+      const list = s.attachments[k]
+      if (!list) return {}
+      return {
+        attachments: {
+          ...s.attachments,
+          [k]: list.map(a => (a.localId === localId ? { ...a, ...patch } : a))
+        }
+      }
+    }),
+
+  removeAttachment: (workspaceId, sessionId, localId) =>
+    set(s => {
+      const k = draftKey(workspaceId, sessionId)
+      const list = s.attachments[k]
+      if (!list) return {}
+      const target = list.find(a => a.localId === localId)
+      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl)
+      return { attachments: { ...s.attachments, [k]: list.filter(a => a.localId !== localId) } }
+    }),
+
+  clearAttachments: (workspaceId, sessionId) =>
+    set(s => {
+      const k = draftKey(workspaceId, sessionId)
+      for (const a of s.attachments[k] ?? []) {
+        if (a.previewUrl) URL.revokeObjectURL(a.previewUrl)
+      }
+      const next = { ...s.attachments }
+      delete next[k]
+      return { attachments: next }
     }),
 
   renameSession: (workspaceId, from, to) =>

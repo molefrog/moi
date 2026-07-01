@@ -3,7 +3,13 @@ import { serveStatic } from 'hono/bun'
 import { createMiddleware } from 'hono/factory'
 import { basename } from 'node:path'
 
-import type { EnvScope, WorkspaceEntry, WorkspaceModels, WorkspaceType } from '@/lib/types'
+import type {
+  EnvScope,
+  UploadInfo,
+  WorkspaceEntry,
+  WorkspaceModels,
+  WorkspaceType
+} from '@/lib/types'
 
 import { getClaudeModels } from './agent'
 import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from './applets'
@@ -28,6 +34,7 @@ import { DIST_DIR, prebuilt } from './static'
 import { getSessionEvents, getSessions } from './state'
 import { getThreadConfig, saveThreadConfig } from './thread-config'
 import type { ThreadConfigPatch } from './thread-config'
+import { MAX_UPLOAD_BYTES, addUpload } from './uploads'
 import { collectViewRequiredEnv, listViews, serveView } from './views'
 import { collectRequiredEnv, listWidgets, serveWidget } from './widgets'
 import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
@@ -146,6 +153,46 @@ one.post('/rpc/*', c => {
   const id = c.req.param('id')
   const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${id}/rpc/`)[1] ?? ''
   return handleFunctionCall(c.req.raw, tail, c.get('ws').path)
+})
+
+// Chat attachments. The composer POSTs files here (drag/drop, paste, or the
+// attach button) ahead of sending; we process + stash them and hand back opaque
+// upload ids the chat WS frame references. Images are downscaled and inlined as
+// vision blocks at send time; other files are referenced by a temp path. See
+// server/uploads.ts and dev/file-uploads.md.
+one.post('/uploads', async c => {
+  const id = c.req.param('id')
+  let form: FormData
+  try {
+    form = await c.req.formData()
+  } catch {
+    return c.text('Expected multipart/form-data', 400)
+  }
+  const files = form.getAll('files').filter((f): f is File => f instanceof File)
+  if (files.length === 0) return c.text('No files', 400)
+  if (files.length > 20) return c.text('Too many files (max 20)', 400)
+
+  const out: UploadInfo[] = []
+  for (const file of files) {
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return c.text(`"${file.name}" is too large (max ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB)`, 413)
+    }
+    try {
+      const bytes = Buffer.from(await file.arrayBuffer())
+      out.push(
+        await addUpload({
+          workspaceId: id,
+          filename: file.name || 'file',
+          mediaType: file.type || 'application/octet-stream',
+          bytes
+        })
+      )
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to process upload'
+      return c.text(`"${file.name}": ${message}`, 400)
+    }
+  }
+  return c.json(out)
 })
 
 one.get('/sessions', async c => {

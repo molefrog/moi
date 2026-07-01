@@ -1,5 +1,7 @@
 import { memo } from 'react'
 
+import { IconFile } from '@tabler/icons-react'
+
 import { MarkdownContent } from '@/client/components/MarkdownContent'
 import { ToolCallGroup } from '@/client/components/tool-group/ToolCallGroup'
 import { useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
@@ -100,16 +102,27 @@ export const TurnView = memo(function TurnView({ turn, processing = false }: Tur
   if (turn.origin.kind === 'subagent-prompt') return null
 
   if (turn.role === 'user' && turn.origin.kind === 'user-input') {
-    // Plain user input — right-aligned bubble (only text is typical here).
+    // Plain user input — right-aligned. Attachments (images/files) stack above
+    // the text bubble.
+    const fileParts = turn.parts.filter(
+      (p): p is Extract<Part, { type: 'file' }> => p.type === 'file'
+    )
     const text = turn.parts
       .filter(p => p.type === 'text')
       .map(p => (p.type === 'text' ? p.text : ''))
       .join('\n')
-    if (!text) return null
+    if (!text && fileParts.length === 0) return null
     return (
-      <p className="ml-8 self-end rounded-md bg-black/[0.07] px-4 py-2 text-sm leading-normal whitespace-pre-wrap">
-        {text}
-      </p>
+      <div className="ml-8 flex flex-col items-end gap-1.5">
+        {fileParts.map((p, i) => (
+          <FilePart key={i} mediaType={p.mediaType} url={p.url} filename={p.filename} />
+        ))}
+        {text && (
+          <p className="rounded-md bg-black/[0.07] px-4 py-2 text-sm leading-normal whitespace-pre-wrap">
+            {text}
+          </p>
+        )}
+      </div>
     )
   }
 
@@ -143,9 +156,22 @@ function PartRenderer({ part }: PartRendererProps) {
 
 type FilePartProps = { mediaType: string; url: string; filename?: string }
 function FilePart({ mediaType, url, filename }: FilePartProps) {
+  // Images (data/object/remote URLs) render as a thumbnail; everything else is a
+  // labelled chip. A file with no usable url (e.g. a non-image attachment whose
+  // bytes live only server-side) still shows its name.
+  if (mediaType.startsWith('image/') && url) {
+    return (
+      <img
+        src={url}
+        alt={filename ?? 'attachment'}
+        className="max-h-64 max-w-full rounded-md border border-black/10 object-contain"
+      />
+    )
+  }
   return (
-    <div className="text-xs text-muted-foreground">
-      📎 {filename ?? url} ({mediaType})
+    <div className="flex items-center gap-1.5 rounded-md border border-black/10 bg-black/[0.03] px-2.5 py-1.5 text-xs text-muted-foreground">
+      <IconFile size={14} stroke={1.5} />
+      <span className="truncate">{filename ?? mediaType}</span>
     </div>
   )
 }
