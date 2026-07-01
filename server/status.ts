@@ -38,11 +38,13 @@ function sessionLine(s: CCDebugSession, now: number): string {
     `session=${s.sessionId}`,
     `model=${s.model ?? 'default'}`,
     `effort=${s.effort ?? 'default'}`,
+    `stream=${s.stream ? 'on' : 'off'}`,
     `pending=${s.pendingTurns}`,
     `age=${fmtDuration(now - s.createdAt)}`,
     `lastActivity=${fmtAgo(s.lastActivityAt, now)}`
   ]
   if (s.desiredEffort !== s.effort) bits.push(`desiredEffort=${s.desiredEffort ?? 'default'}`)
+  if (s.desiredStream !== s.stream) bits.push(`desiredStream=${s.desiredStream ? 'on' : 'off'}`)
   if (!s.busy && !s.hasIdleTimer) bits.push('(no idle timer)')
   let line = '  ' + bits.join('  ')
   if (s.lastUserText) line += `\n      last: ${JSON.stringify(s.lastUserText)}`

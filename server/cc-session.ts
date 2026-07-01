@@ -123,6 +123,8 @@ export type CCDebugSession = {
   model: string | undefined
   effort: string | undefined
   desiredEffort: string | undefined
+  stream: boolean
+  desiredStream: boolean
   pendingTurns: number
   busy: boolean
   closed: boolean
@@ -142,6 +144,8 @@ export function getCCDebugSnapshot(): { sessions: CCDebugSession[]; aliases: num
       model: s.model,
       effort: s.effort,
       desiredEffort: s.desiredEffort,
+      stream: s.stream,
+      desiredStream: s.desiredStream,
       pendingTurns: s.pendingTurns,
       busy: s.pendingTurns > 0,
       closed: s.closed,
