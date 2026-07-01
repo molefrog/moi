@@ -1,4 +1,4 @@
-import type { StreamEvent } from './format'
+import type { PreviewBlock, StreamEvent } from './format'
 
 export type WidgetConfig = {
   rowSpan: 1 | 2 | 3 | 4
@@ -118,6 +118,11 @@ export type ClientMessage =
       // Omitted means the SDK default. Unlike model, the SDK has no live setter,
       // so a change forces the live session to resume (see server/cc-session.ts).
       effort?: string
+      // Opt into live token-by-token streaming for this turn. Omitted/false runs
+      // the current whole-block behavior. Only honored for providers that report
+      // `supportsStreaming` (Claude Code); ignored otherwise. Like effort, a
+      // change forces the live session to rebuild.
+      stream?: boolean
     }
   | { type: 'stop'; workspaceId: string; sessionId: string }
   // Reply to a relayed Scratchpad op (see ScratchpadOpMessage). Carries the
@@ -140,15 +145,20 @@ export type SessionInfo = {
 export type ThreadConfig = {
   model?: string
   effort?: string
+  // Live token streaming preference for this thread. Undefined falls back to the
+  // workspace default (`WorkspaceLayout.selectedStreaming`).
+  stream?: boolean
 }
 
 // Re-export the display format
 export type {
   Citation,
   Part,
+  PreviewBlock,
   ResultSummary,
   SessionSnapshot,
   StreamEvent,
+  StreamPreview,
   SubagentRecord,
   SubagentStatus,
   SystemNotice,
@@ -167,6 +177,7 @@ export type {
 // `(workspaceId, sessionId)` slice of its cache.
 export type ServerMessage =
   | (StreamEvent & { sessionId: string; workspaceId: string })
+  | PreviewFrame
   | StatusMessage
   | SessionRenamedMessage
   | WorkspaceSwitchMessage
@@ -174,6 +185,25 @@ export type ServerMessage =
   | StoppedFrame
   | StatusSnapshotMessage
   | ScratchpadOpMessage
+
+// A live token-by-token snapshot of an assistant message still being generated.
+// Ephemeral: it is NOT a StreamEvent, never persisted, and never folded into the
+// durable transcript (React Query cache). The client keeps it in a separate
+// ephemeral store and discards it the instant the real `turn` for `messageId`
+// lands. `blocks[].text` is CUMULATIVE, so a lost/reordered/duplicated frame is
+// simply overwritten by the next one — it can never corrupt the transcript.
+export type PreviewFrame = {
+  type: 'preview'
+  workspaceId: string
+  sessionId: string
+  // API message id (`msg_...`), globally unique — the accumulator key, so
+  // concurrent streams (parallel subagents) never collide. Matches the eventual
+  // turn's `meta.apiMessageId`, which is how the client clears this preview.
+  messageId: string
+  // null = top-level assistant; a tool_use id = a subagent's nested stream.
+  parentToolUseId: string | null
+  blocks: PreviewBlock[]
+}
 
 // A Scratchpad op relayed to the tab(s) showing `workspaceId`'s canvas. Only
 // `view` travels this way now (rendering needs the browser); mutations run
@@ -190,6 +220,7 @@ export type ScratchpadOpMessage = {
 // `workspaceId` is stamped on by `broadcast`, so callers omit it.
 export type BroadcastFrame =
   | (StreamEvent & { sessionId: string })
+  | Omit<PreviewFrame, 'workspaceId'>
   | Omit<StatusMessage, 'workspaceId'>
   | Omit<SessionRenamedMessage, 'workspaceId'>
   | Omit<ErrorFrame, 'workspaceId'>
@@ -314,6 +345,10 @@ export type WorkspaceLayout = {
   selectedModel?: string
   // Reasoning-effort default for new threads (a `supportedEffortLevels` value).
   selectedEffort?: string
+  // Live-streaming default for new threads. Per-thread `ThreadConfig.stream`
+  // overrides it once a thread exists. Only meaningful when the workspace's
+  // provider reports `supportsStreaming`.
+  selectedStreaming?: boolean
   theme?: {
     font: import('./themes').FontTheme
     background?: string
@@ -385,4 +420,8 @@ export type WorkspaceModels = {
   // The agent backend that produced this list — matches the workspace provider.
   provider: WorkspaceType
   models: Model[]
+  // Whether this provider supports live token-by-token streaming (the picker
+  // shows the "Live typing" toggle only when true). Provider-wide, not per-model
+  // — Claude Code streams uniformly via `includePartialMessages`.
+  supportsStreaming?: boolean
 }

@@ -46,6 +46,7 @@ export const ModelPicker = memo(function ModelPicker() {
   const { workspaceId, layout, setLayout } = useWorkspaceLayoutCtx()
   const { data } = useWorkspaceModels(workspaceId)
   const models = data?.models ?? []
+  const supportsStreaming = data?.supportsStreaming ?? false
 
   // The active thread, if any. Its stored config is the source of truth; a new
   // chat (no active thread) falls back to — and edits — the workspace defaults.
@@ -56,6 +57,10 @@ export const ModelPicker = memo(function ModelPicker() {
 
   const selected = (activeSessionId ? threadCfg?.model : undefined) ?? layout.selectedModel
   const selectedEffort = (activeSessionId ? threadCfg?.effort : undefined) ?? layout.selectedEffort
+  // Live-typing toggle: thread override when a thread is open, else the
+  // workspace default. Persisted the same way as model/effort.
+  const streaming =
+    (activeSessionId ? threadCfg?.stream : undefined) ?? layout.selectedStreaming ?? false
   const setSelected = (value: string) => {
     if (activeSessionId)
       saveThreadCfg.mutate({ sessionId: activeSessionId, patch: { model: value } })
@@ -65,6 +70,11 @@ export const ModelPicker = memo(function ModelPicker() {
     if (activeSessionId)
       saveThreadCfg.mutate({ sessionId: activeSessionId, patch: { effort: value } })
     else setLayout({ selectedEffort: value })
+  }
+  const setStreaming = (value: boolean) => {
+    if (activeSessionId)
+      saveThreadCfg.mutate({ sessionId: activeSessionId, patch: { stream: value } })
+    else setLayout({ selectedStreaming: value })
   }
 
   if (models.length === 0) return null
@@ -108,7 +118,7 @@ export const ModelPicker = memo(function ModelPicker() {
           </DropdownMenuRadioGroup>
         </DropdownMenuGroup>
 
-        {(showReasoning || showFastMode) && <DropdownMenuSeparator />}
+        {(showReasoning || showFastMode || supportsStreaming) && <DropdownMenuSeparator />}
 
         {showReasoning && (
           <DropdownMenuSub>
@@ -138,6 +148,16 @@ export const ModelPicker = memo(function ModelPicker() {
             <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xs px-2 py-1 text-sm">
               Enable fast mode
               <Switch checked={fastMode} onCheckedChange={setFastMode} />
+            </label>
+          </DropdownMenuGroup>
+        )}
+
+        {supportsStreaming && (
+          <DropdownMenuGroup className="mt-0.5">
+            <DropdownMenuLabel>Live typing</DropdownMenuLabel>
+            <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xs px-2 py-1 text-sm">
+              Stream responses
+              <Switch checked={streaming} onCheckedChange={setStreaming} />
             </label>
           </DropdownMenuGroup>
         )}
