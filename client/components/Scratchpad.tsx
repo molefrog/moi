@@ -55,17 +55,9 @@ const AUTOSAVE_MS = 500
 // for dev and scripts/build-client.ts for prod). The key is public by design
 // (domain-scoped, ships in the client bundle). Empty/unset → undefined →
 // tldraw's default unlicensed watermark. See docs/moi-scratchpad.md.
-// Inlining only happens when the var is set at server startup (the CLI launcher
-// defaults it — see server/cli.ts); the try/catch keeps any launch path that
-// skips that default at the watermark instead of throwing `process is not
-// defined` and crashing the app.
-const LICENSE_KEY = (() => {
-  try {
-    return process.env.PUBLIC_TLDRAW_LICENSE_KEY || undefined
-  } catch {
-    return undefined
-  }
-})()
+// Inlining requires the var to be set when the server process starts — the CLI
+// launcher defaults it (server/cli.ts); a bare ref here throws in the browser.
+const LICENSE_KEY = process.env.PUBLIC_TLDRAW_LICENSE_KEY || undefined
 
 // Execute a relayed op in this tab. Only `view` is relayed now — rasterizing the
 // canvas to a PNG needs the browser (`editor.toImageDataUrl`); every mutation runs
