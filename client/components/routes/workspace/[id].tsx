@@ -483,8 +483,17 @@ type WorkspaceViewProps = {
 };
 
 function WorkspaceView({ widgets, views }: WorkspaceViewProps) {
-  const { view, previewTurn, processing, error, send, stop, switchThread, dismissError } =
-    useChat();
+  const {
+    view,
+    previewTurn,
+    sessionId,
+    processing,
+    error,
+    send,
+    stop,
+    switchThread,
+    dismissError,
+  } = useChat();
   const { layout, setLayout, name, icon, provider } = useWorkspaceLayoutCtx();
   const { ref: rowRef, fits: canFitSidebar } = useFitsSidebar<HTMLDivElement>();
   const [widgetMode, setWidgetMode] = useState<WidgetMode>("idle");
@@ -556,6 +565,7 @@ function WorkspaceView({ widgets, views }: WorkspaceViewProps) {
     <ChatPanel
       view={view}
       previewTurn={previewTurn}
+      sessionId={sessionId}
       processing={processing}
       error={error}
       onDismissError={dismissError}
@@ -646,6 +656,7 @@ function WorkspaceView({ widgets, views }: WorkspaceViewProps) {
             <ChatPanel
               view={view}
               previewTurn={previewTurn}
+              sessionId={sessionId}
               processing={processing}
               error={error}
               onDismissError={dismissError}

@@ -153,5 +153,15 @@ export function useChat() {
     [workspaceId]
   )
 
-  return { view, previewTurn, processing, error, send, stop, switchThread, dismissError }
+  return {
+    view,
+    previewTurn,
+    sessionId: activeSessionId,
+    processing,
+    error,
+    send,
+    stop,
+    switchThread,
+    dismissError
+  }
 }
