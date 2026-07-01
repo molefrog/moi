@@ -54,7 +54,7 @@
     "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.169",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.197",
     "@base-ui/react": "^1.2.0",
     "@dnd-kit/core": "^6.3.1",
     "@tabler/icons-react": "^3.44.0",
