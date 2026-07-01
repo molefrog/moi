@@ -56,8 +56,8 @@ function buildSegments(parts: Part[]): Segment[] {
 type TurnPartsProps = { parts: Part[]; cwd: string | null; processing?: boolean }
 
 // Shared body renderer for a sequence of parts — used by both a finalized turn
-// and the live streaming preview (StreamingTail), so a streamed message and its
-// finalized form render identically (seamless swap on finalize). Consecutive
+// and the live streaming preview turn (see client/lib/preview-turn.ts), so a
+// streamed message and its finalized form render identically. Consecutive
 // reasoning + tool-call parts fold into one <ToolCallGroup> run; text/files/etc.
 // stand alone. `processing` flows into the LAST run so a trailing reasoning there
 // reads as a live, expanded "Thinking" row.

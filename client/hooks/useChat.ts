@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -12,7 +12,8 @@ import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
 import { sendMessage } from '@/client/lib/connection'
 import { STREAM_RESPONSES } from '@/client/lib/flags'
-import { liveStore, useLive } from '@/client/store/live'
+import { buildPreviewTurn } from '@/client/lib/preview-turn'
+import { liveStore, selectPreviews, useLive } from '@/client/store/live'
 import { applyEvent, emptyViewState } from '@/lib/format'
 import type { ViewState } from '@/lib/types'
 
@@ -38,6 +39,17 @@ export function useChat() {
   )
 
   const view = useSessionView(workspaceId, activeSessionId).data ?? EMPTY
+
+  // The live streaming preview as a synthetic assistant turn, so the ChatPanel
+  // can run it through the SAME groupTurns pipeline as finalized turns — a
+  // thinking-only preview then folds into the current tool group instead of
+  // rendering as a detached block. Recomputed per delta (the previews slice is
+  // stable across other updates); null when there's nothing visible yet.
+  const previews = useLive(s => s.previews)
+  const previewTurn = useMemo(
+    () => buildPreviewTurn(selectPreviews(previews, workspaceId, activeSessionId).root),
+    [previews, workspaceId, activeSessionId]
+  )
 
   // The active thread's persisted model/effort. For a brand-new chat (no thread
   // yet) this is empty and `send` falls back to the workspace defaults below.
@@ -141,5 +153,5 @@ export function useChat() {
     [workspaceId]
   )
 
-  return { view, processing, error, send, stop, switchThread, dismissError }
+  return { view, previewTurn, processing, error, send, stop, switchThread, dismissError }
 }
