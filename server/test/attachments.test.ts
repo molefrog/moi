@@ -1,12 +1,18 @@
 import { describe, expect, test } from 'bun:test'
 import sharp from 'sharp'
 
+import {
+  ATTACHMENT_NOTE_HEADER,
+  appendAttachmentNote,
+  splitAttachmentNote
+} from '@/lib/attachment-note'
 import { ClaudeAdapter } from '@/lib/claude-adapter'
 import type { Part } from '@/lib/format'
 
 import { buildUserMessage } from '../cc-session'
 import {
   addUpload,
+  getUpload,
   materializeToPath,
   resolveUploads,
   uploadDataUrl,
@@ -156,6 +162,74 @@ describe('uploads: non-image files', () => {
   })
 })
 
+describe('uploads: content-addressed dedup', () => {
+  test('identical image bytes resolve to the same id (single entry)', async () => {
+    const bytes = await pngBuffer(300, 200)
+    const a = await addUpload({
+      workspaceId: 'wsdd',
+      filename: 'one.png',
+      mediaType: 'image/png',
+      bytes
+    })
+    const b = await addUpload({
+      workspaceId: 'wsdd',
+      filename: 'two.png',
+      mediaType: 'image/png',
+      bytes
+    })
+    expect(b.id).toBe(a.id)
+    // The stored entry is shared — the first upload's record wins.
+    expect(resolveUploads('wsdd', [a.id, b.id]).map(u => u.filename)).toEqual([
+      'one.png',
+      'one.png'
+    ])
+  })
+
+  test('same bytes in another workspace get their own entry', async () => {
+    const bytes = await pngBuffer(120, 90)
+    const a = await addUpload({
+      workspaceId: 'wsda',
+      filename: 'x.png',
+      mediaType: 'image/png',
+      bytes
+    })
+    const b = await addUpload({
+      workspaceId: 'wsdb',
+      filename: 'x.png',
+      mediaType: 'image/png',
+      bytes
+    })
+    // Content-addressed → same id, but resolution stays workspace-scoped.
+    expect(b.id).toBe(a.id)
+    expect(resolveUploads('wsda', [a.id])).toHaveLength(1)
+    expect(resolveUploads('wsdb', [b.id])).toHaveLength(1)
+  })
+
+  test('non-image files mix the filename into the id', async () => {
+    const bytes = Buffer.from('same content')
+    const a = await addUpload({
+      workspaceId: 'wsdf',
+      filename: 'a.txt',
+      mediaType: 'text/plain',
+      bytes
+    })
+    const b = await addUpload({
+      workspaceId: 'wsdf',
+      filename: 'b.txt',
+      mediaType: 'text/plain',
+      bytes
+    })
+    const c = await addUpload({
+      workspaceId: 'wsdf',
+      filename: 'a.txt',
+      mediaType: 'text/plain',
+      bytes
+    })
+    expect(b.id).not.toBe(a.id) // different name → own temp path
+    expect(c.id).toBe(a.id) // exact re-upload → dedup
+  })
+})
+
 describe('uploads: resolve + display helpers', () => {
   test('resolveUploads preserves order and drops unknown ids', async () => {
     const a = await addUpload({
@@ -198,13 +272,13 @@ describe('uploads: resolve + display helpers', () => {
     expect(uploadDataUrl(file)).toBeNull()
   })
 
-  test('uploadToDisplayPart: image → data URL, file → path chip', async () => {
+  test('uploadToDisplayPart points at the served URL, never a data URL', async () => {
     const img = await addImage('wsp')
     const imgPart = uploadToDisplayPart(img)
     expect(imgPart?.type).toBe('file')
     if (imgPart?.type === 'file') {
       expect(imgPart.mediaType).toBe('image/png')
-      expect(imgPart.url.startsWith('data:image/png;base64,')).toBe(true)
+      expect(imgPart.url).toBe(`/api/workspaces/wsp/uploads/${img.id}`)
     }
 
     const fileInfo = await addUpload({
@@ -217,8 +291,20 @@ describe('uploads: resolve + display helpers', () => {
     const filePart = uploadToDisplayPart(file)
     if (filePart?.type === 'file') {
       expect(filePart.filename).toBe('doc.txt')
-      expect(filePart.url).toBe(file.path)
+      expect(filePart.url).toBe(`/api/workspaces/wsp/uploads/${file.id}`)
     }
+  })
+
+  test('getUpload serves by id, scoped to the workspace', async () => {
+    const info = await addUpload({
+      workspaceId: 'wsg',
+      filename: 'a.txt',
+      mediaType: 'text/plain',
+      bytes: Buffer.from('bytes')
+    })
+    expect(getUpload('wsg', info.id)?.filename).toBe('a.txt')
+    expect(getUpload('other', info.id)).toBeNull()
+    expect(getUpload('wsg', 'missing')).toBeNull()
   })
 
   test('materializeToPath writes image bytes and is idempotent', async () => {
@@ -347,6 +433,47 @@ describe('persist/reload round-trip', () => {
     expect(file.mediaType).toBe('application/pdf')
     expect(file.url).toBe('data:application/pdf;base64,JVBER')
     expect(file.filename).toBe('spec.pdf')
+  })
+
+  test('file-note text built for the agent folds back into chips on replay', async () => {
+    const info = await addUpload({
+      workspaceId: 'wsrt',
+      filename: 'report.csv',
+      mediaType: 'text/csv',
+      bytes: Buffer.from('a,b\n1,2')
+    })
+    const [u] = resolveUploads('wsrt', [info.id])
+    const { content } = buildUserMessage('summarize this', [u])
+    // Replay the exact content the SDK would persist to the .jsonl.
+    const adapter = new ClaudeAdapter()
+    const events = adapter.ingest({ type: 'user', uuid: 'rt1', message: { role: 'user', content } })
+    const turn = events.find(e => e.kind === 'turn')
+    if (turn?.kind !== 'turn') throw new Error('expected a turn')
+    // The temp-path note is stripped from the bubble text…
+    const text = textPart(turn.turn.parts)
+    expect(text?.text).toBe('summarize this')
+    // …and re-rendered as a file chip.
+    const chip = fileParts(turn.turn.parts)[0]
+    expect(chip.filename).toBe('report.csv')
+    expect(chip.url).toBe(u.path!)
+  })
+
+  test('splitAttachmentNote leaves unrelated text untouched', () => {
+    expect(splitAttachmentNote('just a message').text).toBe('just a message')
+    const withHeader = `hi\n\n${ATTACHMENT_NOTE_HEADER}\nnot a list item`
+    expect(splitAttachmentNote(withHeader).text).toBe(withHeader)
+    expect(splitAttachmentNote(withHeader).files).toHaveLength(0)
+  })
+
+  test('appendAttachmentNote/splitAttachmentNote round-trip', () => {
+    const files = [
+      { filename: 'a.txt', path: '/tmp/moi-uploads/x/a.txt' },
+      { filename: 'b (1).csv', path: '/tmp/moi-uploads/y/b (1).csv' }
+    ]
+    const appended = appendAttachmentNote('look at these', files)
+    const split = splitAttachmentNote(appended)
+    expect(split.text).toBe('look at these')
+    expect(split.files).toEqual(files)
   })
 
   test('bare-url image block is passed through unchanged', () => {
