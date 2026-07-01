@@ -9,6 +9,11 @@
 export const ATTACHMENT_NOTE_HEADER =
   'The user attached the following file(s); read them as needed:'
 
+// The stand-in prompt for a message that is *only* attachments (an Anthropic
+// message must end with a non-empty text block). The adapter drops it on
+// replay so the reloaded bubble shows just the attachments, like the live one.
+export const ATTACHMENT_ONLY_PLACEHOLDER = '(see attached files)'
+
 export type AttachmentNoteFile = { filename: string; path: string }
 
 // `text` plus the note listing each attachment as `- <filename>: <path>`.

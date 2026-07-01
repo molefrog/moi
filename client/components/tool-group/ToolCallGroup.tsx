@@ -19,6 +19,7 @@ import { formatMcpServerName, getMcpIcon } from '@/client/lib/mcp-icons'
 import type { Part, ToolCall } from '@/lib/types'
 
 import { Collapse } from './Collapse'
+import { ReadImagePreview, readImageRelPath } from './ReadImagePreview'
 import { SubagentCard } from './SubagentCard'
 import {
   HEADER,
@@ -73,8 +74,11 @@ type ToolRowProps = RowPosition & {
   marker?: ReactNode
   name: string
   brief: string
+  // Extra expanded content rendered above the output (e.g. the image a Read
+  // tool call opened).
+  preview?: ReactNode
 }
-function ToolRow({ isFirst, isLast, call, leading, marker, name, brief }: ToolRowProps) {
+function ToolRow({ isFirst, isLast, call, leading, marker, name, brief, preview }: ToolRowProps) {
   const [open, setOpen] = useState(false)
   const isError = call.state === 'error'
   const isRunning = call.state === 'running' || call.state === 'pending'
@@ -83,7 +87,7 @@ function ToolRow({ isFirst, isLast, call, leading, marker, name, brief }: ToolRo
     : typeof call.output === 'string'
       ? call.output
       : ''
-  const hasBody = !!(output || isError)
+  const hasBody = !!(output || isError || preview)
   const title = brief ? `${name}: ${brief}` : name
 
   return (
@@ -115,8 +119,9 @@ function ToolRow({ isFirst, isLast, call, leading, marker, name, brief }: ToolRo
         </button>
         {hasBody && (
           <Collapse open={open}>
-            <div className="mt-1 mb-1">
-              <ToolOutput call={call} output={output} isError={isError} />
+            <div className="mt-1 mb-1 flex flex-col gap-1.5">
+              {preview}
+              {(output || isError) && <ToolOutput call={call} output={output} isError={isError} />}
             </div>
           </Collapse>
         )}
@@ -196,6 +201,9 @@ function ToolCallCard({ call, cwd, isFirst, isLast }: ToolCallCardProps) {
       />
     )
   }
+  // A Read of a workspace image gets the actual picture in its expanded body
+  // (skipped while errored — the file likely wasn't readable).
+  const imageRelPath = call.state === 'error' ? null : readImageRelPath(call, cwd)
   return (
     <ToolRow
       isFirst={isFirst}
@@ -204,6 +212,7 @@ function ToolCallCard({ call, cwd, isFirst, isLast }: ToolCallCardProps) {
       leading={<CallerBadge call={call} />}
       name={getToolDisplayName(call)}
       brief={formatInputBrief(call, cwd)}
+      preview={imageRelPath ? <ReadImagePreview relPath={imageRelPath} /> : undefined}
     />
   )
 }

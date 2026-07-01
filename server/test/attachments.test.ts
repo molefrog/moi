@@ -458,6 +458,30 @@ describe('persist/reload round-trip', () => {
     expect(chip.url).toBe(u.path!)
   })
 
+  test('image-only placeholder text is dropped on replay', async () => {
+    const img = await addImage('wsro')
+    const { content } = buildUserMessage('', [img])
+    const adapter = new ClaudeAdapter()
+    const events = adapter.ingest({ type: 'user', uuid: 'ro1', message: { role: 'user', content } })
+    const turn = events.find(e => e.kind === 'turn')
+    if (turn?.kind !== 'turn') throw new Error('expected a turn')
+    // Just the image — no "(see attached files)" bubble text.
+    expect(textPart(turn.turn.parts)).toBeUndefined()
+    expect(fileParts(turn.turn.parts)).toHaveLength(1)
+  })
+
+  test('a literal placeholder typed with no attachments is kept', () => {
+    const adapter = new ClaudeAdapter()
+    const events = adapter.ingest({
+      type: 'user',
+      uuid: 'ro2',
+      message: { role: 'user', content: [{ type: 'text', text: '(see attached files)' }] }
+    })
+    const turn = events.find(e => e.kind === 'turn')
+    if (turn?.kind !== 'turn') throw new Error('expected a turn')
+    expect(textPart(turn.turn.parts)?.text).toBe('(see attached files)')
+  })
+
   test('splitAttachmentNote leaves unrelated text untouched', () => {
     expect(splitAttachmentNote('just a message').text).toBe('just a message')
     const withHeader = `hi\n\n${ATTACHMENT_NOTE_HEADER}\nnot a list item`
