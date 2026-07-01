@@ -11,6 +11,7 @@
 //     `session.message` rows only, per the design call).
 //   - Disk persistence — the gateway is the source of truth; we re-seed from
 //     `sessions.get` on cold start.
+import { appendAttachmentNote } from '@/lib/attachment-note'
 import { applyEvent, emptyViewState } from '@/lib/format'
 import type { StreamEvent, ViewState } from '@/lib/types'
 
@@ -378,16 +379,16 @@ export async function sendOpenClawMessage(input: {
   let content = input.content
   if (input.attachments?.length) {
     const uploads = resolveUploads(input.workspaceId, input.attachments)
-    const paths: string[] = []
+    const files: { filename: string; path: string }[] = []
     for (const u of uploads) {
       const p = await materializeToPath(u)
-      if (p) paths.push(`- ${u.filename}: ${p}`)
+      if (p) files.push({ filename: u.filename, path: p })
     }
-    if (paths.length > 0) {
-      content =
-        `${input.content}\n\nThe user attached the following file(s); read them as needed:\n${paths.join('\n')}`.trim()
-    }
+    content = appendAttachmentNote(input.content, files)
   }
+  // Attachment-only send whose ids all expired → nothing to say; don't open a
+  // session for an empty message.
+  if (!content) return
   return sendOpenClawMessageImpl({ ...input, content })
 }
 

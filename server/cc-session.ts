@@ -18,6 +18,7 @@ import {
   query
 } from '@anthropic-ai/claude-agent-sdk'
 
+import { appendAttachmentNote } from '@/lib/attachment-note'
 import { ClaudeAdapter } from '@/lib/claude-adapter'
 import type { Part } from '@/lib/format'
 
@@ -68,12 +69,10 @@ export function buildUserMessage(
   }
 
   const files = uploads.filter(u => u.kind === 'file' && u.path)
-  let agentText = text
-  if (files.length > 0) {
-    const list = files.map(f => `- ${f.filename}: ${f.path}`).join('\n')
-    agentText =
-      `${text}\n\nThe user attached the following file(s); read them as needed:\n${list}`.trim()
-  }
+  const agentText = appendAttachmentNote(
+    text,
+    files.map(f => ({ filename: f.filename, path: f.path! }))
+  )
   // Always end with a text block so an image-only message still has a prompt.
   blocks.push({ type: 'text', text: agentText || '(see attached files)' })
   return { content: blocks, parts }
@@ -480,6 +479,15 @@ export async function sendCCMessage(input: {
   effort?: string
   stream?: boolean
 }): Promise<void> {
+  // Resolve any attachments into agent content blocks + display parts. Unknown
+  // or expired ids are silently dropped (resolveUploads filters them) — if that
+  // leaves nothing to say at all, don't spin up a session for an empty turn.
+  const uploads = input.attachments?.length
+    ? resolveUploads(input.workspaceId, input.attachments)
+    : []
+  if (!input.content && uploads.length === 0) return
+  const { content, parts } = buildUserMessage(input.content, uploads)
+
   const wantStream = input.stream === true
   let s = sessions.get(liveKey(input.workspaceId, input.sessionId))
   // Neither effort nor streaming can be changed on a running query (both are
@@ -530,13 +538,6 @@ export async function sendCCMessage(input: {
     })
   }
 
-  // Resolve any attachments into agent content blocks + display parts. Unknown
-  // or expired ids are silently dropped (resolveUploads filters them).
-  const uploads = input.attachments?.length
-    ? resolveUploads(input.workspaceId, input.attachments)
-    : []
-  const { content, parts } = buildUserMessage(input.content, uploads)
-
   // Streaming-input mode does NOT echo the pushed user message back in the
   // output stream (string-prompt mode did — that's what expectUserEcho was
   // for), so the adapter never emits a user turn. Synthesize and broadcast it
@@ -561,7 +562,10 @@ export async function sendCCMessage(input: {
   if (input.optimisticId) s.adapter.expectUserEcho(input.optimisticId, input.content)
 
   s.lastActivityAt = Date.now()
-  s.lastUserText = input.content.replace(/\s+/g, ' ').slice(0, 120)
+  // For an attachment-only message, fall back to the filenames so the thread
+  // list / status view don't show a blank label.
+  const label = input.content || uploads.map(u => u.filename).join(', ')
+  s.lastUserText = label.replace(/\s+/g, ' ').slice(0, 120)
 
   const wasIdle = s.pendingTurns === 0
   s.pendingTurns++

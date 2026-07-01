@@ -14,6 +14,8 @@ import type {
   TurnOrigin
 } from './format'
 
+import { splitAttachmentNote } from './attachment-note'
+
 // Loose SDK message shape — we don't pull in the full SDK type tree; the
 // adapter tolerates missing fields. Reference: dev/sdk-message-spec.md.
 type ContentBlock = {
@@ -449,8 +451,28 @@ export class ClaudeAdapter {
       switch (b.type) {
         case 'text':
           if (b.text) {
-            parts.push({ type: 'text', text: b.text })
-            if (!firstText) firstText = b.text
+            let text = b.text
+            if (msg.type === 'user' && !msg.isSynthetic) {
+              // Non-image attachments reach the agent as a temp-path note
+              // appended to the user's text (see lib/attachment-note.ts). The
+              // SDK persists that appended text, so fold the note back into
+              // file chips here — a reloaded bubble matches the live one
+              // instead of leaking temp paths into it.
+              const split = splitAttachmentNote(text)
+              text = split.text
+              for (const f of split.files) {
+                parts.push({
+                  type: 'file',
+                  mediaType: 'application/octet-stream',
+                  url: f.path,
+                  filename: f.filename
+                })
+              }
+            }
+            if (text) {
+              parts.push({ type: 'text', text })
+              if (!firstText) firstText = text
+            }
           }
           break
         case 'thinking':

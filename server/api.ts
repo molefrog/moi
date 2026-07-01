@@ -34,7 +34,7 @@ import { DIST_DIR, prebuilt } from './static'
 import { getSessionEvents, getSessions } from './state'
 import { getThreadConfig, saveThreadConfig } from './thread-config'
 import type { ThreadConfigPatch } from './thread-config'
-import { MAX_UPLOAD_BYTES, addUpload } from './uploads'
+import { MAX_UPLOAD_BYTES, addUpload, getUpload } from './uploads'
 import { collectViewRequiredEnv, listViews, serveView } from './views'
 import { collectRequiredEnv, listWidgets, serveWidget } from './widgets'
 import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
@@ -193,6 +193,24 @@ one.post('/uploads', async c => {
     }
   }
   return c.json(out)
+})
+
+// Serve an upload's bytes back. Display parts reference this URL instead of a
+// base64 data URL so the transcript broadcast / client cache stay small. The id
+// is content-addressed (sha256), so the response is immutable while it lives —
+// let the browser cache it for the store's TTL.
+one.get('/uploads/:uploadId', c => {
+  const u = getUpload(c.req.param('id'), c.req.param('uploadId'))
+  if (!u) return c.text('Not found or expired', 404)
+  const body: BodyInit | null = u.data ?? (u.path ? Bun.file(u.path) : null)
+  if (!body) return c.text('Not found or expired', 404)
+  return new Response(body, {
+    headers: {
+      'Content-Type': u.mediaType,
+      'Content-Disposition': `inline; filename="${u.filename.replaceAll('"', '')}"`,
+      'Cache-Control': 'private, max-age=1800, immutable'
+    }
+  })
 })
 
 one.get('/sessions', async c => {
