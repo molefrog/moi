@@ -48,16 +48,16 @@ Wait for `load`, not `networkidle` — the app holds a WebSocket open.
 
 ## agent-browser
 
+Usage (snapshot/ref loop, commands, troubleshooting) is covered by the
+vendored skill — `.claude/skills/agent-browser/`. The only cloud-specific
+part is:
+
 ```sh
 export AGENT_BROWSER_EXECUTABLE_PATH=/opt/pw-browsers/chromium
-
-agent-browser open http://127.0.0.1:3000/workspace/<id>
-agent-browser snapshot          # a11y tree with refs
-agent-browser screenshot /tmp/shot.png
 ```
 
 The daemon freezes the environment of whichever CLI call spawns it; if it was
-started with wrong options, `agent-browser close` before retrying.
+started without the var, `agent-browser close` before retrying.
 
 ## Appendix: external hosts & the egress relay
 
