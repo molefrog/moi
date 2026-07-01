@@ -125,27 +125,26 @@ already supports a `kind`).
 
 ---
 
-## Part 4 — Gap analysis: shipped (PR #13) vs. target
+## Part 4 — Gap analysis: shipped vs. target
 
-| Area                                            | Shipped today                                  | Target                                     | Action                                               |
-| ----------------------------------------------- | ---------------------------------------------- | ------------------------------------------ | ---------------------------------------------------- |
-| Upload transport                                | HTTP multipart + WS carries ids only ✅        | same                                       | done                                                 |
-| Image downscale/normalize (`sharp`)             | ✅                                             | same                                       | done                                                 |
-| Agent vision (base64 blocks)                    | ✅                                             | same (unavoidable)                         | done                                                 |
-| Persist/reload (adapter parses `.jsonl` base64) | ✅                                             | same                                       | done                                                 |
-| **Dedup**                                       | ❌ random-UUID keys                            | content-hash (`sha256`) keys               | **change `addUpload` to hash**                       |
-| **Display transport**                           | ❌ inlines base64 data URLs over WS + RQ cache | served URL (`GET …/uploads/:id`)           | **add GET route; `uploadToDisplayPart` returns URL** |
-| **Path / `@`-mention**                          | ❌ not supported                               | workspace-file reference, live read        | **new feature (pipeline 2)**                         |
-| Lifecycle TTL                                   | ✅ 30 min                                      | same                                       | done                                                 |
-| Redaction affordance                            | ❌                                             | remove-from-thread                         | nice-to-have                                         |
-| OpenClaw                                        | basic (temp path appended to string message)   | content-block API when gateway supports it | tracked                                              |
+| Area                                            | Shipped today                                             | Target                                     | Action                       |
+| ----------------------------------------------- | --------------------------------------------------------- | ------------------------------------------ | ---------------------------- |
+| Upload transport                                | HTTP multipart + WS carries ids only ✅                   | same                                       | done                         |
+| Image downscale/normalize (`sharp`)             | ✅                                                        | same                                       | done                         |
+| Agent vision (base64 blocks)                    | ✅                                                        | same (unavoidable)                         | done                         |
+| Persist/reload (adapter parses `.jsonl` base64) | ✅ (incl. folding the temp-path note back into chips)     | same                                       | done                         |
+| Dedup                                           | ✅ content-hash (`sha256`) ids, workspace-scoped          | same                                       | done                         |
+| Display transport                               | ✅ served URL (`GET …/uploads/:id`), sliding TTL on reads | same                                       | done                         |
+| **Path / `@`-mention**                          | ❌ not supported                                          | workspace-file reference, live read        | **new feature (pipeline 2)** |
+| Lifecycle TTL                                   | ✅ 30 min, refreshed on resolve/serve                     | same                                       | done                         |
+| Redaction affordance                            | ❌                                                        | remove-from-thread                         | nice-to-have                 |
+| OpenClaw                                        | basic (temp path appended to string message)              | content-block API when gateway supports it | tracked                      |
 
-**Net:** the transport and agent-vision halves match the target. The three
-fixable rough edges Claude Code exhibits — **base64 bloat in moi's own
-display/transport, no dedup, no path-mention** — are exactly the items still open
-for moi. The first two are small, well-scoped changes (content-hash keys + a GET
-route + return a URL from `uploadToDisplayPart`); the third (`@`-mention) is the
-one genuinely new feature.
+**Net:** the transport, agent-vision, dedup, and display halves all match the
+target now. Base64 exists in exactly one place — the SDK-owned session `.jsonl`
+(unavoidable, see Part 2). Still open: the `@`-mention workspace-file reference
+(pipeline 2, a genuinely new feature) and the remove-from-thread redaction
+affordance.
 
 ---
 
