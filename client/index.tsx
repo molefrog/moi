@@ -3,8 +3,9 @@ import './structured-clone-shim'
 
 import './index.css'
 
-// React is externalized to esm.sh (see client/externalize-react.ts + the importmap
-// in index.html), so Bun's bundled Fast Refresh runtime isn't bound to the React
+// React is externalized to the locally-vendored ESM (see client/externalize-react.ts
+// + the importmap in index.html → /vendor/react), so Bun's bundled Fast Refresh
+// runtime isn't bound to the React
 // instance that actually renders the app: it registers component families but
 // performReactRefresh() no-ops, leaving stale modules mounted after an edit.
 // Downgrade HMR to plain live-reload — every hot update triggers a full page

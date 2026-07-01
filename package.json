@@ -46,6 +46,7 @@
   "scripts": {
     "dev": "bun server/cli.ts start --dev",
     "build:client": "bun scripts/build-client.ts",
+    "vendor:react": "bun scripts/build-vendor.ts",
     "prepack": "bun scripts/build-client.ts",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",

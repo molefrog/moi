@@ -22,6 +22,7 @@ import { getWorkspace } from './registry'
 import { addClient, removeClient, sendToClient } from './state'
 import { distShell, prebuilt } from './static'
 import { renderStatus } from './status'
+import { serveVendorReact } from './vendor'
 
 // Guarantee the public tldraw license key is *defined* before the dev bundler
 // inlines it (bunfig `[serve.static] env = "PUBLIC_*"`). Bun's prefix inlining
@@ -93,6 +94,10 @@ export const app = Bun.serve<WsData>({
       new Response(renderStatus(), {
         headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }
       }),
+
+    // Locally-vendored React ESM (offline; no CDN). The importmap in
+    // client/index.html points here; the handler picks dev/prod per env.
+    '/vendor/react/*': req => serveVendorReact(req),
 
     // Client-side routes — serve the SPA shell.
     '/': shell,

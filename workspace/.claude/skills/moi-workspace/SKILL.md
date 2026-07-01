@@ -92,8 +92,9 @@ my-agent-folder/
 - For package management **always** use bun
 - package.json is scaffolded during init. You are free to install/remove/do whatever with packages.
 - if packages aren't installed, it's your responsibility to call `bun install`
-- `react` and `react-dom` are stubs — at runtime they're resolved from esm.sh via the browser
-  importmap. They're listed only so editors pick up the correct types.
+- `react` and `react-dom` are stubs — at runtime they're resolved to moi's locally-vendored ESM
+  (`/vendor/react`) via the browser importmap. They're listed only so editors pick up the correct
+  types.
 - `moi bundle` runs **Bun's bundler**, so standard Bun imports, loaders, and tricks apply (JSON,
   text, etc.) — see the Bun docs. Only the moi-specific imports (covered under **Developing
   Applets**) differ.
