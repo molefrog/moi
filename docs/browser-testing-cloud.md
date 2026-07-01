@@ -30,6 +30,28 @@ So the browser must never talk to the outside world at all. Instead:
   hostnames go to the proxy unresolved).
 - The mirror's cert is self-signed → ignore HTTPS errors in the driver.
 
+> **Temporary:** obstacle 1 (and with it the whole esm-mirror +
+> `--host-resolver-rules` dance) goes away once React ships bundled with the
+> app instead of via the esm.sh import map — that change is landing on a
+> separate branch. Obstacle 2 remains relevant for anything that makes the
+> browser fetch external hosts.
+
+## Container preinstall
+
+Claude Code environments support a preinstall/setup script. Adding this there
+saves a step per session:
+
+```sh
+npm i -g agent-browser   # CLI only — do NOT run `agent-browser install`,
+                         # its Chrome download fails behind the egress relay;
+                         # the system Chromium at /opt/pw-browsers is used instead
+```
+
+The repo also vendors the agent-browser usage skill at
+`.claude/skills/agent-browser/`, so agents get the command reference without
+network access (`agent-browser skills get core --full` prints the copy
+matching the installed CLI, if they differ).
+
 ## Setup (once per session)
 
 ```sh
