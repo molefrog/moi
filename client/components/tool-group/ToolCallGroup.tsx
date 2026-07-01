@@ -127,10 +127,15 @@ function ToolRow({ isFirst, isLast, call, leading, marker, name, brief }: ToolRo
 
 // Reasoning row — collapsible thought text as italic prose. Labelled "Thinking"
 // while live (spinner node), "Thought" once done (dot node). No leading glyph.
+// While live (`inProgress` — the last row of an active stream) it stays expanded
+// so the streaming thought is visible; it collapses on its own the moment
+// anything follows it (a text/tool row makes it no longer the last row, so
+// `inProgress` goes false and it reverts to the user's collapsed default).
 type ReasoningRowProps = RowPosition & { text: string; inProgress?: boolean }
 function ReasoningRow({ isFirst, isLast, text, inProgress = false }: ReasoningRowProps) {
   const [open, setOpen] = useState(false)
   const label = inProgress ? 'Thinking' : 'Thought'
+  const expanded = inProgress || open
   return (
     <TimelineRow isFirst={isFirst} isLast={isLast} loading={inProgress}>
       <div className="min-w-0 flex-1">
@@ -141,9 +146,9 @@ function ReasoningRow({ isFirst, isLast, text, inProgress = false }: ReasoningRo
           className={cn(HEADER, 'cursor-pointer')}
         >
           <span className="text-xs font-medium text-muted-foreground">{label}</span>
-          <RowChevron open={open} />
+          <RowChevron open={expanded} />
         </button>
-        <Collapse open={open}>
+        <Collapse open={expanded}>
           <div className="mt-1 mb-1 pr-2 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
             {text}
           </div>
