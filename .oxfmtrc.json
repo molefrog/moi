@@ -15,5 +15,11 @@
   "importOrderSeparation": true,
   "importOrderSortSpecifiers": true,
   "sortPackageJson": false,
-  "ignorePatterns": [".agents", "workspace", "server/test/__fixtures__", "**/.build"]
+  "ignorePatterns": [
+    ".agents",
+    "workspace",
+    "server/test/__fixtures__",
+    "**/.build",
+    "client/vendor"
+  ]
 }
