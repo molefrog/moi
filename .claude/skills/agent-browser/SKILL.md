@@ -8,11 +8,10 @@ allowed-tools: Bash(agent-browser:*), Bash(npx agent-browser:*)
 
 > **moi note:** vendored from the `agent-browser` npm package (v0.27.0,
 > `agent-browser skills get core --full` serves the copy matching your
-> installed CLI). In sandboxed cloud environments (Claude Code on the web),
-> skip `agent-browser install` — its Chrome download fails behind the egress
-> relay. Instead set `AGENT_BROWSER_EXECUTABLE_PATH=/opt/pw-browsers/chromium`
-> before the first command (the daemon freezes its env; `agent-browser close`
-> to restart). Starting the moi server itself: `docs/browser-testing-cloud.md`.
+> installed CLI). In Claude Code cloud sessions the CLI is preinstalled and
+> `AGENT_BROWSER_EXECUTABLE_PATH` points at the system Chromium — never run
+> `agent-browser install` (its Chrome download fails behind the egress relay).
+> Starting the moi server itself: `docs/browser-testing-cloud.md`.
 
 Fast browser automation CLI for AI agents. Chrome/Chromium via CDP, no
 Playwright or Puppeteer dependency. Accessibility-tree snapshots with compact
