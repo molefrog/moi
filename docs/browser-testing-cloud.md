@@ -4,21 +4,10 @@
 > or agent-browser. React is vendored (served same-origin at `/vendor/react/*`),
 > so the browser needs no external network — vanilla launches work.
 
-## Environment setup script (one-time)
-
-In the environment settings ("Setup script — runs when a new session starts,
-before Claude Code launches"):
-
-```bash
-#!/bin/bash
-bun install
-npm i -g agent-browser
-```
-
-Don't run `agent-browser install` — its Chrome download fails behind the
-sandbox's egress relay. The preinstalled Chromium at `/opt/pw-browsers/chromium`
-is used instead. The agent-browser usage skill is vendored at
-`.claude/skills/agent-browser/`.
+The environment preinstalls everything (deps, agent-browser CLI, the
+executable-path env var). Never run `agent-browser install` — its Chrome
+download fails behind the sandbox's egress relay; the preinstalled Chromium
+at `/opt/pw-browsers/chromium` is used instead.
 
 ## Per session
 
@@ -49,15 +38,10 @@ Wait for `load`, not `networkidle` — the app holds a WebSocket open.
 ## agent-browser
 
 Usage (snapshot/ref loop, commands, troubleshooting) is covered by the
-vendored skill — `.claude/skills/agent-browser/`. The only cloud-specific
-part is:
-
-```sh
-export AGENT_BROWSER_EXECUTABLE_PATH=/opt/pw-browsers/chromium
-```
-
-The daemon freezes the environment of whichever CLI call spawns it; if it was
-started without the var, `agent-browser close` before retrying.
+vendored skill — `.claude/skills/agent-browser/`. `agent-browser open <url>`
+just works: the environment presets `AGENT_BROWSER_EXECUTABLE_PATH` to the
+system Chromium. (The daemon freezes its env at spawn — if it somehow started
+without the var, `agent-browser close` and retry.)
 
 ## Appendix: external hosts & the egress relay
 
