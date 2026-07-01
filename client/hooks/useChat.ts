@@ -24,7 +24,9 @@ export function useChat() {
   const workspaceId = useWorkspaceId()
   const qc = useQueryClient()
   const { layout } = useWorkspaceLayoutCtx()
-  const models = useWorkspaceModels(workspaceId).data?.models
+  const modelsData = useWorkspaceModels(workspaceId).data
+  const models = modelsData?.models
+  const supportsStreaming = modelsData?.supportsStreaming ?? false
 
   const activeSessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
   const processing = useLive(s =>
@@ -92,6 +94,11 @@ export function useChat() {
         (!modelInfo || (modelInfo.supportedEffortLevels ?? []).includes(pickedEffort))
           ? pickedEffort
           : undefined
+      // Live token streaming: thread override, else workspace default — but only
+      // when the provider supports it. Send `true` or omit (never `false`), so a
+      // provider that ignores it behaves identically.
+      const pickedStream = threadCfg?.stream ?? layout.selectedStreaming
+      const stream = supportsStreaming && pickedStream ? true : undefined
       sendMessage({
         type: 'chat',
         workspaceId,
@@ -100,7 +107,8 @@ export function useChat() {
         isNew,
         optimisticId,
         model,
-        effort
+        effort,
+        stream
       })
     },
     [
@@ -109,9 +117,12 @@ export function useChat() {
       qc,
       layout.selectedModel,
       layout.selectedEffort,
+      layout.selectedStreaming,
       threadCfg?.model,
       threadCfg?.effort,
-      models
+      threadCfg?.stream,
+      models,
+      supportsStreaming
     ]
   )
 

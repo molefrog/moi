@@ -45,6 +45,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
     optimisticId?: unknown
     model?: unknown
     effort?: unknown
+    stream?: unknown
     opId?: unknown
   }
   if (v.type === 'chat')
@@ -55,7 +56,8 @@ function isClientMessage(value: unknown): value is ClientMessage {
       typeof v.isNew === 'boolean' &&
       (v.optimisticId === undefined || typeof v.optimisticId === 'string') &&
       (v.model === undefined || typeof v.model === 'string') &&
-      (v.effort === undefined || typeof v.effort === 'string')
+      (v.effort === undefined || typeof v.effort === 'string') &&
+      (v.stream === undefined || typeof v.stream === 'boolean')
     )
   if (v.type === 'stop') return typeof v.workspaceId === 'string' && typeof v.sessionId === 'string'
   if (v.type === 'scratchpad:op-result') return typeof v.opId === 'string'
@@ -144,6 +146,8 @@ export const app = Bun.serve<WsData>({
               optimisticId: data.optimisticId
             })
           } else {
+            // `stream` is only wired for the Claude Code path; the OpenClaw
+            // branch above never receives it (unsupported provider).
             sendCCMessage({
               workspaceId: data.workspaceId,
               workspacePath: workspace.path,
@@ -152,7 +156,8 @@ export const app = Bun.serve<WsData>({
               content: data.content.trim(),
               optimisticId: data.optimisticId,
               model: data.model,
-              effort: data.effort
+              effort: data.effort,
+              stream: data.stream
             })
           }
         }

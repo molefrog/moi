@@ -74,6 +74,11 @@ export type TurnMeta = {
   provider?: string
   stopReason?: string
   usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number; costUsd?: number }
+  // The API message id (`msg_...`) that produced this assistant turn, when the
+  // backend reports one. NOT the Turn `id`. Used to reconcile a live streaming
+  // preview against its finalized turn — the client clears the preview keyed by
+  // this id the instant the real turn lands (see PreviewFrame).
+  apiMessageId?: string
 }
 
 export type Turn = {
@@ -165,11 +170,38 @@ export type ResultSummary = {
 
 // Stream events emitted by the adapter.
 // Semantics: upsert-by-id for `turn` and `snapshot`; append for `notice`; replace for `result`.
+// This is the PERSISTED, replayable union — `getSessionEvents` reconstructs it
+// from disk, so anything reconnect-healing trusts must be here. Live-only
+// previews (below) are deliberately NOT part of it.
 export type StreamEvent =
   | { kind: 'snapshot'; snapshot: SessionSnapshot }
   | { kind: 'turn'; turn: Turn }
   | { kind: 'notice'; notice: SystemNotice }
   | { kind: 'result'; result: ResultSummary }
+
+// One open content block within a live streaming message. `text` is the
+// CUMULATIVE text so far (not a diff) — a preview is always a full snapshot, so
+// a dropped or reordered frame is simply overwritten by the next one and can
+// never desync into corrupted text.
+export type PreviewBlock = { index: number; kind: 'text' | 'reasoning'; text: string }
+
+// A live, token-by-token snapshot of an assistant message still being generated.
+// Ephemeral and non-persisted: it never enters `StreamEvent`, never touches the
+// durable transcript, and is discarded the moment the real `turn` lands. Keyed
+// by `messageId` (the API `msg_...` id) so concurrent streams — e.g. parallel
+// subagents — accumulate independently and never collide.
+export type StreamPreview = {
+  messageId: string
+  // null = top-level assistant stream; a tool_use id = a subagent's nested
+  // stream. Routes the preview to the right UI slot; not part of its identity.
+  parentToolUseId: string | null
+  blocks: PreviewBlock[]
+}
+
+// What the adapter emits per ingested raw message: the persisted stream events,
+// plus the live-only preview. Callers that persist/replay filter previews out;
+// the live session layer forwards them as PreviewFrames over the socket.
+export type AdapterEmit = StreamEvent | { kind: 'preview'; preview: StreamPreview }
 
 // Materialized view state the UI renders from.
 export type ViewState = {

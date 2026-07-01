@@ -8,8 +8,9 @@ import { groupTurns } from '@/client/lib/group-turns'
 import type { ChatDisplay, ViewState } from '@/lib/types'
 
 import { ChatInput } from './ChatInput'
+import { StreamingTail } from './StreamingTail'
 import { ThreadSelector } from './ThreadSelector'
-import { EmptyState, ThinkingIndicator, TurnView } from './TurnView'
+import { EmptyState, TurnView } from './TurnView'
 import { Button } from './ui/button'
 import {
   DropdownMenu,
@@ -208,7 +209,9 @@ export function ChatPanel({
               processing={processing && i === groupedTurns.length - 1}
             />
           ))}
-          {processing && <ThinkingIndicator />}
+          {/* Live streaming preview (token-by-token) or the pulsing dots before
+              the first token — reads the ephemeral preview store, not `view`. */}
+          <StreamingTail processing={processing} />
         </div>
       </div>
 

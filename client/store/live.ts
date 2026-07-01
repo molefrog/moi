@@ -1,6 +1,8 @@
 import { useStore } from 'zustand'
 import { createStore } from 'zustand/vanilla'
 
+import type { PreviewBlock, PreviewFrame } from '@/lib/types'
+
 // App-level ephemeral chat state — the bits that are *pushed* from the server
 // over the WebSocket and can't be re-fetched as request/response data:
 //   - which thread is active per workspace (a UI selection),
@@ -27,10 +29,25 @@ export function draftKey(workspaceId: string, sessionId: string | null): string 
   return key(workspaceId, sessionId ?? 'new')
 }
 
+// A live streaming preview held in the store, keyed by API message id. Ephemeral
+// and disposable — see PreviewFrame. `updatedAt` drives the TTL sweep that reaps
+// any preview a clear signal somehow never reached.
+export type LivePreview = {
+  workspaceId: string
+  sessionId: string
+  parentToolUseId: string | null
+  blocks: PreviewBlock[]
+  updatedAt: number
+}
+
 export type LiveStore = {
   activeByWorkspace: Record<string, string | null>
   processing: Record<string, boolean>
   errors: Record<string, string | null>
+  // Live token-streaming previews, keyed by `messageId` (the API `msg_...` id)
+  // so concurrent streams never collide. Reconciled against the durable
+  // transcript: a preview is dropped the instant its finalized turn arrives.
+  previews: Record<string, LivePreview>
   // Unsent composer text, keyed per thread (`${workspaceId}:${sessionId}`, with
   // a `'new'` sentinel for a not-yet-created thread). Lives here — not in the
   // chat component — so a keystroke re-renders only the composer (which alone
@@ -47,6 +64,19 @@ export type LiveStore = {
   setError: (workspaceId: string, sessionId: string, message: string | null) => void
   setDraft: (workspaceId: string, sessionId: string | null, value: string) => void
   renameSession: (workspaceId: string, from: string, to: string) => void
+
+  // Upsert a preview snapshot (last write wins — blocks are cumulative).
+  setPreview: (frame: Omit<PreviewFrame, 'type'>) => void
+  // Drop one preview by message id — used the instant its real turn lands.
+  clearPreview: (messageId: string) => void
+  // Drop every preview for a session — belt for run end / stop / error, where a
+  // per-message clear might be missed (e.g. a turn without an apiMessageId).
+  clearPreviewsForSession: (workspaceId: string, sessionId: string) => void
+  // Drop everything — used on socket reconnect, where any in-flight preview is
+  // definitionally superseded by the /events refetch.
+  clearAllPreviews: () => void
+  // Reap previews older than `maxAgeMs` (TTL backstop against a missed clear).
+  sweepPreviews: (maxAgeMs: number, now: number) => void
 }
 
 export const liveStore = createStore<LiveStore>()(set => ({
@@ -54,6 +84,7 @@ export const liveStore = createStore<LiveStore>()(set => ({
   processing: {},
   errors: {},
   drafts: {},
+  previews: {},
 
   setActive: (workspaceId, sessionId) =>
     set(s => ({ activeByWorkspace: { ...s.activeByWorkspace, [workspaceId]: sessionId } })),
@@ -71,6 +102,51 @@ export const liveStore = createStore<LiveStore>()(set => ({
 
   setDraft: (workspaceId, sessionId, value) =>
     set(s => ({ drafts: { ...s.drafts, [draftKey(workspaceId, sessionId)]: value } })),
+
+  setPreview: frame =>
+    set(s => ({
+      previews: {
+        ...s.previews,
+        [frame.messageId]: {
+          workspaceId: frame.workspaceId,
+          sessionId: frame.sessionId,
+          parentToolUseId: frame.parentToolUseId,
+          blocks: frame.blocks,
+          updatedAt: Date.now()
+        }
+      }
+    })),
+
+  clearPreview: messageId =>
+    set(s => {
+      if (!(messageId in s.previews)) return s
+      const { [messageId]: _drop, ...rest } = s.previews
+      return { previews: rest }
+    }),
+
+  clearPreviewsForSession: (workspaceId, sessionId) =>
+    set(s => {
+      const rest: Record<string, LivePreview> = {}
+      let changed = false
+      for (const [id, p] of Object.entries(s.previews)) {
+        if (p.workspaceId === workspaceId && p.sessionId === sessionId) changed = true
+        else rest[id] = p
+      }
+      return changed ? { previews: rest } : s
+    }),
+
+  clearAllPreviews: () => set(s => (Object.keys(s.previews).length ? { previews: {} } : s)),
+
+  sweepPreviews: (maxAgeMs, now) =>
+    set(s => {
+      const rest: Record<string, LivePreview> = {}
+      let changed = false
+      for (const [id, p] of Object.entries(s.previews)) {
+        if (now - p.updatedAt > maxAgeMs) changed = true
+        else rest[id] = p
+      }
+      return changed ? { previews: rest } : s
+    }),
 
   renameSession: (workspaceId, from, to) =>
     set(s => {
@@ -90,9 +166,48 @@ export const liveStore = createStore<LiveStore>()(set => ({
         s.activeByWorkspace[workspaceId] === from
           ? { ...s.activeByWorkspace, [workspaceId]: to }
           : s.activeByWorkspace
-      return { processing, errors, activeByWorkspace }
+      // Retarget any in-flight previews from the temp id to the real one so a
+      // preview that arrived before the rename keeps routing to the thread.
+      let previews = s.previews
+      let previewsChanged = false
+      for (const [id, p] of Object.entries(s.previews)) {
+        if (p.workspaceId === workspaceId && p.sessionId === from) {
+          if (!previewsChanged) {
+            previews = { ...s.previews }
+            previewsChanged = true
+          }
+          previews[id] = { ...p, sessionId: to }
+        }
+      }
+      return { processing, errors, activeByWorkspace, previews }
     })
 }))
+
+// Select the live previews for a thread, split into the root (top-level
+// assistant) stream and per-subagent streams. Takes the raw `previews` record
+// (a stable store slice) so callers select that slice and run this inside a
+// `useMemo` — never return a fresh object straight from a zustand selector.
+// `null` sessionId yields empties.
+export function selectPreviews(
+  previews: Record<string, LivePreview>,
+  workspaceId: string,
+  sessionId: string | null
+): { root: LivePreview | null; byParent: Record<string, LivePreview> } {
+  if (!sessionId) return { root: null, byParent: {} }
+  let root: LivePreview | null = null
+  const byParent: Record<string, LivePreview> = {}
+  for (const p of Object.values(previews)) {
+    if (p.workspaceId !== workspaceId || p.sessionId !== sessionId) continue
+    if (p.parentToolUseId === null) {
+      // At most one root stream is active at a time; keep the freshest.
+      if (!root || p.updatedAt > root.updatedAt) root = p
+    } else {
+      const prev = byParent[p.parentToolUseId]
+      if (!prev || p.updatedAt > prev.updatedAt) byParent[p.parentToolUseId] = p
+    }
+  }
+  return { root, byParent }
+}
 
 // Reactive selector hook bound to the singleton store.
 export function useLive<T>(selector: (state: LiveStore) => T): T {

@@ -4,7 +4,14 @@ import { workspaceKeys } from '@/client/api/workspaces'
 import { getScratchExecutor } from '@/client/lib/scratch-executor'
 import { liveStore } from '@/client/store/live'
 import { applyEvent } from '@/lib/format'
-import type { ClientMessage, ScratchOp, StreamEvent, ThreadConfig, ViewState } from '@/lib/types'
+import type {
+  ClientMessage,
+  PreviewFrame,
+  ScratchOp,
+  StreamEvent,
+  ThreadConfig,
+  ViewState
+} from '@/lib/types'
 
 // App-wide chat connection: ONE WebSocket for the whole client, opened once at
 // startup and never torn down on navigation. Every server frame is tagged with
@@ -22,9 +29,21 @@ let generation = 0
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 const queue: ClientMessage[] = []
 let onWorkspaceSwitch: ((workspaceId: string) => void) | null = null
+let sweepTimer: ReturnType<typeof setInterval> | null = null
+
+// TTL backstop for live previews. Every clear path (turn arrival, run end,
+// reconnect) is exact and should fire first; this only reaps a preview whose
+// clear was somehow missed, so it can be generous.
+const PREVIEW_TTL_MS = 15_000
 
 export function initConnection(queryClient: QueryClient) {
   qc = queryClient
+  if (!sweepTimer) {
+    sweepTimer = setInterval(
+      () => liveStore.getState().sweepPreviews(PREVIEW_TTL_MS, Date.now()),
+      5_000
+    )
+  }
   if (socket) return // already connected (mount/StrictMode re-invoke safety)
   connect()
 }
@@ -49,6 +68,10 @@ function connect() {
     // Heal any deltas missed while disconnected: refetch every live transcript.
     // No-op on the first connect (nothing cached yet).
     qc?.invalidateQueries({ queryKey: ['workspaces', 'events'] })
+    // Any in-flight preview from before the drop is superseded by that refetch
+    // (which returns the authoritative disk state) — drop them all so a frozen
+    // half-streamed preview can't linger over the healed transcript.
+    liveStore.getState().clearAllPreviews()
   }
 
   s.onmessage = e => {
@@ -71,7 +94,7 @@ function connect() {
   s.onerror = () => s.close()
 }
 
-function handleFrame(data: Record<string, unknown>) {
+export function handleFrame(data: Record<string, unknown>) {
   const store = liveStore.getState()
 
   // Control frames first.
@@ -82,11 +105,30 @@ function handleFrame(data: Record<string, unknown>) {
     return
   }
   if (data.type === 'status') {
-    store.setProcessing(
-      data.workspaceId as string,
-      data.sessionId as string,
-      data.processing as boolean
-    )
+    const workspaceId = data.workspaceId as string
+    const sessionId = data.sessionId as string
+    const processing = data.processing as boolean
+    store.setProcessing(workspaceId, sessionId, processing)
+    // Run fully ended → any leftover preview for this session is stale (its
+    // finalized turns already arrived). Belt for a per-message clear that was
+    // missed (e.g. a turn that carried no apiMessageId).
+    if (!processing) store.clearPreviewsForSession(workspaceId, sessionId)
+    return
+  }
+  if (data.type === 'preview') {
+    const frame = data as unknown as PreviewFrame
+    // Only hold previews for a thread whose transcript is loaded (mirrors
+    // patchView): keeps the store bounded and never renders a preview over a
+    // history-less background session that would then never refetch.
+    const key = workspaceKeys.events(frame.workspaceId, frame.sessionId)
+    if (qc?.getQueryData(key) === undefined) return
+    store.setPreview({
+      workspaceId: frame.workspaceId,
+      sessionId: frame.sessionId,
+      messageId: frame.messageId,
+      parentToolUseId: frame.parentToolUseId,
+      blocks: frame.blocks
+    })
     return
   }
   if (data.type === 'session_renamed') {
@@ -145,12 +187,24 @@ function handleFrame(data: Record<string, unknown>) {
 
   if (kind === 'snapshot' || kind === 'turn' || kind === 'notice' || kind === 'result') {
     patchView(workspaceId, sessionId, data as unknown as StreamEvent)
+    // The real turn superseding a live preview is the clean handoff: drop the
+    // preview for that exact message id the instant its finalized turn lands, so
+    // there's no double-render and no flicker (both updates commit together).
+    if (kind === 'turn') {
+      const mid = (data as unknown as { turn?: { meta?: { apiMessageId?: string } } }).turn?.meta
+        ?.apiMessageId
+      if (mid) store.clearPreview(mid)
+    }
+    // A `result` ends the turn — sweep any preview that never got an exact clear.
+    if (kind === 'result') store.clearPreviewsForSession(workspaceId, sessionId)
   }
   if (kind === 'error' && typeof data.content === 'string') {
     store.setError(workspaceId, sessionId, data.content)
+    store.clearPreviewsForSession(workspaceId, sessionId)
   }
   if (kind === 'stopped') {
     store.setProcessing(workspaceId, sessionId, false)
+    store.clearPreviewsForSession(workspaceId, sessionId)
   }
 }
 
@@ -173,4 +227,11 @@ export function sendMessage(msg: ClientMessage) {
 
 export function setWorkspaceSwitchHandler(fn: ((workspaceId: string) => void) | null) {
   onWorkspaceSwitch = fn
+}
+
+// Test seam: inject the QueryClient the frame handler reads, without opening a
+// socket (the browser-only `connect()` path). Production always goes through
+// `initConnection`.
+export function __setQueryClientForTests(client: QueryClient | null) {
+  qc = client
 }

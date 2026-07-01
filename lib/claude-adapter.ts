@@ -1,5 +1,7 @@
 import type {
+  AdapterEmit,
   Part,
+  PreviewBlock,
   ResultSummary,
   SessionSnapshot,
   StreamEvent,
@@ -8,6 +10,7 @@ import type {
   ToolCall,
   ToolCaller,
   Turn,
+  TurnMeta,
   TurnOrigin
 } from './format'
 
@@ -33,10 +36,24 @@ type ContentBlock = {
   source_id?: string
 }
 
+// A raw Anthropic Messages-API SSE event, as forwarded by the SDK's
+// `stream_event` messages (only when `includePartialMessages` is on). Loosely
+// typed — we read just the fields we render. `message.id` is present only on
+// `message_start`; the block deltas carry `index` but no message id, so we
+// track the active message per lane (see `currentMsgByParent`).
+type RawStreamEvent = {
+  type?: string
+  message?: { id?: string }
+  index?: number
+  content_block?: { type?: string; text?: string; thinking?: string }
+  delta?: { type?: string; text?: string; thinking?: string }
+}
+
 type SdkMessage = {
   type: string
   subtype?: string
-  message?: { role?: string; content?: unknown; model?: string }
+  message?: { role?: string; content?: unknown; model?: string; id?: string }
+  event?: RawStreamEvent
   parent_tool_use_id?: string | null
   tool_use_id?: string
   isSynthetic?: boolean
@@ -125,6 +142,11 @@ function turnId(msg: SdkMessage): string {
   return `fallback:${Math.random().toString(36).slice(2)}`
 }
 
+// Lane key for the top-level (non-subagent) assistant stream. Deltas carry no
+// message id, so we key "which message is currently streaming" by lane —
+// `parent_tool_use_id` for a subagent, this sentinel for the root.
+const ROOT_LANE = '__root__'
+
 export class ClaudeAdapter {
   private turns: Turn[] = []
   // toolCallId → the Turn that contains the tool call + its position
@@ -138,6 +160,19 @@ export class ClaudeAdapter {
   // queued user messages in flight at once; each echo consumes its match.
   private pendingUserEchoes: { id: string; text: string }[] = []
 
+  // --- live streaming previews (only when includePartialMessages is on) ------
+  // One accumulator PER message id (`msg_...`) so concurrent streams — parallel
+  // subagents, or a root message and a subagent's — never bleed into each other.
+  // Each holds the cumulative text of every open content block, keyed by index.
+  private previewBuffers = new Map<
+    string,
+    { parentToolUseId: string | null; blocks: Map<number, PreviewBlock> }
+  >()
+  // Which message id is currently streaming on each lane (root / per-subagent).
+  // Block deltas carry only `index`, no message id, so this routes them to the
+  // right buffer. Set on message_start, cleared on message_stop / finalize.
+  private currentMsgByLane = new Map<string, string>()
+
   /**
    * Tell the adapter that a user input with this text has already been
    * emitted optimistically by the client under `id`. The next time the SDK
@@ -150,9 +185,14 @@ export class ClaudeAdapter {
     if (this.pendingUserEchoes.length > 32) this.pendingUserEchoes.shift()
   }
 
-  ingest(raw: unknown): StreamEvent[] {
+  ingest(raw: unknown): AdapterEmit[] {
     const msg = raw as SdkMessage
-    const events: StreamEvent[] = []
+    const events: AdapterEmit[] = []
+
+    // --- stream_event → live preview (never persisted) --------------------
+    if (msg.type === 'stream_event') {
+      return this.ingestStreamEvent(msg)
+    }
 
     // --- system/init → SessionSnapshot ------------------------------------
     if (msg.type === 'system' && msg.subtype === 'init') {
@@ -211,6 +251,10 @@ export class ClaudeAdapter {
 
     // --- result -----------------------------------------------------------
     if (msg.type === 'result') {
+      // The turn is fully done; any live preview buffers left open are stale
+      // (each assistant message deletes its own on finalize — this is belt).
+      this.previewBuffers.clear()
+      this.currentMsgByLane.clear()
       const subtype = (msg.subtype ?? 'success') as ResultSummary['subtype']
       events.push({
         kind: 'result',
@@ -224,9 +268,89 @@ export class ClaudeAdapter {
       return events
     }
 
-    // stream_event, tool_progress, tool_use_summary, auth_status,
-    // prompt_suggestion — dropped for display-only mode.
+    // tool_progress, tool_use_summary, auth_status, prompt_suggestion —
+    // dropped for display-only mode.
     return events
+  }
+
+  // -----------------------------------------------------------------------
+  // Live streaming previews (stream_event → StreamPreview)
+  // -----------------------------------------------------------------------
+
+  private ingestStreamEvent(msg: SdkMessage): AdapterEmit[] {
+    const ev = msg.event
+    if (!ev || typeof ev.type !== 'string') return []
+    const parent = msg.parent_tool_use_id ?? null
+    const lane = parent ?? ROOT_LANE
+
+    switch (ev.type) {
+      case 'message_start': {
+        const id = ev.message?.id
+        if (!id) return []
+        // A fresh message on this lane supersedes any prior unfinished one.
+        const stale = this.currentMsgByLane.get(lane)
+        if (stale && stale !== id) this.previewBuffers.delete(stale)
+        this.previewBuffers.set(id, { parentToolUseId: parent, blocks: new Map() })
+        this.currentMsgByLane.set(lane, id)
+        return []
+      }
+      case 'content_block_start': {
+        const cbType = ev.content_block?.type
+        const kind = cbType === 'thinking' ? 'reasoning' : cbType === 'text' ? 'text' : null
+        if (kind === null || typeof ev.index !== 'number') return []
+        const buf = this.currentBuffer(lane)
+        if (!buf) return []
+        const seed = kind === 'reasoning' ? ev.content_block?.thinking : ev.content_block?.text
+        buf.blocks.set(ev.index, { index: ev.index, kind, text: seed ?? '' })
+        return this.emitPreview(lane)
+      }
+      case 'content_block_delta': {
+        if (typeof ev.index !== 'number') return []
+        const d = ev.delta
+        let add: string | null = null
+        let kind: 'text' | 'reasoning' = 'text'
+        if (d?.type === 'text_delta' && typeof d.text === 'string') {
+          add = d.text
+          kind = 'text'
+        } else if (d?.type === 'thinking_delta' && typeof d.thinking === 'string') {
+          add = d.thinking
+          kind = 'reasoning'
+        }
+        // signature_delta / input_json_delta / unknown carry no visible text.
+        if (add === null) return []
+        const buf = this.currentBuffer(lane)
+        if (!buf) return []
+        const existing = buf.blocks.get(ev.index)
+        if (existing) existing.text += add
+        else buf.blocks.set(ev.index, { index: ev.index, kind, text: add })
+        return this.emitPreview(lane)
+      }
+      case 'message_stop': {
+        const id = this.currentMsgByLane.get(lane)
+        if (id) this.previewBuffers.delete(id)
+        this.currentMsgByLane.delete(lane)
+        return []
+      }
+      // content_block_stop, message_delta, ping — no visible text change.
+      default:
+        return []
+    }
+  }
+
+  private currentBuffer(lane: string) {
+    const id = this.currentMsgByLane.get(lane)
+    return id ? this.previewBuffers.get(id) : undefined
+  }
+
+  private emitPreview(lane: string): AdapterEmit[] {
+    const id = this.currentMsgByLane.get(lane)
+    if (!id) return []
+    const buf = this.previewBuffers.get(id)
+    if (!buf) return []
+    const blocks = [...buf.blocks.values()].sort((a, b) => a.index - b.index).map(b => ({ ...b }))
+    return [
+      { kind: 'preview', preview: { messageId: id, parentToolUseId: buf.parentToolUseId, blocks } }
+    ]
   }
 
   // Returns the current snapshot + turns + notices + result as events — used
@@ -244,6 +368,18 @@ export class ClaudeAdapter {
 
   private ingestConversationMessage(msg: SdkMessage): StreamEvent[] {
     const events: StreamEvent[] = []
+
+    // This message is now authoritative for its id — drop its live preview
+    // buffer so no trailing stream_event can re-emit stale text. The client
+    // clears the on-screen preview keyed by the same id when the turn lands.
+    if (msg.type === 'assistant' && msg.message?.id) {
+      const id = msg.message.id
+      this.previewBuffers.delete(id)
+      for (const [lane, mid] of this.currentMsgByLane) {
+        if (mid === id) this.currentMsgByLane.delete(lane)
+      }
+    }
+
     const blocks = contentAsArray(msg.message?.content)
     if (blocks.length === 0) return events
 
@@ -395,7 +531,10 @@ export class ClaudeAdapter {
 
     // The model that actually produced this turn (BetaMessage.model). Present
     // on assistant messages; the most recent one is "the latest model used".
-    const model = msg.message?.model
+    // `apiMessageId` lets the client reconcile a live preview against this turn.
+    const meta: TurnMeta = {}
+    if (msg.message?.model) meta.model = msg.message.model
+    if (msg.message?.id) meta.apiMessageId = msg.message.id
 
     return {
       id,
@@ -404,7 +543,7 @@ export class ClaudeAdapter {
       parentTaskId: msg.parent_tool_use_id ?? undefined,
       parts,
       timestamp: msg.timestamp,
-      meta: model ? { model } : undefined
+      meta: Object.keys(meta).length > 0 ? meta : undefined
     }
   }
 

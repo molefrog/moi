@@ -69,6 +69,13 @@ type LiveSession = {
   // turn is in flight (can't rebuild mid-turn), the session is torn down once it
   // drains so the next message resumes with the requested effort.
   desiredEffort: string | undefined
+  // Whether this query was built with `includePartialMessages` (live token
+  // streaming). Like effort, it's a construct-time option with no live setter,
+  // so a change tears the session down and resumes.
+  stream: boolean
+  // Streaming mode the latest message asked for; drives the same drain-then-
+  // rebuild path as `desiredEffort` when it diverges mid-turn.
+  desiredStream: boolean
   idleTimer: ReturnType<typeof setTimeout> | null
   closed: boolean
   // Introspection only (surfaced by /status) — not load-bearing.
@@ -253,15 +260,33 @@ async function consume(s: LiveSession) {
         // it has none yet, so an explicit user PUT (or a migrated temp-id edit)
         // always wins. A default run (no model/effort) leaves no file and falls
         // back to the workspace defaults.
-        if ((s.model || s.effort) && !(await hasThreadConfig(s.workspacePath, s.sessionId))) {
+        if (
+          (s.model || s.effort || s.stream) &&
+          !(await hasThreadConfig(s.workspacePath, s.sessionId))
+        ) {
           await saveThreadConfig(s.workspacePath, s.sessionId, {
             model: s.model,
-            effort: s.effort
+            effort: s.effort,
+            // Only persist streaming when it was on — `false` is the default and
+            // shouldn't create a config entry for every plain thread.
+            stream: s.stream ? true : undefined
           })
         }
       }
       for (const ev of s.adapter.ingest(msg)) {
-        broadcast(s.workspaceId, { ...ev, sessionId: s.sessionId })
+        if (ev.kind === 'preview') {
+          // Live-only token preview — a sibling frame, never a StreamEvent, so
+          // it never enters the persisted/replayable transcript path.
+          broadcast(s.workspaceId, {
+            type: 'preview',
+            sessionId: s.sessionId,
+            messageId: ev.preview.messageId,
+            parentToolUseId: ev.preview.parentToolUseId,
+            blocks: ev.preview.blocks
+          })
+        } else {
+          broadcast(s.workspaceId, { ...ev, sessionId: s.sessionId })
+        }
       }
       if (msg.type === 'system' && msg.subtype === 'init') {
         debug(`cc init ws=${s.workspaceId} session=${s.sessionId}`)
@@ -272,9 +297,10 @@ async function consume(s: LiveSession) {
         debug(`cc result ws=${s.workspaceId} session=${s.sessionId} pendingTurns=${s.pendingTurns}`)
         if (s.pendingTurns === 0) {
           broadcastProcessing(s, false)
-          // A mid-turn effort change couldn't be applied live; now that the
-          // queue has drained, tear down so the next message resumes with it.
-          if (s.desiredEffort !== s.effort) teardown(s)
+          // A mid-turn effort/streaming change couldn't be applied live; now
+          // that the queue has drained, tear down so the next message resumes
+          // with it.
+          if (s.desiredEffort !== s.effort || s.desiredStream !== s.stream) teardown(s)
           else armIdle(s)
         }
       }
@@ -318,6 +344,9 @@ function createLiveSession(input: {
   isNew: boolean
   model: string | undefined
   effort: string | undefined
+  // Live token streaming (`includePartialMessages`). Only enabled when the
+  // client opts in; off leaves the query byte-for-byte as before.
+  stream: boolean
   // Resolved workspace env (.env + UI custom overrides), injected so the agent's
   // Bash tool can use workspace secrets. Frozen at spawn — see restartWorkspaceSessions.
   workspaceEnv: Record<string, string>
@@ -344,6 +373,9 @@ function createLiveSession(input: {
     // is valid for the model; the SDK silently downgrades otherwise. Cast because
     // the SDK under-types the union (no 'xhigh') vs our pass-through string.
     ...(input.effort ? { effort: input.effort as Options['effort'] } : {}),
+    // Emit `stream_event` partial-message frames so the adapter can surface a
+    // live token-by-token preview. Off = unchanged behavior (whole blocks only).
+    includePartialMessages: input.stream,
     allowedTools: ALLOWED_TOOLS,
     permissionMode: 'bypassPermissions',
     allowDangerouslySkipPermissions: true,
@@ -365,6 +397,8 @@ function createLiveSession(input: {
     model: input.model,
     effort: input.effort,
     desiredEffort: input.effort,
+    stream: input.stream,
+    desiredStream: input.stream,
     idleTimer: null,
     closed: false,
     createdAt: Date.now(),
@@ -390,13 +424,15 @@ export async function sendCCMessage(input: {
   optimisticId?: string
   model?: string
   effort?: string
+  stream?: boolean
 }): Promise<void> {
+  const wantStream = input.stream === true
   let s = sessions.get(liveKey(input.workspaceId, input.sessionId))
-  // Effort can't be changed on a running query (no SDK setter), so when it
-  // differs we tear the idle session down and fall through to recreate it via
-  // resume with the new effort — the change lands on this very turn. A busy
-  // session keeps its effort until the in-flight turn ends (then idle-evicts).
-  if (s && input.effort !== s.effort && s.pendingTurns === 0) {
+  // Neither effort nor streaming can be changed on a running query (both are
+  // construct-time, no SDK setter), so when either differs we tear the idle
+  // session down and recreate it via resume — the change lands on this very
+  // turn. A busy session keeps its settings until the in-flight turn ends.
+  if (s && (input.effort !== s.effort || wantStream !== s.stream) && s.pendingTurns === 0) {
     teardown(s)
     s = undefined
   }
@@ -408,6 +444,7 @@ export async function sendCCMessage(input: {
       isNew: input.isNew,
       model: input.model,
       effort: input.effort,
+      stream: wantStream,
       // The agent only sees secrets scoped to the 'agent' sink (plus .env).
       workspaceEnv: await resolveWorkspaceEnv(input.workspacePath, 'agent')
     })
@@ -421,11 +458,12 @@ export async function sendCCMessage(input: {
         console.error('[cc-session] setModel failed', err)
       }
     }
-    // Effort can't change on a running query; record the request so the session
-    // rebuilds once its turns drain (see the `result` handler). Reaching here
-    // with a divergent effort means the session is busy — an idle one was torn
-    // down above.
+    // Effort/streaming can't change on a running query; record the request so
+    // the session rebuilds once its turns drain (see the `result` handler).
+    // Reaching here with a divergent value means the session is busy — an idle
+    // one was torn down above.
     s.desiredEffort = input.effort
+    s.desiredStream = wantStream
   }
 
   // Streaming-input mode does NOT echo the pushed user message back in the

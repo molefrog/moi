@@ -16,6 +16,7 @@ import type { ThreadConfig } from '@/lib/types'
 export type ThreadConfigPatch = {
   model?: string | null
   effort?: string | null
+  stream?: boolean | null
 }
 
 type Store = Record<string, Record<string, ThreadConfig>>
@@ -32,7 +33,12 @@ function clean(cfg: ThreadConfig | undefined): ThreadConfig {
   const out: ThreadConfig = {}
   if (typeof cfg?.model === 'string') out.model = cfg.model
   if (typeof cfg?.effort === 'string') out.effort = cfg.effort
+  if (typeof cfg?.stream === 'boolean') out.stream = cfg.stream
   return out
+}
+
+function isEmpty(cfg: ThreadConfig): boolean {
+  return cfg.model === undefined && cfg.effort === undefined && cfg.stream === undefined
 }
 
 async function readStore(): Promise<Store> {
@@ -69,8 +75,7 @@ export async function getThreadConfig(
 }
 
 export async function hasThreadConfig(workspacePath: string, sessionId: string): Promise<boolean> {
-  const cfg = await getThreadConfig(workspacePath, sessionId)
-  return cfg.model !== undefined || cfg.effort !== undefined
+  return !isEmpty(await getThreadConfig(workspacePath, sessionId))
 }
 
 // Merge a patch over the stored config and write it back. `null` clears a field,
@@ -91,7 +96,11 @@ export async function saveThreadConfig(
       if (value === null) delete next[key]
       else next[key] = value
     }
-    if (next.model === undefined && next.effort === undefined) delete threads[sessionId]
+    if (patch.stream !== undefined) {
+      if (patch.stream === null) delete next.stream
+      else next.stream = patch.stream
+    }
+    if (isEmpty(next)) delete threads[sessionId]
     else threads[sessionId] = next
     if (Object.keys(threads).length === 0) delete store[workspacePath]
     else store[workspacePath] = threads
@@ -113,7 +122,7 @@ export async function renameThreadConfig(
     const store = await readStore()
     const threads = store[workspacePath]
     const src = clean(threads?.[from])
-    if (src.model === undefined && src.effort === undefined) return
+    if (isEmpty(src)) return
     threads![to] = { ...src, ...clean(threads![to]) }
     delete threads![from]
     store[workspacePath] = threads!

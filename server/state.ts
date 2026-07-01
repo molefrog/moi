@@ -61,7 +61,10 @@ export async function getSessionEvents(
   try {
     const raw = await getSessionMessages(sessionId, { dir: workspacePath })
     for (const msg of raw) {
-      for (const ev of adapter.ingest(msg)) events.push(ev)
+      // Disk replay carries no `stream_event` messages, so the adapter never
+      // produces previews here — filter defensively to keep this the pure,
+      // persisted StreamEvent path that reconnect-healing trusts.
+      for (const ev of adapter.ingest(msg)) if (ev.kind !== 'preview') events.push(ev)
     }
   } catch {
     // session file missing or unreadable — return whatever we have (often [])
