@@ -25,6 +25,10 @@ Do **not** start the server with `bun --hot server/web.ts` or the old `moi start
 
 Only one server runs at a time — it binds port 3000 (HTTP) and 13059 (control). To restart, kill the existing `bun run dev` process and start it again; a second instance fails on the control port.
 
+## Browser testing in cloud sandboxes
+
+To load the app in a real Chromium inside Claude Code on the web (Playwright or agent-browser), see `docs/browser-testing-cloud.md`. Short version: the sandbox's egress proxy kills the browser's TLS handshakes, so run `node scripts/esm-mirror.mjs` (serves esm.sh locally on 127.0.0.1:443) and launch Chromium with `--no-proxy-server --host-resolver-rules="MAP esm.sh 127.0.0.1"` plus ignored HTTPS errors.
+
 ## Session Storage Notes
 
 Claude Code stores sessions as `.jsonl` files under:

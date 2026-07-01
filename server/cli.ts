@@ -302,6 +302,13 @@ const start = defineCommand({
       // `dist/` exists in the tree (prod serves prebuilt `dist/` statically).
       const env = {
         ...process.env,
+        // The dev bundler snapshots process.env at server startup, so the
+        // PUBLIC_* inlining (bunfig `[serve.static] env`) only sees vars that
+        // are set before the server process spawns — setting one later from
+        // server code does nothing. Default the tldraw key here so an unset
+        // key inlines as '' (→ watermark) instead of leaving a bare
+        // `process.env.…` in the browser bundle that throws.
+        PUBLIC_TLDRAW_LICENSE_KEY: process.env.PUBLIC_TLDRAW_LICENSE_KEY ?? '',
         ...(args.port ? { PORT: args.port } : {}),
         ...(dev ? { MOI_DEV: '1' } : {}),
         ...(debug ? { MOI_DEBUG: '1' } : {})
