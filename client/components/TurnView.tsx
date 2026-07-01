@@ -53,6 +53,35 @@ function buildSegments(parts: Part[]): Segment[] {
   return segments
 }
 
+type TurnPartsProps = { parts: Part[]; cwd: string | null; processing?: boolean }
+
+// Shared body renderer for a sequence of parts — used by both a finalized turn
+// and the live streaming preview (StreamingTail), so a streamed message and its
+// finalized form render identically (seamless swap on finalize). Consecutive
+// reasoning + tool-call parts fold into one <ToolCallGroup> run; text/files/etc.
+// stand alone. `processing` flows into the LAST run so a trailing reasoning there
+// reads as a live, expanded "Thinking" row.
+export function TurnParts({ parts, cwd, processing = false }: TurnPartsProps) {
+  const segments = buildSegments(parts)
+  return (
+    <div className="flex flex-col">
+      {segments.map((seg, i) => {
+        const spacing = i === 0 ? '' : 'mt-3'
+        const isLast = i === segments.length - 1
+        return (
+          <div key={i} className={spacing}>
+            {seg.kind === 'run' ? (
+              <ToolCallGroup parts={seg.parts} cwd={cwd} processing={processing && isLast} />
+            ) : (
+              <PartRenderer part={seg.part} />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 type TurnViewProps = { turn: Turn; processing?: boolean }
 
 // Memoized: the message list maps over grouped turns (stable identities — see
@@ -84,26 +113,7 @@ export const TurnView = memo(function TurnView({ turn, processing = false }: Tur
     )
   }
 
-  const segments = buildSegments(turn.parts)
-  return (
-    <div className="flex flex-col">
-      {segments.map((seg, i) => {
-        const spacing = i === 0 ? '' : 'mt-3'
-        // `processing` belongs to the live last row, so only flow it into the
-        // final run — a trailing reasoning there reads as "Thinking".
-        const isLast = i === segments.length - 1
-        return (
-          <div key={i} className={spacing}>
-            {seg.kind === 'run' ? (
-              <ToolCallGroup parts={seg.parts} cwd={cwd} processing={processing && isLast} />
-            ) : (
-              <PartRenderer part={seg.part} />
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
+  return <TurnParts parts={turn.parts} cwd={cwd} processing={processing} />
 })
 
 type PartRendererProps = { part: Part }

@@ -2,19 +2,20 @@
 // flight: either the streaming preview of the assistant's current message
 // (token-by-token) or, before the first token, the pulsing "Thinking" dots.
 //
-// This reads the EPHEMERAL preview store, never the durable transcript. The
-// preview is a full cumulative snapshot per frame, so a dropped/reordered frame
-// just renders the next snapshot — it can never desync. The instant the real
-// turn lands, the connection layer clears the preview (keyed by message id) and
-// the finalized <TurnView> takes over in the same commit, so there's no flicker
-// and no double render.
+// This reads the EPHEMERAL preview store, never the durable transcript. It
+// renders the preview through the SAME <TurnParts> path a finalized turn uses,
+// so a streamed message and its finalized form look identical (seamless swap on
+// finalize) — reasoning folds into a timeline group whose live "Thinking" row is
+// expanded, and text stands alone. The preview is a full cumulative snapshot per
+// frame, so a dropped/reordered frame just renders the next snapshot — it can
+// never desync. The instant the real turn lands, the connection layer clears the
+// preview (keyed by message id) and <TurnView> takes over in the same commit.
 import { useMemo } from 'react'
 
-import { MarkdownContent } from '@/client/components/MarkdownContent'
-import { ThinkingIndicator } from '@/client/components/TurnView'
+import { ThinkingIndicator, TurnParts } from '@/client/components/TurnView'
 import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
 import { selectPreviews, useLive } from '@/client/store/live'
-import type { PreviewBlock } from '@/lib/types'
+import type { Part } from '@/lib/types'
 
 type StreamingTailProps = { processing: boolean }
 
@@ -29,34 +30,24 @@ export function StreamingTail({ processing }: StreamingTailProps) {
     [previews, workspaceId, sessionId]
   )
 
-  const blocks = root?.blocks ?? []
-  const hasVisibleText = blocks.some(b => b.text.length > 0)
+  // Map the preview's blocks to display parts, dropping not-yet-visible (empty)
+  // blocks so a just-opened block doesn't prematurely collapse the live thinking.
+  const parts = useMemo<Part[]>(
+    () =>
+      (root?.blocks ?? [])
+        .filter(b => b.text.length > 0)
+        .map(b =>
+          b.kind === 'reasoning'
+            ? { type: 'reasoning', text: b.text }
+            : { type: 'text', text: b.text }
+        ),
+    [root]
+  )
 
   // No visible tokens yet → the pulsing dots (only while actually processing).
-  if (!hasVisibleText) return processing ? <ThinkingIndicator /> : null
+  if (parts.length === 0) return processing ? <ThinkingIndicator /> : null
 
-  return (
-    <div className="flex flex-col gap-2">
-      {blocks.map(b => (b.text.length > 0 ? <PreviewBlockView key={b.index} block={b} /> : null))}
-    </div>
-  )
-}
-
-type PreviewBlockViewProps = { block: PreviewBlock }
-
-// One open content block. Text renders as Markdown (matching the finalized turn,
-// so the swap on finalize is visually seamless); reasoning renders as muted
-// prose under a "Thinking" label, mirroring the timeline's reasoning row.
-function PreviewBlockView({ block }: PreviewBlockViewProps) {
-  if (block.kind === 'reasoning') {
-    return (
-      <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-muted-foreground">Thinking</span>
-        <div className="pr-2 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
-          {block.text}
-        </div>
-      </div>
-    )
-  }
-  return <MarkdownContent content={block.text} />
+  // `processing` flows into the last run, so a trailing reasoning renders as a
+  // live, expanded "Thinking" row that collapses once text/tools follow it.
+  return <TurnParts parts={parts} cwd={null} processing={processing} />
 }
