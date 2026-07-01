@@ -5,12 +5,11 @@ import { IconChevronsRight, IconSelector, IconX } from '@tabler/icons-react'
 import { useScrollFade } from '@/client/hooks/useScrollFade'
 import { cn } from '@/client/lib/cn'
 import { groupTurns } from '@/client/lib/group-turns'
-import type { ChatDisplay, ViewState } from '@/lib/types'
+import type { ChatDisplay, Turn, ViewState } from '@/lib/types'
 
 import { ChatInput } from './ChatInput'
-import { StreamingTail } from './StreamingTail'
 import { ThreadSelector } from './ThreadSelector'
-import { EmptyState, TurnView } from './TurnView'
+import { EmptyState, ThinkingIndicator, TurnView } from './TurnView'
 import { Button } from './ui/button'
 import {
   DropdownMenu,
@@ -77,6 +76,10 @@ function ChatModeIconFullscreen({ className }: ChatModeIconProps) {
 
 type ChatPanelProps = {
   view: ViewState
+  // The live streaming preview as a synthetic assistant turn (or null). Merged
+  // into the transcript through the same groupTurns pipeline so a thinking-only
+  // preview folds into the current tool group. See client/lib/preview-turn.ts.
+  previewTurn?: Turn | null
   processing: boolean
   error?: string | null
   onDismissError?: () => void
@@ -99,6 +102,7 @@ type ChatPanelProps = {
 
 export function ChatPanel({
   view,
+  previewTurn,
   processing,
   error,
   onDismissError,
@@ -117,12 +121,18 @@ export function ChatPanel({
   // synthetic turn so OpenAI Codex–style traces (which serialize one
   // assistant message per agent step) don't render with the wider
   // inter-turn gap between every tool call. See `dev/turn-spacing.md`.
-  const groupedTurns = useMemo(() => groupTurns(turns), [turns])
+  // The live preview turn is appended before grouping, so a thinking-only
+  // preview merges into the trailing tool group exactly like its finalized form.
+  const groupedTurns = useMemo(
+    () => groupTurns(previewTurn ? [...turns, previewTurn] : turns),
+    [turns, previewTurn]
+  )
 
+  // Follow the tail as turns finalize and as the preview streams.
   useEffect(() => {
     const el = scrollRef.current
     el?.scrollTo({ top: el.scrollHeight, behavior: 'instant' })
-  }, [scrollRef, turns])
+  }, [scrollRef, turns, previewTurn])
 
   const TriggerIcon =
     chatMode === 'sidebar'
@@ -209,9 +219,9 @@ export function ChatPanel({
               processing={processing && i === groupedTurns.length - 1}
             />
           ))}
-          {/* Live streaming preview (token-by-token) or the pulsing dots before
-              the first token — reads the ephemeral preview store, not `view`. */}
-          <StreamingTail processing={processing} />
+          {/* Pulsing dots only before the first token — once the preview has
+              visible content it renders as a (possibly merged) grouped turn. */}
+          {processing && !previewTurn && <ThinkingIndicator />}
         </div>
       </div>
 
