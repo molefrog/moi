@@ -10,12 +10,26 @@
 // frame, so a dropped/reordered frame just renders the next snapshot — it can
 // never desync. The instant the real turn lands, the connection layer clears the
 // preview (keyed by message id) and <TurnView> takes over in the same commit.
+//
+// Split into a store-connected shell (<StreamingTail>) and a pure, prop-driven
+// view (<StreamingTailView>) so the display is unit-testable without the store.
 import { useMemo } from 'react'
 
 import { ThinkingIndicator, TurnParts } from '@/client/components/TurnView'
 import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
-import { selectPreviews, useLive } from '@/client/store/live'
-import type { Part } from '@/lib/types'
+import { type LivePreview, selectPreviews, useLive } from '@/client/store/live'
+import type { Part, PreviewBlock } from '@/lib/types'
+
+// Map preview blocks to display parts, dropping not-yet-visible (empty) blocks so
+// a just-opened block doesn't prematurely collapse the live thinking. Order is
+// preserved, so reasoning-before-text folds/collapses the same as a real turn.
+export function previewBlocksToParts(blocks: PreviewBlock[]): Part[] {
+  return blocks
+    .filter(b => b.text.length > 0)
+    .map(b =>
+      b.kind === 'reasoning' ? { type: 'reasoning', text: b.text } : { type: 'text', text: b.text }
+    )
+}
 
 type StreamingTailProps = { processing: boolean }
 
@@ -29,20 +43,13 @@ export function StreamingTail({ processing }: StreamingTailProps) {
     () => selectPreviews(previews, workspaceId, sessionId).root,
     [previews, workspaceId, sessionId]
   )
+  return <StreamingTailView root={root} processing={processing} />
+}
 
-  // Map the preview's blocks to display parts, dropping not-yet-visible (empty)
-  // blocks so a just-opened block doesn't prematurely collapse the live thinking.
-  const parts = useMemo<Part[]>(
-    () =>
-      (root?.blocks ?? [])
-        .filter(b => b.text.length > 0)
-        .map(b =>
-          b.kind === 'reasoning'
-            ? { type: 'reasoning', text: b.text }
-            : { type: 'text', text: b.text }
-        ),
-    [root]
-  )
+type StreamingTailViewProps = { root: LivePreview | null; processing: boolean }
+
+export function StreamingTailView({ root, processing }: StreamingTailViewProps) {
+  const parts = useMemo<Part[]>(() => previewBlocksToParts(root?.blocks ?? []), [root])
 
   // No visible tokens yet → the pulsing dots (only while actually processing).
   if (parts.length === 0) return processing ? <ThinkingIndicator /> : null
