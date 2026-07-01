@@ -27,7 +27,7 @@ Only one server runs at a time — it binds port 3000 (HTTP) and 13059 (control)
 
 ## Browser testing in cloud sandboxes
 
-To drive the app in a real Chromium inside Claude Code on the web (Playwright or agent-browser), see `docs/browser-testing-cloud.md`.
+To drive the app in a browser inside Claude Code on the web, use the vendored **agent-browser skill** (`.claude/skills/agent-browser/`). Cloud-specific setup — server startup, `AGENT_BROWSER_EXECUTABLE_PATH`, Playwright alternative, egress-relay caveats — is in `docs/browser-testing-cloud.md`.
 
 ## Session Storage Notes
 
