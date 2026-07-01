@@ -282,6 +282,9 @@ const start = defineCommand({
     const projectRoot = join(import.meta.dir, '..')
     // Undocumented: --dev runs the watch-and-full-restart dev supervisor.
     const dev = process.argv.includes('--dev')
+    // Undocumented: --debug turns on the messaging trace (MOI_DEBUG) in the
+    // server — console lines for each message/session/turn in the chat pipeline.
+    const debug = process.argv.includes('--debug')
 
     // Launcher path: we are the CLI, not the server. Decide whether to bail
     // (a server is already up), run the dev supervisor, or spawn a one-shot
@@ -300,7 +303,8 @@ const start = defineCommand({
       const env = {
         ...process.env,
         ...(args.port ? { PORT: args.port } : {}),
-        ...(dev ? { MOI_DEV: '1' } : {})
+        ...(dev ? { MOI_DEV: '1' } : {}),
+        ...(debug ? { MOI_DEBUG: '1' } : {})
       }
       if (dev) {
         await runDevSupervisor(projectRoot, env)

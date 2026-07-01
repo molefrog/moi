@@ -21,6 +21,7 @@ import {
 import { getWorkspace } from './registry'
 import { addClient, removeClient, sendToClient } from './state'
 import { distShell, prebuilt } from './static'
+import { renderStatus } from './status'
 
 // Guarantee the public tldraw license key is *defined* before the dev bundler
 // inlines it (bunfig `[serve.static] env = "PUBLIC_*"`). Bun's prefix inlining
@@ -83,6 +84,14 @@ export const app = Bun.serve<WsData>({
   // HMR only in dev; prod serves prebuilt static assets (no bundler).
   development: prebuilt ? false : { hmr: true },
   routes: {
+    // Plain-text server introspection — live sessions held in cache, connected
+    // tabs, last message per thread. A quick peek into the process when a chat
+    // seems stuck. Served as text/plain so curl/browser both show it raw.
+    '/status': () =>
+      new Response(renderStatus(), {
+        headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }
+      }),
+
     // Client-side routes — serve the SPA shell.
     '/': shell,
     '/playground': shell,

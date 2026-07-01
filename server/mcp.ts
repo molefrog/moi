@@ -1,6 +1,8 @@
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import type { McpServerStatus, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 
+import { debugEnabled } from './debug'
+
 // MCP server status probing. Intentionally decoupled from agent chat runs
 // (cc-session.ts): connecting to MCP servers and reading their status is a
 // metadata concern, not part of any conversation. Nothing here submits a user
@@ -22,6 +24,25 @@ const POLL_INTERVAL_MS = 750
 // `needs-auth` that only changes on external action, not by waiting).
 function isSettled(status: McpServerStatus[]): boolean {
   return status.every(s => s.status !== 'pending')
+}
+
+// Log the probe result without drowning the console. By default we print a
+// one-line summary — a count of healthy servers plus only the ones that need
+// attention (failed / needs-auth / still-pending) called out by name. The full
+// per-server dump (every `connected` line too) is opt-in via `moi start --debug`.
+// `connected`/`disabled` are the boring majority, so they're folded into counts.
+function logMcpStatus(status: McpServerStatus[]): void {
+  if (debugEnabled) {
+    console.log('[mcp]', status.map(s => `${s.name}:${s.status}`).join(', '))
+    return
+  }
+  const connected = status.filter(s => s.status === 'connected').length
+  const disabled = status.filter(s => s.status === 'disabled').length
+  const attention = status.filter(s => s.status !== 'connected' && s.status !== 'disabled')
+  const parts = [`${connected} connected`]
+  if (disabled) parts.push(`${disabled} disabled`)
+  for (const s of attention) parts.push(`${s.status}: ${s.name}`)
+  console.log('[mcp]', parts.join(' · '))
 }
 
 async function probeMcpStatus(workspacePath: string): Promise<McpServerStatus[]> {
@@ -53,7 +74,7 @@ async function probeMcpStatus(workspacePath: string): Promise<McpServerStatus[]>
       if (isSettled(status)) break
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
     }
-    console.log('[mcp]', status.map(s => `${s.name}:${s.status}`).join(', '))
+    logMcpStatus(status)
     return status
   } finally {
     release()

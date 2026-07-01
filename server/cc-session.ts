@@ -20,6 +20,7 @@ import {
 
 import { ClaudeAdapter } from '@/lib/claude-adapter'
 
+import { debug } from './debug'
 import { broadcast } from './state'
 import { hasThreadConfig, renameThreadConfig, saveThreadConfig } from './thread-config'
 import { resolveWorkspaceEnv } from './workspace-env'
@@ -70,6 +71,10 @@ type LiveSession = {
   desiredEffort: string | undefined
   idleTimer: ReturnType<typeof setTimeout> | null
   closed: boolean
+  // Introspection only (surfaced by /status) — not load-bearing.
+  createdAt: number
+  lastActivityAt: number
+  lastUserText: string | undefined
 }
 
 const sessions = new Map<string, LiveSession>()
@@ -100,6 +105,46 @@ export function getCCRunningSessions(): { workspaceId: string; sessionId: string
     if (s.pendingTurns > 0) out.push({ workspaceId: s.workspaceId, sessionId: s.sessionId })
   }
   return out
+}
+
+// Caps surfaced in /status so the numbers there are self-explanatory.
+export const SESSION_LIMITS = { maxLive: MAX_LIVE_SESSIONS, idleTtlMs: IDLE_TTL_MS }
+
+export type CCDebugSession = {
+  workspaceId: string
+  sessionId: string
+  model: string | undefined
+  effort: string | undefined
+  desiredEffort: string | undefined
+  pendingTurns: number
+  busy: boolean
+  closed: boolean
+  hasIdleTimer: boolean
+  createdAt: number
+  lastActivityAt: number
+  lastUserText: string | undefined
+}
+
+// A full snapshot of the in-memory live-session registry, for the /status page.
+// Read-only — never mutate the returned objects.
+export function getCCDebugSnapshot(): { sessions: CCDebugSession[]; aliases: number } {
+  return {
+    sessions: [...sessions.values()].map(s => ({
+      workspaceId: s.workspaceId,
+      sessionId: s.sessionId,
+      model: s.model,
+      effort: s.effort,
+      desiredEffort: s.desiredEffort,
+      pendingTurns: s.pendingTurns,
+      busy: s.pendingTurns > 0,
+      closed: s.closed,
+      hasIdleTimer: s.idleTimer !== null,
+      createdAt: s.createdAt,
+      lastActivityAt: s.lastActivityAt,
+      lastUserText: s.lastUserText
+    })),
+    aliases: aliases.size
+  }
 }
 
 // A push-able async generator used as the streaming-input prompt: it yields
@@ -165,6 +210,7 @@ function armIdle(s: LiveSession) {
 
 function teardown(s: LiveSession) {
   if (s.closed) return
+  debug(`cc teardown ws=${s.workspaceId} session=${s.sessionId} pendingTurns=${s.pendingTurns}`)
   s.closed = true
   clearIdle(s)
   s.input.close()
@@ -217,8 +263,13 @@ async function consume(s: LiveSession) {
       for (const ev of s.adapter.ingest(msg)) {
         broadcast(s.workspaceId, { ...ev, sessionId: s.sessionId })
       }
+      if (msg.type === 'system' && msg.subtype === 'init') {
+        debug(`cc init ws=${s.workspaceId} session=${s.sessionId}`)
+      }
       if (msg.type === 'result') {
+        s.lastActivityAt = Date.now()
         s.pendingTurns = Math.max(0, s.pendingTurns - 1)
+        debug(`cc result ws=${s.workspaceId} session=${s.sessionId} pendingTurns=${s.pendingTurns}`)
         if (s.pendingTurns === 0) {
           broadcastProcessing(s, false)
           // A mid-turn effort change couldn't be applied live; now that the
@@ -229,6 +280,9 @@ async function consume(s: LiveSession) {
       }
     }
   } catch (err) {
+    debug(
+      `cc consume error ws=${s.workspaceId} session=${s.sessionId}: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`
+    )
     if (!(err instanceof Error && err.name === 'AbortError')) {
       broadcast(s.workspaceId, {
         kind: 'error',
@@ -306,9 +360,15 @@ function createLiveSession(input: {
     effort: input.effort,
     desiredEffort: input.effort,
     idleTimer: null,
-    closed: false
+    closed: false,
+    createdAt: Date.now(),
+    lastActivityAt: Date.now(),
+    lastUserText: undefined
   }
   sessions.set(recKey(session.workspaceId, session.sessionId), session)
+  debug(
+    `cc create ${input.isNew ? 'new' : 'resume'} ws=${input.workspaceId} session=${input.sessionId} model=${input.model ?? 'default'} effort=${input.effort ?? 'default'} live=${sessions.size}`
+  )
   void consume(session)
   return session
 }
@@ -385,10 +445,16 @@ export async function sendCCMessage(input: {
   // instead of duplicating.
   if (input.optimisticId) s.adapter.expectUserEcho(input.optimisticId, input.content)
 
+  s.lastActivityAt = Date.now()
+  s.lastUserText = input.content.replace(/\s+/g, ' ').slice(0, 120)
+
   const wasIdle = s.pendingTurns === 0
   s.pendingTurns++
   if (wasIdle) broadcastProcessing(s, true)
   s.input.push(input.content)
+  debug(
+    `cc enqueue ws=${s.workspaceId} session=${s.sessionId} pendingTurns=${s.pendingTurns} text=${JSON.stringify(s.lastUserText)}`
+  )
 }
 
 // Interrupt the current turn and drop any queued messages, but keep the session
@@ -396,6 +462,7 @@ export async function sendCCMessage(input: {
 export async function interruptCCSession(workspaceId: string, sessionId: string): Promise<void> {
   const s = sessions.get(liveKey(workspaceId, sessionId))
   if (!s) return
+  debug(`cc interrupt ws=${workspaceId} session=${sessionId} pendingTurns=${s.pendingTurns}`)
   s.input.clear()
   try {
     await s.q.interrupt()

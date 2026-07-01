@@ -16,6 +16,11 @@ export function removeClient(ws: Bun.ServerWebSocket<unknown>) {
   chatClients.delete(ws)
 }
 
+// Connected chat clients (browser tabs), surfaced by /status.
+export function getClientCount(): number {
+  return chatClients.size
+}
+
 // Stamp `workspaceId` onto the frame and fan it out to every connected chat
 // client. (Phase 1: broadcast-all; Phase 2 will scope by topic subscription.)
 export function broadcast(workspaceId: string, frame: BroadcastFrame) {
