@@ -436,6 +436,32 @@ export async function sendCCMessage(input: {
     teardown(s)
     s = undefined
   }
+  if (s) {
+    clearIdle(s)
+    if (input.model !== s.model) {
+      try {
+        await s.q.setModel(input.model)
+        s.model = input.model
+      } catch (err) {
+        console.error('[cc-session] setModel failed', err)
+      }
+      // setModel is a control round-trip to the subprocess. During that await a
+      // concurrent turn `result` can drain this session to idle and — if effort
+      // or streaming diverged — tear it down (see the `result` handler). If that
+      // happened, drop the dead handle and fall through to recreate a fresh
+      // session below, rather than enqueue onto a closed input queue (which would
+      // silently lose the message and hang the spinner).
+      if (s.closed) s = undefined
+    }
+    if (s) {
+      // Effort/streaming can't change on a running query; record the request so
+      // the session rebuilds once its turns drain (see the `result` handler).
+      // Reaching here with a divergent value means the session is busy — an idle
+      // one was torn down above.
+      s.desiredEffort = input.effort
+      s.desiredStream = wantStream
+    }
+  }
   if (!s) {
     s = createLiveSession({
       workspaceId: input.workspaceId,
@@ -448,22 +474,6 @@ export async function sendCCMessage(input: {
       // The agent only sees secrets scoped to the 'agent' sink (plus .env).
       workspaceEnv: await resolveWorkspaceEnv(input.workspacePath, 'agent')
     })
-  } else {
-    clearIdle(s)
-    if (input.model !== s.model) {
-      try {
-        await s.q.setModel(input.model)
-        s.model = input.model
-      } catch (err) {
-        console.error('[cc-session] setModel failed', err)
-      }
-    }
-    // Effort/streaming can't change on a running query; record the request so
-    // the session rebuilds once its turns drain (see the `result` handler).
-    // Reaching here with a divergent value means the session is busy — an idle
-    // one was torn down above.
-    s.desiredEffort = input.effort
-    s.desiredStream = wantStream
   }
 
   // Streaming-input mode does NOT echo the pushed user message back in the
