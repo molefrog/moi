@@ -1,8 +1,9 @@
-import { useEffect, useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 
-import { IconChevronsRight, IconSelector, IconX } from '@tabler/icons-react'
+import { IconChevronDown, IconChevronsRight, IconSelector, IconX } from '@tabler/icons-react'
 
 import { useScrollFade } from '@/client/hooks/useScrollFade'
+import { useStickToBottom } from '@/client/hooks/useStickToBottom'
 import { cn } from '@/client/lib/cn'
 import { groupTurns } from '@/client/lib/group-turns'
 import type { ChatDisplay, Turn, ViewState } from '@/lib/types'
@@ -80,10 +81,13 @@ type ChatPanelProps = {
   // into the transcript through the same groupTurns pipeline so a thinking-only
   // preview folds into the current tool group. See client/lib/preview-turn.ts.
   previewTurn?: Turn | null
+  // Active thread id — used only as the scroll reset key (jump to bottom on
+  // thread switch).
+  sessionId?: string | null
   processing: boolean
   error?: string | null
   onDismissError?: () => void
-  send: () => void
+  send: (text: string) => void
   stop: () => void
   // How the chat is shown right now (position, or fullscreen). The mode switch
   // and collapse/close affordances key off this; fullscreen shows neither.
@@ -103,6 +107,7 @@ type ChatPanelProps = {
 export function ChatPanel({
   view,
   previewTurn,
+  sessionId,
   processing,
   error,
   onDismissError,
@@ -128,11 +133,18 @@ export function ChatPanel({
     [turns, previewTurn]
   )
 
-  // Follow the tail as turns finalize and as the preview streams.
-  useEffect(() => {
-    const el = scrollRef.current
-    el?.scrollTo({ top: el.scrollHeight, behavior: 'instant' })
-  }, [scrollRef, turns, previewTurn])
+  // Stick to the bottom while pinned; respect scroll-up; jump on thread switch.
+  const { atBottom, scrollToBottom } = useStickToBottom(scrollRef, sessionId)
+
+  // Sending always returns the user to the bottom, even if they'd scrolled up —
+  // they expect to see their message and the reply.
+  const handleSend = useCallback(
+    (text: string) => {
+      send(text)
+      scrollToBottom()
+    },
+    [send, scrollToBottom]
+  )
 
   const TriggerIcon =
     chatMode === 'sidebar'
@@ -196,33 +208,48 @@ export function ChatPanel({
         </div>
       </header>
 
-      <div
-        ref={scrollRef}
-        className={cn(
-          'flex scrollbar-thin flex-1 flex-col overflow-y-auto overscroll-contain px-5 pt-4 pb-12',
-          showTopFade && showBottomFade && 'mask-fade-y',
-          showTopFade && !showBottomFade && 'mask-fade-top',
-          !showTopFade && showBottomFade && 'mask-fade-bottom'
-        )}
-      >
+      <div className="relative flex min-h-0 flex-1 flex-col">
         <div
+          ref={scrollRef}
           className={cn(
-            'flex flex-1 flex-col gap-6',
-            contained && 'mx-auto w-full max-w-[var(--chat-max-container)]'
+            'flex scrollbar-thin flex-1 flex-col overflow-y-auto overscroll-contain px-5 pt-4 pb-12',
+            showTopFade && showBottomFade && 'mask-fade-y',
+            showTopFade && !showBottomFade && 'mask-fade-top',
+            !showTopFade && showBottomFade && 'mask-fade-bottom'
           )}
         >
-          {turns.length === 0 && !processing && <EmptyState />}
-          {groupedTurns.map((turn, i) => (
-            <TurnView
-              key={turn.id}
-              turn={turn}
-              processing={processing && i === groupedTurns.length - 1}
-            />
-          ))}
-          {/* Pulsing dots only before the first token — once the preview has
-              visible content it renders as a (possibly merged) grouped turn. */}
-          {processing && !previewTurn && <ThinkingIndicator />}
+          <div
+            className={cn(
+              'flex flex-1 flex-col gap-6',
+              contained && 'mx-auto w-full max-w-[var(--chat-max-container)]'
+            )}
+          >
+            {turns.length === 0 && !processing && <EmptyState />}
+            {groupedTurns.map((turn, i) => (
+              <TurnView
+                key={turn.id}
+                turn={turn}
+                processing={processing && i === groupedTurns.length - 1}
+              />
+            ))}
+            {/* Pulsing dots only before the first token — once the preview has
+                visible content it renders as a (possibly merged) grouped turn. */}
+            {processing && !previewTurn && <ThinkingIndicator />}
+          </div>
         </div>
+
+        {/* Jump to latest — shown only when scrolled up, so following the tail
+            never yanks the user while they read history. */}
+        {!atBottom && turns.length > 0 && (
+          <button
+            type="button"
+            onClick={() => scrollToBottom('smooth')}
+            aria-label="Jump to latest"
+            className="absolute bottom-3 left-1/2 flex size-8 -translate-x-1/2 animate-in items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-md transition-colors duration-150 fade-in slide-in-from-bottom-1 hover:text-foreground"
+          >
+            <IconChevronDown size={18} stroke={1.5} />
+          </button>
+        )}
       </div>
 
       <div className={cn(contained && 'mx-auto w-full max-w-[var(--chat-max-container)] px-3')}>
@@ -241,7 +268,7 @@ export function ChatPanel({
             )}
           </div>
         )}
-        <ChatInput onSend={send} onStop={stop} processing={processing} />
+        <ChatInput onSend={handleSend} onStop={stop} processing={processing} />
       </div>
     </div>
   )
