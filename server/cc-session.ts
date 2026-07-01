@@ -18,7 +18,7 @@ import {
   query
 } from '@anthropic-ai/claude-agent-sdk'
 
-import { appendAttachmentNote } from '@/lib/attachment-note'
+import { ATTACHMENT_ONLY_PLACEHOLDER, appendAttachmentNote } from '@/lib/attachment-note'
 import { ClaudeAdapter } from '@/lib/claude-adapter'
 import type { Part } from '@/lib/format'
 
@@ -74,7 +74,7 @@ export function buildUserMessage(
     files.map(f => ({ filename: f.filename, path: f.path! }))
   )
   // Always end with a text block so an image-only message still has a prompt.
-  blocks.push({ type: 'text', text: agentText || '(see attached files)' })
+  blocks.push({ type: 'text', text: agentText || ATTACHMENT_ONLY_PLACEHOLDER })
   return { content: blocks, parts }
 }
 

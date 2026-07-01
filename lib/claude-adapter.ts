@@ -14,7 +14,7 @@ import type {
   TurnOrigin
 } from './format'
 
-import { splitAttachmentNote } from './attachment-note'
+import { ATTACHMENT_ONLY_PLACEHOLDER, splitAttachmentNote } from './attachment-note'
 
 // Loose SDK message shape — we don't pull in the full SDK type tree; the
 // adapter tolerates missing fields. Reference: dev/sdk-message-spec.md.
@@ -467,6 +467,11 @@ export class ClaudeAdapter {
                   url: f.path,
                   filename: f.filename
                 })
+              }
+              // An attachment-only message carries a synthesized placeholder
+              // prompt; the bubble should show just the attachments.
+              if (text === ATTACHMENT_ONLY_PLACEHOLDER && parts.some(p => p.type === 'file')) {
+                text = ''
               }
             }
             if (text) {

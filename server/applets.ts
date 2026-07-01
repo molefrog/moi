@@ -194,20 +194,14 @@ export function parseAppletTail(
 const FS_MEDIA_RE =
   /\.(mp4|webm|mov|m4v|mkv|mp3|wav|ogg|oga|m4a|flac|aac|opus|png|jpe?g|gif|webp|avif|svg|ico|pdf|vtt|srt)$/i
 
-// Stream a media file from the workspace root. Hard guards (defense in depth):
-// reject empty/`.`/`..`/dotfile segments and anything resolving outside the
-// root, and require a media extension. The workspace holds secrets (`.env`,
-// `.moi/`) and this route is unauthenticated — these guards are the protection,
-// not the localhost bind.
-//
-// Range is handled explicitly (slice the BunFile, 206 + Content-Range): Bun's
-// implicit range handling for `new Response(Bun.file())` doesn't fire once any
-// headers object is attached, and <video>/<audio> seeking needs byte ranges.
-export async function serveWorkspaceFile(
-  workspaceRoot: string,
-  tail: string,
-  range?: string | null
-): Promise<Response> {
+// Resolve a `/fs/`-style tail to a real on-disk path inside the workspace root,
+// or an error Response. Hard guards (defense in depth): reject empty/`.`/`..`/
+// dotfile segments and anything resolving outside the root, and require a media
+// extension. The workspace holds secrets (`.env`, `.moi/`) and the routes built
+// on this are unauthenticated — these guards are the protection, not the
+// localhost bind. Shared by the raw stream (`serveWorkspaceFile`) and the image
+// preview route (server/preview.ts).
+export function resolveWorkspaceMediaFile(workspaceRoot: string, tail: string): string | Response {
   let rel: string
   try {
     rel = decodeURIComponent(tail)
@@ -250,6 +244,22 @@ export async function serveWorkspaceFile(
   if (realTarget !== realRoot && !realTarget.startsWith(realRoot + sep)) {
     return new Response('Forbidden', { status: 403 })
   }
+  return realTarget
+}
+
+// Stream a media file from the workspace root (guards: see
+// `resolveWorkspaceMediaFile`).
+//
+// Range is handled explicitly (slice the BunFile, 206 + Content-Range): Bun's
+// implicit range handling for `new Response(Bun.file())` doesn't fire once any
+// headers object is attached, and <video>/<audio> seeking needs byte ranges.
+export async function serveWorkspaceFile(
+  workspaceRoot: string,
+  tail: string,
+  range?: string | null
+): Promise<Response> {
+  const realTarget = resolveWorkspaceMediaFile(workspaceRoot, tail)
+  if (realTarget instanceof Response) return realTarget
   const file = Bun.file(realTarget)
 
   const size = file.size

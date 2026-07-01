@@ -34,6 +34,7 @@ import { DIST_DIR, prebuilt } from './static'
 import { getSessionEvents, getSessions } from './state'
 import { getThreadConfig, saveThreadConfig } from './thread-config'
 import type { ThreadConfigPatch } from './thread-config'
+import { serveWorkspaceImagePreview } from './preview'
 import { MAX_UPLOAD_BYTES, addUpload, getUpload } from './uploads'
 import { collectViewRequiredEnv, listViews, serveView } from './views'
 import { collectRequiredEnv, listWidgets, serveWidget } from './widgets'
@@ -153,6 +154,15 @@ one.post('/rpc/*', c => {
   const id = c.req.param('id')
   const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${id}/rpc/`)[1] ?? ''
   return handleFunctionCall(c.req.raw, tail, c.get('ws').path)
+})
+
+// Downscaled image preview of a workspace file. The chat's expanded tool rows
+// use this to show the picture an agent `Read` — same guards as /fs/ above,
+// images only, resized server-side (see server/preview.ts).
+one.get('/preview/*', c => {
+  const id = c.req.param('id')
+  const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${id}/preview/`)[1] ?? ''
+  return serveWorkspaceImagePreview(c.get('ws').path, tail, c.req.header('if-none-match'))
 })
 
 // Chat attachments. The composer POSTs files here (drag/drop, paste, or the
