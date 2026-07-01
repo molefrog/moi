@@ -11,6 +11,7 @@ import {
 import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
 import { sendMessage } from '@/client/lib/connection'
+import { STREAM_RESPONSES } from '@/client/lib/flags'
 import { liveStore, useLive } from '@/client/store/live'
 import { applyEvent, emptyViewState } from '@/lib/format'
 import type { ViewState } from '@/lib/types'
@@ -94,11 +95,10 @@ export function useChat() {
         (!modelInfo || (modelInfo.supportedEffortLevels ?? []).includes(pickedEffort))
           ? pickedEffort
           : undefined
-      // Live token streaming: thread override, else workspace default — but only
-      // when the provider supports it. Send `true` or omit (never `false`), so a
-      // provider that ignores it behaves identically.
-      const pickedStream = threadCfg?.stream ?? layout.selectedStreaming
-      const stream = supportsStreaming && pickedStream ? true : undefined
+      // Live token streaming is a compile-time dev flag (client/lib/flags.ts),
+      // gated to providers that support it. Send `true` or omit (never `false`),
+      // so a provider that ignores it behaves identically.
+      const stream = STREAM_RESPONSES && supportsStreaming ? true : undefined
       sendMessage({
         type: 'chat',
         workspaceId,
@@ -117,10 +117,8 @@ export function useChat() {
       qc,
       layout.selectedModel,
       layout.selectedEffort,
-      layout.selectedStreaming,
       threadCfg?.model,
       threadCfg?.effort,
-      threadCfg?.stream,
       models,
       supportsStreaming
     ]

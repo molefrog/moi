@@ -264,16 +264,10 @@ async function consume(s: LiveSession) {
         // it has none yet, so an explicit user PUT (or a migrated temp-id edit)
         // always wins. A default run (no model/effort) leaves no file and falls
         // back to the workspace defaults.
-        if (
-          (s.model || s.effort || s.stream) &&
-          !(await hasThreadConfig(s.workspacePath, s.sessionId))
-        ) {
+        if ((s.model || s.effort) && !(await hasThreadConfig(s.workspacePath, s.sessionId))) {
           await saveThreadConfig(s.workspacePath, s.sessionId, {
             model: s.model,
-            effort: s.effort,
-            // Only persist streaming when it was on — `false` is the default and
-            // shouldn't create a config entry for every plain thread.
-            stream: s.stream ? true : undefined
+            effort: s.effort
           })
         }
       }

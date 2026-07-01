@@ -145,9 +145,6 @@ export type SessionInfo = {
 export type ThreadConfig = {
   model?: string
   effort?: string
-  // Live token streaming preference for this thread. Undefined falls back to the
-  // workspace default (`WorkspaceLayout.selectedStreaming`).
-  stream?: boolean
 }
 
 // Re-export the display format
@@ -345,10 +342,6 @@ export type WorkspaceLayout = {
   selectedModel?: string
   // Reasoning-effort default for new threads (a `supportedEffortLevels` value).
   selectedEffort?: string
-  // Live-streaming default for new threads. Per-thread `ThreadConfig.stream`
-  // overrides it once a thread exists. Only meaningful when the workspace's
-  // provider reports `supportsStreaming`.
-  selectedStreaming?: boolean
   theme?: {
     font: import('./themes').FontTheme
     background?: string

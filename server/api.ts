@@ -210,13 +210,6 @@ one.put('/sessions/:sessionId/config', async c => {
     }
     patch[key] = value
   }
-  if ('stream' in record) {
-    const value = record.stream
-    if (value !== null && typeof value !== 'boolean') {
-      return c.text('stream must be a boolean or null', 400)
-    }
-    patch.stream = value
-  }
   return c.json(await saveThreadConfig(c.get('ws').path, c.req.param('sessionId'), patch))
 })
 

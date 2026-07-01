@@ -16,7 +16,6 @@ import type { ThreadConfig } from '@/lib/types'
 export type ThreadConfigPatch = {
   model?: string | null
   effort?: string | null
-  stream?: boolean | null
 }
 
 type Store = Record<string, Record<string, ThreadConfig>>
@@ -33,12 +32,11 @@ function clean(cfg: ThreadConfig | undefined): ThreadConfig {
   const out: ThreadConfig = {}
   if (typeof cfg?.model === 'string') out.model = cfg.model
   if (typeof cfg?.effort === 'string') out.effort = cfg.effort
-  if (typeof cfg?.stream === 'boolean') out.stream = cfg.stream
   return out
 }
 
 function isEmpty(cfg: ThreadConfig): boolean {
-  return cfg.model === undefined && cfg.effort === undefined && cfg.stream === undefined
+  return cfg.model === undefined && cfg.effort === undefined
 }
 
 async function readStore(): Promise<Store> {
@@ -95,10 +93,6 @@ export async function saveThreadConfig(
       if (value === undefined) continue
       if (value === null) delete next[key]
       else next[key] = value
-    }
-    if (patch.stream !== undefined) {
-      if (patch.stream === null) delete next.stream
-      else next.stream = patch.stream
     }
     if (isEmpty(next)) delete threads[sessionId]
     else threads[sessionId] = next
