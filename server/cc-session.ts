@@ -333,6 +333,12 @@ function createLiveSession(input: {
     // message recreates it via resume.
     maxTurns: 1000,
     cwd: input.workspacePath,
+    // Current-gen models (Sonnet 5, Opus 4.7/4.8, Fable 5) default thinking
+    // display to 'omitted' — the API still emits a `thinking` block but with
+    // empty text, which the adapter drops (`if (b.thinking)`), so no
+    // "Thinking" row ever reaches the timeline. Request the summary
+    // explicitly so reasoning stays visible.
+    thinking: { type: 'adaptive', display: 'summarized' },
     ...(input.model ? { model: input.model } : {}),
     // The picker only offers a model's own `supportedEffortLevels`, so the value
     // is valid for the model; the SDK silently downgrades otherwise. Cast because
