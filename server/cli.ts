@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import './cli-colors' // must precede citty: sets NO_COLOR before its color flag is computed
 import { defineCommand, runMain, showUsage } from 'citty'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'path'
 import pc from 'picocolors'
@@ -1513,9 +1513,48 @@ const skill = defineCommand({
   }
 })
 
+// `<package version> (<8-char commit>)`, e.g. `0.1.3 (27e17e80)`. The commit is
+// read from git at call time, so it appears for a source/`bun link` checkout and
+// is simply omitted for a published package (which ships no .git).
+function moiVersion(): string {
+  const root = join(import.meta.dir, '..')
+  let version = '0.0.0'
+  try {
+    version = (JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { version: string })
+      .version
+  } catch {}
+  let commit = ''
+  try {
+    const out = Bun.spawnSync(['git', 'rev-parse', '--short=8', 'HEAD'], { cwd: root })
+    if (out.success) commit = out.stdout.toString().trim()
+  } catch {}
+  return commit ? `${version} (${commit})` : version
+}
+
+const version = defineCommand({
+  meta: { name: 'version', description: 'Print the moi version' },
+  run() {
+    console.log(moiVersion())
+  }
+})
+
 const main = defineCommand({
-  meta: { name: 'moi', description: 'moi — local AI workspace' },
-  subCommands: { init, start, bundle, refresh, theme, config, status, openclaw, scratch, skill }
+  // A function so the git lookup runs only for `moi --version` / `--help`, not on
+  // every command. citty resolves a function meta (used for --version + usage).
+  meta: () => ({ name: 'moi', description: 'moi — local AI workspace', version: moiVersion() }),
+  subCommands: {
+    init,
+    start,
+    bundle,
+    refresh,
+    theme,
+    config,
+    status,
+    openclaw,
+    scratch,
+    skill,
+    version
+  }
 })
 
 // Route `moi config --help` to the same terse cheat sheet as `moi config help`;
