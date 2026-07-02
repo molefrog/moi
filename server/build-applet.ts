@@ -41,6 +41,19 @@ const EXTERNAL_MODULES = [
   'react-dom/client'
 ]
 
+// Which React build an applet is compiled against — the same `prebuilt` split
+// server/vendor.ts serves and buildApplet's NODE_ENV define keys off. Production
+// emits `jsx`/`jsxs`; development emits `jsxDEV`.
+export const REACT_MODE: 'production' | 'development' = prebuilt ? 'production' : 'development'
+
+// A stable comment stamped at the top of every built `index.js` recording the
+// React mode it was compiled for. The staleness check (server/applets.ts) reads
+// it back: a bundle built in one mode but served in the other must be rebuilt,
+// or a dev-transform bundle (jsxDEV) crashes against the production React that a
+// prebuilt/global install serves. mtimes alone can't catch this — flipping mode
+// (e.g. `bun run dev` then a production `moi start`) changes no source file.
+export const REACT_MODE_MARKER = `// moi:react-mode=${REACT_MODE}`
+
 type ServerModule = {
   name: string
   exports: string[]
@@ -578,6 +591,11 @@ export async function buildApplet(
     const styleId = kind === 'widget' ? widgetName : `${kind}:${widgetName}`
     js = injectCss(js, css, styleId)
   }
+
+  // Stamp the React mode so the staleness check can rebuild a bundle whose mode
+  // no longer matches the served React (see REACT_MODE_MARKER). First line, so a
+  // cheap prefix read is enough to recover it.
+  js = `${REACT_MODE_MARKER}\n${js}`
 
   const files: AppletFile[] = [{ name: 'index.js', data: js, kind: 'code' }]
   for (const chunk of chunkOutputs) {

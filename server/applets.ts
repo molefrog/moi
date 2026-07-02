@@ -19,6 +19,7 @@ import { dirname, join, resolve, sep } from 'path'
 import {
   APPLET_API_BASE_SENTINEL,
   type AppletKind,
+  REACT_MODE_MARKER,
   buildApplet,
   scanAssetImports,
   scanServerImports
@@ -60,12 +61,20 @@ async function resolveSource(sourceDir: string, name: string): Promise<string | 
   return null
 }
 
-// A bundle is stale if its entry `index.js` is missing, or the source — or any
-// `.server.ts` it imports (RPC stubs are inlined) or asset it imports (emitted
-// into the bundle dir) — is newer than the built entry.
+// A bundle is stale if its entry `index.js` is missing, was compiled for a
+// different React mode than we now serve, or the source — or any `.server.ts` it
+// imports (RPC stubs are inlined) or asset it imports (emitted into the bundle
+// dir) — is newer than the built entry.
 async function needsRebuild(buildDir: string, name: string, srcPath: string): Promise<boolean> {
   const built = Bun.file(join(buildDir, name, 'index.js'))
   if (!(await built.exists())) return true
+  // React-mode mismatch: a dev-transform bundle (jsxDEV) served against the
+  // production React a prebuilt/global install serves crashes every applet with
+  // "jsxDEV is not a function". Flipping mode changes no source file, so the
+  // mtime checks below can't catch it — the stamped marker (first line) can.
+  // Reading only the prefix keeps this off the hot path for large bundles.
+  const head = await built.slice(0, 64).text()
+  if (!head.startsWith(REACT_MODE_MARKER)) return true
   let sourceMtime = Bun.file(srcPath).lastModified
   const source = await Bun.file(srcPath).text()
   const dir = dirname(srcPath)
