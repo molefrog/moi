@@ -14,11 +14,23 @@ bun i -g moi-computer
 moi start        # http://localhost:13337
 ```
 
+Or paste this into Claude Code and it will set everything up for you:
+
+```
+Set up the MOI workspace for this project. Fetch https://moi.computer/CC-INSTALL.md, and follow the steps.
+```
+
 Hacking on it:
 
 ```sh
 bun install
 bun run dev
 ```
+
+## OpenClaw (experimental)
+
+moi also works with OpenClaw agents — `moi openclaw init` installs the moi
+skills into an OpenClaw agent workspace. Integration notes live in
+[docs/OPENCLAW.md](docs/OPENCLAW.md).
 
 License: [Elastic 2.0](LICENSE).
