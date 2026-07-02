@@ -1,5 +1,4 @@
 import { IconDots, IconLoader2, IconPlus, IconTrash } from '@tabler/icons-react'
-import { Link } from 'wouter'
 
 import {
   useAddWorkspace,
@@ -80,20 +79,21 @@ export function WorkspacesPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-8 pt-14 pb-16">
-      <div className="mb-10 grid grid-cols-2 gap-3">
-        {workspaces.map(ws => (
-          <WorkspaceCard
-            key={ws.id}
-            workspace={ws}
-            onRemove={entry => removeMutation.mutate(entry)}
-          />
-        ))}
-        <NewWorkspaceCard />
-      </div>
+      {count > 0 && (
+        <div className="mb-10 grid grid-cols-2 gap-3">
+          {workspaces.map(ws => (
+            <WorkspaceCard
+              key={ws.id}
+              workspace={ws}
+              onRemove={entry => removeMutation.mutate(entry)}
+            />
+          ))}
+        </div>
+      )}
 
       {count === 0 && discovered.length === 0 && (
         <p className="mb-10 text-sm text-muted-foreground">
-          No workspaces yet. Create one above, or run{' '}
+          No workspaces yet. Run{' '}
           <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">moi init</code> in a
           project directory.
         </p>
@@ -192,23 +192,6 @@ function WorkspaceCard({ workspace, onRemove }: WorkspaceCardProps) {
         <div className="text-xs text-muted-foreground">{meta}</div>
       </div>
     </a>
-  )
-}
-
-// Dashed grid cell linking to the create view — always the grid's last card,
-// and the only card on a fresh install.
-function NewWorkspaceCard() {
-  return (
-    <Link
-      href="/workspace/create"
-      className={cn(
-        'flex min-h-28 items-center justify-center gap-2 rounded-xl border border-dashed border-border',
-        'text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground'
-      )}
-    >
-      <IconPlus size={16} stroke={1.5} />
-      New workspace
-    </Link>
   )
 }
 
