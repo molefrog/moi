@@ -202,7 +202,7 @@ function Sidebar({ collapsed, workspaces, logoEffect }: SidebarProps) {
                 <img
                   src={ws.icon ?? PROVIDER_ICON[ws.type ?? 'claude-code']}
                   alt=""
-                  className="size-[18px] shrink-0 rounded-[3px]"
+                  className="size-5 shrink-0 rounded-[4px]"
                 />
               }
               label={workspaceLabel(ws)}

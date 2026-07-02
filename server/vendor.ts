@@ -12,6 +12,7 @@ import { join } from 'node:path'
 import { prebuilt } from './static'
 
 const VENDOR_DIR = join(import.meta.dir, '..', 'client', 'vendor', 'react')
+const EMOJIBASE_DIR = join(import.meta.dir, '..', 'client', 'vendor', 'emojibase')
 const MODE = prebuilt ? 'production' : 'development'
 
 // A single flat file (`react.js`) or one nested under `_impl/` — both `.js`,
@@ -33,6 +34,30 @@ export async function serveVendorReact(req: Request): Promise<Response> {
       // Stable URL across versions, so don't cache immutably — revalidate so a
       // `vendor:react` regen after a React bump is picked up.
       'Cache-Control': prebuilt ? 'public, max-age=3600' : 'no-store'
+    }
+  })
+}
+
+// `<locale>/<file>.json` only — mirrors the emojibase-data package layout the
+// emoji picker expects (`${emojibaseUrl}/${locale}/data.json`).
+const EMOJIBASE_ALLOWED = /^[a-z-]+\/[a-z]+\.json$/
+
+// Serves the vendored emojibase-data JSON (client/vendor/emojibase) behind
+// `/vendor/emojibase/*`, so the settings emoji picker works offline — no
+// jsdelivr fetch at runtime.
+export async function serveVendorEmojibase(req: Request): Promise<Response> {
+  const rel = new URL(req.url).pathname.replace(/^\/vendor\/emojibase\//, '')
+  if (!EMOJIBASE_ALLOWED.test(rel) || rel.includes('..')) {
+    return new Response('Not found', { status: 404 })
+  }
+  const file = Bun.file(join(EMOJIBASE_DIR, rel))
+  if (!(await file.exists())) {
+    return new Response('Not found', { status: 404 })
+  }
+  return new Response(file, {
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'public, max-age=3600'
     }
   })
 }
