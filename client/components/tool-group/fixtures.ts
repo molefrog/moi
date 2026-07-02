@@ -1,31 +1,26 @@
-// Test fixtures for <ToolCallGroup>. Real tool calls captured from the live API
-// events stream of the "spoiled" workspace's Notion thread (session 3cc7132d…),
-// fetched via GET /api/workspaces/:id/sessions/:sid/events.
+// Test fixtures for <ToolCallGroup>. Shaped exactly like real tool calls from a
+// Claude Code session (states, providers, MCP naming, output truncation), but
+// all data — paths, Notion pages, GitHub profile, repo names — is synthetic.
 //
-// Tool outputs are VERBATIM from that stream — not truncated here. Note the
-// adapter (lib/claude-adapter.ts `blockOutputText`) caps each result at 4000
-// chars at ingest, so a long result (e.g. notionSearch) ends exactly where the
-// stream ends. Two exceptions: `toolSearch` (output reconstructed from the raw
-// JSONL — see below) and `readFile` (synthesized — see below).
+// Note the adapter (lib/claude-adapter.ts `blockOutputText`) caps each result at
+// 4000 chars at ingest, so `notionSearch` below ends mid-JSON on purpose — that
+// is what a capped result looks like in the stream. `toolSearch` output is the
+// tool-name-per-line form a real ToolSearch result reduces to (the adapter keeps
+// only `text` blocks and a ToolSearch result is all `tool_reference` blocks, so
+// the live stream shows it empty; a real ToolSearch card would render these).
 //
-// `FIXTURE_CWD` is that workspace's working directory — pass it to the group so
-// file paths render shortened (relative), exactly like the live chat.
+// `FIXTURE_CWD` is the fixture workspace's working directory — pass it to the
+// group so file paths render shortened (relative), exactly like the live chat.
 //
 // The lists are `Part[]` (reasoning + tool-call), so a run reads as a mixed
-// timeline. The `thinking` and `githubCall` items come from a different thread
-// ("lilmd-demo", session c3d7caba) — see their definitions below.
+// timeline.
 import type { Part, ToolCall } from '@/lib/types'
 
-export const FIXTURE_CWD = '/Users/molefrog/git/spoiled'
+export const FIXTURE_CWD = '/Users/kim/git/confetti'
 
-// `select:`-style tool discovery. The API stream shows this empty because the
-// adapter's `blockOutputText()` keeps only `text` blocks and a ToolSearch result
-// is all `tool_reference` blocks. The `output` below is reconstructed from the
-// raw session JSONL — the names of the tools this call loaded into context, one
-// per line (the data the adapter currently drops; a real ToolSearch card would
-// render these).
+// `select:`-style tool discovery.
 const toolSearch: ToolCall = {
-  toolCallId: 'toolu_01GoGuLKFHZKsukHfGymeaKz',
+  toolCallId: 'toolu_fixture_tool_search',
   name: 'ToolSearch',
   caller: 'model',
   provider: 'claude-code',
@@ -42,7 +37,7 @@ const toolSearch: ToolCall = {
 // `caller` is still `model`, and `mcpServer` is absent. The current chat renders
 // these via the generic card (the MCP card only matches `mcporter call …` Bash).
 const notionSearch: ToolCall = {
-  toolCallId: 'toolu_01PQt8FuJScNcAqqNscG35nd',
+  toolCallId: 'toolu_fixture_notion_search',
   name: 'mcp__notion__notion-search',
   caller: 'model',
   provider: 'claude-code',
@@ -53,37 +48,37 @@ const notionSearch: ToolCall = {
     page_size: 25
   },
   output:
-    '{"results":[{"id":"49ec4ef2-0d62-4511-9dc9-5b7f38409a22","title":"Lecture Notes","url":"https://app.notion.com/p/49ec4ef20d6245119dc95b7f38409a22?pvs=1","type":"page","highlight":"Lecture Notes","timestamp":"2024-10-17T13:51:00.000Z"},{"id":"9f5d18aa-6741-4993-88bc-5adf2dabb8da","title":"To-Do","url":"https://app.notion.com/p/9f5d18aa6741499388bc5adf2dabb8da?pvs=1","type":"page","highlight":"https://docs.mcp-use.com/typescript/server/ui-widgets docs.mcp-use.com/typescript/server/ui-widgets","timestamp":"2026-06-15T13:14:00.000Z"},{"id":"211536fd-e65b-433f-92bf-aa95efa91f35","title":"Plans & Notes","url":"https://app.notion.com/p/211536fde65b433f92bfaa95efa91f35?pvs=1","type":"database","highlight":"Plans & Notes","timestamp":"2024-02-06T10:02:00.000Z"},{"id":"29d78a44-b678-8035-b58e-d33e3ce86f5e","title":"RAG & Agents Notes","url":"https://app.notion.com/p/29d78a44b6788035b58ed33e3ce86f5e?pvs=1","type":"page","highlight":"speculative RAG  research.google/blog/speculative-rag-enhancing-retrieval-augmented-generation-through-drafting/    — generate N drafts in parallel (multiple perspective of the doc)","timestamp":"2025-11-03T08:07:00.000Z"},{"id":"31878a44-b678-80df-ade3-dd8cec63de64","title":"CRM","url":"https://app.notion.com/p/31878a44b67880dfade3dd8cec63de64?pvs=1","type":"database","highlight":"CRM","timestamp":"2026-06-09T08:00:00.000Z"},{"id":"f9f78a44-b678-823e-9795-01de5d5f6734","title":"AI meeting notes","url":"https://app.notion.com/p/f9f78a44b678823e979501de5d5f6734?pvs=1","type":"database","highlight":"AI meeting notes","timestamp":"2025-11-06T15:22:00.000Z"},{"id":"31a78a44-b678-801d-948f-c47118e21516","title":"illustrations","url":"https://app.notion.com/p/31a78a44b678801d948fc47118e21516?pvs=1","type":"page","highlight":"illustrations","timestamp":"2026-06-09T18:01:00.000Z"},{"id":"564db5b4-8d50-4938-8808-716a4e89dba6","title":"Weekly Update: March 4 2019","url":"https://app.notion.com/p/564db5b48d5049388808716a4e89dba6?pvs=1","type":"page","highlight":"add backlog project for migrating V1 users","timestamp":"2022-07-30T18:34:00.000Z"},{"id":"2e178a44-b678-807b-9340-e1e830e38c50","title":"ficus.io","url":"https://app.notion.com/p/2e178a44b678807b9340e1e830e38c50?pvs=1","type":"page","highlight":"Collaborative documents (Google Docs style)","timestamp":"2026-06-15T08:15:00.000Z"},{"id":"31e78a44-b678-806b-9a90-efaac9d864cf","title":"User Widget Submissions","url":"https://app.notion.com/p/31e78a44b678806b9a90efaac9d864cf?pvs=1","type":"database","highlight":"User Widget Submissions","timestamp":"2026-03-09T13:03:00.000Z"},{"id":"7e2bbddd-ce16-4002-bcb1-ead4923b9963","title":"Beta feedback (KDK playtesters)","url":"https://app.notion.com/p/7e2bbdddce164002bcb1ead4923b9963?pvs=1","type":"database","highlight":"Beta feedback (KDK playtesters)","timestamp":"2026-04-22T11:56:00.000Z"},{"id":"34878a44-b678-80f3-8f04-cc7fef16e055","title":"moi-w","url":"https://app.notion.com/p/34878a44b67880f38f04cc7fef16e055?pvs=1","type":"page","highlight":"Pi Coding Agent github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/sdk.md","timestamp":"2026-04-21T09:42:00.000Z"},{"id":"34978a44-b678-8145-9023-ffb37c04037d","title":"Jonas Bartasius","url":"https://app.notion.com/p/34978a44b67881459023ffb37c04037d?pvs=1","type":"page","highlight":"Jonas Bartasius","timestamp":"2026-04-21T13:07:00.000Z"},{"id":"36578a44-b678-81ea-845c-d7cc7c2ad2c4","title":"Sales Operations","url":"https://app.notion.com/p/36578a44b67881ea845cd7cc7c2ad2c4?pvs=1","type":"page","highlight":"📘 Sales Agent Context — full briefing doc (product, voice, CRM snapshot)","timestamp":"2026-06-09T08:44:00.000Z"},{"id":"31b78a44-b678-802c-a8e7-d897826cf96d","title":"old","url":"https://app.notion.com/p/31b78a44b678802ca8e7d897826cf96d?pvs=1","type":"page","highlight":"Notes:","timestamp":"2026-03-06T16:31:00.000Z"},{"id":"b78788f6-9908-4d54-be46-a974ac5019da","title":"Weekly Update: Jan 28 2019","url":"https://app.notion.com/p/b78788f699084d54be46a974ac5019da'
+    '{"results":[{"id":"3f1c9a72-0d62-4511-9dc9-5b7f38409a22","title":"Reading List","url":"https://app.notion.com/p/3f1c9a720d6245119dc95b7f38409a22?pvs=1","type":"page","highlight":"Reading List","timestamp":"2024-10-17T13:51:00.000Z"},{"id":"8b2d17aa-6741-4993-88bc-5adf2dabb8da","title":"To-Do","url":"https://app.notion.com/p/8b2d17aa6741499388bc5adf2dabb8da?pvs=1","type":"page","highlight":"canvas-confetti performance notes and particle pooling","timestamp":"2026-06-15T13:14:00.000Z"},{"id":"244536fd-e65b-433f-92bf-aa95efa91f35","title":"Plans & Notes","url":"https://app.notion.com/p/244536fde65b433f92bfaa95efa91f35?pvs=1","type":"database","highlight":"Plans & Notes","timestamp":"2024-02-06T10:02:00.000Z"},{"id":"5a668c31-b678-4035-b58e-d33e3ce86f5e","title":"Animation Research","url":"https://app.notion.com/p/5a668c31b6784035b58ed33e3ce86f5e?pvs=1","type":"page","highlight":"spring easings vs. bezier — generate N particle bursts in parallel and compare frame budgets","timestamp":"2025-11-03T08:07:00.000Z"},{"id":"41c28e19-b678-40df-ade3-dd8cec63de64","title":"Roadmap","url":"https://app.notion.com/p/41c28e19b67840dfade3dd8cec63de64?pvs=1","type":"database","highlight":"Roadmap","timestamp":"2026-06-09T08:00:00.000Z"},{"id":"6d9e2f44-b678-423e-9795-01de5d5f6734","title":"Meeting notes","url":"https://app.notion.com/p/6d9e2f44b678423e979501de5d5f6734?pvs=1","type":"database","highlight":"Meeting notes","timestamp":"2025-11-06T15:22:00.000Z"},{"id":"7fa31c55-b678-401d-948f-c47118e21516","title":"illustrations","url":"https://app.notion.com/p/7fa31c55b678401d948fc47118e21516?pvs=1","type":"page","highlight":"illustrations","timestamp":"2026-06-09T18:01:00.000Z"},{"id":"92e4b5c8-8d50-4938-8808-716a4e89dba6","title":"Weekly Update: March 4","url":"https://app.notion.com/p/92e4b5c88d5049388808716a4e89dba6?pvs=1","type":"page","highlight":"add backlog project for migrating v1 users","timestamp":"2022-07-30T18:34:00.000Z"},{"id":"1c778a02-b678-407b-9340-e1e830e38c50","title":"demo site","url":"https://app.notion.com/p/1c778a02b678407b9340e1e830e38c50?pvs=1","type":"page","highlight":"Interactive playground (CodeSandbox style)","timestamp":"2026-06-15T08:15:00.000Z"},{"id":"e3558d21-b678-406b-9a90-efaac9d864cf","title":"Feature Requests","url":"https://app.notion.com/p/e3558d21b678406b9a90efaac9d864cf?pvs=1","type":"database","highlight":"Feature Requests","timestamp":"2026-03-09T13:03:00.000Z"},{"id":"a91f4c6e-ce16-4002-bcb1-ead4923b9963","title":"Beta feedback","url":"https://app.notion.com/p/a91f4c6ece164002bcb1ead4923b9963?pvs=1","type":"database","highlight":"Beta feedback","timestamp":"2026-04-22T11:56:00.000Z"},{"id":"b0537e88-b678-40f3-8f04-cc7fef16e055","title":"confetti-v2","url":"https://app.notion.com/p/b0537e88b67840f38f04cc7fef16e055?pvs=1","type":"page","highlight":"WebGL renderer spike — offscreen canvas + worker, fall back to 2d context","timestamp":"2026-04-21T09:42:00.000Z"},{"id":"c6b19d34-b678-4145-9023-ffb37c04037d","title":"Physics Notes","url":"https://app.notion.com/p/c6b19d34b67841459023ffb37c04037d?pvs=1","type":"page","highlight":"Physics Notes","timestamp":"2026-04-21T13:07:00.000Z"},{"id":"d84a6f10-b678-41ea-845c-d7cc7c2ad2c4","title":"Docs Outline","url":"https://app.notion.com/p/d84a6f10b67841ea845cd7cc7c2ad2c4?pvs=1","type":"page","highlight":"📘 Getting started — full walkthrough (install, first burst, presets)","timestamp":"2026-06-09T08:44:00.000Z"},{"id":"f2c07b45-b678-402c-a8e7-d897826cf96d","title":"old","url":"https://app.notion.com/p/f2c07b45b678402ca8e7d897826cf96d?pvs=1","type":"page","highlight":"Notes:","timestamp":"2026-03-06T16:31:00.000Z"},{"id":"09d6e2a7-9908-4d54-be46-a974ac5019da","title":"Weekly Update: Jan 28","url":"https://app.notion.com/p/09d6e2a799084d54be46a974ac5019da'
 }
 
 const notionFetchOpenSource: ToolCall = {
-  toolCallId: 'toolu_01YLadtEch5JsyvhAoD5C2fk',
+  toolCallId: 'toolu_fixture_notion_fetch_oss',
   name: 'mcp__notion__notion-fetch',
   caller: 'model',
   provider: 'claude-code',
   state: 'success',
   input: {
-    id: '233f350e-1f0f-47cd-9422-bd7dbc54d536'
+    id: '55e1c208-1f0f-47cd-9422-bd7dbc54d536'
   },
   output:
-    '{"metadata":{"type":"page"},"title":"🛥 Open-Source","url":"https://app.notion.com/p/233f350e1f0f47cd9422bd7dbc54d536","text":"Here is the result of \\"view\\" for the Page with URL https://app.notion.com/p/233f350e1f0f47cd9422bd7dbc54d536 as of 2026-05-29T13:08:56.275Z:\\n<page url=\\"https://app.notion.com/p/233f350e1f0f47cd9422bd7dbc54d536\\" icon=\\"🛥\\">\\n<ancestor-path></ancestor-path>\\n<properties>\\n{\\"title\\":\\"Open-Source\\"}\\n</properties>\\n<content>\\n<page url=\\"https://app.notion.com/p/164f35996438406fac456aeef33a046d\\">wouter</page>\\n<page url=\\"https://app.notion.com/p/72c25fbe45af40c28a19f635332f9c4c\\">spoiled</page>\\n<page url=\\"https://app.notion.com/p/68d8786d210d42e0888168401a40345e\\">retreat</page>\\n<page url=\\"https://app.notion.com/p/01f714ee111a4df295726341c22decbc\\">presa</page>\\n<page url=\\"https://app.notion.com/p/3184781d05c743628f0c0b864b4182ee\\">`use-leader`</page>\\n<page url=\\"https://app.notion.com/p/6d1a390c1e5d4e888f6cdb86e5adcb9d\\">use-pong</page>\\n<empty-block/>\\n<empty-block/>\\n</content>\\n</page>"}'
+    '{"metadata":{"type":"page"},"title":"🛥 Open-Source","url":"https://app.notion.com/p/55e1c2081f0f47cd9422bd7dbc54d536","text":"Here is the result of \\"view\\" for the Page with URL https://app.notion.com/p/55e1c2081f0f47cd9422bd7dbc54d536 as of 2026-05-29T13:08:56.275Z:\\n<page url=\\"https://app.notion.com/p/55e1c2081f0f47cd9422bd7dbc54d536\\" icon=\\"🛥\\">\\n<ancestor-path></ancestor-path>\\n<properties>\\n{\\"title\\":\\"Open-Source\\"}\\n</properties>\\n<content>\\n<page url=\\"https://app.notion.com/p/71a2b39c6438406fac456aeef33a046d\\">tinyrouter</page>\\n<page url=\\"https://app.notion.com/p/83b4c5de45af40c28a19f635332f9c4c\\">confetti</page>\\n<page url=\\"https://app.notion.com/p/95c6d7f0210d42e0888168401a40345e\\">mdnav</page>\\n<page url=\\"https://app.notion.com/p/07d8e912111a4df295726341c22decbc\\">pixelpad</page>\\n<page url=\\"https://app.notion.com/p/19e0fb3405c743628f0c0b864b4182ee\\">`use-sparkle`</page>\\n<page url=\\"https://app.notion.com/p/2bf21c561e5d4e888f6cdb86e5adcb9d\\">use-hotkey</page>\\n<empty-block/>\\n<empty-block/>\\n</content>\\n</page>"}'
 }
 
-const notionFetchSpoiled: ToolCall = {
-  toolCallId: 'toolu_0179zYKPrLE7vwAHQNpchHzT',
+const notionFetchConfetti: ToolCall = {
+  toolCallId: 'toolu_fixture_notion_fetch_confetti',
   name: 'mcp__notion__notion-fetch',
   caller: 'model',
   provider: 'claude-code',
   state: 'success',
   input: {
-    id: '72c25fbe45af40c28a19f635332f9c4c'
+    id: '83b4c5de-45af-40c2-8a19-f635332f9c4c'
   },
   output:
-    '{"metadata":{"type":"page"},"title":"spoiled","url":"https://app.notion.com/p/72c25fbe45af40c28a19f635332f9c4c","text":"Here is the result of \\"view\\" for the Page with URL https://app.notion.com/p/72c25fbe45af40c28a19f635332f9c4c as of 2024-04-19T10:05:10.098Z:\\n<page url=\\"https://app.notion.com/p/72c25fbe45af40c28a19f635332f9c4c\\" icon=\\"https://prod-files-secure.s3.us-west-2.amazonaws.com/99bed442-8dd1-4df6-b9ae-7261db17cdd8/3a9f6ee3-4e85-450f-859b-5a2ed2297f35/favicon.svg\\">\\n<ancestor-path>\\n<parent-page url=\\"https://app.notion.com/p/233f350e1f0f47cd9422bd7dbc54d536\\" title=\\"Open-Source\\"/>\\n</ancestor-path>\\n<properties>\\n{\\"title\\":\\"spoiled\\"}\\n</properties>\\n<content>\\n- [x] Подумать, как разделить шум и анимацию контента\\n- [x] Basic API для реакта\\n\\t- [x] Controlled/uncontrolled\\n\\t- [x] SSR: ok! Если перенесем transitions в реакт\\n\\t- [x] \\\\<spoiler\\\\> tag is not supported\\n\\t- [x] Detach on unmount\\n\\t- [x] `asChild` prop\\n\\t- [x] Block elements and `tagName`\\n\\t- [x] Reveal on `hover`\\n\\t- [x] Pass noise options\\n\\t- [x] asChild types\\n\\t- [x] Content transitions\\n- [x] Следить за объектом в VisibilityObserver\\n- [x] По умолчанию спойлер без транзишена. Для этого нужно сделать враппер, который через `:has` выключает селектор. Но тогда как должны анимироваться блоки? Но тогда не получится `asChild` сделать.\\n- [x] Dark/light theme, none, auto, accent color\\n- [x] Demo: light/dark theme\\n- [x] `useIsomorphicLayoutEffect`\\n- [x] Проверить селектор для текста\\n- [x] Билд и пакет\\n- [x] Лайтово опубликовать и подключить к Domik\\n- [x] Fallback для Safari + Firefox. Анимированная гифка. Можно взять три слоя сдвинутых не по простым числам. 3, 5, 7, 19 и взять три четыре кадра\\n- [x] data-hidden\\n- [x] Для фоллбека сделать pixelRatio\\n- [x] Как должны загружаться стили? Подключать отдельно.\\n- [x] Простой README\\n- [x] Сделать правильную анимацию\\n- [ ] Use inline style in SSR\\n<empty-block/>\\n```javascript\\n// Default spoiler: uncontrolled, light theme, reveals on hover, creates \\n// inline <spoiler> element, opacity no transition, does not mimic words\\n\\n/**\\n * Elements \\n */\\n<Spoiler>Hello!</Spoiler> // <spoiler>Hello!</spoiler>\\n<Spoiler className=\\"custom\\">Hello!</Spoiler>\\n\\n// block elements \\n<Spoiler block><img /></Spoiler> // <div><img /></div>\\n<Spoiler tagName=\\"div\\"><img /></Spoiler> // alias\\n\\n// advanced\\n<Spoiler asChild><blockquote aria-label=\\"hello\\" /></Spoiler>\\n\\n/**\\n * Controlled/uncontrolled component \\n */\\n\\n<Spoiler /> // reveal is hover and uncontrolled\\n<Spoiler revealOn=\\"hover\\" />\\n<Spoiler revealOn=\\"click\\" />\\n<Spoiler defaultHidden={false} onChange={(value) => change} />\\n\\n// when `hidden` option is provided, it becomes controlled and\\n// `revealOn` and `defaultHidden` have no effect \\n<Spoiler hidden={true}>Always hidden</Spoiler>               // controlled\\n<Spoiler hidden={value} onClick={() => setValue()}</Spoiler> // controlled\\n\\n/** \\n * Theming \\n */\\n\\n<Spoiler /> // default theme is `light`\\n<Spoiler theme=\\"dark\\" />\\n<Spoiler theme=\\"auto\\" /> // system-defined\\n<Spoiler theme=\\"dark\\" accentColor=\\"red\\" /> // use `colord` here\\n\\n/**\\n * Content transitions \\n */\\n\\n// disable noise animation start/stop\\n<Spoiler noiseTransition={false}></Spoiler> \\n\\n// this should disable default stylesheet injection (!) for simple opacity\\n<Spoiler><FadeTransition>Hey<FadeTransition></Spoiler> // animated opacity\\n<Spoiler><IrisTransition>Hey<IrisTransition></Spoiler> // animated mask\\n\\n/**\\n  * Noise options\\n  */\\n<Spoiler fps={12} gap={false} mimicWords>Text with words</Spoiler>\\n<Spoiler fps=\\"performance\\">Text with words</Spoiler>\\n\\n/** \\n\\t* Styling \\n  */\\n\\nimport { Spoiler } from \\"spoiled\\"\\n\\nimport { Spoiler } from \\"spoiled/unstyled\\"\\nimport \\"spoiled/styles.css\\"\\n```\\n<empty-block/>\\n<empty-block/>\\n<page url=\\"https://app.notion.com/p/69226847251d43898b7ec135fcb86c36\\">Spoiled: website</page>\\n</content>\\n</page>"}'
+    '{"metadata":{"type":"page"},"title":"confetti","url":"https://app.notion.com/p/83b4c5de45af40c28a19f635332f9c4c","text":"Here is the result of \\"view\\" for the Page with URL https://app.notion.com/p/83b4c5de45af40c28a19f635332f9c4c as of 2024-04-19T10:05:10.098Z:\\n<page url=\\"https://app.notion.com/p/83b4c5de45af40c28a19f635332f9c4c\\">\\n<ancestor-path>\\n<parent-page url=\\"https://app.notion.com/p/55e1c2081f0f47cd9422bd7dbc54d536\\" title=\\"Open-Source\\"/>\\n</ancestor-path>\\n<properties>\\n{\\"title\\":\\"confetti\\"}\\n</properties>\\n<content>\\n- [x] Split the physics step from the render step\\n- [x] Basic React API\\n\\t- [x] Controlled/uncontrolled\\n\\t- [x] SSR: ok! No canvas until mount\\n\\t- [x] Detach on unmount\\n\\t- [x] `asChild` prop\\n\\t- [x] Block elements and `tagName`\\n\\t- [x] Fire on `click`\\n\\t- [x] Pass particle options\\n\\t- [x] asChild types\\n\\t- [x] Reduced-motion fallback\\n- [x] Pause bursts when the tab is hidden (VisibilityObserver)\\n- [x] Default burst has no trail. Needs a wrapper that disables the selector via `:has` — but then how do block elements animate? And `asChild` breaks.\\n- [x] Dark/light theme, none, auto, accent color\\n- [x] Demo: light/dark theme\\n- [x] `useIsomorphicLayoutEffect`\\n- [x] Particle pooling (no per-frame allocs)\\n- [x] Build and package\\n- [x] Publish a canary and dogfood it on the demo site\\n- [x] Fallback for Safari + Firefox: pre-rendered sprite sheet, three layers offset by primes 3, 5, 7 — loop four frames\\n- [x] data-active\\n- [x] pixelRatio for the fallback\\n- [x] How should styles load? Ship them separately.\\n- [x] Simple README\\n- [x] Get the easing curve right\\n- [ ] Use inline style in SSR\\n<empty-block/>\\n```javascript\\n// Default confetti: uncontrolled, light theme, fires on click, creates an\\n// inline <span> wrapper, no trail, does not follow the pointer\\n\\n/**\\n * Elements \\n */\\n<Confetti>Party!</Confetti> // <span>Party!</span>\\n<Confetti className=\\"custom\\">Party!</Confetti>\\n\\n// block elements \\n<Confetti block><img /></Confetti> // <div><img /></div>\\n<Confetti tagName=\\"div\\"><img /></Confetti> // alias\\n\\n// advanced\\n<Confetti asChild><button aria-label=\\"celebrate\\" /></Confetti>\\n\\n/**\\n * Controlled/uncontrolled component \\n */\\n\\n<Confetti /> // fires on click, uncontrolled\\n<Confetti fireOn=\\"click\\" />\\n<Confetti fireOn=\\"hover\\" />\\n<Confetti defaultActive={false} onChange={(value) => change} />\\n\\n// when `active` is provided, it becomes controlled and\\n// `fireOn` and `defaultActive` have no effect \\n<Confetti active={true}>Always bursting</Confetti>            // controlled\\n<Confetti active={value} onClick={() => setValue()}</Confetti> // controlled\\n\\n/** \\n * Theming \\n */\\n\\n<Confetti /> // default theme is `light`\\n<Confetti theme=\\"dark\\" />\\n<Confetti theme=\\"auto\\" /> // system-defined\\n<Confetti theme=\\"dark\\" accentColor=\\"red\\" /> // use `colord` here\\n\\n/**\\n * Particle options\\n */\\n<Confetti count={120} gravity={0.8} spread={60}>Boom</Confetti>\\n<Confetti preset=\\"fireworks\\">Boom</Confetti>\\n\\n/** \\n * Styling \\n */\\n\\nimport { Confetti } from \\"confetti\\"\\n\\nimport { Confetti } from \\"confetti/unstyled\\"\\nimport \\"confetti/styles.css\\"\\n```\\n<empty-block/>\\n<empty-block/>\\n<page url=\\"https://app.notion.com/p/3dc43e781e5d4e888f6cdb86e5adcb00\\">Confetti: website</page>\\n</content>\\n</page>"}'
 }
 
 const bash: ToolCall = {
-  toolCallId: 'toolu_01WXqjUXgUJPaexqLb7pZkgH',
+  toolCallId: 'toolu_fixture_bash_pwd',
   name: 'Bash',
   caller: 'model',
   provider: 'claude-code',
@@ -94,11 +89,10 @@ const bash: ToolCall = {
     description: 'Show current directory and git info'
   },
   output:
-    '/Users/molefrog/git/spoiled\n---\ntotal 232\ndrwxr-xr-x   19 molefrog  staff    608 Jun  9 19:41 .\ndrwxr-xr-x   52 molefrog  staff   1664 Jun 15 10:32 ..\ndrwx------    3 molefrog  staff     96 Nov 17  2025 .claude\n-rw-r--r--@   1 molefrog  staff   6148 Nov 13  2025 .DS_Store\ndrwxr-xr-x   15 molefrog  staff    480 May 23 09:30 .git\n-rw-r--r--    1 molefrog  staff    294 May 23 08:52 .gitignore\ndrwxr-xr-x@   3 molefrog  staff     96 Jun  9 19:41 .moi\n-rw-r--r--    1 molefrog  staff     95 Nov 13  2025 .prettierrc\n-rw-r--r--    1 molefrog  staff  73126 May 23 09:29 bun.lock\ndrwxr-xr-x@   8 molefrog  staff    256 May 23 09:31 esm\n-rw-r--r--    1 molefrog  staff   1210 Nov 13  2025 LICENSE\ndrwxr-xr-x  160 molefrog  staff   5120 May 23 09:30 node_modules\n-rw-r--r--    1 molefrog  staff   2072 May 23 08:52 package.json\n-rw-r--r--@   1 molefrog  staff   4600 May  5 21:49 README.md\ndrwxr-xr-x   16 molefrog  staff    512 May  5 21:50 src\n-rw-r--r--    1 molefrog  staff    605 Nov 13  2025 tsconfig.json\n-rw-r--r--    1 molefrog  staff    233 Nov 13  2025 tsconfig.node.json\n-rw-r--r--    1 molefrog  staff   1582 May 23 08:52 vite.config.ts\ndrwxr-xr-x   11 molefrog  staff    352 May  5 21:49 web\n--- git ---\ntrue\norigin\tgit@github.com:molefrog/spoiled.git (fetch)\norigin\tgit@github.com:molefrog/spoiled.git (push)'
+    '/Users/kim/git/confetti\n---\ntotal 232\ndrwxr-xr-x   19 kim  staff    608 Jun  9 19:41 .\ndrwxr-xr-x   52 kim  staff   1664 Jun 15 10:32 ..\ndrwx------    3 kim  staff     96 Nov 17  2025 .claude\ndrwxr-xr-x   15 kim  staff    480 May 23 09:30 .git\n-rw-r--r--    1 kim  staff    294 May 23 08:52 .gitignore\ndrwxr-xr-x@   3 kim  staff     96 Jun  9 19:41 .moi\n-rw-r--r--    1 kim  staff     95 Nov 13  2025 .prettierrc\n-rw-r--r--    1 kim  staff  73126 May 23 09:29 bun.lock\ndrwxr-xr-x@   8 kim  staff    256 May 23 09:31 esm\n-rw-r--r--    1 kim  staff   1210 Nov 13  2025 LICENSE\ndrwxr-xr-x  160 kim  staff   5120 May 23 09:30 node_modules\n-rw-r--r--    1 kim  staff   2072 May 23 08:52 package.json\n-rw-r--r--@   1 kim  staff   4600 May  5 21:49 README.md\ndrwxr-xr-x   16 kim  staff    512 May  5 21:49 src\n-rw-r--r--    1 kim  staff    605 Nov 13  2025 tsconfig.json\n-rw-r--r--    1 kim  staff    233 Nov 13  2025 tsconfig.node.json\n-rw-r--r--    1 kim  staff   1582 May 23 08:52 vite.config.ts\ndrwxr-xr-x   11 kim  staff    352 May  5 21:49 web\n--- git ---\ntrue\norigin\tgit@github.com:acme/confetti.git (fetch)\norigin\tgit@github.com:acme/confetti.git (push)'
 }
 
-// Synthesized to match a real Claude Read result (cat -n style body): neither
-// recorded thread included a Read, but the group spec calls for one.
+// Matches a real Claude Read result (cat -n style body).
 const readFile: ToolCall = {
   toolCallId: 'toolu_fixture_read_readme',
   name: 'Read',
@@ -106,36 +100,36 @@ const readFile: ToolCall = {
   provider: 'claude-code',
   state: 'success',
   input: {
-    file_path: '/Users/molefrog/git/spoiled/docs/open-source/README.md'
+    file_path: '/Users/kim/git/confetti/docs/open-source/README.md'
   },
   output:
-    '     1\t# 🛥 Open-Source\n     2\t\n     3\tWorking notes, specs, and ideas for my open-source projects.\n     4\t\n     5\t| Project | What it is |\n     6\t|---------|------------|\n     7\t| wouter | Minimalist hooks-based router for React |\n     8\t| spoiled | <Spoiler> reveal effect for React |\n'
+    '     1\t# 🛥 Open-Source\n     2\t\n     3\tWorking notes, specs, and ideas for my open-source projects.\n     4\t\n     5\t| Project | What it is |\n     6\t|---------|------------|\n     7\t| tinyrouter | Minimalist hooks-based router for React |\n     8\t| confetti | <Confetti> burst effect for React |\n'
 }
 
-// A native GitHub MCP call (from the lilmd-demo thread). Renders via the same
-// native-MCP path as notion: github logo + "Github" + `get_me`.
+// A native GitHub MCP call. Renders via the same native-MCP path as notion:
+// github logo + "Github" + `get_me`.
 const githubCall: ToolCall = {
-  toolCallId: 'toolu_01BN1AFsafzezpUwm8uhGWKa',
+  toolCallId: 'toolu_fixture_github_get_me',
   name: 'mcp__github__get_me',
   caller: 'model',
   provider: 'claude-code',
   state: 'success',
   input: {},
   output:
-    '{"login":"molefrog","id":671276,"profile_url":"https://github.com/molefrog","avatar_url":"https://avatars.githubusercontent.com/u/671276?v=4","details":{"name":"Alexey Taktarov","blog":"https://molefrog.com","location":"Copenhagen","hireable":true,"twitter_username":"mlfrg","public_repos":64,"public_gists":10,"followers":700,"following":444,"created_at":"2011-03-15T15:58:23Z","updated_at":"2026-06-13T09:04:50Z"}}'
+    '{"login":"octocat","id":583231,"profile_url":"https://github.com/octocat","avatar_url":"https://avatars.githubusercontent.com/u/583231?v=4","details":{"name":"The Octocat","blog":"https://github.blog","location":"San Francisco","hireable":true,"twitter_username":"github","public_repos":8,"public_gists":8,"followers":700,"following":9,"created_at":"2011-01-25T18:44:36Z","updated_at":"2026-06-13T09:04:50Z"}}'
 }
 
-// A reasoning ("Thinking") step (from the lilmd-demo thread). It's a Part, not a
-// ToolCall, which is why the lists are `Part[]`.
+// A reasoning ("Thinking") step. It's a Part, not a ToolCall, which is why the
+// lists are `Part[]`.
 const thinking: Part = {
   type: 'reasoning',
   text: 'The user is greeting me casually with "Hey bro". This is a friendly greeting and they\'re not asking me to do anything specific yet. I should respond in a friendly, casual way and let them know I\'m ready to help with whatever they need.'
 }
 
-// A Skill launch (from the lilmd-demo thread). `name: 'Skill'` + a `skill`
-// sidecar; renders as a "Loading Skill" timeline row.
+// A Skill launch. `name: 'Skill'` + a `skill` sidecar; renders as a
+// "Loading Skill" timeline row.
 const skillCall: ToolCall = {
-  toolCallId: 'toolu_01ADt4E1V39b8rhGUEuTQvdP',
+  toolCallId: 'toolu_fixture_skill_widgets',
   name: 'Skill',
   caller: 'model',
   provider: 'claude-code',
@@ -158,7 +152,7 @@ export const multipleToolCalls: Part[] = [
   { type: 'tool-call', call: notionFetchOpenSource },
   { type: 'tool-call', call: readFile },
   { type: 'tool-call', call: bash },
-  { type: 'tool-call', call: notionFetchSpoiled },
+  { type: 'tool-call', call: notionFetchConfetti },
   { type: 'tool-call', call: githubCall }
 ]
 
@@ -188,43 +182,43 @@ export const liveToolCalls: Part[] = [
   }
 ]
 
-// A *streaming* subagent (caller='subagent', name='Agent'), captured live from a
-// real Explore subagent run. The `subagent` record fills in incrementally from
+// A *streaming* subagent (caller='subagent', name='Agent'), shaped like a live
+// Explore subagent run. The `subagent` record fills in incrementally from
 // `task_*` events (lib/claude-adapter.ts): `progress[]` accumulates one "latest
 // action" line per tool use (the last is what the collapsed card shows live),
 // alongside `status`, `usage`, and a growing `transcript`. None of it is
 // persisted — a finished/replayed Agent call has none of this, only a live one
-// does. Here it's mid-run (status 'running'): `input` and `progress` are real;
-// the transcript is a trimmed version of the work so far.
+// does. Here it's mid-run (status 'running'); the transcript is a trimmed
+// version of the work so far.
 const subagentCall: ToolCall = {
-  toolCallId: 'toolu_01Qievnpu7yZAt9TWejhzAHu',
+  toolCallId: 'toolu_fixture_subagent',
   name: 'Agent',
   caller: 'subagent',
   provider: 'claude-code',
   state: 'running',
   input: {
-    description: 'Explore lilmd-demo repo structure and purpose',
+    description: 'Explore mdnav-demo repo structure and purpose',
     subagent_type: 'Explore',
     prompt:
-      'Explore the lilmd-demo repository to understand what it is. Look at the repo structure, what lilmd is, example markdown, and the purpose. Give a comprehensive overview citing specific files.'
+      'Explore the mdnav-demo repository to understand what it is. Look at the repo structure, what mdnav is, example markdown, and the purpose. Give a comprehensive overview citing specific files.'
   },
   // Still streaming — no final result yet.
   output: '',
   subagent: {
-    taskId: 'task_explore_lilmd',
-    description: 'Explore lilmd-demo repo structure and purpose',
+    taskId: 'task_explore_mdnav',
+    description: 'Explore mdnav-demo repo structure and purpose',
     status: 'running',
     usage: { totalTokens: 18407, toolUses: 8, durationMs: 10725 },
-    // Real captured progress — each entry is the "latest action" at that step.
+    // Each entry is the "latest action" at that step.
     progress: [
-      'Reading ~/git/lilmd-demo',
+      'Reading ~/git/mdnav-demo',
       'Reading README.md',
       'Reading package.json',
       'Reading CLAUDE.md',
-      'Running ls -la /Users/molefrog/git/lilmd-demo/',
+      'Running ls -la /Users/kim/git/mdnav-demo/',
       'Finding **/*.md',
       'Finding **/*.{js,ts,jsx,tsx}',
-      'Running head -100 /Users/molefrog/git/lilmd-demo/challenger-report.md'
+      'Running head -100 /Users/kim/git/mdnav-demo/moby-dick.md'
     ],
     transcript: [
       {
@@ -234,7 +228,7 @@ const subagentCall: ToolCall = {
         parts: [
           {
             type: 'reasoning',
-            text: 'Let me map the repo: list the markdown files, read the README, then see what the lilmd binary does.'
+            text: 'Let me map the repo: list the markdown files, read the README, then see what the mdnav binary does.'
           },
           {
             type: 'tool-call',
@@ -246,7 +240,7 @@ const subagentCall: ToolCall = {
               state: 'success',
               input: { pattern: '**/*.md' },
               output:
-                'README.md\ndocs/challenger-report.md\ndocs/sections/01-introduction.md\ndocs/sections/02-findings.md'
+                'README.md\ndocs/moby-dick.md\ndocs/sections/01-introduction.md\ndocs/sections/02-findings.md'
             }
           },
           {
@@ -257,9 +251,9 @@ const subagentCall: ToolCall = {
               caller: 'model',
               provider: 'claude-code',
               state: 'success',
-              input: { command: 'lilmd --help' },
+              input: { command: 'mdnav --help' },
               output:
-                'lilmd — navigate large markdown\n\nUSAGE: lilmd <file> <command>\n\nCOMMANDS:\n  toc       print the table of contents\n  read      read a section (fuzzy/regex/path selector)\n  search    full-text search'
+                'mdnav — navigate large markdown\n\nUSAGE: mdnav <file> <command>\n\nCOMMANDS:\n  toc       print the table of contents\n  read      read a section (fuzzy/regex/path selector)\n  search    full-text search'
             }
           }
         ]
@@ -271,7 +265,7 @@ const subagentCall: ToolCall = {
         parts: [
           {
             type: 'text',
-            text: '## Comprehensive Overview of lilmd-demo\n\n**lilmd-demo** showcases **lilmd**, a CLI for large markdown documents, using the Challenger report as a large-document fixture.'
+            text: '## Comprehensive Overview of mdnav-demo\n\n**mdnav-demo** showcases **mdnav**, a CLI for large markdown documents, using the full text of Moby-Dick as a large-document fixture.'
           }
         ]
       }
@@ -283,13 +277,13 @@ const subagentCall: ToolCall = {
 // `output`, and the toolUses count shown in place of the latest-action line.
 const subagentDoneCall: ToolCall = {
   ...subagentCall,
-  toolCallId: 'toolu_01Qievnpu7yZAt9TWejhzAHv',
+  toolCallId: 'toolu_fixture_subagent_done',
   state: 'success',
   output:
-    'lilmd-demo showcases **lilmd**, a CLI for navigating large markdown documents. The repo is a demo harness: a single `challenger-report.md` fixture plus a thin CLI (`toc`/`read`/`search`) that fuzzy-selects sections. README and CLAUDE.md frame it as a worked example, not a library.',
+    'mdnav-demo showcases **mdnav**, a CLI for navigating large markdown documents. The repo is a demo harness: a single `moby-dick.md` fixture plus a thin CLI (`toc`/`read`/`search`) that fuzzy-selects sections. README and CLAUDE.md frame it as a worked example, not a library.',
   subagent: {
     ...subagentCall.subagent!,
-    taskId: 'task_explore_lilmd_done',
+    taskId: 'task_explore_mdnav_done',
     status: 'completed'
   }
 }
