@@ -13,10 +13,10 @@ const base: WorkspaceLayout = { version: 1, widgetGrid: [], chatMode: 'sidebar' 
 
 describe('mergeLayoutForSave', () => {
   test('preserves a stored name when the body omits it (the reset bug)', () => {
-    const existing: WorkspaceLayout = { ...base, name: 'Faroe Lightroom' }
+    const existing: WorkspaceLayout = { ...base, name: 'Trip Photos' }
     const body: WorkspaceLayout = { ...base, widgetGrid: [{ i: 'a', x: 0, y: 0 }] }
     const merged = mergeLayoutForSave(existing, body)
-    expect(merged.name).toBe('Faroe Lightroom')
+    expect(merged.name).toBe('Trip Photos')
     expect(merged.widgetGrid).toEqual([{ i: 'a', x: 0, y: 0 }])
   })
 
