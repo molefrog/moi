@@ -10,8 +10,6 @@ import { basename, dirname, join, relative, sep } from 'path'
 
 import type { ViewConfig, WidgetConfig } from '@/lib/types'
 
-import { prebuilt } from './static'
-
 // An **applet** is any custom UI unit embedded in a workspace; `widget` and
 // `view` are its kinds (more may follow). All compile through this pipeline —
 // `kind` only diverges at the edges: which `config` schema is parsed, the
@@ -40,19 +38,6 @@ const EXTERNAL_MODULES = [
   'react-dom',
   'react-dom/client'
 ]
-
-// Which React build an applet is compiled against — the same `prebuilt` split
-// server/vendor.ts serves and buildApplet's NODE_ENV define keys off. Production
-// emits `jsx`/`jsxs`; development emits `jsxDEV`.
-export const REACT_MODE: 'production' | 'development' = prebuilt ? 'production' : 'development'
-
-// A stable comment stamped at the top of every built `index.js` recording the
-// React mode it was compiled for. The staleness check (server/applets.ts) reads
-// it back: a bundle built in one mode but served in the other must be rebuilt,
-// or a dev-transform bundle (jsxDEV) crashes against the production React that a
-// prebuilt/global install serves. mtimes alone can't catch this — flipping mode
-// (e.g. `bun run dev` then a production `moi start`) changes no source file.
-export const REACT_MODE_MARKER = `// moi:react-mode=${REACT_MODE}`
 
 type ServerModule = {
   name: string
@@ -534,14 +519,20 @@ export async function buildApplet(
       target: 'browser',
       sourcemap: 'inline',
       external: EXTERNAL_MODULES,
-      // Pin the JSX runtime to match the React build the vendor route serves
-      // (server/vendor.ts keys off the same `prebuilt` flag): production emits
-      // `jsx`/`jsxs` (react/jsx-runtime), development emits `jsxDEV`
-      // (react/jsx-dev-runtime). Without this, Bun defaults to `jsxDEV` (the
-      // widget `root` dir has no tsconfig to say otherwise), which crashes in a
-      // prebuilt/global install where the production React has `jsxDEV === undefined`.
+      // Always compile to the PRODUCTION automatic JSX runtime (`jsx`/`jsxs`
+      // from react/jsx-runtime), making the on-disk bundle mode-agnostic: it
+      // runs under both the development and production servers without a rebuild.
+      // Both vendored React builds export working `jsx`/`jsxs` — only `jsxDEV`
+      // is production-undefined, so the dev transform (Bun's default here, since
+      // the widget `root` has no tsconfig) crashes against the production React a
+      // prebuilt/global install serves ("jsxDEV is not a function"). This matters
+      // because widgets built in one mode (e.g. `bun run dev`) are served as-is
+      // in the other (`moi start`) — no source change, so no rebuild is triggered.
+      // Dev still gets React's runtime warnings: the vendor route serves the
+      // development React, whose `jsx()` validates; only jsxDEV's extra
+      // source-location detail is forgone.
       define: {
-        'process.env.NODE_ENV': JSON.stringify(prebuilt ? 'production' : 'development')
+        'process.env.NODE_ENV': JSON.stringify('production')
       },
       // The bundle is a directory: a fixed `index.js` entry (the client
       // dynamic-imports it) plus content-hashed `chunk-*.js` for any dynamic
@@ -591,11 +582,6 @@ export async function buildApplet(
     const styleId = kind === 'widget' ? widgetName : `${kind}:${widgetName}`
     js = injectCss(js, css, styleId)
   }
-
-  // Stamp the React mode so the staleness check can rebuild a bundle whose mode
-  // no longer matches the served React (see REACT_MODE_MARKER). First line, so a
-  // cheap prefix read is enough to recover it.
-  js = `${REACT_MODE_MARKER}\n${js}`
 
   const files: AppletFile[] = [{ name: 'index.js', data: js, kind: 'code' }]
   for (const chunk of chunkOutputs) {

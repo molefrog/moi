@@ -3,7 +3,6 @@ import { rmSync } from 'node:fs'
 import { join } from 'path'
 
 import { buildApplet, extractViewConfig, extractWidgetConfig } from '../build-applet'
-import { prebuilt } from '../static'
 
 const FIXTURES = join(import.meta.dir, '__fixtures__')
 
@@ -27,19 +26,19 @@ describe('buildApplet', () => {
     expect(result.serverModules).toEqual([])
   })
 
-  // Regression: the emitted JSX runtime must match the React build the vendor
-  // route serves (both key off `prebuilt`). In a prebuilt/global install the
-  // production React has `jsxDEV === undefined`, so a dev-transform bundle
-  // (jsxDEV) crashes every widget with "jsxDEV is not a function".
-  test('emits a JSX runtime consistent with the served React build', async () => {
+  // Regression: applets must ALWAYS compile to the production automatic JSX
+  // runtime (`jsx`/`jsxs` from react/jsx-runtime), never the dev transform
+  // (`jsxDEV`). The bundle is served as-is under both the development and
+  // production React (vendor route), and only the production React has
+  // `jsxDEV === undefined` — a dev-transform bundle would crash every applet
+  // there ("jsxDEV is not a function"). `jsx`/`jsxs` exist in both builds, so a
+  // production-transform bundle is mode-agnostic. Regardless of `prebuilt`.
+  test('always emits the production JSX runtime (mode-agnostic)', async () => {
     const result = await buildApplet(join(FIXTURES, 'hello.tsx'))
 
-    if (prebuilt) {
-      expect(result.js).not.toContain('jsx-dev-runtime')
-      expect(result.js).toContain('/jsx-runtime')
-    } else {
-      expect(result.js).toContain('jsx-dev-runtime')
-    }
+    expect(result.js).toContain('/jsx-runtime')
+    expect(result.js).not.toContain('jsx-dev-runtime')
+    expect(result.js).not.toContain('jsxDEV')
   })
 
   test('includes Tailwind CSS injected as a style tag', async () => {
