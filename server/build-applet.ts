@@ -10,6 +10,8 @@ import { basename, dirname, join, relative, sep } from 'path'
 
 import type { ViewConfig, WidgetConfig } from '@/lib/types'
 
+import { prebuilt } from './static'
+
 // An **applet** is any custom UI unit embedded in a workspace; `widget` and
 // `view` are its kinds (more may follow). All compile through this pipeline —
 // `kind` only diverges at the edges: which `config` schema is parsed, the
@@ -519,6 +521,15 @@ export async function buildApplet(
       target: 'browser',
       sourcemap: 'inline',
       external: EXTERNAL_MODULES,
+      // Pin the JSX runtime to match the React build the vendor route serves
+      // (server/vendor.ts keys off the same `prebuilt` flag): production emits
+      // `jsx`/`jsxs` (react/jsx-runtime), development emits `jsxDEV`
+      // (react/jsx-dev-runtime). Without this, Bun defaults to `jsxDEV` (the
+      // widget `root` dir has no tsconfig to say otherwise), which crashes in a
+      // prebuilt/global install where the production React has `jsxDEV === undefined`.
+      define: {
+        'process.env.NODE_ENV': JSON.stringify(prebuilt ? 'production' : 'development')
+      },
       // The bundle is a directory: a fixed `index.js` entry (the client
       // dynamic-imports it) plus content-hashed `chunk-*.js` for any dynamic
       // imports. Assets are emitted by the runtime plugin, not here. `[ext]` is

@@ -3,6 +3,7 @@ import { rmSync } from 'node:fs'
 import { join } from 'path'
 
 import { buildApplet, extractViewConfig, extractWidgetConfig } from '../build-applet'
+import { prebuilt } from '../static'
 
 const FIXTURES = join(import.meta.dir, '__fixtures__')
 
@@ -24,6 +25,21 @@ describe('buildApplet', () => {
     expect(result.js).toContain('from "react"')
     expect(result.js).toContain('HelloWidget')
     expect(result.serverModules).toEqual([])
+  })
+
+  // Regression: the emitted JSX runtime must match the React build the vendor
+  // route serves (both key off `prebuilt`). In a prebuilt/global install the
+  // production React has `jsxDEV === undefined`, so a dev-transform bundle
+  // (jsxDEV) crashes every widget with "jsxDEV is not a function".
+  test('emits a JSX runtime consistent with the served React build', async () => {
+    const result = await buildApplet(join(FIXTURES, 'hello.tsx'))
+
+    if (prebuilt) {
+      expect(result.js).not.toContain('jsx-dev-runtime')
+      expect(result.js).toContain('/jsx-runtime')
+    } else {
+      expect(result.js).toContain('jsx-dev-runtime')
+    }
   })
 
   test('includes Tailwind CSS injected as a style tag', async () => {
