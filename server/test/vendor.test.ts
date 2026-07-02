@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
 
-import { serveVendorReact } from '../vendor'
+import { serveVendorEmojibase, serveVendorReact } from '../vendor'
 
 const VENDOR = join(import.meta.dir, '..', '..', 'client', 'vendor', 'react')
 const ENTRIES = [
@@ -59,5 +59,28 @@ describe('serveVendorReact route', () => {
   test('rejects non-js and unknown files', async () => {
     expect((await get('/vendor/react/react.txt')).status).toBe(404)
     expect((await get('/vendor/react/does-not-exist.js')).status).toBe(404)
+  })
+})
+
+// The settings emoji picker (frimousse) loads its dataset from here instead of
+// the jsdelivr CDN — same offline story as vendored React.
+describe('serveVendorEmojibase route', () => {
+  const get = (path: string) => serveVendorEmojibase(new Request(`http://localhost${path}`))
+
+  test('serves the en dataset as JSON', async () => {
+    for (const name of ['data.json', 'messages.json']) {
+      const res = await get(`/vendor/emojibase/en/${name}`)
+      expect(res.status).toBe(200)
+      expect(res.headers.get('Content-Type')).toContain('json')
+      // Non-trivial payload, and it parses.
+      expect(Array.isArray(await res.json()) || name === 'messages.json').toBe(true)
+    }
+  })
+
+  test('rejects traversal and unknown files', async () => {
+    expect((await get('/vendor/emojibase/../react/react.js')).status).toBe(404)
+    expect((await get('/vendor/emojibase/en/%2e%2e/data.json')).status).toBe(404)
+    expect((await get('/vendor/emojibase/en/data.js')).status).toBe(404)
+    expect((await get('/vendor/emojibase/xx/data.json')).status).toBe(404)
   })
 })

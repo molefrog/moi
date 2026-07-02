@@ -107,7 +107,13 @@ export function GeneralSettings() {
             />
           }
         />
-        <div className="px-3.5 py-3.5">
+        <div className="flex flex-col gap-4 px-3.5 py-3.5">
+          <div className="flex flex-col">
+            <span className="text-sm font-medium">Icon</span>
+            <span className="text-xs text-muted-foreground">
+              Pick an emoji or a glyph on a generated background, or upload an image.
+            </span>
+          </div>
           <IconPicker icon={icon} />
         </div>
       </SettingsSection>

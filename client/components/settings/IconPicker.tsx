@@ -4,6 +4,7 @@ import type { Icon } from '@tabler/icons-react'
 import {
   IconActivity,
   IconApi,
+  IconArrowsShuffle,
   IconAtom,
   IconBell,
   IconBolt,
@@ -43,6 +44,7 @@ import {
   IconMail,
   IconMap,
   IconMessage,
+  IconMoodSad,
   IconMoon,
   IconMountain,
   IconMusic,
@@ -69,6 +71,12 @@ import {
   IconWand,
   IconWorld
 } from '@tabler/icons-react'
+import {
+  EmojiPicker,
+  type EmojiPickerListCategoryHeaderProps,
+  type EmojiPickerListEmojiProps,
+  type EmojiPickerListRowProps
+} from 'frimousse'
 
 import { useResetWorkspaceIcon, useSaveWorkspaceIcon } from '@/client/api/workspaces'
 import { PROVIDER_ICON } from '@/client/components/layout/SidebarLayout'
@@ -76,8 +84,10 @@ import { Button } from '@/client/components/ui/button'
 import { useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
 import {
-  ICON_BACKGROUNDS,
-  type IconBackground,
+  GRADIENT_PRESETS,
+  type IconGradient,
+  gradientCss,
+  randomGradient,
   renderEmojiIcon,
   renderGlyphIcon
 } from '@/client/lib/render-icon'
@@ -148,11 +158,23 @@ const ICON_CHOICES: { id: string; Icon: Icon }[] = [
   { id: 'gamepad', Icon: IconDeviceGamepad2 },
   { id: 'gift', Icon: IconGift },
   { id: 'cart', Icon: IconShoppingCart },
-  { id: 'chef', Icon: IconChefHat },
-  { id: 'heart2', Icon: IconHeart }
+  { id: 'chef', Icon: IconChefHat }
 ]
 
-const EMOJI_CHOICES = [
+// The staged background: a preset id (or 'shuffle'), and its gradient — null
+// means transparent. Only the rasterized result is persisted, so this state
+// lives and dies with the dialog.
+type IconBg = { id: string; gradient: IconGradient | null }
+
+// Force a color-emoji font: the default UI stack can fall back to monochrome
+// outline glyphs (notably on Linux), while the canvas rasterizer already pins
+// these families — this keeps the DOM preview true to the saved icon.
+const EMOJI_FONT = 'font-[Apple_Color_Emoji,Segoe_UI_Emoji,Noto_Color_Emoji,sans-serif]'
+
+// Hand-picked workspace-flavored emoji pinned above the full list — the full
+// emojibase catalog opens with smileys, which are rarely what a project icon
+// wants. Two rows of 13, matching the picker's column count.
+const FAVORITE_EMOJI = [
   '🚀',
   '✨',
   '🔥',
@@ -162,12 +184,10 @@ const EMOJI_CHOICES = [
   '🤖',
   '🪄',
   '🧪',
-  '🔬',
   '⚙️',
   '🛠️',
   '💻',
   '📦',
-  '🗂️',
   '📊',
   '📈',
   '📝',
@@ -175,33 +195,49 @@ const EMOJI_CHOICES = [
   '🎯',
   '🏆',
   '💎',
-  '⭐',
-  '🌟',
-  '❤️',
-  '🌈',
-  '🌙',
-  '☀️',
-  '🌍',
   '🪐',
+  '🌍',
   '🧭',
-  '🗺️',
   '🎨',
-  '🎵',
   '🎮',
-  '📷',
-  '🎁',
-  '🛒',
-  '🍕',
-  '☕',
-  '🌱',
-  '🍃',
-  '🐙',
-  '👻',
-  '🦄',
-  '🐱',
-  '🦊',
-  '🐰'
+  '☕'
 ]
+
+// ── Frimousse list parts (module-level so the virtualized list keeps stable
+// component identities across re-renders) ───────────────────────────────────
+
+function EmojiCategoryHeader({ category, ...props }: EmojiPickerListCategoryHeaderProps) {
+  return (
+    <div
+      className="bg-background px-2.5 pt-2.5 pb-1 text-xs font-medium text-muted-foreground"
+      {...props}
+    >
+      {category.label}
+    </div>
+  )
+}
+
+function EmojiRow({ children, ...props }: EmojiPickerListRowProps) {
+  return (
+    <div className="scroll-my-1 px-1.5" {...props}>
+      {children}
+    </div>
+  )
+}
+
+function EmojiButton({ emoji, ...props }: EmojiPickerListEmojiProps) {
+  return (
+    <button
+      className={cn(
+        'flex size-9 items-center justify-center rounded-lg text-[22px] transition-colors duration-75 data-[active]:bg-muted',
+        EMOJI_FONT
+      )}
+      {...props}
+    >
+      {emoji.emoji}
+    </button>
+  )
+}
 
 type IconPickerProps = {
   // The currently-saved icon data URL, or null to show the provider default.
@@ -214,10 +250,17 @@ export function IconPicker({ icon }: IconPickerProps) {
   const resetIcon = useResetWorkspaceIcon(workspaceId)
 
   const [mode, setMode] = useState<Mode>('emoji')
-  const [bg, setBg] = useState<IconBackground>('blue')
+  const [bg, setBg] = useState<IconBg>({ id: 'sunrise', gradient: GRADIENT_PRESETS[0].gradient })
+  // The last shuffled gradient sticks around as its own swatch, so switching to
+  // a preset and back doesn't lose a roll you liked.
+  const [shuffled, setShuffled] = useState<IconGradient | null>(null)
   const [emoji, setEmoji] = useState<string | null>(null)
+  // Mirrors the emoji search input so the pinned favorites hide while the list
+  // is showing filtered results.
+  const [emojiSearch, setEmojiSearch] = useState('')
   const [iconId, setIconId] = useState<string | null>(null)
   const [uploadPreview, setUploadPreview] = useState<string | null>(null)
+  const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const fileRef = useRef<HTMLInputElement>(null)
@@ -225,8 +268,7 @@ export function IconPicker({ icon }: IconPickerProps) {
   const uploadBlob = useRef<Blob | null>(null)
 
   const selectedIcon = ICON_CHOICES.find(c => c.id === iconId)
-  const bgPreset = ICON_BACKGROUNDS.find(b => b.id === bg)
-  const onGradient = bg !== 'none'
+  const onGradient = bg.gradient !== null
 
   // Whether the current tab has a selection ready to apply.
   const hasSelection =
@@ -235,6 +277,12 @@ export function IconPicker({ icon }: IconPickerProps) {
     (mode === 'upload' && !!uploadBlob.current)
 
   const saving = saveIcon.isPending || resetIcon.isPending
+
+  const shuffle = () => {
+    const gradient = randomGradient()
+    setShuffled(gradient)
+    setBg({ id: 'shuffle', gradient })
+  }
 
   const onFile = (file: File) => {
     setError(null)
@@ -255,11 +303,11 @@ export function IconPicker({ icon }: IconPickerProps) {
         blob = uploadBlob.current
       } else if (mode === 'emoji') {
         if (!emoji) return
-        blob = await renderEmojiIcon(emoji, bg)
+        blob = await renderEmojiIcon(emoji, bg.gradient)
       } else {
         const svg = glyphRef.current?.querySelector('svg')
         if (!svg) return
-        blob = await renderGlyphIcon(new XMLSerializer().serializeToString(svg), bg)
+        blob = await renderGlyphIcon(new XMLSerializer().serializeToString(svg), bg.gradient)
       }
       await saveIcon.mutateAsync(blob)
     } catch (err) {
@@ -277,153 +325,248 @@ export function IconPicker({ icon }: IconPickerProps) {
       : (icon ?? PROVIDER_ICON[provider ?? 'claude-code'])
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col">
-        <span className="text-sm font-medium">Icon</span>
-        <span className="text-xs text-muted-foreground">
-          Upload an image, or pick an emoji or glyph and a background.
-        </span>
+    <div className="flex gap-6">
+      {/* Live preview */}
+      <div className="flex w-24 shrink-0 flex-col items-center gap-2.5">
+        <div
+          className={cn(
+            'flex size-24 items-center justify-center overflow-hidden rounded-[24px] shadow-sm ring-1 ring-foreground/10',
+            // Checkerboard hints at transparency when no background is chosen.
+            previewKind !== 'image' &&
+              !onGradient &&
+              'bg-[repeating-conic-gradient(#0000000d_0%_25%,transparent_0%_50%)] bg-[length:16px_16px]'
+          )}
+          // Gradient colors are generated at runtime (shuffle), so they can't be
+          // static Tailwind classes — set the composed background inline.
+          style={
+            previewKind !== 'image' && bg.gradient
+              ? { background: gradientCss(bg.gradient) }
+              : undefined
+          }
+        >
+          {previewKind === 'emoji' ? (
+            <span
+              className={cn('leading-none', EMOJI_FONT, onGradient ? 'text-[64px]' : 'text-[86px]')}
+            >
+              {emoji}
+            </span>
+          ) : previewKind === 'glyph' && selectedIcon ? (
+            <selectedIcon.Icon
+              stroke={1.75}
+              className={cn(onGradient ? 'size-14 text-white' : 'size-18 text-foreground')}
+            />
+          ) : (
+            <img src={previewImage} alt="" className="size-full object-cover" />
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => resetIcon.mutate()}
+          disabled={saving}
+          className="text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+        >
+          Reset to default
+        </button>
       </div>
 
-      <div className="flex gap-5">
-        {/* Live preview */}
-        <div className="flex shrink-0 flex-col items-center gap-2">
-          <div
-            className={cn(
-              'flex size-20 items-center justify-center overflow-hidden rounded-[22px] ring-1 ring-border',
-              previewKind !== 'image' && onGradient && bgPreset?.css,
-              previewKind !== 'image' && !onGradient && 'bg-muted'
-            )}
-          >
-            {previewKind === 'emoji' ? (
-              <span className="text-[40px] leading-none">{emoji}</span>
-            ) : previewKind === 'glyph' && selectedIcon ? (
-              <selectedIcon.Icon
-                stroke={1.75}
-                className={cn('size-11', onGradient ? 'text-white' : 'text-foreground')}
-              />
-            ) : (
-              <img src={previewImage} alt="" className="size-full object-cover" />
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => resetIcon.mutate()}
-            disabled={saving}
-            className="text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-          >
-            Reset to default
-          </button>
+      {/* Controls */}
+      <div className="flex min-w-0 flex-1 flex-col gap-3">
+        {/* Mode tabs */}
+        <div className="flex gap-1 self-start rounded-lg bg-muted p-0.5">
+          {(['emoji', 'icon', 'upload'] as const).map(m => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={cn(
+                'rounded-md px-3.5 py-1 text-xs font-medium capitalize transition-colors',
+                mode === m
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {m}
+            </button>
+          ))}
         </div>
 
-        {/* Controls */}
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
-          {/* Mode tabs */}
-          <div className="flex gap-1 rounded-lg bg-muted p-0.5">
-            {(['emoji', 'icon', 'upload'] as const).map(m => (
+        {/* Background swatches — disabled (not hidden) on the upload tab so the
+            layout doesn't jump between tabs. */}
+        <div
+          className={cn(
+            'flex items-center gap-2',
+            mode === 'upload' && 'pointer-events-none opacity-35'
+          )}
+        >
+          <span className="text-xs font-medium text-muted-foreground">Background</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              aria-label="No background"
+              onClick={() => setBg({ id: 'none', gradient: null })}
+              className={cn(
+                'flex size-7 items-center justify-center rounded-full bg-muted ring-offset-2 ring-offset-card transition-shadow',
+                bg.id === 'none'
+                  ? 'ring-2 ring-primary'
+                  : 'ring-1 ring-border hover:ring-foreground/30'
+              )}
+            >
+              <IconCircleOff size={14} stroke={1.75} className="text-muted-foreground" />
+            </button>
+            {GRADIENT_PRESETS.map(preset => (
               <button
-                key={m}
+                key={preset.id}
                 type="button"
-                onClick={() => setMode(m)}
+                aria-label={`${preset.id} background`}
+                onClick={() => setBg({ id: preset.id, gradient: preset.gradient })}
+                // Preset colors live in data (shared with the canvas), so the
+                // swatch fill is inline rather than a per-preset class.
+                style={{ background: gradientCss(preset.gradient) }}
                 className={cn(
-                  'flex-1 rounded-md px-2 py-1 text-xs font-medium capitalize transition-colors',
-                  mode === m
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
+                  'size-7 rounded-full ring-offset-2 ring-offset-card transition-shadow',
+                  bg.id === preset.id
+                    ? 'ring-2 ring-primary'
+                    : 'hover:ring-2 hover:ring-foreground/25'
+                )}
+              />
+            ))}
+            <button
+              type="button"
+              aria-label="Random background"
+              title="Surprise me"
+              onClick={shuffle}
+              style={shuffled ? { background: gradientCss(shuffled) } : undefined}
+              className={cn(
+                'flex size-7 items-center justify-center rounded-full ring-offset-2 ring-offset-card transition-shadow',
+                shuffled ? 'text-white' : 'bg-muted text-muted-foreground ring-1 ring-border',
+                bg.id === 'shuffle'
+                  ? 'ring-2 ring-primary'
+                  : 'hover:ring-2 hover:ring-foreground/25'
+              )}
+            >
+              <IconArrowsShuffle size={14} stroke={2} />
+            </button>
+          </div>
+        </div>
+
+        {/* Picker body — fixed height across tabs so the dialog never jumps. */}
+        {mode === 'emoji' ? (
+          <EmojiPicker.Root
+            onEmojiSelect={picked => setEmoji(picked.emoji)}
+            // Same-origin emojibase data (vendored under client/vendor/emojibase,
+            // served by server/vendor.ts) — the picker works fully offline.
+            emojibaseUrl="/vendor/emojibase"
+            columns={13}
+            className="isolate flex h-72 flex-col overflow-hidden rounded-lg border border-border bg-background"
+          >
+            <div className="flex items-center gap-1.5 p-1.5 pb-0">
+              <EmojiPicker.Search
+                placeholder="Search emoji…"
+                onChange={e => setEmojiSearch(e.target.value)}
+                className="h-8 min-w-0 flex-1 appearance-none rounded-md bg-muted px-2.5 text-sm outline-none placeholder:text-muted-foreground"
+              />
+              <EmojiPicker.SkinToneSelector className="size-8 shrink-0 rounded-md text-lg hover:bg-muted" />
+            </div>
+            <EmojiPicker.Viewport className="relative scrollbar-thin flex-1 overflow-y-auto outline-none">
+              <EmojiPicker.Loading className="absolute inset-0 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <IconLoader2 size={16} stroke={1.75} className="animate-spin" />
+                Loading emoji…
+              </EmojiPicker.Loading>
+              {/* Pinned workspace favorites — rendered inside the scroll area so
+                  they read as the first category; hidden while searching so
+                  results stay on top. */}
+              {emojiSearch.trim() === '' && (
+                <div className="border-b border-dashed border-border pb-1.5">
+                  <p className="px-2.5 pt-2.5 pb-1 text-xs font-medium text-muted-foreground">
+                    Favorites
+                  </p>
+                  {/* Fixed 13 columns to mirror the frimousse rows below — the
+                      26 favorites always land as two clean rows. */}
+                  <div className="grid grid-cols-13 justify-items-start px-1.5">
+                    {FAVORITE_EMOJI.map(e => (
+                      <button
+                        key={e}
+                        type="button"
+                        onClick={() => setEmoji(e)}
+                        className={cn(
+                          'flex size-9 items-center justify-center rounded-lg text-[22px] transition-colors duration-75',
+                          EMOJI_FONT,
+                          emoji === e ? 'bg-primary/10' : 'hover:bg-muted'
+                        )}
+                      >
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <EmojiPicker.Empty className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-xs text-muted-foreground">
+                <IconMoodSad size={20} stroke={1.5} />
+                No emoji found
+              </EmojiPicker.Empty>
+              <EmojiPicker.List
+                className="pb-1.5 select-none"
+                components={{
+                  CategoryHeader: EmojiCategoryHeader,
+                  Row: EmojiRow,
+                  Emoji: EmojiButton
+                }}
+              />
+            </EmojiPicker.Viewport>
+          </EmojiPicker.Root>
+        ) : mode === 'icon' ? (
+          <div className="grid scrollbar-thin h-72 grid-cols-[repeat(auto-fill,minmax(2.25rem,1fr))] content-start gap-1 overflow-y-auto rounded-lg border border-border bg-background p-1.5">
+            {ICON_CHOICES.map(({ id, Icon }) => (
+              <button
+                key={id}
+                type="button"
+                aria-label={id}
+                onClick={() => setIconId(id)}
+                className={cn(
+                  'flex aspect-square items-center justify-center rounded-lg text-muted-foreground transition-colors [&_svg]:size-5',
+                  iconId === id
+                    ? 'bg-primary/10 text-primary'
+                    : 'hover:bg-muted hover:text-foreground'
                 )}
               >
-                {m}
+                <Icon stroke={1.75} />
               </button>
             ))}
           </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            onDragOver={e => {
+              e.preventDefault()
+              setDragOver(true)
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={e => {
+              e.preventDefault()
+              setDragOver(false)
+              const file = e.dataTransfer.files?.[0]
+              if (file) onFile(file)
+            }}
+            className={cn(
+              'flex h-72 flex-col items-center justify-center gap-2 rounded-lg border border-dashed transition-colors',
+              dragOver
+                ? 'border-primary bg-primary/5 text-primary'
+                : 'border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground'
+            )}
+          >
+            <IconUpload size={22} stroke={1.5} />
+            <span className="text-xs font-medium">Click or drop an image</span>
+            <span className="text-[11px] text-muted-foreground/70">PNG, JPG, GIF, or WebP</span>
+          </button>
+        )}
 
-          {/* Background swatches (emoji / icon only) */}
-          {mode !== 'upload' && (
-            <div className="flex items-center gap-1.5">
-              <span className="mr-1 text-xs text-muted-foreground">Background</span>
-              <button
-                type="button"
-                aria-label="No background"
-                onClick={() => setBg('none')}
-                className={cn(
-                  'flex size-6 items-center justify-center rounded-md bg-muted ring-offset-1 ring-offset-background transition-all',
-                  bg === 'none'
-                    ? 'ring-2 ring-primary'
-                    : 'ring-1 ring-border hover:ring-foreground/30'
-                )}
-              >
-                <IconCircleOff size={13} stroke={1.75} className="text-muted-foreground" />
-              </button>
-              {ICON_BACKGROUNDS.map(b => (
-                <button
-                  key={b.id}
-                  type="button"
-                  aria-label={b.id}
-                  onClick={() => setBg(b.id)}
-                  className={cn(
-                    'size-6 rounded-md ring-offset-1 ring-offset-background transition-all',
-                    b.css,
-                    bg === b.id ? 'ring-2 ring-primary' : 'hover:ring-1 hover:ring-foreground/30'
-                  )}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Picker body */}
-          {mode === 'emoji' ? (
-            <div className="grid scrollbar-thin max-h-44 grid-cols-8 gap-1 overflow-y-auto pr-1">
-              {EMOJI_CHOICES.map(e => (
-                <button
-                  key={e}
-                  type="button"
-                  onClick={() => setEmoji(e)}
-                  className={cn(
-                    'flex aspect-square items-center justify-center rounded-md text-lg transition-colors',
-                    emoji === e ? 'bg-primary/10 ring-2 ring-primary' : 'hover:bg-muted'
-                  )}
-                >
-                  {e}
-                </button>
-              ))}
-            </div>
-          ) : mode === 'icon' ? (
-            <div className="grid scrollbar-thin max-h-44 grid-cols-8 gap-1 overflow-y-auto pr-1">
-              {ICON_CHOICES.map(({ id, Icon }) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setIconId(id)}
-                  className={cn(
-                    'flex aspect-square items-center justify-center rounded-md text-muted-foreground transition-colors [&_svg]:size-5',
-                    iconId === id
-                      ? 'bg-primary/10 text-foreground ring-2 ring-primary'
-                      : 'hover:bg-muted hover:text-foreground'
-                  )}
-                >
-                  <Icon stroke={1.75} />
-                </button>
-              ))}
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="flex h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
-            >
-              <IconUpload size={20} stroke={1.5} />
-              <span className="text-xs">Click to upload PNG, JPG, GIF, or WebP</span>
-            </button>
-          )}
-
-          {error && <p className="text-xs text-destructive">{error}</p>}
-
-          <div className="flex justify-end">
-            <Button size="sm" onClick={apply} disabled={!hasSelection || saving}>
-              {saving ? <IconLoader2 className="animate-spin" /> : <IconCheck stroke={1.75} />}
-              Apply icon
-            </Button>
-          </div>
+        <div className="flex items-center justify-between gap-3">
+          <p className={cn('text-xs text-destructive', !error && 'invisible')}>{error}</p>
+          <Button size="sm" onClick={apply} disabled={!hasSelection || saving}>
+            {saving ? <IconLoader2 className="animate-spin" /> : <IconCheck stroke={1.75} />}
+            Apply icon
+          </Button>
         </div>
       </div>
 

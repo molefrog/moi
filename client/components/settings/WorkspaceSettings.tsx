@@ -40,19 +40,22 @@ export function WorkspaceSettings() {
       </Tooltip>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="flex h-[min(680px,90vh)] w-[960px] max-w-[94vw]">
+        <DialogContent className="flex h-[min(680px,90vh)] w-[880px] max-w-[94vw]">
           <DialogTitle className="sr-only">Workspace settings</DialogTitle>
 
-          {/* Sidebar nav */}
-          <nav className="flex w-44 shrink-0 flex-col gap-0.5 border-r border-border bg-muted/30 p-2">
-            <p className="px-2 pt-1.5 pb-1 text-xs font-medium text-muted-foreground">Settings</p>
+          {/* Sidebar nav — top padding lines the "Settings" label up with the
+              page title across the divider. */}
+          <nav className="flex w-48 shrink-0 flex-col gap-0.5 border-r border-border bg-muted/30 p-3">
+            <p className="px-2.5 pt-4 pb-2 text-[11px] font-semibold tracking-wider text-muted-foreground/80 uppercase">
+              Settings
+            </p>
             {NAV.map(item => (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => setPage(item.id)}
                 className={cn(
-                  'flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm font-medium transition-colors [&_svg]:size-[18px]',
+                  'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors [&_svg]:size-[18px]',
                   page === item.id
                     ? 'bg-muted text-foreground'
                     : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
@@ -78,7 +81,7 @@ export function WorkspaceSettings() {
                 </Button>
               }
             />
-            <div className="px-9 py-8">
+            <div className="px-8 py-7">
               {page === 'general' ? <GeneralSettings /> : <EnvironmentSettings />}
             </div>
           </div>

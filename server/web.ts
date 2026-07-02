@@ -22,7 +22,7 @@ import { getWorkspace } from './registry'
 import { addClient, removeClient, sendToClient } from './state'
 import { distShell, prebuilt } from './static'
 import { renderStatus } from './status'
-import { serveVendorReact } from './vendor'
+import { serveVendorEmojibase, serveVendorReact } from './vendor'
 
 type WsData = { channel: 'chat' | 'events'; workspaceId: string }
 
@@ -92,6 +92,9 @@ export const app = Bun.serve<WsData>({
     // Locally-vendored React ESM (offline; no CDN). The importmap in
     // client/index.html points here; the handler picks dev/prod per env.
     '/vendor/react/*': req => serveVendorReact(req),
+
+    // Vendored emojibase-data for the settings emoji picker (offline; no CDN).
+    '/vendor/emojibase/*': req => serveVendorEmojibase(req),
 
     // Client-side routes — serve the SPA shell.
     '/': shell,
