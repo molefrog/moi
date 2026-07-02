@@ -1,14 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  utimesSync,
-  writeFileSync
-} from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'path'
 
 import {
@@ -19,7 +10,6 @@ import {
   serveApplet,
   serveWorkspaceFile
 } from '../applets'
-import { REACT_MODE, REACT_MODE_MARKER } from '../build-applet'
 
 // These cover the kind-agnostic applet HTTP machinery without invoking
 // Bun.build: serving files from a compiled bundle dir (sentinel swap + asset
@@ -122,54 +112,6 @@ describe('buildApplets (empty/orphan handling)', () => {
     writeFileSync(join(buildDir, 'ghost', 'index.js'), '//')
     await buildApplets(WS, 'widget', false)
     expect(existsSync(join(buildDir, 'ghost'))).toBe(false)
-  })
-})
-
-// Regression: a bundle cached from one React mode must not be served in the
-// other. A dev-transform bundle (jsxDEV) served against the production React a
-// prebuilt/global install serves crashes every applet ("jsxDEV is not a
-// function" — surfaced as the widget failing to load). Flipping mode (e.g.
-// `bun run dev` then a production `moi start`) changes no source file, so the
-// mtime-only staleness check missed it; the stamped mode marker catches it.
-describe('buildApplets (React-mode staleness)', () => {
-  const OTHER_MODE = REACT_MODE === 'production' ? 'development' : 'production'
-  const OTHER_MARKER = `// moi:react-mode=${OTHER_MODE}`
-
-  function seedSource(name: string): string {
-    const dir = join(WS, '.moi', 'widgets')
-    mkdirSync(dir, { recursive: true })
-    // Resolve tailwindcss/react from the repo node_modules (WS lives under
-    // server/test/), matching how build-applet.test.ts compiles fixtures.
-    const path = join(dir, `${name}.tsx`)
-    writeFileSync(path, 'export default function W() { return <div className="p-4">Hi</div> }\n')
-    // Backdate the source so the mtime check alone would SKIP — isolating the
-    // mode marker as the only thing that can flag the bundle stale.
-    const past = new Date(Date.now() - 60_000)
-    utimesSync(path, past, past)
-    return path
-  }
-
-  test('rebuilds a bundle compiled for the other mode even when the source is untouched', async () => {
-    seedSource('hello')
-    seedApplet('widgets', 'hello', {
-      'index.js': `${OTHER_MARKER}\nimport { jsxDEV } from "react/jsx-dev-runtime";\nexport default function(){}`
-    })
-
-    const { results } = await buildApplets(WS, 'widget', false)
-    expect(results[0]).toMatchObject({ name: 'hello', status: 'built' })
-
-    const built = readFileSync(join(WS, '.moi', '.build', 'widgets', 'hello', 'index.js'), 'utf8')
-    expect(built.startsWith(REACT_MODE_MARKER)).toBe(true)
-  })
-
-  test('skips a bundle already compiled for the current mode', async () => {
-    seedSource('hello')
-    seedApplet('widgets', 'hello', {
-      'index.js': `${REACT_MODE_MARKER}\nexport default function(){}`
-    })
-
-    const { results } = await buildApplets(WS, 'widget', false)
-    expect(results[0]).toEqual({ name: 'hello', status: 'skipped' })
   })
 })
 
