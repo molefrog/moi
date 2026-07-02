@@ -12,9 +12,11 @@ import type { ColorTheme, FontTheme } from '@/lib/themes'
 import type {
   ScratchArrowEnd,
   ScratchColor,
+  ScratchFill,
   ScratchImageQuality,
   ScratchOp,
-  ScratchSize
+  ScratchSize,
+  ScratchStyle
 } from '@/lib/types'
 
 import { columns } from './cli-ui'
@@ -920,9 +922,24 @@ const COLOR_HEX: Record<ScratchColor, string> = {
 }
 const COLOR_NAMES = Object.keys(COLOR_HEX) as ScratchColor[]
 
-// The UI offers two opinionated sizes; the CLI mirrors them by name.
+// Arrows expose tldraw's size as a line weight; the CLI mirrors the UI's two sizes.
 const STROKE_SIZES: Record<string, ScratchSize> = { small: 'm', large: 'xl' }
 const STROKE_NAMES = Object.keys(STROKE_SIZES)
+
+// Text & notes expose the same size style as a label font size, under friendlier names.
+const FONT_SIZES: Record<string, ScratchSize> = { regular: 'm', big: 'xl' }
+const FONT_SIZE_NAMES = Object.keys(FONT_SIZES)
+
+// Rectangle fills — the UI toolbar's four options. Each user-facing name maps onto a
+// tldraw DefaultFillStyle value (see ScratchFill for tldraw's semi/solid quirk). Keep
+// in sync with FILL_OPTIONS in client/components/Scratchpad.tsx.
+const FILL_STYLES: Record<string, ScratchFill> = {
+  none: 'none',
+  semi: 'solid',
+  pattern: 'pattern',
+  solid: 'fill'
+}
+const FILL_NAMES = Object.keys(FILL_STYLES)
 
 function hexToRgb(hex: string): [number, number, number] | null {
   let h = hex.trim().replace(/^#/, '')
@@ -961,6 +978,18 @@ function parseStroke(s: string): ScratchSize {
   return size
 }
 
+function parseFontSize(s: string): ScratchSize {
+  const size = FONT_SIZES[s.trim().toLowerCase()]
+  if (!size) throw new Error(`Unknown font size "${s}". Use one of: ${FONT_SIZE_NAMES.join(', ')}.`)
+  return size
+}
+
+function parseFill(s: string): ScratchFill {
+  const fill = FILL_STYLES[s.trim().toLowerCase()]
+  if (!fill) throw new Error(`Unknown fill "${s}". Use one of: ${FILL_NAMES.join(', ')}.`)
+  return fill
+}
+
 // Resize preset for `add image` — defaults to 'lo' (keep the canvas light).
 function parseImageQuality(s: string | undefined): ScratchImageQuality {
   if (!s) return 'lo'
@@ -969,7 +998,8 @@ function parseImageQuality(s: string | undefined): ScratchImageQuality {
   throw new Error(`Unknown quality "${s}". Use "lo" or "hi".`)
 }
 
-// Shared optional styling on every `add` command. Resolved into op props below.
+// Optional styling shared across `add` commands — each command wires in only the
+// controls its shape exposes (mirroring the UI's per-tool style bar).
 const colorArg = {
   type: 'string',
   description: `Color: ${COLOR_NAMES.join(', ')}, or any hex (snapped to nearest)`
@@ -978,15 +1008,29 @@ const strokeArg = {
   type: 'string',
   description: `Stroke weight: ${STROKE_NAMES.join(', ')}`
 } as const
+const fontSizeArg = {
+  type: 'string',
+  description: `Font size: ${FONT_SIZE_NAMES.join(', ')}`
+} as const
+const fillArg = {
+  type: 'string',
+  default: 'semi',
+  description: `Fill: ${FILL_NAMES.join(', ')} (default: semi)`
+} as const
 
-// Build the optional { color?, size? } props from raw --color/--stroke args.
-function styleArgs(args: { color?: string; stroke?: string }): {
-  color?: ScratchColor
-  size?: ScratchSize
-} {
+// Build the optional style props from raw args. `stroke` and `fontSize` are two names
+// for the same tldraw size style, so at most one is wired per command.
+function styleArgs(args: {
+  color?: string
+  stroke?: string
+  fontSize?: string
+  fill?: string
+}): ScratchStyle {
   return {
     ...(args.color ? { color: parseColor(args.color) } : {}),
-    ...(args.stroke ? { size: parseStroke(args.stroke) } : {})
+    ...(args.stroke ? { size: parseStroke(args.stroke) } : {}),
+    ...(args.fontSize ? { size: parseFontSize(args.fontSize) } : {}),
+    ...(args.fill ? { fill: parseFill(args.fill) } : {})
   }
 }
 
@@ -1124,7 +1168,7 @@ const scratchAddText = defineCommand({
     text: { type: 'string', required: true, description: 'Text content' },
     id: { type: 'string', description: 'Stable name to address this shape later' },
     color: colorArg,
-    stroke: strokeArg,
+    fontSize: fontSizeArg,
     dir: dirArg
   },
   run({ args }) {
@@ -1137,7 +1181,7 @@ const scratchAddText = defineCommand({
         x,
         y,
         text: args.text,
-        ...styleArgs({ color: args.color, stroke: args.stroke })
+        ...styleArgs({ color: args.color, fontSize: args.fontSize })
       },
       printAdded
     )
@@ -1152,7 +1196,8 @@ const scratchAddRect = defineCommand({
     text: { type: 'string', description: 'Optional label' },
     id: { type: 'string', description: 'Stable name to address this shape later' },
     color: colorArg,
-    stroke: strokeArg,
+    fill: fillArg,
+    fontSize: fontSizeArg,
     dir: dirArg
   },
   run({ args }) {
@@ -1168,7 +1213,7 @@ const scratchAddRect = defineCommand({
         w,
         h,
         ...(args.text ? { text: args.text } : {}),
-        ...styleArgs({ color: args.color, stroke: args.stroke })
+        ...styleArgs({ color: args.color, fill: args.fill, fontSize: args.fontSize })
       },
       printAdded
     )
@@ -1182,7 +1227,7 @@ const scratchAddNote = defineCommand({
     text: { type: 'string', required: true, description: 'Note content' },
     id: { type: 'string', description: 'Stable name to address this shape later' },
     color: colorArg,
-    stroke: strokeArg,
+    fontSize: fontSizeArg,
     dir: dirArg
   },
   run({ args }) {
@@ -1195,7 +1240,7 @@ const scratchAddNote = defineCommand({
         x,
         y,
         text: args.text,
-        ...styleArgs({ color: args.color, stroke: args.stroke })
+        ...styleArgs({ color: args.color, fontSize: args.fontSize })
       },
       printAdded
     )

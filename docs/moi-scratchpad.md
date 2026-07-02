@@ -45,9 +45,9 @@ that maps onto tldraw's own shape API — friendly to drive and stable against t
 internal schema:
 
 ```
-moi scratch add text   --at <x,y> --text "..."          [--id NAME] [--color C] [--stroke S]
-moi scratch add rect   --at <x,y> --size <w,h> [--text]  [--id NAME] [--color C] [--stroke S]
-moi scratch add note   --at <x,y> --text "..."           [--id NAME] [--color C] [--stroke S]
+moi scratch add text   --at <x,y> --text "..."          [--id NAME] [--color C] [--font-size S]
+moi scratch add rect   --at <x,y> --size <w,h> [--text]  [--id NAME] [--color C] [--fill F] [--font-size S]
+moi scratch add note   --at <x,y> --text "..."           [--id NAME] [--color C] [--font-size S]
 moi scratch add arrow  --from <id|x,y> --to <id|x,y>     [--id NAME] [--color C] [--stroke S] [--elbow]
 moi scratch add image  <path>                            [--at <x,y>] [--id NAME] [--quality lo|hi]
 moi scratch move   <id> --to <x,y>
@@ -63,10 +63,13 @@ moi scratch clear                           # wipe the whole canvas
   right-angle (squared) routing instead of the default curved arc.
 - `--color` takes one of the **six palette names the UI toolbar offers** — `black`, `red`,
   `yellow`, `green`, `blue`, `grey` — **or any hex** (e.g. `#4465e9`), which is snapped to the
-  nearest of those six (tldraw shapes only hold palette colors). `--stroke` is the weight,
-  `small` or `large`, mirroring the toolbar's two sizes. Omit either to keep tldraw's default.
-  The agent's options deliberately match what the user can pick by hand — neither surface can
-  make something the other can't.
+  nearest of those six (tldraw shapes only hold palette colors). The remaining style flags differ
+  per shape, mirroring that shape's toolbar controls: `--fill` (rect) is `none|semi|pattern|solid`
+  and defaults to `semi` (rects are always a rough hand-drawn outline, like the toolbar draws);
+  `--font-size` (text, note, and a rect's label) is `regular|big`; `--stroke` (arrow) is the line
+  weight, `small` or `large`. Omit the size/stroke flags to keep tldraw's default. The agent's
+  options deliberately match what the user can pick by hand — neither surface can make something
+  the other can't.
 - `add image <path>` embeds a local image file. The server **resizes it to fit the canvas** —
   `--quality lo` (default, long side ≤768px) or `hi` (≤2048px) — re-encoding to WebP so a 10MB
   paste never lands on the canvas whole. `lo` keeps the constantly-rewritten snapshot light and
@@ -75,7 +78,8 @@ moi scratch clear                           # wipe the whole canvas
 - `clear` deletes every shape on the canvas in one shot.
 - Coordinates are tldraw canvas space (origin top-left, y down).
 
-The set is deliberately small — text, rect, note, arrow (with color/stroke), plus
+The set is deliberately small — text, rect, note, arrow (with color plus each shape's
+fill/font-size/stroke), plus
 move/set/delete/clear. Enough to lay out a diagram or annotate the user's drawing; not a full
 tldraw API.
 

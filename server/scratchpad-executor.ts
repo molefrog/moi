@@ -54,11 +54,12 @@ function defaultProps(type: string): Record<string, unknown> {
   return { ...cached }
 }
 
-// Map an op's optional color/size onto tldraw shape props (omitted → tldraw default).
+// Map an op's optional color/size/fill onto tldraw shape props (omitted → tldraw default).
 function styleProps(style: ScratchStyle): Record<string, unknown> {
   return {
     ...(style.color ? { color: style.color } : {}),
-    ...(style.size ? { size: style.size } : {})
+    ...(style.size ? { size: style.size } : {}),
+    ...(style.fill ? { fill: style.fill } : {})
   }
 }
 

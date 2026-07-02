@@ -22,9 +22,9 @@ clean, agent-friendly view. Treat it exactly like `.moi/.workspace.json` — CLI
 ## Drawing
 
 ```
-moi scratch add text   --at <x,y> --text "..."           [--id NAME] [--color C] [--stroke W]
-moi scratch add rect   --at <x,y> --size <w,h> [--text]   [--id NAME] [--color C] [--stroke W]
-moi scratch add note   --at <x,y> --text "..."            [--id NAME] [--color C] [--stroke W]
+moi scratch add text   --at <x,y> --text "..."           [--id NAME] [--color C] [--font-size S]
+moi scratch add rect   --at <x,y> --size <w,h> [--text]   [--id NAME] [--color C] [--fill F] [--font-size S]
+moi scratch add note   --at <x,y> --text "..."            [--id NAME] [--color C] [--font-size S]
 moi scratch add arrow  --from <id|x,y> --to <id|x,y>      [--id NAME] [--color C] [--stroke W] [--elbow]
 moi scratch add image  <path>                             [--at <x,y>] [--id NAME] [--quality lo|hi]
 moi scratch move   <id> --to <x,y>
@@ -39,6 +39,19 @@ moi scratch clear
   they move. Endpoints can also be bare `x,y`. `--elbow` routes with right angles.
 - `add image` resizes to fit the canvas — `--quality lo` (default) or `hi` for more pixels — so a
   huge file never gets embedded whole.
-- `--color` is `black|red|yellow|green|blue|grey` or any hex (snapped to nearest); `--stroke` is
-  `small|large`. These match the UI toolbar — you can only make what the user can make by hand.
+- `--color` is `black|red|yellow|green|blue|grey` or any hex (snapped to nearest). The other style
+  flags mirror each shape's toolbar controls: `--fill` (rect) is `none|semi|pattern|solid`;
+  `--font-size` (text, note, and a rect's label) is `regular|big`; `--stroke` (arrow) is
+  `small|large`. You can only make what the user can make by hand.
+- `--fill` picks how a rectangle's interior is painted (the outline is always the full `--color`):
+  - `none` — transparent interior, just the colored outline. Reach for this to box/group other
+    shapes without hiding them, or when the rect is a frame.
+  - `semi` — a light, translucent wash of the color. Soft highlight; text and shapes underneath
+    still read through it.
+  - `pattern` — diagonal hatch lines in the color over a near-transparent interior. Reads as
+    "marked / selected / special" without going fully opaque.
+  - `solid` — fully opaque fill in the color (interior matches the outline). Use for solid blocks,
+    legend keys, or a label chip; anything behind it is hidden.
+  A rect's outline is always a rough (hand-drawn) stroke, matching what the toolbar draws. Default
+  fill is `semi`; pass `--fill none` for an outline-only box or `--fill solid` for an opaque block.
 - Coordinates are tldraw canvas space (origin top-left, y down).

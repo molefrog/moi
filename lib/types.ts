@@ -43,13 +43,23 @@ export type ScratchArrowEnd = { name: string } | ScratchPoint
 // free hex).
 export type ScratchColor = 'black' | 'grey' | 'blue' | 'green' | 'yellow' | 'red'
 
-// Stroke weight — the UI's two opinionated sizes (small, large), mapped onto
-// tldraw's DefaultSizeStyle. The CLI takes `small`/`large`; ops carry the tldraw value.
+// tldraw's DefaultSizeStyle, exposed under two friendlier CLI names for the two
+// shapes that use it: arrows take `--stroke small|large` (line weight), text &
+// notes take `--font-size regular|big` (label size). Both map onto the same
+// underlying tldraw size — `small`/`regular` → 'm', `large`/`big` → 'xl'.
 export type ScratchSize = 'm' | 'xl'
 
+// Fill style for rectangles — the UI toolbar's four options. The CLI takes
+// `none|semi|pattern|solid`; ops carry the tldraw DefaultFillStyle value. Note the
+// tldraw quirk (see defaultFills / FILL_OPTIONS in client/components/Scratchpad.tsx):
+// fill value 'solid' paints the lighter "semi" color, while 'fill' paints the true
+// solid (body === border). Keep the names in sync with that client list.
+export type ScratchFill = 'none' | 'solid' | 'pattern' | 'fill'
+
 // Optional styling carried by every add op. Omitted fields fall back to the
-// shape's tldraw default.
-export type ScratchStyle = { color?: ScratchColor; size?: ScratchSize }
+// shape's tldraw default. `size` is set from `--stroke` (arrows) or `--font-size`
+// (text/notes); `fill` from `--fill` (rectangles).
+export type ScratchStyle = { color?: ScratchColor; size?: ScratchSize; fill?: ScratchFill }
 
 // Resize preset for `add image`: 'lo' caps the long side smaller (default, keeps
 // the canvas light), 'hi' allows more pixels when detail matters.
