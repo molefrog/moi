@@ -1,6 +1,6 @@
 # Bug: `moi bundle` silently no-ops from the wrong directory
 
-**Status:** fixed 2026-06-21 · diagnosed 2026-06-19 (from the Faroe Lightroom workspace thread)
+**Status:** fixed 2026-06-21 · diagnosed 2026-06-19 (from a live workspace thread)
 **Severity:** high — agents/users "build" repeatedly while nothing rebuilds, and it
 scaffolds a junk nested `.moi/.moi/` directory.
 
@@ -9,12 +9,10 @@ scaffolds a junk nested `.moi/.moi/` directory.
 Editing a view/widget source (`.moi/views/<name>.tsx`) and running `moi bundle`
 produced **an empty result table and exit 0** — but nothing rebuilt and the UI never
 updated. It only worked once run from the workspace **root**, not from inside `.moi/`.
-Along the way it created `…/<workspace>/.moi/.moi/.build/` (still present in
-faroe-lightroom).
+Along the way it created `…/<workspace>/.moi/.moi/.build/`.
 
-Observed in session `398103a4` of `/Users/molefrog/git/faroe-lightroom` — ~6 `moi bundle`
-invocations from inside `.moi/`, all empty, before the agent discovered it must run from
-the workspace root.
+Observed in a real session — ~6 `moi bundle` invocations from inside `.moi/`, all empty,
+before the agent discovered it must run from the workspace root.
 
 ## Root cause
 

@@ -10,14 +10,14 @@ describe('columns', () => {
     const out = columns(
       ['kind', 'name', 'status'],
       [
-        ['widget', 'faroe-overview', 'built'],
+        ['widget', 'stats-overview', 'built'],
         ['view', 'insta', 'skipped']
       ]
     )
     expect(out).toBe(
       [
         '  kind    name            status',
-        '  widget  faroe-overview  built',
+        '  widget  stats-overview  built',
         '  view    insta           skipped'
       ].join('\n')
     )
