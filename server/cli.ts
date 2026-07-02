@@ -22,6 +22,7 @@ import { columns } from './cli-ui'
 import { CONTROL_PORT, PORT } from './constants'
 import { type OpenClawAgent, discoverOpenClawAgents } from './openclaw'
 import { liftToWorkspaceRoot, registerWorkspace } from './registry'
+import { serverCwd } from './server-cwd'
 import {
   type SkillStatus,
   isBehind,
@@ -85,20 +86,19 @@ async function openBrowser(url: string) {
   } catch {}
 }
 
-// Spawn the server as a child with cwd=projectRoot so bunfig.toml is found at Bun startup.
-// bunfig.toml is read before any JS runs, so process.chdir() is too late.
-// MOI_SERVER=1 tells the child it is the actual server process. No `--hot`:
-// frontend HMR comes from Bun.serve's dev bundler, and server reloads are a
-// full process restart driven by the dev supervisor (see runDevSupervisor).
+// Spawn the server as a child. MOI_SERVER=1 tells the child it is the actual
+// server process. No `--hot`: frontend HMR comes from Bun.serve's dev bundler,
+// and server reloads are a full process restart driven by the dev supervisor
+// (see runDevSupervisor).
 function spawnServer(
-  projectRoot: string,
+  cwd: string,
   env: Record<string, string | undefined> = process.env
 ): ReturnType<typeof Bun.spawn> {
   return Bun.spawn(['bun', import.meta.filename, 'start'], {
     stdin: 'inherit',
     stdout: 'inherit',
     stderr: 'inherit',
-    cwd: projectRoot,
+    cwd,
     env: { ...env, MOI_SERVER: '1' }
   })
 }
@@ -269,7 +269,7 @@ const init = defineCommand({
 
     if (!running && args.web) {
       console.log(pc.dim('  Starting server…'))
-      const proc = spawnServer(projectRoot)
+      const proc = spawnServer(serverCwd(projectRoot, false))
       running = await waitForServer()
       if (!running) {
         console.error(pc.red('  Server failed to start\n'))
@@ -350,12 +350,14 @@ const start = defineCommand({
         await runDevSupervisor(projectRoot, env)
         return
       }
-      const proc = spawnServer(projectRoot, env)
+      const proc = spawnServer(serverCwd(projectRoot, dev), env)
       await proc.exited
       process.exit(proc.exitCode ?? 0)
     }
 
-    // This IS the server process (MOI_SERVER=1, cwd=projectRoot, bunfig.toml loaded).
+    // This IS the server process (MOI_SERVER=1). cwd is the package root when the
+    // dev bundler runs (bunfig loaded at Bun startup) or a neutral dir for a
+    // prebuilt install — see serverCwd().
     await import('./web')
     console.log(`\n${pc.green('✓')} Server started on http://localhost:${PORT}`)
     console.log(pc.dim('  Press Ctrl+C to stop\n'))

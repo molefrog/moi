@@ -298,6 +298,18 @@ function appletRuntimePlugin(
         loader: 'js'
       }))
 
+      // `devalue` is moi's OWN dependency, injected into every applet bundle via
+      // the mei:rpc virtual module above. A virtual module has no on-disk
+      // location, so Bun resolves the bare `devalue` specifier against the
+      // process cwd's node_modules — which breaks when the server runs from a
+      // neutral cwd (a prebuilt/global install; see serverCwd in cli.ts). A
+      // resolveDir on the onLoad is ignored for bare specifiers in Bun 1.3, so
+      // pin it to an absolute path inside moi's OWN package (this file's dir
+      // walks up to moi's node_modules), making the applet build cwd-independent.
+      build.onResolve({ filter: /^devalue$/ }, () => ({
+        path: Bun.resolveSync('devalue', import.meta.dir)
+      }))
+
       // The `moi` runtime module (fileUrl). A bare specifier, so match it exactly.
       build.onResolve({ filter: /^moi$/ }, () => ({ path: 'moi', namespace: 'moi-runtime' }))
       build.onLoad({ filter: /.*/, namespace: 'moi-runtime' }, () => ({
