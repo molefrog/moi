@@ -9,7 +9,7 @@ import { type OpenClawAgent, discoverOpenClawAgents } from './openclaw'
 
 // Replace the home-dir prefix with `~` for display. Keeps the original
 // absolute path in place; callers should put the result in `displayPath`.
-function tildify(absPath: string): string {
+export function tildify(absPath: string): string {
   const home = homedir()
   if (!home) return absPath
   if (absPath === home) return '~'

@@ -185,7 +185,7 @@ function Sidebar({ collapsed, workspaces, logoEffect }: SidebarProps) {
         <div className={cn('flex items-center justify-between pl-2', collapsed && 'invisible')}>
           <span className="text-[13px] font-medium text-muted-foreground">Workspaces</span>
           <Link
-            href="/"
+            href="/workspace/create"
             aria-label="Add workspace"
             className="flex size-6 items-center justify-center rounded-[6px] border border-border bg-background text-foreground/60 hover:bg-muted hover:text-foreground"
           >

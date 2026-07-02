@@ -2,7 +2,6 @@
 import './cli-colors' // must precede citty: sets NO_COLOR before its color flag is computed
 import { defineCommand, runMain, showUsage } from 'citty'
 import { existsSync } from 'node:fs'
-import { mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'path'
 import pc from 'picocolors'
@@ -21,18 +20,18 @@ import type {
 
 import { columns } from './cli-ui'
 import { CONTROL_PORT, PORT } from './constants'
-import { scaffoldMoiDir } from './moi-scaffold'
 import { type OpenClawAgent, discoverOpenClawAgents } from './openclaw'
 import { liftToWorkspaceRoot, registerWorkspace } from './registry'
 import {
   type SkillStatus,
   isBehind,
   isMinorBehind,
-  resolveWorkspaceRoot,
+  resolveWorkspace,
   skillStatuses,
   staleSkillNotice
 } from './skill-version'
 import { installBundledSkills } from './skills-template'
+import { provisionWorkspace, skillsDirFor } from './workspace-init'
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -213,13 +212,28 @@ const init = defineCommand({
     const projectRoot = join(import.meta.dir, '..')
     const isInteractive = process.stdout.isTTY
 
-    await mkdir(target, { recursive: true })
-    await installBundledSkills(join(target, '.claude', 'skills'))
+    // Detect an OpenClaw agent workspace before provisioning: skills must land
+    // in `skills/` (not `.claude/skills/`) and the registry entry must carry
+    // the agent metadata — same as `moi openclaw init <agent>`. Discovery
+    // returns [] when the gateway is down, so this never blocks a plain init.
+    const agent = (await discoverOpenClawAgents()).find(a => a.path === target) ?? null
+    if (agent) {
+      console.log(
+        '\n' +
+          pc.yellow('◆') +
+          ' Detected an OpenClaw agent workspace ' +
+          pc.dim('(' + agent.agentId + (agent.name ? ', ' + agent.name : '') + ')') +
+          ' — initializing for OpenClaw.'
+      )
+    }
 
-    // Bootstrap the `.moi/` root (widgets dir + package.json + bun install)
-    // for a fresh workspace; an existing `.moi/` is left untouched.
+    // Provision: bundled skills + the `.moi/` bootstrap (widgets dir +
+    // package.json + bun install). An existing `.moi/` is left untouched.
     console.log()
-    const scaffold = await scaffoldMoiDir(target)
+    const { scaffold, skillsDir } = await provisionWorkspace(
+      target,
+      agent ? 'openclaw' : 'claude-code'
+    )
     if (scaffold !== 'exists') {
       console.log(pc.dim('  Installed widget dependencies in .moi/'))
       if (scaffold !== 0) {
@@ -228,10 +242,27 @@ const init = defineCommand({
     }
 
     // Always register the workspace in the persistent registry
-    const entry = await registerWorkspace(target)
+    const entry = await registerWorkspace(
+      target,
+      agent
+        ? {
+            type: 'openclaw',
+            name: agent.name,
+            agentId: agent.agentId,
+            isDefault: agent.isDefault,
+            lastRunAt: agent.lastRunAt
+          }
+        : { type: 'claude-code' }
+    )
 
     console.log(pc.green('✓') + ' Initialized ' + pc.bold(target))
-    console.log('  Skills installed — ask Claude to build a widget to get started\n')
+    console.log(
+      '  Skills installed to ' +
+        pc.dim(skillsDir) +
+        ' — ask ' +
+        (agent ? 'your agent' : 'Claude') +
+        ' to build a widget to get started\n'
+    )
 
     // If --web and server not running, start it (stay alive as wrapper)
     let running = await isServerRunning()
@@ -703,15 +734,12 @@ const openclawInit = defineCommand({
       process.exit(1)
     }
 
-    // Copy each shipped skill folder into <agent-workspace>/skills/<name>/.
-    // OpenClaw resolves <workspace>/skills with the highest precedence, so
-    // these win over any same-named bundled or per-user skill.
-    const skillsRoot = join(target.path, 'skills')
-    await installBundledSkills(skillsRoot)
-
-    // Same `.moi/` bootstrap as `moi init` — the widgets skill assumes the
-    // folder and its dependencies exist. Existing `.moi/` stays untouched.
-    const scaffold = await scaffoldMoiDir(target.path)
+    // Shared provisioning path with `moi init`: skills land in
+    // <agent-workspace>/skills/<name>/ (OpenClaw resolves <workspace>/skills
+    // with the highest precedence, so these win over any same-named bundled or
+    // per-user skill), plus the `.moi/` bootstrap — the widgets skill assumes
+    // the folder and its dependencies exist. Existing `.moi/` stays untouched.
+    const { scaffold, skillsDir: skillsRoot } = await provisionWorkspace(target.path, 'openclaw')
     if (scaffold !== 'exists') {
       console.log('\n' + pc.dim('  Installed widget dependencies in .moi/'))
       if (scaffold !== 0) {
@@ -1391,10 +1419,12 @@ const scratch = defineCommand({
 // filesystem op — no running server needed. Resolves the workspace root the
 // same way `moi bundle` does, so it works from `.moi/` or any subdirectory.
 async function runSkillUpdate(cwd: string): Promise<void> {
-  const root = await resolveWorkspaceRoot(cwd)
-  const before = await skillStatuses(root)
-  await installBundledSkills(join(root, '.claude', 'skills'))
-  const after = await skillStatuses(root)
+  // Type-aware: an OpenClaw workspace keeps its skills in `skills/`, so the
+  // update must target the same dir the agent actually loads from.
+  const { root, type } = await resolveWorkspace(cwd)
+  const before = await skillStatuses(root, type)
+  await installBundledSkills(skillsDirFor(root, type))
+  const after = await skillStatuses(root, type)
 
   console.log('\n' + pc.green('✓') + ' Skills updated in ' + pc.bold(root) + '\n')
   console.log(
@@ -1459,8 +1489,8 @@ const skill = defineCommand({
     const sub = rawArgs.find(a => !a.startsWith('-'))
     if (sub && sub in skillSubCommands) return
 
-    const root = await resolveWorkspaceRoot(resolve(args.dir))
-    const statuses = await skillStatuses(root)
+    const { root, type } = await resolveWorkspace(resolve(args.dir))
+    const statuses = await skillStatuses(root, type)
 
     console.log('\n' + pc.bold('moi skill') + pc.dim(' — workspace skills') + '\n')
     console.log(
