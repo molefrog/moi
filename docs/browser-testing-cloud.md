@@ -13,12 +13,12 @@ at `/opt/pw-browsers/chromium` is used instead.
 
 ```sh
 bun server/cli.ts init /tmp/test-ws     # register a scratch workspace
-bun run dev                             # port 3000 — use run_in_background,
+bun run dev                             # port 13337 — use run_in_background,
                                         # detached processes get reaped
 ```
 
-Workspace id: `curl -s http://127.0.0.1:3000/api/workspaces`. The chat lives
-at `http://127.0.0.1:3000/workspace/<id>`.
+Workspace id: `curl -s http://127.0.0.1:13337/api/workspaces`. The chat lives
+at `http://127.0.0.1:13337/workspace/<id>`.
 
 ## Playwright
 
@@ -30,7 +30,7 @@ import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs'
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
 const page = await browser.newPage()
-await page.goto('http://127.0.0.1:3000/workspace/<id>', { waitUntil: 'load' })
+await page.goto('http://127.0.0.1:13337/workspace/<id>', { waitUntil: 'load' })
 ```
 
 Wait for `load`, not `networkidle` — the app holds a WebSocket open.

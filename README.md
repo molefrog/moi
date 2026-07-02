@@ -45,7 +45,7 @@ moi init [dir] --web    # also start the server and open the browser
 Start the web server:
 
 ```sh
-moi start               # http://localhost:3000
+moi start               # http://localhost:13337
 moi start --port=4000   # custom port
 ```
 
@@ -63,7 +63,7 @@ moi openclaw init       # install moi skills into an OpenClaw agent workspace
 
 ```sh
 bun install
-bun run dev             # watch-and-restart dev server on port 3000
+bun run dev             # watch-and-restart dev server on port 13337
 ```
 
 `bun run dev` starts a supervisor that hot-reloads the frontend in place and

@@ -12,7 +12,7 @@ Client connects via WebSocket. Agent responses stream back and are broadcast to 
 
 ## Commands
 
-- `bun run dev` — Start the dev server on port 3000 (alias for `bun server/cli.ts start --dev`).
+- `bun run dev` — Start the dev server on port 13337 (alias for `bun server/cli.ts start --dev`).
 
 ### Dev mode
 
@@ -23,7 +23,7 @@ Client connects via WebSocket. Agent responses stream back and are broadcast to 
 
 Do **not** start the server with `bun --hot server/web.ts` or the old `moi start --dev` path: `bun --hot` soft-reloads server modules in place, which churns the dev bundler's chunk hashes and serves **stale frontend bundles** (the symptom: edits don't show up, browser keeps old code). The supervisor exists specifically to avoid this.
 
-Only one server runs at a time — it binds port 3000 (HTTP) and 13059 (control). To restart, kill the existing `bun run dev` process and start it again; a second instance fails on the control port.
+Only one server runs at a time — it binds port 13337 (HTTP) and 13059 (control). To restart, kill the existing `bun run dev` process and start it again; a second instance fails on the control port.
 
 ## Browser testing in cloud sandboxes
 

@@ -308,7 +308,7 @@ const start = defineCommand({
   args: {
     port: {
       type: 'string',
-      description: 'HTTP port to listen on (default: 3000)'
+      description: 'HTTP port to listen on (default: 13337)'
     }
   },
   async run({ args }) {
