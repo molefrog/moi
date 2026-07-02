@@ -7,8 +7,11 @@
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
+import type { WorkspaceType } from '@/lib/types'
+
 import { findWorkspaceForPath, liftToWorkspaceRoot, listWorkspaces } from './registry'
 import { BUNDLED_SKILLS_DIR } from './skills-template'
+import { skillsDirFor } from './workspace-init'
 
 export type SkillStatus = {
   name: string
@@ -90,25 +93,38 @@ export async function bundledSkillNames(): Promise<string[]> {
   }
 }
 
-// Per-skill installed-vs-bundled versions for a workspace root.
-export async function skillStatuses(workspaceRoot: string): Promise<SkillStatus[]> {
+// Per-skill installed-vs-bundled versions for a workspace root. `type` picks
+// the installed-skills location (OpenClaw keeps them in `skills/`, not
+// `.claude/skills/`) — pass the registry entry's type when known.
+export async function skillStatuses(
+  workspaceRoot: string,
+  type?: WorkspaceType
+): Promise<SkillStatus[]> {
   const names = await bundledSkillNames()
+  const skillsDir = skillsDirFor(workspaceRoot, type)
   return Promise.all(
     names.map(async name => ({
       name,
       bundled: await readSkillVersion(join(BUNDLED_SKILLS_DIR, name, 'SKILL.md')),
-      installed: await readSkillVersion(join(workspaceRoot, '.claude', 'skills', name, 'SKILL.md'))
+      installed: await readSkillVersion(join(skillsDir, name, 'SKILL.md'))
     }))
   )
 }
 
-// Resolve a path to its workspace root: the registered workspace that owns it,
-// else lifted out of any `.moi/`, else the path itself. Mirrors how `moi
-// bundle` resolves a target so `moi skill` works from the same places.
-export async function resolveWorkspaceRoot(cwd: string): Promise<string> {
+export type ResolvedWorkspace = { root: string; type?: WorkspaceType }
+
+// Resolve a path to its workspace root: the registered workspace that owns it
+// (carrying its backend type), else lifted out of any `.moi/`, else the path
+// itself. Mirrors how `moi bundle` resolves a target so `moi skill` works from
+// the same places.
+export async function resolveWorkspace(cwd: string): Promise<ResolvedWorkspace> {
   const ws = findWorkspaceForPath(await listWorkspaces(), cwd)
-  if (ws) return ws.path
-  return liftToWorkspaceRoot(cwd)
+  if (ws) return { root: ws.path, type: ws.type }
+  return { root: liftToWorkspaceRoot(cwd) }
+}
+
+export async function resolveWorkspaceRoot(cwd: string): Promise<string> {
+  return (await resolveWorkspace(cwd)).root
 }
 
 // One-line, agent-facing notice when any installed skill is a minor+ behind the
@@ -117,8 +133,10 @@ export async function resolveWorkspaceRoot(cwd: string): Promise<string> {
 // version checks must not break the command they ride on.
 export async function staleSkillNotice(cwd: string): Promise<string | null> {
   try {
-    const root = await resolveWorkspaceRoot(cwd)
-    const stale = (await skillStatuses(root)).filter(s => isMinorBehind(s.installed, s.bundled))
+    const { root, type } = await resolveWorkspace(cwd)
+    const stale = (await skillStatuses(root, type)).filter(s =>
+      isMinorBehind(s.installed, s.bundled)
+    )
     if (stale.length === 0) return null
     const parts = stale.map(s => `${s.name} (${s.installed ?? 'none'} → ${s.bundled})`)
     return `⚠ moi skill outdated: ${parts.join(', ')} — run \`moi skill update\` to refresh.`

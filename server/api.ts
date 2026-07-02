@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { serveStatic } from 'hono/bun'
 import { createMiddleware } from 'hono/factory'
-import { basename } from 'node:path'
+import { existsSync } from 'node:fs'
+import { basename, join, resolve } from 'node:path'
 
 import type {
   EnvScope,
@@ -27,7 +28,8 @@ import {
   getWorkspace,
   listWorkspaces,
   registerWorkspace,
-  removeWorkspace
+  removeWorkspace,
+  tildify
 } from './registry'
 import { loadScratchpadDoc, saveScratchpadDoc } from './scratchpad'
 import { DIST_DIR, prebuilt } from './static'
@@ -39,6 +41,11 @@ import { MAX_UPLOAD_BYTES, addUpload, getUpload } from './uploads'
 import { collectViewRequiredEnv, listViews, serveView } from './views'
 import { collectRequiredEnv, listWidgets, serveWidget } from './widgets'
 import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
+import {
+  CREATED_WORKSPACES_ROOT,
+  provisionWorkspace,
+  validateWorkspaceFolderName
+} from './workspace-init'
 import {
   getWorkspaceEnvView,
   isValidEnvKey,
@@ -500,7 +507,17 @@ workspaces.post('/', async c => {
   if (!body?.path) return c.text('Missing path', 400)
   const rawType = body?.type
   const type = rawType === 'claude-code' || rawType === 'openclaw' ? rawType : undefined
-  const entry = await registerWorkspace(String(body.path), {
+  const path = resolve(String(body.path))
+  // Importing IS initializing: lay down the bundled skills (in the backend's
+  // skills dir) and the `.moi/` scaffold, exactly like `moi init` — a workspace
+  // added from the UI must be indistinguishable from one added via the CLI.
+  try {
+    await provisionWorkspace(path, type)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return c.text(`Could not initialize workspace: ${message}`, 500)
+  }
+  const entry = await registerWorkspace(path, {
     type,
     name: typeof body?.name === 'string' ? body.name : undefined,
     agentId: typeof body?.agentId === 'string' ? body.agentId : undefined,
@@ -511,6 +528,38 @@ workspaces.post('/', async c => {
 })
 
 workspaces.get('/discover', async c => c.json(await discoverWorkspaces()))
+
+// Where `/workspace/create` places new folders — the client shows the resolved
+// location while the user types a name.
+workspaces.get('/create', c =>
+  c.json({ root: CREATED_WORKSPACES_ROOT, displayRoot: tildify(CREATED_WORKSPACES_ROOT) })
+)
+
+// Create a brand-new workspace: a fresh folder under CREATED_WORKSPACES_ROOT,
+// provisioned (skills + `.moi/` scaffold) and registered. Claude Code only for
+// now — OpenClaw workspaces belong to their agents and arrive via discovery.
+workspaces.post('/create', async c => {
+  const body = await c.req.json()
+  const type = body?.type ?? 'claude-code'
+  if (type !== 'claude-code') {
+    return c.text('Only Claude Code workspaces can be created for now', 400)
+  }
+  const name = typeof body?.name === 'string' ? body.name.trim() : ''
+  const invalid = validateWorkspaceFolderName(name)
+  if (invalid) return c.text(invalid, 400)
+  const path = join(CREATED_WORKSPACES_ROOT, name)
+  if (existsSync(path)) return c.text('A folder with that name already exists', 409)
+  try {
+    await provisionWorkspace(path, 'claude-code')
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return c.text(`Could not create workspace: ${message}`, 500)
+  }
+  const entry = await registerWorkspace(path, { type: 'claude-code' })
+  // Nudge every connected client (the sidebar list) to refetch.
+  publishEvent({ type: 'workspace:updated' })
+  return c.json(entry, 201)
+})
 
 // `/:id` is registered after the static `/discover` so the literal path wins.
 // `/api/workspaces/ws` (the live-event WebSocket) is intercepted by Bun's routes

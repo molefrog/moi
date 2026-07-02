@@ -34,6 +34,7 @@ export type WorkspaceLayoutResponse = WorkspaceLayout & {
 export const workspaceKeys = {
   all: ['workspaces'] as const,
   discover: ['workspaces', 'discover'] as const,
+  createInfo: ['workspaces', 'create-info'] as const,
   preview: (id: string) => ['workspaces', 'preview', id] as const,
   layout: (id: string) => ['workspaces', 'layout', id] as const,
   widgets: (id: string) => ['workspaces', 'widgets', id] as const,
@@ -356,6 +357,9 @@ export function useAddWorkspace() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(discovered)
       })
+      // The server provisions (skills + `.moi/`) before registering, so a
+      // failure comes back as a plain-text error, not an entry.
+      if (!res.ok) throw new Error(await res.text())
       return res.json()
     },
     onSuccess: (entry, suggestion) => {
@@ -363,6 +367,46 @@ export function useAddWorkspace() {
       qc.setQueryData<DiscoveredWorkspace[]>(workspaceKeys.discover, prev =>
         (prev ?? []).filter(s => s.path !== suggestion.path)
       )
+    }
+  })
+}
+
+// Where `/workspace/create` places new folders on disk. `displayRoot` is the
+// home-relative form (e.g. "~/moi") shown in the create form.
+export type CreateWorkspaceInfo = {
+  root: string
+  displayRoot: string
+}
+
+export function useCreateWorkspaceInfo() {
+  return useQuery<CreateWorkspaceInfo>({
+    queryKey: workspaceKeys.createInfo,
+    queryFn: () => fetch('/api/workspaces/create').then(r => r.json()),
+    staleTime: Infinity
+  })
+}
+
+export type CreateWorkspaceInput = {
+  name: string
+  type: WorkspaceType
+}
+
+// Create a brand-new workspace folder (server provisions skills + `.moi/` and
+// registers it). Non-2xx responses carry a user-facing message in the body.
+export function useCreateWorkspace() {
+  const qc = useQueryClient()
+  return useMutation<WorkspaceEntry, Error, CreateWorkspaceInput>({
+    mutationFn: async input => {
+      const res = await fetch('/api/workspaces/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input)
+      })
+      if (!res.ok) throw new Error(await res.text())
+      return res.json()
+    },
+    onSuccess: entry => {
+      qc.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, prev => [...(prev ?? []), entry])
     }
   })
 }

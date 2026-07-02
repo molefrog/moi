@@ -8,6 +8,7 @@ import { HomePage } from './HomePage'
 import { PlaygroundPage } from './playground/PlaygroundPage'
 import { ToolCallsPage } from './playground/ToolCallsPage'
 import { WorkspaceRoute } from './routes/workspace/[id]'
+import { CreateWorkspacePage } from './routes/workspace/create'
 
 // Top-level router — sets up all client-side routes
 export function AppRouter() {
@@ -25,6 +26,9 @@ export function AppRouter() {
       <Route path="/" component={HomePage} />
       <Route path="/playground/tool-calls" component={ToolCallsPage} />
       <Route path="/playground" component={PlaygroundPage} />
+      {/* Must precede `/workspace/:id` — the Switch matches in order, so the
+          literal route wins over the id pattern. */}
+      <Route path="/workspace/create" component={CreateWorkspacePage} />
       <Route path="/workspace/:id">
         {/* Key by id so switching workspaces mounts a fresh subtree — the
             per-workspace chat store (and its websocket) tears down and resets
