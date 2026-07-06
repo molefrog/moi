@@ -386,11 +386,6 @@ export type WorkspacePreview = {
   items: { x: number; y: number; w: number; h: number }[]
 }
 
-// Where a custom secret is allowed to flow: the widget function workers, the
-// agent's Bash, or both. Lets a key meant for a widget stay out of the agent's
-// (bypass-permissions) environment, and vice versa.
-export type EnvScope = 'widgets' | 'agent' | 'both'
-
 // One effective env var, as surfaced by GET /api/workspaces/:id/env. Values are
 // NEVER returned — the API masks both `.env` and custom secrets, so editing is
 // write-only. Presence in the list (with `source`) is all the UI needs.
@@ -399,8 +394,6 @@ export type WorkspaceEnvVar = {
   // `dotenv`: only from a `.env` file. `custom`: only a UI-managed secret.
   // `both`: a custom secret shadowing a `.env` value (custom wins).
   source: 'dotenv' | 'custom' | 'both'
-  // Sink scope — present for custom/both (UI-managed) keys.
-  scope?: EnvScope
   // The `.env` files that declare this key (when dotenv-sourced).
   files?: string[]
 }

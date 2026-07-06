@@ -4,23 +4,22 @@
 // Two sources feed a workspace's effective env:
 //   1. Discovered `.env` files in the workspace root (`.env`, then `.env.local`,
 //      local winning). Parsed with node:util's built-in `parseEnv` — no dep.
-//      `.env` flows to BOTH sinks (it's the workspace's own file).
 //   2. UI-managed custom secrets. These never touch the repo. Secret VALUES are
 //      stored via the OS keychain (`Bun.secrets`) when available, else a 0600
-//      file fallback — see SecretStore. Each custom key has a sink scope
-//      (widgets / agent / both) so a secret can be kept out of the agent's
-//      bypass-permissions Bash. Custom wins over `.env`.
+//      file fallback — see SecretStore. Custom wins over `.env`.
 //
-// Non-secret metadata (the `inheritDotenv` mode flag + per-key scopes, which
-// double as the key-name list for the UI) lives in a small JSON file in the OS
-// data dir. Secret values live in the SecretStore. The two are keyed by the
-// absolute workspace path.
+// There is ONE effective env per workspace — every key flows to every sink
+// (widgets, agent, `moi env exec`).
+//
+// Non-secret metadata (the `inheritDotenv` mode flag) lives in a small JSON
+// file in the OS data dir. Secret values live in the SecretStore. The two are
+// keyed by the absolute workspace path.
 import envPaths from 'env-paths'
 import { chmod, mkdir, rename } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { parseEnv } from 'node:util'
 
-import type { EnvScope, WorkspaceEnvView } from '@/lib/types'
+import type { WorkspaceEnvView } from '@/lib/types'
 
 // Dotenv files scanned in the workspace root, low → high precedence. A later
 // file's keys override an earlier file's (base `.env`, machine-local `.env.local`).
@@ -28,19 +27,10 @@ const DOTENV_FILES = ['.env', '.env.local'] as const
 
 // Valid POSIX-ish env var name. Used to reject junk keys from the API.
 const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/
-const SCOPES: readonly EnvScope[] = ['widgets', 'agent', 'both']
 
 export function isValidEnvKey(key: string): boolean {
   return ENV_KEY_RE.test(key)
 }
-
-export function isValidScope(scope: unknown): scope is EnvScope {
-  return typeof scope === 'string' && (SCOPES as readonly string[]).includes(scope)
-}
-
-// Where a key may flow, given its sink. `agent`/`widgets` only match their own
-// sink; `both` matches either.
-type Sink = 'widgets' | 'agent'
 
 const DATA_DIR = envPaths('moi', { suffix: false }).data
 const DEFAULT_META_PATH = join(DATA_DIR, 'workspace-env.json')
@@ -204,13 +194,22 @@ export function setSecretStoreBackend(backend: 'auto' | 'file' | 'keychain') {
 async function createSecretStore(): Promise<SecretStore> {
   if (_backend === 'file') return new FileSecretStore()
   if (_backend === 'keychain') return new KeychainSecretStore()
+  // Out-of-process override (tests spawning the CLI, headless setups): pin the
+  // file backend so a subprocess can never write to the real OS keychain.
+  if (process.env.MOI_SECRET_BACKEND === 'file') return new FileSecretStore()
+  // Announce the backend only in the server process (MOI_SERVER=1) — every CLI
+  // invocation re-probes, and `moi env` already reports the backend in its
+  // output, so logging here would just be per-command noise for the agent.
+  const announce = process.env.MOI_SERVER === '1'
   if (await keychainAvailable()) {
-    console.log('[env] workspace secrets: OS keychain')
+    if (announce) console.log('[env] workspace secrets: OS keychain')
     return new KeychainSecretStore()
   }
-  console.warn(
-    `[env] OS keychain unavailable — storing workspace secrets in ${_secretFilePath} (0600).`
-  )
+  if (announce) {
+    console.warn(
+      `[env] OS keychain unavailable — storing workspace secrets in ${_secretFilePath} (0600).`
+    )
+  }
   return new FileSecretStore()
 }
 
@@ -220,30 +219,24 @@ function secretStore(): Promise<SecretStore> {
 }
 
 // ---------------------------------------------------------------------------
-// Metadata: inheritDotenv + per-key scopes (NOT secret)
+// Metadata: inheritDotenv (NOT secret)
 // ---------------------------------------------------------------------------
 
-type EnvMeta = { inheritDotenv: boolean; scopes: Record<string, EnvScope> }
+// Older versions stored a per-key `scopes` map here too; stale entries in the
+// file are simply ignored (and dropped on the next write).
+type EnvMeta = { inheritDotenv: boolean }
 type MetaStore = Record<string, EnvMeta>
 
 async function getMeta(workspacePath: string): Promise<EnvMeta> {
   const e = (await readJsonObjectFile<MetaStore>(_metaPath))[resolve(workspacePath)]
-  if (!e || typeof e !== 'object') return { inheritDotenv: true, scopes: {} }
-  return {
-    inheritDotenv: e.inheritDotenv !== false,
-    scopes: e.scopes && typeof e.scopes === 'object' ? e.scopes : {}
-  }
+  if (!e || typeof e !== 'object') return { inheritDotenv: true }
+  return { inheritDotenv: e.inheritDotenv !== false }
 }
 
 async function writeMeta(workspacePath: string, meta: EnvMeta): Promise<void> {
   const store = await readJsonObjectFile<MetaStore>(_metaPath)
   store[resolve(workspacePath)] = meta
   await writeJsonAtomic(_metaPath, store)
-}
-
-// The scope of a custom key, defaulting to 'both' when unset.
-function scopeOf(meta: EnvMeta, key: string): EnvScope {
-  return meta.scopes[key] ?? 'both'
 }
 
 // ---------------------------------------------------------------------------
@@ -303,21 +296,12 @@ async function loadWorkspaceEnvState(workspacePath: string): Promise<WorkspaceEn
 // Public API
 // ---------------------------------------------------------------------------
 
-// The effective env for one sink: discovered `.env` (when inherited) overlaid
-// with the custom secrets scoped to that sink. Injected at spawn — env is frozen
-// once the process starts, so changes require a restart (see functions.ts /
-// cc-session.ts).
-export async function resolveWorkspaceEnv(
-  workspacePath: string,
-  sink: Sink
-): Promise<Record<string, string>> {
-  const { meta, secrets, dotenv } = await loadWorkspaceEnvState(workspacePath)
-  const scoped: Record<string, string> = {}
-  for (const [k, v] of Object.entries(secrets)) {
-    const scope = scopeOf(meta, k)
-    if (scope === 'both' || scope === sink) scoped[k] = v
-  }
-  return { ...dotenv, ...scoped }
+// The effective env: discovered `.env` (when inherited) overlaid with the
+// custom secrets. Injected at spawn — env is frozen once the process starts,
+// so changes require a restart (see functions.ts / cc-session.ts).
+export async function resolveWorkspaceEnv(workspacePath: string): Promise<Record<string, string>> {
+  const { secrets, dotenv } = await loadWorkspaceEnvState(workspacePath)
+  return { ...dotenv, ...secrets }
 }
 
 export type EnvUpdate = {
@@ -325,8 +309,6 @@ export type EnvUpdate = {
   set?: Record<string, string>
   // Delete these custom keys.
   remove?: string[]
-  // Set the sink scope for existing custom keys.
-  scopes?: Record<string, EnvScope>
   // Toggle whether `.env` files feed the workspace.
   inheritDotenv?: boolean
 }
@@ -350,23 +332,15 @@ export function updateWorkspaceEnv(workspacePath: string, patch: EnvUpdate): Pro
     await store.set(workspacePath, secrets)
 
     const meta = await getMeta(workspacePath)
-    const scopes: Record<string, EnvScope> = {}
-    // Keep a scope for every current secret key (default 'both'); drop the rest.
-    for (const k of Object.keys(secrets)) scopes[k] = scopeOf(meta, k)
-    if (patch.scopes) {
-      for (const [k, s] of Object.entries(patch.scopes)) {
-        if (k in scopes && isValidScope(s)) scopes[k] = s
-      }
-    }
     const inheritDotenv =
       typeof patch.inheritDotenv === 'boolean' ? patch.inheritDotenv : meta.inheritDotenv
-    await writeMeta(workspacePath, { inheritDotenv, scopes })
+    await writeMeta(workspacePath, { inheritDotenv })
   })
 }
 
-// The env view for the settings UI: every effective key with its source +
-// scope, the discovered files (key counts only — values masked), the mode flag,
-// the secret backend, and declared-required keys with a satisfied flag.
+// The env view for the settings UI and `moi env`: every effective key with its
+// source, the discovered files (key counts only — values masked), the mode
+// flag, the secret backend, and declared-required keys with a satisfied flag.
 // `required` maps a key to the widgets that declared it (collected by caller).
 export async function getWorkspaceEnvView(
   workspacePath: string,
@@ -382,20 +356,14 @@ export async function getWorkspaceEnvView(
     return {
       key,
       source,
-      ...(inCustom ? { scope: scopeOf(meta, key) } : {}),
       ...(fromDotenv ? { files: files.filter(f => key in f.vars).map(f => f.file) } : {})
     }
   })
 
-  // A widget-declared required key is "satisfied" when it's visible to widgets:
-  // a `.env` value (if inherited) or a custom key scoped widgets/both.
-  const widgetVisible = new Set(Object.keys(dotenv))
-  for (const k of Object.keys(secrets)) {
-    if (scopeOf(meta, k) !== 'agent') widgetVisible.add(k)
-  }
+  // A declared-required key is "satisfied" when it's in the effective env.
   const requiredView = Object.entries(required)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, widgets]) => ({ key, satisfied: widgetVisible.has(key), widgets }))
+    .map(([key, widgets]) => ({ key, satisfied: keys.has(key), widgets }))
 
   return {
     vars,

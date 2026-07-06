@@ -165,7 +165,7 @@ export async function callFunction(
   // up current .env + custom overrides. Env is fixed at spawn — an already-warm
   // worker keeps its snapshot until restartWorker() reaps it. Widgets only see
   // secrets scoped to the 'widgets' sink.
-  const workspaceEnv = await resolveWorkspaceEnv(workspacePath, 'widgets')
+  const workspaceEnv = await resolveWorkspaceEnv(workspacePath)
   const slot = getOrSpawn(workspacePath, workspaceEnv)
   await slot.readyPromise
 

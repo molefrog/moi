@@ -18,8 +18,16 @@ import type {
   ScratchStyle
 } from '@/lib/types'
 
+import {
+  execWithEnv,
+  notifyEnvChanged,
+  readSecretValue,
+  renderEnvView,
+  resolveCwdWorkspace
+} from './cli-env'
 import { columns } from './cli-ui'
 import { CONTROL_PORT, PORT } from './constants'
+import { requiredEnvFor } from './required-env'
 import { type OpenClawAgent, discoverOpenClawAgents } from './openclaw'
 import { liftToWorkspaceRoot, registerWorkspace } from './registry'
 import { serverCwd } from './server-cwd'
@@ -32,6 +40,7 @@ import {
   staleSkillNotice
 } from './skill-version'
 import { installBundledSkills } from './skills-template'
+import { getWorkspaceEnvView, isValidEnvKey, updateWorkspaceEnv } from './workspace-env'
 import { provisionWorkspace, skillsDirFor } from './workspace-init'
 
 // ---- helpers ----------------------------------------------------------------
@@ -661,6 +670,131 @@ const status = defineCommand({
     })
 
     if (notice) console.log(pc.yellow(notice) + '\n')
+    process.exit(0)
+  }
+})
+
+// ---- env subcommands --------------------------------------------------------
+
+const envSet = defineCommand({
+  meta: {
+    name: 'set',
+    description:
+      'Set a custom secret: `moi env set KEY=value`, or `moi env set KEY` to read the value from stdin'
+  },
+  args: {
+    key: {
+      type: 'positional',
+      required: true,
+      description: 'KEY=value, or a bare KEY to read the value from stdin'
+    }
+  },
+  async run({ args }) {
+    const entry = await resolveCwdWorkspace()
+    const raw = String(args.key)
+    const eq = raw.indexOf('=')
+    const key = eq === -1 ? raw : raw.slice(0, eq)
+    if (!isValidEnvKey(key)) {
+      console.error('\n' + pc.red('✗') + ` Invalid env key: ${key}\n`)
+      process.exit(1)
+    }
+    let value: string
+    if (eq === -1) {
+      try {
+        value = await readSecretValue(key)
+      } catch {
+        // Ctrl-C at the hidden prompt.
+        process.exit(1)
+      }
+    } else {
+      value = raw.slice(eq + 1)
+    }
+    await updateWorkspaceEnv(entry.path, { set: { [key]: value } })
+    await notifyEnvChanged(entry.path)
+    console.log(pc.green('✓') + ` Set ${pc.bold(key)} ${pc.dim('(custom)')}`)
+    process.exit(0)
+  }
+})
+
+const envUnset = defineCommand({
+  meta: { name: 'unset', description: 'Remove custom secrets: `moi env unset KEY [KEY...]`' },
+  args: {
+    key: { type: 'positional', required: true, description: 'Key(s) to remove' }
+  },
+  async run({ args }) {
+    const entry = await resolveCwdWorkspace()
+    const view = await getWorkspaceEnvView(entry.path)
+    const byKey = new Map(view.vars.map(v => [v.key, v]))
+
+    // Only custom secrets are removable; a dotenv-sourced key lives in its file.
+    const removable: string[] = []
+    let hadError = false
+    for (const key of args._) {
+      const v = byKey.get(key)
+      if (!v) {
+        console.warn(pc.yellow('!') + ` ${key} is not set — skipping`)
+        continue
+      }
+      if (v.source === 'dotenv') {
+        console.error(
+          pc.red('✗') +
+            ` ${key} comes from ${(v.files ?? []).join(', ')} — edit that file instead` +
+            pc.dim(' (moi env unset only removes custom secrets)')
+        )
+        hadError = true
+        continue
+      }
+      removable.push(key)
+    }
+
+    if (removable.length > 0) {
+      await updateWorkspaceEnv(entry.path, { remove: removable })
+      await notifyEnvChanged(entry.path)
+      for (const key of removable) {
+        const v = byKey.get(key)
+        const unshadow =
+          v?.source === 'both' ? pc.dim(` (falls back to ${(v.files ?? []).join(', ')})`) : ''
+        console.log(pc.green('✓') + ` Removed ${pc.bold(key)}${unshadow}`)
+      }
+    }
+    process.exit(hadError ? 1 : 0)
+  }
+})
+
+const envExec = defineCommand({
+  meta: {
+    name: 'exec',
+    description: 'Run a command with the workspace env: `moi env exec -- <cmd> [args...]`'
+  },
+  async run({ rawArgs }) {
+    // Everything after `--` is the child command, untouched by flag parsing.
+    const sep = rawArgs.indexOf('--')
+    const cmd = sep === -1 ? [] : rawArgs.slice(sep + 1)
+    if (cmd.length === 0) {
+      console.error('\n' + pc.red('✗') + ' Usage: moi env exec -- <cmd> [args...]\n')
+      process.exit(1)
+    }
+    const entry = await resolveCwdWorkspace()
+    process.exit(await execWithEnv(entry.path, cmd))
+  }
+})
+
+const envSubCommands = { set: envSet, unset: envUnset, exec: envExec }
+
+const env = defineCommand({
+  meta: {
+    name: 'env',
+    description: 'Show the workspace env (key names only — never values)'
+  },
+  subCommands: envSubCommands,
+  async run({ rawArgs }) {
+    // citty invokes the parent run even after dispatching a subcommand — only
+    // render the table when no subcommand ran.
+    const first = rawArgs.find(a => !a.startsWith('-'))
+    if (first && first in envSubCommands) return
+    const entry = await resolveCwdWorkspace()
+    const view = await getWorkspaceEnvView(entry.path, await requiredEnvFor(entry.path))
+    console.log('\n' + renderEnvView(entry, view) + '\n')
     process.exit(0)
   }
 })
@@ -1549,6 +1683,7 @@ const main = defineCommand({
     refresh,
     theme,
     config,
+    env,
     status,
     openclaw,
     scratch,

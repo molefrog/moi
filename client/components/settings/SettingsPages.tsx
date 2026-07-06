@@ -1,21 +1,21 @@
 import { type ReactNode, useState } from 'react'
 
-import { IconChevronDown, IconLoader2, IconPlus, IconTrash } from '@tabler/icons-react'
+import { IconLoader2, IconPlus, IconTrash } from '@tabler/icons-react'
+import { useQueryClient } from '@tanstack/react-query'
 
-import { useUpdateEnv, useSaveWorkspaceName, useWorkspaceEnv } from '@/client/api/workspaces'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger
-} from '@/client/components/ui/dropdown-menu'
+  useUpdateEnv,
+  useSaveWorkspaceName,
+  useWorkspaceEnv,
+  workspaceKeys
+} from '@/client/api/workspaces'
+import { useMeiEvent } from '@/client/hooks/useMeiEvents'
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
 import { Switch } from '@/client/components/ui/switch'
 import { useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
-import type { EnvScope, WorkspaceEnvVar } from '@/lib/types'
+import type { WorkspaceEnvVar } from '@/lib/types'
 
 import { IconPicker } from './IconPicker'
 
@@ -123,12 +123,6 @@ export function GeneralSettings() {
 
 // ── Environment ─────────────────────────────────────────────────────────────
 
-const SCOPE_LABEL: Record<EnvScope, string> = {
-  widgets: 'Widgets',
-  agent: 'Agent',
-  both: 'Both'
-}
-
 // Source badge copy: where the key actually comes from.
 const SOURCE_LABEL: Record<WorkspaceEnvVar['source'], string> = {
   dotenv: '.env',
@@ -138,43 +132,22 @@ const SOURCE_LABEL: Record<WorkspaceEnvVar['source'], string> = {
 
 const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/
 
-type ScopeSelectProps = {
-  value: EnvScope
-  onChange: (scope: EnvScope) => void
-}
-
-function ScopeSelect({ value, onChange }: ScopeSelectProps) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button variant="outline" size="sm" className="h-7 gap-1 px-2 font-normal">
-            {SCOPE_LABEL[value]}
-            <IconChevronDown stroke={1.75} className="text-muted-foreground" />
-          </Button>
-        }
-      />
-      <DropdownMenuContent align="end" className="w-32">
-        <DropdownMenuRadioGroup value={value} onValueChange={v => onChange(v as EnvScope)}>
-          {(Object.keys(SCOPE_LABEL) as EnvScope[]).map(scope => (
-            <DropdownMenuRadioItem key={scope} value={scope}>
-              {SCOPE_LABEL[scope]}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
 export function EnvironmentSettings() {
   const { workspaceId } = useWorkspaceLayoutCtx()
   const env = useWorkspaceEnv(workspaceId)
   const update = useUpdateEnv(workspaceId)
+  const qc = useQueryClient()
+
+  // `moi env set`/`unset` writes land outside the UI — the server broadcasts
+  // `env:updated`, and we refetch so the list reflects the CLI change.
+  useMeiEvent(e => {
+    if (e.type === 'env:updated' && e.workspaceId === workspaceId) {
+      qc.invalidateQueries({ queryKey: workspaceKeys.env(workspaceId) })
+    }
+  })
 
   const [draftKey, setDraftKey] = useState('')
   const [draftValue, setDraftValue] = useState('')
-  const [draftScope, setDraftScope] = useState<EnvScope>('both')
 
   const keyValid = ENV_KEY_RE.test(draftKey)
   const canAdd = keyValid && draftValue.length > 0 && !update.isPending
@@ -182,12 +155,11 @@ export function EnvironmentSettings() {
   const addVar = () => {
     if (!canAdd) return
     update.mutate(
-      { set: { [draftKey]: draftValue }, scopes: { [draftKey]: draftScope } },
+      { set: { [draftKey]: draftValue } },
       {
         onSuccess: () => {
           setDraftKey('')
           setDraftValue('')
-          setDraftScope('both')
         }
       }
     )
@@ -230,15 +202,8 @@ export function EnvironmentSettings() {
                 >
                   {SOURCE_LABEL[v.source]}
                 </span>
-                {editable ? (
-                  <ScopeSelect
-                    value={v.scope ?? 'both'}
-                    onChange={scope => update.mutate({ scopes: { [v.key]: scope } })}
-                  />
-                ) : (
-                  <span className="w-[60px] text-right text-[11px] text-muted-foreground/60">
-                    from file
-                  </span>
+                {!editable && (
+                  <span className="text-right text-[11px] text-muted-foreground/60">from file</span>
                 )}
                 <button
                   type="button"
@@ -273,7 +238,6 @@ export function EnvironmentSettings() {
             placeholder="value"
             className="h-7 flex-1 text-xs"
           />
-          <ScopeSelect value={draftScope} onChange={setDraftScope} />
           <Button variant="outline" size="sm" className="h-7" onClick={addVar} disabled={!canAdd}>
             {update.isPending ? (
               <IconLoader2 className="animate-spin" />

@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { applyEvents } from '@/lib/format'
 import type {
   DiscoveredWorkspace,
-  EnvScope,
   McpServer,
   SessionInfo,
   StreamEvent,
@@ -242,7 +241,7 @@ export function useSaveLayout(workspaceId: string) {
   })
 }
 
-// A workspace's effective env view (masked values + scopes + discovered `.env`).
+// A workspace's effective env view (masked values + discovered `.env`).
 export function useWorkspaceEnv(workspaceId: string) {
   return useQuery<WorkspaceEnvView>({
     queryKey: workspaceKeys.env(workspaceId),
@@ -251,12 +250,11 @@ export function useWorkspaceEnv(workspaceId: string) {
   })
 }
 
-// Patch of a workspace's env: set/remove custom secrets, change scopes, or
-// toggle `.env` inheritance. The PUT returns the fresh view (see useUpdateEnv).
+// Patch of a workspace's env: set/remove custom secrets, or toggle `.env`
+// inheritance. The PUT returns the fresh view (see useUpdateEnv).
 export type EnvPatch = {
   set?: Record<string, string>
   remove?: string[]
-  scopes?: Record<string, EnvScope>
   inheritDotenv?: boolean
 }
 

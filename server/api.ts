@@ -4,13 +4,7 @@ import { createMiddleware } from 'hono/factory'
 import { existsSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 
-import type {
-  EnvScope,
-  UploadInfo,
-  WorkspaceEntry,
-  WorkspaceModels,
-  WorkspaceType
-} from '@/lib/types'
+import type { UploadInfo, WorkspaceEntry, WorkspaceModels, WorkspaceType } from '@/lib/types'
 
 import { getClaudeModels } from './agent'
 import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from './applets'
@@ -38,41 +32,21 @@ import { getThreadConfig, saveThreadConfig } from './thread-config'
 import type { ThreadConfigPatch } from './thread-config'
 import { serveWorkspaceImagePreview } from './preview'
 import { MAX_UPLOAD_BYTES, addUpload, getUpload } from './uploads'
-import { collectViewRequiredEnv, listViews, serveView } from './views'
-import { collectRequiredEnv, listWidgets, serveWidget } from './widgets'
+import { requiredEnvFor } from './required-env'
+import { listViews, serveView } from './views'
+import { listWidgets, serveWidget } from './widgets'
 import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
 import {
   CREATED_WORKSPACES_ROOT,
   provisionWorkspace,
   validateWorkspaceFolderName
 } from './workspace-init'
-import {
-  getWorkspaceEnvView,
-  isValidEnvKey,
-  isValidScope,
-  updateWorkspaceEnv
-} from './workspace-env'
+import { getWorkspaceEnvView, isValidEnvKey, updateWorkspaceEnv } from './workspace-env'
 import type { EnvUpdate } from './workspace-env'
 
 // The resolved workspace is stashed on the context by `withWorkspace`, so every
 // `/api/workspaces/:id/*` handler can read it without re-querying the registry.
 type ApiEnv = { Variables: { ws: WorkspaceEntry } }
-
-// The env "required" view aggregates `config.requiredEnv` declared by both
-// widgets and views, each key mapped to the bundle ids that asked for it.
-async function requiredEnvFor(workspacePath: string): Promise<Record<string, string[]>> {
-  const [widgets, views] = await Promise.all([
-    collectRequiredEnv(workspacePath),
-    collectViewRequiredEnv(workspacePath)
-  ])
-  const out: Record<string, string[]> = {}
-  for (const map of [widgets, views]) {
-    for (const [key, ids] of Object.entries(map)) {
-      out[key] = [...(out[key] ?? []), ...ids]
-    }
-  }
-  return out
-}
 
 async function handleFunctionCall(
   req: Request,
@@ -307,7 +281,7 @@ one.get('/env', async c => {
   return c.json(await getWorkspaceEnvView(ws.path, required))
 })
 
-// PUT patches custom secrets (set/remove/scopes) and/or the inheritDotenv mode,
+// PUT patches custom secrets (set/remove) and/or the inheritDotenv mode,
 // then reaps the workspace's function worker and idle agent sessions so the next
 // call/message picks up the change (env is frozen at spawn — a hard restart is
 // the only way).
@@ -336,15 +310,6 @@ one.put('/env', async c => {
     }
     patch.remove = body.remove as string[]
   }
-  if (body.scopes !== undefined) {
-    if (typeof body.scopes !== 'object' || body.scopes === null) {
-      return c.text('scopes must be an object', 400)
-    }
-    for (const [k, s] of Object.entries(body.scopes)) {
-      if (!isValidScope(s)) return c.text(`Invalid scope for ${k}`, 400)
-    }
-    patch.scopes = body.scopes as Record<string, EnvScope>
-  }
   if (body.inheritDotenv !== undefined) {
     if (typeof body.inheritDotenv !== 'boolean') {
       return c.text('inheritDotenv must be a boolean', 400)
@@ -355,10 +320,7 @@ one.put('/env', async c => {
   // Skip the write + reaps for a no-op PUT (no recognized fields) so an empty
   // body doesn't needlessly kill warm workers / idle sessions.
   const hasChange =
-    patch.set !== undefined ||
-    patch.remove !== undefined ||
-    patch.scopes !== undefined ||
-    patch.inheritDotenv !== undefined
+    patch.set !== undefined || patch.remove !== undefined || patch.inheritDotenv !== undefined
   if (hasChange) {
     await updateWorkspaceEnv(ws.path, patch)
     // Frozen-at-spawn: reap workers/idle sessions so fresh env takes effect.
