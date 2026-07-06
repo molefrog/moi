@@ -19,10 +19,22 @@ import {
   toRichText
 } from 'tldraw'
 
-import type { ScratchImageQuality, ScratchOp, ScratchOpResult, ScratchStyle } from '@/lib/types'
+import { describeNewerWriter, sequencesAhead } from '@/lib/scratchpad-skew'
+import type {
+  ScratchImageQuality,
+  ScratchOp,
+  ScratchOpResult,
+  ScratchStyle,
+  ScratchpadWriter
+} from '@/lib/types'
 
 import { publishEvent } from './events'
-import { type ScratchpadDoc, loadScratchpadDoc, saveScratchpadDoc } from './scratchpad'
+import {
+  SCRATCHPAD_WRITER,
+  type ScratchpadDoc,
+  loadScratchpadDoc,
+  saveScratchpadDoc
+} from './scratchpad'
 
 // Server-side Scratchpad writer. The browser is no longer required to draw: we run
 // the same ops against a *headless* tldraw store here, persist the snapshot, and
@@ -65,10 +77,31 @@ function styleProps(style: ScratchStyle): Record<string, unknown> {
 
 // A fresh headless store hydrated from the saved snapshot (or empty). The
 // snapshot shape (`{ document }`) matches what the browser PUTs and loads.
-function buildStore(doc: ScratchpadDoc | null): TLStore {
+// A failed load is inspected for version skew: tldraw has no down-migrations,
+// so a snapshot written by a newer tldraw is unreadable here — but intact.
+// That gets a loud, actionable error instead of tldraw's bare `migration-error`
+// (which surfaces verbatim through the control port to the `moi scratch` CLI).
+function buildStore(doc: ScratchpadDoc | null, writer: ScratchpadWriter | undefined): TLStore {
   const store = createTLStore({ shapeUtils: defaultShapeUtils, bindingUtils: defaultBindingUtils })
   if (doc?.store) {
-    loadSnapshot(store, { document: doc } as unknown as Parameters<typeof loadSnapshot>[1])
+    try {
+      loadSnapshot(store, { document: doc } as unknown as Parameters<typeof loadSnapshot>[1])
+    } catch (err) {
+      const ahead = sequencesAhead(doc.schema, store.schema.serialize().sequences)
+      if (ahead.length > 0) {
+        throw new Error(
+          `Scratchpad was written by a newer moi (${describeNewerWriter(writer, ahead)}); ` +
+            `this server has tldraw ${SCRATCHPAD_WRITER.tldraw}. Restart the newer server or ` +
+            `update this install (bun install -g moi-computer@latest). ` +
+            `The canvas file is intact — do not reset it.`
+        )
+      }
+      // Not skew — the snapshot itself is bad. Keep the original cause visible.
+      throw new Error(
+        `Scratchpad snapshot failed to load (not a version mismatch — the file may be ` +
+          `corrupted): ${err instanceof Error ? err.message : String(err)}`
+      )
+    }
   }
   // Seed the document/page records a fresh (or partial) store needs to be valid.
   store.ensureStoreIsUsable()
@@ -368,8 +401,8 @@ export function executeScratchOp(
   op: ScratchOp
 ): Promise<ScratchOpResult> {
   return withLock(workspacePath, async () => {
-    const { document } = await loadScratchpadDoc(workspacePath)
-    const store = buildStore(document)
+    const { document, writer } = await loadScratchpadDoc(workspacePath)
+    const store = buildStore(document, writer)
     // add-image decodes/resizes the file first, so it's the one async op.
     const result = op.kind === 'add-image' ? await applyAddImage(store, op) : applyOp(store, op)
     const next = getSnapshot(store).document as unknown as ScratchpadDoc

@@ -1,5 +1,11 @@
 import { join } from 'path'
 
+import tldrawPkg from 'tldraw/package.json'
+
+import type { ScratchpadWriter } from '@/lib/types'
+
+import moiPkg from '../package.json'
+
 // The Scratchpad is a shared tldraw canvas per workspace, persisted as a tldraw
 // *document* snapshot here (the per-tab `session` is intentionally dropped). Two
 // writers: the browser autosaves on user edits, and the server writes on agent
@@ -9,7 +15,17 @@ import { join } from 'path'
 // A tldraw document snapshot: `getSnapshot(store).document`. Opaque to us apart
 // from `.store` (the record map) which `read` walks. `null` means empty canvas.
 export type ScratchpadDoc = { store?: Record<string, unknown>; schema?: unknown }
-export type ScratchpadSnapshot = { document: ScratchpadDoc | null }
+export type ScratchpadSnapshot = { document: ScratchpadDoc | null; writer?: ScratchpadWriter }
+
+// This process's identity as a snapshot writer. The tldraw version is what
+// matters for compatibility (the snapshot embeds its schema); the moi version is
+// what a user can actually act on ("update moi"). Both resolve from this
+// install's own package.json files, so they're correct in the repo-source and
+// installed layouts alike.
+export const SCRATCHPAD_WRITER: ScratchpadWriter = {
+  moi: moiPkg.version,
+  tldraw: tldrawPkg.version
+}
 
 // One shape as surfaced by `moi scratch read` — a compact, agent-friendly view.
 export type ScratchShape = {
@@ -32,12 +48,21 @@ export function getScratchpadPath(workspacePath: string): string {
   return join(workspacePath, '.moi', '.scratchpad.json')
 }
 
+// The writer stamp is trusted only off disk — we wrote it (saveScratchpadDoc
+// stamps every save); a client PUT body never carries one through.
+function parseWriter(value: unknown): ScratchpadWriter | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const w = value as { moi?: unknown; tldraw?: unknown }
+  if (typeof w.moi !== 'string' || typeof w.tldraw !== 'string') return undefined
+  return { moi: w.moi, tldraw: w.tldraw }
+}
+
 export async function loadScratchpadDoc(workspacePath: string): Promise<ScratchpadSnapshot> {
   try {
     const text = await Bun.file(getScratchpadPath(workspacePath)).text()
     const parsed = JSON.parse(text)
     if (parsed && typeof parsed === 'object' && parsed.document) {
-      return { document: parsed.document as ScratchpadDoc }
+      return { document: parsed.document as ScratchpadDoc, writer: parseWriter(parsed.writer) }
     }
   } catch {}
   return { document: null }
@@ -47,7 +72,23 @@ export async function saveScratchpadDoc(
   document: ScratchpadDoc,
   workspacePath: string
 ): Promise<void> {
-  await Bun.write(getScratchpadPath(workspacePath), JSON.stringify({ document }, null, 2))
+  const path = getScratchpadPath(workspacePath)
+  await backupOnSchemaChange(path, document)
+  await Bun.write(path, JSON.stringify({ document, writer: SCRATCHPAD_WRITER }, null, 2))
+}
+
+// When a save is about to overwrite a snapshot with a *different* schema (i.e.
+// the first write after a tldraw upgrade), keep the old file as `.bak` — the
+// manual escape hatch after a downgrade, since the new file won't open in the
+// older tldraw. One .bak, replaced on each schema change. Best-effort: a backup
+// failure must never block the save.
+async function backupOnSchemaChange(path: string, document: ScratchpadDoc): Promise<void> {
+  try {
+    const existing = JSON.parse(await Bun.file(path).text()) as { document?: ScratchpadDoc }
+    const oldSchema = existing?.document?.schema
+    if (!oldSchema || JSON.stringify(oldSchema) === JSON.stringify(document.schema)) return
+    await Bun.write(`${path}.bak`, Bun.file(path))
+  } catch {}
 }
 
 // tldraw embeds pasted/dropped images as `data:<mime>;base64,<blob>` URLs (on

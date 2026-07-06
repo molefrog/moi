@@ -106,6 +106,11 @@ export type ScratchOp =
 // data URL for `view`, or a bare ack for mutations.
 export type ScratchOpResult = { name: string } | { image: string } | { ok: true }
 
+// The process that last persisted `.moi/.scratchpad.json` (always the server —
+// browser saves funnel through it). Stamped on save so an older reader hitting
+// the snapshot can name the version it needs (see lib/scratchpad-skew.ts).
+export type ScratchpadWriter = { moi: string; tldraw: string }
+
 // An attachment uploaded ahead of a chat message. The bytes live server-side in
 // an in-memory upload store (see server/uploads.ts); a chat frame references it
 // by `id`. `kind` splits the two delivery paths: an `image` is inlined as a
