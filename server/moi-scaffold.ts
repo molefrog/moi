@@ -66,6 +66,27 @@ declare module 'moi' {
     requiredEnv?: string[]
   }
   export type ViewConfig = { title?: string; requiredEnv?: string[] }
+
+  // Server-only (import from a \`.server.ts\` file, NOT a component): invoke
+  // the user's Claude Code MCP servers directly — no model turn involved.
+  // Servers needing OAuth (and claude.ai connectors) are not callable; check
+  // \`listServers()\` for per-server callability.
+  export type McpContentBlock = { type: string; text?: string; [key: string]: unknown }
+  export type McpToolResult = { content: McpContentBlock[]; structuredContent?: unknown }
+  export type McpToolInfo = { name: string; description?: string; inputSchema?: unknown }
+  export type McpServerSummary = {
+    name: string
+    status: 'connected' | 'failed' | 'needs-auth' | 'pending' | 'disabled'
+    scope?: string
+    callable: boolean
+    reason?: string
+    tools?: string[]
+  }
+  export const mcp: {
+    callTool(server: string, tool: string, args?: Record<string, unknown>): Promise<McpToolResult>
+    listTools(server: string): Promise<McpToolInfo[]>
+    listServers(): Promise<McpServerSummary[]>
+  }
 }
 
 // Bundled asset imports (\`import logo from './logo.png'\`) resolve to a URL string.

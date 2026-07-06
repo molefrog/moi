@@ -3,6 +3,8 @@
 import { parse, stringify } from 'devalue'
 import { join, resolve, sep } from 'path'
 
+import type { McpServerSummary, McpToolInfo, McpToolResult } from './mcp-broker'
+
 const MEI_DIR =
   process.env.MEI_FUNCTIONS_DIR ?? join(import.meta.dir, '..', 'test-workspace', '.moi')
 
@@ -25,6 +27,73 @@ function send(msg: unknown) {
     // IPC channel closed — parent died
   }
 }
+
+// ---- MCP bridge (worker side) ----------------------------------------------
+// Server functions call the user's Claude Code MCP tools via `mcp` from the
+// virtual 'moi' module below. The actual connections live in the PARENT
+// (server/mcp-broker.ts) so they're pooled across worker restarts; this side
+// only relays requests over IPC and awaits the matching 'mcp-result'.
+
+// Slightly above the parent-side tool-call ceiling (25s) so the descriptive
+// broker error wins the race against this transport-level guard.
+const MCP_REQUEST_TIMEOUT_MS = 28_000
+
+type McpPending = {
+  resolve: (data: unknown) => void
+  reject: (err: Error) => void
+  timer: ReturnType<typeof setTimeout>
+}
+const mcpPending = new Map<string, McpPending>()
+
+function mcpRequest(
+  op: 'callTool' | 'listTools' | 'listServers',
+  params: { server?: string; tool?: string; args?: Record<string, unknown> } = {}
+): Promise<unknown> {
+  if (!process.send) {
+    return Promise.reject(new Error('MCP is unavailable: worker has no IPC channel'))
+  }
+  const id = crypto.randomUUID()
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      mcpPending.delete(id)
+      reject(new Error(`MCP ${op} timed out`))
+    }, MCP_REQUEST_TIMEOUT_MS)
+    mcpPending.set(id, { resolve, reject, timer })
+    send({ type: 'mcp', id, op, ...params })
+  })
+}
+
+const mcp = {
+  callTool(server: string, tool: string, args?: Record<string, unknown>): Promise<McpToolResult> {
+    return mcpRequest('callTool', { server, tool, args }) as Promise<McpToolResult>
+  },
+  listTools(server: string): Promise<McpToolInfo[]> {
+    return mcpRequest('listTools', { server }) as Promise<McpToolInfo[]>
+  },
+  listServers(): Promise<McpServerSummary[]> {
+    return mcpRequest('listServers') as Promise<McpServerSummary[]>
+  }
+}
+
+// The virtual 'moi' module, mirroring the client-side one the bundler provides
+// to .tsx applets (build-applet.ts). Registered before any .server.ts import
+// so `import { mcp } from 'moi'` resolves inside server functions.
+Bun.plugin({
+  name: 'moi-server-runtime',
+  setup(build) {
+    build.module('moi', () => ({
+      loader: 'object',
+      exports: {
+        mcp,
+        fileUrl: () => {
+          throw new Error(
+            'fileUrl() is client-only — return the path from the server function and call fileUrl(path) in the component'
+          )
+        }
+      }
+    }))
+  }
+})
 
 async function loadModule(name: string): Promise<Record<string, unknown>> {
   const cached = moduleCache.get(name)
@@ -67,9 +136,26 @@ async function evictModule(name: string) {
 
 type CallMessage = { id: string; type: 'call'; module: string; name: string; args: string }
 type ReloadMessage = { type: 'reload'; modules: string[] }
-type IncomingMessage = CallMessage | ReloadMessage
+type McpResultMessage = {
+  type: 'mcp-result'
+  id: string
+  ok: boolean
+  data?: unknown
+  message?: string
+}
+type IncomingMessage = CallMessage | ReloadMessage | McpResultMessage
 
 process.on('message', async (raw: IncomingMessage) => {
+  if (raw.type === 'mcp-result') {
+    const pending = mcpPending.get(raw.id)
+    if (!pending) return
+    mcpPending.delete(raw.id)
+    clearTimeout(pending.timer)
+    if (raw.ok) pending.resolve(raw.data)
+    else pending.reject(new Error(raw.message ?? 'Unknown MCP error'))
+    return
+  }
+
   if (raw.type === 'reload') {
     for (const name of raw.modules) {
       await evictModule(name)

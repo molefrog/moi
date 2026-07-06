@@ -12,6 +12,7 @@ import { PORT } from './constants'
 import { control } from './control'
 import { EVENTS_TOPIC, setEventServer } from './events'
 import { killAllWorkers } from './functions'
+import { closeAllMcpClients } from './mcp-broker'
 import { resolveScratchOp } from './scratchpad-relay'
 import {
   abortOpenClawRun,
@@ -206,6 +207,7 @@ function shutdown() {
   } catch {}
   killAllCCSessions()
   killAllWorkers()
+  closeAllMcpClients()
   process.exit(0)
 }
 process.on('SIGTERM', shutdown)
