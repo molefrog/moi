@@ -1,15 +1,9 @@
 import { type ReactNode, useState } from 'react'
 
 import { IconLoader2, IconPlus, IconTrash } from '@tabler/icons-react'
-import { useQueryClient } from '@tanstack/react-query'
 
-import {
-  useUpdateEnv,
-  useSaveWorkspaceName,
-  useWorkspaceEnv,
-  workspaceKeys
-} from '@/client/api/workspaces'
-import { useMeiEvent } from '@/client/hooks/useMeiEvents'
+import { useSaveWorkspaceName } from '@/client/api/workspaces'
+import { useEnvVars } from '@/client/hooks/useEnvVars'
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
 import { Switch } from '@/client/components/ui/switch'
@@ -134,17 +128,7 @@ const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/
 
 export function EnvironmentSettings() {
   const { workspaceId } = useWorkspaceLayoutCtx()
-  const env = useWorkspaceEnv(workspaceId)
-  const update = useUpdateEnv(workspaceId)
-  const qc = useQueryClient()
-
-  // `moi env set`/`unset` writes land outside the UI — the server broadcasts
-  // `env:updated`, and we refetch so the list reflects the CLI change.
-  useMeiEvent(e => {
-    if (e.type === 'env:updated' && e.workspaceId === workspaceId) {
-      qc.invalidateQueries({ queryKey: workspaceKeys.env(workspaceId) })
-    }
-  })
+  const { env, update } = useEnvVars(workspaceId)
 
   const [draftKey, setDraftKey] = useState('')
   const [draftValue, setDraftValue] = useState('')

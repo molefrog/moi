@@ -37,20 +37,34 @@ manual restart needed.
 
 ### The `moi env` CLI
 
-The same model is accessible from the terminal (see `docs/cli-env.md` for the
-full spec). All subcommands resolve the workspace from cwd and **never print
-secret values**:
+The same model is accessible from the terminal. Every subcommand resolves the
+workspace from **cwd** — the nearest registered workspace containing it, so
+commands work from `.moi/` or any subdirectory — and errors with a hint when
+cwd is outside every workspace. Secret **values are never printed**; the only
+place a value becomes visible is inside a process launched via
+`moi env exec`. Reads and `exec` need no running server.
 
-- `moi env` — the effective env: key names with sources, `.env` files with key
-  counts, required-key satisfaction, and the secret backend.
-- `moi env set KEY=value` / `moi env set KEY` (value from stdin, hidden TTY
-  prompt) — upsert a custom secret.
-- `moi env unset KEY [KEY...]` — remove custom secrets.
-- `moi env exec -- <cmd>` — run a command with the workspace env applied.
+- `moi env` — the effective env: key names with sources (`.env` file list /
+  `custom` / a custom secret overriding `.env`), detected `.env` files with key
+  counts (listed even when inheritance is off, marked disabled), required-key
+  satisfaction (missing keys flagged with the widgets/views that declared
+  them), and the secret backend.
+- `moi env set KEY=value` — upsert a custom secret (the value is everything
+  after the first `=`). Bare `moi env set KEY` reads the value from stdin —
+  hidden prompt on a TTY, piped input with one trailing newline trimmed — so
+  humans can keep secrets out of shell history. Invalid key names are
+  rejected.
+- `moi env unset KEY [KEY...]` — remove custom secrets. Dotenv-sourced keys
+  are refused with a pointer to their file; removing a key that shadows a
+  `.env` value un-shadows it; unknown keys warn without failing.
+- `moi env exec -- <cmd> [args...]` — run a command with the workspace env
+  overlaid on the inherited process env (workspace values win, re-resolved
+  fresh on every run). The child's exit code is propagated.
 
 CLI writes notify a running server over the control port (`env:changed`) so
 workers/sessions are reaped and the settings UI refetches, exactly like a
-`PUT /env`.
+`PUT /env`; with no server running the write still lands and applies on the
+next start.
 
 ### How it reaches code
 

@@ -42,7 +42,10 @@ async function runCli(
       ...process.env,
       XDG_DATA_HOME: dataHome,
       MOI_SECRET_BACKEND: 'file',
-      NO_COLOR: '1'
+      // No NO_COLOR override: stdout is a pipe here, exactly like an agent
+      // capturing the command, so plain output must be the default.
+      NO_COLOR: undefined,
+      FORCE_COLOR: undefined
     }
   })
   const [code, stdout, stderr] = await Promise.all([
@@ -100,6 +103,16 @@ describe('moi env (list)', () => {
     expect(res.stdout).toContain('inherited: on')
     expect(res.stdout).not.toContain('secret-notion')
     expect(res.stdout).not.toContain('postgres://x')
+  })
+
+  test('piped output carries no ANSI color escapes', async () => {
+    await writeFile(join(wsDir, '.env'), 'A=1\n')
+    const res = await runCli([])
+    // stdout is a pipe (the agent-capture case) — coloring must no-op.
+    // eslint-disable-next-line no-control-regex
+    const ansi = /\x1b\[/
+    expect(res.stdout).not.toMatch(ansi)
+    expect(res.stderr).not.toMatch(ansi)
   })
 
   test('flags disabled .env inheritance but still lists files', async () => {
