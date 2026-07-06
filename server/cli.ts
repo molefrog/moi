@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'path'
 import pc from 'picocolors'
 
+import { SCRATCH_COLOR_HEX } from '@/lib/scratch-palette'
 import { COLOR_THEMES, FONT_THEMES } from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/themes'
 import type {
@@ -13,6 +14,7 @@ import type {
   ScratchColor,
   ScratchFill,
   ScratchImageQuality,
+  ScratchLintFinding,
   ScratchOp,
   ScratchSize,
   ScratchStyle
@@ -1109,19 +1111,11 @@ function parseEnd(s: string): ScratchArrowEnd {
   return { name: s }
 }
 
-// The Scratchpad palette (matches the UI toolbar's six swatches) and each color's
-// light-theme solid hex — used to snap an arbitrary `--color #rrggbb` to the nearest
-// palette entry (tldraw shapes can't hold free hex). Keep in sync with the swatches
-// in client/components/Scratchpad.tsx.
-const COLOR_HEX: Record<ScratchColor, string> = {
-  black: '#1d1d1d',
-  red: '#e03131',
-  yellow: '#f1ac4b',
-  green: '#099268',
-  blue: '#4465e9',
-  grey: '#9fa8b2'
-}
-const COLOR_NAMES = Object.keys(COLOR_HEX) as ScratchColor[]
+// The Scratchpad palette hexes live in lib/scratch-palette.ts — shared with the
+// server-side renderer, which paints these same colors back into pixels. Here
+// they snap an arbitrary `--color #rrggbb` to the nearest palette entry (tldraw
+// shapes can't hold free hex).
+const COLOR_NAMES = Object.keys(SCRATCH_COLOR_HEX) as ScratchColor[]
 
 // Arrows expose tldraw's size as a line weight; the CLI mirrors the UI's two sizes.
 const STROKE_SIZES: Record<string, ScratchSize> = { small: 'm', large: 'xl' }
@@ -1163,7 +1157,7 @@ function parseColor(s: string): ScratchColor {
   let best: ScratchColor = 'black'
   let bestDist = Infinity
   for (const name of COLOR_NAMES) {
-    const [r, g, b] = hexToRgb(COLOR_HEX[name])!
+    const [r, g, b] = hexToRgb(SCRATCH_COLOR_HEX[name])!
     const d = (r - rgb[0]) ** 2 + (g - rgb[1]) ** 2 + (b - rgb[2]) ** 2
     if (d < bestDist) {
       bestDist = d
@@ -1235,7 +1229,11 @@ function styleArgs(args: {
   }
 }
 
-type ScratchCliOp = ScratchOp | { kind: 'read' } | { kind: 'read-image'; name: string }
+type ScratchCliOp =
+  | ScratchOp
+  | { kind: 'read' }
+  | { kind: 'read-image'; name: string }
+  | { kind: 'lint' }
 
 // Round-trip one op through the control port and hand the reply to `onResult`.
 // Mirrors the `bundle`/`theme` commands: one socket per invocation, print, exit.
@@ -1290,22 +1288,86 @@ const scratchRead = defineCommand({
 })
 
 const scratchView = defineCommand({
-  meta: { name: 'view', description: 'Render the canvas to a PNG (needs an open Scratchpad tab)' },
+  meta: {
+    name: 'view',
+    description: 'Render the canvas to a PNG (live tab when open, server-rendered otherwise)'
+  },
   args: {
     dir: dirArg,
-    out: { type: 'string', description: 'Output PNG path (default: a temp file)' }
+    out: { type: 'string', description: 'Output PNG path (default: a temp file)' },
+    headless: {
+      type: 'boolean',
+      description: 'Skip the browser and always use the server-side renderer'
+    }
   },
   async run({ args }) {
-    sendScratch(resolve(args.dir), { kind: 'view' }, async res => {
-      const result = res.result as { image?: string } | undefined
-      if (!result?.image) {
-        console.error(pc.red('No image returned'))
-        process.exit(1)
+    sendScratch(
+      resolve(args.dir),
+      { kind: 'view', ...(args.headless ? { headless: true } : {}) },
+      async res => {
+        const result = res.result as { image?: string; headless?: boolean } | undefined
+        if (!result?.image) {
+          console.error(pc.red('No image returned'))
+          process.exit(1)
+        }
+        const b64 = result.image.replace(/^data:image\/png;base64,/, '')
+        const outPath = args.out
+          ? resolve(args.out)
+          : join(tmpdir(), `moi-scratch-${Date.now()}.png`)
+        await Bun.write(outPath, Buffer.from(b64, 'base64'))
+        console.log(outPath)
+        // Path stays alone on stdout; the provenance note rides on stderr.
+        if (result.headless) {
+          console.error(
+            pc.dim('server-rendered approximation — open the Scratchpad tab for the exact view')
+          )
+        }
       }
-      const b64 = result.image.replace(/^data:image\/png;base64,/, '')
-      const outPath = args.out ? resolve(args.out) : join(tmpdir(), `moi-scratch-${Date.now()}.png`)
-      await Bun.write(outPath, Buffer.from(b64, 'base64'))
-      console.log(outPath)
+    )
+  }
+})
+
+const scratchLint = defineCommand({
+  meta: {
+    name: 'lint',
+    description: 'Check the canvas layout: overflowing labels, overlaps, misalignment, gaps'
+  },
+  args: {
+    json: { type: 'boolean', description: 'Print findings as JSON' },
+    dir: dirArg
+  },
+  run({ args }) {
+    sendScratch(resolve(args.dir), { kind: 'lint' }, res => {
+      const findings = (res.findings ?? []) as ScratchLintFinding[]
+      if (args.json) {
+        console.log(JSON.stringify(findings, null, 2))
+        return
+      }
+      if (findings.length === 0) {
+        console.log('\n' + pc.green('✓') + ' no findings — the canvas layout looks clean\n')
+        return
+      }
+      // Errors first, then warns; each finding shows its ready-to-run fix.
+      const ordered = [
+        ...findings.filter(f => f.severity === 'error'),
+        ...findings.filter(f => f.severity === 'warn')
+      ]
+      console.log('')
+      for (const f of ordered) {
+        const mark = f.severity === 'error' ? pc.red('✗') : pc.yellow('!')
+        console.log(`${mark} ${pc.bold(f.code)}  ${f.message}`)
+        if (f.fix) console.log(pc.dim(`    fix: ${f.fix}`))
+      }
+      const errors = findings.filter(f => f.severity === 'error').length
+      const warns = findings.length - errors
+      console.log(
+        '\n' +
+          pc.dim(
+            `${errors} error${errors === 1 ? '' : 's'}, ${warns} warning${warns === 1 ? '' : 's'} — fix errors, judge warnings.`
+          ) +
+          '\n'
+      )
+      // Advisory: findings never fail the command (sendScratch exits 0).
     })
   }
 })
@@ -1534,6 +1596,21 @@ const scratchMove = defineCommand({
   }
 })
 
+const scratchResize = defineCommand({
+  meta: { name: 'resize', description: 'Resize a rectangle or image shape' },
+  args: {
+    id: { type: 'positional', required: true, description: 'Shape name' },
+    size: { type: 'string', required: true, description: 'New size "w,h"' },
+    dir: dirArg
+  },
+  run({ args }) {
+    const { x: w, y: h } = parseXY(args.size)
+    sendScratch(resolve(args.dir), { kind: 'resize', name: args.id, w, h }, () =>
+      console.log('\n' + pc.green('✓') + ' resized ' + pc.bold(args.id) + '\n')
+    )
+  }
+})
+
 const scratchSet = defineCommand({
   meta: { name: 'set', description: "Relabel / edit a shape's text" },
   args: {
@@ -1580,8 +1657,10 @@ const scratch = defineCommand({
     read: scratchRead,
     'read-image': scratchReadImage,
     view: scratchView,
+    lint: scratchLint,
     add: scratchAdd,
     move: scratchMove,
+    resize: scratchResize,
     set: scratchSet,
     delete: scratchDelete,
     clear: scratchClear

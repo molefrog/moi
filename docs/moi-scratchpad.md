@@ -34,9 +34,16 @@ The agent works the canvas through a `moi scratch` CLI — it both **sees** and 
   path). Served off disk, like `read` — this is how the agent pulls the pixels of one image
   that `read` omitted. A remote (`http`) asset prints its URL instead.
 - `moi scratch view` — render the **whole canvas** to a **PNG**. Use this to actually _see_
-  what the user drew (freehand, layout, anything structure can't capture).
+  what the user drew (freehand, layout, anything structure can't capture). **Always works**:
+  a live Scratchpad tab renders the exact canvas; with no tab open the server renders a
+  faithful approximation itself (same font, same layout — minus tldraw's hand-drawn stroke
+  texture) and says so on stderr. `--headless` skips the tab outright.
+- `moi scratch lint` — check the canvas geometry for the ways a drawing reads as sloppy:
+  labels that overflow their boxes (measured with the real canvas font), overlapping shapes,
+  pairs that _almost_ align, uneven gaps in rows and columns. Each finding carries a
+  ready-to-run fix command. `--json` for structured output; always exits 0 (advisory).
 
-`read` is for logic; `view` / `read-image` are for vision.
+`read` is for logic; `view` / `read-image` are for vision; `lint` is for taste.
 
 ### Drawing
 
@@ -51,6 +58,7 @@ moi scratch add note   --at <x,y> --text "..."           [--id NAME] [--color C]
 moi scratch add arrow  --from <id|x,y> --to <id|x,y>     [--id NAME] [--color C] [--stroke S] [--elbow]
 moi scratch add image  <path>                            [--at <x,y>] [--id NAME] [--quality lo|hi]
 moi scratch move   <id> --to <x,y>
+moi scratch resize <id> --size <w,h>        # rects & images only
 moi scratch set    <id> --text "..."        # relabel / edit
 moi scratch delete <id>
 moi scratch clear                           # wipe the whole canvas
@@ -75,8 +83,15 @@ moi scratch clear                           # wipe the whole canvas
   paste never lands on the canvas whole. `lo` keeps the constantly-rewritten snapshot light and
   is well within Claude's vision budget; reach for `hi` only when fine detail (e.g. screenshot
   text) matters. EXIF orientation is baked in; images are never enlarged.
+- `resize` changes a rectangle's or image's size — notes, text, and arrows size themselves.
+  It's the actionable half of a lint `text-overflow` finding: the finding's fix is the exact
+  resize that makes the label fit.
 - `clear` deletes every shape on the canvas in one shot.
 - Coordinates are tldraw canvas space (origin top-left, y down).
+
+The loop that makes agent drawings look human-made: **draw → `lint` (fix every error, judge
+the warnings) → `view` to eyeball → adjust**. Lint catches what structure can measure —
+overflow, overlap, misalignment, spacing; `view` catches what only eyes can.
 
 The set is deliberately small — text, rect, note, arrow (with color plus each shape's
 fill/font-size/stroke), plus
@@ -86,9 +101,10 @@ tldraw API.
 ## How it works
 
 The canvas the **user** sees is a real tldraw editor in the browser. The **agent**, though,
-doesn't need that tab open to draw: every `moi scratch` op except `view` runs against the disk
-snapshot, either by parsing it (`read`) or by replaying it through a **headless tldraw store**
-on the server (the mutations). Only `view` — rendering pixels — genuinely requires the browser.
+doesn't need that tab open at all: every `moi scratch` op runs against the disk snapshot,
+either by parsing it (`read`, `lint`) or by replaying it through a **headless tldraw store**
+on the server (the mutations). Even `view` works tab-less — a live tab renders the exact
+pixels, and the server renders an approximation when none is open.
 
 - **Persistence.** `.moi/.scratchpad.json` holds a tldraw document snapshot (owned by moi — not
   hand-edited). The browser autosaves it ~500ms after you stop drawing; the server writes it
@@ -104,9 +120,15 @@ on the server (the mutations). Only `view` — rendering pixels — genuinely re
   `add image` additionally resizes the file through `sharp` (the same dep the icon pipeline uses)
   before embedding it. (We drive the store, not an `Editor`, because the Editor needs a DOM + text
   measurement the server runtime doesn't have. See `server/scratchpad-executor.ts`.)
-- **Viewing** (`moi scratch view`) is the one op still relayed to a connected tab: only the
-  browser can rasterize the canvas (`editor.toImageDataUrl`). With no tab showing **this**
-  workspace's scratchpad it returns "No live canvas" — every other op still works off disk.
+- **Viewing** (`moi scratch view`) prefers a connected tab — the browser rasterizes the exact
+  canvas (`editor.toImageDataUrl`). With no tab showing **this** workspace's scratchpad it
+  falls back to a **server-side renderer** (`server/scratchpad-render.ts`): our own SVG
+  emitter for the primitive shape set, rasterized by resvg with the real canvas font
+  (woff2 → ttf, cached). Approximate strokes, exact layout — the agent is never blind.
+- **Linting** (`moi scratch lint`) is read-only geometry checking off the disk snapshot
+  (`server/scratchpad-lint.ts`), built on the same server-side text measurement
+  (`server/scratchpad-metrics.ts`) the sizing helpers use — overflow findings are measured
+  with the actual font, not guessed.
 - **Each command targets its own workspace's canvas.** The CLI runs in a workspace directory,
   which resolves to that workspace; reads, writes, and the relayed `view` all key off that
   identity, so one workspace never touches another's canvas.

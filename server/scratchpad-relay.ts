@@ -17,6 +17,11 @@ type Pending = {
 const pendingOps = new Map<string, Pending>()
 const RELAY_TIMEOUT_MS = 10_000
 
+// The exact failure a relay times out with. Exported so `view`'s headless
+// fallback (server/control.ts) can catch precisely this case — no tab showing
+// the canvas — and not swallow real render errors from a live tab.
+export const NO_LIVE_CANVAS = 'No live canvas — open the Scratchpad tab for this workspace.'
+
 // Relay one op and await the first tab's reply. Rejects after a timeout when no
 // tab answers — i.e. no tab is showing this workspace's Scratchpad. (Add ops
 // must already carry a `name`, assigned by the caller, so execution is
@@ -26,7 +31,7 @@ export function relayScratchOp(workspaceId: string, op: ScratchOp): Promise<Scra
   return new Promise<ScratchOpResult>((resolve, reject) => {
     const timer = setTimeout(() => {
       pendingOps.delete(opId)
-      reject(new Error('No live canvas — open the Scratchpad tab for this workspace.'))
+      reject(new Error(NO_LIVE_CANVAS))
     }, RELAY_TIMEOUT_MS)
     pendingOps.set(opId, { resolve, reject, timer })
     broadcastAll({ type: 'scratchpad:op', workspaceId, opId, op })
