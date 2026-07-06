@@ -25,6 +25,14 @@ Do **not** start the server with `bun --hot server/web.ts` or the old `moi start
 
 Only one server runs at a time — it binds port 13337 (HTTP) and 13059 (control). To restart, kill the existing `bun run dev` process and start it again; a second instance fails on the control port.
 
+### Running `moi` globally (three ways)
+
+- **Dev link**: `bun link` in the repo → `moi` runs current source. Keep `dist/` deleted — if `dist/index.html` exists the server silently serves that stale prebuilt client (`server/static.ts`); only `bun run dev` ignores it (`MOI_DEV`).
+- **Prod test before publish**: `bun pm pack` (prepack builds the client) → `bun install -g ./moi-computer-<version>.tgz`. Tests the real artifact: `files` whitelist, prebuilt `dist/`, production React, global install tree.
+- **Published**: `bun install -g moi-computer@latest`.
+
+All three overwrite `~/.bun/bin/moi` — last action wins; `readlink ~/.bun/bin/moi` shows which. Kill the running server before switching (single port 13337).
+
 ## Browser testing in cloud sandboxes
 
 To drive the app in a browser inside Claude Code on the web, use the vendored **agent-browser skill** (`.claude/skills/agent-browser/`). Cloud-specific setup — server startup, `AGENT_BROWSER_EXECUTABLE_PATH`, Playwright alternative, egress-relay caveats — is in `docs/browser-testing-cloud.md`.
