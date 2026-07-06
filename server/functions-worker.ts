@@ -45,6 +45,8 @@ async function loadModule(name: string): Promise<Record<string, unknown>> {
 
   const mod = (await import(filePath + `?t=${file.lastModified}`)) as Record<string, unknown>
   moduleCache.set(name, mod)
+  // Tell the parent what's cached here — introspection only, shown in /status.
+  send({ type: 'loaded', module: name })
   return mod
 }
 
