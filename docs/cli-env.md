@@ -139,6 +139,57 @@ agent sessions so the next call picks up changes. The CLI mirrors that:
    UI refetches the env view. When no server is running, skip silently — the
    next server start resolves fresh env anyway.
 
+## Skill changes (`moi-workspace`)
+
+The agent learns about env through the workspace skill
+(`workspace/.claude/skills/moi-workspace/SKILL.md`). Today its
+"Environment & secrets" section only covers applet authoring (`process.env` in
+`.server.ts`, advisory `requiredEnv`) — the agent has no way to *discover* what
+keys exist or run scripts with the env. Ship the skill update with the feature
+(bump the `<moi-skill version>` marker so `moi skill` flags drift).
+
+Two real workflows the skill must produce:
+
+1. **"Pull my Notion pages"** → agent runs `moi env`, sees `NOTION_TOKEN` in
+   `.env`, tells the user "using `NOTION_TOKEN` from `.env`", and runs its
+   script via `moi env exec -- bun script.ts`.
+2. **"Build me a weather widget"** → agent runs `moi env`, key isn't there →
+   tells the user to add `WEATHER_TOKEN` in the workspace env settings, and
+   still wires the widget (`config.requiredEnv: ['WEATHER_TOKEN']`, handles the
+   missing key) so it lights up once the user sets it.
+
+Concrete edits:
+
+- Add to the `moi` CLI command list:
+
+  > - `moi env` — list available env keys and where they come from (never
+  >   values); `moi env exec -- <cmd>` runs a command with the workspace env
+
+- Replace the "Environment & secrets" section body with (keeping the existing
+  `process.env`-in-`.server.ts` paragraph and code sample at the end):
+
+  > Each workspace has an effective env: keys from the project's `.env` /
+  > `.env.local` (when inheritance is enabled in settings) plus **custom
+  > secrets** the user manages in the workspace env settings. moi injects it
+  > into your shell and into applet `.server.ts` functions.
+  >
+  > - **Check before you assume.** When a task needs a key or token — an API
+  >   pull, a widget calling a service — run `moi env` first. It lists key
+  >   names with their source (`.env` / custom) and flags declared
+  >   `requiredEnv` keys that are missing. Values are never shown.
+  > - **Key present** → say which key you'll use and where it's from ("using
+  >   `NOTION_TOKEN` from `.env`") and proceed. To run a script or one-off
+  >   command with the workspace env, use `moi env exec -- bun script.ts` —
+  >   it also picks up values changed after your session started.
+  > - **Key missing** → never invent or hardcode a value, and don't edit
+  >   `.env` yourself. Tell the user the exact key name to add in the
+  >   workspace env settings. Still build and wire the applet: declare the key
+  >   in `config.requiredEnv` and handle its absence, so it works the moment
+  >   the user sets it. If the user pastes a value in chat, store it with
+  >   `moi env set KEY=value` (`moi env unset KEY` removes it).
+  > - **Never print secret values** — not in chat, not in logs. Refer to keys
+  >   by name only.
+
 ## Touch points
 
 | File                      | Change                                                                                                      |
@@ -151,6 +202,7 @@ agent sessions so the next call picks up changes. The CLI mirrors that:
 | `server/cli-env.ts` (new) | table rendering + stdin/prompt input + exec spawn, keeping `cli.ts` from growing another 300 lines           |
 | `server/control.ts`       | `env:changed` handler → reap worker + idle sessions, publish live event                                      |
 | `docs/env-vars.md`        | remove scoping docs; add a short "CLI" section linking here                                                  |
+| `workspace/.claude/skills/moi-workspace/SKILL.md` | env discovery guidance + `moi env` in the CLI list (see Skill changes); bump `<moi-skill version>` |
 
 ## Details
 
