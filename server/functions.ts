@@ -16,6 +16,7 @@
 // are paths relative to it (`"widgets/hello"` → `.moi/widgets/hello.server.ts`).
 // This is the contract documented in the widgets SKILL.
 import { LRUCache } from 'lru-cache'
+import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'path'
 
@@ -38,6 +39,16 @@ type Slot = {
   readyPromise: Promise<void>
   pending: Map<string, Pending>
   killed: boolean
+  // Introspection only (surfaced by /status) — not load-bearing.
+  ready: boolean
+  spawnedAt: number
+  lastCallAt: number | null
+  calls: number
+  errors: number
+  timeouts: number
+  // Module keys the worker has loaded and cached (reported via 'loaded' IPC,
+  // pruned when reloadModules evicts them).
+  modules: Set<string>
 }
 
 function rejectAndClearPending(slot: Slot, reason: string) {
@@ -76,7 +87,14 @@ function spawnSlot(workspacePath: string, workspaceEnv: Record<string, string>):
     worker: undefined as never,
     readyPromise,
     pending: new Map(),
-    killed: false
+    killed: false,
+    ready: false,
+    spawnedAt: Date.now(),
+    lastCallAt: null,
+    calls: 0,
+    errors: 0,
+    timeouts: 0,
+    modules: new Set()
   }
 
   slot.worker = Bun.spawn([process.execPath, WORKER_PATH], {
@@ -106,10 +124,22 @@ function spawnSlot(workspacePath: string, workspaceEnv: Record<string, string>):
       if (slots.peek(workspacePath) === slot) slots.delete(workspacePath)
     },
     ipc(message) {
-      const msg = message as { type: string; id?: string; data?: string; message?: string }
+      const msg = message as {
+        type: string
+        id?: string
+        data?: string
+        message?: string
+        module?: string
+      }
 
       if (msg.type === 'ready') {
+        slot.ready = true
         readyResolve()
+        return
+      }
+
+      if (msg.type === 'loaded' && msg.module) {
+        slot.modules.add(msg.module)
         return
       }
 
@@ -122,6 +152,7 @@ function spawnSlot(workspacePath: string, workspaceEnv: Record<string, string>):
         if (msg.type === 'result') {
           p.resolve(msg.data!)
         } else if (msg.type === 'error') {
+          slot.errors++
           p.reject(new Error(msg.message ?? 'Unknown error'))
         }
       }
@@ -169,10 +200,14 @@ export async function callFunction(
   const slot = getOrSpawn(workspacePath, workspaceEnv)
   await slot.readyPromise
 
+  slot.calls++
+  slot.lastCallAt = Date.now()
+
   const id = crypto.randomUUID()
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       slot.pending.delete(id)
+      slot.timeouts++
       reject(new Error(`Function call timed out: ${module}/${name}`))
     }, CALL_TIMEOUT_MS)
 
@@ -206,6 +241,66 @@ export function restartWorker(workspacePath: string) {
   slots.delete(workspacePath)
 }
 
+// Caps surfaced in /status so the numbers there are self-explanatory.
+export const WORKER_LIMITS = {
+  maxWorkers: MAX_WORKERS,
+  idleTtlMs: WORKER_IDLE_TTL_MS,
+  callTimeoutMs: CALL_TIMEOUT_MS
+} as const
+
+export type WorkerDebugInfo = {
+  workspacePath: string
+  pid: number | undefined
+  ready: boolean
+  spawnedAt: number
+  lastCallAt: number | null
+  calls: number
+  errors: number
+  timeouts: number
+  pending: number
+  // ms until the LRU idle TTL reaps this worker (refreshed on every call)
+  ttlRemainingMs: number
+  // Resident memory of the worker process; null when /proc isn't available (macOS)
+  rssBytes: number | null
+  modules: string[]
+}
+
+// Best-effort RSS from /proc — Linux only, returns null elsewhere. VmRSS is in
+// kB, so no page-size assumptions. Sync read of a tiny procfs file is cheap.
+function readRss(pid: number | undefined): number | null {
+  if (!pid || process.platform !== 'linux') return null
+  try {
+    const m = readFileSync(`/proc/${pid}/status`, 'utf8').match(/^VmRSS:\s+(\d+)\s+kB/m)
+    return m ? Number(m[1]) * 1024 : null
+  } catch {
+    return null
+  }
+}
+
+// A snapshot of the live worker pool, for the /status page. Iteration and
+// getRemainingTTL don't refresh LRU recency, so peeking is side-effect free.
+export function getWorkersDebugSnapshot(): WorkerDebugInfo[] {
+  const out: WorkerDebugInfo[] = []
+  for (const [workspacePath, slot] of slots.entries()) {
+    if (slot.killed) continue
+    out.push({
+      workspacePath,
+      pid: slot.worker.pid,
+      ready: slot.ready,
+      spawnedAt: slot.spawnedAt,
+      lastCallAt: slot.lastCallAt,
+      calls: slot.calls,
+      errors: slot.errors,
+      timeouts: slot.timeouts,
+      pending: slot.pending.size,
+      ttlRemainingMs: slots.getRemainingTTL(workspacePath),
+      rssBytes: readRss(slot.worker.pid),
+      modules: [...slot.modules].sort()
+    })
+  }
+  return out
+}
+
 export function reloadModules(modules: string[], workspacePath: string) {
   if (modules.length === 0) return
   // peek: don't refresh TTL just because files changed. If the worker was
@@ -214,5 +309,8 @@ export function reloadModules(modules: string[], workspacePath: string) {
   if (!slot || slot.killed) return
   try {
     slot.worker.send({ type: 'reload', modules })
+    // The worker evicts these from its module cache; it re-reports 'loaded'
+    // on the next call, so drop them from the introspection set too.
+    for (const m of modules) slot.modules.delete(m)
   } catch {}
 }
