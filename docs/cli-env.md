@@ -69,7 +69,8 @@ Secrets stored in: OS keychain
   ("missing `WEATHER_TOKEN`") and tell the user exactly which key to add.
 - **Backend line**: keychain vs `0600`-file fallback, same as the settings UI.
 
-No `--json` flag — the plain print is the interface (v1).
+No `--json` flag — the plain print is the interface. Toggling `inheritDotenv`
+stays UI-only; the CLI just displays its state.
 
 ### `moi env set KEY=value` / `moi env set KEY`
 
@@ -116,7 +117,7 @@ workspace containing cwd (`findWorkspaceForPath` over the registry, same
 semantics as `control.ts#resolveWorkspace` — works from `.moi/` or any
 subdirectory). If cwd isn't inside any registered workspace, exit 1 with
 `… is not inside a registered moi workspace. Open it in moi, or run from the
-workspace root.` No `--workspace` flag in v1.
+workspace root.` No `--workspace` flag — cwd is the only selector.
 
 The registry (`workspaces.json`), env metadata, and secret store are all plain
 files/keychain in the OS data dir, so **reads and `exec` need no running
@@ -137,15 +138,6 @@ agent sessions so the next call picks up changes. The CLI mirrors that:
    `restartWorkspaceSessions(path)`, and publishes a live event so the settings
    UI refetches the env view. When no server is running, skip silently — the
    next server start resolves fresh env anyway.
-
-## Non-goals (v1)
-
-- Any per-key scoping — removed from the product entirely (see above).
-- Toggling `inheritDotenv` from the CLI — UI only; state is displayed.
-- `--json` output.
-- Value peeking, even masked previews (`sk-…3f2`).
-- Multi-workspace flags / operating on a workspace other than cwd's.
-- Staleness warnings in `moi env` output.
 
 ## Touch points
 
