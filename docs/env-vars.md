@@ -49,17 +49,22 @@ place a value becomes visible is inside a process launched via
   counts (listed even when inheritance is off, marked disabled), required-key
   satisfaction (missing keys flagged with the widgets/views that declared
   them), and the secret backend.
-- `moi env set KEY=value` — upsert a custom secret (the value is everything
-  after the first `=`). Bare `moi env set KEY` reads the value from stdin —
-  hidden prompt on a TTY, piped input with one trailing newline trimmed — so
-  humans can keep secrets out of shell history. Invalid key names are
-  rejected.
+- `moi env set KEY=value [KEY=value...]` — upsert custom secrets (the value
+  is everything after the first `=`; several pairs apply as one write and one
+  worker restart). A single bare `moi env set KEY` reads the value from
+  stdin — hidden prompt on a TTY, piped input with one trailing newline
+  trimmed — so humans can keep secrets out of shell history. Invalid key
+  names and empty values are rejected, and a write that lands in the
+  plaintext file fallback (no OS keychain) says so.
 - `moi env unset KEY [KEY...]` — remove custom secrets. Dotenv-sourced keys
   are refused with a pointer to their file; removing a key that shadows a
   `.env` value un-shadows it; unknown keys warn without failing.
 - `moi env exec -- <cmd> [args...]` — run a command with the workspace env
   overlaid on the inherited process env (workspace values win, re-resolved
-  fresh on every run). The child's exit code is propagated.
+  fresh on every run; auto-loaded `.env` values are scrubbed from the
+  inherited env first, so the resolution is authoritative). The child's exit
+  code is propagated. One caveat: a child that is itself `bun` re-reads `.env`
+  from cwd on its own, which exec cannot prevent.
 
 CLI writes notify a running server over the control port (`env:changed`) so
 workers/sessions are reaped and the settings UI refetches, exactly like a
@@ -125,9 +130,11 @@ lifetime:
 
 ### Applying changes (no mid-turn reload)
 
-Because env is frozen at spawn, a `PUT /env` (or a CLI write's `env:changed`
-control message) reaps the relevant processes so the next call/message respawns
-with fresh env:
+Because env is frozen at spawn, every write path converges on
+`applyEnvChanged` (`server/env-apply.ts`) — `PUT /env` directly, a CLI write
+via its `env:changed` control message — which reaps the relevant processes so
+the next call/message respawns with fresh env, and broadcasts `env:updated`
+so every connected client refetches the view:
 
 - `restartWorker(path)` — kills the cached widget worker; next RPC respawns it.
 - `restartWorkspaceSessions(path)` — tears down **idle** agent sessions; busy

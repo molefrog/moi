@@ -93,7 +93,7 @@ export function setWorkspaceEnvStorePath(metaPath: string, secretPath?: string) 
 export function resetWorkspaceEnvForTest() {
   _metaPath = DEFAULT_META_PATH
   _secretFilePath = DEFAULT_SECRET_PATH
-  setSecretStoreBackend('auto')
+  setSecretStoreBackend(DEFAULT_BACKEND)
 }
 
 // Serialize writes per workspace path so two concurrent PUTs can't lose an
@@ -182,7 +182,11 @@ async function keychainAvailable(): Promise<boolean> {
   }
 }
 
-let _backend: 'auto' | 'file' | 'keychain' = 'auto'
+// MOI_SECRET_BACKEND=file is the out-of-process form of setSecretStoreBackend:
+// subprocesses (CLI spawned from tests, headless setups) pin the file store so
+// they can never write to the real OS keychain.
+const DEFAULT_BACKEND = process.env.MOI_SECRET_BACKEND === 'file' ? 'file' : 'auto'
+let _backend: 'auto' | 'file' | 'keychain' = DEFAULT_BACKEND
 let _storePromise: Promise<SecretStore> | null = null
 
 // Force a backend (tests pin 'file' so they never touch the real keychain).
@@ -194,9 +198,6 @@ export function setSecretStoreBackend(backend: 'auto' | 'file' | 'keychain') {
 async function createSecretStore(): Promise<SecretStore> {
   if (_backend === 'file') return new FileSecretStore()
   if (_backend === 'keychain') return new KeychainSecretStore()
-  // Out-of-process override (tests spawning the CLI, headless setups): pin the
-  // file backend so a subprocess can never write to the real OS keychain.
-  if (process.env.MOI_SECRET_BACKEND === 'file') return new FileSecretStore()
   // Announce the backend only in the server process (MOI_SERVER=1) — every CLI
   // invocation re-probes, and `moi env` already reports the backend in its
   // output, so logging here would just be per-command noise for the agent.
@@ -223,7 +224,7 @@ function secretStore(): Promise<SecretStore> {
 // ---------------------------------------------------------------------------
 
 // Older versions stored a per-key `scopes` map here too; stale entries in the
-// file are simply ignored (and dropped on the next write).
+// file are simply ignored (and dropped the next time inheritDotenv is written).
 type EnvMeta = { inheritDotenv: boolean }
 type MetaStore = Record<string, EnvMeta>
 
@@ -304,6 +305,20 @@ export async function resolveWorkspaceEnv(workspacePath: string): Promise<Record
   return { ...dotenv, ...secrets }
 }
 
+// Every key declared in the workspace's `.env` files, regardless of the
+// inherit toggle. `moi env exec` uses this to scrub Bun's auto-loaded dotenv
+// values out of the inherited process env, so the resolution above stays
+// authoritative for workspace keys.
+export async function discoverDotenvKeys(workspacePath: string): Promise<string[]> {
+  return Object.keys(mergeDotenv(await discoverDotenv(workspacePath)))
+}
+
+// Which store custom secrets land in — surfaced by the CLI after a write so a
+// plaintext-file fallback never goes unnoticed.
+export async function secretBackend(): Promise<'keychain' | 'file'> {
+  return (await secretStore()).backend
+}
+
 export type EnvUpdate = {
   // Upsert these custom secret values (write-only).
   set?: Record<string, string>
@@ -331,22 +346,28 @@ export function updateWorkspaceEnv(workspacePath: string, patch: EnvUpdate): Pro
     }
     await store.set(workspacePath, secrets)
 
-    const meta = await getMeta(workspacePath)
-    const inheritDotenv =
-      typeof patch.inheritDotenv === 'boolean' ? patch.inheritDotenv : meta.inheritDotenv
-    await writeMeta(workspacePath, { inheritDotenv })
+    // Meta holds only inheritDotenv now, so a secrets-only patch has nothing
+    // to write (this is also the write that drops legacy `scopes` entries).
+    if (typeof patch.inheritDotenv === 'boolean') {
+      await writeMeta(workspacePath, { inheritDotenv: patch.inheritDotenv })
+    }
   })
 }
 
 // The env view for the settings UI and `moi env`: every effective key with its
 // source, the discovered files (key counts only — values masked), the mode
 // flag, the secret backend, and declared-required keys with a satisfied flag.
-// `required` maps a key to the widgets that declared it (collected by caller).
+// `required` maps a key to the widgets that declared it (collected by caller);
+// it may be passed as a promise — manifest reads are independent of the env
+// stores, so both load in parallel here.
 export async function getWorkspaceEnvView(
   workspacePath: string,
-  required: Record<string, string[]> = {}
+  requiredInput: Record<string, string[]> | Promise<Record<string, string[]>> = {}
 ): Promise<WorkspaceEnvView> {
-  const { meta, files, secrets, dotenv, backend } = await loadWorkspaceEnvState(workspacePath)
+  const [{ meta, files, secrets, dotenv, backend }, required] = await Promise.all([
+    loadWorkspaceEnvState(workspacePath),
+    requiredInput
+  ])
 
   const keys = new Set([...Object.keys(dotenv), ...Object.keys(secrets)])
   const vars = [...keys].sort().map(key => {

@@ -12,7 +12,7 @@ import type { WorkspaceEntry, WorkspaceEnvView } from '@/lib/types'
 import { columns } from './cli-ui'
 import { CONTROL_PORT } from './constants'
 import { findWorkspaceForPath, listWorkspaces } from './registry'
-import { resolveWorkspaceEnv } from './workspace-env'
+import { discoverDotenvKeys, resolveWorkspaceEnv } from './workspace-env'
 
 // ---------------------------------------------------------------------------
 // Workspace resolution: cwd → nearest registered workspace
@@ -49,8 +49,11 @@ function renderDotenvSection(view: WorkspaceEnvView): string[] {
   if (view.files.length === 0) {
     out.push(pc.dim('  none detected'))
   } else {
+    const width = Math.max(...view.files.map(f => f.file.length))
     for (const f of view.files) {
-      out.push(`  ${f.file.padEnd(12)} ${pc.dim(`${f.count} ${f.count === 1 ? 'key' : 'keys'}`)}`)
+      out.push(
+        `  ${f.file.padEnd(width)}  ${pc.dim(`${f.count} ${f.count === 1 ? 'key' : 'keys'}`)}`
+      )
     }
   }
   return out
@@ -89,13 +92,14 @@ export function renderEnvView(entry: WorkspaceEntry, view: WorkspaceEnvView): st
   if (view.required.length > 0) {
     lines.push('')
     lines.push(pc.bold('Required by widgets/views'))
+    const width = Math.max(...view.required.map(r => r.key.length))
     for (const r of view.required) {
       const mark = r.satisfied ? pc.green('✓') : pc.red('✗')
       const who = r.widgets.join(', ')
       lines.push(
         r.satisfied
-          ? `  ${mark} ${r.key.padEnd(20)} ${pc.dim(who)}`
-          : `  ${mark} ${r.key.padEnd(20)} missing — required by ${who}`
+          ? `  ${mark} ${r.key.padEnd(width)}  ${pc.dim(who)}`
+          : `  ${mark} ${r.key.padEnd(width)}  missing — required by ${who}`
       )
     }
   }
@@ -182,8 +186,13 @@ export function notifyEnvChanged(path: string): Promise<boolean> {
     ws.onmessage = event => {
       clearTimeout(timer)
       ws.close()
-      const res = JSON.parse(String(event.data))
-      resolve(res.ok === true)
+      // A malformed reply must still settle the promise — the CLI awaits this.
+      try {
+        const res: unknown = JSON.parse(String(event.data))
+        resolve(typeof res === 'object' && res !== null && (res as { ok?: unknown }).ok === true)
+      } catch {
+        resolve(false)
+      }
     }
     ws.onerror = () => {
       clearTimeout(timer)
@@ -201,7 +210,17 @@ export function notifyEnvChanged(path: string): Promise<boolean> {
 // session snapshot. Returns the child's exit code; 127 when the binary is
 // missing.
 export async function execWithEnv(workspacePath: string, cmd: string[]): Promise<number> {
-  const env = { ...process.env, ...(await resolveWorkspaceEnv(workspacePath)) }
+  const [resolved, dotenvKeys] = await Promise.all([
+    resolveWorkspaceEnv(workspacePath),
+    discoverDotenvKeys(workspacePath)
+  ])
+  // Bun auto-loads the workspace `.env` into THIS process when the CLI runs
+  // from the workspace root, so the inherited env is not trustworthy for
+  // workspace keys — scrub them and let the resolution re-add what actually
+  // applies (otherwise `inheritDotenv: off` still leaks `.env` values).
+  const base: Record<string, string | undefined> = { ...process.env }
+  for (const key of dotenvKeys) delete base[key]
+  const env = { ...base, ...resolved }
   try {
     const proc = Bun.spawn(cmd, {
       cwd: process.cwd(),

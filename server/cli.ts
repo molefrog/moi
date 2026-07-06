@@ -27,7 +27,6 @@ import {
 } from './cli-env'
 import { columns } from './cli-ui'
 import { CONTROL_PORT, PORT } from './constants'
-import { requiredEnvFor } from './required-env'
 import { type OpenClawAgent, discoverOpenClawAgents } from './openclaw'
 import { liftToWorkspaceRoot, registerWorkspace } from './registry'
 import { serverCwd } from './server-cwd'
@@ -40,7 +39,12 @@ import {
   staleSkillNotice
 } from './skill-version'
 import { installBundledSkills } from './skills-template'
-import { getWorkspaceEnvView, isValidEnvKey, updateWorkspaceEnv } from './workspace-env'
+import {
+  getWorkspaceEnvView,
+  isValidEnvKey,
+  secretBackend,
+  updateWorkspaceEnv
+} from './workspace-env'
 import { provisionWorkspace, skillsDirFor } from './workspace-init'
 
 // ---- helpers ----------------------------------------------------------------
@@ -676,42 +680,71 @@ const status = defineCommand({
 
 // ---- env subcommands --------------------------------------------------------
 
+function envFail(message: string): never {
+  console.error('\n' + pc.red('✗') + ' ' + message + '\n')
+  process.exit(1)
+}
+
 const envSet = defineCommand({
   meta: {
     name: 'set',
     description:
-      'Set a custom secret: `moi env set KEY=value`, or `moi env set KEY` to read the value from stdin'
+      'Set custom secrets: `moi env set KEY=value [KEY=value...]`, or `moi env set KEY` to read one value from stdin'
   },
   args: {
     key: {
       type: 'positional',
       required: true,
-      description: 'KEY=value, or a bare KEY to read the value from stdin'
+      description: 'KEY=value pair(s), or a single bare KEY to read the value from stdin'
     }
   },
   async run({ args }) {
     const entry = await resolveCwdWorkspace()
-    const raw = String(args.key)
-    const eq = raw.indexOf('=')
-    const key = eq === -1 ? raw : raw.slice(0, eq)
-    if (!isValidEnvKey(key)) {
-      console.error('\n' + pc.red('✗') + ` Invalid env key: ${key}\n`)
-      process.exit(1)
-    }
-    let value: string
-    if (eq === -1) {
+    const pairs = args._
+    const set: Record<string, string> = {}
+
+    if (pairs.length === 1 && !pairs[0].includes('=')) {
+      // Bare-KEY form: one key, value from stdin (hidden prompt on a TTY).
+      const key = pairs[0]
+      if (!isValidEnvKey(key)) envFail(`Invalid env key: ${key}`)
+      let value: string
       try {
         value = await readSecretValue(key)
       } catch {
         // Ctrl-C at the hidden prompt.
         process.exit(1)
       }
+      // An empty value is almost always an unset variable on the piping side —
+      // storing '' would silently shadow a real .env value with nothing.
+      if (value === '')
+        envFail(`Empty value for ${key} — pipe a non-empty value or pass ${key}=value`)
+      set[key] = value
     } else {
-      value = raw.slice(eq + 1)
+      for (const pair of pairs) {
+        const eq = pair.indexOf('=')
+        if (eq === -1) {
+          envFail(
+            `Missing value for ${pair} — use KEY=value (bare KEY reads stdin only when set alone)`
+          )
+        }
+        const key = pair.slice(0, eq)
+        const value = pair.slice(eq + 1)
+        if (!isValidEnvKey(key)) envFail(`Invalid env key: ${key}`)
+        if (value === '')
+          envFail(`Empty value for ${key} — use \`moi env unset ${key}\` to remove a key`)
+        set[key] = value
+      }
     }
-    await updateWorkspaceEnv(entry.path, { set: { [key]: value } })
+
+    await updateWorkspaceEnv(entry.path, { set })
     await notifyEnvChanged(entry.path)
-    console.log(pc.green('✓') + ` Set ${pc.bold(key)} ${pc.dim('(custom)')}`)
+    for (const key of Object.keys(set)) {
+      console.log(pc.green('✓') + ` Set ${pc.bold(key)} ${pc.dim('(custom)')}`)
+    }
+    // A plaintext fallback should never go unnoticed at write time.
+    if ((await secretBackend()) === 'file') {
+      console.log(pc.dim('  Stored in a 0600 file — OS keychain unavailable.'))
+    }
     process.exit(0)
   }
 })
@@ -789,11 +822,15 @@ const env = defineCommand({
   subCommands: envSubCommands,
   async run({ rawArgs }) {
     // citty invokes the parent run even after dispatching a subcommand — only
-    // render the table when no subcommand ran.
+    // render the table when no subcommand ran. Object.hasOwn so prototype
+    // names ('constructor', 'toString') never count as a dispatched command.
     const first = rawArgs.find(a => !a.startsWith('-'))
-    if (first && first in envSubCommands) return
+    if (first && Object.hasOwn(envSubCommands, first)) return
     const entry = await resolveCwdWorkspace()
-    const view = await getWorkspaceEnvView(entry.path, await requiredEnvFor(entry.path))
+    // Lazy: required-env pulls the widget/view bundler chain (TS compiler),
+    // which must not load for every other `moi` command's startup.
+    const { requiredEnvFor } = await import('./required-env')
+    const view = await getWorkspaceEnvView(entry.path, requiredEnvFor(entry.path))
     console.log('\n' + renderEnvView(entry, view) + '\n')
     process.exit(0)
   }

@@ -2,9 +2,8 @@ import { resolve } from 'path'
 
 import type { WorkspaceEntry } from '@/lib/types'
 
-import { restartWorkspaceSessions } from './cc-session'
 import { CONTROL_PORT } from './constants'
-import { restartWorker } from './functions'
+import { applyEnvChanged } from './env-apply'
 import { processIcon } from './icon'
 import { loadLayout, saveLayout } from './layout'
 import { publishEvent } from './events'
@@ -117,14 +116,11 @@ export const control = Bun.serve({
         }
 
         if (data.type === 'env:changed') {
-          // A CLI env write (`moi env set`/`unset`) already landed on disk.
-          // Env is frozen at spawn, so reap the widget worker and idle agent
-          // sessions (mirrors PUT /env) and tell clients to refetch the view.
+          // A CLI env write (`moi env set`/`unset`) already landed on disk —
+          // reap + broadcast so it takes effect (same path as PUT /env).
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
-          restartWorker(match.path)
-          restartWorkspaceSessions(match.path)
-          publishEvent({ type: 'env:updated', workspaceId: match.id })
+          applyEnvChanged(match)
           ws.send(JSON.stringify({ ok: true }))
           return
         }

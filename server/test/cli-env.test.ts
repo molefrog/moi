@@ -167,6 +167,38 @@ describe('moi env set / unset', () => {
     expect(res.stderr).toContain('Invalid env key')
   })
 
+  test('rejects an empty value (KEY= and empty stdin)', async () => {
+    const inline = await runCli(['set', 'TOKEN='])
+    expect(inline.code).toBe(1)
+    expect(inline.stderr).toContain('Empty value')
+
+    // Agent running `moi env set KEY` with no pipe (stdin /dev/null) must not
+    // silently store '' — it would shadow a real .env value with nothing.
+    const piped = await runCli(['set', 'TOKEN'], { stdin: '' })
+    expect(piped.code).toBe(1)
+    expect(piped.stderr).toContain('Empty value')
+    expect(await storedSecrets()).toEqual({})
+  })
+
+  test('sets multiple KEY=value pairs in one invocation', async () => {
+    const res = await runCli(['set', 'A=1', 'B=2'])
+    expect(res.code).toBe(0)
+    expect(res.stdout).toContain('Set A')
+    expect(res.stdout).toContain('Set B')
+    expect((await storedSecrets())[wsDir]).toEqual({ A: '1', B: '2' })
+
+    // Bare KEY (stdin form) is only valid alone.
+    const mixed = await runCli(['set', 'C=3', 'D'])
+    expect(mixed.code).toBe(1)
+    expect(mixed.stderr).toContain('Missing value')
+  })
+
+  test('warns when secrets land in the file backend', async () => {
+    const res = await runCli(['set', 'K=v'])
+    expect(res.code).toBe(0)
+    expect(res.stdout).toContain('0600 file')
+  })
+
   test('custom secret shadows .env and unset un-shadows it', async () => {
     await writeFile(join(wsDir, '.env'), 'TOKEN=from-dotenv\n')
     await runCli(['set', 'TOKEN=from-cli'])
@@ -229,6 +261,24 @@ describe('moi env exec', () => {
     )
     await proc.exited
     expect((await new Response(proc.stdout).text()).trim()).toBe('fresh')
+  })
+
+  test('does not leak auto-loaded .env values when inheritance is off', async () => {
+    // Bun auto-loads the workspace .env into the CLI process itself (cwd is
+    // the workspace root), so exec must scrub dotenv keys from the inherited
+    // env and let the resolution decide what applies. The child here is `sh`,
+    // not `bun` — a Bun child re-reads .env off disk on its own, which exec
+    // cannot prevent (documented caveat; the function worker dodges it with
+    // its neutral-cwd spawn).
+    await writeFile(join(wsDir, '.env'), 'LEAK_TEST=from-dotenv\n')
+    await mkdir(moiDataDir(), { recursive: true })
+    await writeFile(
+      join(moiDataDir(), 'workspace-env.json'),
+      JSON.stringify({ [wsDir]: { inheritDotenv: false } })
+    )
+    const res = await runCli(['exec', '--', 'sh', '-c', 'echo "${LEAK_TEST:-unset}"'])
+    expect(res.code).toBe(0)
+    expect(res.stdout.trim()).toBe('unset')
   })
 
   test('propagates the child exit code', async () => {
