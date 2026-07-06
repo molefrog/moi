@@ -144,7 +144,7 @@ agent sessions so the next call picks up changes. The CLI mirrors that:
 The agent learns about env through the workspace skill
 (`workspace/.claude/skills/moi-workspace/SKILL.md`). Today its
 "Environment & secrets" section only covers applet authoring (`process.env` in
-`.server.ts`, advisory `requiredEnv`) — the agent has no way to *discover* what
+`.server.ts`, advisory `requiredEnv`) — the agent has no way to _discover_ what
 keys exist or run scripts with the env. Ship the skill update with the feature
 (bump the `<moi-skill version>` marker so `moi skill` flags drift).
 
@@ -192,16 +192,16 @@ Concrete edits:
 
 ## Touch points
 
-| File                      | Change                                                                                                      |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `server/workspace-env.ts` | remove sink/scope system (`resolveWorkspaceEnv(path)`, no `scopes` metadata); rest reused as-is              |
-| `lib/types.ts`            | delete `EnvScope`; drop `scope` from `WorkspaceEnvVar`                                                       |
-| `server/api.ts`           | drop `scopes` from `PUT /env`; extract `requiredEnvFor` into a shared helper the CLI reuses                  |
-| `client/` env settings    | remove the scope selector                                                                                    |
-| `server/cli.ts`           | new `env` command group (`env`, `set`, `unset`, `exec`), registered in `main.subCommands`                    |
-| `server/cli-env.ts` (new) | table rendering + stdin/prompt input + exec spawn, keeping `cli.ts` from growing another 300 lines           |
-| `server/control.ts`       | `env:changed` handler → reap worker + idle sessions, publish live event                                      |
-| `docs/env-vars.md`        | remove scoping docs; add a short "CLI" section linking here                                                  |
+| File                                              | Change                                                                                             |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `server/workspace-env.ts`                         | remove sink/scope system (`resolveWorkspaceEnv(path)`, no `scopes` metadata); rest reused as-is    |
+| `lib/types.ts`                                    | delete `EnvScope`; drop `scope` from `WorkspaceEnvVar`                                             |
+| `server/api.ts`                                   | drop `scopes` from `PUT /env`; extract `requiredEnvFor` into a shared helper the CLI reuses        |
+| `client/` env settings                            | remove the scope selector                                                                          |
+| `server/cli.ts`                                   | new `env` command group (`env`, `set`, `unset`, `exec`), registered in `main.subCommands`          |
+| `server/cli-env.ts` (new)                         | table rendering + stdin/prompt input + exec spawn, keeping `cli.ts` from growing another 300 lines |
+| `server/control.ts`                               | `env:changed` handler → reap worker + idle sessions, publish live event                            |
+| `docs/env-vars.md`                                | remove scoping docs; add a short "CLI" section linking here                                        |
 | `workspace/.claude/skills/moi-workspace/SKILL.md` | env discovery guidance + `moi env` in the CLI list (see Skill changes); bump `<moi-skill version>` |
 
 ## Details

@@ -112,6 +112,8 @@ never from inside `.moi/` itself. You don't pass paths; moi resolves the workspa
 - `moi theme --font=<key>` — change font theme (omit `--font` to list options)
 - `moi theme --color=<key>` — change color preset (omit `--color` to list options)
 - `moi config` — set the workspace name & icon (`moi config --help` for usage)
+- `moi env` — list available env keys and where they come from (never values);
+  `moi env exec -- <cmd>` runs a command with the workspace env (see Environment & secrets)
 - `moi skill` — show installed vs bundled skill versions; `moi skill update` to refresh
 
 For more options, commands, use `moi help`.
@@ -193,10 +195,27 @@ media → `.server.ts` returns the **path**, render with `fileUrl()`.
 
 ## Environment & secrets
 
+Each workspace has an effective env: keys from the project's `.env` / `.env.local` (when
+inheritance is enabled in settings) plus **custom secrets** the user manages in the workspace env
+settings. moi injects it into your shell and into applet `.server.ts` functions.
+
+- **Check before you assume.** When a task needs a key or token — an API pull, a widget calling a
+  service — run `moi env` first. It lists key names with their source (`.env` / custom) and flags
+  declared `requiredEnv` keys that are missing. Values are never shown.
+- **Key present** → say which key you'll use and where it's from ("using `NOTION_TOKEN` from
+  `.env`") and proceed. To run a script or one-off command with the workspace env, use
+  `moi env exec -- bun script.ts` — it also picks up values changed after your session started.
+- **Key missing** → never invent or hardcode a value, and don't edit `.env` yourself. Tell the user
+  the exact key name to add in the workspace env settings. Still build and wire the applet: declare
+  the key in `config.requiredEnv` and handle its absence, so it works the moment the user sets it.
+  If the user pastes a value in chat, store it with `moi env set KEY=value`
+  (`moi env unset KEY` removes it).
+- **Never print secret values** — not in chat, not in logs. Refer to keys by name only.
+
 `process.env` is readable **only** inside `.server.ts` (the `.tsx` runs in the browser) — keep API
-keys there. moi injects per-workspace **custom secrets** and optionally-inherited **`.env`** values;
-either may be absent, so always handle a missing key. List expected keys in `config.requiredEnv` —
-advisory only (it surfaces a hint in the UI; it's never enforced).
+keys there. Either source may be absent, so always handle a missing key. List expected keys in
+`config.requiredEnv` — advisory only (it surfaces a hint in the UI and `moi env`; it's never
+enforced).
 
 ```ts
 const key = process.env.ELEVENLABS_API_KEY
@@ -249,4 +268,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.3.0" />
+<moi-skill version="0.4.0" />

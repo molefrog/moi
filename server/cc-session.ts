@@ -534,7 +534,7 @@ export async function sendCCMessage(input: {
       effort: input.effort,
       stream: wantStream,
       // The agent only sees secrets scoped to the 'agent' sink (plus .env).
-      workspaceEnv: await resolveWorkspaceEnv(input.workspacePath, 'agent')
+      workspaceEnv: await resolveWorkspaceEnv(input.workspacePath)
     })
   }
 

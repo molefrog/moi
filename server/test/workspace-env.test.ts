@@ -6,7 +6,6 @@ import { join } from 'path'
 import {
   getWorkspaceEnvView,
   isValidEnvKey,
-  isValidScope,
   resetWorkspaceEnvForTest,
   resolveWorkspaceEnv,
   setSecretStoreBackend,
@@ -39,60 +38,42 @@ describe('validation helpers', () => {
     expect(isValidEnvKey('1ABC')).toBe(false)
     expect(isValidEnvKey('a-b')).toBe(false)
   })
-
-  test('isValidScope', () => {
-    expect(isValidScope('widgets')).toBe(true)
-    expect(isValidScope('agent')).toBe(true)
-    expect(isValidScope('both')).toBe(true)
-    expect(isValidScope('nope')).toBe(false)
-    expect(isValidScope(undefined)).toBe(false)
-  })
 })
 
 describe('resolveWorkspaceEnv — dotenv', () => {
   test('empty when nothing configured', async () => {
-    expect(await resolveWorkspaceEnv(wsDir, 'widgets')).toEqual({})
+    expect(await resolveWorkspaceEnv(wsDir)).toEqual({})
   })
 
-  test('parses .env via node:util parseEnv, feeds both sinks', async () => {
+  test('parses .env via node:util parseEnv', async () => {
     await writeFile(join(wsDir, '.env'), 'A=1\n# comment\nB="two words"\n')
-    expect(await resolveWorkspaceEnv(wsDir, 'widgets')).toEqual({ A: '1', B: 'two words' })
-    expect(await resolveWorkspaceEnv(wsDir, 'agent')).toEqual({ A: '1', B: 'two words' })
+    expect(await resolveWorkspaceEnv(wsDir)).toEqual({ A: '1', B: 'two words' })
   })
 
   test('.env.local overrides .env', async () => {
     await writeFile(join(wsDir, '.env'), 'A=base\nB=base\n')
     await writeFile(join(wsDir, '.env.local'), 'B=local\n')
-    expect(await resolveWorkspaceEnv(wsDir, 'agent')).toEqual({ A: 'base', B: 'local' })
+    expect(await resolveWorkspaceEnv(wsDir)).toEqual({ A: 'base', B: 'local' })
   })
 
   test('inheritDotenv=false ignores .env', async () => {
     await writeFile(join(wsDir, '.env'), 'A=1\n')
     await updateWorkspaceEnv(wsDir, { inheritDotenv: false })
-    expect(await resolveWorkspaceEnv(wsDir, 'widgets')).toEqual({})
+    expect(await resolveWorkspaceEnv(wsDir)).toEqual({})
   })
 })
 
-describe('resolveWorkspaceEnv — custom secrets + scope', () => {
+describe('resolveWorkspaceEnv — custom secrets', () => {
   test('custom wins over .env', async () => {
     await writeFile(join(wsDir, '.env'), 'TOKEN=from-dotenv\n')
     await updateWorkspaceEnv(wsDir, { set: { TOKEN: 'from-ui' } })
-    expect(await resolveWorkspaceEnv(wsDir, 'widgets')).toEqual({ TOKEN: 'from-ui' })
+    expect(await resolveWorkspaceEnv(wsDir)).toEqual({ TOKEN: 'from-ui' })
   })
 
-  test('scope gates which sink sees a secret', async () => {
-    await updateWorkspaceEnv(wsDir, {
-      set: { W_ONLY: 'w', A_ONLY: 'a', SHARED: 's' },
-      scopes: { W_ONLY: 'widgets', A_ONLY: 'agent', SHARED: 'both' }
-    })
-    expect(await resolveWorkspaceEnv(wsDir, 'widgets')).toEqual({ W_ONLY: 'w', SHARED: 's' })
-    expect(await resolveWorkspaceEnv(wsDir, 'agent')).toEqual({ A_ONLY: 'a', SHARED: 's' })
-  })
-
-  test('new keys default to scope both', async () => {
+  test('custom secrets merge with .env keys', async () => {
+    await writeFile(join(wsDir, '.env'), 'A=1\n')
     await updateWorkspaceEnv(wsDir, { set: { K: 'v' } })
-    expect(await resolveWorkspaceEnv(wsDir, 'widgets')).toEqual({ K: 'v' })
-    expect(await resolveWorkspaceEnv(wsDir, 'agent')).toEqual({ K: 'v' })
+    expect(await resolveWorkspaceEnv(wsDir)).toEqual({ A: '1', K: 'v' })
   })
 })
 
@@ -100,15 +81,14 @@ describe('updateWorkspaceEnv — patch semantics', () => {
   test('set upserts, remove deletes, others untouched', async () => {
     await updateWorkspaceEnv(wsDir, { set: { A: '1', B: '2' } })
     await updateWorkspaceEnv(wsDir, { set: { B: '22', C: '3' }, remove: ['A'] })
-    expect(await resolveWorkspaceEnv(wsDir, 'widgets')).toEqual({ B: '22', C: '3' })
+    expect(await resolveWorkspaceEnv(wsDir)).toEqual({ B: '22', C: '3' })
   })
 
-  test('removing a key drops its scope metadata', async () => {
-    await updateWorkspaceEnv(wsDir, { set: { A: '1' }, scopes: { A: 'agent' } })
+  test('remove then re-add round-trips', async () => {
+    await updateWorkspaceEnv(wsDir, { set: { A: '1' } })
     await updateWorkspaceEnv(wsDir, { remove: ['A'] })
     await updateWorkspaceEnv(wsDir, { set: { A: 'again' } })
-    // Re-added A defaults back to 'both', not the stale 'agent'.
-    expect(await resolveWorkspaceEnv(wsDir, 'widgets')).toEqual({ A: 'again' })
+    expect(await resolveWorkspaceEnv(wsDir)).toEqual({ A: 'again' })
   })
 
   test('drops invalid keys and non-string values', async () => {
@@ -126,30 +106,25 @@ describe('updateWorkspaceEnv — patch semantics', () => {
         updateWorkspaceEnv(wsDir, { set: { [`K${i}`]: `${i}` } })
       )
     )
-    const env = await resolveWorkspaceEnv(wsDir, 'widgets')
+    const env = await resolveWorkspaceEnv(wsDir)
     expect(Object.keys(env).sort()).toEqual(Array.from({ length: 12 }, (_, i) => `K${i}`).sort())
   })
 })
 
 describe('getWorkspaceEnvView', () => {
-  test('reports source/scope/files and never leaks values', async () => {
+  test('reports source/files and never leaks values', async () => {
     await writeFile(join(wsDir, '.env'), 'SHARED=dotenv\nONLY_ENV=x\n')
     await writeFile(join(wsDir, '.env.local'), 'SHARED=dotenv\n')
-    await updateWorkspaceEnv(wsDir, {
-      set: { SHARED: 'ui', ONLY_CUSTOM: 'y' },
-      scopes: { ONLY_CUSTOM: 'agent' }
-    })
+    await updateWorkspaceEnv(wsDir, { set: { SHARED: 'ui', ONLY_CUSTOM: 'y' } })
 
     const view = await getWorkspaceEnvView(wsDir)
     const byKey = Object.fromEntries(view.vars.map(v => [v.key, v]))
 
     expect(byKey.SHARED.source).toBe('both')
-    expect(byKey.SHARED.scope).toBe('both')
     expect(byKey.SHARED.files).toEqual(['.env', '.env.local'])
 
     expect(byKey.ONLY_ENV.source).toBe('dotenv')
     expect(byKey.ONLY_CUSTOM.source).toBe('custom')
-    expect(byKey.ONLY_CUSTOM.scope).toBe('agent')
 
     // No var carries a value — the API is write-only for secrets.
     for (const v of view.vars) expect('value' in v).toBe(false)
@@ -162,20 +137,17 @@ describe('getWorkspaceEnvView', () => {
     expect(view.backend).toBe('file')
   })
 
-  test('required satisfied only when visible to widgets', async () => {
+  test('required satisfied only when in the effective env', async () => {
     await writeFile(join(wsDir, '.env'), 'PRESENT=1\n')
-    await updateWorkspaceEnv(wsDir, {
-      set: { AGENT_KEY: 'a' },
-      scopes: { AGENT_KEY: 'agent' }
-    })
+    await updateWorkspaceEnv(wsDir, { set: { CUSTOM_KEY: 'a' } })
     const view = await getWorkspaceEnvView(wsDir, {
       PRESENT: ['weather'],
-      AGENT_KEY: ['tts'], // present but agent-scoped → not visible to widgets
+      CUSTOM_KEY: ['tts'],
       MISSING: ['tts']
     })
     const req = Object.fromEntries(view.required.map(r => [r.key, r]))
     expect(req.PRESENT.satisfied).toBe(true)
-    expect(req.AGENT_KEY.satisfied).toBe(false)
+    expect(req.CUSTOM_KEY.satisfied).toBe(true)
     expect(req.MISSING.satisfied).toBe(false)
   })
 })
