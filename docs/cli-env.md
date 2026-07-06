@@ -8,9 +8,26 @@ API key?", or "how do I run a script with the workspace env?" without guessing.
 This is a CLI face over the existing env model (`server/workspace-env.ts`,
 see `docs/env-vars.md`) — no new storage, no new resolution semantics.
 
-**Secret values are never printed.** Every subcommand deals in key names,
-sources, and scopes only. The single place a value becomes visible is inside a
-process the user explicitly launches via `moi env exec`.
+**Secret values are never printed.** Every subcommand deals in key names and
+sources only. The single place a value becomes visible is inside a process the
+user explicitly launches via `moi env exec`.
+
+## Scope removal (prerequisite)
+
+The per-key sink scope system (`widgets` / `agent` / `both`) is **dropped
+entirely** as part of this work — there is one effective env, and every key
+flows to every sink (widgets, agent, exec). Concretely:
+
+- `resolveWorkspaceEnv(path)` loses its `sink` parameter; both spawn sites
+  (`functions.ts`, `cc-session.ts`) get the same resolution.
+- `EnvScope`, the `scopes` metadata map, `scopeOf`, and scope validation are
+  deleted from `workspace-env.ts` / `lib/types.ts`. Existing `scopes` entries
+  in `workspace-env.json` are simply ignored (stale metadata, harmless).
+- `PUT /api/workspaces/:id/env` drops the `scopes` field; `WorkspaceEnvVar`
+  drops `scope`.
+- The settings UI removes the scope selector.
+- `requiredEnv` satisfaction is computed against the single effective env.
+- `docs/env-vars.md` is updated to match.
 
 ## Commands
 
@@ -26,10 +43,10 @@ Workspace: ~/projects/acme  (acme)
   .env         4 keys
   .env.local   2 keys
 
-KEY                 SOURCE             SCOPE
-ANTHROPIC_API_KEY   custom             both
+KEY                 SOURCE
+ANTHROPIC_API_KEY   custom
 DATABASE_URL        .env
-ELEVENLABS_API_KEY  custom             widgets
+ELEVENLABS_API_KEY  custom
 OPENAI_API_KEY      .env, .env.local
 
 Required by widgets/views
@@ -40,8 +57,8 @@ Secrets stored in: OS keychain
 ```
 
 - **Vars table**: every effective key with its `source` (`.env` file list /
-  `custom` / both — a custom secret shadowing a `.env` key shows both) and, for
-  custom keys, the sink `scope`. No values, no masked previews.
+  `custom` / both — a custom secret shadowing a `.env` key shows both). No
+  values, no masked previews.
 - **Dotenv state**: detected `.env` files with key counts. When `inheritDotenv`
   is off, the files are still listed but the section reads
   `inherited: off (disabled in settings — keys not injected)` and dotenv-only
@@ -64,10 +81,8 @@ Upserts a **custom secret** (moi's own env — never touches `.env` files).
   hidden input; when piped, consume stdin and trim a single trailing newline.
   This keeps secrets out of shell history for humans.
 - Key must pass `isValidEnvKey` (POSIX-ish name); reject otherwise, exit 1.
-- New keys get the default scope `both`. There is **no `--scope` flag** —
-  scopes are managed in the settings UI only.
 - Values are write-only, consistent with the API: the command confirms
-  (`Set FOO (custom, scope: both)`) without echoing the value.
+  (`Set FOO (custom)`) without echoing the value.
 
 ### `moi env unset KEY [KEY...]`
 
@@ -76,28 +91,23 @@ removed — a dotenv-sourced key errors with a pointer to the `.env` file it
 lives in. Unsetting a key that shadows a `.env` value un-shadows it; the
 confirmation says so. Unknown keys warn but don't fail the whole invocation.
 
-### `moi env exec [--sink widgets] -- <cmd> [args...]`
+### `moi env exec -- <cmd> [args...]`
 
 Runs a command with the workspace env applied — the way to run a script or
 one-off tool with fresh env (the agent's own session env is frozen at spawn).
 
-- Env = `{ ...process.env, ...resolveWorkspaceEnv(path, sink) }`. Workspace env
-  wins over inherited process env, so re-resolved values override the agent
+- Env = `{ ...process.env, ...resolveWorkspaceEnv(path) }`. Workspace env wins
+  over inherited process env, so re-resolved values override the agent
   session's stale snapshot.
-- **Default sink is `agent`**: `.env` (when inherited) + custom keys scoped
-  `agent`/`both`. Widgets-only secrets are *not* injected — the agent is the
-  primary caller, and injecting everything would let
-  `moi env exec -- printenv` defeat the scope feature.
-- `--sink widgets` switches to the widgets resolution, for humans testing
-  widget server code from a terminal.
+- Injects the one effective env: `.env` (when inherited) + all custom secrets.
 - Spawns in the current cwd, inherits stdio, propagates the child's exit code.
   Missing `--` or empty command → usage error.
 
 Caveat (documented, not solved): if the child is itself `bun` running from the
 workspace root, Bun auto-loads `.env` from cwd, which can bypass
-`inheritDotenv: off` and shadow scoping for dotenv keys. Same class of issue
-the function worker solves with its neutral-cwd trick; out of scope for the
-CLI — `exec` controls injection, not what the child runtime reads off disk.
+`inheritDotenv: off` for dotenv keys. Same class of issue the function worker
+solves with its neutral-cwd trick; out of scope for the CLI — `exec` controls
+injection, not what the child runtime reads off disk.
 
 ## Workspace resolution
 
@@ -130,7 +140,7 @@ agent sessions so the next call picks up changes. The CLI mirrors that:
 
 ## Non-goals (v1)
 
-- Editing scopes from the CLI (`--scope`) — UI only; new keys default `both`.
+- Any per-key scoping — removed from the product entirely (see above).
 - Toggling `inheritDotenv` from the CLI — UI only; state is displayed.
 - `--json` output.
 - Value peeking, even masked previews (`sk-…3f2`).
@@ -141,12 +151,14 @@ agent sessions so the next call picks up changes. The CLI mirrors that:
 
 | File                      | Change                                                                                                      |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `server/workspace-env.ts` | remove sink/scope system (`resolveWorkspaceEnv(path)`, no `scopes` metadata); rest reused as-is              |
+| `lib/types.ts`            | delete `EnvScope`; drop `scope` from `WorkspaceEnvVar`                                                       |
+| `server/api.ts`           | drop `scopes` from `PUT /env`; extract `requiredEnvFor` into a shared helper the CLI reuses                  |
+| `client/` env settings    | remove the scope selector                                                                                    |
 | `server/cli.ts`           | new `env` command group (`env`, `set`, `unset`, `exec`), registered in `main.subCommands`                    |
 | `server/cli-env.ts` (new) | table rendering + stdin/prompt input + exec spawn, keeping `cli.ts` from growing another 300 lines           |
 | `server/control.ts`       | `env:changed` handler → reap worker + idle sessions, publish live event                                      |
-| `server/workspace-env.ts` | reused as-is (`getWorkspaceEnvView`, `updateWorkspaceEnv`, `resolveWorkspaceEnv`)                            |
-| `server/api.ts`           | extract `requiredEnvFor` (widget + view `requiredEnv` aggregation) into a shared helper the CLI reuses       |
-| `docs/env-vars.md`        | short "CLI" section linking here                                                                             |
+| `docs/env-vars.md`        | remove scoping docs; add a short "CLI" section linking here                                                  |
 
 ## Details
 
@@ -154,6 +166,6 @@ agent sessions so the next call picks up changes. The CLI mirrors that:
   errors; `exec` returns the child's exit code.
 - Output styling follows existing CLI conventions (`picocolors`, the `columns`
   helper used by `moi openclaw`/`status` tables).
-- Tests: `server/test/workspace-env.test.ts` already covers the model; add CLI
-  tests for workspace resolution, set/unset round-trip (file backend), and
-  exec sink filtering.
+- Tests: update `server/test/workspace-env.test.ts` for the scope removal; add
+  CLI tests for workspace resolution, set/unset round-trip (file backend), and
+  exec env injection.
