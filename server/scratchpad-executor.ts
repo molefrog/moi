@@ -305,6 +305,20 @@ function applyOp(store: TLStore, op: ScratchOp): ScratchOpResult {
       store.put([{ ...shape, x: op.x, y: op.y }])
       return { ok: true }
     }
+    case 'resize': {
+      const shape = requireShape(op.name)
+      // Only shapes with real w/h props resize: geo (rects) and images. Notes,
+      // text, and arrows size themselves — a clear error beats a silent no-op.
+      const type = (shape as unknown as { type?: string }).type
+      if (type !== 'geo' && type !== 'image') {
+        throw new Error(`Only rectangles and images can be resized — "${op.name}" is a ${type}.`)
+      }
+      if (!(op.w > 0) || !(op.h > 0)) {
+        throw new Error(`Size must be positive, got ${op.w},${op.h}`)
+      }
+      store.put([{ ...shape, props: { ...shape.props, w: op.w, h: op.h } } as TLRecord])
+      return { ok: true }
+    }
     case 'set': {
       const shape = requireShape(op.name)
       store.put([

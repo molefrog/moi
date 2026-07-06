@@ -97,14 +97,38 @@ export type ScratchOp =
       elbow?: boolean
     } & ScratchStyle)
   | { kind: 'move'; name: string; x: number; y: number }
+  // Resize a rectangle or image — the actionable half of a `text-overflow` lint
+  // finding. Other shape kinds (notes, text, arrows) size themselves.
+  | { kind: 'resize'; name: string; w: number; h: number }
   | { kind: 'set'; name: string; text: string }
   | { kind: 'delete'; name: string }
   | { kind: 'clear' }
-  | { kind: 'view' }
+  // `headless` skips the browser relay and always uses the server-side renderer
+  // (deterministic for tests/CI); without it the relay is tried first.
+  | { kind: 'view'; headless?: boolean }
 
 // What a tab returns after running an op: a shape's `name` for add ops, a PNG
-// data URL for `view`, or a bare ack for mutations.
-export type ScratchOpResult = { name: string } | { image: string } | { ok: true }
+// data URL for `view`, or a bare ack for mutations. A `view` served by the
+// server-side renderer (no live tab) is marked `headless` so the CLI can tell
+// the agent it's looking at an approximation, not the browser's pixels.
+export type ScratchOpResult =
+  | { name: string }
+  | { image: string; headless?: boolean }
+  | { ok: true }
+
+// One `moi scratch lint` finding — a machine-checkable "looks off": an
+// overflowing label, an overlap, an almost-aligned pair, uneven gaps. `ids` are
+// the shape names involved; `fix` is a ready-to-run `moi scratch` command that
+// resolves it. Errors are things a human would always fix; warns are judgement
+// calls. Lint is advisory — the CLI always exits 0.
+export type ScratchLintSeverity = 'error' | 'warn'
+export type ScratchLintFinding = {
+  code: 'text-overflow' | 'overlap' | 'near-misalign' | 'uneven-gaps'
+  severity: ScratchLintSeverity
+  ids: string[]
+  message: string
+  fix?: string
+}
 
 // An attachment uploaded ahead of a chat message. The bytes live server-side in
 // an in-memory upload store (see server/uploads.ts); a chat frame references it

@@ -1,6 +1,6 @@
 import { resolve } from 'path'
 
-import type { WorkspaceEntry } from '@/lib/types'
+import type { ScratchOpResult, WorkspaceEntry } from '@/lib/types'
 
 import { CONTROL_PORT } from './constants'
 import { applyEnvChanged } from './env-apply'
@@ -9,8 +9,10 @@ import { loadLayout, saveLayout } from './layout'
 import { publishEvent } from './events'
 import { findWorkspaceForPath, listWorkspaces, registerWorkspace } from './registry'
 import { executeScratchOp } from './scratchpad-executor'
+import { lintScratchpad } from './scratchpad-lint'
 import { readScratchpadImage, readScratchpadShapes } from './scratchpad'
-import { relayScratchOp } from './scratchpad-relay'
+import { renderScratchpadPng } from './scratchpad-render'
+import { NO_LIVE_CANVAS, relayScratchOp } from './scratchpad-relay'
 import { broadcastAll } from './state'
 import { applyThemeUpdate, matchColorTheme } from './theme'
 import { handleBundle } from './widgets'
@@ -45,6 +47,24 @@ async function resolveWorkspace(
     return null
   }
   return match
+}
+
+// Serve a `view`: the browser relay gives exact pixels, so it's tried first;
+// when no tab is showing this workspace's canvas — and only then — the
+// server-side renderer takes over and the result is marked `headless` so the
+// CLI can say it's an approximation. `headless: true` skips the relay outright
+// (deterministic for tests/CI, no 10s timeout to wait through).
+async function viewScratchpad(match: WorkspaceEntry, headless: boolean): Promise<ScratchOpResult> {
+  if (!headless) {
+    try {
+      return await relayScratchOp(match.id, { kind: 'view' })
+    } catch (err) {
+      // Anything else (a tab answered but failed to rasterize) is a real error.
+      if (!(err instanceof Error) || err.message !== NO_LIVE_CANVAS) throw err
+    }
+  }
+  const png = await renderScratchpadPng(match.path)
+  return { image: `data:image/png;base64,${Buffer.from(png).toString('base64')}`, headless: true }
 }
 
 export const control = Bun.serve({
@@ -227,6 +247,13 @@ export const control = Bun.serve({
             return
           }
 
+          // `lint` is read-only geometry checking off the disk snapshot — like
+          // `read`, it never touches the executor or a live tab.
+          if (op.kind === 'lint') {
+            ws.send(JSON.stringify({ findings: await lintScratchpad(match.path) }))
+            return
+          }
+
           // Assign add ops a stable name when the caller didn't (`--id`), so the
           // derived tldraw shape id is deterministic and addressable later.
           if (op.kind.startsWith('add-') && !op.name) {
@@ -234,12 +261,13 @@ export const control = Bun.serve({
           }
 
           try {
-            // `view` renders pixels — only the browser can do that, so it relays to
-            // a live tab (and fails if none is open). Every mutation runs headlessly
-            // against the disk snapshot, so drawing never needs an open canvas.
+            // `view` prefers a live tab (exact pixels) and falls back to the
+            // server-side renderer when none is open — or skips the relay
+            // entirely with `headless`. Every mutation runs headlessly against
+            // the disk snapshot, so drawing never needs an open canvas.
             const result =
               op.kind === 'view'
-                ? await relayScratchOp(match.id, op)
+                ? await viewScratchpad(match, op.headless === true)
                 : await executeScratchOp(match.path, match.id, op)
             ws.send(JSON.stringify({ ok: true, result }))
           } catch (err) {
