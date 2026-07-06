@@ -19,10 +19,26 @@ import {
   toRichText
 } from 'tldraw'
 
-import type { ScratchImageQuality, ScratchOp, ScratchOpResult, ScratchStyle } from '@/lib/types'
+import type {
+  ScratchImageQuality,
+  ScratchOp,
+  ScratchOpResult,
+  ScratchPlacement,
+  ScratchStyle
+} from '@/lib/types'
 
 import { publishEvent } from './events'
 import { type ScratchpadDoc, loadScratchpadDoc, saveScratchpadDoc } from './scratchpad'
+import {
+  applyAlign,
+  applyAutosize,
+  applyDistribute,
+  applyTidy,
+  autoRectSize,
+  noteAddSize,
+  resolvePlacement,
+  textAddSize
+} from './scratchpad-arrange'
 
 // Server-side Scratchpad writer. The browser is no longer required to draw: we run
 // the same ops against a *headless* tldraw store here, persist the snapshot, and
@@ -208,6 +224,22 @@ async function applyAddImage(
   return { name: op.name }
 }
 
+// Where an add op lands: absolute x/y from `--at`, or a relative placement
+// resolved against the anchor's bounds — deciding needs the store, so it
+// happens here, not in the CLI. `size` is the new shape's footprint (known for
+// rects, estimated for text, fixed for notes), used for cross-axis alignment.
+function resolveAddPosition(
+  store: TLStore,
+  op: { x?: number; y?: number; place?: ScratchPlacement },
+  size: { w: number; h: number }
+): { x: number; y: number } {
+  if (op.place) return resolvePlacement(store, op.place, size)
+  if (typeof op.x === 'number' && typeof op.y === 'number') return { x: op.x, y: op.y }
+  throw new Error(
+    'Missing position: pass --at "x,y" or a relative flag (--below/--above/--left-of/--right-of)'
+  )
+}
+
 // Apply one mutating op to the store. `read` and `view` are handled elsewhere
 // (disk / browser) and never reach here. Returns the op's result.
 function applyOp(store: TLStore, op: ScratchOp): ScratchOpResult {
@@ -220,19 +252,26 @@ function applyOp(store: TLStore, op: ScratchOp): ScratchOpResult {
 
   switch (op.kind) {
     case 'add-rect': {
+      // No `--size` → fit the box to its label (or the default node box), so a
+      // freshly placed rect can never overflow its own text.
+      const size =
+        op.w !== undefined && op.h !== undefined
+          ? { w: op.w, h: op.h }
+          : autoRectSize(op.text, op.size)
+      const { x, y } = resolveAddPosition(store, op, size)
       store.put([
         shapeRecord({
           id: createShapeId(op.name),
           type: 'geo',
-          x: op.x,
-          y: op.y,
+          x,
+          y,
           index: nextIndex(store, pageId),
           parentId: pageId,
           props: {
             ...defaultProps('geo'),
             geo: 'rectangle',
-            w: op.w,
-            h: op.h,
+            w: size.w,
+            h: size.h,
             ...styleProps(op),
             ...(op.text ? { richText: toRichText(op.text) } : {})
           }
@@ -241,12 +280,13 @@ function applyOp(store: TLStore, op: ScratchOp): ScratchOpResult {
       return { name: op.name }
     }
     case 'add-text': {
+      const { x, y } = resolveAddPosition(store, op, textAddSize(op.text, op.size))
       store.put([
         shapeRecord({
           id: createShapeId(op.name),
           type: 'text',
-          x: op.x,
-          y: op.y,
+          x,
+          y,
           index: nextIndex(store, pageId),
           parentId: pageId,
           props: { ...defaultProps('text'), richText: toRichText(op.text), ...styleProps(op) }
@@ -255,12 +295,13 @@ function applyOp(store: TLStore, op: ScratchOp): ScratchOpResult {
       return { name: op.name }
     }
     case 'add-note': {
+      const { x, y } = resolveAddPosition(store, op, noteAddSize())
       store.put([
         shapeRecord({
           id: createShapeId(op.name),
           type: 'note',
-          x: op.x,
-          y: op.y,
+          x,
+          y,
           index: nextIndex(store, pageId),
           parentId: pageId,
           props: { ...defaultProps('note'), richText: toRichText(op.text), ...styleProps(op) }
@@ -310,6 +351,23 @@ function applyOp(store: TLStore, op: ScratchOp): ScratchOpResult {
       store.put([
         { ...shape, props: { ...shape.props, richText: toRichText(op.text) } } as TLRecord
       ])
+      return { ok: true }
+    }
+    // The arrangement verbs (geometry lives in scratchpad-arrange.ts).
+    case 'align': {
+      applyAlign(store, op)
+      return { ok: true }
+    }
+    case 'distribute': {
+      applyDistribute(store, op)
+      return { ok: true }
+    }
+    case 'autosize': {
+      applyAutosize(store, op)
+      return { ok: true }
+    }
+    case 'tidy': {
+      applyTidy(store, op)
       return { ok: true }
     }
     case 'delete': {

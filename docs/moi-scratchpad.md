@@ -45,17 +45,41 @@ that maps onto tldraw's own shape API — friendly to drive and stable against t
 internal schema:
 
 ```
-moi scratch add text   --at <x,y> --text "..."          [--id NAME] [--color C] [--font-size S]
-moi scratch add rect   --at <x,y> --size <w,h> [--text]  [--id NAME] [--color C] [--fill F] [--font-size S]
-moi scratch add note   --at <x,y> --text "..."           [--id NAME] [--color C] [--font-size S]
+moi scratch add text   <pos> --text "..."               [--id NAME] [--color C] [--font-size S]
+moi scratch add rect   <pos> [--size <w,h>] [--text]     [--id NAME] [--color C] [--fill F] [--font-size S]
+moi scratch add note   <pos> --text "..."                [--id NAME] [--color C] [--font-size S]
 moi scratch add arrow  --from <id|x,y> --to <id|x,y>     [--id NAME] [--color C] [--stroke S] [--elbow]
 moi scratch add image  <path>                            [--at <x,y>] [--id NAME] [--quality lo|hi]
 moi scratch move   <id> --to <x,y>
 moi scratch set    <id> --text "..."        # relabel / edit
+moi scratch align      <id> <id> [...] --edge left|right|top|bottom|center-x|center-y [--to <id>]
+moi scratch distribute <id> <id> <id> [...] --axis x|y [--gap N]
+moi scratch autosize   <id> [...]           # re-fit labeled rects to their labels
+moi scratch tidy [--grid N]                 # snap to grid + pull near-aligned edges together
 moi scratch delete <id>
 moi scratch clear                           # wipe the whole canvas
 ```
 
+- `<pos>` for text/rect/note is either an absolute `--at <x,y>` **or a relative placement**:
+  `--below <id>`, `--above <id>`, `--left-of <id>`, `--right-of <id>`, optionally with
+  `--gap <n>` (distance from the anchor, default 48) and `--align start|center|end`
+  (cross-axis alignment to the anchor, default `center` — e.g. `--below a --align start`
+  puts left edges flush). Exactly one of the two; the server resolves the anchor's real
+  bounds, so relative placement is exact where guessed coordinates aren't. Arrows can't
+  be anchors (their geometry lives in bindings).
+- `rect --size` is optional: omitted with `--text`, the server measures the label with the
+  actual canvas font and sizes the box to fit (so the label can never overflow); omitted
+  without text it falls back to a 160×96 node box. Give an explicit size only when the box
+  isn't label-driven (e.g. a container drawn around other shapes).
+- The arrangement verbs are the align/distribute/snap of a design tool. `align` lines the
+  listed shapes' chosen edge or center up with the anchor's (`--to`, default the first
+  listed) and moves them only on that axis. `distribute` spaces shapes along an axis in
+  their current order — with `--gap` it repacks at exactly that spacing (first shape stays
+  put); without, the first and last stay fixed and the gaps between are equalized.
+  `autosize` re-fits labeled rects to their labels in place (top-left kept). `tidy` is the
+  canvas-wide pass: snap every position (and rect size) to the grid (default 8px), then
+  pull edges and centers that are within 10px of lining up exactly together. All four skip
+  arrows — bound arrows follow their shapes on their own.
 - `--id` gives a shape a stable handle so later commands can address it; otherwise the
   command returns the generated id.
 - `arrow --from <id> --to <id>` binds endpoints to shapes, so the arrow **follows** when the
@@ -80,8 +104,24 @@ moi scratch clear                           # wipe the whole canvas
 
 The set is deliberately small — text, rect, note, arrow (with color plus each shape's
 fill/font-size/stroke), plus
-move/set/delete/clear. Enough to lay out a diagram or annotate the user's drawing; not a full
-tldraw API.
+move/set/delete/clear and the arrangement verbs. Enough to lay out a diagram or annotate the
+user's drawing; not a full tldraw API.
+
+### Laying out a diagram
+
+The failure mode to avoid is coordinate arithmetic: computing absolute positions in your head
+produces overlaps, clipped labels, and crooked rows. The workflow that works: **anchor one
+shape absolutely, place everything else relatively, let rects size themselves, and finish
+with the arrangement verbs.**
+
+1. Place the first shape with `--at` (anywhere sensible; `0,0` is fine).
+2. Every subsequent shape hangs off an existing one: `--below`, `--right-of`, etc. Don't
+   compute coordinates — name the neighbor.
+3. Omit `--size` on labeled rects; the server fits the box to the label.
+4. Connect with `add arrow --from <id> --to <id>` (bound arrows follow their shapes through
+   every later adjustment).
+5. Finish with `align` / `distribute` for rows and columns, `autosize` if a relabel outgrew
+   its box, and `tidy` to square everything up.
 
 ## How it works
 
@@ -96,14 +136,18 @@ on the server (the mutations). Only `view` — rendering pixels — genuinely re
   tab reloads from disk, so all viewers converge.
 - **Reading** (`moi scratch read`, `read-image`) parses that snapshot straight off disk — the
   shape listing, or one image's bytes. No browser, no tldraw runtime.
-- **Drawing** (`add`/`move`/`set`/`delete`/`clear`) runs on the server: it loads the snapshot
+- **Drawing** (`add`/`move`/`set`/`align`/`distribute`/`autosize`/`tidy`/`delete`/`clear`)
+  runs on the server: it loads the snapshot
   into a headless `tldraw` store (`createTLStore` + the default shape/binding utils), applies
   the op as store records — using each shape's `getDefaultProps()` so records are schema-valid —
   writes the snapshot back, and nudges open tabs to reload. **No live tab required.** The store
   validates every record on `put`, so a malformed shape throws instead of corrupting the file.
   `add image` additionally resizes the file through `sharp` (the same dep the icon pipeline uses)
   before embedding it. (We drive the store, not an `Editor`, because the Editor needs a DOM + text
-  measurement the server runtime doesn't have. See `server/scratchpad-executor.ts`.)
+  measurement the server runtime doesn't have. See `server/scratchpad-executor.ts`.) Relative
+  placement and the arrangement verbs resolve here too — only the server-side store can see an
+  anchor's bounds — with text measured in the real canvas font (`server/scratchpad-metrics.ts`)
+  and the geometry in `server/scratchpad-arrange.ts`.
 - **Viewing** (`moi scratch view`) is the one op still relayed to a connected tab: only the
   browser can rasterize the canvas (`editor.toImageDataUrl`). With no tab showing **this**
   workspace's scratchpad it returns "No live canvas" — every other op still works off disk.

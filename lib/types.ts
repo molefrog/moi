@@ -65,18 +65,53 @@ export type ScratchStyle = { color?: ScratchColor; size?: ScratchSize; fill?: Sc
 // the canvas light), 'hi' allows more pixels when detail matters.
 export type ScratchImageQuality = 'lo' | 'hi'
 
+// Relative placement for an add op — "put it below that shape" instead of raw
+// coordinates. Carried on the op and resolved by the executor, because only the
+// server-side store can see the anchor's bounds. `gap` is the distance from the
+// anchor on the placement axis; `align` sets the cross axis ('start' = leading
+// edges flush, 'end' = trailing edges flush, 'center' = midpoints match).
+export type ScratchPlacement = {
+  anchor: string
+  side: 'above' | 'below' | 'left' | 'right'
+  gap: number
+  align: 'start' | 'center' | 'end'
+}
+
+// Which edge (or center line) `align` lines shapes up on. The `-x` / `-y`
+// suffix names the axis the centers share — center-x aligns vertical center
+// lines (shapes move horizontally), center-y the horizontal ones.
+export type ScratchAlignEdge = 'left' | 'right' | 'top' | 'bottom' | 'center-x' | 'center-y'
+
+// Add ops position with absolute x/y *or* a relative `place` — exactly one.
+// A rect's w/h may be omitted too: the executor fits the box to its label
+// (or falls back to a default node size), so labels never overflow.
 export type ScratchOp =
-  | ({ kind: 'add-text'; name: string; x: number; y: number; text: string } & ScratchStyle)
+  | ({
+      kind: 'add-text'
+      name: string
+      x?: number
+      y?: number
+      place?: ScratchPlacement
+      text: string
+    } & ScratchStyle)
   | ({
       kind: 'add-rect'
       name: string
-      x: number
-      y: number
-      w: number
-      h: number
+      x?: number
+      y?: number
+      place?: ScratchPlacement
+      w?: number
+      h?: number
       text?: string
     } & ScratchStyle)
-  | ({ kind: 'add-note'; name: string; x: number; y: number; text: string } & ScratchStyle)
+  | ({
+      kind: 'add-note'
+      name: string
+      x?: number
+      y?: number
+      place?: ScratchPlacement
+      text: string
+    } & ScratchStyle)
   // Add an image from a local file `path` — the server resizes it to fit the
   // canvas and embeds it (color/stroke don't apply, so no ScratchStyle).
   // `quality` picks the resize preset: 'lo' (default, smaller) or 'hi' (sharper).
@@ -98,6 +133,18 @@ export type ScratchOp =
     } & ScratchStyle)
   | { kind: 'move'; name: string; x: number; y: number }
   | { kind: 'set'; name: string; text: string }
+  // Arrangement verbs — the align/distribute/tidy every design tool ships, so
+  // the agent nudges shapes into place instead of recomputing coordinates.
+  // Arrows are never arranged directly; bound arrows follow their shapes.
+  | { kind: 'align'; names: string[]; edge: ScratchAlignEdge; to?: string }
+  // With `gap`: repack in spatial order at exact gaps (first shape stays put).
+  // Without: keep the first and last fixed and equalize the gaps between.
+  | { kind: 'distribute'; names: string[]; axis: 'x' | 'y'; gap?: number }
+  // Re-fit labeled rects to their labels (same sizing as an auto-sized add).
+  | { kind: 'autosize'; names: string[] }
+  // Canvas-wide cleanup: snap positions (and geo sizes) to the grid, then pull
+  // nearly-aligned edges/centers exactly together.
+  | { kind: 'tidy'; grid?: number }
   | { kind: 'delete'; name: string }
   | { kind: 'clear' }
   | { kind: 'view' }

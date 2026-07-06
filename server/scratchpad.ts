@@ -62,8 +62,9 @@ function omitBase64(text: string): string {
 
 // Pull readable text out of a shape's props. tldraw stores labels as `richText`
 // (a ProseMirror-style doc) on most shapes; older/simple shapes may use a flat
-// `text` string. Best-effort — never throw on an unexpected shape.
-function extractText(props: unknown): string | undefined {
+// `text` string. Best-effort — never throw on an unexpected shape. Exported for
+// the arrangement verbs (autosize refits a rect to this extracted label).
+export function extractText(props: unknown): string | undefined {
   if (!props || typeof props !== 'object') return undefined
   const p = props as { text?: unknown; richText?: unknown }
   if (typeof p.text === 'string' && p.text.length > 0) return p.text

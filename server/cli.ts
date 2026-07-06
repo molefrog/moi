@@ -9,11 +9,13 @@ import pc from 'picocolors'
 import { COLOR_THEMES, FONT_THEMES } from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/themes'
 import type {
+  ScratchAlignEdge,
   ScratchArrowEnd,
   ScratchColor,
   ScratchFill,
   ScratchImageQuality,
   ScratchOp,
+  ScratchPlacement,
   ScratchSize,
   ScratchStyle
 } from '@/lib/types'
@@ -1235,6 +1237,68 @@ function styleArgs(args: {
   }
 }
 
+// Relative placement flags shared by `add text|rect|note` — position a new
+// shape off an existing one instead of computing coordinates. The anchor's
+// bounds live server-side, so the CLI only names the intent; the executor
+// resolves it (see server/scratchpad-arrange.ts).
+const placeArgs = {
+  below: { type: 'string', description: 'Place below this shape (instead of --at)' },
+  above: { type: 'string', description: 'Place above this shape (instead of --at)' },
+  leftOf: { type: 'string', description: 'Place left of this shape (instead of --at)' },
+  rightOf: { type: 'string', description: 'Place right of this shape (instead of --at)' },
+  gap: { type: 'string', description: 'Distance from the anchor in px (default: 48)' },
+  align: {
+    type: 'string',
+    description: 'Cross-axis alignment to the anchor: start|center|end (default: center)'
+  }
+} as const
+
+const PLACE_ALIGNS = ['start', 'center', 'end'] as const
+
+// Exactly one way to position a shape: absolute `--at`, or one relative side
+// flag (`--gap`/`--align` only make sense with the latter).
+function parsePosition(args: {
+  at?: string
+  below?: string
+  above?: string
+  leftOf?: string
+  rightOf?: string
+  gap?: string
+  align?: string
+}): { x: number; y: number } | { place: ScratchPlacement } {
+  const sides: [ScratchPlacement['side'], string][] = []
+  if (args.above) sides.push(['above', args.above])
+  if (args.below) sides.push(['below', args.below])
+  if (args.leftOf) sides.push(['left', args.leftOf])
+  if (args.rightOf) sides.push(['right', args.rightOf])
+  if (sides.length > 1) {
+    throw new Error('Pick one of --below/--above/--left-of/--right-of, not several')
+  }
+  if (sides.length === 0) {
+    if (args.gap || args.align) {
+      throw new Error('--gap/--align only apply with --below/--above/--left-of/--right-of')
+    }
+    if (!args.at) {
+      throw new Error(
+        'Position the shape with --at "x,y" or one of --below/--above/--left-of/--right-of'
+      )
+    }
+    return parseXY(args.at)
+  }
+  if (args.at) throw new Error('--at and --below/--above/--left-of/--right-of are exclusive')
+  const [side, anchor] = sides[0]
+  let gap = 48
+  if (args.gap !== undefined) {
+    gap = Number(args.gap)
+    if (!Number.isFinite(gap) || gap < 0) throw new Error(`Expected a gap ≥ 0, got "${args.gap}"`)
+  }
+  const alignRaw = (args.align ?? 'center').trim().toLowerCase()
+  if (!(PLACE_ALIGNS as readonly string[]).includes(alignRaw)) {
+    throw new Error(`Unknown align "${args.align}". Use one of: ${PLACE_ALIGNS.join(', ')}.`)
+  }
+  return { place: { anchor, side, gap, align: alignRaw as ScratchPlacement['align'] } }
+}
+
 type ScratchCliOp = ScratchOp | { kind: 'read' } | { kind: 'read-image'; name: string }
 
 // Round-trip one op through the control port and hand the reply to `onResult`.
@@ -1365,22 +1429,21 @@ const scratchReadImage = defineCommand({
 const scratchAddText = defineCommand({
   meta: { name: 'text', description: 'Add a text shape' },
   args: {
-    at: { type: 'string', required: true, description: 'Position "x,y"' },
+    at: { type: 'string', description: 'Position "x,y" (or use a relative flag)' },
     text: { type: 'string', required: true, description: 'Text content' },
     id: { type: 'string', description: 'Stable name to address this shape later' },
+    ...placeArgs,
     color: colorArg,
     fontSize: fontSizeArg,
     dir: dirArg
   },
   run({ args }) {
-    const { x, y } = parseXY(args.at)
     sendScratch(
       resolve(args.dir),
       {
         kind: 'add-text',
         name: args.id ?? '',
-        x,
-        y,
+        ...parsePosition(args),
         text: args.text,
         ...styleArgs({ color: args.color, fontSize: args.fontSize })
       },
@@ -1392,27 +1455,29 @@ const scratchAddText = defineCommand({
 const scratchAddRect = defineCommand({
   meta: { name: 'rect', description: 'Add a rectangle' },
   args: {
-    at: { type: 'string', required: true, description: 'Top-left position "x,y"' },
-    size: { type: 'string', required: true, description: 'Size "w,h"' },
+    at: { type: 'string', description: 'Top-left position "x,y" (or use a relative flag)' },
+    size: {
+      type: 'string',
+      description: 'Size "w,h" (omit to fit the label — labels never overflow)'
+    },
     text: { type: 'string', description: 'Optional label' },
     id: { type: 'string', description: 'Stable name to address this shape later' },
+    ...placeArgs,
     color: colorArg,
     fill: fillArg,
     fontSize: fontSizeArg,
     dir: dirArg
   },
   run({ args }) {
-    const { x, y } = parseXY(args.at)
-    const { x: w, y: h } = parseXY(args.size)
+    // `--size` is optional: omitted, the server fits the rect to its label.
+    const size = args.size ? parseXY(args.size) : undefined
     sendScratch(
       resolve(args.dir),
       {
         kind: 'add-rect',
         name: args.id ?? '',
-        x,
-        y,
-        w,
-        h,
+        ...parsePosition(args),
+        ...(size ? { w: size.x, h: size.y } : {}),
         ...(args.text ? { text: args.text } : {}),
         ...styleArgs({ color: args.color, fill: args.fill, fontSize: args.fontSize })
       },
@@ -1424,22 +1489,21 @@ const scratchAddRect = defineCommand({
 const scratchAddNote = defineCommand({
   meta: { name: 'note', description: 'Add a sticky note' },
   args: {
-    at: { type: 'string', required: true, description: 'Position "x,y"' },
+    at: { type: 'string', description: 'Position "x,y" (or use a relative flag)' },
     text: { type: 'string', required: true, description: 'Note content' },
     id: { type: 'string', description: 'Stable name to address this shape later' },
+    ...placeArgs,
     color: colorArg,
     fontSize: fontSizeArg,
     dir: dirArg
   },
   run({ args }) {
-    const { x, y } = parseXY(args.at)
     sendScratch(
       resolve(args.dir),
       {
         kind: 'add-note',
         name: args.id ?? '',
-        x,
-        y,
+        ...parsePosition(args),
         text: args.text,
         ...styleArgs({ color: args.color, fontSize: args.fontSize })
       },
@@ -1571,6 +1635,111 @@ const scratchClear = defineCommand({
   }
 })
 
+const ALIGN_EDGES: ScratchAlignEdge[] = ['left', 'right', 'top', 'bottom', 'center-x', 'center-y']
+
+function parseEdge(s: string): ScratchAlignEdge {
+  const edge = s.trim().toLowerCase()
+  if (!(ALIGN_EDGES as string[]).includes(edge)) {
+    throw new Error(`Unknown edge "${s}". Use one of: ${ALIGN_EDGES.join(', ')}.`)
+  }
+  return edge as ScratchAlignEdge
+}
+
+// The `id [id...]` rest-positional pattern (same as `moi env unset`): citty
+// collects every positional into `args._`.
+function parseIds(rest: string[], min: number, verb: string): string[] {
+  const ids = rest.map(s => s.trim()).filter(s => s.length > 0)
+  if (ids.length < min) throw new Error(`${verb} needs at least ${min} shape ids`)
+  return ids
+}
+
+const scratchAlign = defineCommand({
+  meta: { name: 'align', description: 'Line shapes up on an edge or center (arrows follow)' },
+  args: {
+    id: { type: 'positional', required: true, description: 'Shape names (two or more)' },
+    edge: {
+      type: 'string',
+      required: true,
+      description: `Edge to align: ${ALIGN_EDGES.join(', ')}`
+    },
+    to: { type: 'string', description: 'Anchor shape that stays put (default: first listed)' },
+    dir: dirArg
+  },
+  run({ args }) {
+    const names = parseIds(args._, 2, 'align')
+    sendScratch(
+      resolve(args.dir),
+      { kind: 'align', names, edge: parseEdge(args.edge), ...(args.to ? { to: args.to } : {}) },
+      () => console.log('\n' + pc.green('✓') + ' aligned ' + pc.bold(names.join(', ')) + '\n')
+    )
+  }
+})
+
+const scratchDistribute = defineCommand({
+  meta: { name: 'distribute', description: 'Space shapes evenly along an axis' },
+  args: {
+    id: { type: 'positional', required: true, description: 'Shape names (two or more)' },
+    axis: { type: 'string', required: true, description: 'Axis: x (a row) or y (a column)' },
+    gap: {
+      type: 'string',
+      description: 'Exact gap in px (omit to equalize between the first and last)'
+    },
+    dir: dirArg
+  },
+  run({ args }) {
+    const axis = args.axis.trim().toLowerCase()
+    if (axis !== 'x' && axis !== 'y') throw new Error(`Unknown axis "${args.axis}". Use x or y.`)
+    let gap: number | undefined
+    if (args.gap !== undefined) {
+      gap = Number(args.gap)
+      if (!Number.isFinite(gap) || gap < 0) throw new Error(`Expected a gap ≥ 0, got "${args.gap}"`)
+    }
+    const names = parseIds(args._, 2, 'distribute')
+    sendScratch(
+      resolve(args.dir),
+      { kind: 'distribute', names, axis, ...(gap !== undefined ? { gap } : {}) },
+      () => console.log('\n' + pc.green('✓') + ' distributed ' + pc.bold(names.join(', ')) + '\n')
+    )
+  }
+})
+
+const scratchAutosize = defineCommand({
+  meta: { name: 'autosize', description: 'Re-fit labeled rects to their labels' },
+  args: {
+    id: { type: 'positional', required: true, description: 'Rect names' },
+    dir: dirArg
+  },
+  run({ args }) {
+    const names = parseIds(args._, 1, 'autosize')
+    sendScratch(resolve(args.dir), { kind: 'autosize', names }, () =>
+      console.log('\n' + pc.green('✓') + ' autosized ' + pc.bold(names.join(', ')) + '\n')
+    )
+  }
+})
+
+const scratchTidy = defineCommand({
+  meta: {
+    name: 'tidy',
+    description: 'Snap every shape to the grid and pull near-aligned edges together'
+  },
+  args: {
+    grid: { type: 'string', description: 'Grid step in px (default: 8)' },
+    dir: dirArg
+  },
+  run({ args }) {
+    let grid: number | undefined
+    if (args.grid !== undefined) {
+      grid = Number(args.grid)
+      if (!Number.isFinite(grid) || grid <= 0) {
+        throw new Error(`Expected a grid step > 0, got "${args.grid}"`)
+      }
+    }
+    sendScratch(resolve(args.dir), { kind: 'tidy', ...(grid !== undefined ? { grid } : {}) }, () =>
+      console.log('\n' + pc.green('✓') + ' tidied the canvas\n')
+    )
+  }
+})
+
 const scratch = defineCommand({
   meta: {
     name: 'scratch',
@@ -1583,6 +1752,10 @@ const scratch = defineCommand({
     add: scratchAdd,
     move: scratchMove,
     set: scratchSet,
+    align: scratchAlign,
+    distribute: scratchDistribute,
+    autosize: scratchAutosize,
+    tidy: scratchTidy,
     delete: scratchDelete,
     clear: scratchClear
   }
