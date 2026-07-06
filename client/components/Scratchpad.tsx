@@ -9,6 +9,7 @@ import {
   type TLDefaultFillStyle,
   type TLDefaultSizeStyle,
   type TLEditorSnapshot,
+  type TLStore,
   type TLUiOverrides,
   DefaultColorStyle,
   DefaultDashStyle,
@@ -19,11 +20,15 @@ import {
   DefaultVerticalAlignStyle,
   GeoShapeGeoStyle,
   Tldraw,
+  createTLStore,
+  defaultBindingUtils,
+  defaultShapeUtils,
   getSnapshot,
   loadSnapshot,
   react
 } from 'tldraw'
 import 'tldraw/tldraw.css'
+import tldrawPkg from 'tldraw/package.json'
 import { motion } from 'motion/react'
 import {
   IconArrowUpRight,
@@ -35,14 +40,16 @@ import {
   IconSketching,
   IconSquare,
   IconSticker2,
-  IconTypography
+  IconTypography,
+  IconVersions
 } from '@tabler/icons-react'
 
 import { cn } from '@/client/lib/cn'
 import { useWorkspaceId } from '@/client/lib/WorkspaceContext'
 import { setScratchExecutor } from '@/client/lib/scratch-executor'
 import { type MeiEvent, useMeiEvent } from '@/client/hooks/useMeiEvents'
-import type { ScratchOp, ScratchOpResult } from '@/lib/types'
+import { describeNewerWriter, sequencesAhead } from '@/lib/scratchpad-skew'
+import type { ScratchOp, ScratchOpResult, ScratchpadWriter } from '@/lib/types'
 
 // Identifies this tab's writes so it can ignore the `scratchpad:updated` echo of
 // its own save (see the MEI reload below). Per page load.
@@ -595,28 +602,86 @@ function ScratchStyleBar({ editor }: ScratchStyleBarProps) {
   )
 }
 
+// --- Version-skew pre-flight ------------------------------------------------
+// tldraw snapshots migrate forward only: a canvas saved by a newer tldraw can
+// never load here, and handing it to <Tldraw> anyway lands on tldraw's crash
+// screen — whose main button is a destructive "Reset data". So every fetched
+// document is pre-flighted against this bundle's schema first; on failure we
+// render a friendly read-only notice and never mount the editor, which is what
+// guarantees this stale client can't autosave over the newer file. See
+// lib/scratchpad-skew.ts and docs/moi-scratchpad.md § Version skew.
+
+// What GET /api/workspaces/:id/scratchpad returns (see server/scratchpad.ts).
+type ScratchpadFetch = {
+  document: TLEditorSnapshot['document'] | null
+  writer?: ScratchpadWriter
+}
+
+// Why the canvas can't be shown: a newer writer (version skew) or a snapshot
+// that fails to load for some other reason. Either way the file is left alone.
+type ScratchpadSkew = { newer: boolean; writer?: ScratchpadWriter; detail: string }
+
+// This bundle's schema, built once and lazily — the same store config the
+// editor and the server executor use, so the pre-flight verdict matches what
+// <Tldraw> would do.
+let runtimeSchemaCache: TLStore['schema'] | null = null
+function runtimeSchema(): TLStore['schema'] {
+  if (!runtimeSchemaCache) {
+    runtimeSchemaCache = createTLStore({
+      shapeUtils: defaultShapeUtils,
+      bindingUtils: defaultBindingUtils
+    }).schema
+  }
+  return runtimeSchemaCache
+}
+
+// Dry-run the migration <Tldraw>/`loadSnapshot` would perform. Returns null when
+// the document is safe to mount, else the skew to display.
+function detectSkew(
+  document: NonNullable<TLEditorSnapshot['document']>,
+  writer: ScratchpadWriter | undefined
+): ScratchpadSkew | null {
+  const schema = runtimeSchema()
+  try {
+    if (schema.migrateStoreSnapshot(document).type === 'success') return null
+  } catch {}
+  const ahead = sequencesAhead(document.schema, schema.serialize().sequences)
+  if (ahead.length > 0) return { newer: true, writer, detail: describeNewerWriter(writer, ahead) }
+  return { newer: false, writer, detail: 'The saved snapshot failed to load.' }
+}
+
 // Hydrate the saved canvas once per workspace from the REST snapshot endpoint.
 // Returns a STABLE snapshot reference (held in a ref, never a fresh object per
 // render): tldraw rebuilds its entire store whenever the `snapshot` prop identity
 // changes, so handing it a new object each render loops it forever — remounting the
 // store and re-fetching fonts/translations endlessly. `document: null` → empty
-// canvas; `loaded` gates the placeholder until the fetch settles.
+// canvas; `loaded` gates the placeholder until the fetch settles. A document that
+// fails the pre-flight sets `skew` instead of the snapshot; `flagSkew` lets the
+// remote-reload path flip the same state mid-session.
 function useScratchpadSnapshot(workspaceId: string): {
   loaded: boolean
   snapshot: Partial<TLEditorSnapshot> | undefined
+  skew: ScratchpadSkew | null
+  flagSkew: (skew: ScratchpadSkew) => void
 } {
   const [loaded, setLoaded] = useState(false)
+  const [skew, setSkew] = useState<ScratchpadSkew | null>(null)
   const snapshot = useRef<Partial<TLEditorSnapshot> | undefined>(undefined)
 
   useEffect(() => {
     let cancelled = false
     setLoaded(false)
+    setSkew(null)
     snapshot.current = undefined
     fetch(`/api/workspaces/${workspaceId}/scratchpad`)
       .then(r => r.json())
-      .then((d: { document: TLEditorSnapshot['document'] | null }) => {
+      .then((d: ScratchpadFetch) => {
         if (cancelled) return
-        if (d?.document) snapshot.current = { document: d.document }
+        if (d?.document) {
+          const found = detectSkew(d.document, d.writer)
+          if (found) setSkew(found)
+          else snapshot.current = { document: d.document }
+        }
         setLoaded(true)
       })
       .catch(() => {
@@ -627,7 +692,47 @@ function useScratchpadSnapshot(workspaceId: string): {
     }
   }, [workspaceId])
 
-  return { loaded, snapshot: snapshot.current }
+  return { loaded, snapshot: snapshot.current, skew, flagSkew: setSkew }
+}
+
+type ScratchpadSkewNoticeProps = { skew: ScratchpadSkew }
+
+// The read-only stand-in for an unloadable canvas. Deliberately mounts no
+// editor and offers no "load anyway": with no store there is nothing to
+// autosave, so the newer file on disk stays byte-for-byte intact.
+function ScratchpadSkewNotice({ skew }: ScratchpadSkewNoticeProps) {
+  return (
+    <div className="flex min-h-0 flex-1 items-center justify-center bg-muted/40 p-6">
+      <div className="flex max-w-md animate-in flex-col gap-3 rounded-xl border bg-background p-6 shadow-sm duration-200 fade-in-0 zoom-in-95">
+        <div className="flex items-center gap-2">
+          <IconVersions size={20} stroke={1.5} className="shrink-0 text-amber-600" />
+          <h2 className="font-semibold text-foreground">
+            {skew.newer ? 'This canvas needs a newer moi' : 'This canvas couldn’t be loaded'}
+          </h2>
+        </div>
+        {skew.newer ? (
+          <>
+            <p className="text-sm text-muted-foreground">
+              It was last saved by a newer version of moi ({skew.detail}), and this moi (tldraw{' '}
+              {tldrawPkg.version}) can’t open canvases from the future.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Restart the newer moi server, or update this one:
+            </p>
+            <code className="self-start rounded bg-muted px-2 py-1 font-mono text-xs text-foreground">
+              bun install -g moi-computer@latest
+            </code>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">{skew.detail}</p>
+        )}
+        <p className="text-sm text-muted-foreground">
+          Nothing was lost — the canvas file is untouched and stays that way while this notice is
+          shown.
+        </p>
+      </div>
+    </div>
+  )
 }
 
 // The Scratchpad surface: a real tldraw editor, hydrated from and autosaved to
@@ -649,7 +754,7 @@ export function Scratchpad() {
   const applyingRemote = useRef(false)
   // Reactive handle to the mounted editor, used to render the custom tool bar.
   const [editor, setEditor] = useState<Editor | null>(null)
-  const { loaded, snapshot } = useScratchpadSnapshot(workspaceId)
+  const { loaded, snapshot, skew, flagSkew } = useScratchpadSnapshot(workspaceId)
 
   const save = useCallback(() => {
     const editor = editorRef.current
@@ -668,16 +773,26 @@ export function Scratchpad() {
   }, [workspaceId])
 
   // A remote save (another tab, or an agent draw landing in another tab) — pull
-  // the new snapshot and load it into the live store. Skip our own echo.
+  // the new snapshot and load it into the live store. Skip our own echo. The
+  // fetched document is pre-flighted like the initial load: if the server was
+  // swapped for a newer moi mid-session, `loadSnapshot` here would throw — flip
+  // the skew notice instead (unmounting the editor, which also stops the
+  // autosave timer) so this stale tab can't save over the newer file.
   useMeiEvent((e: MeiEvent) => {
     if (e.type !== 'scratchpad:updated' || e.workspaceId !== workspaceId) return
     if (e.origin && e.origin === ORIGIN_ID) return
     if (!editorRef.current) return
     fetch(`/api/workspaces/${workspaceId}/scratchpad`)
       .then(r => r.json())
-      .then((d: { document: TLEditorSnapshot['document'] | null }) => {
+      .then((d: ScratchpadFetch) => {
         const editor = editorRef.current
         if (!editor || !d?.document) return
+        const found = detectSkew(d.document, d.writer)
+        if (found) {
+          if (saveTimer.current) clearTimeout(saveTimer.current)
+          flagSkew(found)
+          return
+        }
         applyingRemote.current = true
         loadSnapshot(editor.store, { document: d.document })
       })
@@ -750,6 +865,7 @@ export function Scratchpad() {
   )
 
   if (!loaded) return <div className="min-h-0 flex-1 bg-muted/40" />
+  if (skew) return <ScratchpadSkewNotice skew={skew} />
 
   return (
     <div ref={rootRef} className="relative min-h-0 flex-1 overflow-hidden">

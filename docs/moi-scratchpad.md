@@ -120,6 +120,34 @@ on the server (the mutations). Only `view` — rendering pixels — genuinely re
 > couldn't draw to a closed canvas. The write path moved server-side so drawing no longer
 > depends on the user keeping the Scratchpad open.
 
+## Version skew
+
+The snapshot embeds the serialized tldraw schema of whatever process last **wrote** it, and
+tldraw migrates **forward only** — there are no down-migrations. So `.moi/.scratchpad.json`
+is readable only by tldraw versions ≥ the writer's; a canvas touched by a newer moi will not
+open in an older one. That's the invariant everything below defends.
+
+- **tldraw is pinned exactly** in `package.json` (no `^`/`~` range), and a test
+  (`server/test/tldraw-pin.test.ts`) keeps it that way. The client is prebuilt into `dist/`
+  at publish time with the publisher's `node_modules`, but with a range the server's tldraw
+  would resolve at **install** time — one published version could then ship a client older
+  than its own server, which writes snapshots that client can't read. The pin also keeps
+  side-by-side installs (global package vs repo checkout) on the same schema as long as
+  they're the same moi version.
+- **Bumping tldraw is a deliberate act**: change the pin, `bun install`, test, and
+  release-note that canvases touched by the new version won't open in older moi.
+- **Every save is stamped** with the writer (`{ writer: { moi, tldraw } }` next to
+  `document`), so when an older moi does hit a newer file, the error can name the version
+  it needs. Deliberate downgrades and branch-hopping can't be prevented — only made loud,
+  actionable, and non-destructive: the server's headless ops fail with a message saying
+  which moi wrote the file and how to update (instead of tldraw's bare `migration-error`),
+  and the browser shows a read-only notice _without mounting the editor_ — never tldraw's
+  crash screen with its destructive "Reset data" button, and with no editor mounted the
+  stale tab can't autosave over the newer file. `moi scratch read`/`read-image` parse the
+  raw JSON without migration, so the agent can still see the canvas under skew. The first
+  save after a schema change also keeps the previous file as `.scratchpad.json.bak` — the
+  manual escape hatch after a downgrade. Detection lives in `lib/scratchpad-skew.ts`.
+
 ## Building it
 
 Lean on what's already here rather than inventing plumbing. The canvas is a `<Tldraw>` mounted
