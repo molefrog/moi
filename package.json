@@ -44,7 +44,7 @@
     "!workspace/.moi"
   ],
   "scripts": {
-    "dev": "bun server/cli.ts start --dev",
+    "dev": "bun server/cli.ts start --dev --debug",
     "build:client": "bun scripts/build-client.ts",
     "vendor:react": "bun scripts/build-vendor.ts",
     "prepack": "bun scripts/build-client.ts",

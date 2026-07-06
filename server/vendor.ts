@@ -28,14 +28,21 @@ export async function serveVendorReact(req: Request): Promise<Response> {
   if (!(await file.exists())) {
     return new Response('Not found', { status: 404 })
   }
-  return new Response(file, {
-    headers: {
-      'Content-Type': 'text/javascript; charset=utf-8',
-      // Stable URL across versions, so don't cache immutably — revalidate so a
-      // `vendor:react` regen after a React bump is picked up.
-      'Cache-Control': prebuilt ? 'public, max-age=3600' : 'no-store'
-    }
-  })
+  // Revalidate on every load (no max-age): the same URLs serve different bytes
+  // when the mode flips (prebuilt `moi` vs `bun run dev` on one port) or after
+  // a `vendor:react` regen. The ETag encodes both, so browsers keep the bytes
+  // (304) but never reuse a stale mode — prod jsx-dev-runtime has no `jsxDEV`
+  // and would crash dev.
+  const etag = `"${MODE}-${file.lastModified}-${file.size}"`
+  const headers = {
+    'Content-Type': 'text/javascript; charset=utf-8',
+    'Cache-Control': 'no-cache',
+    ETag: etag
+  }
+  if (req.headers.get('if-none-match') === etag) {
+    return new Response(null, { status: 304, headers })
+  }
+  return new Response(file, { headers })
 }
 
 // `<locale>/<file>.json` only — mirrors the emojibase-data package layout the
