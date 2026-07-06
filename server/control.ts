@@ -228,9 +228,11 @@ export const control = Bun.serve({
           }
 
           // Assign add ops a stable name when the caller didn't (`--id`), so the
-          // derived tldraw shape id is deterministic and addressable later.
-          if (op.kind.startsWith('add-') && !op.name) {
-            op.name = `s_${crypto.randomUUID().slice(0, 8)}`
+          // derived tldraw shape id is deterministic and addressable later. A
+          // diagram's name is the prefix of every shape it creates.
+          if ((op.kind.startsWith('add-') || op.kind === 'diagram') && !op.name) {
+            const prefix = op.kind === 'diagram' ? 'd' : 's'
+            op.name = `${prefix}_${crypto.randomUUID().slice(0, 8)}`
           }
 
           try {

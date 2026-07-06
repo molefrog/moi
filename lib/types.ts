@@ -65,6 +65,50 @@ export type ScratchStyle = { color?: ScratchColor; size?: ScratchSize; fill?: Sc
 // the canvas light), 'hi' allows more pixels when detail matters.
 export type ScratchImageQuality = 'lo' | 'hi'
 
+// A declarative boxes-and-arrows diagram, compiled server-side by `moi scratch
+// diagram`: labels are measured, nodes sized to fit, and positions computed by
+// ELK auto-layout — the agent declares structure and never touches a coordinate.
+// `color`/`fill` carry the CLI's user-facing vocabulary (a palette name or hex;
+// none|semi|pattern|solid) as raw strings: the spec is agent input, so parsing
+// and validation happen in one place server-side (server/scratchpad-diagram.ts)
+// and errors travel back over the control socket.
+export type ScratchDiagramNode = {
+  id: string
+  label: string
+  // 'rect' (default): a geo rectangle sized to fit its label. 'note': a sticky
+  // note — fixed 200×200, so keep note labels short.
+  shape?: 'rect' | 'note'
+  color?: string
+  fill?: string
+  // Preferred label wrap width in px (default 260). A hint: the rect can come
+  // out wider for an unbreakable word, or narrower for a short label.
+  width?: number
+}
+export type ScratchDiagramGroup = {
+  id: string
+  label?: string
+  color?: string
+  // Ids of the nodes (or nested groups) drawn inside this container.
+  children: string[]
+}
+export type ScratchDiagramEdge = {
+  from: string
+  to: string
+  label?: string
+  color?: string
+  // Right-angle routing, like `add arrow --elbow`; default is a curved arc.
+  elbow?: boolean
+}
+export type ScratchDiagramSpec = {
+  // Big heading placed above the diagram bounds.
+  title?: string
+  // Main flow direction: 'right' (default) lays layers left→right, 'down' top→bottom.
+  direction?: 'right' | 'down'
+  nodes: ScratchDiagramNode[]
+  groups?: ScratchDiagramGroup[]
+  edges?: ScratchDiagramEdge[]
+}
+
 export type ScratchOp =
   | ({ kind: 'add-text'; name: string; x: number; y: number; text: string } & ScratchStyle)
   | ({
@@ -96,15 +140,25 @@ export type ScratchOp =
       // Right-angle (orthogonal) routing for clean diagrams; default is a curved arc.
       elbow?: boolean
     } & ScratchStyle)
+  // Compile a declarative diagram spec into laid-out shapes (see
+  // ScratchDiagramSpec). `name` prefixes every created shape id —
+  // `<name>-<nodeId>`, `<name>-title`, `<name>-edge-<i>` — so the agent can
+  // address the pieces afterwards. Omitted x/y auto-places the diagram below
+  // the existing canvas content.
+  | { kind: 'diagram'; name: string; spec: ScratchDiagramSpec; x?: number; y?: number }
   | { kind: 'move'; name: string; x: number; y: number }
   | { kind: 'set'; name: string; text: string }
   | { kind: 'delete'; name: string }
   | { kind: 'clear' }
   | { kind: 'view' }
 
-// What a tab returns after running an op: a shape's `name` for add ops, a PNG
-// data URL for `view`, or a bare ack for mutations.
-export type ScratchOpResult = { name: string } | { image: string } | { ok: true }
+// What a tab returns after running an op: a shape's `name` for add ops (plus
+// the full list of `created` shape ids for `diagram`), a PNG data URL for
+// `view`, or a bare ack for mutations.
+export type ScratchOpResult =
+  | { name: string; created?: string[] }
+  | { image: string }
+  | { ok: true }
 
 // An attachment uploaded ahead of a chat message. The bytes live server-side in
 // an in-memory upload store (see server/uploads.ts); a chat frame references it

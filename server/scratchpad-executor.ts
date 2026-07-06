@@ -2,18 +2,13 @@ import { basename } from 'path'
 import sharp from 'sharp'
 
 import {
-  type IndexKey,
-  type TLPageId,
   type TLRecord,
   type TLStore,
   AssetRecordType,
-  ZERO_INDEX_KEY,
-  createBindingId,
   createShapeId,
   createTLStore,
   defaultBindingUtils,
   defaultShapeUtils,
-  getIndexAbove,
   getSnapshot,
   loadSnapshot,
   toRichText
@@ -23,6 +18,14 @@ import type { ScratchImageQuality, ScratchOp, ScratchOpResult, ScratchStyle } fr
 
 import { publishEvent } from './events'
 import { type ScratchpadDoc, loadScratchpadDoc, saveScratchpadDoc } from './scratchpad'
+import { applyDiagram } from './scratchpad-diagram'
+import {
+  arrowBinding,
+  defaultProps,
+  firstPageId,
+  nextIndex,
+  shapeRecord
+} from './scratchpad-records'
 
 // Server-side Scratchpad writer. The browser is no longer required to draw: we run
 // the same ops against a *headless* tldraw store here, persist the snapshot, and
@@ -35,24 +38,8 @@ import { type ScratchpadDoc, loadScratchpadDoc, saveScratchpadDoc } from './scra
 // validates every `put`, so a malformed record throws instead of corrupting the
 // file — that validation is what keeps hand-built records honest.
 
-// Each shape type's default props, read once from its ShapeUtil. `getDefaultProps`
-// is an instance method but doesn't touch the editor for the shapes we create, so a
-// throwaway instance is enough; the result is static per type, so we cache it.
-const shapeDefaults = new Map<string, Record<string, unknown>>()
-function defaultProps(type: string): Record<string, unknown> {
-  let cached = shapeDefaults.get(type)
-  if (!cached) {
-    const Util = defaultShapeUtils.find(u => (u as unknown as { type: string }).type === type)
-    if (!Util) throw new Error(`Unknown shape type "${type}"`)
-    // eslint-disable-next-line new-cap -- Util is a class constructor pulled from a list
-    const util = new (Util as unknown as new (editor: unknown) => {
-      getDefaultProps(): Record<string, unknown>
-    })({})
-    cached = util.getDefaultProps()
-    shapeDefaults.set(type, cached)
-  }
-  return { ...cached }
-}
+// Record construction (defaultProps / shapeRecord / arrowBinding / index helpers)
+// lives in scratchpad-records.ts, shared with the diagram compiler.
 
 // Map an op's optional color/size/fill onto tldraw shape props (omitted → tldraw default).
 function styleProps(style: ScratchStyle): Record<string, unknown> {
@@ -73,71 +60,6 @@ function buildStore(doc: ScratchpadDoc | null): TLStore {
   // Seed the document/page records a fresh (or partial) store needs to be valid.
   store.ensureStoreIsUsable()
   return store
-}
-
-function firstPageId(store: TLStore): TLPageId {
-  for (const record of store.allRecords()) {
-    if (record.typeName === 'page') return record.id
-  }
-  // ensureStoreIsUsable always leaves a page; this is unreachable in practice.
-  throw new Error('Scratchpad has no page')
-}
-
-// The next fractional index above every shape on the page, so a new shape lands on
-// top. IndexKeys sort lexicographically, so a string max is a valid ordering.
-function nextIndex(store: TLStore, pageId: TLPageId): IndexKey {
-  let max: IndexKey = ZERO_INDEX_KEY
-  for (const record of store.allRecords()) {
-    if (record.typeName === 'shape' && record.parentId === pageId && record.index > max) {
-      max = record.index
-    }
-  }
-  return getIndexAbove(max)
-}
-
-// Hand-build a shape record. TS can't correlate `type` with its matching props
-// variant across the TLRecord union, so we assert — `store.put` validates the
-// result at runtime, which is the real guarantee.
-function shapeRecord(fields: {
-  id: ReturnType<typeof createShapeId>
-  type: string
-  x: number
-  y: number
-  index: IndexKey
-  parentId: TLPageId
-  props: Record<string, unknown>
-}): TLRecord {
-  return {
-    typeName: 'shape',
-    rotation: 0,
-    isLocked: false,
-    opacity: 1,
-    meta: {},
-    ...fields
-  } as unknown as TLRecord
-}
-
-// Bind one arrow terminal to a target shape, so the arrow follows when it moves.
-function arrowBinding(
-  arrowId: ReturnType<typeof createShapeId>,
-  targetId: ReturnType<typeof createShapeId>,
-  terminal: 'start' | 'end'
-): TLRecord {
-  return {
-    id: createBindingId(),
-    typeName: 'binding',
-    type: 'arrow',
-    fromId: arrowId,
-    toId: targetId,
-    meta: {},
-    props: {
-      terminal,
-      normalizedAnchor: { x: 0.5, y: 0.5 },
-      isPrecise: false,
-      isExact: false,
-      snap: 'none'
-    }
-  } as unknown as TLRecord
 }
 
 // Resize an image file to fit the canvas and embed it as a webp data URL, never
@@ -370,8 +292,14 @@ export function executeScratchOp(
   return withLock(workspacePath, async () => {
     const { document } = await loadScratchpadDoc(workspacePath)
     const store = buildStore(document)
-    // add-image decodes/resizes the file first, so it's the one async op.
-    const result = op.kind === 'add-image' ? await applyAddImage(store, op) : applyOp(store, op)
+    // add-image (decode/resize) and diagram (ELK layout in a worker) are async;
+    // every other op mutates the store synchronously.
+    const result =
+      op.kind === 'add-image'
+        ? await applyAddImage(store, op)
+        : op.kind === 'diagram'
+          ? await applyDiagram(store, op)
+          : applyOp(store, op)
     const next = getSnapshot(store).document as unknown as ScratchpadDoc
     await saveScratchpadDoc(next, workspacePath)
     publishEvent({ type: 'scratchpad:updated', workspaceId })

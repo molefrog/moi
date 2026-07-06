@@ -38,11 +38,63 @@ The agent works the canvas through a `moi scratch` CLI — it both **sees** and 
 
 `read` is for logic; `view` / `read-image` are for vision.
 
-### Drawing
+### Drawing diagrams
 
-The agent doesn't emit raw tldraw records. `moi scratch` exposes a small **primitive layer**
-that maps onto tldraw's own shape API — friendly to drive and stable against tldraw's
-internal schema:
+For anything boxes-and-arrows shaped — architectures, flows, pipelines, how-X-works — the
+agent shouldn't place shapes by hand. `moi scratch diagram` takes a **declarative JSON
+spec** (nodes, groups, labeled edges, a title) and compiles it onto the canvas: every label
+is measured with the actual canvas font, nodes are sized to fit, and positions come from
+ELK's layered auto-layout. Geometry is non-overlapping, aligned, and evenly spaced by
+construction — no coordinates in the spec at all.
+
+```
+moi scratch diagram [--spec file.json] [--at x,y] [--id prefix]
+```
+
+No `--spec` reads the spec from stdin (pipe a heredoc). `--at` pins the diagram's top-left
+corner; omitted, it auto-places below whatever is already on the canvas. `--id` sets the
+prefix of the created shape ids — every shape lands as `<prefix>-<nodeId>`,
+`<prefix>-title`, `<prefix>-edge-<i>` (printed on success), so the agent can `move`, `set`,
+or `delete` the pieces afterwards.
+
+The spec:
+
+```jsonc
+{
+  "title": "How to expose a Tailscale service", // optional; big text above the diagram
+  "direction": "right", // main flow: "right" (default) or "down"
+  "nodes": [
+    // shape: "rect" (default, sized to fit its label) | "note" (sticky, fixed 200×200);
+    // color/fill take the same values as the CLI flags; width = optional wrap-width hint
+    { "id": "browser", "label": "Browser (internet)", "color": "blue" }
+  ],
+  "groups": [
+    // a container rect drawn around its children (nodes or nested groups)
+    {
+      "id": "tailnet",
+      "label": "Tailscale network (private)",
+      "color": "grey",
+      "children": ["svc"]
+    }
+  ],
+  "edges": [
+    // arrows bound to their endpoint shapes; "elbow": true for right-angle routing
+    { "from": "browser", "to": "proxy", "label": "https://app.yourdomain.com", "color": "blue" }
+  ]
+}
+```
+
+Edges are real bound arrows (they follow their shapes when moved later), groups render as
+outline rects with the label at the top, and the whole diagram goes in as one batch —
+either all of it lands or none. Spec mistakes (unknown edge endpoint, duplicate id, bad
+color) come back as descriptive errors naming the offending entry.
+
+### Drawing primitives
+
+For **annotations and one-off marks** — a note next to the user's sketch, a single arrow, a
+label — the agent uses the primitive layer directly. It doesn't emit raw tldraw records:
+`moi scratch` exposes a small set that maps onto tldraw's own shape API — friendly to drive
+and stable against tldraw's internal schema:
 
 ```
 moi scratch add text   --at <x,y> --text "..."          [--id NAME] [--color C] [--font-size S]
@@ -80,8 +132,8 @@ moi scratch clear                           # wipe the whole canvas
 
 The set is deliberately small — text, rect, note, arrow (with color plus each shape's
 fill/font-size/stroke), plus
-move/set/delete/clear. Enough to lay out a diagram or annotate the user's drawing; not a full
-tldraw API.
+move/set/delete/clear. Enough to annotate the user's drawing or drop a one-off shape; for
+laying out a whole diagram, `moi scratch diagram` does the geometry instead.
 
 ## How it works
 
@@ -104,6 +156,9 @@ on the server (the mutations). Only `view` — rendering pixels — genuinely re
   `add image` additionally resizes the file through `sharp` (the same dep the icon pipeline uses)
   before embedding it. (We drive the store, not an `Editor`, because the Editor needs a DOM + text
   measurement the server runtime doesn't have. See `server/scratchpad-executor.ts`.)
+  `diagram` runs through the same path with two extra stages up front: labels are measured with
+  the real canvas font (`server/scratchpad-metrics.ts`), then `elkjs` computes the layout in a
+  worker before the records are built (`server/scratchpad-diagram.ts`).
 - **Viewing** (`moi scratch view`) is the one op still relayed to a connected tab: only the
   browser can rasterize the canvas (`editor.toImageDataUrl`). With no tab showing **this**
   workspace's scratchpad it returns "No live canvas" — every other op still works off disk.
