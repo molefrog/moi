@@ -197,8 +197,14 @@ media → `.server.ts` returns the **path**, render with `fileUrl()`.
 
 Each workspace has an effective env: keys from the project's `.env` / `.env.local` (when
 inheritance is enabled in settings) plus **custom secrets** the user manages in the workspace env
-settings. moi injects it into your shell and into applet `.server.ts` functions.
+settings. moi injects this env into:
 
+- applet server functions — read it as `process.env` inside `.server.ts`
+- any command run via `moi env exec -- <cmd>`
+- your own shell (Bash tool) — but only in some harnesses (e.g. Claude Code). Don't assume it:
+  verify the key is visible first, or just use `moi env exec`, which works everywhere.
+
+Rules:
 - **Check before you assume.** When a task needs a key or token — an API pull, a widget calling a
   service — run `moi env` first. It lists key names with their source (`.env` / custom) and flags
   declared `requiredEnv` keys that are missing. Values are never shown.
@@ -218,8 +224,16 @@ keys there. Either source may be absent, so always handle a missing key. List ex
 enforced).
 
 ```ts
-const key = process.env.ELEVENLABS_API_KEY
-if (!key) throw new Error('ELEVENLABS_API_KEY not set')
+// forecast.server.ts
+export async function getForecast(city: string) {
+  const key = process.env.WEATHER_API_KEY // always current — env changes respawn the worker
+  if (!key) return { error: 'Add WEATHER_API_KEY to your env' }
+  const res = await fetch(`https://api.example.com/forecast?city=${encodeURIComponent(city)}`, {
+    headers: { Authorization: `Bearer ${key}` }
+  })
+  if (!res.ok) return { error: `Weather API error ${res.status}` }
+  return { data: await res.json() }
+}
 ```
 
 # Widgets
