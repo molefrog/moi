@@ -10,11 +10,9 @@ import { COLOR_THEMES, FONT_THEMES } from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/themes'
 import type {
   ScratchArrowEnd,
-  ScratchColor,
-  ScratchFill,
+  ScratchDiagramSpec,
   ScratchImageQuality,
   ScratchOp,
-  ScratchSize,
   ScratchStyle
 } from '@/lib/types'
 
@@ -27,6 +25,16 @@ import {
 } from './cli-env'
 import { columns } from './cli-ui'
 import { CONTROL_PORT, PORT } from './constants'
+import {
+  COLOR_NAMES,
+  FILL_NAMES,
+  FONT_SIZE_NAMES,
+  STROKE_NAMES,
+  parseColor,
+  parseFill,
+  parseFontSize,
+  parseStroke
+} from './scratchpad-style'
 import { type OpenClawAgent, discoverOpenClawAgents } from './openclaw'
 import { liftToWorkspaceRoot, registerWorkspace } from './registry'
 import { serverCwd } from './server-cwd'
@@ -1109,87 +1117,8 @@ function parseEnd(s: string): ScratchArrowEnd {
   return { name: s }
 }
 
-// The Scratchpad palette (matches the UI toolbar's six swatches) and each color's
-// light-theme solid hex — used to snap an arbitrary `--color #rrggbb` to the nearest
-// palette entry (tldraw shapes can't hold free hex). Keep in sync with the swatches
-// in client/components/Scratchpad.tsx.
-const COLOR_HEX: Record<ScratchColor, string> = {
-  black: '#1d1d1d',
-  red: '#e03131',
-  yellow: '#f1ac4b',
-  green: '#099268',
-  blue: '#4465e9',
-  grey: '#9fa8b2'
-}
-const COLOR_NAMES = Object.keys(COLOR_HEX) as ScratchColor[]
-
-// Arrows expose tldraw's size as a line weight; the CLI mirrors the UI's two sizes.
-const STROKE_SIZES: Record<string, ScratchSize> = { small: 'm', large: 'xl' }
-const STROKE_NAMES = Object.keys(STROKE_SIZES)
-
-// Text & notes expose the same size style as a label font size, under friendlier names.
-const FONT_SIZES: Record<string, ScratchSize> = { regular: 'm', big: 'xl' }
-const FONT_SIZE_NAMES = Object.keys(FONT_SIZES)
-
-// Rectangle fills — the UI toolbar's four options. Each user-facing name maps onto a
-// tldraw DefaultFillStyle value (see ScratchFill for tldraw's semi/solid quirk). Keep
-// in sync with FILL_OPTIONS in client/components/Scratchpad.tsx.
-const FILL_STYLES: Record<string, ScratchFill> = {
-  none: 'none',
-  semi: 'solid',
-  pattern: 'pattern',
-  solid: 'fill'
-}
-const FILL_NAMES = Object.keys(FILL_STYLES)
-
-function hexToRgb(hex: string): [number, number, number] | null {
-  let h = hex.trim().replace(/^#/, '')
-  if (h.length === 3) h = h.replace(/(.)/g, '$1$1')
-  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null
-  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]
-}
-
-// Accept a palette name as-is, or snap any hex to the nearest palette color by
-// squared RGB distance. Throws on anything else.
-function parseColor(s: string): ScratchColor {
-  const lower = s.trim().toLowerCase()
-  if ((COLOR_NAMES as string[]).includes(lower)) return lower as ScratchColor
-  const rgb = hexToRgb(s)
-  if (!rgb) {
-    throw new Error(
-      `Unknown color "${s}". Use a hex like "#4465e9" or one of: ${COLOR_NAMES.join(', ')}.`
-    )
-  }
-  let best: ScratchColor = 'black'
-  let bestDist = Infinity
-  for (const name of COLOR_NAMES) {
-    const [r, g, b] = hexToRgb(COLOR_HEX[name])!
-    const d = (r - rgb[0]) ** 2 + (g - rgb[1]) ** 2 + (b - rgb[2]) ** 2
-    if (d < bestDist) {
-      bestDist = d
-      best = name
-    }
-  }
-  return best
-}
-
-function parseStroke(s: string): ScratchSize {
-  const size = STROKE_SIZES[s.trim().toLowerCase()]
-  if (!size) throw new Error(`Unknown stroke "${s}". Use one of: ${STROKE_NAMES.join(', ')}.`)
-  return size
-}
-
-function parseFontSize(s: string): ScratchSize {
-  const size = FONT_SIZES[s.trim().toLowerCase()]
-  if (!size) throw new Error(`Unknown font size "${s}". Use one of: ${FONT_SIZE_NAMES.join(', ')}.`)
-  return size
-}
-
-function parseFill(s: string): ScratchFill {
-  const fill = FILL_STYLES[s.trim().toLowerCase()]
-  if (!fill) throw new Error(`Unknown fill "${s}". Use one of: ${FILL_NAMES.join(', ')}.`)
-  return fill
-}
+// The palette / fill / size vocabulary is shared with the `diagram` spec
+// compiler, so it lives in scratchpad-style.ts (imported at the top of this file).
 
 // Resize preset for `add image` — defaults to 'lo' (keep the canvas light).
 function parseImageQuality(s: string | undefined): ScratchImageQuality {
@@ -1519,6 +1448,65 @@ const scratchAdd = defineCommand({
   }
 })
 
+// The declarative diagram compiler: a JSON spec in (file or stdin), measured +
+// auto-laid-out shapes on the canvas out. See server/scratchpad-diagram.ts.
+const scratchDiagram = defineCommand({
+  meta: {
+    name: 'diagram',
+    description:
+      'Compile a declarative diagram (JSON spec) onto the canvas with measured labels and ELK auto-layout — no coordinates needed. ' +
+      'Spec: {"title":"...", "direction":"right|down", ' +
+      '"nodes":[{"id":"a","label":"...","shape":"rect|note","color":"blue","fill":"semi","width":260}], ' +
+      '"groups":[{"id":"g","label":"...","color":"grey","children":["a"]}], ' +
+      '"edges":[{"from":"a","to":"b","label":"...","elbow":true}]}'
+  },
+  args: {
+    spec: { type: 'string', description: 'Path to the JSON spec file (default: read stdin)' },
+    at: {
+      type: 'string',
+      description: 'Top-left anchor "x,y" (default: auto-place below existing content)'
+    },
+    id: {
+      type: 'string',
+      description: 'Id prefix for created shapes (<prefix>-<nodeId>, <prefix>-title, ...)'
+    },
+    dir: dirArg
+  },
+  async run({ args }) {
+    const raw = args.spec ? await Bun.file(resolve(args.spec)).text() : await Bun.stdin.text()
+    let spec: unknown
+    try {
+      spec = JSON.parse(raw)
+    } catch (err) {
+      const source = args.spec ? args.spec : 'stdin'
+      console.error(
+        '\n' +
+          pc.red('✗') +
+          ` The spec (${source}) is not valid JSON: ${err instanceof Error ? err.message : String(err)}\n`
+      )
+      process.exit(1)
+    }
+    const at = args.at ? parseXY(args.at) : undefined
+    sendScratch(
+      resolve(args.dir),
+      {
+        kind: 'diagram',
+        name: args.id ?? '',
+        // Validated server-side (compileDiagramSpec) so errors surface in one
+        // place; the CLI only guarantees it's JSON.
+        spec: spec as ScratchDiagramSpec,
+        ...(at ? { x: at.x, y: at.y } : {})
+      },
+      res => {
+        const result = res.result as { name?: string; created?: string[] } | undefined
+        console.log('\n' + pc.green('✓') + ' diagram ' + pc.bold(result?.name ?? '(diagram)'))
+        for (const id of result?.created ?? []) console.log('  ' + id)
+        console.log('')
+      }
+    )
+  }
+})
+
 const scratchMove = defineCommand({
   meta: { name: 'move', description: 'Move a shape to a new position' },
   args: {
@@ -1581,6 +1569,7 @@ const scratch = defineCommand({
     'read-image': scratchReadImage,
     view: scratchView,
     add: scratchAdd,
+    diagram: scratchDiagram,
     move: scratchMove,
     set: scratchSet,
     delete: scratchDelete,

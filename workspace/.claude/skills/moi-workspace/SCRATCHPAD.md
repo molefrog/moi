@@ -19,7 +19,74 @@ clean, agent-friendly view. Treat it exactly like `.moi/.workspace.json` — CLI
 
 `read` is for logic; `view` / `read-image` are for vision.
 
-## Drawing
+## Drawing diagrams — `moi scratch diagram`
+
+**For ANY boxes-and-arrows structure — architectures, flows, pipelines, "how X works" — use
+`diagram`, never hand-placed primitives.** You declare nodes, groups, and edges; the server
+measures every label with the real canvas font, sizes the boxes to fit, and computes the
+layout with ELK. No overlaps, no clipped text, straight rows, even gaps — and you never
+touch a coordinate. Hand-placing a multi-box diagram with `add rect` wastes turns and comes
+out crooked.
+
+```
+moi scratch diagram [--spec file.json] [--at x,y] [--id prefix]
+```
+
+- No `--spec` reads stdin — pipe a heredoc (easiest).
+- Omit `--at` and the diagram auto-places below whatever is already on the canvas.
+- `--id` prefixes every created shape id: `<prefix>-<nodeId>`, `<prefix>-title`,
+  `<prefix>-edge-<i>`. The ids are printed on success — use them with `move`/`set`/`delete`
+  to adjust individual pieces afterwards.
+
+A complete worked example:
+
+```sh
+moi scratch diagram --id tailscale <<'EOF'
+{
+  "title": "How to expose a Tailscale service",
+  "direction": "right",
+  "nodes": [
+    { "id": "browser", "label": "Browser (internet)", "color": "blue" },
+    { "id": "proxy", "label": "Reverse proxy (Caddy)\nterminates TLS, forwards to the tailnet", "color": "green", "width": 280 },
+    { "id": "svc", "label": "Service\nlocalhost:3000" },
+    { "id": "tip", "label": "MagicDNS gives every machine a stable name", "shape": "note", "color": "yellow" }
+  ],
+  "groups": [
+    { "id": "tailnet", "label": "Tailscale network (private)", "color": "grey", "children": ["svc"] }
+  ],
+  "edges": [
+    { "from": "browser", "to": "proxy", "label": "https://app.yourdomain.com", "color": "blue" },
+    { "from": "proxy", "to": "svc", "label": "tailnet IP", "elbow": true }
+  ]
+}
+EOF
+```
+
+The spec, field by field:
+
+- `title` (optional) — big heading placed above the diagram.
+- `direction` — main flow: `"right"` (default) or `"down"`.
+- `nodes` — required, at least one. Each needs a unique `id` and a `label` (use `\n` for
+  explicit line breaks; long labels wrap automatically). Optional: `shape` (`"rect"`
+  default — sized to fit its label; `"note"` — a sticky, fixed 200×200, keep its text
+  short), `color` and `fill` (same values as the CLI flags below), `width` (label
+  wrap-width hint in px, default 260 — bump it for long one-line labels).
+- `groups` (optional) — container rects drawn around their `children` (node ids, or other
+  group ids for nesting). Rendered as an outline with the label at the top; edges may cross
+  group boundaries freely.
+- `edges` (optional) — arrows **bound** to their endpoint shapes (they follow if anything
+  is moved later). `from`/`to` reference node or group ids; optional `label`, `color`, and
+  `elbow: true` for right-angle routing.
+
+Everything lands in one batch — either the whole diagram or nothing. Spec mistakes come
+back as errors naming the exact entry (`edges[1]: unknown endpoint "svc2" ...`), so fix and
+re-run. To regenerate a diagram, `delete` its shapes (you have the prefixed ids) and compile
+again.
+
+## Drawing primitives
+
+For **annotations and one-offs** — a sticky note next to the user's sketch, one arrow, a
+caption, an image — not for laying out diagrams (that's `diagram` above).
 
 ```
 moi scratch add text   --at <x,y> --text "..."           [--id NAME] [--color C] [--font-size S]
