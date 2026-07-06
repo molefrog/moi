@@ -8,8 +8,8 @@ import type { UploadInfo, WorkspaceEntry, WorkspaceModels, WorkspaceType } from 
 
 import { getClaudeModels } from './agent'
 import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from './applets'
-import { restartWorkspaceSessions } from './cc-session'
-import { callFunction, parseFunctionPath, restartWorker } from './functions'
+import { applyEnvChanged } from './env-apply'
+import { callFunction, parseFunctionPath } from './functions'
 import { processIcon } from './icon'
 import { getWorkspacePreview, loadLayout, mergeLayoutForSave, saveLayout } from './layout'
 import { getMcpStatus } from './mcp'
@@ -277,8 +277,9 @@ one.get('/mcp', async c => {
 // custom secrets + scopes + declared-required keys; values masked).
 one.get('/env', async c => {
   const ws = c.get('ws')
-  const required = await requiredEnvFor(ws.path)
-  return c.json(await getWorkspaceEnvView(ws.path, required))
+  // Unawaited on purpose: getWorkspaceEnvView loads it in parallel with the
+  // env stores (manifest reads and env reads are independent).
+  return c.json(await getWorkspaceEnvView(ws.path, requiredEnvFor(ws.path)))
 })
 
 // PUT patches custom secrets (set/remove) and/or the inheritDotenv mode,
@@ -323,13 +324,11 @@ one.put('/env', async c => {
     patch.set !== undefined || patch.remove !== undefined || patch.inheritDotenv !== undefined
   if (hasChange) {
     await updateWorkspaceEnv(ws.path, patch)
-    // Frozen-at-spawn: reap workers/idle sessions so fresh env takes effect.
-    restartWorker(ws.path)
-    restartWorkspaceSessions(ws.path)
+    // Frozen-at-spawn: reap workers/idle sessions and tell other clients.
+    applyEnvChanged(ws)
   }
 
-  const required = await requiredEnvFor(ws.path)
-  return c.json(await getWorkspaceEnvView(ws.path, required))
+  return c.json(await getWorkspaceEnvView(ws.path, requiredEnvFor(ws.path)))
 })
 
 // Models the workspace's agent backend can run, normalized across providers.
