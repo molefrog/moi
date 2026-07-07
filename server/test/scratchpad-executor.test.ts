@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'node:fs'
+import { readdir } from 'node:fs/promises'
 import { join } from 'path'
 import sharp from 'sharp'
 
@@ -14,6 +15,7 @@ import {
   readScratchpadImage,
   readScratchpadShapes
 } from '../scratchpad'
+import { getScratchpadAssetsDir } from '../scratchpad-assets'
 
 // The headless write path: `executeScratchOp` must produce a snapshot that (a)
 // `read` reflects and (b) the *browser* could load — i.e. it survives a fresh
@@ -104,7 +106,7 @@ describe('executeScratchOp (headless)', () => {
     expect(await Bun.file(getScratchpadPath(WS)).exists()).toBe(true)
   })
 
-  test('add-image resizes to fit, embeds it, and read-image pulls it back', async () => {
+  test('add-image resizes to fit, stores a file asset, and read-image pulls it back', async () => {
     // A 4000×2000 source — larger than both presets, so it's always scaled down.
     const file = join(WS, 'big.png')
     await sharp({
@@ -119,10 +121,34 @@ describe('executeScratchOp (headless)', () => {
     const shape = (await readScratchpadShapes(WS)).find(s => s.id === 'pic')
     // Default 'lo' caps the long side at 768, aspect preserved (2:1 → 768×384).
     expect(shape).toMatchObject({ type: 'image', x: 40, y: 50, w: 768, h: 384 })
-    // read omits the blob; read-image returns the actual (re-encoded webp) data URL.
-    expect(shape?.src).toBe('base64:omitted')
+    // The bytes live as a content-addressed sidecar file, referenced by an
+    // `asset:` src — the snapshot JSON itself must carry no base64 blob.
+    expect(shape?.src).toMatch(/^asset:[0-9a-f]{64}\.webp$/)
+    const files = await readdir(getScratchpadAssetsDir(WS))
+    expect(files).toHaveLength(1)
+    expect(`asset:${files[0]}`).toBe(shape?.src ?? '')
+    expect(await Bun.file(getScratchpadPath(WS)).text()).not.toInclude(';base64,')
+    // read-image resolves the file back into the (re-encoded webp) data URL.
     const img = await readScratchpadImage(WS, 'pic')
     expect(img).toEqual({ src: expect.stringMatching(/^data:image\/webp;base64,/) })
+  })
+
+  test('clear drops asset records so the sweep can reclaim their files', async () => {
+    const file = join(WS, 'img.png')
+    await sharp({
+      create: { width: 64, height: 64, channels: 3, background: { r: 5, g: 5, b: 5 } }
+    })
+      .png()
+      .toFile(file)
+    await run({ kind: 'add-image', name: 'pic', x: 0, y: 0, path: file })
+
+    await run({ kind: 'clear' })
+    const { document } = await loadScratchpadDoc(WS)
+    const assets = Object.values(document?.store ?? {}).filter(
+      r => (r as { typeName?: string }).typeName === 'asset'
+    )
+    expect(assets).toHaveLength(0)
+    expect(await assertLoadable()).toBe(0)
   })
 
   test('add-image --quality hi keeps more pixels', async () => {

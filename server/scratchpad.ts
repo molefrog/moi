@@ -5,12 +5,19 @@ import tldrawPkg from 'tldraw/package.json'
 import type { ScratchpadWriter } from '@/lib/types'
 
 import moiPkg from '../package.json'
+import {
+  assetSrcFileName,
+  extractInlineAssets,
+  scratchpadAssetFile,
+  sweepOrphanAssets
+} from './scratchpad-assets'
 
 // The Scratchpad is a shared tldraw canvas per workspace, persisted as a tldraw
 // *document* snapshot here (the per-tab `session` is intentionally dropped). Two
 // writers: the browser autosaves on user edits, and the server writes on agent
 // draws (see scratchpad-executor.ts). This module owns the on-disk shape: load,
-// save, and the `moi scratch read` parser. See docs/moi-scratchpad.md.
+// save, and the `moi scratch read` parser. Image bytes live beside the snapshot
+// as files, not inside it (see scratchpad-assets.ts). See docs/moi-scratchpad.md.
 
 // A tldraw document snapshot: `getSnapshot(store).document`. Opaque to us apart
 // from `.store` (the record map) which `read` walks. `null` means empty canvas.
@@ -36,8 +43,9 @@ export type ScratchShape = {
   w?: number
   h?: number
   text?: string
-  // Image/asset src. Base64 data URLs are omitted (see omitBase64) — the agent
-  // calls `moi scratch view` to actually see pixels; only the URL kind passes through.
+  // Image/asset src: an `asset:` file reference or an https URL, passed through
+  // as-is. A legacy inline base64 blob is omitted (see omitBase64) — the agent
+  // calls `moi scratch read-image`/`view` to actually see pixels.
   src?: string
 }
 
@@ -73,8 +81,15 @@ export async function saveScratchpadDoc(
   workspacePath: string
 ): Promise<void> {
   const path = getScratchpadPath(workspacePath)
+  // Every writer funnels through here, so this is where inline base64 assets
+  // (legacy snapshots, or a stale tab still holding blobs in its live store)
+  // get extracted to `.moi/scratchpad-assets/` files — the snapshot on disk
+  // never carries image bytes. The sweep after the write reclaims files the
+  // saved document no longer references (see scratchpad-assets.ts).
+  document = await extractInlineAssets(document, workspacePath)
   await backupOnSchemaChange(path, document)
   await Bun.write(path, JSON.stringify({ document, writer: SCRATCHPAD_WRITER }, null, 2))
+  await sweepOrphanAssets(workspacePath, document)
 }
 
 // When a save is about to overwrite a snapshot with a *different* schema (i.e.
@@ -91,11 +106,12 @@ async function backupOnSchemaChange(path: string, document: ScratchpadDoc): Prom
   } catch {}
 }
 
-// tldraw embeds pasted/dropped images as `data:<mime>;base64,<blob>` URLs (on
-// asset records, and occasionally inline in rich text). Those blobs are huge and
+// Asset records now reference image bytes as `asset:` files (see
+// scratchpad-assets.ts), but base64 data URLs can still appear — in a legacy
+// snapshot not yet re-saved, or inline in rich text. Those blobs are huge and
 // useless for reasoning about structure, so we replace each one with a short
-// marker — the agent calls `moi scratch view` when it actually needs the pixels.
-// Non-base64 srcs (e.g. https URLs) pass through untouched.
+// marker — the agent calls `moi scratch read-image`/`view` when it actually
+// needs the pixels. Every other src (`asset:`, https) passes through untouched.
 const BASE64_DATA_URL_RE = /data:[\w.+-]*\/?[\w.+-]*;base64,[A-Za-z0-9+/=]+/g
 function omitBase64(text: string): string {
   return text.replace(BASE64_DATA_URL_RE, 'base64:omitted')
@@ -124,11 +140,13 @@ function extractText(props: unknown): string | undefined {
 }
 
 // Resolve a single image shape's source by id, straight off the disk snapshot —
-// no browser. The shape references an `asset` record by `props.assetId`; we return
-// that asset's `src` (a `data:` URL for pasted/dropped images, or an `https:` URL).
-// `moi scratch read` deliberately omits these blobs, so this is how the agent pulls
-// the actual pixels for one image. Ids match with or without the `shape:` prefix
-// (read surfaces them stripped).
+// no browser. The shape references an `asset` record by `props.assetId`; that
+// asset's `src` is an `asset:` file reference (read back off disk and returned
+// as a `data:` URL so the CLI's decoding keeps working), an `https:` URL
+// (returned as-is), or — in a legacy snapshot — an inline `data:` URL.
+// `moi scratch read` never carries the pixels, so this is how the agent pulls
+// them for one image. Ids match with or without the `shape:` prefix (read
+// surfaces them stripped).
 export async function readScratchpadImage(
   workspacePath: string,
   id: string
@@ -155,7 +173,14 @@ export async function readScratchpadImage(
     if (!record || typeof record !== 'object') continue
     const a = record as { typeName?: string; id?: string; props?: { src?: unknown } }
     if (a.typeName === 'asset' && a.id === assetId && typeof a.props?.src === 'string') {
-      return { src: a.props.src }
+      const fileName = assetSrcFileName(a.props.src)
+      if (!fileName) return { src: a.props.src }
+      const resolved = scratchpadAssetFile(workspacePath, fileName)
+      if (!resolved || !(await resolved.file.exists())) {
+        return { error: `Image "${id}" file is missing from .moi/scratchpad-assets` }
+      }
+      const bytes = Buffer.from(await resolved.file.arrayBuffer())
+      return { src: `data:${resolved.mimeType};base64,${bytes.toString('base64')}` }
     }
   }
   return { error: `Image "${id}" has no stored data` }

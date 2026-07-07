@@ -1,8 +1,17 @@
-import { Fragment, type ReactElement, useCallback, useEffect, useRef, useState } from 'react'
+import {
+  Fragment,
+  type ReactElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react'
 
 import {
   type Editor,
   type StyleProp,
+  type TLAssetStore,
   type TLComponents,
   type TLDefaultColorStyle,
   type TLDefaultDashStyle,
@@ -82,6 +91,34 @@ function makeExecutor(editor: Editor) {
       padding: 32
     })
     return { image: url }
+  }
+}
+
+// File-backed assets: without this, tldraw inlines every pasted/dropped image as
+// a base64 data URL inside the document — megabytes re-serialized into
+// `.moi/.scratchpad.json` on every autosave and shipped over every GET/PUT.
+// Instead `upload` POSTs the bytes once and stores a tiny `asset:<file>` src on
+// the record; `resolve` maps it back to the serving URL at render time. Legacy
+// snapshots still holding data URLs pass through `resolve` untouched (the
+// server extracts them to files on the next save). See server/scratchpad-assets.ts.
+function makeAssetStore(workspaceId: string): TLAssetStore {
+  const base = `/api/workspaces/${workspaceId}/scratchpad/assets`
+  return {
+    async upload(_asset, file) {
+      const res = await fetch(base, {
+        method: 'POST',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file
+      })
+      if (!res.ok) throw new Error(`Upload failed: ${await res.text()}`)
+      const { src } = (await res.json()) as { src: string }
+      return { src }
+    },
+    resolve(asset) {
+      const src = asset.props.src
+      if (src?.startsWith('asset:')) return `${base}/${src.slice('asset:'.length)}`
+      return src
+    }
   }
 }
 
@@ -748,6 +785,8 @@ export function Scratchpad() {
   // Reactive handle to the mounted editor, used to render the custom tool bar.
   const [editor, setEditor] = useState<Editor | null>(null)
   const { loaded, snapshot, skew, flagSkew } = useScratchpadSnapshot(workspaceId)
+  // Stable per workspace — a new identity would remount tldraw's asset handling.
+  const assetStore = useMemo(() => makeAssetStore(workspaceId), [workspaceId])
 
   const save = useCallback(() => {
     const editor = editorRef.current
@@ -865,6 +904,7 @@ export function Scratchpad() {
       <div className="absolute inset-0">
         <Tldraw
           snapshot={snapshot}
+          assets={assetStore}
           licenseKey={LICENSE_KEY}
           onMount={onMount}
           components={SCRATCH_COMPONENTS}

@@ -35,6 +35,7 @@ import {
   loadScratchpadDoc,
   saveScratchpadDoc
 } from './scratchpad'
+import { storeScratchpadAsset } from './scratchpad-assets'
 
 // Server-side Scratchpad writer. The browser is no longer required to draw: we run
 // the same ops against a *headless* tldraw store here, persist the snapshot, and
@@ -173,10 +174,10 @@ function arrowBinding(
   } as unknown as TLRecord
 }
 
-// Resize an image file to fit the canvas and embed it as a webp data URL, never
-// enlarging — so a 10MB paste becomes a lightweight asset. `quality` picks the
-// preset: 'lo' caps the long side smaller (default), 'hi' keeps more pixels.
-// `.rotate()` bakes in EXIF orientation (phone photos).
+// Resize an image file to fit the canvas, never enlarging — so a 10MB paste
+// becomes a lightweight asset. `quality` picks the preset: 'lo' caps the long
+// side smaller (default), 'hi' keeps more pixels. `.rotate()` bakes in EXIF
+// orientation (phone photos).
 const IMAGE_PRESETS: Record<ScratchImageQuality, { dim: number; quality: number }> = {
   lo: { dim: 768, quality: 78 },
   hi: { dim: 2048, quality: 88 }
@@ -186,7 +187,7 @@ const MAX_IMAGE_BYTES = 50 * 1024 * 1024
 async function processCanvasImage(
   path: string,
   quality: ScratchImageQuality
-): Promise<{ src: string; w: number; h: number; mimeType: string; name: string }> {
+): Promise<{ data: Buffer; w: number; h: number; mimeType: string; name: string }> {
   const file = Bun.file(path)
   if (!(await file.exists())) throw new Error(`Image file not found: ${path}`)
   const bytes = new Uint8Array(await file.arrayBuffer())
@@ -200,23 +201,21 @@ async function processCanvasImage(
     .resize(preset.dim, preset.dim, { fit: 'inside', withoutEnlargement: true })
     .webp({ quality: preset.quality })
     .toBuffer({ resolveWithObject: true })
-  return {
-    src: `data:image/webp;base64,${data.toString('base64')}`,
-    w: info.width,
-    h: info.height,
-    mimeType: 'image/webp',
-    name: basename(path)
-  }
+  return { data, w: info.width, h: info.height, mimeType: 'image/webp', name: basename(path) }
 }
 
-// Create an image shape and its backing asset from a file. Async — unlike the
-// other ops — because it decodes and resizes the image first.
+// Create an image shape and its backing asset from a file. The resized bytes go
+// to `.moi/scratchpad-assets/` and the asset record holds the `asset:` file
+// reference — never a base64 blob (see scratchpad-assets.ts). Async — unlike
+// the other ops — because it decodes and resizes the image first.
 async function applyAddImage(
   store: TLStore,
+  workspacePath: string,
   op: Extract<ScratchOp, { kind: 'add-image' }>
 ): Promise<ScratchOpResult> {
   const pageId = firstPageId(store)
-  const { src, w, h, mimeType, name } = await processCanvasImage(op.path, op.quality ?? 'lo')
+  const { data, w, h, mimeType, name } = await processCanvasImage(op.path, op.quality ?? 'lo')
+  const { src } = await storeScratchpadAsset(workspacePath, new Uint8Array(data), mimeType)
   const assetId = AssetRecordType.createId()
   store.put([
     {
@@ -354,9 +353,11 @@ function applyOp(store: TLStore, op: ScratchOp): ScratchOpResult {
       return { ok: true }
     }
     case 'clear': {
+      // Assets go too — with every shape gone they're unreachable, and dropping
+      // the records lets the post-save sweep reclaim their files on disk.
       const ids = store
         .allRecords()
-        .filter(r => r.typeName === 'shape' || r.typeName === 'binding')
+        .filter(r => r.typeName === 'shape' || r.typeName === 'binding' || r.typeName === 'asset')
         .map(r => r.id)
       if (ids.length > 0) store.remove(ids)
       return { ok: true }
@@ -404,7 +405,8 @@ export function executeScratchOp(
     const { document, writer } = await loadScratchpadDoc(workspacePath)
     const store = buildStore(document, writer)
     // add-image decodes/resizes the file first, so it's the one async op.
-    const result = op.kind === 'add-image' ? await applyAddImage(store, op) : applyOp(store, op)
+    const result =
+      op.kind === 'add-image' ? await applyAddImage(store, workspacePath, op) : applyOp(store, op)
     const next = getSnapshot(store).document as unknown as ScratchpadDoc
     await saveScratchpadDoc(next, workspacePath)
     publishEvent({ type: 'scratchpad:updated', workspaceId })
