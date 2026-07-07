@@ -28,7 +28,6 @@ import {
   react
 } from 'tldraw'
 import 'tldraw/tldraw.css'
-import tldrawPkg from 'tldraw/package.json'
 import { motion } from 'motion/react'
 import {
   IconArrowUpRight,
@@ -713,11 +712,9 @@ function ScratchpadSkewNotice({ skew }: ScratchpadSkewNoticeProps) {
         {skew.newer ? (
           <>
             <p className="text-sm text-muted-foreground">
-              It was last saved by a newer version of moi ({skew.detail}), and this moi (tldraw{' '}
-              {tldrawPkg.version}) can’t open canvases from the future.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Restart the newer moi server, or update this one:
+              This scratchpad was saved by a newer version of moi
+              {skew.writer ? ` (v${skew.writer.moi})` : ''} — please update moi and restart the
+              server:
             </p>
             <code className="self-start rounded bg-muted px-2 py-1 font-mono text-xs text-foreground">
               bun install -g moi-computer@latest
@@ -726,10 +723,6 @@ function ScratchpadSkewNotice({ skew }: ScratchpadSkewNoticeProps) {
         ) : (
           <p className="text-sm text-muted-foreground">{skew.detail}</p>
         )}
-        <p className="text-sm text-muted-foreground">
-          Nothing was lost — the canvas file is untouched and stays that way while this notice is
-          shown.
-        </p>
       </div>
     </div>
   )
