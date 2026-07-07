@@ -1,10 +1,10 @@
-import envPaths from 'env-paths'
 import { mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'path'
 
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
+import { DATA_DIR } from './data-dir'
 import { type OpenClawAgent, discoverOpenClawAgents } from './openclaw'
 
 // Replace the home-dir prefix with `~` for display. Keeps the original
@@ -22,7 +22,6 @@ function withDisplayPath<T extends { path: string }>(entry: T): T & { displayPat
   return { ...entry, displayPath: tildify(entry.path) }
 }
 
-const DATA_DIR = envPaths('moi', { suffix: false }).data
 export const DEFAULT_REGISTRY_PATH = join(DATA_DIR, 'workspaces.json')
 
 // Overridable for tests

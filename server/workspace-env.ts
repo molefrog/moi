@@ -14,12 +14,13 @@
 // Non-secret metadata (the `inheritDotenv` mode flag) lives in a small JSON
 // file in the OS data dir. Secret values live in the SecretStore. The two are
 // keyed by the absolute workspace path.
-import envPaths from 'env-paths'
 import { chmod, mkdir, rename } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { parseEnv } from 'node:util'
 
 import type { WorkspaceEnvView } from '@/lib/types'
+
+import { DATA_DIR } from './data-dir'
 
 // Dotenv files scanned in the workspace root, low → high precedence. A later
 // file's keys override an earlier file's (base `.env`, machine-local `.env.local`).
@@ -32,7 +33,6 @@ export function isValidEnvKey(key: string): boolean {
   return ENV_KEY_RE.test(key)
 }
 
-const DATA_DIR = envPaths('moi', { suffix: false }).data
 const DEFAULT_META_PATH = join(DATA_DIR, 'workspace-env.json')
 const DEFAULT_SECRET_PATH = join(DATA_DIR, 'workspace-secrets.json')
 // Keychain namespace for Bun.secrets entries.

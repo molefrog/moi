@@ -1,9 +1,9 @@
 import { mkdir, rename } from 'node:fs/promises'
 import { join } from 'path'
 
-import envPaths from 'env-paths'
-
 import type { ThreadConfig } from '@/lib/types'
+
+import { DATA_DIR } from './data-dir'
 
 // Per-thread model/effort overrides for chat threads. Stored OUTSIDE the user's
 // workspace (no repo churn) in ONE global JSON file in moi's data dir, alongside
@@ -20,7 +20,6 @@ export type ThreadConfigPatch = {
 
 type Store = Record<string, Record<string, ThreadConfig>>
 
-const DATA_DIR = envPaths('moi', { suffix: false }).data
 let _path = join(DATA_DIR, 'thread-config.json')
 
 // Test seam: point the store at a scratch file (mirrors registry.setRegistryPath).

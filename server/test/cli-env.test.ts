@@ -1,9 +1,11 @@
 // End-to-end tests for the `moi env` CLI: each test spawns the real CLI
 // (`bun server/cli.ts env …`) against a temp workspace, with the registry and
-// env stores isolated under a temp XDG_DATA_HOME. MOI_SECRET_BACKEND=file pins
-// the file secret store so a test run can never touch the real OS keychain.
+// env stores isolated under a temp MOI_DATA_DIR (env-paths only honors
+// XDG_DATA_HOME on Linux, so an explicit override is the only portable seam).
+// MOI_SECRET_BACKEND=file pins the file secret store so a test run can never
+// touch the real OS keychain.
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'path'
 
@@ -13,9 +15,6 @@ let dataHome: string
 let wsDir: string
 let outsideDir: string
 
-// The stores keyed by env-paths land in $XDG_DATA_HOME/moi on Linux and
-// $XDG_DATA_HOME/moi (via env-paths override) elsewhere too, because env-paths
-// honors XDG_DATA_HOME on every platform when set.
 const moiDataDir = () => join(dataHome, 'moi')
 const secretsPath = () => join(moiDataDir(), 'workspace-secrets.json')
 
@@ -40,7 +39,7 @@ async function runCli(
     stderr: 'pipe',
     env: {
       ...process.env,
-      XDG_DATA_HOME: dataHome,
+      MOI_DATA_DIR: moiDataDir(),
       MOI_SECRET_BACKEND: 'file',
       // No NO_COLOR override: stdout is a pipe here, exactly like an agent
       // capturing the command, so plain output must be the default.
@@ -64,10 +63,15 @@ async function storedSecrets(): Promise<Record<string, Record<string, string>>> 
   }
 }
 
+// realpath matters: on macOS tmpdir() is a symlink (/var → /private/var), and
+// the spawned CLI sees the resolved cwd, which must prefix-match the
+// registered workspace path.
+const tempDir = async (prefix: string) => realpath(await mkdtemp(join(tmpdir(), prefix)))
+
 beforeEach(async () => {
-  dataHome = await mkdtemp(join(tmpdir(), 'moi-cli-data-'))
-  wsDir = await mkdtemp(join(tmpdir(), 'moi-cli-ws-'))
-  outsideDir = await mkdtemp(join(tmpdir(), 'moi-cli-outside-'))
+  dataHome = await tempDir('moi-cli-data-')
+  wsDir = await tempDir('moi-cli-ws-')
+  outsideDir = await tempDir('moi-cli-outside-')
   await registerWorkspace(wsDir)
 })
 
@@ -252,7 +256,7 @@ describe('moi env exec', () => {
         stderr: 'pipe',
         env: {
           ...process.env,
-          XDG_DATA_HOME: dataHome,
+          MOI_DATA_DIR: moiDataDir(),
           MOI_SECRET_BACKEND: 'file',
           NO_COLOR: '1',
           HOME_MADE: 'stale'
