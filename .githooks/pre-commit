@@ -1,8 +1,9 @@
 #!/bin/sh
 set -e
 
-# Auto-fix lint + format the whole tree, then stage the results so they land in
-# this commit. Lint errors that can't be auto-fixed still abort (set -e).
+# Auto-fix lint + format the whole tree, then re-stage only the files already
+# staged for this commit so the fixes land without pulling in unrelated changes.
+# Lint errors that can't be auto-fixed still abort (set -e).
 bun run lint:fix
 bun run format
-git add -u
+git add $(git diff --cached --name-only)
