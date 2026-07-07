@@ -1,6 +1,6 @@
 {
   "name": "moi-computer",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Local AI workspace powered by the Claude Agent SDK, Bun, React, and Tailwind. Requires Bun.",
   "license": "Elastic-2.0",
   "type": "module",
