@@ -1,7 +1,7 @@
 # Design principles
 
 How to make hand-written UI (HTML + Tailwind) feel designed, not assembled. Distilled craft
-principles — pair with the Tailwind/icons/animations rules in `.claude/rules/`.
+principles — pair with the Tailwind/icons/animations rules in `.agents/rules/`.
 
 ## Before building a new surface
 
