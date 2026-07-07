@@ -84,6 +84,7 @@ my-agent-folder/
     package.json              <- Applet dependencies that you manage
     .workspace.json           <- Auto-generated. Do NOT read, edit, or `cat` this file. Use Moi CLI instead.
     .scratchpad.json          <- Scratchpad canvas snapshot. Internal — inspect only via `moi scratch read`, never open it.
+    .scratchpad/              <- Scratchpad image files. Internal — pull pixels via `moi scratch read-image`, never open it.
 ```
 
 # Build environment

@@ -9,8 +9,9 @@ import type { ScratchpadDoc } from './scratchpad'
 // so a few pasted screenshots inlined as base64 would make every save and every
 // tab reload carry megabytes of pixels. Instead an asset record's `src` is
 // `asset:<sha256>.<ext>` — a tldraw-valid src protocol — pointing at a file in
-// `.moi/scratchpad-assets/`. The browser uploads/resolves through the
-// `/scratchpad/assets` routes (see its TLAssetStore in Scratchpad.tsx); the
+// `.moi/.scratchpad/` (a hidden sidecar dir next to `.moi/.scratchpad.json`,
+// moi-internal like the snapshot itself). The browser uploads/resolves through
+// the `/scratchpad/assets` routes (see its TLAssetStore in Scratchpad.tsx); the
 // server's `add image` writes files directly; `read-image` reads them back.
 //
 // Content addressing (the file name is the sha256 of the bytes) buys dedup —
@@ -18,7 +19,7 @@ import type { ScratchpadDoc } from './scratchpad'
 // so re-extracting a stale tab's base64 PUT converges on the same file.
 
 export function getScratchpadAssetsDir(workspacePath: string): string {
-  return join(workspacePath, '.moi', 'scratchpad-assets')
+  return join(workspacePath, '.moi', '.scratchpad')
 }
 
 // Matches executor-side MAX_IMAGE_BYTES — the most anyone can hand us.

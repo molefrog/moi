@@ -97,12 +97,14 @@ on the server (the mutations). Only `view` — rendering pixels — genuinely re
   after each agent mutation. Either writer publishes a "canvas updated" signal, and every open
   tab reloads from disk, so all viewers converge.
 - **Image bytes live outside the snapshot.** Pasted/dropped/agent-added images are
-  content-addressed files in `.moi/scratchpad-assets/` (`<sha256>.<ext>`), referenced from
-  asset records by `asset:` srcs — one of tldraw's native src protocols. The browser uploads
+  content-addressed files in `.moi/.scratchpad/` (`<sha256>.<ext>` — a hidden sidecar dir
+  next to the snapshot, moi-internal like the snapshot itself), referenced from asset
+  records by `asset:` srcs — one of tldraw's native src protocols. The browser uploads
   via a custom `TLAssetStore` (POST `/scratchpad/assets`, resolved back through GET); the
   server writes files directly. This keeps the constantly-rewritten JSON small: without it,
   every autosave and every tab reload would re-serialize and re-ship megabytes of base64.
-  Every save extracts any inline base64 it still finds (legacy snapshots migrate on their
+  Old workspaces with inline base64 images keep working — they render and `read-image`
+  as-is; every save extracts any inline base64 it finds (legacy snapshots migrate on their
   next save; a stale tab PUTting blobs converges on the same files by content address) and
   then sweeps asset files the document no longer references, with a grace window so a
   just-uploaded file survives until its autosave lands.
