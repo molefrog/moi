@@ -7,8 +7,7 @@ import {
   IconLayoutSidebar,
   IconLayoutSidebarLeftCollapse,
   IconLayoutSidebarLeftExpand,
-  IconPlus,
-  IconSettings
+  IconPlus
 } from '@tabler/icons-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link } from 'wouter'
@@ -216,16 +215,6 @@ function Sidebar({ collapsed, workspaces, logoEffect }: SidebarProps) {
 
       {/* Footer */}
       <div className="flex items-center justify-between gap-2 py-3">
-        <button
-          type="button"
-          className={cn(
-            'flex h-8 items-center gap-2 rounded-sm pl-1.5 text-sm text-foreground hover:bg-foreground/[0.05] hover:text-foreground',
-            collapsed ? 'pr-1.5' : 'pr-2.5'
-          )}
-        >
-          <IconSettings size={18} className="shrink-0" />
-          {!collapsed && <span>Settings</span>}
-        </button>
         {/* Temporarily hidden */}
         <button
           type="button"
