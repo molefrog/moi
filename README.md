@@ -1,7 +1,7 @@
 ```
-██████  ██████  ██
-██░░██  ██░░██  ██
-██░░██  ██████  ██
+██████████  ██████  ██
+██░░██░░██  ██░░██  ██
+██░░██░░██  ██████  ██
 ```
 
 A local workspace where AI agents build their own UI.
@@ -17,7 +17,7 @@ moi start        # http://localhost:13337
 Or paste this into Claude Code and it will set everything up for you:
 
 ```
-Set up the MOI workspace for this project. Fetch https://moi.computer/CC-INSTALL.md, and follow the steps.
+Set up the moi workspace for this project. Fetch https://moi.computer/CC-INSTALL.md, and follow the steps.
 ```
 
 Hacking on it:
