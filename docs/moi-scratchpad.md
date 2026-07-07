@@ -97,8 +97,8 @@ on the server (the mutations). Only `view` — rendering pixels — genuinely re
   after each agent mutation. Either writer publishes a "canvas updated" signal, and every open
   tab reloads from disk, so all viewers converge.
 - **Image bytes live outside the snapshot.** Pasted/dropped/agent-added images are
-  content-addressed files in `.moi/.scratchpad/` (`<sha256>.<ext>` — a hidden sidecar dir
-  next to the snapshot, moi-internal like the snapshot itself), referenced from asset
+  content-addressed files in `.moi/.scratchpad/` (`asset-<sha256>.<ext>` — a hidden sidecar
+  dir next to the snapshot, moi-internal like the snapshot itself), referenced from asset
   records by `asset:` srcs — one of tldraw's native src protocols. The browser uploads
   via a custom `TLAssetStore` (POST `/scratchpad/assets`, resolved back through GET); the
   server writes files directly. This keeps the constantly-rewritten JSON small: without it,

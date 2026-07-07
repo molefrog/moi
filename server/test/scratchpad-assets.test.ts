@@ -57,7 +57,7 @@ describe('storeScratchpadAsset', () => {
     const a = await storeScratchpadAsset(WS, PNG_BYTES, 'image/png')
     const b = await storeScratchpadAsset(WS, PNG_BYTES, 'image/png')
     expect(a.src).toBe(b.src)
-    expect(a.src).toMatch(/^asset:[0-9a-f]{64}\.png$/)
+    expect(a.src).toMatch(/^asset:asset-[0-9a-f]{64}\.png$/)
     expect(await readdir(getScratchpadAssetsDir(WS))).toHaveLength(1)
   })
 
@@ -70,15 +70,17 @@ describe('storeScratchpadAsset', () => {
 })
 
 describe('assetSrcFileName / scratchpadAssetFile', () => {
-  test('accepts only our own sha256.ext names — no traversal, no other schemes', () => {
+  test('accepts only our own asset-<sha256>.ext names — no traversal, no other schemes', () => {
     const hash = 'a'.repeat(64)
-    expect(assetSrcFileName(`asset:${hash}.png`)).toBe(`${hash}.png`)
+    expect(assetSrcFileName(`asset:asset-${hash}.png`)).toBe(`asset-${hash}.png`)
     expect(assetSrcFileName('asset:../../etc/passwd')).toBeNull()
-    expect(assetSrcFileName(`asset:${hash}`)).toBeNull()
+    expect(assetSrcFileName(`asset:asset-${hash}`)).toBeNull()
+    expect(assetSrcFileName(`asset:${hash}.png`)).toBeNull()
     expect(assetSrcFileName('data:image/png;base64,AAAA')).toBeNull()
     expect(assetSrcFileName('https://example.com/x.png')).toBeNull()
     expect(scratchpadAssetFile(WS, '../secret')).toBeNull()
-    expect(scratchpadAssetFile(WS, `${hash}.png`)).not.toBeNull()
+    expect(scratchpadAssetFile(WS, `${hash}.png`)).toBeNull()
+    expect(scratchpadAssetFile(WS, `asset-${hash}.png`)).not.toBeNull()
   })
 })
 
@@ -96,7 +98,7 @@ describe('extractInlineAssets', () => {
 
     const out = await extractInlineAssets(doc, WS)
     const outStore = out.store as Record<string, { props: { src?: string } }>
-    expect(outStore['asset:a1'].props.src).toMatch(/^asset:[0-9a-f]{64}\.png$/)
+    expect(outStore['asset:a1'].props.src).toMatch(/^asset:asset-[0-9a-f]{64}\.png$/)
     expect(outStore['asset:remote'].props.src).toBe('https://example.com/pic.png')
     // The original document is not mutated (snapshot records may be frozen).
     expect(store['asset:a1'].props.src).toStartWith('data:')
@@ -123,7 +125,7 @@ describe('saveScratchpadDoc migration', () => {
 
     const { document } = await loadScratchpadDoc(WS)
     const asset = (document?.store?.['asset:a1'] ?? {}) as { props?: { src?: string } }
-    expect(asset.props?.src).toMatch(/^asset:[0-9a-f]{64}\.png$/)
+    expect(asset.props?.src).toMatch(/^asset:asset-[0-9a-f]{64}\.png$/)
 
     // The agent's read-image path resolves the file back to a data URL.
     expect(await readScratchpadImage(WS, 'pic')).toEqual({
