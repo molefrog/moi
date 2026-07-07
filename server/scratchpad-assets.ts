@@ -27,9 +27,11 @@ export const MAX_ASSET_BYTES = 50 * 1024 * 1024
 
 const ASSET_SRC_PREFIX = 'asset:'
 
-// The only file names we ever create or serve: `<sha256 hex>.<short ext>`.
-// Anything else (traversal attempts included) is rejected at the boundary.
-const ASSET_FILE_RE = /^[0-9a-f]{64}\.[a-z0-9]{1,8}$/
+// The only file names we ever create or serve: `asset-<sha256 hex>.<short ext>`.
+// The `asset-` prefix marks the files as canvas assets, keeping the sidecar dir
+// unambiguous if it ever holds anything else. Anything else (traversal attempts
+// included) is rejected at the boundary.
+const ASSET_FILE_RE = /^asset-[0-9a-f]{64}\.[a-z0-9]{1,8}$/
 
 const MIME_EXT: Record<string, string> = {
   'image/png': 'png',
@@ -79,7 +81,7 @@ export async function storeScratchpadAsset(
   const hasher = new Bun.CryptoHasher('sha256')
   hasher.update(bytes)
   const ext = MIME_EXT[mimeType.split(';')[0].trim().toLowerCase()] ?? 'bin'
-  const fileName = `${hasher.digest('hex')}.${ext}`
+  const fileName = `asset-${hasher.digest('hex')}.${ext}`
   const path = join(getScratchpadAssetsDir(workspacePath), fileName)
   if (!(await Bun.file(path).exists())) await Bun.write(path, bytes)
   return { src: `${ASSET_SRC_PREFIX}${fileName}` }

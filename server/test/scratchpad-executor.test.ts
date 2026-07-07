@@ -123,7 +123,7 @@ describe('executeScratchOp (headless)', () => {
     expect(shape).toMatchObject({ type: 'image', x: 40, y: 50, w: 768, h: 384 })
     // The bytes live as a content-addressed sidecar file, referenced by an
     // `asset:` src — the snapshot JSON itself must carry no base64 blob.
-    expect(shape?.src).toMatch(/^asset:[0-9a-f]{64}\.webp$/)
+    expect(shape?.src).toMatch(/^asset:asset-[0-9a-f]{64}\.webp$/)
     const files = await readdir(getScratchpadAssetsDir(WS))
     expect(files).toHaveLength(1)
     expect(`asset:${files[0]}`).toBe(shape?.src ?? '')
