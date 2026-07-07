@@ -701,19 +701,19 @@ type ScratchpadSkewNoticeProps = { skew: ScratchpadSkew }
 // autosave, so the newer file on disk stays byte-for-byte intact.
 function ScratchpadSkewNotice({ skew }: ScratchpadSkewNoticeProps) {
   return (
-    <div className="flex min-h-0 flex-1 items-center justify-center bg-muted/40 p-6">
-      <div className="flex max-w-md animate-in flex-col gap-3 rounded-xl border bg-background p-6 shadow-sm duration-200 fade-in-0 zoom-in-95">
+    <div className="flex min-h-0 flex-1 items-center justify-center bg-muted/40 bg-[radial-gradient(var(--color-border)_1px,transparent_1px)] [background-size:16px_16px] p-6">
+      <div className="flex max-w-md animate-in flex-col gap-3 rounded-md bg-background p-6 shadow-xs duration-200 fade-in-0 zoom-in-95">
         <div className="flex items-center gap-2">
           <IconVersions size={20} stroke={1.5} className="shrink-0 text-amber-600" />
-          <h2 className="font-semibold text-foreground">
+          <h2 className="font-medium text-foreground">
             {skew.newer ? 'This canvas needs a newer moi' : 'This canvas couldn’t be loaded'}
           </h2>
         </div>
         {skew.newer ? (
           <>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-pretty text-muted-foreground">
               This scratchpad was saved by a newer version of moi
-              {skew.writer ? ` (v${skew.writer.moi})` : ''} — please update moi and restart the
+              {skew.writer ? ` (v${skew.writer.moi})` : ''}.<br /> Please update moi and restart the
               server:
             </p>
             <code className="self-start rounded bg-muted px-2 py-1 font-mono text-xs text-foreground">
