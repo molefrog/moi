@@ -106,8 +106,12 @@ on the server (the mutations). Only `view` — rendering pixels — genuinely re
   Old workspaces with inline base64 images keep working — they render and `read-image`
   as-is; every save extracts any inline base64 it finds (legacy snapshots migrate on their
   next save; a stale tab PUTting blobs converges on the same files by content address) and
-  then sweeps asset files the document no longer references, with a grace window so a
-  just-uploaded file survives until its autosave lands.
+  then sweeps asset files that neither the document nor the `.bak` backup references, with
+  a grace window so a just-uploaded file survives until its autosave lands. If a referenced
+  file does go missing (say the snapshot was copied without its sidecar dir), nothing
+  breaks loudly: the canvas shows a broken-image placeholder, `read` flags the shape with
+  `missing: true`, and `read-image` errors naming the expected location — move the `.moi`
+  directory as a whole and the references heal, since file names are content-addressed.
 - **Reading** (`moi scratch read`, `read-image`) parses that snapshot straight off disk — the
   shape listing, or one image's bytes. No browser, no tldraw runtime.
 - **Drawing** (`add`/`move`/`set`/`delete`/`clear`) runs on the server: it loads the snapshot
