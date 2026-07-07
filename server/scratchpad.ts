@@ -83,7 +83,7 @@ export async function saveScratchpadDoc(
   const path = getScratchpadPath(workspacePath)
   // Every writer funnels through here, so this is where inline base64 assets
   // (legacy snapshots, or a stale tab still holding blobs in its live store)
-  // get extracted to `.moi/scratchpad-assets/` files — the snapshot on disk
+  // get extracted to `.moi/.scratchpad/` files — the snapshot on disk
   // never carries image bytes. The sweep after the write reclaims files the
   // saved document no longer references (see scratchpad-assets.ts).
   document = await extractInlineAssets(document, workspacePath)
@@ -177,7 +177,7 @@ export async function readScratchpadImage(
       if (!fileName) return { src: a.props.src }
       const resolved = scratchpadAssetFile(workspacePath, fileName)
       if (!resolved || !(await resolved.file.exists())) {
-        return { error: `Image "${id}" file is missing from .moi/scratchpad-assets` }
+        return { error: `Image "${id}" file is missing from .moi/.scratchpad` }
       }
       const bytes = Buffer.from(await resolved.file.arrayBuffer())
       return { src: `data:${resolved.mimeType};base64,${bytes.toString('base64')}` }

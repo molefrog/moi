@@ -205,7 +205,7 @@ async function processCanvasImage(
 }
 
 // Create an image shape and its backing asset from a file. The resized bytes go
-// to `.moi/scratchpad-assets/` and the asset record holds the `asset:` file
+// to `.moi/.scratchpad/` and the asset record holds the `asset:` file
 // reference — never a base64 blob (see scratchpad-assets.ts). Async — unlike
 // the other ops — because it decodes and resizes the image first.
 async function applyAddImage(

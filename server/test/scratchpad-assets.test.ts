@@ -15,7 +15,7 @@ import {
 } from '../scratchpad-assets'
 
 // The file-backed asset store keeps image bytes OUT of `.moi/.scratchpad.json`:
-// content-addressed files under `.moi/scratchpad-assets/`, `asset:` srcs on the
+// content-addressed files under `.moi/.scratchpad/`, `asset:` srcs on the
 // records, lazy migration of legacy inline base64 on save, and an orphan sweep.
 
 let WS: string

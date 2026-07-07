@@ -391,7 +391,7 @@ one.put('/scratchpad', async c => {
 })
 
 // Scratchpad assets: pasted/dropped image bytes live as content-addressed files
-// in `.moi/scratchpad-assets/`, referenced from the snapshot by `asset:` srcs —
+// in `.moi/.scratchpad/`, referenced from the snapshot by `asset:` srcs —
 // never inlined as base64 in the JSON (see server/scratchpad-assets.ts). The
 // browser's TLAssetStore POSTs the raw file here on paste and resolves `asset:`
 // srcs back through the GET when rendering.
