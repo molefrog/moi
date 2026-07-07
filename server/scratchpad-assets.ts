@@ -131,11 +131,35 @@ export async function extractInlineAssets(
 // cleared canvas, abandoned upload).
 const SWEEP_GRACE_MS = 5 * 60_000
 
-// Delete asset files the (just-saved) document no longer references. Runs after
-// every save; best-effort — a sweep failure must never surface into the save.
+// Asset file names referenced by the schema-change backup (`.scratchpad.json.bak`
+// — see backupOnSchemaChange in scratchpad.ts). The sweep must not eat those:
+// the .bak is the manual escape hatch after a downgrade, and restoring it with
+// its images gone would defeat the point. A raw regex scan (no JSON parse — the
+// .bak may be a huge legacy file), cached by mtime since the file only changes
+// on a schema upgrade. The pattern is `asset:` + ASSET_FILE_RE.
+const BAK_SRC_RE = /asset:(asset-[0-9a-f]{64}\.[a-z0-9]{1,8})/g
+const bakRefsCache = new Map<string, { mtimeMs: number; refs: Set<string> }>()
+async function bakReferencedAssets(bakFile: string): Promise<Set<string>> {
+  try {
+    const { mtimeMs } = await stat(bakFile)
+    const cached = bakRefsCache.get(bakFile)
+    if (cached && cached.mtimeMs === mtimeMs) return cached.refs
+    const refs = new Set<string>()
+    for (const m of (await Bun.file(bakFile).text()).matchAll(BAK_SRC_RE)) refs.add(m[1])
+    bakRefsCache.set(bakFile, { mtimeMs, refs })
+    return refs
+  } catch {
+    return new Set()
+  }
+}
+
+// Delete asset files that neither the (just-saved) document nor the snapshot's
+// `.bak` backup references. Runs after every save; best-effort — a sweep
+// failure must never surface into the save.
 export async function sweepOrphanAssets(
   workspacePath: string,
-  document: ScratchpadDoc
+  document: ScratchpadDoc,
+  bakFile?: string
 ): Promise<void> {
   try {
     const dir = getScratchpadAssetsDir(workspacePath)
@@ -150,6 +174,7 @@ export async function sweepOrphanAssets(
       const name = assetSrcFileName(r.props.src)
       if (name) referenced.add(name)
     }
+    if (bakFile) for (const name of await bakReferencedAssets(bakFile)) referenced.add(name)
 
     const now = Date.now()
     for (const name of files) {

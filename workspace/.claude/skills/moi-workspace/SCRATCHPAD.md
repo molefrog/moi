@@ -13,7 +13,8 @@ clean, agent-friendly view. Treat it exactly like `.moi/.workspace.json` — CLI
 
 - `moi scratch read` — dump the canvas as JSON: each shape's `id`, `type`, position, size, and
   text. Off disk, so it works whether or not a browser tab is open. An image shape's `src` is a
-  reference (`asset:...` or a URL), never the pixels.
+  reference (`asset:...` or a URL), never the pixels; `missing: true` on a shape means its image
+  file is gone, so don't bother calling `read-image` on it.
 - `moi scratch read-image <id>` — save one image shape to a file (its actual bytes; `read` only
   carries the reference). Off disk too.
 - `moi scratch view` — render the whole canvas to a PNG. Needs an open Scratchpad tab.

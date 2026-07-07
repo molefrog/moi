@@ -47,6 +47,10 @@ export type ScratchShape = {
   // as-is. A legacy inline base64 blob is omitted (see omitBase64) — the agent
   // calls `moi scratch read-image`/`view` to actually see pixels.
   src?: string
+  // True when `src` is an `asset:` reference whose backing file is gone from
+  // .moi/.scratchpad (sidecar dir lost or pruned) — `read-image` will error and
+  // the canvas shows a broken image. Absent otherwise.
+  missing?: true
 }
 
 // The snapshot is a hidden dotfile (like `.moi/.workspace.json`): it's moi-internal
@@ -89,7 +93,9 @@ export async function saveScratchpadDoc(
   document = await extractInlineAssets(document, workspacePath)
   await backupOnSchemaChange(path, document)
   await Bun.write(path, JSON.stringify({ document, writer: SCRATCHPAD_WRITER }, null, 2))
-  await sweepOrphanAssets(workspacePath, document)
+  // The `.bak` path keeps the sweep from orphaning the schema-change backup's
+  // images — a restored .bak should still render.
+  await sweepOrphanAssets(workspacePath, document, `${path}.bak`)
 }
 
 // When a save is about to overwrite a snapshot with a *different* schema (i.e.
@@ -195,13 +201,23 @@ export async function readScratchpadShapes(workspacePath: string): Promise<Scrat
 
   // Images live as `asset` records (typeName 'asset'); a shape references one by
   // `props.assetId`. Index asset src first so we can surface it on the shape —
-  // with base64 blobs omitted — without dumping the asset record itself.
+  // with base64 blobs omitted — without dumping the asset record itself. A
+  // file-backed src whose file is gone is flagged so the agent learns it's
+  // dangling from `read` instead of from a failing `read-image` later.
   const assetSrc = new Map<string, string>()
+  const assetGone = new Set<string>()
   for (const record of Object.values(store)) {
     if (!record || typeof record !== 'object') continue
     const a = record as { typeName?: string; id?: string; props?: { src?: unknown } }
     if (a.typeName !== 'asset' || typeof a.id !== 'string') continue
-    if (typeof a.props?.src === 'string') assetSrc.set(a.id, a.props.src)
+    if (typeof a.props?.src === 'string') {
+      assetSrc.set(a.id, a.props.src)
+      const fileName = assetSrcFileName(a.props.src)
+      if (fileName) {
+        const resolved = scratchpadAssetFile(workspacePath, fileName)
+        if (!resolved || !(await resolved.file.exists())) assetGone.add(a.id)
+      }
+    }
   }
 
   const shapes: ScratchShape[] = []
@@ -218,7 +234,8 @@ export async function readScratchpadShapes(workspacePath: string): Promise<Scrat
     if (r.typeName !== 'shape') continue
     const w = typeof r.props?.w === 'number' ? r.props.w : undefined
     const h = typeof r.props?.h === 'number' ? r.props.h : undefined
-    const rawSrc = typeof r.props?.assetId === 'string' ? assetSrc.get(r.props.assetId) : undefined
+    const assetId = typeof r.props?.assetId === 'string' ? r.props.assetId : undefined
+    const rawSrc = assetId !== undefined ? assetSrc.get(assetId) : undefined
     shapes.push({
       id: (r.id ?? '').replace(/^shape:/, ''),
       type: r.type ?? 'unknown',
@@ -230,7 +247,8 @@ export async function readScratchpadShapes(workspacePath: string): Promise<Scrat
         const text = extractText(r.props)
         return text !== undefined ? { text: omitBase64(text) } : {}
       })(),
-      ...(rawSrc !== undefined ? { src: omitBase64(rawSrc) } : {})
+      ...(rawSrc !== undefined ? { src: omitBase64(rawSrc) } : {}),
+      ...(assetId !== undefined && assetGone.has(assetId) ? { missing: true as const } : {})
     })
   }
   return shapes

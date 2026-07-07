@@ -3,7 +3,12 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { readdir, utimes } from 'node:fs/promises'
 import { join } from 'path'
 
-import { loadScratchpadDoc, readScratchpadImage, saveScratchpadDoc } from '../scratchpad'
+import {
+  loadScratchpadDoc,
+  readScratchpadImage,
+  readScratchpadShapes,
+  saveScratchpadDoc
+} from '../scratchpad'
 import type { ScratchpadDoc } from '../scratchpad'
 import {
   assetSrcFileName,
@@ -134,6 +139,27 @@ describe('saveScratchpadDoc migration', () => {
   })
 })
 
+describe('missing asset files (dangling references)', () => {
+  test('read flags the shape, read-image errors clearly, intact shapes unflagged', async () => {
+    await saveScratchpadDoc(legacyDoc(), WS)
+    const dir = getScratchpadAssetsDir(WS)
+
+    // Intact: no `missing` flag on the shape.
+    let pic = (await readScratchpadShapes(WS)).find(s => s.id === 'pic')
+    expect(pic?.src).toMatch(/^asset:asset-/)
+    expect(pic?.missing).toBeUndefined()
+
+    // Lose the sidecar file (e.g. snapshot copied without `.moi/.scratchpad/`).
+    for (const name of await readdir(dir)) rmSync(join(dir, name))
+
+    pic = (await readScratchpadShapes(WS)).find(s => s.id === 'pic')
+    expect(pic?.missing).toBe(true)
+    expect(await readScratchpadImage(WS, 'pic')).toEqual({
+      error: expect.stringMatching(/missing/)
+    })
+  })
+})
+
 describe('sweepOrphanAssets', () => {
   test('deletes old unreferenced files, keeps referenced and recent ones', async () => {
     const { src } = await storeScratchpadAsset(WS, PNG_BYTES, 'image/png')
@@ -163,6 +189,35 @@ describe('sweepOrphanAssets', () => {
     expect(left).toContain(referenced)
     expect(left).toContain(freshOrphan)
     expect(left).not.toContain(oldOrphan)
+  })
+
+  test('keeps files the .bak backup still references', async () => {
+    const { src: bakSrc } = await storeScratchpadAsset(WS, new Uint8Array([7, 8, 9]), 'image/png')
+    const bakKept = assetSrcFileName(bakSrc)!
+    const { src: orphanSrc } = await storeScratchpadAsset(WS, new Uint8Array([1, 2]), 'image/png')
+    const orphan = assetSrcFileName(orphanSrc)!
+
+    // A .bak referencing only bakKept — the downgrade escape hatch.
+    const bakFile = join(WS, '.moi', '.scratchpad.json.bak')
+    await Bun.write(
+      bakFile,
+      JSON.stringify({
+        document: {
+          store: { 'asset:old': { typeName: 'asset', type: 'image', props: { src: bakSrc } } }
+        }
+      })
+    )
+
+    const dir = getScratchpadAssetsDir(WS)
+    const past = new Date(Date.now() - 60 * 60_000)
+    for (const name of [bakKept, orphan]) await utimes(join(dir, name), past, past)
+
+    // Current document references neither file.
+    await sweepOrphanAssets(WS, { store: {} }, bakFile)
+
+    const left = await readdir(dir)
+    expect(left).toContain(bakKept)
+    expect(left).not.toContain(orphan)
   })
 
   test('is a no-op when the assets dir does not exist', async () => {
