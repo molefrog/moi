@@ -12,9 +12,10 @@ tldraw's and shifts without notice, blobs are stripped, and `moi scratch read` a
 clean, agent-friendly view. Treat it exactly like `.moi/.workspace.json` — CLI only.
 
 - `moi scratch read` — dump the canvas as JSON: each shape's `id`, `type`, position, size, and
-  text. Off disk, so it works whether or not a browser tab is open.
-- `moi scratch read-image <id>` — save one image shape to a file (its actual bytes; `read` omits
-  the blob). Off disk too.
+  text. Off disk, so it works whether or not a browser tab is open. An image shape's `src` is a
+  reference (`asset:...` or a URL), never the pixels.
+- `moi scratch read-image <id>` — save one image shape to a file (its actual bytes; `read` only
+  carries the reference). Off disk too.
 - `moi scratch view` — render the whole canvas to a PNG. Needs an open Scratchpad tab.
 
 `read` is for logic; `view` / `read-image` are for vision.

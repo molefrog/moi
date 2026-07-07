@@ -26,6 +26,7 @@ import {
   tildify
 } from './registry'
 import { loadScratchpadDoc, saveScratchpadDoc } from './scratchpad'
+import { MAX_ASSET_BYTES, scratchpadAssetFile, storeScratchpadAsset } from './scratchpad-assets'
 import { DIST_DIR, prebuilt } from './static'
 import { getSessionEvents, getSessions } from './state'
 import { getThreadConfig, saveThreadConfig } from './thread-config'
@@ -387,6 +388,38 @@ one.put('/scratchpad', async c => {
     origin: typeof body.origin === 'string' ? body.origin : undefined
   })
   return c.body(null, 204)
+})
+
+// Scratchpad assets: pasted/dropped image bytes live as content-addressed files
+// in `.moi/scratchpad-assets/`, referenced from the snapshot by `asset:` srcs —
+// never inlined as base64 in the JSON (see server/scratchpad-assets.ts). The
+// browser's TLAssetStore POSTs the raw file here on paste and resolves `asset:`
+// srcs back through the GET when rendering.
+one.post('/scratchpad/assets', async c => {
+  const length = Number(c.req.header('content-length') ?? 0)
+  if (length > MAX_ASSET_BYTES) {
+    return c.text(`Asset too large (max ${MAX_ASSET_BYTES / (1024 * 1024)} MB)`, 413)
+  }
+  const bytes = new Uint8Array(await c.req.arrayBuffer())
+  if (bytes.length === 0) return c.text('Empty body', 400)
+  if (bytes.length > MAX_ASSET_BYTES) {
+    return c.text(`Asset too large (max ${MAX_ASSET_BYTES / (1024 * 1024)} MB)`, 413)
+  }
+  const mimeType = c.req.header('content-type') ?? 'application/octet-stream'
+  return c.json(await storeScratchpadAsset(c.get('ws').path, bytes, mimeType))
+})
+
+// The file name is content-addressed (sha256 of the bytes), so a hit is
+// immutable — let the browser cache it indefinitely.
+one.get('/scratchpad/assets/:file', async c => {
+  const resolved = scratchpadAssetFile(c.get('ws').path, c.req.param('file'))
+  if (!resolved || !(await resolved.file.exists())) return c.text('Not found', 404)
+  return new Response(resolved.file, {
+    headers: {
+      'Content-Type': resolved.mimeType,
+      'Cache-Control': 'public, max-age=31536000, immutable'
+    }
+  })
 })
 
 // Workspace icon. PUT a raw image body (png/jpg/gif/webp) — the server resizes

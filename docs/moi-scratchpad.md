@@ -28,11 +28,12 @@ The agent works the canvas through a `moi scratch` CLI — it both **sees** and 
 - `moi scratch read` — dump the canvas as **structured JSON**: each shape with its `id`,
   `type`, position, size, and text. Use this to reason about exact shapes — what's where,
   what to move, what to relabel. Works whether or not a browser tab is open. Image shapes
-  carry a `src`, but **base64 data URLs are omitted** (reported as `base64:omitted`) — the
-  blob is huge and unreadable as text, so use `read-image` or `view` for the pixels.
+  carry a `src` — an `asset:` file reference or an https URL; the pixels never appear in
+  the JSON (a legacy inline blob is reported as `base64:omitted`), so use `read-image` or
+  `view` to actually see them.
 - `moi scratch read-image <id>` — save a single image shape's bytes to a file (prints the
-  path). Served off disk, like `read` — this is how the agent pulls the pixels of one image
-  that `read` omitted. A remote (`http`) asset prints its URL instead.
+  path). Served off disk, like `read` — this is how the agent pulls the pixels behind the
+  reference `read` surfaced. A remote (`http`) asset prints its URL instead.
 - `moi scratch view` — render the **whole canvas** to a **PNG**. Use this to actually _see_
   what the user drew (freehand, layout, anything structure can't capture).
 
@@ -70,11 +71,12 @@ moi scratch clear                           # wipe the whole canvas
   weight, `small` or `large`. Omit the size/stroke flags to keep tldraw's default. The agent's
   options deliberately match what the user can pick by hand — neither surface can make something
   the other can't.
-- `add image <path>` embeds a local image file. The server **resizes it to fit the canvas** —
+- `add image <path>` adds a local image file. The server **resizes it to fit the canvas** —
   `--quality lo` (default, long side ≤768px) or `hi` (≤2048px) — re-encoding to WebP so a 10MB
-  paste never lands on the canvas whole. `lo` keeps the constantly-rewritten snapshot light and
-  is well within Claude's vision budget; reach for `hi` only when fine detail (e.g. screenshot
-  text) matters. EXIF orientation is baked in; images are never enlarged.
+  paste never lands on the canvas whole. `lo` is well within Claude's vision budget; reach for
+  `hi` only when fine detail (e.g. screenshot text) matters. EXIF orientation is baked in;
+  images are never enlarged. The bytes are stored as an asset file beside the snapshot (see
+  Persistence below), never inlined into it.
 - `clear` deletes every shape on the canvas in one shot.
 - Coordinates are tldraw canvas space (origin top-left, y down).
 
@@ -94,6 +96,16 @@ on the server (the mutations). Only `view` — rendering pixels — genuinely re
   hand-edited). The browser autosaves it ~500ms after you stop drawing; the server writes it
   after each agent mutation. Either writer publishes a "canvas updated" signal, and every open
   tab reloads from disk, so all viewers converge.
+- **Image bytes live outside the snapshot.** Pasted/dropped/agent-added images are
+  content-addressed files in `.moi/scratchpad-assets/` (`<sha256>.<ext>`), referenced from
+  asset records by `asset:` srcs — one of tldraw's native src protocols. The browser uploads
+  via a custom `TLAssetStore` (POST `/scratchpad/assets`, resolved back through GET); the
+  server writes files directly. This keeps the constantly-rewritten JSON small: without it,
+  every autosave and every tab reload would re-serialize and re-ship megabytes of base64.
+  Every save extracts any inline base64 it still finds (legacy snapshots migrate on their
+  next save; a stale tab PUTting blobs converges on the same files by content address) and
+  then sweeps asset files the document no longer references, with a grace window so a
+  just-uploaded file survives until its autosave lands.
 - **Reading** (`moi scratch read`, `read-image`) parses that snapshot straight off disk — the
   shape listing, or one image's bytes. No browser, no tldraw runtime.
 - **Drawing** (`add`/`move`/`set`/`delete`/`clear`) runs on the server: it loads the snapshot
