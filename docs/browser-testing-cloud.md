@@ -38,7 +38,7 @@ Wait for `load`, not `networkidle` — the app holds a WebSocket open.
 ## agent-browser
 
 Usage (snapshot/ref loop, commands, troubleshooting) is covered by the
-vendored skill — `.claude/skills/agent-browser/`. `agent-browser open <url>`
+vendored skill — `.agents/skills/agent-browser/`. `agent-browser open <url>`
 just works: the environment presets `AGENT_BROWSER_EXECUTABLE_PATH` to the
 system Chromium. (The daemon freezes its env at spawn — if it somehow started
 without the var, `agent-browser close` and retry.)
