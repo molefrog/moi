@@ -1310,14 +1310,21 @@ const scratchView = defineCommand({
   }
 })
 
-// Image data URL mime → file extension, for naming the saved file.
+// Image/video data URL mime → file extension, for naming the saved file. Kept in
+// sync with the server's MIME_EXT (scratchpad-assets.ts) so avif/apng/video assets
+// round-trip through `read-image` with a real extension instead of `.bin`.
 const IMAGE_EXT: Record<string, string> = {
   'image/png': 'png',
   'image/jpeg': 'jpg',
   'image/jpg': 'jpg',
   'image/webp': 'webp',
   'image/gif': 'gif',
-  'image/svg+xml': 'svg'
+  'image/svg+xml': 'svg',
+  'image/avif': 'avif',
+  'image/apng': 'apng',
+  'video/mp4': 'mp4',
+  'video/webm': 'webm',
+  'video/quicktime': 'mov'
 }
 
 const scratchReadImage = defineCommand({

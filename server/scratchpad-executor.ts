@@ -214,8 +214,14 @@ async function applyAddImage(
   op: Extract<ScratchOp, { kind: 'add-image' }>
 ): Promise<ScratchOpResult> {
   const pageId = firstPageId(store)
+  // Re-adding under an existing id replaces that shape; note its current asset so
+  // we can drop it below once nothing else references it (else its file leaks).
+  const prev = store.get(createShapeId(op.name)) as unknown as
+    | { props?: { assetId?: unknown } }
+    | undefined
+  const prevAssetId = typeof prev?.props?.assetId === 'string' ? prev.props.assetId : undefined
   const { data, w, h, mimeType, name } = await processCanvasImage(op.path, op.quality ?? 'lo')
-  const { src } = await storeScratchpadAsset(workspacePath, new Uint8Array(data), mimeType)
+  const { src } = await storeScratchpadAsset(workspacePath, data, mimeType)
   const assetId = AssetRecordType.createId()
   store.put([
     {
@@ -237,6 +243,11 @@ async function applyAddImage(
       props: { ...defaultProps('image'), w, h, assetId }
     })
   ])
+  // The replaced shape's old asset is now unreachable — drop it so the sweep can
+  // reclaim its file.
+  if (prevAssetId && prevAssetId !== assetId && !anyShapeUsesAsset(store, prevAssetId)) {
+    store.remove([prevAssetId as unknown as TLRecord['id']])
+  }
   return { name: op.name }
 }
 
@@ -346,10 +357,17 @@ function applyOp(store: TLStore, op: ScratchOp): ScratchOpResult {
     }
     case 'delete': {
       const id = createShapeId(op.name)
+      const shape = store.get(id) as unknown as { props?: { assetId?: unknown } } | undefined
+      const assetId = typeof shape?.props?.assetId === 'string' ? shape.props.assetId : undefined
       // Remove the shape plus any binding that references it, or the leftover
       // binding would dangle and invalidate the snapshot.
       const ids = [id, ...bindingsTouching(store, op.name)]
       store.remove(ids)
+      // If that was the last shape using the image's asset, drop the asset record
+      // too so the post-save sweep can reclaim its file (mirrors `clear`).
+      if (assetId && !anyShapeUsesAsset(store, assetId)) {
+        store.remove([assetId as unknown as TLRecord['id']])
+      }
       return { ok: true }
     }
     case 'clear': {
@@ -367,6 +385,18 @@ function applyOp(store: TLStore, op: ScratchOp): ScratchOpResult {
       // is an unknown op kind.
       throw new Error(`Cannot execute op "${op.kind}" on the server`)
   }
+}
+
+// True if any shape still references the given asset id. tldraw lets several
+// shapes share one asset (e.g. a duplicated image), so delete/replace only drops
+// the asset record when its last user is gone — leaving the file for the sweep.
+function anyShapeUsesAsset(store: TLStore, assetId: string): boolean {
+  for (const record of store.allRecords()) {
+    if (record.typeName !== 'shape') continue
+    const props = (record as unknown as { props?: { assetId?: unknown } }).props
+    if (props?.assetId === assetId) return true
+  }
+  return false
 }
 
 // Ids of bindings whose start/end is the named shape.

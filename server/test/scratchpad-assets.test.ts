@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'node:fs'
-import { readdir, utimes } from 'node:fs/promises'
+import { readdir } from 'node:fs/promises'
 import { join } from 'path'
 
 import {
@@ -161,7 +161,7 @@ describe('missing asset files (dangling references)', () => {
 })
 
 describe('sweepOrphanAssets', () => {
-  test('deletes old unreferenced files, keeps referenced and recent ones', async () => {
+  test('reclaims a file only after it has stayed unreferenced past the grace window', async () => {
     const { src } = await storeScratchpadAsset(WS, PNG_BYTES, 'image/png')
     const referenced = assetSrcFileName(src)!
     const { src: orphanSrc } = await storeScratchpadAsset(
@@ -169,26 +169,54 @@ describe('sweepOrphanAssets', () => {
       new Uint8Array([1, 2, 3]),
       'image/png'
     )
-    const oldOrphan = assetSrcFileName(orphanSrc)!
-    const { src: freshSrc } = await storeScratchpadAsset(WS, new Uint8Array([4, 5, 6]), 'image/png')
-    const freshOrphan = assetSrcFileName(freshSrc)!
-
-    // Age everything past the grace window, then re-touch the fresh orphan.
+    const orphan = assetSrcFileName(orphanSrc)!
     const dir = getScratchpadAssetsDir(WS)
-    const past = new Date(Date.now() - 60 * 60_000)
-    for (const name of [referenced, oldOrphan]) await utimes(join(dir, name), past, past)
-
     const doc: ScratchpadDoc = {
       store: {
         'asset:a1': { id: 'asset:a1', typeName: 'asset', type: 'image', props: { src } }
       }
     }
-    await sweepOrphanAssets(WS, doc)
 
+    const t0 = 1_000_000
+    // First sweep only starts the orphan's clock; nothing is deleted yet.
+    await sweepOrphanAssets(WS, doc, undefined, t0)
+    expect(await readdir(dir)).toContain(orphan)
+
+    // Still within the grace window — kept.
+    await sweepOrphanAssets(WS, doc, undefined, t0 + 60_000)
+    expect(await readdir(dir)).toContain(orphan)
+
+    // Past the window, the still-unreferenced orphan is reclaimed; the referenced
+    // file was never on the clock and survives.
+    await sweepOrphanAssets(WS, doc, undefined, t0 + 6 * 60_000)
     const left = await readdir(dir)
     expect(left).toContain(referenced)
-    expect(left).toContain(freshOrphan)
-    expect(left).not.toContain(oldOrphan)
+    expect(left).not.toContain(orphan)
+  })
+
+  test('a long-referenced file gets a fresh grace window when it becomes unreferenced', async () => {
+    const { src } = await storeScratchpadAsset(WS, PNG_BYTES, 'image/png')
+    const name = assetSrcFileName(src)!
+    const dir = getScratchpadAssetsDir(WS)
+    const withImg: ScratchpadDoc = {
+      store: { 'asset:a1': { id: 'asset:a1', typeName: 'asset', type: 'image', props: { src } } }
+    }
+    const empty: ScratchpadDoc = { store: {} }
+
+    const t0 = 5_000_000
+    // Referenced across sweeps spanning an hour.
+    await sweepOrphanAssets(WS, withImg, undefined, t0)
+    await sweepOrphanAssets(WS, withImg, undefined, t0 + 60 * 60_000)
+
+    // It becomes unreferenced (e.g. `clear`). Despite the file being an hour old,
+    // the next sweep must NOT delete it — the clock starts here, not at write time.
+    // This is the sweep-race data-loss regression the grace anchoring fixes.
+    await sweepOrphanAssets(WS, empty, undefined, t0 + 60 * 60_000)
+    expect(await readdir(dir)).toContain(name)
+
+    // Only after the grace elapses from the un-reference moment is it reclaimed.
+    await sweepOrphanAssets(WS, empty, undefined, t0 + 60 * 60_000 + 6 * 60_000)
+    expect(await readdir(dir)).not.toContain(name)
   })
 
   test('keeps files the .bak backup still references', async () => {
@@ -209,14 +237,13 @@ describe('sweepOrphanAssets', () => {
     )
 
     const dir = getScratchpadAssetsDir(WS)
-    const past = new Date(Date.now() - 60 * 60_000)
-    for (const name of [bakKept, orphan]) await utimes(join(dir, name), past, past)
-
-    // Current document references neither file.
-    await sweepOrphanAssets(WS, { store: {} }, bakFile)
+    // Current document references neither file; run twice past the grace window.
+    const t0 = 2_000_000
+    await sweepOrphanAssets(WS, { store: {} }, bakFile, t0)
+    await sweepOrphanAssets(WS, { store: {} }, bakFile, t0 + 6 * 60_000)
 
     const left = await readdir(dir)
-    expect(left).toContain(bakKept)
+    expect(left).toContain(bakKept) // pinned by the .bak, never on the clock
     expect(left).not.toContain(orphan)
   })
 

@@ -151,6 +151,26 @@ describe('executeScratchOp (headless)', () => {
     expect(await assertLoadable()).toBe(0)
   })
 
+  test('delete drops the sole asset reference so the sweep can reclaim its file', async () => {
+    const file = join(WS, 'img.png')
+    await sharp({
+      create: { width: 32, height: 32, channels: 3, background: { r: 9, g: 9, b: 9 } }
+    })
+      .png()
+      .toFile(file)
+    await run({ kind: 'add-image', name: 'pic', x: 0, y: 0, path: file })
+    expect(await readdir(getScratchpadAssetsDir(WS))).toHaveLength(1)
+
+    await run({ kind: 'delete', name: 'pic' })
+    // The shape's asset record goes with it (no other shape used it), so the
+    // sweep is free to reclaim the file — nothing pins it anymore.
+    const { document } = await loadScratchpadDoc(WS)
+    const assets = Object.values(document?.store ?? {}).filter(
+      r => (r as { typeName?: string }).typeName === 'asset'
+    )
+    expect(assets).toHaveLength(0)
+  })
+
   test('add-image --quality hi keeps more pixels', async () => {
     const file = join(WS, 'big.png')
     await sharp({
