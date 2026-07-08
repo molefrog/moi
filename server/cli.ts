@@ -4,7 +4,7 @@ import { defineCommand, runMain, showUsage } from 'citty'
 import { existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'path'
-import pc from 'picocolors'
+import pc from './cli-pc'
 
 import { COLOR_THEMES, FONT_THEMES } from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/themes'
