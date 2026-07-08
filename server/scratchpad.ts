@@ -47,9 +47,10 @@ export type ScratchShape = {
   // as-is. A legacy inline base64 blob is omitted (see omitBase64) — the agent
   // calls `moi scratch read-image`/`view` to actually see pixels.
   src?: string
-  // True when `src` is an `asset:` reference whose backing file is gone from
-  // .moi/.scratchpad (sidecar dir lost or pruned) — `read-image` will error and
-  // the canvas shows a broken image. Absent otherwise.
+  // True when the shape references an asset that can't be resolved to pixels: an
+  // `asset:` file gone from .moi/.scratchpad (sidecar dir lost or pruned), or the
+  // asset record absent entirely — `read-image` will error and the canvas shows a
+  // broken image. Absent otherwise.
   missing?: true
 }
 
@@ -236,6 +237,11 @@ export async function readScratchpadShapes(workspacePath: string): Promise<Scrat
     const h = typeof r.props?.h === 'number' ? r.props.h : undefined
     const assetId = typeof r.props?.assetId === 'string' ? r.props.assetId : undefined
     const rawSrc = assetId !== undefined ? assetSrc.get(assetId) : undefined
+    // Flag `missing` when a shape references an asset we can't resolve to pixels:
+    // its backing file is gone (assetGone), or the asset record is absent / has a
+    // non-string src (rawSrc undefined). Either way `read-image` can't return
+    // bytes, so warn from `read` rather than let it fail later.
+    const missing = assetId !== undefined && (assetGone.has(assetId) || rawSrc === undefined)
     shapes.push({
       id: (r.id ?? '').replace(/^shape:/, ''),
       type: r.type ?? 'unknown',
@@ -248,7 +254,7 @@ export async function readScratchpadShapes(workspacePath: string): Promise<Scrat
         return text !== undefined ? { text: omitBase64(text) } : {}
       })(),
       ...(rawSrc !== undefined ? { src: omitBase64(rawSrc) } : {}),
-      ...(assetId !== undefined && assetGone.has(assetId) ? { missing: true as const } : {})
+      ...(missing ? { missing: true as const } : {})
     })
   }
   return shapes

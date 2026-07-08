@@ -1,4 +1,4 @@
-import { readdir, stat, unlink } from 'node:fs/promises'
+import { readdir, rename, stat, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import type { ScratchpadDoc } from './scratchpad'
@@ -30,8 +30,11 @@ const ASSET_SRC_PREFIX = 'asset:'
 // The only file names we ever create or serve: `asset-<sha256 hex>.<short ext>`.
 // The `asset-` prefix marks the files as canvas assets, keeping the sidecar dir
 // unambiguous if it ever holds anything else. Anything else (traversal attempts
-// included) is rejected at the boundary.
-const ASSET_FILE_RE = /^asset-[0-9a-f]{64}\.[a-z0-9]{1,8}$/
+// included) is rejected at the boundary. The core pattern is shared with the
+// `.bak` scanner below (BAK_SRC_RE) so the two can never drift — a drift would
+// let the sweep delete files the schema-change backup still references.
+const ASSET_NAME_PATTERN = 'asset-[0-9a-f]{64}\\.[a-z0-9]{1,8}'
+const ASSET_FILE_RE = new RegExp(`^${ASSET_NAME_PATTERN}$`)
 
 const MIME_EXT: Record<string, string> = {
   'image/png': 'png',
@@ -40,6 +43,7 @@ const MIME_EXT: Record<string, string> = {
   'image/gif': 'gif',
   'image/svg+xml': 'svg',
   'image/avif': 'avif',
+  'image/apng': 'apng',
   'video/mp4': 'mp4',
   'video/webm': 'webm',
   'video/quicktime': 'mov'
@@ -82,8 +86,17 @@ export async function storeScratchpadAsset(
   hasher.update(bytes)
   const ext = MIME_EXT[mimeType.split(';')[0].trim().toLowerCase()] ?? 'bin'
   const fileName = `asset-${hasher.digest('hex')}.${ext}`
-  const path = join(getScratchpadAssetsDir(workspacePath), fileName)
-  if (!(await Bun.file(path).exists())) await Bun.write(path, bytes)
+  const dir = getScratchpadAssetsDir(workspacePath)
+  const path = join(dir, fileName)
+  // Content-addressed, so an existing file already holds these exact bytes.
+  // Write through a temp sibling + atomic rename: a crash or full disk mid-write
+  // must never leave a truncated file at `path`, whose name would then claim a
+  // hash its bytes don't match and be served forever by the exists() skip above.
+  if (!(await Bun.file(path).exists())) {
+    const tmp = join(dir, `.tmp-${crypto.randomUUID()}`)
+    await Bun.write(tmp, bytes)
+    await rename(tmp, path)
+  }
   return { src: `${ASSET_SRC_PREFIX}${fileName}` }
 }
 
@@ -124,20 +137,30 @@ export async function extractInlineAssets(
   return rewritten ? { ...document, store: rewritten } : document
 }
 
-// Files uploaded but not yet referenced by a saved snapshot: the browser's
-// TLAssetStore uploads first, and the asset record only lands on disk with the
-// next autosave (~500ms-1s later). The grace keeps the sweep from eating that
-// window; anything unreferenced *and* old is a genuine orphan (deleted image,
-// cleared canvas, abandoned upload).
+// A file is reclaimed only after it has stayed unreferenced for this long. The
+// clock starts when the sweep FIRST observes the file unreferenced — NOT when
+// the file was written — so every reference drop gets the same recovery window a
+// fresh upload gets. (Keying on file mtime instead gave a long-referenced image
+// zero grace the instant it went unreferenced — e.g. `clear` racing an open
+// tab's pending autosave — letting the sweep permanently delete a file the
+// surviving snapshot still pointed at.) The window covers the upload→autosave
+// gap and a stale tab that re-PUTs an old, still-referencing document alike.
 const SWEEP_GRACE_MS = 5 * 60_000
+
+// When each still-unreferenced asset file was first seen unreferenced, keyed by
+// absolute path. In-memory and per-process: a restart just restarts the clock
+// (delaying cleanup, never losing data). Entries drop as soon as a file is
+// referenced again or unlinked, so this only ever holds currently-unreferenced
+// files within their grace window.
+const firstUnreferencedAt = new Map<string, number>()
 
 // Asset file names referenced by the schema-change backup (`.scratchpad.json.bak`
 // — see backupOnSchemaChange in scratchpad.ts). The sweep must not eat those:
 // the .bak is the manual escape hatch after a downgrade, and restoring it with
 // its images gone would defeat the point. A raw regex scan (no JSON parse — the
 // .bak may be a huge legacy file), cached by mtime since the file only changes
-// on a schema upgrade. The pattern is `asset:` + ASSET_FILE_RE.
-const BAK_SRC_RE = /asset:(asset-[0-9a-f]{64}\.[a-z0-9]{1,8})/g
+// on a schema upgrade. Built from the same ASSET_NAME_PATTERN as ASSET_FILE_RE.
+const BAK_SRC_RE = new RegExp(`asset:(${ASSET_NAME_PATTERN})`, 'g')
 const bakRefsCache = new Map<string, { mtimeMs: number; refs: Set<string> }>()
 async function bakReferencedAssets(bakFile: string): Promise<Set<string>> {
   try {
@@ -159,7 +182,8 @@ async function bakReferencedAssets(bakFile: string): Promise<Set<string>> {
 export async function sweepOrphanAssets(
   workspacePath: string,
   document: ScratchpadDoc,
-  bakFile?: string
+  bakFile?: string,
+  now: number = Date.now()
 ): Promise<void> {
   try {
     const dir = getScratchpadAssetsDir(workspacePath)
@@ -176,14 +200,24 @@ export async function sweepOrphanAssets(
     }
     if (bakFile) for (const name of await bakReferencedAssets(bakFile)) referenced.add(name)
 
-    const now = Date.now()
     for (const name of files) {
-      if (!ASSET_FILE_RE.test(name) || referenced.has(name)) continue
+      if (!ASSET_FILE_RE.test(name)) continue
       const path = join(dir, name)
-      try {
-        const { mtimeMs } = await stat(path)
-        if (now - mtimeMs > SWEEP_GRACE_MS) await unlink(path)
-      } catch {}
+      if (referenced.has(name)) {
+        firstUnreferencedAt.delete(path) // referenced (again) — reset its clock
+        continue
+      }
+      const since = firstUnreferencedAt.get(path)
+      if (since === undefined) {
+        firstUnreferencedAt.set(path, now) // first seen unreferenced — start clock
+        continue
+      }
+      if (now - since > SWEEP_GRACE_MS) {
+        try {
+          await unlink(path)
+          firstUnreferencedAt.delete(path)
+        } catch {}
+      }
     }
   } catch {}
 }

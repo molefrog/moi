@@ -417,7 +417,12 @@ one.get('/scratchpad/assets/:file', async c => {
   return new Response(resolved.file, {
     headers: {
       'Content-Type': resolved.mimeType,
-      'Cache-Control': 'public, max-age=31536000, immutable'
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      // Assets are only ever consumed via <img>/<video>/fetch (which all ignore
+      // this), so force a download on direct navigation and block MIME sniffing:
+      // a pasted/uploaded SVG must not execute as script in the app origin.
+      'Content-Disposition': 'attachment',
+      'X-Content-Type-Options': 'nosniff'
     }
   })
 })

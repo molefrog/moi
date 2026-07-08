@@ -1,12 +1,4 @@
-import {
-  Fragment,
-  type ReactElement,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState
-} from 'react'
+import { Fragment, type ReactElement, useCallback, useEffect, useRef, useState } from 'react'
 
 import {
   type Editor,
@@ -785,8 +777,14 @@ export function Scratchpad() {
   // Reactive handle to the mounted editor, used to render the custom tool bar.
   const [editor, setEditor] = useState<Editor | null>(null)
   const { loaded, snapshot, skew, flagSkew } = useScratchpadSnapshot(workspaceId)
-  // Stable per workspace — a new identity would remount tldraw's asset handling.
-  const assetStore = useMemo(() => makeAssetStore(workspaceId), [workspaceId])
+  // Stable identity per workspace, held in a ref rather than useMemo (which React
+  // may discard): a fresh `assets` identity makes <Tldraw> rebuild its store and
+  // remount the editor, dropping unsaved edits and resetting the camera.
+  const assetStoreRef = useRef<{ id: string; store: TLAssetStore } | null>(null)
+  if (assetStoreRef.current?.id !== workspaceId) {
+    assetStoreRef.current = { id: workspaceId, store: makeAssetStore(workspaceId) }
+  }
+  const assetStore = assetStoreRef.current.store
 
   const save = useCallback(() => {
     const editor = editorRef.current
