@@ -157,6 +157,15 @@ const SCRATCH_OVERRIDES: TLUiOverrides = {
 // One page only — disables the page selector and all multi-page UI.
 const SCRATCH_OPTIONS = { maxPages: 1 }
 
+// Browser drag/drop/paste limits (tldraw defaults: reject >10MB, no rescale). We
+// accept larger drops and rescale big images to fit so a phone-sized photo lands
+// as a lightweight asset instead of bloating the snapshot's sidecar files. The
+// size check runs BEFORE the rescale, so a 32MB drop is admitted and then shrunk.
+// (The agent's `moi scratch add image` path has its own presets — see the
+// executor's IMAGE_PRESETS; this only governs what the browser accepts.)
+const MAX_DROP_BYTES = 32 * 1024 * 1024
+const MAX_IMAGE_DIMENSION = 2048
+
 type IconC = typeof IconPointer2
 
 // The curated left-bar entries, grouped by `sep` dividers. `tool` selects a
@@ -908,6 +917,10 @@ export function Scratchpad() {
           components={SCRATCH_COMPONENTS}
           overrides={SCRATCH_OVERRIDES}
           options={SCRATCH_OPTIONS}
+          // Accept drops up to 32MB and rescale big images to fit (tldraw checks
+          // the size before rescaling, so a large photo is admitted then shrunk).
+          maxAssetSize={MAX_DROP_BYTES}
+          maxImageDimension={MAX_IMAGE_DIMENSION}
           // Hand focus control entirely to us: tldraw's own `autoFocus` only seeds
           // the `isFocused` flag (hotkeys would fire window-wide, even from the
           // chat) without ever DOM-focusing the canvas. Instead onMount focuses
