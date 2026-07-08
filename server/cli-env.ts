@@ -5,10 +5,9 @@
 // Secret VALUES never pass through here except on their way into a spawned
 // process (`execWithEnv`) or the secret store (`set` reads stdin/argv). Nothing
 // in this module prints a value.
-import pc from 'picocolors'
-
 import type { WorkspaceEntry, WorkspaceEnvView } from '@/lib/types'
 
+import pc from './cli-pc'
 import { columns } from './cli-ui'
 import { CONTROL_PORT } from './constants'
 import { findWorkspaceForPath, listWorkspaces } from './registry'
