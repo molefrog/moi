@@ -140,10 +140,10 @@ const JS_CONTENT_TYPE = 'text/javascript; charset=utf-8'
 // A content-hashed url is a fingerprint of its bytes, so it's safe to cache
 // without revalidation. But immutability here is INFERRED from the filename
 // (HASHED_FILE_RE) rather than guaranteed by construction (unlike a sha256-named
-// asset) — so we cap the TTL at a day instead of the usual year. If that
-// inference ever misfires, a wrongly-pinned copy self-heals within a day at the
+// asset) — so we cap the TTL at a week instead of the usual year. If that
+// inference ever misfires, a wrongly-pinned copy self-heals within a week at the
 // edge and in the browser, rather than sticking around for a year.
-const IMMUTABLE_CACHE = 'public, max-age=86400, immutable'
+const IMMUTABLE_CACHE = 'public, max-age=604800, immutable'
 
 // Which build-dir files are safe to serve `immutable`. The build emits exactly
 // two content-hashed shapes — Bun's `chunk-<hash>.js` and the runtime plugin's
