@@ -104,7 +104,7 @@ one.get('/widgets/*', c => {
   const id = c.req.param('id')
   const { name, file } = parseAppletTail(c.req.url, id, 'widgets')
   if (!name) return c.text('Not found', 404)
-  return serveWidget(name, file, c.get('ws').path, apiBaseFor(id))
+  return serveWidget(name, file, c.get('ws').path, apiBaseFor(id), c.req.header('if-none-match'))
 })
 
 // Views — full-screen agent apps. Mirrors the widget pair above: the exact path
@@ -115,7 +115,7 @@ one.get('/views/*', c => {
   const id = c.req.param('id')
   const { name, file } = parseAppletTail(c.req.url, id, 'views')
   if (!name) return c.text('Not found', 404)
-  return serveView(name, file, c.get('ws').path, apiBaseFor(id))
+  return serveView(name, file, c.get('ws').path, apiBaseFor(id), c.req.header('if-none-match'))
 })
 
 // Workspace file stream — an applet's `fileUrl(path)` resolves here. Streams a
@@ -126,7 +126,12 @@ one.get('/views/*', c => {
 one.get('/fs/*', c => {
   const id = c.req.param('id')
   const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${id}/fs/`)[1] ?? ''
-  return serveWorkspaceFile(c.get('ws').path, tail, c.req.header('range'))
+  return serveWorkspaceFile(
+    c.get('ws').path,
+    tail,
+    c.req.header('range'),
+    c.req.header('if-none-match')
+  )
 })
 
 // Applet RPC — the home for server-function calls from a bundle. The bundle's

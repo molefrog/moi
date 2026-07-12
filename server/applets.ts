@@ -136,16 +136,33 @@ const CODE_FILE_RE = /\.js$/
 // can be requested; `..` is rejected separately.
 const ALLOWED_FILE_RE = /^[a-zA-Z0-9_-][a-zA-Z0-9._-]*$/
 
+// The `index.js` entry keeps a STABLE url across rebuilds; every other file in
+// the bundle dir (`chunk-<hash>.js`, `<stem>-<hash>.<ext>`) is content-hashed,
+// so its url changes whenever its bytes do.
+const APPLET_ENTRY = 'index.js'
+const JS_CONTENT_TYPE = 'text/javascript; charset=utf-8'
+// A hashed file's url is a fingerprint of its bytes, so it can never go stale —
+// cache it forever, at the edge and in the browser (mirrors the SPA chunks).
+const IMMUTABLE_CACHE = 'public, max-age=31536000, immutable'
+
 // Serve one file from a compiled applet directory: the `index.js` entry, a code
 // chunk, or a bundled asset. `apiBase` is the workspace's `/api/workspaces/<id>`
 // prefix — substituted for the build-time sentinel in every `.js` so RPC and
 // `fileUrl` calls hit the right workspace. Assets stream untouched.
+//
+// Caching turns on the entry-vs-hashed split. The entry lives at one url across
+// rebuilds, so a shared cache (e.g. Cloudflare) that stored it once will hand
+// back a STALE bundle after the next `moi bundle` unless we force revalidation:
+// it gets an ETag (from size+mtime) + `no-cache`, so an unchanged bundle costs a
+// 304 and a rebuilt one busts. Hashed chunks/assets are immutable — their url
+// already changes with their bytes — so they cache forever.
 export async function serveApplet(
   kind: AppletKind,
   name: string,
   file: string,
   workspacePath: string,
-  apiBase: string
+  apiBase: string,
+  ifNoneMatch?: string | null
 ): Promise<Response> {
   if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
     return new Response('Invalid name', { status: 400 })
@@ -160,11 +177,26 @@ export async function serveApplet(
   if (!(await bunFile.exists())) {
     return new Response(`"${name}" not built. Run: moi bundle`, { status: 404 })
   }
+
+  if (file === APPLET_ENTRY) {
+    const etag = `"${bunFile.size}-${Math.trunc(bunFile.lastModified)}"`
+    const headers = { 'Content-Type': JS_CONTENT_TYPE, ETag: etag, 'Cache-Control': 'no-cache' }
+    if (ifNoneMatch === etag) return new Response(null, { status: 304, headers })
+    const swapped = (await bunFile.text()).replaceAll(APPLET_API_BASE_SENTINEL, apiBase)
+    return new Response(swapped, { headers })
+  }
   if (CODE_FILE_RE.test(file)) {
     const swapped = (await bunFile.text()).replaceAll(APPLET_API_BASE_SENTINEL, apiBase)
-    return new Response(swapped, { headers: { 'Content-Type': 'text/javascript; charset=utf-8' } })
+    return new Response(swapped, {
+      headers: { 'Content-Type': JS_CONTENT_TYPE, 'Cache-Control': IMMUTABLE_CACHE }
+    })
   }
-  return new Response(bunFile)
+  return new Response(bunFile, {
+    headers: {
+      'Content-Type': bunFile.type || 'application/octet-stream',
+      'Cache-Control': IMMUTABLE_CACHE
+    }
+  })
 }
 
 // ---- route helpers ----------------------------------------------------------
@@ -255,10 +287,19 @@ export function resolveWorkspaceMediaFile(workspaceRoot: string, tail: string): 
 // Range is handled explicitly (slice the BunFile, 206 + Content-Range): Bun's
 // implicit range handling for `new Response(Bun.file())` doesn't fire once any
 // headers object is attached, and <video>/<audio> seeking needs byte ranges.
+//
+// Caching: these are the user's own workspace files — private, and rewritten in
+// place by the agent (a regenerated clip keeps its path). So they must NEVER be
+// stored by a shared/edge cache sitting in front of moi, or one user's video
+// could be served to the next, and an edited file could be served stale from a
+// stable url (the applet-bundle incident, but with private bytes). `private`
+// keeps them off the edge; an ETag (size+mtime) + `no-cache` lets the browser
+// revalidate cheaply (304) while guaranteeing a re-fetch when the file changes.
 export async function serveWorkspaceFile(
   workspaceRoot: string,
   tail: string,
-  range?: string | null
+  range?: string | null,
+  ifNoneMatch?: string | null
 ): Promise<Response> {
   const realTarget = resolveWorkspaceMediaFile(workspaceRoot, tail)
   if (realTarget instanceof Response) return realTarget
@@ -266,12 +307,17 @@ export async function serveWorkspaceFile(
 
   const size = file.size
   const type = file.type || 'application/octet-stream'
+
+  const etag = `"${size}-${Math.trunc(file.lastModified)}"`
+  const cache = { ETag: etag, 'Cache-Control': 'private, no-cache' }
+  if (ifNoneMatch === etag) return new Response(null, { status: 304, headers: cache })
+
   const parsed = range ? parseByteRange(range, size) : null
 
   if (parsed === 'invalid') {
     return new Response('Range Not Satisfiable', {
       status: 416,
-      headers: { 'Content-Range': `bytes */${size}`, 'Accept-Ranges': 'bytes' }
+      headers: { ...cache, 'Content-Range': `bytes */${size}`, 'Accept-Ranges': 'bytes' }
     })
   }
   if (parsed) {
@@ -279,6 +325,7 @@ export async function serveWorkspaceFile(
     return new Response(file.slice(start, end + 1), {
       status: 206,
       headers: {
+        ...cache,
         'Content-Type': type,
         'Content-Length': String(end - start + 1),
         'Content-Range': `bytes ${start}-${end}/${size}`,
@@ -287,7 +334,12 @@ export async function serveWorkspaceFile(
     })
   }
   return new Response(file, {
-    headers: { 'Content-Type': type, 'Content-Length': String(size), 'Accept-Ranges': 'bytes' }
+    headers: {
+      ...cache,
+      'Content-Type': type,
+      'Content-Length': String(size),
+      'Accept-Ranges': 'bytes'
+    }
   })
 }
 
