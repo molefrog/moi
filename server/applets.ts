@@ -12,7 +12,7 @@
 // `%%MOI_APPLET_API_BASE%%` sentinel (for RPC + `fileUrl`), swapped to the real
 // `/api/workspaces/<id>` base when served — so the on-disk bundle is
 // workspace-agnostic.
-import { realpathSync } from 'node:fs'
+import { realpathSync, statSync } from 'node:fs'
 import { mkdir, readdir, rm } from 'node:fs/promises'
 import { dirname, join, resolve, sep } from 'path'
 
@@ -303,8 +303,8 @@ export function resolveWorkspaceMediaFile(workspaceRoot: string, tail: string): 
 // stored by a shared/edge cache sitting in front of moi, or one user's video
 // could be served to the next, and an edited file could be served stale from a
 // stable url (the applet-bundle incident, but with private bytes). `private`
-// keeps them off the edge; an ETag (size+mtime) + `no-cache` lets the browser
-// revalidate cheaply (304) while guaranteeing a re-fetch when the file changes.
+// keeps them off the edge; a strong ETag (size + nanosecond mtime) + `no-cache`
+// lets the browser revalidate cheaply (304) while re-fetching when it changes.
 export async function serveWorkspaceFile(
   workspaceRoot: string,
   tail: string,
@@ -315,10 +315,24 @@ export async function serveWorkspaceFile(
   if (realTarget instanceof Response) return realTarget
   const file = Bun.file(realTarget)
 
-  const size = file.size
+  let stat: ReturnType<typeof statSync>
+  try {
+    stat = statSync(realTarget, { bigint: true })
+  } catch {
+    return new Response('Not found', { status: 404 })
+  }
+  const size = Number(stat.size)
   const type = file.type || 'application/octet-stream'
 
-  const etag = `"${size}-${Math.trunc(file.lastModified)}"`
+  // Validator = size + NANOSECOND mtime. This route serves agent-regenerated
+  // files at stable paths, so a weak validator that returns a false 304 pins
+  // stale media in the browser. Truncating mtime to whole milliseconds (or
+  // seconds) can collide when a same-length rewrite lands inside one tick; ns
+  // resolution closes that window without hashing the (possibly huge) file on
+  // every request. A tool that deliberately preserves mtime with same-size but
+  // different bytes could still collide — only a content hash defeats that, and
+  // it's not worth re-reading a video per request when agents rewrite normally.
+  const etag = `"${size}-${stat.mtimeNs}"`
   const cache = { ETag: etag, 'Cache-Control': 'private, no-cache' }
   if (ifNoneMatch === etag) return new Response(null, { status: 304, headers: cache })
 

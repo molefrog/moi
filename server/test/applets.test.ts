@@ -237,6 +237,28 @@ describe('serveWorkspaceFile (fileUrl streaming)', () => {
     expect(await revalidated.text()).toBe('')
   })
 
+  test('workspace ETag uses nanosecond mtime — survives sub-millisecond rewrites', async () => {
+    // The file is agent-regenerated at a stable path, so a coarse validator can
+    // return a false 304 and pin stale media. Guard the resolution: a nanosecond
+    // epoch timestamp is ~19 digits, a millisecond one ~13, so a revert to
+    // `Math.trunc(mtimeMs)` (which could collide on a same-length rewrite inside
+    // one tick) is caught here.
+    seedFile('clips/a.mp4', new Uint8Array([1, 2, 3, 4]))
+    const res = await serveWorkspaceFile(WS, 'clips/a.mp4')
+    const mtimePart = res.headers.get('etag')!.replace(/"/g, '').split('-')[1]
+    expect(mtimePart.length).toBeGreaterThanOrEqual(16)
+  })
+
+  test('a same-length rewrite changes the ETag (no false 304)', async () => {
+    seedFile('clips/a.mp4', new Uint8Array([1, 2, 3, 4]))
+    const etag1 = (await serveWorkspaceFile(WS, 'clips/a.mp4')).headers.get('etag')!
+    // Overwrite with DIFFERENT bytes of the SAME length — the reviewer's case.
+    seedFile('clips/a.mp4', new Uint8Array([9, 8, 7, 6]))
+    const res = await serveWorkspaceFile(WS, 'clips/a.mp4', undefined, etag1)
+    expect(res.status).toBe(200) // the stale validator must not win a 304
+    expect(res.headers.get('etag')).not.toBe(etag1)
+  })
+
   test('a range request still carries the private cache headers', async () => {
     seedFile('clips/a.mp4', new Uint8Array([10, 11, 12, 13, 14, 15]))
     const res = await serveWorkspaceFile(WS, 'clips/a.mp4', 'bytes=1-3')
