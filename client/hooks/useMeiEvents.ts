@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 
+import { wsUrl } from '@/client/lib/ws-url'
 import type { ViewInfo, WidgetInfo } from '@/lib/types'
 
 export type MeiEvent =
@@ -26,7 +27,7 @@ function ensureConnection() {
   if (ws || connecting) return
   connecting = true
 
-  const socket = new WebSocket(`ws://${location.host}/api/workspaces/ws`)
+  const socket = new WebSocket(wsUrl('/api/workspaces/ws'))
 
   socket.onopen = () => {
     ws = socket

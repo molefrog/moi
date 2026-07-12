@@ -2,6 +2,7 @@ import type { QueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspaces'
 import { getScratchExecutor } from '@/client/lib/scratch-executor'
+import { wsUrl } from '@/client/lib/ws-url'
 import { liveStore } from '@/client/store/live'
 import { applyEvent } from '@/lib/format'
 import type {
@@ -55,7 +56,7 @@ function connect() {
     reconnectTimer = null
   }
 
-  const s = new WebSocket(`ws://${location.host}/ws`)
+  const s = new WebSocket(wsUrl('/ws'))
   socket = s
 
   s.onopen = () => {
