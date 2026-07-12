@@ -75,6 +75,45 @@ describe('serveApplet', () => {
     expect(res.status).toBe(200)
   })
 
+  test('entry index.js revalidates: ETag + no-cache, 304 on match', async () => {
+    // The entry's url is stable across rebuilds, so an edge cache must revalidate
+    // it or it serves a stale bundle. It carries an ETag + `no-cache`; a request
+    // echoing that ETag gets a bodyless 304.
+    seedApplet('views', 'editor', { 'index.js': 'export default 1' })
+    const res = await serveApplet('view', 'editor', 'index.js', WS, BASE)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('cache-control')).toBe('no-cache')
+    const etag = res.headers.get('etag')
+    expect(etag).toBeTruthy()
+
+    const revalidated = await serveApplet('view', 'editor', 'index.js', WS, BASE, etag)
+    expect(revalidated.status).toBe(304)
+    expect(revalidated.headers.get('etag')).toBe(etag)
+    expect(await revalidated.text()).toBe('')
+  })
+
+  test('a stale ETag on the entry still serves fresh bytes (200)', async () => {
+    seedApplet('views', 'editor', { 'index.js': 'export default 1' })
+    const res = await serveApplet('view', 'editor', 'index.js', WS, BASE, '"stale"')
+    expect(res.status).toBe(200)
+    expect(await res.text()).toContain('export default 1')
+  })
+
+  test('hashed chunks and assets are immutable — never revalidated', async () => {
+    // A content-hashed url is a fingerprint of its bytes, so it can be cached
+    // forever at the edge and in the browser.
+    seedApplet('widgets', 'clock', {
+      'index.js': '//',
+      'chunk-9f.js': 'export const x=1',
+      'logo-abc123.png': new Uint8Array([0x89, 0x50, 0x4e, 0x47])
+    })
+    const chunk = await serveApplet('widget', 'clock', 'chunk-9f.js', WS, BASE)
+    expect(chunk.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+    expect(chunk.headers.get('etag')).toBeNull()
+    const asset = await serveApplet('widget', 'clock', 'logo-abc123.png', WS, BASE)
+    expect(asset.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+  })
+
   test('400 for a dotfile request', async () => {
     seedApplet('views', 'editor', { 'index.js': '//' })
     expect((await serveApplet('view', 'editor', '.env', WS, BASE)).status).toBe(400)
@@ -162,6 +201,31 @@ describe('serveWorkspaceFile (fileUrl streaming)', () => {
     expect(res.headers.get('content-type')).toContain('video/mp4')
     expect(res.headers.get('accept-ranges')).toBe('bytes')
     expect(res.headers.get('content-length')).toBe('4')
+  })
+
+  test('is private + revalidated, never edge-cached (ETag + private, no-cache)', async () => {
+    seedFile('clips/a.mp4', new Uint8Array([1, 2, 3, 4]))
+    const res = await serveWorkspaceFile(WS, 'clips/a.mp4')
+    expect(res.status).toBe(200)
+    // `private` keeps the user's file off any shared/edge cache; `no-cache`
+    // forces the browser to revalidate so an agent-rewritten file isn't stale.
+    expect(res.headers.get('cache-control')).toBe('private, no-cache')
+    const etag = res.headers.get('etag')
+    expect(etag).toBeTruthy()
+
+    const revalidated = await serveWorkspaceFile(WS, 'clips/a.mp4', undefined, etag)
+    expect(revalidated.status).toBe(304)
+    expect(revalidated.headers.get('etag')).toBe(etag)
+    expect(revalidated.headers.get('cache-control')).toBe('private, no-cache')
+    expect(await revalidated.text()).toBe('')
+  })
+
+  test('a range request still carries the private cache headers', async () => {
+    seedFile('clips/a.mp4', new Uint8Array([10, 11, 12, 13, 14, 15]))
+    const res = await serveWorkspaceFile(WS, 'clips/a.mp4', 'bytes=1-3')
+    expect(res.status).toBe(206)
+    expect(res.headers.get('cache-control')).toBe('private, no-cache')
+    expect(res.headers.get('etag')).toBeTruthy()
   })
 
   test('honors a byte range (206 + Content-Range)', async () => {

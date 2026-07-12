@@ -158,7 +158,8 @@ export function serveWidget(
   name: string,
   file: string,
   workspacePath: string,
-  apiBase: string
+  apiBase: string,
+  ifNoneMatch?: string | null
 ): Promise<Response> {
-  return serveApplet('widget', name, file, workspacePath, apiBase)
+  return serveApplet('widget', name, file, workspacePath, apiBase, ifNoneMatch)
 }
