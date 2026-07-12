@@ -114,6 +114,23 @@ describe('serveApplet', () => {
     expect(asset.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
   })
 
+  test('a non-hashed asset name fails safe — revalidated, not pinned immutable', async () => {
+    // Defense in depth: the build only ever writes index.js + hashed siblings,
+    // but if an un-hashed file ever landed here it must NOT be cached forever at
+    // its stable url (that IS the staleness bug). Names without a recognizable
+    // content hash (`banner.png`, `sprite-map.png` — `-map` isn't hex) revalidate.
+    seedApplet('widgets', 'clock', {
+      'index.js': '//',
+      'banner.png': new Uint8Array([1]),
+      'sprite-map.png': new Uint8Array([2])
+    })
+    for (const f of ['banner.png', 'sprite-map.png']) {
+      const res = await serveApplet('widget', 'clock', f, WS, BASE)
+      expect(res.headers.get('cache-control')).toBe('no-cache')
+      expect(res.headers.get('etag')).toBeTruthy()
+    }
+  })
+
   test('400 for a dotfile request', async () => {
     seedApplet('views', 'editor', { 'index.js': '//' })
     expect((await serveApplet('view', 'editor', '.env', WS, BASE)).status).toBe(400)
