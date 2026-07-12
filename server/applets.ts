@@ -136,26 +136,33 @@ const CODE_FILE_RE = /\.js$/
 // can be requested; `..` is rejected separately.
 const ALLOWED_FILE_RE = /^[a-zA-Z0-9_-][a-zA-Z0-9._-]*$/
 
-// The `index.js` entry keeps a STABLE url across rebuilds; every other file in
-// the bundle dir (`chunk-<hash>.js`, `<stem>-<hash>.<ext>`) is content-hashed,
-// so its url changes whenever its bytes do.
-const APPLET_ENTRY = 'index.js'
 const JS_CONTENT_TYPE = 'text/javascript; charset=utf-8'
-// A hashed file's url is a fingerprint of its bytes, so it can never go stale —
+// A content-hashed url is a fingerprint of its bytes, so it can never go stale —
 // cache it forever, at the edge and in the browser (mirrors the SPA chunks).
 const IMMUTABLE_CACHE = 'public, max-age=31536000, immutable'
+
+// Which build-dir files are safe to serve `immutable`. The build emits exactly
+// two content-hashed shapes — Bun's `chunk-<hash>.js` and the runtime plugin's
+// `<stem>-<hash>.<ext>` assets (hash = hex, see build-applet.ts) — alongside the
+// ONE stable-named entry, `index.js`. We match those shapes POSITIVELY and
+// default everything else (the entry, and anything unexpected) to revalidation:
+// this fix exists to stop a shared cache pinning a stale copy at a stable url,
+// so an unrecognized name must fail safe (revalidate), never fail stale
+// (immutable). The hex-suffix arm rejects real words (`-sprite`, `-preview`) —
+// they aren't hex — so only genuine hashes opt in.
+const HASHED_FILE_RE = /^chunk-[0-9a-z]+\.\w+$|-[0-9a-f]{6,}\.\w+$/i
 
 // Serve one file from a compiled applet directory: the `index.js` entry, a code
 // chunk, or a bundled asset. `apiBase` is the workspace's `/api/workspaces/<id>`
 // prefix — substituted for the build-time sentinel in every `.js` so RPC and
 // `fileUrl` calls hit the right workspace. Assets stream untouched.
 //
-// Caching turns on the entry-vs-hashed split. The entry lives at one url across
-// rebuilds, so a shared cache (e.g. Cloudflare) that stored it once will hand
-// back a STALE bundle after the next `moi bundle` unless we force revalidation:
-// it gets an ETag (from size+mtime) + `no-cache`, so an unchanged bundle costs a
-// 304 and a rebuilt one busts. Hashed chunks/assets are immutable — their url
-// already changes with their bytes — so they cache forever.
+// Caching turns on the hashed-vs-stable split. A content-hashed chunk/asset gets
+// a new url whenever its bytes change, so it's cached forever. The `index.js`
+// entry (and anything not recognizably hashed) lives at ONE url across rebuilds,
+// so a shared cache (e.g. Cloudflare) that stored it once would hand back a
+// STALE copy after the next `moi bundle` — it gets an ETag (size+mtime) +
+// `no-cache` instead, so an unchanged file costs a 304 and a rebuilt one busts.
 export async function serveApplet(
   kind: AppletKind,
   name: string,
@@ -178,24 +185,23 @@ export async function serveApplet(
     return new Response(`"${name}" not built. Run: moi bundle`, { status: 404 })
   }
 
-  if (file === APPLET_ENTRY) {
+  // Content-hashed → immutable. Everything else → revalidate (ETag + no-cache),
+  // short-circuiting to a bodyless 304 when the client's ETag still matches.
+  let cache: Record<string, string>
+  if (HASHED_FILE_RE.test(file)) {
+    cache = { 'Cache-Control': IMMUTABLE_CACHE }
+  } else {
     const etag = `"${bunFile.size}-${Math.trunc(bunFile.lastModified)}"`
-    const headers = { 'Content-Type': JS_CONTENT_TYPE, ETag: etag, 'Cache-Control': 'no-cache' }
-    if (ifNoneMatch === etag) return new Response(null, { status: 304, headers })
-    const swapped = (await bunFile.text()).replaceAll(APPLET_API_BASE_SENTINEL, apiBase)
-    return new Response(swapped, { headers })
+    cache = { ETag: etag, 'Cache-Control': 'no-cache' }
+    if (ifNoneMatch === etag) return new Response(null, { status: 304, headers: cache })
   }
+
   if (CODE_FILE_RE.test(file)) {
     const swapped = (await bunFile.text()).replaceAll(APPLET_API_BASE_SENTINEL, apiBase)
-    return new Response(swapped, {
-      headers: { 'Content-Type': JS_CONTENT_TYPE, 'Cache-Control': IMMUTABLE_CACHE }
-    })
+    return new Response(swapped, { headers: { 'Content-Type': JS_CONTENT_TYPE, ...cache } })
   }
   return new Response(bunFile, {
-    headers: {
-      'Content-Type': bunFile.type || 'application/octet-stream',
-      'Cache-Control': IMMUTABLE_CACHE
-    }
+    headers: { 'Content-Type': bunFile.type || 'application/octet-stream', ...cache }
   })
 }
 
