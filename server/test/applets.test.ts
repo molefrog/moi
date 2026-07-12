@@ -108,10 +108,10 @@ describe('serveApplet', () => {
       'logo-abc123.png': new Uint8Array([0x89, 0x50, 0x4e, 0x47])
     })
     const chunk = await serveApplet('widget', 'clock', 'chunk-9f.js', WS, BASE)
-    expect(chunk.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+    expect(chunk.headers.get('cache-control')).toBe('public, max-age=86400, immutable')
     expect(chunk.headers.get('etag')).toBeNull()
     const asset = await serveApplet('widget', 'clock', 'logo-abc123.png', WS, BASE)
-    expect(asset.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+    expect(asset.headers.get('cache-control')).toBe('public, max-age=86400, immutable')
   })
 
   test('a non-hashed asset name fails safe — revalidated, not pinned immutable', async () => {
