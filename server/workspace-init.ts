@@ -29,9 +29,10 @@ export const CREATED_WORKSPACES_ROOT = join(homedir(), 'moi')
 export type ProvisionResult = {
   // Where the skills were installed (backend-dependent, see skillsDirFor).
   skillsDir: string
-  // 'exists' when `.moi/` was already bootstrapped, else the bun install exit
-  // code (non-zero means deps must be installed manually — not fatal).
-  scaffold: 'exists' | number
+  // 'exists' when `.moi/` was already bootstrapped, 'installing' when bun
+  // install continues in the background, else the install exit code (non-zero
+  // means deps are missing — not fatal, the agent installs on demand).
+  scaffold: 'exists' | 'installing' | number
 }
 
 // Lay down everything a workspace needs: create the folder, copy the bundled

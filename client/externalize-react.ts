@@ -25,7 +25,13 @@ const externalizeReact: BunPlugin = {
 
     build.onLoad({ filter: /.*/, namespace: 'esm' }, args => {
       return {
-        contents: `module.exports = globalThis.__esm["${args.path}"];`,
+        contents:
+          `module.exports = globalThis.__esm["${args.path}"];` +
+          // Self-accept under HMR: the exports are identical on every
+          // re-evaluation (a read of the same global), so a hot update must
+          // stop here instead of propagating up to the entry and forcing a
+          // full page reload. No-op outside the dev server.
+          `if (import.meta.hot) import.meta.hot.accept();`,
         loader: 'js'
       }
     })
