@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'path'
 
-import { MOI_PACKAGE_JSON, scaffoldMoiDir } from '../moi-scaffold'
+import { scaffoldMoiDir } from '../moi-scaffold'
 
 // The scaffold backstop: `scaffoldMoiDir` must refuse to create a `.moi/` inside
 // another `.moi/` (the nested-workspace bug). The guard runs before any fs work,
@@ -28,37 +28,32 @@ describe('scaffoldMoiDir guard', () => {
   })
 })
 
-describe('scaffoldMoiDir interrupted installs', () => {
-  test('retries a generated manifest left incomplete before markers existed', async () => {
+describe('scaffoldMoiDir install', () => {
+  test('returns the exit code when the install finishes within the wait', async () => {
     const moiDir = join(WS, '.moi')
-    mkdirSync(moiDir, { recursive: true })
-    writeFileSync(join(moiDir, 'package.json'), JSON.stringify(MOI_PACKAGE_JSON, null, 2))
-    let installs = 0
 
     const result = await scaffoldMoiDir(WS, async cwd => {
       expect(cwd).toBe(moiDir)
-      installs++
-      return 0
+      return 137
     })
 
-    expect(result).toBe(0)
-    expect(installs).toBe(1)
-    expect(existsSync(join(moiDir, '.install-pending'))).toBe(false)
+    expect(result).toBe(137)
+    expect(existsSync(join(moiDir, 'package.json'))).toBe(true)
+    expect(existsSync(join(moiDir, 'widgets'))).toBe(true)
   })
 
-  test('keeps the pending marker after failure and retries it later', async () => {
-    const moiDir = join(WS, '.moi')
-    const first = await scaffoldMoiDir(WS, async () => 137)
+  test('returns "installing" when the install outlives the wait', async () => {
+    let finish!: (code: number) => void
+    const exited = new Promise<number>(r => (finish = r))
 
-    expect(first).toBe(137)
-    expect(existsSync(join(moiDir, '.install-pending'))).toBe(true)
+    const result = await scaffoldMoiDir(WS, () => exited, 10)
 
-    const second = await scaffoldMoiDir(WS, async () => 0)
-    expect(second).toBe(0)
-    expect(existsSync(join(moiDir, '.install-pending'))).toBe(false)
+    expect(result).toBe('installing')
+    finish(0)
+    expect(await exited).toBe(0)
   })
 
-  test('leaves an existing user manifest untouched', async () => {
+  test('leaves an existing manifest untouched and skips the install', async () => {
     const moiDir = join(WS, '.moi')
     mkdirSync(moiDir, { recursive: true })
     writeFileSync(join(moiDir, 'package.json'), JSON.stringify({ private: true }))
