@@ -1,14 +1,20 @@
 import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 
 type QueryCall = {
   options: {
     cwd: string
     settingSources: string[]
+    mcpServers?: Record<string, unknown>
+    strictMcpConfig?: boolean
   }
 }
 
 const queryCalls: QueryCall[] = []
 const agentSdk = await import('@anthropic-ai/claude-agent-sdk')
+let closeError: Error | null = null
 
 mock.module('@anthropic-ai/claude-agent-sdk', () => ({
   // Module mocks are process-wide in Bun. Preserve the real SDK exports so
@@ -18,7 +24,9 @@ mock.module('@anthropic-ai/claude-agent-sdk', () => ({
     queryCalls.push(call)
     return {
       mcpServerStatus: async () => [],
-      close: async () => {}
+      close: () => {
+        if (closeError) throw closeError
+      }
     }
   }
 }))
@@ -29,6 +37,7 @@ let logSpy: ReturnType<typeof spyOn>
 
 beforeEach(() => {
   queryCalls.length = 0
+  closeError = null
   logSpy = spyOn(console, 'log').mockImplementation(() => {})
 })
 
@@ -43,12 +52,55 @@ test('SDK mock preserves unrelated session exports', async () => {
   expect(sdk.listSessions).toBe(agentSdk.listSessions)
 })
 
-test('project MCP status probes only project-scoped settings', async () => {
-  await getMcpStatus('/tmp/moi-project-scope-test', 'project')
+async function withProjectMcp<T>(body: Record<string, unknown>, fn: (dir: string) => Promise<T>) {
+  const dir = await mkdtemp(join(tmpdir(), 'moi-mcp-'))
+  try {
+    const file = join(dir, '.mcp.json')
+    await mkdir(dirname(file), { recursive: true })
+    await writeFile(file, JSON.stringify(body, null, 2))
+    return await fn(dir)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+}
 
-  expect(queryCalls).toHaveLength(1)
-  expect(queryCalls[0]?.options.cwd).toBe('/tmp/moi-project-scope-test')
-  expect(queryCalls[0]?.options.settingSources).toEqual(['project'])
+test('project MCP status is empty when the workspace has no project config', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'moi-mcp-empty-'))
+  try {
+    const status = await getMcpStatus(dir, 'project')
+
+    expect(status).toEqual([])
+    expect(queryCalls).toHaveLength(0)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('project MCP status probes only explicit project .mcp.json servers', async () => {
+  await withProjectMcp(
+    {
+      mcpServers: {
+        local: {
+          command: 'bun',
+          args: ['server.ts']
+        }
+      }
+    },
+    async dir => {
+      await getMcpStatus(dir, 'project')
+
+      expect(queryCalls).toHaveLength(1)
+      expect(queryCalls[0]?.options.cwd).toBe(dir)
+      expect(queryCalls[0]?.options.settingSources).toEqual(['project'])
+      expect(queryCalls[0]?.options.mcpServers).toEqual({
+        local: {
+          command: 'bun',
+          args: ['server.ts']
+        }
+      })
+      expect(queryCalls[0]?.options.strictMcpConfig).toBe(true)
+    }
+  )
 })
 
 test('user MCP status probes only user-scoped settings', async () => {
@@ -57,4 +109,22 @@ test('user MCP status probes only user-scoped settings', async () => {
   expect(queryCalls).toHaveLength(1)
   expect(queryCalls[0]?.options.cwd).toBe(process.cwd())
   expect(queryCalls[0]?.options.settingSources).toEqual(['user'])
+})
+
+test('settled MCP status survives an SDK cleanup error', async () => {
+  closeError = new Error('Query closed before response received')
+
+  await withProjectMcp(
+    {
+      mcpServers: {
+        local: {
+          command: 'bun',
+          args: ['server.ts']
+        }
+      }
+    },
+    async dir => {
+      expect(await getMcpStatus(dir, 'project')).toEqual([])
+    }
+  )
 })

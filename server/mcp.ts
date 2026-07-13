@@ -1,5 +1,10 @@
 import { query } from '@anthropic-ai/claude-agent-sdk'
-import type { McpServerStatus, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import type {
+  McpServerConfig,
+  McpServerStatus,
+  SDKUserMessage
+} from '@anthropic-ai/claude-agent-sdk'
+import { join } from 'path'
 
 import { debugEnabled } from './debug'
 
@@ -47,7 +52,31 @@ function logMcpStatus(scope: McpScope, status: McpServerStatus[]): void {
   console.log(`[mcp:${scope}]`, parts.join(' · '))
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+async function projectMcpServers(workspacePath: string): Promise<Record<string, McpServerConfig>> {
+  const file = Bun.file(join(workspacePath, '.mcp.json'))
+  if (!(await file.exists())) return {}
+
+  const parsed = await file.json().catch(() => null)
+  if (!isRecord(parsed) || !isRecord(parsed.mcpServers)) return {}
+
+  const servers: Record<string, McpServerConfig> = {}
+  for (const [name, config] of Object.entries(parsed.mcpServers)) {
+    // The SDK owns the detailed MCP config union; here we only need to confirm
+    // the project JSON declares an object keyed by server name before passing it
+    // through unchanged.
+    if (isRecord(config)) servers[name] = config as unknown as McpServerConfig
+  }
+  return servers
+}
+
 async function probeMcpStatus(workspacePath: string, scope: McpScope): Promise<McpServerStatus[]> {
+  const mcpServers = scope === 'project' ? await projectMcpServers(workspacePath) : undefined
+  if (scope === 'project' && Object.keys(mcpServers ?? {}).length === 0) return []
+
   // A prompt that never yields keeps the session alive without a model turn.
   let release!: () => void
   const done = new Promise<void>(r => (release = r))
@@ -64,6 +93,7 @@ async function probeMcpStatus(workspacePath: string, scope: McpScope): Promise<M
       cwd: workspacePath,
       persistSession: false,
       settingSources: [scope],
+      ...(mcpServers && { mcpServers, strictMcpConfig: true }),
       env: { ...process.env, CLAUDECODE: undefined }
     }
   })
@@ -80,7 +110,13 @@ async function probeMcpStatus(workspacePath: string, scope: McpScope): Promise<M
     return status
   } finally {
     release()
-    await q.close()
+    // This metadata-only probe intentionally never submits a user turn, so the
+    // SDK may report that it was closed before receiving a response.
+    try {
+      q.close()
+    } catch {
+      // The connector status is already settled, so cleanup must not replace it.
+    }
   }
 }
 
