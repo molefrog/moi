@@ -8,8 +8,12 @@ type QueryCall = {
 }
 
 const queryCalls: QueryCall[] = []
+const agentSdk = await import('@anthropic-ai/claude-agent-sdk')
 
 mock.module('@anthropic-ai/claude-agent-sdk', () => ({
+  // Module mocks are process-wide in Bun. Preserve the real SDK exports so
+  // tests loaded after this file can still import session helpers.
+  ...agentSdk,
   query: (call: QueryCall) => {
     queryCalls.push(call)
     return {
@@ -30,6 +34,13 @@ beforeEach(() => {
 
 afterEach(() => {
   logSpy.mockRestore()
+})
+
+test('SDK mock preserves unrelated session exports', async () => {
+  const sdk = await import('@anthropic-ai/claude-agent-sdk')
+
+  expect(sdk.getSessionMessages).toBe(agentSdk.getSessionMessages)
+  expect(sdk.listSessions).toBe(agentSdk.listSessions)
 })
 
 test('project MCP status probes only project-scoped settings', async () => {
