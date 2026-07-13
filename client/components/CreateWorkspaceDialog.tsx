@@ -227,7 +227,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
 
             <div className="mt-6 flex items-center justify-end gap-2">
               <Button onClick={handleCreate} disabled={!trimmed || !!nameError || busy}>
-                Create new space
+                {createMutation.isPending ? 'Creating…' : 'Create new space'}
               </Button>
             </div>
           </>

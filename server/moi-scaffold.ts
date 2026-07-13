@@ -2,8 +2,9 @@
 // `moi openclaw init`). Creates `.moi/widgets/`, writes the widget
 // dependency manifest, and installs dependencies — so the agent never has to
 // bootstrap the folder itself.
-import { mkdir } from 'node:fs/promises'
+import { mkdir, rm } from 'node:fs/promises'
 import { join, resolve, sep } from 'node:path'
+import { isDeepStrictEqual } from 'node:util'
 
 // Dependency set available to widgets. `react`/`react-dom` are stubs — at
 // runtime they resolve to Moi's locally-vendored ESM via the browser importmap
@@ -22,6 +23,34 @@ export const MOI_PACKAGE_JSON = {
     '@types/react-dom': '^19.0.0'
   }
 } as const
+
+// Dependency installation is helpful for editor types and widget builds, but
+// it must never block workspace creation indefinitely when the registry is
+// unreachable. A non-zero exit remains non-fatal to callers.
+const INSTALL_TIMEOUT_MS = 15_000
+const INSTALL_PENDING_FILE = '.install-pending'
+
+type InstallDependencies = (moiDir: string) => Promise<number>
+
+async function runBunInstall(moiDir: string): Promise<number> {
+  const install = Bun.spawn(['bun', 'install'], {
+    cwd: moiDir,
+    stdout: 'ignore',
+    stderr: 'inherit',
+    timeout: INSTALL_TIMEOUT_MS,
+    killSignal: 'SIGKILL'
+  })
+  return install.exited
+}
+
+async function isGeneratedManifest(packagePath: string): Promise<boolean> {
+  try {
+    const parsed = await Bun.file(packagePath).json()
+    return isDeepStrictEqual(parsed, MOI_PACKAGE_JSON)
+  } catch {
+    return false
+  }
+}
 
 // Ambient types for applets (widgets & views). Editor DX only — the moi
 // bundler resolves the `moi` module and asset imports at build time without any
@@ -56,7 +85,10 @@ declare module '*.svg' { const s: string; export default s }
 // on an existing workspace overwrites skills but must leave the user's
 // `.moi/` (their deps, widgets, lockfile) completely untouched.
 // Returns 'exists' when skipped, otherwise the `bun install` exit code.
-export async function scaffoldMoiDir(workspacePath: string): Promise<'exists' | number> {
+export async function scaffoldMoiDir(
+  workspacePath: string,
+  installDependencies: InstallDependencies = runBunInstall
+): Promise<'exists' | number> {
   // Backstop against the nested-workspace bug: never scaffold a `.moi/` *inside*
   // another workspace's `.moi/` (which produces the junk `.moi/.moi`). Callers
   // (`moi init`) lift to the workspace root via `liftToWorkspaceRoot` first, so
@@ -68,18 +100,35 @@ export async function scaffoldMoiDir(workspacePath: string): Promise<'exists' | 
     )
   }
   const moiDir = join(workspacePath, '.moi')
-  if (await Bun.file(join(moiDir, 'package.json')).exists()) return 'exists'
+  const packagePath = join(moiDir, 'package.json')
+  const pendingPath = join(moiDir, INSTALL_PENDING_FILE)
+  const packageExists = await Bun.file(packagePath).exists()
+  const pendingInstall = await Bun.file(pendingPath).exists()
+  // Recover workspaces left by an interrupted pre-marker install. Only retry a
+  // manifest structurally equal to Moi's generated package, so a user-owned
+  // `.moi/package.json` remains untouched.
+  const generatedButIncomplete =
+    packageExists &&
+    !pendingInstall &&
+    (await isGeneratedManifest(packagePath)) &&
+    !(await Bun.file(join(moiDir, 'bun.lock')).exists()) &&
+    !(await Bun.file(join(moiDir, 'bun.lockb')).exists()) &&
+    !(await Bun.file(join(moiDir, 'node_modules')).exists())
+  if (packageExists && !pendingInstall && !generatedButIncomplete) return 'exists'
   // A bare `.moi/` dir without package.json counts as not-bootstrapped —
   // fill in the missing pieces.
 
-  await mkdir(join(moiDir, 'widgets'), { recursive: true })
-  await Bun.write(join(moiDir, 'package.json'), JSON.stringify(MOI_PACKAGE_JSON, null, 2) + '\n')
-  await Bun.write(join(moiDir, 'applet-env.d.ts'), APPLET_ENV_DTS)
+  if (!packageExists) {
+    await mkdir(join(moiDir, 'widgets'), { recursive: true })
+    await Bun.write(packagePath, JSON.stringify(MOI_PACKAGE_JSON, null, 2) + '\n')
+    await Bun.write(join(moiDir, 'applet-env.d.ts'), APPLET_ENV_DTS)
+  }
 
-  const install = Bun.spawn(['bun', 'install'], {
-    cwd: moiDir,
-    stdout: 'ignore',
-    stderr: 'inherit'
-  })
-  return await install.exited
+  // The marker survives timeouts, process crashes, and failed installs. A later
+  // `moi init` then retries instead of treating the generated manifest as a
+  // completed scaffold.
+  await Bun.write(pendingPath, '')
+  const exitCode = await installDependencies(moiDir)
+  if (exitCode === 0) await rm(pendingPath, { force: true })
+  return exitCode
 }
