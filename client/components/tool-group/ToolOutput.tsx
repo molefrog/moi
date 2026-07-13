@@ -5,6 +5,7 @@ import { IconCheck, IconCopy } from '@tabler/icons-react'
 import { cn } from '@/client/lib/cn'
 import type { ToolCall } from '@/lib/types'
 
+import { Button } from '../ui/button'
 import { CodeBlock } from './CodeBlock'
 import { detectOutput } from './detect'
 import { formatBytes } from './format'
@@ -29,14 +30,14 @@ export function ToolOutput({ call, output, isError }: ToolOutputProps) {
       <div
         className={cn(
           'rounded-md border',
-          isError ? 'border-red-200 bg-red-50' : 'border-border bg-muted'
+          isError ? 'border-destructive/30 bg-destructive/10' : 'border-border bg-muted'
         )}
       >
         <pre
           className={cn(
             PRE,
             'break-all whitespace-pre-wrap',
-            isError ? 'text-red-800' : 'text-muted-foreground'
+            isError ? 'text-destructive' : 'text-muted-foreground'
           )}
         >
           {output || '(empty)'}
@@ -84,19 +85,15 @@ function Header({ raw, onRaw, label, size, copyText }: HeaderProps) {
   return (
     <div className="flex items-center gap-1 border-b border-border px-2 py-1">
       {options.map(([value, text]) => (
-        <button
+        <Button
           key={text}
           type="button"
+          variant={raw === value ? 'outline' : 'ghost'}
+          size="sm"
           onClick={() => onRaw(value)}
-          className={cn(
-            'rounded-md px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase transition-colors',
-            raw === value
-              ? 'bg-background text-foreground shadow-[inset_0_0_0_1px_var(--border)]'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
         >
           {text}
-        </button>
+        </Button>
       ))}
       <div className="flex-1" />
       <span className="text-[10px] font-medium text-muted-foreground tabular-nums">{size}</span>
@@ -123,17 +120,14 @@ function CopyButton({ text }: { text: string }) {
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="icon-sm"
       onClick={copy}
       aria-label={copied ? 'Copied' : 'Copy'}
-      className="flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
     >
-      {copied ? (
-        <IconCheck size={13} stroke={1.5} className="text-foreground" />
-      ) : (
-        <IconCopy size={13} stroke={1.5} />
-      )}
-    </button>
+      {copied ? <IconCheck stroke={1.75} /> : <IconCopy stroke={1.75} />}
+    </Button>
   )
 }

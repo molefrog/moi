@@ -52,9 +52,9 @@ export function ThreadSelector({ onSwitch }: ThreadSelectorProps) {
     >
       <DropdownMenuTrigger
         render={
-          <Button variant="ghost" className="-mx-3">
+          <Button variant="ghost">
             <span className="max-w-64 truncate">{label}</span>
-            <IconChevronDown stroke={1.5} className="text-muted-foreground" />
+            <IconChevronDown stroke={1.5} />
           </Button>
         }
       />
@@ -63,7 +63,7 @@ export function ThreadSelector({ onSwitch }: ThreadSelectorProps) {
           className="text-muted-foreground! **:text-muted-foreground!"
           onClick={() => handleSelect(null)}
         >
-          <IconPlus size={16} stroke={1.5} />
+          <IconPlus size={16} stroke={1.75} />
           New thread
         </DropdownMenuItem>
         {sessions.length > 0 && (
@@ -71,7 +71,9 @@ export function ThreadSelector({ onSwitch }: ThreadSelectorProps) {
             {sessions.map(s => (
               <DropdownMenuItem
                 key={s.sessionId}
-                className={cn(activeSessionId === s.sessionId && 'bg-accent')}
+                className={cn(
+                  activeSessionId === s.sessionId && 'bg-accent text-accent-foreground'
+                )}
                 onClick={() => handleSelect(s.sessionId)}
               >
                 <span className="truncate">{s.summary}</span>

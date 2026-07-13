@@ -208,7 +208,7 @@ function ToolButton({ label, active, Icon, onClick }: ToolButtonProps) {
       title={label}
       onClick={onClick}
       className={cn(
-        'flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground',
+        'flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground',
         active &&
           'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground'
       )}
@@ -423,16 +423,15 @@ function ensurePaletteColor(editor: Editor, kind: PaletteKind, fallback: TLDefau
 
 // Two sizes only — small→'m', large→'xl'. Each option carries previews for the
 // three size renderings (see sizeGlyphKind): `dot` blob for most tools, `stroke`
-// pen-icon weight for the pencil, `glyph` letter px for text.
+// pen icon for the pencil, `glyph` letter px for text.
 const SIZE_OPTIONS: {
   value: TLDefaultSizeStyle
   label: string
   dot: string
-  stroke: number
   glyph: number
 }[] = [
-  { value: 'm', label: 'Small', dot: 'size-1.5', stroke: 1.5, glyph: 14 },
-  { value: 'xl', label: 'Large', dot: 'size-3', stroke: 3, glyph: 22 }
+  { value: 'm', label: 'Small', dot: 'size-1.5', glyph: 16 },
+  { value: 'xl', label: 'Large', dot: 'size-3', glyph: 24 }
 ]
 
 // Rough (hand-drawn) vs dashed stroke.
@@ -571,15 +570,14 @@ function ScratchStyleBar({ editor }: ScratchStyleBarProps) {
             title={s.label}
             onClick={() => applyStyle(editor, DefaultSizeStyle, s.value)}
             className={cn(
-              'flex size-7.5 items-center justify-center rounded-full hover:bg-muted',
-              state.size === s.value &&
-                'bg-muted-foreground/25 text-primary hover:bg-muted-foreground/25'
+              'flex size-7.5 items-center justify-center rounded-full hover:bg-accent hover:text-accent-foreground',
+              state.size === s.value && 'bg-accent text-accent-foreground'
             )}
           >
             {state.sizeGlyph === 'pen' ? (
-              <IconSketching size={18} stroke={s.stroke} />
+              <IconSketching size={20} stroke={1.5} />
             ) : state.sizeGlyph === 'letter' ? (
-              <IconTypography size={s.glyph} stroke={1.5} />
+              <IconTypography size={s.glyph} stroke={s.glyph === 16 ? 1.75 : 1.5} />
             ) : (
               <span className={cn('rounded-full bg-current', s.dot)} />
             )}
@@ -596,9 +594,8 @@ function ScratchStyleBar({ editor }: ScratchStyleBarProps) {
             title={d.label}
             onClick={() => applyStyle(editor, DefaultDashStyle, d.value)}
             className={cn(
-              'flex size-7.5 items-center justify-center rounded-full hover:bg-muted',
-              state.dash === d.value &&
-                'bg-muted-foreground/25 text-primary hover:bg-muted-foreground/25'
+              'flex size-7.5 items-center justify-center rounded-full hover:bg-accent hover:text-accent-foreground',
+              state.dash === d.value && 'bg-accent text-accent-foreground'
             )}
           >
             <span className={cn('w-3.5', d.preview)} />
@@ -615,9 +612,8 @@ function ScratchStyleBar({ editor }: ScratchStyleBarProps) {
             title={f.label}
             onClick={() => applyStyle(editor, DefaultFillStyle, f.value)}
             className={cn(
-              'flex size-7.5 items-center justify-center rounded-full hover:bg-muted',
-              state.fill === f.value &&
-                'bg-muted-foreground/25 text-primary hover:bg-muted-foreground/25'
+              'flex size-7.5 items-center justify-center rounded-full hover:bg-accent hover:text-accent-foreground',
+              state.fill === f.value && 'bg-accent text-accent-foreground'
             )}
           >
             <span className={cn('size-4.5 rounded-sm', f.preview)} />

@@ -12,7 +12,7 @@ import { applyEnvChanged } from './env-apply'
 import { callFunction, parseFunctionPath } from './functions'
 import { processIcon } from './icon'
 import { getWorkspacePreview, loadLayout, mergeLayoutForSave, saveLayout } from './layout'
-import { getMcpStatus } from './mcp'
+import { getMcpStatus, getUserMcpStatus } from './mcp'
 import { publishEvent } from './events'
 import { getOpenClawModels, getOpenClawSessionMessages, getOpenClawSessions } from './openclaw'
 import { toSessionInfo, toStreamEvents } from './openclaw-adapter'
@@ -23,6 +23,7 @@ import {
   listWorkspaces,
   registerWorkspace,
   removeWorkspace,
+  reorderWorkspaces,
   tildify
 } from './registry'
 import { loadScratchpadDoc, saveScratchpadDoc } from './scratchpad'
@@ -69,7 +70,9 @@ async function handleFunctionCall(
     }
     const args = await req.text()
     const result = await callFunction(module, name, args, workspacePath)
-    return new Response(result, { headers: { 'Content-Type': 'application/json' } })
+    return new Response(result, {
+      headers: { 'Content-Type': 'application/json' }
+    })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     return new Response(message, { status: 500 })
@@ -276,7 +279,7 @@ one.put('/sessions/:sessionId/config', async c => {
 })
 
 one.get('/mcp', async c => {
-  return c.json(await getMcpStatus(c.get('ws').path))
+  return c.json(await getMcpStatus(c.get('ws').path, 'project'))
 })
 
 // Per-workspace env vars. GET returns the effective view (discovered `.env` + UI
@@ -348,7 +351,11 @@ one.get('/models', async c => {
   // Claude Code streams live tokens via `includePartialMessages`; OpenClaw
   // uses durable rows only (no token deltas), so it opts out.
   const supportsStreaming = provider !== 'openclaw'
-  return c.json({ provider, models, supportsStreaming } satisfies WorkspaceModels)
+  return c.json({
+    provider,
+    models,
+    supportsStreaming
+  } satisfies WorkspaceModels)
 })
 
 // Workspace identity (name). GET returns the current {name, icon}; PUT a JSON
@@ -457,7 +464,7 @@ one.delete('/icon', async c => {
   return c.body(null, 204)
 })
 
-// All info about a single workspace: its persisted layout (widget grid, chat
+// All info about a single workspace: its persisted layout (widget grid, layout
 // mode, theme) plus server-resolved metadata. GET reads, PUT writes the layout,
 // DELETE unregisters.
 one.get('/', async c => {
@@ -493,17 +500,35 @@ one.delete('/', async c => {
 // ---- workspace collection: /api/workspaces ----------------------------------
 const workspaces = new Hono<ApiEnv>()
 
-workspaces.get('/', async c => {
-  // Merge each workspace's live layout name/icon over the registry snapshot so
-  // the sidebar reflects `moi config` changes immediately.
-  const entries = await listWorkspaces()
-  const merged = await Promise.all(
+async function mergeWorkspaceList(entries: WorkspaceEntry[]) {
+  return Promise.all(
     entries.map(async e => {
       const layout = await loadLayout(e.path)
       return { ...e, name: layout.name ?? e.name, icon: layout.icon }
     })
   )
-  return c.json(merged)
+}
+
+workspaces.get('/', async c => {
+  // Merge each workspace's live layout name/icon over the registry snapshot so
+  // the sidebar reflects `moi config` changes immediately.
+  const entries = await listWorkspaces()
+  return c.json(await mergeWorkspaceList(entries))
+})
+
+workspaces.put('/order', async c => {
+  const body = await c.req.json()
+  if (!Array.isArray(body?.ids) || body.ids.some((id: unknown) => typeof id !== 'string')) {
+    return c.text('Expected { ids: string[] }', 400)
+  }
+  try {
+    const entries = await reorderWorkspaces(body.ids)
+    publishEvent({ type: 'workspace:updated' })
+    return c.json(await mergeWorkspaceList(entries))
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return c.text(message, 400)
+  }
 })
 
 workspaces.post('/', async c => {
@@ -534,9 +559,14 @@ workspaces.post('/', async c => {
 workspaces.get('/discover', async c => c.json(await discoverWorkspaces()))
 
 // Where `/workspace/create` places new folders — the client shows the resolved
-// location while the user types a name.
+// location while the user types a name. `canChooseFolder` tells the UI whether
+// the native folder picker is available (macOS only for now).
 workspaces.get('/create', c =>
-  c.json({ root: CREATED_WORKSPACES_ROOT, displayRoot: tildify(CREATED_WORKSPACES_ROOT) })
+  c.json({
+    root: CREATED_WORKSPACES_ROOT,
+    displayRoot: tildify(CREATED_WORKSPACES_ROOT),
+    canChooseFolder: process.platform === 'darwin'
+  })
 )
 
 // Create a brand-new workspace: a fresh folder under CREATED_WORKSPACES_ROOT,
@@ -565,6 +595,65 @@ workspaces.post('/create', async c => {
   return c.json(entry, 201)
 })
 
+// Guards against opening a second native picker while one is already up — a
+// duplicate request (e.g. a quick re-click) resolves as canceled instead of
+// spawning a second Finder dialog on top of the first.
+let folderPickerOpen = false
+
+function isSameOriginRequest(req: Request): boolean {
+  if (req.headers.get('sec-fetch-site') === 'cross-site') return false
+  const origin = req.headers.get('origin')
+  if (!origin) return true
+  try {
+    return new URL(origin).origin === new URL(req.url).origin
+  } catch {
+    return false
+  }
+}
+
+// Open the OS-native folder picker so the user can choose an existing folder to
+// import (the create dialog's "Use existing folder"). The server runs on the
+// user's machine, so it can drive the real system dialog — the browser can't.
+// Returns the chosen POSIX path, or `{ canceled: true }` if the dialog is
+// dismissed. macOS only for now (via `osascript`).
+workspaces.post('/choose-folder', async c => {
+  if (!isSameOriginRequest(c.req.raw)) return c.text('Forbidden', 403)
+  if (process.platform !== 'darwin') {
+    return c.text('Choosing a folder is only supported on macOS for now', 400)
+  }
+  if (folderPickerOpen) return c.json({ canceled: true })
+  folderPickerOpen = true
+  try {
+    // The picker is spawned by osascript, a background helper, so macOS won't
+    // give it focus by default. `tell me to activate` forces the script runner
+    // frontmost, and the short delay lets that settle before the panel opens so
+    // it appears focused rather than behind other windows.
+    const proc = Bun.spawn(
+      [
+        'osascript',
+        '-e',
+        'tell me to activate',
+        '-e',
+        'delay 0.2',
+        '-e',
+        'POSIX path of (choose folder with prompt "Select a project folder")'
+      ],
+      { stdout: 'pipe', stderr: 'pipe' }
+    )
+    const exitCode = await proc.exited
+    // osascript exits non-zero when the user presses Cancel.
+    if (exitCode !== 0) return c.json({ canceled: true })
+    const path = (await new Response(proc.stdout).text()).trim()
+    if (!path) return c.json({ canceled: true })
+    return c.json({ path })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return c.text(`Could not open the folder picker: ${message}`, 500)
+  } finally {
+    folderPickerOpen = false
+  }
+})
+
 // `/:id` is registered after the static `/discover` so the literal path wins.
 // `/api/workspaces/ws` (the live-event WebSocket) is intercepted by Bun's routes
 // table before it ever reaches Hono, so it never collides with `:id`.
@@ -572,6 +661,10 @@ workspaces.route('/:id', one)
 
 // ---- top-level API ----------------------------------------------------------
 export const api = new Hono()
+
+api.get('/api/mcp', async c => {
+  return c.json(await getUserMcpStatus())
+})
 
 api.route('/api/workspaces', workspaces)
 

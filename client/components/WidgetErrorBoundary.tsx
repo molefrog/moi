@@ -32,7 +32,7 @@ export class WidgetErrorBoundary extends Component<Props, State> {
       return (
         <div className="flex h-full w-full flex-col items-start justify-start gap-1.5 p-4 text-xs">
           <div className="flex items-center gap-1.5 font-semibold text-destructive">
-            <IconAlertTriangle size={14} stroke={1.5} />
+            <IconAlertTriangle size={16} stroke={1.75} />
             Widget crashed
           </div>
           <div className="font-mono break-words text-muted-foreground">

@@ -106,7 +106,8 @@ describe('loadLayout/saveLayout round-trip with theme', () => {
     const layout: WorkspaceLayout = {
       version: 1,
       widgetGrid: [],
-      chatMode: 'sidebar',
+      layoutMode: 'fullscreen',
+      tabs: { open: ['agent'], active: 'agent' },
       theme: { font: 'serif', background: '#faf8f5', foreground: '#2c2825' }
     }
     await saveLayout(layout, tmpDir)
@@ -118,7 +119,8 @@ describe('loadLayout/saveLayout round-trip with theme', () => {
     const layout: WorkspaceLayout = {
       version: 1,
       widgetGrid: [],
-      chatMode: 'sidebar',
+      layoutMode: 'fullscreen',
+      tabs: { open: ['agent'], active: 'agent' },
       theme: { font: 'default' }
     }
     await saveLayout(layout, tmpDir)

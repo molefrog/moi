@@ -1,6 +1,6 @@
 import { memo } from 'react'
 
-import { IconFile } from '@tabler/icons-react'
+import { IconFile, IconRobotFace } from '@tabler/icons-react'
 
 import { MarkdownContent } from '@/client/components/MarkdownContent'
 import { ToolCallGroup } from '@/client/components/tool-group/ToolCallGroup'
@@ -8,7 +8,14 @@ import { useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
 import type { Part, Turn } from '@/lib/types'
 
 export function EmptyState() {
-  return <div className="flex flex-1 flex-col items-center justify-center" />
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+      <div className="flex size-12 items-center justify-center rounded-xl border border-border bg-muted/40 text-muted-foreground">
+        <IconRobotFace size={24} stroke={1.5} />
+      </div>
+      <p className="text-lg font-medium text-foreground">What do you want to build?</p>
+    </div>
+  )
 }
 
 export function ThinkingIndicator() {
@@ -118,7 +125,7 @@ export const TurnView = memo(function TurnView({ turn, processing = false }: Tur
           <FilePart key={i} mediaType={p.mediaType} url={p.url} filename={p.filename} />
         ))}
         {text && (
-          <p className="rounded-md bg-black/[0.07] px-4 py-2 text-sm leading-normal whitespace-pre-wrap">
+          <p className="rounded-md bg-accent px-4 py-2 text-sm leading-normal whitespace-pre-wrap text-accent-foreground">
             {text}
           </p>
         )}
@@ -164,13 +171,13 @@ function FilePart({ mediaType, url, filename }: FilePartProps) {
       <img
         src={url}
         alt={filename ?? 'attachment'}
-        className="max-h-64 max-w-full rounded-md border border-black/10 object-contain"
+        className="max-h-64 max-w-full rounded-md border border-border object-contain"
       />
     )
   }
   return (
-    <div className="flex items-center gap-1.5 rounded-md border border-black/10 bg-black/[0.03] px-2.5 py-1.5 text-xs text-muted-foreground">
-      <IconFile size={14} stroke={1.5} />
+    <div className="flex items-center gap-1.5 rounded-md border border-border bg-accent px-2.5 py-1.5 text-xs text-accent-foreground">
+      <IconFile size={16} stroke={1.75} />
       <span className="truncate">{filename ?? mediaType}</span>
     </div>
   )

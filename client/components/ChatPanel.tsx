@@ -1,81 +1,21 @@
-import { useCallback, useMemo } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useRef } from 'react'
 
-import { IconChevronDown, IconChevronsRight, IconSelector, IconX } from '@tabler/icons-react'
+import { IconChevronDown, IconX } from '@tabler/icons-react'
 
 import { useScrollFade } from '@/client/hooks/useScrollFade'
 import { useStickToBottom } from '@/client/hooks/useStickToBottom'
 import { cn } from '@/client/lib/cn'
 import { groupTurns } from '@/client/lib/group-turns'
-import type { ChatDisplay, Turn, ViewState } from '@/lib/types'
+import type { Turn, ViewState } from '@/lib/types'
 
 import { ChatInput } from './ChatInput'
 import { ThreadSelector } from './ThreadSelector'
 import { EmptyState, ThinkingIndicator, TurnView } from './TurnView'
 import { Button } from './ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger
-} from './ui/dropdown-menu'
-
-type ChatModeIconProps = {
-  className?: string
-}
-
-function ChatModeIconSidebar({ className }: ChatModeIconProps) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      strokeWidth="1.5"
-      className={className}
-    >
-      <rect x="1.75" y="3.75" width="20.5" height="16.5" rx="2.25" stroke="currentColor" />
-      <rect x="11.5" y="5.5" width="9" height="13" rx="1" fill="currentColor" />
-    </svg>
-  )
-}
-
-function ChatModeIconFloating({ className }: ChatModeIconProps) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      strokeWidth="1.5"
-      className={className}
-    >
-      <rect x="1.75" y="3.75" width="20.5" height="16.5" rx="2.25" stroke="currentColor" />
-      <rect x="12.5" y="11.5" width="8" height="7" rx="1" fill="currentColor" />
-    </svg>
-  )
-}
-
-function ChatModeIconFullscreen({ className }: ChatModeIconProps) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      strokeWidth="1.5"
-      className={className}
-    >
-      <rect x="1.75" y="3.75" width="20.5" height="16.5" rx="2.25" stroke="currentColor" />
-      <rect x="4.5" y="6.5" width="15" height="11" rx="1" fill="currentColor" />
-    </svg>
-  )
-}
 
 type ChatPanelProps = {
+  active?: boolean
+  focusRequest?: number
   view: ViewState
   // The live streaming preview as a synthetic assistant turn (or null). Merged
   // into the transcript through the same groupTurns pipeline so a thinking-only
@@ -89,22 +29,25 @@ type ChatPanelProps = {
   onDismissError?: () => void
   send: (text: string) => void
   stop: () => void
-  // How the chat is shown right now (position, or fullscreen). The mode switch
-  // and collapse/close affordances key off this; fullscreen shows neither.
-  chatMode: ChatDisplay
   // Constrain the scrollable history and the composer to a centered max-width
   // column (var --chat-max-container) while the header still spans full width.
   // Always on for now; will be toggled per layout mode later.
   contained?: boolean
   onSwitchThread: (sessionId: string | null) => void
-  // The chat display picker — sidebar / floating (position) and fullscreen (the
-  // transient view). The parent routes each to the right state.
-  onModeChange?: (mode: ChatDisplay) => void
-  onCollapse?: () => void
+  // Extra content for the header's left edge, rendered before the thread
+  // selector when the chat is the primary panel.
+  headerLeft?: ReactNode
+  // Extra controls for the header's right edge — the parent supplies whatever
+  // chrome belongs here in the current layout (e.g. the section reopen toggle
+  // plus MCP/settings menus when the chat is fullscreen).
+  headerRight?: ReactNode
+  // Floating popup: render a close (X) button that dismisses the popup.
   onClose?: () => void
 }
 
 export function ChatPanel({
+  active = true,
+  focusRequest = 0,
   view,
   previewTurn,
   sessionId,
@@ -113,13 +56,13 @@ export function ChatPanel({
   onDismissError,
   send,
   stop,
-  chatMode,
   contained = true,
   onSwitchThread,
-  onModeChange,
-  onCollapse,
+  headerLeft,
+  headerRight,
   onClose
 }: ChatPanelProps) {
+  const composerRef = useRef<HTMLTextAreaElement>(null)
   const { ref: scrollRef, showTopFade, showBottomFade } = useScrollFade()
   const turns = view.turns
   // Visual grouping: fold consecutive tool-only assistant turns into one
@@ -136,6 +79,12 @@ export function ChatPanel({
   // Stick to the bottom while pinned; respect scroll-up; jump on thread switch.
   const { atBottom, scrollToBottom } = useStickToBottom(scrollRef, sessionId)
 
+  // The active chat surface owns initial focus. A monotonically increasing
+  // request also refocuses an already-visible composer after intent actions.
+  useEffect(() => {
+    if (active) composerRef.current?.focus()
+  }, [active, focusRequest])
+
   // Sending always returns the user to the bottom, even if they'd scrolled up —
   // they expect to see their message and the reply.
   const handleSend = useCallback(
@@ -146,63 +95,18 @@ export function ChatPanel({
     [send, scrollToBottom]
   )
 
-  const TriggerIcon =
-    chatMode === 'sidebar'
-      ? ChatModeIconSidebar
-      : chatMode === 'floating'
-        ? ChatModeIconFloating
-        : ChatModeIconFullscreen
-
   return (
-    <div className="flex h-full flex-col pt-2 pb-4">
-      <header className="flex items-center justify-between pr-2 pb-2 pl-5">
+    <div className="flex min-h-0 flex-1 flex-col pt-2 pb-4">
+      <header className="flex items-center justify-between pr-2 pb-2 pl-2">
         <div className="flex min-w-0 items-center gap-2.5">
+          {headerLeft}
           <ThreadSelector onSwitch={onSwitchThread} />
         </div>
         <div className="flex items-center gap-0.5">
-          {onModeChange && (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    className="gap-0 pr-1! pl-2!"
-                    variant="ghost"
-                    aria-label="Switch chat mode"
-                  >
-                    <>
-                      <TriggerIcon className="text-muted-foreground" />
-                      <IconSelector className="size-4! text-muted-foreground/50" stroke={2} />
-                    </>
-                  </Button>
-                }
-              />
-              <DropdownMenuContent align="end" className="min-w-40">
-                <DropdownMenuRadioGroup value={chatMode} onValueChange={onModeChange}>
-                  <DropdownMenuRadioItem value="sidebar" closeOnClick>
-                    <ChatModeIconSidebar />
-                    Sidebar
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="floating" closeOnClick>
-                    <ChatModeIconFloating />
-                    Floating
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="fullscreen" closeOnClick>
-                    <ChatModeIconFullscreen />
-                    Fullscreen
-                  </DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          {chatMode === 'sidebar' && onCollapse && (
-            <Button variant="ghost" size="icon" onClick={onCollapse} aria-label="Collapse chat">
-              {/* Tabler icon with double chevrons has a really weird optical size, hence the adjustments */}
-              <IconChevronsRight className="size-6! text-muted-foreground" stroke={1.5} />
-            </Button>
-          )}
-          {chatMode === 'floating' && onClose && (
+          {headerRight}
+          {onClose && (
             <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close chat">
-              <IconX className="text-muted-foreground" stroke={1.5} />
+              <IconX stroke={1.5} />
             </Button>
           )}
         </div>
@@ -241,34 +145,43 @@ export function ChatPanel({
         {/* Jump to latest — shown only when scrolled up, so following the tail
             never yanks the user while they read history. */}
         {!atBottom && turns.length > 0 && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             onClick={() => scrollToBottom('smooth')}
             aria-label="Jump to latest"
-            className="absolute bottom-3 left-1/2 flex size-8 -translate-x-1/2 animate-in items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-md transition-colors duration-150 fade-in slide-in-from-bottom-1 hover:text-foreground"
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 animate-in rounded-full fade-in slide-in-from-bottom-1"
           >
-            <IconChevronDown size={18} stroke={1.5} />
-          </button>
+            <IconChevronDown stroke={1.5} />
+          </Button>
         )}
       </div>
 
       <div className={cn(contained && 'mx-auto w-full max-w-[var(--chat-max-container)] px-3')}>
         {error && (
-          <div className="mb-2 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+          <div className="mb-2 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             <span className="flex-1 break-words">{error}</span>
             {onDismissError && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-sm"
                 onClick={onDismissError}
-                className="text-red-600 hover:text-red-900"
+                className="-m-1"
                 aria-label="Dismiss error"
               >
-                <IconX size={14} stroke={1.5} />
-              </button>
+                <IconX stroke={1.75} />
+              </Button>
             )}
           </div>
         )}
-        <ChatInput onSend={handleSend} onStop={stop} processing={processing} />
+        <ChatInput
+          composerRef={composerRef}
+          onSend={handleSend}
+          onStop={stop}
+          processing={processing}
+        />
       </div>
     </div>
   )

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { type RefObject, useRef, useState } from 'react'
 
 import {
   IconArrowUp,
@@ -18,6 +18,7 @@ import { ModelPicker } from './ModelPicker'
 import { Button } from './ui/button'
 
 type ChatInputProps = {
+  composerRef: RefObject<HTMLTextAreaElement | null>
   onSend: (text: string) => void
   onStop: () => void
   processing: boolean
@@ -28,8 +29,7 @@ type ChatInputProps = {
 // panel, message list, or surrounding workspace. The draft is keyed by the
 // active thread, so switching threads swaps the unsent text with you. Attachments
 // (drag/drop, paste, attach button) are tracked the same way and cleared on send.
-export function ChatInput({ onSend, onStop, processing }: ChatInputProps) {
-  const ref = useRef<HTMLTextAreaElement>(null)
+export function ChatInput({ composerRef, onSend, onStop, processing }: ChatInputProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const workspaceId = useWorkspaceId()
   const sessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
@@ -92,7 +92,7 @@ export function ChatInput({ onSend, onStop, processing }: ChatInputProps) {
       onMouseDown={e => {
         if (e.target instanceof HTMLElement && e.target.closest('button')) return
         e.preventDefault()
-        ref.current?.focus()
+        composerRef.current?.focus()
       }}
       onDragOver={e => {
         if (!e.dataTransfer.types.includes('Files')) return
@@ -111,7 +111,7 @@ export function ChatInput({ onSend, onStop, processing }: ChatInputProps) {
         addFiles(Array.from(e.dataTransfer.files))
       }}
       className={cn(
-        'flex w-full cursor-text flex-col gap-1 rounded-lg bg-white p-2 shadow-xs transition-[color,box-shadow] outline-none focus-within:shadow-sm',
+        'flex w-full cursor-text flex-col gap-1 rounded-lg bg-card p-2 text-card-foreground shadow-xs transition-[color,box-shadow] outline-none focus-within:shadow-sm',
         dragOver && 'ring-2 ring-ring/60'
       )}
     >
@@ -130,7 +130,7 @@ export function ChatInput({ onSend, onStop, processing }: ChatInputProps) {
       )}
 
       <textarea
-        ref={ref}
+        ref={composerRef}
         id="chat-input"
         name="message"
         value={value}
@@ -148,7 +148,6 @@ export function ChatInput({ onSend, onStop, processing }: ChatInputProps) {
           addFiles(files)
         }}
         placeholder={processing ? 'Queue a follow-up...' : 'Ask anything...'}
-        autoFocus
         rows={1}
         className="field-sizing-content max-h-40 w-full resize-none bg-transparent px-2 py-1 text-sm leading-relaxed outline-none placeholder:text-muted-foreground disabled:opacity-50"
       />
@@ -204,9 +203,9 @@ function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
   return (
     <div
       className={cn(
-        'group relative flex items-center gap-2 overflow-hidden rounded-md border border-black/10 bg-black/[0.03]',
+        'group relative flex items-center gap-2 overflow-hidden rounded-md border border-border bg-accent text-accent-foreground',
         isImage ? 'size-14' : 'h-10 max-w-52 pr-2 pl-2',
-        status === 'error' && 'border-red-300'
+        status === 'error' && 'border-destructive/50'
       )}
       title={error ?? name}
     >
@@ -214,30 +213,32 @@ function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
         <img src={previewUrl} alt={name} className="size-full object-cover" />
       ) : (
         <>
-          <IconFile size={16} stroke={1.5} className="shrink-0 text-muted-foreground" />
-          <span className="truncate text-xs text-foreground/80">{name}</span>
+          <IconFile size={16} stroke={1.75} className="shrink-0 text-muted-foreground" />
+          <span className="truncate text-xs">{name}</span>
         </>
       )}
 
       {status === 'uploading' && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/60">
-          <IconLoader2 size={16} stroke={1.5} className="animate-spin text-muted-foreground" />
+        <div className="absolute inset-0 flex items-center justify-center bg-background/70">
+          <IconLoader2 size={16} stroke={1.75} className="animate-spin text-muted-foreground" />
         </div>
       )}
       {status === 'error' && (
-        <div className="absolute inset-0 flex items-center justify-center bg-red-50/80 text-[10px] text-red-700">
+        <div className="absolute inset-0 flex items-center justify-center bg-destructive/10 text-[10px] text-destructive">
           Failed
         </div>
       )}
 
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon-sm"
         onClick={onRemove}
         aria-label={`Remove ${name}`}
-        className="absolute top-0.5 right-0.5 flex size-4 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100"
+        className="absolute top-0.5 right-0.5 size-4 rounded-full bg-primary/70 text-primary-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-primary/80 [&_svg]:size-3"
       >
-        <IconX size={10} stroke={2} />
-      </button>
+        <IconX stroke={1.75} />
+      </Button>
     </div>
   )
 }

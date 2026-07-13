@@ -94,7 +94,7 @@ export function SubagentCard({ call, cwd, isFirst, isLast }: SubagentCardProps) 
                 {formatDuration(durationMs)}
               </span>
             )}
-            {status === 'failed' && <span className="shrink-0 text-xs text-red-600">✗</span>}
+            {status === 'failed' && <span className="shrink-0 text-xs text-destructive">✗</span>}
             {status === 'stopped' && (
               <span className="shrink-0 text-xs text-muted-foreground">✗</span>
             )}

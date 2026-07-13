@@ -51,13 +51,8 @@ export function WidgetFrame({ editing, hidden, onRemove, children }: WidgetFrame
 
       {editing && onRemove && (
         <div className="absolute -top-2 -right-2 opacity-0 transition-opacity group-hover/widget:opacity-100">
-          <Button
-            size="icon-sm"
-            variant="outline"
-            className="size-7 rounded-full"
-            onClick={onRemove}
-          >
-            {hidden ? <IconPlus stroke={1.5} /> : <IconMinus stroke={1.5} />}
+          <Button size="icon-sm" variant="outline" className="rounded-full" onClick={onRemove}>
+            {hidden ? <IconPlus stroke={1.75} /> : <IconMinus stroke={1.75} />}
           </Button>
         </div>
       )}

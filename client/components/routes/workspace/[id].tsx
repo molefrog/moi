@@ -1,16 +1,16 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { AnimatePresence, motion } from "motion/react";
 
 import {
   IconAppWindow,
   IconArtboard,
-  IconDots,
-  IconLayoutDashboard,
   IconLayoutGrid,
-  IconMessageCircle,
+  IconLayoutSidebarRight,
   IconPalette,
   IconPlus,
+  IconRobotFace,
+  IconX,
 } from "@tabler/icons-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -22,31 +22,36 @@ import {
 } from "@/client/api/workspaces";
 import { ChatPanel } from "@/client/components/ChatPanel";
 import { ChatPopup } from "@/client/components/ChatPopup";
+import { CustomizePanel } from "@/client/components/CustomizePanel";
 import { McpMenu } from "@/client/components/McpMenu";
+import { ReorderableList } from "@/client/components/ReorderableList";
+import type { ReorderableRenderState } from "@/client/components/ReorderableList";
 import { Scratchpad } from "@/client/components/Scratchpad";
 import { WidgetErrorBoundary } from "@/client/components/WidgetErrorBoundary";
-import { type WidgetMode, Widgets } from "@/client/components/Widgets";
+import { Widgets } from "@/client/components/Widgets";
 import {
   PanelHeader,
   PROVIDER_ICON,
   SidebarLayout,
-  SidebarToggle,
 } from "@/client/components/layout/SidebarLayout";
 import { LedLogo } from "@/client/components/playground/LedLogo";
-import { Button } from "@/client/components/ui/button";
+import { Button, buttonVariants } from "@/client/components/ui/button";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/client/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/client/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/client/components/ui/tooltip";
 import { WorkspaceSettings } from "@/client/components/settings/WorkspaceSettings";
 import { useChat } from "@/client/hooks/useChat";
 import { useAppletCacheInvalidation, useView } from "@/client/hooks/useApplet";
-import { useFitsSidebar } from "@/client/hooks/useFitsSidebar";
+import { useFitsSplitLayout } from "@/client/hooks/useFitsSplitLayout";
 import { useGridReconcile } from "@/client/hooks/useGridReconcile";
 import { useMeiEvent } from "@/client/hooks/useMeiEvents";
 import { useWorkspaceTheme } from "@/client/hooks/useWorkspaceTheme";
@@ -57,7 +62,14 @@ import {
 } from "@/client/lib/WorkspaceLayoutContext";
 import { cn } from "@/client/lib/cn";
 import { liveStore } from "@/client/store/live";
-import type { ChatDisplay, SessionInfo, ViewInfo, WidgetInfo } from "@/lib/types";
+import type {
+  LayoutMode,
+  SessionInfo,
+  ViewInfo,
+  WidgetInfo,
+  WorkspaceTabId,
+  WorkspaceTabsState,
+} from "@/lib/types";
 
 // Tab label for a view: its configured title, or the file-name id as fallback.
 const viewLabel = (v: ViewInfo) => v.config.title || v.id;
@@ -86,7 +98,11 @@ type WorkspaceLoaderProps = {
 
 function WorkspaceLoader({ id }: WorkspaceLoaderProps) {
   const qc = useQueryClient();
-  const { layout, setLayout, isLoading: layoutLoading } = useWorkspaceLayoutCtx();
+  const {
+    layout,
+    setLayout,
+    isLoading: layoutLoading,
+  } = useWorkspaceLayoutCtx();
   const widgets = useWorkspaceWidgets(id);
   const views = useWorkspaceViews(id);
   const sessions = useWorkspaceSessions(id);
@@ -127,7 +143,10 @@ function WorkspaceLoader({ id }: WorkspaceLoaderProps) {
             <LedLogo sprite="moi" effect="chaos" />
           </div>
         ) : (
-          <WorkspaceView widgets={widgets.data ?? []} views={views.data ?? []} />
+          <WorkspaceView
+            widgets={widgets.data ?? []}
+            views={views.data ?? []}
+          />
         )}
       </SidebarLayout>
     </>
@@ -148,236 +167,212 @@ function SeedActiveSession({ workspaceId, sessions }: SeedActiveSessionProps) {
     if (!sessions) return;
     const active = liveStore.getState().activeByWorkspace[workspaceId] ?? null;
     const stillValid = active && sessions.some((s) => s.sessionId === active);
-    if (!stillValid) liveStore.getState().setActive(workspaceId, sessions[0]?.sessionId ?? null);
+    if (!stillValid)
+      liveStore
+        .getState()
+        .setActive(workspaceId, sessions[0]?.sessionId ?? null);
   }, [workspaceId, sessions]);
   return null;
 }
 
-const ACTION_VARIANTS = {
-  from: { opacity: 0, scale: 0.8, filter: "blur(4px)" },
-  to: { opacity: 1, scale: 1, filter: "blur(0px)" },
-};
+const DEFAULT_TABS: WorkspaceTabsState = { open: ["agent"], active: "agent" };
 
-// A nav target: a fixed tab, or a view id. The `(string & {})` keeps editor
-// autocomplete for the fixed keys while still accepting arbitrary view ids.
-// Held in WorkspaceView's local state (transient — never persisted): "chat"
-// shows the chat fullscreen; "widgets" / "canvas" / a view id fill the main area
-// with the chat in its persisted position beside it.
-type WorkspaceNav = "chat" | "widgets" | "canvas" | (string & {});
+const viewTabId = (id: string): WorkspaceTabId => `view:${id}`;
+const viewIdFromTab = (tab: WorkspaceTabId) =>
+  tab.startsWith("view:") ? tab.slice(5) : null;
 
 type WorkspaceTabsProps = {
-  active: WorkspaceNav;
-  onSelect: (nav: WorkspaceNav) => void;
-  views: ViewInfo[];
-  onCreateView: () => void;
+  tabs: TabItem[];
+  active: WorkspaceTabId;
+  createItems: CreateTabItem[];
+  onSelect: (nav: WorkspaceTabId) => void;
+  onClose: (nav: WorkspaceTabId) => void;
+  onReorder: (ordered: WorkspaceTabId[]) => void;
 };
 
-// Shared geometry for every header tab. The active outline uses an inset shadow
-// (not a border) so the box keeps the exact h-7 footprint — no 1px layout shift.
-// Labels never wrap and the leading icon never shrinks, so a long view name keeps
-// its full footprint. No color transition: switching tabs swaps the bg/border
-// instantly.
-const TAB_BASE =
-  "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-sm font-medium whitespace-nowrap [&_svg]:size-[18px] [&_svg]:shrink-0";
+const CREATE_TAB_TRIGGER_CLASS = "text-muted-foreground";
 
-// Square (w = h) geometry modifier for icon-only triggers.
-const ICON_TAB_SQUARE = "size-7 justify-center px-0";
-
-// Labeled tabs (and the chat icon) keep a constant foreground text color; only
-// the background and (when active) the inset-shadow border change between states.
 const tabClass = (isActive: boolean) =>
   cn(
-    TAB_BASE,
-    "text-foreground",
-    isActive ? "bg-muted shadow-[inset_0_0_0_1px_var(--border)]" : "hover:bg-muted/60",
+    buttonVariants({ variant: "ghost", size: "sm" }),
+    isActive && "bg-accent text-accent-foreground",
   );
 
-// The "…" overflow trigger stays gray until active/hovered — it doesn't follow
-// the always-foreground rule the labeled tabs use.
-const iconTabClass = (isActive: boolean) =>
-  cn(
-    TAB_BASE,
-    ICON_TAB_SQUARE,
-    isActive
-      ? "bg-muted text-foreground shadow-[inset_0_0_0_1px_var(--border)]"
-      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-  );
-
-// A collapsible tab. `kind` groups the overflow menu: predefined tabs (widgets,
-// canvas) sit above the custom views, separated by a divider.
 type TabItem = {
-  key: WorkspaceNav;
-  Icon: typeof IconMessageCircle;
+  key: WorkspaceTabId;
+  Icon: typeof IconRobotFace;
   label: string;
-  kind: "fixed" | "view";
+  closable?: boolean;
 };
 
-type OverflowTabsProps = {
-  tabs: TabItem[];
-  active: WorkspaceNav;
-  onSelect: (nav: WorkspaceNav) => void;
-  onCreateView: () => void;
+type CreateTabItem = {
+  key: string;
+  Icon: typeof IconRobotFace;
+  label: string;
+  onClick: () => void;
 };
 
-// A horizontal strip of tabs that fills its available width and folds whatever
-// doesn't fit into a trailing "…" menu, recomputing on resize. It measures each
-// tab's natural width with a hidden mirror row (container queries can't see
-// variable label widths), tracks its own width via a ResizeObserver, then shows
-// as many tabs as fit and hides the rest — rightmost first — into the menu.
-function OverflowTabs({ tabs, active, onSelect, onCreateView }: OverflowTabsProps) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const mirrorRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const menuRef = useRef<HTMLButtonElement>(null);
-  const [avail, setAvail] = useState(0);
-  const [widths, setWidths] = useState<{ items: number[]; menu: number }>({ items: [], menu: 0 });
+function CreateTabMenu({ items }: { items: CreateTabItem[] }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className={CREATE_TAB_TRIGGER_CLASS}
+            aria-label="Create tab"
+          >
+            <IconPlus stroke={1.75} />
+          </Button>
+        }
+      />
+      <DropdownMenuContent align="start" className="min-w-48">
+        <DropdownMenuGroup>
+          {items.map(({ key, Icon, label, onClick }) => (
+            <DropdownMenuItem key={key} onClick={onClick}>
+              <Icon stroke={1.75} />
+              {label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
-  // Re-measure natural widths whenever the set of tabs (or their labels) changes.
-  const sig = tabs.map((t) => `${t.key}:${t.label}`).join("|");
-  useLayoutEffect(() => {
-    setWidths({
-      items: tabs.map((_, i) => mirrorRefs.current[i]?.offsetWidth ?? 0),
-      menu: menuRef.current?.offsetWidth ?? 0,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sig]);
+type TabButtonProps = {
+  tab: TabItem;
+  active: boolean;
+  state: ReorderableRenderState;
+  onSelect: (nav: WorkspaceTabId) => void;
+  onClose: (nav: WorkspaceTabId) => void;
+};
 
-  // Track the strip's available width (it grows to fill the header's slack).
-  useLayoutEffect(() => {
-    const el = rootRef.current;
-    if (!el) return;
-    const update = () => setAvail(el.clientWidth);
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  // How many tabs fit: the "…" trigger is always reserved, then add tabs L→R
-  // while they fit. GAP mirrors the `gap-1` (4px) between buttons.
-  const visibleCount = useMemo(() => {
-    const GAP = 4;
-    if (!avail || widths.items.length !== tabs.length) return tabs.length;
-    let used = widths.menu;
-    let count = 0;
-    for (const w of widths.items) {
-      if (used + w + GAP <= avail) {
-        used += w + GAP;
-        count++;
-      } else break;
-    }
-    return count;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [avail, widths, tabs.length]);
-
-  const overflow = tabs.slice(visibleCount);
-  const overflowFixed = overflow.filter((t) => t.kind === "fixed");
-  const overflowViews = overflow.filter((t) => t.kind === "view");
-  // The "…" trigger lights up when one of the folded-away tabs is the active one.
-  const overflowActive = overflow.some((t) => t.key === active);
-
-  const menuItem = ({ key, Icon, label }: TabItem) => (
-    <DropdownMenuCheckboxItem
-      key={key}
-      checked={active === key}
-      closeOnClick
-      onClick={() => onSelect(key)}
-    >
-      <Icon stroke={1.75} />
-      {label}
-    </DropdownMenuCheckboxItem>
+function TabButton({ tab, active, state, onSelect, onClose }: TabButtonProps) {
+  const className = cn(
+    tabClass(active),
+    "min-w-0",
+    state.isDragging && "invisible",
   );
 
-  return (
-    <div ref={rootRef} className="relative flex min-w-0 flex-1 items-center gap-1">
-      {/* Hidden mirror: every tab + the menu trigger at natural width, laid out
-          but invisible and out of flow, read via the refs above. */}
-      <div
-        aria-hidden
-        className="pointer-events-none invisible absolute left-0 top-0 flex items-center gap-1"
-      >
-        {tabs.map(({ key, Icon, label }, i) => (
-          <button
-            key={key}
-            ref={(el) => {
-              mirrorRefs.current[i] = el;
-            }}
-            type="button"
-            className={tabClass(false)}
-          >
-            <Icon stroke={1.75} />
-            {label}
-          </button>
-        ))}
-        <button ref={menuRef} type="button" className={iconTabClass(false)}>
-          <IconDots stroke={1.75} />
+  if (tab.closable) {
+    return (
+      <div className={cn(className, "group/close relative overflow-hidden")}>
+        <button
+          type="button"
+          className="flex min-w-0 items-center gap-1 rounded-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          onClick={() => onSelect(tab.key)}
+          {...state.dragHandleProps}
+        >
+          <tab.Icon stroke={1.75} />
+          <span className="truncate">{tab.label}</span>
+        </button>
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-0 flex w-10 items-center justify-end rounded-r-xs bg-linear-to-l from-accent via-accent/95 via-55% to-transparent pr-1.5 opacity-0 transition-opacity duration-150 group-hover/close:opacity-100 group-focus-within/close:opacity-100"
+        />
+        <button
+          type="button"
+          aria-label={`Close ${tab.label}`}
+          className="absolute right-1.5 top-1/2 flex size-4 -translate-y-1/2 items-center justify-center rounded-xs text-muted-foreground opacity-0 transition-opacity duration-150 hover:bg-accent hover:text-accent-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 group-hover/close:opacity-100 group-focus-within/close:opacity-100"
+          onClick={() => {
+            onClose(tab.key);
+          }}
+        >
+          <IconX className="size-3!" stroke={1.75} />
         </button>
       </div>
+    );
+  }
 
-      {tabs.slice(0, visibleCount).map(({ key, Icon, label }) => (
-        <button
-          key={key}
-          type="button"
-          className={tabClass(active === key)}
-          onClick={() => onSelect(key)}
-        >
-          <Icon stroke={1.75} />
-          {label}
-        </button>
-      ))}
+  return (
+    <button
+      type="button"
+      className={className}
+      onClick={() => onSelect(tab.key)}
+      {...state.dragHandleProps}
+    >
+      <tab.Icon stroke={1.75} />
+      <span className="truncate">{tab.label}</span>
+    </button>
+  );
+}
 
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <button type="button" className={iconTabClass(overflowActive)} aria-label="More views">
-              <IconDots stroke={1.75} />
-            </button>
-          }
-        />
-        <DropdownMenuContent align="start" className="min-w-48">
-          {overflowFixed.map(menuItem)}
-          {overflowFixed.length > 0 && overflowViews.length > 0 && <DropdownMenuSeparator />}
-          {overflowViews.map(menuItem)}
-          {overflow.length > 0 && <DropdownMenuSeparator />}
-          <DropdownMenuItem onClick={onCreateView}>
-            <IconPlus stroke={1.75} />
-            Create View
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+function TabDragPreview({ tab, active }: { tab: TabItem; active: boolean }) {
+  return (
+    <div
+      className={cn(
+        tabClass(active),
+        "cursor-grabbing shadow-lg ring-1 ring-border",
+      )}
+    >
+      <tab.Icon stroke={1.75} />
+      {tab.label}
+      {tab.closable && <IconX className="size-3!" stroke={1.75} />}
     </div>
   );
 }
 
-// The workspace nav: a pinned fullscreen-chat icon, then the collapsible strip of
-// Widgets / Scratchpad / view tabs, which folds overflow into a "…" menu.
-function WorkspaceTabs({ active, onSelect, views, onCreateView }: WorkspaceTabsProps) {
-  const tabs: TabItem[] = [
-    { key: "widgets", Icon: IconLayoutGrid, label: "Widgets", kind: "fixed" },
-    { key: "canvas", Icon: IconArtboard, label: "Scratchpad", kind: "fixed" },
-    ...views.map(
-      (v): TabItem => ({ key: v.id, Icon: IconAppWindow, label: viewLabel(v), kind: "view" }),
-    ),
-  ];
-
+// The section nav: the scrollable strip of Widgets / Scratchpad / view tabs.
+function WorkspaceTabs({
+  tabs,
+  active,
+  createItems,
+  onSelect,
+  onClose,
+  onReorder,
+}: WorkspaceTabsProps) {
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-1">
-      <Tooltip delay={50}>
-        <TooltipTrigger
-          render={
-            <button
-              type="button"
-              className={cn(tabClass(active === "chat"), ICON_TAB_SQUARE, "shrink-0")}
-              onClick={() => onSelect("chat")}
-              aria-label="Open fullscreen chat"
-            >
-              <IconMessageCircle stroke={1.75} />
-            </button>
-          }
+    <div className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden">
+      <div className="flex w-max items-center gap-1">
+        <ReorderableList
+          items={tabs}
+          getId={(tab) => tab.key}
+          className="flex items-center gap-1"
+          onReorder={(ordered) => onReorder(ordered as WorkspaceTabId[])}
+          renderPlaceholder={() => (
+            <div className="pointer-events-none absolute inset-0 rounded-xs bg-muted" />
+          )}
+          renderOverlay={(tab) => (
+            <TabDragPreview tab={tab} active={active === tab.key} />
+          )}
+          renderItem={(tab, state) => (
+            <TabButton
+              tab={tab}
+              active={active === tab.key}
+              state={state}
+              onSelect={onSelect}
+              onClose={onClose}
+            />
+          )}
         />
-        <TooltipContent>Open fullscreen chat</TooltipContent>
-      </Tooltip>
-      <OverflowTabs tabs={tabs} active={active} onSelect={onSelect} onCreateView={onCreateView} />
+        <CreateTabMenu items={createItems} />
+      </div>
     </div>
+  );
+}
+
+type SectionControlsProps = {
+  mode: LayoutMode;
+  onToggleMode: () => void;
+};
+
+// Temporary layout switch: fullscreen tabbed workspace ⇄ legacy split view.
+function SectionControls({ mode, onToggleMode }: SectionControlsProps) {
+  const fullscreen = mode === "fullscreen";
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      onClick={onToggleMode}
+      aria-label={
+        fullscreen ? "Switch to split view" : "Switch to full-screen view"
+      }
+    >
+      <IconLayoutSidebarRight stroke={1.75} />
+    </Button>
   );
 }
 
@@ -425,55 +420,32 @@ function ViewApp({ view }: ViewAppProps) {
   );
 }
 
-type WidgetActionsProps = {
-  mode: WidgetMode;
-  onMode: (mode: WidgetMode) => void;
+type WorkspaceCustomizeActionProps = {
+  active: boolean;
+  onToggle: () => void;
 };
 
-// Widget controls — live in the page header (right side), always visible.
-function WidgetActions({ mode, onMode }: WidgetActionsProps) {
+function WorkspaceCustomizeAction({
+  active,
+  onToggle,
+}: WorkspaceCustomizeActionProps) {
   return (
-    <AnimatePresence mode="popLayout" initial={false}>
-      {mode !== "idle" ? (
-        <motion.div
-          key="done"
-          variants={ACTION_VARIANTS}
-          initial="from"
-          animate="to"
-          exit="from"
-          transition={{ type: "spring", duration: 0.3, bounce: 0 }}
-        >
-          <Button onClick={() => onMode("idle")}>Done</Button>
-        </motion.div>
-      ) : (
-        <motion.div
-          key="actions"
-          className="flex items-center gap-1"
-          variants={ACTION_VARIANTS}
-          initial="from"
-          animate="to"
-          exit="from"
-          transition={{ type: "spring", duration: 0.3, bounce: 0 }}
-        >
+    <Tooltip delay={50}>
+      <TooltipTrigger
+        render={
           <Button
-            variant="ghost"
-            className="h-7 text-muted-foreground @max-3xl:px-1.5! [&_svg]:size-[18px]"
-            onClick={() => onMode("customizing")}
+            variant={active ? "secondary" : "ghost"}
+            size="icon-sm"
+            aria-label="Customize"
+            aria-pressed={active}
+            onClick={onToggle}
           >
             <IconPalette stroke={1.75} />
-            <span className="@max-3xl:hidden">Customize</span>
           </Button>
-          <Button
-            variant="ghost"
-            className="h-7 text-muted-foreground @max-3xl:px-1.5! [&_svg]:size-[18px]"
-            onClick={() => onMode("editing")}
-          >
-            <IconLayoutDashboard stroke={1.75} />
-            <span className="@max-3xl:hidden">Edit widgets</span>
-          </Button>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        }
+      />
+      <TooltipContent>Customize</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -481,6 +453,81 @@ type WorkspaceViewProps = {
   widgets: WidgetInfo[];
   views: ViewInfo[];
 };
+
+type WidgetMode = "idle" | "editing" | "customizing";
+
+function normalizeTabsState(
+  tabs: WorkspaceTabsState | undefined,
+): WorkspaceTabsState {
+  if (!tabs || !Array.isArray(tabs.open)) return DEFAULT_TABS;
+  const open = tabs.open.filter(
+    (tab, index, all) => all.indexOf(tab) === index,
+  );
+  if (open.length === 0) return DEFAULT_TABS;
+  return { open, active: open.includes(tabs.active) ? tabs.active : open[0] };
+}
+
+function tabAvailable(
+  tab: WorkspaceTabId,
+  views: ViewInfo[],
+) {
+  if (tab === "agent" || tab === "widgets" || tab === "scratchpad") return true;
+  const viewId = viewIdFromTab(tab);
+  return viewId ? views.some((v) => v.id === viewId) : false;
+}
+
+function tabItemFor(
+  tab: WorkspaceTabId,
+  views: ViewInfo[],
+  closable: boolean,
+): TabItem | null {
+  if (tab === "agent") {
+    return {
+      key: tab,
+      Icon: IconRobotFace,
+      label: "Agent",
+      closable,
+    };
+  }
+  if (tab === "widgets") {
+    return {
+      key: tab,
+      Icon: IconLayoutGrid,
+      label: "Widgets",
+      closable,
+    };
+  }
+  if (tab === "scratchpad") {
+    return {
+      key: tab,
+      Icon: IconArtboard,
+      label: "Scratchpad",
+      closable,
+    };
+  }
+  const viewId = viewIdFromTab(tab);
+  const view = viewId ? views.find((v) => v.id === viewId) : null;
+  return view
+    ? {
+        key: tab,
+        Icon: IconAppWindow,
+        label: viewLabel(view),
+        closable,
+      }
+    : null;
+}
+
+function applyVisibleTabOrder(
+  open: WorkspaceTabId[],
+  visible: WorkspaceTabId[],
+  orderedVisible: WorkspaceTabId[],
+) {
+  const visibleSet = new Set(visible);
+  let cursor = 0;
+  return open.map((tab) =>
+    visibleSet.has(tab) ? orderedVisible[cursor++] : tab,
+  );
+}
 
 function WorkspaceView({ widgets, views }: WorkspaceViewProps) {
   const {
@@ -494,75 +541,192 @@ function WorkspaceView({ widgets, views }: WorkspaceViewProps) {
     switchThread,
     dismissError,
   } = useChat();
-  const { layout, setLayout, name, icon, provider } = useWorkspaceLayoutCtx();
-  const { ref: rowRef, fits: canFitSidebar } = useFitsSidebar<HTMLDivElement>();
+  const { layout, setLayout, name, icon, provider, workspaceId } =
+    useWorkspaceLayoutCtx();
+  const { ref: rowRef, fits: canUseSplit } =
+    useFitsSplitLayout<HTMLDivElement>();
   const [widgetMode, setWidgetMode] = useState<WidgetMode>("idle");
-  // Two orthogonal, transient local bits: which body is selected (a fixed tab or
-  // a view id), and whether the chat is fullscreen. Fullscreen overrides (never
-  // persists) the chat's dock position, and toggling it keeps the body beneath.
-  const [bodyTab, setBodyTab] = useState<string>("widgets");
-  const [fullscreen, setFullscreen] = useState(false);
+  const [floatingChatOpen, setFloatingChatOpen] = useState(false);
+  const [chatFocusRequest, setChatFocusRequest] = useState(0);
 
   // Theme is scoped to this wrapper, not :root — the sidebar keeps the default
   // tokens. The floating chat portals into the same element so it inherits them.
   const themeRef = useRef<HTMLDivElement>(null);
   useWorkspaceTheme(layout.theme, themeRef);
 
-  const hasWidgets = widgets.length > 0;
-  // The persisted position switch (sidebar ⇄ floating) only matters with widgets
-  // to dock beside; a solo chat is always fullscreen.
-  const canChangeChatMode = hasWidgets;
+  const tabsState = normalizeTabsState(layout.tabs);
+  const availableOpenTabs = tabsState.open.filter((tab) =>
+    tabAvailable(tab, views),
+  );
+  const effectiveOpenTabs =
+    availableOpenTabs.length > 0 ? availableOpenTabs : DEFAULT_TABS.open;
+  const openSet = new Set(tabsState.open);
+  const nonAgentOpenTabs = effectiveOpenTabs.filter((tab) => tab !== "agent");
+  const hasWorkspaceContent = nonAgentOpenTabs.length > 0;
 
-  // How the chat is shown: fullscreen (the chat view, or a solo chat), otherwise
-  // its persisted position — sidebar, or floating (also the fallback when a
-  // docked sidebar no longer fits). Fullscreen never touches the saved position.
-  const display: ChatDisplay =
-    !hasWidgets || fullscreen
-      ? "fullscreen"
-      : layout.chatMode === "floating" || !canFitSidebar
-        ? "floating"
-        : "sidebar";
+  // Effective layout mode. Split is only visible with workspace content and
+  // enough row width; the saved mode remains the user's intent.
+  const wantsSplit = layout.layoutMode === "split" && hasWorkspaceContent;
+  const mode: LayoutMode =
+    wantsSplit && canUseSplit ? "split" : "fullscreen";
+  const dockedSplit = mode === "split";
 
-  // The nav highlights whatever fills the main area.
-  const activeNav: WorkspaceNav = display === "fullscreen" ? "chat" : bodyTab;
+  const setMode = (m: LayoutMode) => {
+    if (m === "split" && tabsState.active === "agent") {
+      setLayout({
+        layoutMode: m,
+        tabs: {
+          open: tabsState.open,
+          active: nonAgentOpenTabs[0] ?? tabsState.active,
+        },
+      });
+      return;
+    }
+    setLayout({ layoutMode: m });
+  };
 
-  // Nav tabs: "chat" goes fullscreen; a body tab (widgets / canvas / view id)
-  // leaves fullscreen and shows it.
-  const selectNav = (v: WorkspaceNav) => {
-    if (v === "chat") setFullscreen(true);
-    else {
-      setBodyTab(v);
-      setFullscreen(false);
+  const visibleTabIds = dockedSplit
+    ? nonAgentOpenTabs
+    : effectiveOpenTabs;
+  const activeTab: WorkspaceTabId = visibleTabIds.includes(tabsState.active)
+    ? tabsState.active
+    : (visibleTabIds[0] ?? "agent");
+  const canCloseTabs = effectiveOpenTabs.length > 1;
+  const tabItems = visibleTabIds
+    .map((tab) => tabItemFor(tab, views, canCloseTabs))
+    .filter((tab): tab is TabItem => Boolean(tab));
+  const activeViewId = viewIdFromTab(activeTab);
+  const activeView = activeViewId
+    ? views.find((v) => v.id === activeViewId)
+    : undefined;
+
+  useEffect(() => {
+    if (mode !== "fullscreen" || activeTab === "agent") {
+      setFloatingChatOpen(false);
+    }
+  }, [activeTab, mode]);
+
+  const setTabs = (tabs: WorkspaceTabsState) => setLayout({ tabs });
+
+  const openTab = (tab: WorkspaceTabId) => {
+    const open = openSet.has(tab) ? tabsState.open : [...tabsState.open, tab];
+    setTabs({ open, active: tab });
+    if (tab === "agent") {
+      setFloatingChatOpen(false);
+      setChatFocusRequest((request) => request + 1);
     }
   };
 
-  // "Create View" is a no-op for now — views are authored by the agent via the
-  // CLI (`.moi/views/<name>.tsx` + `moi bundle`), not from the UI.
-  const createView = () => {};
-  // The active view, when a view (not a fixed tab) fills the main area.
-  const activeView = views.find((v) => v.id === bodyTab);
+  const closeTab = (tab: WorkspaceTabId) => {
+    if (!canCloseTabs || !openSet.has(tab)) return;
+    const open = tabsState.open.filter((t) => t !== tab);
+    let active = tabsState.active;
+    if (active === tab || !open.includes(active)) {
+      const visibleIndex = visibleTabIds.indexOf(tab);
+      active =
+        visibleTabIds[visibleIndex + 1] ??
+        visibleTabIds[visibleIndex - 1] ??
+        open.find((t) => tabAvailable(t, views)) ??
+        "agent";
+    }
+    setTabs({ open, active });
+  };
 
-  // If the active view's file was deleted (its bundle vanished from the list),
-  // `bodyTab` dangles — fall back to the widget grid so nothing renders blank.
-  const isViewTab = bodyTab !== "widgets" && bodyTab !== "canvas";
-  useEffect(() => {
-    if (isViewTab && !activeView) setBodyTab("widgets");
-  }, [isViewTab, activeView]);
+  const reorderTabs = (orderedVisibleTabs: WorkspaceTabId[]) => {
+    const open = applyVisibleTabOrder(
+      tabsState.open,
+      visibleTabIds,
+      orderedVisibleTabs,
+    );
+    if (open === tabsState.open) return;
+    setTabs({ open, active: tabsState.active });
+  };
 
-  // The chat-mode picker switches the display: fullscreen is the transient view;
-  // sidebar/floating persist the dock position (and leave fullscreen).
-  const handleModeChange = canChangeChatMode
-    ? (mode: ChatDisplay) => {
-        if (mode === "fullscreen") setFullscreen(true);
-        else {
-          setLayout({ chatMode: mode });
-          setFullscreen(false);
-        }
+  const openChat = (intent?: string) => {
+    if (intent !== undefined) {
+      liveStore.getState().setDraft(workspaceId, sessionId, intent);
+    }
+    if (mode === "fullscreen" && activeTab !== "agent") {
+      setFloatingChatOpen(true);
+      if (floatingChatOpen) {
+        setChatFocusRequest((request) => request + 1);
       }
-    : undefined;
+      return;
+    }
+    setChatFocusRequest((request) => request + 1);
+  };
 
-  const chatPanel = (
+  const createItems: CreateTabItem[] = [
+    ...(!dockedSplit && !openSet.has("agent")
+      ? ([
+          {
+            key: "agent",
+            Icon: IconRobotFace,
+            label: "Agent",
+            onClick: () => openTab("agent"),
+          },
+        ] satisfies CreateTabItem[])
+      : []),
+    ...(!openSet.has("widgets")
+      ? ([
+          {
+            key: "widgets",
+            Icon: IconLayoutGrid,
+            label: "Widgets",
+            onClick: () => openTab("widgets"),
+          },
+        ] satisfies CreateTabItem[])
+      : []),
+    ...(!openSet.has("scratchpad")
+      ? ([
+          {
+            key: "scratchpad",
+            Icon: IconArtboard,
+            label: "Scratchpad",
+            onClick: () => openTab("scratchpad"),
+          },
+        ] satisfies CreateTabItem[])
+      : []),
+    ...views
+      .map((v) => ({ view: v, tab: viewTabId(v.id) }))
+      .filter(({ tab }) => !openSet.has(tab))
+      .map(
+        ({ view, tab }): CreateTabItem => ({
+          key: tab,
+          Icon: IconAppWindow,
+          label: viewLabel(view),
+          onClick: () => openTab(tab),
+        }),
+      ),
+    {
+      key: "create-view",
+      Icon: IconAppWindow,
+      label: "View",
+      onClick: () => openChat("Create view"),
+    },
+  ];
+
+  const workspaceIdentity = (
+    <>
+      <img
+        src={icon ?? PROVIDER_ICON[provider ?? "claude-code"]}
+        alt=""
+        className="size-5 shrink-0 rounded-[4px]"
+      />
+      {name && (
+        <span className="text-foreground truncate text-sm font-medium">
+          {name}
+        </span>
+      )}
+      <span className="h-4 w-px shrink-0 bg-border" aria-hidden />
+    </>
+  );
+
+  // The docked split chat. Full-screen Agent uses the tabbed chat below.
+  const dockedChat = (
     <ChatPanel
+      active={mode === "split"}
+      focusRequest={chatFocusRequest}
       view={view}
       previewTurn={previewTurn}
       sessionId={sessionId}
@@ -571,10 +735,23 @@ function WorkspaceView({ widgets, views }: WorkspaceViewProps) {
       onDismissError={dismissError}
       send={send}
       stop={stop}
-      chatMode={display}
       onSwitchThread={switchThread}
-      onModeChange={handleModeChange}
-      onCollapse={() => setLayout({ chatMode: "floating" })}
+    />
+  );
+
+  const tabbedChat = (
+    <ChatPanel
+      active={mode === "fullscreen" && activeTab === "agent"}
+      focusRequest={chatFocusRequest}
+      view={view}
+      previewTurn={previewTurn}
+      sessionId={sessionId}
+      processing={processing}
+      error={error}
+      onDismissError={dismissError}
+      send={send}
+      stop={stop}
+      onSwitchThread={switchThread}
     />
   );
 
@@ -584,92 +761,120 @@ function WorkspaceView({ widgets, views }: WorkspaceViewProps) {
     // sidebar outside stays default.
     <div
       ref={themeRef}
-      className="bg-background text-foreground flex h-full min-h-0 flex-col font-sans"
+      className="bg-background text-foreground relative flex h-full min-h-0 flex-col font-sans"
     >
-      {/* One shared header always sits atop the main content area, whose body is
-          the chat (fullscreen), the widget grid, or the scratchpad per the active
-          nav. A docked chat is an extra column beside it. rowRef stays mounted so
-          the sidebar-fit measurement (full panel width) survives mode switches. */}
       <div ref={rowRef} className="flex min-h-0 flex-1">
-        <div
-          className={cn(
-            "flex min-h-0 flex-1 flex-col",
-            // Border + min width only while a chat docks beside the main area.
-            display !== "fullscreen" && "border-border min-w-[var(--column-w)] border-r",
-          )}
-        >
-          <PanelHeader>
-            <SidebarToggle />
-            <img
-              src={icon ?? PROVIDER_ICON[provider ?? "claude-code"]}
-              alt=""
-              className="size-5 shrink-0 rounded-[4px]"
-            />
-            {name && <span className="text-foreground truncate text-sm font-medium">{name}</span>}
-            {hasWidgets ? (
-              <>
-                <span className="text-muted-foreground/40 select-none text-sm">/</span>
-                {/* The tabs strip grows to fill the header's slack and measures
-                    its own width to fold overflow into the "…" menu, so it owns
-                    the spacer role here. */}
-                <WorkspaceTabs
-                  active={activeNav}
-                  onSelect={selectNav}
-                  views={views}
-                  onCreateView={createView}
-                />
-              </>
-            ) : (
-              <div className="flex-1" />
+        {/* Full-screen: whole panel. Split: the left content column. */}
+        {(mode === "fullscreen" || hasWorkspaceContent) && (
+          <div
+            className={cn(
+              "flex min-h-0 flex-1 flex-col",
+              mode === "split" && "min-w-[var(--column-w)]",
             )}
-            {activeNav === "widgets" && <WidgetActions mode={widgetMode} onMode={setWidgetMode} />}
-            <McpMenu />
-            <WorkspaceSettings />
-          </PanelHeader>
+          >
+            <PanelHeader>
+              {workspaceIdentity}
+              {/* The tabs strip grows to fill the header's slack and scrolls
+                  horizontally when there are too many tabs. */}
+              <WorkspaceTabs
+                tabs={tabItems}
+                active={activeTab}
+                createItems={createItems}
+                onSelect={openTab}
+                onClose={closeTab}
+                onReorder={reorderTabs}
+              />
+              <div className="flex items-center gap-1">
+                <WorkspaceCustomizeAction
+                  active={widgetMode === "customizing"}
+                  onToggle={() =>
+                    setWidgetMode(
+                      widgetMode === "customizing" ? "idle" : "customizing",
+                    )
+                  }
+                />
+                <McpMenu />
+                <WorkspaceSettings />
+                {hasWorkspaceContent && canUseSplit && (
+                  <SectionControls
+                    mode={mode}
+                    onToggleMode={() =>
+                      setMode(
+                        mode === "fullscreen" ? "split" : "fullscreen",
+                      )
+                    }
+                  />
+                )}
+              </div>
+            </PanelHeader>
 
-          {activeNav === "chat" ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{chatPanel}</div>
-          ) : activeNav === "widgets" ? (
-            <Widgets mode={widgetMode} widgets={widgets} />
-          ) : activeNav === "canvas" ? (
-            <Scratchpad />
-          ) : activeView ? (
-            <ViewApp view={activeView} />
-          ) : null}
-        </div>
+            {activeTab === "agent" ? (
+              tabbedChat
+            ) : activeTab === "widgets" ? (
+              <Widgets
+                editing={widgetMode === "editing"}
+                onEditingChange={(editing) =>
+                  setWidgetMode(editing ? "editing" : "idle")
+                }
+                widgets={widgets}
+                onCreateWidget={() => openChat("Create widget")}
+              />
+            ) : activeTab === "scratchpad" ? (
+              <Scratchpad />
+            ) : activeView ? (
+              <ViewApp view={activeView} />
+            ) : null}
+          </div>
+        )}
 
-        {display === "sidebar" && (
-          // Docked chat: caps at --chat-max on big screens (grow 0), shrinks down
-          // to --chat-min before the fit check flips it to floating.
-          <div className="flex min-h-0 min-w-[var(--chat-min)] flex-[0_1_var(--chat-max)] flex-col overflow-hidden">
-            <div className="flex min-h-0 w-full flex-1 flex-col">{chatPanel}</div>
+        {/* Split: Agent chat as a bounded right column. Full-screen mode uses the
+            Agent tab instead. */}
+        {mode === "split" && (
+          <div
+            className={cn(
+              "border-border flex min-h-0 min-w-[var(--chat-min)] flex-[0_1_var(--chat-max)] flex-col overflow-hidden border-l",
+            )}
+          >
+            {dockedChat}
           </div>
         )}
       </div>
 
-      {display === "floating" && (
-        <ChatPopup
-          defaultOpen={layout.chatMode === "floating" && canFitSidebar}
-          container={themeRef}
-        >
-          {(onClose) => (
-            <ChatPanel
-              view={view}
-              previewTurn={previewTurn}
-              sessionId={sessionId}
-              processing={processing}
-              error={error}
-              onDismissError={dismissError}
-              send={send}
-              stop={stop}
-              chatMode={display}
-              onSwitchThread={switchThread}
-              onModeChange={handleModeChange}
-              onClose={onClose}
-            />
-          )}
-        </ChatPopup>
-      )}
+      <AnimatePresence>
+        {widgetMode === "customizing" && <CustomizePanel />}
+      </AnimatePresence>
+
+      {mode === "fullscreen" &&
+        activeTab !== "agent" &&
+        hasWorkspaceContent && (
+          <ChatPopup
+            open={floatingChatOpen}
+            onOpenChange={setFloatingChatOpen}
+            onOpenChangeComplete={(open) => {
+              if (open) {
+                setChatFocusRequest((request) => request + 1);
+              }
+            }}
+            container={themeRef}
+          >
+            {(onClose) => (
+              <ChatPanel
+                active={floatingChatOpen}
+                focusRequest={chatFocusRequest}
+                view={view}
+                previewTurn={previewTurn}
+                sessionId={sessionId}
+                processing={processing}
+                error={error}
+                onDismissError={dismissError}
+                send={send}
+                stop={stop}
+                onSwitchThread={switchThread}
+                onClose={onClose}
+              />
+            )}
+          </ChatPopup>
+        )}
     </div>
   );
 }

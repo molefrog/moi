@@ -5,7 +5,6 @@ import { IconKey, IconSettings, IconX } from '@tabler/icons-react'
 import { Button } from '@/client/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/client/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
-import { cn } from '@/client/lib/cn'
 
 import { EnvironmentSettings, GeneralSettings } from './SettingsPages'
 
@@ -27,21 +26,20 @@ export function WorkspaceSettings() {
           render={
             <Button
               variant="ghost"
-              size="icon"
-              aria-label="Workspace settings"
-              className="size-7 text-primary [&_svg]:size-[20px]"
+              size="icon-sm"
+              aria-label="Space settings"
               onClick={() => setOpen(true)}
             >
               <IconSettings stroke={1.75} />
             </Button>
           }
         />
-        <TooltipContent>Workspace settings</TooltipContent>
+        <TooltipContent>Space settings</TooltipContent>
       </Tooltip>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="flex h-[min(680px,90vh)] w-[880px] max-w-[94vw]">
-          <DialogTitle className="sr-only">Workspace settings</DialogTitle>
+          <DialogTitle className="sr-only">Space settings</DialogTitle>
 
           {/* Sidebar nav — top padding lines the "Settings" label up with the
               page title across the divider. */}
@@ -50,20 +48,17 @@ export function WorkspaceSettings() {
               Settings
             </p>
             {NAV.map(item => (
-              <button
+              <Button
                 key={item.id}
                 type="button"
+                variant={page === item.id ? 'secondary' : 'ghost'}
+                size="sm"
                 onClick={() => setPage(item.id)}
-                className={cn(
-                  'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors [&_svg]:size-[18px]',
-                  page === item.id
-                    ? 'bg-muted text-foreground'
-                    : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
-                )}
+                className="justify-start"
               >
                 <item.icon stroke={1.75} />
                 {item.label}
-              </button>
+              </Button>
             ))}
           </nav>
 
@@ -75,7 +70,7 @@ export function WorkspaceSettings() {
                   variant="ghost"
                   size="icon"
                   aria-label="Close"
-                  className="absolute top-3 right-3 z-10 size-7 text-muted-foreground"
+                  className="absolute top-3 right-3 z-10"
                 >
                   <IconX stroke={1.5} />
                 </Button>

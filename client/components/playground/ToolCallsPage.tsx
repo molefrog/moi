@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { cn } from '@/client/lib/cn'
+import { Button } from '@/client/components/ui/button'
 import {
   FIXTURE_CWD,
   liveToolCalls,
@@ -28,19 +28,17 @@ type SegmentedProps = {
 
 function Segmented({ value, onChange }: SegmentedProps) {
   return (
-    <div className="flex gap-1 rounded-lg bg-black/[0.04] p-1">
+    <div className="flex gap-1 rounded-lg bg-accent p-1">
       {VARIANTS.map(o => (
-        <button
+        <Button
           key={o.value}
           type="button"
+          variant={value === o.value ? 'default' : 'ghost'}
+          size="sm"
           onClick={() => onChange(o.value)}
-          className={cn(
-            'rounded-md px-3 py-1 text-xs transition-colors',
-            value === o.value ? 'bg-neutral-900 text-white' : 'text-black/50 hover:text-black/80'
-          )}
         >
           {o.label}
-        </button>
+        </Button>
       ))}
     </div>
   )
@@ -60,8 +58,8 @@ export function ToolCallsPage() {
   const [variant, setVariant] = useState<Variant>('multiple')
 
   return (
-    <div className="flex min-h-dvh flex-col items-center gap-6 bg-[#f2f1ee] px-4 py-16">
-      <span className="text-[11px] font-medium tracking-widest text-black/30 uppercase">
+    <div className="flex min-h-dvh flex-col items-center gap-6 bg-muted px-4 py-16">
+      <span className="text-[11px] font-medium tracking-widest text-muted-foreground uppercase">
         Playground / Tool calls
       </span>
 

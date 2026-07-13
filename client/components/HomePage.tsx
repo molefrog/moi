@@ -1,14 +1,10 @@
 import { WorkspacesPage } from './WorkspacesPage'
-import { PanelHeader, SidebarLayout, SidebarToggle } from './layout/SidebarLayout'
+import { SidebarLayout } from './layout/SidebarLayout'
 
 // The `/` route: the app shell wrapping the workspaces view.
 export function HomePage() {
   return (
-    <SidebarLayout>
-      <PanelHeader>
-        <SidebarToggle />
-        <span className="text-sm font-medium text-foreground">Home</span>
-      </PanelHeader>
+    <SidebarLayout panel="flat">
       <div className="min-h-0 flex-1 overflow-y-auto">
         <WorkspacesPage />
       </div>

@@ -59,14 +59,14 @@ export function TimelineRow({
         ) : loading ? (
           // A spinner node stands in for the dot; bg-background carves the rule.
           <span className="absolute top-[15px] left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 rounded-full bg-background p-0.5">
-            <IconLoader2 size={10} stroke={2.75} className="animate-spin text-ring" />
+            <IconLoader2 size={12} stroke={1.75} className="animate-spin text-ring" />
           </span>
         ) : (
           // Background-colored ring carves a gap in the rule around the dot.
           <span
             className={cn(
               'absolute top-[15px] left-1/2 z-10 size-[5px] -translate-x-1/2 -translate-y-1/2 rounded-full ring-3 ring-background',
-              isError ? 'bg-red-400' : 'bg-border'
+              isError ? 'bg-destructive' : 'bg-border'
             )}
           />
         )}
@@ -90,7 +90,7 @@ export function RowChevron({ open }: { open: boolean }) {
         open ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100'
       )}
     >
-      <IconChevronRight size={12} stroke={2.2} />
+      <IconChevronRight size={12} stroke={1.75} />
     </motion.span>
   )
 }
@@ -117,7 +117,7 @@ export function NodeBox({ children, className }: { children: ReactNode; classNam
 export function IconMarker({
   icon: Icon,
   size = 12,
-  stroke = 1.5
+  stroke = 1.75
 }: {
   icon: typeof IconPackage
   size?: number

@@ -45,6 +45,7 @@ export const workspaceKeys = {
   events: (id: string, sessionId: string) => ['workspaces', 'events', id, sessionId] as const,
   threadConfig: (id: string, sessionId: string) =>
     ['workspaces', 'threadConfig', id, sessionId] as const,
+  userMcp: ['mcp', 'user'] as const,
   mcp: (id: string) => ['workspaces', 'mcp', id] as const,
   models: (id: string) => ['workspaces', 'models', id] as const,
   env: (id: string) => ['workspaces', 'env', id] as const
@@ -85,6 +86,16 @@ const WORKSPACE_RESOURCE_OPTS = {
   refetchOnMount: true,
   refetchOnWindowFocus: true
 } as const
+
+export function upsertWorkspaceEntry(
+  entries: WorkspaceEntry[] | undefined,
+  entry: WorkspaceEntry
+): WorkspaceEntry[] {
+  const current = entries ?? []
+  const existing = current.findIndex(item => item.id === entry.id || item.path === entry.path)
+  if (existing === -1) return [...current, entry]
+  return current.map((item, index) => (index === existing ? { ...item, ...entry } : item))
+}
 
 // Persisted layout + workspace metadata for a single workspace.
 export function useWorkspaceLayout(workspaceId: string) {
@@ -170,6 +181,21 @@ export function useWorkspaceMcp(workspaceId: string, enabled: boolean) {
   })
 }
 
+// MCP servers configured at user scope. Like the workspace probe, this spins up
+// a metadata-only SDK query, so cache it aggressively on the client.
+export function useUserMcp() {
+  return useQuery<McpServer[]>({
+    queryKey: workspaceKeys.userMcp,
+    queryFn: () => fetch('/api/mcp').then(r => r.json()),
+    // Match the server's shortest MCP cache window so recoverable states such
+    // as `needs-auth` can be checked again without requiring a hard reload.
+    staleTime: 30_000,
+    gcTime: Infinity,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true
+  })
+}
+
 // Models the workspace's agent backend can run (normalized across providers by
 // the server). Like MCP status, the list is stable per workspace, so it's
 // cache-first — fetched once and served from cache across navigation.
@@ -225,7 +251,7 @@ export function useSaveThreadConfig(workspaceId: string) {
   })
 }
 
-// Persist a workspace's layout (widget grid, chat mode, theme). Callers update
+// Persist a workspace's layout (widget grid, layout mode, theme). Callers update
 // the layout query cache optimistically and use this to write through to the
 // server, so it's a plain fire-and-forget PUT with no extra cache work.
 export function useSaveLayout(workspaceId: string) {
@@ -305,6 +331,9 @@ export function useSaveWorkspaceName(workspaceId: string) {
 export function useSaveWorkspaceIcon(workspaceId: string) {
   const qc = useQueryClient()
   return useMutation<{ icon: string }, Error, Blob>({
+    // Icon picks can arrive faster than image processing finishes. Sharing a
+    // scope with reset keeps every write in user-action order.
+    scope: { id: `workspace-icon:${workspaceId}` },
     mutationFn: async blob => {
       const res = await fetch(`/api/workspaces/${workspaceId}/icon`, {
         method: 'PUT',
@@ -325,6 +354,7 @@ export function useSaveWorkspaceIcon(workspaceId: string) {
 export function useResetWorkspaceIcon(workspaceId: string) {
   const qc = useQueryClient()
   return useMutation<void, Error, void>({
+    scope: { id: `workspace-icon:${workspaceId}` },
     mutationFn: async () => {
       const res = await fetch(`/api/workspaces/${workspaceId}/icon`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to reset icon')
@@ -361,7 +391,9 @@ export function useAddWorkspace() {
       return res.json()
     },
     onSuccess: (entry, suggestion) => {
-      qc.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, prev => [...(prev ?? []), entry])
+      qc.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, prev =>
+        upsertWorkspaceEntry(prev, entry)
+      )
       qc.setQueryData<DiscoveredWorkspace[]>(workspaceKeys.discover, prev =>
         (prev ?? []).filter(s => s.path !== suggestion.path)
       )
@@ -370,10 +402,12 @@ export function useAddWorkspace() {
 }
 
 // Where `/workspace/create` places new folders on disk. `displayRoot` is the
-// home-relative form (e.g. "~/moi") shown in the create form.
+// home-relative form (e.g. "~/moi") shown in the create form. `canChooseFolder`
+// is whether the server can open the native folder picker (macOS only).
 export type CreateWorkspaceInfo = {
   root: string
   displayRoot: string
+  canChooseFolder: boolean
 }
 
 export function useCreateWorkspaceInfo() {
@@ -381,6 +415,23 @@ export function useCreateWorkspaceInfo() {
     queryKey: workspaceKeys.createInfo,
     queryFn: () => fetch('/api/workspaces/create').then(r => r.json()),
     staleTime: Infinity
+  })
+}
+
+// Result of the OS-native folder picker (see POST /api/workspaces/choose-folder).
+// `canceled` is returned when the user dismisses the dialog.
+export type ChooseFolderResult = { path: string } | { canceled: true }
+
+// Open the system folder picker on the server host and resolve to the chosen
+// path. The server drives the native dialog because the browser can't hand a
+// real filesystem path to the page.
+export function useChooseFolder() {
+  return useMutation<ChooseFolderResult, Error, void>({
+    mutationFn: async () => {
+      const res = await fetch('/api/workspaces/choose-folder', { method: 'POST' })
+      if (!res.ok) throw new Error(await res.text())
+      return res.json()
+    }
   })
 }
 
@@ -409,17 +460,53 @@ export function useCreateWorkspace() {
   })
 }
 
+// Persist the shared workspace order. Both the sidebar and homepage read the
+// same `workspaceKeys.all` cache, so one optimistic update moves both surfaces.
+export function useReorderWorkspaces() {
+  const qc = useQueryClient()
+  return useMutation<WorkspaceEntry[], Error, string[], { previous?: WorkspaceEntry[] }>({
+    mutationFn: async ids => {
+      const res = await fetch('/api/workspaces/order', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids })
+      })
+      if (!res.ok) throw new Error(await res.text())
+      return res.json()
+    },
+    onMutate: async ids => {
+      await qc.cancelQueries({ queryKey: workspaceKeys.all })
+      const previous = qc.getQueryData<WorkspaceEntry[]>(workspaceKeys.all)
+      if (previous) {
+        const byId = new Map(previous.map(entry => [entry.id, entry]))
+        const ordered = ids
+          .map(id => byId.get(id))
+          .filter((entry): entry is WorkspaceEntry => !!entry)
+        if (ordered.length === previous.length) qc.setQueryData(workspaceKeys.all, ordered)
+      }
+      return { previous }
+    },
+    onError: (_error, _ids, context) => {
+      if (context?.previous) qc.setQueryData(workspaceKeys.all, context.previous)
+      qc.invalidateQueries({ queryKey: workspaceKeys.all })
+    },
+    onSuccess: entries => {
+      qc.setQueryData(workspaceKeys.all, entries)
+    }
+  })
+}
+
 // Remove a workspace from the registry (re-discovery may surface it again).
 export function useRemoveWorkspace() {
   const qc = useQueryClient()
-  return useMutation<void, Error, WorkspaceEntry>({
-    mutationFn: async entry => {
-      const res = await fetch(`/api/workspaces/${entry.id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to remove workspace')
+  return useMutation<void, Error, string>({
+    mutationFn: async workspaceId => {
+      const res = await fetch(`/api/workspaces/${workspaceId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to remove space')
     },
-    onSuccess: (_void, entry) => {
+    onSuccess: (_void, workspaceId) => {
       qc.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, prev =>
-        (prev ?? []).filter(w => w.id !== entry.id)
+        (prev ?? []).filter(workspace => workspace.id !== workspaceId)
       )
       qc.invalidateQueries({ queryKey: workspaceKeys.discover })
     }

@@ -2,20 +2,44 @@ import { useCallback, useState } from 'react'
 
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 
+import { IconPlus } from '@tabler/icons-react'
+
 import { useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
 import { findFreePosition } from '@/client/lib/grid-pack'
 import type { WidgetInfo } from '@/lib/types'
 
-import { CustomizePanel } from './CustomizePanel'
 import { HiddenPanel } from './HiddenPanel'
 import type { GridItem } from './WidgetGrid'
 import { WidgetGrid } from './WidgetGrid'
 import { WidgetShell } from './WidgetShell'
-
-export type WidgetMode = 'idle' | 'editing' | 'customizing'
+import { Button } from './ui/button'
 
 function renderItem(id: string) {
   return <WidgetShell name={id} />
+}
+
+type NoWidgetsCreatedProps = {
+  onCreateWidget: () => void
+}
+
+function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3">
+      <p className="text-sm text-muted-foreground">No widgets created yet</p>
+      <Button type="button" variant="secondary" size="sm" onClick={onCreateWidget}>
+        <IconPlus data-icon="inline-start" stroke={1.75} />
+        Create widget
+      </Button>
+    </div>
+  )
+}
+
+function NoWidgetsAdded() {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3">
+      <p className="text-sm text-muted-foreground">No widgets added yet</p>
+    </div>
+  )
 }
 
 // Tracks the rendered (border-box) height of whichever bottom panel is open, so
@@ -35,13 +59,14 @@ function usePanelHeight() {
 }
 
 type WidgetsProps = {
-  // Owned by the page (its header renders the controls); Widgets only reacts.
-  mode: WidgetMode
+  onCreateWidget: () => void
+  editing: boolean
+  onEditingChange: (editing: boolean) => void
   // Authoritative widget set from the widgets query; positions come from layout.
   widgets: WidgetInfo[]
 }
 
-export function Widgets({ mode, widgets }: WidgetsProps) {
+export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: WidgetsProps) {
   const { layout, setLayout } = useWorkspaceLayoutCtx()
 
   const gridIds = new Set(layout.widgetGrid.map(g => g.i))
@@ -58,7 +83,7 @@ export function Widgets({ mode, widgets }: WidgetsProps) {
     .map(w => ({ id: w.id, w: w.config.colSpan, h: w.config.rowSpan }))
 
   const [panelRef, panelHeight] = usePanelHeight()
-  const panelOpen = mode === 'customizing' || (mode === 'editing' && hiddenItems.length > 0)
+  const panelOpen = editing && hiddenItems.length > 0
 
   function hide(id: string) {
     setLayout({ widgetGrid: layout.widgetGrid.filter(g => g.i !== id) })
@@ -76,11 +101,7 @@ export function Widgets({ mode, widgets }: WidgetsProps) {
   }
 
   if (widgets.length === 0) {
-    return (
-      <div className="flex min-h-0 flex-1 items-center justify-center">
-        <p className="text-sm text-muted-foreground">No widgets found</p>
-      </div>
-    )
+    return <NoWidgetsCreated onCreateWidget={onCreateWidget} />
   }
 
   return (
@@ -88,32 +109,98 @@ export function Widgets({ mode, widgets }: WidgetsProps) {
     // positioning context for the bottom panel (which is anchored to this box,
     // not to the grid). The grid lives in a centered max-w container and grows
     // to its natural height.
-    <div className="relative min-h-0 flex-1">
+    <div className="group relative min-h-0 flex-1">
       <LayoutGroup>
-        <div className="h-full overflow-y-auto px-[var(--page-pad)] pt-[var(--page-pad)] pb-[calc(var(--page-pad)*2)]">
-          {/* Bottom reservation = 2× page-pad (the pb above) + the open panel's
-              height (this margin), so the last cards scroll clear of it. */}
-          <motion.div
-            className="mx-auto w-full max-w-[var(--column-w)]"
-            animate={{ marginBottom: panelOpen ? panelHeight : 0 }}
-            transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
-          >
-            <WidgetGrid
-              items={visibleItems}
-              editing={mode === 'editing'}
-              renderItem={renderItem}
-              onRemove={hide}
-              onLayoutChange={items =>
-                setLayout({
-                  widgetGrid: items.map(i => ({ i: i.id, x: i.x ?? 0, y: i.y ?? 0 }))
-                })
-              }
-            />
-          </motion.div>
+        <div className="flex h-full flex-col overflow-y-auto p-4">
+          <div className="mx-auto mb-4 flex w-full max-w-[var(--column-w)] shrink-0 items-center justify-end gap-2">
+            {editing && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="mr-auto"
+                onClick={onCreateWidget}
+              >
+                <IconPlus data-icon="inline-start" stroke={1.75} />
+                New widget
+              </Button>
+            )}
+            <AnimatePresence mode="popLayout" initial={false}>
+              {editing ? (
+                <motion.div
+                  key="done"
+                  variants={{
+                    from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
+                    to: { opacity: 1, scale: 1, filter: 'blur(0px)' }
+                  }}
+                  initial="from"
+                  animate="to"
+                  exit="from"
+                  transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+                >
+                  <Button type="button" size="sm" onClick={() => onEditingChange(false)}>
+                    Done
+                  </Button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="actions"
+                  className="flex items-center gap-1"
+                  variants={{
+                    from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
+                    to: { opacity: 1, scale: 1, filter: 'blur(0px)' }
+                  }}
+                  initial="from"
+                  animate="to"
+                  exit="from"
+                  transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+                >
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground group-hover:opacity-100 [@media(hover:hover)]:opacity-0"
+                    onClick={() => onEditingChange(true)}
+                  >
+                    Edit widgets
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+          {visibleItems.length === 0 ? (
+            <motion.div
+              className="mx-auto flex min-h-0 w-full max-w-[var(--column-w)] flex-1 flex-col"
+              animate={{ paddingBottom: panelOpen ? panelHeight : 0 }}
+              transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+            >
+              <NoWidgetsAdded />
+            </motion.div>
+          ) : (
+            // The open panel's height is reserved below the grid so every card
+            // can scroll clear of the panel.
+            <motion.div
+              className="mx-auto w-full max-w-[var(--column-w)]"
+              animate={{ marginBottom: panelOpen ? panelHeight : 0 }}
+              transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+            >
+              <WidgetGrid
+                items={visibleItems}
+                editing={editing}
+                renderItem={renderItem}
+                onRemove={hide}
+                onLayoutChange={items =>
+                  setLayout({
+                    widgetGrid: items.map(i => ({ i: i.id, x: i.x ?? 0, y: i.y ?? 0 }))
+                  })
+                }
+              />
+            </motion.div>
+          )}
         </div>
 
         <AnimatePresence>
-          {mode === 'editing' && hiddenItems.length > 0 && (
+          {editing && hiddenItems.length > 0 && (
             <HiddenPanel
               ref={panelRef}
               items={hiddenItems}
@@ -121,10 +208,6 @@ export function Widgets({ mode, widgets }: WidgetsProps) {
               onRestore={restore}
             />
           )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {mode === 'customizing' && <CustomizePanel ref={panelRef} />}
         </AnimatePresence>
       </LayoutGroup>
     </div>

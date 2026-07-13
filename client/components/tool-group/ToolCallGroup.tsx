@@ -113,7 +113,7 @@ function ToolRow({ isFirst, isLast, call, leading, marker, name, brief, preview 
           {/* Dotted rows spin at the node instead; only icon (MCP) rows, whose
               node can't spin, keep a header spinner. */}
           {isRunning && marker && (
-            <IconLoader2 size={12} stroke={1.5} className="shrink-0 animate-spin text-ring" />
+            <IconLoader2 size={12} stroke={1.75} className="shrink-0 animate-spin text-ring" />
           )}
           {hasBody && <RowChevron open={open} />}
         </button>
@@ -181,7 +181,7 @@ function ToolCallCard({ call, cwd, isFirst, isLast }: ToolCallCardProps) {
         isFirst={isFirst}
         isLast={isLast}
         call={call}
-        marker={succeeded ? <IconMarker icon={IconPackage} size={14} stroke={1.75} /> : undefined}
+        marker={succeeded ? <IconMarker icon={IconPackage} size={16} stroke={1.75} /> : undefined}
         name="Loading Skill"
         brief={call.skill.skillName}
       />

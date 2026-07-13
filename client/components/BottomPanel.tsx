@@ -14,7 +14,7 @@ export function BottomPanel({ title, children, ref }: BottomPanelProps) {
   return (
     <motion.div
       ref={ref}
-      className="absolute inset-x-6 bottom-0 z-20 flex max-h-[60vh] flex-col rounded-t-2xl bg-white p-[var(--page-pad)] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04),inset_0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_4px_16px_-4px_rgba(0,0,0,0.06)]"
+      className="absolute inset-x-6 bottom-0 z-20 flex max-h-[60vh] flex-col rounded-t-2xl bg-card p-[var(--page-pad)] text-card-foreground shadow-xl"
       variants={{
         hidden: { opacity: 0, y: 40, filter: 'blur(4px)' },
         visible: { opacity: 1, y: 0, filter: 'blur(0px)' }

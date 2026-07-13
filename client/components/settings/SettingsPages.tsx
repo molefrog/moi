@@ -1,8 +1,9 @@
 import { type ReactNode, useState } from 'react'
 
 import { IconLoader2, IconPlus, IconTrash } from '@tabler/icons-react'
+import { useLocation } from 'wouter'
 
-import { useSaveWorkspaceName } from '@/client/api/workspaces'
+import { useRemoveWorkspace, useSaveWorkspaceName } from '@/client/api/workspaces'
 import { useEnvVars } from '@/client/hooks/useEnvVars'
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
@@ -42,7 +43,7 @@ function SettingsSection({ label, children }: SettingsSectionProps) {
   return (
     <section className="flex flex-col gap-2">
       {label && <p className="px-0.5 text-xs font-medium text-muted-foreground">{label}</p>}
-      <div className="flex flex-col divide-y divide-dashed divide-border overflow-hidden rounded-lg border border-border bg-card">
+      <div className="flex flex-col divide-y divide-dashed divide-border overflow-hidden rounded-lg border border-border bg-card text-card-foreground">
         {children}
       </div>
     </section>
@@ -70,8 +71,10 @@ function SettingsRow({ title, description, control }: SettingsRowProps) {
 // ── General ─────────────────────────────────────────────────────────────────
 
 export function GeneralSettings() {
-  const { name, icon, workspaceId } = useWorkspaceLayoutCtx()
+  const { name, icon, cwd, workspaceId } = useWorkspaceLayoutCtx()
+  const [, navigate] = useLocation()
   const saveName = useSaveWorkspaceName(workspaceId)
+  const removeWorkspace = useRemoveWorkspace()
   const [draft, setDraft] = useState(name ?? '')
 
   // Persist on blur (or Enter): an empty value clears the override so the name
@@ -82,12 +85,19 @@ export function GeneralSettings() {
     saveName.mutate(next === '' ? null : next)
   }
 
+  const remove = () => {
+    const label = name ?? cwd ?? 'this space'
+    const message = `Remove "${label}" from your spaces?\n\nThis only removes it from your list. The folder and its sessions stay on disk. You can add it back any time.`
+    if (!window.confirm(message)) return
+    removeWorkspace.mutate(workspaceId, { onSuccess: () => navigate('/') })
+  }
+
   return (
-    <SettingsPage title="General" description="Basic details for this workspace.">
+    <SettingsPage title="General" description="Basic details for this space.">
       <SettingsSection>
         <SettingsRow
           title="Name"
-          description="Shown in the sidebar and the workspace header."
+          description="Shown in the sidebar and the space header."
           control={
             <Input
               value={draft}
@@ -96,7 +106,7 @@ export function GeneralSettings() {
               onKeyDown={e => {
                 if (e.key === 'Enter') e.currentTarget.blur()
               }}
-              placeholder="Workspace name"
+              placeholder="Space name"
               className="w-56"
             />
           }
@@ -110,6 +120,30 @@ export function GeneralSettings() {
           </div>
           <IconPicker icon={icon} />
         </div>
+      </SettingsSection>
+
+      <SettingsSection label="Danger zone">
+        <SettingsRow
+          title="Remove space"
+          description="Remove this space from Moi. Its folder and sessions stay on disk."
+          control={
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={remove}
+              disabled={removeWorkspace.isPending}
+            >
+              {removeWorkspace.isPending && (
+                <IconLoader2 data-icon="inline-start" stroke={1.75} className="animate-spin" />
+              )}
+              Remove
+            </Button>
+          }
+        />
+        {removeWorkspace.isError && (
+          <p className="px-3.5 py-3 text-xs text-destructive">{removeWorkspace.error.message}</p>
+        )}
       </SettingsSection>
     </SettingsPage>
   )
@@ -189,15 +223,17 @@ export function EnvironmentSettings() {
                 {!editable && (
                   <span className="text-right text-[11px] text-muted-foreground/60">from file</span>
                 )}
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-sm"
                   onClick={() => update.mutate({ remove: [v.key] })}
                   disabled={!editable}
                   aria-label={`Delete ${v.key}`}
-                  className="text-muted-foreground/50 transition-colors not-disabled:hover:text-foreground disabled:invisible [&_svg]:size-4"
+                  className="disabled:invisible"
                 >
-                  <IconTrash stroke={1.5} />
-                </button>
+                  <IconTrash stroke={1.75} />
+                </Button>
               </div>
             )
           })
@@ -222,9 +258,9 @@ export function EnvironmentSettings() {
             placeholder="value"
             className="h-7 flex-1 text-xs"
           />
-          <Button variant="outline" size="sm" className="h-7" onClick={addVar} disabled={!canAdd}>
+          <Button variant="outline" size="sm" onClick={addVar} disabled={!canAdd}>
             {update.isPending ? (
-              <IconLoader2 className="animate-spin" />
+              <IconLoader2 stroke={1.75} className="animate-spin" />
             ) : (
               <IconPlus stroke={1.75} />
             )}
@@ -238,8 +274,8 @@ export function EnvironmentSettings() {
           title="Inherit .env files"
           description={
             dotenvFiles > 0
-              ? `Discovered ${fileCount} ${fileCount === 1 ? 'key' : 'keys'} across ${dotenvFiles} ${dotenvFiles === 1 ? 'file' : 'files'} in this workspace.`
-              : 'No .env files found in this workspace.'
+              ? `Discovered ${fileCount} ${fileCount === 1 ? 'key' : 'keys'} across ${dotenvFiles} ${dotenvFiles === 1 ? 'file' : 'files'} in this space.`
+              : 'No .env files found in this space.'
           }
           control={
             <Switch

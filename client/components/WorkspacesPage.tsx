@@ -1,59 +1,27 @@
-import { IconDots, IconLoader2, IconPlus, IconTrash } from '@tabler/icons-react'
+import { IconChevronRight, IconFolders, IconLoader2, IconPlus } from '@tabler/icons-react'
 
-import {
-  useAddWorkspace,
-  useDiscoveredWorkspaces,
-  useRemoveWorkspace,
-  useWorkspaces
-} from '@/client/api/workspaces'
-import claudeIcon from '@/client/assets/claude.svg'
-import hermesIcon from '@/client/assets/hermes-nous.png'
-import openclawIcon from '@/client/assets/openclaw.svg'
+import { useAddWorkspace, useDiscoveredWorkspaces, useWorkspaces } from '@/client/api/workspaces'
 import { Button } from '@/client/components/ui/button'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/client/components/ui/dropdown-menu'
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger
+} from '@/client/components/ui/collapsible'
 import { cn } from '@/client/lib/cn'
-import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
+import { useUiStore } from '@/client/store/ui'
+import type { DiscoveredWorkspace, WorkspaceEntry } from '@/lib/types'
 
+import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
+import { LedLogo } from './playground/LedLogo'
 import { WorkspacePreview } from './WorkspacePreview'
-
-export const typeIconSrc: Record<WorkspaceType, string> = {
-  'claude-code': claudeIcon,
-  openclaw: openclawIcon,
-  hermes: hermesIcon
-}
-
-export const typeLabel: Record<WorkspaceType, string> = {
-  'claude-code': 'Claude Code',
-  openclaw: 'OpenClaw',
-  hermes: 'Hermes'
-}
-
-type TypeIconProps = {
-  type: WorkspaceType
-  className?: string
-}
-
-export function TypeIcon({ type, className }: TypeIconProps) {
-  return (
-    <img
-      src={typeIconSrc[type]}
-      alt=""
-      aria-label={typeLabel[type]}
-      className={cn('size-4 shrink-0', className)}
-    />
-  )
-}
+import { TypeIcon } from './workspace-type'
 
 export function WorkspacesPage() {
   const workspacesQuery = useWorkspaces()
   const discoveredQuery = useDiscoveredWorkspaces()
   const importMutation = useAddWorkspace()
-  const removeMutation = useRemoveWorkspace()
+  const discoveredWorkspacesOpen = useUiStore(state => state.discoveredWorkspacesOpen)
+  const setDiscoveredWorkspacesOpen = useUiStore(state => state.setDiscoveredWorkspacesOpen)
 
   if (workspacesQuery.isPending || discoveredQuery.isPending) {
     return (
@@ -66,7 +34,7 @@ export function WorkspacesPage() {
   if (workspacesQuery.isError || discoveredQuery.isError) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <p className="text-sm text-muted-foreground">Could not load workspaces.</p>
+        <p className="text-sm text-muted-foreground">Could not load spaces.</p>
       </div>
     )
   }
@@ -79,45 +47,84 @@ export function WorkspacesPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-8 pt-14 pb-16">
+      <div className="mb-8 flex items-center">
+        <LedLogo sprite="moi-full" pixelSize={4} gap={1} />
+      </div>
+
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h1 className="text-sm font-medium text-foreground">My spaces</h1>
+        <CreateWorkspaceDialog
+          trigger={
+            <Button variant="outline" size="sm">
+              <IconPlus stroke={1.75} />
+              New
+            </Button>
+          }
+        />
+      </div>
+
       {count > 0 && (
-        <div className="mb-10 grid grid-cols-2 gap-3">
+        <div className="mb-10 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
           {workspaces.map(ws => (
-            <WorkspaceCard
-              key={ws.id}
-              workspace={ws}
-              onRemove={entry => removeMutation.mutate(entry)}
-            />
+            <WorkspaceCard key={ws.id} workspace={ws} />
           ))}
         </div>
       )}
 
-      {count === 0 && discovered.length === 0 && (
-        <p className="mb-10 text-sm text-muted-foreground">
-          No workspaces yet. Run{' '}
-          <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">moi init</code> in a
-          project directory.
-        </p>
+      {count === 0 && (
+        <div className="mb-10 flex flex-col items-center gap-4 rounded-xl border border-dashed border-border px-8 py-16 text-center">
+          <IconFolders size={24} stroke={1.5} className="text-muted-foreground/70" />
+          <div className="flex flex-col gap-1.5">
+            <h2 className="text-sm font-semibold text-foreground">No spaces yet</h2>
+            <p className="mx-auto max-w-md text-sm text-muted-foreground">
+              Initialize moi in any folder on your computer with{' '}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">moi init</code>, or
+              add an existing folder where you&rsquo;ve worked with other agents.
+            </p>
+          </div>
+        </div>
       )}
 
       {discovered.length > 0 && (
         <section>
-          <div className="mb-4">
-            <h2 className="mb-1.5 text-sm font-semibold text-foreground">Found on your machine</h2>
-            <p className="text-xs text-muted-foreground">Discovered via Claude Code and OpenClaw</p>
-          </div>
-          <ul className="border-t border-border">
-            {discovered.map(item => (
-              <SuggestedRow
-                key={item.path}
-                suggestion={item}
-                onAdd={s => importMutation.mutate(s)}
-                loading={importingPath === item.path}
+          <Collapsible
+            open={discoveredWorkspacesOpen}
+            onOpenChange={setDiscoveredWorkspacesOpen}
+            className="group"
+          >
+            <CollapsibleTrigger
+              className={cn(
+                'group/trigger',
+                'flex w-full items-center gap-1 pb-4 text-left outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                'text-muted-foreground group-data-open:text-foreground hover:text-foreground'
+              )}
+            >
+              <span className="text-sm font-medium">Import from this computer</span>
+              <IconChevronRight
+                size={16}
+                stroke={2}
+                className={cn(
+                  'opacity-0 transition-[opacity,transform]',
+                  'group-hover/trigger:opacity-100 group-focus-visible/trigger:opacity-100 group-data-open:rotate-90'
+                )}
               />
-            ))}
-          </ul>
-          {importMutation.isError && (
-            <p className="mt-3 text-xs text-destructive">{importMutation.error.message}</p>
-          )}
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <ul className="border-t border-border">
+                {discovered.map(item => (
+                  <SuggestedRow
+                    key={item.path}
+                    suggestion={item}
+                    onAdd={s => importMutation.mutate(s)}
+                    loading={importingPath === item.path}
+                  />
+                ))}
+              </ul>
+              {importMutation.isError && (
+                <p className="mt-3 text-xs text-destructive">{importMutation.error.message}</p>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
         </section>
       )}
     </div>
@@ -126,70 +133,30 @@ export function WorkspacesPage() {
 
 type WorkspaceCardProps = {
   workspace: WorkspaceEntry
-  onRemove: (workspace: WorkspaceEntry) => void
 }
 
-function WorkspaceCard({ workspace, onRemove }: WorkspaceCardProps) {
+function WorkspaceCard({ workspace }: WorkspaceCardProps) {
   const name = displayName(workspace)
   const meta = formatAddedAt(workspace.addedAt)
-
-  function handleRemove() {
-    const message = `Remove "${name}" from your workspaces?\n\nThis only removes it from your list. The folder and its sessions stay on disk — you can add it back any time.`
-    if (window.confirm(message)) onRemove(workspace)
-  }
 
   return (
     <a
       href={`/workspace/${workspace.id}`}
       className={cn(
-        'group flex gap-3.5 rounded-xl border border-border bg-card p-2 hover:bg-muted/40',
+        'group flex min-w-0 flex-col gap-4 rounded-xl border border-border bg-card p-2 hover:shadow-sm',
         'transition-colors'
       )}
     >
       <WorkspacePreview workspaceId={workspace.id} />
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5 py-1 pr-2 pl-1">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <TypeIcon type={workspace.type ?? 'claude-code'} />
-            <span className="truncate text-sm font-semibold text-foreground">{name}</span>
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={e => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                  }}
-                  className="-mt-0.5 -mr-1 text-muted-foreground"
-                  aria-label="More actions"
-                >
-                  <IconDots stroke={1.5} />
-                </Button>
-              }
-            />
-            <DropdownMenuContent align="end" sideOffset={4} className="min-w-40">
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={e => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  handleRemove()
-                }}
-              >
-                <IconTrash stroke={1.5} />
-                Remove
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+      <div className="flex min-w-0 flex-col px-2 pb-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <TypeIcon type={workspace.type ?? 'claude-code'} />
+          <span className="truncate text-sm font-medium text-foreground">{name}</span>
         </div>
-        <div title={workspace.path} className="truncate font-mono text-xs text-muted-foreground">
+        <div title={workspace.path} className="mt-2 truncate text-xs text-muted-foreground">
           {workspace.displayPath ?? workspace.path}
         </div>
-        <div className="flex-1" />
-        <div className="text-xs text-muted-foreground">{meta}</div>
+        <div className="mt-1 text-xs text-muted-foreground">{meta}</div>
       </div>
     </a>
   )
@@ -205,20 +172,17 @@ function SuggestedRow({ suggestion, onAdd, loading }: SuggestedRowProps) {
   const { path, type } = suggestion
   const name = displayName(suggestion)
   return (
-    <li className="flex items-center gap-3 border-b border-border px-1 py-2.5">
-      <TypeIcon type={type} className="opacity-70" />
-      <span className="shrink-0 text-sm font-medium text-foreground/80">{name}</span>
-      <span
-        title={path}
-        className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground"
-      >
+    <li className="flex items-center gap-2 border-b border-border px-1 py-3">
+      <TypeIcon type={type} />
+      <span className="shrink-0 text-sm font-medium text-foreground">{name}</span>
+      <span title={path} className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
         {suggestion.displayPath ?? path}
       </span>
       <Button variant="outline" size="sm" onClick={() => onAdd(suggestion)} disabled={loading}>
         {loading ? (
-          <IconLoader2 stroke={1.5} className="animate-spin" />
+          <IconLoader2 stroke={1.75} className="animate-spin" />
         ) : (
-          <IconPlus stroke={1.5} />
+          <IconPlus stroke={1.75} />
         )}
         Add
       </Button>

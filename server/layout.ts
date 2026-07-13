@@ -1,12 +1,42 @@
 import { readdir } from 'node:fs/promises'
 import { join } from 'path'
 
-import type { WidgetConfig, WorkspaceLayout, WorkspacePreview } from '@/lib/types'
+import type { WidgetConfig, WorkspaceLayout, WorkspacePreview, WorkspaceTabId } from '@/lib/types'
 
 const DEFAULT: WorkspaceLayout = {
   version: 1,
   widgetGrid: [],
-  chatMode: 'sidebar'
+  layoutMode: 'fullscreen',
+  tabs: { open: ['agent'], active: 'agent' }
+}
+
+function isTabId(value: unknown): value is WorkspaceTabId {
+  return (
+    value === 'agent' ||
+    value === 'widgets' ||
+    value === 'scratchpad' ||
+    (typeof value === 'string' && /^view:.+/.test(value))
+  )
+}
+
+function normalizeTabs(value: unknown): WorkspaceLayout['tabs'] {
+  if (!value || typeof value !== 'object') return { ...DEFAULT.tabs, open: [...DEFAULT.tabs.open] }
+  const raw = value as Record<string, unknown>
+  const open = Array.isArray(raw.open)
+    ? raw.open.filter(isTabId).filter((tab, index, all) => all.indexOf(tab) === index)
+    : []
+  if (open.length === 0) return { ...DEFAULT.tabs, open: [...DEFAULT.tabs.open] }
+  const active = isTabId(raw.active) && open.includes(raw.active) ? raw.active : open[0]
+  return { open, active }
+}
+
+function normalizeLayout(parsed: Record<string, unknown>): WorkspaceLayout {
+  const layout = { ...DEFAULT, ...parsed } as Record<string, unknown>
+  if (layout.layoutMode !== 'split') layout.layoutMode = 'fullscreen'
+  layout.tabs = normalizeTabs(layout.tabs)
+  delete layout.sectionMode
+  delete layout.chatMode
+  return layout as unknown as WorkspaceLayout
 }
 
 const DEFAULT_WIDGET_CONFIG: WidgetConfig = { rowSpan: 1, colSpan: 2 }
@@ -21,7 +51,7 @@ export async function loadLayout(workspacePath: string): Promise<WorkspaceLayout
   try {
     const text = await Bun.file(getLayoutPath(workspacePath)).text()
     const parsed = JSON.parse(text)
-    if (parsed?.version === 1) return parsed as WorkspaceLayout
+    if (parsed?.version === 1) return normalizeLayout(parsed)
   } catch {}
   return { ...DEFAULT }
 }
@@ -32,10 +62,11 @@ export async function saveLayout(layout: WorkspaceLayout, workspacePath: string)
 
 // Merge a client-submitted layout over the stored one for persistence.
 //
-// Everything (grid, chat mode, theme, AND identity) shares one `.workspace.json`,
-// but the grid editor and `moi config` own different fields. The client's layout
-// PUT is authoritative for the editor fields (widgetGrid, chatMode, theme,
-// selectedModel) — but it strips `name` and round-trips a possibly-stale `icon`.
+// Everything (grid, layout mode, theme, AND identity) shares one
+// `.workspace.json`, but the grid editor and `moi config` own different fields.
+// The client's layout PUT is authoritative for the editor fields (widgetGrid,
+// layoutMode, theme, selectedModel) — but it strips `name` and round-trips a
+// possibly-stale `icon`.
 // A blind overwrite therefore erases a `moi config`-set name (and could revert an
 // icon). So drop whatever identity the body carries and re-apply the server-owned
 // `name`/`icon` from `existing` — conditionally, so an absent field never

@@ -13,11 +13,12 @@ import type { WorkspaceLayout, WorkspaceType } from '@/lib/types'
 const DEFAULT_LAYOUT: WorkspaceLayout = {
   version: 1,
   widgetGrid: [],
-  chatMode: 'sidebar'
+  layoutMode: 'fullscreen',
+  tabs: { open: ['agent'], active: 'agent' }
 }
 
 type WorkspaceLayoutContextValue = {
-  // The persisted layout (widget grid, chat mode, theme). Falls back to an
+  // The persisted layout (widget grid, layout mode, theme). Falls back to an
   // empty default while the query is still loading.
   layout: WorkspaceLayout
   // Merge a partial update into the layout: updates the query cache immediately

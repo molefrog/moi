@@ -16,7 +16,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
   const isEmpty = query.data !== undefined && !hasItems
 
   return (
-    <div className="flex size-24 shrink-0 items-center justify-center rounded-lg bg-muted p-2">
+    <div className="flex aspect-video w-full items-center justify-center rounded-sm bg-muted p-3">
       {hasItems && (
         <svg
           viewBox={`0 0 ${cols} ${rows}`}

@@ -1,0 +1,238 @@
+import { type ReactNode, useState } from 'react'
+
+import { IconX } from '@tabler/icons-react'
+import { useLocation } from 'wouter'
+
+import {
+  useAddWorkspace,
+  useChooseFolder,
+  useCreateWorkspace,
+  useCreateWorkspaceInfo
+} from '@/client/api/workspaces'
+import { Button } from '@/client/components/ui/button'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger
+} from '@/client/components/ui/dialog'
+import { Input } from '@/client/components/ui/input'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
+import { cn } from '@/client/lib/cn'
+import type { WorkspaceType } from '@/lib/types'
+
+import { TypeIcon, typeLabel } from './workspace-type'
+
+// Mirrors the server's validateWorkspaceFolderName (workspace-init.ts) for
+// instant feedback; the server remains the authority and re-validates.
+function folderNameError(name: string): string | null {
+  if (!name) return null // an empty field just disables the submit, no nagging
+  if (name.length > 64) return 'Folder name is too long (max 64 characters)'
+  if (!/^[A-Za-z0-9][A-Za-z0-9._ -]*$/.test(name)) {
+    return 'Use letters, numbers, dots, dashes, underscores and spaces, starting with a letter or number'
+  }
+  if (name.endsWith('.') || name.endsWith(' ')) return 'Folder name cannot end with a dot or space'
+  return null
+}
+
+type AgentOption = {
+  type: WorkspaceType
+  hint: string
+  disabled?: boolean
+}
+
+// Only Claude Code workspaces can be created from scratch for now. OpenClaw
+// workspaces belong to their agents — they arrive via discovery on the home
+// page — and Hermes has no init path yet.
+const AGENT_OPTIONS: AgentOption[] = [
+  { type: 'claude-code', hint: 'Powered by the Claude Agent SDK' },
+  {
+    type: 'openclaw',
+    hint: 'Initialize OpenClaw in the folder manually, then import it from Home',
+    disabled: true
+  },
+  { type: 'hermes', hint: 'Coming soon', disabled: true }
+]
+
+type CreateWorkspaceDialogProps = {
+  trigger: ReactNode
+}
+
+type Step = 'type' | 'name'
+
+// A two-step dialog for adding a workspace. Step one picks the agent type and
+// offers "Use existing folder" (opens the OS folder picker via the server) or
+// "Next"; step two names a brand-new folder created under the workspaces root.
+export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
+  const [, navigate] = useLocation()
+  const info = useCreateWorkspaceInfo()
+  const createMutation = useCreateWorkspace()
+  const addMutation = useAddWorkspace()
+  const chooseFolder = useChooseFolder()
+
+  const [open, setOpen] = useState(false)
+  const [step, setStep] = useState<Step>('type')
+  const [type, setType] = useState<WorkspaceType>('claude-code')
+  const [name, setName] = useState('')
+
+  const trimmed = name.trim()
+  const nameError = folderNameError(trimmed)
+  // The native folder picker is macOS-only (osascript). Elsewhere the button is
+  // disabled with a tooltip pointing to the manual `moi init` path. Default to
+  // enabled while the flag loads so mac users don't see a flicker.
+  const canChooseFolder = info.data?.canChooseFolder ?? true
+  const busy = createMutation.isPending || addMutation.isPending || chooseFolder.isPending
+  const error = createMutation.error ?? addMutation.error ?? chooseFolder.error
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next)
+    if (!next) {
+      // Reset so the dialog always reopens at step one with a clean slate.
+      setStep('type')
+      setName('')
+    }
+  }
+
+  function finish(id: string) {
+    setOpen(false)
+    navigate(`/workspace/${id}`)
+  }
+
+  async function handleUseExisting() {
+    if (busy) return
+    try {
+      const result = await chooseFolder.mutateAsync()
+      if ('canceled' in result) return
+      const entry = await addMutation.mutateAsync({ path: result.path, type })
+      finish(entry.id)
+    } catch {
+      // Surfaced via the mutation error state below.
+    }
+  }
+
+  function handleCreate() {
+    if (!trimmed || nameError || busy) return
+    createMutation.mutate({ name: trimmed, type }, { onSuccess: entry => finish(entry.id) })
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger render={trigger} />
+      <DialogContent className="w-[520px] max-w-[92vw] p-6">
+        <DialogClose
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Close"
+              className="absolute top-4 right-4"
+            >
+              <IconX stroke={1.75} />
+            </Button>
+          }
+        />
+
+        {step === 'type' ? (
+          <>
+            <DialogTitle>Create new space</DialogTitle>
+            <p className="mt-4 mb-2 text-sm font-medium text-foreground">Space type</p>
+            <div className="flex flex-col gap-2">
+              {AGENT_OPTIONS.map(option => {
+                const selected = type === option.type
+                return (
+                  <button
+                    key={option.type}
+                    type="button"
+                    disabled={option.disabled}
+                    onClick={() => setType(option.type)}
+                    aria-pressed={selected}
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg border p-3 text-left transition-colors',
+                      selected
+                        ? 'border-ring bg-muted/50 shadow-[inset_0_0_0_1px_var(--ring)]'
+                        : 'border-border hover:bg-accent',
+                      option.disabled && 'cursor-not-allowed opacity-50 hover:bg-transparent'
+                    )}
+                  >
+                    <TypeIcon type={option.type} className="size-5" />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="text-sm font-medium text-foreground">
+                        {typeLabel[option.type]}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{option.hint}</span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {error && <p className="mt-4 text-xs text-destructive">{error.message}</p>}
+
+            <div className="mt-6 flex items-center justify-end gap-2">
+              {canChooseFolder ? (
+                <Button variant="secondary" onClick={handleUseExisting} disabled={busy}>
+                  Use existing folder
+                </Button>
+              ) : (
+                <Tooltip delay={50}>
+                  <TooltipTrigger
+                    render={
+                      // aria-disabled (not the native `disabled` attr) keeps the
+                      // button hoverable so the tooltip still shows.
+                      <Button
+                        variant="secondary"
+                        aria-disabled
+                        onClick={e => e.preventDefault()}
+                        className="cursor-not-allowed opacity-50"
+                      >
+                        Use existing folder
+                      </Button>
+                    }
+                  />
+                  <TooltipContent className="max-w-64 text-center">
+                    Run <code className="font-mono">moi init</code> in the folder to add it
+                    manually.
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              <Button onClick={() => setStep('name')} disabled={busy}>
+                Next
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <DialogTitle>Name space</DialogTitle>
+            <DialogDescription className="mt-1">Keep it short and recognizable.</DialogDescription>
+
+            <div className="mt-5">
+              <Input
+                value={name}
+                onChange={e => setName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleCreate()
+                }}
+                placeholder="my-space"
+                autoFocus
+                aria-invalid={!!nameError}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {nameError && <p className="mt-2 text-xs text-destructive">{nameError}</p>}
+            </div>
+
+            {error && <p className="mt-4 text-xs text-destructive">{error.message}</p>}
+
+            <div className="mt-6 flex items-center justify-end gap-2">
+              <Button onClick={handleCreate} disabled={!trimmed || !!nameError || busy}>
+                Create new space
+              </Button>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}

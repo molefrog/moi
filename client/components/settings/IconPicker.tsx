@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import type { Icon } from '@tabler/icons-react'
 import {
@@ -16,7 +16,6 @@ import {
   IconCalendar,
   IconCamera,
   IconChartBar,
-  IconCheck,
   IconChefHat,
   IconCircleOff,
   IconCloud,
@@ -80,7 +79,6 @@ import {
 
 import { useResetWorkspaceIcon, useSaveWorkspaceIcon } from '@/client/api/workspaces'
 import { PROVIDER_ICON } from '@/client/components/layout/SidebarLayout'
-import { Button } from '@/client/components/ui/button'
 import { useWorkspaceLayoutCtx } from '@/client/lib/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
 import {
@@ -161,9 +159,8 @@ const ICON_CHOICES: { id: string; Icon: Icon }[] = [
   { id: 'chef', Icon: IconChefHat }
 ]
 
-// The staged background: a preset id (or 'shuffle'), and its gradient — null
-// means transparent. Only the rasterized result is persisted, so this state
-// lives and dies with the dialog.
+// The selected background: a preset id (or 'shuffle'), and its gradient — null
+// means transparent. Only the rasterized result is persisted.
 type IconBg = { id: string; gradient: IconGradient | null }
 
 // Force a color-emoji font: the default UI stack can fall back to monochrome
@@ -246,8 +243,8 @@ type IconPickerProps = {
 
 export function IconPicker({ icon }: IconPickerProps) {
   const { workspaceId, provider } = useWorkspaceLayoutCtx()
-  const saveIcon = useSaveWorkspaceIcon(workspaceId)
-  const resetIcon = useResetWorkspaceIcon(workspaceId)
+  const { isPending: savePending, mutateAsync: saveIcon } = useSaveWorkspaceIcon(workspaceId)
+  const { isPending: resetPending, mutate: resetIcon } = useResetWorkspaceIcon(workspaceId)
 
   const [mode, setMode] = useState<Mode>('emoji')
   const [bg, setBg] = useState<IconBg>({ id: 'sunrise', gradient: GRADIENT_PRESETS[0].gradient })
@@ -269,14 +266,7 @@ export function IconPicker({ icon }: IconPickerProps) {
 
   const selectedIcon = ICON_CHOICES.find(c => c.id === iconId)
   const onGradient = bg.gradient !== null
-
-  // Whether the current tab has a selection ready to apply.
-  const hasSelection =
-    (mode === 'emoji' && !!emoji) ||
-    (mode === 'icon' && !!selectedIcon) ||
-    (mode === 'upload' && !!uploadBlob.current)
-
-  const saving = saveIcon.isPending || resetIcon.isPending
+  const saving = savePending || resetPending
 
   const shuffle = () => {
     const gradient = randomGradient()
@@ -288,15 +278,13 @@ export function IconPicker({ icon }: IconPickerProps) {
     setError(null)
     uploadBlob.current = file
     setMode('upload')
-    setUploadPreview(prev => {
-      if (prev) URL.revokeObjectURL(prev)
-      return URL.createObjectURL(file)
-    })
+    setUploadPreview(URL.createObjectURL(file))
   }
 
-  const apply = async () => {
-    setError(null)
-    try {
+  useEffect(() => {
+    let cancelled = false
+
+    const save = async () => {
       let blob: Blob
       if (mode === 'upload') {
         if (!uploadBlob.current) return
@@ -309,14 +297,43 @@ export function IconPicker({ icon }: IconPickerProps) {
         if (!svg) return
         blob = await renderGlyphIcon(new XMLSerializer().serializeToString(svg), bg.gradient)
       }
-      await saveIcon.mutateAsync(blob)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save icon')
+
+      if (!cancelled) await saveIcon(blob)
     }
+
+    setError(null)
+    // Collapse quick swatch/emoji changes before rasterizing. Requests that have
+    // already started are serialized by the shared mutation scope in the API
+    // hooks, so an older image can never overwrite the final choice.
+    const timer = window.setTimeout(() => {
+      void save().catch(err => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to save icon')
+      })
+    }, 150)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [bg.gradient, emoji, mode, saveIcon, selectedIcon, uploadPreview])
+
+  useEffect(() => {
+    return () => {
+      if (uploadPreview) URL.revokeObjectURL(uploadPreview)
+    }
+  }, [uploadPreview])
+
+  const reset = () => {
+    uploadBlob.current = null
+    setEmoji(null)
+    setIconId(null)
+    setUploadPreview(null)
+    setError(null)
+    resetIcon()
   }
 
-  // The live preview reflects the pending selection, falling back to the saved
-  // icon (or provider default) when nothing is staged on the current tab.
+  // The live preview reflects the current selection, falling back to the saved
+  // icon (or provider default) when the current tab has no selection.
   const previewKind: 'emoji' | 'glyph' | 'image' =
     mode === 'emoji' && emoji ? 'emoji' : mode === 'icon' && selectedIcon ? 'glyph' : 'image'
   const previewImage =
@@ -330,7 +347,7 @@ export function IconPicker({ icon }: IconPickerProps) {
       <div className="flex w-24 shrink-0 flex-col items-center gap-2.5">
         <div
           className={cn(
-            'flex size-24 items-center justify-center overflow-hidden rounded-[24px] shadow-sm ring-1 ring-foreground/10',
+            'flex size-24 items-center justify-center overflow-hidden rounded-[24px] shadow-sm ring-1 ring-border',
             // Checkerboard hints at transparency when no background is chosen.
             previewKind !== 'image' &&
               !onGradient &&
@@ -352,7 +369,7 @@ export function IconPicker({ icon }: IconPickerProps) {
             </span>
           ) : previewKind === 'glyph' && selectedIcon ? (
             <selectedIcon.Icon
-              stroke={1.75}
+              stroke={1.5}
               className={cn(onGradient ? 'size-14 text-white' : 'size-18 text-foreground')}
             />
           ) : (
@@ -361,7 +378,7 @@ export function IconPicker({ icon }: IconPickerProps) {
         </div>
         <button
           type="button"
-          onClick={() => resetIcon.mutate()}
+          onClick={reset}
           disabled={saving}
           className="text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
         >
@@ -408,10 +425,10 @@ export function IconPicker({ icon }: IconPickerProps) {
                 'flex size-7 items-center justify-center rounded-full bg-muted ring-offset-2 ring-offset-card transition-shadow',
                 bg.id === 'none'
                   ? 'ring-2 ring-primary'
-                  : 'ring-1 ring-border hover:ring-foreground/30'
+                  : 'ring-1 ring-border hover:ring-muted-foreground/30'
               )}
             >
-              <IconCircleOff size={14} stroke={1.75} className="text-muted-foreground" />
+              <IconCircleOff size={16} stroke={1.75} className="text-muted-foreground" />
             </button>
             {GRADIENT_PRESETS.map(preset => (
               <button
@@ -426,7 +443,7 @@ export function IconPicker({ icon }: IconPickerProps) {
                   'size-7 rounded-full ring-offset-2 ring-offset-card transition-shadow',
                   bg.id === preset.id
                     ? 'ring-2 ring-primary'
-                    : 'hover:ring-2 hover:ring-foreground/25'
+                    : 'hover:ring-2 hover:ring-muted-foreground/30'
                 )}
               />
             ))}
@@ -441,10 +458,10 @@ export function IconPicker({ icon }: IconPickerProps) {
                 shuffled ? 'text-white' : 'bg-muted text-muted-foreground ring-1 ring-border',
                 bg.id === 'shuffle'
                   ? 'ring-2 ring-primary'
-                  : 'hover:ring-2 hover:ring-foreground/25'
+                  : 'hover:ring-2 hover:ring-muted-foreground/30'
               )}
             >
-              <IconArrowsShuffle size={14} stroke={2} />
+              <IconArrowsShuffle size={16} stroke={1.75} />
             </button>
           </div>
         </div>
@@ -465,7 +482,7 @@ export function IconPicker({ icon }: IconPickerProps) {
                 onChange={e => setEmojiSearch(e.target.value)}
                 className="h-8 min-w-0 flex-1 appearance-none rounded-md bg-muted px-2.5 text-sm outline-none placeholder:text-muted-foreground"
               />
-              <EmojiPicker.SkinToneSelector className="size-8 shrink-0 rounded-md text-lg hover:bg-muted" />
+              <EmojiPicker.SkinToneSelector className="size-8 shrink-0 rounded-md text-lg hover:bg-accent" />
             </div>
             <EmojiPicker.Viewport className="relative scrollbar-thin flex-1 overflow-y-auto outline-none">
               <EmojiPicker.Loading className="absolute inset-0 flex items-center justify-center gap-2 text-xs text-muted-foreground">
@@ -491,7 +508,7 @@ export function IconPicker({ icon }: IconPickerProps) {
                         className={cn(
                           'flex size-9 items-center justify-center rounded-lg text-[22px] transition-colors duration-75',
                           EMOJI_FONT,
-                          emoji === e ? 'bg-primary/10' : 'hover:bg-muted'
+                          emoji === e ? 'bg-primary/10' : 'hover:bg-accent'
                         )}
                       >
                         {e}
@@ -526,10 +543,10 @@ export function IconPicker({ icon }: IconPickerProps) {
                   'flex aspect-square items-center justify-center rounded-lg text-muted-foreground transition-colors [&_svg]:size-5',
                   iconId === id
                     ? 'bg-primary/10 text-primary'
-                    : 'hover:bg-muted hover:text-foreground'
+                    : 'hover:bg-accent hover:text-accent-foreground'
                 )}
               >
-                <Icon stroke={1.75} />
+                <Icon stroke={1.5} />
               </button>
             ))}
           </div>
@@ -552,21 +569,21 @@ export function IconPicker({ icon }: IconPickerProps) {
               'flex h-72 flex-col items-center justify-center gap-2 rounded-lg border border-dashed transition-colors',
               dragOver
                 ? 'border-primary bg-primary/5 text-primary'
-                : 'border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground'
+                : 'border-border text-muted-foreground hover:border-muted-foreground/30 hover:text-foreground'
             )}
           >
-            <IconUpload size={22} stroke={1.5} />
+            <IconUpload size={24} stroke={1.5} />
             <span className="text-xs font-medium">Click or drop an image</span>
             <span className="text-[11px] text-muted-foreground/70">PNG, JPG, GIF, or WebP</span>
           </button>
         )}
 
-        <div className="flex items-center justify-between gap-3">
-          <p className={cn('text-xs text-destructive', !error && 'invisible')}>{error}</p>
-          <Button size="sm" onClick={apply} disabled={!hasSelection || saving}>
-            {saving ? <IconLoader2 className="animate-spin" /> : <IconCheck stroke={1.75} />}
-            Apply icon
-          </Button>
+        <div className="min-h-4" aria-live="polite">
+          {error ? (
+            <p className="text-xs text-destructive">{error}</p>
+          ) : saving ? (
+            <p className="text-xs text-muted-foreground">Saving…</p>
+          ) : null}
         </div>
       </div>
 
@@ -583,7 +600,7 @@ export function IconPicker({ icon }: IconPickerProps) {
         }}
       />
       <span ref={glyphRef} aria-hidden className="hidden">
-        {selectedIcon && <selectedIcon.Icon stroke={1.75} />}
+        {selectedIcon && <selectedIcon.Icon stroke={1.5} />}
       </span>
     </div>
   )
