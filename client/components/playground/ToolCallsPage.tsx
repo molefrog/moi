@@ -9,7 +9,7 @@ import {
   subagentDoneTrace,
   subagentTrace,
   ToolCallGroup
-} from '@/client/components/tool-group'
+} from '@/client/features/chat/tool-group'
 
 const VARIANTS = [
   { value: 'single', label: 'Single' },

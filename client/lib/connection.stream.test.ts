@@ -10,9 +10,9 @@
 import { QueryClient } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test } from 'bun:test'
 
-import { workspaceKeys } from '@/client/api/workspaces'
-import { __setQueryClientForTests, handleFrame } from '@/client/lib/connection'
-import { liveStore } from '@/client/store/live'
+import { workspaceKeys } from '@/client/api/workspace-keys'
+import { __setQueryClientForTests, handleFrame } from '@/client/features/chat/chat-connection'
+import { liveStore } from '@/client/features/chat/chat-store'
 import { emptyViewState } from '@/lib/format'
 import type { PreviewBlock, Turn, ViewState } from '@/lib/types'
 

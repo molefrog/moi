@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import { Button } from '@/client/components/ui/button'
 
-import { type Effect, LedLogo, type Sprite } from './LedLogo'
+import { type Effect, LedLogo, type Sprite } from '@/client/components/shared/LedLogo'
 import { PixelPainter } from './PixelPainter'
 
 const SPRITES: { value: Sprite; label: string }[] = [

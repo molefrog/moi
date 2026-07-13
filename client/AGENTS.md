@@ -14,3 +14,14 @@ Before editing host-app UI, read `../DESIGN.md` and the relevant rules in `../.a
 
 - UI components in `components/ui/` are shadcn built on Base UI React.
 - `lib/cn.ts` is `clsx` + `tailwind-merge`.
+
+## Frontend boundaries
+
+- `app/` owns routes and the app shell. Route files load data and compose features; keep feature UI out of them.
+- `features/<name>/` owns that feature's components, hooks, state, API hooks, and nearby tests.
+- `components/ui/` contains installed shadcn primitives. `components/shared/` contains reusable app components with no feature knowledge.
+- `api/` contains shared request helpers, query keys, and query policies. Feature endpoints stay in the feature's `api.ts`.
+- `runtime/` contains browser-wide lifecycle code such as HMR and shared workspace events.
+- `lib/` contains small feature-neutral utilities. Do not use it as a catch-all for components or feature state.
+- App code may compose features. Shared components and primitives must not import from `features/` or `app/`.
+- Keep tests next to the code they cover. Extract a component, hook, or pure helper when a file starts mixing multiple responsibilities.

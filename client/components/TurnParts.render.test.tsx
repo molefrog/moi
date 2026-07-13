@@ -10,7 +10,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, test } from 'bun:test'
 
-import { TurnParts } from '@/client/components/TurnView'
+import { TurnParts } from '@/client/features/chat/TurnView'
 import type { Part } from '@/lib/types'
 
 const render = (parts: Part[], processing: boolean) =>

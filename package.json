@@ -50,6 +50,7 @@
     "prepack": "bun scripts/build-client.ts",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
+    "typecheck:client": "tsc -p tsconfig.client.json",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "prepare": "git config core.hooksPath .githooks"
