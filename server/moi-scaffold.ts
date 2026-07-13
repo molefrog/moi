@@ -40,6 +40,12 @@ async function runBunInstall(moiDir: string): Promise<number> {
     timeout: INSTALL_TIMEOUT_MS,
     killSignal: 'SIGKILL'
   })
+  // Don't hold the event loop open for a backgrounded install: a short-lived
+  // CLI (`moi init`) must exit after the wait, not linger until the child
+  // does. The child survives parent exit and finishes the install on its own
+  // (verified: orphaned bun processes complete; only the 2-minute kill is no
+  // longer enforced once the parent is gone).
+  install.unref()
   return install.exited
 }
 
