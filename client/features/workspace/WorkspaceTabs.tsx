@@ -1,4 +1,5 @@
-import { IconPlus, IconRobotFace, IconX } from '@tabler/icons-react'
+import { IconPlus, IconCircleXFilled, type TablerIcon } from '@tabler/icons-react'
+import { cva } from 'class-variance-authority'
 
 import { ReorderableList } from '@/client/components/shared/ReorderableList'
 import type { ReorderableRenderState } from '@/client/components/shared/ReorderableList'
@@ -10,19 +11,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/client/components/ui/dropdown-menu'
-import { cn } from '@/client/lib/cn'
 import type { WorkspaceTabId } from '@/lib/types'
 
 export type WorkspaceTabItem = {
   key: WorkspaceTabId
-  Icon: typeof IconRobotFace
+  Icon: TablerIcon
   label: string
   closable?: boolean
 }
 
 export type CreateWorkspaceTabItem = {
   key: string
-  Icon: typeof IconRobotFace
+  Icon: TablerIcon
   label: string
   onClick: () => void
 }
@@ -36,11 +36,30 @@ type WorkspaceTabsProps = {
   onReorder: (ordered: WorkspaceTabId[]) => void
 }
 
-const tabClass = (active: boolean) =>
-  cn(
-    buttonVariants({ variant: 'ghost', size: 'sm' }),
-    active && 'bg-accent text-accent-foreground'
-  )
+const workspaceTabVariants = cva(
+  [buttonVariants({ variant: 'ghost', size: 'sm' }), 'group/tab relative min-w-0 overflow-hidden'],
+  {
+    variants: {
+      active: {
+        true: 'bg-accent text-accent-foreground'
+      },
+      closable: {
+        false: 'px-2!'
+      },
+      dragging: {
+        true: 'invisible'
+      },
+      preview: {
+        true: 'cursor-grabbing shadow-lg ring-1 ring-border'
+      }
+    }
+  }
+)
+
+const workspaceTabStyles = {
+  closeButton:
+    'absolute right-1.5 top-1/2 flex size-4 -translate-y-1/2 items-center justify-center rounded-xs text-muted-foreground opacity-0 transition-opacity duration-150 hover:bg-accent hover:text-accent-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 group-hover/tab:opacity-100 group-focus-within/tab:opacity-100'
+} as const
 
 function CreateTabMenu({ items }: { items: CreateWorkspaceTabItem[] }) {
   return (
@@ -72,7 +91,20 @@ function CreateTabMenu({ items }: { items: CreateWorkspaceTabItem[] }) {
   )
 }
 
-type TabButtonProps = {
+type WorkspaceTabContentProps = {
+  tab: WorkspaceTabItem
+}
+
+function WorkspaceTabContent({ tab }: WorkspaceTabContentProps) {
+  return (
+    <div className="flex min-w-0 items-center gap-1">
+      <tab.Icon stroke={1.75} />
+      <span className="truncate">{tab.label}</span>
+    </div>
+  )
+}
+
+type WorkspaceTabProps = {
   tab: WorkspaceTabItem
   active: boolean
   state: ReorderableRenderState
@@ -80,55 +112,48 @@ type TabButtonProps = {
   onClose: (tab: WorkspaceTabId) => void
 }
 
-function TabButton({ tab, active, state, onSelect, onClose }: TabButtonProps) {
-  const className = cn(tabClass(active), 'min-w-0', state.isDragging && 'invisible')
-
-  if (!tab.closable) {
-    return (
-      <button
-        type="button"
-        className={className}
-        onClick={() => onSelect(tab.key)}
-        {...state.dragHandleProps}
-      >
-        <tab.Icon stroke={1.75} />
-        <span className="truncate">{tab.label}</span>
-      </button>
-    )
-  }
-
+function WorkspaceTab({ tab, active, state, onSelect, onClose }: WorkspaceTabProps) {
   return (
-    <div className={cn(className, 'group/close relative overflow-hidden')}>
-      <button
-        type="button"
-        className="flex min-w-0 items-center gap-1 rounded-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-        onClick={() => onSelect(tab.key)}
-        {...state.dragHandleProps}
-      >
-        <tab.Icon stroke={1.75} />
-        <span className="truncate">{tab.label}</span>
-      </button>
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-y-0 right-0 flex w-10 items-center justify-end rounded-r-xs bg-linear-to-l from-accent via-accent/95 via-55% to-transparent pr-1.5 opacity-0 transition-opacity duration-150 group-hover/close:opacity-100 group-focus-within/close:opacity-100"
-      />
-      <button
-        type="button"
-        aria-label={`Close ${tab.label}`}
-        className="absolute right-1.5 top-1/2 flex size-4 -translate-y-1/2 items-center justify-center rounded-xs text-muted-foreground opacity-0 transition-opacity duration-150 hover:bg-accent hover:text-accent-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 group-hover/close:opacity-100 group-focus-within/close:opacity-100"
-        onClick={() => onClose(tab.key)}
-      >
-        <IconX className="size-3!" stroke={1.75} />
-      </button>
-    </div>
+    <button
+      type="button"
+      className={workspaceTabVariants({
+        active,
+        closable: Boolean(tab.closable),
+        dragging: state.isDragging
+      })}
+      onClick={() => onSelect(tab.key)}
+      {...state.dragHandleProps}
+    >
+      <WorkspaceTabContent tab={tab} />
+      {tab.closable && (
+        <button
+          type="button"
+          aria-label={`Close ${tab.label}`}
+          className={workspaceTabStyles.closeButton}
+          onClick={() => onClose(tab.key)}
+        >
+          <IconCircleXFilled className="size-3!" stroke={1.75} />
+        </button>
+      )}
+    </button>
   )
 }
 
-function TabDragPreview({ tab, active }: { tab: WorkspaceTabItem; active: boolean }) {
+type WorkspaceTabPreviewProps = {
+  tab: WorkspaceTabItem
+  active: boolean
+}
+
+function WorkspaceTabPreview({ tab, active }: WorkspaceTabPreviewProps) {
   return (
-    <div className={cn(tabClass(active), 'cursor-grabbing shadow-lg ring-1 ring-border')}>
-      <tab.Icon stroke={1.75} />
-      {tab.label}
+    <div
+      className={workspaceTabVariants({
+        active,
+        closable: Boolean(tab.closable),
+        preview: true
+      })}
+    >
+      <WorkspaceTabContent tab={tab} />
       {tab.closable && <IconX className="size-3!" stroke={1.75} />}
     </div>
   )
@@ -144,7 +169,7 @@ export function WorkspaceTabs({
 }: WorkspaceTabsProps) {
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1">
-      <div className="scroll-fade-x scrollbar-none min-w-0 overflow-x-auto overflow-y-hidden">
+      <div className="scrollbar-none min-w-0 scroll-fade-x overflow-x-auto overflow-y-hidden">
         <ReorderableList
           items={tabs}
           getId={tab => tab.key}
@@ -153,9 +178,9 @@ export function WorkspaceTabs({
           renderPlaceholder={() => (
             <div className="pointer-events-none absolute inset-0 rounded-xs bg-muted" />
           )}
-          renderOverlay={tab => <TabDragPreview tab={tab} active={active === tab.key} />}
+          renderOverlay={tab => <WorkspaceTabPreview tab={tab} active={active === tab.key} />}
           renderItem={(tab, state) => (
-            <TabButton
+            <WorkspaceTab
               tab={tab}
               active={active === tab.key}
               state={state}
