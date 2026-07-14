@@ -19,12 +19,12 @@ function DialogContent({ className, children, ...props }: DialogPrimitive.Popup.
     <DialogPrimitive.Portal>
       <DialogPrimitive.Backdrop
         data-slot="dialog-backdrop"
-        className="fixed inset-0 z-50 bg-black/40 duration-150 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
+        className="fixed inset-0 z-50 bg-foreground/40 duration-150 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
       />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          'fixed top-1/2 left-1/2 z-50 origin-center -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl bg-card text-card-foreground shadow-xl ring-1 ring-foreground/10 outline-hidden duration-150 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
+          'fixed top-1/2 left-1/2 z-50 origin-center -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl bg-card text-card-foreground shadow-xl ring-1 ring-border outline-hidden duration-150 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
           className
         )}
         {...props}

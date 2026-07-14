@@ -9,7 +9,7 @@ A view is a **real app screen**, not a giant widget. Where a widget earns one gl
 - **Own the whole frame.** The root is `w-full h-full` and handles **its own scrolling** (`overflow-auto`) — there is no outer scroll container. Provide your own padding, header, and chrome.
 - **One view = one screen.** No client-side routing inside a view; cross-screen navigation is the workspace nav. Internal sub-navigation (tabs, a master/detail split) is yours to build.
 - **Three states, always.** Loading → a skeleton that mirrors the real layout (never a spinner). Error → one human sentence + a retry. Empty → a short prompt, never blank.
-- **Tailwind for static styling.** No custom CSS, no `@apply`, no static `style={{}}`. Icons only from `@tabler/icons-react`. Views import only from their own folder.
+- **Tailwind for static styling.** No custom CSS, no `@apply`, no static `style={{}}`. Icons only from `@tabler/icons-react`; use the host project icon rule when present (`.agents/rules/icons.md`) instead of duplicating size/stroke guidance. Views import only from their own folder.
 
 ## Layout
 

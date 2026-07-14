@@ -1,8 +1,8 @@
 import { useState } from 'react'
 
-import { cn } from '@/client/lib/cn'
+import { Button } from '@/client/components/ui/button'
 
-import { type Effect, LedLogo, type Sprite } from './LedLogo'
+import { type Effect, LedLogo, type Sprite } from '@/client/components/shared/LedLogo'
 import { PixelPainter } from './PixelPainter'
 
 const SPRITES: { value: Sprite; label: string }[] = [
@@ -24,19 +24,17 @@ type SegmentedProps<T extends string | number> = {
 
 function Segmented<T extends string | number>({ options, value, onChange }: SegmentedProps<T>) {
   return (
-    <div className="flex gap-1 rounded-lg bg-black/[0.04] p-1">
+    <div className="flex gap-1 rounded-lg bg-accent p-1">
       {options.map(o => (
-        <button
+        <Button
           key={String(o.value)}
           type="button"
+          variant={value === o.value ? 'default' : 'ghost'}
+          size="sm"
           onClick={() => onChange(o.value)}
-          className={cn(
-            'rounded-md px-3 py-1 text-xs transition-colors',
-            value === o.value ? 'bg-neutral-900 text-white' : 'text-black/50 hover:text-black/80'
-          )}
         >
           {o.label}
-        </button>
+        </Button>
       ))}
     </div>
   )
@@ -48,8 +46,8 @@ export function PlaygroundPage() {
   const [effect, setEffect] = useState<Effect | 'none'>('none')
 
   return (
-    <div className="relative flex min-h-dvh flex-col items-center justify-center gap-8 bg-[#f2f1ee]">
-      <span className="absolute top-5 left-5 text-[11px] font-medium tracking-widest text-black/30 uppercase">
+    <div className="relative flex min-h-dvh flex-col items-center justify-center gap-8 bg-muted">
+      <span className="absolute top-5 left-5 text-[11px] font-medium tracking-widest text-muted-foreground uppercase">
         Playground
       </span>
 

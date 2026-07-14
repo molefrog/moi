@@ -17,7 +17,7 @@
   "sortPackageJson": false,
   "ignorePatterns": [
     ".agents",
-    "workspace",
+    "workspace/**",
     "server/test/__fixtures__",
     "**/.build",
     "client/vendor"

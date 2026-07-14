@@ -1,15 +1,92 @@
 import { describe, expect, test } from 'bun:test'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+import { tmpdir } from 'node:os'
 
 import type { WorkspaceLayout } from '@/lib/types'
 
-import { mergeLayoutForSave } from '../layout'
+import { getLayoutPath, loadLayout, mergeLayoutForSave } from '../layout'
 
 // The grid editor and `moi config` write the same `.workspace.json`. A layout
 // PUT is authoritative for the editor fields but must NOT touch identity
 // (name/icon) — otherwise the client's name-stripped body erases a configured
 // name. mergeLayoutForSave enforces that.
 
-const base: WorkspaceLayout = { version: 1, widgetGrid: [], chatMode: 'sidebar' }
+const base: WorkspaceLayout = {
+  version: 1,
+  widgetGrid: [],
+  layoutMode: 'fullscreen',
+  tabs: { open: ['agent'], active: 'agent' }
+}
+
+async function withWorkspaceFile<T>(
+  body: Record<string, unknown>,
+  fn: (dir: string) => Promise<T>
+) {
+  const dir = await mkdtemp(join(tmpdir(), 'moi-layout-'))
+  try {
+    const file = getLayoutPath(dir)
+    await mkdir(dirname(file), { recursive: true })
+    await Bun.write(file, JSON.stringify(body, null, 2))
+    return await fn(dir)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+}
+
+describe('loadLayout', () => {
+  test('defaults missing layoutMode to fullscreen', async () => {
+    await withWorkspaceFile({ version: 1, widgetGrid: [] }, async dir => {
+      const loaded = await loadLayout(dir)
+      expect(loaded.layoutMode).toBe('fullscreen')
+      expect(loaded.tabs).toEqual({ open: ['agent'], active: 'agent' })
+    })
+  })
+
+  test('defaults invalid layoutMode to fullscreen', async () => {
+    await withWorkspaceFile({ version: 1, widgetGrid: [], layoutMode: 'collapsed' }, async dir => {
+      const loaded = await loadLayout(dir)
+      expect(loaded.layoutMode).toBe('fullscreen')
+    })
+  })
+
+  test('preserves valid split layoutMode', async () => {
+    await withWorkspaceFile({ version: 1, widgetGrid: [], layoutMode: 'split' }, async dir => {
+      const loaded = await loadLayout(dir)
+      expect(loaded.layoutMode).toBe('split')
+    })
+  })
+
+  test('defaults invalid tabs to agent', async () => {
+    await withWorkspaceFile(
+      { version: 1, widgetGrid: [], tabs: { open: [], active: 'widgets' } },
+      async dir => {
+        const loaded = await loadLayout(dir)
+        expect(loaded.tabs).toEqual({ open: ['agent'], active: 'agent' })
+      }
+    )
+  })
+
+  test('normalizes tabs and drops invalid tab ids', async () => {
+    await withWorkspaceFile(
+      {
+        version: 1,
+        widgetGrid: [],
+        tabs: {
+          open: ['widgets', 'bad', 'view:dashboard', 'widgets', 'scratchpad'],
+          active: 'bad'
+        }
+      },
+      async dir => {
+        const loaded = await loadLayout(dir)
+        expect(loaded.tabs).toEqual({
+          open: ['widgets', 'view:dashboard', 'scratchpad'],
+          active: 'widgets'
+        })
+      }
+    )
+  })
+})
 
 describe('mergeLayoutForSave', () => {
   test('preserves a stored name when the body omits it (the reset bug)', () => {
@@ -42,7 +119,8 @@ describe('mergeLayoutForSave', () => {
     expect(JSON.parse(JSON.stringify(merged))).toEqual({
       version: 1,
       widgetGrid: [],
-      chatMode: 'sidebar'
+      layoutMode: 'fullscreen',
+      tabs: { open: ['agent'], active: 'agent' }
     })
   })
 
@@ -51,12 +129,14 @@ describe('mergeLayoutForSave', () => {
     const body: WorkspaceLayout = {
       version: 1,
       widgetGrid: [{ i: 'w', x: 1, y: 2 }],
-      chatMode: 'floating',
+      layoutMode: 'split',
+      tabs: { open: ['agent', 'widgets'], active: 'widgets' },
       selectedModel: 'sonnet',
       theme: { font: 'default', background: '#000', foreground: '#fff' }
     }
     const merged = mergeLayoutForSave(existing, body)
-    expect(merged.chatMode).toBe('floating')
+    expect(merged.layoutMode).toBe('split')
+    expect(merged.tabs).toEqual({ open: ['agent', 'widgets'], active: 'widgets' })
     expect(merged.selectedModel).toBe('sonnet')
     expect(merged.theme).toEqual({ font: 'default', background: '#000', foreground: '#fff' })
     expect(merged.name).toBe('Keep')

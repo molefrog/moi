@@ -23,6 +23,7 @@ const result = await Bun.build({
   // Absolute asset URLs (`/chunk-….js`) so they resolve the same under any
   // SPA route (`/`, `/workspace/:id`, …), not relative to the current path.
   publicPath: '/',
+  splitting: true,
   minify: true,
   sourcemap: 'none',
   plugins: [tailwind, externalizeReact],

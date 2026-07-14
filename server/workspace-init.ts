@@ -8,6 +8,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import type { WorkspaceType } from '@/lib/types'
+export { validateWorkspaceFolderName } from '@/lib/workspace-name'
 
 import { scaffoldMoiDir } from './moi-scaffold'
 import { installBundledSkills } from './skills-template'
@@ -29,9 +30,10 @@ export const CREATED_WORKSPACES_ROOT = join(homedir(), 'moi')
 export type ProvisionResult = {
   // Where the skills were installed (backend-dependent, see skillsDirFor).
   skillsDir: string
-  // 'exists' when `.moi/` was already bootstrapped, else the bun install exit
-  // code (non-zero means deps must be installed manually — not fatal).
-  scaffold: 'exists' | number
+  // 'exists' when `.moi/` was already bootstrapped, 'installing' when bun
+  // install continues in the background, else the install exit code (non-zero
+  // means deps are missing — not fatal, the agent installs on demand).
+  scaffold: 'exists' | 'installing' | number
 }
 
 // Lay down everything a workspace needs: create the folder, copy the bundled
@@ -47,20 +49,4 @@ export async function provisionWorkspace(
   await installBundledSkills(skillsDir)
   const scaffold = await scaffoldMoiDir(workspaceRoot)
   return { skillsDir, scaffold }
-}
-
-// Validate a folder name typed in the create-workspace form. Returns a
-// user-facing error, or null when the name is usable as a single path segment
-// under CREATED_WORKSPACES_ROOT. Leading dots are rejected so a name can never
-// be hidden or collide with `.moi` / `.claude`.
-export function validateWorkspaceFolderName(name: string): string | null {
-  if (!name) return 'Folder name is required'
-  if (name.length > 64) return 'Folder name is too long (max 64 characters)'
-  if (!/^[A-Za-z0-9][A-Za-z0-9._ -]*$/.test(name)) {
-    return 'Use letters, numbers, dots, dashes, underscores and spaces, starting with a letter or number'
-  }
-  if (name.endsWith('.') || name.endsWith(' ')) {
-    return 'Folder name cannot end with a dot or space'
-  }
-  return null
 }

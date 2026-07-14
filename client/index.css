@@ -22,21 +22,19 @@
   --popover-foreground: oklch(0.145 0 0);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.64 0 0);
-  --accent: oklch(0.97 0 0);
+  --accent: oklch(0 0 0 / 0.07);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.58 0.22 27);
-  --border: oklch(0.922 0 0);
+  --border: oklch(0 0 0 / 0.07);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
   --radius: 1rem;
 
   /* Workspace page layout — single source of truth for the widget/chat panel.
-     Read by routes/workspace/[id].tsx and useFitsSidebar.ts; don't hardcode
-     equivalents. (The app sidebar's own widths live in SidebarLayout.tsx.) */
+     Read by routes/workspace/[id].tsx; don't hardcode equivalents. (The app
+     sidebar's own widths live in SidebarLayout.tsx.) */
   --page-pad: 2rem; /* padding around the working area */
   --column-w: 40rem; /* grid content width; also the widget area's min before the chat yields */
   --chat-min: 380px; /* docked chat min width — narrower than this and it floats */
@@ -65,14 +63,12 @@
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.985 0 0);
   --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
+  --accent: oklch(1 0 0 / 0.1);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.58 0.22 27);
-  --border: oklch(0.35 0 0);
+  --border: oklch(1 0 0 / 0.1);
   --input: oklch(0.35 0 0);
   --ring: oklch(0.556 0 0);
 }

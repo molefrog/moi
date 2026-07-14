@@ -1,9 +1,12 @@
 #!/bin/sh
 set -e
 
-# Auto-fix lint + format the whole tree, then re-stage only the files already
-# staged for this commit so the fixes land without pulling in unrelated changes.
-# Lint errors that can't be auto-fixed still abort (set -e).
+# Auto-fix lint + format the whole tree, then re-stage the fixes onto the files
+# already staged for this commit (so unrelated dirty files aren't pulled in).
+# Deleted paths are excluded (--diff-filter=d) — they have nothing to reformat,
+# and passing a removed path to `git add` errors. Lint errors that can't be
+# auto-fixed still abort (set -e).
 bun run lint:fix
 bun run format
-git add $(git diff --cached --name-only)
+files=$(git diff --cached --name-only --diff-filter=d)
+[ -n "$files" ] && git add -- $files

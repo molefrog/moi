@@ -3,8 +3,8 @@ import { Agentation } from 'agentation'
 import { createRoot } from 'react-dom/client'
 import { Router } from 'wouter'
 
-import { initConnection } from './lib/connection'
-import { AppRouter } from './components/App'
+import { initConnection } from '@/client/features/chat/chat-connection'
+import { AppRouter } from './app/AppRouter'
 
 const queryClient = new QueryClient()
 

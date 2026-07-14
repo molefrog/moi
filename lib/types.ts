@@ -347,20 +347,27 @@ export type StatusMessage = {
 // Workspace layout persistence
 export type LayoutGridItem = { i: string; x: number; y: number }
 
-// Persisted chat dock position. Fullscreen is NOT a position — it's a transient
-// local view (the "Chat" tab) that overrides the position, so it isn't stored.
-export type ChatMode = 'sidebar' | 'floating'
+// Persisted layout of the workspace panel:
+//   fullscreen — tabbed full-panel workspace; Agent chat is the first tab
+//   split      — Agent chat as a left column, workspace content on the right
+export type LayoutMode = 'fullscreen' | 'split'
 
-// How the chat is actually shown: its persisted position, or fullscreen while
-// the chat view is active.
-export type ChatDisplay = ChatMode | 'fullscreen'
+export type WorkspaceTabId = 'agent' | 'widgets' | 'scratchpad' | `view:${string}`
+
+export type WorkspaceTabsState = {
+  open: WorkspaceTabId[]
+  active: WorkspaceTabId
+}
 
 export type { FontTheme, ColorTheme } from './themes'
 
 export type WorkspaceLayout = {
   version: 1
   widgetGrid: LayoutGridItem[]
-  chatMode: ChatMode
+  layoutMode: LayoutMode
+  // Open tabs and active tab for the fullscreen/split workspace chrome. The
+  // `open` order is persisted so future drag-reordering has one source of truth.
+  tabs: WorkspaceTabsState
   // User-set display-name override. When empty/undefined the API falls back to
   // the workspace folder name, so the resolved name always comes from the API.
   name?: string
@@ -425,6 +432,10 @@ export type WorkspaceEnvView = {
 export type Model = {
   // Id used to select the model (Claude `value`; OpenClaw catalog id).
   value: string
+  // Canonical wire model id this row resolves to (Claude, e.g. 'default' and
+  // 'opus[1m]' both → 'claude-opus-4-8[1m]'). Lets the picker map the synthetic
+  // "default" entry onto the concrete model it points at.
+  resolvedModel?: string
   // Human-readable label (Claude `displayName`; OpenClaw `name`).
   displayName: string
   // " · "-joined blurb (Claude): "<headline> · <tagline> · …". Absent for OpenClaw.

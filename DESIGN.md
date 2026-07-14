@@ -1,84 +1,75 @@
-# Design principles
+# Moi Main App Design
 
-How to make hand-written UI (HTML + Tailwind) feel designed, not assembled. Distilled craft
-principles — pair with the Tailwind/icons/animations rules in `.agents/rules/`.
+This is the visual contract for the host app and its chrome. Workspace widget/view internals and generated applets use their workspace-local design guidance instead.
 
-## Before building a new surface
+This file owns visual direction and semantic choices. Topic rules own syntax, `client/components/ui` owns component APIs and dimensions, and the theme CSS owns token values. Existing UI is inventory, not design precedent.
 
-Commit to three things before writing markup, even informally:
+Generic design skills may help with usability and polish. They cannot introduce a new aesthetic, palette, type system, decoration style, or motion language. Project rules override generic shadcn advice: use installed components and ask before adding a missing primitive or variant.
 
-- **A mood word** — a physical register the surface evokes (e.g. _mineral, bookish, editorial,
-  terminal, candlelit, signage, brutalist_). Pick one that _isn't_ your first instinct; first
-  instincts regress to the same few generic answers.
-- **A palette** — 5–6 values with roles (ground, text, muted, one accent, borders), every color
-  derived from a real object in that scene. "Bookish" = plaster, oak, ink, candle flame. If you
-  can't name the reference for a color, it's abstract and will look glued-on.
-- **A type scale** — font, the weights you'll use, and the size steps.
+## Visual Direction
 
-## Color
+Moi is a local AI space. The host app should feel calm, precise, compact, and a little quirky. It is a serious tool, not a marketing page or visual showcase.
 
-- **One accent, used deliberately.** One intense color moment beats five competing ones. Most of the
-  surface is neutral; color marks the few things that matter (primary action, active state, a key number).
-- **Default to a pure-white ground (`#FFFFFF`) and light mode.** White is the common case for
-  dashboards, product UI, and docs — not a "stark" choice. Off-white/cream is a _specific_ aesthetic
-  (sun-bleached, candlelit, bookish), not a generic neutral.
-- **Derive grays from the scene or stay truly neutral** (`#EEE`, `#CCC`, `#888`, `#444`). Tinted gray
-  without a reason reads as indecision. Pure black `#000` only for high-chroma accents, "inky"/
-  "nocturnal" moods, or when asked.
-- **Proven ground × accent pairings** (families to interpret, not fixed hex): bone × oxidized copper ·
-  fog gray × deep navy · graphite × rust · concrete × safety orange · plaster × ink · slate × amethyst ·
-  pure white × cobalt · pure white × cadmium red · ink × chrome yellow · pure white × pure black.
-- **Avoid the clichés:** warm off-white × terracotta/burnt-orange (recent overuse) · navy/charcoal ×
-  electric purple/lime/teal (2019–2024 SaaS) · pure white × muted earth tone (earth tones fall flat on
-  white; they want a tinted ground from the same scene) · tinted warm ground × any high-chroma accent
-  (the tint mutes the chroma — use pure white or pure black instead).
-- **Secondary accents only with a job** — categories, data viz, semantic states (success/warning/error).
-  Pull them from the same scene as the primary so the palette reads as one. Keep overall saturation low.
+Prefer density with breathing room. Use readable logs, compact controls, quiet panel chrome, and clear interaction states. Personality should come from product-specific copy, icons, and small interaction moments. Avoid gradients, decorative blobs, oversized type, dramatic shadows, large empty hero layouts, and one-off visual systems.
 
-## Typography
+Keep shapes tight and utilitarian. Use component-defined radii, with softer panels and dialogs. Reserve full rounding for pills and circular controls. Do not mix several radius families in one surface.
 
-- **Maximize contrast between display and label.** Pair a heavy, large headline with light/regular
-  small text. Scale contrast (very large next to very small) is the main lever for hierarchy — lean on
-  it rather than boxes and dividers.
-- **Tracking:** slightly tighter on large/display type; open or none on small caps and tiny labels.
-- **Units:** `px` for font size, `em` for letter-spacing, `px` (or unitless) for line-height.
-- **Contrast is non-negotiable.** Reduced-opacity / muted text is for hierarchy, used sparingly.
-  Anything below 16px needs higher contrast — if you'd squint, fix it. Avoid text ≤12px except in
-  dense productivity UI or as an all-caps stylistic accent.
+## Color and Typography
 
-## Layout & spacing
+Use semantic color tokens by intent:
 
-- **Restraint by default.** Choosing between adding an element and removing one, remove. White space
-  is a feature. Refined and minimal beats busy.
-- **Vary spacing deliberately** — tight to group related things, generous to let hero/primary content
-  breathe. Uniform spacing everywhere reads as no spacing decision at all.
-- **Favor asymmetry and scale contrast over grid-like sameness.** Vary scale/weight/spacing to create
-  rhythm; identical repeated blocks feel like a component dump.
-- **Put information directly on surfaces** rather than boxing everything in cards. Reach for a card only
-  when grouping genuinely needs a container.
-- **Avoid late-2010s habits** — stacked gradients and heavy drop shadows. If used, apply subtly so
-  elements don't compete.
-- **Repeated rows must form vertical lanes** (lists, nav, tables). Give icons / indicators / trailing
-  actions fixed-width slots (`w-*` + `shrink-0`), even when empty in some rows. Never rely on `gap`
-  alone to align columns across rows with varying content.
+- `background` and `foreground` for the main app surface and primary content.
+- `card` for intentionally framed surfaces and `popover` for floating UI.
+- `primary` for the single most important action in a local region.
+- `muted` for quiet structure or disabled fills and `muted-foreground` for secondary content.
+- `accent` for hover, active, selection, and subtle highlights.
+- `destructive` for destructive actions, invalid states, and errors.
+- `border`, `input`, and `ring` for structure, controls, and focus.
 
-## Style vs. clarity
+Do not add raw color utilities, manual `dark:` colors, or `foreground` alpha fills. Use alpha only when the semantic token already has the correct role. Do not add, rename, or redefine tokens without explicit owner approval. If no token fits, use the closest semantic role and report the limitation.
 
-Decide which the surface is for:
+Use `font-sans` for UI, including paths and ids. Reserve `font-mono` for code and fixed-width alignment. Keep titles modest and metadata quiet. Default to regular, use medium for emphasis, and reserve semibold for rare exceptions. Use `tabular-nums` where alignment matters.
 
-- **Clarity** (product UI, usability, dense data) → restraint, legibility, predictable layout.
-- **Impress** (marketing, landing, brand, "make it bold/fun") → stronger personality. A _playful_
-  register can use a 2–3 color duo/trio, tilt or sticker elements, offset shadows, hand-drawn marks,
-  quippy copy — pick one or two that fit, not all. If you spend the budget on color, spend less on
-  decoration.
+## Layout and Hierarchy
 
-## Self-review checklist
+Build hierarchy with type weight, spacing, borders, and tonal surfaces. Use the Tailwind scale and component sizes instead of copying numeric geometry into feature code.
 
-After a section looks done, reread it as a critical designer and fix before moving on:
+Respect the layout variables in `client/index.css`; do not hardcode equivalent page or chat dimensions. Make layouts work at narrow and wide widths without clipped controls, overlapping text, or large dead areas.
 
-- **Spacing** — uneven gaps, cramped groups, accidentally-empty areas. Is there visual rhythm?
-- **Typography** — readable sizes, decent line-height, clear heading/body/caption hierarchy.
-- **Contrast** — no low-contrast text or elements blending into the background.
-- **Alignment** — elements that should share a lane do; icons/actions line up across repeated rows.
-- **Repetition** — not so grid-uniform it's lifeless; vary scale/weight/spacing for interest.
-- **Fit** — nothing clipped at edges; no large dead gap at the bottom.
+Repeated rows must form stable lanes. Give leading icons, status markers, counters, and trailing actions fixed slots so changing content does not shift alignment. Keep component trees shallow and split components for state, data flow, repeated structure, or meaningful sub-surfaces.
+
+Avoid cards inside cards. Page sections should usually be unframed regions, panels, or bordered rows. Use a framed surface only when it represents a real contained object, preview, dialog, or tool.
+
+## Components and Accessibility
+
+Check `client/components/ui` and existing feature components before writing styled native markup. Use installed primitives and their built-in variants. Component source is the authority for APIs, sizes, and composition.
+
+If an atomic control is missing, stop and ask before adding a shadcn-style primitive or variant. Do not import an uninstalled component or hand-roll badges, tabs, segmented controls, selects, alerts, skeletons, empty states, and similar controls at the call site.
+
+Use `Button` for normal actions and allow one primary action per local region. A specialized native control is acceptable when no primitive fits; keep it accessible and promote it if the pattern repeats.
+
+Use the installed input and overlay primitives. Follow Base UI composition APIs instead of nesting interactive elements. Dialogs need a title, including visually hidden titles. Icon-only controls need an `aria-label` and a tooltip when the meaning is not obvious.
+
+Cover the states the interaction can reach: focus, hover, disabled, loading, empty, and error. Do not hide a required state behind color alone. Errors should explain what happened and what the user can do next.
+
+Prefer skeletons for loading content, lists, cards, and page regions so the pending layout resembles the result. Use spinners only for compact inline actions, very small blocks, or work with no meaningful content shape.
+
+## Icons, Motion, and Copy
+
+Use Tabler icons and follow `.agents/rules/icons.md`; it is the only source for icon sizes and strokes. Do not copy that matrix into feature docs or components.
+
+Motion should explain a state or spatial change. Follow `.agents/rules/animations.md`. Keep feedback short, avoid decorative loops, and do not add custom keyframes.
+
+Use concise, sentence-case product language. Prefer the nouns space, thread, agent, model, widget, view, connector, session, and run. Name actions precisely, such as `Remove space` or `Start new thread`. Avoid generic confirmations, hype, “please,” and “successfully.”
+
+## Final Review
+
+Before finishing host-app UI work, confirm:
+
+- The change belongs to the host app and follows this visual direction.
+- Existing components are reused; missing primitives received approval.
+- Colors use the correct semantic roles and no tokens were invented.
+- Rows stay aligned and the layout works at narrow and wide widths.
+- Interactive and accessibility states are complete.
+- Icons, motion, Tailwind, and TypeScript follow their owning rules.
+- The markup is as simple as the behavior allows.
