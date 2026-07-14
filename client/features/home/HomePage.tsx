@@ -1,4 +1,5 @@
 import { IconChevronRight, IconFolders, IconLoader2, IconPlus } from '@tabler/icons-react'
+import { useLocation } from 'wouter'
 
 import { useAddWorkspace, useDiscoveredWorkspaces, useWorkspaces } from './api'
 import { Button } from '@/client/components/ui/button'
@@ -21,6 +22,7 @@ import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { WorkspacePreview } from './WorkspacePreview'
 
 export function HomePage() {
+  const [, navigate] = useLocation()
   const workspacesQuery = useWorkspaces()
   const discoveredQuery = useDiscoveredWorkspaces()
   const importMutation = useAddWorkspace()
@@ -48,6 +50,12 @@ export function HomePage() {
   const count = workspaces.length
   const importingPath =
     importMutation.isPending && importMutation.variables ? importMutation.variables.path : null
+
+  function handleAdd(suggestion: DiscoveredWorkspace) {
+    importMutation.mutate(suggestion, {
+      onSuccess: entry => navigate(`/workspace/${entry.id}`)
+    })
+  }
 
   return (
     <div className="mx-auto w-full max-w-3xl px-8 pt-14 pb-16">
@@ -120,7 +128,7 @@ export function HomePage() {
                   <SuggestedRow
                     key={item.path}
                     suggestion={item}
-                    onAdd={s => importMutation.mutate(s)}
+                    onAdd={handleAdd}
                     loading={importingPath === item.path}
                   />
                 ))}

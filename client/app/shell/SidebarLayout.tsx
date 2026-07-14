@@ -156,7 +156,7 @@ function WorkspaceButton({ workspace, dragOverlay = false, dragState }: Workspac
           className="size-7 shrink-0 rounded-[4px]"
         />
       </div>
-      <span className="mt-0.5 line-clamp-2 w-full text-center text-[11px] leading-snug font-medium text-foreground">
+      <span className="mt-0.5 line-clamp-2 w-full text-center text-[11px] leading-snug font-medium text-ellipsis text-foreground">
         {label}
       </span>
     </>
