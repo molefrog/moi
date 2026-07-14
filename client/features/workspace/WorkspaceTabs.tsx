@@ -143,12 +143,12 @@ export function WorkspaceTabs({
   onReorder
 }: WorkspaceTabsProps) {
   return (
-    <div className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden">
-      <div className="flex w-max items-center gap-1">
+    <div className="flex min-w-0 flex-1 items-center gap-1">
+      <div className="scroll-fade-x scrollbar-none min-w-0 flex-1 overflow-x-auto overflow-y-hidden">
         <ReorderableList
           items={tabs}
           getId={tab => tab.key}
-          className="flex items-center gap-1"
+          className="flex w-max items-center gap-1"
           onReorder={ordered => onReorder(ordered as WorkspaceTabId[])}
           renderPlaceholder={() => (
             <div className="pointer-events-none absolute inset-0 rounded-xs bg-muted" />
@@ -164,6 +164,8 @@ export function WorkspaceTabs({
             />
           )}
         />
+      </div>
+      <div className="shrink-0">
         <CreateTabMenu items={createItems} />
       </div>
     </div>

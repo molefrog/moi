@@ -68,48 +68,48 @@ function Sidebar({ workspaces }: SidebarProps) {
   const reorder = useReorderWorkspaces()
 
   return (
-    <aside className="flex h-full shrink-0 flex-col px-2 py-5">
-      <div className="flex items-center justify-center">
-        <Link href="/" aria-label="Home" title="Home" className={sidebarNavButtonClass}>
-          <IconSmartHome stroke={1.5} />
-        </Link>
-      </div>
+    <aside className="flex h-full shrink-0 flex-col px-2 py-5 gap-4 items-center">
+      <Link href="/" aria-label="Home" title="Home" className={sidebarNavButtonClass}>
+        <IconSmartHome stroke={1.5} />
+      </Link>
 
       <nav className="flex min-h-0 w-14 flex-1 flex-col items-center justify-center gap-4">
         {workspaces.length > 0 && (
-          <>
-            <ReorderableList
-              items={workspaces}
-              getId={ws => ws.id}
-              className="flex flex-col gap-4"
-              onReorder={ids => reorder.mutate(ids)}
-              renderPlaceholder={() => (
-                <div className="pointer-events-none absolute top-0 left-1 size-10 rounded-lg bg-accent" />
-              )}
-              renderOverlay={ws => <WorkspaceButton workspace={ws} dragOverlay />}
-              renderItem={(ws, state) => <WorkspaceButton workspace={ws} dragState={state} />}
-            />
-            <CreateWorkspaceDialog
-              trigger={
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-lg"
-                  aria-label="Create new space"
-                  title="Create new space"
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <IconPlus data-icon="inline-start" stroke={1.5} />
-                </Button>
-              }
-            />
-          </>
+          <div className="flex max-h-full min-h-0 flex-col items-center gap-4">
+            <div className="scrollbar-none min-h-0 scroll-fade overflow-y-auto">
+              <ReorderableList
+                items={workspaces}
+                getId={ws => ws.id}
+                className="flex flex-col gap-4"
+                onReorder={ids => reorder.mutate(ids)}
+                renderPlaceholder={() => (
+                  <div className="pointer-events-none absolute top-0 left-1 size-10 rounded-lg bg-accent" />
+                )}
+                renderOverlay={ws => <WorkspaceButton workspace={ws} dragOverlay />}
+                renderItem={(ws, state) => <WorkspaceButton workspace={ws} dragState={state} />}
+              />
+            </div>
+            <div className="shrink-0">
+              <CreateWorkspaceDialog
+                trigger={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-lg"
+                    aria-label="Create new space"
+                    title="Create new space"
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <IconPlus data-icon="inline-start" stroke={1.5} />
+                  </Button>
+                }
+              />
+            </div>
+          </div>
         )}
       </nav>
 
-      <div className="flex shrink-0 items-center justify-center">
-        <ConnectorsNavLink />
-      </div>
+      <ConnectorsNavLink />
     </aside>
   )
 }
@@ -156,7 +156,7 @@ function WorkspaceButton({ workspace, dragOverlay = false, dragState }: Workspac
           className="size-7 shrink-0 rounded-[4px]"
         />
       </span>
-      <span className="w-full truncate text-center text-xs font-medium text-foreground">
+      <span className="line-clamp-2 h-6 w-full text-center text-[11px] leading-3 font-medium text-foreground">
         {label}
       </span>
     </>
