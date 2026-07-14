@@ -14,13 +14,13 @@ import {
   WorkspaceTypeIcon,
   workspaceDisplayName,
   workspaceProviderIcon
-} from '@/client/features/workspaces/workspace-presentation'
+} from '@/client/features/home/workspace-presentation'
 import type { DiscoveredWorkspace, WorkspaceEntry } from '@/lib/types'
 
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { WorkspacePreview } from './WorkspacePreview'
 
-export function WorkspacesPage() {
+export function HomePage() {
   const workspacesQuery = useWorkspaces()
   const discoveredQuery = useDiscoveredWorkspaces()
   const importMutation = useAddWorkspace()

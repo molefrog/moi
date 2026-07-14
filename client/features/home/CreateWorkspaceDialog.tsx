@@ -19,7 +19,7 @@ import { cn } from '@/client/lib/cn'
 import {
   WorkspaceTypeIcon,
   workspaceTypeLabel
-} from '@/client/features/workspaces/workspace-presentation'
+} from '@/client/features/home/workspace-presentation'
 import { validateWorkspaceFolderName } from '@/lib/workspace-name'
 import type { WorkspaceType } from '@/lib/types'
 

@@ -15,7 +15,7 @@ import {
 } from 'frimousse'
 
 import { useResetWorkspaceIcon, useSaveWorkspaceIcon } from '@/client/features/settings/api'
-import { workspaceProviderIcon } from '@/client/features/workspaces/workspace-presentation'
+import { workspaceProviderIcon } from '@/client/features/home/workspace-presentation'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
 import {

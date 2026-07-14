@@ -1,12 +1,12 @@
 import { SidebarLayout } from '@/client/app/shell/SidebarLayout'
-import { WorkspacesPage } from '@/client/features/workspaces/WorkspacesPage'
+import { HomePage } from '@/client/features/home/HomePage'
 
 // The `/` route: the app shell wrapping the workspaces view.
 export function HomeRoute() {
   return (
     <SidebarLayout panel="flat">
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <WorkspacesPage />
+        <HomePage />
       </div>
     </SidebarLayout>
   )

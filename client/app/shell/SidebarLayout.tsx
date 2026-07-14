@@ -4,17 +4,17 @@ import { IconPlugConnected, IconPlus, IconSmartHome } from '@tabler/icons-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'wouter'
 
-import { useReorderWorkspaces, useWorkspaces } from '@/client/features/workspaces/api'
+import { useReorderWorkspaces, useWorkspaces } from '@/client/features/home/api'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
-import { CreateWorkspaceDialog } from '@/client/features/workspaces/CreateWorkspaceDialog'
+import { CreateWorkspaceDialog } from '@/client/features/home/CreateWorkspaceDialog'
 import { ReorderableList } from '@/client/components/shared/ReorderableList'
 import type { ReorderableRenderState } from '@/client/components/shared/ReorderableList'
 import { Button, buttonVariants } from '@/client/components/ui/button'
 import {
   workspaceDisplayName,
   workspaceProviderIcon
-} from '@/client/features/workspaces/workspace-presentation'
+} from '@/client/features/home/workspace-presentation'
 import { cn } from '@/client/lib/cn'
 import type { WorkspaceEntry } from '@/lib/types'
 

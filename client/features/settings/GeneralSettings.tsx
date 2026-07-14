@@ -6,7 +6,7 @@ import { useLocation } from 'wouter'
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
-import { useRemoveWorkspace } from '@/client/features/workspaces/api'
+import { useRemoveWorkspace } from '@/client/features/home/api'
 
 import { useSaveWorkspaceName } from './api'
 import { IconPicker } from './IconPicker'
