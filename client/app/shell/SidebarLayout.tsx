@@ -68,7 +68,7 @@ function Sidebar({ workspaces }: SidebarProps) {
   const reorder = useReorderWorkspaces()
 
   return (
-    <aside className="flex h-full shrink-0 flex-col px-2 py-5 gap-4 items-center">
+    <aside className="flex h-full shrink-0 flex-col items-center gap-4 px-2 py-5">
       <Link href="/" aria-label="Home" title="Home" className={sidebarNavButtonClass}>
         <IconSmartHome stroke={1.5} />
       </Link>
@@ -140,7 +140,7 @@ function WorkspaceButton({ workspace, dragOverlay = false, dragState }: Workspac
   const active = location === href
   const content = (
     <>
-      <span
+      <div
         className={cn(
           buttonVariants({ variant: 'ghost', size: 'icon-lg' }),
           'pointer-events-none size-12',
@@ -155,15 +155,15 @@ function WorkspaceButton({ workspace, dragOverlay = false, dragState }: Workspac
           alt=""
           className="size-7 shrink-0 rounded-[4px]"
         />
-      </span>
-      <span className="line-clamp-2 h-6 w-full text-center text-[11px] leading-3 font-medium text-foreground">
+      </div>
+      <span className="mt-0.5 line-clamp-2 w-full text-center text-[11px] leading-snug font-medium text-foreground">
         {label}
       </span>
     </>
   )
 
   if (dragOverlay) {
-    return <span className="flex w-14 flex-col items-center gap-0.5">{content}</span>
+    return <span className="flex w-14 flex-col items-center">{content}</span>
   }
 
   return (
@@ -175,7 +175,7 @@ function WorkspaceButton({ workspace, dragOverlay = false, dragState }: Workspac
         if (dragState?.isDragging) event.preventDefault()
       }}
       className={cn(
-        'group flex w-14 flex-col items-center gap-0.5 rounded-sm outline-none',
+        'group flex w-14 flex-col items-center rounded-sm outline-none',
         dragState?.isDragging && 'invisible'
       )}
       {...dragState?.dragHandleProps}
