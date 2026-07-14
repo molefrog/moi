@@ -109,7 +109,7 @@ export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: W
     // positioning context for the bottom panel (which is anchored to this box,
     // not to the grid). The grid lives in a centered max-w container and grows
     // to its natural height.
-    <div className="group relative min-h-0 flex-1">
+    <div className="group/widgets relative min-h-0 flex-1">
       <LayoutGroup>
         <div className="flex h-full flex-col overflow-y-auto p-4">
           <div className="mx-auto mb-4 flex w-full max-w-[var(--column-w)] shrink-0 items-center justify-end gap-2">
@@ -159,7 +159,7 @@ export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: W
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="text-muted-foreground group-hover:opacity-100 [@media(hover:hover)]:opacity-0"
+                    className="text-muted-foreground group-hover/widgets:opacity-100 [@media(hover:hover)]:opacity-0"
                     onClick={() => onEditingChange(true)}
                   >
                     Edit widgets

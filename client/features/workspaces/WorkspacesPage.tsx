@@ -165,7 +165,7 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
         <div title={workspace.path} className="mt-2 truncate text-xs text-muted-foreground">
           {workspace.displayPath ?? workspace.path}
         </div>
-        <div className="mt-1 text-xs text-muted-foreground">{meta}</div>
+        <div className="mt-2 text-xs text-muted-foreground">{meta}</div>
       </div>
     </a>
   )

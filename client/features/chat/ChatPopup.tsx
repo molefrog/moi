@@ -45,7 +45,7 @@ export function ChatPopup({
                   stays legible regardless of the active theme background. */}
               <Button
                 variant="outline"
-                size="icon"
+                size="icon-lg"
                 className="bg-card text-card-foreground hover:bg-card"
                 aria-label="Agent"
               >
