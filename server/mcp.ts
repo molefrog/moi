@@ -1,7 +1,14 @@
 import { query } from '@anthropic-ai/claude-agent-sdk'
-import type { McpServerStatus, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import type {
+  McpServerConfig,
+  McpServerStatus,
+  SDKUserMessage
+} from '@anthropic-ai/claude-agent-sdk'
+import { join } from 'path'
 
 import { debugEnabled } from './debug'
+
+export type McpScope = 'user' | 'project'
 
 // MCP server status probing. Intentionally decoupled from agent chat runs
 // (cc-session.ts): connecting to MCP servers and reading their status is a
@@ -31,9 +38,9 @@ function isSettled(status: McpServerStatus[]): boolean {
 // attention (failed / needs-auth / still-pending) called out by name. The full
 // per-server dump (every `connected` line too) is opt-in via `moi start --debug`.
 // `connected`/`disabled` are the boring majority, so they're folded into counts.
-function logMcpStatus(status: McpServerStatus[]): void {
+function logMcpStatus(scope: McpScope, status: McpServerStatus[]): void {
   if (debugEnabled) {
-    console.log('[mcp]', status.map(s => `${s.name}:${s.status}`).join(', '))
+    console.log(`[mcp:${scope}]`, status.map(s => `${s.name}:${s.status}`).join(', '))
     return
   }
   const connected = status.filter(s => s.status === 'connected').length
@@ -42,10 +49,41 @@ function logMcpStatus(status: McpServerStatus[]): void {
   const parts = [`${connected} connected`]
   if (disabled) parts.push(`${disabled} disabled`)
   for (const s of attention) parts.push(`${s.status}: ${s.name}`)
-  console.log('[mcp]', parts.join(' · '))
+  console.log(`[mcp:${scope}]`, parts.join(' · '))
 }
 
-async function probeMcpStatus(workspacePath: string): Promise<McpServerStatus[]> {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+async function projectMcpServers(workspacePath: string): Promise<Record<string, McpServerConfig>> {
+  const file = Bun.file(join(workspacePath, '.mcp.json'))
+  if (!(await file.exists())) return {}
+
+  const parsed = await file.json().catch(() => null)
+  if (!isRecord(parsed) || !isRecord(parsed.mcpServers)) return {}
+
+  const servers: Record<string, McpServerConfig> = {}
+  for (const [name, config] of Object.entries(parsed.mcpServers)) {
+    // The SDK owns the detailed MCP config union; here we only need to confirm
+    // the project JSON declares an object keyed by server name before passing it
+    // through unchanged.
+    if (isRecord(config)) servers[name] = config as unknown as McpServerConfig
+  }
+  return servers
+}
+
+async function probeMcpStatus(workspacePath: string, scope: McpScope): Promise<McpServerStatus[]> {
+  // Known gap, revisit: the project probe covers only `.mcp.json` (strict), and
+  // the user probe runs from the server's cwd — so servers added via `claude
+  // mcp add` (user scope) or `.claude/settings(.local).json` never appear in
+  // the workspace connectors menu, even though chat sessions still load them
+  // (cc-session runs with settingSources ['user','project']). Surfacing those
+  // scopes here needs a per-workspace user+project probe without double-listing
+  // servers across the menu and the /connectors page.
+  const mcpServers = scope === 'project' ? await projectMcpServers(workspacePath) : undefined
+  if (scope === 'project' && Object.keys(mcpServers ?? {}).length === 0) return []
+
   // A prompt that never yields keeps the session alive without a model turn.
   let release!: () => void
   const done = new Promise<void>(r => (release = r))
@@ -61,7 +99,8 @@ async function probeMcpStatus(workspacePath: string): Promise<McpServerStatus[]>
     options: {
       cwd: workspacePath,
       persistSession: false,
-      settingSources: ['user', 'project'],
+      settingSources: [scope],
+      ...(mcpServers && { mcpServers, strictMcpConfig: true }),
       env: { ...process.env, CLAUDECODE: undefined }
     }
   })
@@ -74,11 +113,17 @@ async function probeMcpStatus(workspacePath: string): Promise<McpServerStatus[]>
       if (isSettled(status)) break
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
     }
-    logMcpStatus(status)
+    logMcpStatus(scope, status)
     return status
   } finally {
     release()
-    await q.close()
+    // This metadata-only probe intentionally never submits a user turn, so the
+    // SDK may report that it was closed before receiving a response.
+    try {
+      q.close()
+    } catch {
+      // The connector status is already settled, so cleanup must not replace it.
+    }
   }
 }
 
@@ -105,21 +150,33 @@ const cache = new Map<string, CacheEntry>()
 // cheap insurance against parallel probes of the same workspace.
 const inflight = new Map<string, Promise<McpServerStatus[]>>()
 
-export async function getMcpStatus(workspacePath: string): Promise<McpServerStatus[]> {
-  const cached = cache.get(workspacePath)
+function cacheKey(scope: McpScope, workspacePath: string): string {
+  return `${scope}:${workspacePath}`
+}
+
+export async function getMcpStatus(
+  workspacePath: string,
+  scope: McpScope = 'project'
+): Promise<McpServerStatus[]> {
+  const key = cacheKey(scope, workspacePath)
+  const cached = cache.get(key)
   if (cached && cached.expiresAt > Date.now()) return cached.status
 
-  const existing = inflight.get(workspacePath)
+  const existing = inflight.get(key)
   if (existing) return existing
 
-  const probe = probeMcpStatus(workspacePath)
+  const probe = probeMcpStatus(workspacePath, scope)
     .then(status => {
       const ttl = ttlFor(status)
-      if (ttl > 0) cache.set(workspacePath, { status, expiresAt: Date.now() + ttl })
+      if (ttl > 0) cache.set(key, { status, expiresAt: Date.now() + ttl })
       return status
     })
-    .finally(() => inflight.delete(workspacePath))
+    .finally(() => inflight.delete(key))
 
-  inflight.set(workspacePath, probe)
+  inflight.set(key, probe)
   return probe
+}
+
+export async function getUserMcpStatus(): Promise<McpServerStatus[]> {
+  return getMcpStatus(process.cwd(), 'user')
 }

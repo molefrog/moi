@@ -23,6 +23,32 @@ export const MOI_PACKAGE_JSON = {
   }
 } as const
 
+// Dependency installation is helpful for editor types and widget builds, but
+// it's not critical — the agent installs on demand if it's missing. So it must
+// never block workspace creation: we wait briefly, then let it finish in the
+// background, with a hard kill as a backstop against a hung registry.
+const INSTALL_WAIT_MS = 10_000
+const INSTALL_TIMEOUT_MS = 120_000
+
+type InstallDependencies = (moiDir: string) => Promise<number>
+
+async function runBunInstall(moiDir: string): Promise<number> {
+  const install = Bun.spawn(['bun', 'install'], {
+    cwd: moiDir,
+    stdout: 'ignore',
+    stderr: 'inherit',
+    timeout: INSTALL_TIMEOUT_MS,
+    killSignal: 'SIGKILL'
+  })
+  // Don't hold the event loop open for a backgrounded install: a short-lived
+  // CLI (`moi init`) must exit after the wait, not linger until the child
+  // does. The child survives parent exit and finishes the install on its own
+  // (verified: orphaned bun processes complete; only the 2-minute kill is no
+  // longer enforced once the parent is gone).
+  install.unref()
+  return install.exited
+}
+
 // Ambient types for applets (widgets & views). Editor DX only — the moi
 // bundler resolves the `moi` module and asset imports at build time without any
 // declarations. Lives at `.moi/` root, NOT inside widgets/views, so it isn't
@@ -55,8 +81,13 @@ declare module '*.svg' { const s: string; export default s }
 // Bootstraps `.moi/` ONLY when it doesn't exist yet. Re-running `moi init`
 // on an existing workspace overwrites skills but must leave the user's
 // `.moi/` (their deps, widgets, lockfile) completely untouched.
-// Returns 'exists' when skipped, otherwise the `bun install` exit code.
-export async function scaffoldMoiDir(workspacePath: string): Promise<'exists' | number> {
+// Returns 'exists' when skipped, 'installing' when `bun install` outlived the
+// wait and continues in the background, otherwise the install exit code.
+export async function scaffoldMoiDir(
+  workspacePath: string,
+  installDependencies: InstallDependencies = runBunInstall,
+  installWaitMs: number = INSTALL_WAIT_MS
+): Promise<'exists' | 'installing' | number> {
   // Backstop against the nested-workspace bug: never scaffold a `.moi/` *inside*
   // another workspace's `.moi/` (which produces the junk `.moi/.moi`). Callers
   // (`moi init`) lift to the workspace root via `liftToWorkspaceRoot` first, so
@@ -68,18 +99,32 @@ export async function scaffoldMoiDir(workspacePath: string): Promise<'exists' | 
     )
   }
   const moiDir = join(workspacePath, '.moi')
-  if (await Bun.file(join(moiDir, 'package.json')).exists()) return 'exists'
+  const packagePath = join(moiDir, 'package.json')
+  if (await Bun.file(packagePath).exists()) return 'exists'
   // A bare `.moi/` dir without package.json counts as not-bootstrapped —
   // fill in the missing pieces.
 
   await mkdir(join(moiDir, 'widgets'), { recursive: true })
-  await Bun.write(join(moiDir, 'package.json'), JSON.stringify(MOI_PACKAGE_JSON, null, 2) + '\n')
+  await Bun.write(packagePath, JSON.stringify(MOI_PACKAGE_JSON, null, 2) + '\n')
   await Bun.write(join(moiDir, 'applet-env.d.ts'), APPLET_ENV_DTS)
 
-  const install = Bun.spawn(['bun', 'install'], {
-    cwd: moiDir,
-    stdout: 'ignore',
-    stderr: 'inherit'
-  })
-  return await install.exited
+  const exited = installDependencies(moiDir)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const result = await Promise.race([
+    exited,
+    new Promise<'installing'>(r => (timer = setTimeout(() => r('installing'), installWaitMs)))
+  ])
+  clearTimeout(timer)
+
+  if (result === 'installing') {
+    console.log(`[scaffold] bun install in ${moiDir} still running — continuing in the background`)
+    exited.then(code => {
+      if (code === 0) console.log(`[scaffold] background bun install in ${moiDir} finished`)
+      else
+        console.warn(
+          `[scaffold] background bun install in ${moiDir} failed (exit ${code}) — the agent will install deps on demand`
+        )
+    })
+  }
+  return result
 }

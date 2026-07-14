@@ -92,6 +92,22 @@ export async function listWorkspaces(): Promise<WorkspaceEntry[]> {
   return entries.map(withDisplayPath)
 }
 
+export async function reorderWorkspaces(ids: string[]): Promise<WorkspaceEntry[]> {
+  const entries = await readRegistry()
+  if (ids.length !== entries.length) throw new Error('Workspace order must include every workspace')
+
+  const unique = new Set(ids)
+  if (unique.size !== ids.length) throw new Error('Workspace order contains duplicate ids')
+
+  const byId = new Map(entries.map(e => [e.id, e]))
+  const next = ids.map(id => byId.get(id))
+  if (next.some(e => !e)) throw new Error('Workspace order contains unknown ids')
+
+  const ordered = next as WorkspaceEntry[]
+  await writeRegistry(ordered)
+  return ordered.map(withDisplayPath)
+}
+
 // Resolve a path to the registered workspace that *contains* it: the entry
 // whose path equals `reqPath` or is its nearest ancestor (longest matching
 // prefix, git-style). This lets workspace-scoped commands (e.g. `moi bundle`)

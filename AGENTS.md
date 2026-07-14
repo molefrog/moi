@@ -25,6 +25,10 @@ Claude-only config (`.claude/settings.json` hooks, `.claude/launch.json`) stays 
 
 Client connects via WebSocket. Agent responses stream back and are broadcast to all clients.
 
+## Main app design
+
+`DESIGN.md` is the canonical design guidance for the main app frontend. Before editing host app UI in `client/` (`*.tsx` or `*.css`), read `DESIGN.md` together with `client/AGENTS.md` and the relevant `.agents/rules/` files. It applies to the app shell, chat, settings, menus, workspace list, tabs, panels, and host widget/view chrome. It does **not** govern workspace widget/view internals or generated applets; use workspace-local design guidance for those.
+
 ## Commands
 
 - `bun run dev` — Start the dev server on port 13337 (alias for `bun server/cli.ts start --dev`).

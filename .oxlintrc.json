@@ -5,7 +5,7 @@
   "env": { "browser": true, "node": true, "builtin": true },
   "ignorePatterns": [
     "node_modules",
-    "workspace",
+    "workspace/**",
     "server/workspace",
     "server/test/__fixtures__",
     "client/vendor"

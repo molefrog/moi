@@ -9,7 +9,7 @@ A widget is **glanceable in under 2 seconds** — and earns **one signature mome
 - **Content-only root.** The root is a plain `w-full h-full` rectangle. The host card owns the shell — never put `rounded-*`, an outer `border`, `shadow-*`, or a card-surface background on the root. Use `flex flex-col` + `overflow-hidden`; push footers down with `mt-auto`.
 - **Three states, always.** Loading → skeleton (never a spinner). Error → one human sentence + a retry. Empty → a short prompt, never blank. (Patterns below.)
 - **Height is the hard constraint.** `height = rowSpan×160 + (rowSpan−1)×16`, exact. Width flexes with the viewport. Design for height first; clip risk → `overflow-hidden`, long text → `truncate` / `line-clamp`.
-- **Tailwind for static styling.** No custom CSS, no `@apply`, no *static* `style={{}}`. Icons only from `@tabler/icons-react` (no raw `<svg>`, no other icon packs). Widgets import only from their own folder.
+- **Tailwind for static styling.** No custom CSS, no `@apply`, no *static* `style={{}}`. Icons only from `@tabler/icons-react` (no raw `<svg>`, no other icon packs). Use the host project icon rule when present (`.agents/rules/icons.md`) instead of duplicating size/stroke guidance. Widgets import only from their own folder.
 - **No auto-playing audio or video.** Media is always user-initiated.
 - **No page-level horizontal scroll.** A deliberate, bounded internal scroller (e.g. a Kanban board) is fine; the widget itself never makes the page scroll sideways.
 

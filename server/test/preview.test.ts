@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
 
-import { readImageRelPath } from '@/client/components/tool-group/ReadImagePreview'
+import { readImageRelPath } from '@/client/features/chat/tool-group/ReadImagePreview'
 import type { ToolCall } from '@/lib/types'
 
 import { serveWorkspaceImagePreview } from '../preview'

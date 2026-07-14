@@ -9,6 +9,7 @@ import {
   liftToWorkspaceRoot,
   listWorkspaces,
   registerWorkspace,
+  reorderWorkspaces,
   setRegistryPath
 } from './registry'
 
@@ -64,6 +65,70 @@ describe('listWorkspaces', () => {
     expect(list).toHaveLength(2)
     expect(list.map(e => e.path)).toContain('/Users/foo/project-a')
     expect(list.map(e => e.path)).toContain('/Users/foo/project-b')
+  })
+})
+
+describe('reorderWorkspaces', () => {
+  test('persists workspace order', async () => {
+    const a = await registerWorkspace('/Users/foo/project-a')
+    const b = await registerWorkspace('/Users/foo/project-b')
+    const c = await registerWorkspace('/Users/foo/project-c')
+
+    await reorderWorkspaces([c.id, a.id, b.id])
+
+    const list = await listWorkspaces()
+    expect(list.map(e => e.id)).toEqual([c.id, a.id, b.id])
+  })
+
+  test('rejects missing ids', async () => {
+    const a = await registerWorkspace('/Users/foo/project-a')
+    await registerWorkspace('/Users/foo/project-b')
+
+    await expect(reorderWorkspaces([a.id])).rejects.toThrow(
+      'Workspace order must include every workspace'
+    )
+  })
+
+  test('rejects duplicate ids', async () => {
+    const a = await registerWorkspace('/Users/foo/project-a')
+    await registerWorkspace('/Users/foo/project-b')
+
+    await expect(reorderWorkspaces([a.id, a.id])).rejects.toThrow(
+      'Workspace order contains duplicate ids'
+    )
+  })
+
+  test('rejects unknown ids', async () => {
+    const a = await registerWorkspace('/Users/foo/project-a')
+    await registerWorkspace('/Users/foo/project-b')
+
+    await expect(reorderWorkspaces([a.id, 'missing'])).rejects.toThrow(
+      'Workspace order contains unknown ids'
+    )
+  })
+
+  test('preserves workspace metadata', async () => {
+    const a = await registerWorkspace('/Users/foo/project-a', {
+      type: 'openclaw',
+      name: 'Agent A',
+      agentId: 'agent-a',
+      isDefault: true,
+      lastRunAt: '2026-07-08T10:00:00.000Z'
+    })
+    const b = await registerWorkspace('/Users/foo/project-b', { type: 'claude-code' })
+
+    await reorderWorkspaces([b.id, a.id])
+
+    const list = await listWorkspaces()
+    expect(list[1]).toMatchObject({
+      id: a.id,
+      path: '/Users/foo/project-a',
+      type: 'openclaw',
+      name: 'Agent A',
+      agentId: 'agent-a',
+      isDefault: true,
+      lastRunAt: '2026-07-08T10:00:00.000Z'
+    })
   })
 })
 

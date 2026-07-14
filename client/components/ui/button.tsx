@@ -10,15 +10,18 @@ const buttonVariants = cva(
       variant: {
         default:
           'bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100',
-        secondary: 'bg-muted text-foreground hover:bg-muted/80',
-        outline: 'bg-background shadow-sm hover:bg-muted hover:text-foreground',
-        ghost: 'hover:bg-muted'
+        secondary: 'bg-muted text-foreground hover:bg-accent hover:text-accent-foreground',
+        outline: 'bg-background shadow-sm hover:bg-accent hover:text-accent-foreground',
+        ghost: 'hover:bg-accent hover:text-accent-foreground',
+        destructive:
+          'bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20'
       },
       size: {
-        sm: 'h-6 gap-1 rounded-xs px-2 text-xs has-[>svg]:px-1.5 [&_svg]:size-4',
-        default: 'h-8 px-3 has-[>svg]:px-2.5 [&_svg]:size-5',
-        lg: 'h-10 rounded-lg px-4 has-[>svg]:px-3 [&_svg]:size-5',
-        'icon-sm': 'size-6 rounded-xs [&_svg]:size-4',
+        sm: 'h-7 gap-1.5 rounded-xs px-2.5 text-sm has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg]:size-4',
+        default:
+          'h-8 px-3 has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5 [&_svg]:size-5',
+        lg: 'h-10 rounded-lg px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3 [&_svg]:size-5',
+        'icon-sm': 'size-7 rounded-xs [&_svg]:size-4',
         icon: 'size-8 [&_svg]:size-5',
         'icon-lg': 'size-10 rounded-lg [&_svg]:size-5'
       }

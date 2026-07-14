@@ -248,8 +248,11 @@ const init = defineCommand({
       agent ? 'openclaw' : 'claude-code'
     )
     if (scaffold !== 'exists') {
-      console.log(pc.dim('  Installed widget dependencies in .moi/'))
-      if (scaffold !== 0) {
+      if (scaffold === 'installing') {
+        console.log(pc.dim('  Widget dependencies still installing in .moi/ (background)'))
+      } else if (scaffold === 0) {
+        console.log(pc.dim('  Installed widget dependencies in .moi/'))
+      } else {
         console.warn(pc.yellow('  bun install failed — run it manually in .moi/'))
       }
     }
@@ -914,9 +917,12 @@ const openclawInit = defineCommand({
     // the folder and its dependencies exist. Existing `.moi/` stays untouched.
     const { scaffold, skillsDir: skillsRoot } = await provisionWorkspace(target.path, 'openclaw')
     if (scaffold !== 'exists') {
-      console.log('\n' + pc.dim('  Installed widget dependencies in .moi/'))
-      if (scaffold !== 0) {
-        console.warn(pc.yellow('  bun install failed — run it manually in .moi/'))
+      if (scaffold === 'installing') {
+        console.log('\n' + pc.dim('  Widget dependencies still installing in .moi/ (background)'))
+      } else if (scaffold === 0) {
+        console.log('\n' + pc.dim('  Installed widget dependencies in .moi/'))
+      } else {
+        console.warn('\n' + pc.yellow('  bun install failed — run it manually in .moi/'))
       }
     }
 
