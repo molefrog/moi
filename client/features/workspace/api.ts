@@ -3,12 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import type {
-  ViewInfo,
-  WidgetInfo,
-  WorkspaceLayout,
-  WorkspaceType
-} from '@/lib/types'
+import type { ViewInfo, WidgetInfo, WorkspaceLayout, WorkspaceType } from '@/lib/types'
 
 export type WorkspaceLayoutResponse = WorkspaceLayout & {
   cwd: string
@@ -42,9 +37,7 @@ export function useWorkspaceViews(workspaceId: string) {
   return useQuery<ViewInfo[]>({
     queryKey: workspaceKeys.views(workspaceId),
     queryFn: async () => {
-      const data = await requestJson<{ views: ViewInfo[] }>(
-        `/api/workspaces/${workspaceId}/views`
-      )
+      const data = await requestJson<{ views: ViewInfo[] }>(`/api/workspaces/${workspaceId}/views`)
       return data.views
     },
     ...WORKSPACE_RESOURCE_OPTIONS

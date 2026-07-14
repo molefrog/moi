@@ -3,7 +3,7 @@
 plugins = [
   "bun-plugin-tailwind",
   "./client/externalize-react.ts",
-  "./client/accept-hmr-dependencies.ts",
+  "./client/accept-hmr-dependencies.ts"
 ]
 # Inline only PUBLIC_*-prefixed env vars into the client bundle (e.g. the tldraw
 # license key, PUBLIC_TLDRAW_LICENSE_KEY). The prefix keeps private secrets out

@@ -6,7 +6,6 @@ import { cn } from '@/client/lib/cn'
 import { COLOR_THEMES, type ColorThemeConfig, FONT_THEMES } from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/types'
 
-
 const ALL_FONT_PREVIEW_ID = 'mei-font-previews'
 const ALL_FONTS_QUERY = Object.values(FONT_THEMES)
   .map(f => f.googleFontsQuery)
