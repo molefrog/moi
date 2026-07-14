@@ -154,7 +154,7 @@ function WorkspaceTabPreview({ tab, active }: WorkspaceTabPreviewProps) {
       })}
     >
       <WorkspaceTabContent tab={tab} />
-      {tab.closable && <IconX className="size-3!" stroke={1.75} />}
+      {tab.closable && <IconCircleXFilled className="size-3!" stroke={1.75} />}
     </div>
   )
 }
