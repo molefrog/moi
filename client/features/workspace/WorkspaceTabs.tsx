@@ -125,12 +125,18 @@ function WorkspaceTab(props: WorkspaceTabProps) {
       })}
       {...(props.preview ? {} : props.state.dragHandleProps)}
     >
-      <div className="flex items-center gap-1 overflow-hidden group-hover/tab:mr-3">
+      <div
+        className={cn(
+          'flex items-center gap-1 overflow-hidden',
+          tab.closable && 'group-hover/tab:mr-3'
+        )}
+      >
         <tab.Icon data-icon="inline-start" stroke={1.75} />
         <span
           className={cn(
             'truncate',
-            'group-hover/tab:-mr-3 group-hover/tab:mask-r-from-[calc(100%-24px)] group-hover/tab:mask-r-to-[calc(100%-12px)]'
+            tab.closable &&
+              'group-hover/tab:-mr-3 group-hover/tab:mask-r-from-[calc(100%-24px)] group-hover/tab:mask-r-to-[calc(100%-12px)]'
           )}
         >
           {tab.label}
