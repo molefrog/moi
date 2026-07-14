@@ -37,11 +37,16 @@ type SidebarLayoutProps = {
 export function SidebarLayout({ children, panel = 'default' }: SidebarLayoutProps) {
   const { data: workspaces } = useWorkspaces()
 
-  // `moi config` / the settings modal broadcast `workspace:updated`; refetch the
-  // list so the sidebar reflects new names/icons live.
+  // `moi config` / the settings modal broadcast `workspace:updated` (identity
+  // changes) and reorder/create broadcast `workspaces-list:updated`; refetch the
+  // list so the sidebar reflects it live. Exact: `workspaceKeys.all` is the
+  // prefix of every workspace query — a prefix invalidation would refetch
+  // transcripts, widgets, and MCP probes in every connected client.
   const qc = useQueryClient()
   useWorkspaceEvent(e => {
-    if (e.type === 'workspace:updated') qc.invalidateQueries({ queryKey: workspaceKeys.all })
+    if (e.type === 'workspace:updated' || e.type === 'workspaces-list:updated') {
+      qc.invalidateQueries({ queryKey: workspaceKeys.all, exact: true })
+    }
   })
 
   return (

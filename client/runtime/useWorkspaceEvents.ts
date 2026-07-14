@@ -11,6 +11,9 @@ export type WorkspaceEvent =
   | { type: 'view-layout:updated'; views: ViewInfo[] }
   | { type: 'theme:updated' }
   | { type: 'workspace:updated' }
+  // The registry list changed (reorder, create) without touching any open
+  // workspace's layout — clients refetch just the sidebar list.
+  | { type: 'workspaces-list:updated' }
   // A workspace's env changed outside the UI — refetch the env view.
   | { type: 'env:updated'; workspaceId: string }
   // The Scratchpad canvas for `workspaceId` was saved — open tabs reload from

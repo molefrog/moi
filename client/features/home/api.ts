@@ -107,7 +107,10 @@ export function useReorderWorkspaces() {
     mutationFn: ids =>
       requestJson('/api/workspaces/order', jsonRequest('PUT', { ids }), 'Failed to reorder spaces'),
     onMutate: async ids => {
-      await queryClient.cancelQueries({ queryKey: workspaceKeys.all })
+      // Exact: only pause the workspace list itself — a prefix cancel would
+      // abort unrelated in-flight fetches (transcripts, widgets) that never
+      // retry on their own.
+      await queryClient.cancelQueries({ queryKey: workspaceKeys.all, exact: true })
       const previous = queryClient.getQueryData<WorkspaceEntry[]>(workspaceKeys.all)
       if (previous) {
         const byId = new Map(previous.map(entry => [entry.id, entry]))
@@ -122,7 +125,7 @@ export function useReorderWorkspaces() {
     },
     onError: (_error, _ids, context) => {
       if (context?.previous) queryClient.setQueryData(workspaceKeys.all, context.previous)
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.all })
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.all, exact: true })
     },
     onSuccess: entries => {
       queryClient.setQueryData(workspaceKeys.all, entries)

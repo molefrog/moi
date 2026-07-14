@@ -523,7 +523,10 @@ workspaces.put('/order', async c => {
   }
   try {
     const entries = await reorderWorkspaces(body.ids)
-    publishEvent({ type: 'workspace:updated' })
+    // List-only change: a narrow event so clients refetch just the sidebar
+    // list, not every per-workspace query (`workspace:updated` also triggers
+    // layout refetches in open workspaces).
+    publishEvent({ type: 'workspaces-list:updated' })
     return c.json(await mergeWorkspaceList(entries))
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -591,7 +594,7 @@ workspaces.post('/create', async c => {
   }
   const entry = await registerWorkspace(path, { type: 'claude-code' })
   // Nudge every connected client (the sidebar list) to refetch.
-  publishEvent({ type: 'workspace:updated' })
+  publishEvent({ type: 'workspaces-list:updated' })
   return c.json(entry, 201)
 })
 
@@ -600,12 +603,21 @@ workspaces.post('/create', async c => {
 // spawning a second Finder dialog on top of the first.
 let folderPickerOpen = false
 
-function isSameOriginRequest(req: Request): boolean {
-  if (req.headers.get('sec-fetch-site') === 'cross-site') return false
+export function isSameOriginRequest(req: Request): boolean {
+  const site = req.headers.get('sec-fetch-site')
+  if (site === 'cross-site') return false
+  // Modern browsers state the relationship directly — trust it. Reaching the
+  // Origin fallback below with a full-origin comparison would 403 every request
+  // behind a TLS-terminating proxy (Cloudflare Tunnel, nginx, ngrok — see
+  // client/lib/ws-url.ts): the browser sends `https://…` while `req.url` is
+  // built from the plain-HTTP listener.
+  if (site === 'same-origin') return true
   const origin = req.headers.get('origin')
   if (!origin) return true
+  // Older browsers without sec-fetch-site: compare hosts only, since the
+  // scheme the browser saw is unknowable behind TLS termination.
   try {
-    return new URL(origin).origin === new URL(req.url).origin
+    return new URL(origin).host === new URL(req.url).host
   } catch {
     return false
   }

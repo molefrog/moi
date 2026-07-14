@@ -74,6 +74,13 @@ async function projectMcpServers(workspacePath: string): Promise<Record<string, 
 }
 
 async function probeMcpStatus(workspacePath: string, scope: McpScope): Promise<McpServerStatus[]> {
+  // Known gap, revisit: the project probe covers only `.mcp.json` (strict), and
+  // the user probe runs from the server's cwd — so servers added via `claude
+  // mcp add` (user scope) or `.claude/settings(.local).json` never appear in
+  // the workspace connectors menu, even though chat sessions still load them
+  // (cc-session runs with settingSources ['user','project']). Surfacing those
+  // scopes here needs a per-workspace user+project probe without double-listing
+  // servers across the menu and the /connectors page.
   const mcpServers = scope === 'project' ? await projectMcpServers(workspacePath) : undefined
   if (scope === 'project' && Object.keys(mcpServers ?? {}).length === 0) return []
 

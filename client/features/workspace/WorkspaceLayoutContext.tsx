@@ -79,13 +79,19 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       const prev = qc.getQueryData<WorkspaceLayoutResponse>(key)
       if (!prev) return
       // Optimistic: the grid/theme reflects the change before the PUT lands.
-      qc.setQueryData<WorkspaceLayoutResponse>(key, { ...prev, ...update })
+      const next = { ...prev, ...update }
+      qc.setQueryData<WorkspaceLayoutResponse>(key, next)
 
       if (timer.current) clearTimeout(timer.current)
+      // Persist the value captured at call time, NOT the cache at fire time: a
+      // `workspace:updated` broadcast can invalidate + refetch this query inside
+      // the debounce window, and reading the cache then would PUT the server's
+      // pre-change layout back (reverting the user's edit on disk). Rapid calls
+      // still coalesce — each call's `prev` already includes the previous
+      // optimistic write.
       timer.current = setTimeout(() => {
         timer.current = null
-        const latest = qc.getQueryData<WorkspaceLayoutResponse>(key)
-        if (latest) saveRef.current(stripMeta(latest))
+        saveRef.current(stripMeta(next))
       }, 600)
     },
     [id, qc]
