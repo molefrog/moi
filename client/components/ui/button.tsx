@@ -17,9 +17,10 @@ const buttonVariants = cva(
           'bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20'
       },
       size: {
-        sm: 'h-7 gap-1.5 rounded-xs px-2.5 text-sm has-[>svg]:px-2 [&_svg]:size-4',
-        default: 'h-8 px-3 has-[>svg]:px-2.5 [&_svg]:size-5',
-        lg: 'h-10 rounded-lg px-4 has-[>svg]:px-3 [&_svg]:size-5',
+        sm: 'h-7 gap-1.5 rounded-xs px-2.5 text-sm has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg]:size-4',
+        default:
+          'h-8 px-3 has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5 [&_svg]:size-5',
+        lg: 'h-10 rounded-lg px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3 [&_svg]:size-5',
         'icon-sm': 'size-7 rounded-xs [&_svg]:size-4',
         icon: 'size-8 [&_svg]:size-5',
         'icon-lg': 'size-10 rounded-lg [&_svg]:size-5'
