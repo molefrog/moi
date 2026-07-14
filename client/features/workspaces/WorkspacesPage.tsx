@@ -12,7 +12,8 @@ import { cn } from '@/client/lib/cn'
 import { useUiStore } from '@/client/store/ui'
 import {
   WorkspaceTypeIcon,
-  workspaceDisplayName
+  workspaceDisplayName,
+  workspaceProviderIcon
 } from '@/client/features/workspaces/workspace-presentation'
 import type { DiscoveredWorkspace, WorkspaceEntry } from '@/lib/types'
 
@@ -154,7 +155,11 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
       <WorkspacePreview workspaceId={workspace.id} />
       <div className="flex min-w-0 flex-col px-2 pb-2">
         <div className="flex min-w-0 items-center gap-2">
-          <WorkspaceTypeIcon type={workspace.type ?? 'claude-code'} />
+          <img
+            src={workspace.icon ?? workspaceProviderIcon[workspace.type ?? 'claude-code']}
+            alt=""
+            className="size-4 shrink-0 rounded-[4px]"
+          />
           <span className="truncate text-sm font-medium text-foreground">{name}</span>
         </div>
         <div title={workspace.path} className="mt-2 truncate text-xs text-muted-foreground">
