@@ -22,7 +22,7 @@ export async function requestVoid(
   if (!response.ok) throw await errorFrom(response, error)
 }
 
-export function jsonRequest(method: 'POST' | 'PUT', body?: unknown): RequestInit {
+export function jsonRequest(method: 'POST' | 'PUT' | 'PATCH', body?: unknown): RequestInit {
   return {
     method,
     headers: { 'Content-Type': 'application/json' },

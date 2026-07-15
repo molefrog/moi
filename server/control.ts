@@ -2,6 +2,7 @@ import { resolve } from 'path'
 
 import type { WorkspaceEntry } from '@/lib/types'
 
+import { serializeWorkspaceBundle } from './bundle-queue'
 import { CONTROL_PORT } from './constants'
 import { applyEnvChanged } from './env-apply'
 import { processIcon } from './icon'
@@ -14,7 +15,8 @@ import { relayScratchOp } from './scratchpad-relay'
 import { broadcastAll } from './state'
 import { applyThemeUpdate, matchColorTheme } from './theme'
 import { handleBundle } from './widgets'
-import { handleBundleViews } from './views'
+import { handleBundleViews, hasViewId } from './views'
+import { ViewBuilderError, claimViewBuilder, listViewBuilders } from './view-builders'
 import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
 
 type ControlSocket = { send(data: string): void }
@@ -91,17 +93,64 @@ export const control = Bun.serve({
             status: string
             error?: string
           }[] = []
-          if (only !== 'views') {
-            for (const r of await handleBundle(publishEvent, workspacePath, force)) {
-              results.push({ kind: 'widget', name: r.name, status: r.status, error: r.error })
+          await serializeWorkspaceBundle(workspacePath, async () => {
+            if (only !== 'views') {
+              for (const r of await handleBundle(publishEvent, workspacePath, force)) {
+                results.push({ kind: 'widget', name: r.name, status: r.status, error: r.error })
+              }
             }
-          }
-          if (only !== 'widgets') {
-            for (const r of await handleBundleViews(publishEvent, workspacePath, force)) {
-              results.push({ kind: 'view', name: r.name, status: r.status, error: r.error })
+            if (only !== 'widgets') {
+              for (const r of await handleBundleViews(
+                publishEvent,
+                match.id,
+                workspacePath,
+                force
+              )) {
+                results.push({ kind: 'view', name: r.name, status: r.status, error: r.error })
+              }
             }
-          }
+          })
           ws.send(JSON.stringify({ ok: true, workspacePath, results }))
+          return
+        }
+
+        if (data.type === 'view-builder:claim') {
+          const match = await resolveWorkspace(ws, data.path)
+          if (!match) return
+          const builderId = typeof data.builder === 'string' ? data.builder.trim() : ''
+          const viewId = typeof data.id === 'string' ? data.id.trim() : ''
+          const title = typeof data.title === 'string' ? data.title.trim() : ''
+          if (!builderId || !viewId || !title) {
+            ws.send(JSON.stringify({ error: 'Builder, view id, and title are required' }))
+            return
+          }
+          if (!/^[a-z0-9][a-z0-9_-]*$/.test(viewId)) {
+            ws.send(
+              JSON.stringify({
+                error:
+                  'View id must start with a lowercase letter or number and use a-z, 0-9, _, or -'
+              })
+            )
+            return
+          }
+          try {
+            const current = (await listViewBuilders(match.path)).find(
+              builder => builder.id === builderId
+            )
+            if (current?.viewId !== viewId && (await hasViewId(match.path, viewId))) {
+              ws.send(JSON.stringify({ error: `View id "${viewId}" already exists` }))
+              return
+            }
+            const builder = await claimViewBuilder(match.id, match.path, builderId, viewId, title)
+            ws.send(JSON.stringify({ ok: true, builder, workspacePath: match.path }))
+          } catch (err) {
+            ws.send(
+              JSON.stringify({
+                error:
+                  err instanceof ViewBuilderError ? err.message : 'Could not claim view builder'
+              })
+            )
+          }
           return
         }
 

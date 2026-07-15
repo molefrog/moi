@@ -12,6 +12,7 @@
 //   - Disk persistence — the gateway is the source of truth; we re-seed from
 //     `sessions.get` on cold start.
 import { appendAttachmentNote } from '@/lib/attachment-note'
+import { stripViewBuilderMeta } from '@/lib/view-builder-meta'
 import { applyEvent, emptyViewState } from '@/lib/format'
 import type { StreamEvent, ViewState } from '@/lib/types'
 
@@ -29,6 +30,11 @@ import {
 import { getGateway, onGatewayReconnected } from './openclaw-gateway'
 import { broadcast } from './state'
 import { materializeToPath, resolveUploads } from './uploads'
+import {
+  markViewBuilderBuildingBySession,
+  markViewBuilderWaitingBySession,
+  renameViewBuilderSession
+} from './view-builders'
 
 type OpenClawSessionKey = string // the gateway-side composite key, e.g. `agent:main:main`
 
@@ -108,6 +114,11 @@ function setProcessing(rec: SessionRecord, processing: boolean, runId: string | 
   })
   if (existing?.processing === processing) return
   broadcast(rec.workspaceId, { type: 'status', sessionId: rec.sessionId, processing })
+  if (processing) {
+    void markViewBuilderBuildingBySession(rec.workspaceId, rec.workspacePath, rec.sessionId)
+  } else {
+    void markViewBuilderWaitingBySession(rec.workspaceId, rec.workspacePath, rec.sessionId)
+  }
 }
 
 // On run end the gateway has flushed every durable row — including
@@ -419,6 +430,12 @@ async function sendOpenClawMessageImpl(input: {
           to: created.sessionId
         })
         realSessionId = created.sessionId
+        await renameViewBuilderSession(
+          input.workspaceId,
+          input.workspacePath,
+          input.sessionId,
+          realSessionId
+        )
       }
     }
     rec = await getOrCreateOpenClawSession({
@@ -428,16 +445,26 @@ async function sendOpenClawMessageImpl(input: {
       sessionId: realSessionId
     })
   } catch (err) {
+    const message = err instanceof Error ? err.message : 'failed to start session'
     broadcast(input.workspaceId, {
       kind: 'error',
       sessionId: realSessionId,
-      content: err instanceof Error ? err.message : 'failed to start session'
+      content: message
     })
-    return
+    await markViewBuilderWaitingBySession(
+      input.workspaceId,
+      input.workspacePath,
+      realSessionId,
+      message
+    )
+    throw err
   }
 
   if (input.optimisticId) {
-    rec.pendingUserEchoes.push({ optimisticId: input.optimisticId, text: input.content })
+    rec.pendingUserEchoes.push({
+      optimisticId: input.optimisticId,
+      text: stripViewBuilderMeta(input.content)
+    })
     if (rec.pendingUserEchoes.length > MAX_PENDING_USER_ECHOES) {
       rec.pendingUserEchoes.shift()
     }
@@ -459,11 +486,19 @@ async function sendOpenClawMessageImpl(input: {
       const idx = rec.pendingUserEchoes.findIndex(e => e.optimisticId === input.optimisticId)
       if (idx >= 0) rec.pendingUserEchoes.splice(idx, 1)
     }
+    const message = err instanceof Error ? err.message : 'send failed'
     broadcast(rec.workspaceId, {
       kind: 'error',
       sessionId: rec.sessionId,
-      content: err instanceof Error ? err.message : 'send failed'
+      content: message
     })
+    await markViewBuilderWaitingBySession(
+      rec.workspaceId,
+      rec.workspacePath,
+      rec.sessionId,
+      message
+    )
+    throw err
   }
 }
 

@@ -29,6 +29,24 @@ export type ViewInfo = {
   config: ViewConfig
 }
 
+export type ViewBuilderStatus = 'draft' | 'building' | 'waiting' | 'ready'
+
+export type ViewBuilderInput = {
+  requirements: string
+}
+
+export type ViewBuilder = {
+  id: string
+  status: ViewBuilderStatus
+  input: ViewBuilderInput
+  sessionId: string
+  viewId?: string
+  title?: string
+  error?: string
+  createdAt: number
+  updatedAt: number
+}
+
 // A Scratchpad draw/view operation issued by `moi scratch`. Mutations run
 // server-side against a headless tldraw store; `view` relays to a live tab. The
 // server assigns each add op a `name` (the `--id`, or a generated one) so the
@@ -352,7 +370,12 @@ export type LayoutGridItem = { i: string; x: number; y: number }
 //   split      — Agent chat as a left column, workspace content on the right
 export type LayoutMode = 'fullscreen' | 'split'
 
-export type WorkspaceTabId = 'agent' | 'widgets' | 'scratchpad' | `view:${string}`
+export type WorkspaceTabId =
+  | 'agent'
+  | 'widgets'
+  | 'scratchpad'
+  | `view:${string}`
+  | `view-builder:${string}`
 
 export type WorkspaceTabsState = {
   open: WorkspaceTabId[]

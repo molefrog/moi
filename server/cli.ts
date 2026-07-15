@@ -480,6 +480,60 @@ const bundle = defineCommand({
   }
 })
 
+const viewBuilderClaim = defineCommand({
+  meta: { name: 'claim', description: 'Claim the id and title for a view builder' },
+  args: {
+    builder: { type: 'string', required: true, description: 'View builder id' },
+    id: { type: 'string', required: true, description: 'Stable view id' },
+    title: { type: 'string', required: true, description: 'View title' },
+    dir: {
+      type: 'positional',
+      default: '.',
+      description: 'Workspace directory (default: current)'
+    }
+  },
+  run({ args }) {
+    const path = resolve(args.dir)
+    const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
+    ws.onopen = () =>
+      ws.send(
+        JSON.stringify({
+          type: 'view-builder:claim',
+          path,
+          builder: args.builder,
+          id: args.id,
+          title: args.title
+        })
+      )
+    ws.onmessage = event => {
+      const result = JSON.parse(String(event.data))
+      if (result.error) {
+        console.error('\n' + pc.red(pc.bold('Error:')) + ' ' + result.error + '\n')
+        ws.close()
+        process.exit(1)
+      }
+      console.log(
+        '\n' +
+          pc.green('✓') +
+          ' View builder claimed ' +
+          pc.bold(String(result.builder?.viewId ?? args.id)) +
+          '\n'
+      )
+      ws.close()
+      process.exit(0)
+    }
+    ws.onerror = () => {
+      console.error('Could not connect to control server. Is the main process running?')
+      process.exit(1)
+    }
+  }
+})
+
+const viewBuilder = defineCommand({
+  meta: { name: 'view-builder', description: 'Manage an active view builder' },
+  subCommands: { claim: viewBuilderClaim }
+})
+
 const refresh = defineCommand({
   meta: {
     name: 'refresh',
@@ -1730,6 +1784,7 @@ const main = defineCommand({
     init,
     start,
     bundle,
+    'view-builder': viewBuilder,
     refresh,
     theme,
     config,

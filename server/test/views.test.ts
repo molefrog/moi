@@ -5,6 +5,7 @@ import { join } from 'path'
 import {
   buildAllViews,
   collectViewRequiredEnv,
+  hasViewId,
   listViews,
   reconcileOrder,
   serveView
@@ -94,6 +95,19 @@ describe('listViews', () => {
 
   test('empty when nothing is built', async () => {
     expect(await views()).toEqual([])
+  })
+})
+
+describe('hasViewId', () => {
+  test('finds source and built view ids', async () => {
+    const sourceDir = join(WS, '.moi', 'views')
+    mkdirSync(sourceDir, { recursive: true })
+    writeFileSync(join(sourceDir, 'source-view.tsx'), 'export default function View() {}')
+    seed(['built-view'], { config: {}, order: ['built-view'] })
+
+    expect(await hasViewId(WS, 'source-view')).toBe(true)
+    expect(await hasViewId(WS, 'built-view')).toBe(true)
+    expect(await hasViewId(WS, 'available-view')).toBe(false)
   })
 })
 

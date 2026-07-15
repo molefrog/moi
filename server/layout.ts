@@ -15,7 +15,7 @@ function isTabId(value: unknown): value is WorkspaceTabId {
     value === 'agent' ||
     value === 'widgets' ||
     value === 'scratchpad' ||
-    (typeof value === 'string' && /^view:.+/.test(value))
+    (typeof value === 'string' && (/^view:.+/.test(value) || /^view-builder:.+/.test(value)))
   )
 }
 

@@ -3,14 +3,13 @@ import { useCallback, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { useSessionView, useThreadConfig, useWorkspaceModels } from '@/client/features/chat/api'
-import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { sendMessage } from '@/client/features/chat/chat-connection'
-import { STREAM_RESPONSES } from '@/client/lib/flags'
+import { resolveChatRunOptions, startOptimisticTurn } from '@/client/features/chat/chat-send'
 import { buildPreviewTurn } from '@/client/features/chat/preview-turn'
 import { draftKey, liveStore, selectPreviews, useLive } from '@/client/features/chat/chat-store'
-import { applyEvent, emptyViewState } from '@/lib/format'
+import { emptyViewState } from '@/lib/format'
 import type { Part, ViewState } from '@/lib/types'
 
 const EMPTY: ViewState = emptyViewState()
@@ -23,8 +22,6 @@ export function useChat() {
   const qc = useQueryClient()
   const { layout } = useWorkspaceLayoutCtx()
   const modelsData = useWorkspaceModels(workspaceId).data
-  const models = modelsData?.models
-  const supportsStreaming = modelsData?.supportsStreaming ?? false
 
   const activeSessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
   const processing = useLive(s =>
@@ -79,7 +76,6 @@ export function useChat() {
       // upserts in place rather than duplicating. Image attachments render from
       // their local object URL until the server's broadcast (with a data URL)
       // upserts in place.
-      const optimisticId = `optimistic:${crypto.randomUUID()}`
       const parts: Part[] = []
       for (const a of ready) {
         if (a.upload?.kind === 'image' && a.previewUrl) {
@@ -89,20 +85,12 @@ export function useChat() {
         }
       }
       if (text) parts.push({ type: 'text', text })
-      qc.setQueryData<ViewState>(workspaceKeys.events(workspaceId, sid), prev =>
-        applyEvent(prev ?? emptyViewState(), {
-          kind: 'turn',
-          turn: {
-            id: optimisticId,
-            role: 'user',
-            origin: { kind: 'user-input' },
-            parts,
-            timestamp: new Date().toISOString()
-          }
-        })
-      )
-      liveStore.getState().setProcessing(workspaceId, sid, true)
-      liveStore.getState().setError(workspaceId, sid, null)
+      const optimisticId = startOptimisticTurn({
+        queryClient: qc,
+        workspaceId,
+        sessionId: sid,
+        parts
+      })
 
       // The thread's persisted choice (workspace defaults for a new chat). Drop a
       // model the loaded list no longer offers (stale alias) so the SDK doesn't
@@ -110,19 +98,8 @@ export function useChat() {
       // (e.g. model changed under it); when the model is unknown/default we can't
       // check, so pass it through — the SDK silently downgrades unsupported effort.
       const pickedModel = threadCfg?.model ?? layout.selectedModel
-      const modelOk = !pickedModel || !models || models.some(m => m.value === pickedModel)
-      const model = modelOk ? pickedModel : undefined
-      const modelInfo = models?.find(m => m.value === model)
       const pickedEffort = threadCfg?.effort ?? layout.selectedEffort
-      const effort =
-        pickedEffort &&
-        (!modelInfo || (modelInfo.supportedEffortLevels ?? []).includes(pickedEffort))
-          ? pickedEffort
-          : undefined
-      // Live token streaming is a compile-time dev flag (client/lib/flags.ts),
-      // gated to providers that support it. Send `true` or omit (never `false`),
-      // so a provider that ignores it behaves identically.
-      const stream = STREAM_RESPONSES && supportsStreaming ? true : undefined
+      const { model, effort, stream } = resolveChatRunOptions(modelsData, pickedModel, pickedEffort)
       sendMessage({
         type: 'chat',
         workspaceId,
@@ -148,8 +125,7 @@ export function useChat() {
       layout.selectedEffort,
       threadCfg?.model,
       threadCfg?.effort,
-      models,
-      supportsStreaming
+      modelsData
     ]
   )
 

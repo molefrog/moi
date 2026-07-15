@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 
 import { wsUrl } from '@/client/lib/ws-url'
-import type { ViewInfo, WidgetInfo } from '@/lib/types'
+import type { ViewBuilder, ViewInfo, WidgetInfo } from '@/lib/types'
 
 export type WorkspaceEvent =
   | { type: 'widget:updated'; name: string }
@@ -9,6 +9,8 @@ export type WorkspaceEvent =
   | { type: 'widgets:refresh' }
   | { type: 'view:updated'; name: string }
   | { type: 'view-layout:updated'; views: ViewInfo[] }
+  | { type: 'view-builder:updated'; workspaceId: string; builder: ViewBuilder }
+  | { type: 'view-builder:deleted'; workspaceId: string; builderId: string }
   | { type: 'theme:updated' }
   | { type: 'workspace:updated' }
   // The registry list changed (reorder, create) without touching any open

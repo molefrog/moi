@@ -73,14 +73,21 @@ describe('loadLayout', () => {
         version: 1,
         widgetGrid: [],
         tabs: {
-          open: ['widgets', 'bad', 'view:dashboard', 'widgets', 'scratchpad'],
+          open: [
+            'widgets',
+            'bad',
+            'view:dashboard',
+            'view-builder:builder-1',
+            'widgets',
+            'scratchpad'
+          ],
           active: 'bad'
         }
       },
       async dir => {
         const loaded = await loadLayout(dir)
         expect(loaded.tabs).toEqual({
-          open: ['widgets', 'view:dashboard', 'scratchpad'],
+          open: ['widgets', 'view:dashboard', 'view-builder:builder-1', 'scratchpad'],
           active: 'widgets'
         })
       }
