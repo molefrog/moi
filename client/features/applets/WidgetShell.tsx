@@ -15,20 +15,25 @@ export function WidgetShell({ name }: WidgetShellProps) {
   return (
     <AnimatePresence mode="wait" initial={false}>
       {widget.status === 'ready' && (
-        <motion.div
+        <AppletMount
+          asChild
+          segment="widgets"
+          name={name}
+          version={widget.version}
           key={widget.version}
-          className="absolute inset-0"
-          initial={{ opacity: 0, filter: 'blur(4px)' }}
-          animate={{ opacity: 1, filter: 'blur(0px)' }}
-          exit={{ opacity: 0, filter: 'blur(4px)' }}
-          transition={{ duration: 0.45, ease: 'easeInOut' }}
         >
-          <WidgetErrorBoundary name={name} resetKey={widget.version}>
-            <AppletMount segment="widgets" name={name} version={widget.version}>
+          <motion.div
+            className="absolute inset-0"
+            initial={{ opacity: 0, filter: 'blur(4px)' }}
+            animate={{ opacity: 1, filter: 'blur(0px)' }}
+            exit={{ opacity: 0, filter: 'blur(4px)' }}
+            transition={{ duration: 0.45, ease: 'easeInOut' }}
+          >
+            <WidgetErrorBoundary name={name} resetKey={widget.version}>
               <widget.Component />
-            </AppletMount>
-          </WidgetErrorBoundary>
-        </motion.div>
+            </WidgetErrorBoundary>
+          </motion.div>
+        </AppletMount>
       )}
       {widget.status === 'error' && (
         <motion.p
