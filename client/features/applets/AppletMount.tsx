@@ -21,8 +21,9 @@ type AppletMountProps = {
 // bundle's scoped CSS selectors key off (see server/bundler/applet-css.ts) on a
 // container, and keeps the applet's <style> tag mounted exactly as long as the
 // applet is — unmounting removes the styles from the page. Without `asChild`
-// it renders its own `display: contents` wrapper, which stays out of layout
-// while still anchoring descendant selectors and inherited theme variables.
+// it renders its own wrapper div filling the parent box (the widget path —
+// merging onto the shell's motion.div interferes with AnimatePresence there);
+// with `asChild` it merges onto the child element instead (the view path).
 export function AppletMount({ segment, name, version, asChild, children }: AppletMountProps) {
   const workspaceId = useWorkspaceId()
   useAppletStyle(appletStyleKey(segment, workspaceId, name), version)
@@ -36,7 +37,7 @@ export function AppletMount({ segment, name, version, asChild, children }: Apple
     })
   }
   return (
-    <div data-applet={scope} className="contents">
+    <div data-applet={scope} className="size-full">
       {children}
     </div>
   )
