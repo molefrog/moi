@@ -30,9 +30,18 @@ export function useSaveWidgetThumbnails(workspaceId: string) {
         'Failed to save thumbnails'
       ),
     onMutate: ({ key }) => {
+      // The timestamp too — without it the cached layout keeps the old age
+      // and the capture hook would immediately re-run the pass. The server
+      // stamps its own clock on disk; this local echo holds until a refetch.
       queryClient.setQueryData<WorkspaceLayoutResponse>(workspaceKeys.layout(workspaceId), prev =>
-        prev ? { ...prev, widgetThumbnailsKey: key } : prev
+        prev ? { ...prev, widgetThumbnails: { key, at: new Date().toISOString() } } : prev
       )
+    },
+    onSuccess: () => {
+      // The home card's preview is served from what this PUT just wrote; its
+      // query has a staleTime, so without an explicit invalidation a quick
+      // hop back to the home screen would keep showing the pre-capture state.
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
     }
   })
 }

@@ -432,20 +432,33 @@ export type WorkspaceLayout = {
     background?: string
     foreground?: string
   }
-  // Per-widget thumbnails captured client-side from the live grid: widget id →
-  // WebP data URL (white background, the widget's own aspect ratio). Entries
-  // are merged, never pruned: a removed widget keeps its last thumbnail in
-  // case it comes back. Used for home-screen previews.
-  widgetThumbnails?: Record<string, string>
-  // Fingerprint of the grid state the thumbnails were captured from (visible
-  // widget ids + their bundle tags — see widgetThumbnailsKey()). When the
-  // current grid's fingerprint differs, the whole set is re-captured.
-  widgetThumbnailsKey?: string
+  // Widget thumbnails captured client-side from the live grid, used for
+  // home-screen previews. Saved through their own endpoint (PUT
+  // .../thumbnails), never through the layout PUT.
+  widgetThumbnails?: WidgetThumbnails
 }
 
+export type WidgetThumbnails = {
+  // Fingerprint of the grid state the set was captured from (visible widget
+  // ids + their bundle tags — see widgetThumbnailsKey()). A mismatch with the
+  // live grid re-captures the whole set.
+  key?: string
+  // Server-stamped ISO time of the last save. Widget DATA drifts even when
+  // bundles don't (a dashboard captured in January still shows January), so
+  // an old-enough set re-captures despite a matching key.
+  at?: string
+  // Widget id → WebP data URL (white background, the widget's own aspect
+  // ratio). Entries merge, never prune: a removed widget keeps its last image
+  // in case it comes back. Heavy — the layout GET strips this field; images
+  // reach the home screen via the preview endpoint.
+  images?: Record<string, string>
+}
+
+// Home-screen workspace card preview: a few captured widget thumbnails (WebP
+// data URLs) from the stored layout, rendered as a loose stack. Empty when the
+// workspace has never captured any.
 export type WorkspacePreview = {
-  cols: number
-  items: { x: number; y: number; w: number; h: number }[]
+  thumbnails: string[]
 }
 
 // One effective env var, as surfaced by GET /api/workspaces/:id/env. Values are

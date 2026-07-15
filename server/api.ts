@@ -589,12 +589,16 @@ one.delete('/icon', async c => {
 // DELETE unregisters.
 one.get('/', async c => {
   const ws = c.get('ws')
-  // The thumbnail map is heavy (base64 WebPs) and has its own write path (PUT
-  // .../thumbnails); the layout ships without it. `widgetThumbnailsKey` stays —
-  // clients compare it against the live grid to decide when to re-capture.
-  const { widgetThumbnails: _thumbnails, ...layout } = await loadLayout(ws.path)
+  // The thumbnail images are heavy (base64 WebPs) and have their own write
+  // path (PUT .../thumbnails); the layout ships `widgetThumbnails` without
+  // them — just `key`/`at`, which clients compare against the live grid to
+  // decide when to re-capture.
+  const { widgetThumbnails, ...layout } = await loadLayout(ws.path)
   return c.json({
     ...layout,
+    ...(widgetThumbnails && {
+      widgetThumbnails: { key: widgetThumbnails.key, at: widgetThumbnails.at }
+    }),
     // Resolved display name: the settings override, or the folder name.
     name: layout.name || basename(ws.path),
     cwd: ws.path,
