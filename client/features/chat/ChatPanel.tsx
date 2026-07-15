@@ -2,7 +2,6 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { IconChevronDown, IconX } from '@tabler/icons-react'
 
-import { useScrollFade } from '@/client/hooks/useScrollFade'
 import { useStickToBottom } from '@/client/features/chat/useStickToBottom'
 import { cn } from '@/client/lib/cn'
 import { groupTurns } from '@/client/features/chat/group-turns'
@@ -63,7 +62,7 @@ export function ChatPanel({
   onClose
 }: ChatPanelProps) {
   const composerRef = useRef<HTMLTextAreaElement>(null)
-  const { ref: scrollRef, showTopFade, showBottomFade } = useScrollFade()
+  const scrollRef = useRef<HTMLDivElement>(null)
   const turns = view.turns
   // Visual grouping: fold consecutive tool-only assistant turns into one
   // synthetic turn so OpenAI Codex–style traces (which serialize one
@@ -96,7 +95,7 @@ export function ChatPanel({
   )
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col pt-2 pb-4">
+    <div className="flex min-h-0 flex-1 flex-col pt-2 pb-3">
       <header className="flex items-center justify-between pr-2 pb-2 pl-2">
         <div className="flex min-w-0 items-center gap-2.5">
           {headerLeft}
@@ -115,17 +114,12 @@ export function ChatPanel({
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div
           ref={scrollRef}
-          className={cn(
-            'flex scrollbar-thin flex-1 flex-col overflow-y-auto overscroll-contain px-5 pt-4 pb-12',
-            showTopFade && showBottomFade && 'mask-fade-y',
-            showTopFade && !showBottomFade && 'mask-fade-top',
-            !showTopFade && showBottomFade && 'mask-fade-bottom'
-          )}
+          className="flex scrollbar-thin flex-1 scroll-fade flex-col overflow-y-auto overscroll-contain px-5 pt-4 pb-12 [--scroll-fade-reveal:8px]"
         >
           <div
             className={cn(
               'flex flex-1 flex-col gap-6',
-              contained && 'mx-auto w-full max-w-[var(--chat-max-container)]'
+              contained && 'mx-auto w-full max-w-(--chat-max-container)'
             )}
           >
             {turns.length === 0 && !processing && <EmptyState />}
@@ -158,10 +152,10 @@ export function ChatPanel({
         )}
       </div>
 
-      <div className={cn(contained && 'mx-auto w-full max-w-[var(--chat-max-container)] px-3')}>
+      <div className={cn(contained && 'mx-auto flex w-full justify-center px-3')}>
         {error && (
           <div className="mb-2 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            <span className="flex-1 break-words">{error}</span>
+            <span className="flex-1 wrap-break-word">{error}</span>
             {onDismissError && (
               <Button
                 type="button"

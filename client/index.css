@@ -153,32 +153,6 @@
   --tw-prose-bullets: inherit;
 }
 
-@utility mask-fade-bottom {
-  mask-image: linear-gradient(black 0px, black calc(100% - 24px), transparent 100%);
-  mask-size: 100% 100%;
-  mask-position: 0px 0px;
-  mask-repeat: no-repeat;
-}
-
-@utility mask-fade-top {
-  mask-image: linear-gradient(transparent 0%, black 24px);
-  mask-size: 100% 100%;
-  mask-position: 0px 0px;
-  mask-repeat: no-repeat;
-}
-
-@utility mask-fade-y {
-  mask-image: linear-gradient(
-    transparent 0%,
-    black 24px,
-    black calc(100% - 24px),
-    transparent 100%
-  );
-  mask-size: 100% 100%;
-  mask-position: 0px 0px;
-  mask-repeat: no-repeat;
-}
-
 /* Slim, unobtrusive scrollbar — keeps a clear scroll affordance while taming
    the chunky macOS "always show" scrollbar (a transparent border insets the
    thumb into a thin floating pill). */

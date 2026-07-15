@@ -94,9 +94,8 @@ export function TurnParts({ parts, cwd, processing = false }: TurnPartsProps) {
 type TurnViewProps = { turn: Turn; processing?: boolean }
 
 // Memoized: the message list maps over grouped turns (stable identities — see
-// `groupTurns` in ChatPanel), so a parent re-render (e.g. the scroll-fade state
-// toggling on every scroll) no longer re-renders every row — only rows whose
-// `turn` or `processing` actually changed.
+// `groupTurns` in ChatPanel), so parent re-renders only update rows whose `turn`
+// or `processing` actually changed.
 export const TurnView = memo(function TurnView({ turn, processing = false }: TurnViewProps) {
   const cwd = useWorkspaceLayoutCtx().cwd
 
