@@ -81,7 +81,7 @@ function Sidebar({ workspaces }: SidebarProps) {
       <nav className="flex max-h-full min-h-0 w-14 flex-1 flex-col items-center justify-center gap-4">
         {workspaces.length > 0 && (
           <>
-            <div className="scrollbar-none min-h-0 scroll-fade overflow-y-auto [--scroll-fade-reveal:16px]">
+            <div className="no-scrollbar min-h-0 scroll-fade overflow-y-auto [--scroll-fade-reveal:16px]">
               <ReorderableList
                 items={workspaces}
                 getId={ws => ws.id}

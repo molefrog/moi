@@ -176,7 +176,7 @@ export function WorkspaceTabs({
 }: WorkspaceTabsProps) {
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1">
-      <div className="scrollbar-none min-w-0 scroll-fade-x overflow-x-auto overflow-y-hidden [--scroll-fade-reveal:16px]">
+      <div className="no-scrollbar min-w-0 scroll-fade-x overflow-x-auto overflow-y-hidden [--scroll-fade-reveal:16px]">
         <ReorderableList
           items={tabs}
           getId={tab => tab.key}

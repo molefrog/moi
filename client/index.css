@@ -179,15 +179,6 @@
   mask-repeat: no-repeat;
 }
 
-/* Hide the scrollbar entirely (e.g. the MCP hover card, which signals overflow
-   with top/bottom mask fades instead — see useScrollFade + mask-fade-*). */
-@utility scrollbar-none {
-  scrollbar-width: none;
-  &::-webkit-scrollbar {
-    display: none;
-  }
-}
-
 /* Slim, unobtrusive scrollbar — keeps a clear scroll affordance while taming
    the chunky macOS "always show" scrollbar (a transparent border insets the
    thumb into a thin floating pill). */

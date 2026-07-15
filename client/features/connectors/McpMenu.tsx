@@ -112,10 +112,7 @@ function McpList({ servers }: { servers: McpServer[] }) {
   return (
     <div
       ref={ref}
-      className={cn(
-        'scrollbar-none flex max-h-72 flex-col overflow-y-auto overscroll-contain',
-        fade
-      )}
+      className={cn('no-scrollbar flex max-h-72 flex-col overflow-y-auto overscroll-contain', fade)}
     >
       {servers.map(server => (
         <McpServerRow key={server.name} server={server} />
