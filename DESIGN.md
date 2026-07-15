@@ -32,7 +32,9 @@ Use `font-sans` for UI, including paths and ids. Reserve `font-mono` for code an
 
 ## Layout and Hierarchy
 
-Build hierarchy with type weight, spacing, borders, and tonal surfaces. Use the Tailwind scale and component sizes instead of copying numeric geometry into feature code.
+Build hierarchy with type weight, spacing, tonal surfaces, and subtle shadow-defined edges. Use the Tailwind scale and component sizes instead of copying numeric geometry into feature code.
+
+Use subtle shadows instead of borders for standalone contained blocks and outline-style controls. Keep nested elements flat unless they represent a separate contained object. For interactive elements, let the shadow become one step darker or deeper on hover using the existing shadow scale. Use CSS borders only for separators and hard structural boundaries.
 
 Respect the layout variables in `client/index.css`; do not hardcode equivalent page or chat dimensions. Make layouts work at narrow and wide widths without clipped controls, overlapping text, or large dead areas.
 

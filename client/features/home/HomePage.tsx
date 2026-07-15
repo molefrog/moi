@@ -155,10 +155,7 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
   return (
     <a
       href={`/workspace/${workspace.id}`}
-      className={cn(
-        'group flex min-w-0 flex-col gap-4 rounded-xl border border-border bg-card p-2 hover:shadow-sm',
-        'transition-colors'
-      )}
+      className="group flex min-w-0 flex-col gap-4 rounded-xl bg-card p-2 shadow-xs transition-shadow hover:shadow-sm"
     >
       <WorkspacePreview workspaceId={workspace.id} />
       <div className="flex min-w-0 flex-col px-2 pb-2">

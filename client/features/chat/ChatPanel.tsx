@@ -3,7 +3,6 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef } from 'react'
 import { IconChevronDown, IconX } from '@tabler/icons-react'
 
 import { useStickToBottom } from '@/client/features/chat/useStickToBottom'
-import { cn } from '@/client/lib/cn'
 import { groupTurns } from '@/client/features/chat/group-turns'
 import type { Turn, ViewState } from '@/lib/types'
 
@@ -28,10 +27,6 @@ type ChatPanelProps = {
   onDismissError?: () => void
   send: (text: string) => void
   stop: () => void
-  // Constrain the scrollable history and the composer to a centered max-width
-  // column (var --chat-max-container) while the header still spans full width.
-  // Always on for now; will be toggled per layout mode later.
-  contained?: boolean
   onSwitchThread: (sessionId: string | null) => void
   // Extra content for the header's left edge, rendered before the thread
   // selector when the chat is the primary panel.
@@ -55,7 +50,6 @@ export function ChatPanel({
   onDismissError,
   send,
   stop,
-  contained = true,
   onSwitchThread,
   headerLeft,
   headerRight,
@@ -116,12 +110,7 @@ export function ChatPanel({
           ref={scrollRef}
           className="flex scrollbar-thin flex-1 scroll-fade flex-col overflow-y-auto overscroll-contain px-5 pt-4 pb-12 [--scroll-fade-reveal:8px]"
         >
-          <div
-            className={cn(
-              'flex flex-1 flex-col gap-6',
-              contained && 'mx-auto w-full max-w-(--chat-max-container)'
-            )}
-          >
+          <div className="mx-auto flex w-full max-w-(--chat-max-container) flex-1 flex-col gap-6">
             {turns.length === 0 && !processing && <EmptyState />}
             {groupedTurns.map((turn, i) => (
               <TurnView
@@ -152,7 +141,7 @@ export function ChatPanel({
         )}
       </div>
 
-      <div className={cn(contained && 'mx-auto flex w-full justify-center px-3')}>
+      <div className="mx-auto flex w-full justify-center px-3">
         {error && (
           <div className="mb-2 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             <span className="flex-1 wrap-break-word">{error}</span>
