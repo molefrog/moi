@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test'
 import { rmSync } from 'node:fs'
 import { join } from 'path'
 
-import { buildApplet, extractViewConfig, extractWidgetConfig } from '../build-applet'
+import { buildApplet, extractViewConfig, extractWidgetConfig } from '../bundler/build-applet'
 
 const FIXTURES = join(import.meta.dir, '__fixtures__')
 
@@ -53,21 +53,6 @@ describe('buildApplet', () => {
     // Every rule is scoped to the applet's mount container.
     expect(result.js).toContain('[data-applet=')
     expect(result.js).toContain('widget:hello')
-  })
-
-  test('derives the legacy cleanup id from the filename', async () => {
-    const result = await buildApplet(join(FIXTURES, 'hello.tsx'))
-
-    // Pre-v2 builds appended <style data-widget="hello">; the new bundle
-    // removes that tag on load so upgrades don't strand unscoped rules.
-    expect(result.js).toContain(', "hello");')
-    expect(result.js).toContain('data-widget')
-  })
-
-  test('stamps the build marker as the first line (even format changes rebuild)', async () => {
-    const result = await buildApplet(join(FIXTURES, 'hello.tsx'))
-
-    expect(result.js.startsWith('// moi-applet-build:')).toBe(true)
   })
 
   test('rewrites .server.ts imports to rpc() stubs', async () => {

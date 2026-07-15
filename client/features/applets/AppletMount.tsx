@@ -13,7 +13,7 @@ type AppletMountProps = {
 }
 
 // The style scope for one mounted applet. Renders the `data-applet` container
-// the bundle's scoped CSS selectors key off (see server/applet-css.ts) and
+// the bundle's scoped CSS selectors key off (see server/bundler/applet-css.ts) and
 // keeps the applet's <style> tag mounted exactly as long as the applet is —
 // unmounting removes the styles from the page. `contents` keeps the wrapper
 // out of layout while still anchoring descendant selectors and inherited
