@@ -79,6 +79,7 @@ export function WidgetGridLayout({
             <div key={item.i}>
               <motion.div
                 layoutId={item.i}
+                data-snapshot-widget={item.i}
                 className="size-full"
                 transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
               >

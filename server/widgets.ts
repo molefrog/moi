@@ -1,4 +1,5 @@
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
+import { join } from 'path'
 
 import type { WidgetConfig, WidgetInfo } from '@/lib/types'
 
@@ -77,19 +78,34 @@ export function listBuiltWidgets(workspacePath: string): Promise<string[]> {
   return listBuilt(buildDir)
 }
 
+// Content tag of a widget's built bundle: size+mtime of its entry, the same
+// recipe as the serve ETag. Changes on every rebundle, so clients can use it
+// to invalidate cached artifacts (widget thumbnails).
+function widgetTag(buildDir: string, id: string): string | undefined {
+  try {
+    const stat = statSync(join(buildDir, id, 'index.js'))
+    return `${stat.size}-${Math.trunc(stat.mtimeMs)}`
+  } catch {
+    return undefined
+  }
+}
+
 async function getWidgetList(workspacePath: string): Promise<WidgetInfo[]> {
   const [names, manifest] = await Promise.all([
     listBuiltWidgets(workspacePath),
     readManifest(workspacePath)
   ])
+  const { buildDir } = getAppletPaths(workspacePath, 'widget')
   return names.map(id => {
     const raw = manifest[id] ?? {}
     const rowSpan = VALID_SPANS.includes(raw.rowSpan) ? raw.rowSpan : DEFAULT_CONFIG.rowSpan
     const colSpan = VALID_SPANS.includes(raw.colSpan) ? raw.colSpan : DEFAULT_CONFIG.colSpan
     const requiredEnv = Array.isArray(raw.requiredEnv) ? raw.requiredEnv : undefined
+    const tag = widgetTag(buildDir, id)
     return {
       id,
-      config: { rowSpan, colSpan, ...(requiredEnv ? { requiredEnv } : {}) } as WidgetConfig
+      config: { rowSpan, colSpan, ...(requiredEnv ? { requiredEnv } : {}) } as WidgetConfig,
+      ...(tag ? { tag } : {})
     }
   })
 }

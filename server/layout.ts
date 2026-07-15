@@ -63,18 +63,53 @@ export async function saveLayout(layout: WorkspaceLayout, workspacePath: string)
 // possibly-stale `icon`.
 // A blind overwrite therefore erases a `moi config`-set name (and could revert an
 // icon). So drop whatever identity the body carries and re-apply the server-owned
-// `name`/`icon` from `existing` — conditionally, so an absent field never
-// serializes as `name: undefined`.
+// fields from `existing` — conditionally, so an absent field never serializes
+// as `name: undefined`. Widget thumbnails are likewise not the layout PUT's to
+// write: they have their own endpoint (saveWidgetThumbnails), and the layout
+// GET doesn't even ship the map — a round-trip would erase it.
 export function mergeLayoutForSave(
   existing: WorkspaceLayout,
   body: WorkspaceLayout
 ): WorkspaceLayout {
-  const { name: _name, icon: _icon, ...editor } = body
+  const {
+    name: _name,
+    icon: _icon,
+    widgetThumbnails: _thumbnails,
+    widgetThumbnailsKey: _thumbnailsKey,
+    ...editor
+  } = body
   return {
     ...editor,
     ...(existing.name !== undefined && { name: existing.name }),
-    ...(existing.icon !== undefined && { icon: existing.icon })
+    ...(existing.icon !== undefined && { icon: existing.icon }),
+    ...(existing.widgetThumbnails !== undefined && {
+      widgetThumbnails: existing.widgetThumbnails
+    }),
+    ...(existing.widgetThumbnailsKey !== undefined && {
+      widgetThumbnailsKey: existing.widgetThumbnailsKey
+    })
   }
+}
+
+// Merge a captured thumbnail set into the stored layout. Lives beside
+// mergeLayoutForSave but on its own write path (PUT .../thumbnails): grid and
+// theme saves never carry the base64 map, and a thumbnail save can't touch
+// the grid. Entries merge over the existing map — removed widgets keep their
+// last image.
+export async function saveWidgetThumbnails(
+  workspacePath: string,
+  key: string,
+  thumbnails: Record<string, string>
+): Promise<void> {
+  const existing = await loadLayout(workspacePath)
+  await saveLayout(
+    {
+      ...existing,
+      widgetThumbnails: { ...existing.widgetThumbnails, ...thumbnails },
+      widgetThumbnailsKey: key
+    },
+    workspacePath
+  )
 }
 
 async function scanWidgetIds(workspacePath: string): Promise<Set<string>> {
