@@ -62,7 +62,9 @@ Use Tabler icons and follow `.agents/rules/icons.md`; it is the only source for 
 
 Motion should explain a state or spatial change. Follow `.agents/rules/animations.md`. Keep feedback short, avoid decorative loops, and do not add custom keyframes.
 
-Use concise, sentence-case product language. Prefer the nouns workspace, thread, agent, model, widget, view, connector, session, and run. Name actions precisely, such as `Remove workspace` or `Start new thread`. Avoid generic confirmations, hype, “please,” and “successfully.”
+Use concise, sentence-case product language. Prefer the nouns workspace, chat, agent, model, widget, view, connector, session, and run. Name actions precisely, such as `Remove workspace` or `Start new chat`. Avoid generic confirmations, hype, “please,” and “successfully.”
+
+Use chat in product language. Reserve thread for internal SDK, session, and persistence concepts.
 
 ## Final Review
 

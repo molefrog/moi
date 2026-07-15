@@ -7,7 +7,7 @@ import { groupTurns } from '@/client/features/chat/group-turns'
 import type { Turn, ViewState } from '@/lib/types'
 
 import { ChatComposer } from './ChatComposer'
-import { ThreadSelector } from './ThreadSelector'
+import { ChatSelector } from './ChatSelector'
 import { EmptyState, ThinkingIndicator, TurnView } from './TurnView'
 import { Button } from '@/client/components/ui/button'
 
@@ -93,7 +93,7 @@ export function ChatPanel({
       <header className="flex items-center justify-between pr-2 pb-2 pl-2">
         <div className="flex min-w-0 items-center gap-2.5">
           {headerLeft}
-          <ThreadSelector onSwitch={onSwitchThread} />
+          <ChatSelector onSwitch={onSwitchThread} />
         </div>
         <div className="flex items-center gap-0.5">
           {headerRight}

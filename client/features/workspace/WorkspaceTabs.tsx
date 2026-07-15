@@ -74,8 +74,8 @@ function CreateTabMenu({ items }: { items: CreateWorkspaceTabItem[] }) {
       <DropdownMenuContent align="start" className="min-w-48">
         <DropdownMenuGroup>
           {items.map(({ key, Icon, label, onClick }) => (
-            <DropdownMenuItem key={key} onClick={onClick}>
-              <Icon stroke={1.75} />
+            <DropdownMenuItem key={key} onClick={onClick} className="font-medium">
+              <Icon stroke={2} />
               {label}
             </DropdownMenuItem>
           ))}
@@ -131,7 +131,7 @@ function WorkspaceTab(props: WorkspaceTabProps) {
           tab.closable && 'group-hover/tab:mr-3'
         )}
       >
-        <tab.Icon data-icon="inline-start" stroke={1.75} />
+        <tab.Icon data-icon="inline-start" stroke={2} />
         <span
           className={cn(
             'truncate',

@@ -3,12 +3,12 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 
 import {
-  IconAppWindow,
-  IconArtboard,
-  IconLayoutGrid,
+  IconArticle,
+  IconGhost,
+  IconLayout2,
   IconLayoutSidebarRight,
   IconPalette,
-  IconRobotFace
+  IconSketching
 } from '@tabler/icons-react'
 import { ChatPanel } from '@/client/features/chat/ChatPanel'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
@@ -173,7 +173,7 @@ function tabItemFor(
   if (tab === 'agent') {
     return {
       key: tab,
-      Icon: IconRobotFace,
+      Icon: IconGhost,
       label: 'Agent',
       closable
     }
@@ -181,7 +181,7 @@ function tabItemFor(
   if (tab === 'widgets') {
     return {
       key: tab,
-      Icon: IconLayoutGrid,
+      Icon: IconLayout2,
       label: 'Widgets',
       closable
     }
@@ -189,7 +189,7 @@ function tabItemFor(
   if (tab === 'scratchpad') {
     return {
       key: tab,
-      Icon: IconArtboard,
+      Icon: IconSketching,
       label: 'Scratchpad',
       closable
     }
@@ -199,7 +199,7 @@ function tabItemFor(
   return view
     ? {
         key: tab,
-        Icon: IconAppWindow,
+        Icon: IconArticle,
         label: viewLabel(view),
         closable
       }
@@ -334,7 +334,7 @@ export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
       ? ([
           {
             key: 'agent',
-            Icon: IconRobotFace,
+            Icon: IconGhost,
             label: 'Agent',
             onClick: () => openTab('agent')
           }
@@ -344,7 +344,7 @@ export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
       ? ([
           {
             key: 'widgets',
-            Icon: IconLayoutGrid,
+            Icon: IconLayout2,
             label: 'Widgets',
             onClick: () => openTab('widgets')
           }
@@ -354,7 +354,7 @@ export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
       ? ([
           {
             key: 'scratchpad',
-            Icon: IconArtboard,
+            Icon: IconSketching,
             label: 'Scratchpad',
             onClick: () => openTab('scratchpad')
           }
@@ -366,14 +366,14 @@ export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
       .map(
         ({ view, tab }): CreateWorkspaceTabItem => ({
           key: tab,
-          Icon: IconAppWindow,
+          Icon: IconArticle,
           label: viewLabel(view),
           onClick: () => openTab(tab)
         })
       ),
     {
       key: 'create-view',
-      Icon: IconAppWindow,
+      Icon: IconArticle,
       label: 'View',
       onClick: () => openChat('Create view')
     }
@@ -424,10 +424,7 @@ export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
         {/* Full-screen: whole panel. Split: the left content column. */}
         {(mode === 'fullscreen' || hasWorkspaceContent) && (
           <div
-            className={cn(
-              'flex min-h-0 flex-1 flex-col',
-              mode === 'split' && 'min-w-[var(--column-w)]'
-            )}
+            className={cn('flex min-h-0 flex-1 flex-col', mode === 'split' && 'min-w-(--column-w)')}
           >
             <PanelHeader>
               <div className="flex min-w-0 flex-1 items-center gap-4">
@@ -492,7 +489,7 @@ export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
         {mode === 'split' && (
           <div
             className={cn(
-              'flex min-h-0 min-w-[var(--chat-min)] flex-[0_1_var(--chat-max)] flex-col overflow-hidden border-l border-border'
+              'flex min-h-0 min-w-(--chat-min) flex-[0_1_var(--chat-max)] flex-col overflow-hidden border-l border-border'
             )}
           >
             {dockedChat}

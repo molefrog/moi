@@ -83,9 +83,9 @@ export function HomePage() {
         </section>
       ) : (
         <div className="mb-10 flex flex-col items-center gap-4 px-8 pt-6 pb-12 text-center">
-          <IconEggCracked size={32} stroke={1.5} className="text-muted-foreground/70" />
+          <IconEggCracked size={32} stroke={1.5} className="text-muted-foreground" />
           <div className="flex flex-col gap-1.5">
-            <h1 className="font-medium">Let’s start with creating your first workspace</h1>
+            <h2 className="font-medium">Let’s start with creating your first workspace</h2>
             <p className="mx-auto max-w-sm text-sm text-muted-foreground">
               Workspace is a place for all the chats, widgets, and views that share the same
               context. Create a new one or import an existing folder you&rsquo;ve worked in before.

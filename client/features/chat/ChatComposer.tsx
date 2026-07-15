@@ -152,7 +152,7 @@ export function ChatComposer({ composerRef, onSend, onStop, processing }: ChatCo
           e.preventDefault()
           addFiles(files)
         }}
-        placeholder={processing ? 'Queue a follow-up...' : 'Ask anything...'}
+        placeholder={processing ? 'Queue a follow-up' : 'Do anything'}
         rows={1}
         className="field-sizing-content max-h-40 w-full resize-none bg-transparent px-2 py-1 text-sm leading-relaxed outline-none placeholder:text-muted-foreground disabled:opacity-50"
       />

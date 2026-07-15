@@ -117,7 +117,7 @@ export function McpMenu() {
   // between the fullscreen and two-pane headers) fires `refetchOnMount`, which
   // overwrites an in-flight optimistic chat-mode change before it's persisted.
   const { provider, isLoading } = useWorkspaceLayoutCtx()
-  const isClaude = !isLoading && provider !== 'openclaw' && provider !== 'hermes'
+  const isClaude = !isLoading && provider !== 'openclaw'
   const { data: servers } = useWorkspaceMcp(workspaceId, isClaude)
 
   if (!isClaude) return null

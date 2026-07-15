@@ -1,6 +1,6 @@
 import { memo } from 'react'
 
-import { IconFile, IconRobotFace } from '@tabler/icons-react'
+import { IconFile, IconGhost } from '@tabler/icons-react'
 
 import { MarkdownContent } from '@/client/features/chat/MarkdownContent'
 import { ToolCallGroup } from '@/client/features/chat/tool-group/ToolCallGroup'
@@ -9,11 +9,15 @@ import type { Part, Turn } from '@/lib/types'
 
 export function EmptyState() {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-      <div className="flex size-12 items-center justify-center rounded-xl border border-border bg-muted/40 text-muted-foreground">
-        <IconRobotFace size={24} stroke={1.5} />
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+      <IconGhost size={32} stroke={1.5} className="text-muted-foreground" />
+      <div className="flex flex-col gap-1.5">
+        <h2 className="font-medium">Every journey starts somewhere</h2>
+        <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+          Chat with your agent, create widgets and views, and manage your workspace context from
+          here.
+        </p>
       </div>
-      <p className="text-lg font-medium text-foreground">What do you want to build?</p>
     </div>
   )
 }

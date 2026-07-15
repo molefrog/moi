@@ -20,7 +20,7 @@ Workspace features/pages:
   concepts. Read `SCRATCHPAD.md` before building on or modifying it.
 - "Views" - full-stack embedded apps for bigger work, consume more space, live in their own tab.
 
-User can switch between these, but can access the chat (this conversation and other threads) from
+User can switch between these, but can access the chat (this conversation and other chats) from
 **any place in the app** (copilot mode), or on a dedicated page.
 
 Workspace settings and customisation:
@@ -39,10 +39,10 @@ sees and interacts with "Applets".
 does not have a clear definition, but assumes this is the root folder in which it stores its state
 files.
 
-"Threads" — a workspace is driven through agent conversations (this chat is one). Depending on your
-harness (Claude Code, openclaw, others differ in the details) there can be **multiple threads**, but
+"Chat" — a workspace is driven through agent conversations (this chat is one). Depending on your
+harness (Claude Code, openclaw, others differ in the details) there can be **multiple chats**, but
 they all share **one** workspace **and one Project folder** — the same filesystem, the same `.moi`
-folder, applets, config, and theme. Anything you build is visible to every thread, and another thread
+folder, applets, config, and theme. Anything you build is visible to every chat, and another chat
 may have changed the workspace or the Project files since you last looked. Treat `.moi` and the
 Project folder as shared state, not yours alone.
 

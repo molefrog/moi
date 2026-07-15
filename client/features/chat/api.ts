@@ -66,7 +66,7 @@ export function useSaveThreadConfig(workspaceId: string) {
       requestJson(
         `/api/workspaces/${workspaceId}/sessions/${sessionId}/config`,
         jsonRequest('PUT', patch),
-        'Failed to save thread config'
+        'Failed to save chat settings'
       ),
     onSuccess: (next, { sessionId }) => {
       queryClient.setQueryData<ThreadConfig>(

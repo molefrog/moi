@@ -1,4 +1,4 @@
-import { IconRobotFace } from '@tabler/icons-react'
+import { IconGhost } from '@tabler/icons-react'
 
 import { useWorkspacePreview } from './api'
 
@@ -37,7 +37,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
         </svg>
       )}
       {isEmpty && (
-        <IconRobotFace
+        <IconGhost
           size={20}
           stroke={1.5}
           className="animate-in text-muted-foreground/40 duration-300 fade-in"
