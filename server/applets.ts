@@ -18,6 +18,7 @@ import { dirname, join, resolve, sep } from 'path'
 
 import {
   APPLET_API_BASE_SENTINEL,
+  APPLET_BUILD_MARKER,
   type AppletKind,
   buildApplet,
   scanAssetImports,
@@ -60,14 +61,18 @@ async function resolveSource(sourceDir: string, name: string): Promise<string | 
   return null
 }
 
-// A bundle is stale if its entry `index.js` is missing, or the source — or any
-// `.server.ts` it imports (RPC stubs are inlined) or asset it imports (emitted
-// into the bundle dir) — is newer than the built entry. The bundle itself is
-// React-mode-agnostic (see buildApplet), so it needs no rebuild when the server
-// switches between the development and production React.
+// A bundle is stale if its entry `index.js` is missing, was emitted by a
+// different bundle format (build-marker header mismatch — e.g. a pre-CSS-scoping
+// build), or the source — or any `.server.ts` it imports (RPC stubs are
+// inlined) or asset it imports (emitted into the bundle dir) — is newer than
+// the built entry. The bundle itself is React-mode-agnostic (see buildApplet),
+// so it needs no rebuild when the server switches between the development and
+// production React.
 async function needsRebuild(buildDir: string, name: string, srcPath: string): Promise<boolean> {
   const built = Bun.file(join(buildDir, name, 'index.js'))
   if (!(await built.exists())) return true
+  const header = await built.slice(0, APPLET_BUILD_MARKER.length + 1).text()
+  if (header !== `${APPLET_BUILD_MARKER}\n`) return true
   let sourceMtime = Bun.file(srcPath).lastModified
   const source = await Bun.file(srcPath).text()
   const dir = dirname(srcPath)

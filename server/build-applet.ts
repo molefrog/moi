@@ -10,11 +10,20 @@ import { basename, dirname, join, relative, sep } from 'path'
 
 import type { ViewConfig, WidgetConfig } from '@/lib/types'
 
+import { scopeAppletCss } from './applet-css'
+
 // An **applet** is any custom UI unit embedded in a workspace; `widget` and
 // `view` are its kinds (more may follow). All compile through this pipeline —
 // `kind` only diverges at the edges: which `config` schema is parsed, the
-// synthetic-CSS filename, and the injected `<style>` id namespace.
+// synthetic-CSS filename, and the CSS scope/registry namespace.
 export type AppletKind = 'widget' | 'view'
+
+// First line of every emitted `index.js`. Bump when the bundle FORMAT changes
+// in a way that requires a rebuild without any source edit (e.g. the CSS
+// scoping + registry handoff of v2) — `needsRebuild` in applets.ts treats a
+// missing/mismatched header as stale, so old bundles rebuild on the next
+// `moi bundle`/server scan instead of lingering until their source changes.
+export const APPLET_BUILD_MARKER = '// moi-applet-build:2'
 
 // Baked into the bundle wherever a runtime URL needs the workspace's API base
 // (RPC + workspace files). The serve route string-replaces it with the real
@@ -411,6 +420,11 @@ async function writeSyntheticTailwindCss(
   const contents = [
     `@import 'tailwindcss';`,
     await Bun.file(HOST_THEME_PATH).text(),
+    // Mirror the host's class-based dark mode (client/index.css) so an applet's
+    // `dark:` variants flip with the app theme. Without this Tailwind falls
+    // back to `@media (prefers-color-scheme: dark)`, which diverges from the
+    // host and injects OS-preference media queries into the page.
+    `@custom-variant dark (&:is(.dark *));`,
     `@source "${sourceDir}";`
   ].join('\n')
   await Bun.write(cssPath, contents)
@@ -437,21 +451,26 @@ function widgetEntryPlugin(widgetPath: string, syntheticCssPath: string): BunPlu
   }
 }
 
-function injectCss(js: string, css: string, widgetName: string): string {
+// Hand the bundle's (scoped) CSS to the host instead of mutating the DOM. The
+// module side effect only registers the text under a stable key — the path of
+// the bundle dir, derived from import.meta.url so it self-locates per workspace
+// (`/api/workspaces/<id>/<segment>/<name>`), matching `appletStyleKey` on the
+// client. The host mounts a <style> for that key only while the applet is on
+// screen and removes it on unmount (client/features/applets/applet-styles.ts) —
+// the old direct-append left every applet's rules in <head> forever, because a
+// cached ES module is never re-evaluated, let alone disposed.
+//
+// `legacyId` sweeps the <style data-widget> tag a pre-v2 build of this same
+// applet may have appended, so upgrading doesn't strand unscoped rules.
+function injectCss(js: string, css: string, legacyId: string): string {
   if (!css.trim()) return js
 
-  // After `moi bundle` rebuilds the widget, the new JS module re-runs in the
-  // browser. Always replace any prior <style data-widget="<id>"> tag so the
-  // freshly-built CSS takes effect; the previous "skip if already present"
-  // guard left stale rules in place after edits.
   const injection = [
-    `((css, id) => {`,
-    `  document.querySelector(\`style[data-widget="\${id}"]\`)?.remove();`,
-    `  const s = document.createElement("style");`,
-    `  s.dataset.widget = id;`,
-    `  s.textContent = css;`,
-    `  document.head.appendChild(s);`,
-    `})(${JSON.stringify(css)}, ${JSON.stringify(widgetName)});`
+    `((css, legacyId) => {`,
+    `  const key = new URL(".", import.meta.url).pathname.replace(/\\/$/, "");`,
+    `  (window.__moiAppletCss ||= new Map()).set(key, css);`,
+    `  document.querySelector(\`style[data-widget="\${legacyId}"]\`)?.remove();`,
+    `})(${JSON.stringify(css)}, ${JSON.stringify(legacyId)});`
   ].join('\n')
 
   return injection + '\n' + js
@@ -508,7 +527,7 @@ async function prevalidateServerFiles(entrypoint: string): Promise<void> {
 // `moiRoot` is the directory server-module keys are relative to (the
 // workspace's `.moi/`). Defaults to the entrypoint's own directory, which keeps
 // basename keys for callers that build a file directly (tests, fixtures).
-// `kind` selects the config schema, synthetic-CSS filename, and `<style>` id
+// `kind` selects the config schema, synthetic-CSS filename, and CSS scope
 // namespace; it defaults to 'widget' so existing callers are unaffected.
 export async function buildApplet(
   entrypoint: string,
@@ -588,12 +607,16 @@ export async function buildApplet(
   let js = await entryOutput.text()
 
   if (cssOutput) {
-    const css = await cssOutput.text()
-    // Namespace the injected <style> id by kind so a widget and a view sharing
-    // a name don't overwrite each other's rules.
-    const styleId = kind === 'widget' ? widgetName : `${kind}:${widgetName}`
-    js = injectCss(js, css, styleId)
+    // Scope every rule to the applet's mount container (`[data-applet=
+    // "<kind>:<name>"]`, see applet-css.ts) so the bundle's Tailwind never
+    // leaks into the host page. Kind-namespaced so a widget and a view sharing
+    // a name scope independently; the legacy id passed to injectCss is the
+    // pre-v2 <style> id format, kept only for upgrade cleanup.
+    const css = scopeAppletCss(await cssOutput.text(), `${kind}:${widgetName}`)
+    const legacyId = kind === 'widget' ? widgetName : `${kind}:${widgetName}`
+    js = injectCss(js, css, legacyId)
   }
+  js = `${APPLET_BUILD_MARKER}\n${js}`
 
   const files: AppletFile[] = [{ name: 'index.js', data: js, kind: 'code' }]
   for (const chunk of chunkOutputs) {
