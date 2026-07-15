@@ -1,9 +1,9 @@
-import { IconChevronRight, IconFolders, IconLoader2, IconPlus } from '@tabler/icons-react'
+import { IconChevronRight, IconEggCracked, IconLoader2, IconPlus } from '@tabler/icons-react'
 import { useLocation } from 'wouter'
 
 import { useAddWorkspace, useDiscoveredWorkspaces, useWorkspaces } from './api'
+import { HomeLogo } from './HomeLogo'
 import { Button } from '@/client/components/ui/button'
-import { LedLogo } from '@/client/components/shared/LedLogo'
 import {
   Collapsible,
   CollapsibleContent,
@@ -59,9 +59,7 @@ export function HomePage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-8 pt-14 pb-16">
-      <div className="mb-8 flex items-center">
-        <LedLogo sprite="moi-full" pixelSize={4} gap={1} />
-      </div>
+      <HomeLogo className="mb-8" />
 
       {count > 0 ? (
         <section className="mb-10">
@@ -84,17 +82,16 @@ export function HomePage() {
           </div>
         </section>
       ) : (
-        <div className="mb-10 flex flex-col items-center gap-4 px-8 py-16 text-center">
-          <IconFolders size={24} stroke={1.5} className="text-muted-foreground/70" />
+        <div className="mb-10 flex flex-col items-center gap-4 px-8 pt-6 pb-12 text-center">
+          <IconEggCracked size={32} stroke={1.5} className="text-muted-foreground/70" />
           <div className="flex flex-col gap-1.5">
-            <h1 className="font-medium">Create your first space</h1>
-            <p className="mx-auto max-w-md text-sm text-muted-foreground">
-              Initialize moi in any folder on your computer with{' '}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">moi init</code>, or
-              add an existing folder where you&rsquo;ve worked with other agents.
+            <h1 className="font-medium">Let’s start with creating your first workspace</h1>
+            <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+              Workspace is a place for all the chats, widgets, and views that share the same
+              context. Create a new one or import an existing folder you&rsquo;ve worked in before.
             </p>
           </div>
-          <CreateWorkspaceDialog trigger={<Button size="sm">Create a space</Button>} />
+          <CreateWorkspaceDialog trigger={<Button>Create workspace</Button>} />
         </div>
       )}
 

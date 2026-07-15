@@ -36,7 +36,7 @@ const AGENT_OPTIONS: AgentOption[] = [
   { type: 'claude-code', hint: 'Powered by the Claude Agent SDK' },
   {
     type: 'openclaw',
-    hint: 'Initialize OpenClaw in the folder manually, then import it from Home',
+    hint: 'Initialize OpenClaw in the folder manually, then import it from home',
     disabled: true
   },
   { type: 'hermes', hint: 'Coming soon', disabled: true }
@@ -122,8 +122,8 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
 
         {step === 'type' ? (
           <>
-            <DialogTitle>Create new space</DialogTitle>
-            <p className="mt-4 mb-2 text-sm font-medium text-foreground">Space type</p>
+            <DialogTitle>Create new workspace</DialogTitle>
+            <p className="mt-4 mb-2 text-sm font-medium text-foreground">Agent</p>
             <div className="flex flex-col gap-2">
               {AGENT_OPTIONS.map(option => {
                 const selected = type === option.type
@@ -195,8 +195,8 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
           </>
         ) : (
           <>
-            <DialogTitle>Name the space</DialogTitle>
-            <DialogDescription className="mt-1">Keep it short and recognizable.</DialogDescription>
+            <DialogTitle>Name the workspace</DialogTitle>
+            <DialogDescription className="mt-1">Keep it short and recognizable</DialogDescription>
 
             <div className="mt-5">
               <Input
@@ -205,7 +205,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
                 onKeyDown={e => {
                   if (e.key === 'Enter') handleCreate()
                 }}
-                placeholder="my-space"
+                placeholder="my-workspace"
                 autoFocus
                 aria-invalid={!!nameError}
                 autoComplete="off"
@@ -218,7 +218,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
 
             <div className="mt-6 flex items-center justify-end gap-2">
               <Button onClick={handleCreate} disabled={!trimmed || !!nameError || busy}>
-                {createMutation.isPending ? 'Creating…' : 'Create new space'}
+                {createMutation.isPending ? 'Creating…' : 'Create new workspace'}
               </Button>
             </div>
           </>

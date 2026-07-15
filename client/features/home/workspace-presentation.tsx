@@ -11,7 +11,7 @@ export const workspaceProviderIcon: Record<WorkspaceType, string> = {
 }
 
 export const workspaceTypeLabel: Record<WorkspaceType, string> = {
-  'claude-code': 'Claude Code',
+  'claude-code': 'Claude',
   openclaw: 'OpenClaw',
   hermes: 'Hermes'
 }

@@ -101,8 +101,8 @@ function Sidebar({ workspaces }: SidebarProps) {
                     type="button"
                     variant="ghost"
                     size="icon-lg"
-                    aria-label="Create new space"
-                    title="Create new space"
+                    aria-label="Create new workspace"
+                    title="Create new workspace"
                     className="text-muted-foreground hover:text-foreground"
                   >
                     <IconPlus data-icon="inline-start" stroke={1.5} />
