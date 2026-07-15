@@ -32,8 +32,8 @@ function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
           information that matters.
         </p>
       </div>
-      <Button type="button" variant="secondary" size="sm" onClick={onCreateWidget}>
-        <IconPlus data-icon="inline-start" stroke={1.75} />
+      <Button type="button" variant="secondary" onClick={onCreateWidget}>
+        <IconPlus data-icon="inline-start" stroke={1.5} />
         Create widget
       </Button>
     </div>
