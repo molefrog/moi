@@ -20,6 +20,7 @@ import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'path'
 
+import { callMcpTool, listMcpServers, listMcpTools } from './mcp-broker'
 import { resolveWorkspaceEnv } from './workspace-env'
 
 const WORKER_PATH = join(import.meta.dir, 'functions-worker.ts')
@@ -49,6 +50,42 @@ type Slot = {
   // Module keys the worker has loaded and cached (reported via 'loaded' IPC,
   // pruned when reloadModules evicts them).
   modules: Set<string>
+}
+
+// Worker→parent MCP requests (see functions-worker.ts). The worker cannot
+// talk to MCP servers itself: connections are pooled here in the parent so
+// they survive worker restarts and are shared across reloads. `args` stays
+// plain JSON — MCP is a JSON protocol, no devalue needed on this leg.
+type McpRequest = {
+  type: 'mcp'
+  id: string
+  op: 'callTool' | 'listTools' | 'listServers'
+  server?: string
+  tool?: string
+  args?: Record<string, unknown>
+}
+
+async function handleMcpRequest(slot: Slot, msg: McpRequest) {
+  let reply: { type: 'mcp-result'; id: string; ok: boolean; data?: unknown; message?: string }
+  try {
+    const { workspacePath } = slot
+    let data: unknown
+    if (msg.op === 'callTool') {
+      data = await callMcpTool(workspacePath, msg.server!, msg.tool!, msg.args)
+    } else if (msg.op === 'listTools') {
+      data = await listMcpTools(workspacePath, msg.server!)
+    } else {
+      data = await listMcpServers(workspacePath)
+    }
+    reply = { type: 'mcp-result', id: msg.id, ok: true, data }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown MCP error'
+    reply = { type: 'mcp-result', id: msg.id, ok: false, message }
+  }
+  if (slot.killed) return
+  try {
+    slot.worker.send(reply)
+  } catch {}
 }
 
 function rejectAndClearPending(slot: Slot, reason: string) {
@@ -140,6 +177,11 @@ function spawnSlot(workspacePath: string, workspaceEnv: Record<string, string>):
 
       if (msg.type === 'loaded' && msg.module) {
         slot.modules.add(msg.module)
+        return
+      }
+
+      if (msg.type === 'mcp') {
+        void handleMcpRequest(slot, message as McpRequest)
         return
       }
 
