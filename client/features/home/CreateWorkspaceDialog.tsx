@@ -1,6 +1,6 @@
 import { type ReactElement, useState } from 'react'
 
-import { IconX } from '@tabler/icons-react'
+import { IconCheck, IconX } from '@tabler/icons-react'
 import { useLocation } from 'wouter'
 
 import { useAddWorkspace, useChooseFolder, useCreateWorkspace, useCreateWorkspaceInfo } from './api'
@@ -135,20 +135,25 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
                     onClick={() => setType(option.type)}
                     aria-pressed={selected}
                     className={cn(
-                      'flex items-center gap-3 rounded-lg border p-3 text-left transition-colors',
-                      selected
-                        ? 'border-ring bg-muted/50 shadow-[inset_0_0_0_1px_var(--ring)]'
-                        : 'border-border hover:bg-accent',
+                      'flex items-center gap-3 rounded-lg px-4 py-3 text-left ring-1 ring-border',
+                      selected ? 'bg-card' : 'hover:bg-accent',
                       option.disabled && 'cursor-not-allowed opacity-50 hover:bg-transparent'
                     )}
                   >
                     <WorkspaceTypeIcon type={option.type} className="size-5" />
-                    <span className="flex min-w-0 flex-col">
+                    <span className="flex min-w-0 flex-1 flex-col">
                       <span className="text-sm font-medium text-foreground">
                         {workspaceTypeLabel[option.type]}
                       </span>
                       <span className="text-xs text-muted-foreground">{option.hint}</span>
                     </span>
+                    {selected && (
+                      <IconCheck
+                        className="flex size-5 shrink-0 items-center justify-center"
+                        aria-hidden="true"
+                        stroke={1.75}
+                      />
+                    )}
                   </button>
                 )
               })}
