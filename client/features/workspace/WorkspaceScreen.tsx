@@ -374,7 +374,7 @@ export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
     {
       key: 'create-view',
       Icon: IconArticle,
-      label: 'View',
+      label: 'New view',
       onClick: () => openChat('Create view')
     }
   ]

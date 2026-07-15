@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 
-import { IconLayout2, IconPlus } from '@tabler/icons-react'
+import { IconPlus } from '@tabler/icons-react'
 
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { findFreePosition } from '@/client/features/widgets/grid'
@@ -25,7 +25,6 @@ type NoWidgetsCreatedProps = {
 function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 pb-6 text-center">
-      <IconLayout2 size={32} stroke={1.5} className="text-muted-foreground" />
       <div className="flex flex-col gap-1.5">
         <h2 className="font-medium"> A little empty here</h2>
         <p className="mx-auto max-w-sm text-sm text-muted-foreground">
