@@ -13,6 +13,11 @@ import type { WidgetInfo } from '@/lib/types'
 // bundles mount and their data requests land so we don't snapshot skeletons.
 const SETTLE_MS = 5_000
 
+// Age-based invalidation: bundle tags only catch CODE changes, but widget
+// DATA drifts on its own (a dashboard captured in January still shows
+// January). A set older than this re-captures even with a matching key.
+const MAX_AGE_MS = 3 * 60 * 60 * 1000
+
 type UseWidgetThumbnailsArgs = {
   // Scope for [data-snapshot-widget] cell lookups.
   containerRef: RefObject<HTMLElement | null>
@@ -48,7 +53,10 @@ export function useWidgetThumbnails({
   const [pass, setPass] = useState(0)
 
   const key = widgetThumbnailsKey(visibleIds, widgets)
-  const stale = key !== '' && key !== layout.widgetThumbnailsKey
+  // A missing/unparsable timestamp counts as expired.
+  const capturedAt = Date.parse(layout.widgetThumbnails?.at ?? '')
+  const expired = !Number.isFinite(capturedAt) || Date.now() - capturedAt > MAX_AGE_MS
+  const stale = key !== '' && (key !== layout.widgetThumbnails?.key || expired)
 
   useEffect(() => {
     if (!stale || editing) return

@@ -1,7 +1,6 @@
-import { readdir } from 'node:fs/promises'
 import { join } from 'path'
 
-import type { WidgetConfig, WorkspaceLayout, WorkspacePreview, WorkspaceTabId } from '@/lib/types'
+import type { WorkspaceLayout, WorkspacePreview, WorkspaceTabId } from '@/lib/types'
 import { createDefaultWorkspaceLayout, createDefaultWorkspaceTabs } from '@/lib/workspace-layout'
 
 function isTabId(value: unknown): value is WorkspaceTabId {
@@ -32,10 +31,6 @@ function normalizeLayout(parsed: Record<string, unknown>): WorkspaceLayout {
   delete layout.chatMode
   return layout as unknown as WorkspaceLayout
 }
-
-const DEFAULT_WIDGET_CONFIG: WidgetConfig = { rowSpan: 1, colSpan: 2 }
-const PREVIEW_COLS = 4
-const EMPTY_PREVIEW: WorkspacePreview = { cols: PREVIEW_COLS, items: [] }
 
 export function getLayoutPath(workspacePath: string): string {
   return join(workspacePath, '.moi', '.workspace.json')
@@ -71,22 +66,13 @@ export function mergeLayoutForSave(
   existing: WorkspaceLayout,
   body: WorkspaceLayout
 ): WorkspaceLayout {
-  const {
-    name: _name,
-    icon: _icon,
-    widgetThumbnails: _thumbnails,
-    widgetThumbnailsKey: _thumbnailsKey,
-    ...editor
-  } = body
+  const { name: _name, icon: _icon, widgetThumbnails: _thumbnails, ...editor } = body
   return {
     ...editor,
     ...(existing.name !== undefined && { name: existing.name }),
     ...(existing.icon !== undefined && { icon: existing.icon }),
     ...(existing.widgetThumbnails !== undefined && {
       widgetThumbnails: existing.widgetThumbnails
-    }),
-    ...(existing.widgetThumbnailsKey !== undefined && {
-      widgetThumbnailsKey: existing.widgetThumbnailsKey
     })
   }
 }
@@ -99,67 +85,36 @@ export function mergeLayoutForSave(
 export async function saveWidgetThumbnails(
   workspacePath: string,
   key: string,
-  thumbnails: Record<string, string>
+  images: Record<string, string>
 ): Promise<void> {
   const existing = await loadLayout(workspacePath)
   await saveLayout(
     {
       ...existing,
-      widgetThumbnails: { ...existing.widgetThumbnails, ...thumbnails },
-      widgetThumbnailsKey: key
+      widgetThumbnails: {
+        key,
+        // Server clock, so age-based invalidation doesn't trust client time.
+        at: new Date().toISOString(),
+        images: { ...existing.widgetThumbnails?.images, ...images }
+      }
     },
     workspacePath
   )
 }
 
-async function scanWidgetIds(workspacePath: string): Promise<Set<string>> {
-  try {
-    const entries = await readdir(join(workspacePath, '.moi', 'widgets'))
-    return new Set(
-      entries
-        .filter(f => /\.(tsx|ts)$/.test(f) && !f.endsWith('.server.ts'))
-        .map(f => f.replace(/\.tsx?$/, ''))
-    )
-  } catch {
-    return new Set()
-  }
-}
+// Thumbnails for the home screen's workspace card: a few captured widget
+// images from the stored layout (see saveWidgetThumbnails). The card renders
+// them as a loose stack, so the cap just keeps the payload small — anything
+// past it would hide under the pile anyway.
+const PREVIEW_LIMIT = 4
 
 export async function getWorkspacePreview(workspacePath: string): Promise<WorkspacePreview> {
   try {
     const layout = await loadLayout(workspacePath)
-    if (!Array.isArray(layout.widgetGrid) || layout.widgetGrid.length === 0) return EMPTY_PREVIEW
-
-    const validIds = await scanWidgetIds(workspacePath)
-    if (validIds.size === 0) return EMPTY_PREVIEW
-
-    let manifest: Record<string, WidgetConfig> = {}
-    try {
-      const manifestPath = join(workspacePath, '.moi', '.build', 'widgets', 'manifest.json')
-      const parsed = JSON.parse(await Bun.file(manifestPath).text())
-      if (parsed && typeof parsed.config === 'object' && parsed.config !== null) {
-        manifest = parsed.config as Record<string, WidgetConfig>
-      }
-    } catch {}
-
-    const items = layout.widgetGrid
-      .map(({ i, x, y }) => {
-        if (!validIds.has(i)) return null
-        const cfg = manifest[i] ?? DEFAULT_WIDGET_CONFIG
-        if (
-          typeof x !== 'number' ||
-          typeof y !== 'number' ||
-          typeof cfg.colSpan !== 'number' ||
-          typeof cfg.rowSpan !== 'number'
-        ) {
-          return null
-        }
-        return { x, y, w: cfg.colSpan, h: cfg.rowSpan }
-      })
-      .filter((v): v is { x: number; y: number; w: number; h: number } => v !== null)
-
-    return { cols: PREVIEW_COLS, items }
+    return {
+      thumbnails: Object.values(layout.widgetThumbnails?.images ?? {}).slice(0, PREVIEW_LIMIT)
+    }
   } catch {
-    return EMPTY_PREVIEW
+    return { thumbnails: [] }
   }
 }
