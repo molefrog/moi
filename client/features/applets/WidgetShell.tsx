@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
 
+import { AppletMount } from '@/client/features/applets/AppletMount'
 import { useWidget } from '@/client/features/applets/useApplet'
 
 import { WidgetErrorBoundary } from './WidgetErrorBoundary'
@@ -23,7 +24,9 @@ export function WidgetShell({ name }: WidgetShellProps) {
           transition={{ duration: 0.45, ease: 'easeInOut' }}
         >
           <WidgetErrorBoundary name={name} resetKey={widget.version}>
-            <widget.Component />
+            <AppletMount segment="widgets" name={name} version={widget.version}>
+              <widget.Component />
+            </AppletMount>
           </WidgetErrorBoundary>
         </motion.div>
       )}

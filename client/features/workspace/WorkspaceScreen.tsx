@@ -14,6 +14,7 @@ import { ChatPanel } from '@/client/features/chat/ChatPanel'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { CustomizePanel } from '@/client/features/workspace/CustomizePanel'
 import { McpMenu } from '@/client/features/connectors/McpMenu'
+import { AppletMount } from '@/client/features/applets/AppletMount'
 import { WidgetErrorBoundary } from '@/client/features/applets/WidgetErrorBoundary'
 import { Widgets } from '@/client/features/widgets/Widgets'
 import { PanelHeader } from '@/client/components/shared/PanelHeader'
@@ -98,7 +99,9 @@ function ViewApp({ view }: ViewAppProps) {
             transition={{ duration: 0.3, ease: 'easeInOut' }}
           >
             <WidgetErrorBoundary name={view.id} resetKey={bundle.version}>
-              <bundle.Component />
+              <AppletMount segment="views" name={view.id} version={bundle.version}>
+                <bundle.Component />
+              </AppletMount>
             </WidgetErrorBoundary>
           </motion.div>
         )}

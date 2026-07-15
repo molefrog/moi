@@ -41,17 +41,33 @@ describe('buildApplet', () => {
     expect(result.js).not.toContain('jsxDEV')
   })
 
-  test('includes Tailwind CSS injected as a style tag', async () => {
+  test('registers scoped Tailwind CSS on the host registry (no direct DOM append)', async () => {
     const result = await buildApplet(join(FIXTURES, 'hello.tsx'))
 
-    expect(result.js).toContain('data-widget')
-    expect(result.js).toContain('document.createElement("style")')
+    // The bundle hands its CSS to the host via window.__moiAppletCss instead
+    // of appending a <style> itself; the host mounts/unmounts the tag with the
+    // applet (client/features/applets/applet-styles.ts).
+    expect(result.js).toContain('__moiAppletCss')
+    expect(result.js).toContain('import.meta.url')
+    expect(result.js).not.toContain('document.createElement("style")')
+    // Every rule is scoped to the applet's mount container.
+    expect(result.js).toContain('[data-applet=')
+    expect(result.js).toContain('widget:hello')
   })
 
-  test('derives widget name from filename for CSS injection', async () => {
+  test('derives the legacy cleanup id from the filename', async () => {
     const result = await buildApplet(join(FIXTURES, 'hello.tsx'))
 
+    // Pre-v2 builds appended <style data-widget="hello">; the new bundle
+    // removes that tag on load so upgrades don't strand unscoped rules.
     expect(result.js).toContain(', "hello");')
+    expect(result.js).toContain('data-widget')
+  })
+
+  test('stamps the build marker as the first line (even format changes rebuild)', async () => {
+    const result = await buildApplet(join(FIXTURES, 'hello.tsx'))
+
+    expect(result.js.startsWith('// moi-applet-build:')).toBe(true)
   })
 
   test('rewrites .server.ts imports to rpc() stubs', async () => {
@@ -280,15 +296,15 @@ describe("buildApplet kind='view'", () => {
     expect(result.config).toEqual({ title: 'My View', requiredEnv: ['API_KEY'] })
   })
 
-  test('namespaces the injected <style> id with the view kind', async () => {
+  test('namespaces the CSS scope with the view kind', async () => {
     const result = await buildApplet(join(FIXTURES, 'with-view-config.tsx'), undefined, 'view')
     // Prevents a widget and a view sharing a name from clobbering each other.
-    expect(result.js).toContain(', "view:with-view-config");')
+    expect(result.js).toContain('view:with-view-config')
   })
 
-  test('widget kind keeps the bare name as the style id', async () => {
+  test('widget kind uses the widget: scope namespace', async () => {
     const result = await buildApplet(join(FIXTURES, 'hello.tsx'), undefined, 'widget')
-    expect(result.js).toContain(', "hello");')
+    expect(result.js).toContain('widget:hello')
     expect(result.js).not.toContain('view:hello')
   })
 })
