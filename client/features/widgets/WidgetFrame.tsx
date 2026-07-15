@@ -32,6 +32,9 @@ export function WidgetFrame({ editing, hidden, onRemove, children }: WidgetFrame
       className="group/widget relative size-full"
     >
       <div
+        // Stable hook for widget snapshots: the capture clone overrides this
+        // element's chrome (radius/shadow/stroke) so thumbnails come out square.
+        data-widget-chrome
         className={cn(
           'dark absolute inset-0 overflow-hidden rounded-2xl [corner-shape:superellipse(1.2)]',
           // Outer drop shadow on the wrapper itself.

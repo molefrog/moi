@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 
@@ -15,6 +15,7 @@ import type { WidgetInfo } from '@/lib/types'
 
 import { HiddenPanel } from './HiddenPanel'
 import { WidgetGrid, WidgetGridLayout } from './WidgetGrid'
+import { useWidgetThumbnails } from './useWidgetThumbnails'
 
 function renderItem(id: string) {
   return <WidgetShell name={id} />
@@ -181,6 +182,14 @@ export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: W
   const [panelRef, panelHeight] = usePanelHeight()
   const panelOpen = editing && hiddenItems.length > 0
 
+  const containerRef = useRef<HTMLDivElement>(null)
+  useWidgetThumbnails({
+    containerRef,
+    widgets,
+    visibleIds: visibleItems.map(item => item.id),
+    editing
+  })
+
   function hide(id: string) {
     setLayout({ widgetGrid: layout.widgetGrid.filter(g => g.i !== id) })
   }
@@ -200,7 +209,7 @@ export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: W
     // Shared working area below the header and positioning context for the
     // bottom panel. Created-widget states scroll; the initial empty state clips
     // its fixed-height skeleton grid.
-    <div className="group/widgets relative min-h-0 flex-1">
+    <div ref={containerRef} className="group/widgets relative min-h-0 flex-1">
       <LayoutGroup>
         <div
           className={cn(

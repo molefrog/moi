@@ -12,7 +12,13 @@ import { applyEnvChanged } from './env-apply'
 import { publishEvent } from './events'
 import { callFunction, parseFunctionPath } from './functions'
 import { processIcon } from './icon'
-import { getWorkspacePreview, loadLayout, mergeLayoutForSave, saveLayout } from './layout'
+import {
+  getWorkspacePreview,
+  loadLayout,
+  mergeLayoutForSave,
+  saveLayout,
+  saveWidgetThumbnails
+} from './layout'
 import { getUserMcpStatus } from './harness/claude-code/mcp'
 import { getClientFrameLog, getWireLog } from './harness/debug'
 import { allHarnesses, harnessFor, isHarnessType } from './harness/registry'
@@ -583,7 +589,10 @@ one.delete('/icon', async c => {
 // DELETE unregisters.
 one.get('/', async c => {
   const ws = c.get('ws')
-  const layout = await loadLayout(ws.path)
+  // The thumbnail map is heavy (base64 WebPs) and has its own write path (PUT
+  // .../thumbnails); the layout ships without it. `widgetThumbnailsKey` stays —
+  // clients compare it against the live grid to decide when to re-capture.
+  const { widgetThumbnails: _thumbnails, ...layout } = await loadLayout(ws.path)
   return c.json({
     ...layout,
     // Resolved display name: the settings override, or the folder name.
@@ -592,6 +601,24 @@ one.get('/', async c => {
     provider: ws.type,
     agentId: ws.agentId
   })
+})
+
+// Widget thumbnails: a separate write path from the layout PUT below, so grid
+// and theme saves never round-trip the base64 map (and this save can't touch
+// the grid). Still lands in `.workspace.json` under the hood. Entries merge
+// over the stored map; `key` fingerprints the grid state they were captured
+// from (see widgetThumbnailsKey() on the client).
+one.put('/thumbnails', async c => {
+  const body: unknown = await c.req.json().catch(() => null)
+  if (!body || typeof body !== 'object') return c.text('Bad request', 400)
+  const { key, thumbnails } = body as { key?: unknown; thumbnails?: unknown }
+  const validMap =
+    thumbnails !== null &&
+    typeof thumbnails === 'object' &&
+    Object.values(thumbnails as Record<string, unknown>).every(v => typeof v === 'string')
+  if (typeof key !== 'string' || !validMap) return c.text('Bad request', 400)
+  await saveWidgetThumbnails(c.get('ws').path, key, thumbnails as Record<string, string>)
+  return c.body(null, 204)
 })
 
 one.put('/', async c => {

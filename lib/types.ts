@@ -12,6 +12,11 @@ export type WidgetConfig = {
 export type WidgetInfo = {
   id: string
   config: WidgetConfig
+  // Content tag of the built bundle (`<size>-<mtime>` of its index.js) —
+  // changes whenever the widget is rebundled. Clients compare it against
+  // `WidgetThumbnail.tag` to decide which thumbnails are stale. Absent when
+  // the build output can't be statted.
+  tag?: string
 }
 
 // A view is a full-screen, agent-authored "app" (`.moi/views/<name>.tsx`),
@@ -427,6 +432,15 @@ export type WorkspaceLayout = {
     background?: string
     foreground?: string
   }
+  // Per-widget thumbnails captured client-side from the live grid: widget id →
+  // WebP data URL (white background, the widget's own aspect ratio). Entries
+  // are merged, never pruned: a removed widget keeps its last thumbnail in
+  // case it comes back. Used for home-screen previews.
+  widgetThumbnails?: Record<string, string>
+  // Fingerprint of the grid state the thumbnails were captured from (visible
+  // widget ids + their bundle tags — see widgetThumbnailsKey()). When the
+  // current grid's fingerprint differs, the whole set is re-captured.
+  widgetThumbnailsKey?: string
 }
 
 export type WorkspacePreview = {
