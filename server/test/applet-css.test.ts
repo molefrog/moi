@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { scopeAppletCss } from '../applet-css'
+import { scopeAppletCss } from '../bundler/applet-css'
 
 const SCOPE = 'widget:hello'
 const ATTR = '[data-applet="widget:hello"]'

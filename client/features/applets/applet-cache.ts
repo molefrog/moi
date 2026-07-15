@@ -37,7 +37,7 @@ export function appletUrl(segment: AppletSegment, workspaceId: string, name: str
 
 // The key an applet bundle registers its CSS under (`window.__moiAppletCss`):
 // the bundle-dir path, which the bundle derives from its own import.meta.url
-// (see injectCss in server/build-applet.ts). Workspace-qualified so two
+// (see injectCss in server/bundler/build-applet.ts). Workspace-qualified so two
 // workspaces sharing an applet name never read each other's styles.
 export function appletStyleKey(segment: AppletSegment, workspaceId: string, name: string): string {
   return `/api/workspaces/${workspaceId}/${segment}/${name}`

@@ -5,7 +5,7 @@ import { useInsertionEffect } from 'react'
 // re-evaluated, let alone disposed). Instead its module side effect registers
 // the compiled, container-scoped CSS on `window.__moiAppletCss`, keyed by the
 // bundle-dir path (`/api/workspaces/<id>/<segment>/<name>` — see injectCss in
-// server/build-applet.ts and `appletStyleKey`). The host injects a <style> for
+// server/bundler/build-applet.ts and `appletStyleKey`). The host injects a <style> for
 // that key while at least one instance of the applet is mounted, and removes it
 // when the last one unmounts.
 declare global {

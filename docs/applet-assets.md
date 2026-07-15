@@ -2,7 +2,7 @@
 
 > Implemented. How an applet (widget/view) reaches the outside: bundled assets
 > it imports, server functions, and workspace files. One base, three transports.
-> Compiler: `server/build-applet.ts`; serve/guards: `server/applets.ts`; routes:
+> Compiler: `server/bundler/build-applet.ts`; serve/guards: `server/applets.ts`; routes:
 > `server/web.ts`.
 
 ## One base, swapped at serve

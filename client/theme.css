@@ -1,6 +1,6 @@
 /*
  * Shared design-token map for both the host app (client/index.css) and
- * applet bundles (server/build-applet.ts emits an `@import` to this file
+ * applet bundles (server/bundler/build-applet.ts emits an `@import` to this file
  * into the applet's synthetic CSS).
  *
  * The actual CSS variables (`--background`, `--foreground`, `--card`, etc.)
