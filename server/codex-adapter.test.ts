@@ -121,6 +121,38 @@ describe('codexItemToTurn', () => {
     })
   })
 
+  test('collabAgentToolCall maps to a subagent tool card', () => {
+    const item: CodexThreadItem = {
+      type: 'collabAgentToolCall',
+      id: 'call-1',
+      tool: 'spawn',
+      status: 'inProgress',
+      prompt: 'count the files',
+      receiverThreadIds: ['child-1']
+    }
+    expect(codexItemToTurn(item, THREAD)!.parts[0]).toMatchObject({
+      call: {
+        name: 'subagent',
+        caller: 'subagent',
+        state: 'running',
+        input: { action: 'spawn', prompt: 'count the files', agents: ['child-1'] }
+      }
+    })
+  })
+
+  test('subAgentActivity maps to a subagent activity card', () => {
+    const item: CodexThreadItem = {
+      type: 'subAgentActivity',
+      id: 'act-1',
+      kind: 'started',
+      agentThreadId: 'child-1',
+      agentPath: '/root/count_files'
+    }
+    expect(codexItemToTurn(item, THREAD)!.parts[0]).toMatchObject({
+      call: { name: 'subagent_activity', input: { kind: 'started' } }
+    })
+  })
+
   test('contextCompaction maps to a compact notice, not a turn', () => {
     const item: CodexThreadItem = { type: 'contextCompaction', id: 'cc-1' }
     expect(codexItemToTurn(item, THREAD)).toBeNull()

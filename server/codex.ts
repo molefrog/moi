@@ -27,6 +27,53 @@ const REQUEST_TIMEOUT_MS = 30_000
 type Json = Record<string, unknown>
 type NotificationListener = (method: string, params: Json) => void
 
+// ---- wire-level debug tap ----------------------------------------------------
+// Every JSON-RPC frame in either direction is recorded into a per-workspace
+// ring buffer, kept OUTSIDE the client record so it survives process death.
+// Read by GET /api/workspaces/:id/codex/debug (the /playground/codex page).
+
+export type CodexWireFrame = {
+  seq: number
+  ts: number
+  dir: 'send' | 'recv'
+  frame: unknown
+}
+
+const WIRE_LOG_CAP = 1000
+const wireLogs = new Map<string, CodexWireFrame[]>() // key: workspacePath
+let wireSeq = 0
+
+function tapWire(workspacePath: string, dir: 'send' | 'recv', frame: unknown) {
+  let log = wireLogs.get(workspacePath)
+  if (!log) {
+    log = []
+    wireLogs.set(workspacePath, log)
+  }
+  log.push({ seq: ++wireSeq, ts: Date.now(), dir, frame })
+  if (log.length > WIRE_LOG_CAP) log.splice(0, log.length - WIRE_LOG_CAP)
+}
+
+// Frames after `sinceSeq` (0 = everything buffered), oldest first.
+export function getCodexWireLog(workspacePath: string, sinceSeq = 0): CodexWireFrame[] {
+  const log = wireLogs.get(workspacePath) ?? []
+  return sinceSeq > 0 ? log.filter(f => f.seq > sinceSeq) : log
+}
+
+export type CodexProcessInfo = {
+  running: boolean
+  pid?: number
+  binary: string | null
+}
+
+export function getCodexProcessInfo(workspacePath: string): Promise<CodexProcessInfo> {
+  const rec = clients.get(workspacePath)
+  const binary = findCodexBinary()
+  if (!rec) return Promise.resolve({ running: false, binary })
+  return rec
+    .then(r => ({ running: r.client.isAlive(), pid: r.proc.pid, binary }))
+    .catch(() => ({ running: false, binary }))
+}
+
 export type CodexClient = {
   rpc: <T>(method: string, params?: Json) => Promise<T>
   onNotification: (l: NotificationListener) => () => void
@@ -75,6 +122,7 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
   const listeners = new Set<NotificationListener>()
 
   function send(obj: Json) {
+    tapWire(workspacePath, 'send', obj)
     proc.stdin.write(JSON.stringify(obj) + '\n')
     proc.stdin.flush()
   }
@@ -128,6 +176,7 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
     } catch {
       return
     }
+    tapWire(workspacePath, 'recv', msg)
     if ('id' in msg && 'method' in msg) {
       answerServerRequest(msg)
     } else if ('id' in msg) {

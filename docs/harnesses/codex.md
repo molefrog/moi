@@ -194,6 +194,16 @@ state, steer/interrupt, previews, usage). Empirical findings beyond §2:
   against the app-server process cwd, silently nesting paths.
 - **Deltas stream by default** — no opt-in needed; moi's `stream` flag only
   gates forwarding them as preview frames.
+- **Reasoning summaries need `summary: "auto"` on `turn/start`.** Without it
+  the model still reasons (nonzero `reasoningOutputTokens`) but the
+  `reasoning` item arrives with EMPTY `summary`/`content` — thinking is
+  invisible. With it, summaries stream via `item/reasoning/summaryTextDelta`
+  and land populated. Also note reasoning is adaptive: trivial prompts at low
+  effort legitimately produce no reasoning item at all.
+- **Subagents (collab tools) work unflagged**: the parent emits
+  `collabAgentToolCall` (spawn/send/wait/close) and `subAgentActivity` items;
+  the child agent runs as its own thread whose full item stream arrives on
+  the same connection under `agentThreadId`.
 - **`clientUserMessageId` echo confirmed**: the `userMessage` item carries it
   as `clientId`, on live frames only. `thread/read` replay _renumbers_ item
   ids (`item-1`, `item-2`, …) and drops `clientId`, so replayed turn ids never

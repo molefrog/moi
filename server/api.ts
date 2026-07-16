@@ -22,9 +22,16 @@ import { callFunction, parseFunctionPath } from './functions'
 import { processIcon } from './icon'
 import { getWorkspacePreview, loadLayout, mergeLayoutForSave, saveLayout } from './layout'
 import { getMcpStatus, getUserMcpStatus } from './mcp'
-import { getCodexModels, getCodexSessions, getCodexThreadEvents } from './codex'
+import {
+  getCodexModels,
+  getCodexProcessInfo,
+  getCodexSessions,
+  getCodexThreadEvents,
+  getCodexWireLog
+} from './codex'
 import {
   ensureCodexSessionLive,
+  getCodexBroadcastLog,
   getCodexRunningSessions,
   getLiveCodexEvents,
   sendCodexMessage
@@ -471,6 +478,21 @@ one.put('/sessions/:sessionId/config', async c => {
 
 one.get('/mcp', async c => {
   return c.json(await getMcpStatus(c.get('ws').path, 'project'))
+})
+
+// Codex debug tap for /playground/codex: the raw app-server JSON-RPC frames
+// (both directions) and the exact frames codex-session pushed to clients.
+// `sinceWire`/`sinceBroadcast` are seq cursors so the page can poll deltas.
+one.get('/codex/debug', async c => {
+  const ws = c.get('ws')
+  if (ws.type !== 'codex') return c.text('Not a codex workspace', 400)
+  const sinceWire = Number(c.req.query('sinceWire') ?? 0) || 0
+  const sinceBroadcast = Number(c.req.query('sinceBroadcast') ?? 0) || 0
+  return c.json({
+    process: await getCodexProcessInfo(ws.path),
+    wire: getCodexWireLog(ws.path, sinceWire),
+    broadcasts: getCodexBroadcastLog(ws.id, sinceBroadcast)
+  })
 })
 
 // Per-workspace env vars. GET returns the effective view (discovered `.env` + UI
