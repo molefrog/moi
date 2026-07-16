@@ -4,49 +4,18 @@ import { createMiddleware } from 'hono/factory'
 import { existsSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 
-import type {
-  UploadInfo,
-  ViewBuilderInput,
-  WorkspaceEntry,
-  WorkspaceModels,
-  WorkspaceType
-} from '@/lib/types'
+import type { UploadInfo, ViewBuilderInput, WorkspaceEntry, WorkspaceModels } from '@/lib/types'
 import { appendViewBuilderMeta } from '@/lib/view-builder-meta'
 
-import { getClaudeModels } from './harness/claude-code/models'
 import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from './applets'
-import { getCCRunningSessions, sendCCMessage } from './harness/claude-code/session'
 import { applyEnvChanged } from './env-apply'
 import { publishEvent } from './events'
 import { callFunction, parseFunctionPath } from './functions'
 import { processIcon } from './icon'
 import { getWorkspacePreview, loadLayout, mergeLayoutForSave, saveLayout } from './layout'
-import { getMcpStatus, getUserMcpStatus } from './harness/claude-code/mcp'
-import {
-  getCodexModels,
-  getCodexProcessInfo,
-  getCodexSessions,
-  getCodexThreadEvents
-} from './harness/codex/client'
-import {
-  ensureCodexSessionLive,
-  getCodexRunningSessions,
-  getLiveCodexEvents,
-  sendCodexMessage
-} from './harness/codex/session'
+import { getUserMcpStatus } from './harness/claude-code/mcp'
 import { getClientFrameLog, getWireLog } from './harness/debug'
-import {
-  getOpenClawModels,
-  getOpenClawSessionMessages,
-  getOpenClawSessions
-} from './harness/openclaw/discovery'
-import { toSessionInfo, toStreamEvents } from './harness/openclaw/adapter'
-import {
-  ensureOpenClawSessionLive,
-  getLiveOpenClawEvents,
-  getOpenClawRunningSessions,
-  sendOpenClawMessage
-} from './harness/openclaw/session'
+import { allHarnesses, harnessFor, isHarnessType } from './harness/registry'
 import {
   discoverWorkspaces,
   getWorkspace,
@@ -59,7 +28,6 @@ import {
 import { loadScratchpadDoc, saveScratchpadDoc } from './scratchpad'
 import { MAX_ASSET_BYTES, scratchpadAssetFile, storeScratchpadAsset } from './scratchpad-assets'
 import { DIST_DIR, prebuilt } from './static'
-import { getSessionEvents, getSessions } from './harness/claude-code/sessions'
 import { getThreadConfig, saveThreadConfig } from './thread-config'
 import type { ThreadConfigPatch } from './thread-config'
 import { serveWorkspaceImagePreview } from './preview'
@@ -176,7 +144,8 @@ function parseAvailableViewIcons(value: unknown): string[] | null {
 one.get('/view-builders', async c => {
   const ws = c.get('ws')
   const activeSessionIds = new Set(
-    [...getCCRunningSessions(), ...getOpenClawRunningSessions(), ...getCodexRunningSessions()]
+    allHarnesses()
+      .flatMap(h => h.runningSessions())
       .filter(session => session.workspaceId === ws.id)
       .map(session => session.sessionId)
   )
@@ -245,41 +214,18 @@ one.post('/view-builders/:builderId/submit', async c => {
     )
     const content = appendViewBuilderMeta(builder.input.requirements, builder.id, availableIcons)
     try {
-      if (ws.type === 'openclaw' && ws.agentId) {
-        await sendOpenClawMessage({
-          workspaceId: ws.id,
-          workspacePath: ws.path,
-          agentId: ws.agentId,
-          sessionId: builder.sessionId,
-          isNew: true,
-          content,
-          optimisticId: body.optimisticId
-        })
-      } else if (ws.type === 'codex') {
-        await sendCodexMessage({
-          workspaceId: ws.id,
-          workspacePath: ws.path,
-          sessionId: builder.sessionId,
-          isNew: true,
-          content,
-          optimisticId: body.optimisticId,
-          model: typeof body.model === 'string' ? body.model : undefined,
-          effort: typeof body.effort === 'string' ? body.effort : undefined,
-          stream: body.stream === true ? true : undefined
-        })
-      } else {
-        await sendCCMessage({
-          workspaceId: ws.id,
-          workspacePath: ws.path,
-          sessionId: builder.sessionId,
-          isNew: true,
-          content,
-          optimisticId: body.optimisticId,
-          model: typeof body.model === 'string' ? body.model : undefined,
-          effort: typeof body.effort === 'string' ? body.effort : undefined,
-          stream: body.stream === true ? true : undefined
-        })
-      }
+      await harnessFor(ws).sendMessage({
+        workspaceId: ws.id,
+        workspacePath: ws.path,
+        sessionId: builder.sessionId,
+        isNew: true,
+        content,
+        optimisticId: body.optimisticId,
+        model: typeof body.model === 'string' ? body.model : undefined,
+        effort: typeof body.effort === 'string' ? body.effort : undefined,
+        stream: body.stream === true ? true : undefined,
+        agentId: ws.agentId
+      })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not start view builder'
       await markViewBuilderWaiting(ws.id, ws.path, builder.id, message)
@@ -399,58 +345,12 @@ one.get('/uploads/:uploadId', c => {
 
 one.get('/sessions', async c => {
   const ws = c.get('ws')
-  if (ws.type === 'openclaw') {
-    const rows = await getOpenClawSessions(ws.path, ws.agentId)
-    return c.json(rows.map(r => toSessionInfo(r, ws.path)))
-  }
-  if (ws.type === 'codex') {
-    return c.json(await getCodexSessions(ws.path))
-  }
-  return c.json(await getSessions(ws.path))
+  return c.json(await harnessFor(ws).listSessions(ws))
 })
 
 one.get('/sessions/:sessionId/events', async c => {
   const ws = c.get('ws')
-  const id = c.req.param('id')
-  const sessionId = c.req.param('sessionId')
-  if (ws.type === 'openclaw') {
-    // Prefer the live view if we already hold one — keeps REST + WS in
-    // agreement for any reload that lands while a run is active. The first cold
-    // call also primes the live subscription so subsequent WS frames upsert into
-    // the same view.
-    const live = getLiveOpenClawEvents(id, sessionId)
-    if (live) return c.json(live)
-    if (ws.agentId) {
-      try {
-        const evs = await ensureOpenClawSessionLive({
-          workspaceId: id,
-          workspacePath: ws.path,
-          agentId: ws.agentId,
-          sessionId
-        })
-        return c.json(evs)
-      } catch {
-        // fall through to static path
-      }
-    }
-    const preview = await getOpenClawSessionMessages(sessionId, ws.path, ws.agentId)
-    return c.json(toStreamEvents(preview))
-  }
-  if (ws.type === 'codex') {
-    // Prefer the live view when one exists (same reasoning as OpenClaw above);
-    // otherwise resume the thread so WS frames upsert into the same view, and
-    // fall back to a static thread/read if the resume fails.
-    const live = getLiveCodexEvents(id, sessionId)
-    if (live) return c.json(live)
-    try {
-      return c.json(
-        await ensureCodexSessionLive({ workspaceId: id, workspacePath: ws.path, sessionId })
-      )
-    } catch {
-      return c.json(await getCodexThreadEvents(ws.path, sessionId))
-    }
-  }
-  return c.json(await getSessionEvents(sessionId, ws.path))
+  return c.json(await harnessFor(ws).sessionEvents(ws, c.req.param('sessionId')))
 })
 
 // Per-thread agent settings (model + reasoning effort). GET returns the stored
@@ -480,7 +380,8 @@ one.put('/sessions/:sessionId/config', async c => {
 })
 
 one.get('/mcp', async c => {
-  return c.json(await getMcpStatus(c.get('ws').path, 'project'))
+  const ws = c.get('ws')
+  return c.json((await harnessFor(ws).mcpStatus?.(ws)) ?? [])
 })
 
 // Harness debug tap for /playground/harness: the backend's native wire frames
@@ -489,16 +390,13 @@ one.get('/mcp', async c => {
 // `sinceWire`/`sinceBroadcast` are seq cursors so the page can poll deltas.
 one.get('/harness/debug', async c => {
   const ws = c.get('ws')
-  const provider: WorkspaceType = ws.type ?? 'claude-code'
+  const harness = harnessFor(ws)
   const sinceWire = Number(c.req.query('sinceWire') ?? 0) || 0
   const sinceBroadcast = Number(c.req.query('sinceBroadcast') ?? 0) || 0
-  // Codex taps by workspacePath (the process client doesn't know workspace
-  // ids); everything else taps by workspace id.
-  const wireScope = provider === 'codex' ? ws.path : ws.id
   return c.json({
-    provider,
-    process: provider === 'codex' ? await getCodexProcessInfo(ws.path) : null,
-    wire: getWireLog(wireScope, sinceWire),
+    provider: harness.id,
+    process: (await harness.debugInfo?.(ws)) ?? null,
+    wire: getWireLog(harness.wireScope?.(ws) ?? ws.id, sinceWire),
     broadcasts: getClientFrameLog(ws.id, sinceBroadcast)
   })
 })
@@ -566,21 +464,11 @@ one.put('/env', async c => {
 // account-wide Agent SDK model list.
 one.get('/models', async c => {
   const ws = c.get('ws')
-  const provider: WorkspaceType = ws.type ?? 'claude-code'
-  const models =
-    provider === 'openclaw'
-      ? await getOpenClawModels()
-      : provider === 'codex'
-        ? await getCodexModels(ws.path)
-        : await getClaudeModels(ws.path)
-  // Claude Code streams live tokens via `includePartialMessages`; Codex
-  // streams `item/*/delta` natively. OpenClaw uses durable rows only (no
-  // token deltas), so it opts out.
-  const supportsStreaming = provider !== 'openclaw'
+  const harness = harnessFor(ws)
   return c.json({
-    provider,
-    models,
-    supportsStreaming
+    provider: harness.id,
+    models: await harness.listModels(ws),
+    supportsStreaming: harness.capabilities.supportsStreaming
   } satisfies WorkspaceModels)
 })
 
@@ -764,8 +652,7 @@ workspaces.post('/', async c => {
   const body = await c.req.json()
   if (!body?.path) return c.text('Missing path', 400)
   const rawType = body?.type
-  const type =
-    rawType === 'claude-code' || rawType === 'openclaw' || rawType === 'codex' ? rawType : undefined
+  const type = isHarnessType(rawType) ? rawType : undefined
   const path = resolve(String(body.path))
   // Importing IS initializing: lay down the bundled skills (in the backend's
   // skills dir) and the `.moi/` scaffold, exactly like `moi init` — a workspace

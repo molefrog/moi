@@ -2,28 +2,12 @@ import type { ClientMessage } from '@/lib/types'
 
 import index from '../client/index.html'
 import { api } from './api'
-import {
-  getCCRunningSessions,
-  interruptCCSession,
-  killAllCCSessions,
-  sendCCMessage
-} from './harness/claude-code/session'
 import { PORT } from './constants'
 import { control } from './control'
 import { EVENTS_TOPIC, setEventServer } from './events'
 import { killAllWorkers } from './functions'
 import { resolveScratchOp } from './scratchpad-relay'
-import { killAllCodexClients } from './harness/codex/client'
-import {
-  getCodexRunningSessions,
-  interruptCodexRun,
-  sendCodexMessage
-} from './harness/codex/session'
-import {
-  abortOpenClawRun,
-  getOpenClawRunningSessions,
-  sendOpenClawMessage
-} from './harness/openclaw/session'
+import { allHarnesses, harnessFor } from './harness/registry'
 import { getWorkspace } from './registry'
 import { addClient, removeClient, sendToClient } from './state'
 import { distShell, prebuilt } from './static'
@@ -126,14 +110,10 @@ export const app = Bun.serve<WsData>({
     open(ws) {
       if (ws.data.channel === 'chat') {
         addClient(ws)
-        // Authoritative snapshot of every running session (CC + OpenClaw) so the
-        // client can light/clear spinners correctly even for runs whose status
-        // transitions it missed while disconnected.
-        const running = [
-          ...getCCRunningSessions(),
-          ...getOpenClawRunningSessions(),
-          ...getCodexRunningSessions()
-        ]
+        // Authoritative snapshot of every running session across all harnesses
+        // so the client can light/clear spinners correctly even for runs whose
+        // status transitions it missed while disconnected.
+        const running = allHarnesses().flatMap(h => h.runningSessions())
         sendToClient(ws, { type: 'status_snapshot', running })
       } else {
         ws.subscribe(EVENTS_TOPIC)
@@ -149,19 +129,10 @@ export const app = Bun.serve<WsData>({
         if (data.type === 'chat' && (data.content?.trim() || data.attachments?.length)) {
           const workspace = await getWorkspace(data.workspaceId)
           if (!workspace) return
-          if (workspace.type === 'openclaw' && workspace.agentId) {
-            void sendOpenClawMessage({
-              workspaceId: data.workspaceId,
-              workspacePath: workspace.path,
-              agentId: workspace.agentId,
-              sessionId: data.sessionId,
-              isNew: data.isNew,
-              content: data.content.trim(),
-              attachments: data.attachments,
-              optimisticId: data.optimisticId
-            }).catch(() => {})
-          } else if (workspace.type === 'codex') {
-            void sendCodexMessage({
+          // Harnesses ignore fields they don't support (see SendMessageInput);
+          // failures surface as error frames from inside the harness.
+          void harnessFor(workspace)
+            .sendMessage({
               workspaceId: data.workspaceId,
               workspacePath: workspace.path,
               sessionId: data.sessionId,
@@ -171,34 +142,16 @@ export const app = Bun.serve<WsData>({
               optimisticId: data.optimisticId,
               model: data.model,
               effort: data.effort,
-              stream: data.stream
-            }).catch(() => {})
-          } else {
-            // `stream` is only wired for the Claude Code path; the OpenClaw
-            // branch above never receives it (unsupported provider).
-            sendCCMessage({
-              workspaceId: data.workspaceId,
-              workspacePath: workspace.path,
-              sessionId: data.sessionId,
-              isNew: data.isNew,
-              content: data.content.trim(),
-              attachments: data.attachments,
-              optimisticId: data.optimisticId,
-              model: data.model,
-              effort: data.effort,
-              stream: data.stream
+              stream: data.stream,
+              agentId: workspace.agentId
             })
-          }
+            .catch(() => {})
         }
         if (data.type === 'stop') {
           const workspace = await getWorkspace(data.workspaceId)
-          if (workspace?.type === 'openclaw') {
-            abortOpenClawRun({ workspaceId: data.workspaceId, sessionId: data.sessionId })
-          } else if (workspace?.type === 'codex') {
-            interruptCodexRun({ workspaceId: data.workspaceId, sessionId: data.sessionId })
-          } else {
-            interruptCCSession(data.workspaceId, data.sessionId)
-          }
+          void harnessFor(workspace ?? undefined)
+            .interrupt(data.workspaceId, data.sessionId)
+            .catch(() => {})
         }
         // A tab's reply to a relayed Scratchpad op — settle the pending CLI
         // request (first reply wins; later/duplicate replies are ignored).
@@ -229,8 +182,7 @@ function shutdown() {
   try {
     control.stop(true)
   } catch {}
-  killAllCCSessions()
-  killAllCodexClients()
+  for (const h of allHarnesses()) h.shutdown?.()
   killAllWorkers()
   process.exit(0)
 }

@@ -17,6 +17,8 @@
 // Every frame in both directions is printed. Server→client requests
 // (approvals) are auto-accepted and logged.
 
+export {} // top-level await needs module context under tsc
+
 type Json = Record<string, unknown>
 
 const flags = new Map<string, string>()
