@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 
 import {
   IconArticle,
+  IconBrowserPlus,
   IconGhost,
   IconLayout2,
   IconLayoutSidebarRight,
@@ -54,7 +55,7 @@ const Scratchpad = lazy(() =>
 // Tab label for a view: its configured title, or the file-name id as fallback.
 const viewLabel = (v: ViewInfo) => v.config.title || v.id
 
-const viewBuilderIcon = (builder: ViewBuilder) => resolveAppIcon(builder.icon) ?? IconArticle
+const viewBuilderIcon = (builder: ViewBuilder) => resolveAppIcon(builder.icon) ?? IconBrowserPlus
 
 function viewIcon(view: ViewInfo, builders: ViewBuilder[]) {
   const builder = builders.find(candidate => candidate.viewId === view.id)
@@ -488,7 +489,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       ),
     {
       key: 'create-view',
-      Icon: IconArticle,
+      Icon: IconBrowserPlus,
       label: 'New view',
       onClick: () => {
         void builderActions.create().then(builder => openTab(viewBuilderTabId(builder.id)))
