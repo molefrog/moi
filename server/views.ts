@@ -103,10 +103,15 @@ export async function getViewList(workspacePath: string): Promise<ViewInfo[]> {
   ]
   return ordered.map(id => {
     const raw = manifest.config[id] ?? {}
+    const icon = typeof raw.icon === 'string' && raw.icon ? raw.icon : undefined
     const requiredEnv = Array.isArray(raw.requiredEnv) ? raw.requiredEnv : undefined
     return {
       id,
-      config: { title: raw.title || id, ...(requiredEnv ? { requiredEnv } : {}) }
+      config: {
+        title: raw.title || id,
+        ...(icon ? { icon } : {}),
+        ...(requiredEnv ? { requiredEnv } : {})
+      }
     }
   })
 }
@@ -152,8 +157,11 @@ export async function handleBundleViews(
   const after = await readManifest(workspacePath)
   const afterBuilt = new Set(await listBuiltViews(workspacePath))
 
-  const titleChanged = results.some(
-    r => r.status === 'built' && (before.config[r.name]?.title ?? '') !== (r.config?.title ?? '')
+  const identityChanged = results.some(
+    r =>
+      r.status === 'built' &&
+      ((before.config[r.name]?.title ?? '') !== (r.config?.title ?? '') ||
+        (before.config[r.name]?.icon ?? '') !== (r.config?.icon ?? ''))
   )
   const orderChanged = before.order.join('\0') !== after.order.join('\0')
   const membershipChanged =
@@ -165,7 +173,13 @@ export async function handleBundleViews(
   for (const r of results) {
     if (r.status === 'built') {
       publish({ type: 'view:updated', name: r.name, config: r.config ?? null })
-      await markViewBuilderReady(workspaceId, workspacePath, r.name, r.config?.title || r.name)
+      await markViewBuilderReady(
+        workspaceId,
+        workspacePath,
+        r.name,
+        r.config?.title || r.name,
+        r.config?.icon
+      )
       for (const m of r.serverModules ?? []) changedServerModules.add(m)
     }
   }
@@ -175,7 +189,7 @@ export async function handleBundleViews(
   }
 
   const views = await getViewList(workspacePath)
-  if (titleChanged || orderChanged || membershipChanged) {
+  if (identityChanged || orderChanged || membershipChanged) {
     publish({ type: 'view-layout:updated', views })
   }
 

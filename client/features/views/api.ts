@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
+import { APP_ICON_IDS } from '@/client/lib/app-icon-registry'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import type { ViewBuilder } from '@/lib/types'
 
@@ -90,7 +91,11 @@ export function useSubmitViewBuilder(workspaceId: string) {
     mutationFn: ({ builderId, requirements, ...options }) =>
       requestJson(
         `/api/workspaces/${workspaceId}/view-builders/${builderId}/submit`,
-        jsonRequest('POST', { input: { requirements }, ...options }),
+        jsonRequest('POST', {
+          input: { requirements },
+          availableIcons: APP_ICON_IDS,
+          ...options
+        }),
         'Failed to start view builder'
       ),
     onSuccess: builder => {

@@ -120,8 +120,9 @@ export const control = Bun.serve({
           const builderId = typeof data.builder === 'string' ? data.builder.trim() : ''
           const viewId = typeof data.id === 'string' ? data.id.trim() : ''
           const title = typeof data.title === 'string' ? data.title.trim() : ''
-          if (!builderId || !viewId || !title) {
-            ws.send(JSON.stringify({ error: 'Builder, view id, and title are required' }))
+          const icon = typeof data.icon === 'string' ? data.icon.trim() : ''
+          if (!builderId || !viewId || !title || !icon) {
+            ws.send(JSON.stringify({ error: 'Builder, view id, title, and icon are required' }))
             return
           }
           if (!/^[a-z0-9][a-z0-9_-]*$/.test(viewId)) {
@@ -129,6 +130,14 @@ export const control = Bun.serve({
               JSON.stringify({
                 error:
                   'View id must start with a lowercase letter or number and use a-z, 0-9, _, or -'
+              })
+            )
+            return
+          }
+          if (!/^[a-z0-9][a-z0-9-]*$/.test(icon)) {
+            ws.send(
+              JSON.stringify({
+                error: 'Icon must start with a lowercase letter or number and use a-z, 0-9, or -'
               })
             )
             return
@@ -141,7 +150,14 @@ export const control = Bun.serve({
               ws.send(JSON.stringify({ error: `View id "${viewId}" already exists` }))
               return
             }
-            const builder = await claimViewBuilder(match.id, match.path, builderId, viewId, title)
+            const builder = await claimViewBuilder(
+              match.id,
+              match.path,
+              builderId,
+              viewId,
+              title,
+              icon
+            )
             ws.send(JSON.stringify({ ok: true, builder, workspacePath: match.path }))
           } catch (err) {
             ws.send(

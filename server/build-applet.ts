@@ -144,8 +144,8 @@ export async function extractWidgetConfig(srcPath: string): Promise<WidgetConfig
   return { ...DEFAULT_CONFIG, ...result }
 }
 
-// A view's config: just `title` (string) + advisory `requiredEnv`. No sizing —
-// views are full-screen. Returns null when no `config` export is present.
+// A view's config: `title` + app icon registry id + advisory `requiredEnv`.
+// No sizing — views are full-screen. Returns null when no `config` export is present.
 export async function extractViewConfig(srcPath: string): Promise<ViewConfig | null> {
   const source = await Bun.file(srcPath).text()
 
@@ -158,9 +158,9 @@ export async function extractViewConfig(srcPath: string): Promise<ViewConfig | n
     if (prop.type !== 'Property' || prop.key?.type !== 'Identifier') continue
     const key = prop.key.name as string
 
-    if (key === 'title') {
+    if (key === 'title' || key === 'icon') {
       if (prop.value?.type === 'Literal' && typeof prop.value.value === 'string') {
-        result.title = prop.value.value
+        result[key] = prop.value.value
       }
       continue
     }

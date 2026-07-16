@@ -35,7 +35,7 @@ function seed(jsNames: string[], manifest: object) {
 }
 
 async function views(): Promise<
-  { id: string; config: { title?: string; requiredEnv?: string[] } }[]
+  { id: string; config: { title?: string; icon?: string; requiredEnv?: string[] } }[]
 > {
   const res = await listViews(WS)
   return (await res.json()).views
@@ -81,6 +81,11 @@ describe('listViews', () => {
   test('passes through requiredEnv', async () => {
     seed(['crm'], { config: { crm: { title: 'CRM', requiredEnv: ['K'] } }, order: ['crm'] })
     expect((await views())[0].config).toEqual({ title: 'CRM', requiredEnv: ['K'] })
+  })
+
+  test('passes through the app icon id', async () => {
+    seed(['crm'], { config: { crm: { title: 'CRM', icon: 'briefcase' } }, order: ['crm'] })
+    expect((await views())[0].config).toEqual({ title: 'CRM', icon: 'briefcase' })
   })
 
   test('appends a built view missing from order', async () => {

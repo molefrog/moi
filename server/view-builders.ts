@@ -162,8 +162,12 @@ export async function claimViewBuilder(
   workspacePath: string,
   builderId: string,
   viewId: string,
-  title: string
+  title: string,
+  icon: string
 ): Promise<ViewBuilder> {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(icon)) {
+    throw new ViewBuilderError('Invalid view icon id', 400)
+  }
   const builder = await mutateBuilders(workspacePath, builders => {
     const [current, index] = findBuilder(builders, builderId)
     if (current.status === 'draft') {
@@ -176,7 +180,7 @@ export async function claimViewBuilder(
       candidate => candidate.id !== builderId && candidate.viewId === viewId
     )
     if (claimed) throw new ViewBuilderError(`View id "${viewId}" is already claimed`, 409)
-    return replace(builders, index, updated(current, { viewId, title }))
+    return replace(builders, index, updated(current, { viewId, title, icon }))
   })
   publishUpdated(workspaceId, builder)
   return builder
@@ -262,7 +266,8 @@ export async function markViewBuilderReady(
   workspaceId: string,
   workspacePath: string,
   viewId: string,
-  title: string
+  title: string,
+  icon?: string
 ): Promise<ViewBuilder | null> {
   const builder = await mutateBuilders(workspacePath, builders => {
     const index = builders.findIndex(candidate => candidate.viewId === viewId)
@@ -271,7 +276,11 @@ export async function markViewBuilderReady(
     return replace(
       builders,
       index,
-      updated(withoutError as ViewBuilder, { status: 'ready', title })
+      updated(withoutError as ViewBuilder, {
+        status: 'ready',
+        title,
+        ...(icon ? { icon } : {})
+      })
     )
   })
   if (builder) publishUpdated(workspaceId, builder)
@@ -294,7 +303,8 @@ export async function reconcileViewBuilders(
         const { error: _error, ...withoutError } = current
         const next = updated(withoutError as ViewBuilder, {
           status: 'ready',
-          title: view.config.title
+          title: view.config.title,
+          ...(view.config.icon ? { icon: view.config.icon } : {})
         })
         builders[index] = next
         updates.push(next)

@@ -264,21 +264,24 @@ Full-screen apps, one per nav tab — the user switches tabs; there is no routin
 ## View builder requests
 
 When the user's message includes hidden `<moi>` context marked `View builder request`, this chat is
-linked to a pending view tab. Infer a short stable id and a clear title from the requirements, then
-claim them before writing view files:
+linked to a pending view tab. Before reading files, planning, or writing code, infer a short stable
+id, a clear sentence-case title, and a relevant icon from the requirements. Capitalize only the
+first word of the title. Your first action must claim them:
 
 ```sh
-moi view-builder claim --builder <builder-id> --id <view-id> --title "<title>"
+moi view-builder claim --builder <builder-id> --id <view-id> --title "<title>" --icon <icon-id>
 ```
 
-The id must use lowercase letters, numbers, `_`, or `-`. The first claim locks the id; running the
-same claim again may update its title. After the claim, write `.moi/views/<view-id>.tsx` and finish
-with `moi bundle --only views`. The tab uses the claimed title while you work and changes into the
-built view after a successful bundle.
+Choose the icon id from the available view icons in the hidden context. The id must use lowercase
+letters, numbers, `_`, or `-`. The first claim locks the id; running the same claim again may update
+its title and icon. After the claim, write `.moi/views/<view-id>.tsx`, use the same icon id in its
+config, and finish with `moi bundle --only views`. The tab uses the claimed title and icon while you
+work and changes into the built view after a successful bundle.
 
 ```ts
 export const config = {
-  title: 'User CRM', // nav-tab label — defaults to the file name
+  title: 'Customer overview', // sentence-case nav label — defaults to the file name
+  icon: 'user', // icon id from the view-builder request
   requiredEnv: ['CRM_API_KEY'] // optional env-key hints (advisory; see Environment & secrets)
 } as const
 ```

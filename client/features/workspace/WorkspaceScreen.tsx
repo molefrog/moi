@@ -28,6 +28,7 @@ import { useViewBuilderActions } from '@/client/features/views/useViewBuilderAct
 import { useFitsSplitLayout } from '@/client/features/workspace/useFitsSplitLayout'
 import { useWorkspaceTheme } from '@/client/features/workspace/useWorkspaceTheme'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
+import { resolveAppIcon } from '@/client/lib/app-icon-registry'
 import { cn } from '@/client/lib/cn'
 import { liveStore } from '@/client/features/chat/chat-store'
 import {
@@ -52,6 +53,13 @@ const Scratchpad = lazy(() =>
 
 // Tab label for a view: its configured title, or the file-name id as fallback.
 const viewLabel = (v: ViewInfo) => v.config.title || v.id
+
+const viewBuilderIcon = (builder: ViewBuilder) => resolveAppIcon(builder.icon) ?? IconArticle
+
+function viewIcon(view: ViewInfo, builders: ViewBuilder[]) {
+  const builder = builders.find(candidate => candidate.viewId === view.id)
+  return resolveAppIcon(view.config.icon) ?? resolveAppIcon(builder?.icon) ?? IconArticle
+}
 
 const DEFAULT_TABS: WorkspaceTabsState = { open: ['agent'], active: 'agent' }
 
@@ -209,7 +217,7 @@ function tabItemFor(
   if (builder) {
     return {
       key: tab,
-      Icon: IconArticle,
+      Icon: viewBuilderIcon(builder),
       label: builder.title || builder.viewId || 'New view',
       closable
     }
@@ -219,7 +227,7 @@ function tabItemFor(
   return view
     ? {
         key: tab,
-        Icon: IconArticle,
+        Icon: viewIcon(view, builders),
         label: viewLabel(view),
         closable
       }
@@ -461,7 +469,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       .map(
         ({ view, tab }): CreateWorkspaceTabItem => ({
           key: tab,
-          Icon: IconArticle,
+          Icon: viewIcon(view, builders),
           label: viewLabel(view),
           onClick: () => openTab(tab)
         })
@@ -473,7 +481,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       .map(
         ({ builder, tab }): CreateWorkspaceTabItem => ({
           key: tab,
-          Icon: IconArticle,
+          Icon: viewBuilderIcon(builder),
           label: builder.title || builder.viewId || 'New view',
           onClick: () => openTab(tab)
         })

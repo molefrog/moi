@@ -7,8 +7,17 @@ import { stripUserMessageMetadata } from '../openclaw-strip'
 
 describe('view builder message metadata', () => {
   test('adds agent instructions and restores the visible requirements', () => {
-    const content = appendViewBuilderMeta('Build a project tracker', 'builder-123')
+    const content = appendViewBuilderMeta('Build a project tracker', 'builder-123', [
+      'chart',
+      'calendar'
+    ])
+    expect(content).toContain('Available view icons: chart, calendar')
+    expect(content).toContain('Your first action must be')
+    expect(content).toContain('sentence-case title')
+    expect(content).toContain('Capitalize only the first word')
     expect(content).toContain('moi view-builder claim --builder builder-123')
+    expect(content).toContain('--icon <icon-id>')
+    expect(content).toContain('before reading files')
     expect(stripViewBuilderMeta(content)).toBe('Build a project tracker')
   })
 
@@ -24,7 +33,7 @@ describe('view builder message metadata', () => {
       uuid: 'builder-turn',
       message: {
         role: 'user',
-        content: appendViewBuilderMeta('Build a project tracker', 'builder-123')
+        content: appendViewBuilderMeta('Build a project tracker', 'builder-123', ['chart'])
       }
     })
     const event = events.find(candidate => candidate.kind === 'turn')
@@ -33,7 +42,7 @@ describe('view builder message metadata', () => {
   })
 
   test('strips metadata from OpenClaw transcript replay', () => {
-    const content = appendViewBuilderMeta('Build a project tracker', 'builder-123')
+    const content = appendViewBuilderMeta('Build a project tracker', 'builder-123', ['chart'])
     expect(stripUserMessageMetadata(`[Wed 2026-07-15 10:00 GMT+2] ${content}`)).toBe(
       'Build a project tracker'
     )

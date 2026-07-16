@@ -481,11 +481,12 @@ const bundle = defineCommand({
 })
 
 const viewBuilderClaim = defineCommand({
-  meta: { name: 'claim', description: 'Claim the id and title for a view builder' },
+  meta: { name: 'claim', description: 'Claim the id, title, and icon for a view builder' },
   args: {
     builder: { type: 'string', required: true, description: 'View builder id' },
     id: { type: 'string', required: true, description: 'Stable view id' },
     title: { type: 'string', required: true, description: 'View title' },
+    icon: { type: 'string', required: true, description: 'App icon registry id' },
     dir: {
       type: 'positional',
       default: '.',
@@ -502,7 +503,8 @@ const viewBuilderClaim = defineCommand({
           path,
           builder: args.builder,
           id: args.id,
-          title: args.title
+          title: args.title,
+          icon: args.icon
         })
       )
     ws.onmessage = event => {

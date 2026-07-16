@@ -147,6 +147,15 @@ function viewBuilderError(err: unknown): { message: string; status: 400 | 404 | 
   return err instanceof ViewBuilderError ? { message: err.message, status: err.status } : null
 }
 
+function parseAvailableViewIcons(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null
+  const icons = value.filter(
+    (icon): icon is string =>
+      typeof icon === 'string' && /^[a-z0-9][a-z0-9-]*$/.test(icon) && icon.length <= 64
+  )
+  return icons.length > 0 ? [...new Set(icons)] : null
+}
+
 one.get('/view-builders', async c => {
   const ws = c.get('ws')
   const activeSessionIds = new Set(
@@ -198,6 +207,7 @@ one.post('/view-builders/:builderId/submit', async c => {
     model?: string
     effort?: string
     stream?: boolean
+    availableIcons?: unknown
   }>()
   if (typeof body?.input?.requirements !== 'string') {
     return c.text('Expected { input: { requirements: string } }', 400)
@@ -205,6 +215,8 @@ one.post('/view-builders/:builderId/submit', async c => {
   if (body.optimisticId !== undefined && typeof body.optimisticId !== 'string') {
     return c.text('Invalid optimisticId', 400)
   }
+  const availableIcons = parseAvailableViewIcons(body.availableIcons)
+  if (!availableIcons) return c.text('Available view icons are required', 400)
   try {
     const builder = await beginViewBuilder(
       ws.id,
@@ -212,7 +224,7 @@ one.post('/view-builders/:builderId/submit', async c => {
       c.req.param('builderId'),
       body.input.requirements
     )
-    const content = appendViewBuilderMeta(builder.input.requirements, builder.id)
+    const content = appendViewBuilderMeta(builder.input.requirements, builder.id, availableIcons)
     try {
       if (ws.type === 'openclaw' && ws.agentId) {
         await sendOpenClawMessage({

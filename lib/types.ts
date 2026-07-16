@@ -20,6 +20,8 @@ export type WidgetInfo = {
 export type ViewConfig = {
   // Nav tab label. Falls back to the file name when unset.
   title?: string
+  // App icon registry id used by workspace tabs.
+  icon?: string
   // Advisory env hints, same semantics as WidgetConfig.requiredEnv.
   requiredEnv?: string[]
 }
@@ -42,6 +44,7 @@ export type ViewBuilder = {
   sessionId: string
   viewId?: string
   title?: string
+  icon?: string
   error?: string
   createdAt: number
   updatedAt: number

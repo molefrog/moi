@@ -53,7 +53,7 @@ export function WorkspaceAgentStep({
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-0.5 pr-8">
         <DialogTitle>Choose agent</DialogTitle>
-        <DialogDescription>We will use it to build your workspace</DialogDescription>
+        <DialogDescription>It will be used to build your workspace</DialogDescription>
       </div>
 
       <div role="group" aria-label="Agent" className="grid grid-cols-2 gap-2">

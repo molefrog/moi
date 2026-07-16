@@ -84,23 +84,44 @@ describe('view builder storage', () => {
       workspacePath,
       first.id,
       'sales-dashboard',
-      'Sales dashboard'
+      'Sales dashboard',
+      'chart'
     )
     expect(claimed.viewId).toBe('sales-dashboard')
+    expect(claimed.icon).toBe('chart')
 
     const renamed = await claimViewBuilder(
       workspaceId,
       workspacePath,
       first.id,
       'sales-dashboard',
-      'Revenue dashboard'
+      'Revenue dashboard',
+      'target'
     )
     expect(renamed.title).toBe('Revenue dashboard')
+    expect(renamed.icon).toBe('target')
     await expect(
-      claimViewBuilder(workspaceId, workspacePath, first.id, 'different-id', 'Different')
+      claimViewBuilder(workspaceId, workspacePath, first.id, 'different-id', 'Different', 'file')
     ).rejects.toBeInstanceOf(ViewBuilderError)
     await expect(
-      claimViewBuilder(workspaceId, workspacePath, second.id, 'sales-dashboard', 'Duplicate')
+      claimViewBuilder(
+        workspaceId,
+        workspacePath,
+        second.id,
+        'sales-dashboard',
+        'Duplicate',
+        'file'
+      )
+    ).rejects.toBeInstanceOf(ViewBuilderError)
+    await expect(
+      claimViewBuilder(
+        workspaceId,
+        workspacePath,
+        second.id,
+        'another-view',
+        'Another view',
+        'ChartBar'
+      )
     ).rejects.toBeInstanceOf(ViewBuilderError)
   })
 
@@ -142,13 +163,19 @@ describe('view builder storage', () => {
     const reconciled = await reconcileViewBuilders(
       workspaceId,
       workspacePath,
-      [{ id: 'sales-dashboard', config: { title: 'Final sales dashboard' } }],
+      [
+        {
+          id: 'sales-dashboard',
+          config: { title: 'Final sales dashboard', icon: 'briefcase' }
+        }
+      ],
       new Set()
     )
     expect(reconciled.find(builder => builder.id === claimed.id)?.status).toBe('ready')
     expect(reconciled.find(builder => builder.id === claimed.id)?.title).toBe(
       'Final sales dashboard'
     )
+    expect(reconciled.find(builder => builder.id === claimed.id)?.icon).toBe('briefcase')
     expect(reconciled.find(builder => builder.id === stale.id)?.status).toBe('waiting')
   })
 

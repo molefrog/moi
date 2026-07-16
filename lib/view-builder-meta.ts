@@ -2,13 +2,21 @@ const VIEW_BUILDER_OPEN = '<moi>'
 const VIEW_BUILDER_CLOSE = '</moi>'
 const VIEW_BUILDER_MARKER = 'View builder request'
 
-export function appendViewBuilderMeta(requirements: string, builderId: string): string {
+export function appendViewBuilderMeta(
+  requirements: string,
+  builderId: string,
+  availableIcons: string[]
+): string {
   const context = [
     VIEW_BUILDER_OPEN,
     VIEW_BUILDER_MARKER,
     `Builder id: ${builderId}`,
-    'Before writing view files, infer a stable view id and title, then run:',
-    `moi view-builder claim --builder ${builderId} --id <view-id> --title "<title>"`,
+    `Available view icons: ${availableIcons.join(', ')}`,
+    'Your first action must be to infer a stable view id, sentence-case title, and relevant icon from the requirements, then run:',
+    `moi view-builder claim --builder ${builderId} --id <view-id> --title "<title>" --icon <icon-id>`,
+    'Do this before reading files, planning, or writing code. Choose the icon id from the available view icons above.',
+    'Capitalize only the first word of the title.',
+    'Use the same icon id in the view config.',
     'After building the view, run `moi bundle --only views`.',
     VIEW_BUILDER_CLOSE
   ].join('\n')

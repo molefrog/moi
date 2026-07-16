@@ -259,9 +259,9 @@ describe('extractWidgetConfig', () => {
 })
 
 describe('extractViewConfig', () => {
-  test('extracts title and requiredEnv', async () => {
+  test('extracts title, icon, and requiredEnv', async () => {
     const config = await extractViewConfig(join(FIXTURES, 'with-view-config.tsx'))
-    expect(config).toEqual({ title: 'My View', requiredEnv: ['API_KEY'] })
+    expect(config).toEqual({ title: 'My View', icon: 'chart', requiredEnv: ['API_KEY'] })
   })
 
   test('returns null when there is no config export', async () => {
@@ -275,9 +275,9 @@ describe('extractViewConfig', () => {
 })
 
 describe("buildApplet kind='view'", () => {
-  test('parses the view config (title + requiredEnv, no spans)', async () => {
+  test('parses the view config (title + icon + requiredEnv, no spans)', async () => {
     const result = await buildApplet(join(FIXTURES, 'with-view-config.tsx'), undefined, 'view')
-    expect(result.config).toEqual({ title: 'My View', requiredEnv: ['API_KEY'] })
+    expect(result.config).toEqual({ title: 'My View', icon: 'chart', requiredEnv: ['API_KEY'] })
   })
 
   test('namespaces the injected <style> id with the view kind', async () => {
