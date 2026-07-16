@@ -44,7 +44,9 @@ harness (Claude Code, openclaw, others differ in the details) there can be **mul
 they all share **one** workspace **and one Project folder** — the same filesystem, the same `.moi`
 folder, applets, config, and theme. Anything you build is visible to every chat, and another chat
 may have changed the workspace or the Project files since you last looked. Treat `.moi` and the
-Project folder as shared state, not yours alone.
+Project folder as shared state, not yours alone. Internally, "chats" are sometimes aliased as
+"threads" — "chat" is product language, while "thread" is reserved for internal SDK, session, and
+persistence concepts.
 
 "Applets" are standalone full-stack components that _you_ write and maintain. They extend the
 Workspace UI.
