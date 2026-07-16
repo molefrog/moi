@@ -35,6 +35,14 @@ export function appletUrl(segment: AppletSegment, workspaceId: string, name: str
   return `/api/workspaces/${workspaceId}/${segment}/${name}/index.js?v=${appletVersion(segment, workspaceId, name)}`
 }
 
+// The key an applet bundle registers its CSS under (`window.__moiAppletCss`):
+// the bundle-dir path, which the bundle derives from its own import.meta.url
+// (see injectCss in server/bundler/build-applet.ts). Workspace-qualified so two
+// workspaces sharing an applet name never read each other's styles.
+export function appletStyleKey(segment: AppletSegment, workspaceId: string, name: string): string {
+  return `/api/workspaces/${workspaceId}/${segment}/${name}`
+}
+
 export function getCachedApplet(key: string): Promise<unknown> | undefined {
   return moduleCache.get(key)
 }

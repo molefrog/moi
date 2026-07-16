@@ -1,5 +1,5 @@
 import { IconChevronRight, IconEggCracked, IconLoader2, IconPlus } from '@tabler/icons-react'
-import { useLocation } from 'wouter'
+import { Link, useLocation } from 'wouter'
 
 import { useAddWorkspace, useDiscoveredWorkspaces, useWorkspaces } from './api'
 import { HomeLogo } from './HomeLogo'
@@ -150,7 +150,7 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
   const meta = formatAddedAt(workspace.addedAt)
 
   return (
-    <a
+    <Link
       href={`/workspace/${workspace.id}`}
       className="group flex min-w-0 flex-col gap-4 rounded-xl bg-card p-2 shadow-xs transition-shadow hover:shadow-sm"
     >
@@ -169,7 +169,7 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
         </div>
         <div className="mt-2 text-xs text-muted-foreground">{meta}</div>
       </div>
-    </a>
+    </Link>
   )
 }
 

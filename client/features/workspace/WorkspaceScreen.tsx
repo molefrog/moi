@@ -15,6 +15,7 @@ import { ChatPanel } from '@/client/features/chat/ChatPanel'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { CustomizePanel } from '@/client/features/workspace/CustomizePanel'
 import { McpMenu } from '@/client/features/connectors/McpMenu'
+import { AppletMount } from '@/client/features/applets/AppletMount'
 import { WidgetErrorBoundary } from '@/client/features/applets/WidgetErrorBoundary'
 import { Widgets } from '@/client/features/widgets/Widgets'
 import { PanelHeader } from '@/client/components/shared/PanelHeader'
@@ -104,18 +105,25 @@ function ViewApp({ view }: ViewAppProps) {
     <div className="relative min-h-0 flex-1 overflow-hidden">
       <AnimatePresence mode="wait" initial={false}>
         {bundle.status === 'ready' && (
-          <motion.div
+          <AppletMount
+            asChild
+            segment="views"
+            name={view.id}
+            version={bundle.version}
             key={bundle.version}
-            className="absolute inset-0 overflow-auto"
-            initial={{ opacity: 0, filter: 'blur(4px)' }}
-            animate={{ opacity: 1, filter: 'blur(0px)' }}
-            exit={{ opacity: 0, filter: 'blur(4px)' }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
           >
-            <WidgetErrorBoundary name={view.id} resetKey={bundle.version}>
-              <bundle.Component />
-            </WidgetErrorBoundary>
-          </motion.div>
+            <motion.div
+              className="absolute inset-0 overflow-auto"
+              initial={{ opacity: 0, filter: 'blur(4px)' }}
+              animate={{ opacity: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, filter: 'blur(4px)' }}
+              transition={{ duration: 0.3, ease: 'easeInOut' }}
+            >
+              <WidgetErrorBoundary name={view.id} resetKey={bundle.version}>
+                <bundle.Component />
+              </WidgetErrorBoundary>
+            </motion.div>
+          </AppletMount>
         )}
         {bundle.status === 'error' && (
           <motion.p

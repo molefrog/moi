@@ -22,7 +22,7 @@ import {
   buildApplet,
   scanAssetImports,
   scanServerImports
-} from './build-applet'
+} from './bundler/build-applet'
 
 export type AppletPaths = {
   moiRoot: string
