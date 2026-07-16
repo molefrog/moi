@@ -4,19 +4,32 @@ import { createMiddleware } from 'hono/factory'
 import { existsSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 
-import type { UploadInfo, WorkspaceEntry, WorkspaceModels, WorkspaceType } from '@/lib/types'
+import type {
+  UploadInfo,
+  ViewBuilderInput,
+  WorkspaceEntry,
+  WorkspaceModels,
+  WorkspaceType
+} from '@/lib/types'
+import { appendViewBuilderMeta } from '@/lib/view-builder-meta'
 
 import { getClaudeModels } from './agent'
 import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from './applets'
+import { getCCRunningSessions, sendCCMessage } from './cc-session'
 import { applyEnvChanged } from './env-apply'
+import { publishEvent } from './events'
 import { callFunction, parseFunctionPath } from './functions'
 import { processIcon } from './icon'
 import { getWorkspacePreview, loadLayout, mergeLayoutForSave, saveLayout } from './layout'
 import { getMcpStatus, getUserMcpStatus } from './mcp'
-import { publishEvent } from './events'
 import { getOpenClawModels, getOpenClawSessionMessages, getOpenClawSessions } from './openclaw'
 import { toSessionInfo, toStreamEvents } from './openclaw-adapter'
-import { ensureOpenClawSessionLive, getLiveOpenClawEvents } from './openclaw-session'
+import {
+  ensureOpenClawSessionLive,
+  getLiveOpenClawEvents,
+  getOpenClawRunningSessions,
+  sendOpenClawMessage
+} from './openclaw-session'
 import {
   discoverWorkspaces,
   getWorkspace,
@@ -35,7 +48,16 @@ import type { ThreadConfigPatch } from './thread-config'
 import { serveWorkspaceImagePreview } from './preview'
 import { MAX_UPLOAD_BYTES, addUpload, getUpload } from './uploads'
 import { requiredEnvFor } from './required-env'
-import { listViews, serveView } from './views'
+import { getViewList, listViews, serveView } from './views'
+import {
+  ViewBuilderError,
+  beginViewBuilder,
+  createViewBuilder,
+  deleteViewBuilder,
+  markViewBuilderWaiting,
+  reconcileViewBuilders,
+  updateViewBuilderInput
+} from './view-builders'
 import { listWidgets, serveWidget } from './widgets'
 import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
 import {
@@ -119,6 +141,139 @@ one.get('/views/*', c => {
   const { name, file } = parseAppletTail(c.req.url, id, 'views')
   if (!name) return c.text('Not found', 404)
   return serveView(name, file, c.get('ws').path, apiBaseFor(id), c.req.header('if-none-match'))
+})
+
+function viewBuilderError(err: unknown): { message: string; status: 400 | 404 | 409 } | null {
+  return err instanceof ViewBuilderError ? { message: err.message, status: err.status } : null
+}
+
+function parseAvailableViewIcons(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null
+  const icons = value.filter(
+    (icon): icon is string =>
+      typeof icon === 'string' && /^[a-z0-9][a-z0-9-]*$/.test(icon) && icon.length <= 64
+  )
+  return icons.length > 0 ? [...new Set(icons)] : null
+}
+
+one.get('/view-builders', async c => {
+  const ws = c.get('ws')
+  const activeSessionIds = new Set(
+    [...getCCRunningSessions(), ...getOpenClawRunningSessions()]
+      .filter(session => session.workspaceId === ws.id)
+      .map(session => session.sessionId)
+  )
+  const builders = await reconcileViewBuilders(
+    ws.id,
+    ws.path,
+    await getViewList(ws.path),
+    activeSessionIds
+  )
+  // Widget builders are record-only for now — reconciled server-side but kept
+  // out of the host's view-builder tab list until their UI lands.
+  return c.json({ builders: builders.filter(builder => builder.kind !== 'widget') })
+})
+
+one.post('/view-builders', async c => {
+  const ws = c.get('ws')
+  return c.json(await createViewBuilder(ws.id, ws.path), 201)
+})
+
+one.patch('/view-builders/:builderId', async c => {
+  const ws = c.get('ws')
+  const body = await c.req.json<{ input?: Partial<ViewBuilderInput> }>()
+  if (typeof body?.input?.requirements !== 'string') {
+    return c.text('Expected { input: { requirements: string } }', 400)
+  }
+  try {
+    return c.json(
+      await updateViewBuilderInput(
+        ws.id,
+        ws.path,
+        c.req.param('builderId'),
+        body.input.requirements
+      )
+    )
+  } catch (err) {
+    const known = viewBuilderError(err)
+    if (known) return c.text(known.message, known.status)
+    throw err
+  }
+})
+
+one.post('/view-builders/:builderId/submit', async c => {
+  const ws = c.get('ws')
+  const body = await c.req.json<{
+    input?: Partial<ViewBuilderInput>
+    optimisticId?: string
+    model?: string
+    effort?: string
+    stream?: boolean
+    availableIcons?: unknown
+  }>()
+  if (typeof body?.input?.requirements !== 'string') {
+    return c.text('Expected { input: { requirements: string } }', 400)
+  }
+  if (body.optimisticId !== undefined && typeof body.optimisticId !== 'string') {
+    return c.text('Invalid optimisticId', 400)
+  }
+  const availableIcons = parseAvailableViewIcons(body.availableIcons)
+  if (!availableIcons) return c.text('Available view icons are required', 400)
+  try {
+    const builder = await beginViewBuilder(
+      ws.id,
+      ws.path,
+      c.req.param('builderId'),
+      body.input.requirements
+    )
+    const content = appendViewBuilderMeta(builder.input.requirements, builder.id, availableIcons)
+    try {
+      if (ws.type === 'openclaw' && ws.agentId) {
+        await sendOpenClawMessage({
+          workspaceId: ws.id,
+          workspacePath: ws.path,
+          agentId: ws.agentId,
+          sessionId: builder.sessionId,
+          isNew: true,
+          content,
+          optimisticId: body.optimisticId
+        })
+      } else {
+        await sendCCMessage({
+          workspaceId: ws.id,
+          workspacePath: ws.path,
+          sessionId: builder.sessionId,
+          isNew: true,
+          content,
+          optimisticId: body.optimisticId,
+          model: typeof body.model === 'string' ? body.model : undefined,
+          effort: typeof body.effort === 'string' ? body.effort : undefined,
+          stream: body.stream === true ? true : undefined
+        })
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not start view builder'
+      await markViewBuilderWaiting(ws.id, ws.path, builder.id, message)
+      return c.text(message, 500)
+    }
+    return c.json(builder)
+  } catch (err) {
+    const known = viewBuilderError(err)
+    if (known) return c.text(known.message, known.status)
+    throw err
+  }
+})
+
+one.delete('/view-builders/:builderId', async c => {
+  const ws = c.get('ws')
+  try {
+    await deleteViewBuilder(ws.id, ws.path, c.req.param('builderId'))
+    return c.body(null, 204)
+  } catch (err) {
+    const known = viewBuilderError(err)
+    if (known) return c.text(known.message, known.status)
+    throw err
+  }
 })
 
 // Workspace file stream — an applet's `fileUrl(path)` resolves here. Streams a

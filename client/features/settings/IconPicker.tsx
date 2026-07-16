@@ -17,6 +17,7 @@ import {
 import { useResetWorkspaceIcon, useSaveWorkspaceIcon } from '@/client/features/settings/api'
 import { workspaceProviderIcon } from '@/client/features/home/workspace-presentation'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
+import { APP_ICON_CHOICES } from '@/client/lib/app-icon-registry'
 import { cn } from '@/client/lib/cn'
 import {
   GRADIENT_PRESETS,
@@ -26,7 +27,7 @@ import {
   renderEmojiIcon,
   renderGlyphIcon
 } from '@/client/features/settings/render-icon'
-import { EMOJI_FONT, FAVORITE_EMOJI, ICON_CHOICES } from './icon-picker-options'
+import { EMOJI_FONT, FAVORITE_EMOJI } from './icon-picker-options'
 
 type Mode = 'emoji' | 'icon' | 'upload'
 
@@ -98,7 +99,7 @@ export function IconPicker({ icon }: IconPickerProps) {
   const glyphRef = useRef<HTMLSpanElement>(null)
   const uploadBlob = useRef<Blob | null>(null)
 
-  const selectedIcon = ICON_CHOICES.find(c => c.id === iconId)
+  const selectedIcon = APP_ICON_CHOICES.find(c => c.id === iconId)
   const onGradient = bg.gradient !== null
   const saving = savePending || resetPending
 
@@ -367,7 +368,7 @@ export function IconPicker({ icon }: IconPickerProps) {
           </EmojiPicker.Root>
         ) : mode === 'icon' ? (
           <div className="grid scrollbar-thin h-72 grid-cols-[repeat(auto-fill,minmax(2.25rem,1fr))] content-start gap-1 overflow-y-auto rounded-lg border border-border bg-background p-1.5">
-            {ICON_CHOICES.map(({ id, Icon }) => (
+            {APP_ICON_CHOICES.map(({ id, Icon }) => (
               <button
                 key={id}
                 type="button"

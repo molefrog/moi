@@ -9,13 +9,7 @@ import {
 } from '@/client/features/workspace/api'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import type { WorkspaceLayout, WorkspaceType } from '@/lib/types'
-
-const DEFAULT_LAYOUT: WorkspaceLayout = {
-  version: 1,
-  widgetGrid: [],
-  layoutMode: 'fullscreen',
-  tabs: { open: ['agent'], active: 'agent' }
-}
+import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 
 type WorkspaceLayoutContextValue = {
   // The persisted layout (widget grid, layout mode, theme). Falls back to an
@@ -29,7 +23,7 @@ type WorkspaceLayoutContextValue = {
   // Custom workspace icon (base64 data URL), or null to use the provider icon.
   icon: string | null
   cwd: string | null
-  // The agent backend (claude-code / openclaw / hermes …). Exposed here so
+  // The agent backend (claude-code / openclaw …). Exposed here so
   // components like McpMenu read it from the shared layout query instead of
   // spawning their own observer (a second observer that remounts would trigger
   // `refetchOnMount` and clobber an in-flight optimistic layout update).
@@ -103,7 +97,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
   // is already stable; the rest derive from `query.data`.
   const value = useMemo<WorkspaceLayoutContextValue>(
     () => ({
-      layout: query.data ? stripMeta(query.data) : DEFAULT_LAYOUT,
+      layout: query.data ? stripMeta(query.data) : createDefaultWorkspaceLayout(),
       setLayout,
       name: query.data?.name ?? null,
       icon: query.data?.icon ?? null,

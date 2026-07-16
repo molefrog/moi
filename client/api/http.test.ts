@@ -26,10 +26,10 @@ describe('request helpers', () => {
   })
 
   test('builds JSON request options', () => {
-    expect(jsonRequest('PUT', { name: 'Moi' })).toEqual({
+    expect(jsonRequest('PUT', { name: 'moi' })).toEqual({
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: '{"name":"Moi"}'
+      body: '{"name":"moi"}'
     })
   })
 })

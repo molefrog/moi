@@ -11,6 +11,7 @@ Agent chat UI powered by Claude Agent SDK, Bun, React, and Tailwind.
 `AGENTS.md` files (root, `client/`, `server/`) are the canonical instructions; every `CLAUDE.md` is a symlink to its sibling `AGENTS.md`. Edit the `AGENTS.md` files, never the symlinks. Rules and skills likewise live in agent-neutral directories, with symlinks for Claude Code:
 
 - `.agents/rules/` — topic rules (canonical). `.claude/rules` is a symlink to it, so Claude Code auto-loads them. **Other agents: read the relevant rule before editing matching files:**
+  - `product-language.md` (always) — `moi` casing, sentence case, terminology, and action copy
   - `typescript.md` (`*.ts`, `*.tsx`) — props types, no `any`, `type` over `interface`
   - `tailwind.md` (`*.tsx`, `*.css`) — Tailwind-only styling, no inline styles, `cn()`
   - `icons.md` (`*.tsx`) — `@tabler/icons-react` only, sizing and stroke conventions

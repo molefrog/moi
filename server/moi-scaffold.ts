@@ -6,7 +6,7 @@ import { mkdir } from 'node:fs/promises'
 import { join, resolve, sep } from 'node:path'
 
 // Dependency set available to widgets. `react`/`react-dom` are stubs — at
-// runtime they resolve to Moi's locally-vendored ESM via the browser importmap
+// runtime they resolve to moi's locally-vendored ESM via the browser importmap
 // (/vendor/react); they're listed so editors pick up the correct types.
 export const MOI_PACKAGE_JSON = {
   name: 'widgets',

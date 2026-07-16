@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger
 } from '@/client/components/ui/dropdown-menu'
 
-type ThreadSelectorProps = {
+type ChatSelectorProps = {
   onSwitch: (sessionId: string | null) => void
 }
 
@@ -32,13 +32,13 @@ function formatDate(ms: number) {
   return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
 
-export function ThreadSelector({ onSwitch }: ThreadSelectorProps) {
+export function ChatSelector({ onSwitch }: ChatSelectorProps) {
   const workspaceId = useWorkspaceId()
   const { data: sessions = [], refetch } = useWorkspaceSessions(workspaceId)
   const activeSessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
 
   const active = sessions.find(s => s.sessionId === activeSessionId)
-  const label = active?.summary ?? 'New thread'
+  const label = active?.summary ?? 'New chat'
 
   function handleSelect(sessionId: string | null) {
     onSwitch(sessionId)
@@ -64,7 +64,7 @@ export function ThreadSelector({ onSwitch }: ThreadSelectorProps) {
           onClick={() => handleSelect(null)}
         >
           <IconPlus size={16} stroke={1.75} />
-          New thread
+          New chat
         </DropdownMenuItem>
         {sessions.length > 0 && (
           <DropdownMenuGroup>

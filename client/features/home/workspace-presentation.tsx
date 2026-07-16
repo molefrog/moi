@@ -1,19 +1,16 @@
 import claudeIcon from '@/client/assets/claude.svg'
-import hermesIcon from '@/client/assets/hermes-nous.png'
 import openclawIcon from '@/client/assets/openclaw.svg'
 import { cn } from '@/client/lib/cn'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
 export const workspaceProviderIcon: Record<WorkspaceType, string> = {
   'claude-code': claudeIcon,
-  openclaw: openclawIcon,
-  hermes: hermesIcon
+  openclaw: openclawIcon
 }
 
 export const workspaceTypeLabel: Record<WorkspaceType, string> = {
-  'claude-code': 'Claude Code',
-  openclaw: 'OpenClaw',
-  hermes: 'Hermes'
+  'claude-code': 'Claude',
+  openclaw: 'OpenClaw'
 }
 
 type WorkspaceTypeIconProps = {

@@ -2,7 +2,7 @@ import type { ReactNode, RefObject } from 'react'
 
 import { motion } from 'motion/react'
 
-import { IconRobotFace } from '@tabler/icons-react'
+import { IconGhost } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/client/components/ui/popover'
@@ -46,10 +46,10 @@ export function ChatPopup({
               <Button
                 variant="outline"
                 size="icon-lg"
-                className="bg-card text-card-foreground hover:bg-card"
+                className="shadow-md hover:shadow-lg"
                 aria-label="Agent"
               >
-                <IconRobotFace stroke={1.5} />
+                <IconGhost stroke={1.75} />
               </Button>
             </motion.div>
           </div>

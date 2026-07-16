@@ -20,6 +20,8 @@ export type WidgetInfo = {
 export type ViewConfig = {
   // Nav tab label. Falls back to the file name when unset.
   title?: string
+  // App icon registry id used by workspace tabs.
+  icon?: string
   // Advisory env hints, same semantics as WidgetConfig.requiredEnv.
   requiredEnv?: string[]
 }
@@ -27,6 +29,35 @@ export type ViewConfig = {
 export type ViewInfo = {
   id: string
   config: ViewConfig
+}
+
+export type ViewBuilderStatus = 'draft' | 'building' | 'waiting' | 'ready'
+
+// The kind of an applet — a custom UI unit embedded in a workspace. Shared by
+// the bundler pipeline and the build-status records. On a builder record the
+// field is absent for rows written before it existed; treat a missing kind as
+// 'view' (only views surface in the UI — the view builder page is view-only).
+export type AppletKind = 'view' | 'widget'
+
+export type ViewBuilderInput = {
+  requirements: string
+}
+
+export type ViewBuilder = {
+  id: string
+  kind?: AppletKind
+  status: ViewBuilderStatus
+  input: ViewBuilderInput
+  sessionId: string
+  viewId?: string
+  title?: string
+  icon?: string
+  error?: string
+  // Wall-clock ms when this builder last entered `building`. Used by reconcile
+  // to demote a build that has been running too long (a hung/abandoned turn).
+  buildingSince?: number
+  createdAt: number
+  updatedAt: number
 }
 
 // A Scratchpad draw/view operation issued by `moi scratch`. Mutations run
@@ -274,7 +305,7 @@ export type WorkspaceSwitchMessage = {
   workspaceId: string
 }
 
-export type WorkspaceType = 'claude-code' | 'openclaw' | 'hermes'
+export type WorkspaceType = 'claude-code' | 'openclaw'
 
 // One MCP server's connection status, as surfaced by GET /api/workspaces/:id/mcp
 // (a subset of the agent SDK's McpServerStatus — only what the UI renders).
@@ -352,7 +383,12 @@ export type LayoutGridItem = { i: string; x: number; y: number }
 //   split      — Agent chat as a left column, workspace content on the right
 export type LayoutMode = 'fullscreen' | 'split'
 
-export type WorkspaceTabId = 'agent' | 'widgets' | 'scratchpad' | `view:${string}`
+export type WorkspaceTabId =
+  | 'agent'
+  | 'widgets'
+  | 'scratchpad'
+  | `view:${string}`
+  | `view-builder:${string}`
 
 export type WorkspaceTabsState = {
   open: WorkspaceTabId[]

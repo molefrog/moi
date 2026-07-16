@@ -1,5 +1,5 @@
 // Generate browser-ready, offline ESM builds of React 19 from the installed
-// npm packages, so Moi never fetches React from a CDN (esm.sh) at runtime.
+// npm packages, so moi never fetches React from a CDN (esm.sh) at runtime.
 //
 // Why this exists: the npm packages are CommonJS (`module.exports`,
 // `process.env.NODE_ENV` branches) — a browser can't `import` them directly,

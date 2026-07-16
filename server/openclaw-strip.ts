@@ -1,3 +1,5 @@
+import { stripViewBuilderMeta } from '@/lib/view-builder-meta'
+
 // Strip OpenClaw-injected inbound metadata from user-role message text.
 //
 // The gateway prepends AI-facing envelopes to every user message before storing
@@ -130,5 +132,5 @@ export function stripBootstrapPreamble(text: string): string {
 }
 
 export function stripUserMessageMetadata(text: string): string {
-  return stripInboundMetadata(stripBootstrapPreamble(text))
+  return stripViewBuilderMeta(stripInboundMetadata(stripBootstrapPreamble(text)))
 }

@@ -140,7 +140,7 @@ export const app = Bun.serve<WsData>({
           const workspace = await getWorkspace(data.workspaceId)
           if (!workspace) return
           if (workspace.type === 'openclaw' && workspace.agentId) {
-            sendOpenClawMessage({
+            void sendOpenClawMessage({
               workspaceId: data.workspaceId,
               workspacePath: workspace.path,
               agentId: workspace.agentId,
@@ -149,7 +149,7 @@ export const app = Bun.serve<WsData>({
               content: data.content.trim(),
               attachments: data.attachments,
               optimisticId: data.optimisticId
-            })
+            }).catch(() => {})
           } else {
             // `stream` is only wired for the Claude Code path; the OpenClaw
             // branch above never receives it (unsupported provider).

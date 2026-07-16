@@ -27,7 +27,7 @@ export function GeneralSettings() {
 
   const remove = () => {
     const label = name ?? cwd ?? 'this space'
-    const message = `Remove "${label}" from your spaces?\n\nThis only removes it from your list. The folder and its sessions stay on disk. You can add it back any time.`
+    const message = `Remove "${label}" from your workspaces?\n\nThis only removes it from your list. The folder and its sessions stay on disk. You can add it back any time.`
     if (!window.confirm(message)) return
     removeWorkspace.mutate(workspaceId, { onSuccess: () => navigate('/') })
   }
@@ -37,7 +37,7 @@ export function GeneralSettings() {
       <SettingsSection>
         <SettingsRow
           title="Name"
-          description="Shown in the sidebar and the space header."
+          description="Shown in the sidebar and the workspace header."
           control={
             <Input
               value={draft}
@@ -65,7 +65,7 @@ export function GeneralSettings() {
       <SettingsSection label="Danger zone">
         <SettingsRow
           title="Remove space"
-          description="Remove this space from Moi. Its folder and sessions stay on disk."
+          description="Remove this space from moi. Its folder and sessions stay on disk."
           control={
             <Button
               type="button"

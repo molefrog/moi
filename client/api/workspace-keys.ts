@@ -6,6 +6,7 @@ export const workspaceKeys = {
   layout: (id: string) => ['workspaces', 'layout', id] as const,
   widgets: (id: string) => ['workspaces', 'widgets', id] as const,
   views: (id: string) => ['workspaces', 'views', id] as const,
+  viewBuilders: (id: string) => ['workspaces', 'view-builders', id] as const,
   sessions: (id: string) => ['workspaces', 'sessions', id] as const,
   events: (id: string, sessionId: string) => ['workspaces', 'events', id, sessionId] as const,
   threadConfig: (id: string, sessionId: string) =>

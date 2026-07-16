@@ -47,7 +47,7 @@ export function useAddWorkspace() {
   const queryClient = useQueryClient()
   return useMutation<WorkspaceEntry, Error, DiscoveredWorkspace>({
     mutationFn: discovered =>
-      requestJson('/api/workspaces', jsonRequest('POST', discovered), 'Failed to add space'),
+      requestJson('/api/workspaces', jsonRequest('POST', discovered), 'Failed to add workspace'),
     onSuccess: (entry, suggestion) => {
       queryClient.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, previous =>
         upsertWorkspaceEntry(previous, entry)
@@ -91,7 +91,11 @@ export function useCreateWorkspace() {
   const queryClient = useQueryClient()
   return useMutation<WorkspaceEntry, Error, CreateWorkspaceInput>({
     mutationFn: input =>
-      requestJson('/api/workspaces/create', jsonRequest('POST', input), 'Failed to create space'),
+      requestJson(
+        '/api/workspaces/create',
+        jsonRequest('POST', input),
+        'Failed to create workspace'
+      ),
     onSuccess: entry => {
       queryClient.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, previous => [
         ...(previous ?? []),
@@ -137,7 +141,11 @@ export function useRemoveWorkspace() {
   const queryClient = useQueryClient()
   return useMutation<void, Error, string>({
     mutationFn: workspaceId =>
-      requestVoid(`/api/workspaces/${workspaceId}`, { method: 'DELETE' }, 'Failed to remove space'),
+      requestVoid(
+        `/api/workspaces/${workspaceId}`,
+        { method: 'DELETE' },
+        'Failed to remove workspace'
+      ),
     onSuccess: (_result, workspaceId) => {
       queryClient.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, previous =>
         (previous ?? []).filter(workspace => workspace.id !== workspaceId)

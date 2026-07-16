@@ -9,13 +9,27 @@ import { findFreePosition } from '@/client/features/widgets/grid'
 import type { GridItem } from '@/client/features/widgets/grid'
 import { WidgetShell } from '@/client/features/applets/WidgetShell'
 import { Button } from '@/client/components/ui/button'
+import { Skeleton } from '@/client/components/ui/skeleton'
+import { cn } from '@/client/lib/cn'
 import type { WidgetInfo } from '@/lib/types'
 
 import { HiddenPanel } from './HiddenPanel'
-import { WidgetGrid } from './WidgetGrid'
+import { WidgetGrid, WidgetGridLayout } from './WidgetGrid'
 
 function renderItem(id: string) {
   return <WidgetShell name={id} />
+}
+
+const EMPTY_WIDGET_ITEMS: GridItem[] = Array.from({ length: 10 }, (_, index) => ({
+  id: `empty-widget-${index}`,
+  w: 2,
+  h: 1
+}))
+
+function renderEmptyWidget() {
+  return (
+    <Skeleton className="size-full animate-none rounded-2xl [corner-shape:superellipse(1.2)]" />
+  )
 }
 
 type NoWidgetsCreatedProps = {
@@ -24,12 +38,93 @@ type NoWidgetsCreatedProps = {
 
 function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3">
-      <p className="text-sm text-muted-foreground">No widgets created yet</p>
-      <Button type="button" variant="secondary" size="sm" onClick={onCreateWidget}>
-        <IconPlus data-icon="inline-start" stroke={1.75} />
-        Create widget
-      </Button>
+    <div className="relative min-h-0 flex-1 pt-7">
+      <div aria-hidden="true">
+        <WidgetGridLayout items={EMPTY_WIDGET_ITEMS} renderItem={renderEmptyWidget} />
+      </div>
+
+      <div className="absolute inset-0 z-1 flex items-center justify-center p-6">
+        <div className="flex h-full w-full max-w-(--column-w) flex-col items-center justify-center gap-4 bg-radial from-background from-50% to-transparent to-75% text-center">
+          <div className="flex flex-col gap-1.5">
+            <h2 className="font-medium">A little empty here</h2>
+            <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+              Widgets are small apps that can read data, perform tasks, and show a compact view of
+              the information that matters.
+            </p>
+          </div>
+          <Button type="button" variant="secondary" size="sm" onClick={onCreateWidget}>
+            <IconPlus data-icon="inline-start" stroke={1.5} />
+            Create widget
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type WidgetActionsProps = {
+  editing: boolean
+  onCreateWidget: () => void
+  onEditingChange: (editing: boolean) => void
+}
+
+function WidgetActions({ editing, onCreateWidget, onEditingChange }: WidgetActionsProps) {
+  return (
+    <div className="mx-auto mb-4 flex w-full max-w-(--column-w) shrink-0 items-center justify-end gap-2">
+      {editing && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="mr-auto"
+          onClick={onCreateWidget}
+        >
+          <IconPlus data-icon="inline-start" stroke={1.75} />
+          New widget
+        </Button>
+      )}
+      <AnimatePresence mode="popLayout" initial={false}>
+        {editing ? (
+          <motion.div
+            key="done"
+            variants={{
+              from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
+              to: { opacity: 1, scale: 1, filter: 'blur(0px)' }
+            }}
+            initial="from"
+            animate="to"
+            exit="from"
+            transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+          >
+            <Button type="button" size="sm" onClick={() => onEditingChange(false)}>
+              Done
+            </Button>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="actions"
+            className="flex items-center gap-1"
+            variants={{
+              from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
+              to: { opacity: 1, scale: 1, filter: 'blur(0px)' }
+            }}
+            initial="from"
+            animate="to"
+            exit="from"
+            transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+          >
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground group-hover/widgets:opacity-100 [@media(hover:hover)]:opacity-0"
+              onClick={() => onEditingChange(true)}
+            >
+              Edit widgets
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -68,6 +163,7 @@ type WidgetsProps = {
 
 export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: WidgetsProps) {
   const { layout, setLayout } = useWorkspaceLayoutCtx()
+  const hasWidgets = widgets.length > 0
 
   const gridIds = new Set(layout.widgetGrid.map(g => g.i))
 
@@ -100,107 +196,61 @@ export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: W
     setLayout({ widgetGrid: [...layout.widgetGrid, { i: id, x: pos.x, y: pos.y }] })
   }
 
-  if (widgets.length === 0) {
-    return <NoWidgetsCreated onCreateWidget={onCreateWidget} />
-  }
-
   return (
-    // Working area: everything below the header. It scrolls, and it's the
-    // positioning context for the bottom panel (which is anchored to this box,
-    // not to the grid). The grid lives in a centered max-w container and grows
-    // to its natural height.
+    // Shared working area below the header and positioning context for the
+    // bottom panel. Created-widget states scroll; the initial empty state clips
+    // its fixed-height skeleton grid.
     <div className="group/widgets relative min-h-0 flex-1">
       <LayoutGroup>
-        <div className="flex h-full flex-col overflow-y-auto p-4">
-          <div className="mx-auto mb-4 flex w-full max-w-[var(--column-w)] shrink-0 items-center justify-end gap-2">
-            {editing && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="mr-auto"
-                onClick={onCreateWidget}
-              >
-                <IconPlus data-icon="inline-start" stroke={1.75} />
-                New widget
-              </Button>
-            )}
-            <AnimatePresence mode="popLayout" initial={false}>
-              {editing ? (
+        <div
+          className={cn(
+            'relative flex h-full flex-col p-4',
+            hasWidgets ? 'overflow-y-auto' : 'overflow-hidden'
+          )}
+        >
+          {hasWidgets ? (
+            <>
+              <WidgetActions
+                editing={editing}
+                onCreateWidget={onCreateWidget}
+                onEditingChange={onEditingChange}
+              />
+              {visibleItems.length === 0 ? (
                 <motion.div
-                  key="done"
-                  variants={{
-                    from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
-                    to: { opacity: 1, scale: 1, filter: 'blur(0px)' }
-                  }}
-                  initial="from"
-                  animate="to"
-                  exit="from"
+                  className="mx-auto flex min-h-0 w-full max-w-[var(--column-w)] flex-1 flex-col"
+                  animate={{ paddingBottom: panelOpen ? panelHeight : 0 }}
                   transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
                 >
-                  <Button type="button" size="sm" onClick={() => onEditingChange(false)}>
-                    Done
-                  </Button>
+                  <NoWidgetsAdded />
                 </motion.div>
               ) : (
+                // The open panel's height is reserved below the grid so every card
+                // can scroll clear of the panel.
                 <motion.div
-                  key="actions"
-                  className="flex items-center gap-1"
-                  variants={{
-                    from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
-                    to: { opacity: 1, scale: 1, filter: 'blur(0px)' }
-                  }}
-                  initial="from"
-                  animate="to"
-                  exit="from"
+                  animate={{ marginBottom: panelOpen ? panelHeight : 0 }}
                   transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
                 >
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-muted-foreground group-hover/widgets:opacity-100 [@media(hover:hover)]:opacity-0"
-                    onClick={() => onEditingChange(true)}
-                  >
-                    Edit widgets
-                  </Button>
+                  <WidgetGrid
+                    items={visibleItems}
+                    editing={editing}
+                    renderItem={renderItem}
+                    onRemove={hide}
+                    onLayoutChange={items =>
+                      setLayout({
+                        widgetGrid: items.map(i => ({ i: i.id, x: i.x ?? 0, y: i.y ?? 0 }))
+                      })
+                    }
+                  />
                 </motion.div>
               )}
-            </AnimatePresence>
-          </div>
-          {visibleItems.length === 0 ? (
-            <motion.div
-              className="mx-auto flex min-h-0 w-full max-w-[var(--column-w)] flex-1 flex-col"
-              animate={{ paddingBottom: panelOpen ? panelHeight : 0 }}
-              transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
-            >
-              <NoWidgetsAdded />
-            </motion.div>
+            </>
           ) : (
-            // The open panel's height is reserved below the grid so every card
-            // can scroll clear of the panel.
-            <motion.div
-              className="mx-auto w-full max-w-[var(--column-w)]"
-              animate={{ marginBottom: panelOpen ? panelHeight : 0 }}
-              transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
-            >
-              <WidgetGrid
-                items={visibleItems}
-                editing={editing}
-                renderItem={renderItem}
-                onRemove={hide}
-                onLayoutChange={items =>
-                  setLayout({
-                    widgetGrid: items.map(i => ({ i: i.id, x: i.x ?? 0, y: i.y ?? 0 }))
-                  })
-                }
-              />
-            </motion.div>
+            <NoWidgetsCreated onCreateWidget={onCreateWidget} />
           )}
         </div>
 
         <AnimatePresence>
-          {editing && hiddenItems.length > 0 && (
+          {hasWidgets && editing && hiddenItems.length > 0 && (
             <HiddenPanel
               ref={panelRef}
               items={hiddenItems}

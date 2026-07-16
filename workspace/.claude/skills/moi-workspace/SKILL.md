@@ -20,7 +20,7 @@ Workspace features/pages:
   concepts. Read `SCRATCHPAD.md` before building on or modifying it.
 - "Views" - full-stack embedded apps for bigger work, consume more space, live in their own tab.
 
-User can switch between these, but can access the chat (this conversation and other threads) from
+User can switch between these, but can access the chat (this conversation and other chats) from
 **any place in the app** (copilot mode), or on a dedicated page.
 
 Workspace settings and customisation:
@@ -39,12 +39,14 @@ sees and interacts with "Applets".
 does not have a clear definition, but assumes this is the root folder in which it stores its state
 files.
 
-"Threads" — a workspace is driven through agent conversations (this chat is one). Depending on your
-harness (Claude Code, openclaw, others differ in the details) there can be **multiple threads**, but
+"Chat" — a workspace is driven through agent conversations (this chat is one). Depending on your
+harness (Claude Code, openclaw, others differ in the details) there can be **multiple chats**, but
 they all share **one** workspace **and one Project folder** — the same filesystem, the same `.moi`
-folder, applets, config, and theme. Anything you build is visible to every thread, and another thread
+folder, applets, config, and theme. Anything you build is visible to every chat, and another chat
 may have changed the workspace or the Project files since you last looked. Treat `.moi` and the
-Project folder as shared state, not yours alone.
+Project folder as shared state, not yours alone. Internally, "chats" are sometimes aliased as
+"threads" — "chat" is product language, while "thread" is reserved for internal SDK, session, and
+persistence concepts.
 
 "Applets" are standalone full-stack components that _you_ write and maintain. They extend the
 Workspace UI.
@@ -261,9 +263,28 @@ command as needed. Views work the same way (`.moi/views/<name>.tsx`, appears as 
 
 Full-screen apps, one per nav tab — the user switches tabs; there is no routing inside a view.
 
+## View builder requests
+
+When the user's message includes hidden `<moi>` context marked `View builder request`, this chat is
+linked to a pending view tab. Before reading files, planning, or writing code, infer a short stable
+id, a clear sentence-case title, and a relevant icon from the requirements. Capitalize only the
+first word of the title. Your first action must claim them:
+
+```sh
+moi builder set <view-id> --builder <builder-id> --kind view --title "<title>" --icon <icon-id>
+```
+
+Choose the icon id from the available view icons in the hidden context. The id must use lowercase
+letters, numbers, `_`, or `-`. The first call locks the id; running the same command again may update
+its title and icon. After claiming, write `.moi/views/<view-id>.tsx`, use the same icon id in its
+config, and finish with `moi bundle --only views`. The tab uses the claimed title and icon while you
+work and changes into the built view after a successful bundle. (Bundling marks the view ready; the
+build state is otherwise server-managed, so you never set it to done by hand.)
+
 ```ts
 export const config = {
-  title: 'User CRM', // nav-tab label — defaults to the file name
+  title: 'Customer overview', // sentence-case nav label — defaults to the file name
+  icon: 'user', // icon id from the view-builder request
   requiredEnv: ['CRM_API_KEY'] // optional env-key hints (advisory; see Environment & secrets)
 } as const
 ```
@@ -283,4 +304,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.4.0" />
+<moi-skill version="0.5.0" />

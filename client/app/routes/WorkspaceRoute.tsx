@@ -15,6 +15,7 @@ import {
 } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { WorkspaceScreen } from '@/client/features/workspace/WorkspaceScreen'
 import { useWorkspaceViews, useWorkspaceWidgets } from '@/client/features/workspace/api'
+import { useViewBuilders } from '@/client/features/views/api'
 import { useGridReconcile } from '@/client/features/widgets/useGridReconcile'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import type { SessionInfo } from '@/lib/types'
@@ -38,6 +39,7 @@ function WorkspaceLoader({ id }: WorkspaceRouteProps) {
   const { layout, setLayout, isLoading: layoutLoading } = useWorkspaceLayoutCtx()
   const widgets = useWorkspaceWidgets(id)
   const views = useWorkspaceViews(id)
+  const builders = useViewBuilders(id)
   const sessions = useWorkspaceSessions(id)
 
   useGridReconcile(id, widgets.data, layout, setLayout)
@@ -53,7 +55,7 @@ function WorkspaceLoader({ id }: WorkspaceRouteProps) {
     }
   })
 
-  const fresh = layoutLoading || widgets.isLoading
+  const fresh = layoutLoading || widgets.isLoading || views.isLoading || builders.isLoading
 
   return (
     <>
@@ -64,7 +66,11 @@ function WorkspaceLoader({ id }: WorkspaceRouteProps) {
             <LedLogo sprite="moi" effect="chaos" />
           </div>
         ) : (
-          <WorkspaceScreen widgets={widgets.data ?? []} views={views.data ?? []} />
+          <WorkspaceScreen
+            widgets={widgets.data ?? []}
+            views={views.data ?? []}
+            builders={builders.data ?? []}
+          />
         )}
       </SidebarLayout>
     </>

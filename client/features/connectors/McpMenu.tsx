@@ -3,7 +3,6 @@ import { IconAlertCircleFilled, IconPlugConnected } from '@tabler/icons-react'
 import { IconMcp } from '@/client/features/connectors/IconMcp'
 import { Button } from '@/client/components/ui/button'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/client/components/ui/hover-card'
-import { useScrollFade } from '@/client/hooks/useScrollFade'
 import { formatMcpServerName, getMcpIcon } from '@/client/features/connectors/mcp-icons'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
@@ -96,27 +95,11 @@ export function McpServerCard({ server }: { server: McpServer }) {
   )
 }
 
-// The scrollable server list. Its own component so `useScrollFade`'s effect runs
-// when the (portaled, mount-on-open) hover card opens — attaching the scroll ref.
-// Overflow is signalled with top/bottom mask fades; the scrollbar is hidden.
+// The scrollable server list. Overflow is signalled with scroll-aware fades;
+// the scrollbar is hidden.
 function McpList({ servers }: { servers: McpServer[] }) {
-  const { ref, showTopFade, showBottomFade } = useScrollFade()
-  const fade =
-    showTopFade && showBottomFade
-      ? 'mask-fade-y'
-      : showTopFade
-        ? 'mask-fade-top'
-        : showBottomFade
-          ? 'mask-fade-bottom'
-          : undefined
   return (
-    <div
-      ref={ref}
-      className={cn(
-        'scrollbar-none flex max-h-72 flex-col overflow-y-auto overscroll-contain',
-        fade
-      )}
-    >
+    <div className="no-scrollbar flex max-h-72 scroll-fade flex-col overflow-y-auto overscroll-contain [--scroll-fade-reveal:16px]">
       {servers.map(server => (
         <McpServerRow key={server.name} server={server} />
       ))}
@@ -134,7 +117,7 @@ export function McpMenu() {
   // between the fullscreen and two-pane headers) fires `refetchOnMount`, which
   // overwrites an in-flight optimistic chat-mode change before it's persisted.
   const { provider, isLoading } = useWorkspaceLayoutCtx()
-  const isClaude = !isLoading && provider !== 'openclaw' && provider !== 'hermes'
+  const isClaude = !isLoading && provider !== 'openclaw'
   const { data: servers } = useWorkspaceMcp(workspaceId, isClaude)
 
   if (!isClaude) return null

@@ -5,6 +5,7 @@ import { join } from 'path'
 import {
   buildAllViews,
   collectViewRequiredEnv,
+  hasViewId,
   listViews,
   reconcileOrder,
   serveView
@@ -34,7 +35,7 @@ function seed(jsNames: string[], manifest: object) {
 }
 
 async function views(): Promise<
-  { id: string; config: { title?: string; requiredEnv?: string[] } }[]
+  { id: string; config: { title?: string; icon?: string; requiredEnv?: string[] } }[]
 > {
   const res = await listViews(WS)
   return (await res.json()).views
@@ -82,6 +83,11 @@ describe('listViews', () => {
     expect((await views())[0].config).toEqual({ title: 'CRM', requiredEnv: ['K'] })
   })
 
+  test('passes through the app icon id', async () => {
+    seed(['crm'], { config: { crm: { title: 'CRM', icon: 'briefcase' } }, order: ['crm'] })
+    expect((await views())[0].config).toEqual({ title: 'CRM', icon: 'briefcase' })
+  })
+
   test('appends a built view missing from order', async () => {
     seed(['a', 'b'], { config: {}, order: ['b'] })
     expect((await views()).map(v => v.id)).toEqual(['b', 'a'])
@@ -94,6 +100,19 @@ describe('listViews', () => {
 
   test('empty when nothing is built', async () => {
     expect(await views()).toEqual([])
+  })
+})
+
+describe('hasViewId', () => {
+  test('finds source and built view ids', async () => {
+    const sourceDir = join(WS, '.moi', 'views')
+    mkdirSync(sourceDir, { recursive: true })
+    writeFileSync(join(sourceDir, 'source-view.tsx'), 'export default function View() {}')
+    seed(['built-view'], { config: {}, order: ['built-view'] })
+
+    expect(await hasViewId(WS, 'source-view')).toBe(true)
+    expect(await hasViewId(WS, 'built-view')).toBe(true)
+    expect(await hasViewId(WS, 'available-view')).toBe(false)
   })
 })
 

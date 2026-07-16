@@ -2,36 +2,30 @@ import { readdir } from 'node:fs/promises'
 import { join } from 'path'
 
 import type { WidgetConfig, WorkspaceLayout, WorkspacePreview, WorkspaceTabId } from '@/lib/types'
-
-const DEFAULT: WorkspaceLayout = {
-  version: 1,
-  widgetGrid: [],
-  layoutMode: 'fullscreen',
-  tabs: { open: ['agent'], active: 'agent' }
-}
+import { createDefaultWorkspaceLayout, createDefaultWorkspaceTabs } from '@/lib/workspace-layout'
 
 function isTabId(value: unknown): value is WorkspaceTabId {
   return (
     value === 'agent' ||
     value === 'widgets' ||
     value === 'scratchpad' ||
-    (typeof value === 'string' && /^view:.+/.test(value))
+    (typeof value === 'string' && (/^view:.+/.test(value) || /^view-builder:.+/.test(value)))
   )
 }
 
 function normalizeTabs(value: unknown): WorkspaceLayout['tabs'] {
-  if (!value || typeof value !== 'object') return { ...DEFAULT.tabs, open: [...DEFAULT.tabs.open] }
+  if (!value || typeof value !== 'object') return createDefaultWorkspaceTabs()
   const raw = value as Record<string, unknown>
   const open = Array.isArray(raw.open)
     ? raw.open.filter(isTabId).filter((tab, index, all) => all.indexOf(tab) === index)
     : []
-  if (open.length === 0) return { ...DEFAULT.tabs, open: [...DEFAULT.tabs.open] }
+  if (open.length === 0) return createDefaultWorkspaceTabs()
   const active = isTabId(raw.active) && open.includes(raw.active) ? raw.active : open[0]
   return { open, active }
 }
 
 function normalizeLayout(parsed: Record<string, unknown>): WorkspaceLayout {
-  const layout = { ...DEFAULT, ...parsed } as Record<string, unknown>
+  const layout = { ...createDefaultWorkspaceLayout(), ...parsed } as Record<string, unknown>
   if (layout.layoutMode !== 'split') layout.layoutMode = 'fullscreen'
   layout.tabs = normalizeTabs(layout.tabs)
   delete layout.sectionMode
@@ -53,7 +47,7 @@ export async function loadLayout(workspacePath: string): Promise<WorkspaceLayout
     const parsed = JSON.parse(text)
     if (parsed?.version === 1) return normalizeLayout(parsed)
   } catch {}
-  return { ...DEFAULT }
+  return createDefaultWorkspaceLayout()
 }
 
 export async function saveLayout(layout: WorkspaceLayout, workspacePath: string): Promise<void> {

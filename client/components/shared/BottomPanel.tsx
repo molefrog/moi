@@ -14,7 +14,7 @@ export function BottomPanel({ title, children, ref }: BottomPanelProps) {
   return (
     <motion.div
       ref={ref}
-      className="absolute inset-x-6 bottom-0 z-20 flex max-h-[60vh] flex-col rounded-t-2xl bg-card p-[var(--page-pad)] text-card-foreground shadow-xl"
+      className="absolute inset-x-6 bottom-0 z-20 flex max-h-[60vh] flex-col rounded-t-2xl bg-card p-(--page-pad) text-card-foreground shadow-md"
       variants={{
         hidden: { opacity: 0, y: 40, filter: 'blur(4px)' },
         visible: { opacity: 1, y: 0, filter: 'blur(0px)' }
@@ -25,7 +25,7 @@ export function BottomPanel({ title, children, ref }: BottomPanelProps) {
       transition={{ type: 'spring', duration: 0.25, bounce: 0 }}
     >
       <p className="mb-4 shrink-0 text-sm font-medium text-muted-foreground">{title}</p>
-      <div className="-my-1 [margin-right:calc(var(--page-pad)*-1)] [margin-left:calc(var(--page-pad)*-1)] flex-1 overflow-y-auto px-[var(--page-pad)] py-1">
+      <div className="-my-1 mr-[calc(var(--page-pad)*-1)] ml-[calc(var(--page-pad)*-1)] flex-1 overflow-y-auto px-(--page-pad) py-1">
         {children}
       </div>
     </motion.div>

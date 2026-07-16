@@ -21,11 +21,17 @@ import {
 import { ATTACHMENT_ONLY_PLACEHOLDER, appendAttachmentNote } from '@/lib/attachment-note'
 import { ClaudeAdapter } from '@/lib/claude-adapter'
 import type { Part } from '@/lib/format'
+import { stripViewBuilderMeta } from '@/lib/view-builder-meta'
 
 import { debug } from './debug'
 import { broadcast } from './state'
 import { hasThreadConfig, renameThreadConfig, saveThreadConfig } from './thread-config'
 import { type StoredUpload, resolveUploads, uploadToDisplayPart } from './uploads'
+import {
+  markViewBuilderBuildingBySession,
+  markViewBuilderWaitingBySession,
+  renameViewBuilderSession
+} from './view-builders'
 import { resolveWorkspaceEnv } from './workspace-env'
 
 // Media types Claude vision accepts; uploads.ts guarantees every image upload is
@@ -43,14 +49,15 @@ type MessageContent = SDKUserMessage['message']['content']
 // Exported for unit tests.
 export function buildUserMessage(
   text: string,
-  uploads: StoredUpload[]
+  uploads: StoredUpload[],
+  displayText = text
 ): { content: MessageContent; parts: Part[] } {
   const parts: Part[] = []
   for (const u of uploads) {
     const part = uploadToDisplayPart(u)
     if (part) parts.push(part)
   }
-  if (text) parts.push({ type: 'text', text })
+  if (displayText) parts.push({ type: 'text', text: displayText })
 
   if (uploads.length === 0) return { content: text, parts }
 
@@ -312,6 +319,7 @@ async function consume(s: LiveSession) {
           renameSession(s, realId)
           // Carry any config the picker wrote under the temp id to the real id.
           await renameThreadConfig(s.workspacePath, from, s.sessionId)
+          await renameViewBuilderSession(s.workspaceId, s.workspacePath, from, s.sessionId)
         }
         // Seed the thread's config from what it actually ran with — but only if
         // it has none yet, so an explicit user PUT (or a migrated temp-id edit)
@@ -348,6 +356,16 @@ async function consume(s: LiveSession) {
         debug(`cc result ws=${s.workspaceId} session=${s.sessionId} pendingTurns=${s.pendingTurns}`)
         if (s.pendingTurns === 0) {
           broadcastProcessing(s, false)
+          const builderError =
+            msg.subtype === 'success'
+              ? undefined
+              : msg.errors.join('\n') || msg.subtype.replaceAll('_', ' ')
+          await markViewBuilderWaitingBySession(
+            s.workspaceId,
+            s.workspacePath,
+            s.sessionId,
+            builderError
+          )
           // A mid-turn effort/streaming change couldn't be applied live; now
           // that the queue has drained, tear down so the next message resumes
           // with it.
@@ -361,11 +379,13 @@ async function consume(s: LiveSession) {
       `cc consume error ws=${s.workspaceId} session=${s.sessionId}: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`
     )
     if (!(err instanceof Error && err.name === 'AbortError')) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
       broadcast(s.workspaceId, {
         kind: 'error',
         sessionId: s.sessionId,
-        content: err instanceof Error ? err.message : 'Unknown error'
+        content: message
       })
+      await markViewBuilderWaitingBySession(s.workspaceId, s.workspacePath, s.sessionId, message)
     }
   } finally {
     if (s.pendingTurns > 0) {
@@ -486,7 +506,8 @@ export async function sendCCMessage(input: {
     ? resolveUploads(input.workspaceId, input.attachments)
     : []
   if (!input.content && uploads.length === 0) return
-  const { content, parts } = buildUserMessage(input.content, uploads)
+  const displayContent = stripViewBuilderMeta(input.content)
+  const { content, parts } = buildUserMessage(input.content, uploads, displayContent)
 
   const wantStream = input.stream === true
   let s = sessions.get(liveKey(input.workspaceId, input.sessionId))
@@ -537,7 +558,6 @@ export async function sendCCMessage(input: {
       workspaceEnv: await resolveWorkspaceEnv(input.workspacePath)
     })
   }
-
   // Streaming-input mode does NOT echo the pushed user message back in the
   // output stream (string-prompt mode did — that's what expectUserEcho was
   // for), so the adapter never emits a user turn. Synthesize and broadcast it
@@ -559,17 +579,20 @@ export async function sendCCMessage(input: {
   // Safety net: if a future SDK does echo the user message, the adapter re-ids
   // that echo to the same optimisticId so it collapses onto the turn above
   // instead of duplicating.
-  if (input.optimisticId) s.adapter.expectUserEcho(input.optimisticId, input.content)
+  if (input.optimisticId) s.adapter.expectUserEcho(input.optimisticId, displayContent)
 
   s.lastActivityAt = Date.now()
   // For an attachment-only message, fall back to the filenames so the thread
   // list / status view don't show a blank label.
-  const label = input.content || uploads.map(u => u.filename).join(', ')
+  const label = displayContent || uploads.map(u => u.filename).join(', ')
   s.lastUserText = label.replace(/\s+/g, ' ').slice(0, 120)
 
   const wasIdle = s.pendingTurns === 0
   s.pendingTurns++
-  if (wasIdle) broadcastProcessing(s, true)
+  if (wasIdle) {
+    await markViewBuilderBuildingBySession(s.workspaceId, s.workspacePath, s.sessionId)
+    broadcastProcessing(s, true)
+  }
   s.input.push(content)
   debug(
     `cc enqueue ws=${s.workspaceId} session=${s.sessionId} pendingTurns=${s.pendingTurns} text=${JSON.stringify(s.lastUserText)}`
@@ -591,6 +614,7 @@ export async function interruptCCSession(workspaceId: string, sessionId: string)
   s.pendingTurns = 0
   broadcast(s.workspaceId, { kind: 'stopped', sessionId: s.sessionId })
   broadcastProcessing(s, false)
+  await markViewBuilderWaitingBySession(s.workspaceId, s.workspacePath, s.sessionId)
   armIdle(s)
 }
 

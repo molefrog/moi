@@ -3,12 +3,13 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 
 import {
-  IconAppWindow,
-  IconArtboard,
-  IconLayoutGrid,
+  IconArticle,
+  IconBrowserPlus,
+  IconGhost,
+  IconLayout2,
   IconLayoutSidebarRight,
   IconPalette,
-  IconRobotFace
+  IconSketching
 } from '@tabler/icons-react'
 import { ChatPanel } from '@/client/features/chat/ChatPanel'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
@@ -24,9 +25,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/
 import { WorkspaceSettings } from '@/client/features/settings/WorkspaceSettings'
 import { useChat } from '@/client/features/chat/useChat'
 import { useView } from '@/client/features/applets/useApplet'
+import { ViewBuilderTab } from '@/client/features/views/ViewBuilderTab'
+import { useViewBuilderActions } from '@/client/features/views/useViewBuilderActions'
 import { useFitsSplitLayout } from '@/client/features/workspace/useFitsSplitLayout'
 import { useWorkspaceTheme } from '@/client/features/workspace/useWorkspaceTheme'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
+import { resolveAppIcon } from '@/client/lib/app-icon-registry'
 import { cn } from '@/client/lib/cn'
 import { liveStore } from '@/client/features/chat/chat-store'
 import {
@@ -36,11 +40,13 @@ import {
 } from '@/client/features/workspace/WorkspaceTabs'
 import type {
   LayoutMode,
+  ViewBuilder,
   ViewInfo,
   WidgetInfo,
   WorkspaceTabId,
   WorkspaceTabsState
 } from '@/lib/types'
+import { createDefaultWorkspaceTabs } from '@/lib/workspace-layout'
 
 const Scratchpad = lazy(() =>
   import('@/client/features/scratchpad/Scratchpad').then(module => ({
@@ -51,10 +57,20 @@ const Scratchpad = lazy(() =>
 // Tab label for a view: its configured title, or the file-name id as fallback.
 const viewLabel = (v: ViewInfo) => v.config.title || v.id
 
-const DEFAULT_TABS: WorkspaceTabsState = { open: ['agent'], active: 'agent' }
+const viewBuilderIcon = (builder: ViewBuilder) => resolveAppIcon(builder.icon) ?? IconArticle
+
+function viewIcon(view: ViewInfo, builders: ViewBuilder[]) {
+  const builder = builders.find(candidate => candidate.viewId === view.id)
+  return resolveAppIcon(view.config.icon) ?? resolveAppIcon(builder?.icon) ?? IconArticle
+}
+
+const DEFAULT_TABS = createDefaultWorkspaceTabs()
 
 const viewTabId = (id: string): WorkspaceTabId => `view:${id}`
 const viewIdFromTab = (tab: WorkspaceTabId) => (tab.startsWith('view:') ? tab.slice(5) : null)
+const viewBuilderTabId = (id: string): WorkspaceTabId => `view-builder:${id}`
+const viewBuilderIdFromTab = (tab: WorkspaceTabId) =>
+  tab.startsWith('view-builder:') ? tab.slice('view-builder:'.length) : null
 
 type SectionControlsProps = {
   mode: LayoutMode
@@ -156,6 +172,7 @@ function WorkspaceCustomizeAction({ active, onToggle }: WorkspaceCustomizeAction
 type WorkspaceScreenProps = {
   widgets: WidgetInfo[]
   views: ViewInfo[]
+  builders: ViewBuilder[]
 }
 
 type WidgetMode = 'idle' | 'editing' | 'customizing'
@@ -167,8 +184,10 @@ function normalizeTabsState(tabs: WorkspaceTabsState | undefined): WorkspaceTabs
   return { open, active: open.includes(tabs.active) ? tabs.active : open[0] }
 }
 
-function tabAvailable(tab: WorkspaceTabId, views: ViewInfo[]) {
+function tabAvailable(tab: WorkspaceTabId, views: ViewInfo[], builders: ViewBuilder[]) {
   if (tab === 'agent' || tab === 'widgets' || tab === 'scratchpad') return true
+  const builderId = viewBuilderIdFromTab(tab)
+  if (builderId) return builders.some(builder => builder.id === builderId)
   const viewId = viewIdFromTab(tab)
   return viewId ? views.some(v => v.id === viewId) : false
 }
@@ -176,12 +195,13 @@ function tabAvailable(tab: WorkspaceTabId, views: ViewInfo[]) {
 function tabItemFor(
   tab: WorkspaceTabId,
   views: ViewInfo[],
+  builders: ViewBuilder[],
   closable: boolean
 ): WorkspaceTabItem | null {
   if (tab === 'agent') {
     return {
       key: tab,
-      Icon: IconRobotFace,
+      Icon: IconGhost,
       label: 'Agent',
       closable
     }
@@ -189,7 +209,7 @@ function tabItemFor(
   if (tab === 'widgets') {
     return {
       key: tab,
-      Icon: IconLayoutGrid,
+      Icon: IconLayout2,
       label: 'Widgets',
       closable
     }
@@ -197,8 +217,18 @@ function tabItemFor(
   if (tab === 'scratchpad') {
     return {
       key: tab,
-      Icon: IconArtboard,
+      Icon: IconSketching,
       label: 'Scratchpad',
+      closable
+    }
+  }
+  const builderId = viewBuilderIdFromTab(tab)
+  const builder = builderId ? builders.find(candidate => candidate.id === builderId) : null
+  if (builder) {
+    return {
+      key: tab,
+      Icon: viewBuilderIcon(builder),
+      label: builder.title || builder.viewId || 'New view',
       closable
     }
   }
@@ -207,7 +237,7 @@ function tabItemFor(
   return view
     ? {
         key: tab,
-        Icon: IconAppWindow,
+        Icon: viewIcon(view, builders),
         label: viewLabel(view),
         closable
       }
@@ -224,7 +254,7 @@ function applyVisibleTabOrder(
   return open.map(tab => (visibleSet.has(tab) ? orderedVisible[cursor++] : tab))
 }
 
-export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
+export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenProps) {
   const {
     view,
     previewTurn,
@@ -237,6 +267,7 @@ export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
     dismissError
   } = useChat()
   const { layout, setLayout, name, icon, provider, workspaceId } = useWorkspaceLayoutCtx()
+  const builderActions = useViewBuilderActions()
   const { ref: rowRef, fits: canUseSplit } = useFitsSplitLayout<HTMLDivElement>()
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
   const [floatingChatOpen, setFloatingChatOpen] = useState(false)
@@ -248,7 +279,9 @@ export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
   useWorkspaceTheme(layout.theme, themeRef)
 
   const tabsState = normalizeTabsState(layout.tabs)
-  const availableOpenTabs = tabsState.open.filter(tab => tabAvailable(tab, views))
+  const tabsStateRef = useRef(tabsState)
+  tabsStateRef.current = tabsState
+  const availableOpenTabs = tabsState.open.filter(tab => tabAvailable(tab, views, builders))
   const effectiveOpenTabs = availableOpenTabs.length > 0 ? availableOpenTabs : DEFAULT_TABS.open
   const openSet = new Set(tabsState.open)
   const nonAgentOpenTabs = effectiveOpenTabs.filter(tab => tab !== 'agent')
@@ -280,10 +313,64 @@ export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
     : (visibleTabIds[0] ?? 'agent')
   const canCloseTabs = effectiveOpenTabs.length > 1
   const tabItems = visibleTabIds
-    .map(tab => tabItemFor(tab, views, canCloseTabs))
+    .map(tab =>
+      tabItemFor(tab, views, builders, canCloseTabs || viewBuilderIdFromTab(tab) !== null)
+    )
     .filter((tab): tab is WorkspaceTabItem => Boolean(tab))
   const activeViewId = viewIdFromTab(activeTab)
   const activeView = activeViewId ? views.find(v => v.id === activeViewId) : undefined
+  const activeBuilderId = viewBuilderIdFromTab(activeTab)
+  const activeBuilder = activeBuilderId
+    ? builders.find(builder => builder.id === activeBuilderId)
+    : undefined
+
+  useEffect(() => {
+    const open = tabsState.open.filter(tab => tabAvailable(tab, views, builders))
+    if (open.length === tabsState.open.length) return
+    const nextOpen = open.length > 0 ? open : DEFAULT_TABS.open
+    setLayout({
+      tabs: {
+        open: nextOpen,
+        active: nextOpen.includes(tabsState.active) ? tabsState.active : nextOpen[0]
+      }
+    })
+  }, [builders, setLayout, tabsState.active, tabsState.open, views])
+
+  useEffect(() => {
+    const replacements = new Map<WorkspaceTabId, WorkspaceTabId>()
+    for (const builder of builders) {
+      if (builder.status !== 'ready' || !builder.viewId) continue
+      if (!views.some(view => view.id === builder.viewId)) continue
+      replacements.set(viewBuilderTabId(builder.id), viewTabId(builder.viewId))
+    }
+    if (replacements.size === 0) return
+
+    const replacementViews = new Set(replacements.values())
+    const sourceForView = new Map(
+      [...replacements].map(([builderTab, viewTab]) => [viewTab, builderTab])
+    )
+    const open: WorkspaceTabId[] = []
+    let changed = false
+    for (const tab of tabsState.open) {
+      const source = sourceForView.get(tab)
+      if (replacementViews.has(tab) && source && tabsState.open.includes(source)) {
+        changed = true
+        continue
+      }
+      const replacement = replacements.get(tab)
+      const next = replacement ?? tab
+      if (replacement) changed = true
+      if (!open.includes(next)) open.push(next)
+    }
+    if (!changed) return
+    const active = replacements.get(tabsState.active) ?? tabsState.active
+    setLayout({ tabs: { open: open.length > 0 ? open : ['agent'], active } })
+  }, [builders, setLayout, tabsState.active, tabsState.open, views])
+
+  useEffect(() => {
+    const linked = activeBuilder ?? builders.find(builder => builder.viewId === activeViewId)
+    if (linked) liveStore.getState().setActive(workspaceId, linked.sessionId)
+  }, [activeBuilder, activeViewId, builders, workspaceId])
 
   useEffect(() => {
     if (mode !== 'fullscreen' || activeTab === 'agent') {
@@ -291,10 +378,14 @@ export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
     }
   }, [activeTab, mode])
 
-  const setTabs = (tabs: WorkspaceTabsState) => setLayout({ tabs })
+  const setTabs = (tabs: WorkspaceTabsState) => {
+    tabsStateRef.current = tabs
+    setLayout({ tabs })
+  }
 
   const openTab = (tab: WorkspaceTabId) => {
-    const open = openSet.has(tab) ? tabsState.open : [...tabsState.open, tab]
+    const current = tabsStateRef.current
+    const open = current.open.includes(tab) ? current.open : [...current.open, tab]
     setTabs({ open, active: tab })
     if (tab === 'agent') {
       setFloatingChatOpen(false)
@@ -303,18 +394,32 @@ export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
   }
 
   const closeTab = (tab: WorkspaceTabId) => {
-    if (!canCloseTabs || !openSet.has(tab)) return
-    const open = tabsState.open.filter(t => t !== tab)
+    const builderId = viewBuilderIdFromTab(tab)
+    const builder = builderId ? builders.find(candidate => candidate.id === builderId) : undefined
+    if ((!canCloseTabs && !builder) || !openSet.has(tab)) return
+    let open = tabsState.open.filter(t => t !== tab)
+    if (open.length === 0) open = ['agent']
     let active = tabsState.active
     if (active === tab || !open.includes(active)) {
       const visibleIndex = visibleTabIds.indexOf(tab)
       active =
         visibleTabIds[visibleIndex + 1] ??
         visibleTabIds[visibleIndex - 1] ??
-        open.find(t => tabAvailable(t, views)) ??
+        open.find(t => tabAvailable(t, views, builders)) ??
         'agent'
     }
     setTabs({ open, active })
+    if (builder?.status === 'draft') void builderActions.discard(builder.id)
+  }
+
+  const discardBuilder = (builder: ViewBuilder) => {
+    const tab = viewBuilderTabId(builder.id)
+    if (openSet.has(tab)) {
+      let open = tabsState.open.filter(item => item !== tab)
+      if (open.length === 0) open = ['agent']
+      setTabs({ open, active: tabsState.active === tab ? open[0] : tabsState.active })
+    }
+    void builderActions.discard(builder.id)
   }
 
   const reorderTabs = (orderedVisibleTabs: WorkspaceTabId[]) => {
@@ -342,7 +447,7 @@ export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
       ? ([
           {
             key: 'agent',
-            Icon: IconRobotFace,
+            Icon: IconGhost,
             label: 'Agent',
             onClick: () => openTab('agent')
           }
@@ -352,7 +457,7 @@ export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
       ? ([
           {
             key: 'widgets',
-            Icon: IconLayoutGrid,
+            Icon: IconLayout2,
             label: 'Widgets',
             onClick: () => openTab('widgets')
           }
@@ -362,7 +467,7 @@ export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
       ? ([
           {
             key: 'scratchpad',
-            Icon: IconArtboard,
+            Icon: IconSketching,
             label: 'Scratchpad',
             onClick: () => openTab('scratchpad')
           }
@@ -374,16 +479,30 @@ export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
       .map(
         ({ view, tab }): CreateWorkspaceTabItem => ({
           key: tab,
-          Icon: IconAppWindow,
+          Icon: viewIcon(view, builders),
           label: viewLabel(view),
+          onClick: () => openTab(tab)
+        })
+      ),
+    ...builders
+      .filter(builder => builder.status !== 'ready')
+      .map(builder => ({ builder, tab: viewBuilderTabId(builder.id) }))
+      .filter(({ tab }) => !openSet.has(tab))
+      .map(
+        ({ builder, tab }): CreateWorkspaceTabItem => ({
+          key: tab,
+          Icon: viewBuilderIcon(builder),
+          label: builder.title || builder.viewId || 'New view',
           onClick: () => openTab(tab)
         })
       ),
     {
       key: 'create-view',
-      Icon: IconAppWindow,
-      label: 'View',
-      onClick: () => openChat('Create view')
+      Icon: IconBrowserPlus,
+      label: 'New view',
+      onClick: () => {
+        void builderActions.create().then(builder => openTab(viewBuilderTabId(builder.id)))
+      }
     }
   ]
 
@@ -432,10 +551,7 @@ export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
         {/* Full-screen: whole panel. Split: the left content column. */}
         {(mode === 'fullscreen' || hasWorkspaceContent) && (
           <div
-            className={cn(
-              'flex min-h-0 flex-1 flex-col',
-              mode === 'split' && 'min-w-[var(--column-w)]'
-            )}
+            className={cn('flex min-h-0 flex-1 flex-col', mode === 'split' && 'min-w-(--column-w)')}
           >
             <PanelHeader>
               <div className="flex min-w-0 flex-1 items-center gap-4">
@@ -489,6 +605,21 @@ export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
               <Suspense fallback={null}>
                 <Scratchpad />
               </Suspense>
+            ) : activeBuilder ? (
+              <ViewBuilderTab
+                key={activeBuilder.id}
+                builder={activeBuilder}
+                onSave={requirements => builderActions.save(activeBuilder.id, requirements)}
+                onSubmit={requirements => {
+                  if (mode === 'fullscreen') setFloatingChatOpen(true)
+                  return builderActions.submit(activeBuilder, requirements)
+                }}
+                onOpenChat={() => {
+                  liveStore.getState().setActive(workspaceId, activeBuilder.sessionId)
+                  openChat()
+                }}
+                onDiscard={() => discardBuilder(activeBuilder)}
+              />
             ) : activeView ? (
               <ViewApp view={activeView} />
             ) : null}
@@ -500,7 +631,7 @@ export function WorkspaceScreen({ widgets, views }: WorkspaceScreenProps) {
         {mode === 'split' && (
           <div
             className={cn(
-              'flex min-h-0 min-w-[var(--chat-min)] flex-[0_1_var(--chat-max)] flex-col overflow-hidden border-l border-border'
+              'flex min-h-0 min-w-(--chat-min) flex-[0_1_var(--chat-max)] flex-col overflow-hidden border-l border-border'
             )}
           >
             {dockedChat}

@@ -116,7 +116,7 @@ export function ChatComposer({ composerRef, onSend, onStop, processing }: ChatCo
         addFiles(Array.from(e.dataTransfer.files))
       }}
       className={cn(
-        'flex w-full cursor-text flex-col gap-1 rounded-lg bg-card p-2 text-card-foreground shadow-xs transition-[color,box-shadow] outline-none focus-within:shadow-sm',
+        'flex w-full max-w-(--chat-max-container) cursor-text flex-col gap-1 rounded-lg bg-card p-2 text-card-foreground shadow-xs transition-[color,box-shadow] outline-none focus-within:shadow-sm',
         dragOver && 'ring-2 ring-ring/60'
       )}
     >
@@ -152,7 +152,7 @@ export function ChatComposer({ composerRef, onSend, onStop, processing }: ChatCo
           e.preventDefault()
           addFiles(files)
         }}
-        placeholder={processing ? 'Queue a follow-up...' : 'Ask anything...'}
+        placeholder={processing ? 'Queue a follow-up' : 'Do anything'}
         rows={1}
         className="field-sizing-content max-h-40 w-full resize-none bg-transparent px-2 py-1 text-sm leading-relaxed outline-none placeholder:text-muted-foreground disabled:opacity-50"
       />

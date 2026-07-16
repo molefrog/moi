@@ -11,7 +11,6 @@ describe('skillsDirFor', () => {
   test('claude-code (and untyped) workspaces load skills from .claude/skills', () => {
     expect(skillsDirFor('/ws', 'claude-code')).toBe(join('/ws', '.claude', 'skills'))
     expect(skillsDirFor('/ws')).toBe(join('/ws', '.claude', 'skills'))
-    expect(skillsDirFor('/ws', 'hermes')).toBe(join('/ws', '.claude', 'skills'))
   })
 
   test('openclaw agents load skills from <workspace>/skills', () => {

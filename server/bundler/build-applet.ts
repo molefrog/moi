@@ -8,15 +8,16 @@ import tailwind from 'bun-plugin-tailwind'
 import { realpathSync } from 'node:fs'
 import { basename, dirname, join, relative, sep } from 'path'
 
-import type { ViewConfig, WidgetConfig } from '@/lib/types'
+import type { AppletKind, ViewConfig, WidgetConfig } from '@/lib/types'
 
 import { scopeAppletCss } from './applet-css'
 
 // An **applet** is any custom UI unit embedded in a workspace; `widget` and
 // `view` are its kinds (more may follow). All compile through this pipeline —
 // `kind` only diverges at the edges: which `config` schema is parsed, the
-// synthetic-CSS filename, and the CSS scope/registry namespace.
-export type AppletKind = 'widget' | 'view'
+// synthetic-CSS filename, and the CSS scope/registry namespace. The type is
+// canonical in lib/types; re-exported here for this pipeline's consumers.
+export type { AppletKind }
 
 // Baked into the bundle wherever a runtime URL needs the workspace's API base
 // (RPC + workspace files). The serve route string-replaces it with the real
@@ -146,8 +147,8 @@ export async function extractWidgetConfig(srcPath: string): Promise<WidgetConfig
   return { ...DEFAULT_CONFIG, ...result }
 }
 
-// A view's config: just `title` (string) + advisory `requiredEnv`. No sizing —
-// views are full-screen. Returns null when no `config` export is present.
+// A view's config: `title` + app icon registry id + advisory `requiredEnv`.
+// No sizing — views are full-screen. Returns null when no `config` export is present.
 export async function extractViewConfig(srcPath: string): Promise<ViewConfig | null> {
   const source = await Bun.file(srcPath).text()
 
@@ -160,9 +161,9 @@ export async function extractViewConfig(srcPath: string): Promise<ViewConfig | n
     if (prop.type !== 'Property' || prop.key?.type !== 'Identifier') continue
     const key = prop.key.name as string
 
-    if (key === 'title') {
+    if (key === 'title' || key === 'icon') {
       if (prop.value?.type === 'Literal' && typeof prop.value.value === 'string') {
-        result.title = prop.value.value
+        result[key] = prop.value.value
       }
       continue
     }

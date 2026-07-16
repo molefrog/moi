@@ -10,6 +10,7 @@ A widget is **glanceable in under 2 seconds** — and earns **one signature mome
 - **Three states, always.** Loading → skeleton (never a spinner). Error → one human sentence + a retry. Empty → a short prompt, never blank. (Patterns below.)
 - **Height is the hard constraint.** `height = rowSpan×160 + (rowSpan−1)×16`, exact. Width flexes with the viewport. Design for height first; clip risk → `overflow-hidden`, long text → `truncate` / `line-clamp`.
 - **Tailwind for static styling.** No custom CSS, no `@apply`, no *static* `style={{}}`. Icons only from `@tabler/icons-react` (no raw `<svg>`, no other icon packs). Use the host project icon rule when present (`.agents/rules/icons.md`) instead of duplicating size/stroke guidance. Widgets import only from their own folder.
+- **Font weight.** Use only regular weight (the default, or `font-normal` for an explicit reset) and `font-medium`. Never introduce another font-weight utility; other weights are reserved for owner hand-tuning.
 - **No auto-playing audio or video.** Media is always user-initiated.
 - **No page-level horizontal scroll.** A deliberate, bounded internal scroller (e.g. a Kanban board) is fine; the widget itself never makes the page scroll sideways.
 

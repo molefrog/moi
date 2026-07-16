@@ -30,11 +30,16 @@ type SidebarLayoutProps = {
   // <PanelHeader>) and body.
   children?: ReactNode
   panel?: 'default' | 'flat'
+  showWorkspaces?: boolean
 }
 
 // App shell: a slim icon rail beside the page content. The page owns the panel's
 // header and body.
-export function SidebarLayout({ children, panel = 'default' }: SidebarLayoutProps) {
+export function SidebarLayout({
+  children,
+  panel = 'default',
+  showWorkspaces = true
+}: SidebarLayoutProps) {
   const { data: workspaces } = useWorkspaces()
 
   // `moi config` / the settings modal broadcast `workspace:updated` (identity
@@ -51,7 +56,7 @@ export function SidebarLayout({ children, panel = 'default' }: SidebarLayoutProp
 
   return (
     <div className="flex h-dvh bg-muted">
-      <Sidebar workspaces={workspaces ?? []} />
+      <Sidebar workspaces={showWorkspaces ? (workspaces ?? []) : []} />
       <main
         className={cn(
           'flex min-w-0 flex-1 flex-col overflow-hidden',
@@ -81,7 +86,7 @@ function Sidebar({ workspaces }: SidebarProps) {
       <nav className="flex max-h-full min-h-0 w-14 flex-1 flex-col items-center justify-center gap-4">
         {workspaces.length > 0 && (
           <>
-            <div className="scrollbar-none min-h-0 scroll-fade overflow-y-auto [--scroll-fade-reveal:16px]">
+            <div className="no-scrollbar min-h-0 scroll-fade overflow-y-auto [--scroll-fade-reveal:16px]">
               <ReorderableList
                 items={workspaces}
                 getId={ws => ws.id}
@@ -101,8 +106,8 @@ function Sidebar({ workspaces }: SidebarProps) {
                     type="button"
                     variant="ghost"
                     size="icon-lg"
-                    aria-label="Create new space"
-                    title="Create new space"
+                    aria-label="Create new workspace"
+                    title="Create new workspace"
                     className="text-muted-foreground hover:text-foreground"
                   >
                     <IconPlus data-icon="inline-start" stroke={1.5} />
