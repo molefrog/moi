@@ -3,7 +3,20 @@
 The wire format the Claude Code harness emits and how it maps onto our
 display abstraction (`lib/format.ts`, implemented by `lib/claude-adapter.ts`).
 Originally research for the message-display abstraction; kept as the reference
-spec for the CC adapter. Evidence drawn from:
+spec for the CC adapter.
+
+> **Status note.** The SDK wire-format sections (message kinds, content
+> blocks, subagent/skill mechanics) remain the reference. But the "current
+> implementation" critiques and §14's migration plan describe the
+> **pre-refactor** code and have since shipped: chat moved from
+> `server/agent.ts` to `server/cc-session.ts`, `state.ts`'s
+> `transformMessage` and the 7-variant `Message` union were replaced by
+> `StreamEvent`/`Turn`/`Part` in `lib/format.ts` (built by
+> `lib/claude-adapter.ts`), and `MessageBlock.tsx` was replaced by
+> `client/components/TurnView.tsx`. Read those sections as historical
+> context, not as descriptions of today's code.
+
+Evidence drawn from:
 
 - Upstream types: `node_modules/@anthropic-ai/claude-agent-sdk/sdk.d.ts`
 - Upstream nested content types: `node_modules/@anthropic-ai/sdk/resources/beta/messages/messages.d.ts`
