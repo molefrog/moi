@@ -5,18 +5,19 @@ import { cn } from '@/client/lib/cn'
 import { wsUrl } from '@/client/lib/ws-url'
 import type { Model, WorkspaceEntry, WorkspaceModels } from '@/lib/types'
 
-// Scratch route for driving the Codex harness end to end: pick a codex
-// workspace, fire canned scenarios (or your own prompt), and watch three
-// synchronized logs — the raw app-server JSON-RPC wire, the frames the server
-// pushes to chat clients, and the durable events REST replay. See
-// docs/harnesses/codex.md.
+// Scratch route for driving any harness end to end: pick a workspace, fire
+// canned scenarios (or your own prompt), and watch three synchronized logs —
+// the backend's native wire (Codex: app-server JSON-RPC; Claude Code: raw SDK
+// messages), the frames the server pushes to chat clients, and the durable
+// events REST replay. See docs/harnesses/README.md.
 
 type WireFrame = { seq: number; ts: number; dir: 'send' | 'recv'; frame: unknown }
 type BroadcastFrame = { seq: number; ts: number; frame: unknown }
 type ProcessInfo = { running: boolean; pid?: number; binary: string | null }
 
 type DebugPayload = {
-  process: ProcessInfo
+  provider: string
+  process: ProcessInfo | null
   wire: WireFrame[]
   broadcasts: BroadcastFrame[]
 }
@@ -144,7 +145,7 @@ function Pane({ title, hint, onClear, children }: PaneProps) {
   )
 }
 
-export function CodexDebugPage() {
+export function HarnessDebugPage() {
   const [workspaces, setWorkspaces] = useState<WorkspaceEntry[]>([])
   const [workspaceId, setWorkspaceId] = useState('')
   const [models, setModels] = useState<Model[]>([])
@@ -166,17 +167,18 @@ export function CodexDebugPage() {
   const sessionRef = useRef(sessionId)
   sessionRef.current = sessionId
 
-  // Codex workspaces for the picker.
+  // Every workspace is drivable — the panes adapt to its harness type.
   useEffect(() => {
     fetch('/api/workspaces')
       .then(r => r.json())
       .then((list: WorkspaceEntry[]) => {
-        const codex = list.filter(w => w.type === 'codex')
-        setWorkspaces(codex)
-        setWorkspaceId(id => id || (codex[0]?.id ?? ''))
+        setWorkspaces(list)
+        setWorkspaceId(id => id || (list[0]?.id ?? ''))
       })
       .catch(() => {})
   }, [])
+
+  const provider = workspaces.find(w => w.id === workspaceId)?.type ?? 'claude-code'
 
   // Model list for the selected workspace.
   useEffect(() => {
@@ -187,7 +189,7 @@ export function CodexDebugPage() {
       .catch(() => setModels([]))
   }, [workspaceId])
 
-  // Poll the wire tap (raw app-server frames) once a second.
+  // Poll the wire tap (the backend's native frames) once a second.
   useEffect(() => {
     if (!workspaceId) return
     wireCursor.current = 0
@@ -195,7 +197,7 @@ export function CodexDebugPage() {
     const timer = setInterval(async () => {
       try {
         const r = await fetch(
-          `/api/workspaces/${workspaceId}/codex/debug?sinceWire=${wireCursor.current}&sinceBroadcast=-1`
+          `/api/workspaces/${workspaceId}/harness/debug?sinceWire=${wireCursor.current}&sinceBroadcast=-1`
         )
         if (!r.ok) return
         const d = (await r.json()) as DebugPayload
@@ -288,17 +290,17 @@ export function CodexDebugPage() {
     <div className="flex h-dvh flex-col gap-2 bg-muted p-2">
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-background px-2 py-1.5 text-xs">
         <span className="font-semibold tracking-widest text-muted-foreground uppercase">
-          Codex debug
+          Harness debug
         </span>
         <select
           className="rounded border border-border bg-background px-1 py-0.5"
           value={workspaceId}
           onChange={e => setWorkspaceId(e.target.value)}
         >
-          {workspaces.length === 0 && <option value="">no codex workspaces</option>}
+          {workspaces.length === 0 && <option value="">no workspaces</option>}
           {workspaces.map(w => (
             <option key={w.id} value={w.id}>
-              {w.name ?? w.displayPath ?? w.path}
+              {`${w.name ?? w.displayPath ?? w.path} · ${w.type ?? 'claude-code'}`}
             </option>
           ))}
         </select>
@@ -331,14 +333,16 @@ export function CodexDebugPage() {
           stream
         </label>
         <span className="grow" />
-        <span
-          className={cn(
-            'rounded px-1.5 py-0.5 font-mono text-[10px]',
-            proc?.running ? 'bg-green-500/15 text-green-600' : 'bg-muted text-muted-foreground'
-          )}
-        >
-          {proc?.running ? `app-server pid ${proc.pid}` : 'app-server not running'}
-        </span>
+        {provider === 'codex' && (
+          <span
+            className={cn(
+              'rounded px-1.5 py-0.5 font-mono text-[10px]',
+              proc?.running ? 'bg-green-500/15 text-green-600' : 'bg-muted text-muted-foreground'
+            )}
+          >
+            {proc?.running ? `app-server pid ${proc.pid}` : 'app-server not running'}
+          </span>
+        )}
         <span className="max-w-56 truncate font-mono text-[10px] text-muted-foreground">
           thread {sessionId}
         </span>
@@ -378,8 +382,14 @@ export function CodexDebugPage() {
 
       <div className="flex min-h-0 flex-1 gap-2">
         <Pane
-          title="App-server wire"
-          hint="raw JSON-RPC, both directions"
+          title={provider === 'codex' ? 'App-server wire' : 'Harness wire'}
+          hint={
+            provider === 'codex'
+              ? 'raw JSON-RPC, both directions'
+              : provider === 'openclaw'
+                ? 'no wire tap for OpenClaw yet'
+                : 'raw Agent SDK messages + enqueued inputs'
+          }
           onClear={() => setWire([])}
         >
           {wire.map(f => (

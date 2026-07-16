@@ -24,6 +24,7 @@ import type { Part } from '@/lib/format'
 import { stripViewBuilderMeta } from '@/lib/view-builder-meta'
 
 import { debug } from './debug'
+import { tapWire } from './harness-debug'
 import { broadcast } from './state'
 import { hasThreadConfig, renameThreadConfig, saveThreadConfig } from './thread-config'
 import { type StoredUpload, resolveUploads, uploadToDisplayPart } from './uploads'
@@ -312,6 +313,8 @@ function renameSession(s: LiveSession, realId: string) {
 async function consume(s: LiveSession) {
   try {
     for await (const msg of s.q) {
+      // Raw SDK message into the debug wire ring (/playground/harness).
+      tapWire(s.workspaceId, 'recv', msg)
       if (msg.type === 'system' && msg.subtype === 'init') {
         const realId = msg.session_id
         if (realId && realId !== s.sessionId) {
@@ -594,6 +597,7 @@ export async function sendCCMessage(input: {
     broadcastProcessing(s, true)
   }
   s.input.push(content)
+  tapWire(s.workspaceId, 'send', { type: 'user', content })
   debug(
     `cc enqueue ws=${s.workspaceId} session=${s.sessionId} pendingTurns=${s.pendingTurns} text=${JSON.stringify(s.lastUserText)}`
   )

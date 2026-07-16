@@ -1,15 +1,24 @@
-import { useEffect } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 
 import { Route, Switch, useLocation } from 'wouter'
 
-import { CodexDebugPage } from '@/client/components/playground/CodexDebugPage'
-import { PlaygroundPage } from '@/client/components/playground/PlaygroundPage'
-import { ToolCallsPage } from '@/client/components/playground/ToolCallsPage'
 import { setWorkspaceSwitchHandler } from '@/client/features/chat/chat-connection'
 import { ConnectorsPage } from '@/client/features/connectors/ConnectorsPage'
 
 import { HomeRoute } from './routes/HomeRoute'
 import { WorkspaceRoute } from './routes/WorkspaceRoute'
+
+// Dev-only playground routes: colocated in features/dev and loaded as a
+// separate lazy chunk so none of it ships in the main bundle's hot path.
+const DevRoutes = lazy(() => import('@/client/features/dev/DevRoutes'))
+
+function DevLazy() {
+  return (
+    <Suspense fallback={null}>
+      <DevRoutes />
+    </Suspense>
+  )
+}
 
 // Top-level router — sets up all client-side routes
 export function AppRouter() {
@@ -26,9 +35,7 @@ export function AppRouter() {
     <Switch>
       <Route path="/" component={HomeRoute} />
       <Route path="/connectors" component={ConnectorsPage} />
-      <Route path="/playground/codex" component={CodexDebugPage} />
-      <Route path="/playground/tool-calls" component={ToolCallsPage} />
-      <Route path="/playground" component={PlaygroundPage} />
+      <Route path="/dev/*?" component={DevLazy} />
       <Route path="/workspace/:id">
         {(params: { id: string }) => <WorkspaceRoute key={params.id} id={params.id} />}
       </Route>
