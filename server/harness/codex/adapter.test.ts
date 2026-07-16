@@ -183,6 +183,31 @@ describe('codexItemToTurn', () => {
     })
   })
 
+  test('webSearch surfaces multi-query fan-outs', () => {
+    const item: CodexThreadItem = {
+      type: 'webSearch',
+      id: 'ws-1',
+      query: 'first ...',
+      action: { query: null, queries: ['first', 'second', null] }
+    }
+    expect(codexItemToTurn(item, THREAD)!.parts[0]).toMatchObject({
+      call: { name: 'web_search', input: { query: 'first ...', queries: ['first', 'second'] } }
+    })
+  })
+
+  test('imageGeneration keeps the revised prompt and drops the base64 result', () => {
+    const item = {
+      type: 'imageGeneration',
+      id: 'ig-1',
+      status: 'completed',
+      revisedPrompt: 'A whimsical molefrog',
+      result: 'iVBORw0KGgo...'
+    } as CodexThreadItem
+    const call = (codexItemToTurn(item, THREAD)!.parts[0] as { call: { input: unknown } }).call
+    expect(call).toMatchObject({ input: { prompt: 'A whimsical molefrog' } })
+    expect(JSON.stringify(call)).not.toContain('iVBOR')
+  })
+
   test('imageView maps to a view_image card', () => {
     const item = { type: 'imageView', id: 'iv-1', path: '/w/shot.png' } as CodexThreadItem
     expect(codexItemToTurn(item, THREAD)!.parts[0]).toMatchObject({

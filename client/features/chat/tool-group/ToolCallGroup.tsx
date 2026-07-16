@@ -32,6 +32,7 @@ import {
 import { ToolOutput } from './ToolOutput'
 import {
   formatInputBrief,
+  parseCodexMcp,
   formatMcpTool,
   getToolDisplayName,
   parseMcporterCall,
@@ -195,7 +196,7 @@ function ToolCallCard({ call, cwd, isFirst, isLast }: ToolCallCardProps) {
       />
     )
   }
-  const mcp = parseMcporterCall(call) ?? parseNativeMcp(call)
+  const mcp = parseMcporterCall(call) ?? parseNativeMcp(call) ?? parseCodexMcp(call)
   if (mcp) {
     const fn = formatMcpTool(mcp.server, mcp.tool)
     return (
