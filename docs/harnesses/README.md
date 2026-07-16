@@ -44,10 +44,18 @@ with `turn/start` fallback), interrupt, per-turn token usage folded into
 `TurnMeta`, native optimistic-id rendezvous (`clientUserMessageId` echoes back
 as `clientId`), session list via `thread/list` (cwd-filtered) and history
 replay via `thread/read`. Runs `danger-full-access` + `approvalPolicy: never`
-to match moi's bypass-permissions trust model. Known gaps: no interactive
-approval flow (server→client approval requests are auto-accepted defensively),
-subagent/collab and review items are dropped rather than rendered, and images
-ride inline as data URLs only (no `localImage` path mode).
+to match moi's bypass-permissions trust model. Reasoning requires
+`summary: 'auto'` per turn (see codex.md §5); subagent collab calls render as
+flat tool cards. Known gaps: no interactive approval flow (server→client
+approval requests are auto-accepted defensively), the child agent's own
+transcript is not nested under the parent's card (it streams on the same
+connection, so a CC-style subagent lane is feasible), review items are
+dropped, and images ride inline as data URLs only (no `localImage` path
+mode).
+
+Debug tooling: `/playground/codex` (live wire log + client frames + trigger
+scenarios, backed by `GET /api/workspaces/:id/codex/debug`) and
+`scripts/codex-probe.ts` (drive the raw app-server protocol without moi).
 
 Per-harness notes in this folder:
 

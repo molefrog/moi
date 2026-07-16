@@ -46,6 +46,14 @@ export type CodexThreadItem = {
   error?: { message?: string } | null
   // webSearch
   query?: string
+  // collabAgentToolCall (tool reused from mcpToolCall above)
+  prompt?: string | null
+  senderThreadId?: string
+  receiverThreadIds?: string[]
+  // subAgentActivity
+  kind?: string
+  agentThreadId?: string
+  agentPath?: string
 }
 
 export type CodexTurn = {
@@ -233,6 +241,35 @@ function itemToToolCall(item: CodexThreadItem): ToolCall | null {
         provider: 'codex',
         state: 'success',
         input: { plan: item.text }
+      }
+    }
+    // Codex multi-agent: the parent's collab tool invocations (spawn / send /
+    // wait / close). The child agent runs as its OWN thread whose items
+    // stream on the same connection under `agentThreadId` — nesting that
+    // transcript into a SubagentRecord is future work; for now the card makes
+    // the spawn/wait visible instead of silently dropping it.
+    case 'collabAgentToolCall': {
+      return {
+        toolCallId: item.id,
+        name: 'subagent',
+        caller: 'subagent',
+        provider: 'codex',
+        state: statusToToolState(item.status),
+        input: {
+          action: item.tool,
+          ...(item.prompt ? { prompt: item.prompt } : {}),
+          ...(item.receiverThreadIds?.length ? { agents: item.receiverThreadIds } : {})
+        }
+      }
+    }
+    case 'subAgentActivity': {
+      return {
+        toolCallId: item.id,
+        name: 'subagent_activity',
+        caller: 'subagent',
+        provider: 'codex',
+        state: 'success',
+        input: { kind: item.kind, agentThreadId: item.agentThreadId, agentPath: item.agentPath }
       }
     }
     default:

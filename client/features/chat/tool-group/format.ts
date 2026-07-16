@@ -127,7 +127,9 @@ const CODEX_TOOL_LABELS: Record<string, string> = {
   exec: 'Bash',
   apply_patch: 'Edit',
   web_search: 'Web search',
-  update_plan: 'Update plan'
+  update_plan: 'Update plan',
+  subagent: 'Run sub-agent',
+  subagent_activity: 'Sub-agent'
 }
 
 export function getToolDisplayName(call: ToolCall): string {
@@ -176,6 +178,8 @@ function formatCodexBrief(
     const plan = input.plan
     return typeof plan === 'string' ? plan.split('\n')[0] : ''
   }
+  if (tool === 'subagent') return getInputValue(input, 'prompt') || getInputValue(input, 'action')
+  if (tool === 'subagent_activity') return getInputValue(input, 'kind')
   return ''
 }
 

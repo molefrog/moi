@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 
 import { Route, Switch, useLocation } from 'wouter'
 
+import { CodexDebugPage } from '@/client/components/playground/CodexDebugPage'
 import { PlaygroundPage } from '@/client/components/playground/PlaygroundPage'
 import { ToolCallsPage } from '@/client/components/playground/ToolCallsPage'
 import { setWorkspaceSwitchHandler } from '@/client/features/chat/chat-connection'
@@ -25,6 +26,7 @@ export function AppRouter() {
     <Switch>
       <Route path="/" component={HomeRoute} />
       <Route path="/connectors" component={ConnectorsPage} />
+      <Route path="/playground/codex" component={CodexDebugPage} />
       <Route path="/playground/tool-calls" component={ToolCallsPage} />
       <Route path="/playground" component={PlaygroundPage} />
       <Route path="/workspace/:id">
