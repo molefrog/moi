@@ -1,13 +1,13 @@
 import { describe, expect, test } from 'bun:test'
 
-import type { CodexThread, CodexThreadItem } from './codex-adapter'
+import type { CodexThread, CodexThreadItem } from './adapter'
 import {
   codexItemToNotice,
   codexItemToTurn,
   codexModelToModel,
   codexThreadToEvents,
   codexThreadToSessionInfo
-} from './codex-adapter'
+} from './adapter'
 
 const THREAD = 'thread-1'
 

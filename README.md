@@ -31,7 +31,7 @@ bun run dev
 
 moi also works with OpenClaw agents — `moi openclaw init` installs the moi
 skills into an OpenClaw agent workspace. Integration notes live in
-[docs/harnesses/openclaw.md](docs/harnesses/openclaw.md).
+[server/harness/openclaw/NOTES.md](server/harness/openclaw/NOTES.md).
 
 ## No crypto token
 

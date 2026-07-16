@@ -6,7 +6,7 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk'
 import { join } from 'path'
 
-import { debugEnabled } from './debug'
+import { debugEnabled } from '../../debug'
 
 export type McpScope = 'user' | 'project'
 

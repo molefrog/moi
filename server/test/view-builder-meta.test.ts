@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 
-import { ClaudeAdapter } from '@/lib/claude-adapter'
+import { ClaudeAdapter } from '../harness/claude-code/adapter'
 import { appendViewBuilderMeta, stripViewBuilderMeta } from '@/lib/view-builder-meta'
 
-import { stripUserMessageMetadata } from '../openclaw-strip'
+import { stripUserMessageMetadata } from '../harness/openclaw/strip'
 
 describe('view builder message metadata', () => {
   test('adds agent instructions and restores the visible requirements', () => {

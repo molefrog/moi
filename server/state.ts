@@ -1,9 +1,6 @@
-import { getSessionMessages, listSessions } from '@anthropic-ai/claude-agent-sdk'
+import type { BroadcastFrame, ServerMessage } from '@/lib/types'
 
-import { ClaudeAdapter } from '@/lib/claude-adapter'
-import type { BroadcastFrame, ServerMessage, SessionInfo, StreamEvent } from '@/lib/types'
-
-import { tapClientFrame } from './harness-debug'
+import { tapClientFrame } from './harness/debug'
 
 // The chat socket is app-wide (one per client tab, not per workspace), so a
 // single set of all connected chat clients is enough. Each broadcast frame
@@ -40,39 +37,4 @@ export function broadcastAll(msg: ServerMessage) {
 
 export function sendToClient(ws: Bun.ServerWebSocket<unknown>, msg: ServerMessage) {
   ws.send(JSON.stringify(msg))
-}
-
-export async function getSessions(workspacePath: string): Promise<SessionInfo[]> {
-  const sessions = await listSessions({ dir: workspacePath })
-  return sessions.map(s => ({
-    sessionId: s.sessionId,
-    summary: s.summary,
-    lastModified: s.lastModified,
-    cwd: s.cwd
-  }))
-}
-
-/**
- * Replay a session's persisted raw messages through a fresh adapter and
- * return the resulting StreamEvents. Events are carefully NOT deduplicated —
- * the client reducer is idempotent under upsert-by-id.
- */
-export async function getSessionEvents(
-  sessionId: string,
-  workspacePath: string
-): Promise<StreamEvent[]> {
-  const adapter = new ClaudeAdapter()
-  const events: StreamEvent[] = []
-  try {
-    const raw = await getSessionMessages(sessionId, { dir: workspacePath })
-    for (const msg of raw) {
-      // Disk replay carries no `stream_event` messages, so the adapter never
-      // produces previews here — filter defensively to keep this the pure,
-      // persisted StreamEvent path that reconnect-healing trusts.
-      for (const ev of adapter.ingest(msg)) if (ev.kind !== 'preview') events.push(ev)
-    }
-  } catch {
-    // session file missing or unreadable — return whatever we have (often [])
-  }
-  return events
 }

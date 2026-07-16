@@ -20,21 +20,21 @@ import {
   type OpenClawMessage,
   type OpenClawSessionDetail,
   getOpenClawSessionMessages
-} from './openclaw'
+} from './discovery'
 import {
   type ToolResultInfo,
   findToolCallOwners,
   messageToTurn,
   toolResultFromMessage
-} from './openclaw-adapter'
-import { getGateway, onGatewayReconnected } from './openclaw-gateway'
-import { broadcast } from './state'
-import { materializeToPath, resolveUploads } from './uploads'
+} from './adapter'
+import { getGateway, onGatewayReconnected } from './gateway'
+import { broadcast } from '../../state'
+import { materializeToPath, resolveUploads } from '../../uploads'
 import {
   markViewBuilderBuildingBySession,
   markViewBuilderWaitingBySession,
   renameViewBuilderSession
-} from './view-builders'
+} from '../../view-builders'
 
 type OpenClawSessionKey = string // the gateway-side composite key, e.g. `agent:main:main`
 

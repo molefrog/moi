@@ -7,7 +7,7 @@
 // single `tool-call` part whose state tracks the item's `status`.
 //
 // Type shapes are hand-written against `codex app-server generate-ts`
-// (CLI 0.144.5) and read defensively — see docs/harnesses/codex.md.
+// (CLI 0.144.5) and read defensively — see ./NOTES.md.
 import type { Part, StreamEvent, SystemNotice, ToolCall, ToolState, Turn } from '@/lib/format'
 import type { Model, SessionInfo } from '@/lib/types'
 

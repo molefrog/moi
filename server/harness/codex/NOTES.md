@@ -14,7 +14,7 @@ whole adapter:
 **Recommendation: target the app-server.** The exec SDK is missing too much
 (no interrupt method, no model list, no token deltas, no steering); the
 app-server covers essentially the whole adapter checklist in
-[README.md](README.md) and even exceeds the Claude Agent SDK in places.
+[../README.md](../README.md) and even exceeds the Claude Agent SDK in places.
 
 Sources: [SDK TypeScript source](https://github.com/openai/codex/tree/main/sdk/typescript/src),
 [app-server README](https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md),
@@ -65,7 +65,7 @@ omitted — same transport style as a stdio MCP server). Other transports
 - **One process serves N threads in N different cwds.** `cwd` is per-thread
   (`thread/start`) and overridable per-turn. `thread/loaded/list` shows what's
   in memory; a thread with no subscribers and no activity for 30 min is
-  unloaded (`thread/closed`). This replaces most of `cc-session.ts`'s
+  unloaded (`thread/closed`). This replaces most of `claude-code/session.ts`'s
   eviction/idle-TTL machinery.
 - **Env vars are process-level.** There is no per-thread env injection, so
   moi's per-workspace `workspaceEnv` doesn't map onto a single shared process.
@@ -172,22 +172,22 @@ install instructions.
   but are small/young.
 - **Plan for moi**: write the thin client ourselves (~200 lines in Bun — spawn,
   line-split stdio, id→promise map, notification + server-request routing;
-  same pattern as `server/openclaw-gateway.ts`) and use `generate-ts` for
+  same pattern as `../openclaw/gateway.ts`) and use `generate-ts` for
   types.
 
 ## 4. Adapter shape
 
-A Codex harness would look much closer to `openclaw-session.ts` than
-`cc-session.ts`: one long-lived connection to a server that owns session
+A Codex harness would look much closer to `openclaw/session.ts` than
+`claude-code/session.ts`: one long-lived connection to a server that owns session
 lifecycle, subscribe per thread, map `item/*` notifications onto
 `StreamEvent`s. Capability flags: `liveSettingsPerTurn`, `steering`,
 `interactiveApprovals`, `nativeThreadList`, `imagesInline: 'data-url'`.
 
 ## 5. Implementation notes (shipped, CLI 0.144.5)
 
-The adapter landed as `server/codex.ts` (process + stdio JSON-RPC client, one
-app-server per workspace for env injection), `server/codex-adapter.ts` (item →
-`Turn` mapping, hand-written types), and `server/codex-session.ts` (per-thread
+The adapter landed as `client.ts` (process + stdio JSON-RPC client, one
+app-server per workspace for env injection), `adapter.ts` (item →
+`Turn` mapping, hand-written types), and `session.ts` (per-thread
 state, steer/interrupt, previews, usage). Empirical findings beyond §2:
 
 - **Always pass absolute `cwd`.** A relative `thread/start.cwd` is resolved
@@ -220,3 +220,20 @@ state, steer/interrupt, previews, usage). Empirical findings beyond §2:
   currently ignore.
 - `thread/start` responses label threads `source: "vscode"` — app-server
   clients are indistinguishable from the VS Code extension in `thread/list`.
+
+## 6. Type maintenance (`generate-ts`)
+
+The wire types in `adapter.ts`/`client.ts` are a hand-written defensive
+subset of the protocol, produced against the bindings from:
+
+```
+codex app-server generate-ts --out /tmp/codex-types   # CLI 0.144.5
+```
+
+They are deliberately NOT generated at build time: users run arbitrary codex
+CLI versions, so the runtime reads frames defensively regardless, and
+vendoring ~600 generated files (or generating in CI) would couple typecheck
+to an installed codex binary. When bumping the supported CLI version, re-run
+`generate-ts` into a scratch dir and diff the relevant definitions
+(`v2/ThreadItem`, `v2/TurnStartParams`, `ServerNotification`, `ServerRequest`)
+against the subset here.

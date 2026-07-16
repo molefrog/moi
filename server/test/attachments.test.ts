@@ -6,10 +6,10 @@ import {
   appendAttachmentNote,
   splitAttachmentNote
 } from '@/lib/attachment-note'
-import { ClaudeAdapter } from '@/lib/claude-adapter'
+import { ClaudeAdapter } from '../harness/claude-code/adapter'
 import type { Part } from '@/lib/format'
 
-import { buildUserMessage } from '../cc-session'
+import { buildUserMessage } from '../harness/claude-code/session'
 import {
   addUpload,
   getUpload,

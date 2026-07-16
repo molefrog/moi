@@ -12,13 +12,13 @@ import type {
   Turn,
   TurnMeta,
   TurnOrigin
-} from './format'
+} from '@/lib/format'
 
-import { ATTACHMENT_ONLY_PLACEHOLDER, splitAttachmentNote } from './attachment-note'
-import { stripViewBuilderMeta } from './view-builder-meta'
+import { ATTACHMENT_ONLY_PLACEHOLDER, splitAttachmentNote } from '@/lib/attachment-note'
+import { stripViewBuilderMeta } from '@/lib/view-builder-meta'
 
 // Loose SDK message shape — we don't pull in the full SDK type tree; the
-// adapter tolerates missing fields. Reference: docs/harnesses/claude-code-messages.md.
+// adapter tolerates missing fields. Reference: ./NOTES.md.
 type ContentBlock = {
   type: string
   text?: string

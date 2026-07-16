@@ -5,12 +5,16 @@
 // chat appears stuck (loader spinning) and you want to know whether the server
 // still holds a live session for that thread, or when a widget's server call
 // hangs and you want to see whether its worker is alive and what it has loaded.
-import { type CCDebugSession, SESSION_LIMITS, getCCDebugSnapshot } from './cc-session'
+import {
+  type CCDebugSession,
+  SESSION_LIMITS,
+  getCCDebugSnapshot
+} from './harness/claude-code/session'
 import { CONTROL_PORT, PORT } from './constants'
 import { debugEnabled } from './debug'
 import { WORKER_LIMITS, type WorkerDebugInfo, getWorkersDebugSnapshot } from './functions'
-import { getCodexRunningSessions } from './codex-session'
-import { getOpenClawRunningSessions } from './openclaw-session'
+import { getCodexRunningSessions } from './harness/codex/session'
+import { getOpenClawRunningSessions } from './harness/openclaw/session'
 import { tildify } from './registry'
 import { getClientCount } from './state'
 

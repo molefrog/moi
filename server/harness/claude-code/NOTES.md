@@ -1,7 +1,7 @@
 # Claude Code (Agent SDK) — message spec & UI-abstraction notes
 
 The wire format the Claude Code harness emits and how it maps onto our
-display abstraction (`lib/format.ts`, implemented by `lib/claude-adapter.ts`).
+display abstraction (`lib/format.ts`, implemented by `adapter.ts` here).
 Originally research for the message-display abstraction; kept as the reference
 spec for the CC adapter.
 
@@ -9,10 +9,10 @@ spec for the CC adapter.
 > blocks, subagent/skill mechanics) remain the reference. But the "current
 > implementation" critiques and §14's migration plan describe the
 > **pre-refactor** code and have since shipped: chat moved from
-> `server/agent.ts` to `server/cc-session.ts`, `state.ts`'s
+> `models.ts` to `session.ts` (both in this folder), `state.ts`'s
 > `transformMessage` and the 7-variant `Message` union were replaced by
 > `StreamEvent`/`Turn`/`Part` in `lib/format.ts` (built by
-> `lib/claude-adapter.ts`), and `MessageBlock.tsx` was replaced by
+> `adapter.ts`), and `MessageBlock.tsx` was replaced by
 > `client/components/TurnView.tsx`. Read those sections as historical
 > context, not as descriptions of today's code.
 
