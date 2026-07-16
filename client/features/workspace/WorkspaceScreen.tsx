@@ -46,6 +46,7 @@ import type {
   WorkspaceTabId,
   WorkspaceTabsState
 } from '@/lib/types'
+import { createDefaultWorkspaceTabs } from '@/lib/workspace-layout'
 
 const Scratchpad = lazy(() =>
   import('@/client/features/scratchpad/Scratchpad').then(module => ({
@@ -63,7 +64,7 @@ function viewIcon(view: ViewInfo, builders: ViewBuilder[]) {
   return resolveAppIcon(view.config.icon) ?? resolveAppIcon(builder?.icon) ?? IconArticle
 }
 
-const DEFAULT_TABS: WorkspaceTabsState = { open: ['agent'], active: 'agent' }
+const DEFAULT_TABS = createDefaultWorkspaceTabs()
 
 const viewTabId = (id: string): WorkspaceTabId => `view:${id}`
 const viewIdFromTab = (tab: WorkspaceTabId) => (tab.startsWith('view:') ? tab.slice(5) : null)

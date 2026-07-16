@@ -16,7 +16,7 @@ const base: WorkspaceLayout = {
   version: 1,
   widgetGrid: [],
   layoutMode: 'fullscreen',
-  tabs: { open: ['agent'], active: 'agent' }
+  tabs: { open: ['agent', 'widgets'], active: 'agent' }
 }
 
 async function withWorkspaceFile<T>(
@@ -35,11 +35,21 @@ async function withWorkspaceFile<T>(
 }
 
 describe('loadLayout', () => {
+  test('opens agent and widgets for a new workspace', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'moi-layout-'))
+    try {
+      const loaded = await loadLayout(dir)
+      expect(loaded.tabs).toEqual({ open: ['agent', 'widgets'], active: 'agent' })
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   test('defaults missing layoutMode to fullscreen', async () => {
     await withWorkspaceFile({ version: 1, widgetGrid: [] }, async dir => {
       const loaded = await loadLayout(dir)
       expect(loaded.layoutMode).toBe('fullscreen')
-      expect(loaded.tabs).toEqual({ open: ['agent'], active: 'agent' })
+      expect(loaded.tabs).toEqual({ open: ['agent', 'widgets'], active: 'agent' })
     })
   })
 
@@ -57,12 +67,12 @@ describe('loadLayout', () => {
     })
   })
 
-  test('defaults invalid tabs to agent', async () => {
+  test('defaults invalid tabs to agent and widgets', async () => {
     await withWorkspaceFile(
       { version: 1, widgetGrid: [], tabs: { open: [], active: 'widgets' } },
       async dir => {
         const loaded = await loadLayout(dir)
-        expect(loaded.tabs).toEqual({ open: ['agent'], active: 'agent' })
+        expect(loaded.tabs).toEqual({ open: ['agent', 'widgets'], active: 'agent' })
       }
     )
   })
@@ -127,7 +137,7 @@ describe('mergeLayoutForSave', () => {
       version: 1,
       widgetGrid: [],
       layoutMode: 'fullscreen',
-      tabs: { open: ['agent'], active: 'agent' }
+      tabs: { open: ['agent', 'widgets'], active: 'agent' }
     })
   })
 
