@@ -14,6 +14,33 @@ native wire format onto `StreamEvent`s:
 | OpenClaw (gateway) | `server/openclaw-session.ts` | `server/openclaw-adapter.ts` | shipped |
 | Codex (app-server) | — | — | researched, see [codex.md](codex.md) |
 
+## Implementation status
+
+**Claude Code — shipped, primary harness.** Full chat integration: long-lived
+streaming-input sessions with mid-turn message queueing, resume after idle
+eviction/restart, interrupt, per-thread model + effort picker (backed by
+`supportedModels()`), opt-in live token streaming, image/file attachments,
+subagent lanes, MCP status probe, and session list/history replay from the
+SDK's `.jsonl` files. Known gaps: runs with `bypassPermissions` only (no
+interactive approval flow), token counts from `result` messages are dropped
+(only cost/turns/duration surface), and effort/streaming changes require a
+teardown-and-resume because the SDK has no live setter for them.
+
+**OpenClaw — shipped, experimental.** Chat over the local gateway's WebSocket
+JSON-RPC: sessions seeded cold from `sessions.get` then updated from live
+`session.message` frames, abort via `sessions.abort`, per-turn usage (tokens +
+cost) into `TurnMeta`, optimistic user-echo rendezvous (the gateway echoes
+sends with lag), uploads materialized to file paths. Known gaps: no
+token-delta streaming (durable message rows only — deliberate v2 cut), no
+model/effort selection, and the gateway is the sole source of truth (no local
+persistence; cold restarts re-seed).
+
+**Codex — not started.** Research complete (see [codex.md](codex.md)):
+target the app-server JSON-RPC protocol, not the exec-based npm SDK. Next
+steps: a thin stdio JSON-RPC client (~200 lines, same pattern as
+`server/openclaw-gateway.ts`), types via `codex app-server generate-ts`, and
+an adapter mapping `item/*` notifications onto `StreamEvent`s.
+
 Per-harness notes in this folder:
 
 - [claude-code-messages.md](claude-code-messages.md) — Claude Agent SDK wire
