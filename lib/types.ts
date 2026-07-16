@@ -305,7 +305,7 @@ export type WorkspaceSwitchMessage = {
   workspaceId: string
 }
 
-export type WorkspaceType = 'claude-code' | 'openclaw'
+export type WorkspaceType = 'claude-code' | 'openclaw' | 'codex'
 
 // One MCP server's connection status, as surfaced by GET /api/workspaces/:id/mcp
 // (a subset of the agent SDK's McpServerStatus — only what the UI renders).

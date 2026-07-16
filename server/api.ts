@@ -22,6 +22,13 @@ import { callFunction, parseFunctionPath } from './functions'
 import { processIcon } from './icon'
 import { getWorkspacePreview, loadLayout, mergeLayoutForSave, saveLayout } from './layout'
 import { getMcpStatus, getUserMcpStatus } from './mcp'
+import { getCodexModels, getCodexSessions, getCodexThreadEvents } from './codex'
+import {
+  ensureCodexSessionLive,
+  getCodexRunningSessions,
+  getLiveCodexEvents,
+  sendCodexMessage
+} from './codex-session'
 import { getOpenClawModels, getOpenClawSessionMessages, getOpenClawSessions } from './openclaw'
 import { toSessionInfo, toStreamEvents } from './openclaw-adapter'
 import {
@@ -159,7 +166,7 @@ function parseAvailableViewIcons(value: unknown): string[] | null {
 one.get('/view-builders', async c => {
   const ws = c.get('ws')
   const activeSessionIds = new Set(
-    [...getCCRunningSessions(), ...getOpenClawRunningSessions()]
+    [...getCCRunningSessions(), ...getOpenClawRunningSessions(), ...getCodexRunningSessions()]
       .filter(session => session.workspaceId === ws.id)
       .map(session => session.sessionId)
   )
@@ -237,6 +244,18 @@ one.post('/view-builders/:builderId/submit', async c => {
           isNew: true,
           content,
           optimisticId: body.optimisticId
+        })
+      } else if (ws.type === 'codex') {
+        await sendCodexMessage({
+          workspaceId: ws.id,
+          workspacePath: ws.path,
+          sessionId: builder.sessionId,
+          isNew: true,
+          content,
+          optimisticId: body.optimisticId,
+          model: typeof body.model === 'string' ? body.model : undefined,
+          effort: typeof body.effort === 'string' ? body.effort : undefined,
+          stream: body.stream === true ? true : undefined
         })
       } else {
         await sendCCMessage({
@@ -374,6 +393,9 @@ one.get('/sessions', async c => {
     const rows = await getOpenClawSessions(ws.path, ws.agentId)
     return c.json(rows.map(r => toSessionInfo(r, ws.path)))
   }
+  if (ws.type === 'codex') {
+    return c.json(await getCodexSessions(ws.path))
+  }
   return c.json(await getSessions(ws.path))
 })
 
@@ -403,6 +425,20 @@ one.get('/sessions/:sessionId/events', async c => {
     }
     const preview = await getOpenClawSessionMessages(sessionId, ws.path, ws.agentId)
     return c.json(toStreamEvents(preview))
+  }
+  if (ws.type === 'codex') {
+    // Prefer the live view when one exists (same reasoning as OpenClaw above);
+    // otherwise resume the thread so WS frames upsert into the same view, and
+    // fall back to a static thread/read if the resume fails.
+    const live = getLiveCodexEvents(id, sessionId)
+    if (live) return c.json(live)
+    try {
+      return c.json(
+        await ensureCodexSessionLive({ workspaceId: id, workspacePath: ws.path, sessionId })
+      )
+    } catch {
+      return c.json(await getCodexThreadEvents(ws.path, sessionId))
+    }
   }
   return c.json(await getSessionEvents(sessionId, ws.path))
 })
@@ -502,9 +538,14 @@ one.get('/models', async c => {
   const ws = c.get('ws')
   const provider: WorkspaceType = ws.type ?? 'claude-code'
   const models =
-    provider === 'openclaw' ? await getOpenClawModels() : await getClaudeModels(ws.path)
-  // Claude Code streams live tokens via `includePartialMessages`; OpenClaw
-  // uses durable rows only (no token deltas), so it opts out.
+    provider === 'openclaw'
+      ? await getOpenClawModels()
+      : provider === 'codex'
+        ? await getCodexModels(ws.path)
+        : await getClaudeModels(ws.path)
+  // Claude Code streams live tokens via `includePartialMessages`; Codex
+  // streams `item/*/delta` natively. OpenClaw uses durable rows only (no
+  // token deltas), so it opts out.
   const supportsStreaming = provider !== 'openclaw'
   return c.json({
     provider,
@@ -693,7 +734,8 @@ workspaces.post('/', async c => {
   const body = await c.req.json()
   if (!body?.path) return c.text('Missing path', 400)
   const rawType = body?.type
-  const type = rawType === 'claude-code' || rawType === 'openclaw' ? rawType : undefined
+  const type =
+    rawType === 'claude-code' || rawType === 'openclaw' || rawType === 'codex' ? rawType : undefined
   const path = resolve(String(body.path))
   // Importing IS initializing: lay down the bundled skills (in the backend's
   // skills dir) and the `.moi/` scaffold, exactly like `moi init` — a workspace

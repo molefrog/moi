@@ -13,6 +13,8 @@ import { control } from './control'
 import { EVENTS_TOPIC, setEventServer } from './events'
 import { killAllWorkers } from './functions'
 import { resolveScratchOp } from './scratchpad-relay'
+import { killAllCodexClients } from './codex'
+import { getCodexRunningSessions, interruptCodexRun, sendCodexMessage } from './codex-session'
 import {
   abortOpenClawRun,
   getOpenClawRunningSessions,
@@ -123,7 +125,11 @@ export const app = Bun.serve<WsData>({
         // Authoritative snapshot of every running session (CC + OpenClaw) so the
         // client can light/clear spinners correctly even for runs whose status
         // transitions it missed while disconnected.
-        const running = [...getCCRunningSessions(), ...getOpenClawRunningSessions()]
+        const running = [
+          ...getCCRunningSessions(),
+          ...getOpenClawRunningSessions(),
+          ...getCodexRunningSessions()
+        ]
         sendToClient(ws, { type: 'status_snapshot', running })
       } else {
         ws.subscribe(EVENTS_TOPIC)
@@ -150,6 +156,19 @@ export const app = Bun.serve<WsData>({
               attachments: data.attachments,
               optimisticId: data.optimisticId
             }).catch(() => {})
+          } else if (workspace.type === 'codex') {
+            void sendCodexMessage({
+              workspaceId: data.workspaceId,
+              workspacePath: workspace.path,
+              sessionId: data.sessionId,
+              isNew: data.isNew,
+              content: data.content.trim(),
+              attachments: data.attachments,
+              optimisticId: data.optimisticId,
+              model: data.model,
+              effort: data.effort,
+              stream: data.stream
+            }).catch(() => {})
           } else {
             // `stream` is only wired for the Claude Code path; the OpenClaw
             // branch above never receives it (unsupported provider).
@@ -171,6 +190,8 @@ export const app = Bun.serve<WsData>({
           const workspace = await getWorkspace(data.workspaceId)
           if (workspace?.type === 'openclaw') {
             abortOpenClawRun({ workspaceId: data.workspaceId, sessionId: data.sessionId })
+          } else if (workspace?.type === 'codex') {
+            interruptCodexRun({ workspaceId: data.workspaceId, sessionId: data.sessionId })
           } else {
             interruptCCSession(data.workspaceId, data.sessionId)
           }
@@ -205,6 +226,7 @@ function shutdown() {
     control.stop(true)
   } catch {}
   killAllCCSessions()
+  killAllCodexClients()
   killAllWorkers()
   process.exit(0)
 }

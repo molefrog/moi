@@ -1,0 +1,317 @@
+// Map Codex app-server shapes into our agent-agnostic display format.
+//
+// Codex emits semantic ThreadItems (a command, a patch, an MCP call) with
+// their own lifecycle (`item/started` → `item/completed`), not raw
+// tool_use/tool_result pairs. Each item becomes one Turn: `userMessage` a
+// user turn, everything else an assistant turn; tool-shaped items carry a
+// single `tool-call` part whose state tracks the item's `status`.
+//
+// Type shapes are hand-written against `codex app-server generate-ts`
+// (CLI 0.144.5) and read defensively — see docs/harnesses/codex.md.
+import type { Part, StreamEvent, SystemNotice, ToolCall, ToolState, Turn } from '@/lib/format'
+import type { Model, SessionInfo } from '@/lib/types'
+
+// ---- protocol shapes (subset we consume) ------------------------------------
+
+export type CodexUserInput =
+  | { type: 'text'; text: string }
+  | { type: 'image'; url: string }
+  | { type: 'localImage'; path: string }
+
+export type CodexThreadItem = {
+  type: string
+  id: string
+  // userMessage
+  clientId?: string | null
+  content?: CodexUserInput[]
+  // agentMessage / plan
+  text?: string
+  phase?: string | null
+  // reasoning
+  summary?: string[]
+  // commandExecution
+  command?: string
+  cwd?: string
+  status?: string
+  aggregatedOutput?: string | null
+  exitCode?: number | null
+  durationMs?: number | null
+  // fileChange
+  changes?: { path: string; kind?: { type?: string }; diff?: string }[]
+  // mcpToolCall
+  server?: string
+  tool?: string
+  arguments?: unknown
+  result?: { content?: unknown[]; structuredContent?: unknown } | null
+  error?: { message?: string } | null
+  // webSearch
+  query?: string
+}
+
+export type CodexTurn = {
+  id: string
+  items: CodexThreadItem[]
+  status: string
+  error?: { message?: string; codexErrorInfo?: unknown } | null
+}
+
+export type CodexThread = {
+  id: string
+  preview?: string
+  cwd?: string
+  createdAt?: number
+  updatedAt?: number
+  name?: string | null
+  turns?: CodexTurn[]
+}
+
+export type CodexTokenUsage = {
+  total?: { totalTokens?: number; inputTokens?: number; outputTokens?: number }
+  last?: { totalTokens?: number; inputTokens?: number; outputTokens?: number }
+}
+
+export type CodexModel = {
+  id: string
+  model: string
+  displayName: string
+  description?: string
+  hidden?: boolean
+  supportedReasoningEfforts?: { reasoningEffort: string; description?: string }[]
+  defaultReasoningEffort?: string
+  isDefault?: boolean
+}
+
+// ---- discovery mappings ------------------------------------------------------
+
+export function codexThreadToSessionInfo(t: CodexThread): SessionInfo {
+  return {
+    sessionId: t.id,
+    summary: t.name?.trim() || t.preview?.trim() || '',
+    // Codex timestamps are unix seconds; SessionInfo wants millis.
+    lastModified: (t.updatedAt ?? t.createdAt ?? 0) * 1000,
+    cwd: t.cwd
+  }
+}
+
+export function codexModelToModel(m: CodexModel): Model {
+  const efforts = (m.supportedReasoningEfforts ?? []).map(e => e.reasoningEffort)
+  return {
+    value: m.id,
+    resolvedModel: m.model,
+    displayName: m.displayName,
+    // Our Model.description is a " · "-joined "<headline> · <tagline>" blurb
+    // (the picker renders the first segment as the row label), so lead with
+    // the display name and let Codex's one-liner be the tagline.
+    ...(m.description
+      ? { description: `${m.displayName} · ${m.description}` }
+      : { description: m.displayName }),
+    supportsEffort: efforts.length > 0,
+    ...(efforts.length > 0 ? { supportedEffortLevels: efforts } : {})
+  }
+}
+
+// ---- item → turn -------------------------------------------------------------
+
+function statusToToolState(status: string | undefined): ToolState {
+  switch (status) {
+    case 'inProgress':
+      return 'running'
+    case 'completed':
+      return 'success'
+    case 'failed':
+      return 'error'
+    case 'declined':
+      return 'approval-denied'
+    default:
+      return 'pending'
+  }
+}
+
+function userInputToParts(content: CodexUserInput[] | undefined): Part[] {
+  const parts: Part[] = []
+  for (const c of content ?? []) {
+    if (c.type === 'text' && c.text) parts.push({ type: 'text', text: c.text })
+    else if (c.type === 'image' && c.url)
+      parts.push({ type: 'file', mediaType: 'image/*', url: c.url })
+    else if (c.type === 'localImage' && c.path)
+      parts.push({ type: 'text', text: `[image: ${c.path}]` })
+  }
+  return parts
+}
+
+// Flatten an MCP result's content blocks into a readable string (same
+// approach as the OpenClaw adapter — text blocks joined, others tagged).
+function flattenMcpResult(result: CodexThreadItem['result']): string {
+  if (!result) return ''
+  if (result.structuredContent !== undefined && result.structuredContent !== null) {
+    return JSON.stringify(result.structuredContent, null, 2)
+  }
+  const blocks = Array.isArray(result.content) ? result.content : []
+  return blocks
+    .map(b => {
+      if (b && typeof b === 'object' && (b as { type?: string }).type === 'text') {
+        const t = (b as { text?: unknown }).text
+        return typeof t === 'string' ? t : ''
+      }
+      return b && typeof b === 'object' ? `[${(b as { type?: string }).type ?? 'block'}]` : ''
+    })
+    .filter(Boolean)
+    .join('\n')
+}
+
+function itemToToolCall(item: CodexThreadItem): ToolCall | null {
+  switch (item.type) {
+    case 'commandExecution': {
+      const call: ToolCall = {
+        toolCallId: item.id,
+        name: 'exec',
+        caller: 'model',
+        provider: 'codex',
+        state: statusToToolState(item.status),
+        input: { command: item.command, cwd: item.cwd }
+      }
+      if (item.aggregatedOutput) {
+        if (call.state === 'error') call.errorText = item.aggregatedOutput
+        else call.output = item.aggregatedOutput
+      }
+      if (typeof item.exitCode === 'number' || typeof item.durationMs === 'number') {
+        call.sidecar = { exitCode: item.exitCode, durationMs: item.durationMs }
+      }
+      return call
+    }
+    case 'fileChange': {
+      return {
+        toolCallId: item.id,
+        name: 'apply_patch',
+        caller: 'model',
+        provider: 'codex',
+        state: statusToToolState(item.status),
+        input: {
+          changes: (item.changes ?? []).map(c => ({
+            path: c.path,
+            kind: c.kind?.type,
+            diff: c.diff
+          }))
+        }
+      }
+    }
+    case 'mcpToolCall': {
+      const call: ToolCall = {
+        toolCallId: item.id,
+        name: item.tool ?? 'mcp',
+        caller: 'model',
+        provider: 'codex',
+        mcpServer: item.server,
+        state: statusToToolState(item.status),
+        input: item.arguments
+      }
+      const output = flattenMcpResult(item.result)
+      if (item.error?.message) {
+        call.state = 'error'
+        call.errorText = item.error.message
+      } else if (output) {
+        call.output = output
+      }
+      return call
+    }
+    case 'webSearch': {
+      return {
+        toolCallId: item.id,
+        name: 'web_search',
+        caller: 'model',
+        provider: 'codex',
+        // webSearch items have no lifecycle status; they appear when done.
+        state: 'success',
+        input: { query: item.query }
+      }
+    }
+    case 'plan': {
+      return {
+        toolCallId: item.id,
+        name: 'update_plan',
+        caller: 'model',
+        provider: 'codex',
+        state: 'success',
+        input: { plan: item.text }
+      }
+    }
+    default:
+      return null
+  }
+}
+
+// Build a Turn from one Codex ThreadItem, or null for item kinds we don't
+// render (contextCompaction becomes a notice — see itemToNotice).
+export function codexItemToTurn(item: CodexThreadItem, threadId: string): Turn | null {
+  const turnId = `codex:${threadId}:${item.id}`
+  if (item.type === 'userMessage') {
+    const parts = userInputToParts(item.content)
+    if (parts.length === 0) return null
+    return {
+      // The echo carries our optimistic id back as `clientId` — reusing it
+      // upserts the sender's optimistic bubble in place of a duplicate.
+      id: item.clientId || turnId,
+      role: 'user',
+      origin: { kind: 'user-input' },
+      parts
+    }
+  }
+  if (item.type === 'agentMessage') {
+    if (!item.text) return null
+    return {
+      id: turnId,
+      role: 'assistant',
+      origin: { kind: 'user-input' },
+      parts: [{ type: 'text', text: item.text }],
+      // The item id keys the live token preview; reporting it as the
+      // apiMessageId lets the client clear that preview when the turn lands.
+      meta: { apiMessageId: item.id }
+    }
+  }
+  if (item.type === 'reasoning') {
+    const text = (item.summary ?? []).filter(Boolean).join('\n\n')
+    if (!text) return null
+    return {
+      id: turnId,
+      role: 'assistant',
+      origin: { kind: 'user-input' },
+      parts: [{ type: 'reasoning', text }],
+      meta: { apiMessageId: item.id }
+    }
+  }
+  const call = itemToToolCall(item)
+  if (!call) return null
+  return {
+    id: turnId,
+    role: 'assistant',
+    origin: { kind: 'user-input' },
+    parts: [{ type: 'tool-call', call }]
+  }
+}
+
+export function codexItemToNotice(item: CodexThreadItem, threadId: string): SystemNotice | null {
+  if (item.type !== 'contextCompaction') return null
+  return {
+    id: `codex:${threadId}:${item.id}`,
+    kind: 'compact',
+    at: new Date().toISOString()
+  }
+}
+
+// Static replay path: map a `thread/read`/`thread/resume` payload (turns
+// included) onto StreamEvents for the REST events endpoint.
+export function codexThreadToEvents(thread: CodexThread): StreamEvent[] {
+  const events: StreamEvent[] = []
+  for (const turn of thread.turns ?? []) {
+    for (const item of turn.items ?? []) {
+      const t = codexItemToTurn(item, thread.id)
+      if (t) {
+        events.push({ kind: 'turn', turn: t })
+        continue
+      }
+      const n = codexItemToNotice(item, thread.id)
+      if (n) events.push({ kind: 'notice', notice: n })
+    }
+  }
+  return events
+}

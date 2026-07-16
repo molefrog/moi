@@ -121,8 +121,18 @@ const CLAUDE_TOOL_LABELS: Record<string, string> = {
   WebFetch: 'Web Fetch'
 }
 
+// Codex emits semantic items, which the adapter maps to a small fixed set of
+// tool names (plus raw MCP tool names, which fall through unchanged).
+const CODEX_TOOL_LABELS: Record<string, string> = {
+  exec: 'Bash',
+  apply_patch: 'Edit',
+  web_search: 'Web search',
+  update_plan: 'Update plan'
+}
+
 export function getToolDisplayName(call: ToolCall): string {
   if (call.provider === 'openclaw') return OPENCLAW_TOOL_LABELS[call.name] ?? call.name
+  if (call.provider === 'codex') return CODEX_TOOL_LABELS[call.name] ?? call.name
   return CLAUDE_TOOL_LABELS[call.name] ?? call.name
 }
 
@@ -139,7 +149,34 @@ export function formatInputBrief(call: ToolCall, cwd: string | null): string {
   const input = (call.input as Record<string, unknown>) ?? {}
   const shorten = makeShortenPaths(cwd)
   if (call.provider === 'openclaw') return formatOpenClawBrief(call.name, input, shorten)
+  if (call.provider === 'codex') return formatCodexBrief(call.name, input, shorten)
   return formatClaudeBrief(call.name, input, shorten)
+}
+
+function formatCodexBrief(
+  tool: string,
+  input: Record<string, unknown>,
+  shorten: (s: string) => string
+): string {
+  if (tool === 'exec') return shorten(`$ ${getInputValue(input, 'command')}`)
+  if (tool === 'apply_patch') {
+    // The adapter sends structured per-file changes: [{ path, kind, diff }].
+    const changes = input.changes
+    if (Array.isArray(changes)) {
+      const paths = changes
+        .map(c => (c && typeof c === 'object' ? (c as { path?: unknown }).path : undefined))
+        .filter((p): p is string => typeof p === 'string')
+        .map(shorten)
+      return paths.join(', ')
+    }
+    return ''
+  }
+  if (tool === 'web_search') return getInputValue(input, 'query')
+  if (tool === 'update_plan') {
+    const plan = input.plan
+    return typeof plan === 'string' ? plan.split('\n')[0] : ''
+  }
+  return ''
 }
 
 function formatClaudeBrief(
