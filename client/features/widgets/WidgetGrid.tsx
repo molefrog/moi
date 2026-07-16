@@ -12,27 +12,19 @@ import type { GridItem } from '@/client/features/widgets/grid'
 
 import { WidgetFrame } from './WidgetFrame'
 
-export type WidgetGridProps = {
-  cols?: number
-  rowHeight?: number
-  gap?: number
+type WidgetGridLayoutProps = {
   items: GridItem[]
   editing?: boolean
   renderItem: (id: string) => ReactNode
   onLayoutChange?: (items: GridItem[]) => void
-  onRemove?: (id: string) => void
 }
 
-export function WidgetGrid({
-  cols = 4,
-  rowHeight = 160,
-  gap = 8,
+export function WidgetGridLayout({
   items,
   editing,
   renderItem,
-  onLayoutChange,
-  onRemove
-}: WidgetGridProps) {
+  onLayoutChange
+}: WidgetGridLayoutProps) {
   const [layout, setLayout] = useState<Layout>(() => packItems(items, []))
   const [prevItems, setPrevItems] = useState(items)
 
@@ -71,12 +63,12 @@ export function WidgetGrid({
   )
 
   return (
-    <div ref={containerRef}>
+    <div ref={containerRef} className="mx-auto w-full max-w-[var(--column-w)]">
       {mounted && (
         <GridLayout
           width={width}
           layout={layout}
-          gridConfig={{ cols, rowHeight, margin: [gap, gap], containerPadding: [0, 0] }}
+          gridConfig={{ cols: 4, rowHeight: 160, margin: [8, 8], containerPadding: [0, 0] }}
           dragConfig={{ enabled: !!editing }}
           resizeConfig={{ enabled: false }}
           compactor={verticalCompactor}
@@ -90,17 +82,41 @@ export function WidgetGrid({
                 className="size-full"
                 transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
               >
-                <WidgetFrame
-                  editing={editing}
-                  onRemove={onRemove ? () => onRemove(item.i) : undefined}
-                >
-                  {renderItem(item.i)}
-                </WidgetFrame>
+                {renderItem(item.i)}
               </motion.div>
             </div>
           ))}
         </GridLayout>
       )}
     </div>
+  )
+}
+
+export type WidgetGridProps = {
+  items: GridItem[]
+  editing?: boolean
+  renderItem: (id: string) => ReactNode
+  onLayoutChange?: (items: GridItem[]) => void
+  onRemove?: (id: string) => void
+}
+
+export function WidgetGrid({
+  items,
+  editing,
+  renderItem,
+  onLayoutChange,
+  onRemove
+}: WidgetGridProps) {
+  return (
+    <WidgetGridLayout
+      items={items}
+      editing={editing}
+      onLayoutChange={onLayoutChange}
+      renderItem={id => (
+        <WidgetFrame editing={editing} onRemove={onRemove ? () => onRemove(id) : undefined}>
+          {renderItem(id)}
+        </WidgetFrame>
+      )}
+    />
   )
 }

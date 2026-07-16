@@ -64,7 +64,7 @@ export function HomePage() {
       {count > 0 ? (
         <section className="mb-10">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <h1 className="text-sm font-medium text-foreground">My spaces</h1>
+            <h1 className="text-sm font-medium text-foreground">My workspaces</h1>
             <CreateWorkspaceDialog
               trigger={
                 <Button variant="outline" size="sm">
