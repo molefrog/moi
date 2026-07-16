@@ -115,7 +115,7 @@ Legend: ✅ supported · ⚠️ partial/workaround · ❌ missing.
 | Interactive approvals | ⚠️ (we bypass) | ✅ | ❌ | ✅ server→client requests |
 | Session list/history API | ✅ `listSessions()` + jsonl | ✅ `sessions.get` | ❌ read `~/.codex/sessions` | ✅ `thread/list`/`read` |
 | MCP status | ✅ `mcpServerStatus()` | n/a | ❌ | ✅ `mcpServerStatus/list` |
-| Usage reporting | ✅ on `result` | ⚠️ | ✅ per turn | ✅ live + rate limits |
+| Usage reporting | ⚠️ cost/duration on `result` (adapter drops tokens) | ✅ tokens + cost per turn | ✅ per turn | ✅ live + rate limits |
 | Structured output | ❌ | ❌ | ✅ `outputSchema` | ✅ per turn |
 
 ## Design lessons so far
