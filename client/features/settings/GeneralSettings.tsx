@@ -65,7 +65,7 @@ export function GeneralSettings() {
       <SettingsSection label="Danger zone">
         <SettingsRow
           title="Remove space"
-          description="Remove this space from Moi. Its folder and sessions stay on disk."
+          description="Remove this space from moi. Its folder and sessions stay on disk."
           control={
             <Button
               type="button"

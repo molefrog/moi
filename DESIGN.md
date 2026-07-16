@@ -1,4 +1,4 @@
-# Moi Main App Design
+# moi main app design
 
 This is the visual contract for the host app and its chrome. Workspace widget/view internals and generated applets use their workspace-local design guidance instead.
 
@@ -8,7 +8,7 @@ Generic design skills may help with usability and polish. They cannot introduce 
 
 ## Visual Direction
 
-Moi is a local AI space. The host app should feel calm, precise, compact, and a little quirky. It is a serious tool, not a marketing page or visual showcase.
+moi is a local AI space. The host app should feel calm, precise, compact, and a little quirky. It is a serious tool, not a marketing page or visual showcase.
 
 Prefer density with breathing room. Use readable logs, compact controls, quiet panel chrome, and clear interaction states. Personality should come from product-specific copy, icons, and small interaction moments. Avoid gradients, decorative blobs, oversized type, dramatic shadows, large empty hero layouts, and one-off visual systems.
 
@@ -28,7 +28,7 @@ Use semantic color tokens by intent:
 
 Do not add raw color utilities, manual `dark:` colors, or `foreground` alpha fills. Use alpha only when the semantic token already has the correct role. Do not add, rename, or redefine tokens without explicit owner approval. If no token fits, use the closest semantic role and report the limitation.
 
-Use `font-sans` for UI, including paths and ids. Reserve `font-mono` for code and fixed-width alignment. Keep titles modest and metadata quiet. Default to regular, use medium for emphasis, and reserve semibold for rare exceptions. Use `tabular-nums` where alignment matters.
+Use `font-sans` for UI, including paths and ids. Reserve `font-mono` for code and fixed-width alignment. Keep titles modest and metadata quiet. Agents use only regular weight and medium for emphasis. Other weights are reserved for owner hand-tuning. Use `tabular-nums` where alignment matters.
 
 ## Layout and Hierarchy
 
@@ -62,9 +62,7 @@ Use Tabler icons and follow `.agents/rules/icons.md`; it is the only source for 
 
 Motion should explain a state or spatial change. Follow `.agents/rules/animations.md`. Keep feedback short, avoid decorative loops, and do not add custom keyframes.
 
-Use concise, sentence-case product language. Prefer the nouns workspace, chat, agent, model, widget, view, connector, session, and run. Name actions precisely, such as `Remove workspace` or `Start new chat`. Avoid generic confirmations, hype, “please,” and “successfully.”
-
-Use chat in product language. Reserve thread for internal SDK, session, and persistence concepts.
+Follow `.agents/rules/product-language.md` for casing, sentence case, terminology, tone, and action copy.
 
 ## Final Review
 

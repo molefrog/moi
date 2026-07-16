@@ -7,7 +7,7 @@ import { PixelPainter } from './PixelPainter'
 
 const SPRITES: { value: Sprite; label: string }[] = [
   { value: 'moi', label: 'M' },
-  { value: 'moi-full', label: 'MOI' }
+  { value: 'moi-full', label: 'moi' }
 ]
 
 const EFFECTS: { value: Effect | 'none'; label: string }[] = [
