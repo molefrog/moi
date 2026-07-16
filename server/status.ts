@@ -5,16 +5,10 @@
 // chat appears stuck (loader spinning) and you want to know whether the server
 // still holds a live session for that thread, or when a widget's server call
 // hangs and you want to see whether its worker is alive and what it has loaded.
-import {
-  type CCDebugSession,
-  SESSION_LIMITS,
-  getCCDebugSnapshot
-} from './harness/claude-code/session'
 import { CONTROL_PORT, PORT } from './constants'
 import { debugEnabled } from './debug'
 import { WORKER_LIMITS, type WorkerDebugInfo, getWorkersDebugSnapshot } from './functions'
-import { getCodexRunningSessions } from './harness/codex/session'
-import { getOpenClawRunningSessions } from './harness/openclaw/session'
+import { allHarnesses } from './harness/registry'
 import { tildify } from './registry'
 import { getClientCount } from './state'
 
@@ -69,31 +63,8 @@ function workerLine(w: WorkerDebugInfo, now: number): string {
   return line
 }
 
-function sessionLine(s: CCDebugSession, now: number): string {
-  const mark = s.busy ? '▶ busy' : s.closed ? '✗ closed' : '○ idle'
-  const bits = [
-    mark.padEnd(8),
-    `ws=${s.workspaceId}`,
-    `session=${s.sessionId}`,
-    `model=${s.model ?? 'default'}`,
-    `effort=${s.effort ?? 'default'}`,
-    `stream=${s.stream ? 'on' : 'off'}`,
-    `pending=${s.pendingTurns}`,
-    `age=${fmtDuration(now - s.createdAt)}`,
-    `lastActivity=${fmtAgo(s.lastActivityAt, now)}`
-  ]
-  if (s.desiredEffort !== s.effort) bits.push(`desiredEffort=${s.desiredEffort ?? 'default'}`)
-  if (s.desiredStream !== s.stream) bits.push(`desiredStream=${s.desiredStream ? 'on' : 'off'}`)
-  if (!s.busy && !s.hasIdleTimer) bits.push('(no idle timer)')
-  let line = '  ' + bits.join('  ')
-  if (s.lastUserText) line += `\n      last: ${JSON.stringify(s.lastUserText)}`
-  return line
-}
-
 export function renderStatus(): string {
   const now = Date.now()
-  const cc = getCCDebugSnapshot()
-  const openclawRunning = getOpenClawRunningSessions()
 
   const lines: string[] = []
   lines.push('moi server status')
@@ -106,35 +77,13 @@ export function renderStatus(): string {
   lines.push(`connected tabs  ${getClientCount()}`)
   lines.push('')
 
-  const busy = cc.sessions.filter(s => s.busy).length
-  lines.push(
-    `live CC sessions  ${cc.sessions.length}/${SESSION_LIMITS.maxLive}  ` +
-      `(${busy} busy, ${cc.sessions.length - busy} idle, ${cc.aliases} alias${cc.aliases === 1 ? '' : 'es'}, ` +
-      `idle TTL ${fmtDuration(SESSION_LIMITS.idleTtlMs)})`
-  )
-  if (cc.sessions.length === 0) {
-    lines.push('  (none held in memory — next message will resume from disk)')
-  } else {
-    // Busiest / most-recently-active first.
-    const sorted = [...cc.sessions].sort(
-      (a, b) => Number(b.busy) - Number(a.busy) || b.lastActivityAt - a.lastActivityAt
-    )
-    for (const s of sorted) lines.push(sessionLine(s, now))
+  // One section per harness — each formats its own live-session view.
+  for (const h of allHarnesses()) {
+    const section = h.statusLines?.(now)
+    if (!section?.length) continue
+    lines.push(...section)
+    lines.push('')
   }
-  lines.push('')
-
-  lines.push(`live OpenClaw runs  ${openclawRunning.length}`)
-  for (const r of openclawRunning) {
-    lines.push(`  ▶ busy  ws=${r.workspaceId}  session=${r.sessionId}`)
-  }
-  lines.push('')
-
-  const codexRunning = getCodexRunningSessions()
-  lines.push(`live Codex runs  ${codexRunning.length}`)
-  for (const r of codexRunning) {
-    lines.push(`  ▶ busy  ws=${r.workspaceId}  session=${r.sessionId}`)
-  }
-  lines.push('')
 
   const workers = getWorkersDebugSnapshot()
   lines.push(

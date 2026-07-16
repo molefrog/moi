@@ -5,7 +5,7 @@ import { join, resolve, sep } from 'path'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
 import { DATA_DIR } from './data-dir'
-import { type OpenClawAgent, discoverOpenClawAgents } from './harness/openclaw/discovery'
+import { allHarnesses } from './harness/registry'
 
 // Replace the home-dir prefix with `~` for display. Keeps the original
 // absolute path in place; callers should put the result in `displayPath`.
@@ -138,58 +138,20 @@ export function liftToWorkspaceRoot(p: string): string {
   return segments.slice(0, i).join(sep) || sep
 }
 
-// Discover CC-active directories not yet in the registry
-async function discoverFromCC(registeredPaths: Set<string>): Promise<string[]> {
-  try {
-    const { listSessions } = await import('@anthropic-ai/claude-agent-sdk')
-    const sessions = await listSessions({})
-    const { stat } = await import('node:fs/promises')
-    const paths = new Set<string>()
-
-    for (const s of sessions) {
-      if (!s.cwd || registeredPaths.has(s.cwd)) continue
-      try {
-        const info = await stat(s.cwd)
-        if (info.isDirectory()) paths.add(s.cwd)
-      } catch {}
-    }
-
-    return [...paths]
-  } catch {
-    return []
-  }
-}
-
-// Discover OpenClaw agents via the gateway WebSocket (2s timeout). Returns []
-// if the gateway is unreachable, auth is missing, or probes time out.
-async function discoverFromOpenClaw(registeredPaths: Set<string>): Promise<OpenClawAgent[]> {
-  const agents = await discoverOpenClawAgents()
-  return agents.filter(a => !registeredPaths.has(a.path))
-}
-
+// Ask every harness for workspaces it knows about that aren't registered yet.
+// Precedence: entries from a specific backend (OpenClaw agents, Codex threads)
+// win over Claude Code's generic session-history scan when they claim the
+// same path — CC sessions exist in most directories an agent ever ran in.
 export async function discoverWorkspaces(): Promise<DiscoveredWorkspace[]> {
   const registeredPaths = new Set((await readRegistry()).map(e => e.path))
-  const [ccPaths, openclawAgents] = await Promise.all([
-    discoverFromCC(registeredPaths),
-    discoverFromOpenClaw(registeredPaths)
-  ])
-  const openclawByPath = new Map(openclawAgents.map(a => [a.path, a]))
-  const out: DiscoveredWorkspace[] = []
-  for (const a of openclawAgents) {
-    out.push(
-      withDisplayPath({
-        path: a.path,
-        type: 'openclaw',
-        ...(a.name ? { name: a.name } : {}),
-        ...(a.agentId ? { agentId: a.agentId } : {}),
-        ...(a.isDefault ? { isDefault: a.isDefault } : {}),
-        ...(a.lastRunAt ? { lastRunAt: a.lastRunAt } : {})
-      })
+  const perHarness = await Promise.all(
+    allHarnesses().map(
+      h => h.discoverWorkspaces?.(registeredPaths).catch(() => []) ?? Promise.resolve([])
     )
-  }
-  for (const p of ccPaths) {
-    if (openclawByPath.has(p)) continue
-    out.push(withDisplayPath({ path: p, type: 'claude-code' }))
-  }
-  return out
+  )
+  const found = perHarness.flat()
+  const specific = found.filter(w => w.type !== 'claude-code')
+  const specificPaths = new Set(specific.map(w => w.path))
+  const generic = found.filter(w => w.type === 'claude-code' && !specificPaths.has(w.path))
+  return [...specific, ...generic].map(withDisplayPath)
 }

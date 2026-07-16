@@ -10,17 +10,16 @@ import { join } from 'node:path'
 import type { WorkspaceType } from '@/lib/types'
 export { validateWorkspaceFolderName } from '@/lib/workspace-name'
 
+import { harnessFor } from './harness/registry'
 import { scaffoldMoiDir } from './moi-scaffold'
 import { installBundledSkills } from './skills-template'
 
-// Where each backend loads skills from. Claude Code reads `.claude/skills/`;
-// OpenClaw resolves `<workspace>/skills/` with the highest precedence (it wins
-// over same-named bundled or per-user skills); Codex follows the Agent Skills
-// standard and discovers `.agents/skills/`. An untyped entry is Claude Code.
+// Where each backend loads skills from — the harness owns the answer
+// (Claude Code: `.claude/skills/`; OpenClaw: `<workspace>/skills/`; Codex:
+// `.agents/skills/` per the Agent Skills standard). An untyped entry is
+// Claude Code.
 export function skillsDirFor(workspaceRoot: string, type?: WorkspaceType): string {
-  if (type === 'openclaw') return join(workspaceRoot, 'skills')
-  if (type === 'codex') return join(workspaceRoot, '.agents', 'skills')
-  return join(workspaceRoot, '.claude', 'skills')
+  return harnessFor(type).skillsDir?.(workspaceRoot) ?? join(workspaceRoot, '.claude', 'skills')
 }
 
 // Folder that holds workspaces created from the UI (`/workspace/create`) — a
