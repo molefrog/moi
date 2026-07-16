@@ -17,7 +17,7 @@ import type {
 import { ATTACHMENT_ONLY_PLACEHOLDER, splitAttachmentNote } from './attachment-note'
 
 // Loose SDK message shape — we don't pull in the full SDK type tree; the
-// adapter tolerates missing fields. Reference: dev/sdk-message-spec.md.
+// adapter tolerates missing fields. Reference: docs/harnesses/claude-code-messages.md.
 type ContentBlock = {
   type: string
   text?: string
