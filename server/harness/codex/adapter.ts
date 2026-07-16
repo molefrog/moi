@@ -55,6 +55,9 @@ export type CodexThreadItem = {
   error?: { message?: string } | null
   // webSearch
   query?: string
+  action?: { query?: string | null; queries?: (string | null)[] | null } | null
+  // imageGeneration
+  revisedPrompt?: string | null
   // collabAgentToolCall (tool reused from mcpToolCall above)
   prompt?: string | null
   senderThreadId?: string
@@ -236,6 +239,10 @@ function itemToToolCall(item: CodexThreadItem): ToolCall | null {
       return call
     }
     case 'webSearch': {
+      // A single item can fan out into several queries (`action.queries`).
+      const queries = (item.action?.queries ?? []).filter(
+        (q): q is string => typeof q === 'string' && q.length > 0
+      )
       return {
         toolCallId: item.id,
         name: 'web_search',
@@ -243,7 +250,7 @@ function itemToToolCall(item: CodexThreadItem): ToolCall | null {
         provider: 'codex',
         // webSearch items have no lifecycle status; they appear when done.
         state: 'success',
-        input: { query: item.query }
+        input: { query: item.query, ...(queries.length ? { queries } : {}) }
       }
     }
     case 'plan': {
@@ -313,13 +320,16 @@ function itemToToolCall(item: CodexThreadItem): ToolCall | null {
       }
     }
     case 'imageGeneration': {
+      // `revisedPrompt` is the model's final prompt; the item also carries
+      // `result` — the ENTIRE generated image as base64 (megabytes). Never
+      // fold that into the turn: it would ride every broadcast/replay.
       return {
         toolCallId: item.id,
         name: 'generate_image',
         caller: 'model',
         provider: 'codex',
         state: statusToToolState(item.status),
-        input: { prompt: (item as { prompt?: string }).prompt }
+        input: { ...(item.revisedPrompt ? { prompt: item.revisedPrompt } : {}) }
       }
     }
     default:
