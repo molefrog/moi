@@ -169,7 +169,9 @@ one.get('/view-builders', async c => {
     await getViewList(ws.path),
     activeSessionIds
   )
-  return c.json({ builders })
+  // Widget builders are record-only for now — reconciled server-side but kept
+  // out of the host's view-builder tab list until their UI lands.
+  return c.json({ builders: builders.filter(builder => builder.kind !== 'widget') })
 })
 
 one.post('/view-builders', async c => {

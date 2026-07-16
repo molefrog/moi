@@ -33,12 +33,19 @@ export type ViewInfo = {
 
 export type ViewBuilderStatus = 'draft' | 'building' | 'waiting' | 'ready'
 
+// The kind of an applet — a custom UI unit embedded in a workspace. Shared by
+// the bundler pipeline and the build-status records. On a builder record the
+// field is absent for rows written before it existed; treat a missing kind as
+// 'view' (only views surface in the UI — the view builder page is view-only).
+export type AppletKind = 'view' | 'widget'
+
 export type ViewBuilderInput = {
   requirements: string
 }
 
 export type ViewBuilder = {
   id: string
+  kind?: AppletKind
   status: ViewBuilderStatus
   input: ViewBuilderInput
   sessionId: string
@@ -46,6 +53,9 @@ export type ViewBuilder = {
   title?: string
   icon?: string
   error?: string
+  // Wall-clock ms when this builder last entered `building`. Used by reconcile
+  // to demote a build that has been running too long (a hung/abandoned turn).
+  buildingSince?: number
   createdAt: number
   updatedAt: number
 }

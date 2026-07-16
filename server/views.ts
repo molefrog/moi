@@ -149,7 +149,10 @@ export async function handleBundleViews(
   publish: (msg: unknown) => void,
   workspaceId: string,
   workspacePath: string,
-  force = false
+  force = false,
+  // When set, compile without advancing any view builder to `ready` (the
+  // `moi bundle --no-status` opt-out). The build still publishes `view:updated`.
+  skipStatus = false
 ) {
   const before = await readManifest(workspacePath)
   const beforeBuilt = new Set(await listBuiltViews(workspacePath))
@@ -173,13 +176,15 @@ export async function handleBundleViews(
   for (const r of results) {
     if (r.status === 'built') {
       publish({ type: 'view:updated', name: r.name, config: r.config ?? null })
-      await markViewBuilderReady(
-        workspaceId,
-        workspacePath,
-        r.name,
-        r.config?.title || r.name,
-        r.config?.icon
-      )
+      if (!skipStatus) {
+        await markViewBuilderReady(
+          workspaceId,
+          workspacePath,
+          r.name,
+          r.config?.title || r.name,
+          r.config?.icon
+        )
+      }
       for (const m of r.serverModules ?? []) changedServerModules.add(m)
     }
   }
