@@ -189,6 +189,15 @@ export function HarnessDebugPage() {
       .catch(() => setModels([]))
   }, [workspaceId])
 
+  // Switching workspace targets a different harness — the old thread id is
+  // meaningless there (a codex resume of a Claude session id just errors),
+  // so start a fresh thread.
+  useEffect(() => {
+    setSessionId(crypto.randomUUID())
+    setIsNew(true)
+    setEvents(null)
+  }, [workspaceId])
+
   // Poll the wire tap (the backend's native frames) once a second.
   useEffect(() => {
     if (!workspaceId) return
