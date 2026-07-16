@@ -114,6 +114,18 @@ type SdkMessage = {
   duration_ms?: number
   num_turns?: number
   total_cost_usd?: number
+  // Per-model usage on `result` — the reliable token source (top-level
+  // `usage` has been observed all-zero).
+  modelUsage?: Record<
+    string,
+    {
+      inputTokens?: number
+      outputTokens?: number
+      cacheReadInputTokens?: number
+      cacheCreationInputTokens?: number
+      costUSD?: number
+    } | null
+  >
   state?: string
 }
 
@@ -285,24 +297,38 @@ export class ClaudeAdapter {
       })
       // Fold the turn's token usage into the newest top-level assistant turn
       // so the meta strip can show it (parity with the codex/openclaw
-      // adapters — previously these counts were dropped entirely).
-      const usage = msg.usage
-      if (typeof usage?.input_tokens === 'number' || typeof usage?.output_tokens === 'number') {
+      // adapters — previously these counts were dropped entirely). The
+      // result's top-level `usage` is unreliable (observed all-zero); the
+      // per-model `modelUsage` map carries the real numbers, so sum those
+      // and count cache reads/creation as input (the context the turn
+      // actually processed), falling back to `usage` if absent.
+      let inputTokens = 0
+      let outputTokens = 0
+      let sawUsage = false
+      for (const mu of Object.values(msg.modelUsage ?? {})) {
+        if (!mu || typeof mu !== 'object') continue
+        sawUsage = true
+        inputTokens +=
+          (mu.inputTokens ?? 0) +
+          (mu.cacheReadInputTokens ?? 0) +
+          (mu.cacheCreationInputTokens ?? 0)
+        outputTokens += mu.outputTokens ?? 0
+      }
+      if (!sawUsage && msg.usage) {
+        inputTokens = msg.usage.input_tokens ?? 0
+        outputTokens = msg.usage.output_tokens ?? 0
+        sawUsage = typeof msg.usage.input_tokens === 'number'
+      }
+      if (sawUsage) {
         for (let i = this.turns.length - 1; i >= 0; i--) {
           const t = this.turns[i]
           if (t.role !== 'assistant' || t.parentTaskId) continue
           t.meta = {
             ...t.meta,
             usage: {
-              ...(typeof usage.input_tokens === 'number'
-                ? { inputTokens: usage.input_tokens }
-                : {}),
-              ...(typeof usage.output_tokens === 'number'
-                ? { outputTokens: usage.output_tokens }
-                : {}),
-              ...(typeof usage.input_tokens === 'number' && typeof usage.output_tokens === 'number'
-                ? { totalTokens: usage.input_tokens + usage.output_tokens }
-                : {}),
+              inputTokens,
+              outputTokens,
+              totalTokens: inputTokens + outputTokens,
               ...(typeof msg.total_cost_usd === 'number' ? { costUsd: msg.total_cost_usd } : {})
             }
           }
