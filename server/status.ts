@@ -9,6 +9,7 @@ import { type CCDebugSession, SESSION_LIMITS, getCCDebugSnapshot } from './cc-se
 import { CONTROL_PORT, PORT } from './constants'
 import { debugEnabled } from './debug'
 import { WORKER_LIMITS, type WorkerDebugInfo, getWorkersDebugSnapshot } from './functions'
+import { getCodexRunningSessions } from './codex-session'
 import { getOpenClawRunningSessions } from './openclaw-session'
 import { tildify } from './registry'
 import { getClientCount } from './state'
@@ -120,6 +121,13 @@ export function renderStatus(): string {
 
   lines.push(`live OpenClaw runs  ${openclawRunning.length}`)
   for (const r of openclawRunning) {
+    lines.push(`  ▶ busy  ws=${r.workspaceId}  session=${r.sessionId}`)
+  }
+  lines.push('')
+
+  const codexRunning = getCodexRunningSessions()
+  lines.push(`live Codex runs  ${codexRunning.length}`)
+  for (const r of codexRunning) {
     lines.push(`  ▶ busy  ws=${r.workspaceId}  session=${r.sessionId}`)
   }
   lines.push('')

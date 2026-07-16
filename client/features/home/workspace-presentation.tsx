@@ -1,16 +1,19 @@
 import claudeIcon from '@/client/assets/claude.svg'
+import openaiIcon from '@/client/assets/openai.svg'
 import openclawIcon from '@/client/assets/openclaw.svg'
 import { cn } from '@/client/lib/cn'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
 export const workspaceProviderIcon: Record<WorkspaceType, string> = {
   'claude-code': claudeIcon,
-  openclaw: openclawIcon
+  openclaw: openclawIcon,
+  codex: openaiIcon
 }
 
 export const workspaceTypeLabel: Record<WorkspaceType, string> = {
   'claude-code': 'Claude',
-  openclaw: 'OpenClaw'
+  openclaw: 'OpenClaw',
+  codex: 'Codex'
 }
 
 type WorkspaceTypeIconProps = {

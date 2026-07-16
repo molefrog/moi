@@ -1,8 +1,10 @@
 # Codex — integration research
 
-Research notes on driving OpenAI Codex as a moi harness (July 2026, no code
-yet). Codex exposes **two** programmable surfaces, and they differ enough that
-the choice shapes the whole adapter:
+Research notes on driving OpenAI Codex as a moi harness (July 2026). The
+adapter shipped on the app-server path recommended below — see §5 for what
+implementation against CLI 0.144.5 confirmed/corrected. Codex exposes **two**
+programmable surfaces, and they differ enough that the choice shapes the
+whole adapter:
 
 1. **`@openai/codex-sdk`** (npm, TypeScript) — a thin wrapper that spawns
    `codex exec` as a fresh subprocess per turn.
@@ -21,16 +23,21 @@ Sources: [SDK TypeScript source](https://github.com/openai/codex/tree/main/sdk/t
 ## 1. The exec SDK (`@openai/codex-sdk`)
 
 ```ts
-const codex = new Codex({ env, config })        // env REPLACES process.env, not merged
-const thread = codex.startThread({ model, sandboxMode, workingDirectory,
-                                   modelReasoningEffort, approvalPolicy })
+const codex = new Codex({ env, config }) // env REPLACES process.env, not merged
+const thread = codex.startThread({
+  model,
+  sandboxMode,
+  workingDirectory,
+  modelReasoningEffort,
+  approvalPolicy
+})
 const { events } = await thread.runStreamed(input, { outputSchema, signal })
 ```
 
 - Every `run()`/`runStreamed()` spawns `codex exec` (`resume <threadId>` after
   the first turn) and exits when the turn ends. Thread state persists in
   `~/.codex/sessions`; the in-memory `Thread` is just an id + options.
-- Because each turn is a new process, *every* setting is effectively per-turn
+- Because each turn is a new process, _every_ setting is effectively per-turn
   (`resumeThread(id, newOptions)`) — but there's also no live process to
   interrupt (`AbortSignal` kills it) or steer.
 - Events are **item-level**, not token-level: `thread.started`, `turn.started`,
@@ -145,7 +152,7 @@ all. `thread/settings/update` queues setting changes without starting a turn.
 ### Binary availability (Codex Desktop caveat)
 
 Don't assume Codex Desktop puts `codex` on PATH. The desktop app is a CLI
-*consumer*: it resolves an external codex binary (honoring `CODEX_CLI_PATH`,
+_consumer_: it resolves an external codex binary (honoring `CODEX_CLI_PATH`,
 then PATH) and on first launch can install/update `@openai/codex` with a Node
 runtime bundled inside the app — app-managed, not necessarily a shell-visible
 `codex` command. Officially the CLI is a separate install (`npm i -g
@@ -175,3 +182,31 @@ A Codex harness would look much closer to `openclaw-session.ts` than
 lifecycle, subscribe per thread, map `item/*` notifications onto
 `StreamEvent`s. Capability flags: `liveSettingsPerTurn`, `steering`,
 `interactiveApprovals`, `nativeThreadList`, `imagesInline: 'data-url'`.
+
+## 5. Implementation notes (shipped, CLI 0.144.5)
+
+The adapter landed as `server/codex.ts` (process + stdio JSON-RPC client, one
+app-server per workspace for env injection), `server/codex-adapter.ts` (item →
+`Turn` mapping, hand-written types), and `server/codex-session.ts` (per-thread
+state, steer/interrupt, previews, usage). Empirical findings beyond §2:
+
+- **Always pass absolute `cwd`.** A relative `thread/start.cwd` is resolved
+  against the app-server process cwd, silently nesting paths.
+- **Deltas stream by default** — no opt-in needed; moi's `stream` flag only
+  gates forwarding them as preview frames.
+- **`clientUserMessageId` echo confirmed**: the `userMessage` item carries it
+  as `clientId`, on live frames only. `thread/read` replay _renumbers_ item
+  ids (`item-1`, `item-2`, …) and drops `clientId`, so replayed turn ids never
+  match live ones — harmless under upsert-by-id, but don't key anything
+  durable on them.
+- **`turn/completed` carries no items** (`itemsView: "notLoaded"`); items
+  arrive only via `item/started`/`item/completed`.
+- **The npm `codex` bin is a Node shim** that spawns the platform binary;
+  killing the shim tears down the server via stdin EOF, so no orphans — but
+  binary detection must tolerate shim paths (`CODEX_CLI_PATH` → PATH).
+- **User-level config bleeds in**: threads start MCP servers and hooks from
+  `~/.codex/config.toml` / `hooks.json` per thread; their failures arrive as
+  notifications (`mcpServer/startupStatus/updated`, `hook/completed`) we
+  currently ignore.
+- `thread/start` responses label threads `source: "vscode"` — app-server
+  clients are indistinguishable from the VS Code extension in `thread/list`.

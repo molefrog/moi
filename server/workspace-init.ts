@@ -15,11 +15,12 @@ import { installBundledSkills } from './skills-template'
 
 // Where each backend loads skills from. Claude Code reads `.claude/skills/`;
 // OpenClaw resolves `<workspace>/skills/` with the highest precedence (it wins
-// over same-named bundled or per-user skills). An untyped entry is Claude Code.
+// over same-named bundled or per-user skills); Codex follows the Agent Skills
+// standard and discovers `.agents/skills/`. An untyped entry is Claude Code.
 export function skillsDirFor(workspaceRoot: string, type?: WorkspaceType): string {
-  return type === 'openclaw'
-    ? join(workspaceRoot, 'skills')
-    : join(workspaceRoot, '.claude', 'skills')
+  if (type === 'openclaw') return join(workspaceRoot, 'skills')
+  if (type === 'codex') return join(workspaceRoot, '.agents', 'skills')
+  return join(workspaceRoot, '.claude', 'skills')
 }
 
 // Folder that holds workspaces created from the UI (`/workspace/create`) — a
