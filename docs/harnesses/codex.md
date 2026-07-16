@@ -142,6 +142,17 @@ all. `thread/settings/update` queues setting changes without starting a turn.
 - Typed bindings are generated, version-matched to the installed binary:
   `codex app-server generate-ts --out DIR` (or `generate-json-schema`).
 
+### Binary availability (Codex Desktop caveat)
+
+Don't assume Codex Desktop puts `codex` on PATH. The desktop app is a CLI
+*consumer*: it resolves an external codex binary (honoring `CODEX_CLI_PATH`,
+then PATH) and on first launch can install/update `@openai/codex` with a Node
+runtime bundled inside the app — app-managed, not necessarily a shell-visible
+`codex` command. Officially the CLI is a separate install (`npm i -g
+@openai/codex`, brew, or the standalone installer). The adapter should detect
+the binary: explicit config → `CODEX_CLI_PATH` → `codex` on PATH → error with
+install instructions.
+
 ## 3. Client libraries
 
 - **TypeScript: nothing official.** `@openai/codex-sdk` wraps exec only.
