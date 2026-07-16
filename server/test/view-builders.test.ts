@@ -3,10 +3,11 @@ import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import type { ViewBuilder } from '@/lib/types'
+
 import {
   ViewBuilderError,
   beginViewBuilder,
-  claimViewBuilder,
   createViewBuilder,
   deleteViewBuilder,
   listViewBuilders,
@@ -14,6 +15,7 @@ import {
   markViewBuilderWaitingBySession,
   reconcileViewBuilders,
   renameViewBuilderSession,
+  setBuilder,
   setViewBuilderStorePath,
   updateViewBuilderInput
 } from '../view-builders'
@@ -32,6 +34,23 @@ beforeAll(async () => {
 afterAll(async () => {
   await rm(storeDir, { recursive: true, force: true })
 })
+
+// Backdate a builder's buildingSince directly in the store to simulate a build
+// that has been running longer than the stale threshold (no fake clock needed).
+async function mutateBuildingSince(builderId: string, value: number): Promise<boolean> {
+  const store = JSON.parse(await Bun.file(storePath).text()) as Record<string, ViewBuilder[]>
+  let found = false
+  for (const builders of Object.values(store)) {
+    for (const builder of builders) {
+      if (builder.id === builderId) {
+        builder.buildingSince = value
+        found = true
+      }
+    }
+  }
+  await Bun.write(storePath, JSON.stringify(store, null, 2))
+  return found
+}
 
 describe('view builder storage', () => {
   test('serializes concurrent creates without losing builders', async () => {
@@ -79,50 +98,100 @@ describe('view builder storage', () => {
     const second = builders[1]
     await beginViewBuilder(workspaceId, workspacePath, second.id, 'Another view')
 
-    const claimed = await claimViewBuilder(
-      workspaceId,
-      workspacePath,
-      first.id,
-      'sales-dashboard',
-      'Sales dashboard',
-      'chart'
-    )
+    const claimed = await setBuilder(workspaceId, workspacePath, 'sales-dashboard', {
+      builderId: first.id,
+      title: 'Sales dashboard',
+      icon: 'chart'
+    })
     expect(claimed.viewId).toBe('sales-dashboard')
     expect(claimed.icon).toBe('chart')
 
-    const renamed = await claimViewBuilder(
-      workspaceId,
-      workspacePath,
-      first.id,
-      'sales-dashboard',
-      'Revenue dashboard',
-      'target'
-    )
+    const renamed = await setBuilder(workspaceId, workspacePath, 'sales-dashboard', {
+      builderId: first.id,
+      title: 'Revenue dashboard',
+      icon: 'target'
+    })
     expect(renamed.title).toBe('Revenue dashboard')
     expect(renamed.icon).toBe('target')
+    // A claimed builder can't be re-pointed at a different id.
     await expect(
-      claimViewBuilder(workspaceId, workspacePath, first.id, 'different-id', 'Different', 'file')
+      setBuilder(workspaceId, workspacePath, 'different-id', {
+        builderId: first.id,
+        title: 'Different',
+        icon: 'file'
+      })
     ).rejects.toBeInstanceOf(ViewBuilderError)
+    // Another builder can't claim an id already taken.
     await expect(
-      claimViewBuilder(
-        workspaceId,
-        workspacePath,
-        second.id,
-        'sales-dashboard',
-        'Duplicate',
-        'file'
-      )
+      setBuilder(workspaceId, workspacePath, 'sales-dashboard', {
+        builderId: second.id,
+        title: 'Duplicate',
+        icon: 'file'
+      })
     ).rejects.toBeInstanceOf(ViewBuilderError)
+    // Invalid icon id is rejected.
     await expect(
-      claimViewBuilder(
-        workspaceId,
-        workspacePath,
-        second.id,
-        'another-view',
-        'Another view',
-        'ChartBar'
-      )
+      setBuilder(workspaceId, workspacePath, 'another-view', {
+        builderId: second.id,
+        title: 'Another view',
+        icon: 'ChartBar'
+      })
     ).rejects.toBeInstanceOf(ViewBuilderError)
+  })
+
+  test('creates a standalone widget builder keyed by applet id and stamps buildingSince', async () => {
+    const created = await setBuilder(workspaceId, workspacePath, 'sales-widget', {
+      kind: 'widget',
+      status: 'building',
+      title: 'Sales widget'
+    })
+    expect(created.kind).toBe('widget')
+    expect(created.viewId).toBe('sales-widget')
+    expect(created.status).toBe('building')
+    expect(created.buildingSince).toBeGreaterThan(0)
+
+    // A second call with the same id upserts the existing record, not a new one.
+    const updated = await setBuilder(workspaceId, workspacePath, 'sales-widget', {
+      kind: 'widget',
+      title: 'Revenue widget'
+    })
+    expect(updated.id).toBe(created.id)
+    expect(updated.title).toBe('Revenue widget')
+
+    const stored = await listViewBuilders(workspacePath)
+    expect(stored.filter(builder => builder.viewId === 'sales-widget')).toHaveLength(1)
+
+    // Hand it back so it can be discarded (a building builder can't be), and
+    // clear it from the shared store before the later reconcile tests run.
+    const parked = await setBuilder(workspaceId, workspacePath, 'sales-widget', {
+      kind: 'widget',
+      status: 'waiting'
+    })
+    expect(parked.status).toBe('waiting')
+    await deleteViewBuilder(workspaceId, workspacePath, created.id)
+  })
+
+  test('a stale buildingSince demotes a build even with a live session', async () => {
+    const draft = (await listViewBuilders(workspacePath)).find(
+      builder => builder.status === 'draft'
+    )
+    if (!draft) throw new Error('expected a draft builder')
+    await beginViewBuilder(workspaceId, workspacePath, draft.id, 'Hung build')
+    const building = (await listViewBuilders(workspacePath)).find(
+      builder => builder.id === draft.id
+    )
+    expect(building?.status).toBe('building')
+
+    // Session is "live", but the build has been running far too long.
+    const stale = await mutateBuildingSince(draft.id, Date.now() - 20 * 60_000)
+    expect(stale).toBe(true)
+    const reconciled = await reconcileViewBuilders(
+      workspaceId,
+      workspacePath,
+      [],
+      new Set([draft.sessionId])
+    )
+    expect(reconciled.find(builder => builder.id === draft.id)?.status).toBe('waiting')
   })
 
   test('follows session renames and moves between waiting and building', async () => {

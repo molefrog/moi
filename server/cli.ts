@@ -403,6 +403,11 @@ const bundle = defineCommand({
     only: {
       type: 'string',
       description: 'Narrow the build to "widgets" or "views" (default: both)'
+    },
+    status: {
+      type: 'boolean',
+      description: 'Advance a view builder to ready on success (use --no-status to skip)',
+      default: true
     }
   },
   async run({ args }) {
@@ -413,7 +418,15 @@ const bundle = defineCommand({
     const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
 
     ws.onopen = () =>
-      ws.send(JSON.stringify({ type: 'bundle', path, force: args.force, only: args.only }))
+      ws.send(
+        JSON.stringify({
+          type: 'bundle',
+          path,
+          force: args.force,
+          only: args.only,
+          noStatus: !args.status
+        })
+      )
 
     ws.onmessage = event => {
       const res = JSON.parse(String(event.data))
@@ -480,17 +493,22 @@ const bundle = defineCommand({
   }
 })
 
-const viewBuilderClaim = defineCommand({
-  meta: { name: 'claim', description: 'Claim the id, title, and icon for a view builder' },
+const builderSet = defineCommand({
+  meta: { name: 'set', description: 'Set a view or widget builder id, status, title, and icon' },
   args: {
-    builder: { type: 'string', required: true, description: 'View builder id' },
-    id: { type: 'string', required: true, description: 'Stable view id' },
-    title: { type: 'string', required: true, description: 'View title' },
-    icon: { type: 'string', required: true, description: 'App icon registry id' },
+    id: { type: 'positional', required: true, description: 'View or widget id' },
     dir: {
       type: 'positional',
       default: '.',
       description: 'Workspace directory (default: current)'
+    },
+    kind: { type: 'string', default: 'view', description: '"view" or "widget"' },
+    status: { type: 'string', description: 'Report build state: "building" or "waiting"' },
+    title: { type: 'string', description: 'Display title' },
+    icon: { type: 'string', description: 'App icon registry id' },
+    builder: {
+      type: 'string',
+      description: 'Builder handle for a pending view builder (from its request)'
     }
   },
   run({ args }) {
@@ -499,12 +517,14 @@ const viewBuilderClaim = defineCommand({
     ws.onopen = () =>
       ws.send(
         JSON.stringify({
-          type: 'view-builder:claim',
+          type: 'builder:set',
           path,
-          builder: args.builder,
           id: args.id,
+          kind: args.kind,
+          status: args.status,
           title: args.title,
-          icon: args.icon
+          icon: args.icon,
+          builder: args.builder
         })
       )
     ws.onmessage = event => {
@@ -517,7 +537,7 @@ const viewBuilderClaim = defineCommand({
       console.log(
         '\n' +
           pc.green('✓') +
-          ' View builder claimed ' +
+          ' Builder set ' +
           pc.bold(String(result.builder?.viewId ?? args.id)) +
           '\n'
       )
@@ -531,9 +551,9 @@ const viewBuilderClaim = defineCommand({
   }
 })
 
-const viewBuilder = defineCommand({
-  meta: { name: 'view-builder', description: 'Manage an active view builder' },
-  subCommands: { claim: viewBuilderClaim }
+const builder = defineCommand({
+  meta: { name: 'builder', description: 'Manage a view or widget builder' },
+  subCommands: { set: builderSet }
 })
 
 const refresh = defineCommand({
@@ -1786,7 +1806,7 @@ const main = defineCommand({
     init,
     start,
     bundle,
-    'view-builder': viewBuilder,
+    builder,
     refresh,
     theme,
     config,

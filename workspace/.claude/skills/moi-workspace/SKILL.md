@@ -269,14 +269,15 @@ id, a clear sentence-case title, and a relevant icon from the requirements. Capi
 first word of the title. Your first action must claim them:
 
 ```sh
-moi view-builder claim --builder <builder-id> --id <view-id> --title "<title>" --icon <icon-id>
+moi builder set <view-id> --builder <builder-id> --kind view --title "<title>" --icon <icon-id>
 ```
 
 Choose the icon id from the available view icons in the hidden context. The id must use lowercase
-letters, numbers, `_`, or `-`. The first claim locks the id; running the same claim again may update
-its title and icon. After the claim, write `.moi/views/<view-id>.tsx`, use the same icon id in its
+letters, numbers, `_`, or `-`. The first call locks the id; running the same command again may update
+its title and icon. After claiming, write `.moi/views/<view-id>.tsx`, use the same icon id in its
 config, and finish with `moi bundle --only views`. The tab uses the claimed title and icon while you
-work and changes into the built view after a successful bundle.
+work and changes into the built view after a successful bundle. (Bundling marks the view ready; the
+build state is otherwise server-managed, so you never set it to done by hand.)
 
 ```ts
 export const config = {

@@ -15,7 +15,7 @@ describe('view builder message metadata', () => {
     expect(content).toContain('Your first action must be')
     expect(content).toContain('sentence-case title')
     expect(content).toContain('Capitalize only the first word')
-    expect(content).toContain('moi view-builder claim --builder builder-123')
+    expect(content).toContain('moi builder set <view-id> --builder builder-123 --kind view')
     expect(content).toContain('--icon <icon-id>')
     expect(content).toContain('before reading files')
     expect(stripViewBuilderMeta(content)).toBe('Build a project tracker')

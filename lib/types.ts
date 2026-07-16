@@ -33,12 +33,17 @@ export type ViewInfo = {
 
 export type ViewBuilderStatus = 'draft' | 'building' | 'waiting' | 'ready'
 
+// The two applet kinds a builder can track. Absent on records written before
+// the field existed — treat a missing kind as 'view'.
+export type ViewBuilderKind = 'view' | 'widget'
+
 export type ViewBuilderInput = {
   requirements: string
 }
 
 export type ViewBuilder = {
   id: string
+  kind?: ViewBuilderKind
   status: ViewBuilderStatus
   input: ViewBuilderInput
   sessionId: string
@@ -46,6 +51,9 @@ export type ViewBuilder = {
   title?: string
   icon?: string
   error?: string
+  // Wall-clock ms when this builder last entered `building`. Used by reconcile
+  // to demote a build that has been running too long (a hung/abandoned turn).
+  buildingSince?: number
   createdAt: number
   updatedAt: number
 }

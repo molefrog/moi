@@ -15,8 +15,13 @@ import { relayScratchOp } from './scratchpad-relay'
 import { broadcastAll } from './state'
 import { applyThemeUpdate, matchColorTheme } from './theme'
 import { handleBundle } from './widgets'
-import { handleBundleViews, hasViewId } from './views'
-import { ViewBuilderError, claimViewBuilder, listViewBuilders } from './view-builders'
+import { getViewList, handleBundleViews, hasViewId } from './views'
+import {
+  ViewBuilderError,
+  listViewBuilders,
+  reconcileViewBuilders,
+  setBuilder
+} from './view-builders'
 import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
 
 type ControlSocket = { send(data: string): void }
@@ -84,6 +89,9 @@ export const control = Bun.serve({
           if (!match) return
           const workspacePath = match.path
           const force = !!data.force
+          // `--no-status`: compile without advancing any view builder to `ready`
+          // (status stays whatever the agent last reported).
+          const skipStatus = data.noStatus === true
           // `only` narrows to one kind; default builds both. Results carry a
           // `kind` so the CLI can label each row.
           const only = data.only === 'widgets' || data.only === 'views' ? data.only : undefined
@@ -104,7 +112,8 @@ export const control = Bun.serve({
                 publishEvent,
                 match.id,
                 workspacePath,
-                force
+                force,
+                skipStatus
               )) {
                 results.push({ kind: 'view', name: r.name, status: r.status, error: r.error })
               }
@@ -114,27 +123,29 @@ export const control = Bun.serve({
           return
         }
 
-        if (data.type === 'view-builder:claim') {
+        if (data.type === 'builder:set') {
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
+          const appletId = typeof data.id === 'string' ? data.id.trim() : ''
           const builderId = typeof data.builder === 'string' ? data.builder.trim() : ''
-          const viewId = typeof data.id === 'string' ? data.id.trim() : ''
-          const title = typeof data.title === 'string' ? data.title.trim() : ''
-          const icon = typeof data.icon === 'string' ? data.icon.trim() : ''
-          if (!builderId || !viewId || !title || !icon) {
-            ws.send(JSON.stringify({ error: 'Builder, view id, title, and icon are required' }))
+          const kind = data.kind === 'widget' ? 'widget' : 'view'
+          const status =
+            data.status === 'building' || data.status === 'waiting' ? data.status : undefined
+          const title = typeof data.title === 'string' ? data.title.trim() : undefined
+          const icon = typeof data.icon === 'string' ? data.icon.trim() : undefined
+          if (!appletId) {
+            ws.send(JSON.stringify({ error: 'A view or widget id is required' }))
             return
           }
-          if (!/^[a-z0-9][a-z0-9_-]*$/.test(viewId)) {
+          if (!/^[a-z0-9][a-z0-9_-]*$/.test(appletId)) {
             ws.send(
               JSON.stringify({
-                error:
-                  'View id must start with a lowercase letter or number and use a-z, 0-9, _, or -'
+                error: 'Id must start with a lowercase letter or number and use a-z, 0-9, _, or -'
               })
             )
             return
           }
-          if (!/^[a-z0-9][a-z0-9-]*$/.test(icon)) {
+          if (icon && !/^[a-z0-9][a-z0-9-]*$/.test(icon)) {
             ws.send(
               JSON.stringify({
                 error: 'Icon must start with a lowercase letter or number and use a-z, 0-9, or -'
@@ -143,27 +154,29 @@ export const control = Bun.serve({
             return
           }
           try {
-            const current = (await listViewBuilders(match.path)).find(
-              builder => builder.id === builderId
-            )
-            if (current?.viewId !== viewId && (await hasViewId(match.path, viewId))) {
-              ws.send(JSON.stringify({ error: `View id "${viewId}" already exists` }))
-              return
+            // A view can't claim an id that already exists on disk (unless this
+            // builder already owns it). Widgets live in a separate namespace.
+            if (kind === 'view') {
+              const current = (await listViewBuilders(match.path)).find(builder =>
+                builderId ? builder.id === builderId : builder.viewId === appletId
+              )
+              if (current?.viewId !== appletId && (await hasViewId(match.path, appletId))) {
+                ws.send(JSON.stringify({ error: `View id "${appletId}" already exists` }))
+                return
+              }
             }
-            const builder = await claimViewBuilder(
-              match.id,
-              match.path,
-              builderId,
-              viewId,
+            const builder = await setBuilder(match.id, match.path, appletId, {
+              builderId: builderId || undefined,
+              kind,
+              status,
               title,
               icon
-            )
+            })
             ws.send(JSON.stringify({ ok: true, builder, workspacePath: match.path }))
           } catch (err) {
             ws.send(
               JSON.stringify({
-                error:
-                  err instanceof ViewBuilderError ? err.message : 'Could not claim view builder'
+                error: err instanceof ViewBuilderError ? err.message : 'Could not set builder'
               })
             )
           }
@@ -319,3 +332,23 @@ export const control = Bun.serve({
     }
   }
 })
+
+// On boot, correct any builder a previous process left mid-flight. With no live
+// sessions yet, a persisted `building` record is by definition stale, so
+// reconcile hands it back to `waiting` — or promotes it to `ready` if its view
+// actually reached disk. GET-time reconcile would eventually do this too, but
+// only once a client reopens the workspace; this makes the stored state correct
+// even if no one does.
+async function reconcileBuildersOnBoot(): Promise<void> {
+  const workspaces = await listWorkspaces()
+  await Promise.all(
+    workspaces.map(async entry => {
+      try {
+        await reconcileViewBuilders(entry.id, entry.path, await getViewList(entry.path), new Set())
+      } catch (err) {
+        console.error('[control] boot reconcile failed', entry.path, err)
+      }
+    })
+  )
+}
+void reconcileBuildersOnBoot()

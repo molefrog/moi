@@ -13,7 +13,7 @@ export function appendViewBuilderMeta(
     `Builder id: ${builderId}`,
     `Available view icons: ${availableIcons.join(', ')}`,
     'Your first action must be to infer a stable view id, sentence-case title, and relevant icon from the requirements, then run:',
-    `moi view-builder claim --builder ${builderId} --id <view-id> --title "<title>" --icon <icon-id>`,
+    `moi builder set <view-id> --builder ${builderId} --kind view --title "<title>" --icon <icon-id>`,
     'Do this before reading files, planning, or writing code. Choose the icon id from the available view icons above.',
     'Capitalize only the first word of the title.',
     'Use the same icon id in the view config.',
