@@ -1,7 +1,7 @@
 import { mkdir, rename } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import type { ViewBuilder, ViewBuilderKind, ViewInfo } from '@/lib/types'
+import type { AppletKind, ViewBuilder, ViewInfo } from '@/lib/types'
 
 import { DATA_DIR } from './data-dir'
 import { publishEvent } from './events'
@@ -172,7 +172,7 @@ type SetBuilderInput = {
   // into the agent's prompt). Omitted for a standalone/widget build, which is
   // then keyed and upserted by its applet id.
   builderId?: string
-  kind?: ViewBuilderKind
+  kind?: AppletKind
   // The states the agent reports first-hand. `ready` is never accepted here —
   // it stays server-derived from the compiled applet (bundle + reconcile).
   status?: 'building' | 'waiting'
@@ -195,15 +195,19 @@ export async function setBuilder(
   if (input.icon !== undefined && !/^[a-z0-9][a-z0-9-]*$/.test(input.icon)) {
     throw new ViewBuilderError('Invalid view icon id', 400)
   }
+  // Views and widgets are separate applet namespaces, so an id is only unique
+  // within a kind — a view and a widget may both be called "stats".
+  const kind: AppletKind = input.kind ?? 'view'
+  const sameApplet = (candidate: ViewBuilder) =>
+    candidate.viewId === appletId && (candidate.kind ?? 'view') === kind
   const builder = await mutateBuilders(workspacePath, builders => {
     const index = input.builderId
       ? builders.findIndex(candidate => candidate.id === input.builderId)
-      : builders.findIndex(candidate => candidate.viewId === appletId)
+      : builders.findIndex(sameApplet)
     if (input.builderId && index === -1) {
       throw new ViewBuilderError('View builder not found', 404)
     }
-    // The applet id is unique across builders in a workspace.
-    const clash = builders.find((candidate, i) => i !== index && candidate.viewId === appletId)
+    const clash = builders.find((candidate, i) => i !== index && sameApplet(candidate))
     if (clash) throw new ViewBuilderError(`View id "${appletId}" is already claimed`, 409)
 
     if (index === -1) {
@@ -212,7 +216,7 @@ export async function setBuilder(
       const status = input.status ?? 'building'
       const created: ViewBuilder = {
         id: crypto.randomUUID(),
-        kind: input.kind ?? 'view',
+        kind,
         status,
         input: { requirements: '' },
         sessionId: crypto.randomUUID(),

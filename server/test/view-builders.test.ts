@@ -171,6 +171,37 @@ describe('view builder storage', () => {
     await deleteViewBuilder(workspaceId, workspacePath, created.id)
   })
 
+  test('a view and a widget may share an applet id without clashing', async () => {
+    const view = await setBuilder(workspaceId, workspacePath, 'shared-id', {
+      kind: 'view',
+      title: 'Shared view',
+      icon: 'chart'
+    })
+    const widget = await setBuilder(workspaceId, workspacePath, 'shared-id', {
+      kind: 'widget',
+      title: 'Shared widget'
+    })
+    expect(view.id).not.toBe(widget.id)
+    expect(view.kind).toBe('view')
+    expect(widget.kind).toBe('widget')
+
+    // Setting the widget again resolves to the widget record, not the view.
+    const again = await setBuilder(workspaceId, workspacePath, 'shared-id', {
+      kind: 'widget',
+      title: 'Shared widget v2'
+    })
+    expect(again.id).toBe(widget.id)
+    expect(again.title).toBe('Shared widget v2')
+
+    for (const id of [view.id, widget.id]) {
+      await setBuilder(workspaceId, workspacePath, 'shared-id', {
+        kind: id === view.id ? 'view' : 'widget',
+        status: 'waiting'
+      })
+      await deleteViewBuilder(workspaceId, workspacePath, id)
+    }
+  })
+
   test('a stale buildingSince demotes a build even with a live session', async () => {
     const draft = (await listViewBuilders(workspacePath)).find(
       builder => builder.status === 'draft'

@@ -33,9 +33,11 @@ export type ViewInfo = {
 
 export type ViewBuilderStatus = 'draft' | 'building' | 'waiting' | 'ready'
 
-// The two applet kinds a builder can track. Absent on records written before
-// the field existed — treat a missing kind as 'view'.
-export type ViewBuilderKind = 'view' | 'widget'
+// The kind of an applet — a custom UI unit embedded in a workspace. Shared by
+// the bundler pipeline and the build-status records. On a builder record the
+// field is absent for rows written before it existed; treat a missing kind as
+// 'view' (only views surface in the UI — the view builder page is view-only).
+export type AppletKind = 'view' | 'widget'
 
 export type ViewBuilderInput = {
   requirements: string
@@ -43,7 +45,7 @@ export type ViewBuilderInput = {
 
 export type ViewBuilder = {
   id: string
-  kind?: ViewBuilderKind
+  kind?: AppletKind
   status: ViewBuilderStatus
   input: ViewBuilderInput
   sessionId: string
