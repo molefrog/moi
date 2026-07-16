@@ -1,7 +1,9 @@
-# Claude Agent SDK — message spec & UI-abstraction notes
+# Claude Code (Agent SDK) — message spec & UI-abstraction notes
 
-Research for planning a message-display abstraction that fixes current rendering bugs
-and leaves room for non-Claude agents. Evidence drawn from:
+The wire format the Claude Code harness emits and how it maps onto our
+display abstraction (`lib/format.ts`, implemented by `lib/claude-adapter.ts`).
+Originally research for the message-display abstraction; kept as the reference
+spec for the CC adapter. Evidence drawn from:
 
 - Upstream types: `node_modules/@anthropic-ai/claude-agent-sdk/sdk.d.ts`
 - Upstream nested content types: `node_modules/@anthropic-ai/sdk/resources/beta/messages/messages.d.ts`
