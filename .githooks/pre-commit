@@ -10,3 +10,6 @@ bun run lint:fix
 bun run format
 files=$(git diff --cached --name-only --diff-filter=d)
 [ -n "$files" ] && git add -- $files
+# The && above returns 1 when nothing is staged (empty-diff commits, e.g.
+# merges) — don't let that abort the commit.
+exit 0

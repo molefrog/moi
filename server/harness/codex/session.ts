@@ -16,7 +16,7 @@
 //     `clientUserMessageId` as `clientId`, so the optimistic-id rendezvous is
 //     first-class (no text matching like OpenClaw needs).
 import { appendAttachmentNote } from '@/lib/attachment-note'
-import { type Part, applyEvent, emptyViewState } from '@/lib/format'
+import { type Part, type SubagentRecord, type Turn, applyEvent, emptyViewState } from '@/lib/format'
 import type { StreamEvent, ViewState } from '@/lib/types'
 
 import {
@@ -48,6 +48,14 @@ const APPROVAL_POLICY = 'never'
 
 type CodexUserInputItem = { type: 'text'; text: string } | { type: 'image'; url: string }
 
+// A child agent thread nested under this session (Codex multi-agent): the
+// child's items stream on the same connection under its own threadId, and we
+// fold them into a SubagentRecord on the parent's `subagent_activity` card.
+type ChildThread = {
+  toolCallId: string // the parent card carrying the nested transcript
+  record: SubagentRecord
+}
+
 type SessionRecord = {
   workspaceId: string
   workspacePath: string
@@ -63,6 +71,8 @@ type SessionRecord = {
   // Usage from `thread/tokenUsage/updated`, folded into the last assistant
   // turn when the turn completes.
   lastUsage: CodexTokenUsage | null
+  // Child agent threads keyed by their thread id (see ChildThread).
+  children: Map<string, ChildThread>
   unsubscribe?: () => void
 }
 
@@ -104,11 +114,81 @@ function emitTurnEvent(rec: SessionRecord, ev: StreamEvent) {
 function ingestItem(rec: SessionRecord, item: CodexThreadItem) {
   const turn = codexItemToTurn(item, rec.sessionId)
   if (turn) {
+    // subAgentActivity announces a child agent thread: register it so its
+    // item stream (arriving under `agentThreadId`) nests into this card's
+    // SubagentRecord, CC-style.
+    if (item.type === 'subAgentActivity' && item.agentThreadId) {
+      const existing = rec.children.get(item.agentThreadId)
+      const child: ChildThread = existing ?? {
+        toolCallId: item.id,
+        record: {
+          taskId: item.agentThreadId,
+          description: item.agentPath?.split('/').pop() || 'sub-agent',
+          progress: [],
+          status: 'running',
+          transcript: []
+        }
+      }
+      if (item.kind === 'completed' || item.kind === 'closed') child.record.status = 'completed'
+      if (item.kind === 'failed') child.record.status = 'failed'
+      rec.children.set(item.agentThreadId, child)
+      attachSubagent(turn, child.record)
+    }
     emitTurnEvent(rec, { kind: 'turn', turn })
     return
   }
   const notice = codexItemToNotice(item, rec.sessionId)
   if (notice) emitTurnEvent(rec, { kind: 'notice', notice })
+}
+
+// Fold the child's SubagentRecord into the tool-call part of its parent card.
+function attachSubagent(turn: Turn, record: SubagentRecord) {
+  const part = turn.parts.find(p => p.type === 'tool-call')
+  if (part?.type === 'tool-call') part.call.subagent = record
+}
+
+// A child-thread notification: upsert the child's items into its
+// SubagentRecord transcript and re-emit the parent card so the nested lane
+// updates live.
+function handleChildNotification(
+  rec: SessionRecord,
+  child: ChildThread,
+  childThreadId: string,
+  method: string,
+  params: Record<string, unknown>
+) {
+  if (method === 'item/started' || method === 'item/completed') {
+    const item = params.item as CodexThreadItem | undefined
+    if (!item) return
+    const turn = codexItemToTurn(item, childThreadId)
+    if (!turn) return
+    const idx = child.record.transcript.findIndex(t => t.id === turn.id)
+    if (idx >= 0) child.record.transcript[idx] = turn
+    else child.record.transcript.push(turn)
+    // Progress: keep the latest assistant text as the "what it's doing" line.
+    if (method === 'item/completed' && item.type === 'agentMessage' && item.text) {
+      child.record.progress = [item.text.slice(0, 200)]
+    }
+  } else if (method === 'thread/tokenUsage/updated') {
+    const usage = (params.tokenUsage ?? null) as CodexTokenUsage | null
+    if (usage?.total?.totalTokens !== undefined) {
+      child.record.usage = { ...child.record.usage, totalTokens: usage.total.totalTokens }
+    }
+  } else if (method === 'turn/completed') {
+    const turn = params.turn as CodexTurn | undefined
+    if (turn?.status === 'failed') child.record.status = 'failed'
+    else if (child.record.status === 'running') child.record.status = 'completed'
+  } else {
+    return
+  }
+  // Re-emit the parent card so the nested transcript renders live.
+  const owner = rec.view.turns.find(t =>
+    t.parts.some(p => p.type === 'tool-call' && p.call.toolCallId === child.toolCallId)
+  )
+  if (owner) {
+    attachSubagent(owner, child.record)
+    emitTurnEvent(rec, { kind: 'turn', turn: owner })
+  }
 }
 
 function forwardPreview(
@@ -163,6 +243,13 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
     sessions.delete(recKey(rec.workspaceId, rec.sessionId))
     return
   }
+  // Child agent threads stream on the same connection under their own ids —
+  // route them into the parent's SubagentRecord.
+  if (typeof params.threadId === 'string' && params.threadId !== rec.sessionId) {
+    const child = rec.children.get(params.threadId)
+    if (child) handleChildNotification(rec, child, params.threadId, method, params)
+    return
+  }
   if (params.threadId !== rec.sessionId) return
 
   switch (method) {
@@ -213,6 +300,64 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
       }
       return
     }
+    // Codex hooks (~/.codex/hooks.json) — surface as hook notices, parity
+    // with Claude Code's. started/completed share a notice id so the row
+    // upserts from "started" to its outcome.
+    case 'hook/started':
+    case 'hook/completed': {
+      const run = params.run as
+        | {
+            id?: string
+            eventName?: string
+            status?: string
+            entries?: { kind?: string; text?: string }[]
+          }
+        | undefined
+      if (!run?.id) return
+      const output = (run.entries ?? [])
+        .map(e => e.text)
+        .filter(Boolean)
+        .join('\n')
+      emitTurnEvent(rec, {
+        kind: 'notice',
+        notice: {
+          id: `codex:${rec.sessionId}:hook:${run.id}`,
+          kind: 'hook',
+          at: new Date().toISOString(),
+          hookId: run.id,
+          hookName: run.eventName ?? 'hook',
+          event: run.eventName ?? '',
+          status: method === 'hook/started' ? 'started' : 'response',
+          ...(output ? { output } : {}),
+          ...(method === 'hook/completed'
+            ? { outcome: run.status === 'failed' ? ('error' as const) : ('success' as const) }
+            : {})
+        }
+      })
+      return
+    }
+    // A per-thread MCP server that failed to start — surface it instead of
+    // silently dropping (reuses the hook notice shape; a dedicated notice
+    // kind isn't worth a lib/format extension yet).
+    case 'mcpServer/startupStatus/updated': {
+      if (params.status !== 'failed') return
+      const name = typeof params.name === 'string' ? params.name : 'mcp'
+      emitTurnEvent(rec, {
+        kind: 'notice',
+        notice: {
+          id: `codex:${rec.sessionId}:mcp:${name}`,
+          kind: 'hook',
+          at: new Date().toISOString(),
+          hookId: `mcp:${name}`,
+          hookName: `MCP ${name}`,
+          event: 'mcpServerStartup',
+          status: 'response',
+          outcome: 'error',
+          ...(typeof params.error === 'string' ? { output: params.error } : {})
+        }
+      })
+      return
+    }
   }
 }
 
@@ -231,6 +376,7 @@ function createRecord(input: {
     processing: false,
     stream: false,
     previews: new Map(),
+    children: new Map(),
     lastUsage: null
   }
   rec.unsubscribe = input.client.onNotification((method, params) =>
