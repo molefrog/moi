@@ -30,11 +30,16 @@ type SidebarLayoutProps = {
   // <PanelHeader>) and body.
   children?: ReactNode
   panel?: 'default' | 'flat'
+  showWorkspaces?: boolean
 }
 
 // App shell: a slim icon rail beside the page content. The page owns the panel's
 // header and body.
-export function SidebarLayout({ children, panel = 'default' }: SidebarLayoutProps) {
+export function SidebarLayout({
+  children,
+  panel = 'default',
+  showWorkspaces = true
+}: SidebarLayoutProps) {
   const { data: workspaces } = useWorkspaces()
 
   // `moi config` / the settings modal broadcast `workspace:updated` (identity
@@ -51,7 +56,7 @@ export function SidebarLayout({ children, panel = 'default' }: SidebarLayoutProp
 
   return (
     <div className="flex h-dvh bg-muted">
-      <Sidebar workspaces={workspaces ?? []} />
+      <Sidebar workspaces={showWorkspaces ? (workspaces ?? []) : []} />
       <main
         className={cn(
           'flex min-w-0 flex-1 flex-col overflow-hidden',

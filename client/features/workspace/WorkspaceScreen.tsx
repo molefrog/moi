@@ -55,7 +55,7 @@ const Scratchpad = lazy(() =>
 // Tab label for a view: its configured title, or the file-name id as fallback.
 const viewLabel = (v: ViewInfo) => v.config.title || v.id
 
-const viewBuilderIcon = (builder: ViewBuilder) => resolveAppIcon(builder.icon) ?? IconBrowserPlus
+const viewBuilderIcon = (builder: ViewBuilder) => resolveAppIcon(builder.icon) ?? IconArticle
 
 function viewIcon(view: ViewInfo, builders: ViewBuilder[]) {
   const builder = builders.find(candidate => candidate.viewId === view.id)
