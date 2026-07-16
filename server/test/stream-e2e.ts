@@ -28,7 +28,7 @@ import {
   interruptCCSession,
   killAllCCSessions,
   sendCCMessage
-} from '../cc-session'
+} from '../harness/claude-code/session'
 import { getWorkspace, registerWorkspace, setRegistryPath } from '../registry'
 import { addClient, removeClient } from '../state'
 import { setThreadConfigPath } from '../thread-config'

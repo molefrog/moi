@@ -5,7 +5,7 @@ import { join, resolve, sep } from 'path'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
 import { DATA_DIR } from './data-dir'
-import { type OpenClawAgent, discoverOpenClawAgents } from './openclaw'
+import { type OpenClawAgent, discoverOpenClawAgents } from './harness/openclaw/discovery'
 
 // Replace the home-dir prefix with `~` for display. Keeps the original
 // absolute path in place; callers should put the result in `displayPath`.

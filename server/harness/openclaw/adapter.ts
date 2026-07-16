@@ -24,8 +24,8 @@ import type {
   OpenClawMessage,
   OpenClawSessionDetail,
   OpenClawSessionRow
-} from './openclaw'
-import { stripUserMessageMetadata } from './openclaw-strip'
+} from './discovery'
+import { stripUserMessageMetadata } from './strip'
 
 export function toSessionInfo(row: OpenClawSessionRow, cwd: string): SessionInfo {
   const summary =

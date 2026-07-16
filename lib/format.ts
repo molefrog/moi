@@ -1,5 +1,5 @@
 // Display-only conversation format. Agent-agnostic.
-// Source: docs/harnesses/claude-code-messages.md §14 (and the research PDF under dev/report).
+// Source: server/harness/README.md (format section; formerly claude-code-messages.md §14) (and the research PDF under dev/report).
 // Built at ingest time from an agent's raw stream (today: Claude Agent SDK).
 
 export type ToolCaller = 'model' | 'server-tool' | 'mcp' | 'subagent'

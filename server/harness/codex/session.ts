@@ -27,17 +27,17 @@ import {
   codexItemToNotice,
   codexItemToTurn,
   codexThreadToEvents
-} from './codex-adapter'
-import { type CodexClient, getCodexClient } from './codex'
-import { debug } from './debug'
-import { broadcast } from './state'
-import { hasThreadConfig, renameThreadConfig, saveThreadConfig } from './thread-config'
+} from './adapter'
+import { type CodexClient, getCodexClient } from './client'
+import { debug } from '../../debug'
+import { broadcast } from '../../state'
+import { hasThreadConfig, renameThreadConfig, saveThreadConfig } from '../../thread-config'
 import {
   type StoredUpload,
   materializeToPath,
   resolveUploads,
   uploadToDisplayPart
-} from './uploads'
+} from '../../uploads'
 
 // moi's trust model matches Claude Code's `bypassPermissions`: the agent acts
 // autonomously in the workspace. Codex expresses that as full sandbox access

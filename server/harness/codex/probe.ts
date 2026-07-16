@@ -2,7 +2,7 @@
 // raw harness without moi in the loop. Complements /playground/codex (which
 // debugs the full server → client pipeline); use this when you need to poke
 // the protocol itself: try params, watch notifications, verify a claim in
-// docs/harnesses/codex.md.
+// ./NOTES.md.
 //
 // Usage:
 //   bun scripts/codex-probe.ts chat  [cwd] "prompt"   — thread/start + one turn

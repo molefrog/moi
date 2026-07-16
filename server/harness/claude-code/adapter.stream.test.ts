@@ -8,8 +8,8 @@
 // bleed into each other — exactly the case the per-message-id design targets.
 import { describe, expect, test } from 'bun:test'
 
-import { ClaudeAdapter } from './claude-adapter'
-import type { AdapterEmit, StreamPreview } from './format'
+import { ClaudeAdapter } from './adapter'
+import type { AdapterEmit, StreamPreview } from '@/lib/format'
 
 // --- synthetic SDK message builders (match the real wire shapes) ------------
 

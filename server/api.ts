@@ -13,36 +13,40 @@ import type {
 } from '@/lib/types'
 import { appendViewBuilderMeta } from '@/lib/view-builder-meta'
 
-import { getClaudeModels } from './agent'
+import { getClaudeModels } from './harness/claude-code/models'
 import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from './applets'
-import { getCCRunningSessions, sendCCMessage } from './cc-session'
+import { getCCRunningSessions, sendCCMessage } from './harness/claude-code/session'
 import { applyEnvChanged } from './env-apply'
 import { publishEvent } from './events'
 import { callFunction, parseFunctionPath } from './functions'
 import { processIcon } from './icon'
 import { getWorkspacePreview, loadLayout, mergeLayoutForSave, saveLayout } from './layout'
-import { getMcpStatus, getUserMcpStatus } from './mcp'
+import { getMcpStatus, getUserMcpStatus } from './harness/claude-code/mcp'
 import {
   getCodexModels,
   getCodexProcessInfo,
   getCodexSessions,
   getCodexThreadEvents
-} from './codex'
+} from './harness/codex/client'
 import {
   ensureCodexSessionLive,
   getCodexRunningSessions,
   getLiveCodexEvents,
   sendCodexMessage
-} from './codex-session'
-import { getClientFrameLog, getWireLog } from './harness-debug'
-import { getOpenClawModels, getOpenClawSessionMessages, getOpenClawSessions } from './openclaw'
-import { toSessionInfo, toStreamEvents } from './openclaw-adapter'
+} from './harness/codex/session'
+import { getClientFrameLog, getWireLog } from './harness/debug'
+import {
+  getOpenClawModels,
+  getOpenClawSessionMessages,
+  getOpenClawSessions
+} from './harness/openclaw/discovery'
+import { toSessionInfo, toStreamEvents } from './harness/openclaw/adapter'
 import {
   ensureOpenClawSessionLive,
   getLiveOpenClawEvents,
   getOpenClawRunningSessions,
   sendOpenClawMessage
-} from './openclaw-session'
+} from './harness/openclaw/session'
 import {
   discoverWorkspaces,
   getWorkspace,
@@ -55,7 +59,7 @@ import {
 import { loadScratchpadDoc, saveScratchpadDoc } from './scratchpad'
 import { MAX_ASSET_BYTES, scratchpadAssetFile, storeScratchpadAsset } from './scratchpad-assets'
 import { DIST_DIR, prebuilt } from './static'
-import { getSessionEvents, getSessions } from './state'
+import { getSessionEvents, getSessions } from './harness/claude-code/sessions'
 import { getThreadConfig, saveThreadConfig } from './thread-config'
 import type { ThreadConfigPatch } from './thread-config'
 import { serveWorkspaceImagePreview } from './preview'

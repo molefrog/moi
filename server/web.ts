@@ -7,19 +7,23 @@ import {
   interruptCCSession,
   killAllCCSessions,
   sendCCMessage
-} from './cc-session'
+} from './harness/claude-code/session'
 import { PORT } from './constants'
 import { control } from './control'
 import { EVENTS_TOPIC, setEventServer } from './events'
 import { killAllWorkers } from './functions'
 import { resolveScratchOp } from './scratchpad-relay'
-import { killAllCodexClients } from './codex'
-import { getCodexRunningSessions, interruptCodexRun, sendCodexMessage } from './codex-session'
+import { killAllCodexClients } from './harness/codex/client'
+import {
+  getCodexRunningSessions,
+  interruptCodexRun,
+  sendCodexMessage
+} from './harness/codex/session'
 import {
   abortOpenClawRun,
   getOpenClawRunningSessions,
   sendOpenClawMessage
-} from './openclaw-session'
+} from './harness/openclaw/session'
 import { getWorkspace } from './registry'
 import { addClient, removeClient, sendToClient } from './state'
 import { distShell, prebuilt } from './static'

@@ -19,21 +19,21 @@ import {
 } from '@anthropic-ai/claude-agent-sdk'
 
 import { ATTACHMENT_ONLY_PLACEHOLDER, appendAttachmentNote } from '@/lib/attachment-note'
-import { ClaudeAdapter } from '@/lib/claude-adapter'
+import { ClaudeAdapter } from './adapter'
 import type { Part } from '@/lib/format'
 import { stripViewBuilderMeta } from '@/lib/view-builder-meta'
 
-import { debug } from './debug'
-import { tapWire } from './harness-debug'
-import { broadcast } from './state'
-import { hasThreadConfig, renameThreadConfig, saveThreadConfig } from './thread-config'
-import { type StoredUpload, resolveUploads, uploadToDisplayPart } from './uploads'
+import { debug } from '../../debug'
+import { tapWire } from '../debug'
+import { broadcast } from '../../state'
+import { hasThreadConfig, renameThreadConfig, saveThreadConfig } from '../../thread-config'
+import { type StoredUpload, resolveUploads, uploadToDisplayPart } from '../../uploads'
 import {
   markViewBuilderBuildingBySession,
   markViewBuilderWaitingBySession,
   renameViewBuilderSession
-} from './view-builders'
-import { resolveWorkspaceEnv } from './workspace-env'
+} from '../../view-builders'
+import { resolveWorkspaceEnv } from '../../workspace-env'
 
 // Media types Claude vision accepts; uploads.ts guarantees every image upload is
 // normalized to one of these, so the cast on `media_type` below is sound.

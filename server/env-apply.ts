@@ -3,8 +3,8 @@
 // relayed over the control port — the workspace's processes must be reaped and
 // every connected client told to refetch. Both entry points call this so the
 // side effects can never drift apart.
-import { restartWorkspaceSessions } from './cc-session'
-import { killCodexWorkspace } from './codex'
+import { restartWorkspaceSessions } from './harness/claude-code/session'
+import { killCodexWorkspace } from './harness/codex/client'
 import { publishEvent } from './events'
 import { restartWorker } from './functions'
 

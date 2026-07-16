@@ -9,7 +9,7 @@ import type { Model, WorkspaceEntry, WorkspaceModels } from '@/lib/types'
 // canned scenarios (or your own prompt), and watch three synchronized logs —
 // the backend's native wire (Codex: app-server JSON-RPC; Claude Code: raw SDK
 // messages), the frames the server pushes to chat clients, and the durable
-// events REST replay. See docs/harnesses/README.md.
+// events REST replay. See server/harness/README.md.
 
 type WireFrame = { seq: number; ts: number; dir: 'send' | 'recv'; frame: unknown }
 type BroadcastFrame = { seq: number; ts: number; frame: unknown }

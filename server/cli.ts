@@ -27,7 +27,7 @@ import {
 } from './cli-env'
 import { columns } from './cli-ui'
 import { CONTROL_PORT, PORT } from './constants'
-import { type OpenClawAgent, discoverOpenClawAgents } from './openclaw'
+import { type OpenClawAgent, discoverOpenClawAgents } from './harness/openclaw/discovery'
 import { liftToWorkspaceRoot, registerWorkspace } from './registry'
 import { serverCwd } from './server-cwd'
 import {
