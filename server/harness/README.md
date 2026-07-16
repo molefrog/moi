@@ -88,7 +88,8 @@ streaming-input sessions with mid-turn message queueing, resume after idle
 eviction/restart, interrupt, per-thread model + effort picker (backed by
 `supportedModels()`), opt-in live token streaming, image/file attachments,
 subagent lanes, MCP status probe, and session list/history replay from the
-SDK's `.jsonl` files. Known gaps: runs with `bypassPermissions` only (no
+SDK's `.jsonl` files, with per-turn token usage folded into the final
+assistant turn. Known gaps: runs with `bypassPermissions` only (no
 interactive approval flow), and effort/streaming changes require a
 teardown-and-resume because the SDK has no live setter for them.
 
@@ -109,7 +110,10 @@ effort overrides (both live — no rebuild dance), opt-in token streaming from
 steered into the running turn (`turn/steer` with `turn/start` fallback),
 interrupt, per-turn token usage folded into `TurnMeta`, native optimistic-id
 rendezvous, session list via `thread/list` (cwd-filtered) and history replay
-via `thread/read`. Runs `danger-full-access` + `approvalPolicy: never` to
+via `thread/read`, subagent (collab) child threads nested as live
+SubagentRecord transcripts on the parent card, semantic exec labels from
+`commandActions`, MCP status via `mcpServerStatus/list`, and hook / failed
+MCP-startup notices. Runs `danger-full-access` + `approvalPolicy: never` to
 match moi's bypass-permissions trust model. Known gaps: no interactive
 approval flow (server→client approval requests are auto-accepted
 defensively), and images ride inline as data URLs only (no `localImage` path

@@ -2,6 +2,7 @@
 // ../types.ts for the contract and ../README.md for the architecture.
 import type { Harness } from '../types'
 import {
+  getCodexMcpStatus,
   getCodexModels,
   getCodexProcessInfo,
   getCodexSessions,
@@ -49,6 +50,7 @@ export const codexHarness: Harness = {
     }
   },
   listModels: ws => getCodexModels(ws.path),
+  mcpStatus: ws => getCodexMcpStatus(ws.path),
 
   onEnvChanged: workspacePath => killCodexWorkspace(workspacePath),
   shutdown: () => killAllCodexClients(),

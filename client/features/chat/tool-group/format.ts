@@ -129,12 +129,42 @@ const CODEX_TOOL_LABELS: Record<string, string> = {
   web_search: 'Web search',
   update_plan: 'Update plan',
   subagent: 'Run sub-agent',
-  subagent_activity: 'Sub-agent'
+  subagent_activity: 'Sub-agent',
+  review: 'Review',
+  view_image: 'View image',
+  generate_image: 'Generate image'
+}
+
+// Codex classifies each shell command itself (`commandActions`, one entry per
+// piped command). When every action agrees on a type, use a CC-style semantic
+// label instead of "Bash".
+type CodexCommandAction = { type?: string; name?: string; path?: string; query?: string | null }
+
+const CODEX_ACTION_LABELS: Record<string, string> = {
+  read: 'Read',
+  listFiles: 'List files',
+  search: 'Search'
+}
+
+function codexExecAction(input: unknown): CodexCommandAction | null {
+  const actions = (input as { commandActions?: unknown } | null)?.commandActions
+  if (!Array.isArray(actions) || actions.length === 0) return null
+  const first = actions[0] as CodexCommandAction
+  const type = first?.type
+  if (!type || !(type in CODEX_ACTION_LABELS)) return null
+  if (actions.some(a => (a as CodexCommandAction)?.type !== type)) return null
+  return first
 }
 
 export function getToolDisplayName(call: ToolCall): string {
   if (call.provider === 'openclaw') return OPENCLAW_TOOL_LABELS[call.name] ?? call.name
-  if (call.provider === 'codex') return CODEX_TOOL_LABELS[call.name] ?? call.name
+  if (call.provider === 'codex') {
+    if (call.name === 'exec') {
+      const action = codexExecAction(call.input)
+      if (action?.type) return CODEX_ACTION_LABELS[action.type]
+    }
+    return CODEX_TOOL_LABELS[call.name] ?? call.name
+  }
   return CLAUDE_TOOL_LABELS[call.name] ?? call.name
 }
 
@@ -160,7 +190,18 @@ function formatCodexBrief(
   input: Record<string, unknown>,
   shorten: (s: string) => string
 ): string {
-  if (tool === 'exec') return shorten(`$ ${getInputValue(input, 'command')}`)
+  if (tool === 'exec') {
+    // Semantic brief when Codex classified the command (label says Read/
+    // Search/List files); raw command otherwise.
+    const action = codexExecAction(input)
+    if (action?.type === 'read') return shorten(action.path || action.name || '')
+    if (action?.type === 'search')
+      return [action.query && `/${action.query}/`, action.path && shorten(action.path)]
+        .filter(Boolean)
+        .join(' ')
+    if (action?.type === 'listFiles') return action.path ? shorten(action.path) : ''
+    return shorten(`$ ${getInputValue(input, 'command')}`)
+  }
   if (tool === 'apply_patch') {
     // The adapter sends structured per-file changes: [{ path, kind, diff }].
     const changes = input.changes

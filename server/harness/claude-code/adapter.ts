@@ -84,7 +84,15 @@ type SdkMessage = {
   task_id?: string
   description?: string
   status?: string
-  usage?: { total_tokens?: number; tool_uses?: number; duration_ms?: number }
+  // task_* events report total_tokens/tool_uses; `result` reports the API
+  // usage breakdown (input/output tokens).
+  usage?: {
+    total_tokens?: number
+    tool_uses?: number
+    duration_ms?: number
+    input_tokens?: number
+    output_tokens?: number
+  }
   hook_id?: string
   hook_name?: string
   hook_event?: string
@@ -275,6 +283,33 @@ export class ClaudeAdapter {
           durationMs: msg.duration_ms
         }
       })
+      // Fold the turn's token usage into the newest top-level assistant turn
+      // so the meta strip can show it (parity with the codex/openclaw
+      // adapters — previously these counts were dropped entirely).
+      const usage = msg.usage
+      if (typeof usage?.input_tokens === 'number' || typeof usage?.output_tokens === 'number') {
+        for (let i = this.turns.length - 1; i >= 0; i--) {
+          const t = this.turns[i]
+          if (t.role !== 'assistant' || t.parentTaskId) continue
+          t.meta = {
+            ...t.meta,
+            usage: {
+              ...(typeof usage.input_tokens === 'number'
+                ? { inputTokens: usage.input_tokens }
+                : {}),
+              ...(typeof usage.output_tokens === 'number'
+                ? { outputTokens: usage.output_tokens }
+                : {}),
+              ...(typeof usage.input_tokens === 'number' && typeof usage.output_tokens === 'number'
+                ? { totalTokens: usage.input_tokens + usage.output_tokens }
+                : {}),
+              ...(typeof msg.total_cost_usd === 'number' ? { costUsd: msg.total_cost_usd } : {})
+            }
+          }
+          events.push({ kind: 'turn', turn: t })
+          break
+        }
+      }
       return events
     }
 

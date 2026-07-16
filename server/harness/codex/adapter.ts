@@ -36,6 +36,15 @@ export type CodexThreadItem = {
   aggregatedOutput?: string | null
   exitCode?: number | null
   durationMs?: number | null
+  // Codex's own parse of what the command does (read/listFiles/search/
+  // unknown) — one entry per piped command. Drives CC-style semantic labels.
+  commandActions?: {
+    type?: string
+    command?: string
+    name?: string
+    path?: string
+    query?: string | null
+  }[]
   // fileChange
   changes?: { path: string; kind?: { type?: string }; diff?: string }[]
   // mcpToolCall
@@ -176,7 +185,11 @@ function itemToToolCall(item: CodexThreadItem): ToolCall | null {
         caller: 'model',
         provider: 'codex',
         state: statusToToolState(item.status),
-        input: { command: item.command, cwd: item.cwd }
+        input: {
+          command: item.command,
+          cwd: item.cwd,
+          ...(item.commandActions?.length ? { commandActions: item.commandActions } : {})
+        }
       }
       if (item.aggregatedOutput) {
         if (call.state === 'error') call.errorText = item.aggregatedOutput
@@ -263,6 +276,9 @@ function itemToToolCall(item: CodexThreadItem): ToolCall | null {
       }
     }
     case 'subAgentActivity': {
+      // The card that carries the child agent's nested transcript: the
+      // session layer correlates the child thread (`agentThreadId`) and
+      // attaches a SubagentRecord to this call (see session.ts).
       return {
         toolCallId: item.id,
         name: 'subagent_activity',
@@ -270,6 +286,40 @@ function itemToToolCall(item: CodexThreadItem): ToolCall | null {
         provider: 'codex',
         state: 'success',
         input: { kind: item.kind, agentThreadId: item.agentThreadId, agentPath: item.agentPath }
+      }
+    }
+    case 'enteredReviewMode':
+    case 'exitedReviewMode': {
+      return {
+        toolCallId: item.id,
+        name: 'review',
+        caller: 'model',
+        provider: 'codex',
+        state: 'success',
+        input: {
+          phase: item.type === 'enteredReviewMode' ? 'entered' : 'exited',
+          review: item.text ?? (item as { review?: string }).review
+        }
+      }
+    }
+    case 'imageView': {
+      return {
+        toolCallId: item.id,
+        name: 'view_image',
+        caller: 'model',
+        provider: 'codex',
+        state: 'success',
+        input: { path: (item as { path?: string }).path }
+      }
+    }
+    case 'imageGeneration': {
+      return {
+        toolCallId: item.id,
+        name: 'generate_image',
+        caller: 'model',
+        provider: 'codex',
+        state: statusToToolState(item.status),
+        input: { prompt: (item as { prompt?: string }).prompt }
       }
     }
     default:

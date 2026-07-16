@@ -153,6 +153,43 @@ describe('codexItemToTurn', () => {
     })
   })
 
+  test('commandExecution passes commandActions through for semantic labels', () => {
+    const item: CodexThreadItem = {
+      type: 'commandExecution',
+      id: 'exec-2',
+      command: '/bin/zsh -lc "sed -n \'1p\' notes.md"',
+      status: 'completed',
+      commandActions: [
+        { type: 'read', command: 'sed -n 1p notes.md', name: 'notes.md', path: '/w/notes.md' }
+      ]
+    }
+    expect(codexItemToTurn(item, THREAD)!.parts[0]).toMatchObject({
+      call: { name: 'exec', input: { commandActions: [{ type: 'read', name: 'notes.md' }] } }
+    })
+  })
+
+  test('review mode transitions map to review cards', () => {
+    const entered: CodexThreadItem = {
+      type: 'enteredReviewMode',
+      id: 'rv-1',
+      text: 'check the diff'
+    }
+    expect(codexItemToTurn(entered, THREAD)!.parts[0]).toMatchObject({
+      call: { name: 'review', input: { phase: 'entered', review: 'check the diff' } }
+    })
+    const exited: CodexThreadItem = { type: 'exitedReviewMode', id: 'rv-2' }
+    expect(codexItemToTurn(exited, THREAD)!.parts[0]).toMatchObject({
+      call: { name: 'review', input: { phase: 'exited' } }
+    })
+  })
+
+  test('imageView maps to a view_image card', () => {
+    const item = { type: 'imageView', id: 'iv-1', path: '/w/shot.png' } as CodexThreadItem
+    expect(codexItemToTurn(item, THREAD)!.parts[0]).toMatchObject({
+      call: { name: 'view_image', input: { path: '/w/shot.png' } }
+    })
+  })
+
   test('contextCompaction maps to a compact notice, not a turn', () => {
     const item: CodexThreadItem = { type: 'contextCompaction', id: 'cc-1' }
     expect(codexItemToTurn(item, THREAD)).toBeNull()
