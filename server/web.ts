@@ -101,8 +101,8 @@ export const app = Bun.serve<WsData>({
     // Client-side routes — serve the SPA shell.
     '/': shell,
     '/connectors': shell,
-    '/playground': shell,
-    '/playground/*': shell,
+    '/dev': shell,
+    '/dev/*': shell,
     '/workspace/*': shell,
 
     // Chat websocket — app-wide (one per client, not per workspace). Each chat

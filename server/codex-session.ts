@@ -31,7 +31,6 @@ import {
 import { type CodexClient, getCodexClient } from './codex'
 import { debug } from './debug'
 import { broadcast } from './state'
-import type { BroadcastFrame } from '@/lib/types'
 import { hasThreadConfig, renameThreadConfig, saveThreadConfig } from './thread-config'
 import {
   type StoredUpload,
@@ -46,35 +45,6 @@ import {
 // server→client requests we have no UI for yet).
 const SANDBOX_MODE = 'danger-full-access'
 const APPROVAL_POLICY = 'never'
-
-// ---- client-frame debug tap ---------------------------------------------------
-// Everything this module pushes over the chat socket also lands in a
-// per-workspace ring buffer, so the /playground/codex page can show the exact
-// server→client frames next to the raw app-server wire log (see codex.ts).
-
-export type CodexBroadcastFrame = { seq: number; ts: number; frame: unknown }
-
-const BROADCAST_LOG_CAP = 1000
-const broadcastLogs = new Map<string, CodexBroadcastFrame[]>() // key: workspaceId
-let broadcastSeq = 0
-
-export function getCodexBroadcastLog(workspaceId: string, sinceSeq = 0): CodexBroadcastFrame[] {
-  const log = broadcastLogs.get(workspaceId) ?? []
-  return sinceSeq > 0 ? log.filter(f => f.seq > sinceSeq) : log
-}
-
-// The single choke point for everything codex-session sends to clients:
-// records into the debug ring, then broadcasts.
-function emitFrame(workspaceId: string, frame: BroadcastFrame) {
-  let log = broadcastLogs.get(workspaceId)
-  if (!log) {
-    log = []
-    broadcastLogs.set(workspaceId, log)
-  }
-  log.push({ seq: ++broadcastSeq, ts: Date.now(), frame })
-  if (log.length > BROADCAST_LOG_CAP) log.splice(0, log.length - BROADCAST_LOG_CAP)
-  broadcast(workspaceId, frame)
-}
 
 type CodexUserInputItem = { type: 'text'; text: string } | { type: 'image'; url: string }
 
@@ -123,12 +93,12 @@ function setProcessing(rec: SessionRecord, processing: boolean, turnId: string |
   rec.activeTurnId = turnId
   if (rec.processing === processing) return
   rec.processing = processing
-  emitFrame(rec.workspaceId, { type: 'status', sessionId: rec.sessionId, processing })
+  broadcast(rec.workspaceId, { type: 'status', sessionId: rec.sessionId, processing })
 }
 
 function emitTurnEvent(rec: SessionRecord, ev: StreamEvent) {
   rec.view = applyEvent(rec.view, ev)
-  emitFrame(rec.workspaceId, { ...ev, sessionId: rec.sessionId })
+  broadcast(rec.workspaceId, { ...ev, sessionId: rec.sessionId })
 }
 
 function ingestItem(rec: SessionRecord, item: CodexThreadItem) {
@@ -151,7 +121,7 @@ function forwardPreview(
   const entry = rec.previews.get(itemId) ?? { kind, text: '' }
   entry.text += delta
   rec.previews.set(itemId, entry)
-  emitFrame(rec.workspaceId, {
+  broadcast(rec.workspaceId, {
     type: 'preview',
     sessionId: rec.sessionId,
     messageId: itemId,
@@ -227,7 +197,7 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
       applyUsage(rec)
       setProcessing(rec, false, null)
       if (turn?.status === 'failed' && turn.error?.message) {
-        emitFrame(rec.workspaceId, {
+        broadcast(rec.workspaceId, {
           kind: 'error',
           sessionId: rec.sessionId,
           content: turn.error.message
@@ -239,7 +209,7 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
       const err = params.error as { message?: string } | undefined
       const message = err?.message ?? (typeof params.message === 'string' ? params.message : '')
       if (message) {
-        emitFrame(rec.workspaceId, { kind: 'error', sessionId: rec.sessionId, content: message })
+        broadcast(rec.workspaceId, { kind: 'error', sessionId: rec.sessionId, content: message })
       }
       return
     }
@@ -357,7 +327,7 @@ export async function sendCodexMessage(input: {
       const realId = started.thread.id
       if (realId !== input.sessionId) {
         aliases.set(recKey(input.workspaceId, input.sessionId), realId)
-        emitFrame(input.workspaceId, {
+        broadcast(input.workspaceId, {
           type: 'session_renamed',
           from: input.sessionId,
           to: realId
@@ -380,7 +350,7 @@ export async function sendCodexMessage(input: {
       rec = await resumeSession(input)
     }
   } catch (err) {
-    emitFrame(input.workspaceId, {
+    broadcast(input.workspaceId, {
       kind: 'error',
       sessionId: input.sessionId,
       content: err instanceof Error ? err.message : 'failed to start codex session'
@@ -442,7 +412,7 @@ export async function sendCodexMessage(input: {
     debug(`codex send ws=${rec.workspaceId} thread=${rec.sessionId} turn=${rec.activeTurnId}`)
   } catch (err) {
     setProcessing(rec, false, null)
-    emitFrame(rec.workspaceId, {
+    broadcast(rec.workspaceId, {
       kind: 'error',
       sessionId: rec.sessionId,
       content: err instanceof Error ? err.message : 'send failed'
@@ -464,10 +434,10 @@ export async function interruptCodexRun(input: {
         turnId: rec.activeTurnId
       })
     }
-    emitFrame(rec.workspaceId, { kind: 'stopped', sessionId: rec.sessionId })
+    broadcast(rec.workspaceId, { kind: 'stopped', sessionId: rec.sessionId })
     setProcessing(rec, false, null)
   } catch (err) {
-    emitFrame(rec.workspaceId, {
+    broadcast(rec.workspaceId, {
       kind: 'error',
       sessionId: rec.sessionId,
       content: err instanceof Error ? err.message : 'interrupt failed'

@@ -26,16 +26,15 @@ import {
   getCodexModels,
   getCodexProcessInfo,
   getCodexSessions,
-  getCodexThreadEvents,
-  getCodexWireLog
+  getCodexThreadEvents
 } from './codex'
 import {
   ensureCodexSessionLive,
-  getCodexBroadcastLog,
   getCodexRunningSessions,
   getLiveCodexEvents,
   sendCodexMessage
 } from './codex-session'
+import { getClientFrameLog, getWireLog } from './harness-debug'
 import { getOpenClawModels, getOpenClawSessionMessages, getOpenClawSessions } from './openclaw'
 import { toSessionInfo, toStreamEvents } from './openclaw-adapter'
 import {
@@ -480,18 +479,23 @@ one.get('/mcp', async c => {
   return c.json(await getMcpStatus(c.get('ws').path, 'project'))
 })
 
-// Codex debug tap for /playground/codex: the raw app-server JSON-RPC frames
-// (both directions) and the exact frames codex-session pushed to clients.
+// Harness debug tap for /playground/harness: the backend's native wire frames
+// (Codex: app-server JSON-RPC, both directions; Claude Code: raw SDK messages
+// + enqueued inputs) and the exact frames the server pushed to chat clients.
 // `sinceWire`/`sinceBroadcast` are seq cursors so the page can poll deltas.
-one.get('/codex/debug', async c => {
+one.get('/harness/debug', async c => {
   const ws = c.get('ws')
-  if (ws.type !== 'codex') return c.text('Not a codex workspace', 400)
+  const provider: WorkspaceType = ws.type ?? 'claude-code'
   const sinceWire = Number(c.req.query('sinceWire') ?? 0) || 0
   const sinceBroadcast = Number(c.req.query('sinceBroadcast') ?? 0) || 0
+  // Codex taps by workspacePath (the process client doesn't know workspace
+  // ids); everything else taps by workspace id.
+  const wireScope = provider === 'codex' ? ws.path : ws.id
   return c.json({
-    process: await getCodexProcessInfo(ws.path),
-    wire: getCodexWireLog(ws.path, sinceWire),
-    broadcasts: getCodexBroadcastLog(ws.id, sinceBroadcast)
+    provider,
+    process: provider === 'codex' ? await getCodexProcessInfo(ws.path) : null,
+    wire: getWireLog(wireScope, sinceWire),
+    broadcasts: getClientFrameLog(ws.id, sinceBroadcast)
   })
 })
 

@@ -20,6 +20,7 @@ import {
   codexThreadToSessionInfo
 } from './codex-adapter'
 import { debug } from './debug'
+import { tapWire } from './harness-debug'
 import { resolveWorkspaceEnv } from './workspace-env'
 
 const REQUEST_TIMEOUT_MS = 30_000
@@ -27,37 +28,9 @@ const REQUEST_TIMEOUT_MS = 30_000
 type Json = Record<string, unknown>
 type NotificationListener = (method: string, params: Json) => void
 
-// ---- wire-level debug tap ----------------------------------------------------
-// Every JSON-RPC frame in either direction is recorded into a per-workspace
-// ring buffer, kept OUTSIDE the client record so it survives process death.
-// Read by GET /api/workspaces/:id/codex/debug (the /playground/codex page).
-
-export type CodexWireFrame = {
-  seq: number
-  ts: number
-  dir: 'send' | 'recv'
-  frame: unknown
-}
-
-const WIRE_LOG_CAP = 1000
-const wireLogs = new Map<string, CodexWireFrame[]>() // key: workspacePath
-let wireSeq = 0
-
-function tapWire(workspacePath: string, dir: 'send' | 'recv', frame: unknown) {
-  let log = wireLogs.get(workspacePath)
-  if (!log) {
-    log = []
-    wireLogs.set(workspacePath, log)
-  }
-  log.push({ seq: ++wireSeq, ts: Date.now(), dir, frame })
-  if (log.length > WIRE_LOG_CAP) log.splice(0, log.length - WIRE_LOG_CAP)
-}
-
-// Frames after `sinceSeq` (0 = everything buffered), oldest first.
-export function getCodexWireLog(workspacePath: string, sinceSeq = 0): CodexWireFrame[] {
-  const log = wireLogs.get(workspacePath) ?? []
-  return sinceSeq > 0 ? log.filter(f => f.seq > sinceSeq) : log
-}
+// Every JSON-RPC frame in either direction lands in the shared wire ring
+// (server/harness-debug.ts, scoped by workspacePath), kept OUTSIDE the client
+// record so it survives process death. Read via /api/.../harness/debug.
 
 export type CodexProcessInfo = {
   running: boolean

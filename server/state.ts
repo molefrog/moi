@@ -3,6 +3,8 @@ import { getSessionMessages, listSessions } from '@anthropic-ai/claude-agent-sdk
 import { ClaudeAdapter } from '@/lib/claude-adapter'
 import type { BroadcastFrame, ServerMessage, SessionInfo, StreamEvent } from '@/lib/types'
 
+import { tapClientFrame } from './harness-debug'
+
 // The chat socket is app-wide (one per client tab, not per workspace), so a
 // single set of all connected chat clients is enough. Each broadcast frame
 // carries its `workspaceId`, and the client routes it.
@@ -23,7 +25,10 @@ export function getClientCount(): number {
 
 // Stamp `workspaceId` onto the frame and fan it out to every connected chat
 // client. (Phase 1: broadcast-all; Phase 2 will scope by topic subscription.)
+// Every frame is also tapped into the per-workspace debug ring so the
+// /playground/harness page can show exactly what clients received.
 export function broadcast(workspaceId: string, frame: BroadcastFrame) {
+  tapClientFrame(workspaceId, { ...frame, workspaceId })
   const json = JSON.stringify({ ...frame, workspaceId })
   for (const ws of chatClients) ws.send(json)
 }
