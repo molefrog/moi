@@ -1,5 +1,7 @@
 import type { Model, WorkspaceType } from '@/lib/types'
 
+export const DEFAULT_EFFORT = 'high'
+
 export const MODEL_ORDER = {
   'claude-code': [
     'claude-fable-5',
@@ -14,6 +16,19 @@ export const MODEL_ORDER = {
 
 function modelOrderKey(model: Model): string {
   return model.resolvedModel ?? model.value
+}
+
+export function reverseEffortLevels(levels: readonly string[]): string[] {
+  return [...levels].reverse()
+}
+
+export function resolveDisplayedEffort(
+  levels: readonly string[],
+  selectedEffort: string | undefined
+): string | undefined {
+  if (selectedEffort && levels.includes(selectedEffort)) return selectedEffort
+  if (levels.includes(DEFAULT_EFFORT)) return DEFAULT_EFFORT
+  return levels[0]
 }
 
 export function sortModelsByProviderOrder(models: Model[], provider: WorkspaceType): Model[] {

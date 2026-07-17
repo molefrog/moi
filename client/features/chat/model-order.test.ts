@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 
-import { sortModelsByProviderOrder } from '@/client/features/chat/model-order'
+import {
+  resolveDisplayedEffort,
+  reverseEffortLevels,
+  sortModelsByProviderOrder
+} from '@/client/features/chat/model-order'
 import type { Model } from '@/lib/types'
 
 function model(value: string, resolvedModel?: string): Model {
@@ -55,5 +59,35 @@ describe('sortModelsByProviderOrder', () => {
     const models = [model('provider/model-b'), model('provider/model-a')]
 
     expect(sortModelsByProviderOrder(models, 'openclaw')).toEqual(models)
+  })
+})
+
+describe('reverseEffortLevels', () => {
+  test('orders SDK effort levels from highest to lowest without mutating them', () => {
+    const levels = ['low', 'medium', 'high', 'xhigh', 'max']
+
+    expect(reverseEffortLevels(levels)).toEqual(['max', 'xhigh', 'high', 'medium', 'low'])
+    expect(levels).toEqual(['low', 'medium', 'high', 'xhigh', 'max'])
+  })
+
+  test('reverses partial effort lists', () => {
+    expect(reverseEffortLevels(['low', 'high', 'max'])).toEqual(['max', 'high', 'low'])
+  })
+})
+
+describe('resolveDisplayedEffort', () => {
+  const levels = ['max', 'xhigh', 'high', 'medium', 'low']
+
+  test('keeps the last supported explicit choice', () => {
+    expect(resolveDisplayedEffort(levels, 'medium')).toBe('medium')
+  })
+
+  test('uses High when there is no supported explicit choice', () => {
+    expect(resolveDisplayedEffort(levels, undefined)).toBe('high')
+    expect(resolveDisplayedEffort(levels, 'unsupported')).toBe('high')
+  })
+
+  test('uses the highest available level when High is unavailable', () => {
+    expect(resolveDisplayedEffort(['max', 'medium', 'low'], undefined)).toBe('max')
   })
 })
