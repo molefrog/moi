@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import './cli-colors' // must precede citty: sets NO_COLOR before its color flag is computed
 import { defineCommand, runMain, showUsage } from 'citty'
+import { parse as devalueParse } from 'devalue'
 import { existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'path'
@@ -9,6 +10,7 @@ import pc from './cli-pc'
 import { COLOR_THEMES, FONT_THEMES } from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/themes'
 import type {
+  AppletLogEntry,
   ScratchArrowEnd,
   ScratchColor,
   ScratchFill,
@@ -479,6 +481,16 @@ const bundle = defineCommand({
       for (const f of failed) {
         console.log(pc.red(pc.bold(f.name + ':')))
         console.log('  ' + f.error + '\n')
+      }
+
+      // Runtime errors still standing after the rebuild's clear-on-success
+      // sweep — point the agent at the journal while it's paying attention.
+      const logCount = typeof res.logCount === 'number' ? res.logCount : 0
+      if (logCount > 0) {
+        console.log(
+          pc.yellow(`ℹ ${logCount} applet runtime error(s) on record — run \`moi debug logs\`.`) +
+            '\n'
+        )
       }
 
       if (notice) console.log(pc.yellow(notice) + '\n')
@@ -1319,15 +1331,16 @@ function styleArgs(args: {
 
 type ScratchCliOp = ScratchOp | { kind: 'read' } | { kind: 'read-image'; name: string }
 
-// Round-trip one op through the control port and hand the reply to `onResult`.
-// Mirrors the `bundle`/`theme` commands: one socket per invocation, print, exit.
-function sendScratch(
+// Round-trip one request through the control port and hand the reply to
+// `onResult`. Mirrors the `bundle`/`theme` commands: one socket per invocation,
+// print, exit. Shared by `scratch`, `call-server-fn`, and `debug logs`.
+function sendControl(
   path: string,
-  op: ScratchCliOp,
+  payload: Record<string, unknown>,
   onResult: (res: Record<string, unknown>) => void | Promise<void>
 ) {
   const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
-  ws.onopen = () => ws.send(JSON.stringify({ type: 'scratch', path, op }))
+  ws.onopen = () => ws.send(JSON.stringify(payload))
   ws.onmessage = async event => {
     const res = JSON.parse(String(event.data))
     if (res.error) {
@@ -1347,6 +1360,14 @@ function sendScratch(
     console.error('Could not connect to control server. Is the main process running?')
     process.exit(1)
   }
+}
+
+function sendScratch(
+  path: string,
+  op: ScratchCliOp,
+  onResult: (res: Record<string, unknown>) => void | Promise<void>
+) {
+  sendControl(path, { type: 'scratch', path, op }, onResult)
 }
 
 // Print the name a draw op landed on, so the agent can address it later.
@@ -1677,6 +1698,136 @@ const scratch = defineCommand({
   }
 })
 
+// ---- self-correction commands (docs/self-correction.md) ---------------------
+
+const callServerFn = defineCommand({
+  meta: {
+    name: 'call-server-fn',
+    description: 'Invoke an applet .server.ts function in an isolated one-shot worker (smoke test)'
+  },
+  args: {
+    fn: {
+      type: 'positional',
+      required: true,
+      description: 'Function path: <module>/<fn>, e.g. widgets/hello/getGreeting'
+    },
+    args: {
+      type: 'positional',
+      required: false,
+      description: 'Arguments as one JSON array, e.g. \'["ann", 10]\' (default [])'
+    },
+    dir: dirArg
+  },
+  run({ args }) {
+    const path = resolve(args.dir)
+    sendControl(
+      path,
+      { type: 'call-server-fn', path, fn: args.fn, args: args.args ?? '[]' },
+      res => {
+        // The worker replies devalue-encoded (same wire format the browser RPC
+        // parses), so Map/Set/Date render readably through Bun.inspect.
+        const value = devalueParse(String(res.result))
+        console.log(Bun.inspect(value, { depth: 8, colors: process.stdout.isTTY }))
+        // Duration on stderr: stdout stays clean data, and a slow call is a
+        // warning sign worth surfacing (browser RPC times out at 30s).
+        console.error(pc.dim(`↩ ${res.ms}ms`))
+      }
+    )
+  }
+})
+
+// Compact relative age for a journal row: "just now", "4m ago", "2h ago", …
+function agoLabel(ts: number): string {
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000))
+  if (s < 60) return 'just now'
+  if (s < 3600) return `${Math.round(s / 60)}m ago`
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`
+  return `${Math.round(s / 86400)}d ago`
+}
+
+// Where a journal entry points: the server function for rpc rows, else the applet.
+function logSubject(e: {
+  source: string
+  kind?: string
+  name?: string
+  module?: string
+  fn?: string
+}): string {
+  if (e.module) return `${e.module}/${e.fn ?? '?'}`
+  if (e.name) return `${e.kind ?? 'applet'} ${e.name}`
+  return 'unattributed'
+}
+
+const MAX_LOG_MESSAGE_LINES = 12
+
+const debugLogs = defineCommand({
+  meta: {
+    name: 'logs',
+    description: 'Applet runtime errors on record (load / render / rpc / build failures)'
+  },
+  args: {
+    dir: dirArg,
+    json: {
+      type: 'boolean',
+      default: false,
+      description: 'Machine-readable output, includes stacks and epoch timestamps'
+    },
+    clear: { type: 'boolean', default: false, description: 'Wipe the journal' }
+  },
+  run({ args }) {
+    const path = resolve(args.dir)
+    if (args.clear) {
+      sendControl(path, { type: 'debug:logs', path, clear: true }, res => {
+        console.log('\n' + pc.green('✓') + ` cleared ${res.cleared ?? 0} entries\n`)
+      })
+      return
+    }
+    sendControl(path, { type: 'debug:logs', path }, res => {
+      const entries = (Array.isArray(res.entries) ? res.entries : []) as AppletLogEntry[]
+      if (args.json) {
+        console.log(JSON.stringify(entries, null, 2))
+        return
+      }
+      if (entries.length === 0) {
+        console.log(
+          '\n' + pc.bold('moi debug logs') + pc.dim(' — no applet errors on record') + '\n'
+        )
+        return
+      }
+      console.log(
+        '\n' + pc.bold('moi debug logs') + pc.dim(` — ${entries.length} error(s) on record`) + '\n'
+      )
+      for (const e of entries) {
+        const count = e.count > 1 ? pc.dim(` ×${e.count}`) : ''
+        console.log(
+          `  ${pc.dim(agoLabel(e.ts).padEnd(10))} ${e.source.padEnd(7)} ${pc.bold(logSubject(e))}${count}`
+        )
+        const lines = e.message.split('\n')
+        for (const line of lines.slice(0, MAX_LOG_MESSAGE_LINES)) {
+          console.log('    ' + line)
+        }
+        if (lines.length > MAX_LOG_MESSAGE_LINES) {
+          console.log(pc.dim(`    … ${lines.length - MAX_LOG_MESSAGE_LINES} more lines (--json)`))
+        }
+        console.log()
+      }
+      console.log(
+        pc.dim('  Entries clear when their applet next builds successfully, or via --clear.') + '\n'
+      )
+    })
+  }
+})
+
+// Experimental workspace-debugging toolbox. One subcommand for now (`logs`);
+// more introspection (worker state, RPC traces, …) may hang off it later.
+const debug = defineCommand({
+  meta: {
+    name: 'debug',
+    description: 'Debug the workspace (experimental) — `moi debug logs` for applet errors'
+  },
+  subCommands: { logs: debugLogs }
+})
+
 // Re-copy bundled skills into a workspace, then report what changed. Pure
 // filesystem op — no running server needed. Resolves the workspace root the
 // same way `moi bundle` does, so it works from `.moi/` or any subdirectory.
@@ -1808,6 +1959,8 @@ const main = defineCommand({
     bundle,
     builder,
     refresh,
+    'call-server-fn': callServerFn,
+    debug,
     theme,
     config,
     env,

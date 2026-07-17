@@ -112,6 +112,9 @@ never from inside `.moi/` itself. You don't pass paths; moi resolves the workspa
 - `moi bundle --force` — rebuild all applets (use after changing `config`)
 - `moi refresh` — re-fetch widget/view data without rebuilding (use after you mutated data the
   widgets read — DB rows, files, external API records — so the displayed values catch up)
+- `moi call-server-fn <module>/<fn> '[args]'` — invoke a `.server.ts` function directly
+  (smoke test; see Verify your work)
+- `moi debug logs` — applet runtime errors on record (experimental; see Verify your work)
 - `moi theme --font=<key>` — change font theme (omit `--font` to list options)
 - `moi theme --color=<key>` — change color preset (omit `--color` to list options)
 - `moi config` — set the workspace name & icon (`moi config --help` for usage)
@@ -256,8 +259,34 @@ Render **content only**: a plain `h-full w-full` region with no card chrome (`ro
 elevation. Changing `colSpan`/`rowSpan` needs `moi bundle --force`. See `DESIGN.md`.
 
 Typical loop: check/`bun install` deps → write `.moi/widgets/<name>.tsx` → `moi bundle` → it appears
-on the dashboard → change it and re-`bundle`, or `moi refresh` after mutating data, or any other `moi`
-command as needed. Views work the same way (`.moi/views/<name>.tsx`, appears as a nav tab).
+on the dashboard → verify it actually works (see **Verify your work**) → change it and re-`bundle`,
+or `moi refresh` after mutating data, or any other `moi` command as needed. Views work the same way
+(`.moi/views/<name>.tsx`, appears as a nav tab).
+
+# Verify your work
+
+`moi bundle` succeeding does **not** mean the applet works — it can still fail to load in the
+browser, crash on render, or throw in its server functions. Don't wait for the user to tell you;
+close the loop yourself:
+
+1. **Build** — read the `moi bundle` output. Fix any `failed` row before anything else. The
+   footer also warns when older runtime errors are still on record.
+2. **Poke** — after writing or changing a `.server.ts`, smoke-test it before reporting done:
+   `moi call-server-fn widgets/hello/getGreeting` or
+   `moi call-server-fn views/crm/searchUsers '["ann", 10]'` (args are one JSON array). Each
+   invocation runs in a fresh, isolated one-shot process with the same env, module loading, and
+   timeout as the browser's calls — a pass means the real path works. Server functions only; for
+   arbitrary scripts use `moi env exec`. A multi-second duration is a warning sign — browser calls
+   time out at 30s.
+3. **Feel** — `moi debug logs` prints the applet errors the workspace has seen since each applet's
+   last good build: browser-side load failures and render crashes, plus server-function (rpc)
+   errors. Check it whenever the user reports breakage ("it doesn't work", "the widget is blank"),
+   and proactively after shipping something new — the user's tab reports errors automatically, so
+   what broke for them is already on record. Entries clear when their applet next builds
+   successfully. (`moi debug` is an experimental command group — expect its output and flags to
+   evolve; use `--json` when you need to parse it.)
+
+When the user reports a problem, start from `moi debug logs`.
 
 # Views
 
@@ -304,4 +333,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.5.0" />
+<moi-skill version="0.6.0" />

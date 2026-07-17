@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 
 import type { ViewConfig, ViewInfo } from '@/lib/types'
 
+import { syncAppletLogAfterBuild } from './applet-log'
 import { buildApplets, getAppletPaths, listBuilt, scanSources, serveApplet } from './applets'
 import { reloadModules } from './functions'
 import { markViewBuilderReady } from './view-builders'
@@ -159,6 +160,10 @@ export async function handleBundleViews(
   const results = await buildAllViews(workspacePath, force)
   const after = await readManifest(workspacePath)
   const afterBuilt = new Set(await listBuiltViews(workspacePath))
+
+  // Keep the applet error journal honest: record build failures, clear entries
+  // superseded by a successful rebuild (see docs/self-correction.md).
+  syncAppletLogAfterBuild(workspacePath, 'view', results)
 
   const identityChanged = results.some(
     r =>

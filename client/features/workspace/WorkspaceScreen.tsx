@@ -29,6 +29,7 @@ import { ViewBuilderTab } from '@/client/features/views/ViewBuilderTab'
 import { useViewBuilderActions } from '@/client/features/views/useViewBuilderActions'
 import { useFitsSplitLayout } from '@/client/features/workspace/useFitsSplitLayout'
 import { useWorkspaceTheme } from '@/client/features/workspace/useWorkspaceTheme'
+import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { resolveAppIcon } from '@/client/lib/app-icon-registry'
 import { cn } from '@/client/lib/cn'
@@ -100,6 +101,7 @@ type ViewAppProps = {
 // layout + scroll, so we give it a plain filled box and fade it in (mirroring
 // WidgetShell, but full-area instead of a grid cell).
 function ViewApp({ view }: ViewAppProps) {
+  const workspaceId = useWorkspaceId()
   const bundle = useView(view.id)
 
   return (
@@ -120,7 +122,12 @@ function ViewApp({ view }: ViewAppProps) {
               exit={{ opacity: 0, filter: 'blur(4px)' }}
               transition={{ duration: 0.3, ease: 'easeInOut' }}
             >
-              <WidgetErrorBoundary name={view.id} resetKey={bundle.version}>
+              <WidgetErrorBoundary
+                name={view.id}
+                kind="view"
+                workspaceId={workspaceId}
+                resetKey={bundle.version}
+              >
                 <bundle.Component />
               </WidgetErrorBoundary>
             </motion.div>
