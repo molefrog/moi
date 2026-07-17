@@ -111,6 +111,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
   const firstUserMessage = query.data?.firstUserMessage
   const { ref, horizontalRadiusScale } = useFolderRadiusScale()
   const backdropPath = folderBackdropPath(horizontalRadiusScale)
+  const noiseFilterId = `folder-noise-${workspaceId}`
 
   return (
     <div ref={ref} className="relative h-40 w-full">
@@ -120,8 +121,33 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
         aria-hidden="true"
         className="absolute inset-0 h-full w-full overflow-visible"
       >
+        <defs>
+          <filter
+            id={noiseFilterId}
+            x="0%"
+            y="0%"
+            width="100%"
+            height="100%"
+            colorInterpolationFilters="sRGB"
+          >
+            <feTurbulence
+              type="fractalNoise"
+              baseFrequency="0.5"
+              numOctaves="3"
+              seed="7"
+              result="noise"
+            />
+            <feColorMatrix in="noise" type="saturate" values="0" result="monochromeNoise" />
+            <feComponentTransfer in="monochromeNoise" result="faintNoise">
+              <feFuncA type="linear" slope="0.24" />
+            </feComponentTransfer>
+            <feComposite in="faintNoise" in2="SourceAlpha" operator="in" result="clippedNoise" />
+            <feBlend in="SourceGraphic" in2="clippedNoise" mode="soft-light" />
+          </filter>
+        </defs>
         <path
           d={backdropPath}
+          filter={`url(#${noiseFilterId})`}
           className="mask-[linear-gradient(to_bottom,rgba(0,0,0,0.5),black_40%)] fill-accent"
         />
       </svg>
@@ -141,11 +167,11 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
       ))}
 
       {thumbnails.length === 0 && firstUserMessage && (
-        <div className="absolute top-[20%] right-[12%]">
+        <div className="absolute inset-x-[12%] top-[20%] flex justify-end">
           <div
             aria-hidden="true"
             className={cn(
-              'mx-auto w-max max-w-40 origin-center rounded-sm bg-card px-3 py-2 shadow-xs',
+              'w-max max-w-40 origin-center rounded-sm bg-card px-3 py-2 shadow-xs',
               'animate-in transition-transform duration-300 ease-out fade-in',
               STACK[STACK.length - 1],
               'group-hover:translate-y-0.5 group-focus-visible:translate-y-0.5'
