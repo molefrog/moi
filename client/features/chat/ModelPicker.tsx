@@ -3,9 +3,9 @@ import { memo, useState } from 'react'
 import { IconChevronDown } from '@tabler/icons-react'
 
 import { useSaveThreadConfig, useThreadConfig, useWorkspaceModels } from './api'
+import { sortModelsByProviderOrder } from './model-order'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { useLive } from '@/client/features/chat/chat-store'
-import type { Model } from '@/lib/types'
 
 import { Button } from '@/client/components/ui/button'
 import {
@@ -39,33 +39,6 @@ function effortLabel(level: string): string {
   return level === 'xhigh' ? 'Extra' : capitalize(level)
 }
 
-// Output price ($/Mtok) parsed from a model's "$in/$out per Mtok" blurb.
-function outputPrice(description?: string): number {
-  const m = description?.match(/\$\d+(?:\.\d+)?\s*\/\s*\$(\d+(?:\.\d+)?)\s*per Mtok/)
-  return m ? Number(m[1]) : -1
-}
-
-// Canonical wire id without a context-variant suffix, e.g.
-// 'claude-opus-4-8[1m]' → 'claude-opus-4-8'. Groups a model with its variants.
-function familyOf(m: Model): string | undefined {
-  return m.resolvedModel?.replace(/\[[^\]]*\]$/, '')
-}
-
-// Sort key ordering models most-capable-first (Fable → Opus → Sonnet → Haiku)
-// from price alone, no hardcoded names. A bare alias that omits its price (e.g.
-// plain 'opus') borrows a same-family variant's price ('opus[1m]'s $/Mtok) so
-// the two group together. Unpriced models (OpenClaw) return -1 → sort last,
-// keeping their original order since they're all equal.
-function sortPrice(m: Model, all: Model[]): number {
-  const own = outputPrice(m.description)
-  if (own >= 0) return own
-  const family = familyOf(m)
-  const sibling = all.find(
-    x => x !== m && familyOf(x) === family && outputPrice(x.description) >= 0
-  )
-  return sibling ? outputPrice(sibling.description) : -1
-}
-
 type ModelPickerProps = {
   scope?: 'active-chat' | 'workspace'
 }
@@ -90,11 +63,12 @@ export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: 
   // "use default" row.
   const allModels = data?.models ?? []
   const defaultEntry = allModels.find(m => m.value === 'default')
-  // Drop the "default" entry, then order by price descending. Array.sort is
-  // stable, so same-price variants (Opus 1M vs standard) keep the SDK's order.
-  const models = allModels
-    .filter(m => m.value !== 'default')
-    .sort((a, b) => sortPrice(b, allModels) - sortPrice(a, allModels))
+  const models = data
+    ? sortModelsByProviderOrder(
+        allModels.filter(model => model.value !== 'default'),
+        data.provider
+      )
+    : []
 
   // The active thread, if any. Its stored config is the source of truth; a new
   // chat (no active thread) falls back to — and edits — the workspace defaults.
