@@ -15,7 +15,8 @@ import type {
   ScratchImageQuality,
   ScratchOp,
   ScratchSize,
-  ScratchStyle
+  ScratchStyle,
+  WorkspaceEntry
 } from '@/lib/types'
 
 import {
@@ -741,7 +742,7 @@ const status = defineCommand({
 
       ws.onmessage = event => {
         const res = JSON.parse(String(event.data))
-        const workspaces: { id: string; path: string; addedAt: string }[] = res.workspaces ?? []
+        const workspaces: WorkspaceEntry[] = res.workspaces ?? []
         const n = workspaces.length
         console.log(pc.dim(`  ${n} workspace${n === 1 ? '' : 's'} registered\n`))
 
