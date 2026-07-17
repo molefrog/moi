@@ -83,11 +83,6 @@
 /* Color/radius/shadow tokens — shared with widget bundles via theme.css */
 @import './theme.css';
 
-/* Lift all grid items so the placeholder (z-index: 0) stays behind them */
-.react-grid-item:not(.react-grid-placeholder) {
-  z-index: 1;
-}
-
 /* Dragged card floats above all others */
 .react-grid-item.react-draggable-dragging {
   z-index: 10;
