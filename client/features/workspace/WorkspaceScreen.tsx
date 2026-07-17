@@ -16,7 +16,6 @@ import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { CustomizePanel } from '@/client/features/workspace/CustomizePanel'
 import { McpMenu } from '@/client/features/connectors/McpMenu'
 import { AppletMount } from '@/client/features/applets/AppletMount'
-import { SnapshotPlayground } from '@/client/features/workspace/SnapshotPlayground'
 import { WidgetErrorBoundary } from '@/client/features/applets/WidgetErrorBoundary'
 import { Widgets } from '@/client/features/widgets/Widgets'
 import { PanelHeader } from '@/client/components/shared/PanelHeader'
@@ -641,9 +640,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       </div>
 
       <AnimatePresence>{widgetMode === 'customizing' && <CustomizePanel />}</AnimatePresence>
-
-      {/* Dev playground: capture this panel to an image (workspace previews). */}
-      <SnapshotPlayground targetRef={themeRef} widgets={widgets} />
 
       {mode === 'fullscreen' && activeTab !== 'agent' && hasWorkspaceContent && (
         <ChatPopup
