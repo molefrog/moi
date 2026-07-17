@@ -1,3 +1,4 @@
+import { readdir } from 'node:fs/promises'
 import { join } from 'path'
 
 import tldrawPkg from 'tldraw/package.json'
@@ -6,8 +7,10 @@ import type { ScratchpadWriter } from '@/lib/types'
 
 import moiPkg from '../package.json'
 import {
+  SWEEP_GRACE_MS,
   assetSrcFileName,
   extractInlineAssets,
+  getScratchpadAssetsDir,
   scratchpadAssetFile,
   sweepOrphanAssets
 } from './scratchpad-assets'
@@ -97,6 +100,33 @@ export async function saveScratchpadDoc(
   // The `.bak` path keeps the sweep from orphaning the schema-change backup's
   // images — a restored .bak should still render.
   await sweepOrphanAssets(workspacePath, document, `${path}.bak`)
+}
+
+// The save-time sweep only STARTS an orphan's grace clock — deletion needs a
+// later sweep after the window elapses, and on a quiet canvas (delete an
+// image, walk away) no later save comes. Rather than scheduling per-workspace
+// follow-ups, one dumb periodic pass re-sweeps every registered workspace:
+// it also catches uploads whose tab died before the autosave and leftovers
+// from before a restart (the grace clock is in-memory). Workspaces without
+// asset files cost one readdir per tick.
+export async function sweepAllWorkspaces(): Promise<void> {
+  // Lazy: the registry pulls in the harness adapters, which this module's
+  // other consumers (CLI reads, tests) shouldn't load just to parse a snapshot.
+  const { listWorkspaces } = await import('./registry')
+  for (const ws of await listWorkspaces()) {
+    try {
+      const dir = getScratchpadAssetsDir(ws.path)
+      if ((await readdir(dir).catch(() => [])).length === 0) continue
+      const { document } = await loadScratchpadDoc(ws.path)
+      await sweepOrphanAssets(ws.path, document ?? {}, `${getScratchpadPath(ws.path)}.bak`)
+    } catch {}
+  }
+}
+
+export function startScratchpadSweeper(): void {
+  const timer = setInterval(sweepAllWorkspaces, SWEEP_GRACE_MS + 60_000)
+  // A background sweeper must never hold the process open.
+  timer.unref?.()
 }
 
 // When a save is about to overwrite a snapshot with a *different* schema (i.e.
