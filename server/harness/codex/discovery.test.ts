@@ -74,6 +74,18 @@ describe('discoverCodexWorkspaces', () => {
     expect(found).toEqual([{ path: flat, type: 'codex' }])
   })
 
+  test('regex fallback recovers an escaped cwd from a truncated meta line', async () => {
+    const dir = join(workDirs, 'has"quote')
+    await mkdir(dir)
+    // A session_meta head cut off mid-JSON (e.g. giant inlined instructions):
+    // JSON.parse of the line fails, but the quoted cwd value is intact.
+    const truncated = `{"type":"session_meta","payload":{"id":"x","cwd":${JSON.stringify(dir)},"instructions":"${'x'.repeat(64)}`
+    await writeRollout('2026/05/01/rollout-truncated.jsonl', truncated)
+
+    const found = await discoverCodexWorkspaces(new Set(), root)
+    expect(found).toEqual([{ path: dir, type: 'codex' }])
+  })
+
   test('returns nothing when the sessions dir does not exist', async () => {
     expect(await discoverCodexWorkspaces(new Set(), join(root, 'missing'))).toEqual([])
   })

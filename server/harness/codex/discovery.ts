@@ -9,7 +9,7 @@
 // when the CLI has since been uninstalled.
 import { readdir, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 
 import type { DiscoveredWorkspace } from '@/lib/types'
 
@@ -43,21 +43,31 @@ async function readSessionMeta(file: string): Promise<SessionMeta | null> {
       payload?: { cwd?: string; timestamp?: string }
     }
     const cwd = parsed.payload?.cwd ?? parsed.cwd
-    if (typeof cwd === 'string' && cwd.startsWith('/')) {
+    // isAbsolute (not a '/' check) so Windows drive-letter cwds survive.
+    if (typeof cwd === 'string' && isAbsolute(cwd)) {
       const timestamp = parsed.payload?.timestamp ?? parsed.timestamp
       return { cwd, ...(typeof timestamp === 'string' ? { timestamp } : {}) }
     }
   } catch {
-    const m = line.match(/"cwd"\s*:\s*"(\/[^"]*)"/)
-    if (m) return { cwd: m[1] }
+    // Truncated head: pull the quoted cwd value out and JSON-parse just the
+    // string so escapes (Windows "C:\\...") decode correctly.
+    const m = line.match(/"cwd"\s*:\s*("(?:[^"\\]|\\.)*")/)
+    if (m) {
+      try {
+        const cwd = JSON.parse(m[1]) as string
+        if (isAbsolute(cwd)) return { cwd }
+      } catch {}
+    }
   }
   return null
 }
 
-// All rollout files under the date-partitioned tree, newest first. Directory
-// names are zero-padded dates and filenames embed ISO timestamps, so a
-// lexicographic sort of full paths IS reverse-chronological order.
-async function listRolloutFiles(root: string): Promise<string[]> {
+// Up to `limit` rollout files under the date-partitioned tree, newest first.
+// Directory names are zero-padded dates and filenames embed ISO timestamps,
+// so descending name order at every level IS reverse-chronological order —
+// which lets the walk stop at the cap instead of traversing (and sorting)
+// the entire unbounded history first.
+async function listRolloutFiles(root: string, limit: number): Promise<string[]> {
   const out: string[] = []
   async function walk(dir: string) {
     let entries
@@ -66,21 +76,23 @@ async function listRolloutFiles(root: string): Promise<string[]> {
     } catch {
       return
     }
+    entries.sort((a, b) => (a.name < b.name ? 1 : -1))
     for (const e of entries) {
+      if (out.length >= limit) return
       const p = join(dir, e.name)
       if (e.isDirectory()) await walk(p)
       else if (e.isFile() && e.name.endsWith('.jsonl')) out.push(p)
     }
   }
   await walk(root)
-  return out.sort((a, b) => (a < b ? 1 : -1))
+  return out
 }
 
 export async function discoverCodexWorkspaces(
   registeredPaths: Set<string>,
   sessionsRoot: string = CODEX_SESSIONS_ROOT
 ): Promise<DiscoveredWorkspace[]> {
-  const files = (await listRolloutFiles(sessionsRoot)).slice(0, SCAN_LIMIT)
+  const files = await listRolloutFiles(sessionsRoot, SCAN_LIMIT)
   // Newest-first scan: the first rollout seen per cwd carries its lastRunAt.
   const byCwd = new Map<string, string | undefined>()
   for (const file of files) {
