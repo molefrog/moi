@@ -3,6 +3,8 @@ import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 
 import { IconArrowUp, IconLoader2 } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
+import { Composer, ComposerFooter, ComposerTextarea } from '@/client/components/shared/Composer'
+import { ModelPicker } from '@/client/features/chat/ModelPicker'
 import type { ViewBuilder } from '@/lib/types'
 
 type ViewBuilderTabProps = {
@@ -62,20 +64,12 @@ export function ViewBuilderTab({
               Describe the content, data, and actions you need.
             </p>
           </div>
-          <form
-            onSubmit={submit}
-            onMouseDown={event => {
-              if (event.target instanceof HTMLElement && event.target.closest('button')) return
-              event.preventDefault()
-              composerRef.current?.focus()
-            }}
-            className="flex w-full cursor-text flex-col gap-1 rounded-lg bg-card p-2 text-card-foreground shadow-xs transition-[color,box-shadow] outline-none focus-within:shadow-sm"
-          >
+          <Composer composerRef={composerRef} onSubmit={submit}>
             <label className="sr-only" htmlFor={`view-builder-${builder.id}`}>
               View requirements
             </label>
-            <textarea
-              ref={composerRef}
+            <ComposerTextarea
+              textareaRef={composerRef}
               id={`view-builder-${builder.id}`}
               value={requirements}
               onChange={event => setRequirements(event.target.value)}
@@ -87,12 +81,13 @@ export function ViewBuilderTab({
               }}
               placeholder="Build a customer dashboard with…"
               rows={1}
-              className="field-sizing-content max-h-40 min-h-16 w-full resize-none bg-transparent px-2 py-1 text-sm leading-relaxed outline-none placeholder:text-muted-foreground disabled:opacity-50"
+              className="min-h-16"
               aria-describedby={saveError ? `view-builder-error-${builder.id}` : undefined}
               aria-invalid={Boolean(saveError)}
               autoFocus
             />
-            <div className="flex items-center justify-end gap-1.5">
+            <ComposerFooter>
+              <ModelPicker scope="workspace" />
               <Button
                 type="submit"
                 size="icon"
@@ -105,8 +100,8 @@ export function ViewBuilderTab({
                   <IconArrowUp stroke={1.5} />
                 )}
               </Button>
-            </div>
-          </form>
+            </ComposerFooter>
+          </Composer>
           {saveError && (
             <p
               id={`view-builder-error-${builder.id}`}
