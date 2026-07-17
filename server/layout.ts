@@ -118,7 +118,10 @@ function normalizePreviewMessage(message: string | undefined): string | undefine
 
 export async function getWorkspacePreview(
   workspacePath: string,
-  getFirstUserMessage?: () => Promise<string | undefined>
+  getProviderPreview?: (includeFirstUserMessage: boolean) => Promise<{
+    firstUserMessage?: string
+    updatedAt?: number
+  }>
 ): Promise<WorkspacePreview> {
   try {
     const layout = await loadLayout(workspacePath)
@@ -128,17 +131,24 @@ export async function getWorkspacePreview(
       .map(item => images[item.i])
       .filter((image): image is string => typeof image === 'string')
       .slice(0, PREVIEW_LIMIT)
+    const includeFirstUserMessage = layout.widgetGrid.length === 0
+    const providerPreview = await getProviderPreview?.(includeFirstUserMessage).catch(
+      () => undefined
+    )
+    const updatedAt = providerPreview?.updatedAt
 
-    if (layout.widgetGrid.length === 0) {
-      const firstUserMessage = normalizePreviewMessage(await getFirstUserMessage?.())
+    if (includeFirstUserMessage) {
+      const firstUserMessage = normalizePreviewMessage(providerPreview?.firstUserMessage)
       return {
         thumbnails,
-        ...(firstUserMessage ? { firstUserMessage } : {})
+        ...(firstUserMessage ? { firstUserMessage } : {}),
+        ...(updatedAt !== undefined ? { updatedAt } : {})
       }
     }
 
     return {
-      thumbnails
+      thumbnails,
+      ...(updatedAt !== undefined ? { updatedAt } : {})
     }
   } catch {
     return { thumbnails: [] }

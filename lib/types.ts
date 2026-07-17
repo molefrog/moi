@@ -455,11 +455,13 @@ export type WidgetThumbnails = {
 }
 
 // Home-screen workspace card preview: a few captured widget thumbnails (WebP
-// data URLs) from the stored layout, rendered as a loose stack. A workspace
-// with no widgets may instead carry its oldest thread's first user message.
+// data URLs) from the stored layout, rendered as a loose stack, plus the latest
+// provider session activity. A workspace with no widgets may instead carry its
+// oldest thread's first user message.
 export type WorkspacePreview = {
   thumbnails: string[]
   firstUserMessage?: string
+  updatedAt?: number
 }
 
 // One effective env var, as surfaced by GET /api/workspaces/:id/env. Values are

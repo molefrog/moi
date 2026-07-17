@@ -122,7 +122,7 @@ export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: 
       <DropdownMenuTrigger
         render={
           <Button variant="ghost">
-            <span className="font-normal text-foreground">
+            <span className="text-foreground">
               {headline(model.description) || model.displayName}
             </span>
             {currentEffort && (
