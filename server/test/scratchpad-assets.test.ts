@@ -4,11 +4,11 @@ import { readdir } from 'node:fs/promises'
 import { join } from 'path'
 
 import {
-  armOrphanSweep,
   loadScratchpadDoc,
   readScratchpadImage,
   readScratchpadShapes,
-  saveScratchpadDoc
+  saveScratchpadDoc,
+  sweepAllWorkspaces
 } from '../scratchpad'
 import type { ScratchpadDoc } from '../scratchpad'
 import {
@@ -261,7 +261,7 @@ describe('sweepOrphanAssets', () => {
   })
 
   test('is a no-op when the assets dir does not exist', async () => {
-    expect(await sweepOrphanAssets(WS, { store: {} })).toBe(0)
+    await sweepOrphanAssets(WS, { store: {} })
   })
 
   test('an asset record no shape uses does not pin its file (browser image deletion)', async () => {
@@ -284,27 +284,12 @@ describe('sweepOrphanAssets', () => {
 
     // Shape deleted in the browser: clock starts, grace applies (an undo that
     // restores the shape within the window would reset it)...
-    expect(await sweepOrphanAssets(WS, afterDelete, undefined, t0 + 1000)).toBe(1)
+    await sweepOrphanAssets(WS, afterDelete, undefined, t0 + 1000)
     expect(await readdir(dir)).toContain(name)
 
     // ...and past the window the file is reclaimed despite the lingering record.
-    expect(await sweepOrphanAssets(WS, afterDelete, undefined, t0 + 7 * 60_000)).toBe(0)
+    await sweepOrphanAssets(WS, afterDelete, undefined, t0 + 7 * 60_000)
     expect(await readdir(dir)).not.toContain(name)
-  })
-
-  test('reports files still waiting out the grace window, 0 once reclaimed', async () => {
-    const { src } = await storeScratchpadAsset(WS, PNG_BYTES, 'image/png')
-    await storeScratchpadAsset(WS, new Uint8Array([9]), 'image/png')
-    const doc = docWithImage(src)
-
-    const t0 = 3_000_000
-    // Clock started for the orphan — pending, so the caller must sweep again.
-    expect(await sweepOrphanAssets(WS, doc, undefined, t0)).toBe(1)
-    // Still within grace — still pending.
-    expect(await sweepOrphanAssets(WS, doc, undefined, t0 + 60_000)).toBe(1)
-    // Reclaimed — nothing pending, no follow-up needed.
-    expect(await sweepOrphanAssets(WS, doc, undefined, t0 + 6 * 60_000)).toBe(0)
-    expect(await readdir(getScratchpadAssetsDir(WS))).toEqual([assetSrcFileName(src)!])
   })
 
   test('reclaims stale .tmp-* files left by a crashed write', async () => {
@@ -313,9 +298,8 @@ describe('sweepOrphanAssets', () => {
     await Bun.write(join(dir, '.tmp-crashed'), 'partial bytes')
     const doc: ScratchpadDoc = { store: {} }
 
-    // Too young to judge (could be a write in flight) — kept, reported pending.
-    // The asset file also lands on the clock, hence 2.
-    expect(await sweepOrphanAssets(WS, doc, undefined, Date.now())).toBe(2)
+    // Too young to judge (could be a write in flight) — kept.
+    await sweepOrphanAssets(WS, doc, undefined, Date.now())
     expect(await readdir(dir)).toContain('.tmp-crashed')
 
     // Older than the grace window — abandoned, reclaimed.
@@ -324,22 +308,27 @@ describe('sweepOrphanAssets', () => {
   })
 })
 
-describe('armOrphanSweep', () => {
-  test('a scheduled follow-up sweep reclaims orphans without any further save', async () => {
+describe('sweepAllWorkspaces', () => {
+  test('the periodic pass reclaims expired orphans without any further save', async () => {
+    const { setRegistryPath, registerWorkspace } = await import('../registry')
+    setRegistryPath(join(WS, 'workspaces.json'))
+    await registerWorkspace(WS, { type: 'claude-code' })
+
     const { src } = await storeScratchpadAsset(WS, PNG_BYTES, 'image/png')
     const kept = assetSrcFileName(src)!
     const { src: orphanSrc } = await storeScratchpadAsset(WS, new Uint8Array([4, 5]), 'image/png')
     const orphan = assetSrcFileName(orphanSrc)!
-    const doc = docWithImage(src)
-    // The follow-up judges against the snapshot on disk — write it directly.
-    await Bun.write(join(WS, '.moi', '.scratchpad.json'), JSON.stringify({ document: doc }))
+    // The pass judges against the snapshot on disk — write it directly.
+    await Bun.write(
+      join(WS, '.moi', '.scratchpad.json'),
+      JSON.stringify({ document: docWithImage(src) })
+    )
 
-    // Start the orphan's clock far in the past so the follow-up (running at the
-    // real Date.now()) sees the grace window already elapsed.
-    await sweepOrphanAssets(WS, doc, undefined, 1_000_000)
+    // Start the orphan's clock far in the past so the pass (running at the real
+    // Date.now()) sees the grace window already elapsed.
+    await sweepOrphanAssets(WS, docWithImage(src), undefined, 1_000_000)
 
-    armOrphanSweep(WS, 20)
-    await new Promise(resolve => setTimeout(resolve, 250))
+    await sweepAllWorkspaces()
 
     const left = await readdir(getScratchpadAssetsDir(WS))
     expect(left).toContain(kept)

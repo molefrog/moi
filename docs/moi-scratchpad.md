@@ -109,10 +109,10 @@ on the server (the mutations). Only `view` — rendering pixels — genuinely re
   then sweeps asset files that no shape in the document still uses (deleting an image in the
   browser removes only the shape — tldraw leaves the asset record behind, so the sweep keys
   on shape usage, not bare asset records) and the `.bak` backup doesn't reference, with
-  a grace window so a just-uploaded file survives until its autosave lands. A sweep that
-  leaves files inside their grace window schedules a follow-up sweep past it, so orphans
-  are reclaimed even when that save was the last edit — deleting an image and walking away
-  still frees its file a few minutes later. If a referenced
+  a grace window so a just-uploaded file survives until its autosave lands. A periodic
+  background pass re-sweeps every workspace, so orphans are reclaimed even when that save
+  was the last edit — deleting an image and walking away still frees its file a few
+  minutes later. If a referenced
   file does go missing (say the snapshot was copied without its sidecar dir), nothing
   breaks loudly: the canvas shows a broken-image placeholder, `read` flags the shape with
   `missing: true`, and `read-image` errors naming the expected location — move the `.moi`

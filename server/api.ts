@@ -25,7 +25,7 @@ import {
   reorderWorkspaces,
   tildify
 } from './registry'
-import { armOrphanSweep, loadScratchpadDoc, saveScratchpadDoc } from './scratchpad'
+import { loadScratchpadDoc, saveScratchpadDoc } from './scratchpad'
 import { MAX_ASSET_BYTES, scratchpadAssetFile, storeScratchpadAsset } from './scratchpad-assets'
 import { DIST_DIR, prebuilt } from './static'
 import { getThreadConfig, saveThreadConfig } from './thread-config'
@@ -498,10 +498,6 @@ one.put('/config', async c => {
 // ignore its own save. This is the browser's write path; the agent's draws are
 // written server-side (see scratchpad-executor.ts). See docs/moi-scratchpad.md.
 one.get('/scratchpad', async c => {
-  // Viewing the canvas re-arms the orphan sweep: after a restart the grace
-  // clock (in-memory) is empty, so leftovers from a previous process would
-  // otherwise wait for the next save to even start their clock.
-  armOrphanSweep(c.get('ws').path)
   return c.json(await loadScratchpadDoc(c.get('ws').path))
 })
 
@@ -536,11 +532,7 @@ one.post('/scratchpad/assets', async c => {
     return c.text(`Asset too large (max ${MAX_ASSET_BYTES / (1024 * 1024)} MB)`, 413)
   }
   const mimeType = c.req.header('content-type') ?? 'application/octet-stream'
-  const stored = await storeScratchpadAsset(c.get('ws').path, bytes, mimeType)
-  // The file is unreferenced until the tab's autosave PUT lands. If the tab
-  // dies first, no save ever sweeps — the armed follow-up reclaims it.
-  armOrphanSweep(c.get('ws').path)
-  return c.json(stored)
+  return c.json(await storeScratchpadAsset(c.get('ws').path, bytes, mimeType))
 })
 
 // The file name is content-addressed (sha256 of the bytes), so a hit is
