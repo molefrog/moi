@@ -44,7 +44,7 @@ function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
         <WidgetGridLayout items={EMPTY_WIDGET_ITEMS} renderItem={renderEmptyWidget} />
       </div>
 
-      <div className="absolute inset-0 z-1 flex items-center justify-center p-6">
+      <div className="absolute inset-0 flex items-center justify-center p-6">
         <div className="flex h-full w-full max-w-(--column-w) flex-col items-center justify-center gap-4 bg-radial from-background from-50% to-transparent to-75% text-center">
           <div className="flex flex-col gap-1.5">
             <h2 className="font-medium">A little empty here</h2>
