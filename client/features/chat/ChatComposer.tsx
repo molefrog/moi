@@ -9,6 +9,7 @@ import {
   IconX
 } from '@tabler/icons-react'
 
+import { Composer, ComposerFooter, ComposerTextarea } from '@/client/components/shared/Composer'
 import { cn } from '@/client/lib/cn'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { uploadFiles } from '@/client/features/chat/uploads'
@@ -89,15 +90,11 @@ export function ChatComposer({ composerRef, onSend, onStop, processing }: ChatCo
   }
 
   return (
-    <form
+    <Composer
+      composerRef={composerRef}
       onSubmit={e => {
         e.preventDefault()
         send()
-      }}
-      onMouseDown={e => {
-        if (e.target instanceof HTMLElement && e.target.closest('button')) return
-        e.preventDefault()
-        composerRef.current?.focus()
       }}
       onDragOver={e => {
         if (!e.dataTransfer.types.includes('Files')) return
@@ -115,10 +112,7 @@ export function ChatComposer({ composerRef, onSend, onStop, processing }: ChatCo
         setDragOver(false)
         addFiles(Array.from(e.dataTransfer.files))
       }}
-      className={cn(
-        'flex w-full max-w-(--chat-max-container) cursor-text flex-col gap-1 rounded-lg bg-card p-2 text-card-foreground shadow-xs transition-[color,box-shadow] outline-none focus-within:shadow-sm',
-        dragOver && 'ring-2 ring-ring/60'
-      )}
+      className={cn(dragOver && 'ring-2 ring-ring/60')}
     >
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 px-1 pt-1 pb-0.5">
@@ -134,8 +128,8 @@ export function ChatComposer({ composerRef, onSend, onStop, processing }: ChatCo
         </div>
       )}
 
-      <textarea
-        ref={composerRef}
+      <ComposerTextarea
+        textareaRef={composerRef}
         id="chat-input"
         name="message"
         value={value}
@@ -154,9 +148,8 @@ export function ChatComposer({ composerRef, onSend, onStop, processing }: ChatCo
         }}
         placeholder={processing ? 'Queue a follow-up' : 'Do anything'}
         rows={1}
-        className="field-sizing-content max-h-40 w-full resize-none bg-transparent px-2 py-1 text-sm leading-relaxed outline-none placeholder:text-muted-foreground disabled:opacity-50"
       />
-      <div className="flex items-center justify-end gap-1.5">
+      <ComposerFooter>
         <input
           ref={fileRef}
           type="file"
@@ -187,8 +180,8 @@ export function ChatComposer({ composerRef, onSend, onStop, processing }: ChatCo
             <IconArrowUp stroke={1.5} />
           </Button>
         )}
-      </div>
-    </form>
+      </ComposerFooter>
+    </Composer>
   )
 }
 

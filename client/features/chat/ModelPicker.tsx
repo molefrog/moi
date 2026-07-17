@@ -66,6 +66,10 @@ function sortPrice(m: Model, all: Model[]): number {
   return sibling ? outputPrice(sibling.description) : -1
 }
 
+type ModelPickerProps = {
+  scope?: 'active-chat' | 'workspace'
+}
+
 // Model selector for the chat composer. Renders the workspace's available
 // models from `/api/workspaces/:id/models`. Model + reasoning effort are
 // persisted PER THREAD (so a thread reopens with the settings it last ran with)
@@ -73,10 +77,11 @@ function sortPrice(m: Model, all: Model[]): number {
 // edits the workspace defaults, which seed the new thread. Both are sent with
 // each chat frame (see useChat); leaving them untouched runs on the SDK default.
 // Fast mode remains local-only for now.
-// Memoized (no props): it lives inside ChatInput, which re-renders on every
-// keystroke, so memo keeps the picker from re-rendering with it — it updates
-// only on its own store/query changes (active thread, models, layout).
-export const ModelPicker = memo(function ModelPicker() {
+// The workspace scope gives new-chat surfaces such as the view builder the same
+// defaults that their submit path reads. The active-chat scope persists per
+// thread once one exists.
+// Memoized because composer text changes should not re-render the picker.
+export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: ModelPickerProps) {
   const { workspaceId, layout, setLayout } = useWorkspaceLayoutCtx()
   const { data } = useWorkspaceModels(workspaceId)
   // The SDK prepends a synthetic "default" entry ("Use the default model
@@ -93,7 +98,9 @@ export const ModelPicker = memo(function ModelPicker() {
 
   // The active thread, if any. Its stored config is the source of truth; a new
   // chat (no active thread) falls back to — and edits — the workspace defaults.
-  const activeSessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
+  const activeSessionId = useLive(s =>
+    scope === 'active-chat' ? (s.activeByWorkspace[workspaceId] ?? null) : null
+  )
   const threadCfg = useThreadConfig(workspaceId, activeSessionId).data
   const saveThreadCfg = useSaveThreadConfig(workspaceId)
   const [fastMode, setFastMode] = useState(false)
