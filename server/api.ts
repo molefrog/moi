@@ -20,7 +20,9 @@ import {
   saveWidgetThumbnails
 } from './layout'
 import { getUserMcpStatus } from './harness/claude-code/mcp'
+import { getOldestSessionFirstUserMessage } from './harness/claude-code/sessions'
 import { getClientFrameLog, getWireLog } from './harness/debug'
+import { getOldestOpenClawFirstUserMessage } from './harness/openclaw/discovery'
 import { allHarnesses, harnessFor, isHarnessType } from './harness/registry'
 import {
   discoverWorkspaces,
@@ -107,7 +109,14 @@ const one = new Hono<ApiEnv>()
 one.use('*', withWorkspace)
 
 one.get('/preview', async c => {
-  return c.json(await getWorkspacePreview(c.get('ws').path))
+  const ws = c.get('ws')
+  return c.json(
+    await getWorkspacePreview(ws.path, () =>
+      ws.type === 'openclaw'
+        ? getOldestOpenClawFirstUserMessage(ws.path, ws.agentId)
+        : getOldestSessionFirstUserMessage(ws.path)
+    )
+  )
 })
 
 one.get('/widgets', c => listWidgets(c.get('ws').path))

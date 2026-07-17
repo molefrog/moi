@@ -188,4 +188,46 @@ describe('getWorkspacePreview', () => {
       }
     )
   })
+
+  test('loads and normalizes the first user message when the grid is empty', async () => {
+    await withWorkspaceFile(base, async dir => {
+      const message = `  ${'A'.repeat(260)}\nsecond line  `
+      const preview = await getWorkspacePreview(dir, async () => message)
+
+      expect(preview.thumbnails).toEqual([])
+      expect(preview.firstUserMessage?.length).toBe(240)
+      expect(preview.firstUserMessage?.endsWith('…')).toBe(true)
+      expect(preview.firstUserMessage).not.toContain('\n')
+    })
+  })
+
+  test('does not load the message fallback when widgets exist without screenshots', async () => {
+    await withWorkspaceFile(
+      {
+        ...base,
+        widgetGrid: [{ i: 'waiting-for-thumbnail', x: 0, y: 0 }]
+      },
+      async dir => {
+        let calls = 0
+        const preview = await getWorkspacePreview(dir, async () => {
+          calls += 1
+          return 'Should stay hidden'
+        })
+
+        expect(preview).toEqual({ thumbnails: [] })
+        expect(calls).toBe(0)
+      }
+    )
+  })
+
+  test('keeps an empty folder when the fallback is empty or unreadable', async () => {
+    await withWorkspaceFile(base, async dir => {
+      expect(await getWorkspacePreview(dir, async () => ' \n ')).toEqual({ thumbnails: [] })
+      expect(
+        await getWorkspacePreview(dir, async () => {
+          throw new Error('unreadable session')
+        })
+      ).toEqual({ thumbnails: [] })
+    })
+  })
 })

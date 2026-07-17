@@ -107,8 +107,19 @@ export async function saveWidgetThumbnails(
 // them as a loose stack, so the cap just keeps the payload small — anything
 // past it would hide under the pile anyway.
 const PREVIEW_LIMIT = 3
+const PREVIEW_MESSAGE_LIMIT = 240
 
-export async function getWorkspacePreview(workspacePath: string): Promise<WorkspacePreview> {
+function normalizePreviewMessage(message: string | undefined): string | undefined {
+  const normalized = message?.replace(/\s+/g, ' ').trim()
+  if (!normalized) return undefined
+  if (normalized.length <= PREVIEW_MESSAGE_LIMIT) return normalized
+  return `${normalized.slice(0, PREVIEW_MESSAGE_LIMIT - 1).trimEnd()}…`
+}
+
+export async function getWorkspacePreview(
+  workspacePath: string,
+  getFirstUserMessage?: () => Promise<string | undefined>
+): Promise<WorkspacePreview> {
   try {
     const layout = await loadLayout(workspacePath)
     const images = layout.widgetThumbnails?.images ?? {}
@@ -117,6 +128,14 @@ export async function getWorkspacePreview(workspacePath: string): Promise<Worksp
       .map(item => images[item.i])
       .filter((image): image is string => typeof image === 'string')
       .slice(0, PREVIEW_LIMIT)
+
+    if (layout.widgetGrid.length === 0) {
+      const firstUserMessage = normalizePreviewMessage(await getFirstUserMessage?.())
+      return {
+        thumbnails,
+        ...(firstUserMessage ? { firstUserMessage } : {})
+      }
+    }
 
     return {
       thumbnails

@@ -108,6 +108,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
   const query = useWorkspacePreview(workspaceId)
   const thumbnails = query.data ? [...query.data.thumbnails].reverse() : []
   const slots = STACK.slice(STACK.length - thumbnails.length)
+  const firstUserMessage = query.data?.firstUserMessage
   const { ref, horizontalRadiusScale } = useFolderRadiusScale()
   const backdropPath = folderBackdropPath(horizontalRadiusScale)
 
@@ -138,6 +139,24 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
           )}
         />
       ))}
+
+      {thumbnails.length === 0 && firstUserMessage && (
+        <div className="absolute top-[20%] right-[12%]">
+          <div
+            aria-hidden="true"
+            className={cn(
+              'mx-auto w-max max-w-40 origin-center rounded-sm bg-card px-3 py-2 shadow-xs',
+              'animate-in transition-transform duration-300 ease-out fade-in',
+              STACK[STACK.length - 1],
+              'group-hover:translate-y-0.5 group-focus-visible:translate-y-0.5'
+            )}
+          >
+            <p className="line-clamp-3 text-sm leading-normal whitespace-normal">
+              {firstUserMessage}
+            </p>
+          </div>
+        </div>
+      )}
 
       <div
         className={cn(

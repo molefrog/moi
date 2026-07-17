@@ -6,6 +6,13 @@ import type { SessionInfo, StreamEvent } from '@/lib/types'
 
 import { ClaudeAdapter } from './adapter'
 
+export type SessionFirstPromptCandidate = {
+  sessionId: string
+  firstPrompt?: string
+  createdAt?: number
+  lastModified: number
+}
+
 export async function getSessions(workspacePath: string): Promise<SessionInfo[]> {
   const sessions = await listSessions({ dir: workspacePath })
   return sessions.map(s => ({
@@ -14,6 +21,26 @@ export async function getSessions(workspacePath: string): Promise<SessionInfo[]>
     lastModified: s.lastModified,
     cwd: s.cwd
   }))
+}
+
+export function selectOldestSessionFirstUserMessage(
+  sessions: SessionFirstPromptCandidate[]
+): string | undefined {
+  const oldest = sessions
+    .slice()
+    .sort(
+      (a, b) =>
+        (a.createdAt ?? a.lastModified) - (b.createdAt ?? b.lastModified) ||
+        a.sessionId.localeCompare(b.sessionId)
+    )[0]
+  return oldest?.firstPrompt
+}
+
+export async function getOldestSessionFirstUserMessage(
+  workspacePath: string
+): Promise<string | undefined> {
+  const sessions = await listSessions({ dir: workspacePath })
+  return selectOldestSessionFirstUserMessage(sessions)
 }
 
 /**

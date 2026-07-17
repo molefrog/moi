@@ -4,6 +4,8 @@ import { join, resolve } from 'node:path'
 
 import type { Model } from '@/lib/types'
 
+import { stripUserMessageMetadata } from './strip'
+
 export type OpenClawAgent = {
   path: string
   agentId: string
@@ -43,6 +45,12 @@ export type OpenClawMessage = {
 
 export type OpenClawSessionDetail = {
   messages: OpenClawMessage[]
+}
+
+export type OpenClawSessionPreviewCandidate = {
+  key: string
+  updatedAt: number
+  detail: OpenClawSessionDetail | null
 }
 
 const TIMEOUT_MS = 2000
@@ -205,6 +213,64 @@ export async function getOpenClawSessionMessages(
     return await rpc<OpenClawSessionDetail>('sessions.get', { key })
   })
   return out ?? null
+}
+
+function firstUserMessageText(detail: OpenClawSessionDetail | null): string | undefined {
+  const message = detail?.messages.find(candidate => candidate.role === 'user')
+  if (!message) return undefined
+
+  const raw =
+    typeof message.content === 'string'
+      ? message.content
+      : message.content
+          .filter(
+            (block): block is Extract<OpenClawContentBlock, { type: 'text' }> =>
+              block.type === 'text'
+          )
+          .map(block => block.text)
+          .join('\n')
+  const text = stripUserMessageMetadata(raw).trim()
+  return text || undefined
+}
+
+export function selectOldestOpenClawFirstUserMessage(
+  candidates: OpenClawSessionPreviewCandidate[]
+): string | undefined {
+  const oldest = candidates.slice().sort((a, b) => {
+    const aCreatedAt =
+      a.detail?.messages.find(message => typeof message.timestamp === 'number')?.timestamp ??
+      a.updatedAt
+    const bCreatedAt =
+      b.detail?.messages.find(message => typeof message.timestamp === 'number')?.timestamp ??
+      b.updatedAt
+    return aCreatedAt - bCreatedAt || a.key.localeCompare(b.key)
+  })[0]
+  return oldest ? firstUserMessageText(oldest.detail) : undefined
+}
+
+export async function getOldestOpenClawFirstUserMessage(
+  workspacePath: string,
+  agentId?: string
+): Promise<string | undefined> {
+  const out = await withGatewayClient(async rpc => {
+    const id = agentId ?? (await resolveAgentIdForPath(rpc, workspacePath))
+    if (!id) return undefined
+
+    const res = await rpc<{ sessions: OpenClawSessionRow[] }>('sessions.list', {
+      agentId: id
+    })
+    const candidates = await Promise.all(
+      res.sessions.map(async session => ({
+        key: session.key,
+        updatedAt: session.updatedAt,
+        detail: await rpc<OpenClawSessionDetail>('sessions.get', { key: session.key }).catch(
+          () => null
+        )
+      }))
+    )
+    return selectOldestOpenClawFirstUserMessage(candidates)
+  })
+  return out ?? undefined
 }
 
 // One entry from the gateway's `models.list` catalog. The catalog is

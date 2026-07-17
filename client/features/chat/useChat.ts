@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
 
+import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useSessionView, useThreadConfig, useWorkspaceModels } from '@/client/features/chat/api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
@@ -112,6 +113,9 @@ export function useChat() {
         stream,
         ...(ready.length > 0 ? { attachments: ready.map(a => a.upload!.id) } : {})
       })
+      if (isNew) {
+        qc.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
+      }
       // Drop the thread's attachments now that they've been sent (revokes the
       // preview object URLs). Keyed by the pre-mint id, matching where they were
       // stored by the composer.

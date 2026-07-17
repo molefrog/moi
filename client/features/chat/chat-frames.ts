@@ -72,6 +72,7 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
       queryClient?.removeQueries({ queryKey: workspaceKeys.threadConfig(workspaceId, from) })
     }
     queryClient?.invalidateQueries({ queryKey: workspaceKeys.sessions(workspaceId) })
+    queryClient?.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
     return
   }
   if (data.type === 'workspace:switch') {
