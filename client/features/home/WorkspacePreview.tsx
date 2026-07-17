@@ -1,6 +1,7 @@
 import { IconGhost } from '@tabler/icons-react'
 
 import { useWorkspacePreview } from './api'
+import { cn } from '@/client/lib/cn'
 
 type WorkspacePreviewProps = {
   workspaceId: string
@@ -15,13 +16,19 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
   const hasItems = items.length > 0 && rows > 0
   const isEmpty = query.data !== undefined && !hasItems
 
+  const overflows = rows > cols
+
   return (
-    <div className="flex aspect-video w-full items-center justify-center rounded-sm bg-muted p-3">
+    <div
+      className={cn(
+        'flex aspect-square w-full justify-center overflow-hidden rounded-sm bg-muted p-3',
+        overflows ? 'items-start' : 'items-center'
+      )}
+    >
       {hasItems && (
         <svg
           viewBox={`0 0 ${cols} ${rows}`}
-          preserveAspectRatio="none"
-          className="size-full animate-in duration-300 fade-in"
+          className="w-full shrink-0 animate-in duration-300 fade-in"
         >
           {items.map((item, i) => (
             <rect
