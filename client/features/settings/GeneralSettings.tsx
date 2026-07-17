@@ -51,6 +51,18 @@ export function GeneralSettings() {
             />
           }
         />
+        <SettingsRow
+          title="Path"
+          control={
+            <Input
+              value={cwd ?? ''}
+              readOnly
+              aria-label="Workspace path"
+              title={cwd ?? undefined}
+              className="w-56"
+            />
+          }
+        />
         <div className="flex flex-col gap-4 px-3.5 py-3.5">
           <div className="flex flex-col">
             <span className="text-sm font-medium">Icon</span>

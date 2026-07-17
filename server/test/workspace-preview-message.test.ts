@@ -1,10 +1,14 @@
 import { describe, expect, test } from 'bun:test'
 
 import {
+  selectLatestOpenClawUpdatedAt,
   selectOldestOpenClawFirstUserMessage,
   type OpenClawSessionPreviewCandidate
 } from '../harness/openclaw/discovery'
-import { selectOldestSessionFirstUserMessage } from '../harness/claude-code/sessions'
+import {
+  selectLatestSessionUpdatedAt,
+  selectOldestSessionFirstUserMessage
+} from '../harness/claude-code/sessions'
 
 describe('workspace preview message selection', () => {
   test('uses the oldest Claude Code thread creation time', () => {
@@ -33,6 +37,17 @@ describe('workspace preview message selection', () => {
         { sessionId: 'older', firstPrompt: 'Older', lastModified: 10 }
       ])
     ).toBe('Older')
+  })
+
+  test('uses the latest Claude Code thread activity time', () => {
+    expect(
+      selectLatestSessionUpdatedAt([
+        { lastModified: 100 },
+        { lastModified: 900 },
+        { lastModified: 200 }
+      ])
+    ).toBe(900)
+    expect(selectLatestSessionUpdatedAt([])).toBeUndefined()
   })
 
   test('uses the oldest OpenClaw transcript and strips stored message metadata', () => {
@@ -82,5 +97,12 @@ describe('workspace preview message selection', () => {
     ]
 
     expect(selectOldestOpenClawFirstUserMessage(candidates)).toBeUndefined()
+  })
+
+  test('uses the latest OpenClaw thread activity time', () => {
+    expect(
+      selectLatestOpenClawUpdatedAt([{ updatedAt: 100 }, { updatedAt: 900 }, { updatedAt: 200 }])
+    ).toBe(900)
+    expect(selectLatestOpenClawUpdatedAt([])).toBeUndefined()
   })
 })

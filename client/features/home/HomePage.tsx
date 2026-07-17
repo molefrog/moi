@@ -1,7 +1,7 @@
 import { IconChevronRight, IconEggCracked, IconLoader2, IconPlus } from '@tabler/icons-react'
 import { Link, useLocation } from 'wouter'
 
-import { useAddWorkspace, useDiscoveredWorkspaces, useWorkspaces } from './api'
+import { useAddWorkspace, useDiscoveredWorkspaces, useWorkspacePreview, useWorkspaces } from './api'
 import { HomeLogo } from './HomeLogo'
 import { Button } from '@/client/components/ui/button'
 import {
@@ -147,7 +147,6 @@ type WorkspaceCardProps = {
 
 function WorkspaceCard({ workspace }: WorkspaceCardProps) {
   const name = workspaceDisplayName(workspace)
-  const meta = formatAddedAt(workspace.addedAt)
 
   return (
     <Link
@@ -155,8 +154,8 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
       className="group flex min-w-0 flex-col gap-4 rounded-xl bg-card p-2 shadow-xs transition-shadow hover:shadow-sm"
     >
       <WorkspacePreview workspaceId={workspace.id} />
-      <div className="flex min-w-0 flex-col px-2 pb-2">
-        <div className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 flex-col gap-2 px-2 pb-2">
+        <div className="flex min-w-0 items-center gap-1.5">
           <img
             src={workspace.icon ?? workspaceProviderIcon[workspace.type ?? 'claude-code']}
             alt=""
@@ -164,12 +163,22 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
           />
           <span className="truncate text-sm font-medium text-foreground">{name}</span>
         </div>
-        <div title={workspace.path} className="mt-2 truncate text-xs text-muted-foreground">
-          {workspace.displayPath ?? workspace.path}
-        </div>
-        <div className="mt-2 text-xs text-muted-foreground">{meta}</div>
+        <WorkspaceUpdatedAt workspaceId={workspace.id} />
       </div>
     </Link>
+  )
+}
+
+type WorkspaceUpdatedAtProps = {
+  workspaceId: string
+}
+
+function WorkspaceUpdatedAt({ workspaceId }: WorkspaceUpdatedAtProps) {
+  const query = useWorkspacePreview(workspaceId)
+  if (query.data?.updatedAt === undefined) return null
+
+  return (
+    <span className="text-xs text-muted-foreground">{formatUpdatedAt(query.data.updatedAt)}</span>
   )
 }
 
@@ -201,14 +210,14 @@ function SuggestedRow({ suggestion, onAdd, loading }: SuggestedRowProps) {
   )
 }
 
-function formatAddedAt(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime()
+function formatUpdatedAt(timestamp: number): string {
+  const ms = Date.now() - timestamp
   const mins = Math.floor(ms / 60000)
-  if (mins < 1) return 'Added just now'
-  if (mins < 60) return `Added ${mins} min${mins === 1 ? '' : 's'} ago`
+  if (mins < 1) return 'Updated just now'
+  if (mins < 60) return `Updated ${mins} min${mins === 1 ? '' : 's'} ago`
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `Added ${hours} hour${hours === 1 ? '' : 's'} ago`
+  if (hours < 24) return `Updated ${hours} hour${hours === 1 ? '' : 's'} ago`
   const days = Math.floor(hours / 24)
-  if (days < 30) return `Added ${days} day${days === 1 ? '' : 's'} ago`
-  return `Added ${new Date(iso).toLocaleDateString()}`
+  if (days < 30) return `Updated ${days} day${days === 1 ? '' : 's'} ago`
+  return `Updated ${new Date(timestamp).toLocaleDateString()}`
 }

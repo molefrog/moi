@@ -53,6 +53,11 @@ export type OpenClawSessionPreviewCandidate = {
   detail: OpenClawSessionDetail | null
 }
 
+export type OpenClawWorkspacePreview = {
+  firstUserMessage?: string
+  updatedAt?: number
+}
+
 const TIMEOUT_MS = 2000
 
 type AgentsList = {
@@ -248,17 +253,33 @@ export function selectOldestOpenClawFirstUserMessage(
   return oldest ? firstUserMessageText(oldest.detail) : undefined
 }
 
-export async function getOldestOpenClawFirstUserMessage(
+export function selectLatestOpenClawUpdatedAt(
+  sessions: Pick<OpenClawSessionRow, 'updatedAt'>[]
+): number | undefined {
+  return sessions.reduce<number | undefined>(
+    (latest, session) =>
+      latest === undefined || session.updatedAt > latest ? session.updatedAt : latest,
+    undefined
+  )
+}
+
+export async function getOpenClawWorkspacePreview(
   workspacePath: string,
-  agentId?: string
-): Promise<string | undefined> {
+  agentId: string | undefined,
+  includeFirstUserMessage: boolean
+): Promise<OpenClawWorkspacePreview> {
   const out = await withGatewayClient(async rpc => {
     const id = agentId ?? (await resolveAgentIdForPath(rpc, workspacePath))
-    if (!id) return undefined
+    if (!id) return {}
 
     const res = await rpc<{ sessions: OpenClawSessionRow[] }>('sessions.list', {
       agentId: id
     })
+    const updatedAt = selectLatestOpenClawUpdatedAt(res.sessions)
+    if (!includeFirstUserMessage) {
+      return updatedAt !== undefined ? { updatedAt } : {}
+    }
+
     const candidates = await Promise.all(
       res.sessions.map(async session => ({
         key: session.key,
@@ -268,9 +289,13 @@ export async function getOldestOpenClawFirstUserMessage(
         )
       }))
     )
-    return selectOldestOpenClawFirstUserMessage(candidates)
+    const firstUserMessage = selectOldestOpenClawFirstUserMessage(candidates)
+    return {
+      ...(firstUserMessage ? { firstUserMessage } : {}),
+      ...(updatedAt !== undefined ? { updatedAt } : {})
+    }
   })
-  return out ?? undefined
+  return out ?? {}
 }
 
 // One entry from the gateway's `models.list` catalog. The catalog is

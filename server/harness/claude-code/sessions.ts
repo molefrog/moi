@@ -13,6 +13,11 @@ export type SessionFirstPromptCandidate = {
   lastModified: number
 }
 
+export type SessionWorkspacePreview = {
+  firstUserMessage?: string
+  updatedAt?: number
+}
+
 export async function getSessions(workspacePath: string): Promise<SessionInfo[]> {
   const sessions = await listSessions({ dir: workspacePath })
   return sessions.map(s => ({
@@ -36,11 +41,30 @@ export function selectOldestSessionFirstUserMessage(
   return oldest?.firstPrompt
 }
 
-export async function getOldestSessionFirstUserMessage(
-  workspacePath: string
-): Promise<string | undefined> {
+export function selectLatestSessionUpdatedAt(
+  sessions: Pick<SessionFirstPromptCandidate, 'lastModified'>[]
+): number | undefined {
+  return sessions.reduce<number | undefined>(
+    (latest, session) =>
+      latest === undefined || session.lastModified > latest ? session.lastModified : latest,
+    undefined
+  )
+}
+
+export async function getSessionWorkspacePreview(
+  workspacePath: string,
+  includeFirstUserMessage: boolean
+): Promise<SessionWorkspacePreview> {
   const sessions = await listSessions({ dir: workspacePath })
-  return selectOldestSessionFirstUserMessage(sessions)
+  const updatedAt = selectLatestSessionUpdatedAt(sessions)
+  const firstUserMessage = includeFirstUserMessage
+    ? selectOldestSessionFirstUserMessage(sessions)
+    : undefined
+
+  return {
+    ...(firstUserMessage ? { firstUserMessage } : {}),
+    ...(updatedAt !== undefined ? { updatedAt } : {})
+  }
 }
 
 /**
