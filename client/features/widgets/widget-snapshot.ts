@@ -2,7 +2,7 @@
 // `data-snapshot-widget` in WidgetGrid) to a WebP data URL via
 // modern-screenshot — white background, the widget's own aspect ratio, frame
 // chrome stripped. Shared by the automatic invalidation hook
-// (useWidgetThumbnails) and the dev SnapshotPlayground.
+// (useWidgetThumbnails).
 import type { WidgetInfo } from '@/lib/types'
 
 // Long edge of a stored thumbnail, in output px. Placeholder until the real
