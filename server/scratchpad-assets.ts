@@ -195,11 +195,28 @@ export async function sweepOrphanAssets(
     const files = await readdir(dir).catch(() => [] as string[])
     if (files.length === 0) return 0
 
+    // A file is referenced only when an asset record points at it AND some
+    // shape still uses that asset. The shape check matters: tldraw's editor
+    // deletes only the shape when the user removes an image in the browser —
+    // the asset record stays in the document forever — so counting bare asset
+    // records as references kept every browser-deleted image's file pinned for
+    // good. An asset orphaned this way gets the normal grace window, so an
+    // undo shortly after the delete (which restores the shape and re-saves)
+    // resets its clock before anything is reclaimed.
+    const usedAssetIds = new Set<string>()
+    for (const record of Object.values(document?.store ?? {})) {
+      if (!record || typeof record !== 'object') continue
+      const r = record as { typeName?: string; props?: { assetId?: unknown } }
+      if (r.typeName === 'shape' && typeof r.props?.assetId === 'string') {
+        usedAssetIds.add(r.props.assetId)
+      }
+    }
     const referenced = new Set<string>()
     for (const record of Object.values(document?.store ?? {})) {
       if (!record || typeof record !== 'object') continue
-      const r = record as { typeName?: string; props?: { src?: unknown } }
+      const r = record as { typeName?: string; id?: string; props?: { src?: unknown } }
       if (r.typeName !== 'asset' || typeof r.props?.src !== 'string') continue
+      if (typeof r.id !== 'string' || !usedAssetIds.has(r.id)) continue
       const name = assetSrcFileName(r.props.src)
       if (name) referenced.add(name)
     }
