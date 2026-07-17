@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
@@ -45,12 +45,16 @@ export function useWorkspaceViews(workspaceId: string) {
 }
 
 export function useSaveLayout(workspaceId: string) {
+  const queryClient = useQueryClient()
   return useMutation<void, Error, WorkspaceLayout>({
     mutationFn: layout =>
       requestVoid(
         `/api/workspaces/${workspaceId}`,
         jsonRequest('PUT', layout),
         'Failed to save layout'
-      )
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
+    }
   })
 }
