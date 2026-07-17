@@ -214,6 +214,11 @@ state, steer/interrupt, previews, usage). Empirical findings beyond §2:
 - **The npm `codex` bin is a Node shim** that spawns the platform binary;
   killing the shim tears down the server via stdin EOF, so no orphans — but
   binary detection must tolerate shim paths (`CODEX_CLI_PATH` → PATH).
+- **Rollout files double as a discovery index.** Each thread persists to
+  `~/.codex/sessions/YYYY/MM/DD/rollout-<timestamp>-<uuid>.jsonl` whose first
+  line is a `session_meta` record with the thread's `cwd` (older formats put
+  the meta fields at the top level). `discovery.ts` reads those heads directly
+  — workspace discovery works without the binary installed.
 - **User-level config bleeds in**: threads start MCP servers and hooks from
   `~/.codex/config.toml` / `hooks.json` per thread; their failures arrive as
   notifications (`mcpServer/startupStatus/updated`, `hook/completed`) we

@@ -14,5 +14,6 @@ export const workspaceKeys = {
   userMcp: ['mcp', 'user'] as const,
   mcp: (id: string) => ['workspaces', 'mcp', id] as const,
   models: (id: string) => ['workspaces', 'models', id] as const,
+  availability: (id: string) => ['workspaces', 'availability', id] as const,
   env: (id: string) => ['workspaces', 'env', id] as const
 }

@@ -4,7 +4,14 @@ import { createMiddleware } from 'hono/factory'
 import { existsSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 
-import type { UploadInfo, ViewBuilderInput, WorkspaceEntry, WorkspaceModels } from '@/lib/types'
+import type {
+  HarnessAvailability,
+  UploadInfo,
+  ViewBuilderInput,
+  WorkspaceEntry,
+  WorkspaceModels,
+  WorkspaceType
+} from '@/lib/types'
 import { appendViewBuilderMeta } from '@/lib/view-builder-meta'
 
 import { appletForModule, recordAppletError } from './applet-log'
@@ -518,15 +525,31 @@ one.put('/env', async c => {
   return c.json(await getWorkspaceEnvView(ws.path, requiredEnvFor(ws.path)))
 })
 
+// Is the workspace's agent backend usable right now? (e.g. a codex workspace
+// on a machine without the codex CLI). The chat surfaces the `reason` as a
+// banner instead of letting the first send fail cold.
+one.get('/availability', async c => {
+  const harness = harnessFor(c.get('ws'))
+  const availability = (await harness.availability?.()) ?? { available: true }
+  return c.json(availability satisfies HarnessAvailability)
+})
+
 // Models the workspace's agent backend can run, normalized across providers.
 // OpenClaw queries the gateway catalog; everything else (Claude Code) reads the
 // account-wide Agent SDK model list.
 one.get('/models', async c => {
   const ws = c.get('ws')
   const harness = harnessFor(ws)
+  // A backend that can't answer (codex CLI missing, gateway down) degrades to
+  // an empty catalog — the picker hides and chat surfaces the real problem via
+  // the availability banner, instead of this endpoint 500ing on page load.
+  const models = await harness.listModels(ws).catch(err => {
+    console.error(`[api] listModels failed for ${harness.id}`, err)
+    return []
+  })
   return c.json({
     provider: harness.id,
-    models: await harness.listModels(ws),
+    models,
     supportsStreaming: harness.capabilities.supportsStreaming
   } satisfies WorkspaceModels)
 })
@@ -759,38 +782,56 @@ workspaces.post('/', async c => {
 
 workspaces.get('/discover', async c => c.json(await discoverWorkspaces()))
 
+// Backends the create dialog can provision from scratch. OpenClaw workspaces
+// belong to their agents and arrive via discovery.
+const CREATABLE_TYPES = new Set<WorkspaceType>(['claude-code', 'codex'])
+
+// Per-backend runtime availability (e.g. is the codex CLI installed?), keyed
+// by workspace type. Harnesses without the hook are always available.
+async function harnessAvailability(): Promise<Record<string, HarnessAvailability>> {
+  const out: Record<string, HarnessAvailability> = {}
+  for (const h of allHarnesses()) {
+    out[h.id] = h.availability ? await h.availability() : { available: true }
+  }
+  return out
+}
+
 // Where `/workspace/create` places new folders — the client shows the resolved
 // location while the user types a name. `canChooseFolder` tells the UI whether
-// the native folder picker is available (macOS only for now).
-workspaces.get('/create', c =>
+// the native folder picker is available (macOS only for now). `availability`
+// lets the dialog disable backends whose runtime is missing.
+workspaces.get('/create', async c =>
   c.json({
     root: CREATED_WORKSPACES_ROOT,
     displayRoot: tildify(CREATED_WORKSPACES_ROOT),
-    canChooseFolder: process.platform === 'darwin'
+    canChooseFolder: process.platform === 'darwin',
+    availability: await harnessAvailability()
   })
 )
 
 // Create a brand-new workspace: a fresh folder under CREATED_WORKSPACES_ROOT,
-// provisioned (skills + `.moi/` scaffold) and registered. Claude Code only for
-// now — OpenClaw workspaces belong to their agents and arrive via discovery.
+// provisioned (skills + `.moi/` scaffold) and registered.
 workspaces.post('/create', async c => {
   const body = await c.req.json()
-  const type = body?.type ?? 'claude-code'
-  if (type !== 'claude-code') {
-    return c.text('Only Claude Code workspaces can be created for now', 400)
+  const type: WorkspaceType = isHarnessType(body?.type) ? body.type : 'claude-code'
+  if (!CREATABLE_TYPES.has(type)) {
+    return c.text('Workspaces of this type arrive through discovery, not creation', 400)
   }
+  const availability = await (harnessFor(type).availability?.() ??
+    Promise.resolve({ available: true as const }))
+  if (!availability.available) return c.text(availability.reason, 400)
   const name = typeof body?.name === 'string' ? body.name.trim() : ''
   const invalid = validateWorkspaceFolderName(name)
   if (invalid) return c.text(invalid, 400)
   const path = join(CREATED_WORKSPACES_ROOT, name)
   if (existsSync(path)) return c.text('A folder with that name already exists', 409)
   try {
-    await provisionWorkspace(path, 'claude-code')
+    await provisionWorkspace(path, type)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return c.text(`Could not create workspace: ${message}`, 500)
   }
-  const entry = await registerWorkspace(path, { type: 'claude-code' })
+  const entry = await registerWorkspace(path, { type })
   // Nudge every connected client (the sidebar list) to refetch.
   publishEvent({ type: 'workspaces-list:updated' })
   return c.json(entry, 201)

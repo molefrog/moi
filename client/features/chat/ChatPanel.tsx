@@ -25,6 +25,10 @@ type ChatPanelProps = {
   processing: boolean
   error?: string | null
   onDismissError?: () => void
+  // Persistent, non-dismissable problem with the workspace's agent backend
+  // (e.g. the codex CLI is missing) — shown above the composer until it
+  // resolves, unlike `error` which reports one failed send.
+  warning?: string | null
   send: (text: string) => void
   stop: () => void
   onSwitchThread: (sessionId: string | null) => void
@@ -48,6 +52,7 @@ export function ChatPanel({
   processing,
   error,
   onDismissError,
+  warning,
   send,
   stop,
   onSwitchThread,
@@ -141,9 +146,9 @@ export function ChatPanel({
         )}
       </div>
 
-      <div className="mx-auto flex w-full justify-center px-3">
+      <div className="mx-auto flex w-full flex-col items-center px-3">
         {error && (
-          <div className="mb-2 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <div className="mb-2 flex w-full max-w-(--chat-max-container) items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             <span className="flex-1 wrap-break-word">{error}</span>
             {onDismissError && (
               <Button
@@ -157,6 +162,16 @@ export function ChatPanel({
                 <IconX stroke={1.75} />
               </Button>
             )}
+          </div>
+        )}
+        {/* The persistent backend warning yields to a fresh send error so two
+            near-identical banners never stack. */}
+        {warning && !error && (
+          <div
+            role="alert"
+            className="mb-2 w-full max-w-(--chat-max-container) rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs wrap-break-word text-destructive"
+          >
+            {warning}
           </div>
         )}
         <ChatComposer
