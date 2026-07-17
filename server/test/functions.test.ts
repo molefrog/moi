@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-import { callFunction, parseFunctionPath, restartWorker } from '../functions'
+import { callFunction, callFunctionEphemeral, parseFunctionPath, restartWorker } from '../functions'
 import {
   resetWorkspaceEnvForTest,
   setSecretStoreBackend,
@@ -204,5 +204,43 @@ describe('worker env isolation', () => {
     restartWorker(FIXTURES)
     const v = parse(await callFunction('envprobe', 'readSentinel', stringify([]), FIXTURES))
     expect(v).toBe('leaked')
+  })
+})
+
+describe('callFunctionEphemeral (one-shot isolated worker)', () => {
+  afterAll(() => {
+    restartWorker(FIXTURES)
+  })
+
+  test('returns a result through a throwaway worker', async () => {
+    const result = parse(
+      await callFunctionEphemeral('with-server', 'getWeather', stringify(['NYC']), FIXTURES)
+    )
+    expect(result).toEqual({ city: 'NYC', temp: 72 })
+  })
+
+  test('propagates function errors', async () => {
+    await expect(
+      callFunctionEphemeral('error', 'failHard', stringify([]), FIXTURES)
+    ).rejects.toThrow('intentional test error')
+  })
+
+  test('each invocation starts from clean module state', async () => {
+    // The stateful fixture's counter lives in module scope: a warm worker
+    // would return 1 then 2. A fresh process per call returns 1 both times.
+    const a = parse(await callFunctionEphemeral('stateful', 'increment', stringify([]), FIXTURES))
+    const b = parse(await callFunctionEphemeral('stateful', 'increment', stringify([]), FIXTURES))
+    expect(a).toBe(1)
+    expect(b).toBe(1)
+  })
+
+  test('never touches the warm pool worker', async () => {
+    restartWorker(FIXTURES)
+    const w1 = parse(await callFunction('stateful', 'increment', stringify([]), FIXTURES))
+    await callFunctionEphemeral('stateful', 'increment', stringify([]), FIXTURES)
+    const w2 = parse(await callFunction('stateful', 'increment', stringify([]), FIXTURES))
+    // The pool worker's counter advanced by exactly one — the ephemeral call
+    // ran elsewhere and its kill didn't reap the pool slot.
+    expect(w2).toBe((w1 as number) + 1)
   })
 })

@@ -9,8 +9,10 @@ import {
   invalidateApplet,
   setCachedApplet
 } from '@/client/features/applets/applet-cache'
+import { reportAppletError } from '@/client/features/applets/applet-log'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { type WorkspaceEvent, useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
+import type { AppletKind } from '@/lib/types'
 
 type AppletState =
   | { status: 'loading'; version: number }
@@ -21,19 +23,22 @@ type AppletState =
 // MEI events tell it to reload. Everything else — dynamic import, caching,
 // cache-busting — is shared. An applet is an agent-authored UI unit loaded as an
 // ESM module and mounted into the workspace.
-type AppletKind = {
+type AppletKindSpec = {
+  kind: AppletKind
   segment: AppletSegment
   // True when this MEI event means the named applet should cache-bust + reload.
   shouldReload: (event: WorkspaceEvent, name: string) => boolean
 }
 
-const WIDGET_KIND: AppletKind = {
+const WIDGET_KIND: AppletKindSpec = {
+  kind: 'widget',
   segment: 'widgets',
   shouldReload: (e, name) =>
     (e.type === 'widget:updated' && e.name === name) || e.type === 'widgets:refresh'
 }
 
-const VIEW_KIND: AppletKind = {
+const VIEW_KIND: AppletKindSpec = {
+  kind: 'view',
   segment: 'views',
   shouldReload: (e, name) => e.type === 'view:updated' && e.name === name
 }
@@ -59,7 +64,7 @@ function loadApplet(
   return promise
 }
 
-function useApplet(kind: AppletKind, name: string): AppletState {
+function useApplet(kind: AppletKindSpec, name: string): AppletState {
   const workspaceId = useWorkspaceId()
   const [state, setState] = useState<AppletState>({ status: 'loading', version: 0 })
 
@@ -69,10 +74,19 @@ function useApplet(kind: AppletKind, name: string): AppletState {
       .then(Component =>
         setState(prev => ({ status: 'ready', Component, version: prev.version + 1 }))
       )
-      .catch(err =>
+      .catch(err => {
+        // Journal the load failure so `moi debug logs` can surface it to the
+        // agent — otherwise only this tab ever sees it (docs/self-correction.md).
+        reportAppletError(workspaceId, {
+          source: 'load',
+          kind: kind.kind,
+          name,
+          message: String(err),
+          ...(err instanceof Error && err.stack ? { stack: err.stack } : {})
+        })
         setState(prev => ({ status: 'error', error: String(err), version: prev.version + 1 }))
-      )
-  }, [kind.segment, workspaceId, name])
+      })
+  }, [kind, workspaceId, name])
 
   useEffect(() => {
     load()

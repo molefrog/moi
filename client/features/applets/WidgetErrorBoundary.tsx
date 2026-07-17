@@ -2,15 +2,22 @@ import { Component, type ErrorInfo, type ReactNode } from 'react'
 
 import { IconAlertTriangle } from '@tabler/icons-react'
 
-type Props = {
+import { reportAppletError } from '@/client/features/applets/applet-log'
+import type { AppletKind } from '@/lib/types'
+
+type WidgetErrorBoundaryProps = {
   name: string
+  // Applet attribution for the error journal (docs/self-correction.md). The
+  // boundary wraps both widgets (WidgetShell) and views (WorkspaceScreen).
+  kind: AppletKind
+  workspaceId: string
   resetKey: number
   children: ReactNode
 }
 
 type State = { error: Error | null }
 
-export class WidgetErrorBoundary extends Component<Props, State> {
+export class WidgetErrorBoundary extends Component<WidgetErrorBoundaryProps, State> {
   state: State = { error: null }
 
   static getDerivedStateFromError(error: Error): State {
@@ -19,9 +26,18 @@ export class WidgetErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error(`[widget:${this.props.name}]`, error, info.componentStack)
+    // Journal the crash so `moi debug logs` can surface it to the agent — the
+    // console line above dies in a console nobody reads.
+    reportAppletError(this.props.workspaceId, {
+      source: 'render',
+      kind: this.props.kind,
+      name: this.props.name,
+      message: error.message || String(error),
+      stack: [error.stack, info.componentStack].filter(Boolean).join('\n')
+    })
   }
 
-  componentDidUpdate(prev: Props) {
+  componentDidUpdate(prev: WidgetErrorBoundaryProps) {
     if (prev.resetKey !== this.props.resetKey && this.state.error) {
       this.setState({ error: null })
     }

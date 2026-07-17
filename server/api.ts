@@ -7,6 +7,7 @@ import { basename, join, resolve } from 'node:path'
 import type { UploadInfo, ViewBuilderInput, WorkspaceEntry, WorkspaceModels } from '@/lib/types'
 import { appendViewBuilderMeta } from '@/lib/view-builder-meta'
 
+import { appletForModule, recordAppletError } from './applet-log'
 import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from './applets'
 import { applyEnvChanged } from './env-apply'
 import { publishEvent } from './events'
@@ -88,6 +89,15 @@ async function handleFunctionCall(
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
+    // Journal the failure so the agent can find it via `moi debug logs` — the
+    // 500 body below only reaches the browser (see docs/self-correction.md).
+    recordAppletError(workspacePath, {
+      source: 'rpc',
+      ...(appletForModule(module) ?? {}),
+      module,
+      fn: name,
+      message
+    })
     return new Response(message, { status: 500 })
   }
 }
@@ -285,6 +295,44 @@ one.post('/rpc/*', c => {
   const id = c.req.param('id')
   const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${id}/rpc/`)[1] ?? ''
   return handleFunctionCall(c.req.raw, tail, c.get('ws').path)
+})
+
+// Browser-side applet errors (module load failures, render crashes, window
+// errors attributed to a bundle) reported into the workspace's error journal —
+// `moi debug logs` reads it back (docs/self-correction.md). Unauthenticated
+// localhost route, so treat the payload as hostile: whitelist the browser-only
+// sources (`build`/`rpc` are server-recorded and can't be spoofed by a tab),
+// pattern-check the applet name, cap the batch size; applet-log.ts caps string
+// lengths.
+one.post('/applet-log', async c => {
+  let body: { events?: unknown }
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.text('Invalid JSON', 400)
+  }
+  const events = Array.isArray(body.events) ? body.events.slice(0, 10) : []
+  for (const raw of events) {
+    const e = raw as {
+      source?: unknown
+      kind?: unknown
+      name?: unknown
+      message?: unknown
+      stack?: unknown
+    }
+    if (e.source !== 'load' && e.source !== 'render' && e.source !== 'window') continue
+    if (e.kind !== 'widget' && e.kind !== 'view') continue
+    if (typeof e.name !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(e.name)) continue
+    if (typeof e.message !== 'string' || !e.message) continue
+    recordAppletError(c.get('ws').path, {
+      source: e.source,
+      kind: e.kind,
+      name: e.name,
+      message: e.message,
+      ...(typeof e.stack === 'string' ? { stack: e.stack } : {})
+    })
+  }
+  return c.body(null, 204)
 })
 
 // Downscaled image preview of a workspace file. The chat's expanded tool rows

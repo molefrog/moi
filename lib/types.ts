@@ -65,6 +65,40 @@ export type ViewBuilder = {
   updatedAt: number
 }
 
+// ---- Applet error journal (see docs/self-correction.md) ------------------
+
+// Where an applet error was observed. `build` and `rpc` are recorded
+// server-side (bundle pipeline, RPC route); `load`/`render`/`window` are
+// browser-side and reach the journal via POST /api/workspaces/:id/applet-log.
+export type AppletLogSource = 'build' | 'load' | 'render' | 'window' | 'rpc'
+
+// One journal entry, as returned to `moi debug logs`. `kind`/`name` attribute
+// the applet when known; `module`/`fn` pin down the server function for `rpc`
+// entries. `count` dedups repeats of the identical error (crash loops are one
+// line, not a hundred); `ts` is the LAST occurrence.
+export type AppletLogEntry = {
+  ts: number
+  source: AppletLogSource
+  kind?: AppletKind
+  name?: string
+  module?: string
+  fn?: string
+  message: string
+  stack?: string
+  count: number
+}
+
+// The browser-reported subset (the server-side sources can't be spoofed by a
+// tab — the POST route rejects them).
+export type AppletClientErrorSource = 'load' | 'render' | 'window'
+export type AppletClientError = {
+  source: AppletClientErrorSource
+  kind: AppletKind
+  name: string
+  message: string
+  stack?: string
+}
+
 // A Scratchpad draw/view operation issued by `moi scratch`. Mutations run
 // server-side against a headless tldraw store; `view` relays to a live tab. The
 // server assigns each add op a `name` (the `--id`, or a generated one) so the

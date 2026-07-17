@@ -3,6 +3,7 @@ import { join } from 'path'
 
 import type { WidgetConfig, WidgetInfo } from '@/lib/types'
 
+import { syncAppletLogAfterBuild } from './applet-log'
 import { buildApplets, getAppletPaths, listBuilt, serveApplet } from './applets'
 import { reloadModules } from './functions'
 
@@ -137,6 +138,10 @@ export async function handleBundle(
   const manifestBefore = await readManifest(workspacePath)
   const results = await buildAllWidgets(workspacePath, force)
   const after = new Set(await listBuiltWidgets(workspacePath))
+
+  // Keep the applet error journal honest: record build failures, clear entries
+  // superseded by a successful rebuild (see docs/self-correction.md).
+  syncAppletLogAfterBuild(workspacePath, 'widget', results)
 
   const configChanged = results.some(r => {
     if (r.status !== 'built' || !r.config) return false
