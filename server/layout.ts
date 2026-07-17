@@ -106,13 +106,20 @@ export async function saveWidgetThumbnails(
 // images from the stored layout (see saveWidgetThumbnails). The card renders
 // them as a loose stack, so the cap just keeps the payload small — anything
 // past it would hide under the pile anyway.
-const PREVIEW_LIMIT = 4
+const PREVIEW_LIMIT = 3
 
 export async function getWorkspacePreview(workspacePath: string): Promise<WorkspacePreview> {
   try {
     const layout = await loadLayout(workspacePath)
+    const images = layout.widgetThumbnails?.images ?? {}
+    const thumbnails = [...layout.widgetGrid]
+      .sort((a, b) => a.y - b.y || a.x - b.x)
+      .map(item => images[item.i])
+      .filter((image): image is string => typeof image === 'string')
+      .slice(0, PREVIEW_LIMIT)
+
     return {
-      thumbnails: Object.values(layout.widgetThumbnails?.images ?? {}).slice(0, PREVIEW_LIMIT)
+      thumbnails
     }
   } catch {
     return { thumbnails: [] }

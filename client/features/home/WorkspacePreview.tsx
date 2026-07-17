@@ -84,27 +84,29 @@ function useFolderRadiusScale() {
   return { ref, horizontalRadiusScale }
 }
 
-// Bottom-to-top placement for up to four widget screenshots. Each card peeks
+// Bottom-to-top placement for up to three widget screenshots. Each card peeks
 // out of the folder at a slightly different angle and lifts on card hover.
 const STACK = [
   cn(
+    'opacity-40',
     '-translate-x-3 translate-y-3 -rotate-6',
-    'group-hover:-translate-y-1 group-focus-visible:-translate-y-1'
+    'group-hover:translate-y-2 group-focus-visible:translate-y-2'
   ),
   cn(
+    'opacity-50',
     'translate-x-3 translate-y-2 rotate-5',
-    'group-hover:-translate-y-2 group-focus-visible:-translate-y-2'
+    'group-hover:translate-y-1 group-focus-visible:translate-y-1'
   ),
   cn(
+    'opacity-100',
     '-translate-x-1 translate-y-1 -rotate-2',
-    'group-hover:-translate-y-3 group-focus-visible:-translate-y-3'
-  ),
-  cn('translate-x-1 rotate-1', 'group-hover:-translate-y-4 group-focus-visible:-translate-y-4')
+    'group-hover:-translate-y-2 group-focus-visible:-translate-y-2'
+  )
 ]
 
 export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
   const query = useWorkspacePreview(workspaceId)
-  const thumbnails = query.data?.thumbnails ?? []
+  const thumbnails = query.data ? [...query.data.thumbnails].reverse() : []
   const slots = STACK.slice(STACK.length - thumbnails.length)
   const { ref, horizontalRadiusScale } = useFolderRadiusScale()
   const backdropPath = folderBackdropPath(horizontalRadiusScale)
@@ -140,7 +142,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
       <div
         className={cn(
           'absolute inset-x-2 top-[40%] bottom-2 rounded-lg bg-accent',
-          'mask-[linear-gradient(to_bottom,rgba(0,0,0,0.9)_0%,black_50%)] backdrop-blur-md',
+          'mask-[linear-gradient(to_bottom,rgba(0,0,0,0.9)_0%,black_50%)] backdrop-blur-lg',
           'inset-shadow-[0_0_12px_color-mix(in_oklab,var(--background)_20%,transparent)]'
         )}
       />

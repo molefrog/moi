@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 
 import type { WorkspaceLayout } from '@/lib/types'
 
-import { getLayoutPath, loadLayout, mergeLayoutForSave } from '../layout'
+import { getLayoutPath, getWorkspacePreview, loadLayout, mergeLayoutForSave } from '../layout'
 
 // The grid editor and `moi config` write the same `.workspace.json`. A layout
 // PUT is authoritative for the editor fields but must NOT touch identity
@@ -157,5 +157,35 @@ describe('mergeLayoutForSave', () => {
     expect(merged.selectedModel).toBe('sonnet')
     expect(merged.theme).toEqual({ font: 'default', background: '#000', foreground: '#fff' })
     expect(merged.name).toBe('Keep')
+  })
+})
+
+describe('getWorkspacePreview', () => {
+  test('sorts thumbnails top-to-bottom and left-to-right, then caps the stack', async () => {
+    await withWorkspaceFile(
+      {
+        ...base,
+        widgetGrid: [
+          { i: 'bottom', x: 0, y: 2 },
+          { i: 'fourth', x: 0, y: 3 },
+          { i: 'right', x: 2, y: 0 },
+          { i: 'left', x: 0, y: 0 }
+        ],
+        widgetThumbnails: {
+          images: {
+            stale: 'stale-image',
+            right: 'right-image',
+            bottom: 'bottom-image',
+            fourth: 'fourth-image',
+            left: 'left-image'
+          }
+        }
+      },
+      async dir => {
+        expect(await getWorkspacePreview(dir)).toEqual({
+          thumbnails: ['left-image', 'right-image', 'bottom-image']
+        })
+      }
+    )
   })
 })
