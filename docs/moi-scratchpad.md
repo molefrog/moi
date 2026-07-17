@@ -107,7 +107,10 @@ on the server (the mutations). Only `view` — rendering pixels — genuinely re
   as-is; every save extracts any inline base64 it finds (legacy snapshots migrate on their
   next save; a stale tab PUTting blobs converges on the same files by content address) and
   then sweeps asset files that neither the document nor the `.bak` backup references, with
-  a grace window so a just-uploaded file survives until its autosave lands. If a referenced
+  a grace window so a just-uploaded file survives until its autosave lands. A sweep that
+  leaves files inside their grace window schedules a follow-up sweep past it, so orphans
+  are reclaimed even when that save was the last edit — deleting an image and walking away
+  still frees its file a few minutes later. If a referenced
   file does go missing (say the snapshot was copied without its sidecar dir), nothing
   breaks loudly: the canvas shows a broken-image placeholder, `read` flags the shape with
   `missing: true`, and `read-image` errors naming the expected location — move the `.moi`

@@ -145,7 +145,7 @@ export async function extractInlineAssets(
 // tab's pending autosave — letting the sweep permanently delete a file the
 // surviving snapshot still pointed at.) The window covers the upload→autosave
 // gap and a stale tab that re-PUTs an old, still-referencing document alike.
-const SWEEP_GRACE_MS = 5 * 60_000
+export const SWEEP_GRACE_MS = 5 * 60_000
 
 // When each still-unreferenced asset file was first seen unreferenced, keyed by
 // absolute path. In-memory and per-process: a restart just restarts the clock
@@ -177,18 +177,23 @@ async function bakReferencedAssets(bakFile: string): Promise<Set<string>> {
 }
 
 // Delete asset files that neither the (just-saved) document nor the snapshot's
-// `.bak` backup references. Runs after every save; best-effort — a sweep
-// failure must never surface into the save.
+// `.bak` backup references. Best-effort — a sweep failure must never surface
+// into the save. Returns how many files are still waiting out their grace
+// window: a non-zero count means THIS sweep didn't finish the job and a
+// follow-up sweep after the grace elapses is needed to actually reclaim them
+// (see armOrphanSweep in scratchpad.ts — without it, the save that dropped a
+// file's last reference only ever starts the clock, and if no later save comes
+// the orphan survives forever).
 export async function sweepOrphanAssets(
   workspacePath: string,
   document: ScratchpadDoc,
   bakFile?: string,
   now: number = Date.now()
-): Promise<void> {
+): Promise<number> {
   try {
     const dir = getScratchpadAssetsDir(workspacePath)
     const files = await readdir(dir).catch(() => [] as string[])
-    if (files.length === 0) return
+    if (files.length === 0) return 0
 
     const referenced = new Set<string>()
     for (const record of Object.values(document?.store ?? {})) {
@@ -200,8 +205,16 @@ export async function sweepOrphanAssets(
     }
     if (bakFile) for (const name of await bakReferencedAssets(bakFile)) referenced.add(name)
 
+    let pending = 0
     for (const name of files) {
-      if (!ASSET_FILE_RE.test(name)) continue
+      if (!ASSET_FILE_RE.test(name)) {
+        // A `.tmp-*` sibling stranded by a crash between write and rename in
+        // storeScratchpadAsset. A live one exists for milliseconds, so anything
+        // older than the grace window (by mtime — these are never re-referenced,
+        // the clock map doesn't apply) is abandoned and reclaimed here.
+        if (name.startsWith('.tmp-')) pending += await reclaimStaleTmp(join(dir, name), now)
+        continue
+      }
       const path = join(dir, name)
       if (referenced.has(name)) {
         firstUnreferencedAt.delete(path) // referenced (again) — reset its clock
@@ -210,14 +223,34 @@ export async function sweepOrphanAssets(
       const since = firstUnreferencedAt.get(path)
       if (since === undefined) {
         firstUnreferencedAt.set(path, now) // first seen unreferenced — start clock
+        pending++
         continue
       }
       if (now - since > SWEEP_GRACE_MS) {
         try {
           await unlink(path)
           firstUnreferencedAt.delete(path)
-        } catch {}
+        } catch {
+          pending++ // couldn't reclaim — leave it for the next sweep
+        }
+      } else {
+        pending++ // still within grace — a later sweep must revisit
       }
     }
+    return pending
+  } catch {
+    return 0
+  }
+}
+
+// Unlink an abandoned `.tmp-*` file once it's older than the grace window.
+// Returns 1 while the file is too young to judge (so the caller schedules a
+// follow-up), 0 once it's gone or unreadable.
+async function reclaimStaleTmp(path: string, now: number): Promise<0 | 1> {
+  try {
+    const { mtimeMs } = await stat(path)
+    if (now - mtimeMs <= SWEEP_GRACE_MS) return 1
+    await unlink(path)
   } catch {}
+  return 0
 }

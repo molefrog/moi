@@ -4,6 +4,7 @@ import { readdir } from 'node:fs/promises'
 import { join } from 'path'
 
 import {
+  armOrphanSweep,
   loadScratchpadDoc,
   readScratchpadImage,
   readScratchpadShapes,
@@ -248,6 +249,68 @@ describe('sweepOrphanAssets', () => {
   })
 
   test('is a no-op when the assets dir does not exist', async () => {
-    await sweepOrphanAssets(WS, { store: {} })
+    expect(await sweepOrphanAssets(WS, { store: {} })).toBe(0)
+  })
+
+  test('reports files still waiting out the grace window, 0 once reclaimed', async () => {
+    const { src } = await storeScratchpadAsset(WS, PNG_BYTES, 'image/png')
+    await storeScratchpadAsset(WS, new Uint8Array([9]), 'image/png')
+    const doc: ScratchpadDoc = {
+      store: {
+        'asset:a1': { id: 'asset:a1', typeName: 'asset', type: 'image', props: { src } }
+      }
+    }
+
+    const t0 = 3_000_000
+    // Clock started for the orphan — pending, so the caller must sweep again.
+    expect(await sweepOrphanAssets(WS, doc, undefined, t0)).toBe(1)
+    // Still within grace — still pending.
+    expect(await sweepOrphanAssets(WS, doc, undefined, t0 + 60_000)).toBe(1)
+    // Reclaimed — nothing pending, no follow-up needed.
+    expect(await sweepOrphanAssets(WS, doc, undefined, t0 + 6 * 60_000)).toBe(0)
+    expect(await readdir(getScratchpadAssetsDir(WS))).toEqual([assetSrcFileName(src)!])
+  })
+
+  test('reclaims stale .tmp-* files left by a crashed write', async () => {
+    await storeScratchpadAsset(WS, PNG_BYTES, 'image/png') // ensures the dir exists
+    const dir = getScratchpadAssetsDir(WS)
+    await Bun.write(join(dir, '.tmp-crashed'), 'partial bytes')
+    const doc: ScratchpadDoc = { store: {} }
+
+    // Too young to judge (could be a write in flight) — kept, reported pending.
+    // The asset file also lands on the clock, hence 2.
+    expect(await sweepOrphanAssets(WS, doc, undefined, Date.now())).toBe(2)
+    expect(await readdir(dir)).toContain('.tmp-crashed')
+
+    // Older than the grace window — abandoned, reclaimed.
+    await sweepOrphanAssets(WS, doc, undefined, Date.now() + 10 * 60_000)
+    expect(await readdir(dir)).not.toContain('.tmp-crashed')
+  })
+})
+
+describe('armOrphanSweep', () => {
+  test('a scheduled follow-up sweep reclaims orphans without any further save', async () => {
+    const { src } = await storeScratchpadAsset(WS, PNG_BYTES, 'image/png')
+    const kept = assetSrcFileName(src)!
+    const { src: orphanSrc } = await storeScratchpadAsset(WS, new Uint8Array([4, 5]), 'image/png')
+    const orphan = assetSrcFileName(orphanSrc)!
+    const doc: ScratchpadDoc = {
+      store: {
+        'asset:a1': { id: 'asset:a1', typeName: 'asset', type: 'image', props: { src } }
+      }
+    }
+    // The follow-up judges against the snapshot on disk — write it directly.
+    await Bun.write(join(WS, '.moi', '.scratchpad.json'), JSON.stringify({ document: doc }))
+
+    // Start the orphan's clock far in the past so the follow-up (running at the
+    // real Date.now()) sees the grace window already elapsed.
+    await sweepOrphanAssets(WS, doc, undefined, 1_000_000)
+
+    armOrphanSweep(WS, 20)
+    await new Promise(resolve => setTimeout(resolve, 250))
+
+    const left = await readdir(getScratchpadAssetsDir(WS))
+    expect(left).toContain(kept)
+    expect(left).not.toContain(orphan)
   })
 })

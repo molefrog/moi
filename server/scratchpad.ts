@@ -6,6 +6,7 @@ import type { ScratchpadWriter } from '@/lib/types'
 
 import moiPkg from '../package.json'
 import {
+  SWEEP_GRACE_MS,
   assetSrcFileName,
   extractInlineAssets,
   scratchpadAssetFile,
@@ -96,7 +97,40 @@ export async function saveScratchpadDoc(
   await Bun.write(path, JSON.stringify({ document, writer: SCRATCHPAD_WRITER }, null, 2))
   // The `.bak` path keeps the sweep from orphaning the schema-change backup's
   // images — a restored .bak should still render.
-  await sweepOrphanAssets(workspacePath, document, `${path}.bak`)
+  const pending = await sweepOrphanAssets(workspacePath, document, `${path}.bak`)
+  // Files the sweep left on the grace clock only get reclaimed by a LATER
+  // sweep — and if this save was the user's last edit, no later save comes.
+  // Schedule one past the grace window so the orphans actually get deleted.
+  if (pending > 0) armOrphanSweep(workspacePath)
+}
+
+// Follow-up orphan sweeps. sweepOrphanAssets deletes a file only once it has
+// stayed unreferenced past the grace window, so the sweep that first sees a
+// file unreferenced merely starts its clock — someone must sweep again after
+// the window elapses. Saves do that on a busy canvas; this timer covers the
+// quiet one (delete an image, walk away). One timer per workspace, re-armed
+// while a sweep still reports pending files, and re-loading the snapshot off
+// disk each time so it judges against the latest references. In-memory like
+// the grace clock itself: a restart drops both, and the next save, upload, or
+// snapshot GET re-arms.
+const SWEEP_FOLLOW_UP_MS = SWEEP_GRACE_MS + 30_000
+const sweepTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+export function armOrphanSweep(workspacePath: string, delayMs: number = SWEEP_FOLLOW_UP_MS): void {
+  const prev = sweepTimers.get(workspacePath)
+  if (prev) clearTimeout(prev)
+  const timer = setTimeout(async () => {
+    sweepTimers.delete(workspacePath)
+    try {
+      const { document } = await loadScratchpadDoc(workspacePath)
+      const bakFile = `${getScratchpadPath(workspacePath)}.bak`
+      const pending = await sweepOrphanAssets(workspacePath, document ?? {}, bakFile)
+      if (pending > 0) armOrphanSweep(workspacePath, delayMs)
+    } catch {}
+  }, delayMs)
+  // A pending sweep must never hold the process open.
+  timer.unref?.()
+  sweepTimers.set(workspacePath, timer)
 }
 
 // When a save is about to overwrite a snapshot with a *different* schema (i.e.
