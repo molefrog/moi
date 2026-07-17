@@ -147,6 +147,8 @@ type WorkspaceCardProps = {
 
 function WorkspaceCard({ workspace }: WorkspaceCardProps) {
   const name = workspaceDisplayName(workspace)
+  const previewQuery = useWorkspacePreview(workspace.id)
+  const updatedAt = previewQuery.data?.updatedAt ?? new Date(workspace.addedAt).getTime()
 
   return (
     <Link
@@ -163,22 +165,9 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
           />
           <span className="truncate text-sm font-medium text-foreground">{name}</span>
         </div>
-        <WorkspaceUpdatedAt workspaceId={workspace.id} />
+        <span className="text-xs text-muted-foreground">{formatUpdatedAt(updatedAt)}</span>
       </div>
     </Link>
-  )
-}
-
-type WorkspaceUpdatedAtProps = {
-  workspaceId: string
-}
-
-function WorkspaceUpdatedAt({ workspaceId }: WorkspaceUpdatedAtProps) {
-  const query = useWorkspacePreview(workspaceId)
-  if (query.data?.updatedAt === undefined) return null
-
-  return (
-    <span className="text-xs text-muted-foreground">{formatUpdatedAt(query.data.updatedAt)}</span>
   )
 }
 
