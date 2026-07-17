@@ -7,7 +7,8 @@ import {
   loadScratchpadDoc,
   readScratchpadImage,
   readScratchpadShapes,
-  saveScratchpadDoc
+  saveScratchpadDoc,
+  sweepAllWorkspaces
 } from '../scratchpad'
 import type { ScratchpadDoc } from '../scratchpad'
 import {
@@ -160,6 +161,24 @@ describe('missing asset files (dangling references)', () => {
   })
 })
 
+// An asset record plus a shape actually using it — the shape matters: the sweep
+// treats an asset no shape uses as unreferenced (see the browser-deletion test).
+function docWithImage(src: string): ScratchpadDoc {
+  return {
+    store: {
+      'asset:a1': { id: 'asset:a1', typeName: 'asset', type: 'image', props: { src } },
+      'shape:pic': {
+        id: 'shape:pic',
+        typeName: 'shape',
+        type: 'image',
+        x: 0,
+        y: 0,
+        props: { assetId: 'asset:a1', w: 4, h: 4 }
+      }
+    }
+  }
+}
+
 describe('sweepOrphanAssets', () => {
   test('reclaims a file only after it has stayed unreferenced past the grace window', async () => {
     const { src } = await storeScratchpadAsset(WS, PNG_BYTES, 'image/png')
@@ -171,11 +190,7 @@ describe('sweepOrphanAssets', () => {
     )
     const orphan = assetSrcFileName(orphanSrc)!
     const dir = getScratchpadAssetsDir(WS)
-    const doc: ScratchpadDoc = {
-      store: {
-        'asset:a1': { id: 'asset:a1', typeName: 'asset', type: 'image', props: { src } }
-      }
-    }
+    const doc = docWithImage(src)
 
     const t0 = 1_000_000
     // First sweep only starts the orphan's clock; nothing is deleted yet.
@@ -198,9 +213,7 @@ describe('sweepOrphanAssets', () => {
     const { src } = await storeScratchpadAsset(WS, PNG_BYTES, 'image/png')
     const name = assetSrcFileName(src)!
     const dir = getScratchpadAssetsDir(WS)
-    const withImg: ScratchpadDoc = {
-      store: { 'asset:a1': { id: 'asset:a1', typeName: 'asset', type: 'image', props: { src } } }
-    }
+    const withImg = docWithImage(src)
     const empty: ScratchpadDoc = { store: {} }
 
     const t0 = 5_000_000
@@ -249,5 +262,76 @@ describe('sweepOrphanAssets', () => {
 
   test('is a no-op when the assets dir does not exist', async () => {
     await sweepOrphanAssets(WS, { store: {} })
+  })
+
+  test('an asset record no shape uses does not pin its file (browser image deletion)', async () => {
+    // Deleting an image in the tldraw editor removes the SHAPE but leaves the
+    // asset record in the document. Its file must still be reclaimable — this
+    // was the original "orphaned assets are not deleted" repro.
+    const { src } = await storeScratchpadAsset(WS, PNG_BYTES, 'image/png')
+    const name = assetSrcFileName(src)!
+    const doc = docWithImage(src)
+    const afterDelete: ScratchpadDoc = {
+      // Shape removed, asset record left behind — what the browser autosaves.
+      store: { 'asset:a1': (doc.store as Record<string, unknown>)['asset:a1'] }
+    }
+    const dir = getScratchpadAssetsDir(WS)
+
+    const t0 = 7_000_000
+    // While the shape exists the file is referenced — never on the clock.
+    await sweepOrphanAssets(WS, doc, undefined, t0)
+    expect(await readdir(dir)).toContain(name)
+
+    // Shape deleted in the browser: clock starts, grace applies (an undo that
+    // restores the shape within the window would reset it)...
+    await sweepOrphanAssets(WS, afterDelete, undefined, t0 + 1000)
+    expect(await readdir(dir)).toContain(name)
+
+    // ...and past the window the file is reclaimed despite the lingering record.
+    await sweepOrphanAssets(WS, afterDelete, undefined, t0 + 7 * 60_000)
+    expect(await readdir(dir)).not.toContain(name)
+  })
+
+  test('reclaims stale .tmp-* files left by a crashed write', async () => {
+    await storeScratchpadAsset(WS, PNG_BYTES, 'image/png') // ensures the dir exists
+    const dir = getScratchpadAssetsDir(WS)
+    await Bun.write(join(dir, '.tmp-crashed'), 'partial bytes')
+    const doc: ScratchpadDoc = { store: {} }
+
+    // Too young to judge (could be a write in flight) — kept.
+    await sweepOrphanAssets(WS, doc, undefined, Date.now())
+    expect(await readdir(dir)).toContain('.tmp-crashed')
+
+    // Older than the grace window — abandoned, reclaimed.
+    await sweepOrphanAssets(WS, doc, undefined, Date.now() + 10 * 60_000)
+    expect(await readdir(dir)).not.toContain('.tmp-crashed')
+  })
+})
+
+describe('sweepAllWorkspaces', () => {
+  test('the periodic pass reclaims expired orphans without any further save', async () => {
+    const { setRegistryPath, registerWorkspace } = await import('../registry')
+    setRegistryPath(join(WS, 'workspaces.json'))
+    await registerWorkspace(WS, { type: 'claude-code' })
+
+    const { src } = await storeScratchpadAsset(WS, PNG_BYTES, 'image/png')
+    const kept = assetSrcFileName(src)!
+    const { src: orphanSrc } = await storeScratchpadAsset(WS, new Uint8Array([4, 5]), 'image/png')
+    const orphan = assetSrcFileName(orphanSrc)!
+    // The pass judges against the snapshot on disk — write it directly.
+    await Bun.write(
+      join(WS, '.moi', '.scratchpad.json'),
+      JSON.stringify({ document: docWithImage(src) })
+    )
+
+    // Start the orphan's clock far in the past so the pass (running at the real
+    // Date.now()) sees the grace window already elapsed.
+    await sweepOrphanAssets(WS, docWithImage(src), undefined, 1_000_000)
+
+    await sweepAllWorkspaces()
+
+    const left = await readdir(getScratchpadAssetsDir(WS))
+    expect(left).toContain(kept)
+    expect(left).not.toContain(orphan)
   })
 })

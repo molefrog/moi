@@ -6,6 +6,7 @@ import { PORT } from './constants'
 import { control } from './control'
 import { EVENTS_TOPIC, setEventServer } from './events'
 import { killAllWorkers } from './functions'
+import { startScratchpadSweeper } from './scratchpad'
 import { resolveScratchOp } from './scratchpad-relay'
 import { allHarnesses, harnessFor } from './harness/registry'
 import { getWorkspace } from './registry'
@@ -171,6 +172,11 @@ export const app = Bun.serve<WsData>({
 // that it exists. Kept in ./events so control.ts and ./api can publish without
 // importing web.ts (which binds ports on load).
 setEventServer(app)
+
+// Periodically reclaim scratchpad asset files nothing references anymore —
+// deleting an image in the browser (or an upload whose tab died) otherwise
+// leaves its file behind forever. See sweepOrphanAssets.
+startScratchpadSweeper()
 
 // Graceful shutdown. In dev the supervisor sends SIGTERM on server-file
 // changes; in any context Ctrl-C sends SIGINT. Close both servers and kill the

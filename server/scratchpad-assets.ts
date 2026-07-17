@@ -145,7 +145,7 @@ export async function extractInlineAssets(
 // tab's pending autosave — letting the sweep permanently delete a file the
 // surviving snapshot still pointed at.) The window covers the upload→autosave
 // gap and a stale tab that re-PUTs an old, still-referencing document alike.
-const SWEEP_GRACE_MS = 5 * 60_000
+export const SWEEP_GRACE_MS = 5 * 60_000
 
 // When each still-unreferenced asset file was first seen unreferenced, keyed by
 // absolute path. In-memory and per-process: a restart just restarts the clock
@@ -176,9 +176,13 @@ async function bakReferencedAssets(bakFile: string): Promise<Set<string>> {
   }
 }
 
-// Delete asset files that neither the (just-saved) document nor the snapshot's
-// `.bak` backup references. Runs after every save; best-effort — a sweep
-// failure must never surface into the save.
+// Delete asset files that no shape in the document uses and the snapshot's
+// `.bak` backup doesn't reference. Best-effort — a sweep failure must never
+// surface into a save. Runs after every save AND from the periodic sweeper
+// (see startScratchpadSweeper in scratchpad.ts): a single sweep only STARTS an
+// orphan's grace clock, so something must sweep again after the window elapses
+// — on a quiet canvas (delete an image, walk away) the periodic pass is what
+// actually reclaims the file.
 export async function sweepOrphanAssets(
   workspacePath: string,
   document: ScratchpadDoc,
@@ -190,18 +194,41 @@ export async function sweepOrphanAssets(
     const files = await readdir(dir).catch(() => [] as string[])
     if (files.length === 0) return
 
+    // A file is referenced only when an asset record points at it AND some
+    // shape still uses that asset. The shape check matters: tldraw's editor
+    // deletes only the shape when the user removes an image in the browser —
+    // the asset record stays in the document forever — so counting bare asset
+    // records as references kept every browser-deleted image's file pinned for
+    // good. An asset orphaned this way gets the normal grace window, so an
+    // undo shortly after the delete (which restores the shape and re-saves)
+    // resets its clock before anything is reclaimed.
+    const usedAssetIds = new Set<string>()
+    for (const record of Object.values(document?.store ?? {})) {
+      if (!record || typeof record !== 'object') continue
+      const r = record as { typeName?: string; props?: { assetId?: unknown } }
+      if (r.typeName === 'shape' && typeof r.props?.assetId === 'string') {
+        usedAssetIds.add(r.props.assetId)
+      }
+    }
     const referenced = new Set<string>()
     for (const record of Object.values(document?.store ?? {})) {
       if (!record || typeof record !== 'object') continue
-      const r = record as { typeName?: string; props?: { src?: unknown } }
+      const r = record as { typeName?: string; id?: string; props?: { src?: unknown } }
       if (r.typeName !== 'asset' || typeof r.props?.src !== 'string') continue
+      if (typeof r.id !== 'string' || !usedAssetIds.has(r.id)) continue
       const name = assetSrcFileName(r.props.src)
       if (name) referenced.add(name)
     }
     if (bakFile) for (const name of await bakReferencedAssets(bakFile)) referenced.add(name)
 
     for (const name of files) {
-      if (!ASSET_FILE_RE.test(name)) continue
+      if (!ASSET_FILE_RE.test(name)) {
+        // A `.tmp-*` sibling stranded by a crash between write and rename in
+        // storeScratchpadAsset. A live one exists for milliseconds, so anything
+        // older than the grace window (by mtime) is abandoned — reclaim it.
+        if (name.startsWith('.tmp-')) await reclaimStaleTmp(join(dir, name), now)
+        continue
+      }
       const path = join(dir, name)
       if (referenced.has(name)) {
         firstUnreferencedAt.delete(path) // referenced (again) — reset its clock
@@ -219,5 +246,13 @@ export async function sweepOrphanAssets(
         } catch {}
       }
     }
+  } catch {}
+}
+
+// Unlink an abandoned `.tmp-*` file once it's older than the grace window.
+async function reclaimStaleTmp(path: string, now: number): Promise<void> {
+  try {
+    const { mtimeMs } = await stat(path)
+    if (now - mtimeMs > SWEEP_GRACE_MS) await unlink(path)
   } catch {}
 }
