@@ -28,6 +28,7 @@ import { useView } from '@/client/features/applets/useApplet'
 import { ViewBuilderTab } from '@/client/features/views/ViewBuilderTab'
 import { useViewBuilderActions } from '@/client/features/views/useViewBuilderActions'
 import { useFitsSplitLayout } from '@/client/features/workspace/useFitsSplitLayout'
+import { useWorkspaceAvailability } from '@/client/features/workspace/api'
 import { useWorkspaceTheme } from '@/client/features/workspace/useWorkspaceTheme'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
@@ -274,6 +275,10 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     dismissError
   } = useChat()
   const { layout, setLayout, name, icon, provider, workspaceId } = useWorkspaceLayoutCtx()
+  // Backend runtime problem (e.g. the codex CLI is missing) — surfaced as a
+  // persistent banner above the composer in every chat surface.
+  const availability = useWorkspaceAvailability(workspaceId).data
+  const warning = availability && !availability.available ? availability.reason : null
   const builderActions = useViewBuilderActions()
   const { ref: rowRef, fits: canUseSplit } = useFitsSplitLayout<HTMLDivElement>()
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
@@ -524,6 +529,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       processing={processing}
       error={error}
       onDismissError={dismissError}
+      warning={warning}
       send={send}
       stop={stop}
       onSwitchThread={switchThread}
@@ -540,6 +546,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       processing={processing}
       error={error}
       onDismissError={dismissError}
+      warning={warning}
       send={send}
       stop={stop}
       onSwitchThread={switchThread}
@@ -669,6 +676,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               processing={processing}
               error={error}
               onDismissError={dismissError}
+              warning={warning}
               send={send}
               stop={stop}
               onSwitchThread={switchThread}

@@ -107,6 +107,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
         {step === 'agent' ? (
           <WorkspaceAgentStep
             type={type}
+            availability={info.data?.availability}
             canChooseFolder={canChooseFolder}
             isPending={isImporting}
             errorMessage={(chooseFolder.error ?? addMutation.error)?.message}

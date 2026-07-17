@@ -4,6 +4,7 @@ import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import type {
   DiscoveredWorkspace,
+  HarnessAvailability,
   WorkspaceEntry,
   WorkspacePreview,
   WorkspaceType
@@ -63,13 +64,19 @@ export type CreateWorkspaceInfo = {
   root: string
   displayRoot: string
   canChooseFolder: boolean
+  // Per-backend runtime availability (e.g. is the codex CLI installed?),
+  // keyed by workspace type. Missing entries mean available.
+  availability?: Partial<Record<WorkspaceType, HarnessAvailability>>
 }
 
 export function useCreateWorkspaceInfo() {
   return useQuery<CreateWorkspaceInfo>({
     queryKey: workspaceKeys.createInfo,
+    // Availability can change while the app is open (the user installs the
+    // codex CLI) — refetch on mount instead of caching forever.
     queryFn: () => requestJson('/api/workspaces/create'),
-    staleTime: Infinity
+    staleTime: 30_000,
+    refetchOnMount: 'always'
   })
 }
 

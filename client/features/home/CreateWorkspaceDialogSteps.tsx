@@ -11,7 +11,7 @@ import {
   WorkspaceTypeIcon,
   workspaceTypeLabel
 } from '@/client/features/home/workspace-presentation'
-import type { WorkspaceType } from '@/lib/types'
+import type { HarnessAvailability, WorkspaceType } from '@/lib/types'
 
 type WorkspaceAgentOption = {
   type: WorkspaceType
@@ -19,10 +19,12 @@ type WorkspaceAgentOption = {
   disabled?: boolean
 }
 
-// Only Claude Code workspaces can be created from scratch for now. OpenClaw
-// workspaces arrive through discovery, and Hermes has no initialization path.
+// Claude Code and Codex workspaces can be created from scratch; Codex needs
+// its CLI on this machine (checked via `availability`). OpenClaw workspaces
+// arrive through discovery.
 const WORKSPACE_AGENT_OPTIONS: WorkspaceAgentOption[] = [
   { type: 'claude-code', hint: 'Great all-rounder for complex tasks built by Anthropic' },
+  { type: 'codex', hint: 'OpenAI coding agent that runs through the Codex CLI' },
   {
     type: 'openclaw',
     hint: 'Initialize OpenClaw in the folder manually, then import it to moi',
@@ -32,6 +34,7 @@ const WORKSPACE_AGENT_OPTIONS: WorkspaceAgentOption[] = [
 
 type WorkspaceAgentStepProps = {
   type: WorkspaceType
+  availability?: Partial<Record<WorkspaceType, HarnessAvailability>>
   canChooseFolder: boolean
   isPending: boolean
   errorMessage?: string
@@ -42,6 +45,7 @@ type WorkspaceAgentStepProps = {
 
 export function WorkspaceAgentStep({
   type,
+  availability,
   canChooseFolder,
   isPending,
   errorMessage,
@@ -49,6 +53,14 @@ export function WorkspaceAgentStep({
   onUseExisting,
   onContinue
 }: WorkspaceAgentStepProps) {
+  // An unavailable backend stays visible but disabled, with the availability
+  // reason (e.g. codex CLI install instructions) replacing the hint.
+  const options = WORKSPACE_AGENT_OPTIONS.map(option => {
+    const state = availability?.[option.type]
+    if (!state || state.available) return option
+    return { ...option, hint: state.reason, disabled: true }
+  })
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-0.5 pr-8">
@@ -57,7 +69,7 @@ export function WorkspaceAgentStep({
       </div>
 
       <div role="group" aria-label="Agent" className="grid grid-cols-2 gap-2">
-        {WORKSPACE_AGENT_OPTIONS.map(option => (
+        {options.map(option => (
           <WorkspaceAgentOptionButton
             key={option.type}
             option={option}

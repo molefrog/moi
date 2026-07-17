@@ -75,7 +75,7 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
   const bin = findCodexBinary()
   if (!bin) {
     throw new Error(
-      'codex CLI not found — install it (`npm i -g @openai/codex`) or set CODEX_CLI_PATH'
+      'Codex CLI not found. Install it with npm i -g @openai/codex, or set CODEX_CLI_PATH.'
     )
   }
 

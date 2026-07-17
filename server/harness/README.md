@@ -118,7 +118,9 @@ rendezvous, session list via `thread/list` (cwd-filtered) and history replay
 via `thread/read`, subagent (collab) child threads nested as live
 SubagentRecord transcripts on the parent card, semantic exec labels from
 `commandActions`, MCP status via `mcpServerStatus/list`, and hook / failed
-MCP-startup notices. Runs `danger-full-access` + `approvalPolicy: never` to
+MCP-startup notices. Workspace discovery scans `~/.codex/sessions` rollout
+heads for cwds (`codex/discovery.ts` — no binary needed), and `availability()`
+reports a missing codex CLI to the create dialog and the chat banner. Runs `danger-full-access` + `approvalPolicy: never` to
 match moi's bypass-permissions trust model. Known gaps: no interactive
 approval flow (server→client approval requests are auto-accepted
 defensively), and images ride inline as data URLs only (no `localImage` path
