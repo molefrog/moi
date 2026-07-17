@@ -52,6 +52,14 @@ describe('resolveChatRunOptions', () => {
     })
   })
 
+  test('keeps the implicit effort unset', () => {
+    expect(resolveChatRunOptions(models, 'sonnet', undefined)).toEqual({
+      model: 'sonnet',
+      effort: undefined,
+      stream: true
+    })
+  })
+
   test('drops a stale model and keeps an effort it cannot validate', () => {
     expect(resolveChatRunOptions(models, 'removed-model', 'medium')).toEqual({
       model: undefined,

@@ -3,7 +3,11 @@ import { memo, useState } from 'react'
 import { IconChevronDown } from '@tabler/icons-react'
 
 import { useSaveThreadConfig, useThreadConfig, useWorkspaceModels } from './api'
-import { sortModelsByProviderOrder } from './model-order'
+import {
+  resolveDisplayedEffort,
+  reverseEffortLevels,
+  sortModelsByProviderOrder
+} from './model-order'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { useLive } from '@/client/features/chat/chat-store'
 
@@ -105,9 +109,10 @@ export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: 
     ) ?? models[0]
   const current = persisted ?? defaultModel.value
   const model = models.find(m => m.value === current) ?? models[0]
-  const effortLevels = model.supportsEffort ? (model.supportedEffortLevels ?? []) : []
-  const currentEffort =
-    selectedEffort && effortLevels.includes(selectedEffort) ? selectedEffort : effortLevels[0]
+  const effortLevels = reverseEffortLevels(
+    model.supportsEffort ? (model.supportedEffortLevels ?? []) : []
+  )
+  const currentEffort = resolveDisplayedEffort(effortLevels, selectedEffort)
   const showReasoning = effortLevels.length > 0
   // Fast mode is Claude-only (Opus); OpenClaw models never report supportsFastMode.
   const showFastMode = !!model.supportsFastMode
