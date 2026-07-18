@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
 import {
+  openClawSessionSetSignature,
   selectLatestOpenClawUpdatedAt,
   selectOldestOpenClawFirstUserMessage,
   type OpenClawSessionPreviewCandidate
@@ -104,5 +105,17 @@ describe('workspace preview message selection', () => {
       selectLatestOpenClawUpdatedAt([{ updatedAt: 100 }, { updatedAt: 900 }, { updatedAt: 200 }])
     ).toBe(900)
     expect(selectLatestOpenClawUpdatedAt([])).toBeUndefined()
+  })
+
+  test('session-set signature ignores order and reflects membership changes', () => {
+    expect(openClawSessionSetSignature([{ key: 'b' }, { key: 'a' }])).toBe(
+      openClawSessionSetSignature([{ key: 'a' }, { key: 'b' }])
+    )
+    expect(openClawSessionSetSignature([{ key: 'a' }, { key: 'b' }])).not.toBe(
+      openClawSessionSetSignature([{ key: 'a' }])
+    )
+    expect(openClawSessionSetSignature([{ key: 'a' }, { key: 'b' }])).not.toBe(
+      openClawSessionSetSignature([{ key: 'a' }, { key: 'c' }])
+    )
   })
 })

@@ -4,6 +4,8 @@ import { join, resolve } from 'node:path'
 
 import type { Model } from '@/lib/types'
 
+import { getGateway } from './gateway'
+import type { GatewayHandle } from './gateway'
 import { stripUserMessageMetadata } from './strip'
 
 export type OpenClawAgent = {
@@ -263,12 +265,36 @@ export function selectLatestOpenClawUpdatedAt(
   )
 }
 
+// Session-set identity for the first-user-message cache: transcripts are
+// append-only, so once the oldest session's first message exists it can only
+// change when a session is added or removed. Order-insensitive.
+export function openClawSessionSetSignature(sessions: Pick<OpenClawSessionRow, 'key'>[]): string {
+  return sessions
+    .map(session => session.key)
+    .sort()
+    .join('\n')
+}
+
+const firstUserMessageCache = new Map<string, { signature: string; message: string }>()
+
 export async function getOpenClawWorkspacePreview(
   workspacePath: string,
   agentId: string | undefined,
   includeFirstUserMessage: boolean
 ): Promise<OpenClawWorkspacePreview> {
-  const out = await withGatewayClient(async rpc => {
+  // Preview reads ride the shared persistent gateway connection instead of a
+  // one-shot client per home-page card; per-call timeouts keep the card fast
+  // when the gateway is up but slow.
+  let gateway: GatewayHandle
+  try {
+    gateway = await getGateway()
+  } catch {
+    return {}
+  }
+  const rpc: Rpc = (method, params = {}) =>
+    withTimeout(gateway.rpc(method, params), TIMEOUT_MS, method)
+
+  try {
     const id = agentId ?? (await resolveAgentIdForPath(rpc, workspacePath))
     if (!id) return {}
 
@@ -280,22 +306,35 @@ export async function getOpenClawWorkspacePreview(
       return updatedAt !== undefined ? { updatedAt } : {}
     }
 
-    const candidates = await Promise.all(
-      res.sessions.map(async session => ({
-        key: session.key,
-        updatedAt: session.updatedAt,
-        detail: await rpc<OpenClawSessionDetail>('sessions.get', { key: session.key }).catch(
-          () => null
-        )
-      }))
-    )
-    const firstUserMessage = selectOldestOpenClawFirstUserMessage(candidates)
+    const signature = openClawSessionSetSignature(res.sessions)
+    const cached = firstUserMessageCache.get(workspacePath)
+    let firstUserMessage = cached?.signature === signature ? cached.message : undefined
+
+    if (firstUserMessage === undefined) {
+      const candidates = await Promise.all(
+        res.sessions.map(async session => ({
+          key: session.key,
+          updatedAt: session.updatedAt,
+          detail: await rpc<OpenClawSessionDetail>('sessions.get', { key: session.key }).catch(
+            () => null
+          )
+        }))
+      )
+      firstUserMessage = selectOldestOpenClawFirstUserMessage(candidates)
+      // Only cache found messages: a session without a user message yet can
+      // gain one later without the session set changing.
+      if (firstUserMessage) {
+        firstUserMessageCache.set(workspacePath, { signature, message: firstUserMessage })
+      }
+    }
+
     return {
       ...(firstUserMessage ? { firstUserMessage } : {}),
       ...(updatedAt !== undefined ? { updatedAt } : {})
     }
-  })
-  return out ?? {}
+  } catch {
+    return {}
+  }
 }
 
 // One entry from the gateway's `models.list` catalog. The catalog is
