@@ -17,8 +17,10 @@ import {
   type CodexThread,
   codexModelToModel,
   codexThreadToEvents,
-  codexThreadToSessionInfo
+  codexThreadToSessionInfo,
+  selectCodexWorkspacePreview
 } from './adapter'
+import type { WorkspaceActivityPreview } from '../types'
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
 import { resolveWorkspaceEnv } from '../../workspace-env'
@@ -250,6 +252,20 @@ export async function getCodexClient(workspacePath: string): Promise<CodexClient
   }
 }
 
+// Preview reads must not spawn an app-server — home-page cards render for
+// every workspace, and starting a codex process per card is disproportionate.
+// Returns the workspace's client only if one is already running.
+async function peekCodexClient(workspacePath: string): Promise<CodexClient | null> {
+  const existing = clients.get(workspacePath)
+  if (!existing) return null
+  try {
+    const rec = await existing
+    return rec.client.isAlive() ? rec.client : null
+  } catch {
+    return null
+  }
+}
+
 // Kill a workspace's app-server so the next message respawns it with fresh
 // env (env is process-level and frozen at spawn). Mirrors the semantics of
 // cc-session's restartWorkspaceSessions; in-flight turns are lost.
@@ -282,6 +298,25 @@ export async function getCodexSessions(workspacePath: string): Promise<SessionIn
   } catch (err) {
     console.error('[codex] thread/list failed', err)
     return []
+  }
+}
+
+// Home-page card preview. Peek-only: with no live app-server the card simply
+// omits the activity fields until the workspace is opened once.
+export async function getCodexWorkspacePreview(
+  workspacePath: string,
+  includeFirstUserMessage: boolean
+): Promise<WorkspaceActivityPreview> {
+  const client = await peekCodexClient(workspacePath)
+  if (!client) return {}
+  try {
+    const res = await client.rpc<{ data?: CodexThread[] }>('thread/list', {
+      cwd: workspacePath,
+      limit: 50
+    })
+    return selectCodexWorkspacePreview(res.data ?? [], includeFirstUserMessage)
+  } catch {
+    return {}
   }
 }
 

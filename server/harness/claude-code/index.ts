@@ -16,7 +16,7 @@ import {
   restartWorkspaceSessions,
   sendCCMessage
 } from './session'
-import { getSessionEvents, getSessions } from './sessions'
+import { getSessionEvents, getSessions, getSessionWorkspacePreview } from './sessions'
 
 function fmtDuration(ms: number): string {
   const s = Math.floor(ms / 1000)
@@ -72,6 +72,8 @@ export const claudeCodeHarness: Harness = {
   runningSessions: () => getCCRunningSessions(),
 
   listSessions: ws => getSessions(ws.path),
+  workspacePreview: (ws, includeFirstUserMessage) =>
+    getSessionWorkspacePreview(ws.path, includeFirstUserMessage),
   sessionEvents: (ws, sessionId) => getSessionEvents(sessionId, ws.path),
   listModels: ws => getClaudeModels(ws.path),
   // The SDK's McpServerStatus is a superset of the UI's McpServer (extra

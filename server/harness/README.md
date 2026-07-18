@@ -208,6 +208,7 @@ Legend: ✅ supported · ⚠️ partial/workaround · ❌ missing.
 | Images in input          | ✅ base64 blocks                                    | ⚠️ materialize to path    | ✅ data URL or path                   |
 | Interactive approvals    | ⚠️ (we bypass)                                      | ✅                        | ✅ server→client requests (we bypass) |
 | Session list/history API | ✅ `listSessions()` + jsonl                         | ✅ `sessions.get`         | ✅ `thread/list`/`read`               |
+| Home card preview        | ✅ session file scan                                | ✅ cached first message   | ⚠️ live app-server only               |
 | MCP status               | ✅ `mcpServerStatus()`                              | n/a                       | ✅ `mcpServerStatus/list`             |
 | Usage reporting          | ⚠️ cost/duration on `result` (adapter drops tokens) | ✅ tokens + cost per turn | ✅ live + rate limits                 |
 | Structured output        | ❌                                                  | ❌                        | ✅ per turn                           |

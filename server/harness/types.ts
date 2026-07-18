@@ -48,6 +48,13 @@ export type HarnessCapabilities = {
   nativeUserEcho: boolean
 }
 
+// Home-page workspace card data beyond thumbnails: latest session activity
+// and (for widget-less workspaces) the oldest session's first user message.
+export type WorkspaceActivityPreview = {
+  firstUserMessage?: string
+  updatedAt?: number
+}
+
 export type Harness = {
   id: WorkspaceType
   capabilities: HarnessCapabilities
@@ -61,6 +68,14 @@ export type Harness = {
 
   // -- discovery / metadata ---------------------------------------------------
   listSessions(ws: WorkspaceEntry): Promise<SessionInfo[]>
+  // Home-page card preview. Called for every card on the home screen, so
+  // implementations must stay cheap: no process spawns, no per-session
+  // transcript reads unless cached. Failures resolve to {} — the card
+  // renders without the activity fields.
+  workspacePreview(
+    ws: WorkspaceEntry,
+    includeFirstUserMessage: boolean
+  ): Promise<WorkspaceActivityPreview>
   sessionEvents(ws: WorkspaceEntry, sessionId: string): Promise<StreamEvent[]>
   listModels(ws: WorkspaceEntry): Promise<Model[]>
   // MCP server status for the connectors UI; absent = backend has no MCP story.
