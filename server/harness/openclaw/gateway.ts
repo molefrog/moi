@@ -116,12 +116,25 @@ async function startClient(): Promise<{ handle: GatewayHandle; client: GatewayIn
   const { GatewayClient } = await import('openclaw/plugin-sdk/gateway-runtime')
 
   let connected = false
+  // The SDK's `opts` is private since 2026.7.x — connect callbacks must be
+  // handed to the constructor, so wire them to a deferred promise up front.
+  let settleConnect!: { res: () => void; rej: (err: Error) => void }
+  const connectPromise = new Promise<void>((res, rej) => {
+    settleConnect = { res, rej }
+  })
   const client = new GatewayClient({
     url: `ws://127.0.0.1:${cfg.port}`,
     token: cfg.token,
     role: 'operator',
     scopes: ['operator.admin', 'operator.read', 'operator.write'],
     requestTimeoutMs: REQUEST_TIMEOUT_MS,
+    onHelloOk: () => {
+      connected = true
+      settleConnect.res()
+    },
+    onConnectError: err => {
+      settleConnect.rej(err)
+    },
     onEvent: evt => {
       const event = (evt as unknown as { event?: unknown }).event
       const payload = (evt as unknown as { payload?: unknown }).payload
@@ -150,15 +163,16 @@ async function startClient(): Promise<{ handle: GatewayHandle; client: GatewayIn
       () => rej(new Error(`openclaw connect timeout after ${CONNECT_TIMEOUT_MS}ms`)),
       CONNECT_TIMEOUT_MS
     )
-    client.opts.onHelloOk = () => {
-      clearTimeout(t)
-      connected = true
-      res()
-    }
-    client.opts.onConnectError = err => {
-      clearTimeout(t)
-      rej(err)
-    }
+    connectPromise.then(
+      () => {
+        clearTimeout(t)
+        res()
+      },
+      err => {
+        clearTimeout(t)
+        rej(err)
+      }
+    )
     client.start()
   })
 
@@ -226,24 +240,32 @@ export async function withOneShotGateway<T>(fn: (rpc: Rpc) => Promise<T>): Promi
   const cfg = await readGatewayConfig()
   if (!cfg) return null
   const { GatewayClient } = await import('openclaw/plugin-sdk/gateway-runtime')
+  let settleConnect!: { res: () => void; rej: (err: Error) => void }
+  const connectPromise = new Promise<void>((res, rej) => {
+    settleConnect = { res, rej }
+  })
   const client = new GatewayClient({
     url: `ws://127.0.0.1:${cfg.port}`,
     token: cfg.token,
     role: 'operator',
     scopes: ['operator.admin', 'operator.read', 'operator.write'],
-    requestTimeoutMs: 2000
+    requestTimeoutMs: 2000,
+    onHelloOk: () => settleConnect.res(),
+    onConnectError: err => settleConnect.rej(err)
   })
   try {
     await new Promise<void>((res, rej) => {
       const t = setTimeout(() => rej(new Error('openclaw connect timeout')), 2000)
-      client.opts.onHelloOk = () => {
-        clearTimeout(t)
-        res()
-      }
-      client.opts.onConnectError = e => {
-        clearTimeout(t)
-        rej(e)
-      }
+      connectPromise.then(
+        () => {
+          clearTimeout(t)
+          res()
+        },
+        err => {
+          clearTimeout(t)
+          rej(err)
+        }
+      )
       client.start()
     })
     return await fn((m, p = {}) => client.request(m, p) as Promise<never>)

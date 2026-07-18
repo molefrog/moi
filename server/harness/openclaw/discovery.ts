@@ -116,17 +116,20 @@ async function withGatewayClient<T>(fn: (rpc: Rpc) => Promise<T>): Promise<T | n
     return null
   }
 
+  // The SDK's `opts` is private since 2026.7.x — connect callbacks must be
+  // handed to the constructor, so wire them to a deferred promise up front.
+  let settleConnect!: { res: () => void; rej: (err: Error) => void }
+  const connect = new Promise<void>((res, rej) => {
+    settleConnect = { res, rej }
+  })
   const client = new GatewayClient({
     url: `ws://127.0.0.1:${port}`,
     token,
     role: 'operator',
     scopes: ['operator.admin', 'operator.read', 'operator.write'],
-    requestTimeoutMs: TIMEOUT_MS
-  })
-
-  const connect = new Promise<void>((res, rej) => {
-    client.opts.onHelloOk = () => res()
-    client.opts.onConnectError = rej
+    requestTimeoutMs: TIMEOUT_MS,
+    onHelloOk: () => settleConnect.res(),
+    onConnectError: err => settleConnect.rej(err)
   })
 
   try {

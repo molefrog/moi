@@ -131,7 +131,11 @@ export async function getWorkspacePreview(
       .map(item => images[item.i])
       .filter((image): image is string => typeof image === 'string')
       .slice(0, PREVIEW_LIMIT)
-    const includeFirstUserMessage = layout.widgetGrid.length === 0
+    // The message bubble is the card's fallback for "nothing to show": gate on
+    // captured thumbnails, not grid emptiness — a workspace with widgets that
+    // were never captured (never opened in a browser) still renders an empty
+    // folder otherwise.
+    const includeFirstUserMessage = thumbnails.length === 0
     const providerPreview = await getProviderPreview?.(includeFirstUserMessage).catch(
       () => undefined
     )
