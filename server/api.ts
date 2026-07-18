@@ -20,9 +20,7 @@ import {
   saveWidgetThumbnails
 } from './layout'
 import { getUserMcpStatus } from './harness/claude-code/mcp'
-import { getSessionWorkspacePreview } from './harness/claude-code/sessions'
 import { getClientFrameLog, getWireLog } from './harness/debug'
-import { getOpenClawWorkspacePreview } from './harness/openclaw/discovery'
 import { allHarnesses, harnessFor, isHarnessType } from './harness/registry'
 import {
   discoverWorkspaces,
@@ -112,9 +110,7 @@ one.get('/preview', async c => {
   const ws = c.get('ws')
   return c.json(
     await getWorkspacePreview(ws.path, includeFirstUserMessage =>
-      ws.type === 'openclaw'
-        ? getOpenClawWorkspacePreview(ws.path, ws.agentId, includeFirstUserMessage)
-        : getSessionWorkspacePreview(ws.path, includeFirstUserMessage)
+      harnessFor(ws).workspacePreview(ws, includeFirstUserMessage)
     )
   )
 })

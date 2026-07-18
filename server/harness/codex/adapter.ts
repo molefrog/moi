@@ -11,6 +11,8 @@
 import type { Part, StreamEvent, SystemNotice, ToolCall, ToolState, Turn } from '@/lib/format'
 import type { Model, SessionInfo } from '@/lib/types'
 
+import type { WorkspaceActivityPreview } from '../types'
+
 // ---- protocol shapes (subset we consume) ------------------------------------
 
 export type CodexUserInput =
@@ -110,6 +112,36 @@ export function codexThreadToSessionInfo(t: CodexThread): SessionInfo {
     // Codex timestamps are unix seconds; SessionInfo wants millis.
     lastModified: (t.updatedAt ?? t.createdAt ?? 0) * 1000,
     cwd: t.cwd
+  }
+}
+
+// Home-page card preview from thread/list alone: `preview` already carries the
+// thread's first-message snippet, so no thread/read is needed. The oldest
+// thread by creation supplies the message; the newest activity supplies the
+// timestamp.
+export function selectCodexWorkspacePreview(
+  threads: CodexThread[],
+  includeFirstUserMessage: boolean
+): WorkspaceActivityPreview {
+  const latest = threads.reduce<number | undefined>((acc, t) => {
+    const ts = t.updatedAt ?? t.createdAt
+    return ts !== undefined && (acc === undefined || ts > acc) ? ts : acc
+  }, undefined)
+  const updatedAt = latest !== undefined ? latest * 1000 : undefined
+
+  let firstUserMessage: string | undefined
+  if (includeFirstUserMessage) {
+    const oldest = [...threads].sort(
+      (a, b) =>
+        (a.createdAt ?? a.updatedAt ?? 0) - (b.createdAt ?? b.updatedAt ?? 0) ||
+        a.id.localeCompare(b.id)
+    )[0]
+    firstUserMessage = oldest?.preview?.trim() || undefined
+  }
+
+  return {
+    ...(firstUserMessage ? { firstUserMessage } : {}),
+    ...(updatedAt !== undefined ? { updatedAt } : {})
   }
 }
 

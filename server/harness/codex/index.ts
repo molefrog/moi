@@ -7,6 +7,7 @@ import {
   getCodexProcessInfo,
   getCodexSessions,
   getCodexThreadEvents,
+  getCodexWorkspacePreview,
   killAllCodexClients,
   killCodexWorkspace
 } from './client'
@@ -33,6 +34,8 @@ export const codexHarness: Harness = {
   runningSessions: () => getCodexRunningSessions(),
 
   listSessions: ws => getCodexSessions(ws.path),
+  workspacePreview: (ws, includeFirstUserMessage) =>
+    getCodexWorkspacePreview(ws.path, includeFirstUserMessage),
   // Prefer the live view when one exists; otherwise resume the thread so WS
   // frames upsert into the same view, and fall back to a static thread/read
   // if the resume fails.

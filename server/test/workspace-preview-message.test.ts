@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
+import { selectCodexWorkspacePreview } from '../harness/codex/adapter'
 import {
   openClawSessionSetSignature,
   selectLatestOpenClawUpdatedAt,
@@ -105,6 +106,20 @@ describe('workspace preview message selection', () => {
       selectLatestOpenClawUpdatedAt([{ updatedAt: 100 }, { updatedAt: 900 }, { updatedAt: 200 }])
     ).toBe(900)
     expect(selectLatestOpenClawUpdatedAt([])).toBeUndefined()
+  })
+
+  test('codex preview picks the oldest thread message and latest activity', () => {
+    const threads = [
+      { id: 'newer', preview: 'Newer question', createdAt: 200, updatedAt: 900 },
+      { id: 'older', preview: 'The first question', createdAt: 100, updatedAt: 300 }
+    ]
+    expect(selectCodexWorkspacePreview(threads, true)).toEqual({
+      firstUserMessage: 'The first question',
+      // Codex timestamps are unix seconds; the preview reports millis.
+      updatedAt: 900_000
+    })
+    expect(selectCodexWorkspacePreview(threads, false)).toEqual({ updatedAt: 900_000 })
+    expect(selectCodexWorkspacePreview([], true)).toEqual({})
   })
 
   test('session-set signature ignores order and reflects membership changes', () => {

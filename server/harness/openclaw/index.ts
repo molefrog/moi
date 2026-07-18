@@ -8,7 +8,8 @@ import {
   discoverOpenClawAgents,
   getOpenClawModels,
   getOpenClawSessionMessages,
-  getOpenClawSessions
+  getOpenClawSessions,
+  getOpenClawWorkspacePreview
 } from './discovery'
 import {
   abortOpenClawRun,
@@ -41,6 +42,8 @@ export const openclawHarness: Harness = {
     const rows = await getOpenClawSessions(ws.path, ws.agentId)
     return rows.map(r => toSessionInfo(r, ws.path))
   },
+  workspacePreview: (ws, includeFirstUserMessage) =>
+    getOpenClawWorkspacePreview(ws.path, ws.agentId, includeFirstUserMessage),
   // Prefer the live view if we already hold one — keeps REST + WS in
   // agreement for any reload that lands while a run is active. The first cold
   // call also primes the live subscription so subsequent WS frames upsert
