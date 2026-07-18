@@ -56,9 +56,13 @@ moi debug logs --clear    # wipe the buffer
   applet when known; `module`/`fn` pin down the server function for `rpc` entries.
 - **Producers.** Server-side: the RPC route records every failed function call; the bundle
   pipeline records build failures. Browser-side: the client POSTs `load`, `render`, and
-  `window` events to `POST /api/workspaces/:id/applet-log` — fire-and-forget, throttled,
-  size-capped. Reporting is **always on**: when the user says "it's broken", the crash their
-  tab saw five minutes ago is already on record.
+  `window` events to `POST /api/workspaces/:id/applet-log` — fire-and-forget and
+  flood-guarded: a per-error cooldown (5s) collapses repeats of the same error, and a global
+  cap (30 reports/min) bounds the total even when the message varies every occurrence, so a
+  tight throw loop never becomes a POST-per-frame storm. `window` errors attribute via
+  `ErrorEvent.filename` first (structured, no stack parsing), falling back to a bundle-URL
+  match in the stack text. Reporting is **always on**: when the user says "it's broken", the
+  crash their tab saw five minutes ago is already on record.
 - **Dedup.** A repeat of an identical error (same source + attribution + message) bumps a
   `count` and its timestamp instead of appending — a render crash loop is one line, not a
   hundred.
