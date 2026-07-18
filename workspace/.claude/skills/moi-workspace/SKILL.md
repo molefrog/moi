@@ -272,8 +272,7 @@ build; reach for them when they'd help (smoke-testing something new, or investig
   directly (args are one JSON array). Each invocation runs in a fresh, isolated one-shot process
   with the same env, module loading, and timeout as the browser's calls, so a pass means the real
   path works — handy for trying a function without touching the UI. Server functions only; for
-  arbitrary scripts use `moi env exec`. Browser calls time out at 30s, so a multi-second duration
-  is worth noting.
+  arbitrary scripts use `moi env exec`.
 - `moi debug logs` — the applet errors the workspace has seen since each applet's last good
   build: browser-side load failures and render crashes, plus server-function (rpc) errors. The
   user's tab reports these automatically, so when the user says something is broken, what
