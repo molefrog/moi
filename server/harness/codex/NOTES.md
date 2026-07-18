@@ -221,7 +221,94 @@ state, steer/interrupt, previews, usage). Empirical findings beyond §2:
 - `thread/start` responses label threads `source: "vscode"` — app-server
   clients are indistinguishable from the VS Code extension in `thread/list`.
 
-## 6. Type maintenance (`generate-ts`)
+## 6. MCP servers & connectors (probed at CLI 0.144.5)
+
+One-off probe: `bun server/harness/codex/probe.ts rpc . mcpServerStatus/list '{}'`.
+
+### `mcpServerStatus/list` payload
+
+`{ data: McpServerStatus[] }`, one entry per server Codex loaded:
+
+- `name` — the registry key (config.toml table name, or injected name).
+- `serverInfo` — the server's MCP `initialize` result (`name`, `title`,
+  `version`, `description`, `icons`, `websiteUrl`), `null` if it never
+  answered. A server can list with `serverInfo: null` and an empty `tools`
+  map and still be "configured" — that's what a dead/misbehaving remote
+  looks like (no error field).
+- `tools` — a **map keyed by tool name**, each value a full MCP tool def:
+  `name`, `title`, `description`, `inputSchema`, `outputSchema`,
+  `annotations` (`readOnlyHint`/`destructiveHint`/`openWorldHint`), `_meta`.
+  This payload is BIG (~0.5 MB with ChatGPT connectors installed) — don't
+  fold it into anything broadcast.
+- `resources`, `resourceTemplates` — arrays.
+- `authStatus` — `bearerToken` (authed HTTP/OAuth), `notLoggedIn` (OAuth
+  awaiting `mcpServer/oauth/login`; the one `getCodexMcpStatus` maps to
+  `needs-auth`), `unsupported` (stdio server, no auth concept).
+
+### `codex_apps` — the ChatGPT connector aggregator
+
+Injected automatically when signed in with a ChatGPT account; **absent from
+config.toml**. `serverInfo.name` is `plugin-runtime`. It flattens every
+connector installed on the user's ChatGPT account (GitHub, Figma, Granola, …)
+into ONE server whose tool names are dotted `<connector>.<tool>`
+(`figma.generate_deck`). The true brand lives in each tool's `_meta`:
+`connector_id`, `connector_name` ("Figma"), `connector_description`,
+`link_id` (the user's authorization to that connector), plus Apps SDK widget
+hints (`openai/outputTemplate: "ui://widget/….html"`). This is why the
+client's `parseCodexMcp` brands dotted `codex_apps` calls by the prefix
+before the dot, not the server name. The adapter does not currently carry
+`_meta.connector_name` through to the `ToolCall` — icon/brand matching is
+name-based.
+
+### Where MCP servers can be defined (config layers)
+
+From the 0.144.5 binary's config-layer enum, lowest to highest:
+
+1. **User** — `$CODEX_HOME/config.toml` (`[mcp_servers.<name>]`). Shared by
+   three writers: hand edits, `codex mcp add/remove`, and other apps (the
+   ChatGPT desktop app writes `node_repl` / `computer-use` entries here).
+2. **Profile v2** — `$CODEX_HOME/<name>.config.toml`, layered via `-p <name>`
+   (legacy `[profiles.<name>]` tables in config.toml also exist).
+3. **Project** — `.codex/config.toml` in a trusted repo ("sandbox, MCP,
+   hooks, model, or reasoning defaults").
+4. **Session flags** — `-c 'mcp_servers.foo.command="…"'` per invocation.
+5. **Plugins** — an enabled plugin can provide MCP servers ("not configured
+   in config.toml or an enabled plugin").
+6. **Account-injected** — `codex_apps` (above); server-side, no local file.
+7. **Admin layers** — system config.toml, MDM managed preferences, legacy
+   `managed_config.toml`, and an enterprise-managed cloud layer;
+   `requirements.toml` restricts (never defines) what the others may set.
+
+The app-server can also edit the user layer programmatically
+(`config/value/write`, `config/batchWrite`) — unused by moi.
+
+### The full MCP RPC surface (from the 0.144.5 binary's method enums)
+
+Requests:
+
+- `mcpServerStatus/list` — the registry dump above.
+- `mcpServer/tool/call` — **direct one-off tool invocation, no model turn**:
+  `{ threadId, server, tool, arguments }` → a raw MCP `CallToolResult`
+  (`{ content: [...], isError }`). Requires a live `threadId` (MCP servers
+  are started per thread), but `thread/start` + call works without ever
+  running a turn — verified against `mastra_docs`. Argument validation
+  errors come back as `isError: true` content, not JSON-RPC errors.
+- `mcpServer/resource/read` — read an MCP resource by uri.
+- `mcpServer/oauth/login` — start OAuth for a `notLoggedIn` server;
+  completion arrives as the `mcpServer/oauthLogin/completed` notification.
+- `config/mcpServer/reload` — re-read server definitions without a restart.
+- `config/read`, `config/value/write`, `config/batchWrite`,
+  `configRequirements/read` — inspect/edit the config layers that define
+  servers.
+
+Notifications: `mcpServer/startupStatus/updated` (per-thread startup
+progress/failures — we currently ignore it), `mcpServer/oauthLogin/completed`,
+`item/mcpToolCall/progress` (progress of an in-turn MCP call).
+
+Server→client request: `mcpServer/elicitation/request` — an MCP server
+asking the user for input mid-call, forwarded for the client to answer.
+
+## 7. Type maintenance (`generate-ts`)
 
 The wire types in `adapter.ts`/`client.ts` are a hand-written defensive
 subset of the protocol, produced against the bindings from:
