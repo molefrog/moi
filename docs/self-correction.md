@@ -103,14 +103,14 @@ moi call-server-fn views/crm/searchUsers '["ann", 10]'    # args as one JSON arr
   the agent can act on. (Expect a few hundred ms of process-spawn overhead on top of the
   function's own time — the isolation costs a fork.)
 
-## The loop, as the skill teaches it
+## How the skill presents it
 
-1. **Build** — `moi bundle`; a `failed` row is fixed before anything else. The footer nudges
-   when older runtime errors are still on record.
-2. **Poke** — new or changed `.server.ts` functions get a `moi call-server-fn` smoke test
-   before the agent reports them working.
-3. **Feel** — `moi debug logs` when the user reports breakage, and proactively after shipping
-   something new (once the user's tab has had a moment to load it).
+The moi-workspace skill describes both commands as **available feedback channels, not a
+mandatory checklist** — the agent decides when a smoke test or a journal check is worth the
+trip (typically: after building something non-trivial, or when the user reports breakage).
+The ambient signals do the nagging instead: the `moi bundle` footer calls out standing
+errors, and the journal is already populated by the time the user complains — reporting is
+always on, opting in is only about _reading_ it.
 
 ## How it works
 
