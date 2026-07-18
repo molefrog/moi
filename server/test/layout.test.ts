@@ -205,11 +205,36 @@ describe('getWorkspacePreview', () => {
     })
   })
 
-  test('does not load the message fallback when widgets exist without screenshots', async () => {
+  test('loads the message fallback when widgets exist without screenshots', async () => {
     await withWorkspaceFile(
       {
         ...base,
         widgetGrid: [{ i: 'waiting-for-thumbnail', x: 0, y: 0 }]
+      },
+      async dir => {
+        const preview = await getWorkspacePreview(dir, async includeFirstUserMessage => {
+          expect(includeFirstUserMessage).toBe(true)
+          return {
+            firstUserMessage: 'Shown until a capture lands',
+            updatedAt: 900
+          }
+        })
+
+        expect(preview).toEqual({
+          thumbnails: [],
+          firstUserMessage: 'Shown until a capture lands',
+          updatedAt: 900
+        })
+      }
+    )
+  })
+
+  test('does not load the message fallback when screenshots exist', async () => {
+    await withWorkspaceFile(
+      {
+        ...base,
+        widgetGrid: [{ i: 'captured', x: 0, y: 0 }],
+        widgetThumbnails: { images: { captured: 'captured-image' } }
       },
       async dir => {
         const preview = await getWorkspacePreview(dir, async includeFirstUserMessage => {
@@ -220,7 +245,7 @@ describe('getWorkspacePreview', () => {
           }
         })
 
-        expect(preview).toEqual({ thumbnails: [], updatedAt: 900 })
+        expect(preview).toEqual({ thumbnails: ['captured-image'], updatedAt: 900 })
       }
     )
   })

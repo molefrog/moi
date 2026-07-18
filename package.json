@@ -99,7 +99,7 @@
     "zustand": "^5.0.12"
   },
   "optionalDependencies": {
-    "openclaw": "2026.4.22"
+    "openclaw": "2026.7.1"
   },
   "devDependencies": {
     "@types/bun": "latest",
