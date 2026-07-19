@@ -150,8 +150,8 @@ function check(name: string, ok: boolean, detail = '') {
 const isPreview = (f: Frame) => f.type === 'preview'
 const isAssistantTurn = (f: Frame) =>
   f.kind === 'turn' && (f.turn as { role?: string } | undefined)?.role === 'assistant'
-const isStatusFalse = (f: Frame) => f.type === 'status' && f.processing === false
-const isStatusTrue = (f: Frame) => f.type === 'status' && f.processing === true
+const isStatusFalse = (f: Frame) => f.type === 'status' && f.activity === 'idle'
+const isStatusTrue = (f: Frame) => f.type === 'status' && f.activity === 'running'
 
 function previewText(f: Frame): string {
   const blocks = (f.blocks ?? []) as { text?: string }[]
@@ -269,7 +269,7 @@ async function scenarioReconnectMidStream() {
   const c2 = new Client(URL)
   await c2.open()
   const snapshot = c2.frames.find(f => f.type === 'status_snapshot')
-  const runningNow = (snapshot?.running as unknown[] | undefined) ?? []
+  const runningNow = (snapshot?.sessions as unknown[] | undefined) ?? []
   if (runningNow.length >= 1) {
     // The common case: the long run is still going. The new client must receive
     // the tail and the terminal status — proving delivery survives a mid-stream
