@@ -247,16 +247,17 @@ Message
 
 ## 9. What's missing today vs. what the SDK emits
 
-Known blind spots the abstraction should close:
+Known blind spots the abstraction should close (historical audit — items marked
+CLOSED have since been handled; see adapter.ts / session.ts):
 
 - **Thinking blocks** — SDK emits them; `transformMessage` drops them. Would require a new repo-level block type.
 - **Server tool use** (`web_search`, `web_fetch`, `code_execution`, etc.) — completely invisible. An assistant using `WebSearch` currently looks like a silent gap between user turn and final answer.
 - **MCP tool calls proper** (`mcp_tool_use` / `mcp_tool_result` blocks) — dropped. Regular `Task`/`Bash` MCP tools happen to survive because they wear the plain `tool_use` shape.
-- **Streaming** — `stream_event` dropped, so assistant text lands in one block per turn, not token-by-token.
-- **Session lifecycle signals** — `system/init`, `system/session_state_changed`, `system/status` dropped. UI can't display model name, current tools, permission mode, "thinking…", "awaiting permission".
-- **Sub-agent nesting** — subagent turns survive structurally but lose `parent_tool_use_id`, so they render flat. All `task_*` events dropped.
-- **Hooks / tasks / rate limits / api_retry** — all invisible.
-- **MessageBlock switch exhaustiveness** — any future repo-level type crashes render.
+- **Streaming** — CLOSED: `stream_event` drives live token previews (`preview` frames) when the client opts into streaming.
+- **Session lifecycle signals** — partially CLOSED: `system/init` feeds the session snapshot; `system/session_state_changed` mirrors into `SessionActivity` (note: current CLIs don't emit it in streaming-input mode — `result` is the everyday turn-over fallback); `requires-action` reaches the wire but has no UI yet. `system/status` (`requesting`/`compacting`) still dropped.
+- **Sub-agent nesting** — CLOSED: `task_started`/`task_progress`/`task_notification` build nested subagent records; `task_started`/`task_updated`/`task_notification` also track live background tasks for the idle-eviction keep-alive (session.ts `bgTasks`).
+- **Hooks / rate limits / api_retry** — CLOSED: surfaced as notices.
+- **MessageBlock switch exhaustiveness** — the UI layer this referred to (`MessageBlock.tsx`) no longer exists; turns render via `TurnView`/`ToolCallGroup`.
 
 ---
 

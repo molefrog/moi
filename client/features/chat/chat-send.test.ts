@@ -11,7 +11,7 @@ const workspaceId = 'workspace-1'
 const sessionId = 'session-1'
 
 afterEach(() => {
-  liveStore.setState({ processing: {}, errors: {} })
+  liveStore.setState({ activity: {}, errors: {} })
 })
 
 describe('startOptimisticTurn', () => {
@@ -27,7 +27,7 @@ describe('startOptimisticTurn', () => {
     const view = queryClient.getQueryData<ViewState>(workspaceKeys.events(workspaceId, sessionId))
     expect(optimisticId).toStartWith('optimistic:')
     expect(view?.turns[0]?.parts).toEqual([{ type: 'text', text: 'Build a dashboard' }])
-    expect(liveStore.getState().processing[`${workspaceId}:${sessionId}`]).toBe(true)
+    expect(liveStore.getState().activity[`${workspaceId}:${sessionId}`]).toBe('running')
   })
 })
 

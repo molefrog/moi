@@ -10,7 +10,7 @@ import { getClaudeModels } from './models'
 import {
   SESSION_LIMITS,
   getCCDebugSnapshot,
-  getCCRunningSessions,
+  getCCActiveSessions,
   interruptCCSession,
   killAllCCSessions,
   restartWorkspaceSessions,
@@ -69,7 +69,7 @@ export const claudeCodeHarness: Harness = {
 
   sendMessage: input => sendCCMessage(input),
   interrupt: (workspaceId, sessionId) => interruptCCSession(workspaceId, sessionId),
-  runningSessions: () => getCCRunningSessions(),
+  activeSessions: () => getCCActiveSessions(),
 
   listSessions: ws => getSessions(ws.path),
   workspacePreview: (ws, includeFirstUserMessage) =>
@@ -87,7 +87,7 @@ export const claudeCodeHarness: Harness = {
 
   statusLines: now => {
     const cc = getCCDebugSnapshot()
-    const busy = cc.sessions.filter(s => s.busy).length
+    const busy = cc.sessions.filter(s => s.activity !== 'idle').length
     const lines = [
       `live CC sessions  ${cc.sessions.length}/${SESSION_LIMITS.maxLive}  ` +
         `(${busy} busy, ${cc.sessions.length - busy} idle, ${cc.aliases} alias${cc.aliases === 1 ? '' : 'es'}, ` +
@@ -99,10 +99,19 @@ export const claudeCodeHarness: Harness = {
     }
     // Busiest / most-recently-active first.
     const sorted = [...cc.sessions].sort(
-      (a, b) => Number(b.busy) - Number(a.busy) || b.lastActivityAt - a.lastActivityAt
+      (a, b) =>
+        Number(b.activity !== 'idle') - Number(a.activity !== 'idle') ||
+        b.lastActivityAt - a.lastActivityAt
     )
     for (const s of sorted) {
-      const mark = s.busy ? '▶ busy' : s.closed ? '✗ closed' : '○ idle'
+      const mark =
+        s.activity === 'running'
+          ? '▶ busy'
+          : s.activity === 'requires-action'
+            ? '⏸ input'
+            : s.closed
+              ? '✗ closed'
+              : '○ idle'
       const bits = [
         mark.padEnd(8),
         `ws=${s.workspaceId}`,
@@ -110,13 +119,13 @@ export const claudeCodeHarness: Harness = {
         `model=${s.model ?? 'default'}`,
         `effort=${s.effort ?? 'default'}`,
         `stream=${s.stream ? 'on' : 'off'}`,
-        `pending=${s.pendingTurns}`,
         `age=${fmtDuration(now - s.createdAt)}`,
         `lastActivity=${fmtAgo(s.lastActivityAt, now)}`
       ]
+      if (s.bgTasks > 0) bits.push(`bgTasks=${s.bgTasks}`)
       if (s.desiredEffort !== s.effort) bits.push(`desiredEffort=${s.desiredEffort ?? 'default'}`)
       if (s.desiredStream !== s.stream) bits.push(`desiredStream=${s.desiredStream ? 'on' : 'off'}`)
-      if (!s.busy && !s.hasIdleTimer) bits.push('(no idle timer)')
+      if (s.activity === 'idle' && !s.hasIdleTimer) bits.push('(no idle timer)')
       let line = '  ' + bits.join('  ')
       if (s.lastUserText) line += `\n      last: ${JSON.stringify(s.lastUserText)}`
       lines.push(line)

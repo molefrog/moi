@@ -17,7 +17,7 @@
 //     first-class (no text matching like OpenClaw needs).
 import { appendAttachmentNote } from '@/lib/attachment-note'
 import { type Part, type SubagentRecord, type Turn, applyEvent, emptyViewState } from '@/lib/format'
-import type { StreamEvent, ViewState } from '@/lib/types'
+import type { SessionActivity, StreamEvent, ViewState } from '@/lib/types'
 
 import {
   type CodexThread,
@@ -91,10 +91,20 @@ function liveKey(workspaceId: string, sessionId: string): string {
   return real ? recKey(workspaceId, real) : direct
 }
 
-export function getCodexRunningSessions(): { workspaceId: string; sessionId: string }[] {
-  const out: { workspaceId: string; sessionId: string }[] = []
+export function getCodexActiveSessions(): {
+  workspaceId: string
+  sessionId: string
+  activity: SessionActivity
+}[] {
+  const out: { workspaceId: string; sessionId: string; activity: SessionActivity }[] = []
   for (const s of sessions.values()) {
-    if (s.processing) out.push({ workspaceId: s.workspaceId, sessionId: s.sessionId })
+    // Codex never surfaces `requires-action`: approvals are designed out
+    // (APPROVAL_POLICY 'never' + transport auto-accept in client.ts). If that
+    // policy is ever relaxed, `*requestApproval` / `elicitation` server
+    // requests are the signals to map to it.
+    if (s.processing) {
+      out.push({ workspaceId: s.workspaceId, sessionId: s.sessionId, activity: 'running' })
+    }
   }
   return out
 }
@@ -103,7 +113,11 @@ function setProcessing(rec: SessionRecord, processing: boolean, turnId: string |
   rec.activeTurnId = turnId
   if (rec.processing === processing) return
   rec.processing = processing
-  broadcast(rec.workspaceId, { type: 'status', sessionId: rec.sessionId, processing })
+  broadcast(rec.workspaceId, {
+    type: 'status',
+    sessionId: rec.sessionId,
+    activity: processing ? 'running' : 'idle'
+  })
 }
 
 function emitTurnEvent(rec: SessionRecord, ev: StreamEvent) {
@@ -290,6 +304,11 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
           content: turn.error.message
         })
       }
+      // An externally-interrupted turn otherwise ends silently, identical to a
+      // clean completion — surface the stop so the client can render it.
+      if (turn?.status === 'interrupted') {
+        broadcast(rec.workspaceId, { kind: 'stopped', sessionId: rec.sessionId })
+      }
       return
     }
     case 'error': {
@@ -298,6 +317,9 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
       if (message) {
         broadcast(rec.workspaceId, { kind: 'error', sessionId: rec.sessionId, content: message })
       }
+      // A top-level error without a following turn/completed would otherwise
+      // leave the session busy forever — the error is terminal for the turn.
+      setProcessing(rec, false, null)
       return
     }
     // Codex hooks (~/.codex/hooks.json) — surface as hook notices, parity

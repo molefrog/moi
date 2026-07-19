@@ -166,7 +166,7 @@ one.get('/view-builders', async c => {
   const ws = c.get('ws')
   const activeSessionIds = new Set(
     allHarnesses()
-      .flatMap(h => h.runningSessions())
+      .flatMap(h => h.activeSessions())
       .filter(session => session.workspaceId === ws.id)
       .map(session => session.sessionId)
   )

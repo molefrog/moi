@@ -26,7 +26,7 @@ beforeEach(() => {
   __setQueryClientForTests(qc)
   liveStore.setState({
     previews: {},
-    processing: {},
+    activity: {},
     errors: {},
     activeByWorkspace: {},
     drafts: {}
@@ -59,7 +59,7 @@ function assistantTurn(id: string, apiMessageId: string, text: string): Turn {
   }
 }
 function statusFrame(processing: boolean, sessionId = SID) {
-  return { type: 'status', workspaceId: WS, sessionId, processing }
+  return { type: 'status', workspaceId: WS, sessionId, activity: processing ? 'running' : 'idle' }
 }
 
 // Prime a thread's transcript so patchView/preview-guard treat it as loaded.
@@ -211,6 +211,6 @@ describe('streaming frame reduction', () => {
     expect(turns[1].role).toBe('assistant')
     expect(turns[1].parts).toEqual([{ type: 'text', text: 'Hello' }])
     // No preview-shaped junk leaked into the transcript.
-    expect(liveStore.getState().processing[`${WS}:${SID}`]).toBe(false)
+    expect(liveStore.getState().activity[`${WS}:${SID}`]).toBe('idle')
   })
 })

@@ -6,6 +6,7 @@ import type {
   DiscoveredWorkspace,
   McpServer,
   Model,
+  SessionActivity,
   SessionInfo,
   StreamEvent,
   WorkspaceEntry,
@@ -62,9 +63,10 @@ export type Harness = {
   // -- chat lifecycle ---------------------------------------------------------
   sendMessage(input: SendMessageInput): Promise<void>
   interrupt(workspaceId: string, sessionId: string): Promise<void>
-  // Sessions currently processing a turn, across all workspaces (drives the
-  // connect-time status snapshot and view-builder reconciliation).
-  runningSessions(): { workspaceId: string; sessionId: string }[]
+  // Every session whose activity is not `idle`, across all workspaces (drives
+  // the status snapshot and view-builder reconciliation). Activity is mirrored
+  // from the backend's native lifecycle signal, never derived by counting.
+  activeSessions(): { workspaceId: string; sessionId: string; activity: SessionActivity }[]
 
   // -- discovery / metadata ---------------------------------------------------
   listSessions(ws: WorkspaceEntry): Promise<SessionInfo[]>

@@ -54,7 +54,7 @@ export function useViewBuilderActions() {
         stream
       })
     } catch (error) {
-      liveStore.getState().setProcessing(workspaceId, builder.sessionId, false)
+      liveStore.getState().setActivity(workspaceId, builder.sessionId, 'idle')
       liveStore
         .getState()
         .setError(

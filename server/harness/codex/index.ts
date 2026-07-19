@@ -13,7 +13,7 @@ import {
 } from './client'
 import {
   ensureCodexSessionLive,
-  getCodexRunningSessions,
+  getCodexActiveSessions,
   getLiveCodexEvents,
   interruptCodexRun,
   sendCodexMessage
@@ -31,7 +31,7 @@ export const codexHarness: Harness = {
 
   sendMessage: input => sendCodexMessage(input),
   interrupt: (workspaceId, sessionId) => interruptCodexRun({ workspaceId, sessionId }),
-  runningSessions: () => getCodexRunningSessions(),
+  activeSessions: () => getCodexActiveSessions(),
 
   listSessions: ws => getCodexSessions(ws.path),
   workspacePreview: (ws, includeFirstUserMessage) =>
@@ -62,10 +62,10 @@ export const codexHarness: Harness = {
   wireScope: ws => ws.path,
 
   statusLines: () => {
-    const running = getCodexRunningSessions()
+    const active = getCodexActiveSessions()
     return [
-      `live Codex runs  ${running.length}`,
-      ...running.map(r => `  ▶ busy  ws=${r.workspaceId}  session=${r.sessionId}`)
+      `live Codex runs  ${active.length}`,
+      ...active.map(r => `  ▶ busy  ws=${r.workspaceId}  session=${r.sessionId}`)
     ]
   }
 }
