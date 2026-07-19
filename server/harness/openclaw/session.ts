@@ -14,7 +14,7 @@
 import { appendAttachmentNote } from '@/lib/attachment-note'
 import { stripViewBuilderMeta } from '@/lib/view-builder-meta'
 import { applyEvent, emptyViewState } from '@/lib/format'
-import type { StreamEvent, ViewState } from '@/lib/types'
+import type { SessionActivity, StreamEvent, ViewState } from '@/lib/types'
 
 import {
   type OpenClawMessage,
@@ -82,20 +82,46 @@ onGatewayReconnected(async () => {
       console.error('[openclaw-session] reconcile-on-reconnect failed', err)
     }
   }
+  // Lifecycle frames emitted during the disconnect window are gone for good —
+  // a run that ended while we were away would leave its session busy forever.
+  // Re-derive every busy flag from the gateway's own `sessions.list` status.
+  try {
+    const busy = [...sessions.values()].filter(rec =>
+      isOpenClawProcessing(rec.workspaceId, rec.sessionId)
+    )
+    if (busy.length === 0) return
+    const gw = await getGateway()
+    const res = await gw.rpc<{ sessions: { key: string; status?: string }[] }>('sessions.list', {
+      includeGlobal: true
+    })
+    const running = new Set(
+      (res?.sessions ?? []).filter(row => row.status === 'running').map(row => row.key)
+    )
+    for (const rec of busy) {
+      if (!running.has(rec.sessionKey)) setProcessing(rec, false, null)
+    }
+  } catch (err) {
+    console.error('[openclaw-session] busy-flag reconcile failed', err)
+  }
 })
 
 function recKey(workspaceId: string, sessionId: string): string {
   return `${workspaceId}:${sessionId}`
 }
 
-// All running OpenClaw sessions across every workspace, for the connect-time
-// status snapshot. Key is `${workspaceId}:${sessionId}` (both are colon-free).
-export function getOpenClawRunningSessions(): { workspaceId: string; sessionId: string }[] {
-  const out: { workspaceId: string; sessionId: string }[] = []
+// All non-idle OpenClaw sessions across every workspace, for the status
+// snapshot. Key is `${workspaceId}:${sessionId}` (both are colon-free). The
+// protocol has no "waiting for user input" concept, so activity is binary.
+export function getOpenClawActiveSessions(): {
+  workspaceId: string
+  sessionId: string
+  activity: SessionActivity
+}[] {
+  const out: { workspaceId: string; sessionId: string; activity: SessionActivity }[] = []
   for (const [k, v] of openclawAgents) {
     if (!v.processing) continue
     const i = k.indexOf(':')
-    out.push({ workspaceId: k.slice(0, i), sessionId: k.slice(i + 1) })
+    out.push({ workspaceId: k.slice(0, i), sessionId: k.slice(i + 1), activity: 'running' })
   }
   return out
 }
@@ -113,7 +139,11 @@ function setProcessing(rec: SessionRecord, processing: boolean, runId: string | 
     activeRunId: runId
   })
   if (existing?.processing === processing) return
-  broadcast(rec.workspaceId, { type: 'status', sessionId: rec.sessionId, processing })
+  broadcast(rec.workspaceId, {
+    type: 'status',
+    sessionId: rec.sessionId,
+    activity: processing ? 'running' : 'idle'
+  })
   if (processing) {
     void markViewBuilderBuildingBySession(rec.workspaceId, rec.workspacePath, rec.sessionId)
   } else {
@@ -522,6 +552,9 @@ export async function abortOpenClawRun(input: {
       sessionId: rec.sessionId,
       content: err instanceof Error ? err.message : 'abort failed'
     })
+    // Stop is the user's escape hatch from a stuck spinner — clear the busy
+    // flag even when the abort RPC fails (the run may already be gone).
+    setProcessing(rec, false, null)
   }
 }
 

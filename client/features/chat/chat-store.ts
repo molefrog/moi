@@ -1,7 +1,7 @@
 import { useStore } from 'zustand'
 import { createStore } from 'zustand/vanilla'
 
-import type { PreviewBlock, PreviewFrame, UploadInfo } from '@/lib/types'
+import type { PreviewBlock, PreviewFrame, SessionActivity, UploadInfo } from '@/lib/types'
 
 // One composer attachment, tracked per thread until the message is sent. It is
 // uploaded as soon as it's added (drop/paste/pick); `status` reflects that
@@ -20,7 +20,7 @@ export type ChatAttachment = {
 // App-level ephemeral chat state — the bits that are *pushed* from the server
 // over the WebSocket and can't be re-fetched as request/response data:
 //   - which thread is active per workspace (a UI selection),
-//   - per-session `processing` (spinner) flags,
+//   - per-session `activity` (spinner) state,
 //   - per-session error banners.
 //
 // The durable message transcripts live in the React Query cache (see
@@ -56,7 +56,10 @@ export type LivePreview = {
 
 export type LiveStore = {
   activeByWorkspace: Record<string, string | null>
-  processing: Record<string, boolean>
+  // Per-session activity mirrored from server `status` frames. Only `running`
+  // shows the loader/Stop; `requires-action` is tracked but not rendered yet.
+  // Missing key = idle.
+  activity: Record<string, SessionActivity>
   errors: Record<string, string | null>
   // Live token-streaming previews, keyed by `messageId` (the API `msg_...` id)
   // so concurrent streams never collide. Reconciled against the durable
@@ -73,11 +76,13 @@ export type LiveStore = {
   attachments: Record<string, ChatAttachment[]>
 
   setActive: (workspaceId: string, sessionId: string | null) => void
-  setProcessing: (workspaceId: string, sessionId: string, value: boolean) => void
+  setActivity: (workspaceId: string, sessionId: string, value: SessionActivity) => void
   // Authoritative reconcile from a server `status_snapshot`: exactly the listed
-  // sessions are processing; everything else is cleared (fixes a spinner whose
-  // terminal status was emitted while we were disconnected).
-  reconcileProcessing: (running: { workspaceId: string; sessionId: string }[]) => void
+  // sessions are active; everything else is cleared to idle (fixes a spinner
+  // whose terminal status frame was lost while we were disconnected).
+  reconcileActivity: (
+    sessions: { workspaceId: string; sessionId: string; activity: SessionActivity }[]
+  ) => void
   setError: (workspaceId: string, sessionId: string, message: string | null) => void
   setDraft: (workspaceId: string, sessionId: string | null, value: string) => void
   addAttachments: (workspaceId: string, sessionId: string | null, items: ChatAttachment[]) => void
@@ -107,7 +112,7 @@ export type LiveStore = {
 
 export const liveStore = createStore<LiveStore>()(set => ({
   activeByWorkspace: {},
-  processing: {},
+  activity: {},
   errors: {},
   drafts: {},
   previews: {},
@@ -116,12 +121,12 @@ export const liveStore = createStore<LiveStore>()(set => ({
   setActive: (workspaceId, sessionId) =>
     set(s => ({ activeByWorkspace: { ...s.activeByWorkspace, [workspaceId]: sessionId } })),
 
-  setProcessing: (workspaceId, sessionId, value) =>
-    set(s => ({ processing: { ...s.processing, [key(workspaceId, sessionId)]: value } })),
+  setActivity: (workspaceId, sessionId, value) =>
+    set(s => ({ activity: { ...s.activity, [key(workspaceId, sessionId)]: value } })),
 
-  reconcileProcessing: running =>
+  reconcileActivity: sessions =>
     set(() => ({
-      processing: Object.fromEntries(running.map(r => [key(r.workspaceId, r.sessionId), true]))
+      activity: Object.fromEntries(sessions.map(r => [key(r.workspaceId, r.sessionId), r.activity]))
     })),
 
   setError: (workspaceId, sessionId, message) =>
@@ -219,11 +224,11 @@ export const liveStore = createStore<LiveStore>()(set => ({
     set(s => {
       const fromKey = key(workspaceId, from)
       const toKey = key(workspaceId, to)
-      const processing = { ...s.processing }
+      const activity = { ...s.activity }
       const errors = { ...s.errors }
-      if (fromKey in processing) {
-        processing[toKey] = processing[fromKey]
-        delete processing[fromKey]
+      if (fromKey in activity) {
+        activity[toKey] = activity[fromKey]
+        delete activity[fromKey]
       }
       if (fromKey in errors) {
         errors[toKey] = errors[fromKey]
@@ -246,7 +251,7 @@ export const liveStore = createStore<LiveStore>()(set => ({
           previews[id] = { ...p, sessionId: to }
         }
       }
-      return { processing, errors, activeByWorkspace, previews }
+      return { activity, errors, activeByWorkspace, previews }
     })
 }))
 

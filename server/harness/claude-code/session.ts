@@ -21,6 +21,7 @@ import {
 import { ATTACHMENT_ONLY_PLACEHOLDER, appendAttachmentNote } from '@/lib/attachment-note'
 import { ClaudeAdapter } from './adapter'
 import type { Part } from '@/lib/format'
+import type { SessionActivity } from '@/lib/types'
 import { stripViewBuilderMeta } from '@/lib/view-builder-meta'
 
 import { debug } from '../../debug'
@@ -92,6 +93,11 @@ export function buildUserMessage(
 const MAX_LIVE_SESSIONS = 8
 const IDLE_TTL_MS = 5 * 60_000
 
+// SDK task types that keep running after the turn ends (background Bash,
+// workflow runs). Subagent Tasks complete within their turn, so they are
+// deliberately excluded — a leaked entry would keep the session alive forever.
+const BG_TASK_TYPES = new Set(['local_bash', 'local_workflow'])
+
 const ALLOWED_TOOLS = [
   'Bash',
   'Read',
@@ -119,9 +125,19 @@ type LiveSession = {
   adapter: ClaudeAdapter
   input: InputQueue
   abort: AbortController
-  // User messages enqueued but not yet completed. A turn ends on a `result`
-  // message; processing = pendingTurns > 0.
-  pendingTurns: number
+  // Session activity, mirrored from the SDK's `session_state_changed` events
+  // (authoritative — it fires `idle` only after the CLI's input queue drains,
+  // so queued messages merged into one model turn can't wedge it, unlike the
+  // old send/result counter). `sendCCMessage` flips it to 'running'
+  // optimistically so the loader doesn't wait a subprocess round-trip.
+  activity: SessionActivity
+  // Whether this query has emitted `session_state_changed` at all. When it
+  // never does (older CLI), the `result` handler falls back to declaring idle.
+  sawStateEvents: boolean
+  // Live background tasks (background Bash, workflows) keyed by task id, fed by
+  // the SDK's typed task events. Non-empty keeps the session alive past the
+  // idle TTL — tearing down the subprocess would kill its background children.
+  bgTasks: Set<string>
   model: string | undefined
   // Reasoning effort the query was created with. The SDK has no live setter for
   // it (unlike setModel), so a change tears the session down and resumes.
@@ -139,6 +155,9 @@ type LiveSession = {
   desiredStream: boolean
   idleTimer: ReturnType<typeof setTimeout> | null
   closed: boolean
+  // Last turn's error text (result subtype), consumed by the view-builder
+  // status update on the idle transition.
+  lastBuilderError: string | undefined
   // Introspection only (surfaced by /status) — not load-bearing.
   createdAt: number
   lastActivityAt: number
@@ -166,11 +185,17 @@ function liveKey(workspaceId: string, sessionId: string): string {
   return real ? recKey(workspaceId, real) : direct
 }
 
-// Running sessions across all workspaces, for the connect-time status snapshot.
-export function getCCRunningSessions(): { workspaceId: string; sessionId: string }[] {
-  const out: { workspaceId: string; sessionId: string }[] = []
+// Non-idle sessions across all workspaces, for the status snapshot.
+export function getCCActiveSessions(): {
+  workspaceId: string
+  sessionId: string
+  activity: SessionActivity
+}[] {
+  const out: { workspaceId: string; sessionId: string; activity: SessionActivity }[] = []
   for (const s of sessions.values()) {
-    if (s.pendingTurns > 0) out.push({ workspaceId: s.workspaceId, sessionId: s.sessionId })
+    if (s.activity !== 'idle') {
+      out.push({ workspaceId: s.workspaceId, sessionId: s.sessionId, activity: s.activity })
+    }
   }
   return out
 }
@@ -186,8 +211,8 @@ export type CCDebugSession = {
   desiredEffort: string | undefined
   stream: boolean
   desiredStream: boolean
-  pendingTurns: number
-  busy: boolean
+  activity: SessionActivity
+  bgTasks: number
   closed: boolean
   hasIdleTimer: boolean
   createdAt: number
@@ -207,8 +232,8 @@ export function getCCDebugSnapshot(): { sessions: CCDebugSession[]; aliases: num
       desiredEffort: s.desiredEffort,
       stream: s.stream,
       desiredStream: s.desiredStream,
-      pendingTurns: s.pendingTurns,
-      busy: s.pendingTurns > 0,
+      activity: s.activity,
+      bgTasks: s.bgTasks.size,
       closed: s.closed,
       hasIdleTimer: s.idleTimer !== null,
       createdAt: s.createdAt,
@@ -262,8 +287,12 @@ function createInputQueue(): InputQueue {
   }
 }
 
-function broadcastProcessing(s: LiveSession, processing: boolean) {
-  broadcast(s.workspaceId, { type: 'status', sessionId: s.sessionId, processing })
+// Set the session's activity and broadcast the transition (deduped — repeated
+// same-value events from the SDK don't re-broadcast).
+function setActivity(s: LiveSession, activity: SessionActivity) {
+  if (s.activity === activity) return
+  s.activity = activity
+  broadcast(s.workspaceId, { type: 'status', sessionId: s.sessionId, activity })
 }
 
 function clearIdle(s: LiveSession) {
@@ -276,13 +305,26 @@ function clearIdle(s: LiveSession) {
 function armIdle(s: LiveSession) {
   clearIdle(s)
   s.idleTimer = setTimeout(() => {
-    if (s.pendingTurns === 0) teardown(s)
+    if (s.activity === 'running') return
+    if (s.bgTasks.size > 0) {
+      // Tearing down would kill the subprocess and its background children
+      // (renders, watch loops). Keep the session alive until they finish.
+      debug(
+        `cc idle-keepalive ws=${s.workspaceId} session=${s.sessionId} bgTasks=${s.bgTasks.size}`
+      )
+      armIdle(s)
+      return
+    }
+    teardown(s)
   }, IDLE_TTL_MS)
 }
 
 function teardown(s: LiveSession) {
   if (s.closed) return
-  debug(`cc teardown ws=${s.workspaceId} session=${s.sessionId} pendingTurns=${s.pendingTurns}`)
+  debug(`cc teardown ws=${s.workspaceId} session=${s.sessionId} activity=${s.activity}`)
+  // Terminal status first, while the session is still registered — the consume
+  // finally can't be relied on (a hung SDK iterator never reaches it).
+  setActivity(s, 'idle')
   s.closed = true
   clearIdle(s)
   s.input.close()
@@ -308,6 +350,20 @@ function renameSession(s: LiveSession, realId: string) {
   sessions.set(recKey(s.workspaceId, realId), s)
   aliases.set(recKey(s.workspaceId, from), realId)
   broadcast(s.workspaceId, { type: 'session_renamed', from, to: realId })
+}
+
+// The session just went idle (state event, or `result` on a CLI without state
+// events): settle the view builder, then either rebuild for a deferred
+// effort/streaming change or arm the idle timer.
+async function onSessionIdle(s: LiveSession) {
+  await markViewBuilderWaitingBySession(
+    s.workspaceId,
+    s.workspacePath,
+    s.sessionId,
+    s.lastBuilderError
+  )
+  if (s.desiredEffort !== s.effort || s.desiredStream !== s.stream) teardown(s)
+  else armIdle(s)
 }
 
 async function consume(s: LiveSession) {
@@ -353,27 +409,68 @@ async function consume(s: LiveSession) {
       if (msg.type === 'system' && msg.subtype === 'init') {
         debug(`cc init ws=${s.workspaceId} session=${s.sessionId}`)
       }
+      // A turn is producing output while we think the session is idle: a
+      // queued message the CLI ran as its own turn after the previous result,
+      // or an SDK-initiated turn (e.g. a background-task notification waking
+      // the model). Re-assert running so the spinner tracks real activity.
+      if ((msg.type === 'assistant' || msg.type === 'stream_event') && s.activity === 'idle') {
+        setActivity(s, 'running')
+      }
+      // Authoritative activity mirror. The CLI emits `idle` only once its own
+      // input queue drains, so queued messages the model merged into one turn
+      // (one `result` for N sends) still end in a clean idle here. Observed
+      // empirically: current CLIs don't emit this in streaming-input mode, so
+      // the `result` fallback below is the everyday path.
+      if (msg.type === 'system' && msg.subtype === 'session_state_changed') {
+        s.sawStateEvents = true
+        s.lastActivityAt = Date.now()
+        debug(`cc state ws=${s.workspaceId} session=${s.sessionId} state=${msg.state}`)
+        if (msg.state === 'running') setActivity(s, 'running')
+        else if (msg.state === 'requires_action') setActivity(s, 'requires-action')
+        else if (msg.state === 'idle') {
+          setActivity(s, 'idle')
+          await onSessionIdle(s)
+        }
+      }
+      // Background-task lifecycle (typed SDK events): track live background
+      // work so idle eviction doesn't kill it (armIdle keep-alive). Only task
+      // types that outlive the turn count; subagent Tasks end within it.
+      if (msg.type === 'system' && msg.subtype === 'task_started') {
+        if (BG_TASK_TYPES.has(msg.task_type ?? '')) {
+          s.bgTasks.add(msg.task_id)
+          debug(
+            `cc bg-task start ws=${s.workspaceId} session=${s.sessionId} task=${msg.task_id} type=${msg.task_type} live=${s.bgTasks.size}`
+          )
+        }
+      }
+      if (msg.type === 'system' && msg.subtype === 'task_notification') {
+        if (s.bgTasks.delete(msg.task_id)) {
+          debug(
+            `cc bg-task end ws=${s.workspaceId} session=${s.sessionId} task=${msg.task_id} status=${msg.status} live=${s.bgTasks.size}`
+          )
+        }
+      }
+      if (msg.type === 'system' && msg.subtype === 'task_updated') {
+        const status = msg.patch?.status
+        if (status === 'completed' || status === 'failed' || status === 'killed') {
+          s.bgTasks.delete(msg.task_id)
+        }
+      }
       if (msg.type === 'result') {
         s.lastActivityAt = Date.now()
-        s.pendingTurns = Math.max(0, s.pendingTurns - 1)
-        debug(`cc result ws=${s.workspaceId} session=${s.sessionId} pendingTurns=${s.pendingTurns}`)
-        if (s.pendingTurns === 0) {
-          broadcastProcessing(s, false)
-          const builderError =
-            msg.subtype === 'success'
-              ? undefined
-              : msg.errors.join('\n') || msg.subtype.replaceAll('_', ' ')
-          await markViewBuilderWaitingBySession(
-            s.workspaceId,
-            s.workspacePath,
-            s.sessionId,
-            builderError
-          )
-          // A mid-turn effort/streaming change couldn't be applied live; now
-          // that the queue has drained, tear down so the next message resumes
-          // with it.
-          if (s.desiredEffort !== s.effort || s.desiredStream !== s.stream) teardown(s)
-          else armIdle(s)
+        // Remembered for the idle transition — the view builder shows the last
+        // turn's error once the queue drains.
+        s.lastBuilderError =
+          msg.subtype === 'success'
+            ? undefined
+            : msg.errors.join('\n') || msg.subtype.replaceAll('_', ' ')
+        debug(`cc result ws=${s.workspaceId} session=${s.sessionId} subtype=${msg.subtype}`)
+        // Fallback for CLIs that never emit `session_state_changed`: treat
+        // every result as turn-over. With state events, `idle` follows the
+        // result and drives the same path.
+        if (!s.sawStateEvents) {
+          setActivity(s, 'idle')
+          await onSessionIdle(s)
         }
       }
     }
@@ -391,20 +488,18 @@ async function consume(s: LiveSession) {
       await markViewBuilderWaitingBySession(s.workspaceId, s.workspacePath, s.sessionId, message)
     }
   } finally {
-    if (s.pendingTurns > 0) {
-      s.pendingTurns = 0
-      broadcastProcessing(s, false)
-    }
+    // teardown broadcasts the terminal idle status itself (deduped).
     teardown(s)
   }
 }
 
-// Close one idle session to stay under the cap. A busy session is never evicted;
-// if everything is busy we allow a temporary overflow rather than killing a run.
+// Close one idle session to stay under the cap. A running session — or one
+// with live background tasks — is never evicted; if everything is busy we allow
+// a temporary overflow rather than killing a run.
 function evictIfNeeded() {
   if (sessions.size < MAX_LIVE_SESSIONS) return
   for (const s of sessions.values()) {
-    if (s.pendingTurns === 0) {
+    if (s.activity === 'idle' && s.bgTasks.size === 0) {
       teardown(s)
       return
     }
@@ -467,7 +562,9 @@ function createLiveSession(input: {
     adapter: new ClaudeAdapter(),
     input: queue,
     abort,
-    pendingTurns: 0,
+    activity: 'idle',
+    sawStateEvents: false,
+    bgTasks: new Set(),
     model: input.model,
     effort: input.effort,
     desiredEffort: input.effort,
@@ -475,6 +572,7 @@ function createLiveSession(input: {
     desiredStream: input.stream,
     idleTimer: null,
     closed: false,
+    lastBuilderError: undefined,
     createdAt: Date.now(),
     lastActivityAt: Date.now(),
     lastUserText: undefined
@@ -518,7 +616,7 @@ export async function sendCCMessage(input: {
   // construct-time, no SDK setter), so when either differs we tear the idle
   // session down and recreate it via resume — the change lands on this very
   // turn. A busy session keeps its settings until the in-flight turn ends.
-  if (s && (input.effort !== s.effort || wantStream !== s.stream) && s.pendingTurns === 0) {
+  if (s && (input.effort !== s.effort || wantStream !== s.stream) && s.activity === 'idle') {
     teardown(s)
     s = undefined
   }
@@ -590,36 +688,56 @@ export async function sendCCMessage(input: {
   const label = displayContent || uploads.map(u => u.filename).join(', ')
   s.lastUserText = label.replace(/\s+/g, ' ').slice(0, 120)
 
-  const wasIdle = s.pendingTurns === 0
-  s.pendingTurns++
-  if (wasIdle) {
+  // Optimistic flip — the authoritative `session_state_changed: running` from
+  // the subprocess confirms it moments later (setActivity dedupes).
+  if (s.activity !== 'running') {
     await markViewBuilderBuildingBySession(s.workspaceId, s.workspacePath, s.sessionId)
-    broadcastProcessing(s, true)
+    setActivity(s, 'running')
   }
+  clearIdle(s)
   s.input.push(content)
   tapWire(s.workspaceId, 'send', { type: 'user', content })
   debug(
-    `cc enqueue ws=${s.workspaceId} session=${s.sessionId} pendingTurns=${s.pendingTurns} text=${JSON.stringify(s.lastUserText)}`
+    `cc enqueue ws=${s.workspaceId} session=${s.sessionId} activity=${s.activity} text=${JSON.stringify(s.lastUserText)}`
   )
 }
 
-// Interrupt the current turn and drop any queued messages, but keep the session
-// alive for the next message.
+// How long Stop waits for the SDK's interrupt round-trip before declaring the
+// subprocess wedged and tearing it down. A hung subprocess never answers, and
+// without this cap the whole interrupt path (and the user's only escape hatch
+// from a stuck spinner) hangs with it.
+const INTERRUPT_TIMEOUT_MS = 5_000
+
+// Interrupt the current turn and drop any queued messages, keeping the session
+// alive for the next message. If the subprocess doesn't acknowledge in time it
+// is torn down instead — the next message respawns via resume.
 export async function interruptCCSession(workspaceId: string, sessionId: string): Promise<void> {
   const s = sessions.get(liveKey(workspaceId, sessionId))
   if (!s) return
-  debug(`cc interrupt ws=${workspaceId} session=${sessionId} pendingTurns=${s.pendingTurns}`)
+  debug(`cc interrupt ws=${workspaceId} session=${sessionId} activity=${s.activity}`)
   s.input.clear()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timedOut = Symbol('interrupt-timeout')
   try {
-    await s.q.interrupt()
+    const outcome = await Promise.race([
+      s.q.interrupt(),
+      new Promise(resolve => {
+        timer = setTimeout(() => resolve(timedOut), INTERRUPT_TIMEOUT_MS)
+      })
+    ])
+    if (outcome === timedOut) {
+      debug(`cc interrupt timeout ws=${workspaceId} session=${sessionId} — tearing down`)
+      teardown(s)
+    }
   } catch (err) {
     console.error('[cc-session] interrupt failed', err)
+  } finally {
+    clearTimeout(timer)
   }
-  s.pendingTurns = 0
   broadcast(s.workspaceId, { kind: 'stopped', sessionId: s.sessionId })
-  broadcastProcessing(s, false)
+  setActivity(s, 'idle')
   await markViewBuilderWaitingBySession(s.workspaceId, s.workspacePath, s.sessionId)
-  armIdle(s)
+  if (!s.closed) armIdle(s)
 }
 
 // Tear down a workspace's IDLE sessions so the next message respawns the agent
@@ -628,7 +746,7 @@ export async function interruptCCSession(workspaceId: string, sessionId: string)
 // turn ends (then idle-evict or get recreated on the next message via resume).
 export function restartWorkspaceSessions(workspacePath: string): void {
   for (const s of [...sessions.values()]) {
-    if (s.workspacePath === workspacePath && s.pendingTurns === 0) teardown(s)
+    if (s.workspacePath === workspacePath && s.activity === 'idle') teardown(s)
   }
 }
 

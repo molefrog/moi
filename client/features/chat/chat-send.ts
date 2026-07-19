@@ -32,7 +32,7 @@ export function startOptimisticTurn({
       }
     })
   )
-  liveStore.getState().setProcessing(workspaceId, sessionId, true)
+  liveStore.getState().setActivity(workspaceId, sessionId, 'running')
   liveStore.getState().setError(workspaceId, sessionId, null)
   return optimisticId
 }

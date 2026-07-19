@@ -8,6 +8,7 @@ import type {
   ClientMessage,
   PreviewFrame,
   ScratchOp,
+  SessionActivity,
   StreamEvent,
   ThreadConfig,
   ViewState
@@ -24,17 +25,19 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
   const store = liveStore.getState()
 
   if (data.type === 'status_snapshot') {
-    store.reconcileProcessing(
-      (data.running as { workspaceId: string; sessionId: string }[] | undefined) ?? []
+    store.reconcileActivity(
+      (data.sessions as
+        | { workspaceId: string; sessionId: string; activity: SessionActivity }[]
+        | undefined) ?? []
     )
     return
   }
   if (data.type === 'status') {
     const workspaceId = data.workspaceId as string
     const sessionId = data.sessionId as string
-    const processing = data.processing as boolean
-    store.setProcessing(workspaceId, sessionId, processing)
-    if (!processing) store.clearPreviewsForSession(workspaceId, sessionId)
+    const activity = data.activity as SessionActivity
+    store.setActivity(workspaceId, sessionId, activity)
+    if (activity !== 'running') store.clearPreviewsForSession(workspaceId, sessionId)
     return
   }
   if (data.type === 'preview') {
@@ -111,10 +114,14 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
   }
   if (kind === 'error' && typeof data.content === 'string') {
     store.setError(workspaceId, sessionId, data.content)
+    // Servers only emit `error` terminally, so it also ends the busy state —
+    // relying solely on a separate status frame left the spinner stuck when
+    // that frame was lost.
+    store.setActivity(workspaceId, sessionId, 'idle')
     store.clearPreviewsForSession(workspaceId, sessionId)
   }
   if (kind === 'stopped') {
-    store.setProcessing(workspaceId, sessionId, false)
+    store.setActivity(workspaceId, sessionId, 'idle')
     store.clearPreviewsForSession(workspaceId, sessionId)
   }
 }

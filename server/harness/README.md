@@ -39,8 +39,13 @@ Socket-protocol notes the layers rely on (all defined in `lib/types.ts`):
   echoes it natively (`clientUserMessageId` → `clientId`), Claude Code never
   echoes (the server synthesizes the turn), OpenClaw echoes lagged (matched
   by text).
-- **`status` / `status_snapshot`** — busy/idle per session; the snapshot on
-  connect is authoritative (clears spinners for missed transitions).
+- **`status` / `status_snapshot`** — per-session `activity`
+  (`idle | running | requires-action`), mirrored from the backend's native
+  lifecycle signal — never derived by counting sends vs results. The snapshot
+  (sent on connect and re-broadcast periodically) is authoritative: the client
+  rebuilds its whole activity map from it, so a lost terminal frame self-heals.
+  `requires-action` (agent blocked on user input) is tracked but not rendered
+  yet — the client shows no loader for it.
 - **`preview`** — live token frames, cumulative text, never persisted;
   cleared when the turn with matching `meta.apiMessageId` lands.
 
@@ -137,8 +142,12 @@ doubles as the evaluation rubric for new harnesses.
 - **Interrupt / cancel** — stop the current turn without killing the session,
   and drop queued messages.
 - **Teardown** — graceful close on idle TTL, LRU eviction, server shutdown.
-- **Turn accounting** — know when a turn ends (CC: `result` message; Codex:
-  `turn/completed`) to drive busy/idle state and the processing spinner.
+- **Activity mirror** — map the backend's native lifecycle signal onto
+  `SessionActivity` (CC: `result` as the turn-over fallback plus
+  `session_state_changed` when the CLI emits it; Codex: `turn/started` /
+  `turn/completed`; OpenClaw: `agent` lifecycle phases). Flip to `running`
+  optimistically on send; a session with live background tasks (CC
+  `task_started`/`task_notification`) must not be idle-evicted.
 
 ### Per-request configuration
 

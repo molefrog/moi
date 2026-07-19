@@ -330,13 +330,14 @@ export type BroadcastFrame =
   | Omit<ErrorFrame, 'workspaceId'>
   | Omit<StoppedFrame, 'workspaceId'>
 
-// Sent to a client right after it connects: the authoritative set of currently
-// running sessions across all workspaces. The client treats it as ground truth —
-// any session NOT listed is marked not-processing — which clears a spinner whose
-// terminal `status:false` was emitted while the client was disconnected.
+// Sent to a client right after it connects (and re-broadcast periodically): the
+// authoritative set of non-idle sessions across all workspaces. The client
+// treats it as ground truth — any session NOT listed is marked idle — which
+// clears a spinner whose terminal `status` frame was lost (disconnect window,
+// dropped frame, harness gap).
 export type StatusSnapshotMessage = {
   type: 'status_snapshot'
-  running: { workspaceId: string; sessionId: string }[]
+  sessions: { workspaceId: string; sessionId: string; activity: SessionActivity }[]
 }
 
 export type WorkspaceSwitchMessage = {
@@ -407,11 +408,20 @@ export type StoppedFrame = {
   sessionId: string
 }
 
+// Unified per-session activity state, mirrored from each harness's native
+// lifecycle signal (CC `session_state_changed`, Codex `turn/*`, OpenClaw run
+// lifecycle) rather than derived by counting messages:
+//   running         — the agent is working; the client shows the loader/Stop
+//   requires-action — the agent is blocked on user input (permission prompt,
+//                     MCP elicitation). Not rendered yet: no loader, no Stop.
+//   idle            — everything else, including interrupted/failed turns
+export type SessionActivity = 'idle' | 'running' | 'requires-action'
+
 export type StatusMessage = {
   type: 'status'
   workspaceId: string
   sessionId: string
-  processing: boolean
+  activity: SessionActivity
 }
 
 // Workspace layout persistence

@@ -25,9 +25,12 @@ export function useChat() {
   const modelsData = useWorkspaceModels(workspaceId).data
 
   const activeSessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
-  const processing = useLive(s =>
-    activeSessionId ? (s.processing[`${workspaceId}:${activeSessionId}`] ?? false) : false
+  const activity = useLive(s =>
+    activeSessionId ? (s.activity[`${workspaceId}:${activeSessionId}`] ?? 'idle') : 'idle'
   )
+  // Only `running` shows the loader/Stop. `requires-action` (agent blocked on
+  // user input) deliberately renders like idle until it gets its own UI.
+  const processing = activity === 'running'
   const error = useLive(s =>
     activeSessionId ? (s.errors[`${workspaceId}:${activeSessionId}`] ?? null) : null
   )

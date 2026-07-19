@@ -15,7 +15,7 @@ import {
   abortOpenClawRun,
   ensureOpenClawSessionLive,
   getLiveOpenClawEvents,
-  getOpenClawRunningSessions,
+  getOpenClawActiveSessions,
   sendOpenClawMessage
 } from './session'
 
@@ -36,7 +36,7 @@ export const openclawHarness: Harness = {
     return sendOpenClawMessage({ ...input, agentId: input.agentId })
   },
   interrupt: (workspaceId, sessionId) => abortOpenClawRun({ workspaceId, sessionId }),
-  runningSessions: () => getOpenClawRunningSessions(),
+  activeSessions: () => getOpenClawActiveSessions(),
 
   listSessions: async ws => {
     const rows = await getOpenClawSessions(ws.path, ws.agentId)
@@ -87,10 +87,10 @@ export const openclawHarness: Harness = {
   skillsDir: workspaceRoot => `${workspaceRoot}/skills`,
 
   statusLines: () => {
-    const running = getOpenClawRunningSessions()
+    const active = getOpenClawActiveSessions()
     return [
-      `live OpenClaw runs  ${running.length}`,
-      ...running.map(r => `  ▶ busy  ws=${r.workspaceId}  session=${r.sessionId}`)
+      `live OpenClaw runs  ${active.length}`,
+      ...active.map(r => `  ▶ busy  ws=${r.workspaceId}  session=${r.sessionId}`)
     ]
   }
 }

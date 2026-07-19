@@ -24,7 +24,7 @@ import type { ClientMessage } from '@/lib/types'
 process.env.IS_SANDBOX ??= '1'
 
 import {
-  getCCRunningSessions,
+  getCCActiveSessions,
   interruptCCSession,
   killAllCCSessions,
   sendCCMessage
@@ -52,7 +52,7 @@ const server = Bun.serve({
   websocket: {
     open(ws) {
       addClient(ws)
-      ws.send(JSON.stringify({ type: 'status_snapshot', running: getCCRunningSessions() }))
+      ws.send(JSON.stringify({ type: 'status_snapshot', sessions: getCCActiveSessions() }))
     },
     async message(ws, message) {
       const data = JSON.parse(String(message)) as ClientMessage

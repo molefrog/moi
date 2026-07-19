@@ -1,4 +1,4 @@
-import type { ClientMessage } from '@/lib/types'
+import type { ClientMessage, StatusSnapshotMessage } from '@/lib/types'
 
 import index from '../client/index.html'
 import { api } from './api'
@@ -10,7 +10,7 @@ import { startScratchpadSweeper } from './scratchpad'
 import { resolveScratchOp } from './scratchpad-relay'
 import { allHarnesses, harnessFor } from './harness/registry'
 import { getWorkspace } from './registry'
-import { addClient, removeClient, sendToClient } from './state'
+import { addClient, broadcastAll, getClientCount, removeClient, sendToClient } from './state'
 import { distShell, prebuilt } from './static'
 import { renderStatus } from './status'
 import { serveVendorEmojibase, serveVendorReact } from './vendor'
@@ -54,6 +54,13 @@ function isClientMessage(value: unknown): value is ClientMessage {
 // live-bundled HTML import in dev (Bun.serve's bundler + HMR). The HTML import
 // stays here, in the routes table, so Bun's dev bundler keys off it.
 const shell = prebuilt ? distShell : index
+
+// Authoritative activity snapshot across all harnesses. Sent on chat-socket
+// connect and re-broadcast periodically (below) so a spinner whose terminal
+// status frame was lost self-heals without a reconnect.
+function statusSnapshot(): StatusSnapshotMessage {
+  return { type: 'status_snapshot', sessions: allHarnesses().flatMap(h => h.activeSessions()) }
+}
 
 type Upgradable = { upgrade(req: Request, opts: { data: WsData }): boolean }
 
@@ -111,11 +118,10 @@ export const app = Bun.serve<WsData>({
     open(ws) {
       if (ws.data.channel === 'chat') {
         addClient(ws)
-        // Authoritative snapshot of every running session across all harnesses
-        // so the client can light/clear spinners correctly even for runs whose
-        // status transitions it missed while disconnected.
-        const running = allHarnesses().flatMap(h => h.runningSessions())
-        sendToClient(ws, { type: 'status_snapshot', running })
+        // Authoritative snapshot of every non-idle session across all
+        // harnesses so the client can light/clear spinners correctly even for
+        // runs whose status transitions it missed while disconnected.
+        sendToClient(ws, statusSnapshot())
       } else {
         ws.subscribe(EVENTS_TOPIC)
       }
@@ -172,6 +178,13 @@ export const app = Bun.serve<WsData>({
 // that it exists. Kept in ./events so control.ts and ./api can publish without
 // importing web.ts (which binds ports on load).
 setEventServer(app)
+
+// The snapshot heartbeat: the client's reconcile fully replaces its activity
+// map from each snapshot, so any stale spinner clears within one interval.
+const SNAPSHOT_INTERVAL_MS = 30_000
+setInterval(() => {
+  if (getClientCount() > 0) broadcastAll(statusSnapshot())
+}, SNAPSHOT_INTERVAL_MS)
 
 // Periodically reclaim scratchpad asset files nothing references anymore —
 // deleting an image in the browser (or an upload whose tab died) otherwise
