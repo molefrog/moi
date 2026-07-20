@@ -1,11 +1,11 @@
 import { useState } from 'react'
 
 import { useImportWorkspace } from '../api'
-import { WORKSPACE_TYPE_ORDER, orderWorkspaceTypes } from '@/lib/workspace-types'
+import { WORKSPACE_TYPE_ORDER } from '@/lib/workspace-types'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
 export function workspaceImportDefaultType(workspace: DiscoveredWorkspace): WorkspaceType {
-  return orderWorkspaceTypes(workspace.types)[0] ?? WORKSPACE_TYPE_ORDER[0]
+  return workspace.types[0] ?? WORKSPACE_TYPE_ORDER[0]
 }
 
 type UseWorkspaceImportProps = {

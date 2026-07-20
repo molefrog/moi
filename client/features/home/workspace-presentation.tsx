@@ -1,8 +1,6 @@
 import claudeIcon from '@/client/assets/claude.svg'
 import openaiIcon from '@/client/assets/openai.svg'
 import openclawIcon from '@/client/assets/openclaw.svg'
-import { cn } from '@/client/lib/cn'
-import { orderWorkspaceTypes } from '@/lib/workspace-types'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
 export const workspaceProviderIcon: Record<WorkspaceType, string> = {
@@ -17,27 +15,21 @@ export const workspaceTypeLabel: Record<WorkspaceType, string> = {
   codex: 'Codex'
 }
 
-type WorkspaceAgentIconProps = {
-  type: WorkspaceType | WorkspaceType[]
-  className?: string
+type WorkspaceAgentIconsProps = {
+  types: WorkspaceType[]
 }
 
-export function WorkspaceAgentIcon({ type, className }: WorkspaceAgentIconProps) {
-  const types = orderWorkspaceTypes(Array.isArray(type) ? type : [type])
-  const label = types.map(workspaceType => workspaceTypeLabel[workspaceType]).join(', ')
+export function WorkspaceAgentIcons({ types }: WorkspaceAgentIconsProps) {
+  const label = types.map(type => workspaceTypeLabel[type]).join(', ')
 
   return (
-    <span
-      role="img"
-      aria-label={label}
-      className={cn('inline-flex shrink-0 items-center -space-x-0.5', className)}
-    >
-      {types.map(workspaceType => (
+    <span role="img" aria-label={label} className="inline-flex shrink-0 items-center -space-x-0.5">
+      {types.map(type => (
         <img
-          key={workspaceType}
-          src={workspaceProviderIcon[workspaceType]}
+          key={type}
+          src={workspaceProviderIcon[type]}
           alt=""
-          className={cn('size-4 shrink-0 rounded-full bg-muted ring-2 ring-muted', className)}
+          className="size-4 shrink-0 rounded-full bg-muted ring-2 ring-muted"
         />
       ))}
     </span>

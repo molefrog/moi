@@ -387,6 +387,7 @@ export type WorkspaceEntry = {
 export type DiscoveredWorkspace = {
   path: string
   displayPath?: string
+  // Deduplicated in canonical provider order by the discovery API.
   types: WorkspaceType[]
 }
 

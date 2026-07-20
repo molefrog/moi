@@ -15,20 +15,11 @@ describe('workspaceImportDefaultType', () => {
     expect(workspaceImportDefaultType({ path: '/workspace', types: ['openclaw'] })).toBe('openclaw')
   })
 
-  test('uses canonical order for multiple detected agents', () => {
+  test('uses the first agent returned by the API', () => {
     expect(
       workspaceImportDefaultType({
         path: '/workspace',
-        types: ['openclaw', 'codex', 'claude-code', 'codex']
-      })
-    ).toBe('claude-code')
-  })
-
-  test('deduplicates detected agents before selecting', () => {
-    expect(
-      workspaceImportDefaultType({
-        path: '/workspace',
-        types: ['openclaw', 'codex', 'codex']
+        types: ['codex', 'openclaw']
       })
     ).toBe('codex')
   })
