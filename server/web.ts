@@ -96,7 +96,6 @@ export const app = Bun.serve<WsData>({
 
     // Client-side routes — serve the SPA shell.
     '/': shell,
-    '/connectors': shell,
     '/dev': shell,
     '/dev/*': shell,
     '/workspace/*': shell,

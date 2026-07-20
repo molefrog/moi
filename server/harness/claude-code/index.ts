@@ -81,7 +81,7 @@ export const claudeCodeHarness: Harness = {
   listModels: ws => getClaudeModels(ws.path),
   // The SDK's McpServerStatus is a superset of the UI's McpServer (extra
   // fields are ignored by the client) — pass it through unchanged.
-  mcpStatus: async ws => (await getMcpStatus(ws.path, 'project')) as unknown as McpServer[],
+  mcpStatus: async ws => (await getMcpStatus(ws.path)) as unknown as McpServer[],
   discoverWorkspaces,
   availability: async () => pathHarnessAvailability('claude-code'),
 

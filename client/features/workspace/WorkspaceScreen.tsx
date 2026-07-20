@@ -14,7 +14,6 @@ import {
 import { ChatPanel } from '@/client/features/chat/ChatPanel'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { CustomizePanel } from '@/client/features/workspace/CustomizePanel'
-import { McpMenu } from '@/client/features/connectors/McpMenu'
 import { AppletMount } from '@/client/features/applets/AppletMount'
 import { WidgetErrorBoundary } from '@/client/features/applets/WidgetErrorBoundary'
 import { Widgets } from '@/client/features/widgets/Widgets'
@@ -596,7 +595,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
                     setWidgetMode(widgetMode === 'customizing' ? 'idle' : 'customizing')
                   }
                 />
-                <McpMenu />
                 <WorkspaceSettings />
                 {hasWorkspaceContent && canUseSplit && (
                   <SectionControls

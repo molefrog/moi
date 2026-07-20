@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 
-import { IconPlugConnected, IconPlus, IconSmartHome } from '@tabler/icons-react'
+import { IconPlus, IconSmartHome } from '@tabler/icons-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'wouter'
 
@@ -119,21 +119,8 @@ function Sidebar({ workspaces }: SidebarProps) {
         )}
       </nav>
 
-      <ConnectorsNavLink />
+      <div aria-hidden="true" className="size-8 shrink-0" />
     </aside>
-  )
-}
-
-function ConnectorsNavLink() {
-  return (
-    <Link
-      href="/connectors"
-      aria-label="Connectors"
-      title="Connectors"
-      className={sidebarNavButtonClass}
-    >
-      <IconPlugConnected stroke={1.5} />
-    </Link>
   )
 }
 
