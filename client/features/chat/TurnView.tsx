@@ -119,12 +119,12 @@ export const TurnView = memo(function TurnView({ turn, processing = false }: Tur
       .join('\n')
     if (!text && fileParts.length === 0) return null
     return (
-      <div className="ml-8 flex flex-col items-end gap-1.5">
+      <div className="ml-8 flex min-w-0 flex-col items-end gap-1.5">
         {fileParts.map((p, i) => (
           <FilePart key={i} mediaType={p.mediaType} url={p.url} filename={p.filename} />
         ))}
         {text && (
-          <p className="rounded-md bg-accent px-4 py-2 text-sm leading-normal whitespace-pre-wrap text-accent-foreground">
+          <p className="max-w-full min-w-0 rounded-md bg-accent px-4 py-2 text-sm leading-normal wrap-anywhere whitespace-pre-wrap text-accent-foreground">
             {text}
           </p>
         )}
