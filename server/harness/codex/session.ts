@@ -520,7 +520,7 @@ export async function sendCodexMessage(input: {
   } catch (err) {
     // No session record exists to run setProcessing through — clear the
     // client's optimistic spinner explicitly or it sticks until reconnect.
-    broadcast(input.workspaceId, { type: 'status', sessionId: input.sessionId, processing: false })
+    broadcast(input.workspaceId, { type: 'status', sessionId: input.sessionId, activity: 'idle' })
     broadcast(input.workspaceId, {
       kind: 'error',
       sessionId: input.sessionId,

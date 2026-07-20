@@ -813,7 +813,11 @@ workspaces.get('/create', async c =>
 // provisioned (skills + `.moi/` scaffold) and registered.
 workspaces.post('/create', async c => {
   const body = await c.req.json()
-  const type: WorkspaceType = isHarnessType(body?.type) ? body.type : 'claude-code'
+  const requestedType: unknown = body?.type ?? 'claude-code'
+  if (!isHarnessType(requestedType)) {
+    return c.text('Unknown workspace type', 400)
+  }
+  const type: WorkspaceType = requestedType
   if (!CREATABLE_TYPES.has(type)) {
     return c.text('Workspaces of this type arrive through discovery, not creation', 400)
   }
