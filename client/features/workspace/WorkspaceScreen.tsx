@@ -158,7 +158,7 @@ type WorkspaceCustomizeActionProps = {
 
 function WorkspaceCustomizeAction({ active, onToggle }: WorkspaceCustomizeActionProps) {
   return (
-    <Tooltip delay={50}>
+    <Tooltip>
       <TooltipTrigger
         render={
           <Button
