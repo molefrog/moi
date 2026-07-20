@@ -83,7 +83,7 @@ function Header({ raw, onRaw, label, size, copyText }: HeaderProps) {
     [true, 'raw']
   ]
   return (
-    <div className="flex items-center gap-1 border-b border-border px-2 py-1">
+    <div className="flex items-center gap-1 border-b border-border p-2">
       {options.map(([value, text]) => (
         <Button
           key={text}
@@ -91,6 +91,7 @@ function Header({ raw, onRaw, label, size, copyText }: HeaderProps) {
           variant={raw === value ? 'outline' : 'ghost'}
           size="sm"
           onClick={() => onRaw(value)}
+          className="rounded-full text-xs uppercase"
         >
           {text}
         </Button>
