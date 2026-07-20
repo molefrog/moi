@@ -15,20 +15,22 @@ import type { HarnessAvailability, WorkspaceType } from '@/lib/types'
 
 type WorkspaceAgentOption = {
   type: WorkspaceType
-  hint: string
+  description: string
   disabled?: boolean
+  lockedDescription?: string
 }
 
 // Claude Code and Codex workspaces can be created from scratch; Codex needs
 // its CLI on this machine (checked via `availability`). OpenClaw workspaces
 // arrive through discovery.
 const WORKSPACE_AGENT_OPTIONS: WorkspaceAgentOption[] = [
-  { type: 'claude-code', hint: 'By Anthropic' },
-  { type: 'codex', hint: 'By OpenAI' },
+  { type: 'claude-code', description: 'By Anthropic' },
+  { type: 'codex', description: 'By OpenAI' },
   {
     type: 'openclaw',
-    hint: 'Open-source',
-    disabled: true
+    description: 'Open-source',
+    disabled: true,
+    lockedDescription: 'Initialize OpenClaw in the folder\nmanually, then import it to moi'
   }
 ]
 
@@ -54,11 +56,11 @@ export function WorkspaceAgentStep({
   onContinue
 }: WorkspaceAgentStepProps) {
   // An unavailable backend stays visible but disabled, with the availability
-  // reason (e.g. codex CLI install instructions) replacing the hint.
+  // reason (e.g. codex CLI install instructions) replacing the description.
   const options = WORKSPACE_AGENT_OPTIONS.map(option => {
     const state = availability?.[option.type]
     if (!state || state.available) return option
-    return { ...option, hint: state.reason, disabled: true }
+    return { ...option, description: state.reason, disabled: true }
   })
   const selectedUnavailable = options.find(option => option.type === type)?.disabled === true
 
@@ -177,11 +179,19 @@ function WorkspaceAgentOptionButton({
   selected,
   onSelect
 }: WorkspaceAgentOptionButtonProps) {
-  return (
+  const showLockedTooltip = Boolean(option.lockedDescription)
+  const button = (
     <button
       type="button"
-      disabled={option.disabled}
-      onClick={() => onSelect(option.type)}
+      disabled={option.disabled && !showLockedTooltip}
+      aria-disabled={option.disabled || undefined}
+      onClick={event => {
+        if (option.disabled) {
+          event.preventDefault()
+          return
+        }
+        onSelect(option.type)
+      }}
       aria-pressed={selected}
       className={cn(
         'relative flex w-full flex-col items-start justify-between gap-6 rounded-lg bg-card p-4 text-left ring-1 ring-border transition-shadow outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
@@ -204,9 +214,20 @@ function WorkspaceAgentOptionButton({
         <span className="text-sm font-medium text-foreground">
           {workspaceTypeLabel[option.type]}
         </span>
-        <span className="text-xs leading-4 text-muted-foreground">{option.hint}</span>
+        <span className="text-xs leading-4 text-muted-foreground">{option.description}</span>
       </span>
     </button>
+  )
+
+  if (!showLockedTooltip) return button
+
+  return (
+    <Tooltip>
+      <TooltipTrigger render={button} />
+      <TooltipContent className="max-w-64 text-center whitespace-pre-line">
+        {option.lockedDescription}
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -226,7 +247,7 @@ function ExistingFolderButton({ available, disabled, onClick }: ExistingFolderBu
   }
 
   return (
-    <Tooltip delay={50}>
+    <Tooltip>
       <TooltipTrigger
         render={
           <Button
@@ -239,8 +260,9 @@ function ExistingFolderButton({ available, disabled, onClick }: ExistingFolderBu
           </Button>
         }
       />
-      <TooltipContent className="max-w-64 text-center">
-        Run <code className="font-mono">moi init</code> in the folder to add it manually.
+      <TooltipContent>
+        Run <code className="rounded-[4px] bg-accent px-1 py-0.5 font-mono">moi init</code> in the
+        folder to add it manually
       </TooltipContent>
     </Tooltip>
   )

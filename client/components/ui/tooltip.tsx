@@ -2,18 +2,12 @@ import { Tooltip as TooltipPrimitive } from '@base-ui/react/tooltip'
 
 import { cn } from '@/client/lib/cn'
 
-// Self-contained: each Tooltip wraps its own provider so `delay` can be set
-// per-instance (Base UI exposes delay/closeDelay on the provider, not the root).
-function Tooltip({
-  delay,
-  closeDelay,
-  ...props
-}: TooltipPrimitive.Root.Props & { delay?: number; closeDelay?: number }) {
-  return (
-    <TooltipPrimitive.Provider delay={delay} closeDelay={closeDelay}>
-      <TooltipPrimitive.Root data-slot="tooltip" {...props} />
-    </TooltipPrimitive.Provider>
-  )
+function TooltipProvider({ delay = 100, ...props }: TooltipPrimitive.Provider.Props) {
+  return <TooltipPrimitive.Provider data-slot="tooltip-provider" delay={delay} {...props} />
+}
+
+function Tooltip({ ...props }: TooltipPrimitive.Root.Props) {
+  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
 }
 
 function TooltipTrigger({ ...props }: TooltipPrimitive.Trigger.Props) {
@@ -26,6 +20,7 @@ function TooltipContent({
   sideOffset = 6,
   align = 'center',
   alignOffset = 0,
+  children,
   ...props
 }: TooltipPrimitive.Popup.Props &
   Pick<TooltipPrimitive.Positioner.Props, 'align' | 'alignOffset' | 'side' | 'sideOffset'>) {
@@ -41,14 +36,16 @@ function TooltipContent({
         <TooltipPrimitive.Popup
           data-slot="tooltip-content"
           className={cn(
-            'z-50 origin-(--transform-origin) rounded-sm bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-md ring-1 ring-border outline-hidden duration-100 data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
+            'z-50 w-fit max-w-xs origin-(--transform-origin) items-center gap-1.5 rounded-sm bg-popover px-2.5 py-1.5 text-xs font-medium text-popover-foreground shadow-md has-data-[slot=kbd]:pr-1.5 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 **:data-[slot=kbd]:relative **:data-[slot=kbd]:isolate **:data-[slot=kbd]:z-50 **:data-[slot=kbd]:rounded-sm data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
             className
           )}
           {...props}
-        />
+        >
+          {children}
+        </TooltipPrimitive.Popup>
       </TooltipPrimitive.Positioner>
     </TooltipPrimitive.Portal>
   )
 }
 
-export { Tooltip, TooltipContent, TooltipTrigger }
+export { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider }

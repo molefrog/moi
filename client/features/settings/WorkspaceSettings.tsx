@@ -22,7 +22,7 @@ export function WorkspaceSettings() {
 
   return (
     <>
-      <Tooltip delay={50}>
+      <Tooltip>
         <TooltipTrigger
           render={
             <Button
