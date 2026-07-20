@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { Button } from '@/client/components/ui/button'
 import { Dialog } from '@/client/components/ui/dialog'
+import { workspaceDisplayName } from '@/client/features/home/workspace-presentation'
 import type { HarnessAvailability, WorkspaceType } from '@/lib/types'
 
 import { WorkspaceAgentStep } from './WorkspaceAgentStep'
@@ -29,7 +30,7 @@ export function ImportWorkspaceStep({
 }: ImportWorkspaceStepProps) {
   return (
     <WorkspaceAgentStep
-      title="Import from this computer"
+      title={`Import ${workspaceDisplayName(choice.workspace)}`}
       selectedType={choice.selectedType}
       detectedTypes={choice.workspace.types}
       availability={availability}
