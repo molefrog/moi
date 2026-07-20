@@ -20,7 +20,7 @@ import {
 import { cn } from '@/client/lib/cn'
 import { useUiStore } from '@/client/store/ui'
 import {
-  WorkspaceAgentIcon,
+  WorkspaceAgentIcons,
   workspaceDisplayName,
   workspaceProviderIcon
 } from '@/client/features/home/workspace-presentation'
@@ -191,7 +191,7 @@ function SuggestedRow({ suggestion, onAdd }: SuggestedRowProps) {
   const name = workspaceDisplayName(suggestion)
   return (
     <li className="flex items-center gap-2 border-b border-border px-1 py-3">
-      <WorkspaceAgentIcon type={types} />
+      <WorkspaceAgentIcons types={types} />
       <span className="shrink-0 text-sm font-medium text-foreground">{name}</span>
       <span title={path} className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
         {suggestion.displayPath ?? path}
