@@ -17,12 +17,12 @@ export const workspaceTypeLabel: Record<WorkspaceType, string> = {
   codex: 'Codex'
 }
 
-type WorkspaceTypeIconProps = {
+type WorkspaceAgentIconProps = {
   type: WorkspaceType | WorkspaceType[]
   className?: string
 }
 
-export function WorkspaceTypeIcon({ type, className }: WorkspaceTypeIconProps) {
+export function WorkspaceAgentIcon({ type, className }: WorkspaceAgentIconProps) {
   const types = orderWorkspaceTypes(Array.isArray(type) ? type : [type])
   const label = types.map(workspaceType => workspaceTypeLabel[workspaceType]).join(', ')
 
@@ -30,14 +30,14 @@ export function WorkspaceTypeIcon({ type, className }: WorkspaceTypeIconProps) {
     <span
       role="img"
       aria-label={label}
-      className={cn('inline-flex shrink-0 items-center -space-x-1', className)}
+      className={cn('inline-flex shrink-0 items-center -space-x-0.5', className)}
     >
       {types.map(workspaceType => (
         <img
           key={workspaceType}
           src={workspaceProviderIcon[workspaceType]}
           alt=""
-          className={cn('size-4 shrink-0 rounded-[4px] bg-background', className)}
+          className={cn('size-4 shrink-0 rounded-full bg-muted ring-2 ring-muted', className)}
         />
       ))}
     </span>

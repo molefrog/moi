@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 
-import { workspaceAgentIsDisabled, workspaceAgentOptions } from './workspace-agent-options'
+import { getWorkspaceAgentOptions, isWorkspaceAgentDisabled } from './WorkspaceAgentStep'
 
-describe('workspaceAgentOptions', () => {
+describe('getWorkspaceAgentOptions', () => {
   test('returns every agent in canonical order', () => {
-    const options = workspaceAgentOptions({ openClawSelectable: true })
+    const options = getWorkspaceAgentOptions({ detectedTypes: ['openclaw'] })
 
     expect(options.map(option => option.type)).toEqual(['claude-code', 'codex', 'openclaw'])
     expect(options.every(option => !option.disabled)).toBe(true)
@@ -12,21 +12,21 @@ describe('workspaceAgentOptions', () => {
 
   test('uses backend availability for Codex', () => {
     const reason = 'Codex CLI not found'
-    const options = workspaceAgentOptions({
+    const options = getWorkspaceAgentOptions({
       availability: { codex: { available: false, reason } },
-      openClawSelectable: true
+      detectedTypes: ['openclaw']
     })
 
     expect(options.find(option => option.type === 'codex')).toMatchObject({
       description: reason,
       disabled: true
     })
-    expect(workspaceAgentIsDisabled(options, 'codex')).toBe(true)
-    expect(workspaceAgentIsDisabled(options, 'claude-code')).toBe(false)
+    expect(isWorkspaceAgentDisabled(options, 'codex')).toBe(true)
+    expect(isWorkspaceAgentDisabled(options, 'claude-code')).toBe(false)
   })
 
   test('locks OpenClaw when it was not detected', () => {
-    const options = workspaceAgentOptions({ openClawSelectable: false })
+    const options = getWorkspaceAgentOptions({})
 
     expect(options.find(option => option.type === 'openclaw')).toMatchObject({
       disabled: true,
@@ -35,7 +35,7 @@ describe('workspaceAgentOptions', () => {
   })
 
   test('enables OpenClaw when it was detected', () => {
-    const options = workspaceAgentOptions({ openClawSelectable: true })
+    const options = getWorkspaceAgentOptions({ detectedTypes: ['openclaw'] })
 
     expect(options.find(option => option.type === 'openclaw')).toEqual({
       type: 'openclaw',

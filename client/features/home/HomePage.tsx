@@ -1,5 +1,3 @@
-import { useState } from 'react'
-
 import { IconChevronRight, IconEggCracked, IconLoader2, IconPlus } from '@tabler/icons-react'
 import { Link, useLocation } from 'wouter'
 
@@ -9,9 +7,10 @@ import {
   useWorkspaces,
   useWorkspaceSetupInfo
 } from './api'
+import { CreateWorkspaceDialog } from './workspace-setup/CreateWorkspaceDialog'
+import { ImportWorkspaceDialog } from './workspace-setup/ImportWorkspaceDialog'
+import { useWorkspaceImport } from './workspace-setup/useWorkspaceImport'
 import { HomeLogo } from './HomeLogo'
-import { useWorkspaceImport } from './useWorkspaceImport'
-import { WorkspaceImportDialog } from './WorkspaceImportDialog'
 import { Button } from '@/client/components/ui/button'
 import {
   Collapsible,
@@ -21,13 +20,12 @@ import {
 import { cn } from '@/client/lib/cn'
 import { useUiStore } from '@/client/store/ui'
 import {
-  WorkspaceTypeIcon,
+  WorkspaceAgentIcon,
   workspaceDisplayName,
   workspaceProviderIcon
 } from '@/client/features/home/workspace-presentation'
 import type { DiscoveredWorkspace, WorkspaceEntry } from '@/lib/types'
 
-import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { WorkspacePreview } from './WorkspacePreview'
 
 export function HomePage() {
@@ -38,7 +36,6 @@ export function HomePage() {
   const importFlow = useWorkspaceImport({
     onSuccess: entry => navigate(`/workspace/${entry.id}`)
   })
-  const [importDialogOpen, setImportDialogOpen] = useState(false)
   const discoveredWorkspacesOpen = useUiStore(state => state.discoveredWorkspacesOpen)
   const setDiscoveredWorkspacesOpen = useUiStore(state => state.setDiscoveredWorkspacesOpen)
 
@@ -64,16 +61,6 @@ export function HomePage() {
 
   function handleAdd(suggestion: DiscoveredWorkspace) {
     importFlow.startImport(suggestion)
-    setImportDialogOpen(true)
-  }
-
-  function handleImportDialogOpenChange(nextOpen: boolean) {
-    if (!nextOpen && importFlow.isPending) return
-    setImportDialogOpen(nextOpen)
-  }
-
-  function handleImportDialogOpenChangeComplete(nextOpen: boolean) {
-    if (!nextOpen) importFlow.reset()
   }
 
   return (
@@ -141,35 +128,23 @@ export function HomePage() {
             <CollapsibleContent>
               <ul className="border-t border-border">
                 {discovered.map(item => (
-                  <SuggestedRow
-                    key={item.path}
-                    suggestion={item}
-                    onAdd={handleAdd}
-                    loading={importFlow.importingPath === item.path}
-                  />
+                  <SuggestedRow key={item.path} suggestion={item} onAdd={handleAdd} />
                 ))}
               </ul>
-              {importFlow.error && !importFlow.choice && (
-                <p className="mt-3 text-xs text-destructive">{importFlow.error.message}</p>
-              )}
             </CollapsibleContent>
           </Collapsible>
         </section>
       )}
 
       {importFlow.choice && (
-        <WorkspaceImportDialog
-          open={importDialogOpen}
-          detectedTypes={importFlow.choice.workspace.types}
-          selectedType={importFlow.choice.selectedType}
+        <ImportWorkspaceDialog
+          choice={importFlow.choice}
           availability={setupInfo.data?.availability}
           isPending={importFlow.isPending}
           errorMessage={importFlow.error?.message}
-          onOpenChange={handleImportDialogOpenChange}
-          onOpenChangeComplete={handleImportDialogOpenChangeComplete}
-          onTypeChange={importFlow.setSelectedType}
-          onCancel={() => setImportDialogOpen(false)}
-          onSubmit={importFlow.confirmImport}
+          onTypeChange={importFlow.selectType}
+          onSubmit={importFlow.submit}
+          onReset={importFlow.reset}
         />
       )}
     </div>
@@ -209,25 +184,20 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
 type SuggestedRowProps = {
   suggestion: DiscoveredWorkspace
   onAdd: (suggestion: DiscoveredWorkspace) => void
-  loading: boolean
 }
 
-function SuggestedRow({ suggestion, onAdd, loading }: SuggestedRowProps) {
+function SuggestedRow({ suggestion, onAdd }: SuggestedRowProps) {
   const { path, types } = suggestion
   const name = workspaceDisplayName(suggestion)
   return (
     <li className="flex items-center gap-2 border-b border-border px-1 py-3">
-      <WorkspaceTypeIcon type={types} />
+      <WorkspaceAgentIcon type={types} />
       <span className="shrink-0 text-sm font-medium text-foreground">{name}</span>
       <span title={path} className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
         {suggestion.displayPath ?? path}
       </span>
-      <Button variant="outline" size="sm" onClick={() => onAdd(suggestion)} disabled={loading}>
-        {loading ? (
-          <IconLoader2 stroke={1.75} className="animate-spin" />
-        ) : (
-          <IconPlus stroke={1.75} />
-        )}
+      <Button variant="outline" size="sm" onClick={() => onAdd(suggestion)}>
+        <IconPlus stroke={1.75} />
         Add
       </Button>
     </li>
