@@ -11,7 +11,7 @@ import { readdir, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 
-import type { DiscoveredWorkspace } from '@/lib/types'
+import type { DiscoveredWorkspaceCandidate } from '../types'
 
 export const CODEX_SESSIONS_ROOT = join(homedir(), '.codex', 'sessions')
 
@@ -91,24 +91,24 @@ async function listRolloutFiles(root: string, limit: number): Promise<string[]> 
 export async function discoverCodexWorkspaces(
   registeredPaths: Set<string>,
   sessionsRoot: string = CODEX_SESSIONS_ROOT
-): Promise<DiscoveredWorkspace[]> {
+): Promise<DiscoveredWorkspaceCandidate[]> {
   const files = await listRolloutFiles(sessionsRoot, SCAN_LIMIT)
-  // Newest-first scan: the first rollout seen per cwd carries its lastRunAt.
+  // Newest-first scan: only the first rollout seen per cwd is needed.
   const byCwd = new Map<string, string | undefined>()
   for (const file of files) {
     const meta = await readSessionMeta(file)
     if (!meta || byCwd.has(meta.cwd)) continue
     byCwd.set(meta.cwd, meta.timestamp)
   }
-  const out: DiscoveredWorkspace[] = []
-  for (const [cwd, lastRunAt] of byCwd) {
+  const out: DiscoveredWorkspaceCandidate[] = []
+  for (const cwd of byCwd.keys()) {
     if (registeredPaths.has(cwd)) continue
     try {
       if (!(await stat(cwd)).isDirectory()) continue
     } catch {
       continue // directory deleted since the session ran
     }
-    out.push({ path: cwd, type: 'codex', ...(lastRunAt ? { lastRunAt } : {}) })
+    out.push({ path: cwd, type: 'codex' })
   }
   return out
 }

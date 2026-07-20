@@ -386,12 +386,8 @@ export type WorkspaceEntry = {
 
 export type DiscoveredWorkspace = {
   path: string
-  type: WorkspaceType
-  name?: string
   displayPath?: string
-  agentId?: string
-  isDefault?: boolean
-  lastRunAt?: string
+  types: WorkspaceType[]
 }
 
 export type SessionRenamedMessage = {

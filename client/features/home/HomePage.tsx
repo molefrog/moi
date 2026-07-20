@@ -1,8 +1,12 @@
+import { useState } from 'react'
+
 import { IconChevronRight, IconEggCracked, IconLoader2, IconPlus } from '@tabler/icons-react'
 import { Link, useLocation } from 'wouter'
 
-import { useAddWorkspace, useDiscoveredWorkspaces, useWorkspacePreview, useWorkspaces } from './api'
+import { useDiscoveredWorkspaces, useWorkspacePreview, useWorkspaces } from './api'
 import { HomeLogo } from './HomeLogo'
+import { useWorkspaceImport } from './useWorkspaceImport'
+import { WorkspaceImportDialog } from './WorkspaceImportDialog'
 import { Button } from '@/client/components/ui/button'
 import {
   Collapsible,
@@ -25,7 +29,10 @@ export function HomePage() {
   const [, navigate] = useLocation()
   const workspacesQuery = useWorkspaces()
   const discoveredQuery = useDiscoveredWorkspaces()
-  const importMutation = useAddWorkspace()
+  const importFlow = useWorkspaceImport({
+    onSuccess: entry => navigate(`/workspace/${entry.id}`)
+  })
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
   const discoveredWorkspacesOpen = useUiStore(state => state.discoveredWorkspacesOpen)
   const setDiscoveredWorkspacesOpen = useUiStore(state => state.setDiscoveredWorkspacesOpen)
 
@@ -48,13 +55,19 @@ export function HomePage() {
   const workspaces = workspacesQuery.data
   const discovered = discoveredQuery.data
   const count = workspaces.length
-  const importingPath =
-    importMutation.isPending && importMutation.variables ? importMutation.variables.path : null
 
   function handleAdd(suggestion: DiscoveredWorkspace) {
-    importMutation.mutate(suggestion, {
-      onSuccess: entry => navigate(`/workspace/${entry.id}`)
-    })
+    const decision = importFlow.startImport(suggestion)
+    if (decision.kind === 'choose') setImportDialogOpen(true)
+  }
+
+  function handleImportDialogOpenChange(nextOpen: boolean) {
+    if (!nextOpen && importFlow.isPending) return
+    setImportDialogOpen(nextOpen)
+  }
+
+  function handleImportDialogOpenChangeComplete(nextOpen: boolean) {
+    if (!nextOpen) importFlow.reset()
   }
 
   return (
@@ -126,16 +139,31 @@ export function HomePage() {
                     key={item.path}
                     suggestion={item}
                     onAdd={handleAdd}
-                    loading={importingPath === item.path}
+                    loading={importFlow.importingPath === item.path}
                   />
                 ))}
               </ul>
-              {importMutation.isError && (
-                <p className="mt-3 text-xs text-destructive">{importMutation.error.message}</p>
+              {importFlow.error && !importFlow.choice && (
+                <p className="mt-3 text-xs text-destructive">{importFlow.error.message}</p>
               )}
             </CollapsibleContent>
           </Collapsible>
         </section>
+      )}
+
+      {importFlow.choice && (
+        <WorkspaceImportDialog
+          open={importDialogOpen}
+          types={importFlow.choice.types}
+          selectedType={importFlow.choice.selectedType}
+          isPending={importFlow.isPending}
+          errorMessage={importFlow.error?.message}
+          onOpenChange={handleImportDialogOpenChange}
+          onOpenChangeComplete={handleImportDialogOpenChangeComplete}
+          onTypeChange={importFlow.setSelectedType}
+          onCancel={() => setImportDialogOpen(false)}
+          onSubmit={importFlow.confirmImport}
+        />
       )}
     </div>
   )
@@ -178,11 +206,11 @@ type SuggestedRowProps = {
 }
 
 function SuggestedRow({ suggestion, onAdd, loading }: SuggestedRowProps) {
-  const { path, type } = suggestion
+  const { path, types } = suggestion
   const name = workspaceDisplayName(suggestion)
   return (
     <li className="flex items-center gap-2 border-b border-border px-1 py-3">
-      <WorkspaceTypeIcon type={type} />
+      <WorkspaceTypeIcon type={types} />
       <span className="shrink-0 text-sm font-medium text-foreground">{name}</span>
       <span title={path} className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
         {suggestion.displayPath ?? path}

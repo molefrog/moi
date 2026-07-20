@@ -33,7 +33,7 @@ function sessionMeta(cwd: string, timestamp?: string): string {
 }
 
 describe('discoverCodexWorkspaces', () => {
-  test('finds cwds from rollout session_meta lines, newest run first per cwd', async () => {
+  test('finds and deduplicates cwds from rollout session_meta lines', async () => {
     const projectA = join(workDirs, 'a')
     await mkdir(projectA)
     await writeRollout(
@@ -47,7 +47,7 @@ describe('discoverCodexWorkspaces', () => {
     )
 
     const found = await discoverCodexWorkspaces(new Set(), root)
-    expect(found).toEqual([{ path: projectA, type: 'codex', lastRunAt: '2026-07-15T09:30:00Z' }])
+    expect(found).toEqual([{ path: projectA, type: 'codex' }])
   })
 
   test('skips registered paths and cwds that no longer exist', async () => {
