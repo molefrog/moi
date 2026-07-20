@@ -151,12 +151,15 @@ all. `thread/settings/update` queues setting changes without starting a turn.
 
 ### Binary availability
 
-The adapter requires `codex` to resolve from the moi server's PATH. Codex
-Desktop may use an app-managed binary that is not shell-visible, so having the
-desktop app installed does not satisfy this requirement. If the command is
-missing, install the CLI with
-`curl -fsSL https://chatgpt.com/codex/install.sh | sh` and restart moi if the
-new executable directory was not already present in its inherited PATH.
+The adapter resolves `codex` through `../executable.ts`: first a PATH lookup
+over the server's PATH merged with the user's login-shell PATH
+(`../shell-path.ts`), then the known macOS app-bundle locations —
+`/Applications/ChatGPT.app/Contents/Resources/codex` and the legacy
+`/Applications/Codex.app/Contents/Resources/codex` — since Codex Desktop
+manages an app-internal binary that is not shell-visible. PATH wins over the
+bundle probe, so a deliberately installed CLI is never shadowed. If nothing
+resolves, install the CLI with
+`curl -fsSL https://chatgpt.com/codex/install.sh | sh`.
 
 ## 3. Client libraries
 

@@ -30,8 +30,11 @@ Evidence drawn from:
 ## Runtime executable
 
 The Agent SDK remains the transport layer, but every `query()` explicitly uses
-the `claude` executable resolved from the moi server's PATH through
-`pathToClaudeCodeExecutable`. There is no bundled-executable fallback. If the
+the `claude` executable through `pathToClaudeCodeExecutable`. Lookup goes
+through `../executable.ts`: the server's PATH merged with the user's
+login-shell PATH (`../shell-path.ts`, probed once at startup), so a moi server
+launched outside a terminal still finds CLIs from `~/.local/bin`, homebrew,
+and version-manager shims. There is no SDK bundled-executable fallback. If the
 command is missing, setup and existing workspaces report:
 `Run curl -fsSL https://claude.ai/install.sh | sh in your terminal to install Claude`.
 
