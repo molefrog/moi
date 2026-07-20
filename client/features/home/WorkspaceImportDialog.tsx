@@ -1,6 +1,7 @@
 import { IconX } from '@tabler/icons-react'
 
-import { WorkspaceAgentSelector, workspaceAgentDescription } from './WorkspaceAgentSelector'
+import { WorkspaceAgentSelector } from './WorkspaceAgentSelector'
+import { workspaceAgentIsDisabled, workspaceAgentOptions } from './workspace-agent-options'
 import { Button } from '@/client/components/ui/button'
 import {
   Dialog,
@@ -9,11 +10,12 @@ import {
   DialogDescription,
   DialogTitle
 } from '@/client/components/ui/dialog'
-import type { WorkspaceType } from '@/lib/types'
+import type { HarnessAvailability, WorkspaceType } from '@/lib/types'
 
 type WorkspaceImportAgentStepProps = {
-  types: WorkspaceType[]
+  detectedTypes: WorkspaceType[]
   selectedType: WorkspaceType
+  availability?: Partial<Record<WorkspaceType, HarnessAvailability>>
   isPending: boolean
   errorMessage?: string
   onTypeChange: (type: WorkspaceType) => void
@@ -22,25 +24,27 @@ type WorkspaceImportAgentStepProps = {
 }
 
 export function WorkspaceImportAgentStep({
-  types,
+  detectedTypes,
   selectedType,
+  availability,
   isPending,
   errorMessage,
   onTypeChange,
   onCancel,
   onSubmit
 }: WorkspaceImportAgentStepProps) {
-  const options = types.map(type => ({
-    type,
-    description: workspaceAgentDescription[type]
-  }))
+  const options = workspaceAgentOptions({
+    availability,
+    openClawSelectable: detectedTypes.includes('openclaw')
+  })
+  const selectedUnavailable = workspaceAgentIsDisabled(options, selectedType)
 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-0.5 pr-8">
         <DialogTitle>Import from this computer</DialogTitle>
         <DialogDescription>
-          Choose which agent moi should use to build your workspace
+          Choose which agent moi will use to build your workspace
         </DialogDescription>
       </div>
 
@@ -60,7 +64,7 @@ export function WorkspaceImportAgentStep({
         <Button variant="secondary" onClick={onCancel} disabled={isPending}>
           Cancel
         </Button>
-        <Button onClick={onSubmit} disabled={isPending}>
+        <Button onClick={onSubmit} disabled={isPending || selectedUnavailable}>
           {isPending ? 'Adding…' : 'Add workspace'}
         </Button>
       </div>
@@ -70,8 +74,9 @@ export function WorkspaceImportAgentStep({
 
 type WorkspaceImportDialogProps = {
   open: boolean
-  types: WorkspaceType[]
+  detectedTypes: WorkspaceType[]
   selectedType: WorkspaceType
+  availability?: Partial<Record<WorkspaceType, HarnessAvailability>>
   isPending: boolean
   errorMessage?: string
   onOpenChange: (open: boolean) => void
@@ -83,8 +88,9 @@ type WorkspaceImportDialogProps = {
 
 export function WorkspaceImportDialog({
   open,
-  types,
+  detectedTypes,
   selectedType,
+  availability,
   isPending,
   errorMessage,
   onOpenChange,
@@ -110,8 +116,9 @@ export function WorkspaceImportDialog({
           }
         />
         <WorkspaceImportAgentStep
-          types={types}
+          detectedTypes={detectedTypes}
           selectedType={selectedType}
+          availability={availability}
           isPending={isPending}
           errorMessage={errorMessage}
           onTypeChange={onTypeChange}

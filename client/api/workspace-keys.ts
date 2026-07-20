@@ -1,7 +1,7 @@
 export const workspaceKeys = {
   all: ['workspaces'] as const,
   discover: ['workspaces', 'discover'] as const,
-  createInfo: ['workspaces', 'create-info'] as const,
+  setupInfo: ['workspaces', 'setup-info'] as const,
   preview: (id: string) => ['workspaces', 'preview', id] as const,
   layout: (id: string) => ['workspaces', 'layout', id] as const,
   widgets: (id: string) => ['workspaces', 'widgets', id] as const,

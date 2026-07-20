@@ -532,8 +532,7 @@ one.put('/env', async c => {
 // on a machine without the codex CLI). The chat surfaces the `reason` as a
 // banner instead of letting the first send fail cold.
 one.get('/availability', async c => {
-  const harness = harnessFor(c.get('ws'))
-  const availability = (await harness.availability?.()) ?? { available: true }
+  const availability = await workspaceTypeAvailability(c.get('ws').type ?? 'claude-code')
   return c.json(availability satisfies HarnessAvailability)
 })
 
@@ -764,6 +763,8 @@ workspaces.post('/', async c => {
   const requestedType: unknown = body?.type ?? 'claude-code'
   if (!isHarnessType(requestedType)) return c.text('Unknown workspace type', 400)
   const type: WorkspaceType = requestedType
+  const availability = await workspaceTypeAvailability(type)
+  if (!availability.available) return c.text(availability.reason, 400)
   const path = resolve(String(body.path))
   let metadata: WorkspaceImportMetadata
   try {
@@ -794,12 +795,16 @@ workspaces.get('/discover', async c => c.json(await discoverWorkspaces()))
 // belong to their agents and arrive via discovery.
 const CREATABLE_TYPES = new Set<WorkspaceType>(['claude-code', 'codex'])
 
+async function workspaceTypeAvailability(type: WorkspaceType): Promise<HarnessAvailability> {
+  return (await harnessFor(type).availability?.()) ?? { available: true }
+}
+
 // Per-backend runtime availability (e.g. is the codex CLI installed?), keyed
 // by workspace type. Harnesses without the hook are always available.
 async function harnessAvailability(): Promise<Record<string, HarnessAvailability>> {
   const out: Record<string, HarnessAvailability> = {}
   for (const h of allHarnesses()) {
-    out[h.id] = h.availability ? await h.availability() : { available: true }
+    out[h.id] = await workspaceTypeAvailability(h.id)
   }
   return out
 }
@@ -829,8 +834,7 @@ workspaces.post('/create', async c => {
   if (!CREATABLE_TYPES.has(type)) {
     return c.text('Workspaces of this type arrive through discovery, not creation', 400)
   }
-  const availability = await (harnessFor(type).availability?.() ??
-    Promise.resolve({ available: true as const }))
+  const availability = await workspaceTypeAvailability(type)
   if (!availability.available) return c.text(availability.reason, 400)
   const name = typeof body?.name === 'string' ? body.name.trim() : ''
   const invalid = validateWorkspaceFolderName(name)

@@ -4,26 +4,12 @@ import { Button } from '@/client/components/ui/button'
 import { DialogDescription, DialogTitle } from '@/client/components/ui/dialog'
 import { Input } from '@/client/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
+import { WorkspaceAgentSelector } from '@/client/features/home/WorkspaceAgentSelector'
 import {
-  WorkspaceAgentSelector,
-  workspaceAgentDescription
-} from '@/client/features/home/WorkspaceAgentSelector'
-import type { WorkspaceAgentOption } from '@/client/features/home/WorkspaceAgentSelector'
+  workspaceAgentIsDisabled,
+  workspaceAgentOptions
+} from '@/client/features/home/workspace-agent-options'
 import type { HarnessAvailability, WorkspaceType } from '@/lib/types'
-
-// Claude Code and Codex workspaces can be created from scratch; Codex needs
-// its CLI on this machine (checked via `availability`). OpenClaw workspaces
-// arrive through discovery.
-const WORKSPACE_AGENT_OPTIONS: WorkspaceAgentOption[] = [
-  { type: 'claude-code', description: workspaceAgentDescription['claude-code'] },
-  { type: 'codex', description: workspaceAgentDescription.codex },
-  {
-    type: 'openclaw',
-    description: workspaceAgentDescription.openclaw,
-    disabled: true,
-    lockedDescription: 'Initialize OpenClaw in the folder\nmanually, then import it to moi'
-  }
-]
 
 type CreateWorkspaceAgentStepProps = {
   type: WorkspaceType
@@ -46,20 +32,16 @@ export function CreateWorkspaceAgentStep({
   onUseExisting,
   onContinue
 }: CreateWorkspaceAgentStepProps) {
-  // An unavailable backend stays visible but disabled, with the availability
-  // reason (e.g. codex CLI install instructions) replacing the description.
-  const options = WORKSPACE_AGENT_OPTIONS.map(option => {
-    const state = availability?.[option.type]
-    if (!state || state.available) return option
-    return { ...option, description: state.reason, disabled: true }
-  })
-  const selectedUnavailable = options.find(option => option.type === type)?.disabled === true
+  const options = workspaceAgentOptions({ availability, openClawSelectable: false })
+  const selectedUnavailable = workspaceAgentIsDisabled(options, type)
 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-0.5 pr-8">
-        <DialogTitle>Choose agent</DialogTitle>
-        <DialogDescription>It will be used to build your workspace</DialogDescription>
+        <DialogTitle>Create new workspace</DialogTitle>
+        <DialogDescription>
+          Choose which agent moi will use to build your workspace
+        </DialogDescription>
       </div>
 
       <WorkspaceAgentSelector options={options} selectedType={type} onTypeChange={onTypeChange} />
@@ -109,8 +91,8 @@ export function WorkspaceNameStep({
   return (
     <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
       <div className="flex flex-col gap-0.5 pr-8">
-        <DialogTitle>Name workspace</DialogTitle>
-        <DialogDescription>Keep it short and recognizable</DialogDescription>
+        <DialogTitle>Create new workspace</DialogTitle>
+        <DialogDescription>Give it a short and recognizable name</DialogDescription>
       </div>
 
       <div className="flex flex-col gap-2">

@@ -3,7 +3,7 @@ import { type ReactElement, useState } from 'react'
 import { IconX } from '@tabler/icons-react'
 import { useLocation } from 'wouter'
 
-import { useChooseFolder, useCreateWorkspace, useCreateWorkspaceInfo } from './api'
+import { useChooseFolder, useCreateWorkspace, useWorkspaceSetupInfo } from './api'
 import { CreateWorkspaceAgentStep, WorkspaceNameStep } from './CreateWorkspaceDialogSteps'
 import { useWorkspaceImport } from './useWorkspaceImport'
 import { WorkspaceImportAgentStep } from './WorkspaceImportDialog'
@@ -22,7 +22,7 @@ const DEFAULT_WORKSPACE_TYPE: WorkspaceType = 'claude-code'
 
 export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   const [, navigate] = useLocation()
-  const info = useCreateWorkspaceInfo()
+  const info = useWorkspaceSetupInfo()
   const createMutation = useCreateWorkspace()
   const chooseFolder = useChooseFolder()
   const importFlow = useWorkspaceImport({ onSuccess: entry => finish(entry.id) })
@@ -110,8 +110,9 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
 
         {importFlow.choice ? (
           <WorkspaceImportAgentStep
-            types={importFlow.choice.types}
+            detectedTypes={importFlow.choice.workspace.types}
             selectedType={importFlow.choice.selectedType}
+            availability={info.data?.availability}
             isPending={importFlow.isPending}
             errorMessage={importFlow.error?.message}
             onTypeChange={importFlow.setSelectedType}

@@ -1,59 +1,35 @@
 import { describe, expect, test } from 'bun:test'
 
-import { workspaceImportDecision, workspaceImportTypes } from './useWorkspaceImport'
+import { workspaceImportDefaultType } from './useWorkspaceImport'
 import type { DiscoveredWorkspace } from '@/lib/types'
 
-describe('workspaceImportTypes', () => {
-  test('offers Claude Code and Codex when no provider is detected', () => {
+describe('workspaceImportDefaultType', () => {
+  test('defaults to Claude Code when no agent is detected', () => {
     const workspace: DiscoveredWorkspace = { path: '/workspace', types: [] }
 
-    expect(workspaceImportTypes(workspace)).toEqual(['claude-code', 'codex'])
-    expect(workspaceImportDecision(workspace)).toEqual({
-      kind: 'choose',
-      types: ['claude-code', 'codex'],
-      selectedType: 'claude-code'
-    })
+    expect(workspaceImportDefaultType(workspace)).toBe('claude-code')
   })
 
-  test('keeps one detected provider for direct import', () => {
-    const workspace: DiscoveredWorkspace = { path: '/workspace', types: ['openclaw'] }
-
-    expect(workspaceImportTypes(workspace)).toEqual(['openclaw'])
-    expect(workspaceImportDecision(workspace)).toEqual({
-      kind: 'direct',
-      type: 'openclaw'
-    })
+  test('preselects one detected agent', () => {
+    expect(workspaceImportDefaultType({ path: '/workspace', types: ['codex'] })).toBe('codex')
+    expect(workspaceImportDefaultType({ path: '/workspace', types: ['openclaw'] })).toBe('openclaw')
   })
 
-  test('deduplicates and orders multiple detected providers', () => {
+  test('uses canonical order for multiple detected agents', () => {
     expect(
-      workspaceImportDecision({
+      workspaceImportDefaultType({
         path: '/workspace',
         types: ['openclaw', 'codex', 'claude-code', 'codex']
       })
-    ).toEqual({
-      kind: 'choose',
-      types: ['claude-code', 'codex', 'openclaw'],
-      selectedType: 'claude-code'
-    })
-    expect(
-      workspaceImportTypes({
-        path: '/workspace',
-        types: ['openclaw', 'codex', 'claude-code', 'codex']
-      })
-    ).toEqual(['claude-code', 'codex', 'openclaw'])
+    ).toBe('claude-code')
   })
 
-  test('preselects the first detected provider in display order', () => {
+  test('deduplicates detected agents before selecting', () => {
     expect(
-      workspaceImportDecision({
+      workspaceImportDefaultType({
         path: '/workspace',
-        types: ['openclaw', 'codex']
+        types: ['openclaw', 'codex', 'codex']
       })
-    ).toEqual({
-      kind: 'choose',
-      types: ['codex', 'openclaw'],
-      selectedType: 'codex'
-    })
+    ).toBe('codex')
   })
 })
