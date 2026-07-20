@@ -32,9 +32,11 @@ const [cmd = 'chat', ...rest] = positional
 const asJson = flags.get('json') === 'true'
 const timeoutSec = Number(flags.get('timeout') ?? 120)
 
-const bin = process.env.CODEX_CLI_PATH ?? Bun.which('codex')
+const bin = Bun.which('codex')
 if (!bin) {
-  console.error('codex binary not found (install @openai/codex or set CODEX_CLI_PATH)')
+  console.error(
+    'Run curl -fsSL https://chatgpt.com/codex/install.sh | sh in your terminal to install Codex'
+  )
   process.exit(1)
 }
 

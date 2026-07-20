@@ -69,7 +69,7 @@ export type WorkspaceSetupInfo = {
   root: string
   displayRoot: string
   canChooseFolder: boolean
-  // Per-backend runtime availability (e.g. is the codex CLI installed?),
+  // Per-backend runtime availability (are the Claude/Codex CLIs installed?),
   // keyed by workspace type. Missing entries mean available.
   availability?: Partial<Record<WorkspaceType, HarnessAvailability>>
 }
@@ -78,7 +78,7 @@ export function useWorkspaceSetupInfo() {
   return useQuery<WorkspaceSetupInfo>({
     queryKey: workspaceKeys.setupInfo,
     // Availability can change while the app is open (the user installs the
-    // codex CLI) — refetch on mount instead of caching forever.
+    // agent CLI) — refetch on mount instead of caching forever.
     queryFn: () => requestJson('/api/workspaces/create'),
     staleTime: 30_000,
     refetchOnMount: 'always'

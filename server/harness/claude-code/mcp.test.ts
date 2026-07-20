@@ -7,6 +7,7 @@ type QueryCall = {
   options: {
     cwd: string
     settingSources: string[]
+    pathToClaudeCodeExecutable: string
     mcpServers?: Record<string, unknown>
     strictMcpConfig?: boolean
   }
@@ -34,15 +35,20 @@ mock.module('@anthropic-ai/claude-agent-sdk', () => ({
 const { getMcpStatus, getUserMcpStatus } = await import('./mcp')
 
 let logSpy: ReturnType<typeof spyOn>
+let whichSpy: ReturnType<typeof spyOn>
 
 beforeEach(() => {
   queryCalls.length = 0
   closeError = null
   logSpy = spyOn(console, 'log').mockImplementation(() => {})
+  whichSpy = spyOn(Bun, 'which').mockImplementation(command =>
+    command === 'claude' ? '/test/bin/claude' : null
+  )
 })
 
 afterEach(() => {
   logSpy.mockRestore()
+  whichSpy.mockRestore()
 })
 
 test('SDK mock preserves unrelated session exports', async () => {
@@ -92,6 +98,7 @@ test('project MCP status probes only explicit project .mcp.json servers', async 
       expect(queryCalls).toHaveLength(1)
       expect(queryCalls[0]?.options.cwd).toBe(dir)
       expect(queryCalls[0]?.options.settingSources).toEqual(['project'])
+      expect(queryCalls[0]?.options.pathToClaudeCodeExecutable).toBe('/test/bin/claude')
       expect(queryCalls[0]?.options.mcpServers).toEqual({
         local: {
           command: 'bun',
@@ -109,6 +116,7 @@ test('user MCP status probes only user-scoped settings', async () => {
   expect(queryCalls).toHaveLength(1)
   expect(queryCalls[0]?.options.cwd).toBe(process.cwd())
   expect(queryCalls[0]?.options.settingSources).toEqual(['user'])
+  expect(queryCalls[0]?.options.pathToClaudeCodeExecutable).toBe('/test/bin/claude')
 })
 
 test('settled MCP status survives an SDK cleanup error', async () => {

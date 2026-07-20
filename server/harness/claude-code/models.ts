@@ -1,6 +1,8 @@
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import type { ModelInfo } from '@anthropic-ai/claude-agent-sdk'
 
+import { requireHarnessExecutable } from '../executable'
+
 // Chat runs live in `cc-session.ts` (streaming-input sessions held per thread).
 // MCP status probing lives in `mcp.ts`. This module now only probes the agent
 // backend for the model list — spins up a throwaway `query()` and reads metadata.
@@ -13,6 +15,7 @@ async function fetchClaudeModels(cwd: string): Promise<ModelInfo[]> {
     prompt: '',
     options: {
       cwd,
+      pathToClaudeCodeExecutable: requireHarnessExecutable('claude-code'),
       persistSession: false,
       settingSources: ['user', 'project'],
       env: { ...process.env, CLAUDECODE: undefined }

@@ -27,7 +27,7 @@ export type WorkspaceAgentOption = {
   type: WorkspaceType
   description: string
   disabled: boolean
-  lockedDescription?: string
+  disabledReason?: string
 }
 
 type WorkspaceAgentOptionsInput = {
@@ -41,13 +41,16 @@ export function getWorkspaceAgentOptions({
 }: WorkspaceAgentOptionsInput): WorkspaceAgentOption[] {
   return WORKSPACE_TYPE_ORDER.map(type => {
     const state = availability?.[type]
-    const openClawLocked = type === 'openclaw' && !detectedTypes.includes(type)
+    const unavailableReason = state?.available === false ? state.reason : undefined
+    const openClawReason =
+      type === 'openclaw' && !detectedTypes.includes(type) ? OPENCLAW_LOCKED_DESCRIPTION : undefined
+    const disabledReason = unavailableReason ?? openClawReason
 
     return {
       type,
-      description: state?.available === false ? state.reason : workspaceAgentDescription[type],
-      disabled: state?.available === false || openClawLocked,
-      ...(openClawLocked ? { lockedDescription: OPENCLAW_LOCKED_DESCRIPTION } : {})
+      description: workspaceAgentDescription[type],
+      disabled: Boolean(disabledReason),
+      ...(disabledReason ? { disabledReason } : {})
     }
   })
 }
@@ -158,11 +161,11 @@ function WorkspaceAgentOptionButton({
   selected,
   onSelect
 }: WorkspaceAgentOptionButtonProps) {
-  const showLockedTooltip = Boolean(option.lockedDescription)
+  const showDisabledTooltip = Boolean(option.disabledReason)
   const button = (
     <button
       type="button"
-      disabled={option.disabled && !showLockedTooltip}
+      disabled={option.disabled && !showDisabledTooltip}
       aria-disabled={option.disabled || undefined}
       aria-pressed={selected}
       onClick={event => {
@@ -198,13 +201,13 @@ function WorkspaceAgentOptionButton({
     </button>
   )
 
-  if (!showLockedTooltip) return button
+  if (!showDisabledTooltip) return button
 
   return (
     <Tooltip>
       <TooltipTrigger render={button} />
       <TooltipContent className="max-w-64 text-center whitespace-pre-line">
-        {option.lockedDescription}
+        {option.disabledReason}
       </TooltipContent>
     </Tooltip>
   )

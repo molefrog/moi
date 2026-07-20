@@ -7,6 +7,7 @@ import type {
 import { join } from 'path'
 
 import { debugEnabled } from '../../debug'
+import { requireHarnessExecutable } from '../executable'
 
 export type McpScope = 'user' | 'project'
 
@@ -98,6 +99,7 @@ async function probeMcpStatus(workspacePath: string, scope: McpScope): Promise<M
     prompt: keepAlive(),
     options: {
       cwd: workspacePath,
+      pathToClaudeCodeExecutable: requireHarnessExecutable('claude-code'),
       persistSession: false,
       settingSources: [scope],
       ...(mcpServers && { mcpServers, strictMcpConfig: true }),

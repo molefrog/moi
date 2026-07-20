@@ -27,6 +27,16 @@ Evidence drawn from:
 
 ---
 
+## Runtime executable
+
+The Agent SDK remains the transport layer, but every `query()` explicitly uses
+the `claude` executable resolved from the moi server's PATH through
+`pathToClaudeCodeExecutable`. There is no bundled-executable fallback. If the
+command is missing, setup and existing workspaces report:
+`Run curl -fsSL https://claude.ai/install.sh | sh in your terminal to install Claude`.
+
+---
+
 ## 1. Three layers
 
 ```
