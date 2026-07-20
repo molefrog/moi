@@ -23,11 +23,11 @@ type WorkspaceAgentOption = {
 // its CLI on this machine (checked via `availability`). OpenClaw workspaces
 // arrive through discovery.
 const WORKSPACE_AGENT_OPTIONS: WorkspaceAgentOption[] = [
-  { type: 'claude-code', hint: 'Great all-rounder for complex tasks built by Anthropic' },
-  { type: 'codex', hint: 'OpenAI coding agent that runs through the Codex CLI' },
+  { type: 'claude-code', hint: 'By Anthropic' },
+  { type: 'codex', hint: 'By OpenAI' },
   {
     type: 'openclaw',
-    hint: 'Initialize OpenClaw in the folder manually, then import it to moi',
+    hint: 'Open-source',
     disabled: true
   }
 ]
@@ -69,7 +69,7 @@ export function WorkspaceAgentStep({
         <DialogDescription>It will be used to build your workspace</DialogDescription>
       </div>
 
-      <div role="group" aria-label="Agent" className="grid grid-cols-2 gap-2">
+      <div role="group" aria-label="Agent" className="grid grid-cols-3 gap-2">
         {options.map(option => (
           <WorkspaceAgentOptionButton
             key={option.type}
