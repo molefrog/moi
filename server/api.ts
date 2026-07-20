@@ -31,6 +31,7 @@ import { getUserMcpStatus } from './harness/claude-code/mcp'
 import { getClientFrameLog, getWireLog } from './harness/debug'
 import { allHarnesses, harnessFor, isHarnessType } from './harness/registry'
 import {
+  discoverWorkspace,
   discoverWorkspaces,
   getWorkspace,
   listWorkspaces,
@@ -64,6 +65,8 @@ import {
   provisionWorkspace,
   validateWorkspaceFolderName
 } from './workspace-init'
+import { resolveWorkspaceImportMetadata } from './workspace-import'
+import type { WorkspaceImportMetadata } from './workspace-import'
 import { getWorkspaceEnvView, isValidEnvKey, updateWorkspaceEnv } from './workspace-env'
 import type { EnvUpdate } from './workspace-env'
 
@@ -758,9 +761,17 @@ workspaces.put('/order', async c => {
 workspaces.post('/', async c => {
   const body = await c.req.json()
   if (!body?.path) return c.text('Missing path', 400)
-  const rawType = body?.type
-  const type = isHarnessType(rawType) ? rawType : undefined
+  const requestedType: unknown = body?.type ?? 'claude-code'
+  if (!isHarnessType(requestedType)) return c.text('Unknown workspace type', 400)
+  const type: WorkspaceType = requestedType
   const path = resolve(String(body.path))
+  let metadata: WorkspaceImportMetadata
+  try {
+    metadata = await resolveWorkspaceImportMetadata(path, type)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return c.text(message, 400)
+  }
   // Importing IS initializing: lay down the bundled skills (in the backend's
   // skills dir) and the `.moi/` scaffold, exactly like `moi init` — a workspace
   // added from the UI must be indistinguishable from one added via the CLI.
@@ -772,10 +783,7 @@ workspaces.post('/', async c => {
   }
   const entry = await registerWorkspace(path, {
     type,
-    name: typeof body?.name === 'string' ? body.name : undefined,
-    agentId: typeof body?.agentId === 'string' ? body.agentId : undefined,
-    isDefault: typeof body?.isDefault === 'boolean' ? body.isDefault : undefined,
-    lastRunAt: typeof body?.lastRunAt === 'string' ? body.lastRunAt : undefined
+    ...metadata
   })
   return c.json(entry, 201)
 })
@@ -869,8 +877,8 @@ export function isSameOriginRequest(req: Request): boolean {
 // Open the OS-native folder picker so the user can choose an existing folder to
 // import (the create dialog's "Use existing folder"). The server runs on the
 // user's machine, so it can drive the real system dialog — the browser can't.
-// Returns the chosen POSIX path, or `{ canceled: true }` if the dialog is
-// dismissed. macOS only for now (via `osascript`).
+// Returns the same grouped provider discovery shape as `/discover`, or
+// `{ canceled: true }` if the dialog is dismissed. macOS only for now.
 workspaces.post('/choose-folder', async c => {
   if (!isSameOriginRequest(c.req.raw)) return c.text('Forbidden', 403)
   if (process.platform !== 'darwin') {
@@ -900,7 +908,7 @@ workspaces.post('/choose-folder', async c => {
     if (exitCode !== 0) return c.json({ canceled: true })
     const path = (await new Response(proc.stdout).text()).trim()
     if (!path) return c.json({ canceled: true })
-    return c.json({ path })
+    return c.json(await discoverWorkspace(path))
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return c.text(`Could not open the folder picker: ${message}`, 500)

@@ -3,9 +3,11 @@ import { homedir } from 'node:os'
 import { join, resolve, sep } from 'path'
 
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
+import { orderWorkspaceTypes } from '@/lib/workspace-types'
 
 import { DATA_DIR } from './data-dir'
 import { allHarnesses } from './harness/registry'
+import type { DiscoveredWorkspaceCandidate } from './harness/types'
 
 // Replace the home-dir prefix with `~` for display. Keeps the original
 // absolute path in place; callers should put the result in `displayPath`.
@@ -138,20 +140,62 @@ export function liftToWorkspaceRoot(p: string): string {
   return segments.slice(0, i).join(sep) || sep
 }
 
-// Ask every harness for workspaces it knows about that aren't registered yet.
-// Precedence: entries from a specific backend (OpenClaw agents, Codex threads)
-// win over Claude Code's generic session-history scan when they claim the
-// same path — CC sessions exist in most directories an agent ever ran in.
-export async function discoverWorkspaces(): Promise<DiscoveredWorkspace[]> {
-  const registeredPaths = new Set((await readRegistry()).map(e => e.path))
+async function collectDiscoveredWorkspaces(
+  registeredPaths: Set<string>
+): Promise<DiscoveredWorkspaceCandidate[]> {
   const perHarness = await Promise.all(
     allHarnesses().map(
       h => h.discoverWorkspaces?.(registeredPaths).catch(() => []) ?? Promise.resolve([])
     )
   )
-  const found = perHarness.flat()
-  const specific = found.filter(w => w.type !== 'claude-code')
-  const specificPaths = new Set(specific.map(w => w.path))
-  const generic = found.filter(w => w.type === 'claude-code' && !specificPaths.has(w.path))
-  return [...specific, ...generic].map(withDisplayPath)
+  return perHarness.flat()
+}
+
+export function groupDiscoveredWorkspaces(
+  candidates: DiscoveredWorkspaceCandidate[],
+  registeredPaths: Set<string> = new Set()
+): DiscoveredWorkspace[] {
+  const normalizedRegisteredPaths = new Set([...registeredPaths].map(path => resolve(path)))
+  const byPath = new Map<string, Set<WorkspaceType>>()
+
+  for (const candidate of candidates) {
+    const path = resolve(candidate.path)
+    if (normalizedRegisteredPaths.has(path)) continue
+    const types = byPath.get(path) ?? new Set<WorkspaceType>()
+    types.add(candidate.type)
+    byPath.set(path, types)
+  }
+
+  return [...byPath].map(([path, types]) => ({
+    path,
+    types: orderWorkspaceTypes(types)
+  }))
+}
+
+export function discoveredWorkspaceForPath(
+  path: string,
+  candidates: DiscoveredWorkspaceCandidate[]
+): DiscoveredWorkspace {
+  const normalizedPath = resolve(path)
+  return (
+    groupDiscoveredWorkspaces(candidates).find(workspace => workspace.path === normalizedPath) ?? {
+      path: normalizedPath,
+      types: []
+    }
+  )
+}
+
+// Ask every harness for workspaces it knows about that aren't registered yet,
+// then combine providers that claim the same normalized folder.
+export async function discoverWorkspaces(): Promise<DiscoveredWorkspace[]> {
+  const registeredPaths = new Set((await readRegistry()).map(e => e.path))
+  const found = await collectDiscoveredWorkspaces(registeredPaths)
+  return groupDiscoveredWorkspaces(found, registeredPaths).map(withDisplayPath)
+}
+
+// Inspect one folder through the same provider discovery used by the home
+// suggestions. An empty types list means no provider recognized the folder.
+export async function discoverWorkspace(path: string): Promise<DiscoveredWorkspace> {
+  const found = await collectDiscoveredWorkspaces(new Set())
+  return withDisplayPath(discoveredWorkspaceForPath(path, found))
 }

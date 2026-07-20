@@ -2,9 +2,9 @@
 // ../types.ts for the contract and ../README.md for the architecture.
 import { join } from 'node:path'
 
-import type { DiscoveredWorkspace, McpServer } from '@/lib/types'
+import type { McpServer } from '@/lib/types'
 
-import type { Harness } from '../types'
+import type { DiscoveredWorkspaceCandidate, Harness } from '../types'
 import { getMcpStatus } from './mcp'
 import { getClaudeModels } from './models'
 import {
@@ -38,7 +38,9 @@ function fmtAgo(ts: number, now: number): string {
 }
 
 // Discover directories with CC session history that aren't registered yet.
-async function discoverWorkspaces(registeredPaths: Set<string>): Promise<DiscoveredWorkspace[]> {
+async function discoverWorkspaces(
+  registeredPaths: Set<string>
+): Promise<DiscoveredWorkspaceCandidate[]> {
   try {
     const { listSessions } = await import('@anthropic-ai/claude-agent-sdk')
     const sessions = await listSessions({})

@@ -1,40 +1,31 @@
 import type { FormEvent } from 'react'
 
-import { IconCircleCheckFilled } from '@tabler/icons-react'
-
 import { Button } from '@/client/components/ui/button'
 import { DialogDescription, DialogTitle } from '@/client/components/ui/dialog'
 import { Input } from '@/client/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
-import { cn } from '@/client/lib/cn'
 import {
-  WorkspaceTypeIcon,
-  workspaceTypeLabel
-} from '@/client/features/home/workspace-presentation'
+  WorkspaceAgentSelector,
+  workspaceAgentDescription
+} from '@/client/features/home/WorkspaceAgentSelector'
+import type { WorkspaceAgentOption } from '@/client/features/home/WorkspaceAgentSelector'
 import type { HarnessAvailability, WorkspaceType } from '@/lib/types'
-
-type WorkspaceAgentOption = {
-  type: WorkspaceType
-  description: string
-  disabled?: boolean
-  lockedDescription?: string
-}
 
 // Claude Code and Codex workspaces can be created from scratch; Codex needs
 // its CLI on this machine (checked via `availability`). OpenClaw workspaces
 // arrive through discovery.
 const WORKSPACE_AGENT_OPTIONS: WorkspaceAgentOption[] = [
-  { type: 'claude-code', description: 'By Anthropic' },
-  { type: 'codex', description: 'By OpenAI' },
+  { type: 'claude-code', description: workspaceAgentDescription['claude-code'] },
+  { type: 'codex', description: workspaceAgentDescription.codex },
   {
     type: 'openclaw',
-    description: 'Open-source',
+    description: workspaceAgentDescription.openclaw,
     disabled: true,
     lockedDescription: 'Initialize OpenClaw in the folder\nmanually, then import it to moi'
   }
 ]
 
-type WorkspaceAgentStepProps = {
+type CreateWorkspaceAgentStepProps = {
   type: WorkspaceType
   availability?: Partial<Record<WorkspaceType, HarnessAvailability>>
   canChooseFolder: boolean
@@ -45,7 +36,7 @@ type WorkspaceAgentStepProps = {
   onContinue: () => void
 }
 
-export function WorkspaceAgentStep({
+export function CreateWorkspaceAgentStep({
   type,
   availability,
   canChooseFolder,
@@ -54,7 +45,7 @@ export function WorkspaceAgentStep({
   onTypeChange,
   onUseExisting,
   onContinue
-}: WorkspaceAgentStepProps) {
+}: CreateWorkspaceAgentStepProps) {
   // An unavailable backend stays visible but disabled, with the availability
   // reason (e.g. codex CLI install instructions) replacing the description.
   const options = WORKSPACE_AGENT_OPTIONS.map(option => {
@@ -71,16 +62,7 @@ export function WorkspaceAgentStep({
         <DialogDescription>It will be used to build your workspace</DialogDescription>
       </div>
 
-      <div role="group" aria-label="Agent" className="grid grid-cols-3 gap-2">
-        {options.map(option => (
-          <WorkspaceAgentOptionButton
-            key={option.type}
-            option={option}
-            selected={type === option.type}
-            onSelect={onTypeChange}
-          />
-        ))}
-      </div>
+      <WorkspaceAgentSelector options={options} selectedType={type} onTypeChange={onTypeChange} />
 
       {errorMessage && (
         <p role="alert" className="text-xs text-destructive">
@@ -165,69 +147,6 @@ export function WorkspaceNameStep({
         </Button>
       </div>
     </form>
-  )
-}
-
-type WorkspaceAgentOptionButtonProps = {
-  option: WorkspaceAgentOption
-  selected: boolean
-  onSelect: (type: WorkspaceType) => void
-}
-
-function WorkspaceAgentOptionButton({
-  option,
-  selected,
-  onSelect
-}: WorkspaceAgentOptionButtonProps) {
-  const showLockedTooltip = Boolean(option.lockedDescription)
-  const button = (
-    <button
-      type="button"
-      disabled={option.disabled && !showLockedTooltip}
-      aria-disabled={option.disabled || undefined}
-      onClick={event => {
-        if (option.disabled) {
-          event.preventDefault()
-          return
-        }
-        onSelect(option.type)
-      }}
-      aria-pressed={selected}
-      className={cn(
-        'relative flex w-full flex-col items-start justify-between gap-6 rounded-lg bg-card p-4 text-left ring-1 ring-border transition-shadow outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-        !selected && !option.disabled && 'cursor-pointer',
-        option.disabled && 'cursor-not-allowed opacity-50'
-      )}
-    >
-      <span className="relative inline-flex">
-        <WorkspaceTypeIcon type={option.type} className="size-10" />
-        {selected && (
-          <IconCircleCheckFilled
-            size={20}
-            stroke={1.5}
-            aria-hidden="true"
-            className="absolute -top-1.5 -right-1.5"
-          />
-        )}
-      </span>
-      <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-sm font-medium text-foreground">
-          {workspaceTypeLabel[option.type]}
-        </span>
-        <span className="text-xs leading-4 text-muted-foreground">{option.description}</span>
-      </span>
-    </button>
-  )
-
-  if (!showLockedTooltip) return button
-
-  return (
-    <Tooltip>
-      <TooltipTrigger render={button} />
-      <TooltipContent className="max-w-64 text-center whitespace-pre-line">
-        {option.lockedDescription}
-      </TooltipContent>
-    </Tooltip>
   )
 }
 

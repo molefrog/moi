@@ -2,6 +2,7 @@ import claudeIcon from '@/client/assets/claude.svg'
 import openaiIcon from '@/client/assets/openai.svg'
 import openclawIcon from '@/client/assets/openclaw.svg'
 import { cn } from '@/client/lib/cn'
+import { orderWorkspaceTypes } from '@/lib/workspace-types'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
 export const workspaceProviderIcon: Record<WorkspaceType, string> = {
@@ -17,27 +18,36 @@ export const workspaceTypeLabel: Record<WorkspaceType, string> = {
 }
 
 type WorkspaceTypeIconProps = {
-  type: WorkspaceType
+  type: WorkspaceType | WorkspaceType[]
   className?: string
 }
 
 export function WorkspaceTypeIcon({ type, className }: WorkspaceTypeIconProps) {
+  const types = orderWorkspaceTypes(Array.isArray(type) ? type : [type])
+  const label = types.map(workspaceType => workspaceTypeLabel[workspaceType]).join(', ')
+
   return (
-    <img
-      src={workspaceProviderIcon[type]}
-      alt=""
-      aria-label={workspaceTypeLabel[type]}
-      className={cn('size-4 shrink-0', className)}
-    />
+    <span
+      role="img"
+      aria-label={label}
+      className={cn('inline-flex shrink-0 items-center -space-x-1', className)}
+    >
+      {types.map(workspaceType => (
+        <img
+          key={workspaceType}
+          src={workspaceProviderIcon[workspaceType]}
+          alt=""
+          className={cn('size-4 shrink-0 rounded-[4px] bg-background', className)}
+        />
+      ))}
+    </span>
   )
 }
 
-type WorkspaceDisplaySource = Pick<
-  WorkspaceEntry | DiscoveredWorkspace,
-  'name' | 'path' | 'type' | 'agentId'
->
+type WorkspaceDisplaySource = WorkspaceEntry | DiscoveredWorkspace
 
 export function workspaceDisplayName(workspace: WorkspaceDisplaySource): string {
+  if ('types' in workspace) return workspace.path.split('/').pop() || workspace.path
   if (workspace.name) return workspace.name
   if (workspace.type === 'openclaw') return workspace.agentId ?? 'OpenClaw agent'
   return workspace.path.split('/').pop() || workspace.path

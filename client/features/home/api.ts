@@ -44,20 +44,25 @@ export function useDiscoveredWorkspaces() {
   })
 }
 
-export function useAddWorkspace() {
+export function useImportWorkspace() {
   const queryClient = useQueryClient()
-  return useMutation<WorkspaceEntry, Error, DiscoveredWorkspace>({
-    mutationFn: discovered =>
-      requestJson('/api/workspaces', jsonRequest('POST', discovered), 'Failed to add workspace'),
-    onSuccess: (entry, suggestion) => {
+  return useMutation<WorkspaceEntry, Error, ImportWorkspaceInput>({
+    mutationFn: input =>
+      requestJson('/api/workspaces', jsonRequest('POST', input), 'Failed to add workspace'),
+    onSuccess: (entry, input) => {
       queryClient.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, previous =>
         upsertWorkspaceEntry(previous, entry)
       )
       queryClient.setQueryData<DiscoveredWorkspace[]>(workspaceKeys.discover, previous =>
-        (previous ?? []).filter(item => item.path !== suggestion.path)
+        (previous ?? []).filter(item => item.path !== input.path)
       )
     }
   })
+}
+
+export type ImportWorkspaceInput = {
+  path: string
+  type: WorkspaceType
 }
 
 export type CreateWorkspaceInfo = {
@@ -80,7 +85,7 @@ export function useCreateWorkspaceInfo() {
   })
 }
 
-export type ChooseFolderResult = { path: string } | { canceled: true }
+export type ChooseFolderResult = DiscoveredWorkspace | { canceled: true }
 
 export function useChooseFolder() {
   return useMutation<ChooseFolderResult, Error, void>({
