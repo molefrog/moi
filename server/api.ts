@@ -235,6 +235,8 @@ one.post('/view-builders/:builderId/submit', async c => {
   }
   const availableIcons = parseAvailableViewIcons(body.availableIcons)
   if (!availableIcons) return c.text('Available view icons are required', 400)
+  const availability = await workspaceTypeAvailability(ws.type ?? 'claude-code')
+  if (!availability.available) return c.text(availability.reason, 400)
   try {
     const builder = await beginViewBuilder(
       ws.id,

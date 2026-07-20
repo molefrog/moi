@@ -622,6 +622,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               <ViewBuilderTab
                 key={activeBuilder.id}
                 builder={activeBuilder}
+                unavailableReason={unavailableReason}
                 onSave={requirements => builderActions.save(activeBuilder.id, requirements)}
                 onSubmit={requirements => {
                   if (mode === 'fullscreen') setFloatingChatOpen(true)
