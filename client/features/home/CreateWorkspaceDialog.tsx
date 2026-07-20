@@ -90,7 +90,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger render={trigger} />
-      <DialogContent className="w-[calc(100%-2rem)] max-w-lg p-6">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-md p-6">
         <DialogClose
           render={
             <Button
