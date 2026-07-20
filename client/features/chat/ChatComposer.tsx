@@ -1,15 +1,15 @@
 import { type RefObject, useRef, useState } from 'react'
 
-import {
-  IconArrowUp,
-  IconFile,
-  IconLoader2,
-  IconPaperclip,
-  IconPlayerStop,
-  IconX
-} from '@tabler/icons-react'
+import { IconFile, IconLoader2, IconPaperclip, IconPlayerStop, IconX } from '@tabler/icons-react'
 
-import { Composer, ComposerFooter, ComposerTextarea } from '@/client/components/shared/Composer'
+import {
+  canSubmitComposerAction,
+  Composer,
+  ComposerFooter,
+  ComposerSubmitButton,
+  ComposerTextarea
+} from '@/client/components/shared/Composer'
+import { Button } from '@/client/components/ui/button'
 import { cn } from '@/client/lib/cn'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { uploadFiles } from '@/client/features/chat/uploads'
@@ -21,8 +21,6 @@ import {
 } from '@/client/features/chat/chat-store'
 
 import { ModelPicker } from './ModelPicker'
-import { Button } from '@/client/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 
 type ChatComposerProps = {
   composerRef: RefObject<HTMLTextAreaElement | null>
@@ -30,14 +28,6 @@ type ChatComposerProps = {
   onStop: () => void
   processing: boolean
   unavailableReason: string | null | undefined
-}
-
-export function canSendChatMessage(
-  hasContent: boolean,
-  uploading: boolean,
-  unavailableReason: string | null | undefined
-): boolean {
-  return hasContent && !uploading && unavailableReason === null
 }
 
 // The composer owns the draft: it reads/writes the per-thread draft in the live
@@ -61,11 +51,8 @@ export function ChatComposer({
 
   const uploading = attachments.some(a => a.status === 'uploading')
   const hasReady = attachments.some(a => a.status === 'ready')
-  const canSend = canSendChatMessage(
-    value.trim().length > 0 || hasReady,
-    uploading,
-    unavailableReason
-  )
+  const hasContent = value.trim().length > 0 || hasReady
+  const canSend = canSubmitComposerAction(hasContent, uploading, unavailableReason)
 
   const onChange = (next: string) => liveStore.getState().setDraft(workspaceId, sessionId, next)
 
@@ -108,12 +95,6 @@ export function ChatComposer({
     // re-renders empty under the new key. (Attachments are cleared by `send`.)
     liveStore.getState().setDraft(workspaceId, sessionId, '')
   }
-
-  const sendButton = (
-    <Button type="submit" size="icon" disabled={!canSend} aria-label="Send message">
-      <IconArrowUp stroke={1.5} />
-    </Button>
-  )
 
   return (
     <Composer
@@ -201,13 +182,13 @@ export function ChatComposer({
           <Button type="button" size="icon" onClick={onStop} aria-label="Stop agent">
             <IconPlayerStop stroke={1.5} />
           </Button>
-        ) : unavailableReason ? (
-          <Tooltip>
-            <TooltipTrigger render={<span className="inline-flex">{sendButton}</span>} />
-            <TooltipContent className="max-w-64 text-center">{unavailableReason}</TooltipContent>
-          </Tooltip>
         ) : (
-          sendButton
+          <ComposerSubmitButton
+            label="Send message"
+            hasContent={hasContent}
+            busy={uploading}
+            unavailableReason={unavailableReason}
+          />
         )}
       </ComposerFooter>
     </Composer>
