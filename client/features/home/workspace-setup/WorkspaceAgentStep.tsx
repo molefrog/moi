@@ -183,17 +183,18 @@ function WorkspaceAgentOptionButton({
         onSelect(option.type)
       }}
       className={cn(
-        'relative flex w-full flex-col items-start justify-between gap-6 rounded-lg bg-card p-4 text-left ring-1 ring-border transition-shadow outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-        !selected && !option.disabled && 'cursor-pointer',
-        option.disabled && 'cursor-not-allowed opacity-50'
+        'relative flex w-full flex-col items-start justify-between gap-6 rounded-lg bg-card p-4 text-left ring-1 ring-border transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+        !selected && 'opacity-70',
+        !selected && !option.disabled && 'cursor-pointer hover:opacity-100',
+        option.disabled && 'cursor-not-allowed'
       )}
     >
       <span className="relative inline-flex">
         <WorkspaceAgentIcon type={option.type} />
         {selected && (
           <IconCircleCheckFilled
-            size={20}
-            stroke={1.5}
+            size={16}
+            stroke={1.75}
             aria-hidden="true"
             className="absolute -top-1.5 -right-1.5"
           />
@@ -225,5 +226,5 @@ type WorkspaceAgentIconProps = {
 }
 
 function WorkspaceAgentIcon({ type }: WorkspaceAgentIconProps) {
-  return <img src={workspaceProviderIcon[type]} alt="" className="size-10 shrink-0" />
+  return <img src={workspaceProviderIcon[type]} alt="" className="size-8 shrink-0" />
 }
