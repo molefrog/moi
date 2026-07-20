@@ -36,8 +36,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   const isImporting = chooseFolder.isPending || addMutation.isPending
   const isCreating = createMutation.isPending
 
-  function resetDialog() {
-    setOpen(false)
+  function resetDialogState() {
     setStep('agent')
     setType(DEFAULT_WORKSPACE_TYPE)
     setName('')
@@ -47,15 +46,15 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   }
 
   function handleOpenChange(nextOpen: boolean) {
-    if (nextOpen) {
-      setOpen(true)
-      return
-    }
-    resetDialog()
+    setOpen(nextOpen)
+  }
+
+  function handleOpenChangeComplete(nextOpen: boolean) {
+    if (!nextOpen) resetDialogState()
   }
 
   function finish(workspaceId: string) {
-    resetDialog()
+    setOpen(false)
     navigate(`/workspace/${workspaceId}`)
   }
 
@@ -88,7 +87,11 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={handleOpenChange}
+      onOpenChangeComplete={handleOpenChangeComplete}
+    >
       <DialogTrigger render={trigger} />
       <DialogContent className="w-[calc(100%-2rem)] max-w-lg p-6">
         <DialogClose
