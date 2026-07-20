@@ -68,12 +68,6 @@ function getInputValue(input: Record<string, unknown>, key: string): string {
   return typeof value === 'string' ? value : ''
 }
 
-// Human byte size of a string (UTF-8): `124B`, `2.5KB`.
-export function formatBytes(text: string): string {
-  const n = new TextEncoder().encode(text).length
-  return n < 1024 ? `${n}B` : `${(n / 1024).toFixed(1)}KB`
-}
-
 // Compact wall-clock duration: sub-second → "850ms", under a minute → "3.2s" /
 // "11s", longer → "1m 5s". Used on the subagent card's duration badge.
 export function formatDuration(ms: number): string {
