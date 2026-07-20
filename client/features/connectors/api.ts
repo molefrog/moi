@@ -15,14 +15,3 @@ export function useWorkspaceMcp(workspaceId: string, enabled: boolean) {
     refetchOnWindowFocus: false
   })
 }
-
-export function useUserMcp() {
-  return useQuery<McpServer[]>({
-    queryKey: workspaceKeys.userMcp,
-    queryFn: () => requestJson('/api/mcp'),
-    staleTime: 30_000,
-    gcTime: Infinity,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true
-  })
-}

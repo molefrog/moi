@@ -27,7 +27,6 @@ import {
   saveLayout,
   saveWidgetThumbnails
 } from './layout'
-import { getUserMcpStatus } from './harness/claude-code/mcp'
 import { getClientFrameLog, getWireLog } from './harness/debug'
 import { allHarnesses, harnessFor, isHarnessType } from './harness/registry'
 import {
@@ -928,10 +927,6 @@ workspaces.route('/:id', one)
 
 // ---- top-level API ----------------------------------------------------------
 export const api = new Hono()
-
-api.get('/api/mcp', async c => {
-  return c.json(await getUserMcpStatus())
-})
 
 api.route('/api/workspaces', workspaces)
 

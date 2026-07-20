@@ -23,10 +23,9 @@ type WorkspaceLayoutContextValue = {
   // Custom workspace icon (base64 data URL), or null to use the provider icon.
   icon: string | null
   cwd: string | null
-  // The agent backend (claude-code / openclaw …). Exposed here so
-  // components like McpMenu read it from the shared layout query instead of
-  // spawning their own observer (a second observer that remounts would trigger
-  // `refetchOnMount` and clobber an in-flight optimistic layout update).
+  // The agent backend (claude-code / openclaw …). Exposed here so descendants
+  // can reuse the shared layout query instead of spawning another observer
+  // that could refetch on mount and clobber an optimistic layout update.
   provider: WorkspaceType | null
   // The workspace's registry id (the route param), so descendants can key
   // their own queries (e.g. the model picker) without prop-drilling.

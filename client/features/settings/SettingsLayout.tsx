@@ -9,8 +9,8 @@ type SettingsPageProps = {
 export function SettingsPage({ title, description, children }: SettingsPageProps) {
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+      <header className="flex flex-col gap-0.5">
+        <h2 className="text-lg font-medium tracking-tight">{title}</h2>
         {description && <p className="text-sm text-muted-foreground">{description}</p>}
       </header>
       {children}
