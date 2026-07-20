@@ -122,13 +122,15 @@ export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: 
       <DropdownMenuTrigger
         render={
           <Button variant="ghost">
-            <span className="text-foreground">
+            <span className="font-normal text-foreground">
               {headline(model.description) || model.displayName}
             </span>
             {currentEffort && (
-              <span className="text-muted-foreground">{effortLabel(currentEffort)}</span>
+              <span className="font-normal text-muted-foreground">
+                {effortLabel(currentEffort)}
+              </span>
             )}
-            <IconChevronDown stroke={1.5} />
+            <IconChevronDown stroke={1.5} className="text-muted-foreground" />
           </Button>
         }
       />

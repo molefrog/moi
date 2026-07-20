@@ -1,6 +1,21 @@
-import { expect, test } from 'bun:test'
+import { afterEach, beforeEach, expect, test } from 'bun:test'
 
 import { api } from './api'
+import { claudeCodeHarness } from './harness/claude-code'
+import { codexHarness } from './harness/codex'
+
+const originalClaudeAvailability = claudeCodeHarness.availability
+const originalCodexAvailability = codexHarness.availability
+
+beforeEach(() => {
+  claudeCodeHarness.availability = async () => ({ available: true })
+  codexHarness.availability = async () => ({ available: true })
+})
+
+afterEach(() => {
+  claudeCodeHarness.availability = originalClaudeAvailability
+  codexHarness.availability = originalCodexAvailability
+})
 
 function createWorkspace(type: unknown) {
   return api.request('/api/workspaces/create', {
@@ -35,4 +50,30 @@ test('creating a workspace rejects a provider that only supports discovery', asy
   expect(await response.text()).toBe(
     'Workspaces of this type arrive through discovery, not creation'
   )
+})
+
+test('setup info reports Claude and Codex availability from their harnesses', async () => {
+  claudeCodeHarness.availability = async () => ({
+    available: false,
+    reason: 'Install Claude'
+  })
+  codexHarness.availability = async () => ({
+    available: false,
+    reason: 'Install Codex'
+  })
+
+  const response = await api.request('/api/workspaces/create')
+  const body = (await response.json()) as {
+    availability: Record<string, { available: boolean; reason?: string }>
+  }
+
+  expect(response.status).toBe(200)
+  expect(body.availability['claude-code']).toEqual({
+    available: false,
+    reason: 'Install Claude'
+  })
+  expect(body.availability.codex).toEqual({
+    available: false,
+    reason: 'Install Codex'
+  })
 })

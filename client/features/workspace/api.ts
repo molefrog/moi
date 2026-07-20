@@ -26,9 +26,9 @@ export function useWorkspaceLayout(workspaceId: string) {
   })
 }
 
-// Is the workspace's agent backend usable right now (e.g. codex CLI
-// installed)? Drives the chat's warning banner. Refetches on window focus so
-// installing the missing runtime and returning to the tab clears the banner.
+// Is the workspace's agent executable installed? Drives the Send button's
+// disabled state and tooltip. Refetches on window focus so installing the
+// missing runtime and returning to the tab unlocks the composer.
 export function useWorkspaceAvailability(workspaceId: string) {
   return useQuery<HarnessAvailability>({
     queryKey: workspaceKeys.availability(workspaceId),

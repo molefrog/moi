@@ -799,8 +799,8 @@ async function workspaceTypeAvailability(type: WorkspaceType): Promise<HarnessAv
   return (await harnessFor(type).availability?.()) ?? { available: true }
 }
 
-// Per-backend runtime availability (e.g. is the codex CLI installed?), keyed
-// by workspace type. Harnesses without the hook are always available.
+// Per-backend runtime availability, keyed by workspace type. Harnesses without
+// the hook are always available.
 async function harnessAvailability(): Promise<Record<string, HarnessAvailability>> {
   const out: Record<string, HarnessAvailability> = {}
   for (const h of allHarnesses()) {

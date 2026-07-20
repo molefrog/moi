@@ -275,10 +275,11 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     dismissError
   } = useChat()
   const { layout, setLayout, name, icon, provider, workspaceId } = useWorkspaceLayoutCtx()
-  // Backend runtime problem (e.g. the codex CLI is missing) — surfaced as a
-  // persistent banner above the composer in every chat surface.
+  // Keep the composer read/write, but block sends when its agent executable is
+  // missing. The Send button explains how to install it.
   const availability = useWorkspaceAvailability(workspaceId).data
-  const warning = availability && !availability.available ? availability.reason : null
+  const unavailableReason =
+    availability === undefined ? undefined : availability.available ? null : availability.reason
   const builderActions = useViewBuilderActions()
   const { ref: rowRef, fits: canUseSplit } = useFitsSplitLayout<HTMLDivElement>()
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
@@ -529,7 +530,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       processing={processing}
       error={error}
       onDismissError={dismissError}
-      warning={warning}
+      unavailableReason={unavailableReason}
       send={send}
       stop={stop}
       onSwitchThread={switchThread}
@@ -546,7 +547,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       processing={processing}
       error={error}
       onDismissError={dismissError}
-      warning={warning}
+      unavailableReason={unavailableReason}
       send={send}
       stop={stop}
       onSwitchThread={switchThread}
@@ -676,7 +677,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               processing={processing}
               error={error}
               onDismissError={dismissError}
-              warning={warning}
+              unavailableReason={unavailableReason}
               send={send}
               stop={stop}
               onSwitchThread={switchThread}

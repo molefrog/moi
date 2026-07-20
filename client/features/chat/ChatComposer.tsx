@@ -22,12 +22,22 @@ import {
 
 import { ModelPicker } from './ModelPicker'
 import { Button } from '@/client/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 
 type ChatComposerProps = {
   composerRef: RefObject<HTMLTextAreaElement | null>
   onSend: (text: string) => void
   onStop: () => void
   processing: boolean
+  unavailableReason: string | null | undefined
+}
+
+export function canSendChatMessage(
+  hasContent: boolean,
+  uploading: boolean,
+  unavailableReason: string | null | undefined
+): boolean {
+  return hasContent && !uploading && unavailableReason === null
 }
 
 // The composer owns the draft: it reads/writes the per-thread draft in the live
@@ -35,7 +45,13 @@ type ChatComposerProps = {
 // panel, message list, or surrounding workspace. The draft is keyed by the
 // active thread, so switching threads swaps the unsent text with you. Attachments
 // (drag/drop, paste, attach button) are tracked the same way and cleared on send.
-export function ChatComposer({ composerRef, onSend, onStop, processing }: ChatComposerProps) {
+export function ChatComposer({
+  composerRef,
+  onSend,
+  onStop,
+  processing,
+  unavailableReason
+}: ChatComposerProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const workspaceId = useWorkspaceId()
   const sessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
@@ -45,7 +61,11 @@ export function ChatComposer({ composerRef, onSend, onStop, processing }: ChatCo
 
   const uploading = attachments.some(a => a.status === 'uploading')
   const hasReady = attachments.some(a => a.status === 'ready')
-  const canSend = (value.trim().length > 0 || hasReady) && !uploading
+  const canSend = canSendChatMessage(
+    value.trim().length > 0 || hasReady,
+    uploading,
+    unavailableReason
+  )
 
   const onChange = (next: string) => liveStore.getState().setDraft(workspaceId, sessionId, next)
 
@@ -88,6 +108,12 @@ export function ChatComposer({ composerRef, onSend, onStop, processing }: ChatCo
     // re-renders empty under the new key. (Attachments are cleared by `send`.)
     liveStore.getState().setDraft(workspaceId, sessionId, '')
   }
+
+  const sendButton = (
+    <Button type="submit" size="icon" disabled={!canSend} aria-label="Send message">
+      <IconArrowUp stroke={1.5} />
+    </Button>
+  )
 
   return (
     <Composer
@@ -175,10 +201,13 @@ export function ChatComposer({ composerRef, onSend, onStop, processing }: ChatCo
           <Button type="button" size="icon" onClick={onStop} aria-label="Stop agent">
             <IconPlayerStop stroke={1.5} />
           </Button>
+        ) : unavailableReason ? (
+          <Tooltip>
+            <TooltipTrigger render={<span className="inline-flex">{sendButton}</span>} />
+            <TooltipContent className="max-w-64 text-center">{unavailableReason}</TooltipContent>
+          </Tooltip>
         ) : (
-          <Button type="submit" size="icon" disabled={!canSend} aria-label="Send message">
-            <IconArrowUp stroke={1.5} />
-          </Button>
+          sendButton
         )}
       </ComposerFooter>
     </Composer>

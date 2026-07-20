@@ -35,6 +35,7 @@ import {
   renameViewBuilderSession
 } from '../../view-builders'
 import { resolveWorkspaceEnv } from '../../workspace-env'
+import { requireHarnessExecutable } from '../executable'
 
 // Media types Claude vision accepts; uploads.ts guarantees every image upload is
 // normalized to one of these, so the cast on `media_type` below is sound.
@@ -526,6 +527,7 @@ function createLiveSession(input: {
   const abort = new AbortController()
   const options: Options = {
     abortController: abort,
+    pathToClaudeCodeExecutable: requireHarnessExecutable('claude-code'),
     // Generous: one query() spans the whole live session (many turns). On end
     // (limit hit / closed / error) the session is torn down and the next
     // message recreates it via resume.

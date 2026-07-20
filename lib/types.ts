@@ -347,10 +347,10 @@ export type WorkspaceSwitchMessage = {
 
 export type WorkspaceType = 'claude-code' | 'openclaw' | 'codex'
 
-// Whether an agent backend's runtime is usable on this machine (e.g. the codex
-// CLI binary is installed). `reason` is user-facing copy explaining what to do
-// next. Surfaced by GET /api/workspaces/create (per-type map, drives the
-// create dialog) and GET /api/workspaces/:id/availability (chat banner).
+// Whether an agent backend's runtime is installed on this machine. `reason` is
+// user-facing copy explaining what to do next. Surfaced by
+// GET /api/workspaces/create (per-type map, drives setup dialogs) and
+// GET /api/workspaces/:id/availability (disables Send in existing workspaces).
 export type HarnessAvailability = { available: true } | { available: false; reason: string }
 
 // One MCP server's connection status, as surfaced by GET /api/workspaces/:id/mcp

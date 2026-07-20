@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import type { McpServer } from '@/lib/types'
 
 import type { DiscoveredWorkspaceCandidate, Harness } from '../types'
+import { pathHarnessAvailability } from '../executable'
 import { getMcpStatus } from './mcp'
 import { getClaudeModels } from './models'
 import {
@@ -82,6 +83,7 @@ export const claudeCodeHarness: Harness = {
   // fields are ignored by the client) — pass it through unchanged.
   mcpStatus: async ws => (await getMcpStatus(ws.path, 'project')) as unknown as McpServer[],
   discoverWorkspaces,
+  availability: async () => pathHarnessAvailability('claude-code'),
 
   onEnvChanged: workspacePath => restartWorkspaceSessions(workspacePath),
   shutdown: () => killAllCCSessions(),
