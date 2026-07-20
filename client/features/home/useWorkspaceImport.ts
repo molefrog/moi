@@ -4,23 +4,10 @@ import { useImportWorkspace } from './api'
 import { orderWorkspaceTypes } from '@/lib/workspace-types'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
-const UNDETECTED_IMPORT_TYPES: WorkspaceType[] = ['claude-code', 'codex']
+const DEFAULT_IMPORT_TYPE: WorkspaceType = 'claude-code'
 
-export function workspaceImportTypes(workspace: DiscoveredWorkspace): WorkspaceType[] {
-  return workspace.types.length > 0
-    ? orderWorkspaceTypes(workspace.types)
-    : [...UNDETECTED_IMPORT_TYPES]
-}
-
-export type WorkspaceImportDecision =
-  | { kind: 'direct'; type: WorkspaceType }
-  | { kind: 'choose'; types: WorkspaceType[]; selectedType: WorkspaceType }
-
-export function workspaceImportDecision(workspace: DiscoveredWorkspace): WorkspaceImportDecision {
-  const types = workspaceImportTypes(workspace)
-  return types.length === 1
-    ? { kind: 'direct', type: types[0] }
-    : { kind: 'choose', types, selectedType: types[0] }
+export function workspaceImportDefaultType(workspace: DiscoveredWorkspace): WorkspaceType {
+  return orderWorkspaceTypes(workspace.types)[0] ?? DEFAULT_IMPORT_TYPE
 }
 
 type UseWorkspaceImportProps = {
@@ -29,7 +16,6 @@ type UseWorkspaceImportProps = {
 
 type WorkspaceImportChoice = {
   workspace: DiscoveredWorkspace
-  types: WorkspaceType[]
   selectedType: WorkspaceType
 }
 
@@ -46,21 +32,12 @@ export function useWorkspaceImport({ onSuccess }: UseWorkspaceImportProps) {
     )
   }
 
-  function startImport(workspace: DiscoveredWorkspace): WorkspaceImportDecision {
+  function startImport(workspace: DiscoveredWorkspace) {
     mutation.reset()
-    const decision = workspaceImportDecision(workspace)
-    if (decision.kind === 'direct') {
-      setChoice(null)
-      addWorkspace(workspace, decision.type)
-      return decision
-    }
-
     setChoice({
       workspace,
-      types: decision.types,
-      selectedType: decision.selectedType
+      selectedType: workspaceImportDefaultType(workspace)
     })
-    return decision
   }
 
   function confirmImport() {
@@ -70,7 +47,7 @@ export function useWorkspaceImport({ onSuccess }: UseWorkspaceImportProps) {
 
   function setSelectedType(type: WorkspaceType) {
     setChoice(current => {
-      if (!current?.types.includes(type)) return current
+      if (!current) return current
       return { ...current, selectedType: type }
     })
   }

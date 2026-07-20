@@ -6,20 +6,8 @@ import {
   WorkspaceTypeIcon,
   workspaceTypeLabel
 } from '@/client/features/home/workspace-presentation'
+import type { WorkspaceAgentOption } from '@/client/features/home/workspace-agent-options'
 import type { WorkspaceType } from '@/lib/types'
-
-export const workspaceAgentDescription: Record<WorkspaceType, string> = {
-  'claude-code': 'By Anthropic',
-  codex: 'By OpenAI',
-  openclaw: 'Open-source'
-}
-
-export type WorkspaceAgentOption = {
-  type: WorkspaceType
-  description: string
-  disabled?: boolean
-  lockedDescription?: string
-}
 
 type WorkspaceAgentSelectorProps = {
   options: WorkspaceAgentOption[]

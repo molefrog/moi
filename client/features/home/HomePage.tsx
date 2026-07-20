@@ -3,7 +3,12 @@ import { useState } from 'react'
 import { IconChevronRight, IconEggCracked, IconLoader2, IconPlus } from '@tabler/icons-react'
 import { Link, useLocation } from 'wouter'
 
-import { useDiscoveredWorkspaces, useWorkspacePreview, useWorkspaces } from './api'
+import {
+  useDiscoveredWorkspaces,
+  useWorkspacePreview,
+  useWorkspaces,
+  useWorkspaceSetupInfo
+} from './api'
 import { HomeLogo } from './HomeLogo'
 import { useWorkspaceImport } from './useWorkspaceImport'
 import { WorkspaceImportDialog } from './WorkspaceImportDialog'
@@ -29,6 +34,7 @@ export function HomePage() {
   const [, navigate] = useLocation()
   const workspacesQuery = useWorkspaces()
   const discoveredQuery = useDiscoveredWorkspaces()
+  const setupInfo = useWorkspaceSetupInfo()
   const importFlow = useWorkspaceImport({
     onSuccess: entry => navigate(`/workspace/${entry.id}`)
   })
@@ -57,8 +63,8 @@ export function HomePage() {
   const count = workspaces.length
 
   function handleAdd(suggestion: DiscoveredWorkspace) {
-    const decision = importFlow.startImport(suggestion)
-    if (decision.kind === 'choose') setImportDialogOpen(true)
+    importFlow.startImport(suggestion)
+    setImportDialogOpen(true)
   }
 
   function handleImportDialogOpenChange(nextOpen: boolean) {
@@ -154,8 +160,9 @@ export function HomePage() {
       {importFlow.choice && (
         <WorkspaceImportDialog
           open={importDialogOpen}
-          types={importFlow.choice.types}
+          detectedTypes={importFlow.choice.workspace.types}
           selectedType={importFlow.choice.selectedType}
+          availability={setupInfo.data?.availability}
           isPending={importFlow.isPending}
           errorMessage={importFlow.error?.message}
           onOpenChange={handleImportDialogOpenChange}

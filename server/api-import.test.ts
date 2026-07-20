@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import type { WorkspaceEntry } from '@/lib/types'
 
 import { api } from './api'
+import { codexHarness } from './harness/codex'
 import { DEFAULT_REGISTRY_PATH, setRegistryPath } from './registry'
 
 let tempDir: string
@@ -49,5 +50,28 @@ describe('workspace import provider', () => {
 
     expect(response.status).toBe(400)
     expect(await response.text()).toBe('Unknown workspace type')
+  })
+
+  test('rejects an unavailable provider before provisioning', async () => {
+    const originalAvailability = codexHarness.availability
+    codexHarness.availability = async () => ({
+      available: false,
+      reason: 'Codex CLI not found'
+    })
+    const workspacePath = join(tempDir, 'workspace')
+
+    try {
+      const response = await api.request('/api/workspaces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: workspacePath, type: 'codex' })
+      })
+
+      expect(response.status).toBe(400)
+      expect(await response.text()).toContain('Codex CLI not found')
+      expect(await Bun.file(join(workspacePath, '.moi', 'package.json')).exists()).toBe(false)
+    } finally {
+      codexHarness.availability = originalAvailability
+    }
   })
 })

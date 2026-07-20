@@ -65,7 +65,7 @@ export type ImportWorkspaceInput = {
   type: WorkspaceType
 }
 
-export type CreateWorkspaceInfo = {
+export type WorkspaceSetupInfo = {
   root: string
   displayRoot: string
   canChooseFolder: boolean
@@ -74,9 +74,9 @@ export type CreateWorkspaceInfo = {
   availability?: Partial<Record<WorkspaceType, HarnessAvailability>>
 }
 
-export function useCreateWorkspaceInfo() {
-  return useQuery<CreateWorkspaceInfo>({
-    queryKey: workspaceKeys.createInfo,
+export function useWorkspaceSetupInfo() {
+  return useQuery<WorkspaceSetupInfo>({
+    queryKey: workspaceKeys.setupInfo,
     // Availability can change while the app is open (the user installs the
     // codex CLI) — refetch on mount instead of caching forever.
     queryFn: () => requestJson('/api/workspaces/create'),
