@@ -41,7 +41,12 @@ type MarkdownContentProps = {
 
 export function MarkdownContent({ size = 'sm', content }: MarkdownContentProps) {
   return (
-    <div className={cn('prose prose-inherit', size === 'sm' && 'prose-sm')}>
+    <div
+      className={cn(
+        'prose max-w-full min-w-0 wrap-anywhere prose-inherit',
+        size === 'sm' && 'prose-sm'
+      )}
+    >
       <ReactMarkdown
         remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePlugins}
