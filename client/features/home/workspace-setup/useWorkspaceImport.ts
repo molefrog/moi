@@ -1,20 +1,18 @@
 import { useState } from 'react'
 
-import { useImportWorkspace } from './api'
-import { orderWorkspaceTypes } from '@/lib/workspace-types'
+import { useImportWorkspace } from '../api'
+import { WORKSPACE_TYPE_ORDER, orderWorkspaceTypes } from '@/lib/workspace-types'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
-const DEFAULT_IMPORT_TYPE: WorkspaceType = 'claude-code'
-
 export function workspaceImportDefaultType(workspace: DiscoveredWorkspace): WorkspaceType {
-  return orderWorkspaceTypes(workspace.types)[0] ?? DEFAULT_IMPORT_TYPE
+  return orderWorkspaceTypes(workspace.types)[0] ?? WORKSPACE_TYPE_ORDER[0]
 }
 
 type UseWorkspaceImportProps = {
   onSuccess: (entry: WorkspaceEntry) => void
 }
 
-type WorkspaceImportChoice = {
+export type WorkspaceImportChoice = {
   workspace: DiscoveredWorkspace
   selectedType: WorkspaceType
 }
@@ -22,15 +20,6 @@ type WorkspaceImportChoice = {
 export function useWorkspaceImport({ onSuccess }: UseWorkspaceImportProps) {
   const mutation = useImportWorkspace()
   const [choice, setChoice] = useState<WorkspaceImportChoice | null>(null)
-
-  function addWorkspace(workspace: DiscoveredWorkspace, type: WorkspaceType) {
-    mutation.mutate(
-      { path: workspace.path, type },
-      {
-        onSuccess
-      }
-    )
-  }
 
   function startImport(workspace: DiscoveredWorkspace) {
     mutation.reset()
@@ -40,16 +29,19 @@ export function useWorkspaceImport({ onSuccess }: UseWorkspaceImportProps) {
     })
   }
 
-  function confirmImport() {
-    if (!choice || mutation.isPending) return
-    addWorkspace(choice.workspace, choice.selectedType)
+  function selectType(type: WorkspaceType) {
+    setChoice(current => (current ? { ...current, selectedType: type } : current))
   }
 
-  function setSelectedType(type: WorkspaceType) {
-    setChoice(current => {
-      if (!current) return current
-      return { ...current, selectedType: type }
-    })
+  function submit() {
+    if (!choice || mutation.isPending) return
+    mutation.mutate(
+      {
+        path: choice.workspace.path,
+        type: choice.selectedType
+      },
+      { onSuccess }
+    )
   }
 
   function reset() {
@@ -61,10 +53,9 @@ export function useWorkspaceImport({ onSuccess }: UseWorkspaceImportProps) {
     choice,
     isPending: mutation.isPending,
     error: mutation.error,
-    importingPath: mutation.isPending ? mutation.variables?.path : undefined,
     startImport,
-    setSelectedType,
-    confirmImport,
+    selectType,
+    submit,
     reset
   }
 }
