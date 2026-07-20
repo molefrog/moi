@@ -60,6 +60,7 @@ export function WorkspaceAgentStep({
     if (!state || state.available) return option
     return { ...option, hint: state.reason, disabled: true }
   })
+  const selectedUnavailable = options.find(option => option.type === type)?.disabled === true
 
   return (
     <div className="flex flex-col gap-5">
@@ -91,7 +92,7 @@ export function WorkspaceAgentStep({
           disabled={isPending}
           onClick={onUseExisting}
         />
-        <Button onClick={onContinue} disabled={isPending}>
+        <Button onClick={onContinue} disabled={isPending || selectedUnavailable}>
           Next
         </Button>
       </div>
