@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { getWorkspaceAgentOptions, isWorkspaceAgentDisabled } from './WorkspaceAgentStep'
+import { getWorkspaceAgentOptions, resolveWorkspaceAgentSelection } from './WorkspaceAgentStep'
 
 describe('getWorkspaceAgentOptions', () => {
   test('returns every agent in canonical order', () => {
@@ -33,7 +33,6 @@ describe('getWorkspaceAgentOptions', () => {
       disabled: true,
       disabledReason: input.reason
     })
-    expect(isWorkspaceAgentDisabled(options, input.type)).toBe(true)
   })
 
   test('locks OpenClaw when it was not detected', () => {
@@ -53,5 +52,33 @@ describe('getWorkspaceAgentOptions', () => {
       description: 'Open-source',
       disabled: false
     })
+  })
+
+  test('falls back to the first unlocked agent when the selection is locked', () => {
+    const options = getWorkspaceAgentOptions({
+      availability: {
+        'claude-code': { available: false, reason: 'Install Claude' },
+        codex: { available: true }
+      }
+    })
+
+    expect(resolveWorkspaceAgentSelection(options, 'claude-code')).toBe('codex')
+  })
+
+  test('keeps an unlocked selection and returns nothing when every agent is locked', () => {
+    const options = getWorkspaceAgentOptions({
+      availability: {
+        'claude-code': { available: false, reason: 'Install Claude' },
+        codex: { available: false, reason: 'Install Codex' }
+      }
+    })
+
+    expect(resolveWorkspaceAgentSelection(options, 'codex')).toBeUndefined()
+    expect(
+      resolveWorkspaceAgentSelection(
+        getWorkspaceAgentOptions({ detectedTypes: ['openclaw'] }),
+        'openclaw'
+      )
+    ).toBe('openclaw')
   })
 })

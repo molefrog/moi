@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { type ReactNode, useEffect } from 'react'
 
 import { IconCircleCheckFilled } from '@tabler/icons-react'
 
@@ -55,11 +55,13 @@ export function getWorkspaceAgentOptions({
   })
 }
 
-export function isWorkspaceAgentDisabled(
+export function resolveWorkspaceAgentSelection(
   options: WorkspaceAgentOption[],
-  type: WorkspaceType
-): boolean {
-  return options.find(option => option.type === type)?.disabled === true
+  selectedType: WorkspaceType
+): WorkspaceType | undefined {
+  const selected = options.find(option => option.type === selectedType)
+  if (selected && !selected.disabled) return selected.type
+  return options.find(option => !option.disabled)?.type
 }
 
 type WorkspaceAgentStepProps = {
@@ -90,7 +92,12 @@ export function WorkspaceAgentStep({
   onSubmit
 }: WorkspaceAgentStepProps) {
   const options = getWorkspaceAgentOptions({ availability, detectedTypes })
-  const selectedUnavailable = isWorkspaceAgentDisabled(options, selectedType)
+  const selectableType = resolveWorkspaceAgentSelection(options, selectedType)
+  const selectedUnavailable = selectableType !== selectedType
+
+  useEffect(() => {
+    if (selectableType && selectedUnavailable) onTypeChange(selectableType)
+  }, [onTypeChange, selectableType, selectedUnavailable])
 
   return (
     <div className="flex flex-col gap-5">
@@ -101,7 +108,7 @@ export function WorkspaceAgentStep({
 
       <WorkspaceAgentSelector
         options={options}
-        selectedType={selectedType}
+        selectedType={selectedUnavailable ? undefined : selectedType}
         onTypeChange={onTypeChange}
       />
 
@@ -123,7 +130,7 @@ export function WorkspaceAgentStep({
 
 type WorkspaceAgentSelectorProps = {
   options: WorkspaceAgentOption[]
-  selectedType: WorkspaceType
+  selectedType?: WorkspaceType
   onTypeChange: (type: WorkspaceType) => void
 }
 
