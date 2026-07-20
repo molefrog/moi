@@ -283,8 +283,8 @@ describe('discovery mappings', () => {
     expect(model).toEqual({
       value: 'gpt-5.6-sol',
       resolvedModel: 'gpt-5.6-sol',
-      displayName: 'GPT-5.6-Sol',
-      description: 'GPT-5.6-Sol · Latest frontier model.',
+      displayName: '5.6 Sol',
+      description: '5.6 Sol · Latest frontier model.',
       supportsEffort: true,
       supportedEffortLevels: ['low', 'high']
     })
