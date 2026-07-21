@@ -22,9 +22,15 @@ describe('moi context envelope', () => {
 
   test('describes tabs with their UI labels', () => {
     expect(renderMoiContext({ activeTab: 'view:crm' })).toContain(
-      'The user is on the "crm" view tab.'
+      'The user is on the "crm" view tab (.moi/views/crm.tsx).'
     )
     expect(renderMoiContext({ activeTab: 'agent' })).toContain('The user is on the "Agent" tab.')
+  })
+
+  test('a view tab with a configured title names both title and file', () => {
+    expect(
+      renderMoiContext({ activeTab: 'view:color-studio', tabTitle: 'Grading review' })
+    ).toContain('The user is on the "Grading review" view tab (.moi/views/color-studio.tsx).')
   })
 
   test('append + strip round-trips the user text', () => {
