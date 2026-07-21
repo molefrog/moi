@@ -1,14 +1,15 @@
 // The moi context envelope: ambient workspace state that rides along with
 // every user message so the agent knows it is running inside a moi workspace
 // and what the user is looking at. Everything about the envelope lives here —
-// the structured form the client builds, the rendered `<moi-context>` text,
-// the per-harness injection transforms, and the strip used to keep the
-// envelope out of chat bubbles.
+// the structured `MoiContext` form, the rendered `<moi-context>` text, the
+// per-harness injection transforms, and the strip used to keep the envelope
+// out of chat bubbles.
 //
-// Flow: the client builds `MoiContext` at send time, renders it with
-// `renderMoiContext`, and sends the text on the chat frame (`context`). Each
-// harness injects it into the outgoing message with the transform matching
-// its conventions:
+// Flow: a `MoiContext` is built at send time — by the client for chat sends
+// (chat frame `context`), by the server for view-builder requests — rendered
+// with `renderMoiContext`, and handed to the harness as text. Each harness
+// injects it into the outgoing message with the transform matching its
+// conventions:
 //   - Claude Code  — `wrapMoiContextSystemReminder` + prepended to the text
 //     (mirrors how Claude Code itself injects ambient context)
 //   - Codex — native `turn/start.additionalContext` (`unwrapMoiContext` body,
