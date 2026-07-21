@@ -5,16 +5,16 @@
 // per-harness injection transforms, and the strip used to keep the envelope
 // out of chat bubbles.
 //
-// Flow: a `MoiContext` is built at send time — by the client for chat sends
-// (chat frame `context`), by the server for view-builder requests — rendered
-// with `renderMoiContext`, and handed to the harness as text. Each harness
-// injects it into the outgoing message with the transform matching its
-// conventions:
+// Flow: a structured `MoiContext` is assembled at send time — by the client
+// for chat sends (client/features/workspace/moi-context.ts, sent as the chat
+// frame's `context`), by the server for view-builder requests — and travels
+// structured all the way to the harness, which renders it with the transform
+// matching its conventions:
 //   - Claude Code  — `moiContextSystemReminder` as its own leading text block
 //     (mirrors how Claude Code itself injects ambient context; a string
 //     prefix would defeat the SDK's first-prompt extraction, which skips
 //     tag-leading text)
-//   - Codex — native `turn/start.additionalContext` (`unwrapMoiContext` body,
+//   - Codex — native `turn/start.additionalContext` (`renderMoiContextBody`,
 //     the entry key becomes the tag) on servers >= 0.135; `appendMoiContext`
 //     fallback below that
 //   - OpenClaw — `appendMoiContext` after the user's text
@@ -69,9 +69,11 @@ function describeTab(tab: WorkspaceTabId, title?: string): string {
 // Format (modeled on Claude Code's system-reminder context blocks): a short
 // orientation preamble with the skill pointer, `# Section` headers with
 // complete sentences under them, and an IMPORTANT footer with handling rules.
-export function renderMoiContext(ctx: MoiContext): string {
+// The body renderer exists for transports that supply their own tag — Codex
+// `additionalContext` renders the entry key as the tag, so shipping the
+// wrapped text would double-wrap it.
+export function renderMoiContextBody(ctx: MoiContext): string {
   const preamble = [
-    MOI_CONTEXT_OPEN,
     `${MOI_CONTEXT_MARKER} — a shared UI the user chats with you from, which you can extend and customize.`,
     'If you have not read the **`moi-workspace` skill** in this chat, read it before acting.'
   ].join('\n')
@@ -81,10 +83,25 @@ export function renderMoiContext(ctx: MoiContext): string {
   }
   const footer = [
     'IMPORTANT: This context comes from moi, not from the user, and the user does not see it.',
-    'Only the newest of these blocks is current. Do not respond to it directly, and omit it from summaries and compaction.',
-    MOI_CONTEXT_CLOSE
+    'Only the newest of these blocks is current. Do not respond to it directly, and omit it from summaries and compaction.'
   ].join('\n')
   return [preamble, ...sections, footer].join('\n\n')
+}
+
+export function renderMoiContext(ctx: MoiContext): string {
+  return `${MOI_CONTEXT_OPEN}\n${renderMoiContextBody(ctx)}\n${MOI_CONTEXT_CLOSE}`
+}
+
+// Wire-shape guard for the chat frame's `context` field (see web.ts).
+export function isMoiContext(value: unknown): value is MoiContext {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as { activeTab?: unknown; tabTitle?: unknown; directives?: unknown }
+  return (
+    typeof v.activeTab === 'string' &&
+    (v.tabTitle === undefined || typeof v.tabTitle === 'string') &&
+    (v.directives === undefined ||
+      (Array.isArray(v.directives) && v.directives.every(d => typeof d === 'string')))
+  )
 }
 
 // Claude Code: the envelope rides as its OWN text block wrapped in
@@ -100,17 +117,6 @@ export function moiContextSystemReminder(contextText: string): string {
 // after the user's text.
 export function appendMoiContext(text: string, contextText: string): string {
   return text ? `${text}\n\n${contextText}` : contextText
-}
-
-// The envelope body without the wrapper tag, for transports that supply their
-// own tag — Codex `turn/start.additionalContext` renders the entry key as the
-// tag, so shipping the wrapped text would double-wrap it.
-export function unwrapMoiContext(contextText: string): string {
-  const t = contextText.trim()
-  if (t.startsWith(MOI_CONTEXT_OPEN) && t.endsWith(MOI_CONTEXT_CLOSE)) {
-    return t.slice(MOI_CONTEXT_OPEN.length, -MOI_CONTEXT_CLOSE.length).trim()
-  }
-  return t
 }
 
 // Remove the envelope (and, for Claude Code transcripts, its enclosing

@@ -12,7 +12,7 @@
 //   - Disk persistence — the gateway is the source of truth; we re-seed from
 //     `sessions.get` on cold start.
 import { appendAttachmentNote } from '@/lib/attachment-note'
-import { appendMoiContext } from '@/lib/moi-context'
+import { type MoiContext, appendMoiContext, renderMoiContext } from '@/lib/moi-context'
 import { applyEvent, emptyViewState } from '@/lib/format'
 import type { SessionActivity, StreamEvent, ViewState } from '@/lib/types'
 
@@ -415,10 +415,10 @@ export async function sendOpenClawMessage(input: {
   // (see dev/file-uploads.md).
   attachments?: string[]
   optimisticId?: string
-  // Rendered `<moi-context>` envelope (lib/moi-context.ts). Appended to the
-  // gateway message only — `content` stays clean so the optimistic-id echo
+  // Structured moi context (lib/moi-context.ts), rendered and appended at
+  // the gateway send only — `content` stays clean so the optimistic-id echo
   // rendezvous keeps matching on the user's text.
-  context?: string
+  context?: MoiContext
 }): Promise<void> {
   // Fold any attachments into the message text as file-path references.
   let content = input.content
@@ -445,7 +445,7 @@ async function sendOpenClawMessageImpl(input: {
   isNew: boolean
   content: string
   optimisticId?: string
-  context?: string
+  context?: MoiContext
 }): Promise<void> {
   // New threads: ask the gateway to create one, then rename the client's
   // tentative UUID to the real session id. Mirrors the Claude Code flow
@@ -512,7 +512,9 @@ async function sendOpenClawMessageImpl(input: {
     const gw = await getGateway()
     const resp = await gw.rpc<{ runId?: string; status?: string }>('sessions.send', {
       key: rec.sessionKey,
-      message: input.context ? appendMoiContext(input.content, input.context) : input.content
+      message: input.context
+        ? appendMoiContext(input.content, renderMoiContext(input.context))
+        : input.content
     })
     if (resp?.runId) setProcessing(rec, true, resp.runId)
   } catch (err) {

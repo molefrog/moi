@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 
 import type { UploadInfo, ViewBuilderInput, WorkspaceEntry, WorkspaceModels } from '@/lib/types'
-import { renderMoiContext } from '@/lib/moi-context'
+import type { MoiContext } from '@/lib/moi-context'
 import { viewBuilderDirectives } from '@/lib/view-builder-directives'
 
 import { appletForModule, recordAppletError } from './applet-log'
@@ -237,10 +237,10 @@ one.post('/view-builders/:builderId/submit', async c => {
     // The bootstrap instructions ride the moi-context envelope, injected by
     // the harness like any other ambient context; the user text stays bare.
     // The user submits from the builder's own tab, so that's the active tab.
-    const context = renderMoiContext({
+    const context: MoiContext = {
       activeTab: `view-builder:${builder.id}`,
       directives: viewBuilderDirectives(builder.id, availableIcons)
-    })
+    }
     try {
       await harnessFor(ws).sendMessage({
         workspaceId: ws.id,

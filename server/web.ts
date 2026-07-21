@@ -1,4 +1,5 @@
 import type { ClientMessage, StatusSnapshotMessage } from '@/lib/types'
+import { isMoiContext } from '@/lib/moi-context'
 
 import index from '../client/index.html'
 import { api } from './api'
@@ -43,7 +44,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
       (v.model === undefined || typeof v.model === 'string') &&
       (v.effort === undefined || typeof v.effort === 'string') &&
       (v.stream === undefined || typeof v.stream === 'boolean') &&
-      (v.context === undefined || typeof v.context === 'string') &&
+      (v.context === undefined || isMoiContext(v.context)) &&
       (v.attachments === undefined ||
         (Array.isArray(v.attachments) && v.attachments.every(a => typeof a === 'string')))
     )

@@ -2,11 +2,12 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   appendMoiContext,
+  isMoiContext,
   moiContextSystemReminder,
   renderMoiContext,
+  renderMoiContextBody,
   stripMoiContext,
-  stripMoiContextLoose,
-  unwrapMoiContext
+  stripMoiContextLoose
 } from '@/lib/moi-context'
 
 describe('moi context envelope', () => {
@@ -69,14 +70,25 @@ describe('moi context envelope', () => {
     expect(stripMoiContext(appendMoiContext('Build it', rendered))).toBe('Build it')
   })
 
-  test('unwrap removes the wrapper tag and keeps the body', () => {
-    const body = unwrapMoiContext(context)
+  test('the body render is the envelope minus the wrapper tag', () => {
+    const body = renderMoiContextBody({ activeTab: 'scratchpad' })
     expect(body.startsWith('<moi-context>')).toBe(false)
-    expect(body.endsWith('</moi-context>')).toBe(false)
     expect(body).toContain('You are running in a `moi` workspace')
     expect(body).toContain('The user is on the "Scratchpad" tab.')
-    // Already-unwrapped text passes through.
-    expect(unwrapMoiContext(body)).toBe(body)
+    expect(renderMoiContext({ activeTab: 'scratchpad' })).toBe(
+      `<moi-context>\n${body}\n</moi-context>`
+    )
+  })
+
+  test('wire guard accepts valid shapes and rejects junk', () => {
+    expect(isMoiContext({ activeTab: 'scratchpad' })).toBe(true)
+    expect(isMoiContext({ activeTab: 'view:crm', tabTitle: 'CRM', directives: ['Do it.'] })).toBe(
+      true
+    )
+    expect(isMoiContext(undefined)).toBe(false)
+    expect(isMoiContext('rendered text')).toBe(false)
+    expect(isMoiContext({ tabTitle: 'CRM' })).toBe(false)
+    expect(isMoiContext({ activeTab: 'agent', directives: [1] })).toBe(false)
   })
 
   test('loose strip handles truncated envelopes in previews', () => {

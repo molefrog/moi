@@ -22,7 +22,7 @@ import { ATTACHMENT_ONLY_PLACEHOLDER, appendAttachmentNote } from '@/lib/attachm
 import { ClaudeAdapter } from './adapter'
 import type { Part } from '@/lib/format'
 import type { SessionActivity } from '@/lib/types'
-import { moiContextSystemReminder } from '@/lib/moi-context'
+import { type MoiContext, moiContextSystemReminder, renderMoiContext } from '@/lib/moi-context'
 
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
@@ -599,9 +599,9 @@ export async function sendCCMessage(input: {
   model?: string
   effort?: string
   stream?: boolean
-  // Rendered `<moi-context>` envelope (lib/moi-context.ts), injected as a
-  // leading system-reminder text block; the display parts never see it.
-  context?: string
+  // Structured moi context (lib/moi-context.ts), rendered here and injected
+  // as a leading system-reminder text block; the display parts never see it.
+  context?: MoiContext
 }): Promise<void> {
   // Resolve any attachments into agent content blocks + display parts. Unknown
   // or expired ids are silently dropped (resolveUploads filters them) — if that
@@ -618,7 +618,7 @@ export async function sendCCMessage(input: {
   // empty and drops it.
   const content: MessageContent = input.context
     ? [
-        { type: 'text', text: moiContextSystemReminder(input.context) },
+        { type: 'text', text: moiContextSystemReminder(renderMoiContext(input.context)) },
         ...(typeof userContent === 'string'
           ? [{ type: 'text' as const, text: userContent }]
           : userContent)

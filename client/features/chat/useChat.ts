@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useSessionView, useThreadConfig, useWorkspaceModels } from '@/client/features/chat/api'
-import { useWorkspaceViews } from '@/client/features/workspace/api'
+import { useMoiContext } from '@/client/features/workspace/moi-context'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { sendMessage } from '@/client/features/chat/chat-connection'
@@ -12,17 +12,9 @@ import { resolveChatRunOptions, startOptimisticTurn } from '@/client/features/ch
 import { buildPreviewTurn } from '@/client/features/chat/preview-turn'
 import { draftKey, liveStore, selectPreviews, useLive } from '@/client/features/chat/chat-store'
 import { emptyViewState } from '@/lib/format'
-import { renderMoiContext } from '@/lib/moi-context'
-import type { Part, ViewInfo, ViewState, WorkspaceTabId } from '@/lib/types'
+import type { Part, ViewState } from '@/lib/types'
 
 const EMPTY: ViewState = emptyViewState()
-
-// The configured title of the active view tab, undefined for other tabs or
-// an unset title (the envelope then falls back to the id, like the tab bar).
-function activeViewTitle(tab: WorkspaceTabId, views: ViewInfo[] | undefined): string | undefined {
-  if (!tab.startsWith('view:')) return undefined
-  return views?.find(v => v.id === tab.slice('view:'.length))?.config.title || undefined
-}
 
 // Thin projection over app-level state: the active thread + spinner/error come
 // from the live store; the transcript comes from the React Query cache (kept
@@ -32,9 +24,9 @@ export function useChat() {
   const qc = useQueryClient()
   const { layout } = useWorkspaceLayoutCtx()
   const modelsData = useWorkspaceModels(workspaceId).data
-  // For the context envelope: resolve the active view tab's configured title
-  // (the label the user sees) from the same views list the tab bar renders.
-  const views = useWorkspaceViews(workspaceId).data
+  // Snapshot of the workspace's ambient UI state + queued one-shot
+  // directives, taken when the message actually goes out.
+  const buildMoiContext = useMoiContext()
 
   const activeSessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
   const activity = useLive(s =>
@@ -126,10 +118,7 @@ export function useChat() {
         model,
         effort,
         stream,
-        context: renderMoiContext({
-          activeTab: layout.tabs.active,
-          tabTitle: activeViewTitle(layout.tabs.active, views)
-        }),
+        context: buildMoiContext(),
         ...(ready.length > 0 ? { attachments: ready.map(a => a.upload!.id) } : {})
       })
       if (isNew) {
@@ -146,8 +135,7 @@ export function useChat() {
       qc,
       layout.selectedModel,
       layout.selectedEffort,
-      layout.tabs.active,
-      views,
+      buildMoiContext,
       threadCfg?.model,
       threadCfg?.effort,
       modelsData

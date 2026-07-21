@@ -16,7 +16,12 @@
 //     `clientUserMessageId` as `clientId`, so the optimistic-id rendezvous is
 //     first-class (no text matching like OpenClaw needs).
 import { appendAttachmentNote } from '@/lib/attachment-note'
-import { appendMoiContext, unwrapMoiContext } from '@/lib/moi-context'
+import {
+  type MoiContext,
+  appendMoiContext,
+  renderMoiContext,
+  renderMoiContextBody
+} from '@/lib/moi-context'
 import { type Part, type SubagentRecord, type Turn, applyEvent, emptyViewState } from '@/lib/format'
 import type { SessionActivity, StreamEvent, ViewState } from '@/lib/types'
 
@@ -475,10 +480,11 @@ export async function sendCodexMessage(input: {
   model?: string
   effort?: string
   stream?: boolean
-  // Rendered `<moi-context>` envelope (lib/moi-context.ts). Servers >= 0.135
-  // take it via `additionalContext` (never enters userMessage items); older
-  // ones get it appended to the text item, stripped from echoes by the adapter.
-  context?: string
+  // Structured moi context (lib/moi-context.ts), rendered here. Servers
+  // >= 0.135 take it via `additionalContext` (never enters userMessage
+  // items); older ones get it appended to the text item, stripped from
+  // echoes by the adapter.
+  context?: MoiContext
 }): Promise<void> {
   const uploads = input.attachments?.length
     ? resolveUploads(input.workspaceId, input.attachments)
@@ -557,12 +563,13 @@ export async function sendCodexMessage(input: {
     // drop the field, so append to the text item there instead.
     const additionalContext =
       input.context && client.supportsAdditionalContext
-        ? { 'moi-context': { value: unwrapMoiContext(input.context), kind: 'application' } }
+        ? { 'moi-context': { value: renderMoiContextBody(input.context), kind: 'application' } }
         : undefined
     if (input.context && !additionalContext) {
+      const envelope = renderMoiContext(input.context)
       const last = userInput[userInput.length - 1]
-      if (last?.type === 'text') last.text = appendMoiContext(last.text, input.context)
-      else userInput.push({ type: 'text', text: input.context })
+      if (last?.type === 'text') last.text = appendMoiContext(last.text, envelope)
+      else userInput.push({ type: 'text', text: envelope })
     }
     const turnParams = {
       threadId: rec.sessionId,
