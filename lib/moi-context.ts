@@ -47,10 +47,10 @@ function describeTab(tab: WorkspaceTabId): string {
 export function renderMoiContext(ctx: MoiContext): string {
   return [
     MOI_CONTEXT_OPEN,
-    `${MOI_CONTEXT_MARKER} — snapshot at send time, not shown in the user's chat.`,
-    'Ephemeral: only the newest of these blocks is current — disregard older ones, and omit them entirely when summarizing or compacting this conversation.',
-    'This message was sent from a moi workspace. If you have not read the moi-workspace skill in this chat yet, read it before taking any action.',
+    `${MOI_CONTEXT_MARKER} — snapshot at send time, hidden from the user.`,
+    'You are running in a moi workspace. Read the moi-workspace skill before acting, if you have not yet.',
     `The user is on: ${describeTab(ctx.activeTab)}`,
+    'Only the newest of these blocks is current; omit them from summaries and compaction.',
     MOI_CONTEXT_CLOSE
   ].join('\n')
 }
