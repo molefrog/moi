@@ -1,9 +1,23 @@
 // Central assembly of the moi context sent with every chat message — the one
 // place that snapshots the workspace's primary UI state (active tab, view
-// titles) and drains queued one-shot directives. Any feature can contribute
-// from anywhere in the app via `pushMoiDirective`; the chat send path calls
-// the builder from `useMoiContext`. The structured `MoiContext` travels to
-// the server as-is; harnesses render it (lib/moi-context.ts).
+// titles) and drains queued one-shot directives. The structured `MoiContext`
+// travels to the server as-is; harnesses render it (lib/moi-context.ts).
+//
+// Quick API:
+//
+//   pushChatDirective(workspaceId, 'The user clicked "Sync now" on the stock-ticker widget.')
+//     Queue a one-shot instruction from anywhere in the app — event handlers,
+//     stores, non-React code. It rides the NEXT chat message's
+//     "# This message only" section and is delivered exactly once.
+//
+//   useMoiContext()
+//     Hook for the chat send path: returns a builder that snapshots ambient
+//     state (active tab, view title) and drains the directive queue. Call
+//     the builder only for a message that actually goes out.
+//
+//   Adding a new ambient field (e.g. scratchpad selection): extend the
+//   `MoiContext` type and its renderer in lib/moi-context.ts, then supply
+//   the field in `useMoiContext`'s builder below.
 import { useCallback } from 'react'
 
 import { useWorkspaceViews } from '@/client/features/workspace/api'
@@ -18,17 +32,16 @@ import type { ViewInfo, WorkspaceTabId } from '@/lib/types'
 // survive re-renders without causing any.
 const directiveQueues = new Map<string, string[]>()
 
-// Queue a one-shot instruction for the next message sent from `workspaceId`
-// (e.g. "The user clicked "Sync now" on the stock-ticker widget."). Write a
-// complete sentence; it reaches the agent once and is not re-sent.
-export function pushMoiDirective(workspaceId: string, directive: string): void {
+// Queue a one-shot instruction for the next message sent from `workspaceId`.
+// Write a complete sentence; it reaches the agent once and is not re-sent.
+export function pushChatDirective(workspaceId: string, directive: string): void {
   const queue = directiveQueues.get(workspaceId) ?? []
   queue.push(directive)
   directiveQueues.set(workspaceId, queue)
 }
 
 // Exported for unit tests; production code drains only via `useMoiContext`.
-export function drainMoiDirectives(workspaceId: string): string[] {
+export function drainChatDirectives(workspaceId: string): string[] {
   const queue = directiveQueues.get(workspaceId) ?? []
   directiveQueues.delete(workspaceId)
   return queue
@@ -54,7 +67,7 @@ export function useMoiContext(): () => MoiContext {
   const views = useWorkspaceViews(workspaceId).data
   const activeTab = layout.tabs.active
   return useCallback(() => {
-    const directives = drainMoiDirectives(workspaceId)
+    const directives = drainChatDirectives(workspaceId)
     return {
       activeTab,
       tabTitle: activeViewTitle(activeTab, views),

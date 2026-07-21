@@ -1,16 +1,16 @@
 import { describe, expect, test } from 'bun:test'
 
-import { activeViewTitle, drainMoiDirectives, pushMoiDirective } from './moi-context'
+import { activeViewTitle, drainChatDirectives, pushChatDirective } from './moi-context'
 import type { ViewInfo } from '@/lib/types'
 
 describe('moi context assembly', () => {
   test('directives queue per workspace and drain once, in order', () => {
-    pushMoiDirective('ws-1', 'First.')
-    pushMoiDirective('ws-1', 'Second.')
-    pushMoiDirective('ws-2', 'Other workspace.')
-    expect(drainMoiDirectives('ws-1')).toEqual(['First.', 'Second.'])
-    expect(drainMoiDirectives('ws-1')).toEqual([])
-    expect(drainMoiDirectives('ws-2')).toEqual(['Other workspace.'])
+    pushChatDirective('ws-1', 'First.')
+    pushChatDirective('ws-1', 'Second.')
+    pushChatDirective('ws-2', 'Other workspace.')
+    expect(drainChatDirectives('ws-1')).toEqual(['First.', 'Second.'])
+    expect(drainChatDirectives('ws-1')).toEqual([])
+    expect(drainChatDirectives('ws-2')).toEqual(['Other workspace.'])
   })
 
   test('activeViewTitle resolves only view tabs with a configured title', () => {
