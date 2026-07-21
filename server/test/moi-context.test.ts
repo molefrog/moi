@@ -4,6 +4,7 @@ import {
   appendMoiContext,
   renderMoiContext,
   stripMoiContext,
+  unwrapMoiContext,
   wrapMoiContextSystemReminder
 } from '@/lib/moi-context'
 
@@ -37,6 +38,16 @@ describe('moi context envelope', () => {
 
   test('context-only message strips to empty', () => {
     expect(stripMoiContext(wrapMoiContextSystemReminder('', context))).toBe('')
+  })
+
+  test('unwrap removes the wrapper tag and keeps the body', () => {
+    const body = unwrapMoiContext(context)
+    expect(body.startsWith('<moi-context>')).toBe(false)
+    expect(body.endsWith('</moi-context>')).toBe(false)
+    expect(body).toContain('moi workspace context')
+    expect(body).toContain('The user is on: scratchpad')
+    // Already-unwrapped text passes through.
+    expect(unwrapMoiContext(body)).toBe(body)
   })
 
   test('leaves text without the marker alone', () => {

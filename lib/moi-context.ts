@@ -11,7 +11,10 @@
 // its conventions:
 //   - Claude Code  — `wrapMoiContextSystemReminder` + prepended to the text
 //     (mirrors how Claude Code itself injects ambient context)
-//   - Codex / OpenClaw — `appendMoiContext` after the user's text
+//   - Codex — native `turn/start.additionalContext` (`unwrapMoiContext` body,
+//     the entry key becomes the tag) on servers >= 0.135; `appendMoiContext`
+//     fallback below that
+//   - OpenClaw — `appendMoiContext` after the user's text
 // Display paths strip with `stripMoiContext` so the envelope never surfaces
 // in a bubble, live or replayed from a transcript.
 import type { WorkspaceTabId } from './types'
@@ -57,10 +60,21 @@ export function wrapMoiContextSystemReminder(text: string, contextText: string):
   return `${SYSTEM_REMINDER_OPEN}\n${contextText}\n${SYSTEM_REMINDER_CLOSE}\n\n${text}`
 }
 
-// Text-only harnesses (Codex, OpenClaw): the envelope is appended after the
-// user's text, same placement as the view-builder meta block.
+// Text-only harnesses (OpenClaw; Codex fallback): the envelope is appended
+// after the user's text, same placement as the view-builder meta block.
 export function appendMoiContext(text: string, contextText: string): string {
   return text ? `${text}\n\n${contextText}` : contextText
+}
+
+// The envelope body without the wrapper tag, for transports that supply their
+// own tag — Codex `turn/start.additionalContext` renders the entry key as the
+// tag, so shipping the wrapped text would double-wrap it.
+export function unwrapMoiContext(contextText: string): string {
+  const t = contextText.trim()
+  if (t.startsWith(MOI_CONTEXT_OPEN) && t.endsWith(MOI_CONTEXT_CLOSE)) {
+    return t.slice(MOI_CONTEXT_OPEN.length, -MOI_CONTEXT_CLOSE.length).trim()
+  }
+  return t
 }
 
 // Remove the envelope (and, for Claude Code transcripts, its enclosing

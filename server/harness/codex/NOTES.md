@@ -97,6 +97,29 @@ Per-turn overrides (`model`, `effort`, `summary`, sandbox/approval policy)
 become the thread's defaults for later turns — no drain-then-rebuild dance at
 all. `thread/settings/update` queues setting changes without starting a turn.
 
+### additionalContext (native per-turn ambient context)
+
+`turn/start` and `turn/steer` take an experimental
+`additionalContext: { <key>: { value, kind: 'untrusted' | 'application' } }`
+map (openai/codex#24154, shipped in 0.135.0, May 2026) — moi uses it for the
+`<moi-context>` envelope (key `moi_context`, kind `application`):
+
+- `application` injects a developer-role message `<key>value</key>`;
+  `untrusted` a user-role `<external_key>value</external_key>`. Values are
+  middle-truncated to a ~1,000-token budget.
+- Send the map every turn; the server diffs per key and injects only when a
+  value CHANGED since the last turn — unchanged keys cost nothing.
+- Injected fragments never appear as `userMessage` items (live or on
+  `thread/read` replay), so nothing to strip.
+- Gated: requires `initialize.capabilities.experimentalApi: true`, else a
+  new-enough server rejects the request when the field is present.
+- Servers < 0.135 have no `deny_unknown_fields` on TurnStartParams and
+  silently DROP the field — no error to detect. The only reliable support
+  signal is the version in the initialize response's `userAgent`
+  (`codex_cli_rs/<semver> …`) — see `codexSupportsAdditionalContext`
+  (client.ts). Below the cutoff the session path appends the envelope to the
+  text item instead (adapter strips it from echoes).
+
 ### Feature map vs the adapter checklist
 
 - **Models**: `model/list` — models with ordered `supportedReasoningEfforts`,

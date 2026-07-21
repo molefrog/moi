@@ -16,7 +16,7 @@
 //     `clientUserMessageId` as `clientId`, so the optimistic-id rendezvous is
 //     first-class (no text matching like OpenClaw needs).
 import { appendAttachmentNote } from '@/lib/attachment-note'
-import { appendMoiContext } from '@/lib/moi-context'
+import { appendMoiContext, unwrapMoiContext } from '@/lib/moi-context'
 import { type Part, type SubagentRecord, type Turn, applyEvent, emptyViewState } from '@/lib/format'
 import type { SessionActivity, StreamEvent, ViewState } from '@/lib/types'
 
@@ -438,15 +438,14 @@ async function resumeSession(input: {
 // referenced in an attachment note the agent can read.
 async function buildUserInput(
   text: string,
-  uploads: StoredUpload[],
-  displayText = text
+  uploads: StoredUpload[]
 ): Promise<{ input: CodexUserInputItem[]; parts: Part[] }> {
   const parts: Part[] = []
   for (const u of uploads) {
     const part = uploadToDisplayPart(u)
     if (part) parts.push(part)
   }
-  if (displayText) parts.push({ type: 'text', text: displayText })
+  if (text) parts.push({ type: 'text', text })
 
   const input: CodexUserInputItem[] = []
   for (const u of uploads) {
@@ -476,16 +475,16 @@ export async function sendCodexMessage(input: {
   model?: string
   effort?: string
   stream?: boolean
-  // Rendered `<moi-context>` envelope (lib/moi-context.ts), appended after the
-  // user's text for the agent; display parts and the native echo strip it.
+  // Rendered `<moi-context>` envelope (lib/moi-context.ts). Servers >= 0.135
+  // take it via `additionalContext` (never enters userMessage items); older
+  // ones get it appended to the text item, stripped from echoes by the adapter.
   context?: string
 }): Promise<void> {
   const uploads = input.attachments?.length
     ? resolveUploads(input.workspaceId, input.attachments)
     : []
   if (!input.content && uploads.length === 0) return
-  const agentText = input.context ? appendMoiContext(input.content, input.context) : input.content
-  const { input: userInput, parts } = await buildUserInput(agentText, uploads, input.content)
+  const { input: userInput, parts } = await buildUserInput(input.content, uploads)
   if (userInput.length === 0) return
 
   let rec: SessionRecord
@@ -552,10 +551,24 @@ export async function sendCodexMessage(input: {
   setProcessing(rec, true, rec.activeTurnId)
   try {
     const client = await getCodexClient(input.workspacePath)
+    // Native context channel: diffed per key server-side (unchanged values
+    // inject nothing) and never echoed back in userMessage items. The entry
+    // key becomes the tag, so ship the unwrapped body. Older servers silently
+    // drop the field, so append to the text item there instead.
+    const additionalContext =
+      input.context && client.supportsAdditionalContext
+        ? { moi_context: { value: unwrapMoiContext(input.context), kind: 'application' } }
+        : undefined
+    if (input.context && !additionalContext) {
+      const last = userInput[userInput.length - 1]
+      if (last?.type === 'text') last.text = appendMoiContext(last.text, input.context)
+      else userInput.push({ type: 'text', text: input.context })
+    }
     const turnParams = {
       threadId: rec.sessionId,
       clientUserMessageId: turnId,
       input: userInput,
+      ...(additionalContext ? { additionalContext } : {}),
       // Without an explicit summary mode Codex still reasons but emits the
       // reasoning item with EMPTY summary/content (verified on the wire —
       // scripts/codex-probe.ts), so no thinking ever reaches the UI. 'auto'
@@ -573,6 +586,7 @@ export async function sendCodexMessage(input: {
           threadId: rec.sessionId,
           clientUserMessageId: turnId,
           input: userInput,
+          ...(additionalContext ? { additionalContext } : {}),
           expectedTurnId: rec.activeTurnId
         })
       } catch {

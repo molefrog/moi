@@ -54,6 +54,27 @@ export type CodexClient = {
   onNotification: (l: NotificationListener) => () => void
   isAlive: () => boolean
   workspacePath: string
+  // Whether this app-server accepts `turn/start.additionalContext` (the native
+  // per-turn context channel). Resolved from the initialize handshake.
+  supportsAdditionalContext: boolean
+}
+
+// `additionalContext` shipped in codex 0.135.0 (openai/codex#24154, May 2026).
+// Older servers have no `deny_unknown_fields` on TurnStartParams, so they
+// silently DROP the field instead of erroring — probing is useless. The only
+// reliable signal is the version embedded in the initialize response's
+// userAgent (e.g. `codex_cli_rs/0.144.5 (…)`); an unparsable userAgent gates
+// to false and the session path falls back to appending context to the text.
+const ADDITIONAL_CONTEXT_MIN_VERSION = [0, 135, 0] as const
+
+export function codexSupportsAdditionalContext(userAgent: string | undefined): boolean {
+  const m = userAgent?.match(/\/(\d+)\.(\d+)\.(\d+)/)
+  if (!m) return false
+  const v = [Number(m[1]), Number(m[2]), Number(m[3])]
+  for (let i = 0; i < 3; i++) {
+    if (v[i] !== ADDITIONAL_CONTEXT_MIN_VERSION[i]) return v[i] > ADDITIONAL_CONTEXT_MIN_VERSION[i]
+  }
+  return true
 }
 
 // Locate the codex binary. Codex Desktop does NOT guarantee a `codex` on PATH
@@ -218,7 +239,8 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
       return () => listeners.delete(l)
     },
     isAlive: () => alive,
-    workspacePath
+    workspacePath,
+    supportsAdditionalContext: false
   }
   const record: ClientRecord = { client, proc }
   const recordPromise = Promise.resolve(record)
@@ -226,12 +248,18 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
   void readLoop()
   void drainStderr()
 
-  await rpc('initialize', {
+  // experimentalApi opts this connection into experimental fields — required
+  // for `turn/start.additionalContext`; servers new enough to gate it reject
+  // the field otherwise. The response's userAgent carries the CLI version.
+  const init = await rpc<{ userAgent?: string }>('initialize', {
     clientInfo: { name: 'moi', title: 'moi', version: '0.1' },
-    capabilities: { experimentalApi: false, requestAttestation: false }
+    capabilities: { experimentalApi: true, requestAttestation: false }
   })
+  client.supportsAdditionalContext = codexSupportsAdditionalContext(init?.userAgent)
   send({ jsonrpc: '2.0', method: 'initialized', params: {} })
-  debug(`codex app-server started ws=${workspacePath} bin=${bin}`)
+  debug(
+    `codex app-server started ws=${workspacePath} bin=${bin} ua=${init?.userAgent ?? 'unknown'} additionalContext=${client.supportsAdditionalContext}`
+  )
   return record
 }
 
