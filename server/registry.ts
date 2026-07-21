@@ -2,11 +2,11 @@ import { mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'path'
 
+import { newWorkspaceId } from '@/lib/ids'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
 import { DATA_DIR } from './data-dir'
 import { allHarnesses } from './harness/registry'
-import { newWorkspaceId } from './short-id'
 
 // Replace the home-dir prefix with `~` for display. Keeps the original
 // absolute path in place; callers should put the result in `displayPath`.

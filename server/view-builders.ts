@@ -1,11 +1,11 @@
 import { mkdir, rename } from 'node:fs/promises'
 import { join } from 'node:path'
 
+import { newBuilderId } from '@/lib/ids'
 import type { AppletKind, ViewBuilder, ViewInfo } from '@/lib/types'
 
 import { DATA_DIR } from './data-dir'
 import { publishEvent } from './events'
-import { newBuilderId } from './short-id'
 
 type ViewBuilderStore = Record<string, ViewBuilder[]>
 
