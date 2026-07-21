@@ -9,7 +9,7 @@ describe('view builder directives', () => {
       activeTab: 'view-builder:builder-123',
       directives: viewBuilderDirectives('builder-123', ['chart', 'calendar'])
     })
-    expect(context).toContain('The user is on the view builder tab for builder "builder-123".')
+    expect(context).toContain('The user is building a new view. Builder id "builder-123".')
     expect(context).toContain('# This message only\nView builder request')
     expect(context).toContain('Builder id: builder-123')
     expect(context).toContain('Available view icons: chart, calendar')

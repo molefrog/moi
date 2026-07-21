@@ -54,11 +54,11 @@ export type MoiContext = {
 // titles ("fix the Grading review page") while the agent edits
 // `.moi/views/<id>.tsx` — this line connects the two.
 function describeTab(tab: WorkspaceTabId, title?: string): string {
-  if (tab === 'agent') return 'The user is on the "Agent" tab.'
+  if (tab === 'agent') return 'The user is on the "Agent" tab (full page chat).'
   if (tab === 'widgets') return 'The user is on the "Widgets" tab.'
   if (tab === 'scratchpad') return 'The user is on the "Scratchpad" tab.'
   if (tab.startsWith('view-builder:'))
-    return `The user is on the view builder tab for builder "${tab.slice('view-builder:'.length)}".`
+    return `The user is building a new view. Builder id "${tab.slice('view-builder:'.length)}".`
   if (tab.startsWith('view:')) {
     const id = tab.slice('view:'.length)
     return `The user is on the "${title ?? id}" view tab (.moi/views/${id}.tsx).`

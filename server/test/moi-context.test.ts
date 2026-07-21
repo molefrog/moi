@@ -26,7 +26,9 @@ describe('moi context envelope', () => {
     expect(renderMoiContext({ activeTab: 'view:crm' })).toContain(
       'The user is on the "crm" view tab (.moi/views/crm.tsx).'
     )
-    expect(renderMoiContext({ activeTab: 'agent' })).toContain('The user is on the "Agent" tab.')
+    expect(renderMoiContext({ activeTab: 'agent' })).toContain(
+      'The user is on the "Agent" tab (full page chat).'
+    )
   })
 
   test('a view tab with a configured title names both title and file', () => {
@@ -65,7 +67,7 @@ describe('moi context envelope', () => {
       activeTab: 'view-builder:builder-1',
       directives: ['Do the thing first.', 'Then bundle.']
     })
-    expect(rendered).toContain('The user is on the view builder tab for builder "builder-1".')
+    expect(rendered).toContain('The user is building a new view. Builder id "builder-1".')
     expect(rendered).toContain('# This message only\nDo the thing first.\nThen bundle.')
     expect(stripMoiContext(appendMoiContext('Build it', rendered))).toBe('Build it')
   })
