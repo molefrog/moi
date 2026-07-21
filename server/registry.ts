@@ -2,6 +2,7 @@ import { mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'path'
 
+import { newWorkspaceId } from '@/lib/ids'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 import { orderWorkspaceTypes } from '@/lib/workspace-types'
 
@@ -63,7 +64,7 @@ export async function registerWorkspace(
   const existing = entries.find(e => e.path === normalPath)
   if (existing) return existing
   const entry: WorkspaceEntry = {
-    id: crypto.randomUUID(),
+    id: newWorkspaceId(),
     path: normalPath,
     addedAt: new Date().toISOString(),
     ...(opts.type ? { type: opts.type } : {}),

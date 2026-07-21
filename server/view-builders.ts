@@ -1,6 +1,7 @@
 import { mkdir, rename } from 'node:fs/promises'
 import { join } from 'node:path'
 
+import { newBuilderId } from '@/lib/ids'
 import type { AppletKind, ViewBuilder, ViewInfo } from '@/lib/types'
 
 import { DATA_DIR } from './data-dir'
@@ -107,7 +108,7 @@ export async function createViewBuilder(
   const builder = await mutateBuilders(workspacePath, builders => {
     const now = Date.now()
     const created: ViewBuilder = {
-      id: crypto.randomUUID(),
+      id: newBuilderId(),
       kind: 'view',
       status: 'draft',
       input: { requirements: '' },
@@ -215,7 +216,7 @@ export async function setBuilder(
       const now = Date.now()
       const status = input.status ?? 'building'
       const created: ViewBuilder = {
-        id: crypto.randomUUID(),
+        id: newBuilderId(),
         kind,
         status,
         input: { requirements: '' },

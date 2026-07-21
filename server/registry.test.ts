@@ -31,7 +31,7 @@ describe('registerWorkspace', () => {
     const entry = await registerWorkspace('/Users/foo/my-project')
     expect(entry.path).toBe('/Users/foo/my-project')
     expect(typeof entry.id).toBe('string')
-    expect(entry.id).toHaveLength(36) // UUID v4
+    expect(entry.id).toMatch(/^[0-9a-z]{10}$/) // short base36 id
     expect(typeof entry.addedAt).toBe('string')
   })
 
