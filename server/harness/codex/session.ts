@@ -557,7 +557,7 @@ export async function sendCodexMessage(input: {
     // drop the field, so append to the text item there instead.
     const additionalContext =
       input.context && client.supportsAdditionalContext
-        ? { moi_context: { value: unwrapMoiContext(input.context), kind: 'application' } }
+        ? { 'moi-context': { value: unwrapMoiContext(input.context), kind: 'application' } }
         : undefined
     if (input.context && !additionalContext) {
       const last = userInput[userInput.length - 1]

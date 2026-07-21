@@ -102,7 +102,8 @@ all. `thread/settings/update` queues setting changes without starting a turn.
 `turn/start` and `turn/steer` take an experimental
 `additionalContext: { <key>: { value, kind: 'untrusted' | 'application' } }`
 map (openai/codex#24154, shipped in 0.135.0, May 2026) — moi uses it for the
-`<moi-context>` envelope (key `moi_context`, kind `application`):
+`<moi-context>` envelope (key `moi-context`, kind `application`, so the wire
+tag matches the tag the moi-workspace skill triggers on):
 
 - `application` injects a developer-role message `<key>value</key>`;
   `untrusted` a user-role `<external_key>value</external_key>`. Values are

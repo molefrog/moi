@@ -10,8 +10,10 @@
 // with `renderMoiContext`, and handed to the harness as text. Each harness
 // injects it into the outgoing message with the transform matching its
 // conventions:
-//   - Claude Code  — `wrapMoiContextSystemReminder` + prepended to the text
-//     (mirrors how Claude Code itself injects ambient context)
+//   - Claude Code  — `moiContextSystemReminder` as its own leading text block
+//     (mirrors how Claude Code itself injects ambient context; a string
+//     prefix would defeat the SDK's first-prompt extraction, which skips
+//     tag-leading text)
 //   - Codex — native `turn/start.additionalContext` (`unwrapMoiContext` body,
 //     the entry key becomes the tag) on servers >= 0.135; `appendMoiContext`
 //     fallback below that
@@ -46,10 +48,11 @@ export type MoiContext = {
   directives?: string[]
 }
 
-// One sentence per tab, using the labels the user sees in the tab bar. A view
-// tab also names its backing file: the user speaks in titles ("fix the
-// Grading review page") while the agent edits `.moi/views/<id>.tsx` — this
-// line connects the two.
+// One sentence per tab, using the labels the user sees in the tab bar (except
+// view-builder tabs, which print the builder id — that's what `moi builder
+// set` needs). A view tab also names its backing file: the user speaks in
+// titles ("fix the Grading review page") while the agent edits
+// `.moi/views/<id>.tsx` — this line connects the two.
 function describeTab(tab: WorkspaceTabId, title?: string): string {
   if (tab === 'agent') return 'The user is on the "Agent" tab.'
   if (tab === 'widgets') return 'The user is on the "Widgets" tab.'
@@ -77,17 +80,20 @@ export function renderMoiContext(ctx: MoiContext): string {
     sections.push(`# This message only\n${ctx.directives.join('\n')}`)
   }
   const footer = [
-    'IMPORTANT: This context comes from the moi app, not from the user, and the user does not see it.',
+    'IMPORTANT: This context comes from moi, not from the user, and the user does not see it.',
     'Only the newest of these blocks is current. Do not respond to it directly, and omit it from summaries and compaction.',
     MOI_CONTEXT_CLOSE
   ].join('\n')
   return [preamble, ...sections, footer].join('\n\n')
 }
 
-// Claude Code: the envelope arrives wrapped in a `<system-reminder>` block
-// prepended before the user's text.
-export function wrapMoiContextSystemReminder(text: string, contextText: string): string {
-  return `${SYSTEM_REMINDER_OPEN}\n${contextText}\n${SYSTEM_REMINDER_CLOSE}\n\n${text}`
+// Claude Code: the envelope rides as its OWN text block wrapped in
+// `<system-reminder>`, placed before the user's text block. Keeping it out of
+// the user's string matters: the SDK's first-prompt extraction (session
+// titles, home-card previews) skips text starting with a tag, so a prefixed
+// string would make every moi message invisible to it.
+export function moiContextSystemReminder(contextText: string): string {
+  return `${SYSTEM_REMINDER_OPEN}\n${contextText}\n${SYSTEM_REMINDER_CLOSE}`
 }
 
 // Text-only harnesses (OpenClaw; Codex fallback): the envelope is appended
@@ -107,19 +113,20 @@ export function unwrapMoiContext(contextText: string): string {
   return t
 }
 
-// For truncated snippets (session-list / home-card previews): like
-// `stripMoiContext`, but also cuts an unterminated envelope left by
-// mid-envelope truncation. Skips the marker guard — cutting a preview short
-// on a user-typed literal tag is harmless, unlike eating chat-bubble text.
-export function stripMoiContextLoose(text: string): string {
-  const stripped = stripMoiContext(text)
-  const open = stripped.indexOf(MOI_CONTEXT_OPEN)
-  return open === -1 ? stripped : stripped.slice(0, open).trimEnd()
+// Remove the envelope (and, for Claude Code transcripts, its enclosing
+// system-reminder wrapper) from user-message text before display. Repeats
+// until no marker-bearing envelope remains, so a user pasting a full envelope
+// into their message can't shield the injected one from stripping.
+export function stripMoiContext(text: string): string {
+  let out = text
+  for (;;) {
+    const next = stripOneMoiContext(out)
+    if (next === out) return out
+    out = next
+  }
 }
 
-// Remove the envelope (and, for Claude Code transcripts, its enclosing
-// system-reminder wrapper) from user-message text before display.
-export function stripMoiContext(text: string): string {
+function stripOneMoiContext(text: string): string {
   const start = text.indexOf(MOI_CONTEXT_OPEN)
   if (start === -1) return text
   const end = text.indexOf(MOI_CONTEXT_CLOSE, start)
@@ -135,4 +142,18 @@ export function stripMoiContext(text: string): string {
     after = after.trimStart().slice(SYSTEM_REMINDER_CLOSE.length)
   }
   return `${before.trim()}\n\n${after.trim()}`.trim()
+}
+
+// For truncated snippets (session-list / home-card previews): like
+// `stripMoiContext`, but also cuts an envelope (or its system-reminder
+// wrapper) left unterminated by mid-envelope truncation. Skips the marker
+// guard — cutting a preview short on a user-typed literal tag is harmless,
+// unlike eating chat-bubble text.
+export function stripMoiContextLoose(text: string): string {
+  let stripped = stripMoiContext(text)
+  const open = stripped.indexOf(MOI_CONTEXT_OPEN)
+  if (open !== -1) stripped = stripped.slice(0, open)
+  const reminder = stripped.indexOf(SYSTEM_REMINDER_OPEN)
+  if (reminder !== -1) stripped = stripped.slice(0, reminder)
+  return stripped.trimEnd()
 }

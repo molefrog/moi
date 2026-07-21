@@ -22,7 +22,7 @@ import { ATTACHMENT_ONLY_PLACEHOLDER, appendAttachmentNote } from '@/lib/attachm
 import { ClaudeAdapter } from './adapter'
 import type { Part } from '@/lib/format'
 import type { SessionActivity } from '@/lib/types'
-import { wrapMoiContextSystemReminder } from '@/lib/moi-context'
+import { moiContextSystemReminder } from '@/lib/moi-context'
 
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
@@ -600,7 +600,7 @@ export async function sendCCMessage(input: {
   effort?: string
   stream?: boolean
   // Rendered `<moi-context>` envelope (lib/moi-context.ts), injected as a
-  // system-reminder prefix on the agent text; the display parts never see it.
+  // leading system-reminder text block; the display parts never see it.
   context?: string
 }): Promise<void> {
   // Resolve any attachments into agent content blocks + display parts. Unknown
@@ -610,10 +610,20 @@ export async function sendCCMessage(input: {
     ? resolveUploads(input.workspaceId, input.attachments)
     : []
   if (!input.content && uploads.length === 0) return
-  const agentText = input.context
-    ? wrapMoiContextSystemReminder(input.content, input.context)
-    : input.content
-  const { content, parts } = buildUserMessage(agentText, uploads, input.content)
+  const { content: userContent, parts } = buildUserMessage(input.content, uploads)
+  // The envelope goes in as its OWN leading text block, never merged into the
+  // user's string: the SDK's first-prompt extraction (session titles,
+  // home-card previews) skips tag-leading text, so a prefixed string would
+  // hide every moi message from it. On replay the adapter strips the block to
+  // empty and drops it.
+  const content: MessageContent = input.context
+    ? [
+        { type: 'text', text: moiContextSystemReminder(input.context) },
+        ...(typeof userContent === 'string'
+          ? [{ type: 'text' as const, text: userContent }]
+          : userContent)
+      ]
+    : userContent
 
   const wantStream = input.stream === true
   let s = sessions.get(liveKey(input.workspaceId, input.sessionId))

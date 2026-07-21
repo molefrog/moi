@@ -30,8 +30,10 @@ export type SendMessageInput = {
   effort?: string
   stream?: boolean
   // Rendered `<moi-context>` envelope from the client (lib/moi-context.ts).
-  // Each harness injects it into the outgoing message its own way (Claude
-  // Code: system-reminder prefix; Codex/OpenClaw: appended after the text).
+  // Each harness injects it its own way: Claude Code as a leading
+  // system-reminder text block, Codex >= 0.135 via the native
+  // additionalContext channel (appended to the text below that), OpenClaw
+  // appended after the text at the gateway send.
   context?: string
   // OpenClaw: the gateway agent that owns the workspace.
   agentId?: string

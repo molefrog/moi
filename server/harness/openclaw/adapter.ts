@@ -25,11 +25,18 @@ import type {
   OpenClawSessionDetail,
   OpenClawSessionRow
 } from './discovery'
+import { stripMoiContextLoose } from '@/lib/moi-context'
 import { stripUserMessageMetadata } from './strip'
 
 export function toSessionInfo(row: OpenClawSessionRow, cwd: string): SessionInfo {
+  // Gateway previews carry the raw stored message — for a user send that
+  // includes the appended context envelope, and truncation can cut it open,
+  // so clean with the loose strip like the Codex previews do.
   const summary =
-    row.lastMessagePreview?.trim() || row.displayName?.trim() || row.label?.trim() || ''
+    stripMoiContextLoose(row.lastMessagePreview ?? '').trim() ||
+    row.displayName?.trim() ||
+    row.label?.trim() ||
+    ''
   return {
     sessionId: row.sessionId,
     summary,

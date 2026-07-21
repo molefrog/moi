@@ -2,11 +2,11 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   appendMoiContext,
+  moiContextSystemReminder,
   renderMoiContext,
   stripMoiContext,
   stripMoiContextLoose,
-  unwrapMoiContext,
-  wrapMoiContextSystemReminder
+  unwrapMoiContext
 } from '@/lib/moi-context'
 
 describe('moi context envelope', () => {
@@ -18,7 +18,7 @@ describe('moi context envelope', () => {
     expect(context).toContain('You are running in a `moi` workspace')
     expect(context).toContain('moi-workspace')
     expect(context).toContain('# Active tab\nThe user is on the "Scratchpad" tab.')
-    expect(context).toContain('IMPORTANT: This context comes from the moi app')
+    expect(context).toContain('IMPORTANT: This context comes from moi, not from the user')
   })
 
   test('describes tabs with their UI labels', () => {
@@ -40,14 +40,23 @@ describe('moi context envelope', () => {
     expect(stripMoiContext(sent)).toBe('Fix the header')
   })
 
-  test('system-reminder wrap + strip round-trips the user text', () => {
-    const sent = wrapMoiContextSystemReminder('Fix the header', context)
-    expect(sent.startsWith('<system-reminder>')).toBe(true)
-    expect(stripMoiContext(sent)).toBe('Fix the header')
+  test('system-reminder block strips to empty (the CC block is dropped on replay)', () => {
+    const block = moiContextSystemReminder(context)
+    expect(block.startsWith('<system-reminder>')).toBe(true)
+    expect(block.endsWith('</system-reminder>')).toBe(true)
+    expect(stripMoiContext(block)).toBe('')
   })
 
-  test('context-only message strips to empty', () => {
-    expect(stripMoiContext(wrapMoiContextSystemReminder('', context))).toBe('')
+  test('strips the persisted CC shape: reminder block + text + attachment note', () => {
+    const persisted = `${moiContextSystemReminder(context)}\n\nFix the header\n\nThe user attached the following files:\n- report.pdf (/tmp/up/report.pdf)`
+    expect(stripMoiContext(persisted)).toBe(
+      'Fix the header\n\nThe user attached the following files:\n- report.pdf (/tmp/up/report.pdf)'
+    )
+  })
+
+  test('strips every envelope when a user pastes one into their message', () => {
+    const pasted = `Look at this:\n\n${context}\n\nweird right?\n\n${context}`
+    expect(stripMoiContext(pasted)).toBe('Look at this:\n\nweird right?')
   })
 
   test('renders directives under a this-message-only section', () => {
