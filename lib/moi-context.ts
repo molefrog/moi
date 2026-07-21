@@ -48,6 +48,7 @@ export function renderMoiContext(ctx: MoiContext): string {
   return [
     MOI_CONTEXT_OPEN,
     `${MOI_CONTEXT_MARKER} — snapshot at send time, not shown in the user's chat.`,
+    'Ephemeral: only the newest of these blocks is current — disregard older ones, and omit them entirely when summarizing or compacting this conversation.',
     'This message was sent from a moi workspace. If you have not read the moi-workspace skill in this chat yet, read it before taking any action.',
     `The user is on: ${describeTab(ctx.activeTab)}`,
     MOI_CONTEXT_CLOSE
