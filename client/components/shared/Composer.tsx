@@ -23,8 +23,11 @@ export function Composer({
       onMouseDown={event => {
         onMouseDown?.(event)
         if (event.defaultPrevented) return
-        if (event.target instanceof HTMLElement && event.target.closest('button')) return
-        event.preventDefault()
+        if (
+          event.target instanceof Element &&
+          event.target.closest('button, input, textarea, select, a, [contenteditable="true"]')
+        )
+          return
         composerRef.current?.focus()
       }}
       className={cn(
