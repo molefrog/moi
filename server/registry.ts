@@ -6,7 +6,7 @@ import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/t
 
 import { DATA_DIR } from './data-dir'
 import { allHarnesses } from './harness/registry'
-import { shortId } from './short-id'
+import { newWorkspaceId } from './short-id'
 
 // Replace the home-dir prefix with `~` for display. Keeps the original
 // absolute path in place; callers should put the result in `displayPath`.
@@ -62,7 +62,7 @@ export async function registerWorkspace(
   const existing = entries.find(e => e.path === normalPath)
   if (existing) return existing
   const entry: WorkspaceEntry = {
-    id: shortId(),
+    id: newWorkspaceId(),
     path: normalPath,
     addedAt: new Date().toISOString(),
     ...(opts.type ? { type: opts.type } : {}),

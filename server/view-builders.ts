@@ -5,12 +5,9 @@ import type { AppletKind, ViewBuilder, ViewInfo } from '@/lib/types'
 
 import { DATA_DIR } from './data-dir'
 import { publishEvent } from './events'
-import { shortId } from './short-id'
+import { newBuilderId } from './short-id'
 
 type ViewBuilderStore = Record<string, ViewBuilder[]>
-
-// The builder handle the agent copies into `moi builder set … --builder <id>`.
-const newBuilderId = shortId
 
 // A build running past this is treated as hung/abandoned and reconciled back to
 // `waiting`, even if its session still looks live. Generous so a slow but real
