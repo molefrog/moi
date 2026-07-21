@@ -17,6 +17,7 @@ Agent chat UI powered by Claude Agent SDK, Bun, React, and Tailwind.
   - `icons.md` (`*.tsx`) — `@tabler/icons-react` only, sizing and stroke conventions
   - `animations.md` (`*.tsx`, `*.css`) — `tw-animate-css` utilities, no custom keyframes
   - `bun.md` — Bun instead of Node/npm/vite, Bun-native APIs
+  - `pull-requests.md` (before creating or updating a PR) — description format, length budget, update-on-pivot
   - `README.md` — format for writing new rules
 - `.agents/skills/` — skills in the `SKILL.md` [Agent Skills](https://agentskills.io) format (canonical). Codex and other tools that follow the standard discover this directory natively; Claude Code loads them via per-skill symlinks in `.claude/skills/`. When adding a skill, put it in `.agents/skills/<name>/` and add a matching symlink in `.claude/skills/`.
 
