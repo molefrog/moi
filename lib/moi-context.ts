@@ -40,8 +40,9 @@ export type MoiContext = {
   // request that's the builder's own tab (`view-builder:<id>`).
   activeTab: WorkspaceTabId
   // UI label of the active tab when it differs from the id — a view's
-  // configured title (e.g. "Grading review" for `view:color-studio`). The tab
-  // bar falls back to the id when unset; so does the envelope.
+  // configured title (e.g. "Grading review" for `view:color-studio`), or a
+  // view builder's claimed title while the build runs. The tab bar falls
+  // back to the id when unset; so does the envelope.
   tabTitle?: string
   // One-shot imperative lines for this message only (e.g. the view-builder
   // bootstrap instructions from lib/view-builder-directives.ts).
@@ -57,8 +58,12 @@ function describeTab(tab: WorkspaceTabId, title?: string): string {
   if (tab === 'agent') return 'The user is on the "Agent" tab (full page chat).'
   if (tab === 'widgets') return 'The user is on the "Widgets" tab.'
   if (tab === 'scratchpad') return 'The user is on the "Scratchpad" tab.'
-  if (tab.startsWith('view-builder:'))
-    return `The user is building a new view. Builder id "${tab.slice('view-builder:'.length)}".`
+  if (tab.startsWith('view-builder:')) {
+    const id = tab.slice('view-builder:'.length)
+    return title
+      ? `The user is building a new view "${title}". Builder id "${id}".`
+      : `The user is building a new view. Builder id "${id}".`
+  }
   if (tab.startsWith('view:')) {
     const id = tab.slice('view:'.length)
     return `The user is on the "${title ?? id}" view tab (.moi/views/${id}.tsx).`
@@ -75,7 +80,7 @@ function describeTab(tab: WorkspaceTabId, title?: string): string {
 export function renderMoiContextBody(ctx: MoiContext): string {
   const preamble = [
     `${MOI_CONTEXT_MARKER} — a shared UI the user chats with you from, which you can extend and customize.`,
-    'If you have not read the **`moi-workspace` skill** in this chat, read it before acting.'
+    'Read the **`moi-workspace` skill** before responding — even to a simple question — unless you already read it in this chat.'
   ].join('\n')
   const sections = [`# Active tab\n${describeTab(ctx.activeTab, ctx.tabTitle)}`]
   if (ctx.directives?.length) {

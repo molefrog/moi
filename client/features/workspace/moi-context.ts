@@ -20,11 +20,12 @@
 //   the field in `useMoiUserMessageContext`'s builder below.
 import { useCallback } from 'react'
 
+import { useViewBuilders } from '@/client/features/views/api'
 import { useWorkspaceViews } from '@/client/features/workspace/api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import type { MoiContext } from '@/lib/moi-context'
-import type { ViewInfo, WorkspaceTabId } from '@/lib/types'
+import type { ViewBuilder, ViewInfo, WorkspaceTabId } from '@/lib/types'
 
 // One-shot directives queued per workspace, drained into the NEXT chat
 // message's `# This message only` section. Module-level (not React state):
@@ -47,14 +48,20 @@ export function drainChatDirectives(workspaceId: string): string[] {
   return queue
 }
 
-// The configured title of the active view tab, undefined for other tabs or
-// an unset title (the envelope then falls back to the id, like the tab bar).
-export function activeViewTitle(
+// The UI label of the active tab when it has one beyond its id: a view's
+// configured title, or a builder's claimed title while the build runs.
+// Undefined otherwise (the envelope then falls back to the id, like the tab
+// bar).
+export function activeTabTitle(
   tab: WorkspaceTabId,
-  views: ViewInfo[] | undefined
+  views: ViewInfo[] | undefined,
+  builders: ViewBuilder[] | undefined
 ): string | undefined {
-  if (!tab.startsWith('view:')) return undefined
-  return views?.find(v => v.id === tab.slice('view:'.length))?.config.title || undefined
+  if (tab.startsWith('view:'))
+    return views?.find(v => v.id === tab.slice('view:'.length))?.config.title || undefined
+  if (tab.startsWith('view-builder:'))
+    return builders?.find(b => b.id === tab.slice('view-builder:'.length))?.title || undefined
+  return undefined
 }
 
 // Returns a builder that snapshots the workspace state at call time — invoke
@@ -65,13 +72,14 @@ export function useMoiUserMessageContext(): () => MoiContext {
   const workspaceId = useWorkspaceId()
   const { layout } = useWorkspaceLayoutCtx()
   const views = useWorkspaceViews(workspaceId).data
+  const builders = useViewBuilders(workspaceId).data
   const activeTab = layout.tabs.active
   return useCallback(() => {
     const directives = drainChatDirectives(workspaceId)
     return {
       activeTab,
-      tabTitle: activeViewTitle(activeTab, views),
+      tabTitle: activeTabTitle(activeTab, views, builders),
       ...(directives.length > 0 ? { directives } : {})
     }
-  }, [workspaceId, activeTab, views])
+  }, [workspaceId, activeTab, views, builders])
 }

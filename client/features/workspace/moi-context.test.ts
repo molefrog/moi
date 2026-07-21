@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
-import { activeViewTitle, drainChatDirectives, pushChatDirective } from './moi-context'
-import type { ViewInfo } from '@/lib/types'
+import { activeTabTitle, drainChatDirectives, pushChatDirective } from './moi-context'
+import type { ViewBuilder, ViewInfo } from '@/lib/types'
 
 describe('moi context assembly', () => {
   test('directives queue per workspace and drain once, in order', () => {
@@ -13,15 +13,36 @@ describe('moi context assembly', () => {
     expect(drainChatDirectives('ws-2')).toEqual(['Other workspace.'])
   })
 
-  test('activeViewTitle resolves only view tabs with a configured title', () => {
+  test('activeTabTitle resolves view titles and claimed builder titles', () => {
     const views: ViewInfo[] = [
       { id: 'color-studio', config: { title: 'Grading review' } },
       { id: 'untitled', config: {} }
     ]
-    expect(activeViewTitle('view:color-studio', views)).toBe('Grading review')
-    expect(activeViewTitle('view:untitled', views)).toBeUndefined()
-    expect(activeViewTitle('view:missing', views)).toBeUndefined()
-    expect(activeViewTitle('scratchpad', views)).toBeUndefined()
-    expect(activeViewTitle('view:color-studio', undefined)).toBeUndefined()
+    const builders: ViewBuilder[] = [
+      {
+        id: 'b-42',
+        status: 'building',
+        input: { requirements: '' },
+        sessionId: 's-1',
+        title: 'Customer overview',
+        createdAt: 0,
+        updatedAt: 0
+      },
+      {
+        id: 'b-draft',
+        status: 'draft',
+        input: { requirements: '' },
+        sessionId: 's-2',
+        createdAt: 0,
+        updatedAt: 0
+      }
+    ]
+    expect(activeTabTitle('view:color-studio', views, builders)).toBe('Grading review')
+    expect(activeTabTitle('view:untitled', views, builders)).toBeUndefined()
+    expect(activeTabTitle('view:missing', views, builders)).toBeUndefined()
+    expect(activeTabTitle('view-builder:b-42', views, builders)).toBe('Customer overview')
+    expect(activeTabTitle('view-builder:b-draft', views, builders)).toBeUndefined()
+    expect(activeTabTitle('scratchpad', views, builders)).toBeUndefined()
+    expect(activeTabTitle('view:color-studio', undefined, undefined)).toBeUndefined()
   })
 })

@@ -37,6 +37,12 @@ describe('moi context envelope', () => {
     ).toContain('The user is on the "Grading review" view tab (.moi/views/color-studio.tsx).')
   })
 
+  test('a claimed builder title lands in the view-builder line', () => {
+    expect(
+      renderMoiContext({ activeTab: 'view-builder:b-42', tabTitle: 'Customer overview' })
+    ).toContain('The user is building a new view "Customer overview". Builder id "b-42".')
+  })
+
   test('append + strip round-trips the user text', () => {
     const sent = appendMoiContext('Fix the header', context)
     expect(sent).toContain('<moi-context>')
