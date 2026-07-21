@@ -9,6 +9,7 @@
 // Type shapes are hand-written against `codex app-server generate-ts`
 // (CLI 0.144.5) and read defensively — see ./NOTES.md.
 import type { Part, StreamEvent, SystemNotice, ToolCall, ToolState, Turn } from '@/lib/format'
+import { stripMoiContext } from '@/lib/moi-context'
 import type { Model, SessionInfo } from '@/lib/types'
 
 import type { WorkspaceActivityPreview } from '../types'
@@ -182,8 +183,12 @@ function statusToToolState(status: string | undefined): ToolState {
 function userInputToParts(content: CodexUserInput[] | undefined): Part[] {
   const parts: Part[] = []
   for (const c of content ?? []) {
-    if (c.type === 'text' && c.text) parts.push({ type: 'text', text: c.text })
-    else if (c.type === 'image' && c.url)
+    // The send path appends the `<moi-context>` envelope to the agent text;
+    // the native echo and thread replays carry it back, so peel it here.
+    if (c.type === 'text' && c.text) {
+      const text = stripMoiContext(c.text)
+      if (text) parts.push({ type: 'text', text })
+    } else if (c.type === 'image' && c.url)
       parts.push({ type: 'file', mediaType: 'image/*', url: c.url })
     else if (c.type === 'localImage' && c.path)
       parts.push({ type: 'text', text: `[image: ${c.path}]` })

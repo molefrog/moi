@@ -29,6 +29,10 @@ export type SendMessageInput = {
   model?: string
   effort?: string
   stream?: boolean
+  // Rendered `<moi-context>` envelope from the client (lib/moi-context.ts).
+  // Each harness injects it into the outgoing message its own way (Claude
+  // Code: system-reminder prefix; Codex/OpenClaw: appended after the text).
+  context?: string
   // OpenClaw: the gateway agent that owns the workspace.
   agentId?: string
 }

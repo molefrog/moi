@@ -1,3 +1,4 @@
+import { stripMoiContext } from '@/lib/moi-context'
 import { stripViewBuilderMeta } from '@/lib/view-builder-meta'
 
 // Strip OpenClaw-injected inbound metadata from user-role message text.
@@ -132,5 +133,5 @@ export function stripBootstrapPreamble(text: string): string {
 }
 
 export function stripUserMessageMetadata(text: string): string {
-  return stripViewBuilderMeta(stripInboundMetadata(stripBootstrapPreamble(text)))
+  return stripMoiContext(stripViewBuilderMeta(stripInboundMetadata(stripBootstrapPreamble(text))))
 }

@@ -29,6 +29,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
     model?: unknown
     effort?: unknown
     stream?: unknown
+    context?: unknown
     attachments?: unknown
     opId?: unknown
   }
@@ -42,6 +43,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
       (v.model === undefined || typeof v.model === 'string') &&
       (v.effort === undefined || typeof v.effort === 'string') &&
       (v.stream === undefined || typeof v.stream === 'boolean') &&
+      (v.context === undefined || typeof v.context === 'string') &&
       (v.attachments === undefined ||
         (Array.isArray(v.attachments) && v.attachments.every(a => typeof a === 'string')))
     )
@@ -150,6 +152,7 @@ export const app = Bun.serve<WsData>({
               model: data.model,
               effort: data.effort,
               stream: data.stream,
+              context: data.context,
               agentId: workspace.agentId
             })
             .catch(() => {})

@@ -11,6 +11,7 @@ import { resolveChatRunOptions, startOptimisticTurn } from '@/client/features/ch
 import { buildPreviewTurn } from '@/client/features/chat/preview-turn'
 import { draftKey, liveStore, selectPreviews, useLive } from '@/client/features/chat/chat-store'
 import { emptyViewState } from '@/lib/format'
+import { renderMoiContext } from '@/lib/moi-context'
 import type { Part, ViewState } from '@/lib/types'
 
 const EMPTY: ViewState = emptyViewState()
@@ -114,6 +115,7 @@ export function useChat() {
         model,
         effort,
         stream,
+        context: renderMoiContext({ activeTab: layout.tabs.active }),
         ...(ready.length > 0 ? { attachments: ready.map(a => a.upload!.id) } : {})
       })
       if (isNew) {
@@ -130,6 +132,7 @@ export function useChat() {
       qc,
       layout.selectedModel,
       layout.selectedEffort,
+      layout.tabs.active,
       threadCfg?.model,
       threadCfg?.effort,
       modelsData

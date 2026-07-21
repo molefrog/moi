@@ -22,6 +22,7 @@ import { ATTACHMENT_ONLY_PLACEHOLDER, appendAttachmentNote } from '@/lib/attachm
 import { ClaudeAdapter } from './adapter'
 import type { Part } from '@/lib/format'
 import type { SessionActivity } from '@/lib/types'
+import { wrapMoiContextSystemReminder } from '@/lib/moi-context'
 import { stripViewBuilderMeta } from '@/lib/view-builder-meta'
 
 import { debug } from '../../debug'
@@ -599,6 +600,9 @@ export async function sendCCMessage(input: {
   model?: string
   effort?: string
   stream?: boolean
+  // Rendered `<moi-context>` envelope (lib/moi-context.ts), injected as a
+  // system-reminder prefix on the agent text; the display parts never see it.
+  context?: string
 }): Promise<void> {
   // Resolve any attachments into agent content blocks + display parts. Unknown
   // or expired ids are silently dropped (resolveUploads filters them) — if that
@@ -608,7 +612,10 @@ export async function sendCCMessage(input: {
     : []
   if (!input.content && uploads.length === 0) return
   const displayContent = stripViewBuilderMeta(input.content)
-  const { content, parts } = buildUserMessage(input.content, uploads, displayContent)
+  const agentText = input.context
+    ? wrapMoiContextSystemReminder(input.content, input.context)
+    : input.content
+  const { content, parts } = buildUserMessage(agentText, uploads, displayContent)
 
   const wantStream = input.stream === true
   let s = sessions.get(liveKey(input.workspaceId, input.sessionId))
