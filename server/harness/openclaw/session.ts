@@ -13,7 +13,6 @@
 //     `sessions.get` on cold start.
 import { appendAttachmentNote } from '@/lib/attachment-note'
 import { appendMoiContext } from '@/lib/moi-context'
-import { stripViewBuilderMeta } from '@/lib/view-builder-meta'
 import { applyEvent, emptyViewState } from '@/lib/format'
 import type { SessionActivity, StreamEvent, ViewState } from '@/lib/types'
 
@@ -499,7 +498,7 @@ async function sendOpenClawMessageImpl(input: {
   if (input.optimisticId) {
     rec.pendingUserEchoes.push({
       optimisticId: input.optimisticId,
-      text: stripViewBuilderMeta(input.content)
+      text: input.content
     })
     if (rec.pendingUserEchoes.length > MAX_PENDING_USER_ECHOES) {
       rec.pendingUserEchoes.shift()

@@ -6,7 +6,7 @@ import { basename, join, resolve } from 'node:path'
 
 import type { UploadInfo, ViewBuilderInput, WorkspaceEntry, WorkspaceModels } from '@/lib/types'
 import { renderMoiContext } from '@/lib/moi-context'
-import { viewBuilderDirectives } from '@/lib/view-builder-meta'
+import { viewBuilderDirectives } from '@/lib/view-builder-directives'
 
 import { appletForModule, recordAppletError } from './applet-log'
 import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from './applets'

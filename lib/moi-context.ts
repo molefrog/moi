@@ -42,7 +42,7 @@ export type MoiContext = {
   // bar falls back to the id when unset; so does the envelope.
   tabTitle?: string
   // One-shot imperative lines for this message only (e.g. the view-builder
-  // bootstrap instructions from lib/view-builder-meta.ts).
+  // bootstrap instructions from lib/view-builder-directives.ts).
   directives?: string[]
 }
 
@@ -91,7 +91,7 @@ export function wrapMoiContextSystemReminder(text: string, contextText: string):
 }
 
 // Text-only harnesses (OpenClaw; Codex fallback): the envelope is appended
-// after the user's text, same placement as the legacy view-builder meta block.
+// after the user's text.
 export function appendMoiContext(text: string, contextText: string): string {
   return text ? `${text}\n\n${contextText}` : contextText
 }

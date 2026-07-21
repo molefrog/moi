@@ -16,7 +16,6 @@ import type {
 
 import { ATTACHMENT_ONLY_PLACEHOLDER, splitAttachmentNote } from '@/lib/attachment-note'
 import { stripMoiContext } from '@/lib/moi-context'
-import { stripViewBuilderMeta } from '@/lib/view-builder-meta'
 
 // Loose SDK message shape — we don't pull in the full SDK type tree; the
 // adapter tolerates missing fields. Reference: ./NOTES.md.
@@ -522,7 +521,7 @@ export class ClaudeAdapter {
               // file chips here — a reloaded bubble matches the live one
               // instead of leaking temp paths into it.
               const split = splitAttachmentNote(text)
-              text = stripMoiContext(stripViewBuilderMeta(split.text))
+              text = stripMoiContext(split.text)
               for (const f of split.files) {
                 parts.push({
                   type: 'file',
