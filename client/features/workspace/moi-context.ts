@@ -10,14 +10,14 @@
 //     stores, non-React code. It rides the NEXT chat message's
 //     "# This message only" section and is delivered exactly once.
 //
-//   useMoiContext()
+//   useMoiUserMessageContext()
 //     Hook for the chat send path: returns a builder that snapshots ambient
 //     state (active tab, view title) and drains the directive queue. Call
 //     the builder only for a message that actually goes out.
 //
 //   Adding a new ambient field (e.g. scratchpad selection): extend the
 //   `MoiContext` type and its renderer in lib/moi-context.ts, then supply
-//   the field in `useMoiContext`'s builder below.
+//   the field in `useMoiUserMessageContext`'s builder below.
 import { useCallback } from 'react'
 
 import { useWorkspaceViews } from '@/client/features/workspace/api'
@@ -40,7 +40,7 @@ export function pushChatDirective(workspaceId: string, directive: string): void 
   directiveQueues.set(workspaceId, queue)
 }
 
-// Exported for unit tests; production code drains only via `useMoiContext`.
+// Exported for unit tests; production code drains only via `useMoiUserMessageContext`.
 export function drainChatDirectives(workspaceId: string): string[] {
   const queue = directiveQueues.get(workspaceId) ?? []
   directiveQueues.delete(workspaceId)
@@ -61,7 +61,7 @@ export function activeViewTitle(
 // it when the message is actually sent, not at render. Draining the
 // directive queue is part of the snapshot, so only call it for a message
 // that will really go out.
-export function useMoiContext(): () => MoiContext {
+export function useMoiUserMessageContext(): () => MoiContext {
   const workspaceId = useWorkspaceId()
   const { layout } = useWorkspaceLayoutCtx()
   const views = useWorkspaceViews(workspaceId).data

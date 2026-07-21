@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useSessionView, useThreadConfig, useWorkspaceModels } from '@/client/features/chat/api'
-import { useMoiContext } from '@/client/features/workspace/moi-context'
+import { useMoiUserMessageContext } from '@/client/features/workspace/moi-context'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { sendMessage } from '@/client/features/chat/chat-connection'
@@ -26,7 +26,7 @@ export function useChat() {
   const modelsData = useWorkspaceModels(workspaceId).data
   // Snapshot of the workspace's ambient UI state + queued one-shot
   // directives, taken when the message actually goes out.
-  const buildMoiContext = useMoiContext()
+  const buildMoiContext = useMoiUserMessageContext()
 
   const activeSessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
   const activity = useLive(s =>
