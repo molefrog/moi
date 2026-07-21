@@ -1,7 +1,7 @@
 // Codex as a Harness. Thin wiring over this folder's modules — see
 // ../types.ts for the contract and ../README.md for the architecture.
 import type { Harness } from '../types'
-import { pathHarnessAvailability } from '../executable'
+import { findHarnessExecutable, pathHarnessAvailability } from '../executable'
 import {
   getCodexMcpStatus,
   getCodexModels,
@@ -68,6 +68,7 @@ export const codexHarness: Harness = {
   statusLines: () => {
     const active = getCodexActiveSessions()
     return [
+      `codex executable  ${findHarnessExecutable('codex') ?? '(not found)'}`,
       `live Codex runs  ${active.length}`,
       ...active.map(r => `  ▶ busy  ws=${r.workspaceId}  session=${r.sessionId}`)
     ]
