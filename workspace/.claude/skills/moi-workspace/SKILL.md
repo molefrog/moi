@@ -294,10 +294,10 @@ Full-screen apps, one per nav tab — the user switches tabs; there is no routin
 
 ## View builder requests
 
-When the user's message includes hidden `<moi>` context marked `View builder request`, this chat is
-linked to a pending view tab. Before reading files, planning, or writing code, infer a short stable
-id, a clear sentence-case title, and a relevant icon from the requirements. Capitalize only the
-first word of the title. Your first action must claim them:
+When the message's hidden `<moi-context>` envelope (or, in older chats, a `<moi>` block) is marked
+`View builder request`, this chat is linked to a pending view tab. Before reading files, planning,
+or writing code, infer a short stable id, a clear sentence-case title, and a relevant icon from the
+requirements. Capitalize only the first word of the title. Your first action must claim them:
 
 ```sh
 moi builder set <view-id> --builder <builder-id> --kind view --title "<title>" --icon <icon-id>

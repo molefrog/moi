@@ -28,11 +28,15 @@ const MOI_CONTEXT_MARKER = 'moi workspace context'
 const SYSTEM_REMINDER_OPEN = '<system-reminder>'
 const SYSTEM_REMINDER_CLOSE = '</system-reminder>'
 
-// The structured form the client builds at send time. Extend this (and
-// `renderMoiContext`) when new ambient fields or one-shot directives land.
+// The structured form built at send time — by the client for chat sends, by
+// the server for programmatic sends (the view builder). Extend this (and
+// `renderMoiContext`) when new ambient fields land.
 export type MoiContext = {
   // The workspace tab the user is on when they hit send.
-  activeTab: WorkspaceTabId
+  activeTab?: WorkspaceTabId
+  // One-shot imperative lines for this message only (e.g. the view-builder
+  // bootstrap instructions from lib/view-builder-meta.ts).
+  directives?: string[]
 }
 
 function describeTab(tab: WorkspaceTabId): string {
@@ -49,7 +53,8 @@ export function renderMoiContext(ctx: MoiContext): string {
     MOI_CONTEXT_OPEN,
     `${MOI_CONTEXT_MARKER} — snapshot at send time, hidden from the user.`,
     'You are running in a moi workspace. Read the moi-workspace skill before acting, if you have not yet.',
-    `The user is on: ${describeTab(ctx.activeTab)}`,
+    ...(ctx.activeTab ? [`The user is on: ${describeTab(ctx.activeTab)}`] : []),
+    ...(ctx.directives ?? []),
     'Only the newest of these blocks is current; omit them from summaries and compaction.',
     MOI_CONTEXT_CLOSE
   ].join('\n')
@@ -62,7 +67,7 @@ export function wrapMoiContextSystemReminder(text: string, contextText: string):
 }
 
 // Text-only harnesses (OpenClaw; Codex fallback): the envelope is appended
-// after the user's text, same placement as the view-builder meta block.
+// after the user's text, same placement as the legacy view-builder meta block.
 export function appendMoiContext(text: string, contextText: string): string {
   return text ? `${text}\n\n${contextText}` : contextText
 }

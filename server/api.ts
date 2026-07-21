@@ -5,7 +5,8 @@ import { existsSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 
 import type { UploadInfo, ViewBuilderInput, WorkspaceEntry, WorkspaceModels } from '@/lib/types'
-import { appendViewBuilderMeta } from '@/lib/view-builder-meta'
+import { renderMoiContext } from '@/lib/moi-context'
+import { viewBuilderDirectives } from '@/lib/view-builder-meta'
 
 import { appletForModule, recordAppletError } from './applet-log'
 import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from './applets'
@@ -233,14 +234,19 @@ one.post('/view-builders/:builderId/submit', async c => {
       c.req.param('builderId'),
       body.input.requirements
     )
-    const content = appendViewBuilderMeta(builder.input.requirements, builder.id, availableIcons)
+    // The bootstrap instructions ride the moi-context envelope, injected by
+    // the harness like any other ambient context; the user text stays bare.
+    const context = renderMoiContext({
+      directives: viewBuilderDirectives(builder.id, availableIcons)
+    })
     try {
       await harnessFor(ws).sendMessage({
         workspaceId: ws.id,
         workspacePath: ws.path,
         sessionId: builder.sessionId,
         isNew: true,
-        content,
+        content: builder.input.requirements,
+        context,
         optimisticId: body.optimisticId,
         model: typeof body.model === 'string' ? body.model : undefined,
         effort: typeof body.effort === 'string' ? body.effort : undefined,
