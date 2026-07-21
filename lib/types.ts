@@ -230,6 +230,11 @@ export type ClientMessage =
       // `supportsStreaming` (Claude Code); ignored otherwise. Like effort, a
       // change forces the live session to rebuild.
       stream?: boolean
+      // Structured moi context (lib/moi-context.ts): ambient workspace state
+      // snapshotted at send time, assembled by
+      // client/features/workspace/moi-context.ts. The server renders it per
+      // harness; display paths strip the rendered envelope from bubbles.
+      context?: import('./moi-context').MoiContext
     }
   | { type: 'stop'; workspaceId: string; sessionId: string }
   // Reply to a relayed Scratchpad op (see ScratchpadOpMessage). Carries the

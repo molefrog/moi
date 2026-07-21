@@ -16,6 +16,12 @@
 //     `clientUserMessageId` as `clientId`, so the optimistic-id rendezvous is
 //     first-class (no text matching like OpenClaw needs).
 import { appendAttachmentNote } from '@/lib/attachment-note'
+import {
+  type MoiContext,
+  appendMoiContext,
+  renderMoiContext,
+  renderMoiContextBody
+} from '@/lib/moi-context'
 import { type Part, type SubagentRecord, type Turn, applyEvent, emptyViewState } from '@/lib/format'
 import type { SessionActivity, StreamEvent, ViewState } from '@/lib/types'
 
@@ -474,6 +480,11 @@ export async function sendCodexMessage(input: {
   model?: string
   effort?: string
   stream?: boolean
+  // Structured moi context (lib/moi-context.ts), rendered here. Servers
+  // >= 0.135 take it via `additionalContext` (never enters userMessage
+  // items); older ones get it appended to the text item, stripped from
+  // echoes by the adapter.
+  context?: MoiContext
 }): Promise<void> {
   const uploads = input.attachments?.length
     ? resolveUploads(input.workspaceId, input.attachments)
@@ -549,10 +560,25 @@ export async function sendCodexMessage(input: {
   setProcessing(rec, true, rec.activeTurnId)
   try {
     const client = await getCodexClient(input.workspacePath)
+    // Native context channel: diffed per key server-side (unchanged values
+    // inject nothing) and never echoed back in userMessage items. The entry
+    // key becomes the tag, so ship the unwrapped body. Older servers silently
+    // drop the field, so append to the text item there instead.
+    const additionalContext =
+      input.context && client.supportsAdditionalContext
+        ? { 'moi-context': { value: renderMoiContextBody(input.context), kind: 'application' } }
+        : undefined
+    if (input.context && !additionalContext) {
+      const envelope = renderMoiContext(input.context)
+      const last = userInput[userInput.length - 1]
+      if (last?.type === 'text') last.text = appendMoiContext(last.text, envelope)
+      else userInput.push({ type: 'text', text: envelope })
+    }
     const turnParams = {
       threadId: rec.sessionId,
       clientUserMessageId: turnId,
       input: userInput,
+      ...(additionalContext ? { additionalContext } : {}),
       // Without an explicit summary mode Codex still reasons but emits the
       // reasoning item with EMPTY summary/content (verified on the wire —
       // scripts/codex-probe.ts), so no thinking ever reaches the UI. 'auto'
@@ -570,6 +596,7 @@ export async function sendCodexMessage(input: {
           threadId: rec.sessionId,
           clientUserMessageId: turnId,
           input: userInput,
+          ...(additionalContext ? { additionalContext } : {}),
           expectedTurnId: rec.activeTurnId
         })
       } catch {

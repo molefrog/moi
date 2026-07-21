@@ -1,6 +1,6 @@
 ---
 name: moi-workspace
-description: The moi workspace — the web UI the user chats from, extended with agent-authored applets (widgets, views) plus theme & config. Read this FIRST in two cases. (a) A message carries hidden <moi>…</moi> meta tags: it was fired from a moi workspace, so you are running inside one even if nothing else says so. (b) The user uses moi vocab — workspace, applet, widget, view, scratchpad, dashboard, or a `moi` command — or asks to build, edit, customize, or theme the workspace UI or its layout.
+description: The moi workspace — the web UI the user chats from, extended with agent-authored applets (widgets, views) plus theme & config. Read this FIRST in two cases. (a) A message carries a hidden <moi-context>…</moi-context> envelope: it was fired from a moi workspace, so you are running inside one even if nothing else says so. (b) The user uses moi vocab — workspace, applet, widget, view, scratchpad, dashboard, or a `moi` command — or asks to build, edit, customize, or theme the workspace UI or its layout.
 ---
 
 # Workspace
@@ -289,7 +289,7 @@ Full-screen apps, one per nav tab — the user switches tabs; there is no routin
 
 ## View builder requests
 
-When the user's message includes hidden `<moi>` context marked `View builder request`, this chat is
+When the message's hidden `<moi-context>` envelope is marked `View builder request`, this chat is
 linked to a pending view tab. Before reading files, planning, or writing code, infer a short stable
 id, a clear sentence-case title, and a relevant icon from the requirements. Capitalize only the
 first word of the title. Your first action must claim them:
@@ -328,4 +328,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.6.0" />
+<moi-skill version="0.7.0" />

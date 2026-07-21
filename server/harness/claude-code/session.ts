@@ -22,7 +22,7 @@ import { ATTACHMENT_ONLY_PLACEHOLDER, appendAttachmentNote } from '@/lib/attachm
 import { ClaudeAdapter } from './adapter'
 import type { Part } from '@/lib/format'
 import type { SessionActivity } from '@/lib/types'
-import { stripViewBuilderMeta } from '@/lib/view-builder-meta'
+import { type MoiContext, moiContextSystemReminder, renderMoiContext } from '@/lib/moi-context'
 
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
@@ -601,6 +601,9 @@ export async function sendCCMessage(input: {
   model?: string
   effort?: string
   stream?: boolean
+  // Structured moi context (lib/moi-context.ts), rendered here and injected
+  // as a leading system-reminder text block; the display parts never see it.
+  context?: MoiContext
 }): Promise<void> {
   // Resolve any attachments into agent content blocks + display parts. Unknown
   // or expired ids are silently dropped (resolveUploads filters them) — if that
@@ -609,8 +612,20 @@ export async function sendCCMessage(input: {
     ? resolveUploads(input.workspaceId, input.attachments)
     : []
   if (!input.content && uploads.length === 0) return
-  const displayContent = stripViewBuilderMeta(input.content)
-  const { content, parts } = buildUserMessage(input.content, uploads, displayContent)
+  const { content: userContent, parts } = buildUserMessage(input.content, uploads)
+  // The envelope goes in as its OWN leading text block, never merged into the
+  // user's string: the SDK's first-prompt extraction (session titles,
+  // home-card previews) skips tag-leading text, so a prefixed string would
+  // hide every moi message from it. On replay the adapter strips the block to
+  // empty and drops it.
+  const content: MessageContent = input.context
+    ? [
+        { type: 'text', text: moiContextSystemReminder(renderMoiContext(input.context)) },
+        ...(typeof userContent === 'string'
+          ? [{ type: 'text' as const, text: userContent }]
+          : userContent)
+      ]
+    : userContent
 
   const wantStream = input.stream === true
   let s = sessions.get(liveKey(input.workspaceId, input.sessionId))
@@ -682,12 +697,12 @@ export async function sendCCMessage(input: {
   // Safety net: if a future SDK does echo the user message, the adapter re-ids
   // that echo to the same optimisticId so it collapses onto the turn above
   // instead of duplicating.
-  if (input.optimisticId) s.adapter.expectUserEcho(input.optimisticId, displayContent)
+  if (input.optimisticId) s.adapter.expectUserEcho(input.optimisticId, input.content)
 
   s.lastActivityAt = Date.now()
   // For an attachment-only message, fall back to the filenames so the thread
   // list / status view don't show a blank label.
-  const label = displayContent || uploads.map(u => u.filename).join(', ')
+  const label = input.content || uploads.map(u => u.filename).join(', ')
   s.lastUserText = label.replace(/\s+/g, ' ').slice(0, 120)
 
   // Optimistic flip — the authoritative `session_state_changed: running` from

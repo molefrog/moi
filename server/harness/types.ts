@@ -2,6 +2,7 @@
 // by moi. See README.md in this folder for the full checklist and the
 // message-type layers; each harness's index.ts exports one Harness object
 // wrapping its session/adapter/transport modules.
+import type { MoiContext } from '@/lib/moi-context'
 import type {
   HarnessAvailability,
   McpServer,
@@ -29,6 +30,12 @@ export type SendMessageInput = {
   model?: string
   effort?: string
   stream?: boolean
+  // Structured moi context (lib/moi-context.ts). Each harness renders and
+  // injects it its own way: Claude Code as a leading system-reminder text
+  // block, Codex >= 0.135 via the native additionalContext channel (appended
+  // to the text below that), OpenClaw appended after the text at the gateway
+  // send.
+  context?: MoiContext
   // OpenClaw: the gateway agent that owns the workspace.
   agentId?: string
 }
