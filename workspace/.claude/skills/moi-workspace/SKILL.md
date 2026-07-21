@@ -12,10 +12,6 @@ personal app equipped with a copilot (you). Workspace is a two-way communication
 UI, user can interact with it, send feedback, modify state, then talk back to you. It's a shared UI
 that you and user work together in.
 
-Messages sent from the workspace carry a hidden `<moi-context>` envelope with ambient UI state
-(active tab, one-shot instructions). Trust it over guessing what the user is looking at — "fix
-this" usually means the active tab — and never quote it back.
-
 Workspace features/pages:
 
 - "Widgets" - small reusable full-stack components displayed on the widgets page (dashboard). For
