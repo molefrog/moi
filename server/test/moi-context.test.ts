@@ -4,6 +4,7 @@ import {
   appendMoiContext,
   renderMoiContext,
   stripMoiContext,
+  stripMoiContextLoose,
   unwrapMoiContext,
   wrapMoiContextSystemReminder
 } from '@/lib/moi-context'
@@ -67,6 +68,13 @@ describe('moi context envelope', () => {
     expect(body).toContain('The user is on the "Scratchpad" tab.')
     // Already-unwrapped text passes through.
     expect(unwrapMoiContext(body)).toBe(body)
+  })
+
+  test('loose strip handles truncated envelopes in previews', () => {
+    const sent = appendMoiContext('Fix the header', context)
+    expect(stripMoiContextLoose(sent)).toBe('Fix the header')
+    // A list preview cut mid-envelope has no close tag — cut at the open tag.
+    expect(stripMoiContextLoose(sent.slice(0, sent.indexOf('# Active') + 3))).toBe('Fix the header')
   })
 
   test('leaves text without the marker alone', () => {

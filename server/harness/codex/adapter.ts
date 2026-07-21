@@ -9,7 +9,7 @@
 // Type shapes are hand-written against `codex app-server generate-ts`
 // (CLI 0.144.5) and read defensively — see ./NOTES.md.
 import type { Part, StreamEvent, SystemNotice, ToolCall, ToolState, Turn } from '@/lib/format'
-import { stripMoiContext } from '@/lib/moi-context'
+import { stripMoiContext, stripMoiContextLoose } from '@/lib/moi-context'
 import type { Model, SessionInfo } from '@/lib/types'
 
 import type { WorkspaceActivityPreview } from '../types'
@@ -106,10 +106,18 @@ export type CodexModel = {
 
 // ---- discovery mappings ------------------------------------------------------
 
+// `thread/list.preview` snippets come from the raw first user message — on
+// the pre-0.135 fallback path that text carries the appended context envelope,
+// so previews strip it like transcript turns do. Loose variant: previews are
+// truncated snippets, so a mid-envelope cut must still strip.
+function cleanPreview(preview: string | undefined): string {
+  return preview ? stripMoiContextLoose(preview).trim() : ''
+}
+
 export function codexThreadToSessionInfo(t: CodexThread): SessionInfo {
   return {
     sessionId: t.id,
-    summary: t.name?.trim() || t.preview?.trim() || '',
+    summary: t.name?.trim() || cleanPreview(t.preview),
     // Codex timestamps are unix seconds; SessionInfo wants millis.
     lastModified: (t.updatedAt ?? t.createdAt ?? 0) * 1000,
     cwd: t.cwd
@@ -137,7 +145,7 @@ export function selectCodexWorkspacePreview(
         (a.createdAt ?? a.updatedAt ?? 0) - (b.createdAt ?? b.updatedAt ?? 0) ||
         a.id.localeCompare(b.id)
     )[0]
-    firstUserMessage = oldest?.preview?.trim() || undefined
+    firstUserMessage = cleanPreview(oldest?.preview) || undefined
   }
 
   return {

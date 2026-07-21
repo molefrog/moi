@@ -107,6 +107,16 @@ export function unwrapMoiContext(contextText: string): string {
   return t
 }
 
+// For truncated snippets (session-list / home-card previews): like
+// `stripMoiContext`, but also cuts an unterminated envelope left by
+// mid-envelope truncation. Skips the marker guard — cutting a preview short
+// on a user-typed literal tag is harmless, unlike eating chat-bubble text.
+export function stripMoiContextLoose(text: string): string {
+  const stripped = stripMoiContext(text)
+  const open = stripped.indexOf(MOI_CONTEXT_OPEN)
+  return open === -1 ? stripped : stripped.slice(0, open).trimEnd()
+}
+
 // Remove the envelope (and, for Claude Code transcripts, its enclosing
 // system-reminder wrapper) from user-message text before display.
 export function stripMoiContext(text: string): string {
