@@ -40,11 +40,14 @@ describe('moi context envelope', () => {
     expect(stripMoiContext(wrapMoiContextSystemReminder('', context))).toBe('')
   })
 
-  test('renders directives and omits the tab line when unset', () => {
-    const rendered = renderMoiContext({ directives: ['Do the thing first.', 'Then bundle.'] })
+  test('renders directives after the tab line', () => {
+    const rendered = renderMoiContext({
+      activeTab: 'view-builder:builder-1',
+      directives: ['Do the thing first.', 'Then bundle.']
+    })
+    expect(rendered).toContain('The user is on: view builder "builder-1"')
     expect(rendered).toContain('Do the thing first.')
     expect(rendered).toContain('Then bundle.')
-    expect(rendered).not.toContain('The user is on:')
     expect(stripMoiContext(appendMoiContext('Build it', rendered))).toBe('Build it')
   })
 

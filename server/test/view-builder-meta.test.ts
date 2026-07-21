@@ -21,8 +21,10 @@ const LEGACY_CONTENT = [
 describe('view builder directives', () => {
   test('render into the moi-context envelope with the agent instructions', () => {
     const context = renderMoiContext({
+      activeTab: 'view-builder:builder-123',
       directives: viewBuilderDirectives('builder-123', ['chart', 'calendar'])
     })
+    expect(context).toContain('The user is on: view builder "builder-123"')
     expect(context).toContain('View builder request')
     expect(context).toContain('Builder id: builder-123')
     expect(context).toContain('Available view icons: chart, calendar')

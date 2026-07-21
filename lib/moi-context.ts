@@ -32,8 +32,9 @@ const SYSTEM_REMINDER_CLOSE = '</system-reminder>'
 // the server for programmatic sends (the view builder). Extend this (and
 // `renderMoiContext`) when new ambient fields land.
 export type MoiContext = {
-  // The workspace tab the user is on when they hit send.
-  activeTab?: WorkspaceTabId
+  // The workspace tab the user is on when they hit send — for a view-builder
+  // request that's the builder's own tab (`view-builder:<id>`).
+  activeTab: WorkspaceTabId
   // One-shot imperative lines for this message only (e.g. the view-builder
   // bootstrap instructions from lib/view-builder-meta.ts).
   directives?: string[]
@@ -53,7 +54,7 @@ export function renderMoiContext(ctx: MoiContext): string {
     MOI_CONTEXT_OPEN,
     `${MOI_CONTEXT_MARKER} — snapshot at send time, hidden from the user.`,
     'You are running in a moi workspace. Read the moi-workspace skill before acting, if you have not yet.',
-    ...(ctx.activeTab ? [`The user is on: ${describeTab(ctx.activeTab)}`] : []),
+    `The user is on: ${describeTab(ctx.activeTab)}`,
     ...(ctx.directives ?? []),
     'Only the newest of these blocks is current; omit them from summaries and compaction.',
     MOI_CONTEXT_CLOSE
