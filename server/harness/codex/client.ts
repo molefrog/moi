@@ -21,6 +21,7 @@ import {
   selectCodexWorkspacePreview
 } from './adapter'
 import type { WorkspaceActivityPreview } from '../types'
+import { findHarnessExecutable, requireHarnessExecutable } from '../executable'
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
 import { resolveWorkspaceEnv } from '../../workspace-env'
@@ -42,7 +43,7 @@ export type CodexProcessInfo = {
 
 export function getCodexProcessInfo(workspacePath: string): Promise<CodexProcessInfo> {
   const rec = clients.get(workspacePath)
-  const binary = findCodexBinary()
+  const binary = findHarnessExecutable('codex')
   if (!rec) return Promise.resolve({ running: false, binary })
   return rec
     .then(r => ({ running: r.client.isAlive(), pid: r.proc.pid, binary }))
@@ -77,14 +78,6 @@ export function codexSupportsAdditionalContext(userAgent: string | undefined): b
   return true
 }
 
-// Locate the codex binary. Codex Desktop does NOT guarantee a `codex` on PATH
-// (it manages an app-internal install), so honor an explicit override first.
-export function findCodexBinary(): string | null {
-  const explicit = process.env.CODEX_CLI_PATH
-  if (explicit) return explicit
-  return Bun.which('codex')
-}
-
 type ClientRecord = {
   client: CodexClient
   proc: ReturnType<typeof Bun.spawn>
@@ -93,12 +86,7 @@ type ClientRecord = {
 const clients = new Map<string, Promise<ClientRecord>>() // key: workspacePath
 
 async function startClient(workspacePath: string): Promise<ClientRecord> {
-  const bin = findCodexBinary()
-  if (!bin) {
-    throw new Error(
-      'codex CLI not found — install it (`npm i -g @openai/codex`) or set CODEX_CLI_PATH'
-    )
-  }
+  const bin = requireHarnessExecutable('codex')
 
   const workspaceEnv = await resolveWorkspaceEnv(workspacePath)
   const proc = Bun.spawn([bin, 'app-server'], {

@@ -1,7 +1,15 @@
 import { IconChevronRight, IconEggCracked, IconLoader2, IconPlus } from '@tabler/icons-react'
 import { Link, useLocation } from 'wouter'
 
-import { useAddWorkspace, useDiscoveredWorkspaces, useWorkspacePreview, useWorkspaces } from './api'
+import {
+  useDiscoveredWorkspaces,
+  useWorkspacePreview,
+  useWorkspaces,
+  useWorkspaceSetupInfo
+} from './api'
+import { CreateWorkspaceDialog } from './workspace-setup/CreateWorkspaceDialog'
+import { ImportWorkspaceDialog } from './workspace-setup/ImportWorkspaceDialog'
+import { useWorkspaceImport } from './workspace-setup/useWorkspaceImport'
 import { HomeLogo } from './HomeLogo'
 import { Button } from '@/client/components/ui/button'
 import {
@@ -12,20 +20,22 @@ import {
 import { cn } from '@/client/lib/cn'
 import { useUiStore } from '@/client/store/ui'
 import {
-  WorkspaceTypeIcon,
+  WorkspaceAgentIcons,
   workspaceDisplayName,
   workspaceProviderIcon
 } from '@/client/features/home/workspace-presentation'
 import type { DiscoveredWorkspace, WorkspaceEntry } from '@/lib/types'
 
-import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { WorkspacePreview } from './WorkspacePreview'
 
 export function HomePage() {
   const [, navigate] = useLocation()
   const workspacesQuery = useWorkspaces()
   const discoveredQuery = useDiscoveredWorkspaces()
-  const importMutation = useAddWorkspace()
+  const setupInfo = useWorkspaceSetupInfo()
+  const importFlow = useWorkspaceImport({
+    onSuccess: entry => navigate(`/workspace/${entry.id}`)
+  })
   const discoveredWorkspacesOpen = useUiStore(state => state.discoveredWorkspacesOpen)
   const setDiscoveredWorkspacesOpen = useUiStore(state => state.setDiscoveredWorkspacesOpen)
 
@@ -48,13 +58,9 @@ export function HomePage() {
   const workspaces = workspacesQuery.data
   const discovered = discoveredQuery.data
   const count = workspaces.length
-  const importingPath =
-    importMutation.isPending && importMutation.variables ? importMutation.variables.path : null
 
   function handleAdd(suggestion: DiscoveredWorkspace) {
-    importMutation.mutate(suggestion, {
-      onSuccess: entry => navigate(`/workspace/${entry.id}`)
-    })
+    importFlow.startImport(suggestion)
   }
 
   return (
@@ -122,20 +128,24 @@ export function HomePage() {
             <CollapsibleContent>
               <ul className="border-t border-border">
                 {discovered.map(item => (
-                  <SuggestedRow
-                    key={item.path}
-                    suggestion={item}
-                    onAdd={handleAdd}
-                    loading={importingPath === item.path}
-                  />
+                  <SuggestedRow key={item.path} suggestion={item} onAdd={handleAdd} />
                 ))}
               </ul>
-              {importMutation.isError && (
-                <p className="mt-3 text-xs text-destructive">{importMutation.error.message}</p>
-              )}
             </CollapsibleContent>
           </Collapsible>
         </section>
+      )}
+
+      {importFlow.choice && (
+        <ImportWorkspaceDialog
+          choice={importFlow.choice}
+          availability={setupInfo.data?.availability}
+          isPending={importFlow.isPending}
+          errorMessage={importFlow.error?.message}
+          onTypeChange={importFlow.selectType}
+          onSubmit={importFlow.submit}
+          onReset={importFlow.reset}
+        />
       )}
     </div>
   )
@@ -174,25 +184,20 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
 type SuggestedRowProps = {
   suggestion: DiscoveredWorkspace
   onAdd: (suggestion: DiscoveredWorkspace) => void
-  loading: boolean
 }
 
-function SuggestedRow({ suggestion, onAdd, loading }: SuggestedRowProps) {
-  const { path, type } = suggestion
+function SuggestedRow({ suggestion, onAdd }: SuggestedRowProps) {
+  const { path, types } = suggestion
   const name = workspaceDisplayName(suggestion)
   return (
     <li className="flex items-center gap-2 border-b border-border px-1 py-3">
-      <WorkspaceTypeIcon type={type} />
+      <WorkspaceAgentIcons types={types} />
       <span className="shrink-0 text-sm font-medium text-foreground">{name}</span>
       <span title={path} className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
         {suggestion.displayPath ?? path}
       </span>
-      <Button variant="outline" size="sm" onClick={() => onAdd(suggestion)} disabled={loading}>
-        {loading ? (
-          <IconLoader2 stroke={1.75} className="animate-spin" />
-        ) : (
-          <IconPlus stroke={1.75} />
-        )}
+      <Button variant="outline" size="sm" onClick={() => onAdd(suggestion)}>
+        <IconPlus stroke={1.75} />
         Add
       </Button>
     </li>

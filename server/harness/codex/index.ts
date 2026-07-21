@@ -1,6 +1,7 @@
 // Codex as a Harness. Thin wiring over this folder's modules — see
 // ../types.ts for the contract and ../README.md for the architecture.
 import type { Harness } from '../types'
+import { pathHarnessAvailability } from '../executable'
 import {
   getCodexMcpStatus,
   getCodexModels,
@@ -11,6 +12,7 @@ import {
   killAllCodexClients,
   killCodexWorkspace
 } from './client'
+import { discoverCodexWorkspaces } from './discovery'
 import {
   ensureCodexSessionLive,
   getCodexActiveSessions,
@@ -54,6 +56,8 @@ export const codexHarness: Harness = {
   },
   listModels: ws => getCodexModels(ws.path),
   mcpStatus: ws => getCodexMcpStatus(ws.path),
+  discoverWorkspaces: registeredPaths => discoverCodexWorkspaces(registeredPaths),
+  availability: async () => pathHarnessAvailability('codex'),
 
   onEnvChanged: workspacePath => killCodexWorkspace(workspacePath),
   shutdown: () => killAllCodexClients(),

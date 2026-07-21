@@ -3,7 +3,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import type { ViewInfo, WidgetInfo, WorkspaceLayout, WorkspaceType } from '@/lib/types'
+import type {
+  HarnessAvailability,
+  ViewInfo,
+  WidgetInfo,
+  WorkspaceLayout,
+  WorkspaceType
+} from '@/lib/types'
 
 export type WorkspaceLayoutResponse = WorkspaceLayout & {
   cwd: string
@@ -17,6 +23,18 @@ export function useWorkspaceLayout(workspaceId: string) {
     queryKey: workspaceKeys.layout(workspaceId),
     queryFn: () => requestJson(`/api/workspaces/${workspaceId}`),
     ...WORKSPACE_RESOURCE_OPTIONS
+  })
+}
+
+// Is the workspace's agent executable installed? Drives the Send button's
+// disabled state and tooltip. Refetches on window focus so installing the
+// missing runtime and returning to the tab unlocks the composer.
+export function useWorkspaceAvailability(workspaceId: string) {
+  return useQuery<HarnessAvailability>({
+    queryKey: workspaceKeys.availability(workspaceId),
+    queryFn: () => requestJson(`/api/workspaces/${workspaceId}/availability`),
+    staleTime: 30_000,
+    refetchOnWindowFocus: true
   })
 }
 

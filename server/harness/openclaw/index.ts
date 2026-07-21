@@ -1,8 +1,6 @@
 // OpenClaw as a Harness. Thin wiring over this folder's modules — see
 // ../types.ts for the contract and ../README.md for the architecture.
-import type { DiscoveredWorkspace } from '@/lib/types'
-
-import type { Harness } from '../types'
+import type { DiscoveredWorkspaceCandidate, Harness } from '../types'
 import { toSessionInfo, toStreamEvents } from './adapter'
 import {
   discoverOpenClawAgents,
@@ -73,13 +71,9 @@ export const openclawHarness: Harness = {
     return agents
       .filter(a => !registeredPaths.has(a.path))
       .map(
-        (a): DiscoveredWorkspace => ({
+        (a): DiscoveredWorkspaceCandidate => ({
           path: a.path,
-          type: 'openclaw',
-          ...(a.name ? { name: a.name } : {}),
-          ...(a.agentId ? { agentId: a.agentId } : {}),
-          ...(a.isDefault ? { isDefault: a.isDefault } : {}),
-          ...(a.lastRunAt ? { lastRunAt: a.lastRunAt } : {})
+          type: 'openclaw'
         })
       )
   },

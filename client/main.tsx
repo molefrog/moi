@@ -3,6 +3,7 @@ import { Agentation } from 'agentation'
 import { createRoot } from 'react-dom/client'
 import { Router } from 'wouter'
 
+import { TooltipProvider } from '@/client/components/ui/tooltip'
 import { installAppletErrorHook } from '@/client/features/applets/applet-log'
 import { initConnection } from '@/client/features/chat/chat-connection'
 import { AppRouter } from './app/AppRouter'
@@ -22,10 +23,12 @@ export function mount(el: HTMLElement) {
   function Root() {
     return (
       <QueryClientProvider client={queryClient}>
-        <Router>
-          <AppRouter />
-        </Router>
-        {process.env.NODE_ENV === 'development' && <Agentation />}
+        <TooltipProvider>
+          <Router>
+            <AppRouter />
+          </Router>
+          {process.env.NODE_ENV === 'development' && <Agentation />}
+        </TooltipProvider>
       </QueryClientProvider>
     )
   }

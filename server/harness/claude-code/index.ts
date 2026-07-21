@@ -2,9 +2,11 @@
 // ../types.ts for the contract and ../README.md for the architecture.
 import { join } from 'node:path'
 
-import type { DiscoveredWorkspace, McpServer } from '@/lib/types'
+import type { McpServer } from '@/lib/types'
 
-import type { Harness } from '../types'
+import type { DiscoveredWorkspaceCandidate, Harness } from '../types'
+import { pathHarnessAvailability } from '../executable'
+import { isLinkedGitWorktree } from './git-worktree'
 import { getMcpStatus } from './mcp'
 import { getClaudeModels } from './models'
 import {
@@ -38,7 +40,9 @@ function fmtAgo(ts: number, now: number): string {
 }
 
 // Discover directories with CC session history that aren't registered yet.
-async function discoverWorkspaces(registeredPaths: Set<string>): Promise<DiscoveredWorkspace[]> {
+async function discoverWorkspaces(
+  registeredPaths: Set<string>
+): Promise<DiscoveredWorkspaceCandidate[]> {
   try {
     const { listSessions } = await import('@anthropic-ai/claude-agent-sdk')
     const sessions = await listSessions({})
@@ -51,7 +55,13 @@ async function discoverWorkspaces(registeredPaths: Set<string>): Promise<Discove
         if (info.isDirectory()) paths.add(s.cwd)
       } catch {}
     }
-    return [...paths].map(path => ({ path, type: 'claude-code' as const }))
+    // Drop linked git worktrees — throwaway checkouts (e.g. worktree-isolated
+    // runs) that shouldn't surface as importable workspaces.
+    const candidates = [...paths]
+    const worktree = await Promise.all(candidates.map(isLinkedGitWorktree))
+    return candidates
+      .filter((_, i) => !worktree[i])
+      .map(path => ({ path, type: 'claude-code' as const }))
   } catch {
     return []
   }
@@ -78,8 +88,9 @@ export const claudeCodeHarness: Harness = {
   listModels: ws => getClaudeModels(ws.path),
   // The SDK's McpServerStatus is a superset of the UI's McpServer (extra
   // fields are ignored by the client) — pass it through unchanged.
-  mcpStatus: async ws => (await getMcpStatus(ws.path, 'project')) as unknown as McpServer[],
+  mcpStatus: async ws => (await getMcpStatus(ws.path)) as unknown as McpServer[],
   discoverWorkspaces,
+  availability: async () => pathHarnessAvailability('claude-code'),
 
   onEnvChanged: workspacePath => restartWorkspaceSessions(workspacePath),
   shutdown: () => killAllCCSessions(),

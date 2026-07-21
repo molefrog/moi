@@ -4,7 +4,7 @@
 // wrapping its session/adapter/transport modules.
 import type { MoiContext } from '@/lib/moi-context'
 import type {
-  DiscoveredWorkspace,
+  HarnessAvailability,
   McpServer,
   Model,
   SessionActivity,
@@ -63,6 +63,11 @@ export type WorkspaceActivityPreview = {
   updatedAt?: number
 }
 
+export type DiscoveredWorkspaceCandidate = {
+  path: string
+  type: WorkspaceType
+}
+
 export type Harness = {
   id: WorkspaceType
   capabilities: HarnessCapabilities
@@ -90,7 +95,10 @@ export type Harness = {
   // MCP server status for the connectors UI; absent = backend has no MCP story.
   mcpStatus?(ws: WorkspaceEntry): Promise<McpServer[]>
   // Workspaces this backend knows about that aren't registered yet.
-  discoverWorkspaces?(registeredPaths: Set<string>): Promise<DiscoveredWorkspace[]>
+  discoverWorkspaces?(registeredPaths: Set<string>): Promise<DiscoveredWorkspaceCandidate[]>
+  // Is the backend's runtime present on this machine? Absent = always
+  // available. Cheap enough to call per request (a PATH lookup, not a probe).
+  availability?(): Promise<HarnessAvailability>
 
   // -- host integration hooks -------------------------------------------------
   // Env is frozen at spawn everywhere; this reaps idle sessions/processes so

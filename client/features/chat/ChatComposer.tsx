@@ -1,15 +1,15 @@
 import { type RefObject, useRef, useState } from 'react'
 
-import {
-  IconArrowUp,
-  IconFile,
-  IconLoader2,
-  IconPaperclip,
-  IconPlayerStop,
-  IconX
-} from '@tabler/icons-react'
+import { IconFile, IconLoader2, IconPaperclip, IconPlayerStop, IconX } from '@tabler/icons-react'
 
-import { Composer, ComposerFooter, ComposerTextarea } from '@/client/components/shared/Composer'
+import {
+  canSubmitComposerAction,
+  Composer,
+  ComposerFooter,
+  ComposerSubmitButton,
+  ComposerTextarea
+} from '@/client/components/shared/Composer'
+import { Button } from '@/client/components/ui/button'
 import { cn } from '@/client/lib/cn'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { uploadFiles } from '@/client/features/chat/uploads'
@@ -21,13 +21,13 @@ import {
 } from '@/client/features/chat/chat-store'
 
 import { ModelPicker } from './ModelPicker'
-import { Button } from '@/client/components/ui/button'
 
 type ChatComposerProps = {
   composerRef: RefObject<HTMLTextAreaElement | null>
   onSend: (text: string) => void
   onStop: () => void
   processing: boolean
+  unavailableReason: string | null | undefined
 }
 
 // The composer owns the draft: it reads/writes the per-thread draft in the live
@@ -35,7 +35,13 @@ type ChatComposerProps = {
 // panel, message list, or surrounding workspace. The draft is keyed by the
 // active thread, so switching threads swaps the unsent text with you. Attachments
 // (drag/drop, paste, attach button) are tracked the same way and cleared on send.
-export function ChatComposer({ composerRef, onSend, onStop, processing }: ChatComposerProps) {
+export function ChatComposer({
+  composerRef,
+  onSend,
+  onStop,
+  processing,
+  unavailableReason
+}: ChatComposerProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const workspaceId = useWorkspaceId()
   const sessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
@@ -45,7 +51,8 @@ export function ChatComposer({ composerRef, onSend, onStop, processing }: ChatCo
 
   const uploading = attachments.some(a => a.status === 'uploading')
   const hasReady = attachments.some(a => a.status === 'ready')
-  const canSend = (value.trim().length > 0 || hasReady) && !uploading
+  const hasContent = value.trim().length > 0 || hasReady
+  const canSend = canSubmitComposerAction(hasContent, uploading, unavailableReason)
 
   const onChange = (next: string) => liveStore.getState().setDraft(workspaceId, sessionId, next)
 
@@ -176,9 +183,12 @@ export function ChatComposer({ composerRef, onSend, onStop, processing }: ChatCo
             <IconPlayerStop stroke={1.5} />
           </Button>
         ) : (
-          <Button type="submit" size="icon" disabled={!canSend} aria-label="Send message">
-            <IconArrowUp stroke={1.5} />
-          </Button>
+          <ComposerSubmitButton
+            label="Send message"
+            hasContent={hasContent}
+            busy={uploading}
+            unavailableReason={unavailableReason}
+          />
         )}
       </ComposerFooter>
     </Composer>

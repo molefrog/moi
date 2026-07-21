@@ -173,16 +173,17 @@ tag matches the tag the moi-workspace skill triggers on):
 - Typed bindings are generated, version-matched to the installed binary:
   `codex app-server generate-ts --out DIR` (or `generate-json-schema`).
 
-### Binary availability (Codex Desktop caveat)
+### Binary availability
 
-Don't assume Codex Desktop puts `codex` on PATH. The desktop app is a CLI
-_consumer_: it resolves an external codex binary (honoring `CODEX_CLI_PATH`,
-then PATH) and on first launch can install/update `@openai/codex` with a Node
-runtime bundled inside the app — app-managed, not necessarily a shell-visible
-`codex` command. Officially the CLI is a separate install (`npm i -g
-@openai/codex`, brew, or the standalone installer). The adapter should detect
-the binary: explicit config → `CODEX_CLI_PATH` → `codex` on PATH → error with
-install instructions.
+The adapter resolves `codex` through `../executable.ts`: first a PATH lookup
+over the server's PATH merged with the user's login-shell PATH
+(`../shell-path.ts`), then the known macOS app-bundle locations —
+`/Applications/ChatGPT.app/Contents/Resources/codex` and the legacy
+`/Applications/Codex.app/Contents/Resources/codex` — since Codex Desktop
+manages an app-internal binary that is not shell-visible. PATH wins over the
+bundle probe, so a deliberately installed CLI is never shadowed. If nothing
+resolves, install the CLI with
+`curl -fsSL https://chatgpt.com/codex/install.sh | sh`.
 
 ## 3. Client libraries
 
@@ -236,8 +237,13 @@ state, steer/interrupt, previews, usage). Empirical findings beyond §2:
 - **`turn/completed` carries no items** (`itemsView: "notLoaded"`); items
   arrive only via `item/started`/`item/completed`.
 - **The npm `codex` bin is a Node shim** that spawns the platform binary;
-  killing the shim tears down the server via stdin EOF, so no orphans — but
-  binary detection must tolerate shim paths (`CODEX_CLI_PATH` → PATH).
+  killing the shim tears down the server via stdin EOF, so no orphans. The
+  absolute shim path returned by the PATH lookup is safe to spawn.
+- **Rollout files double as a discovery index.** Each thread persists to
+  `~/.codex/sessions/YYYY/MM/DD/rollout-<timestamp>-<uuid>.jsonl` whose first
+  line is a `session_meta` record with the thread's `cwd` (older formats put
+  the meta fields at the top level). `discovery.ts` reads those heads directly
+  — workspace discovery works without the binary installed.
 - **User-level config bleeds in**: threads start MCP servers and hooks from
   `~/.codex/config.toml` / `hooks.json` per thread; their failures arrive as
   notifications (`mcpServer/startupStatus/updated`, `hook/completed`) we

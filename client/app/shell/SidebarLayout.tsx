@@ -1,13 +1,13 @@
 import { type ReactNode } from 'react'
 
-import { IconPlugConnected, IconPlus, IconSmartHome } from '@tabler/icons-react'
+import { IconPlus, IconSmartHome } from '@tabler/icons-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'wouter'
 
 import { useReorderWorkspaces, useWorkspaces } from '@/client/features/home/api'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
-import { CreateWorkspaceDialog } from '@/client/features/home/CreateWorkspaceDialog'
+import { CreateWorkspaceDialog } from '@/client/features/home/workspace-setup/CreateWorkspaceDialog'
 import { ReorderableList } from '@/client/components/shared/ReorderableList'
 import type { ReorderableRenderState } from '@/client/components/shared/ReorderableList'
 import { Button, buttonVariants } from '@/client/components/ui/button'
@@ -119,21 +119,8 @@ function Sidebar({ workspaces }: SidebarProps) {
         )}
       </nav>
 
-      <ConnectorsNavLink />
+      <div aria-hidden="true" className="size-8 shrink-0" />
     </aside>
-  )
-}
-
-function ConnectorsNavLink() {
-  return (
-    <Link
-      href="/connectors"
-      aria-label="Connectors"
-      title="Connectors"
-      className={sidebarNavButtonClass}
-    >
-      <IconPlugConnected stroke={1.5} />
-    </Link>
   )
 }
 

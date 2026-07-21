@@ -1,14 +1,21 @@
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react'
 
-import { IconArrowUp, IconLoader2 } from '@tabler/icons-react'
+import { IconLoader2 } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
-import { Composer, ComposerFooter, ComposerTextarea } from '@/client/components/shared/Composer'
+import {
+  canSubmitComposerAction,
+  Composer,
+  ComposerFooter,
+  ComposerSubmitButton,
+  ComposerTextarea
+} from '@/client/components/shared/Composer'
 import { ModelPicker } from '@/client/features/chat/ModelPicker'
 import type { ViewBuilder } from '@/lib/types'
 
 type ViewBuilderTabProps = {
   builder: ViewBuilder
+  unavailableReason: string | null | undefined
   onSave: (requirements: string) => Promise<unknown>
   onSubmit: (requirements: string) => Promise<unknown>
   onOpenChat: () => void
@@ -17,6 +24,7 @@ type ViewBuilderTabProps = {
 
 export function ViewBuilderTab({
   builder,
+  unavailableReason,
   onSave,
   onSubmit,
   onOpenChat,
@@ -28,6 +36,8 @@ export function ViewBuilderTab({
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const onSaveRef = useRef(onSave)
   onSaveRef.current = onSave
+  const hasRequirements = requirements.trim().length > 0
+  const canSubmit = canSubmitComposerAction(hasRequirements, submitting, unavailableReason)
 
   useEffect(() => {
     if (builder.status !== 'draft' || requirements === builder.input.requirements) return
@@ -44,7 +54,7 @@ export function ViewBuilderTab({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
-    if (!requirements.trim() || submitting) return
+    if (!canSubmit) return
     setSubmitting(true)
     try {
       await onSubmit(requirements)
@@ -88,18 +98,12 @@ export function ViewBuilderTab({
             />
             <ComposerFooter>
               <ModelPicker scope="workspace" />
-              <Button
-                type="submit"
-                size="icon"
-                disabled={!requirements.trim() || submitting}
-                aria-label="Build view"
-              >
-                {submitting ? (
-                  <IconLoader2 stroke={1.5} className="animate-spin" />
-                ) : (
-                  <IconArrowUp stroke={1.5} />
-                )}
-              </Button>
+              <ComposerSubmitButton
+                label="Build view"
+                hasContent={hasRequirements}
+                loading={submitting}
+                unavailableReason={unavailableReason}
+              />
             </ComposerFooter>
           </Composer>
           {saveError && (

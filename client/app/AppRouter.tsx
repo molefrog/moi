@@ -3,7 +3,6 @@ import { Suspense, lazy, useEffect } from 'react'
 import { Route, Switch, useLocation } from 'wouter'
 
 import { setWorkspaceSwitchHandler } from '@/client/features/chat/chat-connection'
-import { ConnectorsPage } from '@/client/features/connectors/ConnectorsPage'
 
 import { HomeRoute } from './routes/HomeRoute'
 import { WorkspaceRoute } from './routes/WorkspaceRoute'
@@ -34,7 +33,6 @@ export function AppRouter() {
   return (
     <Switch>
       <Route path="/" component={HomeRoute} />
-      <Route path="/connectors" component={ConnectorsPage} />
       <Route path="/dev/*?" component={DevLazy} />
       <Route path="/workspace/:id">
         {(params: { id: string }) => <WorkspaceRoute key={params.id} id={params.id} />}

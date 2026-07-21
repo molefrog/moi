@@ -352,6 +352,12 @@ export type WorkspaceSwitchMessage = {
 
 export type WorkspaceType = 'claude-code' | 'openclaw' | 'codex'
 
+// Whether an agent backend's runtime is installed on this machine. `reason` is
+// user-facing copy explaining what to do next. Surfaced by
+// GET /api/workspaces/create (per-type map, drives setup dialogs) and
+// GET /api/workspaces/:id/availability (disables Send in existing workspaces).
+export type HarnessAvailability = { available: true } | { available: false; reason: string }
+
 // One MCP server's connection status, as surfaced by GET /api/workspaces/:id/mcp
 // (a subset of the agent SDK's McpServerStatus — only what the UI renders).
 export type McpServerState = 'connected' | 'failed' | 'needs-auth' | 'pending' | 'disabled'
@@ -385,12 +391,9 @@ export type WorkspaceEntry = {
 
 export type DiscoveredWorkspace = {
   path: string
-  type: WorkspaceType
-  name?: string
   displayPath?: string
-  agentId?: string
-  isDefault?: boolean
-  lastRunAt?: string
+  // Deduplicated in canonical provider order by the discovery API.
+  types: WorkspaceType[]
 }
 
 export type SessionRenamedMessage = {

@@ -25,6 +25,7 @@ type ChatPanelProps = {
   processing: boolean
   error?: string | null
   onDismissError?: () => void
+  unavailableReason: string | null | undefined
   send: (text: string) => void
   stop: () => void
   onSwitchThread: (sessionId: string | null) => void
@@ -48,6 +49,7 @@ export function ChatPanel({
   processing,
   error,
   onDismissError,
+  unavailableReason,
   send,
   stop,
   onSwitchThread,
@@ -141,9 +143,9 @@ export function ChatPanel({
         )}
       </div>
 
-      <div className="mx-auto flex w-full justify-center px-3">
+      <div className="mx-auto flex w-full flex-col items-center px-3">
         {error && (
-          <div className="mb-2 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <div className="mb-2 flex w-full max-w-(--chat-max-container) items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             <span className="flex-1 wrap-break-word">{error}</span>
             {onDismissError && (
               <Button
@@ -164,6 +166,7 @@ export function ChatPanel({
           onSend={handleSend}
           onStop={stop}
           processing={processing}
+          unavailableReason={unavailableReason}
         />
       </div>
     </div>

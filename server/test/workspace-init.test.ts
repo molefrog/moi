@@ -16,6 +16,10 @@ describe('skillsDirFor', () => {
   test('openclaw agents load skills from <workspace>/skills', () => {
     expect(skillsDirFor('/agent', 'openclaw')).toBe(join('/agent', 'skills'))
   })
+
+  test('codex workspaces load skills from .agents/skills', () => {
+    expect(skillsDirFor('/ws', 'codex')).toBe(join('/ws', '.agents', 'skills'))
+  })
 })
 
 describe('validateWorkspaceFolderName', () => {

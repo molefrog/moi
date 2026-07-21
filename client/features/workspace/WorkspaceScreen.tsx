@@ -14,7 +14,6 @@ import {
 import { ChatPanel } from '@/client/features/chat/ChatPanel'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { CustomizePanel } from '@/client/features/workspace/CustomizePanel'
-import { McpMenu } from '@/client/features/connectors/McpMenu'
 import { AppletMount } from '@/client/features/applets/AppletMount'
 import { WidgetErrorBoundary } from '@/client/features/applets/WidgetErrorBoundary'
 import { Widgets } from '@/client/features/widgets/Widgets'
@@ -28,6 +27,7 @@ import { useView } from '@/client/features/applets/useApplet'
 import { ViewBuilderTab } from '@/client/features/views/ViewBuilderTab'
 import { useViewBuilderActions } from '@/client/features/views/useViewBuilderActions'
 import { useFitsSplitLayout } from '@/client/features/workspace/useFitsSplitLayout'
+import { useWorkspaceAvailability } from '@/client/features/workspace/api'
 import { useWorkspaceTheme } from '@/client/features/workspace/useWorkspaceTheme'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
@@ -157,7 +157,7 @@ type WorkspaceCustomizeActionProps = {
 
 function WorkspaceCustomizeAction({ active, onToggle }: WorkspaceCustomizeActionProps) {
   return (
-    <Tooltip delay={50}>
+    <Tooltip>
       <TooltipTrigger
         render={
           <Button
@@ -274,6 +274,11 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     dismissError
   } = useChat()
   const { layout, setLayout, name, icon, provider, workspaceId } = useWorkspaceLayoutCtx()
+  // Keep the composer read/write, but block sends when its agent executable is
+  // missing. The Send button explains how to install it.
+  const availability = useWorkspaceAvailability(workspaceId).data
+  const unavailableReason =
+    availability === undefined ? undefined : availability.available ? null : availability.reason
   const builderActions = useViewBuilderActions()
   const { ref: rowRef, fits: canUseSplit } = useFitsSplitLayout<HTMLDivElement>()
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
@@ -524,6 +529,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       processing={processing}
       error={error}
       onDismissError={dismissError}
+      unavailableReason={unavailableReason}
       send={send}
       stop={stop}
       onSwitchThread={switchThread}
@@ -540,6 +546,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       processing={processing}
       error={error}
       onDismissError={dismissError}
+      unavailableReason={unavailableReason}
       send={send}
       stop={stop}
       onSwitchThread={switchThread}
@@ -588,7 +595,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
                     setWidgetMode(widgetMode === 'customizing' ? 'idle' : 'customizing')
                   }
                 />
-                <McpMenu />
                 <WorkspaceSettings />
                 {hasWorkspaceContent && canUseSplit && (
                   <SectionControls
@@ -616,6 +622,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               <ViewBuilderTab
                 key={activeBuilder.id}
                 builder={activeBuilder}
+                unavailableReason={unavailableReason}
                 onSave={requirements => builderActions.save(activeBuilder.id, requirements)}
                 onSubmit={requirements => {
                   if (mode === 'fullscreen') setFloatingChatOpen(true)
@@ -669,6 +676,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               processing={processing}
               error={error}
               onDismissError={dismissError}
+              unavailableReason={unavailableReason}
               send={send}
               stop={stop}
               onSwitchThread={switchThread}

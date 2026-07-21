@@ -8,7 +8,6 @@ import type { ToolCall } from '@/lib/types'
 import { Button } from '@/client/components/ui/button'
 import { CodeBlock } from './CodeBlock'
 import { detectOutput } from './detect'
-import { formatBytes } from './format'
 
 type ToolOutputProps = { call: ToolCall; output: string; isError: boolean }
 
@@ -49,13 +48,7 @@ export function ToolOutput({ call, output, isError }: ToolOutputProps) {
   return (
     <div className="overflow-hidden rounded-md border border-border bg-muted">
       {/* Size is always the raw output; copy grabs whatever's currently shown. */}
-      <Header
-        raw={raw}
-        onRaw={setRaw}
-        label={view.label}
-        size={formatBytes(output)}
-        copyText={raw ? output : view.code}
-      />
+      <Header raw={raw} onRaw={setRaw} label={view.label} copyText={raw ? output : view.code} />
       {raw ? (
         <pre className={cn(PRE, 'break-all whitespace-pre-wrap text-muted-foreground')}>
           {output || '(empty)'}
@@ -71,19 +64,18 @@ type HeaderProps = {
   raw: boolean
   onRaw: (raw: boolean) => void
   label: string
-  size: string
   copyText: string
 }
 
 // Output toolbar: a left outline switch (<label> | raw), and on the right the
 // raw byte size + a copy button.
-function Header({ raw, onRaw, label, size, copyText }: HeaderProps) {
+function Header({ raw, onRaw, label, copyText }: HeaderProps) {
   const options: [boolean, string][] = [
     [false, label],
     [true, 'raw']
   ]
   return (
-    <div className="flex items-center gap-1 border-b border-border px-2 py-1">
+    <div className="flex items-center gap-1 border-b border-border p-2">
       {options.map(([value, text]) => (
         <Button
           key={text}
@@ -91,12 +83,12 @@ function Header({ raw, onRaw, label, size, copyText }: HeaderProps) {
           variant={raw === value ? 'outline' : 'ghost'}
           size="sm"
           onClick={() => onRaw(value)}
+          className="rounded-full text-xs uppercase"
         >
           {text}
         </Button>
       ))}
       <div className="flex-1" />
-      <span className="text-[10px] font-medium text-muted-foreground tabular-nums">{size}</span>
       <CopyButton text={copyText} />
     </div>
   )

@@ -94,9 +94,12 @@ eviction/restart, interrupt, per-thread model + effort picker (backed by
 `supportedModels()`), opt-in live token streaming, image/file attachments,
 subagent lanes, MCP status probe, and session list/history replay from the
 SDK's `.jsonl` files, with per-turn token usage folded into the final
-assistant turn. Known gaps: runs with `bypassPermissions` only (no
-interactive approval flow), and effort/streaming changes require a
-teardown-and-resume because the SDK has no live setter for them.
+assistant turn. The Agent SDK remains the transport, while every query is
+forced through the `claude` executable resolved via `executable.ts` (server
+PATH merged with the login-shell PATH).
+Known gaps: runs with `bypassPermissions` only (no interactive approval
+flow), and effort/streaming changes require a teardown-and-resume because the
+SDK has no live setter for them.
 
 **OpenClaw — shipped, experimental.** Chat over the local gateway's WebSocket
 JSON-RPC: sessions seeded cold from `sessions.get` then updated from live
@@ -118,8 +121,12 @@ rendezvous, session list via `thread/list` (cwd-filtered) and history replay
 via `thread/read`, subagent (collab) child threads nested as live
 SubagentRecord transcripts on the parent card, semantic exec labels from
 `commandActions`, MCP status via `mcpServerStatus/list`, and hook / failed
-MCP-startup notices. Runs `danger-full-access` + `approvalPolicy: never` to
-match moi's bypass-permissions trust model. Known gaps: no interactive
+MCP-startup notices. Workspace discovery scans `~/.codex/sessions` rollout
+heads for cwds (`codex/discovery.ts` — no binary needed), and `availability()`
+reports a missing `codex` executable (PATH + login-shell PATH lookup, with a
+Codex Desktop app-bundle fallback — `executable.ts`) to setup flows and the
+workspace composer. Runs `danger-full-access` + `approvalPolicy: never`
+to match moi's bypass-permissions trust model. Known gaps: no interactive
 approval flow (server→client approval requests are auto-accepted
 defensively), and images ride inline as data URLs only (no `localImage` path
 mode).

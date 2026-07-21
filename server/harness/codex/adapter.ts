@@ -156,16 +156,17 @@ export function selectCodexWorkspacePreview(
 
 export function codexModelToModel(m: CodexModel): Model {
   const efforts = (m.supportedReasoningEfforts ?? []).map(e => e.reasoningEffort)
+  const displayName = m.displayName.replace(/^GPT-/, '').replaceAll('-', ' ')
   return {
     value: m.id,
     resolvedModel: m.model,
-    displayName: m.displayName,
+    displayName,
     // Our Model.description is a " · "-joined "<headline> · <tagline>" blurb
     // (the picker renders the first segment as the row label), so lead with
     // the display name and let Codex's one-liner be the tagline.
     ...(m.description
-      ? { description: `${m.displayName} · ${m.description}` }
-      : { description: m.displayName }),
+      ? { description: `${displayName} · ${m.description}` }
+      : { description: displayName }),
     supportsEffort: efforts.length > 0,
     ...(efforts.length > 0 ? { supportedEffortLevels: efforts } : {})
   }

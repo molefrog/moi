@@ -1,18 +1,20 @@
 import { useState } from 'react'
 
-import { IconKey, IconSettings, IconX } from '@tabler/icons-react'
+import { IconKey, IconPlugConnected, IconSettings, IconX } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/client/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 
+import { ConnectorsSettings } from './ConnectorsSettings'
 import { EnvironmentSettings } from './EnvironmentSettings'
 import { GeneralSettings } from './GeneralSettings'
 
-type SettingsNav = 'general' | 'environment'
+type SettingsNav = 'general' | 'connectors' | 'environment'
 
 const NAV: { id: SettingsNav; label: string; icon: typeof IconSettings }[] = [
   { id: 'general', label: 'General', icon: IconSettings },
+  { id: 'connectors', label: 'Connectors', icon: IconPlugConnected },
   { id: 'environment', label: 'Environment', icon: IconKey }
 ]
 
@@ -22,7 +24,7 @@ export function WorkspaceSettings() {
 
   return (
     <>
-      <Tooltip delay={50}>
+      <Tooltip>
         <TooltipTrigger
           render={
             <Button
@@ -78,7 +80,9 @@ export function WorkspaceSettings() {
               }
             />
             <div className="px-8 py-7">
-              {page === 'general' ? <GeneralSettings /> : <EnvironmentSettings />}
+              {page === 'general' && <GeneralSettings />}
+              {page === 'connectors' && <ConnectorsSettings />}
+              {page === 'environment' && <EnvironmentSettings />}
             </div>
           </div>
         </DialogContent>

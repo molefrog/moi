@@ -4,6 +4,7 @@ import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import type {
   DiscoveredWorkspace,
+  HarnessAvailability,
   WorkspaceEntry,
   WorkspacePreview,
   WorkspaceType
@@ -43,37 +44,48 @@ export function useDiscoveredWorkspaces() {
   })
 }
 
-export function useAddWorkspace() {
+export function useImportWorkspace() {
   const queryClient = useQueryClient()
-  return useMutation<WorkspaceEntry, Error, DiscoveredWorkspace>({
-    mutationFn: discovered =>
-      requestJson('/api/workspaces', jsonRequest('POST', discovered), 'Failed to add workspace'),
-    onSuccess: (entry, suggestion) => {
+  return useMutation<WorkspaceEntry, Error, ImportWorkspaceInput>({
+    mutationFn: input =>
+      requestJson('/api/workspaces', jsonRequest('POST', input), 'Failed to add workspace'),
+    onSuccess: (entry, input) => {
       queryClient.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, previous =>
         upsertWorkspaceEntry(previous, entry)
       )
       queryClient.setQueryData<DiscoveredWorkspace[]>(workspaceKeys.discover, previous =>
-        (previous ?? []).filter(item => item.path !== suggestion.path)
+        (previous ?? []).filter(item => item.path !== input.path)
       )
     }
   })
 }
 
-export type CreateWorkspaceInfo = {
+export type ImportWorkspaceInput = {
+  path: string
+  type: WorkspaceType
+}
+
+export type WorkspaceSetupInfo = {
   root: string
   displayRoot: string
   canChooseFolder: boolean
+  // Per-backend runtime availability (are the Claude/Codex CLIs installed?),
+  // keyed by workspace type. Missing entries mean available.
+  availability?: Partial<Record<WorkspaceType, HarnessAvailability>>
 }
 
-export function useCreateWorkspaceInfo() {
-  return useQuery<CreateWorkspaceInfo>({
-    queryKey: workspaceKeys.createInfo,
+export function useWorkspaceSetupInfo() {
+  return useQuery<WorkspaceSetupInfo>({
+    queryKey: workspaceKeys.setupInfo,
+    // Availability can change while the app is open (the user installs the
+    // agent CLI) — refetch on mount instead of caching forever.
     queryFn: () => requestJson('/api/workspaces/create'),
-    staleTime: Infinity
+    staleTime: 30_000,
+    refetchOnMount: 'always'
   })
 }
 
-export type ChooseFolderResult = { path: string } | { canceled: true }
+export type ChooseFolderResult = DiscoveredWorkspace | { canceled: true }
 
 export function useChooseFolder() {
   return useMutation<ChooseFolderResult, Error, void>({

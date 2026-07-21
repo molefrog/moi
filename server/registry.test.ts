@@ -4,8 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'path'
 
 import {
+  discoveredWorkspaceForPath,
   findWorkspaceForPath,
   getWorkspace,
+  groupDiscoveredWorkspaces,
   liftToWorkspaceRoot,
   listWorkspaces,
   registerWorkspace,
@@ -29,7 +31,7 @@ describe('registerWorkspace', () => {
     const entry = await registerWorkspace('/Users/foo/my-project')
     expect(entry.path).toBe('/Users/foo/my-project')
     expect(typeof entry.id).toBe('string')
-    expect(entry.id).toHaveLength(36) // UUID v4
+    expect(entry.id).toMatch(/^[0-9a-z]{10}$/) // short base36 id
     expect(typeof entry.addedAt).toBe('string')
   })
 
@@ -49,6 +51,53 @@ describe('registerWorkspace', () => {
     const a = await registerWorkspace('/Users/foo/project-a')
     const b = await registerWorkspace('/Users/foo/project-b')
     expect(a.id).not.toBe(b.id)
+  })
+})
+
+describe('workspace discovery grouping', () => {
+  test('groups providers by normalized path in display order', () => {
+    const path = '/Users/foo/project'
+    const grouped = groupDiscoveredWorkspaces([
+      { path, type: 'openclaw' },
+      { path: '/Users/foo/project/../project', type: 'codex' },
+      { path, type: 'claude-code' },
+      { path, type: 'codex' }
+    ])
+
+    expect(grouped).toEqual([
+      {
+        path,
+        types: ['claude-code', 'codex', 'openclaw']
+      }
+    ])
+  })
+
+  test('filters registered paths after normalization', () => {
+    const grouped = groupDiscoveredWorkspaces(
+      [{ path: '/Users/foo/project/../project', type: 'codex' }],
+      new Set(['/Users/foo/project'])
+    )
+
+    expect(grouped).toEqual([])
+  })
+
+  test('returns zero, one, or multiple types for one chosen folder', () => {
+    const path = '/Users/foo/project'
+
+    expect(discoveredWorkspaceForPath(path, [])).toEqual({ path, types: [] })
+    expect(discoveredWorkspaceForPath(path, [{ path, type: 'codex' }])).toEqual({
+      path,
+      types: ['codex']
+    })
+    expect(
+      discoveredWorkspaceForPath(path, [
+        { path, type: 'openclaw' },
+        { path, type: 'claude-code' }
+      ])
+    ).toEqual({
+      path,
+      types: ['claude-code', 'openclaw']
+    })
   })
 })
 
