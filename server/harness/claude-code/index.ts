@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import type { McpServer } from '@/lib/types'
 
 import type { DiscoveredWorkspaceCandidate, Harness } from '../types'
-import { pathHarnessAvailability } from '../executable'
+import { findHarnessExecutable, pathHarnessAvailability } from '../executable'
 import { isLinkedGitWorktree } from './git-worktree'
 import { getMcpStatus } from './mcp'
 import { getClaudeModels } from './models'
@@ -100,6 +100,7 @@ export const claudeCodeHarness: Harness = {
     const cc = getCCDebugSnapshot()
     const busy = cc.sessions.filter(s => s.activity !== 'idle').length
     const lines = [
+      `claude executable  ${findHarnessExecutable('claude-code') ?? '(not found)'}`,
       `live CC sessions  ${cc.sessions.length}/${SESSION_LIMITS.maxLive}  ` +
         `(${busy} busy, ${cc.sessions.length - busy} idle, ${cc.aliases} alias${cc.aliases === 1 ? '' : 'es'}, ` +
         `idle TTL ${fmtDuration(SESSION_LIMITS.idleTtlMs)})`
