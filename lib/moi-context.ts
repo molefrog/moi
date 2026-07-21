@@ -21,9 +21,10 @@ import type { WorkspaceTabId } from './types'
 
 const MOI_CONTEXT_OPEN = '<moi-context>'
 const MOI_CONTEXT_CLOSE = '</moi-context>'
-// First line inside the tag. Doubles as the strip guard: a user literally
-// typing `<moi-context>` in their message won't have their text eaten.
-const MOI_CONTEXT_MARKER = 'moi workspace context'
+// Start of the first line inside the tag. Doubles as the strip guard: a user
+// literally typing `<moi-context>` in their message won't have their text
+// eaten. Keep this phrase byte-stable when rewording the envelope.
+const MOI_CONTEXT_MARKER = 'You are running in a `moi` workspace'
 
 const SYSTEM_REMINDER_OPEN = '<system-reminder>'
 const SYSTEM_REMINDER_CLOSE = '</system-reminder>'
@@ -40,25 +41,36 @@ export type MoiContext = {
   directives?: string[]
 }
 
+// One sentence per tab, using the labels the user sees in the tab bar.
 function describeTab(tab: WorkspaceTabId): string {
-  if (tab === 'agent') return 'chat'
-  if (tab === 'widgets') return 'widgets (dashboard)'
-  if (tab === 'scratchpad') return 'scratchpad'
-  if (tab.startsWith('view-builder:')) return `view builder "${tab.slice('view-builder:'.length)}"`
-  if (tab.startsWith('view:')) return `view "${tab.slice('view:'.length)}"`
-  return tab
+  if (tab === 'agent') return 'The user is on the "Agent" tab.'
+  if (tab === 'widgets') return 'The user is on the "Widgets" tab.'
+  if (tab === 'scratchpad') return 'The user is on the "Scratchpad" tab.'
+  if (tab.startsWith('view-builder:'))
+    return `The user is on the view builder tab for builder "${tab.slice('view-builder:'.length)}".`
+  if (tab.startsWith('view:')) return `The user is on the "${tab.slice('view:'.length)}" view tab.`
+  return `The user is on the "${tab}" tab.`
 }
 
+// Format (modeled on Claude Code's system-reminder context blocks): a short
+// orientation preamble with the skill pointer, `# Section` headers with
+// complete sentences under them, and an IMPORTANT footer with handling rules.
 export function renderMoiContext(ctx: MoiContext): string {
-  return [
+  const preamble = [
     MOI_CONTEXT_OPEN,
-    `${MOI_CONTEXT_MARKER} — snapshot at send time, hidden from the user.`,
-    'You are running in a moi workspace. Read the moi-workspace skill before acting, if you have not yet.',
-    `The user is on: ${describeTab(ctx.activeTab)}`,
-    ...(ctx.directives ?? []),
-    'Only the newest of these blocks is current; omit them from summaries and compaction.',
+    `${MOI_CONTEXT_MARKER} — a shared UI the user chats with you from, which you can extend and customize.`,
+    'If you have not read the **`moi-workspace` skill** in this chat, read it before acting.'
+  ].join('\n')
+  const sections = [`# Active tab\n${describeTab(ctx.activeTab)}`]
+  if (ctx.directives?.length) {
+    sections.push(`# This message only\n${ctx.directives.join('\n')}`)
+  }
+  const footer = [
+    'IMPORTANT: This context comes from the moi app, not from the user, and the user does not see it.',
+    'Only the newest of these blocks is current. Do not respond to it directly, and omit it from summaries and compaction.',
     MOI_CONTEXT_CLOSE
   ].join('\n')
+  return [preamble, ...sections, footer].join('\n\n')
 }
 
 // Claude Code: the envelope arrives wrapped in a `<system-reminder>` block
