@@ -6,6 +6,7 @@ import type { McpServer } from '@/lib/types'
 
 import type { DiscoveredWorkspaceCandidate, Harness } from '../types'
 import { pathHarnessAvailability } from '../executable'
+import { isLinkedGitWorktree } from './git-worktree'
 import { getMcpStatus } from './mcp'
 import { getClaudeModels } from './models'
 import {
@@ -54,7 +55,13 @@ async function discoverWorkspaces(
         if (info.isDirectory()) paths.add(s.cwd)
       } catch {}
     }
-    return [...paths].map(path => ({ path, type: 'claude-code' as const }))
+    // Drop linked git worktrees — throwaway checkouts (e.g. worktree-isolated
+    // runs) that shouldn't surface as importable workspaces.
+    const candidates = [...paths]
+    const worktree = await Promise.all(candidates.map(isLinkedGitWorktree))
+    return candidates
+      .filter((_, i) => !worktree[i])
+      .map(path => ({ path, type: 'claude-code' as const }))
   } catch {
     return []
   }
