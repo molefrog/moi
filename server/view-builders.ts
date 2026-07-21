@@ -1,19 +1,16 @@
 import { mkdir, rename } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { customAlphabet } from 'nanoid'
-
 import type { AppletKind, ViewBuilder, ViewInfo } from '@/lib/types'
 
 import { DATA_DIR } from './data-dir'
 import { publishEvent } from './events'
+import { shortId } from './short-id'
 
 type ViewBuilderStore = Record<string, ViewBuilder[]>
 
-// A short, shell-safe builder handle: base36 (no dashes to confuse the CLI),
-// and a workspace only ever has a handful of builders, so 10 chars is ample
-// headroom. This is the id the agent passes as `moi builder set … --builder`.
-const newBuilderId = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 10)
+// The builder handle the agent copies into `moi builder set … --builder <id>`.
+const newBuilderId = shortId
 
 // A build running past this is treated as hung/abandoned and reconciled back to
 // `waiting`, even if its session still looks live. Generous so a slow but real
