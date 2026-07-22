@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 
-import { activeTabTitle, drainChatDirectives, pushChatDirective } from './moi-context'
+import {
+  activeTabTitle,
+  drainChatDirectives,
+  pushChatDirective,
+  takeChatDirectives
+} from './moi-context'
 import type { ViewBuilder, ViewInfo } from '@/lib/types'
 
 describe('moi context assembly', () => {
@@ -11,6 +16,17 @@ describe('moi context assembly', () => {
     expect(drainChatDirectives('ws-1')).toEqual(['First.', 'Second.'])
     expect(drainChatDirectives('ws-1')).toEqual([])
     expect(drainChatDirectives('ws-2')).toEqual(['Other workspace.'])
+  })
+
+  test('appends directives tied to the current message after queued directives', () => {
+    pushChatDirective('ws-3', 'Queued first.')
+
+    expect(takeChatDirectives('ws-3', ['Inline second.', 'Inline third.'])).toEqual([
+      'Queued first.',
+      'Inline second.',
+      'Inline third.'
+    ])
+    expect(takeChatDirectives('ws-3')).toEqual([])
   })
 
   test('activeTabTitle resolves view titles and claimed builder titles', () => {

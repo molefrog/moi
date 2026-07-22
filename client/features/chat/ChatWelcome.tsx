@@ -11,29 +11,52 @@ import {
 
 import { ChatPromptBubbles, type ChatPromptBubble } from '@/client/features/chat/ChatPromptBubbles'
 
-const PROMPTS = [
+export const CHAT_WELCOME_PROMPTS = [
   {
     label: "What's the weather?",
     prompt:
       "Build me a set of weather widgets that surface current conditions, today's hourly forecast, and a simple weekly outlook at a glance",
+    context: [
+      'Build this onboarding example immediately without asking follow-up questions.',
+      "Create three separate widgets: current conditions, today's hourly forecast, and a seven-day outlook.",
+      'Use one shared Open-Meteo server function with no API key and use Berlin as the default location.',
+      'Give each widget an appropriate grid size and a compact, visually distinct layout with loading, error, and last-updated states.',
+      'Bundle all three widgets, smoke-test the shared weather function, and check runtime logs before finishing.'
+    ],
     icon: IconUmbrella2
   },
   {
-    label: 'Build a fun sythesizer',
+    label: 'Build a fun synthesizer',
     prompt:
       'Build me a view with a simple, playful synthesizer featuring a keyboard, five sound controls, and the ability to record, save, and load music files from the workspace',
+    context: [
+      "Build this onboarding example immediately without asking follow-up questions, and don't use external services.",
+      "Create a responsive View that uses the browser's audio capabilities, with an onscreen piano and computer-keyboard controls.",
+      'Include five clearly labeled sound controls for waveform, attack, release, filter cutoff, and volume.',
+      'Let the user record timed note events, play and stop recordings, give them names, and save and load them as JSON music files in a workspace music folder.',
+      'Include clear empty and error states, then bundle the View and check runtime logs before finishing.'
+    ],
     icon: IconPiano
   },
   {
     label: 'Make a job tracker',
     prompt:
       'Build me a view with a visual job search board where I can add opportunities by pasting a job link, automatically extract the details, move opportunities through stages, and keep notes and related files in the workspace',
+    context: [
+      'Build this onboarding example immediately without asking follow-up questions.',
+      'Create a visual View with Saved, Applied, Interviewing, Offer, and Closed stages.',
+      'Let the user add a job by pasting its URL, and use a server function to parse public metadata for the title, company, and location.',
+      'When a page blocks parsing or lacks metadata, keep the URL and provide editable manual fields.',
+      'Support moving opportunities between stages, editing their details and notes, and referencing related workspace files.',
+      'Persist the board in a workspace-local JSON file and include loading, empty, and error states.',
+      'Bundle the View and smoke-test its persistence and parsing functions before finishing.'
+    ],
     icon: IconBriefcase
   }
 ] satisfies ChatPromptBubble[]
 
 type ChatWelcomeProps = {
-  onSelectPrompt: (prompt: string) => void
+  onSelectPrompt: (prompt: ChatPromptBubble) => void
 }
 
 export function ChatWelcome({ onSelectPrompt }: ChatWelcomeProps) {
@@ -55,7 +78,7 @@ export function ChatWelcome({ onSelectPrompt }: ChatWelcomeProps) {
         </p>
         <p>Give it a try:</p>
       </div>
-      <ChatPromptBubbles prompts={PROMPTS} onSelect={onSelectPrompt} />
+      <ChatPromptBubbles prompts={CHAT_WELCOME_PROMPTS} onSelect={onSelectPrompt} />
     </div>
   )
 }

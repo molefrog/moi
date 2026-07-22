@@ -6,13 +6,14 @@ import { cn } from '@/client/lib/cn'
 export type ChatPromptBubble = {
   label: string
   prompt: string
+  context: readonly string[]
   icon: TablerIcon
 }
 
 type ChatPromptBubblesProps = {
   prompts: readonly ChatPromptBubble[]
   disabled?: boolean
-  onSelect: (prompt: string) => void
+  onSelect: (prompt: ChatPromptBubble) => void
 }
 
 export function ChatPromptBubbles({ prompts, disabled = false, onSelect }: ChatPromptBubblesProps) {
@@ -28,7 +29,7 @@ export function ChatPromptBubbles({ prompts, disabled = false, onSelect }: ChatP
             variant="secondary"
             size="sm"
             disabled={disabled}
-            onClick={() => onSelect(prompt.prompt)}
+            onClick={() => onSelect(prompt)}
             className={cn(
               'h-full w-full items-start justify-start gap-2 rounded-lg p-3 pl-4 text-left leading-snug whitespace-normal',
               'hover:bg-accent',

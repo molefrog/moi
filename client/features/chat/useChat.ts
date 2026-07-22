@@ -13,7 +13,11 @@ import { useMoiUserMessageContext } from '@/client/features/workspace/moi-contex
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { sendMessage } from '@/client/features/chat/chat-connection'
-import { resolveChatRunOptions, startOptimisticTurn } from '@/client/features/chat/chat-send'
+import {
+  type ChatSendOptions,
+  resolveChatRunOptions,
+  startOptimisticTurn
+} from '@/client/features/chat/chat-send'
 import { buildPreviewTurn } from '@/client/features/chat/preview-turn'
 import { draftKey, liveStore, selectPreviews, useLive } from '@/client/features/chat/chat-store'
 import { useUiStore } from '@/client/store/ui'
@@ -77,7 +81,7 @@ export function useChat() {
   // keystroke re-renders only the composer — not this hook's host (WorkspaceView)
   // and its whole subtree. See `ChatInput`.
   const send = useCallback(
-    (draft: string) => {
+    (draft: string, options?: ChatSendOptions) => {
       const text = draft.trim()
       // Attachments for the active thread, keyed exactly like the draft. Only
       // fully-uploaded ones are sent; the composer disables send while any are
@@ -135,7 +139,7 @@ export function useChat() {
         model,
         effort,
         stream,
-        context: buildMoiContext(),
+        context: buildMoiContext(options?.directives),
         ...(ready.length > 0 ? { attachments: ready.map(a => a.upload!.id) } : {})
       })
       useUiStore.getState().markMessageSentFromMoi()

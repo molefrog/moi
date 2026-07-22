@@ -4,6 +4,8 @@ import { IconChevronDown, IconX } from '@tabler/icons-react'
 
 import { useStickToBottom } from '@/client/features/chat/useStickToBottom'
 import { groupTurns } from '@/client/features/chat/group-turns'
+import type { ChatPromptBubble } from '@/client/features/chat/ChatPromptBubbles'
+import type { ChatSendOptions } from '@/client/features/chat/chat-send'
 import type { Turn, ViewState } from '@/lib/types'
 
 import { ChatComposer } from './ChatComposer'
@@ -29,7 +31,7 @@ type ChatPanelProps = {
   error?: string | null
   onDismissError?: () => void
   unavailableReason: string | null | undefined
-  send: (text: string) => void
+  send: (text: string, options?: ChatSendOptions) => void
   stop: () => void
   onSwitchThread: (sessionId: string | null) => void
   // Floating popup: render a close (X) button that dismisses the popup.
@@ -84,11 +86,18 @@ export function ChatPanel({
   // Sending always returns the user to the bottom, even if they'd scrolled up —
   // they expect to see their message and the reply.
   const handleSend = useCallback(
-    (text: string) => {
-      send(text)
+    (text: string, options?: ChatSendOptions) => {
+      send(text, options)
       scrollToBottom()
     },
     [send, scrollToBottom]
+  )
+
+  const handlePromptSelect = useCallback(
+    (prompt: ChatPromptBubble) => {
+      handleSend(prompt.prompt, { directives: prompt.context })
+    },
+    [handleSend]
   )
 
   return (
@@ -112,7 +121,7 @@ export function ChatPanel({
               (hasSentMessageFromMoi ? (
                 <EmptyState />
               ) : (
-                <ChatWelcome onSelectPrompt={handleSend} />
+                <ChatWelcome onSelectPrompt={handlePromptSelect} />
               ))}
             {groupedTurns.map((turn, i) => (
               <TurnView
