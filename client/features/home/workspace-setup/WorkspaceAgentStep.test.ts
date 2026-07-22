@@ -13,12 +13,12 @@ describe('getWorkspaceAgentOptions', () => {
   test.each([
     {
       type: 'claude-code' as const,
-      description: 'By Anthropic',
+      description: 'Anthropic',
       reason: 'Run curl -fsSL https://claude.ai/install.sh | sh in your terminal to install Claude'
     },
     {
       type: 'codex' as const,
-      description: 'By OpenAI',
+      description: 'OpenAI',
       reason:
         'Run curl -fsSL https://chatgpt.com/codex/install.sh | sh in your terminal to install Codex'
     }
