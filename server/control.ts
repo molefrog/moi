@@ -18,7 +18,7 @@ import { relayScratchOp } from './scratchpad-relay'
 import { broadcastAll } from './state'
 import { applyThemeUpdate, matchColorTheme } from './theme'
 import { handleBundle } from './widgets'
-import { getViewList, handleBundleViews, hasViewId } from './views'
+import { assembleWorkspaceTabs, getViewList, handleBundleViews, hasViewId } from './views'
 import {
   ViewBuilderError,
   listViewBuilders,
@@ -260,6 +260,50 @@ export const control = Bun.serve({
               })
             )
           }
+          return
+        }
+
+        // `moi tabs` — the workspace tab manifest (static tabs + built views
+        // with their declared focus params). See docs/intents.md.
+        if (data.type === 'tabs') {
+          const match = await resolveWorkspace(ws, data.path)
+          if (!match) return
+          ws.send(
+            JSON.stringify({ ok: true, tabs: assembleWorkspaceTabs(await getViewList(match.path)) })
+          )
+          return
+        }
+
+        // `moi focus <tab-id>` — a focus intent: broadcast to the workspace's
+        // open tabs, which switch to `tab` and hand it `params`. The tab is
+        // validated here (cheap) so an agent typo gets a corrective error
+        // instead of a silent no-op in the browser.
+        if (data.type === 'intent:focus') {
+          const match = await resolveWorkspace(ws, data.path)
+          if (!match) return
+          const tab = String(data.tab ?? '')
+          const params =
+            data.params && typeof data.params === 'object' && !Array.isArray(data.params)
+              ? (data.params as Record<string, unknown>)
+              : undefined
+          const isStatic = tab === 'agent' || tab === 'widgets' || tab === 'scratchpad'
+          const isView = tab.startsWith('view:')
+          if (!isStatic && (!isView || !(await hasViewId(match.path, tab.slice('view:'.length))))) {
+            const known = assembleWorkspaceTabs(await getViewList(match.path)).map(t => t.id)
+            ws.send(
+              JSON.stringify({
+                error: `Unknown tab "${tab}". Valid tabs: ${known.join(', ')}. Run \`moi tabs\` for details.`
+              })
+            )
+            return
+          }
+          publishEvent({
+            type: 'intent:focus',
+            workspaceId: match.id,
+            tab,
+            ...(params ? { params } : {})
+          })
+          ws.send(JSON.stringify({ ok: true, tab }))
           return
         }
 

@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 
-import type { ViewConfig, ViewInfo } from '@/lib/types'
+import type { ViewConfig, ViewInfo, WorkspaceTabInfo } from '@/lib/types'
 
 import { syncAppletLogAfterBuild } from './applet-log'
 import { buildApplets, getAppletPaths, listBuilt, scanSources, serveApplet } from './applets'
@@ -106,15 +106,36 @@ export async function getViewList(workspacePath: string): Promise<ViewInfo[]> {
     const raw = manifest.config[id] ?? {}
     const icon = typeof raw.icon === 'string' && raw.icon ? raw.icon : undefined
     const requiredEnv = Array.isArray(raw.requiredEnv) ? raw.requiredEnv : undefined
+    const params =
+      raw.params && typeof raw.params === 'object' && Object.keys(raw.params).length > 0
+        ? raw.params
+        : undefined
     return {
       id,
       config: {
         title: raw.title || id,
         ...(icon ? { icon } : {}),
-        ...(requiredEnv ? { requiredEnv } : {})
+        ...(requiredEnv ? { requiredEnv } : {}),
+        ...(params ? { params } : {})
       }
     }
   })
+}
+
+// The `moi tabs` manifest: the static tabs plus one row per built view (nav
+// order), each view carrying its declared focus params. Pure assembly from a
+// view list so it unit-tests without a workspace on disk.
+export function assembleWorkspaceTabs(views: ViewInfo[]): WorkspaceTabInfo[] {
+  return [
+    { id: 'agent', title: 'Agent' },
+    { id: 'widgets', title: 'Widgets' },
+    { id: 'scratchpad', title: 'Scratchpad' },
+    ...views.map<WorkspaceTabInfo>(view => ({
+      id: `view:${view.id}`,
+      title: view.config.title || view.id,
+      ...(view.config.params ? { params: view.config.params } : {})
+    }))
+  ]
 }
 
 export async function hasViewId(workspacePath: string, viewId: string): Promise<boolean> {

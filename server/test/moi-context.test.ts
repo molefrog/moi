@@ -68,6 +68,37 @@ describe('moi context envelope', () => {
     expect(stripMoiContext(pasted)).toBe('Look at this:\n\nweird right?')
   })
 
+  test('renders active-view params as a sentence + fenced JSON', () => {
+    const rendered = renderMoiContext({
+      activeTab: 'view:shop',
+      tabTitle: 'Shop',
+      tabParams: { product: 'scarf' }
+    })
+    expect(rendered).toContain('The user is on the "Shop" view tab (.moi/views/shop.tsx).')
+    expect(rendered).toContain(
+      'The view currently shows these param values:\n```json\n{"product":"scarf"}\n```'
+    )
+    // Empty params render nothing extra.
+    expect(renderMoiContext({ activeTab: 'view:shop', tabParams: {} })).not.toContain(
+      'param values'
+    )
+  })
+
+  test('renders an applet action as its own section with fenced context', () => {
+    const rendered = renderMoiContext({
+      activeTab: 'view:shop',
+      intent: { source: 'view:shop', context: { sku: 'milk-1l' } }
+    })
+    expect(rendered).toContain(
+      '# Applet action\nThe user fired this message with an action in "view:shop" — the message text is the action\'s label, not typed by the user.'
+    )
+    expect(rendered).toContain('The applet attached this context:\n```json\n{"sku":"milk-1l"}\n```')
+    // A context-less action still gets the attribution sentence, minus the JSON.
+    const bare = renderMoiContext({ activeTab: 'widgets', intent: { source: 'widget:orders' } })
+    expect(bare).toContain('an action in "widget:orders"')
+    expect(bare).not.toContain('attached this context')
+  })
+
   test('renders directives under a this-message-only section', () => {
     const rendered = renderMoiContext({
       activeTab: 'view-builder:builder-1',
@@ -97,6 +128,23 @@ describe('moi context envelope', () => {
     expect(isMoiContext('rendered text')).toBe(false)
     expect(isMoiContext({ tabTitle: 'CRM' })).toBe(false)
     expect(isMoiContext({ activeTab: 'agent', directives: [1] })).toBe(false)
+  })
+
+  test('wire guard validates tabParams and intent shapes', () => {
+    expect(isMoiContext({ activeTab: 'view:shop', tabParams: { product: 'scarf' } })).toBe(true)
+    expect(
+      isMoiContext({
+        activeTab: 'view:shop',
+        intent: { source: 'view:shop', context: { sku: 1 } }
+      })
+    ).toBe(true)
+    expect(isMoiContext({ activeTab: 'view:shop', intent: { source: 'view:shop' } })).toBe(true)
+    expect(isMoiContext({ activeTab: 'view:shop', tabParams: ['scarf'] })).toBe(false)
+    expect(isMoiContext({ activeTab: 'view:shop', intent: { context: {} } })).toBe(false)
+    expect(isMoiContext({ activeTab: 'view:shop', intent: { source: 1 } })).toBe(false)
+    expect(isMoiContext({ activeTab: 'view:shop', intent: { source: 'x', context: 'y' } })).toBe(
+      false
+    )
   })
 
   test('loose strip handles truncated envelopes in previews', () => {

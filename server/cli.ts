@@ -18,7 +18,8 @@ import type {
   ScratchOp,
   ScratchSize,
   ScratchStyle,
-  WorkspaceEntry
+  WorkspaceEntry,
+  WorkspaceTabInfo
 } from '@/lib/types'
 
 import {
@@ -598,6 +599,100 @@ const refresh = defineCommand({
       console.error('Could not connect to control server. Is the main process running?')
       process.exit(1)
     }
+  }
+})
+
+// ---- intents (docs/intents.md) ----------------------------------------------
+
+const tabs = defineCommand({
+  meta: {
+    name: 'tabs',
+    description: 'List workspace tabs — static tabs and views with their declared params'
+  },
+  args: {
+    dir: {
+      type: 'positional',
+      default: '.',
+      description: 'Workspace directory (default: current)'
+    }
+  },
+  run({ args }) {
+    const path = resolve(args.dir)
+    sendControl(path, { type: 'tabs', path }, res => {
+      const tabList = (Array.isArray(res.tabs) ? res.tabs : []) as WorkspaceTabInfo[]
+      console.log('\n' + pc.bold('moi tabs') + pc.dim(` — ${tabList.length} tabs`) + '\n')
+      // One row per tab; a view's declared params continue on indented rows so
+      // the table stays scannable for an agent.
+      const rows: string[][] = []
+      for (const tab of tabList) {
+        const params = Object.entries(tab.params ?? {})
+        rows.push([pc.cyan(tab.id), tab.title, params.length ? paramCell(params[0]) : ''])
+        for (const param of params.slice(1)) rows.push(['', '', paramCell(param)])
+      }
+      console.log(
+        columns(
+          ['tab', 'title', 'params'].map(h => pc.dim(h)),
+          rows
+        )
+      )
+      console.log(
+        '\n' + pc.dim('  Focus one with `moi focus <tab-id> [--params \'{"k":"v"}\']`.') + '\n'
+      )
+    })
+  }
+})
+
+function paramCell([name, description]: [string, string]): string {
+  return `${name} ${pc.dim('— ' + description)}`
+}
+
+const focus = defineCommand({
+  meta: {
+    name: 'focus',
+    description: 'Focus a workspace tab in open browser tabs, optionally passing view params'
+  },
+  args: {
+    tab: {
+      type: 'positional',
+      required: true,
+      description: 'Tab id from `moi tabs`, e.g. view:shop or scratchpad'
+    },
+    params: {
+      type: 'string',
+      description: 'Param values as one JSON object, e.g. \'{"product":"scarf"}\''
+    },
+    dir: {
+      type: 'string',
+      default: '.',
+      description: 'Workspace directory (default: current)'
+    }
+  },
+  run({ args }) {
+    const path = resolve(args.dir)
+    let params: Record<string, unknown> | undefined
+    if (args.params) {
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(args.params)
+      } catch (err) {
+        console.error(
+          '\n' +
+            pc.red('✗') +
+            ` --params is not valid JSON: ${err instanceof Error ? err.message : String(err)}\n`
+        )
+        process.exit(1)
+      }
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        console.error(
+          '\n' + pc.red('✗') + ' --params must be one JSON object, e.g. \'{"product":"scarf"}\'\n'
+        )
+        process.exit(1)
+      }
+      params = parsed as Record<string, unknown>
+    }
+    sendControl(path, { type: 'intent:focus', path, tab: args.tab, params }, res => {
+      console.log('\n' + pc.green('✓') + ' Focused ' + pc.bold(String(res.tab)) + '\n')
+    })
   }
 })
 
@@ -1960,6 +2055,8 @@ const main = defineCommand({
     bundle,
     builder,
     refresh,
+    tabs,
+    focus,
     'call-server-fn': callServerFn,
     debug,
     theme,

@@ -12,6 +12,7 @@ import { resolveChatRunOptions, startOptimisticTurn } from '@/client/features/ch
 import { buildPreviewTurn } from '@/client/features/chat/preview-turn'
 import { draftKey, liveStore, selectPreviews, useLive } from '@/client/features/chat/chat-store'
 import { emptyViewState } from '@/lib/format'
+import type { MoiIntent } from '@/lib/moi-context'
 import type { Part, ViewState } from '@/lib/types'
 
 const EMPTY: ViewState = emptyViewState()
@@ -58,9 +59,11 @@ export function useChat() {
 
   // The composer owns the draft (in the live store) and hands the text in, so a
   // keystroke re-renders only the composer — not this hook's host (WorkspaceView)
-  // and its whole subtree. See `ChatInput`.
+  // and its whole subtree. See `ChatInput`. `intent` marks an applet-fired
+  // action message (docs/intents.md): it rides the context envelope, so the
+  // visible text stays the action's label.
   const send = useCallback(
-    (draft: string) => {
+    (draft: string, intent?: MoiIntent) => {
       const text = draft.trim()
       // Attachments for the active thread, keyed exactly like the draft. Only
       // fully-uploaded ones are sent; the composer disables send while any are
@@ -118,7 +121,7 @@ export function useChat() {
         model,
         effort,
         stream,
-        context: buildMoiContext(),
+        context: { ...buildMoiContext(), ...(intent ? { intent } : {}) },
         ...(ready.length > 0 ? { attachments: ready.map(a => a.upload!.id) } : {})
       })
       if (isNew) {

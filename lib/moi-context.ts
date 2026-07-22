@@ -32,6 +32,16 @@ const MOI_CONTEXT_MARKER = 'You are running in a `moi` workspace'
 const SYSTEM_REMINDER_OPEN = '<system-reminder>'
 const SYSTEM_REMINDER_CLOSE = '</system-reminder>'
 
+// An applet-fired action riding a chat message (`sendAction` — see
+// docs/intents.md). The visible message text is the action's label; the
+// structured payload lives here, never in the text.
+export type MoiIntent = {
+  // The applet the action originated from, e.g. `view:shop` or `widget:orders`.
+  source: string
+  // Structured state the applet attached (the selected row, current filters, …).
+  context?: Record<string, unknown>
+}
+
 // The structured form built at send time — by the client for chat sends, by
 // the server for programmatic sends (the view builder). Extend this (and
 // `renderMoiContext`) when new ambient fields land.
@@ -44,6 +54,12 @@ export type MoiContext = {
   // view builder's claimed title while the build runs. The tab bar falls
   // back to the id when unset; so does the envelope.
   tabTitle?: string
+  // Current param values of the active view tab (set by the last focus
+  // intent), so the agent knows exactly what the user is looking at when
+  // they say "make this cheaper".
+  tabParams?: Record<string, unknown>
+  // Set when this message was fired by an applet action instead of typed.
+  intent?: MoiIntent
   // One-shot imperative lines for this message only (e.g. the view-builder
   // bootstrap instructions from lib/view-builder-directives.ts).
   directives?: string[]
@@ -71,6 +87,12 @@ function describeTab(tab: WorkspaceTabId, title?: string): string {
   return `The user is on the "${tab}" tab.`
 }
 
+// A compact fenced JSON block for structured envelope payloads (view params,
+// applet action context). Single-line — these objects are meant to stay small.
+function fencedJson(value: Record<string, unknown>): string {
+  return '```json\n' + JSON.stringify(value) + '\n```'
+}
+
 // Format (modeled on Claude Code's system-reminder context blocks): a short
 // orientation preamble with the skill pointer, `# Section` headers with
 // complete sentences under them, and an IMPORTANT footer with handling rules.
@@ -82,7 +104,20 @@ export function renderMoiContextBody(ctx: MoiContext): string {
     `${MOI_CONTEXT_MARKER} — a shared UI the user chats with you from, which you can extend and customize.`,
     'Read the **`moi-workspace` skill** before responding — even to a simple question — unless you already read it in this chat.'
   ].join('\n')
-  const sections = [`# Active tab\n${describeTab(ctx.activeTab, ctx.tabTitle)}`]
+  const activeTabLines = [describeTab(ctx.activeTab, ctx.tabTitle)]
+  if (ctx.tabParams && Object.keys(ctx.tabParams).length > 0) {
+    activeTabLines.push('The view currently shows these param values:', fencedJson(ctx.tabParams))
+  }
+  const sections = [`# Active tab\n${activeTabLines.join('\n')}`]
+  if (ctx.intent) {
+    const intentLines = [
+      `The user fired this message with an action in "${ctx.intent.source}" — the message text is the action's label, not typed by the user.`
+    ]
+    if (ctx.intent.context && Object.keys(ctx.intent.context).length > 0) {
+      intentLines.push('The applet attached this context:', fencedJson(ctx.intent.context))
+    }
+    sections.push(`# Applet action\n${intentLines.join('\n')}`)
+  }
   if (ctx.directives?.length) {
     sections.push(`# This message only\n${ctx.directives.join('\n')}`)
   }
@@ -97,13 +132,30 @@ export function renderMoiContext(ctx: MoiContext): string {
   return `${MOI_CONTEXT_OPEN}\n${renderMoiContextBody(ctx)}\n${MOI_CONTEXT_CLOSE}`
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 // Wire-shape guard for the chat frame's `context` field (see web.ts).
 export function isMoiContext(value: unknown): value is MoiContext {
-  if (typeof value !== 'object' || value === null) return false
-  const v = value as { activeTab?: unknown; tabTitle?: unknown; directives?: unknown }
+  if (!isRecord(value)) return false
+  const v = value as {
+    activeTab?: unknown
+    tabTitle?: unknown
+    tabParams?: unknown
+    intent?: unknown
+    directives?: unknown
+  }
+  const intentOk =
+    v.intent === undefined ||
+    (isRecord(v.intent) &&
+      typeof v.intent.source === 'string' &&
+      (v.intent.context === undefined || isRecord(v.intent.context)))
   return (
     typeof v.activeTab === 'string' &&
     (v.tabTitle === undefined || typeof v.tabTitle === 'string') &&
+    (v.tabParams === undefined || isRecord(v.tabParams)) &&
+    intentOk &&
     (v.directives === undefined ||
       (Array.isArray(v.directives) && v.directives.every(d => typeof d === 'string')))
   )

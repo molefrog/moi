@@ -99,6 +99,33 @@ function findConfigProperties(source: string) {
   return init.properties
 }
 
+// `params`: a view's declared focus-param contract — an object literal of
+// param name → one-line description, both strings. Advisory only — surfaced by
+// `moi tabs`, never enforced at focus time.
+function readParamsMap(propValue: unknown): Record<string, string> | undefined {
+  const value = propValue as { type?: string; properties?: unknown[] }
+  if (value?.type !== 'ObjectExpression') return undefined
+  const out: Record<string, string> = {}
+  for (const raw of value.properties ?? []) {
+    const prop = raw as {
+      type?: string
+      key?: { type?: string; name?: string; value?: unknown }
+      value?: { type?: string; value?: unknown }
+    }
+    if (prop?.type !== 'Property') continue
+    const key =
+      prop.key?.type === 'Identifier'
+        ? prop.key.name
+        : prop.key?.type === 'Literal' && typeof prop.key.value === 'string'
+          ? prop.key.value
+          : undefined
+    if (!key) continue
+    if (prop.value?.type !== 'Literal' || typeof prop.value.value !== 'string') continue
+    out[key] = prop.value.value
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
 // `requiredEnv`: an array of string literals naming env vars the bundle needs.
 // Advisory only — surfaced in the env UI, never enforced at build/load.
 function readRequiredEnv(propValue: unknown): string[] | undefined {
@@ -147,8 +174,9 @@ export async function extractWidgetConfig(srcPath: string): Promise<WidgetConfig
   return { ...DEFAULT_CONFIG, ...result }
 }
 
-// A view's config: `title` + app icon registry id + advisory `requiredEnv`.
-// No sizing — views are full-screen. Returns null when no `config` export is present.
+// A view's config: `title` + app icon registry id + advisory `requiredEnv` +
+// declared focus `params`. No sizing — views are full-screen. Returns null
+// when no `config` export is present.
 export async function extractViewConfig(srcPath: string): Promise<ViewConfig | null> {
   const source = await Bun.file(srcPath).text()
 
@@ -165,6 +193,11 @@ export async function extractViewConfig(srcPath: string): Promise<ViewConfig | n
       if (prop.value?.type === 'Literal' && typeof prop.value.value === 'string') {
         result[key] = prop.value.value
       }
+      continue
+    }
+    if (key === 'params') {
+      const params = readParamsMap(prop.value)
+      if (params) result.params = params
       continue
     }
     if (key === 'requiredEnv') {
@@ -231,19 +264,35 @@ export function rpc(module, name) {
 }
 `
 
-// The `moi` virtual module — the applet-facing runtime API. Today just
-// `fileUrl(path)`, which maps a workspace-relative path to its streaming URL
-// (`/api/workspaces/<id>/fs/<path>`). Same sentinel base as RPC; the path is
-// per-segment URL-encoded so spaces / unicode in filenames survive. A leading
-// slash is stripped so both `clips/a.mp4` and `/clips/a.mp4` work.
-const MOI_MODULE_SOURCE = `
+// The `moi` virtual module — the applet-facing runtime API:
+//   • `fileUrl(path)` maps a workspace-relative path to its streaming URL
+//     (`/api/workspaces/<id>/fs/<path>`). Same sentinel base as RPC; the path
+//     is per-segment URL-encoded so spaces / unicode in filenames survive. A
+//     leading slash is stripped so both `clips/a.mp4` and `/clips/a.mp4` work.
+//   • `focus(tab, params?)` / `sendAction(label, context?)` delegate to the
+//     host-installed intent bridge (`window.moi`, see MoiAppletRuntime in
+//     lib/types.ts) and no-op outside the moi host. `SOURCE` is this applet's
+//     own `<kind>:<name>` id, baked in so actions self-attribute without the
+//     author passing anything.
+function moiModuleSource(source: string): string {
+  return `
 const BASE = ${JSON.stringify(APPLET_API_BASE_SENTINEL)};
+const SOURCE = ${JSON.stringify(source)};
 
 export function fileUrl(path) {
   const clean = String(path).replace(/^\\/+/, "");
   return BASE + "/fs/" + clean.split("/").map(encodeURIComponent).join("/");
 }
+
+export function focus(tab, params) {
+  window.moi?.focus(tab, params);
+}
+
+export function sendAction(label, context) {
+  window.moi?.sendAction(label, context, SOURCE);
+}
 `
+}
 
 // Server modules are keyed by their path relative to the moi root
 // (`.moi/widgets/hello.server.ts` → `"widgets/hello"`), posix-normalized so
@@ -272,13 +321,15 @@ function serverModuleKey(serverPath: string, moiRoot: string): string {
 
 // The applet runtime plugin wires the three I/O transports into the bundle:
 //   • `.server` imports → RPC stubs (via the `mei:rpc` virtual module)
-//   • `moi` import      → the `fileUrl` runtime
+//   • `moi` import      → the `fileUrl` + intent (`focus`/`sendAction`) runtime
 //   • asset imports     → content-hashed sibling files, referenced by URL
 // It returns the collected server modules (for hot-reload + env aggregation)
-// and the asset files the caller must emit next to `index.js`.
+// and the asset files the caller must emit next to `index.js`. `appletSource`
+// is the applet's `<kind>:<name>` id, baked into `sendAction` for attribution.
 function appletRuntimePlugin(
   sourceDir: string,
-  moiRoot: string
+  moiRoot: string,
+  appletSource: string
 ): {
   plugin: BunPlugin
   serverModules: ServerModule[]
@@ -313,10 +364,11 @@ function appletRuntimePlugin(
         path: Bun.resolveSync('devalue', import.meta.dir)
       }))
 
-      // The `moi` runtime module (fileUrl). A bare specifier, so match it exactly.
+      // The `moi` runtime module (fileUrl + intents). A bare specifier, so
+      // match it exactly.
       build.onResolve({ filter: /^moi$/ }, () => ({ path: 'moi', namespace: 'moi-runtime' }))
       build.onLoad({ filter: /.*/, namespace: 'moi-runtime' }, () => ({
-        contents: MOI_MODULE_SOURCE,
+        contents: moiModuleSource(appletSource),
         loader: 'js'
       }))
 
@@ -529,7 +581,11 @@ export async function buildApplet(
 
   await prevalidateServerFiles(entrypoint)
 
-  const { plugin: runtime, serverModules, assets } = appletRuntimePlugin(sourceDir, moiRoot)
+  const {
+    plugin: runtime,
+    serverModules,
+    assets
+  } = appletRuntimePlugin(sourceDir, moiRoot, `${kind}:${widgetName}`)
   const syntheticCssPath = await writeSyntheticTailwindCss(entrypoint, moiRoot, kind)
 
   let result: Awaited<ReturnType<typeof Bun.build>>

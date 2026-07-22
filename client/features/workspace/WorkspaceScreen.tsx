@@ -34,6 +34,8 @@ import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayo
 import { resolveAppIcon } from '@/client/lib/app-icon-registry'
 import { cn } from '@/client/lib/cn'
 import { liveStore } from '@/client/features/chat/chat-store'
+import { bindWorkspaceIntents, focusTab, useTabParams } from '@/client/features/workspace/intents'
+import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import {
   type CreateWorkspaceTabItem,
   type WorkspaceTabItem,
@@ -99,10 +101,13 @@ type ViewAppProps = {
 
 // A view — an agent-defined app — mounted full-area. The bundle owns its own
 // layout + scroll, so we give it a plain filled box and fade it in (mirroring
-// WidgetShell, but full-area instead of a grid cell).
+// WidgetShell, but full-area instead of a grid cell). `params` hands the view
+// its current focus-param values (docs/intents.md), `{}` until a focus intent
+// sets them.
 function ViewApp({ view }: ViewAppProps) {
   const workspaceId = useWorkspaceId()
   const bundle = useView(view.id)
+  const params = useTabParams(workspaceId, viewTabId(view.id))
 
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -128,7 +133,7 @@ function ViewApp({ view }: ViewAppProps) {
                 workspaceId={workspaceId}
                 resetKey={bundle.version}
               >
-                <bundle.Component />
+                <bundle.Component params={params} />
               </WidgetErrorBoundary>
             </motion.div>
           </AppletMount>
@@ -453,6 +458,45 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     }
     setChatFocusRequest(request => request + 1)
   }
+
+  // An applet action (docs/intents.md). Idle chat: send now — the label is the
+  // visible text, the structured payload rides the envelope's `intent` field.
+  // Busy chat: never interrupt or drop — park the label as the composer draft
+  // (the structured context is lost on this path; acceptable for now). Both
+  // paths surface the chat so the user sees what happened.
+  const runAppletAction = (label: string, context?: Record<string, unknown>, source?: string) => {
+    const text = label.trim()
+    if (!text) return
+    if (processing) {
+      openChat(text)
+      return
+    }
+    send(text, { source: source ?? activeTab, ...(context ? { context } : {}) })
+    openChat()
+  }
+
+  // Bind this screen to the intent system: register the tab switcher +
+  // action sender, and install the `window.moi` applet bridge. Bound once per
+  // workspace; the ref keeps the callbacks current across renders.
+  const intentScreenRef = useRef({ openTab, runAppletAction })
+  intentScreenRef.current = { openTab, runAppletAction }
+  useEffect(
+    () =>
+      bindWorkspaceIntents(workspaceId, {
+        openTab: tab => intentScreenRef.current.openTab(tab),
+        sendAction: (label, context, source) =>
+          intentScreenRef.current.runAppletAction(label, context, source)
+      }),
+    [workspaceId]
+  )
+
+  // Agent-initiated focus (`moi focus` → `intent:focus` event): same dispatch
+  // as an applet's `focus()` call.
+  useWorkspaceEvent(event => {
+    if (event.type === 'intent:focus' && event.workspaceId === workspaceId) {
+      focusTab(workspaceId, event.tab, event.params)
+    }
+  })
 
   const createItems: CreateWorkspaceTabItem[] = [
     ...(!dockedSplit && !openSet.has('agent')

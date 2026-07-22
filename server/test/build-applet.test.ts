@@ -273,6 +273,24 @@ describe('extractViewConfig', () => {
     // with-config.tsx exports { rowSpan, colSpan } — none of which a view honors.
     expect(await extractViewConfig(join(FIXTURES, 'with-config.tsx'))).toEqual({})
   })
+
+  test('extracts the declared params map (identifier and string-literal keys)', async () => {
+    const config = await extractViewConfig(join(FIXTURES, 'with-view-params.tsx'))
+    expect(config).toEqual({
+      title: 'Shop',
+      icon: 'cart',
+      params: {
+        product: 'Product slug shown in the detail pane',
+        'detail-tab': 'Which detail tab is open: overview or reviews'
+      }
+    })
+  })
+
+  test('omits params when the map is empty or not string → string', async () => {
+    // with-view-config.tsx declares no params at all.
+    const config = await extractViewConfig(join(FIXTURES, 'with-view-config.tsx'))
+    expect(config?.params).toBeUndefined()
+  })
 })
 
 describe("buildApplet kind='view'", () => {
@@ -321,6 +339,17 @@ describe('moi fileUrl module', () => {
     expect(result.js).toContain('function fileUrl')
     expect(result.js).toContain('%%MOI_APPLET_API_BASE%%')
     expect(result.js).toContain('"/fs/"')
+  })
+})
+
+describe('moi intent stubs', () => {
+  test('focus/sendAction delegate to window.moi with the applet source baked in', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-intents.tsx'), undefined, 'view')
+    // Both stubs go through the host bridge and never throw outside the host.
+    expect(result.js).toContain('window.moi?.focus')
+    expect(result.js).toContain('window.moi?.sendAction')
+    // sendAction self-attributes with this applet's `<kind>:<name>` id.
+    expect(result.js).toContain('"view:with-intents"')
   })
 })
 

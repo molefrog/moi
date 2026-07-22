@@ -29,6 +29,11 @@ export type ViewConfig = {
   icon?: string
   // Advisory env hints, same semantics as WidgetConfig.requiredEnv.
   requiredEnv?: string[]
+  // Declared focus-param contract: param name → one-line description. Advisory
+  // metadata surfaced by `moi tabs` so an agent knows what a `moi focus
+  // view:<id> --params` call can pass. Never enforced — the mounted view
+  // receives whatever the focus intent carried (see docs/intents.md).
+  params?: Record<string, string>
 }
 
 export type ViewInfo = {
@@ -450,6 +455,25 @@ export type WorkspaceTabId =
 export type WorkspaceTabsState = {
   open: WorkspaceTabId[]
   active: WorkspaceTabId
+}
+
+// One row of the `moi tabs` manifest: a static tab or a built view, with the
+// view's declared focus params (name → description) when it has any.
+export type WorkspaceTabInfo = {
+  id: WorkspaceTabId
+  title: string
+  params?: Record<string, string>
+}
+
+// The host-installed applet runtime bridge (`window.moi`). Applet code reaches
+// it through the `focus`/`sendAction` stubs of the `moi` module baked into
+// every bundle (server/bundler/build-applet.ts); the host binds it to the
+// mounted workspace (client/features/workspace/intents.ts). `source` names the
+// applet an action originated from (e.g. `view:shop`) — the module stub fills
+// it in, so applet authors never pass it.
+export type MoiAppletRuntime = {
+  focus: (tab: WorkspaceTabId, params?: Record<string, unknown>) => void
+  sendAction: (label: string, context?: Record<string, unknown>, source?: string) => void
 }
 
 export type { FontTheme, ColorTheme } from './themes'

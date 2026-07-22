@@ -22,6 +22,7 @@ import { useCallback } from 'react'
 
 import { useViewBuilders } from '@/client/features/views/api'
 import { useWorkspaceViews } from '@/client/features/workspace/api'
+import { getTabParams } from '@/client/features/workspace/intents'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import type { MoiContext } from '@/lib/moi-context'
@@ -76,9 +77,16 @@ export function useMoiUserMessageContext(): () => MoiContext {
   const activeTab = layout.tabs.active
   return useCallback(() => {
     const directives = drainChatDirectives(workspaceId)
+    // Current focus-param values of the active view (a live read from the
+    // intents store, so the snapshot is send-time fresh) — how the agent knows
+    // "this" means product "scarf". Views only; other tabs hold no params.
+    const tabParams = activeTab.startsWith('view:')
+      ? getTabParams(workspaceId, activeTab)
+      : undefined
     return {
       activeTab,
       tabTitle: activeTabTitle(activeTab, views, builders),
+      ...(tabParams && Object.keys(tabParams).length > 0 ? { tabParams } : {}),
       ...(directives.length > 0 ? { directives } : {})
     }
   }, [workspaceId, activeTab, views, builders])

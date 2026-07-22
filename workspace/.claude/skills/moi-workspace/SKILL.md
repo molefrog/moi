@@ -112,6 +112,8 @@ never from inside `.moi/` itself. You don't pass paths; moi resolves the workspa
 - `moi bundle --force` — rebuild all applets (use after changing `config`)
 - `moi refresh` — re-fetch widget/view data without rebuilding (use after you mutated data the
   widgets read — DB rows, files, external API records — so the displayed values catch up)
+- `moi tabs` — list the workspace tabs: static tabs plus every view with its declared params
+- `moi focus <tab-id> [--params '<json>']` — switch the user's UI to a tab (see Intents)
 - `moi call-server-fn <module>/<fn> '[args]'` — invoke a `.server.ts` function directly (smoke test)
 - `moi debug logs` — applet runtime errors on record (experimental)
 - `moi theme --font=<key>` — change font theme (omit `--font` to list options)
@@ -316,6 +318,59 @@ export const config = {
 The inverse of a widget: a view **owns its whole page** — its own `h-full w-full` layout, scrolling
 (`overflow-auto`), padding, and chrome. Build it to read like an app screen. See `VIEW-DESIGN.md`.
 
+# Intents — connecting chat, widgets, and views
+
+Tabs are addressable by id: `agent`, `widgets`, `scratchpad`, `view:<id>`. Run `moi tabs` to list
+them with each view's declared params. Keep a current picture of what exists in the workspace —
+check `moi tabs` before wiring anything to a tab id.
+
+## View params
+
+Declare `params` in a view's config when the view has addressable state (a selected record, an
+active filter, a sub-page). Param name → one-line description, both strings:
+
+```ts
+export const config = {
+  title: 'Shop',
+  icon: 'cart',
+  params: { product: 'Product slug shown in the detail pane' }
+} as const
+```
+
+The mounted view receives the current values as a `params` prop — `Record<string, unknown>`, `{}`
+until a focus intent sets them, reset on page reload — so always handle the empty case:
+
+```tsx
+export default function Shop({ params = {} }: { params?: Record<string, unknown> }) {
+  const product = typeof params.product === 'string' ? params.product : null
+  // product === null → render the index; otherwise the detail pane
+}
+```
+
+`params` is config, so run `moi bundle --force` after changing the declaration.
+
+## Navigate: `moi focus` (you) and `focus` (applet code)
+
+- `moi focus view:shop --params '{"product":"scarf"}'` — switch the user's open workspace UI to
+  that tab and hand the view its params. Use it to show the user what you're talking about. An
+  unknown tab id fails with the list of valid ids.
+- In applet code: `import { focus } from 'moi'`, then `focus(tab, params?)` — e.g. a widget row
+  opening its detail view: `focus('view:shop', { product: row.slug })`.
+- Before wiring a widget button that focuses a view, check the target view's declared params with
+  `moi tabs`; if the param you need is missing, edit the view to accept and declare it **first**.
+
+## Applet → chat: `sendAction`
+
+`import { sendAction } from 'moi'`, then `sendAction(label, context?)` sends a chat message from
+applet UI. The user sees `label` as their own message; `context` reaches you inside the hidden
+`<moi-context>` envelope under `# Applet action`, together with which applet fired it. Keep the
+label a short user-readable action ("Reorder milk") and put ids/state in `context`, never in the
+label. If a run is already in progress the label is parked in the composer as a draft instead (its
+`context` is dropped), so don't rely on an action arriving instantly.
+
+The envelope is symmetric: while a view with params is active, the user's own messages carry the
+current param values — "make this cheaper" arrives with `{"product":"scarf"}` attached.
+
 # Keeping this skill current
 
 This skill is installed with moi (via the CLI or the UI) and can fall behind when the moi CLI updates.
@@ -328,4 +383,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.7.0" />
+<moi-skill version="0.8.0" />
