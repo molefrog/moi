@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { IconCheck, IconCopy } from '@tabler/icons-react'
+import { useSearchParams } from 'wouter'
+
 import { Button } from '@/client/components/ui/button'
 import { cn } from '@/client/lib/cn'
 import { wsUrl } from '@/client/lib/ws-url'
@@ -110,28 +113,54 @@ function LogRow({ time, badge, badgeClass, label, body }: LogRowProps) {
 }
 
 type PaneProps = {
-  title: string
+  title: React.ReactNode
   hint?: string
+  // Extra header widgets (e.g. a filter input), rendered before the follow toggle.
+  controls?: React.ReactNode
+  onCopy?: () => void
   onClear?: () => void
   children: React.ReactNode
 }
 
-function Pane({ title, hint, onClear, children }: PaneProps) {
+function Pane({ title, hint, controls, onCopy, onClear, children }: PaneProps) {
   const scroller = useRef<HTMLDivElement>(null)
   const [follow, setFollow] = useState(true)
+  const [copied, setCopied] = useState(false)
+  const handleCopy = useCallback(() => {
+    onCopy?.()
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }, [onCopy])
   useEffect(() => {
     if (follow && scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight
   })
   return (
-    <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-border bg-background">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-border bg-background">
       <div className="flex items-center gap-2 border-b border-border px-2 py-1">
-        <span className="text-xs font-semibold">{title}</span>
+        {typeof title === 'string' ? <span className="text-xs font-semibold">{title}</span> : title}
         {hint && <span className="truncate text-[10px] text-muted-foreground">{hint}</span>}
         <span className="grow" />
+        {controls}
         <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
           <input type="checkbox" checked={follow} onChange={e => setFollow(e.target.checked)} />
           follow
         </label>
+        {onCopy && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={handleCopy}
+            aria-label="Copy log"
+            title="Copy log"
+          >
+            {copied ? (
+              <IconCheck stroke={1.75} className="text-muted-foreground" />
+            ) : (
+              <IconCopy stroke={1.75} />
+            )}
+          </Button>
+        )}
         {onClear && (
           <Button type="button" variant="ghost" size="sm" onClick={onClear}>
             Clear
@@ -146,8 +175,10 @@ function Pane({ title, hint, onClear, children }: PaneProps) {
 }
 
 export function HarnessDebugPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [workspaces, setWorkspaces] = useState<WorkspaceEntry[]>([])
-  const [workspaceId, setWorkspaceId] = useState('')
+  // Seeded from ?workspace= so the selection survives reloads / can be shared.
+  const [workspaceId, setWorkspaceId] = useState(() => searchParams.get('workspace') ?? '')
   const [models, setModels] = useState<Model[]>([])
   const [model, setModel] = useState('')
   const [effort, setEffort] = useState('')
@@ -160,6 +191,12 @@ export function HarnessDebugPage() {
   const [clientFrames, setClientFrames] = useState<BroadcastFrame[]>([])
   const [events, setEvents] = useState<unknown[] | null>(null)
   const [hidePreviews, setHidePreviews] = useState(false)
+  const [rightTab, setRightTab] = useState<'frames' | 'events'>('frames')
+  // Split position of the wire pane, as % of the row. Wire frames are the
+  // denser log, so it gets more room by default; the handle between the panes
+  // drags it between 20% and 80%.
+  const [leftPct, setLeftPct] = useState(60)
+  const rowRef = useRef<HTMLDivElement>(null)
 
   const wireCursor = useRef(0)
   const wsRef = useRef<WebSocket | null>(null)
@@ -173,10 +210,25 @@ export function HarnessDebugPage() {
       .then(r => r.json())
       .then((list: WorkspaceEntry[]) => {
         setWorkspaces(list)
-        setWorkspaceId(id => id || (list[0]?.id ?? ''))
+        // Keep the URL-seeded id only if it's a real workspace.
+        setWorkspaceId(id => (id && list.some(w => w.id === id) ? id : (list[0]?.id ?? '')))
       })
       .catch(() => {})
   }, [])
+
+  const selectWorkspace = useCallback(
+    (id: string) => {
+      setWorkspaceId(id)
+      setSearchParams(
+        prev => {
+          prev.set('workspace', id)
+          return prev
+        },
+        { replace: true }
+      )
+    },
+    [setSearchParams]
+  )
 
   const provider = workspaces.find(w => w.id === workspaceId)?.type ?? 'claude-code'
 
@@ -287,6 +339,12 @@ export function HarnessDebugPage() {
     [models, model]
   )
 
+  const [wireFilter, setWireFilter] = useState('')
+  const visibleWire = useMemo(() => {
+    const q = wireFilter.trim().toLowerCase()
+    return q ? wire.filter(f => frameLabel(f.frame).toLowerCase().includes(q)) : wire
+  }, [wire, wireFilter])
+
   const visibleClientFrames = useMemo(
     () =>
       hidePreviews
@@ -294,6 +352,24 @@ export function HarnessDebugPage() {
         : clientFrames,
     [clientFrames, hidePreviews]
   )
+
+  // Copy the displayed frames (respecting any active filter) as timestamped
+  // JSONL — the same shape the panes render, so a paste reads like the
+  // on-screen log.
+  const copyWire = useCallback(() => {
+    navigator.clipboard.writeText(
+      visibleWire
+        .map(f => `${ts(f.ts)} ${f.dir === 'send' ? '→' : '←'} ${JSON.stringify(f.frame)}`)
+        .join('\n')
+    )
+  }, [visibleWire])
+  const copyRight = useCallback(() => {
+    navigator.clipboard.writeText(
+      rightTab === 'frames'
+        ? visibleClientFrames.map(f => `${ts(f.ts)} ws ${JSON.stringify(f.frame)}`).join('\n')
+        : JSON.stringify(events ?? [], null, 2)
+    )
+  }, [rightTab, visibleClientFrames, events])
 
   return (
     <div className="flex h-dvh flex-col gap-2 bg-muted p-2">
@@ -304,7 +380,7 @@ export function HarnessDebugPage() {
         <select
           className="rounded border border-border bg-background px-1 py-0.5"
           value={workspaceId}
-          onChange={e => setWorkspaceId(e.target.value)}
+          onChange={e => selectWorkspace(e.target.value)}
         >
           {workspaces.length === 0 && <option value="">no workspaces</option>}
           {workspaces.map(w => (
@@ -389,77 +465,137 @@ export function HarnessDebugPage() {
         />
       </div>
 
-      <div className="flex min-h-0 flex-1 gap-2">
-        <Pane
-          title={provider === 'codex' ? 'App-server wire' : 'Harness wire'}
-          hint={
-            provider === 'codex'
-              ? 'raw JSON-RPC, both directions'
-              : provider === 'openclaw'
-                ? 'no wire tap for OpenClaw yet'
-                : 'raw Agent SDK messages + enqueued inputs'
-          }
-          onClear={() => setWire([])}
-        >
-          {wire.map(f => (
-            <LogRow
-              key={f.seq}
-              time={f.ts}
-              badge={f.dir === 'send' ? '→' : '←'}
-              badgeClass={
-                f.dir === 'send' ? 'bg-blue-500/15 text-blue-600' : 'bg-amber-500/15 text-amber-600'
-              }
-              label={frameLabel(f.frame)}
-              body={f.frame}
-            />
-          ))}
-        </Pane>
-
-        <Pane
-          title="Client frames"
-          hint="what the browser receives on /ws"
-          onClear={() => setClientFrames([])}
-        >
-          <div className="border-b border-border/40 px-2 py-1">
-            <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+      <div ref={rowRef} className="flex min-h-0 flex-1 gap-1">
+        {/* Dynamic drag geometry can't be a static Tailwind class */}
+        <div className="flex min-w-0" style={{ width: `${leftPct}%` }}>
+          <Pane
+            title={provider === 'codex' ? 'App-server wire' : 'Harness wire'}
+            hint={
+              provider === 'codex'
+                ? 'raw JSON-RPC, both directions'
+                : provider === 'openclaw'
+                  ? 'no wire tap for OpenClaw yet'
+                  : 'raw Agent SDK messages + enqueued inputs'
+            }
+            controls={
               <input
-                type="checkbox"
-                checked={hidePreviews}
-                onChange={e => setHidePreviews(e.target.checked)}
+                className="w-36 rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[10px]"
+                placeholder="filter types…"
+                value={wireFilter}
+                onChange={e => setWireFilter(e.target.value)}
               />
-              hide preview frames
-            </label>
-          </div>
-          {visibleClientFrames.map(f => (
-            <LogRow
-              key={f.seq}
-              time={f.ts}
-              badge="ws"
-              badgeClass="bg-purple-500/15 text-purple-600"
-              label={frameLabel(f.frame)}
-              body={f.frame}
-            />
-          ))}
-        </Pane>
+            }
+            onCopy={copyWire}
+            onClear={() => setWire([])}
+          >
+            {visibleWire.map(f => (
+              <LogRow
+                key={f.seq}
+                time={f.ts}
+                badge={f.dir === 'send' ? '→' : '←'}
+                badgeClass={
+                  f.dir === 'send'
+                    ? 'bg-blue-500/15 text-blue-600'
+                    : 'bg-amber-500/15 text-amber-600'
+                }
+                label={frameLabel(f.frame)}
+                body={f.frame}
+              />
+            ))}
+          </Pane>
+        </div>
 
-        <Pane title="Durable events" hint="GET /sessions/:id/events replay">
-          <div className="border-b border-border/40 px-2 py-1">
-            <Button type="button" size="sm" variant="secondary" onClick={fetchEvents}>
-              Fetch events
-            </Button>
-          </div>
-          {events?.map((ev, i) => (
-            <LogRow
-              key={i}
-              time={Date.now()}
-              badge="ev"
-              badgeClass="bg-teal-500/15 text-teal-600"
-              label={frameLabel(ev)}
-              body={ev}
-            />
-          ))}
-          {events?.length === 0 && (
-            <div className="p-2 text-[11px] text-muted-foreground">no events</div>
+        <div
+          className="w-1.5 shrink-0 cursor-col-resize touch-none rounded-full hover:bg-border active:bg-border"
+          onPointerDown={e => {
+            e.preventDefault()
+            e.currentTarget.setPointerCapture(e.pointerId)
+          }}
+          onPointerMove={e => {
+            if (!e.currentTarget.hasPointerCapture(e.pointerId) || !rowRef.current) return
+            const rect = rowRef.current.getBoundingClientRect()
+            const pct = ((e.clientX - rect.left) / rect.width) * 100
+            setLeftPct(Math.min(80, Math.max(20, pct)))
+          }}
+        />
+
+        <Pane
+          title={
+            <span className="flex items-center gap-1">
+              <button
+                type="button"
+                className={cn(
+                  'rounded px-1.5 py-0.5 text-xs',
+                  rightTab === 'frames' ? 'bg-muted font-medium' : 'text-muted-foreground'
+                )}
+                onClick={() => setRightTab('frames')}
+              >
+                Client frames
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  'rounded px-1.5 py-0.5 text-xs',
+                  rightTab === 'events' ? 'bg-muted font-medium' : 'text-muted-foreground'
+                )}
+                onClick={() => setRightTab('events')}
+              >
+                Durable events
+              </button>
+            </span>
+          }
+          hint={
+            rightTab === 'frames'
+              ? 'what the browser receives on /ws'
+              : 'GET /sessions/:id/events replay'
+          }
+          onCopy={copyRight}
+          onClear={rightTab === 'frames' ? () => setClientFrames([]) : undefined}
+        >
+          {rightTab === 'frames' ? (
+            <>
+              <div className="border-b border-border/40 px-2 py-1">
+                <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={hidePreviews}
+                    onChange={e => setHidePreviews(e.target.checked)}
+                  />
+                  hide preview frames
+                </label>
+              </div>
+              {visibleClientFrames.map(f => (
+                <LogRow
+                  key={f.seq}
+                  time={f.ts}
+                  badge="ws"
+                  badgeClass="bg-purple-500/15 text-purple-600"
+                  label={frameLabel(f.frame)}
+                  body={f.frame}
+                />
+              ))}
+            </>
+          ) : (
+            <>
+              <div className="border-b border-border/40 px-2 py-1">
+                <Button type="button" size="sm" variant="secondary" onClick={fetchEvents}>
+                  Fetch events
+                </Button>
+              </div>
+              {events?.map((ev, i) => (
+                <LogRow
+                  key={i}
+                  time={Date.now()}
+                  badge="ev"
+                  badgeClass="bg-teal-500/15 text-teal-600"
+                  label={frameLabel(ev)}
+                  body={ev}
+                />
+              ))}
+              {events?.length === 0 && (
+                <div className="p-2 text-[11px] text-muted-foreground">no events</div>
+              )}
+            </>
           )}
         </Pane>
       </div>
