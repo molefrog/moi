@@ -55,7 +55,7 @@ export function useChat() {
 
   const viewQuery = useSessionView(workspaceId, activeSessionId)
   const view = viewQuery.data ?? EMPTY
-  const chatReady =
+  const chatLoaded =
     sessionSelectionInitialized &&
     sessions !== undefined &&
     (activeSessionId === null ||
@@ -183,7 +183,7 @@ export function useChat() {
 
   return {
     view,
-    chatReady,
+    chatLoaded,
     previewTurn,
     sessionId: activeSessionId,
     processing,

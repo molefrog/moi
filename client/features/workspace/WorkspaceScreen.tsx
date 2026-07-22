@@ -264,7 +264,7 @@ function applyVisibleTabOrder(
 export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenProps) {
   const {
     view,
-    chatReady,
+    chatLoaded,
     previewTurn,
     sessionId,
     processing,
@@ -524,7 +524,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     <ChatPanel
       active={mode === 'split'}
       focusRequest={chatFocusRequest}
-      chatReady={chatReady}
+      chatLoaded={chatLoaded}
       view={view}
       previewTurn={previewTurn}
       sessionId={sessionId}
@@ -542,7 +542,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     <ChatPanel
       active={mode === 'fullscreen' && activeTab === 'agent'}
       focusRequest={chatFocusRequest}
-      chatReady={chatReady}
+      chatLoaded={chatLoaded}
       view={view}
       previewTurn={previewTurn}
       sessionId={sessionId}
@@ -673,7 +673,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
             <ChatPanel
               active={floatingChatOpen}
               focusRequest={chatFocusRequest}
-              chatReady={chatReady}
+              chatLoaded={chatLoaded}
               view={view}
               previewTurn={previewTurn}
               sessionId={sessionId}

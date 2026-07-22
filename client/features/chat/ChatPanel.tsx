@@ -18,7 +18,7 @@ import { useUiStore } from '@/client/store/ui'
 type ChatPanelProps = {
   active?: boolean
   focusRequest?: number
-  chatReady: boolean
+  chatLoaded: boolean
   view: ViewState
   // The live streaming preview as a synthetic assistant turn (or null). Merged
   // into the transcript through the same groupTurns pipeline so a thinking-only
@@ -41,7 +41,7 @@ type ChatPanelProps = {
 export function ChatPanel({
   active = true,
   focusRequest = 0,
-  chatReady,
+  chatLoaded,
   view,
   previewTurn,
   sessionId,
@@ -68,7 +68,7 @@ export function ChatPanel({
     () => groupTurns(previewTurn ? [...turns, previewTurn] : turns),
     [turns, previewTurn]
   )
-  const showEmptyChat = chatReady && groupedTurns.length === 0 && !processing
+  const showEmptyChat = chatLoaded && groupedTurns.length === 0 && !processing
 
   // Stick to the bottom while pinned; respect scroll-up; jump on thread switch.
   const { atBottom, scrollToBottom, scrollToTop } = useStickToBottom(scrollRef, sessionId)
