@@ -9,9 +9,8 @@ import type { Part, Turn } from '@/lib/types'
 
 export function EmptyState() {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center text-sm">
-      <h2 className="font-medium">It all starts somewhere</h2>
-      <p className="mx-auto max-w-sm text-muted-foreground">
+    <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center">
+      <p className="mx-auto max-w-sm text-sm text-muted-foreground">
         Chat with your agent, create widgets and views, and manage your workspace context from here
       </p>
     </div>
