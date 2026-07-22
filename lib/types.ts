@@ -19,6 +19,16 @@ export type WidgetInfo = {
   tag?: string
 }
 
+// One intent a view declares it handles (docs/intents.md). `name` is a
+// kebab-case verb like `open-product`; `params` maps each param name to a
+// one-line description. Emitters dispatch by name — the system routes to
+// whichever view declares it, so links survive renames and rebuilds.
+export type ViewIntent = {
+  name: string
+  description?: string
+  params?: Record<string, string>
+}
+
 // A view is a full-screen, agent-authored "app" (`.moi/views/<name>.tsx`),
 // shown one-at-a-time in the workspace nav. Same build/RPC machinery as a
 // widget, minus the grid: no sizing, the view owns its own layout and scroll.
@@ -29,6 +39,24 @@ export type ViewConfig = {
   icon?: string
   // Advisory env hints, same semantics as WidgetConfig.requiredEnv.
   requiredEnv?: string[]
+  // Intents this view handles (docs/intents.md).
+  intents?: ViewIntent[]
+}
+
+// Props the host passes a mounted view component after routing an intent to
+// it (client/features/workspace/intents.ts). Absent until a dispatch lands;
+// ephemeral in-memory state, never persisted into the workspace layout.
+export type ViewIntentProps = {
+  intent?: string
+  params?: Record<string, unknown>
+}
+
+// The applet-facing runtime the host installs at `window.moi` (re-exported to
+// bundles by the `moi` virtual module): dispatch a declared intent, or send a
+// chat action whose label becomes the visible message text. See docs/intents.md.
+export type MoiAppletRuntime = {
+  intent: (name: string, params?: Record<string, unknown>) => void
+  sendAction: (label: string, context?: Record<string, unknown>) => void
 }
 
 export type ViewInfo = {
@@ -68,9 +96,10 @@ export type ViewBuilder = {
 // ---- Applet error journal (see docs/self-correction.md) ------------------
 
 // Where an applet error was observed. `build` and `rpc` are recorded
-// server-side (bundle pipeline, RPC route); `load`/`render`/`window` are
-// browser-side and reach the journal via POST /api/workspaces/:id/applet-log.
-export type AppletLogSource = 'build' | 'load' | 'render' | 'window' | 'rpc'
+// server-side (bundle pipeline, RPC route); `load`/`render`/`window`/`intent`
+// are browser-side and reach the journal via POST /api/workspaces/:id/applet-log.
+// `intent` marks a dispatch no view declared (docs/intents.md).
+export type AppletLogSource = 'build' | 'load' | 'render' | 'window' | 'rpc' | 'intent'
 
 // One journal entry, as returned to `moi debug logs`. `kind`/`name` attribute
 // the applet when known; `module`/`fn` pin down the server function for `rpc`
@@ -89,12 +118,14 @@ export type AppletLogEntry = {
 }
 
 // The browser-reported subset (the server-side sources can't be spoofed by a
-// tab — the POST route rejects them).
-export type AppletClientErrorSource = 'load' | 'render' | 'window'
+// tab — the POST route rejects them). `kind`/`name` attribute the applet; they
+// are optional only for `intent` entries, whose dispatcher may not be an
+// applet (`cli`) — the POST route still requires them for the other sources.
+export type AppletClientErrorSource = 'load' | 'render' | 'window' | 'intent'
 export type AppletClientError = {
   source: AppletClientErrorSource
-  kind: AppletKind
-  name: string
+  kind?: AppletKind
+  name?: string
   message: string
   stack?: string
 }

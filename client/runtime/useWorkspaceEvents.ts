@@ -21,6 +21,16 @@ export type WorkspaceEvent =
   // The Scratchpad canvas for `workspaceId` was saved — open tabs reload from
   // disk. `origin` is the tab that wrote it, so that tab can skip its own echo.
   | { type: 'scratchpad:updated'; workspaceId: string; origin?: string }
+  // An agent-initiated intent dispatch (`moi intent <name>`, docs/intents.md).
+  // Tabs showing `workspaceId` route it through the client resolver
+  // (client/features/workspace/intents.ts) to the view declaring the name.
+  | {
+      type: 'intent:dispatch'
+      workspaceId: string
+      name: string
+      params?: Record<string, unknown>
+      source: string
+    }
 
 type WorkspaceEventHandler = (event: WorkspaceEvent) => void
 

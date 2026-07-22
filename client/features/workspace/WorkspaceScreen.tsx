@@ -31,9 +31,17 @@ import { useWorkspaceAvailability } from '@/client/features/workspace/api'
 import { useWorkspaceTheme } from '@/client/features/workspace/useWorkspaceTheme'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
+import {
+  routeIntentDispatch,
+  useDeliveredIntent,
+  useMoiAppletRuntime
+} from '@/client/features/workspace/intents'
+import { pushIntentAction } from '@/client/features/workspace/moi-context'
 import { resolveAppIcon } from '@/client/lib/app-icon-registry'
 import { cn } from '@/client/lib/cn'
 import { liveStore } from '@/client/features/chat/chat-store'
+import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
+import type { IntentDispatch } from '@/lib/intents'
 import {
   type CreateWorkspaceTabItem,
   type WorkspaceTabItem,
@@ -99,10 +107,12 @@ type ViewAppProps = {
 
 // A view — an agent-defined app — mounted full-area. The bundle owns its own
 // layout + scroll, so we give it a plain filled box and fade it in (mirroring
-// WidgetShell, but full-area instead of a grid cell).
+// WidgetShell, but full-area instead of a grid cell). A routed intent reaches
+// the component as `intent`/`params` props (docs/intents.md).
 function ViewApp({ view }: ViewAppProps) {
   const workspaceId = useWorkspaceId()
   const bundle = useView(view.id)
+  const delivered = useDeliveredIntent(workspaceId, view.id)
 
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -128,7 +138,9 @@ function ViewApp({ view }: ViewAppProps) {
                 workspaceId={workspaceId}
                 resetKey={bundle.version}
               >
-                <bundle.Component />
+                <bundle.Component
+                  {...(delivered ? { intent: delivered.intent, params: delivered.params } : {})}
+                />
               </WidgetErrorBoundary>
             </motion.div>
           </AppletMount>
@@ -453,6 +465,43 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     }
     setChatFocusRequest(request => request + 1)
   }
+
+  // Intent routing (docs/intents.md): CLI dispatches arrive as workspace
+  // events; applet dispatches come through the `window.moi` runtime installed
+  // below. Both resolve against the loaded view configs and land on the
+  // declaring view's tab.
+  const routeDispatch = (dispatch: IntentDispatch) =>
+    routeIntentDispatch({ workspaceId, views, openTab }, dispatch)
+
+  useWorkspaceEvent(event => {
+    if (event.type === 'intent:dispatch' && event.workspaceId === workspaceId) {
+      routeDispatch({
+        name: event.name,
+        ...(event.params ? { params: event.params } : {}),
+        source: event.source
+      })
+    }
+  })
+
+  useMoiAppletRuntime({
+    dispatch: routeDispatch,
+    sendAction: (label, context, source) => {
+      const text = label.trim()
+      if (!text) return
+      if (processing) {
+        // A run is in flight: don't interrupt, don't drop — park the label as
+        // the composer draft and surface the chat. The structured context is
+        // lost on this path (an MVP tradeoff; see docs/intents.md).
+        openChat(text)
+        return
+      }
+      // Idle: send now. The label is the visible message text; the structured
+      // payload rides the next envelope via the one-shot intent-action queue.
+      pushIntentAction(workspaceId, { source, ...(context ? { context } : {}) })
+      send(text)
+      openChat()
+    }
+  })
 
   const createItems: CreateWorkspaceTabItem[] = [
     ...(!dockedSplit && !openSet.has('agent')

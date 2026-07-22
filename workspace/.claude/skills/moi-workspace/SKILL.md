@@ -113,6 +113,8 @@ never from inside `.moi/` itself. You don't pass paths; moi resolves the workspa
 - `moi refresh` — re-fetch widget/view data without rebuilding (use after you mutated data the
   widgets read — DB rows, files, external API records — so the displayed values catch up)
 - `moi call-server-fn <module>/<fn> '[args]'` — invoke a `.server.ts` function directly (smoke test)
+- `moi intents` — list the intents declared by the workspace views (see Intents)
+- `moi intent <name> --params '<json>'` — dispatch an intent; the declaring view opens with the params
 - `moi debug logs` — applet runtime errors on record (experimental)
 - `moi theme --font=<key>` — change font theme (omit `--font` to list options)
 - `moi theme --color=<key>` — change color preset (omit `--color` to list options)
@@ -316,6 +318,42 @@ export const config = {
 The inverse of a widget: a view **owns its whole page** — its own `h-full w-full` layout, scrolling
 (`overflow-auto`), padding, and chrome. Build it to read like an app screen. See `VIEW-DESIGN.md`.
 
+# Intents
+
+Views declare **intents** — named capabilities that other applets and you (via the CLI) can
+trigger. Dispatching an intent switches the workspace to the view that declares it and hands it the
+params. Always route by declared name, never hardcode a tab or prop wiring between applets — named
+routing survives renames and rebuilds.
+
+- Declare an intent in the view's config for anything other applets or you should be able to
+  trigger. Names are kebab-case verbs; `params` maps each param name to a one-line description:
+
+  ```ts
+  export const config = {
+    title: 'Products',
+    intents: [
+      { name: 'open-product', description: 'Open one product detail pane', params: { id: 'product id' } }
+    ]
+  } as const
+  ```
+
+- The view receives a dispatch as props — re-render, don't refetch the world:
+
+  ```tsx
+  export default function Products({ intent, params }: { intent?: string; params?: Record<string, unknown> }) { … }
+  ```
+
+- Dispatch from applet code via the `moi` module:
+  `import { intent, sendAction } from 'moi'` → `intent('open-product', { id: 'p-42' })`.
+- `sendAction(label, context?)` sends a chat message to **you**: `label` becomes the visible
+  message text and `context` rides the hidden envelope. Use it for "ask the agent" buttons. If a
+  run is already in progress the label lands in the composer draft instead (context is dropped).
+- Run `moi intents` **before wiring an emitter**. If the target intent is missing, add the
+  declaration to the target view first and `moi bundle` — only then wire the emitter.
+- Dispatch yourself with `moi intent open-product --params '{"id":"p-42"}'` (params: one JSON object).
+- A dispatch no view declares does not error in the UI — it lands in `moi debug logs`, so check
+  there when a link seems dead.
+
 # Keeping this skill current
 
 This skill is installed with moi (via the CLI or the UI) and can fall behind when the moi CLI updates.
@@ -328,4 +366,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.7.0" />
+<moi-skill version="0.8.0" />

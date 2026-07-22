@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'path'
 import pc from './cli-pc'
 
+import type { WorkspaceIntent } from '@/lib/intents'
 import { COLOR_THEMES, FONT_THEMES } from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/themes'
 import type {
@@ -1699,6 +1700,112 @@ const scratch = defineCommand({
   }
 })
 
+// ---- intents (capability manifest + dispatch — docs/intents.md) --------------
+
+const intentsCmd = defineCommand({
+  meta: {
+    name: 'intents',
+    description: 'List the intents declared by the workspace views (the capability manifest)'
+  },
+  args: {
+    dir: dirArg,
+    json: { type: 'boolean', default: false, description: 'Machine-readable output' }
+  },
+  run({ args }) {
+    const path = resolve(args.dir)
+    sendControl(path, { type: 'intent:list', path }, res => {
+      const list = (Array.isArray(res.intents) ? res.intents : []) as WorkspaceIntent[]
+      if (args.json) {
+        console.log(JSON.stringify(list, null, 2))
+        return
+      }
+      if (list.length === 0) {
+        console.log(
+          '\n' +
+            pc.bold('moi intents') +
+            pc.dim(' — no intents declared') +
+            '\n\n' +
+            pc.dim(
+              '  Views declare intents in their config: `intents: [{ name, description, params }]`.'
+            ) +
+            '\n'
+        )
+        return
+      }
+      console.log('\n' + pc.bold('moi intents') + pc.dim(` — ${list.length} declared`) + '\n')
+      for (const intent of list) {
+        console.log(
+          `  ${pc.bold(intent.name)} ${pc.dim(`→ view ${intent.viewId}`)}` +
+            (intent.description ? ` — ${intent.description}` : '')
+        )
+        for (const [param, desc] of Object.entries(intent.params ?? {})) {
+          console.log(pc.dim(`      ${param}: ${desc}`))
+        }
+      }
+      console.log(
+        '\n' +
+          pc.dim('  Dispatch with ') +
+          pc.bold("moi intent <name> --params '<json>'") +
+          pc.dim(' — params are one JSON object.') +
+          '\n'
+      )
+    })
+  }
+})
+
+const intentCmd = defineCommand({
+  meta: {
+    name: 'intent',
+    description: 'Dispatch an intent — the view that declares it opens and receives the params'
+  },
+  args: {
+    name: {
+      type: 'positional',
+      required: true,
+      description: 'Intent name (see `moi intents`)'
+    },
+    params: {
+      type: 'string',
+      description: 'Params as one JSON object, e.g. \'{"id": "p-42"}\''
+    },
+    dir: dirArg
+  },
+  run({ args }) {
+    const path = resolve(args.dir)
+    let params: Record<string, unknown> | undefined
+    if (args.params !== undefined) {
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(args.params)
+      } catch {
+        parsed = null
+      }
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        console.error(
+          '\n' + pc.red('✗') + ' --params must be one JSON object, e.g. \'{"id": "p-42"}\'\n'
+        )
+        process.exit(1)
+      }
+      params = parsed as Record<string, unknown>
+    }
+    sendControl(
+      path,
+      { type: 'intent:dispatch', path, name: args.name, ...(params ? { params } : {}) },
+      res => {
+        console.log(
+          '\n' +
+            pc.green('✓') +
+            ' dispatched ' +
+            pc.bold(args.name) +
+            ' → view ' +
+            pc.bold(String(res.viewId)) +
+            '\n'
+        )
+      }
+    )
+  }
+})
+
 // ---- self-correction commands (docs/self-correction.md) ---------------------
 
 const callServerFn = defineCommand({
@@ -1960,6 +2067,8 @@ const main = defineCommand({
     bundle,
     builder,
     refresh,
+    intent: intentCmd,
+    intents: intentsCmd,
     'call-server-fn': callServerFn,
     debug,
     theme,

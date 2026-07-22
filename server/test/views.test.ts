@@ -88,6 +88,24 @@ describe('listViews', () => {
     expect((await views())[0].config).toEqual({ title: 'CRM', icon: 'briefcase' })
   })
 
+  test('passes through intent declarations (docs/intents.md)', async () => {
+    seed(['crm'], {
+      config: {
+        crm: {
+          title: 'CRM',
+          intents: [{ name: 'open-customer', description: 'Open one', params: { id: 'row id' } }]
+        }
+      },
+      order: ['crm']
+    })
+    const res = await listViews(WS)
+    const body = (await res.json()) as { views: { config: Record<string, unknown> }[] }
+    expect(body.views[0].config).toEqual({
+      title: 'CRM',
+      intents: [{ name: 'open-customer', description: 'Open one', params: { id: 'row id' } }]
+    })
+  })
+
   test('appends a built view missing from order', async () => {
     seed(['a', 'b'], { config: {}, order: ['b'] })
     expect((await views()).map(v => v.id)).toEqual(['b', 'a'])

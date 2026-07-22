@@ -8,7 +8,8 @@ import tailwind from 'bun-plugin-tailwind'
 import { realpathSync } from 'node:fs'
 import { basename, dirname, join, relative, sep } from 'path'
 
-import type { AppletKind, ViewConfig, WidgetConfig } from '@/lib/types'
+import { INTENT_NAME_RE } from '@/lib/intents'
+import type { AppletKind, ViewConfig, ViewIntent, WidgetConfig } from '@/lib/types'
 
 import { scopeAppletCss } from './applet-css'
 
@@ -114,6 +115,74 @@ function readRequiredEnv(propValue: unknown): string[] | undefined {
   return names.length ? names : undefined
 }
 
+// A string-literal AST node's value, or undefined for anything else.
+function literalString(node: unknown): string | undefined {
+  const n = node as { type?: string; value?: unknown }
+  return n?.type === 'Literal' && typeof n.value === 'string' ? n.value : undefined
+}
+
+// A property's key name: `name: …` (Identifier) or `'name': …` (string Literal).
+function propertyKey(prop: { key?: unknown }): string | undefined {
+  const key = prop.key as { type?: string; name?: string; value?: unknown } | undefined
+  if (key?.type === 'Identifier') return key.name
+  return literalString(key)
+}
+
+// `params`: an object literal mapping param name → one-line description.
+// Non-string values are dropped.
+function readIntentParams(propValue: unknown): Record<string, string> | undefined {
+  const value = propValue as { type?: string; properties?: unknown[] }
+  if (value?.type !== 'ObjectExpression') return undefined
+  const out: Record<string, string> = {}
+  for (const raw of value.properties ?? []) {
+    const prop = raw as { type?: string; key?: unknown; value?: unknown }
+    if (prop?.type !== 'Property') continue
+    const key = propertyKey(prop)
+    const desc = literalString(prop.value)
+    if (key && desc !== undefined) out[key] = desc
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
+// `intents`: declarations of the named intents a view handles
+// (docs/intents.md). Minimal validation — an entry must be an object literal
+// with a kebab-case string `name`; malformed entries are skipped with a warn,
+// never failing the build.
+function readIntents(propValue: unknown, viewName: string): ViewIntent[] | undefined {
+  const value = propValue as { type?: string; elements?: unknown[] }
+  if (value?.type !== 'ArrayExpression') return undefined
+  const intents: ViewIntent[] = []
+  for (const el of value.elements ?? []) {
+    const obj = el as { type?: string; properties?: unknown[] }
+    if (obj?.type !== 'ObjectExpression') continue
+    let name: string | undefined
+    let description: string | undefined
+    let params: Record<string, string> | undefined
+    for (const raw of obj.properties ?? []) {
+      const prop = raw as { type?: string; key?: unknown; value?: unknown }
+      if (prop?.type !== 'Property') continue
+      const key = propertyKey(prop)
+      if (key === 'name') name = literalString(prop.value)
+      else if (key === 'description') description = literalString(prop.value)
+      else if (key === 'params') params = readIntentParams(prop.value)
+    }
+    if (!name || !INTENT_NAME_RE.test(name)) {
+      console.warn(
+        `[moi] "${viewName}": skipping malformed intent declaration` +
+          (name ? ` "${name}"` : '') +
+          ' (name must be a kebab-case string like "open-product")'
+      )
+      continue
+    }
+    intents.push({
+      name,
+      ...(description ? { description } : {}),
+      ...(params ? { params } : {})
+    })
+  }
+  return intents.length ? intents : undefined
+}
+
 export async function extractWidgetConfig(srcPath: string): Promise<WidgetConfig | null> {
   const source = await Bun.file(srcPath).text()
   const widgetName = basename(srcPath).replace(/\.tsx?$/, '')
@@ -147,10 +216,12 @@ export async function extractWidgetConfig(srcPath: string): Promise<WidgetConfig
   return { ...DEFAULT_CONFIG, ...result }
 }
 
-// A view's config: `title` + app icon registry id + advisory `requiredEnv`.
-// No sizing — views are full-screen. Returns null when no `config` export is present.
+// A view's config: `title` + app icon registry id + advisory `requiredEnv` +
+// declared `intents`. No sizing — views are full-screen. Returns null when no
+// `config` export is present.
 export async function extractViewConfig(srcPath: string): Promise<ViewConfig | null> {
   const source = await Bun.file(srcPath).text()
+  const viewName = basename(srcPath).replace(/\.tsx?$/, '')
 
   const properties = findConfigProperties(source)
   if (!properties) return null
@@ -170,6 +241,11 @@ export async function extractViewConfig(srcPath: string): Promise<ViewConfig | n
     if (key === 'requiredEnv') {
       const names = readRequiredEnv(prop.value)
       if (names) result.requiredEnv = names
+      continue
+    }
+    if (key === 'intents') {
+      const intents = readIntents(prop.value, viewName)
+      if (intents) result.intents = intents
     }
   }
 
@@ -231,17 +307,29 @@ export function rpc(module, name) {
 }
 `
 
-// The `moi` virtual module — the applet-facing runtime API. Today just
-// `fileUrl(path)`, which maps a workspace-relative path to its streaming URL
-// (`/api/workspaces/<id>/fs/<path>`). Same sentinel base as RPC; the path is
-// per-segment URL-encoded so spaces / unicode in filenames survive. A leading
-// slash is stripped so both `clips/a.mp4` and `/clips/a.mp4` work.
+// The `moi` virtual module — the applet-facing runtime API:
+//   • `fileUrl(path)` maps a workspace-relative path to its streaming URL
+//     (`/api/workspaces/<id>/fs/<path>`). Same sentinel base as RPC; the path
+//     is per-segment URL-encoded so spaces / unicode in filenames survive. A
+//     leading slash is stripped so both `clips/a.mp4` and `/clips/a.mp4` work.
+//   • `intent(name, params?)` / `sendAction(label, context?)` delegate to the
+//     host-installed `window.moi` runtime (docs/intents.md; typed as
+//     `MoiAppletRuntime` in lib/types). Thin delegation keeps the on-disk
+//     bundle host-agnostic; a bundle loaded outside the host is a no-op.
 const MOI_MODULE_SOURCE = `
 const BASE = ${JSON.stringify(APPLET_API_BASE_SENTINEL)};
 
 export function fileUrl(path) {
   const clean = String(path).replace(/^\\/+/, "");
   return BASE + "/fs/" + clean.split("/").map(encodeURIComponent).join("/");
+}
+
+export function intent(name, params) {
+  window.moi?.intent(name, params);
+}
+
+export function sendAction(label, context) {
+  window.moi?.sendAction(label, context);
 }
 `
 

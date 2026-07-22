@@ -99,6 +99,47 @@ describe('moi context envelope', () => {
     expect(isMoiContext({ activeTab: 'agent', directives: [1] })).toBe(false)
   })
 
+  test('renders an applet action section with fenced context JSON', () => {
+    const rendered = renderMoiContext({
+      activeTab: 'view:crm',
+      intent: { source: 'widget:products', context: { sku: 'a-1' } }
+    })
+    expect(rendered).toContain(
+      '# Applet action\nThe user sent this message with an applet action from "widget:products" — the message text is the action\'s label.'
+    )
+    expect(rendered).toContain('```json\n{\n  "sku": "a-1"\n}\n```')
+    // Context-less action: the sentence stands alone, no fence.
+    const bare = renderMoiContext({ activeTab: 'agent', intent: { source: 'view:crm' } })
+    expect(bare).toContain('# Applet action')
+    expect(bare).not.toContain('```json')
+  })
+
+  test('renders the workspace intents sentence with the CLI pointer', () => {
+    const rendered = renderMoiContext({
+      activeTab: 'widgets',
+      availableIntents: ['open-product', 'add-order']
+    })
+    expect(rendered).toContain(
+      "# Workspace intents\nThe workspace's views declare these intents: `open-product`, `add-order`. Run `moi intents` for details and `moi intent <name>` to dispatch one."
+    )
+    // Absent list, absent section.
+    expect(renderMoiContext({ activeTab: 'widgets' })).not.toContain('# Workspace intents')
+  })
+
+  test('wire guard covers intent and availableIntents', () => {
+    expect(isMoiContext({ activeTab: 'agent', intent: { source: 'widget:products' } })).toBe(true)
+    expect(
+      isMoiContext({
+        activeTab: 'agent',
+        intent: { source: 'cli', context: { id: 1 } },
+        availableIntents: ['open-product']
+      })
+    ).toBe(true)
+    expect(isMoiContext({ activeTab: 'agent', intent: { context: {} } })).toBe(false)
+    expect(isMoiContext({ activeTab: 'agent', intent: { source: 'x', context: [] } })).toBe(false)
+    expect(isMoiContext({ activeTab: 'agent', availableIntents: [1] })).toBe(false)
+  })
+
   test('loose strip handles truncated envelopes in previews', () => {
     const sent = appendMoiContext('Fix the header', context)
     expect(stripMoiContextLoose(sent)).toBe('Fix the header')

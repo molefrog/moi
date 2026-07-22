@@ -273,6 +273,22 @@ describe('extractViewConfig', () => {
     // with-config.tsx exports { rowSpan, colSpan } — none of which a view honors.
     expect(await extractViewConfig(join(FIXTURES, 'with-config.tsx'))).toEqual({})
   })
+
+  test('extracts intent declarations, skipping malformed entries', async () => {
+    const config = await extractViewConfig(join(FIXTURES, 'with-intents.tsx'))
+    // Non-kebab-case and nameless entries are skipped; non-string param
+    // descriptions are dropped; quoted (kebab-case) param keys survive.
+    expect(config?.intents).toEqual([
+      { name: 'open-product', description: 'Open one product', params: { id: 'product id' } },
+      { name: 'list-products' },
+      { name: 'mixed-params', params: { kept: 'a string', 'kebab-key': 'quoted key' } }
+    ])
+  })
+
+  test('omits intents when the config declares none', async () => {
+    const config = await extractViewConfig(join(FIXTURES, 'with-view-config.tsx'))
+    expect(config?.intents).toBeUndefined()
+  })
 })
 
 describe("buildApplet kind='view'", () => {
@@ -291,6 +307,16 @@ describe("buildApplet kind='view'", () => {
     const result = await buildApplet(join(FIXTURES, 'hello.tsx'), undefined, 'widget')
     expect(result.js).toContain('widget:hello')
     expect(result.js).not.toContain('view:hello')
+  })
+
+  test('the moi module exposes intent/sendAction as window.moi delegates', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-intent-call.tsx'), undefined, 'view')
+    // The bundle carries thin stubs — the host installs the real runtime at
+    // window.moi (client/features/workspace/intents.ts), so an on-disk bundle
+    // stays host-agnostic.
+    expect(result.js).toContain('window.moi?.intent')
+    expect(result.js).toContain('window.moi?.sendAction')
+    expect(result.config).toEqual({ title: 'Emitter', intents: [{ name: 'noop' }] })
   })
 })
 

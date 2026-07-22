@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 
-import { activeTabTitle, drainChatDirectives, pushChatDirective } from './moi-context'
+import {
+  activeTabTitle,
+  drainChatDirectives,
+  drainIntentAction,
+  pushChatDirective,
+  pushIntentAction
+} from './moi-context'
 import type { ViewBuilder, ViewInfo } from '@/lib/types'
 
 describe('moi context assembly', () => {
@@ -11,6 +17,18 @@ describe('moi context assembly', () => {
     expect(drainChatDirectives('ws-1')).toEqual(['First.', 'Second.'])
     expect(drainChatDirectives('ws-1')).toEqual([])
     expect(drainChatDirectives('ws-2')).toEqual(['Other workspace.'])
+  })
+
+  test('intent actions queue per workspace, last write wins, drain once', () => {
+    pushIntentAction('ws-1', { source: 'widget:products', context: { sku: 'old' } })
+    pushIntentAction('ws-1', { source: 'widget:products', context: { sku: 'a-1' } })
+    pushIntentAction('ws-2', { source: 'view:crm' })
+    expect(drainIntentAction('ws-1')).toEqual({
+      source: 'widget:products',
+      context: { sku: 'a-1' }
+    })
+    expect(drainIntentAction('ws-1')).toBeUndefined()
+    expect(drainIntentAction('ws-2')).toEqual({ source: 'view:crm' })
   })
 
   test('activeTabTitle resolves view titles and claimed builder titles', () => {

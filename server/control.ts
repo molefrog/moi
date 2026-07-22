@@ -1,6 +1,7 @@
 import { stringify as devalueStringify } from 'devalue'
 import { resolve } from 'path'
 
+import { collectIntents, resolveIntentView } from '@/lib/intents'
 import type { WorkspaceEntry } from '@/lib/types'
 
 import { clearAppletLog, getAppletLog, getAppletLogCount } from './applet-log'
@@ -132,6 +133,54 @@ export const control = Bun.serve({
               logCount: getAppletLogCount(workspacePath)
             })
           )
+          return
+        }
+
+        // The intent capability manifest — `moi intents` (docs/intents.md):
+        // every intent the workspace's built views declare, in nav order.
+        if (data.type === 'intent:list') {
+          const match = await resolveWorkspace(ws, data.path)
+          if (!match) return
+          ws.send(
+            JSON.stringify({ ok: true, intents: collectIntents(await getViewList(match.path)) })
+          )
+          return
+        }
+
+        // Agent-initiated dispatch — `moi intent <name>`. Resolved against the
+        // BUILT views before publishing, so a name nothing declares fails
+        // loudly in the CLI (listing what is declared) instead of dissolving
+        // into a browser event no view handles.
+        if (data.type === 'intent:dispatch') {
+          const match = await resolveWorkspace(ws, data.path)
+          if (!match) return
+          const name = typeof data.name === 'string' ? data.name.trim() : ''
+          if (!name) {
+            ws.send(JSON.stringify({ error: 'An intent name is required' }))
+            return
+          }
+          const params =
+            typeof data.params === 'object' && data.params !== null && !Array.isArray(data.params)
+              ? (data.params as Record<string, unknown>)
+              : undefined
+          const views = await getViewList(match.path)
+          const target = resolveIntentView(views, name)
+          if (!target) {
+            const declared = collectIntents(views)
+            const hint = declared.length
+              ? `Declared intents: ${declared.map(i => `${i.name} (view ${i.viewId})`).join(', ')}`
+              : 'No intents are declared in this workspace — add an `intents` entry to a view config and run `moi bundle`.'
+            ws.send(JSON.stringify({ error: `No view declares intent "${name}". ${hint}` }))
+            return
+          }
+          publishEvent({
+            type: 'intent:dispatch',
+            workspaceId: match.id,
+            name,
+            ...(params ? { params } : {}),
+            source: 'cli'
+          })
+          ws.send(JSON.stringify({ ok: true, viewId: target.id }))
           return
         }
 

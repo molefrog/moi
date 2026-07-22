@@ -106,12 +106,16 @@ export async function getViewList(workspacePath: string): Promise<ViewInfo[]> {
     const raw = manifest.config[id] ?? {}
     const icon = typeof raw.icon === 'string' && raw.icon ? raw.icon : undefined
     const requiredEnv = Array.isArray(raw.requiredEnv) ? raw.requiredEnv : undefined
+    // Declared intents pass through as extracted (the bundler already
+    // validated the declarations — see readIntents in build-applet.ts).
+    const intents = Array.isArray(raw.intents) && raw.intents.length ? raw.intents : undefined
     return {
       id,
       config: {
         title: raw.title || id,
         ...(icon ? { icon } : {}),
-        ...(requiredEnv ? { requiredEnv } : {})
+        ...(requiredEnv ? { requiredEnv } : {}),
+        ...(intents ? { intents } : {})
       }
     }
   })
@@ -169,7 +173,11 @@ export async function handleBundleViews(
     r =>
       r.status === 'built' &&
       ((before.config[r.name]?.title ?? '') !== (r.config?.title ?? '') ||
-        (before.config[r.name]?.icon ?? '') !== (r.config?.icon ?? ''))
+        (before.config[r.name]?.icon ?? '') !== (r.config?.icon ?? '') ||
+        // Intent declarations ride the client's views query — a changed set
+        // must refetch it or the client resolver routes on stale capabilities.
+        JSON.stringify(before.config[r.name]?.intents ?? []) !==
+          JSON.stringify(r.config?.intents ?? []))
   )
   const orderChanged = before.order.join('\0') !== after.order.join('\0')
   const membershipChanged =

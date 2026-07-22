@@ -24,6 +24,7 @@ import { useViewBuilders } from '@/client/features/views/api'
 import { useWorkspaceViews } from '@/client/features/workspace/api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
+import { intentNames } from '@/lib/intents'
 import type { MoiContext } from '@/lib/moi-context'
 import type { ViewBuilder, ViewInfo, WorkspaceTabId } from '@/lib/types'
 
@@ -46,6 +47,24 @@ export function drainChatDirectives(workspaceId: string): string[] {
   const queue = directiveQueues.get(workspaceId) ?? []
   directiveQueues.delete(workspaceId)
   return queue
+}
+
+// One-shot applet-action payload per workspace (docs/intents.md): `sendAction`
+// stores the originating applet + structured context here and the NEXT chat
+// message's envelope carries it as `MoiContext.intent`. Last write wins — one
+// action produces one message, so there is never more than one in flight.
+type IntentAction = NonNullable<MoiContext['intent']>
+const intentActions = new Map<string, IntentAction>()
+
+export function pushIntentAction(workspaceId: string, intent: IntentAction): void {
+  intentActions.set(workspaceId, intent)
+}
+
+// Exported for unit tests; production code drains only via `useMoiUserMessageContext`.
+export function drainIntentAction(workspaceId: string): IntentAction | undefined {
+  const intent = intentActions.get(workspaceId)
+  intentActions.delete(workspaceId)
+  return intent
 }
 
 // The UI label of the active tab when it has one beyond its id: a view's
@@ -76,9 +95,15 @@ export function useMoiUserMessageContext(): () => MoiContext {
   const activeTab = layout.tabs.active
   return useCallback(() => {
     const directives = drainChatDirectives(workspaceId)
+    const intent = drainIntentAction(workspaceId)
+    // The workspace's declared capability surface — names only (the envelope
+    // stays terse; `moi intents` has the details).
+    const availableIntents = intentNames(views ?? [])
     return {
       activeTab,
       tabTitle: activeTabTitle(activeTab, views, builders),
+      ...(intent ? { intent } : {}),
+      ...(availableIntents.length > 0 ? { availableIntents } : {}),
       ...(directives.length > 0 ? { directives } : {})
     }
   }, [workspaceId, activeTab, views, builders])

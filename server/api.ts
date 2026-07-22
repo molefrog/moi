@@ -339,14 +339,29 @@ one.post('/applet-log', async c => {
       message?: unknown
       stack?: unknown
     }
-    if (e.source !== 'load' && e.source !== 'render' && e.source !== 'window') continue
-    if (e.kind !== 'widget' && e.kind !== 'view') continue
-    if (typeof e.name !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(e.name)) continue
+    if (
+      e.source !== 'load' &&
+      e.source !== 'render' &&
+      e.source !== 'window' &&
+      e.source !== 'intent'
+    ) {
+      continue
+    }
+    const kind = e.kind === 'widget' || e.kind === 'view' ? e.kind : undefined
+    const name = typeof e.name === 'string' && /^[a-zA-Z0-9_-]+$/.test(e.name) ? e.name : undefined
+    // `intent` entries (a dispatch no view declares — docs/intents.md) may be
+    // unattributed: a `cli`-sourced dispatch has no applet behind it. Every
+    // other source must name its applet.
+    if (e.source === 'intent') {
+      if ((e.kind !== undefined && !kind) || (e.name !== undefined && !name)) continue
+    } else if (!kind || !name) {
+      continue
+    }
     if (typeof e.message !== 'string' || !e.message) continue
     recordAppletError(c.get('ws').path, {
       source: e.source,
-      kind: e.kind,
-      name: e.name,
+      ...(kind ? { kind } : {}),
+      ...(name ? { name } : {}),
       message: e.message,
       ...(typeof e.stack === 'string' ? { stack: e.stack } : {})
     })

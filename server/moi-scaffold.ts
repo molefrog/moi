@@ -60,12 +60,28 @@ declare module 'moi' {
   // Absolute URL to a workspace file, streamed by the server. Pass a
   // workspace-relative path (e.g. 'clips/001.mp4'). Media/asset files only.
   export function fileUrl(path: string): string
+  // Dispatch a declared intent — the view declaring \`name\` opens and receives
+  // the params as props. Run \`moi intents\` to see what's declared.
+  export function intent(name: string, params?: Record<string, unknown>): void
+  // Send a chat message to the agent: \`label\` is the visible text, \`context\`
+  // rides the hidden envelope. Parks as a composer draft while a run is active.
+  export function sendAction(label: string, context?: Record<string, unknown>): void
+  export type ViewIntent = {
+    name: string
+    description?: string
+    params?: Record<string, string>
+  }
   export type WidgetConfig = {
     rowSpan: 1 | 2 | 3 | 4
     colSpan: 1 | 2 | 3 | 4
     requiredEnv?: string[]
   }
-  export type ViewConfig = { title?: string; requiredEnv?: string[] }
+  export type ViewConfig = {
+    title?: string
+    icon?: string
+    requiredEnv?: string[]
+    intents?: ViewIntent[]
+  }
 }
 
 // Bundled asset imports (\`import logo from './logo.png'\`) resolve to a URL string.

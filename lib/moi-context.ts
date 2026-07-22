@@ -44,6 +44,14 @@ export type MoiContext = {
   // view builder's claimed title while the build runs. The tab bar falls
   // back to the id when unset; so does the envelope.
   tabTitle?: string
+  // Set when this message was sent by an applet action (`sendAction`,
+  // docs/intents.md): the originating applet and its structured context. The
+  // visible message text is the action's label; the payload rides here only.
+  intent?: { source: string; context?: Record<string, unknown> }
+  // Names of every intent the workspace's views declare — the workspace's
+  // capability surface, so the agent knows what it can dispatch. Names only
+  // to stay terse; `moi intents` has descriptions and params.
+  availableIntents?: string[]
   // One-shot imperative lines for this message only (e.g. the view-builder
   // bootstrap instructions from lib/view-builder-directives.ts).
   directives?: string[]
@@ -83,6 +91,27 @@ export function renderMoiContextBody(ctx: MoiContext): string {
     'Read the **`moi-workspace` skill** before responding — even to a simple question — unless you already read it in this chat.'
   ].join('\n')
   const sections = [`# Active tab\n${describeTab(ctx.activeTab, ctx.tabTitle)}`]
+  if (ctx.intent) {
+    const lines = [
+      `The user sent this message with an applet action from "${ctx.intent.source}" — the message text is the action's label.`
+    ]
+    if (ctx.intent.context) {
+      lines.push(
+        'The applet attached this structured context:',
+        '```json',
+        JSON.stringify(ctx.intent.context, null, 2),
+        '```'
+      )
+    }
+    sections.push(`# Applet action\n${lines.join('\n')}`)
+  }
+  if (ctx.availableIntents?.length) {
+    sections.push(
+      `# Workspace intents\nThe workspace's views declare these intents: ${ctx.availableIntents
+        .map(name => `\`${name}\``)
+        .join(', ')}. Run \`moi intents\` for details and \`moi intent <name>\` to dispatch one.`
+    )
+  }
   if (ctx.directives?.length) {
     sections.push(`# This message only\n${ctx.directives.join('\n')}`)
   }
@@ -97,13 +126,31 @@ export function renderMoiContext(ctx: MoiContext): string {
   return `${MOI_CONTEXT_OPEN}\n${renderMoiContextBody(ctx)}\n${MOI_CONTEXT_CLOSE}`
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 // Wire-shape guard for the chat frame's `context` field (see web.ts).
 export function isMoiContext(value: unknown): value is MoiContext {
   if (typeof value !== 'object' || value === null) return false
-  const v = value as { activeTab?: unknown; tabTitle?: unknown; directives?: unknown }
+  const v = value as {
+    activeTab?: unknown
+    tabTitle?: unknown
+    intent?: unknown
+    availableIntents?: unknown
+    directives?: unknown
+  }
+  const intent = v.intent as { source?: unknown; context?: unknown } | undefined
   return (
     typeof v.activeTab === 'string' &&
     (v.tabTitle === undefined || typeof v.tabTitle === 'string') &&
+    (v.intent === undefined ||
+      (isPlainObject(v.intent) &&
+        typeof intent?.source === 'string' &&
+        (intent.context === undefined || isPlainObject(intent.context)))) &&
+    (v.availableIntents === undefined ||
+      (Array.isArray(v.availableIntents) &&
+        v.availableIntents.every(n => typeof n === 'string'))) &&
     (v.directives === undefined ||
       (Array.isArray(v.directives) && v.directives.every(d => typeof d === 'string')))
   )
