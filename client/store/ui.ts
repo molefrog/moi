@@ -6,9 +6,11 @@ import { persist } from 'zustand/middleware'
 type UiStore = {
   sidebarCollapsed: boolean
   discoveredWorkspacesOpen: boolean
+  hasSentMessageFromMoi: boolean
   toggleSidebar: () => void
   setSidebarCollapsed: (collapsed: boolean) => void
   setDiscoveredWorkspacesOpen: (open: boolean) => void
+  markMessageSentFromMoi: () => void
 }
 
 export const useUiStore = create<UiStore>()(
@@ -16,9 +18,11 @@ export const useUiStore = create<UiStore>()(
     set => ({
       sidebarCollapsed: false,
       discoveredWorkspacesOpen: true,
+      hasSentMessageFromMoi: false,
       toggleSidebar: () => set(s => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setSidebarCollapsed: collapsed => set({ sidebarCollapsed: collapsed }),
-      setDiscoveredWorkspacesOpen: open => set({ discoveredWorkspacesOpen: open })
+      setDiscoveredWorkspacesOpen: open => set({ discoveredWorkspacesOpen: open }),
+      markMessageSentFromMoi: () => set({ hasSentMessageFromMoi: true })
     }),
     { name: 'moi:ui' }
   )

@@ -3,7 +3,12 @@ import { useCallback, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { useSessionView, useThreadConfig, useWorkspaceModels } from '@/client/features/chat/api'
+import {
+  useSessionView,
+  useThreadConfig,
+  useWorkspaceModels,
+  useWorkspaceSessions
+} from '@/client/features/chat/api'
 import { useMoiUserMessageContext } from '@/client/features/workspace/moi-context'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
@@ -11,6 +16,7 @@ import { sendMessage } from '@/client/features/chat/chat-connection'
 import { resolveChatRunOptions, startOptimisticTurn } from '@/client/features/chat/chat-send'
 import { buildPreviewTurn } from '@/client/features/chat/preview-turn'
 import { draftKey, liveStore, selectPreviews, useLive } from '@/client/features/chat/chat-store'
+import { useUiStore } from '@/client/store/ui'
 import { emptyViewState } from '@/lib/format'
 import type { Part, ViewState } from '@/lib/types'
 
@@ -24,11 +30,15 @@ export function useChat() {
   const qc = useQueryClient()
   const { layout } = useWorkspaceLayoutCtx()
   const modelsData = useWorkspaceModels(workspaceId).data
+  const sessions = useWorkspaceSessions(workspaceId).data
   // Snapshot of the workspace's ambient UI state + queued one-shot
   // directives, taken when the message actually goes out.
   const buildMoiContext = useMoiUserMessageContext()
 
   const activeSessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
+  const sessionSelectionInitialized = useLive(s =>
+    Object.prototype.hasOwnProperty.call(s.activeByWorkspace, workspaceId)
+  )
   const activity = useLive(s =>
     activeSessionId ? (s.activity[`${workspaceId}:${activeSessionId}`] ?? 'idle') : 'idle'
   )
@@ -39,7 +49,14 @@ export function useChat() {
     activeSessionId ? (s.errors[`${workspaceId}:${activeSessionId}`] ?? null) : null
   )
 
-  const view = useSessionView(workspaceId, activeSessionId).data ?? EMPTY
+  const viewQuery = useSessionView(workspaceId, activeSessionId)
+  const view = viewQuery.data ?? EMPTY
+  const chatReady =
+    sessionSelectionInitialized &&
+    sessions !== undefined &&
+    (activeSessionId === null ||
+      (sessions.some(session => session.sessionId === activeSessionId) &&
+        viewQuery.data !== undefined))
 
   // The live streaming preview as a synthetic assistant turn, so the ChatPanel
   // can run it through the SAME groupTurns pipeline as finalized turns — a
@@ -121,6 +138,7 @@ export function useChat() {
         context: buildMoiContext(),
         ...(ready.length > 0 ? { attachments: ready.map(a => a.upload!.id) } : {})
       })
+      useUiStore.getState().markMessageSentFromMoi()
       if (isNew) {
         qc.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
       }
@@ -161,6 +179,7 @@ export function useChat() {
 
   return {
     view,
+    chatReady,
     previewTurn,
     sessionId: activeSessionId,
     processing,

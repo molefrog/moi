@@ -18,8 +18,8 @@ const OPENCLAW_LOCKED_DESCRIPTION =
   'Initialize OpenClaw in the folder\nmanually, then import it to moi'
 
 const workspaceAgentDescription: Record<WorkspaceType, string> = {
-  'claude-code': 'By Anthropic',
-  codex: 'By OpenAI',
+  'claude-code': 'Anthropic',
+  codex: 'OpenAI',
   openclaw: 'Open-source'
 }
 

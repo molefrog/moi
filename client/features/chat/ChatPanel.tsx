@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useRef } from 'react'
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
 import { IconChevronDown, IconX } from '@tabler/icons-react'
 
@@ -8,12 +8,15 @@ import type { Turn, ViewState } from '@/lib/types'
 
 import { ChatComposer } from './ChatComposer'
 import { ChatSelector } from './ChatSelector'
+import { ChatWelcome } from './ChatWelcome'
 import { EmptyState, ThinkingIndicator, TurnView } from './TurnView'
 import { Button } from '@/client/components/ui/button'
+import { useUiStore } from '@/client/store/ui'
 
 type ChatPanelProps = {
   active?: boolean
   focusRequest?: number
+  chatReady: boolean
   view: ViewState
   // The live streaming preview as a synthetic assistant turn (or null). Merged
   // into the transcript through the same groupTurns pipeline so a thinking-only
@@ -43,6 +46,7 @@ type ChatPanelProps = {
 export function ChatPanel({
   active = true,
   focusRequest = 0,
+  chatReady,
   view,
   previewTurn,
   sessionId,
@@ -60,6 +64,7 @@ export function ChatPanel({
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const turns = view.turns
+  const hasSentMessageFromMoi = useUiStore(state => state.hasSentMessageFromMoi)
   // Visual grouping: fold consecutive tool-only assistant turns into one
   // synthetic turn so OpenAI Codex–style traces (which serialize one
   // assistant message per agent step) don't render with the wider
@@ -70,9 +75,14 @@ export function ChatPanel({
     () => groupTurns(previewTurn ? [...turns, previewTurn] : turns),
     [turns, previewTurn]
   )
+  const showEmptyChat = chatReady && groupedTurns.length === 0 && !processing
 
   // Stick to the bottom while pinned; respect scroll-up; jump on thread switch.
-  const { atBottom, scrollToBottom } = useStickToBottom(scrollRef, sessionId)
+  const { atBottom, scrollToBottom, scrollToTop } = useStickToBottom(scrollRef, sessionId)
+
+  useLayoutEffect(() => {
+    if (showEmptyChat && !hasSentMessageFromMoi) scrollToTop()
+  }, [showEmptyChat, hasSentMessageFromMoi, scrollToTop])
 
   // The active chat surface owns initial focus. A monotonically increasing
   // request also refocuses an already-visible composer after intent actions.
@@ -113,7 +123,12 @@ export function ChatPanel({
           className="flex scrollbar-thin flex-1 scroll-fade flex-col overflow-y-auto overscroll-contain px-5 pt-4 pb-12 [--scroll-fade-reveal:8px]"
         >
           <div className="mx-auto flex w-full max-w-(--chat-max-container) flex-1 flex-col gap-6">
-            {turns.length === 0 && !processing && <EmptyState />}
+            {showEmptyChat &&
+              (hasSentMessageFromMoi ? (
+                <EmptyState />
+              ) : (
+                <ChatWelcome onSelectPrompt={handleSend} />
+              ))}
             {groupedTurns.map((turn, i) => (
               <TurnView
                 key={turn.id}
