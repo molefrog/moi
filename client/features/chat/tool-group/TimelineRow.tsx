@@ -47,10 +47,10 @@ export function TimelineRow({
           1px rule lands on a single pixel column instead of straddling two. */}
       <div className="relative w-[13px] shrink-0">
         {!isFirst && (
-          <span className="absolute top-0 left-1/2 h-4 w-px -translate-x-1/2 bg-border" />
+          <span className="absolute top-0 left-1/2 h-3 w-px -translate-x-1/2 bg-border" />
         )}
         {!isLast && (
-          <span className="absolute top-[15px] bottom-0 left-1/2 w-px -translate-x-1/2 bg-border" />
+          <span className="absolute bottom-0 left-1/2 h-3 w-px -translate-x-1/2 bg-border" />
         )}
         {marker ? (
           <span className="absolute top-[15px] left-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
