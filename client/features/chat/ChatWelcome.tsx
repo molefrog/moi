@@ -1,27 +1,34 @@
 import {
   IconArticle,
-  IconChartBar,
-  IconFolder,
+  IconBriefcase,
   IconGhost,
   IconLayout2,
-  IconRepeat,
+  IconPiano,
   IconSketching,
+  IconUmbrella2,
   type TablerIcon
 } from '@tabler/icons-react'
 
 import { ChatPromptBubbles, type ChatPromptBubble } from '@/client/features/chat/ChatPromptBubbles'
 
 const PROMPTS = [
-  { label: 'Track my daily habits', prompt: 'Track my daily habits.', icon: IconRepeat },
   {
-    label: 'Work with my files',
-    prompt: 'Work with my files.',
-    icon: IconFolder
+    label: "What's the weather?",
+    prompt:
+      "Build me a set of weather widgets that surface current conditions, today's hourly forecast, and a simple weekly outlook at a glance",
+    icon: IconUmbrella2
   },
   {
-    label: 'Build a sales tool',
-    prompt: 'Build a tool to manage my sales.',
-    icon: IconChartBar
+    label: 'Build a fun sythesizer',
+    prompt:
+      'Build me a view with a simple, playful synthesizer featuring a keyboard, five sound controls, and the ability to record, save, and load music files from the workspace',
+    icon: IconPiano
+  },
+  {
+    label: 'Make a job tracker',
+    prompt:
+      'Build me a view with a visual job search board where I can add opportunities by pasting a job link, automatically extract the details, move opportunities through stages, and keep notes and related files in the workspace',
+    icon: IconBriefcase
   }
 ] satisfies ChatPromptBubble[]
 
@@ -31,12 +38,12 @@ type ChatWelcomeProps = {
 
 export function ChatWelcome({ onSelectPrompt }: ChatWelcomeProps) {
   return (
-    <div className="flex max-w-md min-w-0 flex-col pb-2">
+    <div className="flex min-h-full max-w-md min-w-0 flex-col items-center justify-center self-center pb-2">
       <div className="prose prose-sm min-w-0 wrap-anywhere prose-inherit">
         <p>moi is the visual workspace for you and your agent.</p>
         <p>
-          It can grow and adapt it to the work you're doing. Just describe what you want, and your
-          agent will extend the workspace with small apps wired to your data.
+          It can grow and adapt it to the work you're doing. Just describe what you want, and the
+          agent will build small apps in the workspace.
         </p>
         <p>
           You start chatting with <WelcomeTerm Icon={IconGhost}>Agent</WelcomeTerm>, where you can
