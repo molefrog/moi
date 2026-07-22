@@ -1,25 +1,17 @@
 import { join } from 'path'
 
-import type { WorkspaceLayout, WorkspacePreview, WorkspaceTabId } from '@/lib/types'
+import type { WorkspaceLayout, WorkspacePreview } from '@/lib/types'
 import { createDefaultWorkspaceLayout, createDefaultWorkspaceTabs } from '@/lib/workspace-layout'
-
-function isTabId(value: unknown): value is WorkspaceTabId {
-  return (
-    value === 'agent' ||
-    value === 'widgets' ||
-    value === 'scratchpad' ||
-    (typeof value === 'string' && (/^view:.+/.test(value) || /^view-builder:.+/.test(value)))
-  )
-}
+import { isWorkspaceTabId } from '@/lib/workspace-tabs'
 
 function normalizeTabs(value: unknown): WorkspaceLayout['tabs'] {
   if (!value || typeof value !== 'object') return createDefaultWorkspaceTabs()
   const raw = value as Record<string, unknown>
   const open = Array.isArray(raw.open)
-    ? raw.open.filter(isTabId).filter((tab, index, all) => all.indexOf(tab) === index)
+    ? raw.open.filter(isWorkspaceTabId).filter((tab, index, all) => all.indexOf(tab) === index)
     : []
   if (open.length === 0) return createDefaultWorkspaceTabs()
-  const active = isTabId(raw.active) && open.includes(raw.active) ? raw.active : open[0]
+  const active = isWorkspaceTabId(raw.active) && open.includes(raw.active) ? raw.active : open[0]
   return { open, active }
 }
 

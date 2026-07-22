@@ -447,9 +447,24 @@ export type WorkspaceTabId =
   | `view:${string}`
   | `view-builder:${string}`
 
+// Open tabs plus the workspace's saved DEFAULT tab. `active` is not live focus
+// state — the live active tab is each browser tab's URL (`/workspace/:id/<tab>`).
+// The saved default answers one question: where a bare `/workspace/:id` lands
+// (and which row `moi tabs` marks). Navigating writes it, so it tracks the last
+// tab switch, last writer wins across clients.
 export type WorkspaceTabsState = {
   open: WorkspaceTabId[]
   active: WorkspaceTabId
+}
+
+// The host-installed applet runtime bridge (`window.moi`). Applet bundles get a
+// virtual `moi` module whose functions delegate here via optional chaining, so
+// an applet no-ops cleanly outside the moi host (see server/bundler/build-applet.ts).
+export type MoiAppletRuntime = {
+  // Client-local replace-navigation to a workspace tab. `params` reach the
+  // target view as its `params` prop via navigation state — JSON-plain only
+  // (history state is structured-cloned).
+  focusTab: (tab: WorkspaceTabId, params?: Record<string, unknown>) => void
 }
 
 export type { FontTheme, ColorTheme } from './themes'

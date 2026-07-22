@@ -322,6 +322,14 @@ describe('moi fileUrl module', () => {
     expect(result.js).toContain('%%MOI_APPLET_API_BASE%%')
     expect(result.js).toContain('"/fs/"')
   })
+
+  test('bundles the focusTab stub delegating to the window.moi bridge', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-focustab.tsx'), undefined, 'view')
+    expect(result.js).toContain('function focusTab')
+    // Optional-chained so the stub no-ops outside the moi host. The compiled
+    // form may or may not keep the `?.` sugar, so match both.
+    expect(result.js).toMatch(/window\.moi\s*(\?\.|&&|==)/)
+  })
 })
 
 describe('mixed widget + view build (Tailwind isolation)', () => {

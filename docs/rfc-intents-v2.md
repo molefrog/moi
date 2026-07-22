@@ -50,6 +50,21 @@ moi tabs            # alias: moi tab — all tabs, one per row, the default one 
 moi tab focus <tab-id> [--params '<json-object>']
 ```
 
+`moi tabs` output (colors omitted):
+
+```
+moi tabs — workspace tabs, the default one marked
+
+     tab          title
+  ●  agent        Agent
+     widgets      Widgets
+     scratchpad   Scratchpad
+     view:orders  Orders
+     view:shop    Shop
+
+  Focus one: moi tab focus <tab-id> [--params '{"k":"v"}']
+```
+
 - `moi tabs` prints tab id + title; the marked row is the saved default (`layout.tabs.active`).
 - `moi tab focus` validates the tab id server-side (unknown id fails listing the valid ids), then
   publishes a workspace-scoped `tab:focus` event; every connected client of that workspace
@@ -77,8 +92,10 @@ import { listOrders } from './orders.server'
 export const config = { title: 'Orders', icon: 'package' } as const
 
 // The view's addressable state — what `focusTab('view:orders', …)` can set.
-// Other agents read this file to learn how to talk to this view.
-export type Params = {
+// Other agents read this file to learn how to talk to this view. Local on
+// purpose (not exported): applets never import from each other, so exporting
+// would only invite that mistake — the type is read, never imported.
+type Params = {
   // Order id to open in the detail pane; omit to show the list.
   order?: string
   // Narrow the list to one status: 'open' | 'shipped' | 'refunded'.
