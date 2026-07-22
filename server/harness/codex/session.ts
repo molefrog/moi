@@ -30,11 +30,12 @@ import {
   type CodexThreadItem,
   type CodexTokenUsage,
   type CodexTurn,
+  type SubagentReplay,
   codexItemToNotice,
   codexItemToTurn,
   codexThreadToEvents
 } from './adapter'
-import { type CodexClient, getCodexClient } from './client'
+import { type CodexClient, getCodexClient, readSubagentRecords } from './client'
 import { debug } from '../../debug'
 import { broadcast } from '../../state'
 import { hasThreadConfig, renameThreadConfig, saveThreadConfig } from '../../thread-config'
@@ -180,6 +181,10 @@ function handleChildNotification(
   if (method === 'item/started' || method === 'item/completed') {
     const item = params.item as CodexThreadItem | undefined
     if (!item) return
+    // The child's own `subAgentActivity` (its send-back to the parent) would
+    // render as a cryptic nested agent card — skip it, matching the replay
+    // path (childThreadToSubagentRecord).
+    if (item.type === 'subAgentActivity') return
     const turn = codexItemToTurn(item, childThreadId)
     if (!turn) return
     const idx = child.record.transcript.findIndex(t => t.id === turn.id)
@@ -287,6 +292,15 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
     }
     case 'item/reasoning/summaryTextDelta': {
       forwardPreview(rec, params.itemId as string, 'reasoning', String(params.delta ?? ''))
+      return
+    }
+    case 'item/reasoning/summaryPartAdded': {
+      // Each part is a new summary section; without a break the sections
+      // concatenate into one run-on paragraph. Skip the first part (no
+      // preview text yet) so the reasoning doesn't open with a blank line.
+      if (rec.previews.has(params.itemId as string)) {
+        forwardPreview(rec, params.itemId as string, 'reasoning', '\n')
+      }
       return
     }
     case 'thread/tokenUsage/updated': {
@@ -415,9 +429,13 @@ function createRecord(input: {
 }
 
 // Seed a record's view from a resumed thread payload (turns included).
-function seedFromThread(rec: SessionRecord, thread: CodexThread) {
+function seedFromThread(
+  rec: SessionRecord,
+  thread: CodexThread,
+  subagents?: Map<string, SubagentReplay>
+) {
   let view = emptyViewState()
-  for (const ev of codexThreadToEvents(thread)) view = applyEvent(view, ev)
+  for (const ev of codexThreadToEvents(thread, subagents)) view = applyEvent(view, ev)
   rec.view = view
 }
 
@@ -433,7 +451,12 @@ async function resumeSession(input: {
     threadId: input.sessionId
   })
   const rec = createRecord({ ...input, sessionId: resumed.thread.id, client })
-  seedFromThread(rec, resumed.thread)
+  // Rebuild child-agent transcripts from their own threads and register them
+  // as live children, so a mid-run resume keeps routing child frames into
+  // the same records the replay attached.
+  const subagents = await readSubagentRecords(client, resumed.thread)
+  for (const [childId, sub] of subagents) rec.children.set(childId, sub)
+  seedFromThread(rec, resumed.thread, subagents)
   return rec
 }
 
@@ -581,10 +604,11 @@ export async function sendCodexMessage(input: {
       ...(additionalContext ? { additionalContext } : {}),
       // Without an explicit summary mode Codex still reasons but emits the
       // reasoning item with EMPTY summary/content (verified on the wire —
-      // scripts/codex-probe.ts), so no thinking ever reaches the UI. 'auto'
-      // makes summaries stream via item/reasoning/summaryTextDelta and land
-      // populated on item/completed.
-      summary: 'auto',
+      // scripts/codex-probe.ts), so no thinking ever reaches the UI. 'detailed'
+      // (vs 'auto') makes the summaries longer and stream in more frequent
+      // item/reasoning/summaryTextDelta bursts while the model is still
+      // thinking — 'auto' tends to emit one short blob near the end.
+      summary: 'detailed',
       ...(input.model ? { model: input.model } : {}),
       ...(input.effort ? { effort: input.effort } : {})
     }

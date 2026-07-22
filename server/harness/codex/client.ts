@@ -15,9 +15,12 @@ import type { McpServer, Model, SessionInfo, StreamEvent } from '@/lib/types'
 import {
   type CodexModel,
   type CodexThread,
+  type SubagentReplay,
+  childThreadToSubagentRecord,
   codexModelToModel,
   codexThreadToEvents,
   codexThreadToSessionInfo,
+  collectSubagentActivities,
   selectCodexWorkspacePreview
 } from './adapter'
 import type { WorkspaceActivityPreview } from '../types'
@@ -376,6 +379,35 @@ export async function getCodexMcpStatus(workspacePath: string): Promise<McpServe
   }
 }
 
+// Rebuild the SubagentRecords for a replayed parent thread: read each child
+// thread announced by a `subAgentActivity` item and fold its transcript into
+// a replay record. A child that can't be read just leaves its bare card.
+export async function readSubagentRecords(
+  client: CodexClient,
+  thread: CodexThread
+): Promise<Map<string, SubagentReplay>> {
+  const map = new Map<string, SubagentReplay>()
+  const parentTurnIds = new Set((thread.turns ?? []).map(t => t.id))
+  for (const activity of collectSubagentActivities(thread)) {
+    const childId = activity.agentThreadId
+    if (!childId) continue
+    try {
+      const res = await client.rpc<{ thread?: CodexThread }>('thread/read', {
+        threadId: childId,
+        includeTurns: true
+      })
+      if (!res.thread) continue
+      map.set(childId, {
+        toolCallId: activity.id,
+        record: childThreadToSubagentRecord(res.thread, activity, parentTurnIds)
+      })
+    } catch {
+      // child thread unreadable (deleted, other cwd) — keep the plain card
+    }
+  }
+  return map
+}
+
 // Static history replay for the REST events endpoint (no live subscription).
 export async function getCodexThreadEvents(
   workspacePath: string,
@@ -387,7 +419,8 @@ export async function getCodexThreadEvents(
       threadId,
       includeTurns: true
     })
-    return res.thread ? codexThreadToEvents(res.thread) : []
+    if (!res.thread) return []
+    return codexThreadToEvents(res.thread, await readSubagentRecords(client, res.thread))
   } catch {
     return []
   }

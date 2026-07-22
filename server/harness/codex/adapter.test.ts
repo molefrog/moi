@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
 import type { CodexThread, CodexThreadItem } from './adapter'
+import { childThreadToSubagentRecord, collectSubagentActivities } from './adapter'
 import {
   codexItemToNotice,
   codexItemToTurn,
@@ -50,7 +51,7 @@ describe('codexItemToTurn', () => {
   test('reasoning joins summary sections into one reasoning part', () => {
     const item: CodexThreadItem = { type: 'reasoning', id: 'r1', summary: ['a', 'b'] }
     const turn = codexItemToTurn(item, THREAD)!
-    expect(turn.parts).toEqual([{ type: 'reasoning', text: 'a\n\nb' }])
+    expect(turn.parts).toEqual([{ type: 'reasoning', text: 'a\nb' }])
   })
 
   test('commandExecution maps status/output onto a codex exec tool call', () => {
@@ -125,7 +126,7 @@ describe('codexItemToTurn', () => {
     const item: CodexThreadItem = {
       type: 'collabAgentToolCall',
       id: 'call-1',
-      tool: 'spawn',
+      tool: 'spawn_agent',
       status: 'inProgress',
       prompt: 'count the files',
       receiverThreadIds: ['child-1']
@@ -135,9 +136,20 @@ describe('codexItemToTurn', () => {
         name: 'subagent',
         caller: 'subagent',
         state: 'running',
-        input: { action: 'spawn', prompt: 'count the files', agents: ['child-1'] }
+        input: { action: 'spawn_agent', prompt: 'count the files', agents: ['child-1'] }
       }
     })
+  })
+
+  test('collabAgentToolCall wait is dropped', () => {
+    const item: CodexThreadItem = {
+      type: 'collabAgentToolCall',
+      id: 'call-2',
+      tool: 'wait',
+      status: 'inProgress',
+      receiverThreadIds: []
+    }
+    expect(codexItemToTurn(item, THREAD)).toBeNull()
   })
 
   test('subAgentActivity maps to a subagent activity card', () => {
@@ -251,6 +263,61 @@ describe('codexThreadToEvents', () => {
     expect(events).toHaveLength(2)
     expect(events[0]).toMatchObject({ kind: 'turn', turn: { role: 'user' } })
     expect(events[1]).toMatchObject({ kind: 'turn', turn: { role: 'assistant' } })
+  })
+
+  test('reattaches subagent records to subAgentActivity cards', () => {
+    const activity: CodexThreadItem = {
+      type: 'subAgentActivity',
+      id: 'act-1',
+      kind: 'started',
+      agentThreadId: 'child-1',
+      agentPath: '/root/count_files'
+    }
+    const parent: CodexThread = {
+      id: THREAD,
+      turns: [{ id: 'p1', status: 'completed', items: [activity] }]
+    }
+    // Forked child: inherits the parent turn (same id) plus its own work.
+    const child: CodexThread = {
+      id: 'child-1',
+      status: { type: 'idle' },
+      turns: [
+        {
+          id: 'p1',
+          status: 'interrupted',
+          items: [{ type: 'agentMessage', id: 'inherited', text: 'parent text' }]
+        },
+        {
+          id: 'c1',
+          status: 'completed',
+          durationMs: 9963,
+          items: [
+            { type: 'agentMessage', id: 'own', text: 'child answer' },
+            { type: 'subAgentActivity', id: 'echo', kind: 'interacted', agentThreadId: THREAD }
+          ]
+        }
+      ]
+    }
+    expect(collectSubagentActivities(parent)).toEqual([activity])
+    const record = childThreadToSubagentRecord(child, activity, new Set(['p1']))
+    expect(record).toMatchObject({
+      taskId: 'child-1',
+      description: 'count_files',
+      status: 'completed',
+      usage: { durationMs: 9963 }
+    })
+    // Inherited parent turn and the subAgentActivity echo are both excluded.
+    expect(record.transcript).toHaveLength(1)
+    expect(record.transcript[0].parts[0]).toMatchObject({ type: 'text', text: 'child answer' })
+
+    const events = codexThreadToEvents(
+      parent,
+      new Map([['child-1', { toolCallId: 'act-1', record }]])
+    )
+    expect(events[0]).toMatchObject({
+      kind: 'turn',
+      turn: { parts: [{ type: 'tool-call', call: { subagent: { taskId: 'child-1' } } }] }
+    })
   })
 })
 

@@ -8,7 +8,15 @@
 //
 // Type shapes are hand-written against `codex app-server generate-ts`
 // (CLI 0.144.5) and read defensively — see ./NOTES.md.
-import type { Part, StreamEvent, SystemNotice, ToolCall, ToolState, Turn } from '@/lib/format'
+import type {
+  Part,
+  StreamEvent,
+  SubagentRecord,
+  SystemNotice,
+  ToolCall,
+  ToolState,
+  Turn
+} from '@/lib/format'
 import { stripMoiContext, stripMoiContextLoose } from '@/lib/moi-context'
 import type { Model, SessionInfo } from '@/lib/types'
 
@@ -76,6 +84,7 @@ export type CodexTurn = {
   items: CodexThreadItem[]
   status: string
   error?: { message?: string; codexErrorInfo?: unknown } | null
+  durationMs?: number | null
 }
 
 export type CodexThread = {
@@ -85,6 +94,7 @@ export type CodexThread = {
   createdAt?: number
   updatedAt?: number
   name?: string | null
+  status?: { type?: string }
   turns?: CodexTurn[]
 }
 
@@ -309,12 +319,15 @@ function itemToToolCall(item: CodexThreadItem): ToolCall | null {
         input: { plan: item.text }
       }
     }
-    // Codex multi-agent: the parent's collab tool invocations (spawn / send /
-    // wait / close). The child agent runs as its OWN thread whose items
-    // stream on the same connection under `agentThreadId` — nesting that
-    // transcript into a SubagentRecord is future work; for now the card makes
-    // the spawn/wait visible instead of silently dropping it.
+    // Codex multi-agent: the parent's collab tool invocations (`spawn_agent`,
+    // `send_input`, `resume_agent`, `wait`, `close_agent`). The child agent
+    // runs as its OWN thread whose items stream on the same connection under
+    // `agentThreadId`; its transcript nests into the `subAgentActivity` card
+    // (see session.ts), so this card only narrates the parent's side.
     case 'collabAgentToolCall': {
+      // `wait` is the parent idling on its children — protocol noise next to
+      // the activity card that already shows the child running. Drop it.
+      if (item.tool === 'wait') return null
       return {
         toolCallId: item.id,
         name: 'subagent',
@@ -412,7 +425,9 @@ export function codexItemToTurn(item: CodexThreadItem, threadId: string): Turn |
     }
   }
   if (item.type === 'reasoning') {
-    const text = (item.summary ?? []).filter(Boolean).join('\n\n')
+    // Single newline between summary sections — must match the live preview
+    // separator (session.ts summaryPartAdded) or the text reflows on land.
+    const text = (item.summary ?? []).filter(Boolean).join('\n')
     if (!text) return null
     return {
       id: turnId,
@@ -441,14 +456,90 @@ export function codexItemToNotice(item: CodexThreadItem, threadId: string): Syst
   }
 }
 
+// A child agent thread rebuilt from replay: the parent card carrying the
+// nested transcript plus the record itself (same shape session.ts keeps live).
+export type SubagentReplay = { toolCallId: string; record: SubagentRecord }
+
+// The parent's `subAgentActivity` items, one per child thread (the last item
+// wins so `kind` reflects the child's final state).
+export function collectSubagentActivities(thread: CodexThread): CodexThreadItem[] {
+  const byChild = new Map<string, CodexThreadItem>()
+  for (const turn of thread.turns ?? []) {
+    for (const item of turn.items ?? []) {
+      if (item.type === 'subAgentActivity' && item.agentThreadId)
+        byChild.set(item.agentThreadId, item)
+    }
+  }
+  return [...byChild.values()]
+}
+
+// Rebuild a SubagentRecord from the child thread's own replay payload.
+// Children are forks of the parent, so their replay inherits the parent's
+// turns verbatim (same turn ids) — exclude those. Also drop `subAgentActivity`
+// echoes (the child's send-back to the parent) which would render as cryptic
+// nested agent cards.
+export function childThreadToSubagentRecord(
+  child: CodexThread,
+  activity: CodexThreadItem,
+  parentTurnIds: Set<string>
+): SubagentRecord {
+  const transcript: Turn[] = []
+  let durationMs = 0
+  let toolUses = 0
+  for (const turn of child.turns ?? []) {
+    if (parentTurnIds.has(turn.id)) continue
+    if (typeof turn.durationMs === 'number') durationMs += turn.durationMs
+    for (const item of turn.items ?? []) {
+      if (item.type === 'subAgentActivity') continue
+      const t = codexItemToTurn(item, child.id)
+      if (!t) continue
+      if (t.parts.some(p => p.type === 'tool-call')) toolUses++
+      transcript.push(t)
+    }
+  }
+  const status =
+    activity.kind === 'failed'
+      ? ('failed' as const)
+      : child.status?.type === 'active'
+        ? ('running' as const)
+        : ('completed' as const)
+  return {
+    taskId: child.id,
+    description: activity.agentPath?.split('/').pop() || 'sub-agent',
+    progress: [],
+    status,
+    // Zero counts stay out: codex's child replay drops commandExecution
+    // items, and a "Took 0 steps" subline reads as broken.
+    ...(durationMs || toolUses
+      ? {
+          usage: {
+            ...(durationMs ? { durationMs } : {}),
+            ...(toolUses ? { toolUses } : {})
+          }
+        }
+      : {}),
+    transcript
+  }
+}
+
 // Static replay path: map a `thread/read`/`thread/resume` payload (turns
-// included) onto StreamEvents for the REST events endpoint.
-export function codexThreadToEvents(thread: CodexThread): StreamEvent[] {
+// included) onto StreamEvents for the REST events endpoint. `subagents`
+// (child thread id → replay record) re-attaches nested transcripts to their
+// `subAgentActivity` cards.
+export function codexThreadToEvents(
+  thread: CodexThread,
+  subagents?: Map<string, SubagentReplay>
+): StreamEvent[] {
   const events: StreamEvent[] = []
   for (const turn of thread.turns ?? []) {
     for (const item of turn.items ?? []) {
       const t = codexItemToTurn(item, thread.id)
       if (t) {
+        if (item.type === 'subAgentActivity' && item.agentThreadId) {
+          const sub = subagents?.get(item.agentThreadId)
+          const part = t.parts.find(p => p.type === 'tool-call')
+          if (sub && part?.type === 'tool-call') part.call.subagent = sub.record
+        }
         events.push({ kind: 'turn', turn: t })
         continue
       }
