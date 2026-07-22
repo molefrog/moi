@@ -1,7 +1,10 @@
 import {
   IconArticle,
+  IconChartBar,
+  IconFolder,
   IconGhost,
   IconLayout2,
+  IconRepeat,
   IconSketching,
   type TablerIcon
 } from '@tabler/icons-react'
@@ -9,12 +12,17 @@ import {
 import { ChatPromptBubbles, type ChatPromptBubble } from '@/client/features/chat/ChatPromptBubbles'
 
 const PROMPTS = [
-  { label: '“Track my daily habits.”', prompt: 'Track my daily habits.' },
+  { label: 'Track my daily habits', prompt: 'Track my daily habits.', icon: IconRepeat },
   {
-    label: '“Help me work with my project files.”',
-    prompt: 'Help me work with my project files.'
+    label: 'Work with my files',
+    prompt: 'Work with my files.',
+    icon: IconFolder
   },
-  { label: '“Build a tool to manage my sales.”', prompt: 'Build a tool to manage my sales.' }
+  {
+    label: 'Build a sales tool',
+    prompt: 'Build a tool to manage my sales.',
+    icon: IconChartBar
+  }
 ] satisfies ChatPromptBubble[]
 
 type ChatWelcomeProps = {
@@ -23,29 +31,22 @@ type ChatWelcomeProps = {
 
 export function ChatWelcome({ onSelectPrompt }: ChatWelcomeProps) {
   return (
-    <div className="flex min-w-0 flex-col gap-3 pb-2">
-      <div className="prose prose-sm max-w-full min-w-0 wrap-anywhere prose-inherit">
-        <p>moi is the UI for your AI.</p>
+    <div className="flex max-w-md min-w-0 flex-col pb-2">
+      <div className="prose prose-sm min-w-0 wrap-anywhere prose-inherit">
+        <p>moi is the visual workspace for you and your agent.</p>
         <p>
-          Build functional, reusable interfaces for your workspace. moi makes it easy to create apps
-          that work with your data, manage workspace files, connect to external services, and adapt
-          to your specific needs. Describe what you want, and your agent builds it directly inside
-          the workspace.
+          It can grow and adapt it to the work you're doing. Just describe what you want, and your
+          agent will extend the workspace with small apps wired to your data.
         </p>
         <p>
-          You start in <WelcomeTerm Icon={IconGhost}>Chat</WelcomeTerm>, where you can build with
-          your agent and ask any questions. <WelcomeTerm Icon={IconLayout2}>Widgets</WelcomeTerm>{' '}
-          are small apps on the Widgets tab that surface information and provide quick actions. For
-          more complex tools, you can build <WelcomeTerm Icon={IconArticle}>Views</WelcomeTerm> that
-          open in their own tabs. <WelcomeTerm Icon={IconSketching}>Scratchpad</WelcomeTerm> is a
-          shared canvas for exploring and shaping ideas with your agent.
+          You start chatting with <WelcomeTerm Icon={IconGhost}>Agent</WelcomeTerm>, where you can
+          ask questions and build anything. <WelcomeTerm Icon={IconLayout2}>Widgets</WelcomeTerm>{' '}
+          are small apps that surface information and provide quick actions. For more complex tools,
+          you can build <WelcomeTerm Icon={IconArticle}>Views</WelcomeTerm> that open in their own
+          tabs. <WelcomeTerm Icon={IconSketching}>Scratchpad</WelcomeTerm> is a shared canvas for
+          exploring and shaping ideas with your agent.
         </p>
-        <p>
-          As your needs evolve, you can add new tools, refine existing ones, and keep shaping the
-          workspace around the way you work. You can also use your existing Claude or ChatGPT
-          subscription directly in moi.
-        </p>
-        <p>What would you like to create first?</p>
+        <p>Give it a try:</p>
       </div>
       <ChatPromptBubbles prompts={PROMPTS} onSelect={onSelectPrompt} />
     </div>
@@ -59,8 +60,8 @@ type WelcomeTermProps = {
 
 function WelcomeTerm({ Icon, children }: WelcomeTermProps) {
   return (
-    <strong className="inline-flex items-center gap-1 font-medium">
-      <Icon size={16} stroke={1.75} aria-hidden />
+    <strong className="inline-flex items-center gap-0.5 align-bottom font-medium">
+      <Icon size={16} stroke={2} aria-hidden />
       {children}
     </strong>
   )
