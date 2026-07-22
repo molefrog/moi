@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
@@ -30,12 +30,27 @@ export function useWorkspaces() {
   })
 }
 
-export function useWorkspacePreview(workspaceId: string) {
-  return useQuery<WorkspacePreview>({
-    queryKey: workspaceKeys.preview(workspaceId),
-    queryFn: () => requestJson(`/api/workspaces/${workspaceId}/preview`),
-    staleTime: 60_000
+export function useWorkspacePreviews(workspaces: WorkspaceEntry[]) {
+  return useQueries({
+    queries: workspaces.map(workspace => ({
+      queryKey: workspaceKeys.preview(workspace.id),
+      queryFn: () => requestJson<WorkspacePreview>(`/api/workspaces/${workspace.id}/preview`),
+      staleTime: 60_000
+    }))
   })
+}
+
+export type ResolvedWorkspacePreview = WorkspacePreview & { updatedAt: number }
+
+export function resolveWorkspacePreview(
+  workspace: WorkspaceEntry,
+  preview: WorkspacePreview | undefined
+): ResolvedWorkspacePreview {
+  return {
+    ...preview,
+    thumbnails: preview?.thumbnails ?? [],
+    updatedAt: preview?.updatedAt ?? new Date(workspace.addedAt).getTime()
+  }
 }
 
 export function useDiscoveredWorkspaces() {

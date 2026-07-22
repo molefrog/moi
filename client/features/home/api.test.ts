@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { WorkspaceEntry } from '@/lib/types'
 
-import { upsertWorkspaceEntry } from './api'
+import { resolveWorkspacePreview, upsertWorkspaceEntry } from './api'
 
 const existing: WorkspaceEntry = {
   id: 'one',
@@ -39,5 +39,21 @@ describe('upsertWorkspaceEntry', () => {
     }
 
     expect(upsertWorkspaceEntry([existing], imported)).toEqual([imported])
+  })
+})
+
+describe('resolveWorkspacePreview', () => {
+  test('uses provider activity when it is available', () => {
+    expect(resolveWorkspacePreview(existing, { thumbnails: ['preview'], updatedAt: 200 })).toEqual({
+      thumbnails: ['preview'],
+      updatedAt: 200
+    })
+  })
+
+  test('falls back to the date the workspace was added', () => {
+    expect(resolveWorkspacePreview(existing, undefined)).toEqual({
+      thumbnails: [],
+      updatedAt: new Date(existing.addedAt).getTime()
+    })
   })
 })

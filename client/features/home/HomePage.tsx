@@ -3,9 +3,10 @@ import { Link, useLocation } from 'wouter'
 
 import {
   useDiscoveredWorkspaces,
-  useWorkspacePreview,
+  useWorkspacePreviews,
   useWorkspaces,
-  useWorkspaceSetupInfo
+  useWorkspaceSetupInfo,
+  resolveWorkspacePreview
 } from './api'
 import { CreateWorkspaceDialog } from './workspace-setup/CreateWorkspaceDialog'
 import { ImportWorkspaceDialog } from './workspace-setup/ImportWorkspaceDialog'
@@ -25,6 +26,7 @@ import {
   workspaceProviderIcon
 } from '@/client/features/home/workspace-presentation'
 import type { DiscoveredWorkspace, WorkspaceEntry } from '@/lib/types'
+import type { ResolvedWorkspacePreview } from './api'
 
 import { WorkspacePreview } from './WorkspacePreview'
 
@@ -36,6 +38,8 @@ export function HomePage() {
   const importFlow = useWorkspaceImport({
     onSuccess: entry => navigate(`/workspace/${entry.id}`)
   })
+  const workspaces = workspacesQuery.data ?? []
+  const previewQueries = useWorkspacePreviews(workspaces)
   const discoveredWorkspacesOpen = useUiStore(state => state.discoveredWorkspacesOpen)
   const setDiscoveredWorkspacesOpen = useUiStore(state => state.setDiscoveredWorkspacesOpen)
 
@@ -55,9 +59,14 @@ export function HomePage() {
     )
   }
 
-  const workspaces = workspacesQuery.data
   const discovered = discoveredQuery.data
   const count = workspaces.length
+  const workspaceCards = workspaces
+    .map((workspace, index) => ({
+      workspace,
+      preview: resolveWorkspacePreview(workspace, previewQueries[index]?.data)
+    }))
+    .sort((a, b) => b.preview.updatedAt - a.preview.updatedAt)
 
   function handleAdd(suggestion: DiscoveredWorkspace) {
     importFlow.startImport(suggestion)
@@ -82,8 +91,8 @@ export function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-            {workspaces.map(ws => (
-              <WorkspaceCard key={ws.id} workspace={ws} />
+            {workspaceCards.map(({ workspace, preview }) => (
+              <WorkspaceCard key={workspace.id} workspace={workspace} preview={preview} />
             ))}
           </div>
         </section>
@@ -153,19 +162,18 @@ export function HomePage() {
 
 type WorkspaceCardProps = {
   workspace: WorkspaceEntry
+  preview: ResolvedWorkspacePreview
 }
 
-function WorkspaceCard({ workspace }: WorkspaceCardProps) {
+function WorkspaceCard({ workspace, preview }: WorkspaceCardProps) {
   const name = workspaceDisplayName(workspace)
-  const previewQuery = useWorkspacePreview(workspace.id)
-  const updatedAt = previewQuery.data?.updatedAt ?? new Date(workspace.addedAt).getTime()
 
   return (
     <Link
       href={`/workspace/${workspace.id}`}
       className="group flex min-w-0 flex-col gap-4 rounded-xl bg-card p-2 shadow-xs transition-shadow hover:shadow-sm"
     >
-      <WorkspacePreview workspaceId={workspace.id} />
+      <WorkspacePreview workspaceId={workspace.id} preview={preview} />
       <div className="flex min-w-0 flex-col gap-2 px-2 pb-2">
         <div className="flex min-w-0 items-center gap-1.5">
           <img
@@ -175,7 +183,7 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
           />
           <span className="truncate text-sm font-medium text-foreground">{name}</span>
         </div>
-        <span className="text-xs text-muted-foreground">{formatUpdatedAt(updatedAt)}</span>
+        <span className="text-xs text-muted-foreground">{formatUpdatedAt(preview.updatedAt)}</span>
       </div>
     </Link>
   )
