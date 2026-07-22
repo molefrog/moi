@@ -32,13 +32,6 @@ type ChatPanelProps = {
   send: (text: string) => void
   stop: () => void
   onSwitchThread: (sessionId: string | null) => void
-  // Extra content for the header's left edge, rendered before the thread
-  // selector when the chat is the primary panel.
-  headerLeft?: ReactNode
-  // Extra controls for the header's right edge — the parent supplies whatever
-  // chrome belongs here in the current layout (e.g. the section reopen toggle
-  // plus MCP/settings menus when the chat is fullscreen).
-  headerRight?: ReactNode
   // Floating popup: render a close (X) button that dismisses the popup.
   onClose?: () => void
 }
@@ -57,8 +50,6 @@ export function ChatPanel({
   send,
   stop,
   onSwitchThread,
-  headerLeft,
-  headerRight,
   onClose
 }: ChatPanelProps) {
   const composerRef = useRef<HTMLTextAreaElement>(null)
@@ -102,19 +93,13 @@ export function ChatPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col pt-2 pb-3">
-      <header className="flex items-center justify-between pr-2 pb-2 pl-2">
-        <div className="flex min-w-0 items-center gap-2.5">
-          {headerLeft}
-          <ChatSelector onSwitch={onSwitchThread} />
-        </div>
-        <div className="flex items-center gap-0.5">
-          {headerRight}
-          {onClose && (
-            <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close chat">
-              <IconX stroke={1.5} />
-            </Button>
-          )}
-        </div>
+      <header className="mx-auto flex w-full max-w-[calc(var(--chat-max-container)+40px)] items-center justify-between pr-2 pb-2 pl-2">
+        <ChatSelector onSwitch={onSwitchThread} />
+        {onClose && (
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close chat">
+            <IconX stroke={1.5} />
+          </Button>
+        )}
       </header>
 
       <div className="relative flex min-h-0 flex-1 flex-col">
@@ -158,9 +143,9 @@ export function ChatPanel({
         )}
       </div>
 
-      <div className="mx-auto flex w-full flex-col items-center px-3">
+      <div className="mx-auto flex w-full max-w-[calc(var(--chat-max-container)+24px)] flex-col px-3">
         {error && (
-          <div className="mb-2 flex w-full max-w-(--chat-max-container) items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <div className="mb-2 flex w-full items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             <span className="flex-1 wrap-break-word">{error}</span>
             {onDismissError && (
               <Button
