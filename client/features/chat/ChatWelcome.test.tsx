@@ -25,7 +25,7 @@ describe('ChatWelcome', () => {
 
     expect(renderedParagraphs(html)).toEqual([
       'moi is the visual workspace for you and your agent.',
-      "It can grow and adapt it to the work you're doing. Just describe what you want, and the agent will build small apps in the workspace.",
+      "It can grow and adapt to the work you're doing. Just describe what you want, and the agent will build small apps in the workspace.",
       'You start chatting with Agent, where you can ask questions and build anything. Widgets are small apps that surface information and provide quick actions. For more complex tools, you can build Views that open in their own tabs. Scratchpad is a shared canvas for exploring and shaping ideas with your agent.',
       'Give it a try:'
     ])

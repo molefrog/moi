@@ -65,8 +65,8 @@ export function ChatWelcome({ onSelectPrompt }: ChatWelcomeProps) {
       <div className="prose prose-sm min-w-0 wrap-anywhere prose-inherit">
         <p>moi is the visual workspace for you and your agent.</p>
         <p>
-          It can grow and adapt it to the work you're doing. Just describe what you want, and the
-          agent will build small apps in the workspace.
+          It can grow and adapt to the work you're doing. Just describe what you want, and the agent
+          will build small apps in the workspace.
         </p>
         <p>
           You start chatting with <WelcomeTerm Icon={IconGhost}>Agent</WelcomeTerm>, where you can
