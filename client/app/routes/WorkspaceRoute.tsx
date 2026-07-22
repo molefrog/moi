@@ -22,19 +22,22 @@ import type { SessionInfo } from '@/lib/types'
 
 type WorkspaceRouteProps = {
   id: string
+  // The URL's tab segment (raw wildcard — may be absent or garbage). The
+  // workspace screen resolves it against the layout and what exists.
+  tab: string | null
 }
 
-export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
+export function WorkspaceRoute({ id, tab }: WorkspaceRouteProps) {
   return (
     <Workspace id={id}>
       <WorkspaceLayoutProvider id={id}>
-        <WorkspaceLoader id={id} />
+        <WorkspaceLoader id={id} tab={tab} />
       </WorkspaceLayoutProvider>
     </Workspace>
   )
 }
 
-function WorkspaceLoader({ id }: WorkspaceRouteProps) {
+function WorkspaceLoader({ id, tab }: WorkspaceRouteProps) {
   const queryClient = useQueryClient()
   const { layout, setLayout, isLoading: layoutLoading } = useWorkspaceLayoutCtx()
   const widgets = useWorkspaceWidgets(id)
@@ -72,6 +75,7 @@ function WorkspaceLoader({ id }: WorkspaceRouteProps) {
             widgets={widgets.data ?? []}
             views={views.data ?? []}
             builders={builders.data ?? []}
+            urlTab={tab}
           />
         )}
       </SidebarLayout>

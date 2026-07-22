@@ -14,9 +14,17 @@ import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { type WorkspaceEvent, useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import type { AppletKind } from '@/lib/types'
 
+// The props the host passes to a mounted applet component. Views receive
+// `params` from navigation state (focusTab / `moi tab focus` → the URL's
+// history entry — see ViewApp in WorkspaceScreen.tsx); widgets are mounted
+// bare, so the applet must render sensibly with `params` absent.
+export type AppletComponentProps = {
+  params?: Record<string, unknown>
+}
+
 type AppletState =
   | { status: 'loading'; version: number }
-  | { status: 'ready'; Component: ComponentType; version: number }
+  | { status: 'ready'; Component: ComponentType<AppletComponentProps>; version: number }
   | { status: 'error'; error: string; version: number }
 
 // An applet kind (widget / view) differs only in its URL path segment and which
@@ -47,9 +55,9 @@ function loadApplet(
   segment: AppletSegment,
   workspaceId: string,
   name: string
-): Promise<ComponentType> {
+): Promise<ComponentType<AppletComponentProps>> {
   const key = appletKey(segment, workspaceId, name)
-  const existing = getCachedApplet(key) as Promise<ComponentType> | undefined
+  const existing = getCachedApplet(key) as Promise<ComponentType<AppletComponentProps>> | undefined
   if (existing) return existing
 
   // Import the bundle dir's `index.js` at its current `?v`; the version is bumped
@@ -57,7 +65,7 @@ function loadApplet(
   // while this applet is unmounted — so a backgrounded tab never serves stale.
   const promise = import(/* @vite-ignore */ appletUrl(segment, workspaceId, name)).then(mod => {
     if (!mod.default) throw new Error(`"${name}" has no default export`)
-    return mod.default as ComponentType
+    return mod.default as ComponentType<AppletComponentProps>
   })
 
   setCachedApplet(key, promise)
