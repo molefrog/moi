@@ -10,6 +10,7 @@ import {
   workspaceTypeLabel
 } from '@/client/features/home/workspace-presentation'
 import { cn } from '@/client/lib/cn'
+import { useUiStore } from '@/client/store/ui'
 import { WORKSPACE_TYPE_ORDER } from '@/lib/workspace-types'
 import type { HarnessAvailability, WorkspaceType } from '@/lib/types'
 
@@ -91,9 +92,16 @@ export function WorkspaceAgentStep({
   onTypeChange,
   onSubmit
 }: WorkspaceAgentStepProps) {
+  const hasSentMessageFromMoi = useUiStore(state => state.hasSentMessageFromMoi)
   const options = getWorkspaceAgentOptions({ availability, detectedTypes })
   const selectableType = resolveWorkspaceAgentSelection(options, selectedType)
   const selectedUnavailable = selectableType !== selectedType
+  const subscriptionTip =
+    selectableType === 'claude-code'
+      ? 'Tip: you can use your existing Claude subscription in moi'
+      : selectableType === 'codex'
+        ? 'Tip: you can use your existing ChatGPT subscription in moi'
+        : undefined
 
   useEffect(() => {
     if (selectableType && selectedUnavailable) onTypeChange(selectableType)
@@ -106,11 +114,16 @@ export function WorkspaceAgentStep({
         <DialogDescription>{WORKSPACE_AGENT_DESCRIPTION}</DialogDescription>
       </div>
 
-      <WorkspaceAgentSelector
-        options={options}
-        selectedType={selectedUnavailable ? undefined : selectedType}
-        onTypeChange={onTypeChange}
-      />
+      <div className="flex flex-col gap-4">
+        <WorkspaceAgentSelector
+          options={options}
+          selectedType={selectedUnavailable ? undefined : selectedType}
+          onTypeChange={onTypeChange}
+        />
+        {!hasSentMessageFromMoi && subscriptionTip && (
+          <p className="text-sm text-muted-foreground">{subscriptionTip}</p>
+        )}
+      </div>
 
       {errorMessage && (
         <p role="alert" className="text-xs text-destructive">
