@@ -173,12 +173,27 @@ function codexExecAction(input: unknown): CodexCommandAction | null {
   return first
 }
 
+// Codex collab tool actions (`input.action` on the `subagent` card). `wait`
+// never reaches the UI — the adapter drops it.
+const CODEX_SUBAGENT_ACTION_LABELS: Record<string, string> = {
+  spawn_agent: 'Run sub-agent',
+  send_input: 'Message the agent',
+  resume_agent: 'Resume the agent',
+  close_agent: 'Stopping the agent'
+}
+
 export function getToolDisplayName(call: ToolCall): string {
   if (call.provider === 'openclaw') return OPENCLAW_TOOL_LABELS[call.name] ?? call.name
   if (call.provider === 'codex') {
     if (call.name === 'exec') {
       const action = codexExecAction(call.input)
       if (action?.type) return CODEX_ACTION_LABELS[action.type]
+    }
+    if (call.name === 'subagent') {
+      const action = (call.input as { action?: unknown } | null)?.action
+      if (typeof action === 'string' && action in CODEX_SUBAGENT_ACTION_LABELS) {
+        return CODEX_SUBAGENT_ACTION_LABELS[action]
+      }
     }
     return CODEX_TOOL_LABELS[call.name] ?? call.name
   }
@@ -244,7 +259,13 @@ function formatCodexBrief(
     const plan = input.plan
     return typeof plan === 'string' ? plan.split('\n')[0] : ''
   }
-  if (tool === 'subagent') return getInputValue(input, 'prompt') || getInputValue(input, 'action')
+  if (tool === 'subagent') {
+    // The label already names the action; the brief carries the text being
+    // sent (spawn prompt, send_input/resume_agent message). close_agent has
+    // none — the label alone reads fine.
+    if (getInputValue(input, 'action') === 'close_agent') return ''
+    return getInputValue(input, 'prompt')
+  }
   if (tool === 'subagent_activity') return getInputValue(input, 'kind')
   if (tool === 'generate_image') return getInputValue(input, 'prompt').split('\n')[0]
   if (tool === 'read_mcp_resource') return getInputValue(input, 'uri')
