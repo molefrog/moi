@@ -27,7 +27,7 @@ export function SettingsSection({ label, children }: SettingsSectionProps) {
   return (
     <section className="flex flex-col gap-2">
       {label && <p className="px-0.5 text-xs font-medium text-muted-foreground">{label}</p>}
-      <div className="flex flex-col divide-y divide-dashed divide-border overflow-hidden rounded-lg border border-border bg-card text-card-foreground">
+      <div className="flex flex-col divide-y divide-dashed divide-border overflow-hidden rounded-xl border border-border bg-card text-card-foreground">
         {children}
       </div>
     </section>

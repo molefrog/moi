@@ -43,7 +43,7 @@ describe('ChatWelcome', () => {
     expect(welcomeTerms.every(([term]) => term.includes('<svg'))).toBe(true)
     expect(promptButtons).toHaveLength(3)
     expect(promptButtons.every(([button]) => button.includes('<svg'))).toBe(true)
-    expect(html).toContain('rounded-lg')
+    expect(html).toContain('rounded-xl')
     expect(html).toContain('whitespace-normal')
     expect(html).toContain('What&#x27;s the weather?')
     expect(html).toContain('Build a fun synthesizer')

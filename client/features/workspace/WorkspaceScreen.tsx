@@ -576,7 +576,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
                   <img
                     src={icon ?? workspaceProviderIcon[provider ?? 'claude-code']}
                     alt=""
-                    className="size-5 shrink-0 rounded-[4px]"
+                    className="size-5 shrink-0 rounded-xs"
                   />
                   {name && (
                     <span className="truncate text-sm font-medium text-foreground">{name}</span>

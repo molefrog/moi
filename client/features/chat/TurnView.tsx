@@ -113,7 +113,7 @@ export const TurnView = memo(function TurnView({ turn, processing = false }: Tur
           <FilePart key={i} mediaType={p.mediaType} url={p.url} filename={p.filename} />
         ))}
         {text && (
-          <p className="max-w-full min-w-0 rounded-md bg-accent px-4 py-2 text-sm leading-normal wrap-anywhere whitespace-pre-wrap text-accent-foreground">
+          <p className="max-w-full min-w-0 rounded-lg bg-accent px-4 py-2 text-sm leading-normal wrap-anywhere whitespace-pre-wrap text-accent-foreground">
             {text}
           </p>
         )}
@@ -159,12 +159,12 @@ function FilePart({ mediaType, url, filename }: FilePartProps) {
       <img
         src={url}
         alt={filename ?? 'attachment'}
-        className="max-h-64 max-w-full rounded-md border border-border object-contain"
+        className="max-h-64 max-w-full rounded-lg border border-border object-contain"
       />
     )
   }
   return (
-    <div className="flex items-center gap-1.5 rounded-md border border-border bg-accent px-2.5 py-1.5 text-xs text-accent-foreground">
+    <div className="flex items-center gap-1.5 rounded-lg border border-border bg-accent px-2.5 py-1.5 text-xs text-accent-foreground">
       <IconFile size={16} stroke={1.75} />
       <span className="truncate">{filename ?? mediaType}</span>
     </div>

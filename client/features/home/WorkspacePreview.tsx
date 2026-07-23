@@ -12,7 +12,7 @@ const FOLDER = {
   width: 320,
   height: 160,
   radius: 24,
-  topLeftRadius: 12,
+  topLeftRadius: 10,
   bodyTop: 24,
   tabEnd: 124,
   shoulder: {
@@ -159,7 +159,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
           alt=""
           loading="lazy"
           className={cn(
-            'absolute top-[12%] left-[14%] aspect-4/3 w-[72%] rounded-sm object-cover object-top shadow-xs',
+            'absolute top-[12%] left-[14%] aspect-4/3 w-[72%] rounded-lg object-cover object-top shadow-xs',
             'animate-in transition-transform duration-300 ease-out fade-in',
             slots[index]
           )}
@@ -171,7 +171,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
           <div
             aria-hidden="true"
             className={cn(
-              'w-max max-w-40 origin-center rounded-sm bg-card px-3 py-2 shadow-xs',
+              'w-max max-w-40 origin-center rounded-lg bg-card px-3 py-2 shadow-xs',
               'animate-in transition-transform duration-300 ease-out fade-in',
               STACK[STACK.length - 1],
               'group-hover:translate-y-0.5 group-focus-visible:translate-y-0.5'
@@ -186,7 +186,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
 
       <div
         className={cn(
-          'absolute inset-x-2 top-[40%] bottom-2 rounded-lg bg-accent',
+          'absolute inset-x-2 top-[40%] bottom-2 rounded-xl bg-accent',
           'mask-[linear-gradient(to_bottom,rgba(0,0,0,0.9)_0%,black_50%)] backdrop-blur-lg',
           'inset-shadow-[0_0_12px_color-mix(in_oklab,var(--background)_20%,transparent)]'
         )}

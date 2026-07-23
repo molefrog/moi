@@ -28,7 +28,7 @@ type SegmentedProps = {
 
 function Segmented({ value, onChange }: SegmentedProps) {
   return (
-    <div className="flex gap-1 rounded-lg bg-accent p-1">
+    <div className="flex gap-1 rounded-xl bg-accent p-1">
       {VARIANTS.map(o => (
         <Button
           key={o.value}

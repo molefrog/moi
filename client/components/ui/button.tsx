@@ -4,7 +4,7 @@ import { type VariantProps, cva } from 'class-variance-authority'
 import { cn } from '@/client/lib/cn'
 
 const buttonVariants = cva(
-  'inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-sm text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+  'inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
   {
     variants: {
       variant: {
@@ -18,13 +18,13 @@ const buttonVariants = cva(
           'bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20'
       },
       size: {
-        sm: 'h-7 gap-1.5 rounded-xs px-2.5 text-sm has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg]:size-4',
+        sm: 'h-7 gap-1.5 rounded-md px-2.5 text-sm has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg]:size-4',
         default:
           'h-8 px-3 has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5 [&_svg]:size-5',
-        lg: 'h-10 rounded-lg px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3 [&_svg]:size-5',
-        'icon-sm': 'size-7 rounded-xs [&_svg]:size-4',
+        lg: 'h-10 rounded-xl px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3 [&_svg]:size-5',
+        'icon-sm': 'size-7 rounded-md [&_svg]:size-4',
         icon: 'size-8 [&_svg]:size-5',
-        'icon-lg': 'size-10 rounded-lg [&_svg]:size-5'
+        'icon-lg': 'size-10 rounded-xl [&_svg]:size-5'
       }
     },
     defaultVariants: {

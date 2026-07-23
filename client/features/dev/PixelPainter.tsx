@@ -74,7 +74,7 @@ export function PixelPainter() {
         )}
       </div>
 
-      <pre className="rounded-md border border-border bg-card px-3 py-2 text-center font-mono text-sm leading-snug text-card-foreground">
+      <pre className="rounded-lg border border-border bg-card px-3 py-2 text-center font-mono text-sm leading-snug text-card-foreground">
         {ascii}
       </pre>
 

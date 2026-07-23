@@ -211,7 +211,7 @@ function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
   return (
     <div
       className={cn(
-        'group relative flex items-center gap-2 overflow-hidden rounded-md border border-border bg-accent text-accent-foreground',
+        'group relative flex items-center gap-2 overflow-hidden rounded-lg border border-border bg-accent text-accent-foreground',
         isImage ? 'size-14' : 'h-10 max-w-52 pr-2 pl-2',
         status === 'error' && 'border-destructive/50'
       )}

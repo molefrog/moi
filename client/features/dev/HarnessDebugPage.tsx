@@ -135,7 +135,7 @@ function Pane({ title, hint, controls, onCopy, onClear, children }: PaneProps) {
     if (follow && scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight
   })
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-border bg-background">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col rounded-xl border border-border bg-background">
       <div className="flex items-center gap-2 border-b border-border px-2 py-1">
         {typeof title === 'string' ? <span className="text-xs font-semibold">{title}</span> : title}
         {hint && <span className="truncate text-[10px] text-muted-foreground">{hint}</span>}
@@ -373,7 +373,7 @@ export function HarnessDebugPage() {
 
   return (
     <div className="flex h-dvh flex-col gap-2 bg-muted p-2">
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-background px-2 py-1.5 text-xs">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-background px-2 py-1.5 text-xs">
         <span className="font-semibold tracking-widest text-muted-foreground uppercase">
           Harness debug
         </span>
@@ -439,7 +439,7 @@ export function HarnessDebugPage() {
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-background px-2 py-1.5">
+      <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border bg-background px-2 py-1.5">
         {SCENARIOS.map(s => (
           <Button
             key={s.label}

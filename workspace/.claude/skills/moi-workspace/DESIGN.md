@@ -98,6 +98,14 @@ Use a 4 px spacing rhythm. As a guide:
 Prefer spacing over dividers. Keep repeated rows, chart labels, status markers, counters, and
 trailing actions in stable lanes so changing values do not shift the layout.
 
+## Shape and radius
+
+Use the shared shadcn radius scale and keep its default radius on standard controls. Ordinary cards,
+fields, list rows, and repeated sections should use `rounded-lg` or `rounded-xl`. Reserve
+`rounded-2xl` and `rounded-3xl` for one expressive focal surface, and use `rounded-full` only for
+real pills, circular buttons, avatars, and status dots. Controls and rectangular content regions
+must not look capsule-shaped.
+
 ## Interaction and motion
 
 Widgets support quick interactions such as a filter, toggle, refresh, or direct action. Multi-step

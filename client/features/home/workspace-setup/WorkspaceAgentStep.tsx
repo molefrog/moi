@@ -196,7 +196,7 @@ function WorkspaceAgentOptionButton({
         onSelect(option.type)
       }}
       className={cn(
-        'relative flex w-full flex-col items-start justify-between gap-6 rounded-lg bg-card p-4 text-left ring-1 ring-border transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+        'relative flex w-full flex-col items-start justify-between gap-6 rounded-xl bg-card p-4 text-left ring-1 ring-border transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
         !selected && 'opacity-70',
         !selected && !option.disabled && 'cursor-pointer hover:opacity-100',
         option.disabled && 'cursor-not-allowed'

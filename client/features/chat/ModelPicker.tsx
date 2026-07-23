@@ -174,7 +174,7 @@ export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: 
 
         {showFastMode && (
           <DropdownMenuGroup className="mt-0.5">
-            <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xs px-2 py-1 text-sm">
+            <label className="flex cursor-pointer items-center justify-between gap-4 rounded-md px-2 py-1 text-sm">
               Fast mode
               <Switch checked={fastMode} onCheckedChange={setFastMode} />
             </label>

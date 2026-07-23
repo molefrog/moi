@@ -75,7 +75,7 @@ function ToolButton({ label, active, Icon, onClick }: ToolButtonProps) {
       title={label}
       onClick={onClick}
       className={cn(
-        'flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+        'flex size-9 items-center justify-center rounded-xl text-muted-foreground hover:bg-accent hover:text-accent-foreground',
         active &&
           'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground'
       )}
@@ -483,7 +483,7 @@ export function ScratchStyleBar({ editor }: ScratchStyleBarProps) {
               state.fill === f.value && 'bg-accent text-accent-foreground'
             )}
           >
-            <span className={cn('size-4.5 rounded-sm', f.preview)} />
+            <span className={cn('size-4.5 rounded-lg', f.preview)} />
           </button>
         ))}
       </div>

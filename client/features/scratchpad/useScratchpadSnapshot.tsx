@@ -88,7 +88,7 @@ export function useScratchpadSnapshot(workspaceId: string): {
 export function ScratchpadSkewNotice({ skew }: { skew: ScratchpadSkew }) {
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center bg-muted/40 bg-[radial-gradient(var(--color-border)_1px,transparent_1px)] [background-size:16px_16px] p-6">
-      <div className="flex max-w-md animate-in flex-col gap-3 rounded-md bg-background p-6 shadow-xs duration-200 fade-in-0 zoom-in-95">
+      <div className="flex max-w-md animate-in flex-col gap-3 rounded-lg bg-background p-6 shadow-xs duration-200 fade-in-0 zoom-in-95">
         <div className="flex items-center gap-2">
           <IconVersions size={20} stroke={1.5} className="shrink-0 text-amber-600" />
           <h2 className="font-medium text-foreground">

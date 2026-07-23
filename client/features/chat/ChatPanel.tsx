@@ -173,7 +173,7 @@ export function ChatPanel({
 
       <div className="mx-auto flex w-full max-w-[calc(var(--chat-max-container)+24px)] flex-col px-3">
         {error && (
-          <div className="mb-2 flex w-full items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <div className="mb-2 flex w-full items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             <span className="flex-1 wrap-break-word">{error}</span>
             {onDismissError && (
               <Button
