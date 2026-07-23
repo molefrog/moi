@@ -35,19 +35,19 @@ Works with the harness you already use:
 
 <table>
   <tr>
-    <td><img src="assets/screenshots/moi-widgets-screen.webp" alt="Widgets dashboard" /></td>
+    <td><img src="assets/screenshots/moi-moi-dash-2.webp" alt="Widgets dashboard" /></td>
+    <td><img src="assets/screenshots/moi-magazin-scratch-2.webp" alt="Scratchpad" /></td>
+    <td><img src="assets/screenshots/moi-magazin-products-2.webp" alt="Products view" /></td>
+  </tr>
+  <tr>
+    <td><img src="assets/screenshots/moi-magazin-dash-2.webp" alt="Magazine dashboard" /></td>
     <td><img src="assets/screenshots/moi-view-screen.webp" alt="View in its own tab" /></td>
-    <td><img src="assets/screenshots/moi-scratch.webp" alt="Scratchpad" /></td>
+    <td><img src="assets/screenshots/moi-scratch.webp" alt="Scratchpad canvas" /></td>
   </tr>
   <tr>
-    <td><img src="assets/screenshots/moi-dashboard-2.webp" alt="Dashboard" /></td>
-    <td><img src="assets/screenshots/moi-magazin-view.webp" alt="Magazine view" /></td>
-    <td><img src="assets/screenshots/moi-scratch-magazin.webp" alt="Scratchpad with magazine" /></td>
-  </tr>
-  <tr>
-    <td><img src="assets/screenshots/moi-magazin-2.webp" alt="Magazine" /></td>
     <td><img src="assets/screenshots/moi-color-grading.webp" alt="Color grading" /></td>
-    <td></td>
+    <td><img src="assets/screenshots/moi-home.webp" alt="Home screen" /></td>
+    <td><img src="assets/screenshots/moi-linear.webp" alt="Linear view" /></td>
   </tr>
 </table>
 
