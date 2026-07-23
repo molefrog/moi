@@ -1,11 +1,11 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 
 import { cn } from '@/client/lib/cn'
-import type { ResolvedWorkspacePreview } from './api'
+
+import { useWorkspacePreview } from './api'
 
 type WorkspacePreviewProps = {
   workspaceId: string
-  preview: ResolvedWorkspacePreview
 }
 
 const FOLDER = {
@@ -104,10 +104,11 @@ const STACK = [
   )
 ]
 
-export function WorkspacePreview({ workspaceId, preview }: WorkspacePreviewProps) {
-  const thumbnails = [...preview.thumbnails].reverse()
+export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
+  const query = useWorkspacePreview(workspaceId)
+  const thumbnails = query.data ? [...query.data.thumbnails].reverse() : []
   const slots = STACK.slice(STACK.length - thumbnails.length)
-  const firstUserMessage = preview.firstUserMessage
+  const firstUserMessage = query.data?.firstUserMessage
   const { ref, horizontalRadiusScale } = useFolderRadiusScale()
   const backdropPath = folderBackdropPath(horizontalRadiusScale)
   const noiseFilterId = `folder-noise-${workspaceId}`

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { WorkspaceEntry } from '@/lib/types'
 
-import { resolveWorkspacePreview, upsertWorkspaceEntry } from './api'
+import { upsertWorkspaceEntry } from './api'
 
 const existing: WorkspaceEntry = {
   id: 'one',
@@ -12,23 +12,28 @@ const existing: WorkspaceEntry = {
 }
 
 describe('upsertWorkspaceEntry', () => {
-  test('appends a new workspace', () => {
+  test('prepends a new workspace', () => {
     const added: WorkspaceEntry = {
       id: 'two',
       path: '/tmp/two',
       addedAt: '2026-01-02T00:00:00.000Z'
     }
 
-    expect(upsertWorkspaceEntry([existing], added)).toEqual([existing, added])
+    expect(upsertWorkspaceEntry([existing], added)).toEqual([added, existing])
   })
 
-  test('updates an existing workspace without duplicating it', () => {
+  test('updates an existing workspace in place without duplicating it', () => {
+    const other: WorkspaceEntry = {
+      id: 'two',
+      path: '/tmp/two',
+      addedAt: '2026-01-02T00:00:00.000Z'
+    }
     const imported: WorkspaceEntry = {
       ...existing,
       name: 'Updated name'
     }
 
-    expect(upsertWorkspaceEntry([existing], imported)).toEqual([imported])
+    expect(upsertWorkspaceEntry([other, existing], imported)).toEqual([other, imported])
   })
 
   test('deduplicates a registry match returned with a different id', () => {
@@ -39,21 +44,5 @@ describe('upsertWorkspaceEntry', () => {
     }
 
     expect(upsertWorkspaceEntry([existing], imported)).toEqual([imported])
-  })
-})
-
-describe('resolveWorkspacePreview', () => {
-  test('uses provider activity when it is available', () => {
-    expect(resolveWorkspacePreview(existing, { thumbnails: ['preview'], updatedAt: 200 })).toEqual({
-      thumbnails: ['preview'],
-      updatedAt: 200
-    })
-  })
-
-  test('falls back to the date the workspace was added', () => {
-    expect(resolveWorkspacePreview(existing, undefined)).toEqual({
-      thumbnails: [],
-      updatedAt: new Date(existing.addedAt).getTime()
-    })
   })
 })

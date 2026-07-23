@@ -42,6 +42,15 @@ describe('registerWorkspace', () => {
     expect(a.addedAt).toBe(b.addedAt)
   })
 
+  test('prepends new workspaces without moving existing registrations', async () => {
+    const first = await registerWorkspace('/Users/foo/first')
+    const second = await registerWorkspace('/Users/foo/second')
+
+    await registerWorkspace('/Users/foo/first')
+
+    expect((await listWorkspaces()).map(entry => entry.id)).toEqual([second.id, first.id])
+  })
+
   test('resolves relative paths to absolute', async () => {
     const entry = await registerWorkspace('.')
     expect(entry.path).toBe(process.cwd())
@@ -127,6 +136,16 @@ describe('reorderWorkspaces', () => {
 
     const list = await listWorkspaces()
     expect(list.map(e => e.id)).toEqual([c.id, a.id, b.id])
+  })
+
+  test('keeps manual order below a newly registered workspace', async () => {
+    const a = await registerWorkspace('/Users/foo/project-a')
+    const b = await registerWorkspace('/Users/foo/project-b')
+    await reorderWorkspaces([a.id, b.id])
+
+    const c = await registerWorkspace('/Users/foo/project-c')
+
+    expect((await listWorkspaces()).map(entry => entry.id)).toEqual([c.id, a.id, b.id])
   })
 
   test('rejects missing ids', async () => {
