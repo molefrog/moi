@@ -31,7 +31,7 @@ export function Composer({
         composerRef.current?.focus()
       }}
       className={cn(
-        'flex w-full max-w-(--chat-max-container) cursor-text flex-col gap-1 rounded-lg bg-card p-2 text-card-foreground shadow-xs transition-[color,box-shadow] outline-none focus-within:shadow-sm',
+        'flex w-full cursor-text flex-col gap-1 rounded-lg bg-card p-2 text-card-foreground shadow-xs transition-[color,box-shadow] outline-none focus-within:shadow-sm',
         className
       )}
     >

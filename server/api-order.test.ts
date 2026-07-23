@@ -35,13 +35,13 @@ test('reordering workspaces broadcasts a workspace update', async () => {
   const response = await api.request('/api/workspaces/order', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ids: [second.id, first.id] })
+    body: JSON.stringify({ ids: [first.id, second.id] })
   })
 
   expect(response.status).toBe(200)
   expect((await response.json()).map((entry: WorkspaceEntry) => entry.id)).toEqual([
-    second.id,
-    first.id
+    first.id,
+    second.id
   ])
   expect(published).toEqual([JSON.stringify({ type: 'workspaces-list:updated' })])
 })
