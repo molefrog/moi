@@ -50,6 +50,16 @@ describe('ChatWelcome', () => {
     expect(html).toContain('Make a job tracker')
   })
 
+  test('disables every prompt when sending is unavailable', () => {
+    const html = renderToStaticMarkup(
+      createElement(ChatWelcome, { disabled: true, onSelectPrompt: () => undefined })
+    )
+    const promptButtons = [...html.matchAll(/<button.*?<\/button>/gs)]
+
+    expect(promptButtons).toHaveLength(3)
+    expect(promptButtons.every(([button]) => button.includes('disabled=""'))).toBe(true)
+  })
+
   test('keeps visible requests separate from detailed build context', () => {
     expect(CHAT_WELCOME_PROMPTS.map(({ label, prompt }) => ({ label, prompt }))).toEqual([
       {

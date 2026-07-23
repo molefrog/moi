@@ -56,10 +56,11 @@ export const CHAT_WELCOME_PROMPTS = [
 ] satisfies ChatPromptBubble[]
 
 type ChatWelcomeProps = {
+  disabled?: boolean
   onSelectPrompt: (prompt: ChatPromptBubble) => void
 }
 
-export function ChatWelcome({ onSelectPrompt }: ChatWelcomeProps) {
+export function ChatWelcome({ disabled = false, onSelectPrompt }: ChatWelcomeProps) {
   return (
     <div className="flex min-h-full max-w-md min-w-0 flex-col items-center justify-center self-center pb-2">
       <div className="prose prose-sm min-w-0 wrap-anywhere prose-inherit">
@@ -78,7 +79,11 @@ export function ChatWelcome({ onSelectPrompt }: ChatWelcomeProps) {
         </p>
         <p>Give it a try:</p>
       </div>
-      <ChatPromptBubbles prompts={CHAT_WELCOME_PROMPTS} onSelect={onSelectPrompt} />
+      <ChatPromptBubbles
+        prompts={CHAT_WELCOME_PROMPTS}
+        disabled={disabled}
+        onSelect={onSelectPrompt}
+      />
     </div>
   )
 }

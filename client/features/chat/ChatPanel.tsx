@@ -2,10 +2,13 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
 import { IconChevronDown, IconX } from '@tabler/icons-react'
 
+import { canSubmitComposerAction } from '@/client/components/shared/Composer'
 import { useStickToBottom } from '@/client/features/chat/useStickToBottom'
 import { groupTurns } from '@/client/features/chat/group-turns'
+import { draftKey, useLive } from '@/client/features/chat/chat-store'
 import type { ChatPromptBubble } from '@/client/features/chat/ChatPromptBubbles'
 import type { ChatSendOptions } from '@/client/features/chat/chat-send'
+import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import type { Turn, ViewState } from '@/lib/types'
 
 import { ChatComposer } from './ChatComposer'
@@ -54,10 +57,17 @@ export function ChatPanel({
   onSwitchThread,
   onClose
 }: ChatPanelProps) {
+  const workspaceId = useWorkspaceId()
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const turns = view.turns
   const hasSentMessageFromMoi = useUiStore(state => state.hasSentMessageFromMoi)
+  const attachmentsUploading = useLive(state =>
+    (state.attachments[draftKey(workspaceId, sessionId ?? null)] ?? []).some(
+      attachment => attachment.status === 'uploading'
+    )
+  )
+  const promptDisabled = !canSubmitComposerAction(true, attachmentsUploading, unavailableReason)
   // Visual grouping: fold consecutive tool-only assistant turns into one
   // synthetic turn so OpenAI Codex–style traces (which serialize one
   // assistant message per agent step) don't render with the wider
@@ -95,9 +105,10 @@ export function ChatPanel({
 
   const handlePromptSelect = useCallback(
     (prompt: ChatPromptBubble) => {
+      if (promptDisabled) return
       handleSend(prompt.prompt, { directives: prompt.context })
     },
-    [handleSend]
+    [handleSend, promptDisabled]
   )
 
   return (
@@ -121,7 +132,7 @@ export function ChatPanel({
               (hasSentMessageFromMoi ? (
                 <EmptyState />
               ) : (
-                <ChatWelcome onSelectPrompt={handlePromptSelect} />
+                <ChatWelcome disabled={promptDisabled} onSelectPrompt={handlePromptSelect} />
               ))}
             {groupedTurns.map((turn, i) => (
               <TurnView
