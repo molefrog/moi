@@ -9,11 +9,11 @@ import type { Part, Turn } from '@/lib/types'
 
 export function ThinkingIndicator() {
   return (
-    <div className="flex items-center gap-1.5 px-1 py-3">
+    <div className="flex items-center gap-1 px-1 py-3">
       {[0, 1, 2].map(i => (
         <span
           key={i}
-          className="block h-1.5 w-1.5 rounded-full bg-ring"
+          className="block h-1 w-1 rounded-full bg-ring"
           style={{
             animation: 'pulse-dot 1.4s ease-in-out infinite',
             animationDelay: `${i * 0.2}s`
