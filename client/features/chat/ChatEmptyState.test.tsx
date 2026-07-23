@@ -50,7 +50,7 @@ describe('resolveChatEmptyState', () => {
 describe('ChatEmptyState', () => {
   test('renders the selected empty state', () => {
     expect(renderState('chat-welcome')).toContain('moi is the visual workspace')
-    expect(renderState('workspace-welcome')).toContain('What could you build?')
+    expect(renderState('workspace-welcome')).toContain('Explore the workspace')
     expect(renderState('empty')).toContain('Chat with your agent')
   })
 })

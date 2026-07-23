@@ -5,11 +5,9 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   ChatWorkspaceWelcome,
-  WORKSPACE_ANALYSIS_PROMPTS
+  WORKSPACE_ANALYSIS_PROMPT
 } from '@/client/features/chat/ChatEmptyState'
 import { renderMoiContext } from '@/lib/moi-context'
-
-const workspaceAnalysisPrompt = WORKSPACE_ANALYSIS_PROMPTS[0]
 
 describe('ChatWorkspaceWelcome', () => {
   test('renders the workspace analysis copy and one plain prompt', () => {
@@ -18,8 +16,8 @@ describe('ChatWorkspaceWelcome', () => {
     )
     const promptButtons = [...html.matchAll(/<button.*?<\/button>/gs)]
 
-    expect(html).toContain('Let&#x27;s explore the workspace')
-    expect(html).toContain('What could you build?')
+    expect(html).toContain('See what moi can build for you')
+    expect(html).toContain('Explore the workspace')
     expect(promptButtons).toHaveLength(1)
     expect(promptButtons[0]?.[0]).toContain('<svg')
     expect(promptButtons[0]?.[0]).not.toContain('grid')
@@ -38,10 +36,9 @@ describe('ChatWorkspaceWelcome', () => {
   })
 
   test('keeps analysis instructions in hidden message context', () => {
-    expect(workspaceAnalysisPrompt).toMatchObject({
-      label: 'What could you build?',
-      prompt:
-        'Analyze this workspace and suggest useful widgets and views moi can build based on its content'
+    expect(WORKSPACE_ANALYSIS_PROMPT).toMatchObject({
+      label: 'Explore the workspace',
+      prompt: 'Explore this workspace and suggest what moi can build based on its content'
     })
 
     const html = renderToStaticMarkup(
@@ -51,7 +48,7 @@ describe('ChatWorkspaceWelcome', () => {
 
     const context = renderMoiContext({
       activeTab: 'agent',
-      directives: [...workspaceAnalysisPrompt.context]
+      directives: [...WORKSPACE_ANALYSIS_PROMPT.context]
     })
     expect(context).toContain('Explore the existing workspace files')
     expect(context).toContain('which content informed your ideas')
