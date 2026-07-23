@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, test } from 'bun:test'
 
-import { CHAT_WELCOME_PROMPTS, ChatWelcome } from '@/client/features/chat/ChatWelcome'
+import { CHAT_WELCOME_PROMPTS, ChatWelcome } from '@/client/features/chat/ChatEmptyState'
 import { renderMoiContext } from '@/lib/moi-context'
 
 function renderedParagraphs(html: string): string[] {

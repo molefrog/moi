@@ -142,7 +142,7 @@ export function useChat() {
         context: buildMoiContext(options?.directives),
         ...(ready.length > 0 ? { attachments: ready.map(a => a.upload!.id) } : {})
       })
-      useUiStore.getState().markMessageSentFromMoi()
+      useUiStore.getState().markMessageSentFromMoi(workspaceId)
       if (isNew) {
         qc.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
       }

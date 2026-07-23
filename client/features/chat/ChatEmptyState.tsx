@@ -1,6 +1,7 @@
 import {
   IconArticle,
   IconBriefcase,
+  IconFileSearch,
   IconGhost,
   IconLayout2,
   IconPiano,
@@ -9,7 +10,12 @@ import {
   type TablerIcon
 } from '@tabler/icons-react'
 
-import { ChatPromptBubbles, type ChatPromptBubble } from '@/client/features/chat/ChatPromptBubbles'
+import {
+  ChatPromptBubble,
+  ChatPromptBubbles,
+  type ChatPromptBubble as ChatPrompt
+} from '@/client/features/chat/ChatPromptBubbles'
+import { cn } from '@/client/lib/cn'
 
 export const CHAT_WELCOME_PROMPTS = [
   {
@@ -53,16 +59,62 @@ export const CHAT_WELCOME_PROMPTS = [
     ],
     icon: IconBriefcase
   }
-] satisfies ChatPromptBubble[]
+] satisfies ChatPrompt[]
 
-type ChatWelcomeProps = {
-  disabled?: boolean
-  onSelectPrompt: (prompt: ChatPromptBubble) => void
+export const WORKSPACE_ANALYSIS_PROMPT = {
+  label: 'Explore the workspace',
+  prompt: 'Explore this workspace and suggest what moi can build based on its content',
+  context: [
+    'Explore the existing workspace files before making suggestions.',
+    'Briefly explain what the workspace appears to be for and which content informed your ideas.',
+    'Propose a focused set of useful widgets or views that fit the work already here.',
+    'Wait for me to choose before building anything.'
+  ],
+  icon: IconFileSearch
+} satisfies ChatPrompt
+
+export type ChatEmptyStateKind = 'chat-welcome' | 'workspace-welcome' | 'empty'
+
+type ResolveChatEmptyStateOptions = {
+  hasSentMessageFromMoi: boolean
+  isWorkspacePendingAnalysis: boolean
 }
 
-export function ChatWelcome({ disabled = false, onSelectPrompt }: ChatWelcomeProps) {
+export function resolveChatEmptyState({
+  hasSentMessageFromMoi,
+  isWorkspacePendingAnalysis
+}: ResolveChatEmptyStateOptions): ChatEmptyStateKind {
+  if (!hasSentMessageFromMoi) return 'chat-welcome'
+  if (isWorkspacePendingAnalysis) return 'workspace-welcome'
+  return 'empty'
+}
+
+const EMPTY_STATE_STYLES = cn('flex flex-1 flex-col items-center justify-center')
+
+type ChatEmptyStateProps = {
+  kind: ChatEmptyStateKind
+  disabled?: boolean
+  onSelectPrompt: (prompt: ChatPrompt) => void
+}
+
+export function ChatEmptyState({ kind, disabled = false, onSelectPrompt }: ChatEmptyStateProps) {
+  if (kind === 'chat-welcome') {
+    return <ChatWelcome disabled={disabled} onSelectPrompt={onSelectPrompt} />
+  }
+  if (kind === 'workspace-welcome') {
+    return <ChatWorkspaceWelcome disabled={disabled} onSelectPrompt={onSelectPrompt} />
+  }
+  return <EmptyState />
+}
+
+type WelcomeProps = {
+  disabled?: boolean
+  onSelectPrompt: (prompt: ChatPrompt) => void
+}
+
+export function ChatWelcome({ disabled = false, onSelectPrompt }: WelcomeProps) {
   return (
-    <div className="flex min-h-full max-w-md min-w-0 flex-col items-center justify-center self-center pb-2">
+    <div className={cn(EMPTY_STATE_STYLES, 'max-w-md min-w-0')}>
       <div className="prose prose-sm min-w-0 wrap-anywhere prose-inherit">
         <p>moi is the visual workspace for you and your agent.</p>
         <p>
@@ -84,6 +136,31 @@ export function ChatWelcome({ disabled = false, onSelectPrompt }: ChatWelcomePro
         disabled={disabled}
         onSelect={onSelectPrompt}
       />
+    </div>
+  )
+}
+
+export function ChatWorkspaceWelcome({ disabled = false, onSelectPrompt }: WelcomeProps) {
+  return (
+    <div className={cn(EMPTY_STATE_STYLES, 'gap-2')}>
+      <div className="prose prose-sm max-w-60 min-w-0 text-center wrap-anywhere text-muted-foreground prose-inherit">
+        <p>See what moi can build for you</p>
+      </div>
+      <ChatPromptBubble
+        prompt={WORKSPACE_ANALYSIS_PROMPT}
+        disabled={disabled}
+        onSelect={onSelectPrompt}
+      />
+    </div>
+  )
+}
+
+function EmptyState() {
+  return (
+    <div className={cn(EMPTY_STATE_STYLES, 'gap-1 text-center')}>
+      <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+        Chat with your agent, create widgets and views, and manage your workspace context from here
+      </p>
     </div>
   )
 }

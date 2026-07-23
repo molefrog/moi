@@ -7,16 +7,6 @@ import { ToolCallGroup } from '@/client/features/chat/tool-group/ToolCallGroup'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import type { Part, Turn } from '@/lib/types'
 
-export function EmptyState() {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center">
-      <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-        Chat with your agent, create widgets and views, and manage your workspace context from here
-      </p>
-    </div>
-  )
-}
-
 export function ThinkingIndicator() {
   return (
     <div className="flex items-center gap-1.5 px-1 py-3">

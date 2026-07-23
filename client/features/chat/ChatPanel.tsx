@@ -12,9 +12,9 @@ import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import type { Turn, ViewState } from '@/lib/types'
 
 import { ChatComposer } from './ChatComposer'
+import { ChatEmptyState, resolveChatEmptyState } from './ChatEmptyState'
 import { ChatSelector } from './ChatSelector'
-import { ChatWelcome } from './ChatWelcome'
-import { EmptyState, ThinkingIndicator, TurnView } from './TurnView'
+import { ThinkingIndicator, TurnView } from './TurnView'
 import { Button } from '@/client/components/ui/button'
 import { useUiStore } from '@/client/store/ui'
 
@@ -62,6 +62,9 @@ export function ChatPanel({
   const scrollRef = useRef<HTMLDivElement>(null)
   const turns = view.turns
   const hasSentMessageFromMoi = useUiStore(state => state.hasSentMessageFromMoi)
+  const isWorkspacePendingAnalysis = useUiStore(state =>
+    (state.workspaceIdsPendingAnalysis ?? []).includes(workspaceId)
+  )
   const attachmentsUploading = useLive(state =>
     (state.attachments[draftKey(workspaceId, sessionId ?? null)] ?? []).some(
       attachment => attachment.status === 'uploading'
@@ -79,13 +82,17 @@ export function ChatPanel({
     [turns, previewTurn]
   )
   const showEmptyChat = chatLoaded && groupedTurns.length === 0 && !processing
+  const emptyStateKind = resolveChatEmptyState({
+    hasSentMessageFromMoi,
+    isWorkspacePendingAnalysis
+  })
 
   // Stick to the bottom while pinned; respect scroll-up; jump on thread switch.
   const { atBottom, scrollToBottom, scrollToTop } = useStickToBottom(scrollRef, sessionId)
 
   useLayoutEffect(() => {
-    if (showEmptyChat && !hasSentMessageFromMoi) scrollToTop()
-  }, [showEmptyChat, hasSentMessageFromMoi, scrollToTop])
+    if (showEmptyChat && emptyStateKind !== 'empty') scrollToTop()
+  }, [showEmptyChat, emptyStateKind, scrollToTop])
 
   // The active chat surface owns initial focus. A monotonically increasing
   // request also refocuses an already-visible composer after intent actions.
@@ -128,12 +135,13 @@ export function ChatPanel({
           className="flex scrollbar-thin flex-1 scroll-fade flex-col overflow-y-auto overscroll-contain px-5 pt-4 pb-12 [--scroll-fade-reveal:8px]"
         >
           <div className="mx-auto flex w-full max-w-(--chat-max-container) flex-1 flex-col gap-6">
-            {showEmptyChat &&
-              (hasSentMessageFromMoi ? (
-                <EmptyState />
-              ) : (
-                <ChatWelcome disabled={promptDisabled} onSelectPrompt={handlePromptSelect} />
-              ))}
+            {showEmptyChat && (
+              <ChatEmptyState
+                kind={emptyStateKind}
+                disabled={promptDisabled}
+                onSelectPrompt={handlePromptSelect}
+              />
+            )}
             {groupedTurns.map((turn, i) => (
               <TurnView
                 key={turn.id}
