@@ -35,19 +35,19 @@ Works with the harness you already use:
 
 <table>
   <tr>
-    <td><img src="assets/screenshots/moi-moi-dash-2.webp" alt="Widgets dashboard" /></td>
-    <td><img src="assets/screenshots/moi-magazin-scratch-2.webp" alt="Scratchpad" /></td>
-    <td><img src="assets/screenshots/moi-magazin-products-2.webp" alt="Products view" /></td>
+    <td align="center"><img src="assets/screenshots/moi-moi-dash-2.webp" alt="Widgets dashboard" /><br /><sub>Widgets wired to live project stats</sub></td>
+    <td align="center"><img src="assets/screenshots/moi-magazin-scratch-2.webp" alt="Scratchpad" /><br /><sub>Order funnel on the scratchpad, live from Postgres</sub></td>
+    <td align="center"><img src="assets/screenshots/moi-magazin-products-2.webp" alt="Products view" /><br /><sub>Use the agent as a copilot when working with products</sub></td>
   </tr>
   <tr>
-    <td><img src="assets/screenshots/moi-magazin-dash-2.webp" alt="Magazine dashboard" /></td>
-    <td><img src="assets/screenshots/moi-view-screen.webp" alt="View in its own tab" /></td>
-    <td><img src="assets/screenshots/moi-scratch.webp" alt="Scratchpad canvas" /></td>
+    <td align="center"><img src="assets/screenshots/moi-magazin-dash-2.webp" alt="Store dashboard" /><br /><sub>E-commerce store dashboard connected to Postgres and Resend</sub></td>
+    <td align="center"><img src="assets/screenshots/moi-view-screen.webp" alt="Roadmap view" /><br /><sub>Build a Roadmap view with epics and pull requests</sub></td>
+    <td align="center"><img src="assets/screenshots/moi-scratch.webp" alt="Scratchpad canvas" /><br /><sub>Sketching architecture together with the agent</sub></td>
   </tr>
   <tr>
-    <td><img src="assets/screenshots/moi-color-grading.webp" alt="Color grading" /></td>
-    <td><img src="assets/screenshots/moi-home.webp" alt="Home screen" /></td>
-    <td><img src="assets/screenshots/moi-linear.webp" alt="Linear view" /></td>
+    <td align="center"><img src="assets/screenshots/moi-color-grading.webp" alt="Color grading review" /><br /><sub>Custom view for color grading</sub></td>
+    <td align="center"><img src="assets/screenshots/moi-home.webp" alt="Home screen" /><br /><sub>Home screen with your workspaces</sub></td>
+    <td align="center"><img src="assets/screenshots/moi-linear.webp" alt="Issues view" /><br /><sub>Issues view, a lightweight Linear-like tracker</sub></td>
   </tr>
 </table>
 
