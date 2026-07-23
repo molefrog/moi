@@ -9,6 +9,7 @@ import pc from './cli-pc'
 
 import { COLOR_THEMES, FONT_THEMES } from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/themes'
+import { isParamsRecord } from '@/lib/workspace-tabs'
 import type {
   AppletLogEntry,
   ScratchArrowEnd,
@@ -1829,6 +1830,97 @@ const debug = defineCommand({
   subCommands: { logs: debugLogs }
 })
 
+// ---- workspace tabs ----------------------------------------------------------
+
+// The shared listing behind `moi tabs` and bare `moi tab`: every tab (static +
+// views), one per row, the saved default (`layout.tabs.active`) marked. The
+// output shape is documented in docs/rfc-intents-v2.md §3 — keep them in sync.
+function runTabsList(dir: string) {
+  const path = resolve(dir)
+  sendControl(path, { type: 'tabs', path }, res => {
+    type Row = { id: string; title: string; isDefault: boolean }
+    const rows: Row[] = Array.isArray(res.tabs) ? (res.tabs as Row[]) : []
+    console.log(
+      '\n' + pc.bold('moi tabs') + pc.dim(' — workspace tabs, the default one marked') + '\n'
+    )
+    console.log(
+      columns(
+        ['', 'tab', 'title'].map(h => pc.dim(h)),
+        rows.map(row => [
+          row.isDefault ? pc.green('●') : ' ',
+          row.isDefault ? pc.bold(row.id) : row.id,
+          row.title
+        ])
+      )
+    )
+    console.log(
+      '\n' + pc.dim('  Focus one: moi tab focus <tab-id> [--params \'{"k":"v"}\']') + '\n'
+    )
+  })
+}
+
+const tabFocus = defineCommand({
+  meta: { name: 'focus', description: 'Focus a workspace tab in every open client' },
+  args: {
+    tab: {
+      type: 'positional',
+      required: true,
+      description: 'Tab id from `moi tabs`, e.g. view:orders'
+    },
+    params: {
+      type: 'string',
+      description: 'One JSON object delivered to the view as its params, e.g. \'{"order":"o-1"}\''
+    },
+    dir: dirArg
+  },
+  run({ args }) {
+    const path = resolve(args.dir)
+    let params: Record<string, unknown> | undefined
+    if (args.params !== undefined) {
+      try {
+        const parsed: unknown = JSON.parse(args.params)
+        if (!isParamsRecord(parsed)) throw new Error('not a JSON object')
+        params = parsed
+      } catch {
+        console.error(
+          '\n' + pc.red('✗') + ' --params must be one JSON object, e.g. \'{"order":"o-1"}\'\n'
+        )
+        process.exit(1)
+      }
+    }
+    sendControl(
+      path,
+      { type: 'tab:focus', path, tab: args.tab, ...(params ? { params } : {}) },
+      res => {
+        console.log('\n' + pc.green('✓') + ' Focused ' + pc.bold(String(res.tab)) + '\n')
+      }
+    )
+  }
+})
+
+const tabSubCommands = { focus: tabFocus }
+
+const tab = defineCommand({
+  meta: { name: 'tab', description: 'List workspace tabs, or focus one: `moi tab focus <tab-id>`' },
+  subCommands: tabSubCommands,
+  args: { dir: dirArg },
+  run({ args, rawArgs }) {
+    // citty invokes the parent run even after dispatching a subcommand — only
+    // list when none ran (same pattern as `moi env` / `moi skill`).
+    const sub = rawArgs.find(a => !a.startsWith('-'))
+    if (sub && Object.hasOwn(tabSubCommands, sub)) return
+    runTabsList(args.dir)
+  }
+})
+
+const tabs = defineCommand({
+  meta: { name: 'tabs', description: 'List workspace tabs (alias for `moi tab`)' },
+  args: { dir: dirArg },
+  run({ args }) {
+    runTabsList(args.dir)
+  }
+})
+
 // Re-copy bundled skills into a workspace, then report what changed. Pure
 // filesystem op — no running server needed. Resolves the workspace root the
 // same way `moi bundle` does, so it works from `.moi/` or any subdirectory.
@@ -1969,6 +2061,8 @@ const main = defineCommand({
     openclaw,
     scratch,
     skill,
+    tab,
+    tabs,
     version
   }
 })

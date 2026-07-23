@@ -1,6 +1,8 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { AnimatePresence, motion } from 'motion/react'
+import { useLocation } from 'wouter'
+import { useHistoryState } from 'wouter/use-browser-location'
 
 import {
   IconArticle,
@@ -15,6 +17,7 @@ import { ChatPanel } from '@/client/features/chat/ChatPanel'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { CustomizePanel } from '@/client/features/workspace/CustomizePanel'
 import { AppletMount } from '@/client/features/applets/AppletMount'
+import { useMoiAppletBridge } from '@/client/features/applets/applet-bridge'
 import { WidgetErrorBoundary } from '@/client/features/applets/WidgetErrorBoundary'
 import { Widgets } from '@/client/features/widgets/Widgets'
 import { PanelHeader } from '@/client/components/shared/PanelHeader'
@@ -31,9 +34,16 @@ import { useWorkspaceAvailability } from '@/client/features/workspace/api'
 import { useWorkspaceTheme } from '@/client/features/workspace/useWorkspaceTheme'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
+import {
+  effectiveOpenTabs,
+  normalizeTabsState,
+  resolveActiveTab,
+  tabAvailable
+} from '@/client/features/workspace/tab-resolution'
 import { resolveAppIcon } from '@/client/lib/app-icon-registry'
 import { cn } from '@/client/lib/cn'
 import { liveStore } from '@/client/features/chat/chat-store'
+import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import {
   type CreateWorkspaceTabItem,
   type WorkspaceTabItem,
@@ -47,7 +57,17 @@ import type {
   WorkspaceTabId,
   WorkspaceTabsState
 } from '@/lib/types'
-import { createDefaultWorkspaceTabs } from '@/lib/workspace-layout'
+import {
+  isParamsRecord,
+  isWorkspaceTabId,
+  parseWorkspaceTab,
+  readAppletParams,
+  viewBuilderIdFromTab,
+  viewBuilderTabId,
+  viewIdFromTab,
+  viewTabId,
+  workspaceTabPath
+} from '@/lib/workspace-tabs'
 
 const Scratchpad = lazy(() =>
   import('@/client/features/scratchpad/Scratchpad').then(module => ({
@@ -64,14 +84,6 @@ function viewIcon(view: ViewInfo, builders: ViewBuilder[]) {
   const builder = builders.find(candidate => candidate.viewId === view.id)
   return resolveAppIcon(view.config.icon) ?? resolveAppIcon(builder?.icon) ?? IconArticle
 }
-
-const DEFAULT_TABS = createDefaultWorkspaceTabs()
-
-const viewTabId = (id: string): WorkspaceTabId => `view:${id}`
-const viewIdFromTab = (tab: WorkspaceTabId) => (tab.startsWith('view:') ? tab.slice(5) : null)
-const viewBuilderTabId = (id: string): WorkspaceTabId => `view-builder:${id}`
-const viewBuilderIdFromTab = (tab: WorkspaceTabId) =>
-  tab.startsWith('view-builder:') ? tab.slice('view-builder:'.length) : null
 
 type SectionControlsProps = {
   mode: LayoutMode
@@ -95,12 +107,16 @@ function SectionControls({ mode, onToggleMode }: SectionControlsProps) {
 
 type ViewAppProps = {
   view: ViewInfo
+  // The view's addressable state, read from navigation state (focusTab /
+  // `moi tab focus`). `{}` on a fresh mount, a new browser tab, or a plain
+  // tab-bar click — the view must render sensibly with that.
+  params: Record<string, unknown>
 }
 
 // A view — an agent-defined app — mounted full-area. The bundle owns its own
 // layout + scroll, so we give it a plain filled box and fade it in (mirroring
 // WidgetShell, but full-area instead of a grid cell).
-function ViewApp({ view }: ViewAppProps) {
+function ViewApp({ view, params }: ViewAppProps) {
   const workspaceId = useWorkspaceId()
   const bundle = useView(view.id)
 
@@ -128,7 +144,7 @@ function ViewApp({ view }: ViewAppProps) {
                 workspaceId={workspaceId}
                 resetKey={bundle.version}
               >
-                <bundle.Component />
+                <bundle.Component params={params} />
               </WidgetErrorBoundary>
             </motion.div>
           </AppletMount>
@@ -180,24 +196,12 @@ type WorkspaceScreenProps = {
   widgets: WidgetInfo[]
   views: ViewInfo[]
   builders: ViewBuilder[]
+  // The URL's tab segment (raw wildcard — may be null or garbage). The active
+  // tab derives from it; see tab-resolution.ts.
+  urlTab: string | null
 }
 
 type WidgetMode = 'idle' | 'editing' | 'customizing'
-
-function normalizeTabsState(tabs: WorkspaceTabsState | undefined): WorkspaceTabsState {
-  if (!tabs || !Array.isArray(tabs.open)) return DEFAULT_TABS
-  const open = tabs.open.filter((tab, index, all) => all.indexOf(tab) === index)
-  if (open.length === 0) return DEFAULT_TABS
-  return { open, active: open.includes(tabs.active) ? tabs.active : open[0] }
-}
-
-function tabAvailable(tab: WorkspaceTabId, views: ViewInfo[], builders: ViewBuilder[]) {
-  if (tab === 'agent' || tab === 'widgets' || tab === 'scratchpad') return true
-  const builderId = viewBuilderIdFromTab(tab)
-  if (builderId) return builders.some(builder => builder.id === builderId)
-  const viewId = viewIdFromTab(tab)
-  return viewId ? views.some(v => v.id === viewId) : false
-}
 
 function tabItemFor(
   tab: WorkspaceTabId,
@@ -261,7 +265,7 @@ function applyVisibleTabOrder(
   return open.map(tab => (visibleSet.has(tab) ? orderedVisible[cursor++] : tab))
 }
 
-export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenProps) {
+export function WorkspaceScreen({ widgets, views, builders, urlTab }: WorkspaceScreenProps) {
   const {
     view,
     previewTurn,
@@ -274,6 +278,10 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     dismissError
   } = useChat()
   const { layout, setLayout, name, icon, provider, workspaceId } = useWorkspaceLayoutCtx()
+  const [, navigate] = useLocation()
+  // Applet params ride wouter navigation state; anything malformed reads as {}.
+  const historyState = useHistoryState<unknown>()
+  const appletParams = useMemo(() => readAppletParams(historyState), [historyState])
   // Keep the composer read/write, but block sends when its agent executable is
   // missing. The Send button explains how to install it.
   const availability = useWorkspaceAvailability(workspaceId).data
@@ -293,10 +301,9 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const tabsState = normalizeTabsState(layout.tabs)
   const tabsStateRef = useRef(tabsState)
   tabsStateRef.current = tabsState
-  const availableOpenTabs = tabsState.open.filter(tab => tabAvailable(tab, views, builders))
-  const effectiveOpenTabs = availableOpenTabs.length > 0 ? availableOpenTabs : DEFAULT_TABS.open
+  const openTabIds = effectiveOpenTabs(tabsState, views, builders)
   const openSet = new Set(tabsState.open)
-  const nonAgentOpenTabs = effectiveOpenTabs.filter(tab => tab !== 'agent')
+  const nonAgentOpenTabs = openTabIds.filter(tab => tab !== 'agent')
   const hasWorkspaceContent = nonAgentOpenTabs.length > 0
 
   // Effective layout mode. Split is only visible with workspace content and
@@ -305,25 +312,23 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const mode: LayoutMode = wantsSplit && canUseSplit ? 'split' : 'fullscreen'
   const dockedSplit = mode === 'split'
 
+  // Entering split with the agent tab on screen needs no special-casing
+  // anymore: the URL resolution below derives a visible tab and the redirect
+  // effect makes the URL follow it (replace).
   const setMode = (m: LayoutMode) => {
-    if (m === 'split' && tabsState.active === 'agent') {
-      setLayout({
-        layoutMode: m,
-        tabs: {
-          open: tabsState.open,
-          active: nonAgentOpenTabs[0] ?? tabsState.active
-        }
-      })
-      return
-    }
     setLayout({ layoutMode: m })
   }
 
-  const visibleTabIds = dockedSplit ? nonAgentOpenTabs : effectiveOpenTabs
-  const activeTab: WorkspaceTabId = visibleTabIds.includes(tabsState.active)
-    ? tabsState.active
-    : (visibleTabIds[0] ?? 'agent')
-  const canCloseTabs = effectiveOpenTabs.length > 1
+  // The ACTIVE tab derives from the URL; `tabsState.active` is only the saved
+  // default (where a bare /workspace/:id lands). A URL naming an available tab
+  // wins; anything else falls back through the same availability chain as
+  // before, and the redirect effect below rewrites the URL to match.
+  const requestedTab = parseWorkspaceTab(urlTab)
+  const activeTab = resolveActiveTab(requestedTab, tabsState, views, builders, dockedSplit)
+  const urlTabHonored = requestedTab !== null && requestedTab === activeTab
+
+  const visibleTabIds = dockedSplit ? nonAgentOpenTabs : openTabIds
+  const canCloseTabs = openTabIds.length > 1
   const tabItems = visibleTabIds
     .map(tab =>
       tabItemFor(tab, views, builders, canCloseTabs || viewBuilderIdFromTab(tab) !== null)
@@ -336,17 +341,47 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     ? builders.find(builder => builder.id === activeBuilderId)
     : undefined
 
+  // Keep the URL honest — replace, never push, so Back leaves the workspace
+  // instead of walking tab history. This is the single redirect: a bare
+  // /workspace/:id, an unknown/unavailable tab, or the agent tab while split
+  // mode hides it all land on the resolved tab.
+  useEffect(() => {
+    if (urlTab === activeTab) return
+    navigate(workspaceTabPath(workspaceId, activeTab), { replace: true })
+  }, [activeTab, navigate, urlTab, workspaceId])
+
+  const setTabs = useCallback(
+    (tabs: WorkspaceTabsState) => {
+      tabsStateRef.current = tabs
+      setLayout({ tabs })
+    },
+    [setLayout]
+  )
+
+  // Navigating IS the tab switch, so persist its effects through the same
+  // write path as before: the saved default (`tabs.active`) follows the URL,
+  // and a URL-navigated tab missing from the open set is auto-added, like
+  // openTab used to do. Only an honored URL tab writes — redirects settle
+  // into an honored URL first.
+  useEffect(() => {
+    if (!urlTabHonored) return
+    const current = tabsStateRef.current
+    const open = current.open.includes(activeTab) ? current.open : [...current.open, activeTab]
+    if (open === current.open && current.active === activeTab) return
+    setTabs({ open, active: activeTab })
+  }, [activeTab, setTabs, urlTabHonored])
+
   useEffect(() => {
     const open = tabsState.open.filter(tab => tabAvailable(tab, views, builders))
     if (open.length === tabsState.open.length) return
-    const nextOpen = open.length > 0 ? open : DEFAULT_TABS.open
+    const nextOpen = effectiveOpenTabs(tabsState, views, builders)
     setLayout({
       tabs: {
         open: nextOpen,
         active: nextOpen.includes(tabsState.active) ? tabsState.active : nextOpen[0]
       }
     })
-  }, [builders, setLayout, tabsState.active, tabsState.open, views])
+  }, [builders, setLayout, tabsState, views])
 
   useEffect(() => {
     const replacements = new Map<WorkspaceTabId, WorkspaceTabId>()
@@ -356,6 +391,12 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       replacements.set(viewBuilderTabId(builder.id), viewTabId(builder.viewId))
     }
     if (replacements.size === 0) return
+
+    // The URL follows a replaced builder tab to the view that took its place.
+    const urlReplacement = replacements.get(activeTab)
+    if (urlReplacement) {
+      navigate(workspaceTabPath(workspaceId, urlReplacement), { replace: true })
+    }
 
     const replacementViews = new Set(replacements.values())
     const sourceForView = new Map(
@@ -377,7 +418,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     if (!changed) return
     const active = replacements.get(tabsState.active) ?? tabsState.active
     setLayout({ tabs: { open: open.length > 0 ? open : ['agent'], active } })
-  }, [builders, setLayout, tabsState.active, tabsState.open, views])
+  }, [activeTab, builders, navigate, setLayout, tabsState, views, workspaceId])
 
   useEffect(() => {
     const linked = activeBuilder ?? builders.find(builder => builder.viewId === activeViewId)
@@ -390,20 +431,38 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     }
   }, [activeTab, mode])
 
-  const setTabs = (tabs: WorkspaceTabsState) => {
-    tabsStateRef.current = tabs
-    setLayout({ tabs })
-  }
-
-  const openTab = (tab: WorkspaceTabId) => {
-    const current = tabsStateRef.current
-    const open = current.open.includes(tab) ? current.open : [...current.open, tab]
-    setTabs({ open, active: tab })
+  // All tab switching goes through the router: a replace-navigation to the
+  // tab's URL. The saved default and the open set follow via the sync effect
+  // above (same layout write path as before).
+  const openTab = (tab: WorkspaceTabId, params?: Record<string, unknown>) => {
+    navigate(workspaceTabPath(workspaceId, tab), {
+      replace: true,
+      // Only a focus navigation carries state; a plain tab click resets it,
+      // so the target view mounts with empty params. That's by design.
+      ...(params ? { state: { appletParams: params } } : {})
+    })
     if (tab === 'agent') {
       setFloatingChatOpen(false)
       setChatFocusRequest(request => request + 1)
     }
   }
+
+  // Focus requests from outside the tab bar — the `window.moi` applet bridge
+  // and `moi tab focus` events. The tab id crosses a trust boundary, so
+  // validate the shape; a well-formed id for a missing view just resolves to
+  // the default like any dead URL.
+  const focusTab = (tab: WorkspaceTabId, params?: Record<string, unknown>) => {
+    if (!isWorkspaceTabId(tab)) return
+    openTab(tab, isParamsRecord(params) ? params : undefined)
+  }
+
+  useMoiAppletBridge({ focusTab })
+
+  useWorkspaceEvent(event => {
+    if (event.type === 'tab:focus' && event.workspaceId === workspaceId) {
+      focusTab(event.tab, event.params)
+    }
+  })
 
   const closeTab = (tab: WorkspaceTabId) => {
     const builderId = viewBuilderIdFromTab(tab)
@@ -411,16 +470,19 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     if ((!canCloseTabs && !builder) || !openSet.has(tab)) return
     let open = tabsState.open.filter(t => t !== tab)
     if (open.length === 0) open = ['agent']
-    let active = tabsState.active
-    if (active === tab || !open.includes(active)) {
-      const visibleIndex = visibleTabIds.indexOf(tab)
-      active =
-        visibleTabIds[visibleIndex + 1] ??
-        visibleTabIds[visibleIndex - 1] ??
-        open.find(t => tabAvailable(t, views, builders)) ??
-        'agent'
-    }
+    // The neighbor that takes over when the tab on screen closes.
+    const visibleIndex = visibleTabIds.indexOf(tab)
+    const nextTab =
+      visibleTabIds[visibleIndex + 1] ??
+      visibleTabIds[visibleIndex - 1] ??
+      open.find(t => tabAvailable(t, views, builders)) ??
+      'agent'
+    const active =
+      tabsState.active === tab || !open.includes(tabsState.active) ? nextTab : tabsState.active
+    // Persist the open set BEFORE navigating so the sync effect (which reads
+    // tabsStateRef) can't resurrect the closed tab.
     setTabs({ open, active })
+    if (activeTab === tab) navigate(workspaceTabPath(workspaceId, nextTab), { replace: true })
     if (builder?.status === 'draft') void builderActions.discard(builder.id)
   }
 
@@ -430,6 +492,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       let open = tabsState.open.filter(item => item !== tab)
       if (open.length === 0) open = ['agent']
       setTabs({ open, active: tabsState.active === tab ? open[0] : tabsState.active })
+      if (activeTab === tab) navigate(workspaceTabPath(workspaceId, open[0]), { replace: true })
     }
     void builderActions.discard(builder.id)
   }
@@ -635,7 +698,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
                 onDiscard={() => discardBuilder(activeBuilder)}
               />
             ) : activeView ? (
-              <ViewApp view={activeView} />
+              <ViewApp view={activeView} params={appletParams} />
             ) : null}
           </div>
         )}

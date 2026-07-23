@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 
 import { wsUrl } from '@/client/lib/ws-url'
-import type { ViewBuilder, ViewInfo, WidgetInfo } from '@/lib/types'
+import type { ViewBuilder, ViewInfo, WidgetInfo, WorkspaceTabId } from '@/lib/types'
 
 export type WorkspaceEvent =
   | { type: 'widget:updated'; name: string }
@@ -21,6 +21,14 @@ export type WorkspaceEvent =
   // The Scratchpad canvas for `workspaceId` was saved — open tabs reload from
   // disk. `origin` is the tab that wrote it, so that tab can skip its own echo.
   | { type: 'scratchpad:updated'; workspaceId: string; origin?: string }
+  // `moi tab focus` — every open client of `workspaceId` navigates (replace)
+  // to `tab`, delivering `params` to the target view via navigation state.
+  | {
+      type: 'tab:focus'
+      workspaceId: string
+      tab: WorkspaceTabId
+      params?: Record<string, unknown>
+    }
 
 type WorkspaceEventHandler = (event: WorkspaceEvent) => void
 

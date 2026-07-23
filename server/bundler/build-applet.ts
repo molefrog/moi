@@ -231,17 +231,27 @@ export function rpc(module, name) {
 }
 `
 
-// The `moi` virtual module — the applet-facing runtime API. Today just
-// `fileUrl(path)`, which maps a workspace-relative path to its streaming URL
+// The `moi` virtual module — the applet-facing runtime API.
+//
+// `fileUrl(path)` maps a workspace-relative path to its streaming URL
 // (`/api/workspaces/<id>/fs/<path>`). Same sentinel base as RPC; the path is
 // per-segment URL-encoded so spaces / unicode in filenames survive. A leading
 // slash is stripped so both `clips/a.mp4` and `/clips/a.mp4` work.
+//
+// `focusTab(tab, params?)` is a stub delegating to the host-installed
+// `window.moi` bridge (`MoiAppletRuntime` in lib/types.ts) — client-local
+// replace-navigation to a workspace tab, params delivered to the target view
+// via navigation state. Optional-chained so it no-ops outside the moi host.
 const MOI_MODULE_SOURCE = `
 const BASE = ${JSON.stringify(APPLET_API_BASE_SENTINEL)};
 
 export function fileUrl(path) {
   const clean = String(path).replace(/^\\/+/, "");
   return BASE + "/fs/" + clean.split("/").map(encodeURIComponent).join("/");
+}
+
+export function focusTab(tab, params) {
+  window.moi?.focusTab(tab, params);
 }
 `
 
