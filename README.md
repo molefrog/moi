@@ -2,36 +2,73 @@
 ██████████  ██████  ██
 ██░░██░░██  ██░░██  ██
 ██░░██░░██  ██████  ██
+
+  THE UI FOR YOUR AI
 ```
 
-A local workspace where AI agents build their own UI.
+A visual workspace where your AI agents build their own UI.
 See [moi.computer](https://moi.computer) for what it is and how it works.
 
-Needs [Bun](https://bun.sh). The npm package is `moi-computer`, the command is `moi`:
+Works with the harness you already use:
+
+| [Claude Code](https://github.com/anthropics/claude-code) | [Codex](https://github.com/openai/codex) |
+| :------------------------------------------------------- | :--------------------------------------- |
+| [OpenClaw](https://github.com/openclaw/openclaw)         | Hermes _(coming soon)_                   |
+
+# Quick start
+
+Using Claude Code or Codex? Paste this prompt into an existing session and the
+agent will set everything up for you:
+
+```
+Set up the moi workspace for this project. Fetch https://moi.computer/CC-INSTALL.md, and follow the steps.
+```
+
+For OpenClaw or a manual setup, read on.
+
+## Manual install
+
+Make sure [Bun](https://bun.sh) is installed. moi uses it to run the web server and bundle the dynamic UI.
+
+Install the `moi-computer` package from npm and start the web UI:
 
 ```sh
 bun i -g moi-computer
 moi start        # http://localhost:13337
 ```
 
-Or paste this into Claude Code and it will set everything up for you:
+Then bring in your project, either way works:
+
+- open [http://localhost:13337](http://localhost:13337) and create a workspace
+  (or import an existing folder) right from the web UI;
+- or run `moi init` inside a folder to turn it into a workspace.
+
+## OpenClaw
+
+In OpenClaw, moi is installed per _agent workspace_. First, list the agents
+you have:
 
 ```
-Set up the moi workspace for this project. Fetch https://moi.computer/CC-INSTALL.md, and follow the steps.
+> openclaw agents
+
+🦞 OpenClaw 2026.7.1
+
+Agents:
+- main (default)   <-- the agent name you'll pass to moi
+  Identity: Assistant (IDENTITY.md)
+  Workspace: ~/.openclaw/workspace
+  Agent dir: ~/.openclaw/agents/main/agent
+  Model: openai/gpt-5.6-sol
 ```
 
-Hacking on it:
+Then install the moi skill into an agent's workspace and start the web UI:
 
 ```sh
-bun install
-bun run dev
+moi openclaw init <agent-name>
+moi start
 ```
 
-## OpenClaw (experimental)
-
-moi also works with OpenClaw agents — `moi openclaw init` installs the moi
-skills into an OpenClaw agent workspace. Integration notes live in
-[server/harness/openclaw/NOTES.md](server/harness/openclaw/NOTES.md).
+Your agent's workspace will show up at `http://localhost:13337`.
 
 ## No crypto token
 
