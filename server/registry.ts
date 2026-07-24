@@ -73,7 +73,7 @@ export async function registerWorkspace(
     ...(opts.isDefault ? { isDefault: opts.isDefault } : {}),
     ...(opts.lastRunAt ? { lastRunAt: opts.lastRunAt } : {})
   }
-  await writeRegistry([...entries, entry])
+  await writeRegistry([entry, ...entries])
   return withDisplayPath(entry)
 }
 

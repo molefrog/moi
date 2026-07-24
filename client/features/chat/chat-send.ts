@@ -6,6 +6,10 @@ import { STREAM_RESPONSES } from '@/client/lib/flags'
 import { applyEvent, emptyViewState } from '@/lib/format'
 import type { Part, ViewState, WorkspaceModels } from '@/lib/types'
 
+export type ChatSendOptions = {
+  directives?: readonly string[]
+}
+
 type StartOptimisticTurnInput = {
   queryClient: QueryClient
   workspaceId: string

@@ -87,11 +87,13 @@ type SeedActiveSessionProps = {
 function SeedActiveSession({ workspaceId, sessions }: SeedActiveSessionProps) {
   useEffect(() => {
     if (!sessions) return
-    const active = liveStore.getState().activeByWorkspace[workspaceId] ?? null
-    const stillValid = active && sessions.some(session => session.sessionId === active)
-    if (!stillValid) {
-      liveStore.getState().setActive(workspaceId, sessions[0]?.sessionId ?? null)
-    }
+    const activeByWorkspace = liveStore.getState().activeByWorkspace
+    const hasActiveSelection = Object.prototype.hasOwnProperty.call(activeByWorkspace, workspaceId)
+    const activeSessionId = activeByWorkspace[workspaceId]
+    const activeStillValid =
+      activeSessionId === null || sessions.some(session => session.sessionId === activeSessionId)
+    if (hasActiveSelection && activeStillValid) return
+    liveStore.getState().setActive(workspaceId, sessions[0]?.sessionId ?? null)
   }, [workspaceId, sessions])
   return null
 }

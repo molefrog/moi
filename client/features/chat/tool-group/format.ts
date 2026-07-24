@@ -128,9 +128,9 @@ const OPENCLAW_TOOL_LABELS: Record<string, string> = {
 // Claude tool names are mostly already presentable (Read, Bash, …); only a few
 // need spacing/relabelling.
 const CLAUDE_TOOL_LABELS: Record<string, string> = {
-  ToolSearch: 'Tool Search',
-  WebSearch: 'Web Search',
-  WebFetch: 'Web Fetch'
+  ToolSearch: 'Tool search',
+  WebSearch: 'Web search',
+  WebFetch: 'Web fetch'
 }
 
 // Codex emits semantic items, which the adapter maps to a small fixed set of

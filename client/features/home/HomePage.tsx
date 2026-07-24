@@ -82,8 +82,8 @@ export function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-            {workspaces.map(ws => (
-              <WorkspaceCard key={ws.id} workspace={ws} />
+            {workspaces.map(workspace => (
+              <WorkspaceCard key={workspace.id} workspace={workspace} />
             ))}
           </div>
         </section>
