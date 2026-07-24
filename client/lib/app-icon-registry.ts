@@ -41,6 +41,7 @@ import {
   IconMoon,
   IconMountain,
   IconMusic,
+  IconPiano,
   IconPalette,
   IconPaperclip,
   IconPhoto,
@@ -64,82 +65,88 @@ import {
   IconWorld
 } from '@tabler/icons-react'
 
+import { APP_ICON_IDS, isAppIconId, type AppIconId } from '@/lib/app-icons'
+
 export type AppIconChoice = {
-  id: string
+  id: AppIconId
   Icon: TablerIcon
 }
 
-// Shared by the workspace icon picker and view tabs. Add new app-level icon
-// choices here so both surfaces and the view-builder prompt stay in sync.
-export const APP_ICON_CHOICES: AppIconChoice[] = [
-  { id: 'rocket', Icon: IconRocket },
-  { id: 'sparkles', Icon: IconSparkles },
-  { id: 'bolt', Icon: IconBolt },
-  { id: 'flame', Icon: IconFlame },
-  { id: 'star', Icon: IconStar },
-  { id: 'heart', Icon: IconHeart },
-  { id: 'diamond', Icon: IconDiamond },
-  { id: 'trophy', Icon: IconTrophy },
-  { id: 'target', Icon: IconTarget },
-  { id: 'bulb', Icon: IconBulb },
-  { id: 'brain', Icon: IconBrain },
-  { id: 'robot', Icon: IconRobot },
-  { id: 'wand', Icon: IconWand },
-  { id: 'atom', Icon: IconAtom },
-  { id: 'flask', Icon: IconFlask },
-  { id: 'cpu', Icon: IconCpu },
-  { id: 'code', Icon: IconCode },
-  { id: 'terminal', Icon: IconTerminal2 },
-  { id: 'api', Icon: IconApi },
-  { id: 'database', Icon: IconDatabase },
-  { id: 'cube', Icon: IconCube },
-  { id: 'hexagon', Icon: IconHexagon },
-  { id: 'plug', Icon: IconPlug },
-  { id: 'tool', Icon: IconTool },
-  { id: 'settings', Icon: IconSettings },
-  { id: 'bug', Icon: IconBug },
-  { id: 'activity', Icon: IconActivity },
-  { id: 'chart', Icon: IconChartBar },
-  { id: 'briefcase', Icon: IconBriefcase },
-  { id: 'folder', Icon: IconFolder },
-  { id: 'file', Icon: IconFile },
-  { id: 'book', Icon: IconBook },
-  { id: 'message', Icon: IconMessage },
-  { id: 'mail', Icon: IconMail },
-  { id: 'bell', Icon: IconBell },
-  { id: 'paperclip', Icon: IconPaperclip },
-  { id: 'key', Icon: IconKey },
-  { id: 'shield', Icon: IconShield },
-  { id: 'user', Icon: IconUser },
-  { id: 'home', Icon: IconHome },
-  { id: 'globe', Icon: IconGlobe },
-  { id: 'world', Icon: IconWorld },
-  { id: 'planet', Icon: IconPlanet },
-  { id: 'compass', Icon: IconCompass },
-  { id: 'map', Icon: IconMap },
-  { id: 'calendar', Icon: IconCalendar },
-  { id: 'cloud', Icon: IconCloud },
-  { id: 'sun', Icon: IconSun },
-  { id: 'moon', Icon: IconMoon },
-  { id: 'snowflake', Icon: IconSnowflake },
-  { id: 'leaf', Icon: IconLeaf },
-  { id: 'mountain', Icon: IconMountain },
-  { id: 'feather', Icon: IconFeather },
-  { id: 'ghost', Icon: IconGhost },
-  { id: 'music', Icon: IconMusic },
-  { id: 'camera', Icon: IconCamera },
-  { id: 'photo', Icon: IconPhoto },
-  { id: 'palette', Icon: IconPalette },
-  { id: 'gamepad', Icon: IconDeviceGamepad2 },
-  { id: 'gift', Icon: IconGift },
-  { id: 'cart', Icon: IconShoppingCart },
-  { id: 'chef', Icon: IconChefHat }
-]
+// UI component for every shared app icon id. Record<> keeps this map in sync
+// with the server-safe list used by builder and bundle validation.
+const appIconById: Record<AppIconId, TablerIcon> = {
+  rocket: IconRocket,
+  sparkles: IconSparkles,
+  bolt: IconBolt,
+  flame: IconFlame,
+  star: IconStar,
+  heart: IconHeart,
+  diamond: IconDiamond,
+  trophy: IconTrophy,
+  target: IconTarget,
+  bulb: IconBulb,
+  brain: IconBrain,
+  robot: IconRobot,
+  wand: IconWand,
+  atom: IconAtom,
+  flask: IconFlask,
+  cpu: IconCpu,
+  code: IconCode,
+  terminal: IconTerminal2,
+  api: IconApi,
+  database: IconDatabase,
+  cube: IconCube,
+  hexagon: IconHexagon,
+  plug: IconPlug,
+  tool: IconTool,
+  settings: IconSettings,
+  bug: IconBug,
+  activity: IconActivity,
+  chart: IconChartBar,
+  briefcase: IconBriefcase,
+  folder: IconFolder,
+  file: IconFile,
+  book: IconBook,
+  message: IconMessage,
+  mail: IconMail,
+  bell: IconBell,
+  paperclip: IconPaperclip,
+  key: IconKey,
+  shield: IconShield,
+  user: IconUser,
+  home: IconHome,
+  globe: IconGlobe,
+  world: IconWorld,
+  planet: IconPlanet,
+  compass: IconCompass,
+  map: IconMap,
+  calendar: IconCalendar,
+  cloud: IconCloud,
+  sun: IconSun,
+  moon: IconMoon,
+  snowflake: IconSnowflake,
+  leaf: IconLeaf,
+  mountain: IconMountain,
+  feather: IconFeather,
+  ghost: IconGhost,
+  music: IconMusic,
+  piano: IconPiano,
+  camera: IconCamera,
+  photo: IconPhoto,
+  palette: IconPalette,
+  gamepad: IconDeviceGamepad2,
+  gift: IconGift,
+  cart: IconShoppingCart,
+  chef: IconChefHat
+}
 
-export const APP_ICON_IDS = APP_ICON_CHOICES.map(choice => choice.id)
+export const APP_ICON_CHOICES: AppIconChoice[] = APP_ICON_IDS.map(id => ({
+  id,
+  Icon: appIconById[id]
+}))
 
-const appIconById = new Map(APP_ICON_CHOICES.map(choice => [choice.id, choice.Icon]))
+export { APP_ICON_IDS }
 
 export function resolveAppIcon(id: string | undefined): TablerIcon | null {
-  return id ? (appIconById.get(id) ?? null) : null
+  return id && isAppIconId(id) ? appIconById[id] : null
 }

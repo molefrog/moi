@@ -104,8 +104,8 @@ type ChatEmptyStateProps = {
 }
 
 export function ChatEmptyState({ kind, disabled = false, onSelectPrompt }: ChatEmptyStateProps) {
-  return <ChatWelcome disabled={disabled} onSelectPrompt={onSelectPrompt} />
   if (kind === 'chat-welcome') {
+    return <ChatWelcome disabled={disabled} onSelectPrompt={onSelectPrompt} />
   }
   if (kind === 'workspace-welcome') {
     return <ChatWorkspaceWelcome disabled={disabled} onSelectPrompt={onSelectPrompt} />

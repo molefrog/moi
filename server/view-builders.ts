@@ -1,6 +1,7 @@
 import { mkdir, rename } from 'node:fs/promises'
 import { join } from 'node:path'
 
+import { APP_ICON_IDS, isAppIconId } from '@/lib/app-icons'
 import { newBuilderId } from '@/lib/ids'
 import type { AppletKind, ViewBuilder, ViewInfo } from '@/lib/types'
 
@@ -193,8 +194,11 @@ export async function setBuilder(
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(appletId)) {
     throw new ViewBuilderError('Invalid applet id', 400)
   }
-  if (input.icon !== undefined && !/^[a-z0-9][a-z0-9-]*$/.test(input.icon)) {
-    throw new ViewBuilderError('Invalid view icon id', 400)
+  if (input.icon !== undefined && !isAppIconId(input.icon)) {
+    throw new ViewBuilderError(
+      `Unknown view icon id "${input.icon}". Use one of: ${APP_ICON_IDS.join(', ')}`,
+      400
+    )
   }
   // Views and widgets are separate applet namespaces, so an id is only unique
   // within a kind — a view and a widget may both be called "stats".

@@ -65,7 +65,7 @@ declare module 'moi' {
     colSpan: 1 | 2 | 3 | 4
     requiredEnv?: string[]
   }
-  export type ViewConfig = { title?: string; requiredEnv?: string[] }
+  export type ViewConfig = { title?: string; icon?: string; requiredEnv?: string[] }
 }
 
 // Bundled asset imports (\`import logo from './logo.png'\`) resolve to a URL string.
