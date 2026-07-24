@@ -3,7 +3,7 @@ import { IconFolderExclamation, IconLoader2, IconX } from '@tabler/icons-react'
 import { Button } from '@/client/components/ui/button'
 import { cn } from '@/client/lib/cn'
 
-export type WorkspaceSkillUpdateAction = 'never' | 'once'
+export type WorkspaceSkillUpdateAction = 'auto' | 'once'
 
 export type WorkspaceSkillUpdateBannerProps = {
   error: string | null
@@ -54,12 +54,12 @@ export function WorkspaceSkillUpdateBanner({
           type="button"
           variant="default"
           size="sm"
-          onClick={() => onUpdate('never')}
+          onClick={() => onUpdate('auto')}
           disabled={pending}
           className="@xl:order-2"
         >
-          {pendingAction === 'never' && <IconLoader2 stroke={1.75} className="animate-spin" />}
-          {pendingAction === 'never' ? 'Updating…' : 'Auto-update'}
+          {pendingAction === 'auto' && <IconLoader2 stroke={1.75} className="animate-spin" />}
+          {pendingAction === 'auto' ? 'Updating…' : 'Auto-update'}
         </Button>
 
         <Button

@@ -4,7 +4,10 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, test } from 'bun:test'
 
 import { WorkspaceSkillUpdateBanner } from './WorkspaceSkillUpdateBanner'
-import { shouldShowWorkspaceSkillUpdateBanner } from './useWorkspaceSkillUpdateBanner'
+import {
+  shouldAutomaticallyUpdateWorkspaceSkills,
+  shouldShowWorkspaceSkillUpdateBanner
+} from './useWorkspaceSkillUpdates'
 
 function renderBanner(
   props: Partial<Parameters<typeof WorkspaceSkillUpdateBanner>[0]> = {}
@@ -34,7 +37,7 @@ describe('WorkspaceSkillUpdateBanner', () => {
   })
 
   test('renders the selected pending action and disables both updates', () => {
-    const html = renderBanner({ pendingAction: 'never' })
+    const html = renderBanner({ pendingAction: 'auto' })
 
     expect(html).toContain('Updating…')
     expect((html.match(/(?<!-)disabled=""/g) ?? []).length).toBe(2)
@@ -49,38 +52,70 @@ describe('WorkspaceSkillUpdateBanner', () => {
 })
 
 describe('workspace skill banner visibility', () => {
-  test('shows an available update once per unsuppressed visit', () => {
+  test('shows an available update once per manual visit', () => {
     expect(
       shouldShowWorkspaceSkillUpdateBanner({
         updateAvailable: true,
-        permanentlyDisabled: false,
+        autoUpdateEnabled: false,
         phase: 'idle'
       })
     ).toBe(true)
     expect(
       shouldShowWorkspaceSkillUpdateBanner({
         updateAvailable: true,
-        permanentlyDisabled: false,
+        autoUpdateEnabled: false,
         phase: 'dismissed'
       })
     ).toBe(false)
   })
 
-  test('keeps an engaged banner visible after the permanent opt-out is saved', () => {
+  test('keeps an engaged automatic update visible', () => {
     expect(
       shouldShowWorkspaceSkillUpdateBanner({
         updateAvailable: true,
-        permanentlyDisabled: true,
+        autoUpdateEnabled: true,
         phase: 'active'
       })
     ).toBe(true)
   })
 
-  test('does not open a fresh banner for a permanently disabled workspace', () => {
+  test('does not open a fresh prompt when automatic updates are enabled', () => {
     expect(
       shouldShowWorkspaceSkillUpdateBanner({
         updateAvailable: true,
-        permanentlyDisabled: true,
+        autoUpdateEnabled: true,
+        phase: 'idle'
+      })
+    ).toBe(false)
+  })
+})
+
+describe('automatic workspace skill updates', () => {
+  test('starts an available update while the visit is idle', () => {
+    expect(
+      shouldAutomaticallyUpdateWorkspaceSkills({
+        updateAvailable: true,
+        autoUpdateEnabled: true,
+        updatePending: false,
+        phase: 'idle'
+      })
+    ).toBe(true)
+  })
+
+  test('does not retry an active or pending update', () => {
+    expect(
+      shouldAutomaticallyUpdateWorkspaceSkills({
+        updateAvailable: true,
+        autoUpdateEnabled: true,
+        updatePending: false,
+        phase: 'active'
+      })
+    ).toBe(false)
+    expect(
+      shouldAutomaticallyUpdateWorkspaceSkills({
+        updateAvailable: true,
+        autoUpdateEnabled: true,
+        updatePending: true,
         phase: 'idle'
       })
     ).toBe(false)
