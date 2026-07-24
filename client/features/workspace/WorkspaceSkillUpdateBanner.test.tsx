@@ -24,7 +24,7 @@ describe('WorkspaceSkillUpdateBanner', () => {
   test('renders the primary, secondary, and dismiss actions', () => {
     const html = renderBanner()
 
-    expect(html).toContain('tabler-icon-alert-square-rounded')
+    expect(html).toContain('tabler-icon-folder-exclamation')
     expect(html).toContain('This workspace is using old moi skills')
     expect(html).toContain('Auto-update')
     expect(html).toContain('Update once')
