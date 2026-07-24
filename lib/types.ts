@@ -352,6 +352,21 @@ export type WorkspaceSwitchMessage = {
 
 export type WorkspaceType = 'claude-code' | 'openclaw' | 'codex'
 
+export type WorkspaceSkillStatus = {
+  name: string
+  installed: string | null
+  bundled: string | null
+}
+
+export type WorkspaceSkillsStatus = {
+  skills: WorkspaceSkillStatus[]
+  updateAvailable: boolean
+}
+
+export type WorkspaceSkillsUpdateFailure = WorkspaceSkillsStatus & {
+  error: string
+}
+
 // Whether an agent backend's runtime is installed on this machine. `reason` is
 // user-facing copy explaining what to do next. Surfaced by
 // GET /api/workspaces/create (per-type map, drives setup dialogs) and

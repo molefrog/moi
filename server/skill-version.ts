@@ -7,20 +7,11 @@
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import type { WorkspaceType } from '@/lib/types'
+import type { WorkspaceSkillStatus, WorkspaceType } from '@/lib/types'
 
 import { findWorkspaceForPath, liftToWorkspaceRoot, listWorkspaces } from './registry'
 import { BUNDLED_SKILLS_DIR } from './skills-template'
 import { skillsDirFor } from './workspace-init'
-
-export type SkillStatus = {
-  name: string
-  // Version stamped in the workspace's copy. `null` means absent — either the
-  // skill isn't installed or it predates skill versioning (treated as behind).
-  installed: string | null
-  // Version shipped with this CLI. `null` only if a bundled skill lacks a stamp.
-  bundled: string | null
-}
 
 // The version is stamped as a self-contained marker in SKILL.md, e.g.
 // `<moi-skill version="0.1.0" />`, rather than in YAML frontmatter. SKILL.md
@@ -99,7 +90,7 @@ export async function bundledSkillNames(): Promise<string[]> {
 export async function skillStatuses(
   workspaceRoot: string,
   type?: WorkspaceType
-): Promise<SkillStatus[]> {
+): Promise<WorkspaceSkillStatus[]> {
   const names = await bundledSkillNames()
   const skillsDir = skillsDirFor(workspaceRoot, type)
   return Promise.all(

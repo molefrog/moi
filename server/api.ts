@@ -43,6 +43,7 @@ import {
 import { loadScratchpadDoc, saveScratchpadDoc } from './scratchpad'
 import { MAX_ASSET_BYTES, scratchpadAssetFile, storeScratchpadAsset } from './scratchpad-assets'
 import { DIST_DIR, prebuilt } from './static'
+import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from './skill-update'
 import { getThreadConfig, saveThreadConfig } from './thread-config'
 import type { ThreadConfigPatch } from './thread-config'
 import { serveWorkspaceImagePreview } from './preview'
@@ -543,6 +544,17 @@ one.put('/env', async c => {
 one.get('/availability', async c => {
   const availability = await workspaceTypeAvailability(c.get('ws').type ?? 'claude-code')
   return c.json(availability satisfies HarnessAvailability)
+})
+
+one.get('/skills', async c => {
+  const ws = c.get('ws')
+  return c.json(await getWorkspaceSkillsStatus(ws.path, ws.type))
+})
+
+one.post('/skills/update', async c => {
+  const ws = c.get('ws')
+  const result = await updateWorkspaceSkills(ws.path, ws.type ?? 'claude-code')
+  return c.json(result.status)
 })
 
 // Models the workspace's agent backend can run, normalized across providers.

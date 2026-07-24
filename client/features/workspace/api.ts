@@ -8,6 +8,8 @@ import type {
   ViewInfo,
   WidgetInfo,
   WorkspaceLayout,
+  WorkspaceSkillsStatus,
+  WorkspaceSkillsUpdateFailure,
   WorkspaceType
 } from '@/lib/types'
 
@@ -35,6 +37,56 @@ export function useWorkspaceAvailability(workspaceId: string) {
     queryFn: () => requestJson(`/api/workspaces/${workspaceId}/availability`),
     staleTime: 30_000,
     refetchOnWindowFocus: true
+  })
+}
+
+export function useWorkspaceSkills(workspaceId: string) {
+  return useQuery<WorkspaceSkillsStatus>({
+    queryKey: workspaceKeys.skills(workspaceId),
+    queryFn: () => requestJson(`/api/workspaces/${workspaceId}/skills`),
+    ...WORKSPACE_RESOURCE_OPTIONS
+  })
+}
+
+export type WorkspaceSkillUpdateError = Error & {
+  status?: WorkspaceSkillsStatus
+}
+
+async function updateWorkspaceSkills(workspaceId: string): Promise<WorkspaceSkillsStatus> {
+  const response = await fetch(`/api/workspaces/${workspaceId}/skills/update`, { method: 'POST' })
+  const text = await response.text()
+  let body: WorkspaceSkillsStatus | WorkspaceSkillsUpdateFailure | null = null
+  try {
+    body = JSON.parse(text) as WorkspaceSkillsStatus | WorkspaceSkillsUpdateFailure
+  } catch {}
+
+  if (!response.ok) {
+    const message = body && 'error' in body ? body.error : text
+    const error = new Error(message || 'Failed to update workspace skill')
+    if (body?.skills) {
+      ;(error as WorkspaceSkillUpdateError).status = {
+        skills: body.skills,
+        updateAvailable: body.updateAvailable
+      }
+    }
+    throw error
+  }
+  if (!body) throw new Error('Invalid workspace skill update response')
+  return body
+}
+
+export function useUpdateWorkspaceSkills(workspaceId: string) {
+  const queryClient = useQueryClient()
+  return useMutation<WorkspaceSkillsStatus, WorkspaceSkillUpdateError>({
+    mutationFn: () => updateWorkspaceSkills(workspaceId),
+    onSuccess: status => {
+      queryClient.setQueryData(workspaceKeys.skills(workspaceId), status)
+    },
+    onError: error => {
+      if (error.status) {
+        queryClient.setQueryData(workspaceKeys.skills(workspaceId), error.status)
+      }
+    }
   })
 }
 

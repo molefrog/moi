@@ -7,9 +7,11 @@ type UiStore = {
   discoveredWorkspacesOpen: boolean
   hasSentMessageFromMoi: boolean
   workspaceIdsPendingAnalysis: string[]
+  skillUpdatePromptDisabledWorkspaceIds: string[]
   setDiscoveredWorkspacesOpen: (open: boolean) => void
   markWorkspacePendingAnalysis: (workspaceId: string) => void
   markMessageSentFromMoi: (workspaceId: string) => void
+  disableSkillUpdatePrompt: (workspaceId: string) => void
 }
 
 export const useUiStore = create<UiStore>()(
@@ -18,6 +20,7 @@ export const useUiStore = create<UiStore>()(
       discoveredWorkspacesOpen: true,
       hasSentMessageFromMoi: false,
       workspaceIdsPendingAnalysis: [],
+      skillUpdatePromptDisabledWorkspaceIds: [],
       setDiscoveredWorkspacesOpen: open => set({ discoveredWorkspacesOpen: open }),
       markWorkspacePendingAnalysis: workspaceId =>
         set(state => {
@@ -34,7 +37,16 @@ export const useUiStore = create<UiStore>()(
           workspaceIdsPendingAnalysis: (state.workspaceIdsPendingAnalysis ?? []).filter(
             id => id !== workspaceId
           )
-        }))
+        })),
+      disableSkillUpdatePrompt: workspaceId =>
+        set(state => {
+          const workspaceIds = state.skillUpdatePromptDisabledWorkspaceIds ?? []
+          return {
+            skillUpdatePromptDisabledWorkspaceIds: workspaceIds.includes(workspaceId)
+              ? workspaceIds
+              : [...workspaceIds, workspaceId]
+          }
+        })
     }),
     { name: 'moi:ui' }
   )
