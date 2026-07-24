@@ -1,6 +1,6 @@
 // Live-event channel: server → browser push over the `/api/workspaces/ws`
 // socket. Bundles, the control server, and the REST API publish build/refresh/
-// identity events (`widgets:refresh`, `theme:updated`, `workspace:updated`, …)
+// identity events (`applets:refresh`, `theme:updated`, `workspace:updated`, …)
 // here; every subscribed browser receives them. This is not a transport of its
 // own — it rides the Bun WebSocket pub/sub already open for that route.
 //

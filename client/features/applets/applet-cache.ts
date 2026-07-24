@@ -60,3 +60,17 @@ export function invalidateApplet(segment: AppletSegment, workspaceId: string, na
   moduleCache.delete(key)
   versions.set(key, (versions.get(key) ?? 0) + 1)
 }
+
+// Invalidate every applet of one kind across all workspaces — the
+// `applets:refresh` path, which names no specific applet. Only keys that have
+// ever been loaded (or bumped) exist in the maps; anything else already loads
+// fresh on first mount.
+export function invalidateAppletSegment(segment: AppletSegment): void {
+  const prefix = `${segment}/`
+  for (const key of new Set([...moduleCache.keys(), ...versions.keys()])) {
+    if (key.startsWith(prefix)) {
+      moduleCache.delete(key)
+      versions.set(key, (versions.get(key) ?? 0) + 1)
+    }
+  }
+}

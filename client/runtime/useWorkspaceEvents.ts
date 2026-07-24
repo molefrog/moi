@@ -6,7 +6,9 @@ import type { ViewBuilder, ViewInfo, WidgetInfo } from '@/lib/types'
 export type WorkspaceEvent =
   | { type: 'widget:updated'; name: string }
   | { type: 'widget-layout:updated'; widgets: WidgetInfo[] }
-  | { type: 'widgets:refresh' }
+  // `moi refresh` — cache-bust and re-fetch applets without a rebuild. `only`
+  // narrows to one kind; absent means both widgets and views.
+  | { type: 'applets:refresh'; only?: 'widgets' | 'views' }
   | { type: 'view:updated'; name: string }
   | { type: 'view-layout:updated'; views: ViewInfo[] }
   | { type: 'view-builder:updated'; workspaceId: string; builder: ViewBuilder }
