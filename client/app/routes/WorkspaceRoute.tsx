@@ -22,22 +22,21 @@ import type { SessionInfo } from '@/lib/types'
 
 type WorkspaceRouteProps = {
   id: string
-  // The URL's tab segment (raw wildcard — may be absent or garbage). The
-  // workspace screen resolves it against the layout and what exists.
-  tab: string | null
 }
 
-export function WorkspaceRoute({ id, tab }: WorkspaceRouteProps) {
+// The URL's tab segment is not threaded down — useWorkspaceNavigation reads it
+// off the matched route with wouter's `useParams`.
+export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
   return (
     <Workspace id={id}>
       <WorkspaceLayoutProvider id={id}>
-        <WorkspaceLoader id={id} tab={tab} />
+        <WorkspaceLoader id={id} />
       </WorkspaceLayoutProvider>
     </Workspace>
   )
 }
 
-function WorkspaceLoader({ id, tab }: WorkspaceRouteProps) {
+function WorkspaceLoader({ id }: WorkspaceRouteProps) {
   const queryClient = useQueryClient()
   const { layout, setLayout, isLoading: layoutLoading } = useWorkspaceLayoutCtx()
   const widgets = useWorkspaceWidgets(id)
@@ -75,7 +74,6 @@ function WorkspaceLoader({ id, tab }: WorkspaceRouteProps) {
             widgets={widgets.data ?? []}
             views={views.data ?? []}
             builders={builders.data ?? []}
-            urlTab={tab}
           />
         )}
       </SidebarLayout>

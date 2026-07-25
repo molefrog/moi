@@ -1,8 +1,6 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 
 import { AnimatePresence, motion } from 'motion/react'
-import { useLocation } from 'wouter'
-import { useHistoryState } from 'wouter/use-browser-location'
 
 import {
   IconArticle,
@@ -37,9 +35,9 @@ import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayo
 import {
   effectiveOpenTabs,
   normalizeTabsState,
-  resolveActiveTab,
   tabAvailable
 } from '@/client/features/workspace/tab-resolution'
+import { useWorkspaceNavigation } from '@/client/features/workspace/useWorkspaceNavigation'
 import { resolveAppIcon } from '@/client/lib/app-icon-registry'
 import { cn } from '@/client/lib/cn'
 import { liveStore } from '@/client/features/chat/chat-store'
@@ -49,24 +47,14 @@ import {
   type WorkspaceTabItem,
   WorkspaceTabs
 } from '@/client/features/workspace/WorkspaceTabs'
-import type {
-  LayoutMode,
-  ViewBuilder,
-  ViewInfo,
-  WidgetInfo,
-  WorkspaceTabId,
-  WorkspaceTabsState
-} from '@/lib/types'
+import type { LayoutMode, ViewBuilder, ViewInfo, WidgetInfo, WorkspaceTabId } from '@/lib/types'
 import {
   isParamsRecord,
   isWorkspaceTabId,
-  parseWorkspaceTab,
-  readAppletParams,
   viewBuilderIdFromTab,
   viewBuilderTabId,
   viewIdFromTab,
-  viewTabId,
-  workspaceTabPath
+  viewTabId
 } from '@/lib/workspace-tabs'
 
 const Scratchpad = lazy(() =>
@@ -196,9 +184,6 @@ type WorkspaceScreenProps = {
   widgets: WidgetInfo[]
   views: ViewInfo[]
   builders: ViewBuilder[]
-  // The URL's tab segment (raw wildcard — may be null or garbage). The active
-  // tab derives from it; see tab-resolution.ts.
-  urlTab: string | null
 }
 
 type WidgetMode = 'idle' | 'editing' | 'customizing'
@@ -265,7 +250,7 @@ function applyVisibleTabOrder(
   return open.map(tab => (visibleSet.has(tab) ? orderedVisible[cursor++] : tab))
 }
 
-export function WorkspaceScreen({ widgets, views, builders, urlTab }: WorkspaceScreenProps) {
+export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenProps) {
   const {
     view,
     chatLoaded,
@@ -279,10 +264,6 @@ export function WorkspaceScreen({ widgets, views, builders, urlTab }: WorkspaceS
     dismissError
   } = useChat()
   const { layout, setLayout, name, icon, provider, workspaceId } = useWorkspaceLayoutCtx()
-  const [, navigate] = useLocation()
-  // Applet params ride wouter navigation state; anything malformed reads as {}.
-  const historyState = useHistoryState<unknown>()
-  const appletParams = useMemo(() => readAppletParams(historyState), [historyState])
   // Keep the composer read/write, but block sends when its agent executable is
   // missing. The Send button explains how to install it.
   const availability = useWorkspaceAvailability(workspaceId).data
@@ -299,11 +280,10 @@ export function WorkspaceScreen({ widgets, views, builders, urlTab }: WorkspaceS
   const themeRef = useRef<HTMLDivElement>(null)
   useWorkspaceTheme(layout.theme, themeRef)
 
-  const tabsState = normalizeTabsState(layout.tabs)
-  const tabsStateRef = useRef(tabsState)
-  tabsStateRef.current = tabsState
-  const openTabIds = effectiveOpenTabs(tabsState, views, builders)
-  const openSet = new Set(tabsState.open)
+  // Split needs the open set to decide whether it's available at all, and the
+  // navigation hook needs split to resolve the active tab — so the open set is
+  // derived from the raw layout here, before either.
+  const openTabIds = effectiveOpenTabs(normalizeTabsState(layout.tabs), views, builders)
   const nonAgentOpenTabs = openTabIds.filter(tab => tab !== 'agent')
   const hasWorkspaceContent = nonAgentOpenTabs.length > 0
 
@@ -313,20 +293,21 @@ export function WorkspaceScreen({ widgets, views, builders, urlTab }: WorkspaceS
   const mode: LayoutMode = wantsSplit && canUseSplit ? 'split' : 'fullscreen'
   const dockedSplit = mode === 'split'
 
+  // The tab address: URL in, active tab + applet params out, plus the persisted
+  // tab state it keeps in sync. See useWorkspaceNavigation for the invariants.
+  const { tabsState, activeTab, appletParams, navigateToTab, setTabs } = useWorkspaceNavigation({
+    views,
+    builders,
+    split: dockedSplit
+  })
+  const openSet = new Set(tabsState.open)
+
   // Entering split with the agent tab on screen needs no special-casing
   // anymore: the URL resolution below derives a visible tab and the redirect
   // effect makes the URL follow it (replace).
   const setMode = (m: LayoutMode) => {
     setLayout({ layoutMode: m })
   }
-
-  // The ACTIVE tab derives from the URL; `tabsState.active` is only the saved
-  // default (where a bare /workspace/:id lands). A URL naming an available tab
-  // wins; anything else falls back through the same availability chain as
-  // before, and the redirect effect below rewrites the URL to match.
-  const requestedTab = parseWorkspaceTab(urlTab)
-  const activeTab = resolveActiveTab(requestedTab, tabsState, views, builders, dockedSplit)
-  const urlTabHonored = requestedTab !== null && requestedTab === activeTab
 
   const visibleTabIds = dockedSplit ? nonAgentOpenTabs : openTabIds
   const canCloseTabs = openTabIds.length > 1
@@ -341,36 +322,6 @@ export function WorkspaceScreen({ widgets, views, builders, urlTab }: WorkspaceS
   const activeBuilder = activeBuilderId
     ? builders.find(builder => builder.id === activeBuilderId)
     : undefined
-
-  // Keep the URL honest — replace, never push, so Back leaves the workspace
-  // instead of walking tab history. This is the single redirect: a bare
-  // /workspace/:id, an unknown/unavailable tab, or the agent tab while split
-  // mode hides it all land on the resolved tab.
-  useEffect(() => {
-    if (urlTab === activeTab) return
-    navigate(workspaceTabPath(workspaceId, activeTab), { replace: true })
-  }, [activeTab, navigate, urlTab, workspaceId])
-
-  const setTabs = useCallback(
-    (tabs: WorkspaceTabsState) => {
-      tabsStateRef.current = tabs
-      setLayout({ tabs })
-    },
-    [setLayout]
-  )
-
-  // Navigating IS the tab switch, so persist its effects through the same
-  // write path as before: the saved default (`tabs.active`) follows the URL,
-  // and a URL-navigated tab missing from the open set is auto-added, like
-  // openTab used to do. Only an honored URL tab writes — redirects settle
-  // into an honored URL first.
-  useEffect(() => {
-    if (!urlTabHonored) return
-    const current = tabsStateRef.current
-    const open = current.open.includes(activeTab) ? current.open : [...current.open, activeTab]
-    if (open === current.open && current.active === activeTab) return
-    setTabs({ open, active: activeTab })
-  }, [activeTab, setTabs, urlTabHonored])
 
   useEffect(() => {
     const open = tabsState.open.filter(tab => tabAvailable(tab, views, builders))
@@ -395,9 +346,7 @@ export function WorkspaceScreen({ widgets, views, builders, urlTab }: WorkspaceS
 
     // The URL follows a replaced builder tab to the view that took its place.
     const urlReplacement = replacements.get(activeTab)
-    if (urlReplacement) {
-      navigate(workspaceTabPath(workspaceId, urlReplacement), { replace: true })
-    }
+    if (urlReplacement) navigateToTab(urlReplacement)
 
     const replacementViews = new Set(replacements.values())
     const sourceForView = new Map(
@@ -419,7 +368,7 @@ export function WorkspaceScreen({ widgets, views, builders, urlTab }: WorkspaceS
     if (!changed) return
     const active = replacements.get(tabsState.active) ?? tabsState.active
     setLayout({ tabs: { open: open.length > 0 ? open : ['agent'], active } })
-  }, [activeTab, builders, navigate, setLayout, tabsState, views, workspaceId])
+  }, [activeTab, builders, navigateToTab, setLayout, tabsState, views])
 
   useEffect(() => {
     const linked = activeBuilder ?? builders.find(builder => builder.viewId === activeViewId)
@@ -432,16 +381,10 @@ export function WorkspaceScreen({ widgets, views, builders, urlTab }: WorkspaceS
     }
   }, [activeTab, mode])
 
-  // All tab switching goes through the router: a replace-navigation to the
-  // tab's URL. The saved default and the open set follow via the sync effect
-  // above (same layout write path as before).
+  // Tab switching is navigation; the saved default and the open set follow via
+  // the navigation hook. Only the chat side effects belong to the screen.
   const openTab = (tab: WorkspaceTabId, params?: Record<string, unknown>) => {
-    navigate(workspaceTabPath(workspaceId, tab), {
-      replace: true,
-      // Only a focus navigation carries state; a plain tab click resets it,
-      // so the target view mounts with empty params. That's by design.
-      ...(params ? { state: { appletParams: params } } : {})
-    })
+    navigateToTab(tab, params)
     if (tab === 'agent') {
       setFloatingChatOpen(false)
       setChatFocusRequest(request => request + 1)
@@ -483,7 +426,7 @@ export function WorkspaceScreen({ widgets, views, builders, urlTab }: WorkspaceS
     // Persist the open set BEFORE navigating so the sync effect (which reads
     // tabsStateRef) can't resurrect the closed tab.
     setTabs({ open, active })
-    if (activeTab === tab) navigate(workspaceTabPath(workspaceId, nextTab), { replace: true })
+    if (activeTab === tab) navigateToTab(nextTab)
     if (builder?.status === 'draft') void builderActions.discard(builder.id)
   }
 
@@ -493,7 +436,7 @@ export function WorkspaceScreen({ widgets, views, builders, urlTab }: WorkspaceS
       let open = tabsState.open.filter(item => item !== tab)
       if (open.length === 0) open = ['agent']
       setTabs({ open, active: tabsState.active === tab ? open[0] : tabsState.active })
-      if (activeTab === tab) navigate(workspaceTabPath(workspaceId, open[0]), { replace: true })
+      if (activeTab === tab) navigateToTab(open[0])
     }
     void builderActions.discard(builder.id)
   }
