@@ -62,9 +62,7 @@ export function useWorkspaceSkillUpdates(workspaceId: string): WorkspaceSkillUpd
     mutate: updateSkills,
     reset: resetUpdate
   } = useUpdateWorkspaceSkills(workspaceId)
-  const autoUpdateEnabled = useUiStore(state =>
-    (state.skillAutoUpdateWorkspaceIds ?? []).includes(workspaceId)
-  )
+  const autoUpdateEnabled = useUiStore(state => state.skillAutoUpdateEnabled)
   const enableAutoUpdate = useUiStore(state => state.enableSkillAutoUpdate)
   const [visit, setVisit] = useState<VisitState>(() => initialVisitState(workspaceId))
   const currentVisit = visit.workspaceId === workspaceId ? visit : initialVisitState(workspaceId)
@@ -77,7 +75,7 @@ export function useWorkspaceSkillUpdates(workspaceId: string): WorkspaceSkillUpd
   const onUpdate = useCallback(
     (action: WorkspaceSkillUpdateAction) => {
       if (updatePending) return
-      if (action === 'auto') enableAutoUpdate(workspaceId)
+      if (action === 'auto') enableAutoUpdate()
       setVisit({
         workspaceId,
         phase: 'active',

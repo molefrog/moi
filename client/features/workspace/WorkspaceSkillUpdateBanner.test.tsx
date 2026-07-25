@@ -36,18 +36,35 @@ describe('WorkspaceSkillUpdateBanner', () => {
     expect(html.indexOf('Auto-update')).toBeLessThan(html.indexOf('Update once'))
   })
 
-  test('renders the selected pending action and disables both updates', () => {
+  test('renders a status-only banner during automatic updates', () => {
     const html = renderBanner({ pendingAction: 'auto' })
 
-    expect(html).toContain('Updating…')
-    expect((html.match(/(?<!-)disabled=""/g) ?? []).length).toBe(2)
+    expect(html).toContain('role="status"')
+    expect(html).toContain('tabler-icon-loader-2')
+    expect(html).toContain('Updating moi skills…')
+    expect(html).not.toContain('This workspace is using old moi skills')
+    expect(html).not.toContain('Auto-update')
+    expect(html).not.toContain('Update once')
+    expect(html).not.toContain('aria-label="Dismiss skill update"')
   })
 
-  test('renders update failures as an alert', () => {
+  test('keeps the existing pending state for one-time updates', () => {
+    const html = renderBanner({ pendingAction: 'once' })
+
+    expect(html).toContain('This workspace is using old moi skills')
+    expect(html).toContain('Updating…')
+    expect((html.match(/(?<!-)disabled=""/g) ?? []).length).toBe(2)
+    expect(html).toContain('aria-label="Dismiss skill update"')
+  })
+
+  test('renders update failures with the existing actions and dismiss control', () => {
     const html = renderBanner({ error: 'Network unavailable.' })
 
     expect(html).toContain('role="alert"')
     expect(html).toContain('Update failed: Network unavailable.')
+    expect(html).toContain('Auto-update')
+    expect(html).toContain('Update once')
+    expect(html).toContain('aria-label="Dismiss skill update"')
   })
 })
 

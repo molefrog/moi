@@ -18,6 +18,18 @@ export function WorkspaceSkillUpdateBanner({
   onUpdate,
   onDismiss
 }: WorkspaceSkillUpdateBannerProps) {
+  if (!error && pendingAction === 'auto') {
+    return (
+      <div
+        role="status"
+        className="flex w-full items-center gap-1.5 p-2 text-sm text-muted-foreground"
+      >
+        <IconLoader2 size={20} stroke={1.5} className="shrink-0 animate-spin" />
+        <span className="wrap-break-word">Updating moi skills…</span>
+      </div>
+    )
+  }
+
   const pending = pendingAction !== null
 
   return (

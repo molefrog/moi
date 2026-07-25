@@ -7,11 +7,11 @@ type UiStore = {
   discoveredWorkspacesOpen: boolean
   hasSentMessageFromMoi: boolean
   workspaceIdsPendingAnalysis: string[]
-  skillAutoUpdateWorkspaceIds: string[]
+  skillAutoUpdateEnabled: boolean
   setDiscoveredWorkspacesOpen: (open: boolean) => void
   markWorkspacePendingAnalysis: (workspaceId: string) => void
   markMessageSentFromMoi: (workspaceId: string) => void
-  enableSkillAutoUpdate: (workspaceId: string) => void
+  enableSkillAutoUpdate: () => void
 }
 
 export const useUiStore = create<UiStore>()(
@@ -20,7 +20,7 @@ export const useUiStore = create<UiStore>()(
       discoveredWorkspacesOpen: true,
       hasSentMessageFromMoi: false,
       workspaceIdsPendingAnalysis: [],
-      skillAutoUpdateWorkspaceIds: [],
+      skillAutoUpdateEnabled: false,
       setDiscoveredWorkspacesOpen: open => set({ discoveredWorkspacesOpen: open }),
       markWorkspacePendingAnalysis: workspaceId =>
         set(state => {
@@ -38,15 +38,7 @@ export const useUiStore = create<UiStore>()(
             id => id !== workspaceId
           )
         })),
-      enableSkillAutoUpdate: workspaceId =>
-        set(state => {
-          const workspaceIds = state.skillAutoUpdateWorkspaceIds ?? []
-          return {
-            skillAutoUpdateWorkspaceIds: workspaceIds.includes(workspaceId)
-              ? workspaceIds
-              : [...workspaceIds, workspaceId]
-          }
-        })
+      enableSkillAutoUpdate: () => set({ skillAutoUpdateEnabled: true })
     }),
     { name: 'moi:ui' }
   )
