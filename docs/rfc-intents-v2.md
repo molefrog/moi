@@ -31,7 +31,7 @@ from applet UI**. The "intent" vocabulary disappears from the API surface — th
 
 ## 2. Saved tab state stays in the layout; "active" means "default"
 
-`layout.tabs` (`open` + `active`) stays in the workspace layout (`.moi/layout.json`) — no move
+`layout.tabs` (`open` + `active`) stays in the workspace layout (`.moi/.workspace.json`) — no move
 to the per-system store for now. What changes is the **meaning** of `active`: it is the
 workspace's **default tab**, not live focus state.
 
