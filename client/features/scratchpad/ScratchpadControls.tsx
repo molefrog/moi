@@ -31,6 +31,7 @@ import {
   IconTypography
 } from '@tabler/icons-react'
 
+import { Button } from '@/client/components/ui/button'
 import { cn } from '@/client/lib/cn'
 
 type IconC = typeof IconPointer2
@@ -70,18 +71,17 @@ type ToolButtonProps = {
 
 function ToolButton({ label, active, Icon, onClick }: ToolButtonProps) {
   return (
-    <button
+    <Button
       type="button"
+      size="icon"
+      variant={active ? 'default' : 'ghost'}
+      aria-label={label}
       title={label}
       onClick={onClick}
-      className={cn(
-        'flex size-9 items-center justify-center rounded-xl text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-        active &&
-          'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground'
-      )}
+      className={cn(!active && 'text-muted-foreground hover:text-foreground')}
     >
-      <Icon size={20} stroke={1.5} />
-    </button>
+      <Icon stroke={1.5} />
+    </Button>
   )
 }
 
@@ -148,12 +148,12 @@ export function ScratchToolbar({ editor }: ScratchToolbarProps) {
   }
 
   return (
-    <div className="absolute top-1/2 left-3 z-10 -translate-y-1/2">
+    <div className="absolute top-1/2 left-2 z-10 -translate-y-1/2">
       <motion.div
         initial={{ x: -72, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
-        transition={{ type: 'spring', bounce: 0.4, duration: 0.55 }}
-        className="flex flex-col gap-1 rounded-xl bg-background/95 p-1 shadow-[0_2px_8px_rgba(0,0,0,0.08),0_4px_16px_rgba(0,0,0,0.06),0_0_0_1px_rgba(0,0,0,0.04)] backdrop-blur"
+        transition={{ type: 'spring', bounce: 0.2, duration: 0.55 }}
+        className="flex flex-col gap-1 rounded-xl bg-background/95 p-1 shadow-md backdrop-blur"
       >
         {TOOL_ENTRIES.map((entry, i) => {
           if (entry.kind === 'sep') {
@@ -491,7 +491,7 @@ export function ScratchStyleBar({ editor }: ScratchStyleBarProps) {
   }
 
   return (
-    <div className="absolute top-1/2 left-15 z-10 flex -translate-y-1/2 flex-col items-center gap-1.5 rounded-full bg-background/95 px-1 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.08),0_4px_16px_rgba(0,0,0,0.06),0_0_0_1px_rgba(0,0,0,0.04)] backdrop-blur">
+    <div className="absolute top-1/2 left-14 z-10 flex -translate-y-1/2 flex-col items-center gap-1.5 rounded-full bg-background/95 px-1 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.08),0_4px_16px_rgba(0,0,0,0.06),0_0_0_1px_rgba(0,0,0,0.04)] backdrop-blur">
       {state.controls.map((control, i) => (
         <Fragment key={control}>
           {i > 0 && <div className="h-px w-5 bg-border" />}

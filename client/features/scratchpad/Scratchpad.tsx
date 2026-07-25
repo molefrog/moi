@@ -5,6 +5,7 @@ import {
   type TLAssetStore,
   type TLComponents,
   type TLEditorSnapshot,
+  type TLGridProps,
   type TLUiOverrides,
   DefaultFillStyle,
   DefaultFontStyle,
@@ -12,7 +13,9 @@ import {
   DefaultVerticalAlignStyle,
   Tldraw,
   getSnapshot,
-  loadSnapshot
+  loadSnapshot,
+  useEditor,
+  useUniqueSafeId
 } from 'tldraw'
 import 'tldraw/tldraw.css'
 
@@ -103,7 +106,42 @@ function makeAssetStore(workspaceId: string): TLAssetStore {
 // native zoom control — but Minimap is nulled, which also strips its toggle button
 // from the panel, leaving just the zoom menu. Kept on defaults: NavigationPanel
 // (zoom), ContextMenu, KeyboardShortcutsDialog.
+function ScratchBackground() {
+  return (
+    <div className="absolute inset-0 bg-[color-mix(in_oklch,var(--muted),var(--background)_50%)]" />
+  )
+}
+
+function UniformGrid({ x, y, z, size }: TLGridProps) {
+  const id = useUniqueSafeId('scratch-grid')
+  const editor = useEditor()
+  let step = editor.options.gridSteps[0]?.step ?? 1
+
+  for (const gridStep of editor.options.gridSteps) {
+    if (z >= gridStep.min) step = gridStep.step
+  }
+
+  const spacing = step * size * z
+  const offsetX = 0.5 + x * z
+  const offsetY = 0.5 + y * z
+  const dotX = offsetX > 0 ? offsetX % spacing : spacing + (offsetX % spacing)
+  const dotY = offsetY > 0 ? offsetY % spacing : spacing + (offsetY % spacing)
+
+  return (
+    <svg className="tl-grid" version="1.1" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <pattern id={id} width={spacing} height={spacing} patternUnits="userSpaceOnUse">
+          <circle className="fill-accent" cx={dotX} cy={dotY} r={1} />
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill={`url(#${id})`} />
+    </svg>
+  )
+}
+
 const SCRATCH_COMPONENTS: TLComponents = {
+  Background: ScratchBackground,
+  Grid: UniformGrid,
   Toolbar: null,
   StylePanel: null,
   Minimap: null,
@@ -112,7 +150,8 @@ const SCRATCH_COMPONENTS: TLComponents = {
   ActionsMenu: null,
   QuickActions: null,
   HelpMenu: null,
-  DebugMenu: null
+  DebugMenu: null,
+  ZoomMenu: null
 }
 
 // Remove dropped tools (kills their shortcuts too) and hard-disable export/print.
