@@ -307,12 +307,14 @@ export const control = Bun.serve({
           return
         }
 
-        if (data.type === 'widget:refresh') {
-          // Tell every connected widget to re-import its module (cache-bust)
-          // and re-run its data fetches. No rebuild, no page reload — the
-          // existing `useWidget` hook handles `widgets:refresh` identically
-          // to `widget:updated` (load with bust=true).
-          publishEvent({ type: 'widgets:refresh' })
+        // Tell every connected applet to re-import its module (cache-bust) and
+        // re-run its data fetches. No rebuild, no page reload — `useApplet`
+        // handles `applets:refresh` like `*:updated` (invalidate + reload).
+        // `only` narrows to one kind; default is both widgets and views.
+        // `widget:refresh` is the pre-filter message name older CLIs send.
+        if (data.type === 'applets:refresh' || data.type === 'widget:refresh') {
+          const only = data.only === 'widgets' || data.only === 'views' ? data.only : undefined
+          publishEvent({ type: 'applets:refresh', only })
           ws.send(JSON.stringify({ ok: true }))
           return
         }

@@ -7,6 +7,7 @@ import {
   appletUrl,
   getCachedApplet,
   invalidateApplet,
+  invalidateAppletSegment,
   setCachedApplet
 } from '@/client/features/applets/applet-cache'
 import { reportAppletError } from '@/client/features/applets/applet-log'
@@ -42,13 +43,16 @@ const WIDGET_KIND: AppletKindSpec = {
   kind: 'widget',
   segment: 'widgets',
   shouldReload: (e, name) =>
-    (e.type === 'widget:updated' && e.name === name) || e.type === 'widgets:refresh'
+    (e.type === 'widget:updated' && e.name === name) ||
+    (e.type === 'applets:refresh' && e.only !== 'views')
 }
 
 const VIEW_KIND: AppletKindSpec = {
   kind: 'view',
   segment: 'views',
-  shouldReload: (e, name) => e.type === 'view:updated' && e.name === name
+  shouldReload: (e, name) =>
+    (e.type === 'view:updated' && e.name === name) ||
+    (e.type === 'applets:refresh' && e.only !== 'widgets')
 }
 
 function loadApplet(
@@ -100,8 +104,8 @@ function useApplet(kind: AppletKindSpec, name: string): AppletState {
     load()
   }, [load])
 
-  // Reload the MOUNTED applet the moment the server says its bundle changed (or,
-  // widgets only, `moi refresh`). Invalidate first so we don't re-read a stale
+  // Reload the MOUNTED applet the moment the server says its bundle changed or
+  // `moi refresh` targets its kind. Invalidate first so we don't re-read a stale
   // cache entry — `useAppletCacheInvalidation` may already have done so for the
   // unmounted case, but doing it here keeps this self-sufficient and
   // order-independent. The bumped version remounts the component and re-runs its
@@ -134,5 +138,12 @@ export function useAppletCacheInvalidation(): void {
   useWorkspaceEvent(event => {
     if (event.type === 'view:updated') invalidateApplet('views', workspaceId, event.name)
     else if (event.type === 'widget:updated') invalidateApplet('widgets', workspaceId, event.name)
+    else if (event.type === 'applets:refresh') {
+      // Segment-wide: `moi refresh` names no applet, so every cached module in
+      // the targeted kind(s) is stale — including ones whose tabs are
+      // backgrounded right now.
+      if (event.only !== 'views') invalidateAppletSegment('widgets')
+      if (event.only !== 'widgets') invalidateAppletSegment('views')
+    }
   })
 }

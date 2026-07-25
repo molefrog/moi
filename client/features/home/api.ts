@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
+import { liveStore } from '@/client/features/chat/chat-store'
+import { useUiStore } from '@/client/store/ui'
 import type {
   DiscoveredWorkspace,
   HarnessAvailability,
@@ -16,7 +18,7 @@ export function upsertWorkspaceEntry(
 ): WorkspaceEntry[] {
   const current = entries ?? []
   const existing = current.findIndex(item => item.id === entry.id || item.path === entry.path)
-  if (existing === -1) return [...current, entry]
+  if (existing === -1) return [entry, ...current]
   return current.map((item, index) => (index === existing ? { ...item, ...entry } : item))
 }
 
@@ -50,6 +52,8 @@ export function useImportWorkspace() {
     mutationFn: input =>
       requestJson('/api/workspaces', jsonRequest('POST', input), 'Failed to add workspace'),
     onSuccess: (entry, input) => {
+      liveStore.getState().setActive(entry.id, null)
+      useUiStore.getState().markWorkspacePendingAnalysis(entry.id)
       queryClient.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, previous =>
         upsertWorkspaceEntry(previous, entry)
       )
@@ -109,10 +113,9 @@ export function useCreateWorkspace() {
         'Failed to create workspace'
       ),
     onSuccess: entry => {
-      queryClient.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, previous => [
-        ...(previous ?? []),
-        entry
-      ])
+      queryClient.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, previous =>
+        upsertWorkspaceEntry(previous, entry)
+      )
     }
   })
 }

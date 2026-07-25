@@ -12,8 +12,9 @@
 //
 //   useMoiUserMessageContext()
 //     Hook for the chat send path: returns a builder that snapshots ambient
-//     state (active tab, view title) and drains the directive queue. Call
-//     the builder only for a message that actually goes out.
+//     state (active tab, view title), drains the directive queue, and accepts
+//     directives tied directly to that message. Call the builder only for a
+//     message that actually goes out.
 //
 //   Adding a new ambient field (e.g. scratchpad selection): extend the
 //   `MoiContext` type and its renderer in lib/moi-context.ts, then supply
@@ -48,6 +49,16 @@ export function drainChatDirectives(workspaceId: string): string[] {
   return queue
 }
 
+// Drain queued directives and append instructions explicitly attached to the
+// message being sent. Keeping the latter out of the queue ties them to that
+// exact send while preserving queued directives from other UI actions.
+export function takeChatDirectives(
+  workspaceId: string,
+  messageDirectives: readonly string[] = []
+): string[] {
+  return [...drainChatDirectives(workspaceId), ...messageDirectives]
+}
+
 // The UI label of the active tab when it has one beyond its id: a view's
 // configured title, or a builder's claimed title while the build runs.
 // Undefined otherwise (the envelope then falls back to the id, like the tab
@@ -68,18 +79,21 @@ export function activeTabTitle(
 // it when the message is actually sent, not at render. Draining the
 // directive queue is part of the snapshot, so only call it for a message
 // that will really go out.
-export function useMoiUserMessageContext(): () => MoiContext {
+export function useMoiUserMessageContext(): (directives?: readonly string[]) => MoiContext {
   const workspaceId = useWorkspaceId()
   const { layout } = useWorkspaceLayoutCtx()
   const views = useWorkspaceViews(workspaceId).data
   const builders = useViewBuilders(workspaceId).data
   const activeTab = layout.tabs.active
-  return useCallback(() => {
-    const directives = drainChatDirectives(workspaceId)
-    return {
-      activeTab,
-      tabTitle: activeTabTitle(activeTab, views, builders),
-      ...(directives.length > 0 ? { directives } : {})
-    }
-  }, [workspaceId, activeTab, views, builders])
+  return useCallback(
+    (messageDirectives: readonly string[] = []) => {
+      const directives = takeChatDirectives(workspaceId, messageDirectives)
+      return {
+        activeTab,
+        tabTitle: activeTabTitle(activeTab, views, builders),
+        ...(directives.length > 0 ? { directives } : {})
+      }
+    },
+    [workspaceId, activeTab, views, builders]
+  )
 }

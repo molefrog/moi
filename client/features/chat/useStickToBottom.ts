@@ -22,6 +22,9 @@ type StickToBottom = {
   atBottom: boolean
   // Scroll to the bottom and re-pin. `smooth` for user-initiated jumps.
   scrollToBottom: (behavior?: ScrollBehavior) => void
+  // Show top-anchored content such as the initial Chat welcome without the
+  // resize observer pulling it back to the bottom.
+  scrollToTop: () => void
 }
 
 export function useStickToBottom(
@@ -47,6 +50,13 @@ export function useStickToBottom(
     },
     [scrollRef, setPinned]
   )
+
+  const scrollToTop = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    setPinned(false)
+    el.scrollTo({ top: 0, behavior: 'auto' })
+  }, [scrollRef, setPinned])
 
   // Track whether the user is at the bottom. A programmatic scroll-to-bottom
   // also fires this with distance ≈ 0, so pinned stays true — no fight.
@@ -82,5 +92,5 @@ export function useStickToBottom(
     scrollToBottom('auto')
   }, [resetKey, scrollToBottom])
 
-  return { atBottom, scrollToBottom }
+  return { atBottom, scrollToBottom, scrollToTop }
 }

@@ -191,7 +191,7 @@ function ToolCallCard({ call, cwd, isFirst, isLast }: ToolCallCardProps) {
         isLast={isLast}
         call={call}
         marker={succeeded ? <IconMarker icon={IconPackage} size={16} stroke={1.75} /> : undefined}
-        name="Loading Skill"
+        name="Loading skill"
         brief={call.skill.skillName}
       />
     )

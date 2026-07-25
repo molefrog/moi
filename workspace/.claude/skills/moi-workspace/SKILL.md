@@ -110,8 +110,9 @@ never from inside `.moi/` itself. You don't pass paths; moi resolves the workspa
 
 - `moi bundle` — compile changed applets
 - `moi bundle --force` — rebuild all applets (use after changing `config`)
-- `moi refresh` — re-fetch widget/view data without rebuilding (use after you mutated data the
-  widgets read — DB rows, files, external API records — so the displayed values catch up)
+- `moi refresh` — re-fetch widget and view data without rebuilding (use after you mutated data the
+  applets read — DB rows, files, external API records — so the displayed values catch up);
+  `--only widgets` / `--only views` narrows the refresh to one kind
 - `moi call-server-fn <module>/<fn> '[args]'` — invoke a `.server.ts` function directly (smoke test)
 - `moi debug logs` — applet runtime errors on record (experimental)
 - `moi theme --font=<key>` — change font theme (omit `--font` to list options)
@@ -328,4 +329,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.7.0" />
+<moi-skill version="0.7.1" />

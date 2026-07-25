@@ -574,13 +574,27 @@ const refresh = defineCommand({
   meta: {
     name: 'refresh',
     description:
-      'Refresh widget data without rebuilding. Use after the agent mutates underlying data.'
+      'Refresh widget and view data without rebuilding. Use after the agent mutates underlying data.'
   },
-  async run() {
+  args: {
+    only: {
+      type: 'string',
+      description: 'Narrow the refresh to "widgets" or "views" (default: both)'
+    }
+  },
+  async run({ args }) {
+    // Validate up front: a typo'd filter silently refreshing everything would
+    // read as "my filter worked".
+    if (args.only && args.only !== 'widgets' && args.only !== 'views') {
+      console.error(
+        '\n' + pc.red('✗') + ` Unknown --only value "${args.only}" — use "widgets" or "views".\n`
+      )
+      process.exit(1)
+    }
     const notice = await staleSkillNotice(process.cwd())
     const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
 
-    ws.onopen = () => ws.send(JSON.stringify({ type: 'widget:refresh' }))
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'applets:refresh', only: args.only }))
 
     ws.onmessage = event => {
       const data = JSON.parse(String(event.data))
@@ -589,7 +603,9 @@ const refresh = defineCommand({
         ws.close()
         process.exit(1)
       }
-      console.log('\n' + pc.green('✓') + ' Refresh signal sent\n')
+      console.log(
+        '\n' + pc.green('✓') + ' Refresh signal sent' + (args.only ? ` (${args.only})` : '') + '\n'
+      )
       if (notice) console.log(pc.yellow(notice) + '\n')
       ws.close()
       process.exit(0)

@@ -12,23 +12,28 @@ const existing: WorkspaceEntry = {
 }
 
 describe('upsertWorkspaceEntry', () => {
-  test('appends a new workspace', () => {
+  test('prepends a new workspace', () => {
     const added: WorkspaceEntry = {
       id: 'two',
       path: '/tmp/two',
       addedAt: '2026-01-02T00:00:00.000Z'
     }
 
-    expect(upsertWorkspaceEntry([existing], added)).toEqual([existing, added])
+    expect(upsertWorkspaceEntry([existing], added)).toEqual([added, existing])
   })
 
-  test('updates an existing workspace without duplicating it', () => {
+  test('updates an existing workspace in place without duplicating it', () => {
+    const other: WorkspaceEntry = {
+      id: 'two',
+      path: '/tmp/two',
+      addedAt: '2026-01-02T00:00:00.000Z'
+    }
     const imported: WorkspaceEntry = {
       ...existing,
       name: 'Updated name'
     }
 
-    expect(upsertWorkspaceEntry([existing], imported)).toEqual([imported])
+    expect(upsertWorkspaceEntry([other, existing], imported)).toEqual([other, imported])
   })
 
   test('deduplicates a registry match returned with a different id', () => {
