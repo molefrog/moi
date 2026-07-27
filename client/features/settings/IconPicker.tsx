@@ -61,7 +61,7 @@ function EmojiButton({ emoji, ...props }: EmojiPickerListEmojiProps) {
   return (
     <button
       className={cn(
-        'flex size-9 items-center justify-center rounded-xl text-[22px] transition-colors duration-75 data-[active]:bg-muted',
+        'flex size-9 items-center justify-center rounded-xl text-[22px] transition-colors duration-75 data-active:bg-muted',
         EMOJI_FONT
       )}
       {...props}
