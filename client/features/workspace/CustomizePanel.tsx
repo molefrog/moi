@@ -5,7 +5,12 @@ import { IconCircleCheckFilled } from '@tabler/icons-react'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { BottomPanel } from '@/client/components/shared/BottomPanel'
 import { cn } from '@/client/lib/cn'
-import { COLOR_THEMES, type ColorThemeConfig, FONT_THEMES } from '@/lib/themes'
+import {
+  COLOR_THEMES,
+  type ColorThemeConfig,
+  FONT_THEMES,
+  getThemeColorOverrides
+} from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/types'
 
 const ALL_FONT_PREVIEW_ID = 'mei-font-previews'
@@ -114,14 +119,7 @@ export function CustomizePanel({ ref }: CustomizePanelProps) {
             <CustomizeOption
               key={key}
               active={presetMatches(preset, currentBg, currentFg)}
-              onSelect={() =>
-                setTheme({
-                  background: preset.background,
-                  foreground: preset.foreground,
-                  muted: preset.muted,
-                  accent: preset.accent
-                })
-              }
+              onSelect={() => setTheme(getThemeColorOverrides(preset))}
             >
               <div className="flex gap-2">
                 <span

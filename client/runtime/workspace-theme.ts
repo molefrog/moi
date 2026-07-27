@@ -1,27 +1,26 @@
 import { useEffect } from 'react'
 import type { CSSProperties } from 'react'
 
-import { FONT_THEMES } from '@/lib/themes'
+import { FONT_THEMES, THEME_COLOR_TOKENS } from '@/lib/themes'
+import type { ThemeColorOverrides, ThemeColorToken } from '@/lib/themes'
 import type { WorkspaceLayout } from '@/lib/types'
 
 const FONT_LINK_ID = 'mei-fonts'
-const WORKSPACE_COLOR_PROPERTIES = [
-  ['background', '--background'],
-  ['foreground', '--foreground'],
-  ['muted', '--muted'],
-  ['accent', '--accent']
-] as const
+const WORKSPACE_COLOR_PROPERTIES = THEME_COLOR_TOKENS.map(
+  token => [token, themeColorProperty(token)] as const
+)
 
-type WorkspaceColorTheme = Pick<
-  NonNullable<WorkspaceLayout['theme']>,
-  (typeof WORKSPACE_COLOR_PROPERTIES)[number][0]
->
+type WorkspaceThemeStyle = CSSProperties & {
+  [property: `--${string}`]: string | undefined
+}
 
-type WorkspaceThemeStyle = CSSProperties &
-  Partial<Record<(typeof WORKSPACE_COLOR_PROPERTIES)[number][1], string>>
+function themeColorProperty(token: ThemeColorToken): `--${string}` {
+  const name = token.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)
+  return `--${name}`
+}
 
 export function getWorkspaceThemeStyle(
-  theme: WorkspaceColorTheme | undefined
+  theme: ThemeColorOverrides | undefined
 ): WorkspaceThemeStyle {
   const style: WorkspaceThemeStyle = {}
   for (const [token, property] of WORKSPACE_COLOR_PROPERTIES) {
@@ -30,15 +29,10 @@ export function getWorkspaceThemeStyle(
   return style
 }
 
-function useDocumentWorkspaceThemeStyle(theme: WorkspaceColorTheme | undefined) {
-  const background = theme?.background
-  const foreground = theme?.foreground
-  const muted = theme?.muted
-  const accent = theme?.accent
-
+function useDocumentWorkspaceThemeStyle(theme: ThemeColorOverrides | undefined) {
   useEffect(() => {
     const element = document.documentElement
-    const style = getWorkspaceThemeStyle({ background, foreground, muted, accent })
+    const style = getWorkspaceThemeStyle(theme)
 
     for (const [, property] of WORKSPACE_COLOR_PROPERTIES) {
       const value = style[property]
@@ -54,7 +48,7 @@ function useDocumentWorkspaceThemeStyle(theme: WorkspaceColorTheme | undefined) 
         element.style.removeProperty(property)
       }
     }
-  }, [background, foreground, muted, accent])
+  }, [theme])
 }
 
 // Applies the active workspace theme to the document root so the workspace,

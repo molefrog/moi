@@ -55,35 +55,48 @@ export const FONT_THEMES: Record<FontTheme, FontThemeConfig> = {
 
 export type ColorTheme = 'default' | 'paper' | 'sand' | 'rose' | 'lavender' | 'mint' | 'sky'
 
-export type ColorThemeConfig = {
-  label: string
-  // undefined colors = no override, reveals :root defaults
-  background?: string
-  foreground?: string
-  muted?: string
-  accent?: string
-}
-
 type ThemeColorSource = {
   background: string
   foreground: string
 }
 
-type DerivedThemeColors = ThemeColorSource & {
-  muted: string
-  accent: string
+const THEME_COLOR_DERIVATIONS = {
+  background: ({ background }) => background,
+  foreground: ({ foreground }) => foreground,
+  muted: ({ background, foreground }) => `color-mix(in oklch, ${background} 95%, ${foreground} 5%)`,
+  mutedForeground: ({ background, foreground }) =>
+    `color-mix(in oklch, ${background} 58%, ${foreground} 42%)`,
+  accent: ({ background, foreground }) =>
+    `color-mix(in oklch, oklch(from ${background} l calc(c * 10) h) 6%, ${foreground} 6%)`
+} satisfies Record<string, (source: ThemeColorSource) => string>
+
+export type ThemeColorToken = keyof typeof THEME_COLOR_DERIVATIONS
+export type ThemeColors = Record<ThemeColorToken, string>
+export type ThemeColorOverrides = Partial<ThemeColors>
+
+export type ColorThemeConfig = {
+  label: string
+  // undefined colors = no override, reveals :root defaults
+} & ThemeColorOverrides
+
+export const THEME_COLOR_TOKENS = Object.keys(THEME_COLOR_DERIVATIONS) as ThemeColorToken[]
+
+export function getThemeColorOverrides(
+  theme: ThemeColorOverrides | undefined
+): ThemeColorOverrides {
+  const overrides: ThemeColorOverrides = {}
+  for (const token of THEME_COLOR_TOKENS) {
+    overrides[token] = theme?.[token]
+  }
+  return overrides
 }
 
-export function deriveThemeColors({
-  background,
-  foreground
-}: ThemeColorSource): DerivedThemeColors {
-  return {
-    background,
-    foreground,
-    muted: `color-mix(in oklch, ${background} 95%, ${foreground} 5%)`,
-    accent: `color-mix(in oklch, oklch(from ${background} l calc(c * 10) h) 6%, ${foreground} 6%)`
+export function deriveThemeColors(source: ThemeColorSource): ThemeColors {
+  const colors = {} as ThemeColors
+  for (const token of THEME_COLOR_TOKENS) {
+    colors[token] = THEME_COLOR_DERIVATIONS[token](source)
   }
+  return colors
 }
 
 export const COLOR_THEMES: Record<ColorTheme, ColorThemeConfig> = {

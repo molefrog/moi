@@ -25,12 +25,13 @@ function normalizeLayout(parsed: Record<string, unknown>): WorkspaceLayout {
   const normalized = layout as unknown as WorkspaceLayout
   const theme = normalized.theme
   if (theme?.background && theme.foreground) {
-    const colors = deriveThemeColors({
-      background: theme.background,
-      foreground: theme.foreground
-    })
-    theme.muted = colors.muted
-    theme.accent = colors.accent
+    Object.assign(
+      theme,
+      deriveThemeColors({
+        background: theme.background,
+        foreground: theme.foreground
+      })
+    )
   }
   return normalized
 }

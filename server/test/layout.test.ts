@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 
+import { deriveThemeColors } from '@/lib/themes'
 import type { WorkspaceLayout } from '@/lib/types'
 
 import { getLayoutPath, getWorkspacePreview, loadLayout, mergeLayoutForSave } from '../layout'
@@ -170,6 +171,7 @@ describe('getWorkspacePreview', () => {
           background: '#fdf2f4',
           foreground: '#3b1c26',
           muted: 'stale-muted',
+          mutedForeground: 'stale-muted-foreground',
           accent: 'color-mix(in oklch, #3b1c26 7%, transparent)'
         }
       },
@@ -178,10 +180,10 @@ describe('getWorkspacePreview', () => {
           thumbnails: [],
           theme: {
             font: 'default',
-            background: '#fdf2f4',
-            foreground: '#3b1c26',
-            muted: 'color-mix(in oklch, #fdf2f4 95%, #3b1c26 5%)',
-            accent: 'color-mix(in oklch, oklch(from #fdf2f4 l calc(c * 10) h) 8%, #3b1c26 6%)'
+            ...deriveThemeColors({
+              background: '#fdf2f4',
+              foreground: '#3b1c26'
+            })
           }
         })
       }

@@ -1,4 +1,4 @@
-import { COLOR_THEMES, FONT_THEMES } from '@/lib/themes'
+import { COLOR_THEMES, FONT_THEMES, getThemeColorOverrides } from '@/lib/themes'
 import type { ColorTheme, FontTheme, WorkspaceLayout } from '@/lib/types'
 
 type ThemeShape = NonNullable<WorkspaceLayout['theme']>
@@ -29,10 +29,7 @@ export function applyThemeUpdate(
 
   if (update.color) {
     const preset = COLOR_THEMES[update.color as ColorTheme]
-    theme.background = preset.background
-    theme.foreground = preset.foreground
-    theme.muted = preset.muted
-    theme.accent = preset.accent
+    Object.assign(theme, getThemeColorOverrides(preset))
   }
 
   return {
