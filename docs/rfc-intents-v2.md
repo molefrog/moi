@@ -1,7 +1,7 @@
 # RFC: workspace tab navigation and applet messaging (intents v2)
 
-Status: draft · Supersedes the prototypes reviewed in PR #52 (direction kept, code dropped) and
-PR #53 (capability routing not taken).
+Status: MVP 1 (tab foundation) implemented; MVP 2–3 staged · Supersedes the prototypes reviewed
+in PR #52 (direction kept, code dropped) and PR #53 (capability routing not taken).
 
 ## Summary
 
@@ -160,6 +160,9 @@ sendChatMessage(label: string, context?: Record<string, unknown>): void
   applet share a bridge.
   `sendChatMessage` self-attributes with the applet's `<kind>:<name>`, derived by the runtime —
   never passed by the caller.
+- The bridge wiring (`__attachBridge` / `__getBridge`, re-exported by every bundle entry) is host
+  plumbing: it stays out of the author-facing ambient types (`.moi/applet-env.d.ts`), which
+  declare only the public API — `fileUrl`, `focusTab`, and the config types.
 - `focusTab` from an applet is client-local navigation (replace) — no server round-trip.
 - `sendChatMessage` always targets the **active chat**. Envelope discipline: `label` is the
   visible message text; `{ source, context }` rides the `<moi-context>` envelope under an
