@@ -221,9 +221,9 @@ describe('dependency staleness', () => {
     }
   })
 
-  test('imported assets and .server modules ride the same walk, as leaves', async () => {
-    // Neither has a scanner of its own any more: both are just relative imports
-    // that resolve to a non-descendable file.
+  test('imported assets and .server modules ride the same walk', async () => {
+    // Neither has a scanner of its own any more: both are just relative
+    // imports that resolve to a file like everything else.
     seed(
       '.moi/widgets/photo.tsx',
       [
@@ -259,9 +259,13 @@ describe('dependency staleness', () => {
     expect((await build())[0]).toMatchObject({ status: 'built' })
     expect((await build())[0]).toMatchObject({ status: 'skipped' })
 
-    // What the server module imports does not: none of it reaches the bundle,
-    // so the walk stops at `.server.ts` and this edit is deliberately ignored.
+    // And so does what the server module imports — even though none of it
+    // reaches the bundle. 'built' is the signal that recycles the functions
+    // worker (see needsRebuild), and without it a live worker would keep
+    // serving the old `_schema.ts` with nothing to dislodge it. The rebuilt
+    // bytes are identical; the reload is the point.
     seed('.moi/widgets/_schema.ts', `export const table = 'renamed'`)
+    expect((await build())[0]).toMatchObject({ status: 'built' })
     expect((await build())[0]).toMatchObject({ status: 'skipped' })
   })
 

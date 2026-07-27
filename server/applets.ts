@@ -71,9 +71,8 @@ const MAX_GRAPH_FILES = 256
 
 // Files the walk keeps descending through — anything Bun treats as a module
 // (`.ts`, `.mjs`, `.cts`, …). Everything else (`.json`, `.css`, images) is a
-// leaf, and so are `.server.ts` modules.
+// leaf.
 const MODULE_FILE_RE = /\.[mc]?[jt]sx?$/
-const SERVER_FILE_RE = /\.server\.tsx?$/
 // Which transpiler loader lexes a module's imports. Only `.ts`/`.mts`/`.cts`
 // take the `ts` loader: angle-bracket casts (`<string>x`) parse there and are
 // JSX everywhere else. `.js`/`.mjs`/`.cjs` go through `tsx`, which accepts both
@@ -92,6 +91,17 @@ const TS_ONLY_FILE_RE = /\.[mc]?ts$/
 // are not walked: after a dependency bump, `moi bundle --force`. The bundle
 // itself is React-mode-agnostic (see buildApplet), so it needs no rebuild when
 // the server switches between the development and production React.
+//
+// `.server.ts` modules are walked like anything else, which is deliberately
+// MORE than the bundle needs: their code never ships to the client (only the
+// export list, inlined as RPC stubs), so editing one — or anything it imports
+// — cannot change a byte of `index.js`. We report stale anyway because 'built'
+// is what drives the worker recycle downstream (see `reloadModules`, called
+// from widgets.ts/views.ts for every rebuilt applet). Without it, editing a
+// helper that only a server module imports would leave a live worker serving
+// the old code with nothing to dislodge it. The redundant rebuild is the price
+// of that signal; the alternative is a second staleness channel threaded
+// through the build results.
 async function needsRebuild(buildDir: string, name: string, srcPath: string): Promise<boolean> {
   const built = Bun.file(join(buildDir, name, 'index.js'))
   if (!(await built.exists())) return true
@@ -107,11 +117,9 @@ async function needsRebuild(buildDir: string, name: string, srcPath: string): Pr
     const file = Bun.file(path)
     if (!(await file.exists())) continue
     if (file.lastModified >= builtMtime) return true
-    // Leaves stop at the mtime check above: an asset, JSON, or CSS file can't
-    // import anything, and a `.server.ts` module contributes only its export
-    // list to the bundle — what its own imports do is invisible here (edit one
-    // of those and `moi bundle --force`).
-    if (!MODULE_FILE_RE.test(path) || SERVER_FILE_RE.test(path)) continue
+    // Leaves stop at the mtime check above — an asset, JSON, or CSS file can't
+    // import anything.
+    if (!MODULE_FILE_RE.test(path)) continue
     const source = await file.text()
     const dir = dirname(path)
     for (const specifier of scanRelativeImports(
