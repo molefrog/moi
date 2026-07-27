@@ -1852,11 +1852,33 @@ async function runSkillUpdate(cwd: string): Promise<void> {
   // Type-aware: an OpenClaw workspace keeps its skills in `skills/`, so the
   // update must target the same dir the agent actually loads from.
   const { root, type } = await resolveWorkspace(cwd)
-  const { before, status } = await updateWorkspaceSkills(root, type ?? 'claude-code')
+  const { before, status, shadcn } = await updateWorkspaceSkills(root, type ?? 'claude-code')
   const after = status.skills
+
+  if (!shadcn.ok) {
+    console.log('\n' + pc.yellow('!') + ' moi skill updated in ' + pc.bold(root) + '\n')
+    printSkillUpdateTable(before, after)
+    console.log(
+      '\n  ' +
+        pc.red('✗') +
+        ' Official shadcn skill refresh failed: ' +
+        pc.dim(shadcn.reason) +
+        '\n'
+    )
+    process.exitCode = 1
+    return
+  }
 
   console.log('\n' + pc.green('✓') + ' Skills updated in ' + pc.bold(root) + '\n')
   printSkillUpdateTable(before, after)
+  console.log('\n  ' + pc.green('✓') + ' Official shadcn skill refreshed')
+  console.log(
+    '\n' +
+      pc.dim(
+        '  Changes apply when the skill is next loaded (new session or next skill invocation).'
+      ) +
+      '\n'
+  )
 }
 
 function printSkillUpdateTable(
@@ -1876,13 +1898,6 @@ function printSkillUpdateTable(
         ]
       })
     )
-  )
-  console.log(
-    '\n' +
-      pc.dim(
-        '  Changes apply when the skill is next loaded (new session or next skill invocation).'
-      ) +
-      '\n'
   )
 }
 
@@ -1908,10 +1923,7 @@ const defineSkillUpdate = (name: string, description: string) =>
   })
 
 const skillSubCommands = {
-  update: defineSkillUpdate(
-    'update',
-    'Update this workspace’s skills to the version shipped with the CLI'
-  ),
+  update: defineSkillUpdate('update', 'Update this workspace’s bundled and official skills'),
   install: defineSkillUpdate('install', 'Alias for `moi skill update`')
 }
 

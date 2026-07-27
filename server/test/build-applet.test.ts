@@ -55,6 +55,20 @@ describe('buildApplet', () => {
     expect(result.js).toContain('widget:hello')
   })
 
+  test('compiles shadcn state variants and animations', async () => {
+    const result = await buildApplet(join(FIXTURES, 'shadcn-tailwind.tsx'))
+
+    expect(result.js).toContain('[data-orientation=\\"horizontal\\"]')
+    expect(result.js).toContain('[data-orientation=\\"vertical\\"]')
+    expect(result.js).toContain('[data-state=\\"open\\"]')
+  })
+
+  test('gives bare shadcn borders the semantic border color', async () => {
+    const result = await buildApplet(join(FIXTURES, 'shadcn-tailwind.tsx'))
+
+    expect(result.js).toMatch(/border-color:\s*var\(--border\)/)
+  })
+
   test('rewrites .server.ts imports to rpc() stubs', async () => {
     const result = await buildApplet(join(FIXTURES, 'with-server.tsx'))
 

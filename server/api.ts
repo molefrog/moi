@@ -10,6 +10,7 @@ import type {
   ViewBuilderInput,
   WorkspaceEntry,
   WorkspaceModels,
+  WorkspaceSkillsUpdateFailure,
   WorkspaceType
 } from '@/lib/types'
 import type { MoiContext } from '@/lib/moi-context'
@@ -554,6 +555,15 @@ one.get('/skills', async c => {
 one.post('/skills/update', async c => {
   const ws = c.get('ws')
   const result = await updateWorkspaceSkills(ws.path, ws.type ?? 'claude-code')
+  if (!result.shadcn.ok) {
+    return c.json(
+      {
+        ...result.status,
+        error: `moi skill updated, but the official shadcn skill could not be refreshed: ${result.shadcn.reason}`
+      } satisfies WorkspaceSkillsUpdateFailure,
+      502
+    )
+  }
   return c.json(result.status)
 })
 

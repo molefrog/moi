@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { installBundledSkills } from '../skills-template'
+import { BUNDLED_SKILLS_DIR, installBundledSkills } from '../skills-template'
 
 let targetSkillsDir = ''
 
@@ -33,11 +33,16 @@ describe('installBundledSkills', () => {
     await installBundledSkills(targetSkillsDir)
 
     expect(await Bun.file(retiredViewDesign).exists()).toBe(false)
-    expect(await Bun.file(join(workspaceSkillDir, 'DESIGN.md')).exists()).toBe(true)
+    const designGuide = Bun.file(join(workspaceSkillDir, 'DESIGN.md'))
+    expect(await designGuide.exists()).toBe(true)
+    expect(await designGuide.text()).toContain(
+      'bunx --bun shadcn@latest add <components...> --cwd .moi'
+    )
     expect(await Bun.file(join(workspaceSkillDir, 'SKILL.md')).text()).toContain(
-      '<moi-skill version="0.8.0" />'
+      '<moi-skill version="0.9.0" />'
     )
     expect(await Bun.file(workspaceNote).text()).toBe('Keep this note\n')
     expect(await Bun.file(customSkill).text()).toBe('Keep this skill\n')
+    expect(await Bun.file(join(BUNDLED_SKILLS_DIR, 'shadcn', 'SKILL.md')).exists()).toBe(false)
   })
 })

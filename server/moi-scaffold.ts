@@ -13,15 +13,75 @@ export const MOI_PACKAGE_JSON = {
   private: true,
   dependencies: {
     '@tabler/icons-react': '^3.40.0',
-    tailwindcss: '^4.0.0',
+    clsx: '^2.1.1',
     react: '^19.0.0',
-    'react-dom': '^19.0.0'
+    'react-dom': '^19.0.0',
+    tailwindcss: '^4.0.0',
+    'tailwind-merge': '^3.5.0'
   },
   devDependencies: {
     '@types/react': '^19.0.0',
     '@types/react-dom': '^19.0.0'
   }
 } as const
+
+// shadcn's `add` command requires project configuration even when `--path`
+// chooses a kind-local component directory. Keep this config aligned with the
+// host's shadcn base and icon library, while leaving theme values host-owned.
+export const SHADCN_COMPONENTS_JSON = {
+  $schema: 'https://ui.shadcn.com/schema.json',
+  style: 'base-nova',
+  rsc: false,
+  tsx: true,
+  tailwind: {
+    config: '',
+    css: '',
+    baseColor: 'neutral',
+    cssVariables: true,
+    prefix: ''
+  },
+  iconLibrary: 'tabler',
+  rtl: false,
+  aliases: {
+    components: '@/components',
+    ui: '@/components/ui',
+    hooks: '@/hooks',
+    lib: '@/lib',
+    utils: '@/lib/utils'
+  },
+  registries: {}
+} as const
+
+export const APPLET_TSCONFIG_JSON = {
+  compilerOptions: {
+    target: 'ESNext',
+    module: 'ESNext',
+    moduleResolution: 'bundler',
+    jsx: 'react-jsx',
+    strict: true,
+    skipLibCheck: true,
+    isolatedModules: true,
+    noEmit: true,
+    baseUrl: '.',
+    paths: {
+      '@/*': ['./*']
+    }
+  },
+  include: ['widgets/**/*.ts', 'widgets/**/*.tsx', 'views/**/*.ts', 'views/**/*.tsx', 'lib/**/*.ts']
+} as const
+
+// shadcn generates `cn()` calls. `cx()` remains the applet-facing name, while
+// the alias keeps freshly generated source valid until the agent rewrites its
+// imports to relative paths.
+export const APPLET_CLASS_NAMES_TS = `import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+
+export function cx(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
+export const cn = cx
+`
 
 // Dependency installation is helpful for editor types and widget builds, but
 // it's not critical — the agent installs on demand if it's missing. So it must
@@ -104,9 +164,20 @@ export async function scaffoldMoiDir(
   // A bare `.moi/` dir without package.json counts as not-bootstrapped —
   // fill in the missing pieces.
 
-  await mkdir(join(moiDir, 'widgets'), { recursive: true })
-  await Bun.write(packagePath, JSON.stringify(MOI_PACKAGE_JSON, null, 2) + '\n')
-  await Bun.write(join(moiDir, 'applet-env.d.ts'), APPLET_ENV_DTS)
+  await Promise.all([
+    mkdir(join(moiDir, 'widgets'), { recursive: true }),
+    mkdir(join(moiDir, 'lib'), { recursive: true })
+  ])
+  await Promise.all([
+    Bun.write(packagePath, JSON.stringify(MOI_PACKAGE_JSON, null, 2) + '\n'),
+    Bun.write(
+      join(moiDir, 'components.json'),
+      JSON.stringify(SHADCN_COMPONENTS_JSON, null, 2) + '\n'
+    ),
+    Bun.write(join(moiDir, 'tsconfig.json'), JSON.stringify(APPLET_TSCONFIG_JSON, null, 2) + '\n'),
+    Bun.write(join(moiDir, 'lib', 'utils.ts'), APPLET_CLASS_NAMES_TS),
+    Bun.write(join(moiDir, 'applet-env.d.ts'), APPLET_ENV_DTS)
+  ])
 
   const exited = installDependencies(moiDir)
   let timer: ReturnType<typeof setTimeout> | undefined
