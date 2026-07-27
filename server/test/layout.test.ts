@@ -181,7 +181,7 @@ describe('getWorkspacePreview', () => {
             background: '#fdf2f4',
             foreground: '#3b1c26',
             muted: 'color-mix(in oklch, #fdf2f4 95%, #3b1c26 5%)',
-            accent: 'color-mix(in oklch, oklch(from #fdf2f4 l calc(c * 2) h) 20%, #3b1c26 5%)'
+            accent: 'color-mix(in oklch, oklch(from #fdf2f4 l calc(c * 10) h) 8%, #3b1c26 6%)'
           }
         })
       }

@@ -15,7 +15,7 @@ describe('color themes', () => {
       background: '#fdf2f4',
       foreground: '#3b1c26',
       muted: 'color-mix(in oklch, #fdf2f4 95%, #3b1c26 5%)',
-      accent: 'color-mix(in oklch, oklch(from #fdf2f4 l calc(c * 2) h) 20%, #3b1c26 5%)'
+      accent: 'color-mix(in oklch, oklch(from #fdf2f4 l calc(c * 10) h) 8%, #3b1c26 6%)'
     })
   })
 
@@ -27,7 +27,7 @@ describe('color themes', () => {
   test('stores the generated supporting tokens on each color preset', () => {
     expect(COLOR_THEMES.rose.muted).toBe('color-mix(in oklch, #fdf2f4 95%, #3b1c26 5%)')
     expect(COLOR_THEMES.rose.accent).toBe(
-      'color-mix(in oklch, oklch(from #fdf2f4 l calc(c * 2) h) 20%, #3b1c26 5%)'
+      'color-mix(in oklch, oklch(from #fdf2f4 l calc(c * 10) h) 8%, #3b1c26 6%)'
     )
   })
 })
