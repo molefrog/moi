@@ -82,7 +82,7 @@ export function deriveThemeColors({
     background,
     foreground,
     muted: `color-mix(in oklch, ${background} 95%, ${foreground} 5%)`,
-    accent: `color-mix(in oklch, oklch(from ${background} l calc(c * 10) h) 8%, ${foreground} 6%)`
+    accent: `color-mix(in oklch, oklch(from ${background} l calc(c * 10) h) 6%, ${foreground} 6%)`
   }
 }
 
