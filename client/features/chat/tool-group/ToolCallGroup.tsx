@@ -148,6 +148,7 @@ function ReasoningRow({ isFirst, isLast, text, inProgress = false }: ReasoningRo
         <button
           type="button"
           title={`${label}: ${text}`}
+          aria-expanded={expanded}
           onClick={() => setOpen(o => !o)}
           className={cn(HEADER, 'cursor-pointer')}
         >
