@@ -83,14 +83,14 @@ export function HomePage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2 md:grid-cols-3">
             {workspaces.map(workspace => (
               <WorkspaceCard key={workspace.id} workspace={workspace} />
             ))}
           </div>
         </section>
       ) : (
-        <div className="mb-10 flex flex-col items-center gap-4 px-8 pt-6 pb-12 text-center">
+        <div className="mb-10 flex flex-col items-center gap-4 px-8 pt-8 pb-16 text-center">
           <IconEggCracked size={32} stroke={1.5} className="text-muted-foreground" />
           <div className="flex flex-col gap-1.5">
             <h2 className="font-medium">Let’s start with creating your first workspace</h2>
@@ -166,7 +166,7 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
   return (
     <Link href={`/workspace/${workspace.id}`} className="group flex min-w-0 flex-col gap-3">
       <WorkspacePreview workspaceId={workspace.id} />
-      <div className="flex min-w-0 flex-col gap-2 px-2 pb-2">
+      <div className="flex min-w-0 flex-col gap-2 px-2">
         <div
           className="flex min-w-0 items-center gap-1.5 font-sans"
           style={getWorkspaceThemeStyle(theme)}
