@@ -134,7 +134,10 @@ function WorkspaceButton({ workspace, dragOverlay = false, dragState }: Workspac
   const [location] = useLocation()
   const href = `/workspace/${workspace.id}`
   const label = workspaceDisplayName(workspace)
-  const active = location === href
+  // A workspace URL carries a tab suffix (`/workspace/:id/view:orders`), so the
+  // rail matches the workspace segment, not the whole path. The trailing slash
+  // keeps `/workspace/ws1` from lighting up a sibling `/workspace/ws1-other`.
+  const active = location === href || location.startsWith(`${href}/`)
   const content = (
     <>
       <div
