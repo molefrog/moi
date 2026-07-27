@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { COLOR_THEMES, FONT_THEMES } from '@/lib/themes'
+import { COLOR_THEMES, FONT_THEMES, deriveThemeColors } from '@/lib/themes'
 
 import { getWorkspaceThemeStyle } from './workspace-theme'
 
@@ -13,16 +13,22 @@ describe('getWorkspaceThemeStyle', () => {
   })
 
   test('combines selected font and color variables', () => {
+    const primary = COLOR_THEMES.paper.primary
+    if (!primary) throw new Error('expected paper primary')
+    const colors = deriveThemeColors(primary)
     const style = getWorkspaceThemeStyle({
       font: 'blobby',
-      ...COLOR_THEMES.paper
+      primary
     })
 
     expect(style).toMatchObject({
       '--sans': FONT_THEMES.blobby.sans,
       '--mono': FONT_THEMES.blobby.mono,
-      '--background': COLOR_THEMES.paper.background,
-      '--foreground': COLOR_THEMES.paper.foreground
+      '--primary': colors.primary,
+      '--primary-foreground': colors.primaryForeground,
+      '--background': colors.background,
+      '--foreground': colors.foreground,
+      '--accent': colors.accent
     })
   })
 

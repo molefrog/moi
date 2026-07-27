@@ -5,12 +5,7 @@ import { IconCircleCheckFilled } from '@tabler/icons-react'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { BottomPanel } from '@/client/components/shared/BottomPanel'
 import { cn } from '@/client/lib/cn'
-import {
-  COLOR_THEMES,
-  type ColorThemeConfig,
-  FONT_THEMES,
-  getThemeColorOverrides
-} from '@/lib/themes'
+import { COLOR_THEMES, type ColorThemeConfig, FONT_THEMES, deriveThemeColors } from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/types'
 
 const ALL_FONT_PREVIEW_ID = 'mei-font-previews'
@@ -34,8 +29,8 @@ const FONT_OPTIONS = Object.entries(FONT_THEMES) as [FontTheme, (typeof FONT_THE
 
 const COLOR_OPTIONS = Object.entries(COLOR_THEMES) as [ColorTheme, ColorThemeConfig][]
 
-function presetMatches(preset: ColorThemeConfig, bg?: string, fg?: string): boolean {
-  return (preset.background ?? undefined) === bg && (preset.foreground ?? undefined) === fg
+function presetMatches(preset: ColorThemeConfig, primary?: string): boolean {
+  return (preset.primary ?? undefined) === primary
 }
 
 type CustomizeOptionGroupProps = {
@@ -88,11 +83,10 @@ export function CustomizePanel({ ref }: CustomizePanelProps) {
   usePreloadAllFonts()
   const { layout, setLayout } = useWorkspaceLayoutCtx()
   const currentFont = layout.theme?.font ?? 'default'
-  const currentBg = layout.theme?.background
-  const currentFg = layout.theme?.foreground
+  const currentPrimary = layout.theme?.primary
 
-  function setTheme(update: Partial<NonNullable<typeof layout.theme>>) {
-    setLayout({ theme: { ...layout.theme, font: currentFont, ...update } })
+  function setTheme(font: FontTheme, primary: string | undefined) {
+    setLayout({ theme: { font, ...(primary ? { primary } : {}) } })
   }
 
   return (
@@ -104,7 +98,7 @@ export function CustomizePanel({ ref }: CustomizePanelProps) {
               key={key}
               active={key === currentFont}
               fontFamily={config.sans}
-              onSelect={() => setTheme({ font: key })}
+              onSelect={() => setTheme(key, currentPrimary)}
             >
               <div className="flex flex-col">
                 <span className="text-sm font-medium">{config.label}</span>
@@ -118,17 +112,21 @@ export function CustomizePanel({ ref }: CustomizePanelProps) {
           {COLOR_OPTIONS.map(([key, preset]) => (
             <CustomizeOption
               key={key}
-              active={presetMatches(preset, currentBg, currentFg)}
-              onSelect={() => setTheme(getThemeColorOverrides(preset))}
+              active={presetMatches(preset, currentPrimary)}
+              onSelect={() => setTheme(currentFont, preset.primary)}
             >
               <div className="flex gap-2">
                 <span
                   className="size-5 shrink-0 rounded-full border border-border"
-                  style={{ backgroundColor: preset.background ?? 'oklch(1 0 0)' }}
+                  style={{ backgroundColor: preset.primary ?? 'oklch(0.205 0 0)' }}
                 >
                   <span
                     className="flex size-full items-center justify-center text-[9px] leading-none font-bold"
-                    style={{ color: preset.foreground ?? 'oklch(0.145 0 0)' }}
+                    style={{
+                      color: preset.primary
+                        ? deriveThemeColors(preset.primary).primaryForeground
+                        : 'oklch(0.985 0 0)'
+                    }}
                   >
                     A
                   </span>

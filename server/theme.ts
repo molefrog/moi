@@ -1,4 +1,4 @@
-import { COLOR_THEMES, FONT_THEMES, getThemeColorOverrides } from '@/lib/themes'
+import { COLOR_THEMES, FONT_THEMES } from '@/lib/themes'
 import type { ColorTheme, FontTheme, WorkspaceLayout } from '@/lib/types'
 
 type ThemeShape = NonNullable<WorkspaceLayout['theme']>
@@ -8,9 +8,8 @@ export type ThemeUpdateResult =
   | { ok: true; theme: ThemeShape; applied: { font?: FontTheme; color?: ColorTheme } }
   | { ok: false; error: string }
 
-// Pure merge + validation for a theme update. Spreads the existing theme so
-// setting one axis never wipes the other. 'default' color is stored as
-// undefined color tokens, which JSON.stringify drops on save.
+// Pure merge + validation for a theme update. The workspace stores only the
+// selected font and primary; all other color tokens are derived at runtime.
 export function applyThemeUpdate(
   current: WorkspaceLayout['theme'],
   update: ThemeUpdate
@@ -22,14 +21,10 @@ export function applyThemeUpdate(
     return { ok: false, error: `Unknown color theme: ${update.color}` }
   }
 
+  const primary = update.color ? COLOR_THEMES[update.color as ColorTheme].primary : current?.primary
   const theme: ThemeShape = {
-    ...current,
-    font: (update.font as FontTheme) ?? current?.font ?? 'default'
-  }
-
-  if (update.color) {
-    const preset = COLOR_THEMES[update.color as ColorTheme]
-    Object.assign(theme, getThemeColorOverrides(preset))
+    font: (update.font as FontTheme) ?? current?.font ?? 'default',
+    ...(primary ? { primary } : {})
   }
 
   return {
@@ -42,13 +37,13 @@ export function applyThemeUpdate(
   }
 }
 
-// Reverse-lookup: resolve stored bg/fg to a preset key, or null for custom colors.
-export function matchColorTheme(bg: string | undefined, fg: string | undefined): ColorTheme | null {
+// Reverse-lookup: resolve the stored primary to a preset key, or null for custom colors.
+export function matchColorTheme(primary: string | undefined): ColorTheme | null {
   for (const [key, preset] of Object.entries(COLOR_THEMES) as [
     ColorTheme,
     (typeof COLOR_THEMES)[ColorTheme]
   ][]) {
-    if (preset.background === bg && preset.foreground === fg) return key
+    if (preset.primary === primary) return key
   }
   return null
 }

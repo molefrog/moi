@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import type { CSSProperties } from 'react'
 
-import { FONT_THEMES, THEME_COLOR_TOKENS } from '@/lib/themes'
+import { FONT_THEMES, THEME_COLOR_TOKENS, deriveThemeColors } from '@/lib/themes'
 import type { ThemeColorToken } from '@/lib/themes'
 import type { WorkspaceLayout } from '@/lib/types'
 
@@ -30,11 +30,12 @@ function themeColorProperty(token: ThemeColorToken): `--${string}` {
 export function getWorkspaceThemeStyle(theme: WorkspaceLayout['theme']): WorkspaceThemeStyle {
   const style: WorkspaceThemeStyle = {}
   const font = FONT_THEMES[theme?.font ?? 'default'] ?? FONT_THEMES.default
+  const colors = theme?.primary ? deriveThemeColors(theme.primary) : undefined
   for (const [token, property] of WORKSPACE_FONT_PROPERTIES) {
     style[property] = font[token]
   }
   for (const [token, property] of WORKSPACE_COLOR_PROPERTIES) {
-    style[property] = theme?.[token]
+    style[property] = colors?.[token]
   }
   return style
 }

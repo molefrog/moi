@@ -55,45 +55,47 @@ export const FONT_THEMES: Record<FontTheme, FontThemeConfig> = {
 
 export type ColorTheme = 'default' | 'paper' | 'sand' | 'rose' | 'lavender' | 'mint' | 'sky'
 
-type ThemeColorSource = {
-  background: string
+function relativeLuminance(hex: string): number {
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) {
+    throw new Error(`Primary theme color must use #rrggbb: ${hex}`)
+  }
+
+  const channels = [1, 3, 5].map(index => {
+    const channel = Number.parseInt(hex.slice(index, index + 2), 16) / 255
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+}
+
+function foregroundForPrimary(primary: string): string {
+  return relativeLuminance(primary) > 0.24 ? '#000000' : '#ffffff'
 }
 
 const THEME_COLOR_DERIVATIONS = {
-  background: ({ background }) => background,
-  foreground: () =>
-    `color-mix(in oklch, oklch(from var(--background) l calc(c * 10) h) 32%, black 68%)`,
+  primary: primary => primary,
+  primaryForeground: primary => foregroundForPrimary(primary),
+  background: () => 'color-mix(in oklch, var(--primary) 3%, white 97%)',
+  foreground: () => 'color-mix(in oklch, var(--primary) 24%, black 76%)',
   muted: () => 'color-mix(in oklch, var(--background) 95%, var(--foreground) 5%)',
   mutedForeground: () => 'color-mix(in oklch, var(--background) 58%, var(--foreground) 42%)',
-  accent: () =>
-    'color-mix(in oklch, oklch(from var(--background) l calc(c * 10) h) 6%, var(--foreground) 6%)'
-} satisfies Record<string, (source: ThemeColorSource) => string>
+  accent: () => 'color-mix(in oklch, var(--primary) 5%, var(--foreground) 5%)'
+} satisfies Record<string, (primary: string) => string>
 
 export type ThemeColorToken = keyof typeof THEME_COLOR_DERIVATIONS
 export type ThemeColors = Record<ThemeColorToken, string>
-export type ThemeColorOverrides = Partial<ThemeColors>
 
 export type ColorThemeConfig = {
   label: string
-  // undefined colors = no override, reveals :root defaults
-} & ThemeColorOverrides
+  // undefined primary = no override, reveals :root defaults
+  primary?: string
+}
 
 export const THEME_COLOR_TOKENS = Object.keys(THEME_COLOR_DERIVATIONS) as ThemeColorToken[]
 
-export function getThemeColorOverrides(
-  theme: ThemeColorOverrides | undefined
-): ThemeColorOverrides {
-  const overrides: ThemeColorOverrides = {}
-  for (const token of THEME_COLOR_TOKENS) {
-    overrides[token] = theme?.[token]
-  }
-  return overrides
-}
-
-export function deriveThemeColors(source: ThemeColorSource): ThemeColors {
+export function deriveThemeColors(primary: string): ThemeColors {
   const colors = {} as ThemeColors
   for (const token of THEME_COLOR_TOKENS) {
-    colors[token] = THEME_COLOR_DERIVATIONS[token](source)
+    colors[token] = THEME_COLOR_DERIVATIONS[token](primary)
   }
   return colors
 }
@@ -102,26 +104,26 @@ export const COLOR_THEMES: Record<ColorTheme, ColorThemeConfig> = {
   default: { label: 'Default' },
   paper: {
     label: 'Paper',
-    ...deriveThemeColors({ background: '#fcfaf8' })
+    primary: '#453521'
   },
   sand: {
     label: 'Sand',
-    ...deriveThemeColors({ background: '#f5f0e8' })
+    primary: '#ff8700'
   },
   rose: {
     label: 'Rose',
-    ...deriveThemeColors({ background: '#fef6f8' })
+    primary: '#f13c3c'
   },
   lavender: {
     label: 'Lavender',
-    ...deriveThemeColors({ background: '#f8f7fd' })
+    primary: '#9051ff'
   },
   mint: {
-    label: 'Mint',
-    ...deriveThemeColors({ background: '#f7fcfa' })
+    label: 'Tropics',
+    primary: '#00914a'
   },
   sky: {
     label: 'Sky',
-    ...deriveThemeColors({ background: '#f6fafd' })
+    primary: '#007ae3'
   }
 }

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'path'
 import pc from './cli-pc'
 
-import { COLOR_THEMES, FONT_THEMES } from '@/lib/themes'
+import { COLOR_THEMES, FONT_THEMES, deriveThemeColors } from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/themes'
 import { isParamsRecord } from '@/lib/workspace-tabs'
 import type {
@@ -632,6 +632,12 @@ function swatch(bg?: string, fg?: string): string {
   return `\x1b[48;2;${br};${bgg};${bb}m\x1b[38;2;${fr};${fgg};${fb}m Aa \x1b[0m`
 }
 
+function themeSwatch(primary?: string): string {
+  if (!primary) return swatch()
+  const colors = deriveThemeColors(primary)
+  return swatch(colors.primary, colors.primaryForeground)
+}
+
 const theme = defineCommand({
   meta: { name: 'theme', description: 'Show or set the workspace font and color themes' },
   args: {
@@ -680,7 +686,7 @@ const theme = defineCommand({
         }
         if (res.color) {
           const preset = COLOR_THEMES[res.color as ColorTheme]
-          const chip = swatch(preset.background, preset.foreground)
+          const chip = themeSwatch(preset.primary)
           console.log(pc.green('✓') + ' Color set to ' + pc.bold(preset.label) + ' ' + chip)
         }
         console.log()
@@ -721,7 +727,7 @@ const theme = defineCommand({
           selected ? pc.green('→') : ' ',
           selected ? pc.bold(key) : key,
           c.label,
-          swatch(c.background, c.foreground)
+          themeSwatch(c.primary)
         ]
       })
       console.log(pc.dim('  Colors'))

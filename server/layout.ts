@@ -1,6 +1,5 @@
 import { join } from 'path'
 
-import { deriveThemeColors } from '@/lib/themes'
 import type { WorkspaceLayout, WorkspacePreview } from '@/lib/types'
 import { createDefaultWorkspaceLayout, createDefaultWorkspaceTabs } from '@/lib/workspace-layout'
 import { isWorkspaceTabId } from '@/lib/workspace-tabs'
@@ -22,17 +21,7 @@ function normalizeLayout(parsed: Record<string, unknown>): WorkspaceLayout {
   layout.tabs = normalizeTabs(layout.tabs)
   delete layout.sectionMode
   delete layout.chatMode
-  const normalized = layout as unknown as WorkspaceLayout
-  const theme = normalized.theme
-  if (theme?.background) {
-    Object.assign(
-      theme,
-      deriveThemeColors({
-        background: theme.background
-      })
-    )
-  }
-  return normalized
+  return layout as unknown as WorkspaceLayout
 }
 
 export function getLayoutPath(workspacePath: string): string {

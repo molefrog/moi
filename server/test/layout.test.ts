@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-import { deriveThemeColors } from '@/lib/themes'
+import { COLOR_THEMES } from '@/lib/themes'
 import type { WorkspaceLayout } from '@/lib/types'
 
 import { getLayoutPath, getWorkspacePreview, loadLayout, mergeLayoutForSave } from '../layout'
@@ -150,40 +150,32 @@ describe('mergeLayoutForSave', () => {
       layoutMode: 'split',
       tabs: { open: ['agent', 'widgets'], active: 'widgets' },
       selectedModel: 'sonnet',
-      theme: { font: 'default', background: '#000', foreground: '#fff' }
+      theme: { font: 'default', primary: '#123456' }
     }
     const merged = mergeLayoutForSave(existing, body)
     expect(merged.layoutMode).toBe('split')
     expect(merged.tabs).toEqual({ open: ['agent', 'widgets'], active: 'widgets' })
     expect(merged.selectedModel).toBe('sonnet')
-    expect(merged.theme).toEqual({ font: 'default', background: '#000', foreground: '#fff' })
+    expect(merged.theme).toEqual({ font: 'default', primary: '#123456' })
     expect(merged.name).toBe('Keep')
   })
 })
 
 describe('getWorkspacePreview', () => {
-  test('includes the workspace color theme with refreshed generated tokens', async () => {
+  test('includes the persisted workspace color theme', async () => {
+    const theme = {
+      font: 'default' as const,
+      primary: COLOR_THEMES.rose.primary
+    }
     await withWorkspaceFile(
       {
         ...base,
-        theme: {
-          font: 'default',
-          background: '#fdf2f4',
-          foreground: '#3b1c26',
-          muted: 'stale-muted',
-          mutedForeground: 'stale-muted-foreground',
-          accent: 'color-mix(in oklch, #3b1c26 7%, transparent)'
-        }
+        theme
       },
       async dir => {
         expect(await getWorkspacePreview(dir)).toEqual({
           thumbnails: [],
-          theme: {
-            font: 'default',
-            ...deriveThemeColors({
-              background: '#fdf2f4'
-            })
-          }
+          theme
         })
       }
     )

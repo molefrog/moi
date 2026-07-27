@@ -1,5 +1,4 @@
 import type { PreviewBlock, StreamEvent } from './format'
-import type { ThemeColorOverrides } from './themes'
 
 export type WidgetConfig = {
   rowSpan: 1 | 2 | 3 | 4
@@ -517,7 +516,8 @@ export type WorkspaceLayout = {
   selectedEffort?: string
   theme?: {
     font: import('./themes').FontTheme
-  } & ThemeColorOverrides
+    primary?: string
+  }
   // Widget thumbnails captured client-side from the live grid, used for
   // home-screen previews. Saved through their own endpoint (PUT
   // .../thumbnails), never through the layout PUT.
