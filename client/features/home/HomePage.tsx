@@ -67,11 +67,11 @@ export function HomePage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-8 pt-14 pb-16">
-      <HomeLogo className="mb-8" />
+      <HomeLogo className="mb-10" />
 
       {count > 0 ? (
-        <section className="mb-10">
-          <div className="mb-2 flex items-center justify-between gap-2">
+        <section className="mb-12">
+          <div className="mb-4 flex items-center justify-between gap-2">
             <h1 className="text-sm font-medium text-foreground">My workspaces</h1>
             <CreateWorkspaceDialog
               trigger={
@@ -83,7 +83,7 @@ export function HomePage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2 md:grid-cols-3">
             {workspaces.map(workspace => (
               <WorkspaceCard key={workspace.id} workspace={workspace} />
             ))}
@@ -164,10 +164,7 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
   const updatedAt = previewQuery.data?.updatedAt ?? new Date(workspace.addedAt).getTime()
 
   return (
-    <Link
-      href={`/workspace/${workspace.id}`}
-      className="group flex min-w-0 flex-col gap-4 rounded-xl bg-card p-2 shadow-xs transition-shadow hover:shadow-sm"
-    >
+    <Link href={`/workspace/${workspace.id}`} className="group flex min-w-0 flex-col gap-3">
       <WorkspacePreview workspaceId={workspace.id} />
       <div className="flex min-w-0 flex-col gap-2 px-2 pb-2">
         <div

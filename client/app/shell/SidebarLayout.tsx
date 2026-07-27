@@ -55,12 +55,7 @@ export function SidebarLayout({
   })
 
   return (
-    <div
-      className={cn(
-        'flex h-dvh bg-muted',
-        "relative isolate before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:bg-[url('./assets/noise.gif')] before:bg-size-[300px_300px] before:bg-repeat before:opacity-3 before:mix-blend-hard-light before:content-['']"
-      )}
-    >
+    <div className={cn('flex h-dvh bg-muted')}>
       <Sidebar workspaces={showWorkspaces ? (workspaces ?? []) : []} />
       <main
         className={cn(

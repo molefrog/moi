@@ -302,7 +302,7 @@ function HomeLogoGlyph({ geometry }: HomeLogoGlyphProps) {
   return (
     <svg
       ref={svgRef}
-      className="h-10 w-auto"
+      className="h-8 w-auto"
       viewBox={`0 0 ${geometry.width} ${geometry.height}`}
       fill="currentColor"
       aria-hidden="true"
