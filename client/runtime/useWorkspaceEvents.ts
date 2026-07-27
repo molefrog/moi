@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 
 import { wsUrl } from '@/client/lib/ws-url'
-import type { ViewBuilder, ViewInfo, WidgetInfo } from '@/lib/types'
+import type { AppSettings, ViewBuilder, ViewInfo, WidgetInfo } from '@/lib/types'
 
 export type WorkspaceEvent =
   | { type: 'widget:updated'; name: string }
@@ -23,6 +23,9 @@ export type WorkspaceEvent =
   // The Scratchpad canvas for `workspaceId` was saved — open tabs reload from
   // disk. `origin` is the tab that wrote it, so that tab can skip its own echo.
   | { type: 'scratchpad:updated'; workspaceId: string; origin?: string }
+  // App settings changed (PATCH /api/settings from any client) — carries the
+  // new value so caches update without a refetch.
+  | { type: 'settings:updated'; settings: AppSettings }
 
 type WorkspaceEventHandler = (event: WorkspaceEvent) => void
 

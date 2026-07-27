@@ -8,12 +8,16 @@ import type { AppSettings } from '@/lib/types'
 import { api } from './api'
 import { setAppSettingsDir } from './app-settings'
 import { DATA_DIR } from './data-dir'
+import { setEventServer } from './events'
 
 let tempDir = ''
+let published: unknown[] = []
 
 beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), 'moi-app-settings-'))
   setAppSettingsDir(tempDir)
+  published = []
+  setEventServer({ publish: (_topic, data) => published.push(JSON.parse(data)) })
 })
 
 afterEach(async () => {
@@ -47,6 +51,9 @@ describe('app settings API', () => {
 
     const readBack = await api.request('/api/settings')
     expect(((await readBack.json()) as AppSettings).autoUpdateSkills).toBe(true)
+
+    // Other open clients learn about the change over the live-event channel.
+    expect(published).toEqual([{ type: 'settings:updated', settings: { autoUpdateSkills: true } }])
   })
 
   test('rejects a non-boolean flag and unknown-only patches change nothing', async () => {
