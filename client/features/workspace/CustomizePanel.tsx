@@ -1,4 +1,6 @@
-import { type Ref, useEffect } from 'react'
+import { type ReactNode, type Ref, useEffect } from 'react'
+
+import { IconCircleCheckFilled } from '@tabler/icons-react'
 
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { BottomPanel } from '@/client/components/shared/BottomPanel'
@@ -31,6 +33,48 @@ function presetMatches(preset: ColorThemeConfig, bg?: string, fg?: string): bool
   return (preset.background ?? undefined) === bg && (preset.foreground ?? undefined) === fg
 }
 
+type CustomizeOptionGroupProps = {
+  children: ReactNode
+  label: string
+}
+
+function CustomizeOptionGroup({ children, label }: CustomizeOptionGroupProps) {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <div role="group" aria-label={label} className="grid grid-cols-3 gap-2">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+type CustomizeOptionProps = {
+  active: boolean
+  children: ReactNode
+  fontFamily?: string
+  onSelect: () => void
+}
+
+function CustomizeOption({ active, children, fontFamily, onSelect }: CustomizeOptionProps) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onSelect}
+      className={cn(
+        'relative w-full rounded-md bg-card text-left ring-1 ring-border transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+        'flex items-center gap-2 p-3',
+        !active && 'cursor-pointer pr-9 opacity-70 hover:opacity-100'
+      )}
+      style={fontFamily ? { fontFamily } : undefined}
+    >
+      <div className="flex-1">{children}</div>
+      {active && <IconCircleCheckFilled size={20} stroke={1.5} aria-hidden="true" />}
+    </button>
+  )
+}
+
 type CustomizePanelProps = {
   ref?: Ref<HTMLDivElement>
 }
@@ -49,67 +93,48 @@ export function CustomizePanel({ ref }: CustomizePanelProps) {
   return (
     <BottomPanel ref={ref} title="Customize">
       <div className="flex flex-col gap-6">
-        {/* Font picker */}
-        <div className="flex flex-col gap-2">
-          <p className="text-xs font-medium text-muted-foreground">Font</p>
-          <div className="grid grid-cols-3 gap-2">
-            {FONT_OPTIONS.map(([key, config]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setTheme({ font: key })}
-                className={cn(
-                  'flex flex-col items-start rounded-lg px-3 py-2 text-left transition-colors',
-                  key === currentFont
-                    ? 'bg-primary/5 ring-2 ring-primary'
-                    : 'border-transparent hover:bg-accent'
-                )}
-                style={{ fontFamily: config.sans }}
-              >
+        <CustomizeOptionGroup label="Font">
+          {FONT_OPTIONS.map(([key, config]) => (
+            <CustomizeOption
+              key={key}
+              active={key === currentFont}
+              fontFamily={config.sans}
+              onSelect={() => setTheme({ font: key })}
+            >
+              <div className="flex flex-col">
                 <span className="text-sm font-medium">{config.label}</span>
                 <span className="text-xs text-muted-foreground">{config.feel}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+              </div>
+            </CustomizeOption>
+          ))}
+        </CustomizeOptionGroup>
 
-        {/* Color palette */}
-        <div className="flex flex-col gap-2">
-          <p className="text-xs font-medium text-muted-foreground">Colors</p>
-          <div className="grid grid-cols-3 gap-2">
-            {COLOR_OPTIONS.map(([key, preset]) => {
-              const active = presetMatches(preset, currentBg, currentFg)
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() =>
-                    setTheme({ background: preset.background, foreground: preset.foreground })
-                  }
-                  className={cn(
-                    'flex items-center gap-2 rounded-md px-3 py-2 ring-border transition-colors',
-                    active
-                      ? 'bg-primary/5 ring-2 ring-primary'
-                      : 'border-transparent hover:bg-accent'
-                  )}
+        <CustomizeOptionGroup label="Colors">
+          {COLOR_OPTIONS.map(([key, preset]) => (
+            <CustomizeOption
+              key={key}
+              active={presetMatches(preset, currentBg, currentFg)}
+              onSelect={() =>
+                setTheme({ background: preset.background, foreground: preset.foreground })
+              }
+            >
+              <div className="flex gap-2">
+                <span
+                  className="size-5 shrink-0 rounded-full border border-border"
+                  style={{ backgroundColor: preset.background ?? 'oklch(1 0 0)' }}
                 >
                   <span
-                    className="size-5 shrink-0 rounded-full border border-border"
-                    style={{ backgroundColor: preset.background ?? 'oklch(1 0 0)' }}
+                    className="flex size-full items-center justify-center text-[9px] leading-none font-bold"
+                    style={{ color: preset.foreground ?? 'oklch(0.145 0 0)' }}
                   >
-                    <span
-                      className="flex size-full items-center justify-center text-[9px] leading-none font-bold"
-                      style={{ color: preset.foreground ?? 'oklch(0.145 0 0)' }}
-                    >
-                      A
-                    </span>
+                    A
                   </span>
-                  <span className="text-sm">{preset.label}</span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
+                </span>
+                <span className="text-sm">{preset.label}</span>
+              </div>
+            </CustomizeOption>
+          ))}
+        </CustomizeOptionGroup>
       </div>
     </BottomPanel>
   )
