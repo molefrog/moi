@@ -40,7 +40,7 @@ export function ReadImagePreview({ relPath }: ReadImagePreviewProps) {
       alt={relPath}
       loading="lazy"
       onError={() => setFailed(true)}
-      className="max-h-64 max-w-full self-start rounded-md border border-border object-contain"
+      className="max-h-64 max-w-full self-start rounded-lg border border-border object-contain"
     />
   )
 }

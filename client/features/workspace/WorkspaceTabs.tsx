@@ -183,7 +183,7 @@ export function WorkspaceTabs({
           className="flex w-max items-center gap-1"
           onReorder={ordered => onReorder(ordered as WorkspaceTabId[])}
           renderPlaceholder={() => (
-            <div className="pointer-events-none absolute inset-0 rounded-xs bg-muted" />
+            <div className="pointer-events-none absolute inset-0 rounded-md bg-muted" />
           )}
           renderOverlay={tab => <WorkspaceTab tab={tab} active={active === tab.key} preview />}
           renderItem={(tab, state) => (

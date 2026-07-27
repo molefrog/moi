@@ -12,6 +12,8 @@ moi is a local AI space. The host app should feel calm, precise, compact, and a 
 
 Prefer density with breathing room. Use readable logs, compact controls, quiet panel chrome, and clear interaction states. Personality should come from product-specific copy, icons, and small interaction moments. Avoid gradients, decorative blobs, oversized type, dramatic shadows, large empty hero layouts, and one-off visual systems.
 
+Never use purple gradients anywhere. They read as generic AI-generated styling and are outside moi's visual language.
+
 Keep shapes tight and utilitarian. Use component-defined radii, with softer panels and dialogs. Reserve full rounding for pills and circular controls. Do not mix several radius families in one surface.
 
 ## Color and Typography
@@ -28,19 +30,23 @@ Use semantic color tokens by intent:
 
 Do not add raw color utilities, manual `dark:` colors, or `foreground` alpha fills. Use alpha only when the semantic token already has the correct role. Do not add, rename, or redefine tokens without explicit owner approval. If no token fits, use the closest semantic role and report the limitation.
 
-Use `font-sans` for UI, including paths and ids. Reserve `font-mono` for code and fixed-width alignment. Keep titles modest and metadata quiet. Agents use only regular weight and medium for emphasis. Other weights are reserved for owner hand-tuning. Use `tabular-nums` where alignment matters.
+Use a small, consistent type scale. `text-sm` (14px) is the default for UI text. Use smaller text only for genuinely compact metadata and larger text only for clear headings. Do not create many label styles with slightly different sizes.
+
+Keep text contrast clear. Use `foreground` for primary content and `muted-foreground` for genuinely secondary content. Avoid several near-identical text styles that make hierarchy hard to read.
+
+Use `font-sans` for UI, including paths, ids, and numbers. Reserve `font-mono` for code. When numbers need stable alignment, keep the main font and use `tabular-nums` where available. Keep titles modest and metadata quiet. Agents use only regular weight and medium for emphasis. Other weights are reserved for owner hand-tuning.
 
 ## Layout and Hierarchy
 
 Build hierarchy with type weight, spacing, tonal surfaces, and subtle shadow-defined edges. Use the Tailwind scale and component sizes instead of copying numeric geometry into feature code.
 
-Use subtle shadows instead of borders for standalone contained blocks and outline-style controls. Keep nested elements flat unless they represent a separate contained object. For interactive elements, let the shadow become one step darker or deeper on hover using the existing shadow scale. Use CSS borders only for separators and hard structural boundaries.
+Use subtle shadows instead of borders for standalone contained blocks and outline-style controls. Keep nested elements flat unless they represent a separate contained object. For interactive elements, let the shadow become one step darker or deeper on hover using the existing shadow scale. Use CSS borders only for separators and hard structural boundaries, and keep them subtle with the semantic `border` token. Do not use black or high-contrast 1px outlines around containers, including dashed outlines.
 
 Respect the layout variables in `client/index.css`; do not hardcode equivalent page or chat dimensions. Make layouts work at narrow and wide widths without clipped controls, overlapping text, or large dead areas.
 
 Repeated rows must form stable lanes. Give leading icons, status markers, counters, and trailing actions fixed slots so changing content does not shift alignment. Keep component trees shallow and split components for state, data flow, repeated structure, or meaningful sub-surfaces.
 
-Avoid cards inside cards. Page sections should usually be unframed regions, panels, or bordered rows. Use a framed surface only when it represents a real contained object, preview, dialog, or tool.
+Use container borders sparingly. Avoid cards inside cards and chains of bordered, padded wrappers. A section should usually have at most one framed surface. Inside it, create hierarchy with spacing, typography, tonal surfaces, dividers, or flat rows. Add another frame only when it contains a genuinely separate object, preview, dialog, or tool.
 
 ## Components and Accessibility
 

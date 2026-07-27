@@ -17,6 +17,9 @@ import {
 } from '@/client/features/chat/ChatPromptBubbles'
 import { cn } from '@/client/lib/cn'
 
+const ONBOARDING_HANDOFF_DIRECTIVE =
+  'Keep the final reply brief and user-facing. Do not include file or storage links, file paths, or bundle, test, and runtime-log summaries.'
+
 export const CHAT_WELCOME_PROMPTS = [
   {
     label: "What's the weather?",
@@ -27,7 +30,8 @@ export const CHAT_WELCOME_PROMPTS = [
       "Create three separate widgets: current conditions, today's hourly forecast, and a seven-day outlook.",
       'Use one shared Open-Meteo server function with no API key and use Berlin as the default location.',
       'Give each widget an appropriate grid size and a compact, visually distinct layout with loading, error, and last-updated states.',
-      'Bundle all three widgets, smoke-test the shared weather function, and check runtime logs before finishing.'
+      'Bundle all three widgets, smoke-test the shared weather function, and check runtime logs before finishing.',
+      ONBOARDING_HANDOFF_DIRECTIVE
     ],
     icon: IconUmbrella2
   },
@@ -40,7 +44,8 @@ export const CHAT_WELCOME_PROMPTS = [
       "Create a responsive View that uses the browser's audio capabilities, with an onscreen piano and computer-keyboard controls.",
       'Include five clearly labeled sound controls for waveform, attack, release, filter cutoff, and volume.',
       'Let the user record timed note events, play and stop recordings, give them names, and save and load them as JSON music files in a workspace music folder.',
-      'Include clear empty and error states, then bundle the View and check runtime logs before finishing.'
+      'Include clear empty and error states, then bundle the View and check runtime logs before finishing.',
+      ONBOARDING_HANDOFF_DIRECTIVE
     ],
     icon: IconPiano
   },
@@ -55,7 +60,8 @@ export const CHAT_WELCOME_PROMPTS = [
       'When a page blocks parsing or lacks metadata, keep the URL and provide editable manual fields.',
       'Support moving opportunities between stages, editing their details and notes, and referencing related workspace files.',
       'Persist the board in a workspace-local JSON file and include loading, empty, and error states.',
-      'Bundle the View and smoke-test its persistence and parsing functions before finishing.'
+      'Bundle the View and smoke-test its persistence and parsing functions before finishing.',
+      ONBOARDING_HANDOFF_DIRECTIVE
     ],
     icon: IconBriefcase
   }
@@ -114,7 +120,7 @@ type WelcomeProps = {
 
 export function ChatWelcome({ disabled = false, onSelectPrompt }: WelcomeProps) {
   return (
-    <div className={cn(EMPTY_STATE_STYLES, 'max-w-md min-w-0')}>
+    <div className={cn(EMPTY_STATE_STYLES, 'max-w-md min-w-0 self-center')}>
       <div className="prose prose-sm min-w-0 wrap-anywhere prose-inherit">
         <p>moi is the visual workspace for you and your agent.</p>
         <p>

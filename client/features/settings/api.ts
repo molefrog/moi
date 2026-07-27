@@ -3,7 +3,39 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import type { WorkspaceEntry, WorkspaceEnvView } from '@/lib/types'
+import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
+import type { AppSettings, WorkspaceEntry, WorkspaceEnvView } from '@/lib/types'
+
+// App-wide settings (server-side settings.json, GET/PATCH /api/settings) —
+// shared by every workspace, unlike the per-workspace queries below.
+export const appSettingsKey = ['app-settings'] as const
+
+export function useAppSettings() {
+  const queryClient = useQueryClient()
+  // Another client can change settings; the server broadcasts the new value
+  // over the live-events socket so every open client stays in sync.
+  useWorkspaceEvent(event => {
+    if (event.type === 'settings:updated') {
+      queryClient.setQueryData<AppSettings>(appSettingsKey, event.settings)
+    }
+  })
+  return useQuery<AppSettings>({
+    queryKey: appSettingsKey,
+    queryFn: () => requestJson('/api/settings'),
+    staleTime: 30_000
+  })
+}
+
+export function useSaveAppSettings() {
+  const queryClient = useQueryClient()
+  return useMutation<AppSettings, Error, Partial<AppSettings>>({
+    mutationFn: patch =>
+      requestJson('/api/settings', jsonRequest('PATCH', patch), 'Failed to save settings'),
+    onSuccess: next => {
+      queryClient.setQueryData<AppSettings>(appSettingsKey, next)
+    }
+  })
+}
 
 export function useWorkspaceEnv(workspaceId: string) {
   return useQuery<WorkspaceEnvView>({

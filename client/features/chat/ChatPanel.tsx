@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
 import { IconChevronDown, IconX } from '@tabler/icons-react'
 
@@ -16,6 +16,7 @@ import { ChatEmptyState, resolveChatEmptyState } from './ChatEmptyState'
 import { ChatSelector } from './ChatSelector'
 import { ThinkingIndicator, TurnView } from './TurnView'
 import { Button } from '@/client/components/ui/button'
+import { cn } from '@/client/lib/cn'
 import { useUiStore } from '@/client/store/ui'
 
 type ChatPanelProps = {
@@ -33,6 +34,7 @@ type ChatPanelProps = {
   processing: boolean
   error?: string | null
   onDismissError?: () => void
+  composerBanner?: ReactNode
   unavailableReason: string | null | undefined
   send: (text: string, options?: ChatSendOptions) => void
   stop: () => void
@@ -51,6 +53,7 @@ export function ChatPanel({
   processing,
   error,
   onDismissError,
+  composerBanner,
   unavailableReason,
   send,
   stop,
@@ -172,30 +175,40 @@ export function ChatPanel({
       </div>
 
       <div className="mx-auto flex w-full max-w-[calc(var(--chat-max-container)+24px)] flex-col px-3">
-        {error && (
-          <div className="mb-2 flex w-full items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            <span className="flex-1 wrap-break-word">{error}</span>
-            {onDismissError && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={onDismissError}
-                className="-m-1"
-                aria-label="Dismiss error"
-              >
-                <IconX stroke={1.75} />
-              </Button>
-            )}
-          </div>
-        )}
-        <ChatComposer
-          composerRef={composerRef}
-          onSend={handleSend}
-          onStop={stop}
-          processing={processing}
-          unavailableReason={unavailableReason}
-        />
+        <div
+          className={cn(
+            '@container flex w-full flex-col transition-[padding]',
+            (composerBanner || error) && 'gap-1 rounded-2xl p-2',
+            composerBanner && 'bg-muted',
+            error && 'bg-destructive/10'
+          )}
+        >
+          {composerBanner}
+          {error && (
+            <div className="flex w-full items-start gap-2 px-3 py-2 text-sm text-destructive">
+              <span className="flex-1 wrap-break-word">{error}</span>
+              {onDismissError && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={onDismissError}
+                  className="-m-1"
+                  aria-label="Dismiss error"
+                >
+                  <IconX stroke={1.75} />
+                </Button>
+              )}
+            </div>
+          )}
+          <ChatComposer
+            composerRef={composerRef}
+            onSend={handleSend}
+            onStop={stop}
+            processing={processing}
+            unavailableReason={unavailableReason}
+          />
+        </div>
       </div>
     </div>
   )

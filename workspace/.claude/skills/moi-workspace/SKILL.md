@@ -135,7 +135,7 @@ For more options, commands, use `moi help`.
 
 Every applet — a **Widget** or a **View** — is a default-exported React component in
 `.moi/<type>/<name>.tsx`, optionally paired with a `<name>.server.ts`. `moi bundle` compiles each
-into a live module the browser loads (edits hot-reload). Read `DESIGN.md` / `VIEW-DESIGN.md` first.
+into a live module the browser loads (edits hot-reload). Read `DESIGN.md` first.
 Write normal React + Tailwind — below is only what's **moi-specific**.
 
 ## Anatomy
@@ -161,6 +161,22 @@ Imports resolve relatively (same folder, or elsewhere under `.moi/` — e.g. `..
 from `.moi/package.json` deps — no `@/` aliases. Files starting with `_` (e.g. `_utils.tsx`) in
 `widgets/` and `views/` are never applet entry points — put code shared between applets there.
 `moi bundle` tracks these local imports: editing a shared module rebuilds every applet using it.
+
+## Applet styling
+
+- Use Tailwind for static styling. Do not add custom CSS, `@apply`, or static `style={{}}` values.
+- Use `style={{}}` only for computed data such as chart geometry, progress, per-item delays, or
+  per-frame transforms.
+- Use icons from `@tabler/icons-react`. Do not add raw SVG icons or another icon pack. When the
+  project provides `.agents/rules/icons.md`, follow its size and stroke policy.
+- Applets cannot import the host project's `cn`. Use a local `cx()` when classes are conditional;
+  do not build class names with template-literal ternaries.
+
+```tsx
+function cx(...classes: (string | false | undefined | null)[]) {
+  return classes.filter(Boolean).join(' ')
+}
+```
 
 ## Server functions — `<name>.server.ts`
 
@@ -259,8 +275,9 @@ export const config = {
 ```
 
 Render **content only**: a plain `h-full w-full` region with no card chrome (`rounded-*`,
-`shadow-*`, outer `border`, or a card-like background) — the dashboard owns the shell, spacing, and
-elevation. Changing `colSpan`/`rowSpan` needs `moi bundle --force`. See `DESIGN.md`.
+`shadow-*`, or outer `border`) — the dashboard owns the shell, spacing, and elevation. The content
+surface may use a background, color, gradient, image, or visualization. Changing
+`colSpan`/`rowSpan` needs `moi bundle --force`. See `DESIGN.md`.
 
 Typical loop: check/`bun install` deps → write `.moi/widgets/<name>.tsx` → `moi bundle` → it appears
 on the dashboard → change it and re-`bundle`, or `moi refresh` after mutating data, or any other `moi`
@@ -319,7 +336,7 @@ export const config = {
 ```
 
 The inverse of a widget: a view **owns its whole page** — its own `h-full w-full` layout, scrolling
-(`overflow-auto`), padding, and chrome. Build it to read like an app screen. See `VIEW-DESIGN.md`.
+(`overflow-auto`), padding, and chrome. Build it to read like an app screen. See `DESIGN.md`.
 
 # Keeping this skill current
 
@@ -328,9 +345,9 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **You'll know** — `moi` commands warn you when this skill is behind.
 - **To update** — run `moi skill update`. Never mid-task: finish first, or do it at the end.
 - **Re-read after updating** — `moi skill update` rewrites `SKILL.md` and its companion docs
-  (`DESIGN.md`, `VIEW-DESIGN.md`, `SCRATCHPAD.md`) on disk, so the copy already in your context is
-  stale. Re-read this `SKILL.md` before you rely on it again — don't act on the old version.
+  (`DESIGN.md` and `SCRATCHPAD.md`) on disk, so the copy already in your context is stale. Re-read
+  this `SKILL.md` before you rely on it again — don't act on the old version.
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.7.1" />
+<moi-skill version="0.8.0" />

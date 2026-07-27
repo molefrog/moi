@@ -8,6 +8,7 @@ import tailwind from 'bun-plugin-tailwind'
 import { realpathSync } from 'node:fs'
 import { basename, dirname, join, relative, sep } from 'path'
 
+import { APP_ICON_IDS, isAppIconId } from '@/lib/app-icons'
 import type { AppletKind, ViewConfig, WidgetConfig } from '@/lib/types'
 
 import { scopeAppletCss } from './applet-css'
@@ -161,9 +162,19 @@ export async function extractViewConfig(srcPath: string): Promise<ViewConfig | n
     if (prop.type !== 'Property' || prop.key?.type !== 'Identifier') continue
     const key = prop.key.name as string
 
-    if (key === 'title' || key === 'icon') {
+    if (key === 'title') {
       if (prop.value?.type === 'Literal' && typeof prop.value.value === 'string') {
-        result[key] = prop.value.value
+        result.title = prop.value.value
+      }
+      continue
+    }
+    if (key === 'icon') {
+      if (prop.value?.type === 'Literal' && typeof prop.value.value === 'string') {
+        const icon = prop.value.value
+        if (!isAppIconId(icon)) {
+          throw new Error(`Unknown view icon id "${icon}". Use one of: ${APP_ICON_IDS.join(', ')}`)
+        }
+        result.icon = icon
       }
       continue
     }

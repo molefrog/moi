@@ -43,7 +43,7 @@ describe('ChatWelcome', () => {
     expect(welcomeTerms.every(([term]) => term.includes('<svg'))).toBe(true)
     expect(promptButtons).toHaveLength(3)
     expect(promptButtons.every(([button]) => button.includes('<svg'))).toBe(true)
-    expect(html).toContain('rounded-lg')
+    expect(html).toContain('rounded-xl')
     expect(html).toContain('whitespace-normal')
     expect(html).toContain('What&#x27;s the weather?')
     expect(html).toContain('Build a fun synthesizer')
@@ -88,6 +88,11 @@ describe('ChatWelcome', () => {
     expect(synthesizer).toContain('JSON music files')
     expect(jobTracker).toContain('Saved, Applied, Interviewing, Offer, and Closed')
     expect(jobTracker).toContain('workspace-local JSON file')
+    for (const prompt of CHAT_WELCOME_PROMPTS) {
+      expect(prompt.context.at(-1)).toBe(
+        'Keep the final reply brief and user-facing. Do not include file or storage links, file paths, or bundle, test, and runtime-log summaries.'
+      )
+    }
 
     const html = renderToStaticMarkup(
       createElement(ChatWelcome, { onSelectPrompt: () => undefined })
@@ -102,5 +107,6 @@ describe('ChatWelcome', () => {
     expect(context).toContain('# This message only')
     expect(context).toContain('Open-Meteo')
     expect(context).toContain('smoke-test the shared weather function')
+    expect(context).toContain('Do not include file or storage links')
   })
 })

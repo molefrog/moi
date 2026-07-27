@@ -235,7 +235,7 @@ function ExistingFolderButton({ available, disabled, onClick }: ExistingFolderBu
     <Tooltip>
       <TooltipTrigger render={button} />
       <TooltipContent>
-        Run <code className="rounded-[4px] bg-accent px-1 py-0.5 font-mono">moi init</code> in the
+        Run <code className="rounded-xs bg-accent px-1 py-0.5 font-mono">moi init</code> in the
         folder to add it manually
       </TooltipContent>
     </Tooltip>

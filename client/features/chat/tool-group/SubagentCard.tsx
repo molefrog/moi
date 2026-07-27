@@ -114,7 +114,7 @@ export function SubagentCard({ call, cwd, isFirst, isLast, renderNestedParts }: 
                 the final summary (muted bg, roomier padding) below, split by a
                 border. The divider + summary segment only render when there's a
                 summary, so a steps-only card has no trailing border. */}
-            <div className="mt-1 mb-1 overflow-hidden rounded-md border border-border">
+            <div className="mt-1 mb-1 overflow-hidden rounded-lg border border-border">
               {nestedParts.length > 0 && (
                 <div className="py-1.5 pr-2 pl-3">{renderNestedParts(nestedParts, cwd)}</div>
               )}

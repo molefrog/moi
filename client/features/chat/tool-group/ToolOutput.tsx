@@ -28,7 +28,7 @@ export function ToolOutput({ call, output, isError }: ToolOutputProps) {
     return (
       <div
         className={cn(
-          'rounded-md border',
+          'rounded-lg border',
           isError ? 'border-destructive/30 bg-destructive/10' : 'border-border bg-muted'
         )}
       >
@@ -46,7 +46,7 @@ export function ToolOutput({ call, output, isError }: ToolOutputProps) {
   }
 
   return (
-    <div className="overflow-hidden rounded-md border border-border bg-muted">
+    <div className="overflow-hidden rounded-lg border border-border bg-muted">
       {/* Size is always the raw output; copy grabs whatever's currently shown. */}
       <Header raw={raw} onRaw={setRaw} label={view.label} copyText={raw ? output : view.code} />
       {raw ? (

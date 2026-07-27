@@ -273,12 +273,24 @@ describe('extractViewConfig', () => {
     // with-config.tsx exports { rowSpan, colSpan } — none of which a view honors.
     expect(await extractViewConfig(join(FIXTURES, 'with-config.tsx'))).toEqual({})
   })
+
+  test('rejects an icon outside the app icon registry', async () => {
+    await expect(extractViewConfig(join(FIXTURES, 'with-invalid-view-icon.tsx'))).rejects.toThrow(
+      'Unknown view icon id "piano-keyboard"'
+    )
+  })
 })
 
 describe("buildApplet kind='view'", () => {
   test('parses the view config (title + icon + requiredEnv, no spans)', async () => {
     const result = await buildApplet(join(FIXTURES, 'with-view-config.tsx'), undefined, 'view')
     expect(result.config).toEqual({ title: 'My View', icon: 'chart', requiredEnv: ['API_KEY'] })
+  })
+
+  test('fails the view build for an icon outside the app icon registry', async () => {
+    await expect(
+      buildApplet(join(FIXTURES, 'with-invalid-view-icon.tsx'), undefined, 'view')
+    ).rejects.toThrow('Unknown view icon id "piano-keyboard"')
   })
 
   test('namespaces the CSS scope with the view kind', async () => {

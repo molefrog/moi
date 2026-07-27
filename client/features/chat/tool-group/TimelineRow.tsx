@@ -102,7 +102,7 @@ export function NodeBox({ children, className }: { children: ReactNode; classNam
   return (
     <span
       className={cn(
-        'flex size-4 items-center justify-center overflow-hidden rounded-[4px] bg-muted ring-2 ring-background',
+        'flex size-4 items-center justify-center overflow-hidden rounded-xs bg-muted ring-2 ring-background',
         className
       )}
     >

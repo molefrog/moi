@@ -28,7 +28,7 @@ type SegmentedProps = {
 
 function Segmented({ value, onChange }: SegmentedProps) {
   return (
-    <div className="flex gap-1 rounded-lg bg-accent p-1">
+    <div className="flex gap-1 rounded-xl bg-accent p-1">
       {VARIANTS.map(o => (
         <Button
           key={o.value}
@@ -65,7 +65,7 @@ export function ToolCallsPage() {
 
       <Segmented value={variant} onChange={setVariant} />
 
-      <div className="w-full max-w-[var(--column-w)] rounded-xl border border-border bg-background p-5 font-sans text-foreground shadow-sm">
+      <div className="w-full max-w-(--column-w) rounded-xl border border-border bg-background p-5 font-sans text-foreground shadow-sm">
         {/* `processing` only matters for the live variant — it turns the trailing
             reasoning into "Thinking" and shows the live running tool spinning. */}
         <ToolCallGroup

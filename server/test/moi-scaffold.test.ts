@@ -40,6 +40,7 @@ describe('scaffoldMoiDir install', () => {
     expect(result).toBe(137)
     expect(existsSync(join(moiDir, 'package.json'))).toBe(true)
     expect(existsSync(join(moiDir, 'widgets'))).toBe(true)
+    expect(await Bun.file(join(moiDir, 'applet-env.d.ts')).text()).toContain('icon?: string')
   })
 
   test('returns "installing" when the install outlives the wait', async () => {

@@ -61,7 +61,7 @@ export function SidebarLayout({
         className={cn(
           'flex min-w-0 flex-1 flex-col overflow-hidden',
           panel === 'default' &&
-            'rounded-l-md border-l border-border bg-background shadow-[1px_0_3px_0_var(--border)]'
+            'rounded-l-xl border-l border-border bg-background shadow-[1px_0_3px_0_var(--border)]'
         )}
       >
         {children}
@@ -93,7 +93,7 @@ function Sidebar({ workspaces }: SidebarProps) {
                 className="flex flex-col gap-4"
                 onReorder={ids => reorder.mutate(ids)}
                 renderPlaceholder={() => (
-                  <div className="pointer-events-none absolute top-0 left-1 size-10 rounded-lg bg-accent" />
+                  <div className="pointer-events-none absolute top-0 left-1 size-10 rounded-xl bg-accent" />
                 )}
                 renderOverlay={ws => <WorkspaceButton workspace={ws} dragOverlay />}
                 renderItem={(ws, state) => <WorkspaceButton workspace={ws} dragState={state} />}
@@ -150,7 +150,7 @@ function WorkspaceButton({ workspace, dragOverlay = false, dragState }: Workspac
         <img
           src={workspace.icon ?? workspaceProviderIcon[workspace.type ?? 'claude-code']}
           alt=""
-          className="size-7 shrink-0 rounded-[4px]"
+          className="size-7 shrink-0 rounded-xs"
         />
       </div>
       <span className="mt-0.5 line-clamp-2 w-full text-center text-[11px] leading-snug font-medium text-ellipsis text-foreground">
@@ -172,7 +172,7 @@ function WorkspaceButton({ workspace, dragOverlay = false, dragState }: Workspac
         if (dragState?.isDragging) event.preventDefault()
       }}
       className={cn(
-        'group flex w-14 flex-col items-center rounded-sm outline-none',
+        'group flex w-14 flex-col items-center rounded-lg outline-none',
         dragState?.isDragging && 'invisible'
       )}
       {...dragState?.dragHandleProps}

@@ -19,14 +19,14 @@ type McpServerIconProps = {
 
 function McpServerIcon({ name, status }: McpServerIconProps) {
   const icon = getMcpIcon(name)
-  const className = 'size-full rounded-sm ring-2 ring-background'
+  const className = 'size-full rounded-lg ring-2 ring-background'
 
   return (
     <span className="relative size-10 shrink-0">
       {icon ? (
         <img src={icon} alt="" className={className} />
       ) : (
-        <span className="flex size-full items-center justify-center rounded-sm bg-muted text-muted-foreground ring-2 ring-background">
+        <span className="flex size-full items-center justify-center rounded-lg bg-muted text-muted-foreground ring-2 ring-background">
           <IconMcp className="size-5" />
         </span>
       )}
@@ -79,7 +79,7 @@ export function McpServerCard({ server }: McpServerCardProps) {
 
 export function McpServerCardSkeleton() {
   return (
-    <McpServerCardLayout icon={<Skeleton className="size-10 shrink-0 rounded-sm" />}>
+    <McpServerCardLayout icon={<Skeleton className="size-10 shrink-0 rounded-lg" />}>
       <Skeleton className="h-4 w-36 max-w-full" />
       <Skeleton className="h-4 w-20" />
     </McpServerCardLayout>

@@ -129,14 +129,14 @@ describe('view builder storage', () => {
         icon: 'file'
       })
     ).rejects.toBeInstanceOf(ViewBuilderError)
-    // Invalid icon id is rejected.
+    // A well-formed icon id outside the registry is rejected.
     await expect(
       setBuilder(workspaceId, workspacePath, 'another-view', {
         builderId: second.id,
         title: 'Another view',
-        icon: 'ChartBar'
+        icon: 'piano-keyboard'
       })
-    ).rejects.toBeInstanceOf(ViewBuilderError)
+    ).rejects.toThrow('Unknown view icon id "piano-keyboard"')
   })
 
   test('creates a standalone widget builder keyed by applet id and stamps buildingSince', async () => {

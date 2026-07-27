@@ -71,7 +71,7 @@ export function EnvironmentSettings() {
                 </span>
                 <span
                   className={cn(
-                    'rounded-sm px-1.5 py-0.5 text-[11px] font-medium',
+                    'rounded-lg px-1.5 py-0.5 text-[11px] font-medium',
                     variable.source === 'dotenv'
                       ? 'bg-muted text-muted-foreground'
                       : 'bg-primary/10 text-primary'

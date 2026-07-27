@@ -171,7 +171,7 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
           <img
             src={workspace.icon ?? workspaceProviderIcon[workspace.type ?? 'claude-code']}
             alt=""
-            className="size-4 shrink-0 rounded-[4px]"
+            className="size-4 shrink-0 rounded-xs"
           />
           <span className="truncate text-sm font-medium text-foreground">{name}</span>
         </div>

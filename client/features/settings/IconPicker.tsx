@@ -61,7 +61,7 @@ function EmojiButton({ emoji, ...props }: EmojiPickerListEmojiProps) {
   return (
     <button
       className={cn(
-        'flex size-9 items-center justify-center rounded-lg text-[22px] transition-colors duration-75 data-[active]:bg-muted',
+        'flex size-9 items-center justify-center rounded-xl text-[22px] transition-colors duration-75 data-active:bg-muted',
         EMOJI_FONT
       )}
       {...props}
@@ -224,14 +224,14 @@ export function IconPicker({ icon }: IconPickerProps) {
       {/* Controls */}
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         {/* Mode tabs */}
-        <div className="flex gap-1 self-start rounded-lg bg-muted p-0.5">
+        <div className="flex gap-1 self-start rounded-xl bg-muted p-0.5">
           {(['emoji', 'icon', 'upload'] as const).map(m => (
             <button
               key={m}
               type="button"
               onClick={() => setMode(m)}
               className={cn(
-                'rounded-md px-3.5 py-1 text-xs font-medium capitalize transition-colors',
+                'rounded-lg px-3.5 py-1 text-xs font-medium capitalize transition-colors',
                 mode === m
                   ? 'bg-background text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
@@ -309,15 +309,15 @@ export function IconPicker({ icon }: IconPickerProps) {
             // served by server/vendor.ts) — the picker works fully offline.
             emojibaseUrl="/vendor/emojibase"
             columns={13}
-            className="isolate flex h-72 flex-col overflow-hidden rounded-lg border border-border bg-background"
+            className="isolate flex h-72 flex-col overflow-hidden rounded-xl border border-border bg-background"
           >
             <div className="flex items-center gap-1.5 p-1.5 pb-0">
               <EmojiPicker.Search
                 placeholder="Search emoji…"
                 onChange={e => setEmojiSearch(e.target.value)}
-                className="h-8 min-w-0 flex-1 appearance-none rounded-md bg-muted px-2.5 text-sm outline-none placeholder:text-muted-foreground"
+                className="h-8 min-w-0 flex-1 appearance-none rounded-lg bg-muted px-2.5 text-sm outline-none placeholder:text-muted-foreground"
               />
-              <EmojiPicker.SkinToneSelector className="size-8 shrink-0 rounded-md text-lg hover:bg-accent" />
+              <EmojiPicker.SkinToneSelector className="size-8 shrink-0 rounded-lg text-lg hover:bg-accent" />
             </div>
             <EmojiPicker.Viewport className="relative scrollbar-thin flex-1 overflow-y-auto outline-none">
               <EmojiPicker.Loading className="absolute inset-0 flex items-center justify-center gap-2 text-xs text-muted-foreground">
@@ -341,7 +341,7 @@ export function IconPicker({ icon }: IconPickerProps) {
                         type="button"
                         onClick={() => setEmoji(e)}
                         className={cn(
-                          'flex size-9 items-center justify-center rounded-lg text-[22px] transition-colors duration-75',
+                          'flex size-9 items-center justify-center rounded-xl text-[22px] transition-colors duration-75',
                           EMOJI_FONT,
                           emoji === e ? 'bg-primary/10' : 'hover:bg-accent'
                         )}
@@ -367,7 +367,7 @@ export function IconPicker({ icon }: IconPickerProps) {
             </EmojiPicker.Viewport>
           </EmojiPicker.Root>
         ) : mode === 'icon' ? (
-          <div className="grid scrollbar-thin h-72 grid-cols-[repeat(auto-fill,minmax(2.25rem,1fr))] content-start gap-1 overflow-y-auto rounded-lg border border-border bg-background p-1.5">
+          <div className="grid scrollbar-thin h-72 grid-cols-[repeat(auto-fill,minmax(2.25rem,1fr))] content-start gap-1 overflow-y-auto rounded-xl border border-border bg-background p-1.5">
             {APP_ICON_CHOICES.map(({ id, Icon }) => (
               <button
                 key={id}
@@ -375,7 +375,7 @@ export function IconPicker({ icon }: IconPickerProps) {
                 aria-label={id}
                 onClick={() => setIconId(id)}
                 className={cn(
-                  'flex aspect-square items-center justify-center rounded-lg text-muted-foreground transition-colors [&_svg]:size-5',
+                  'flex aspect-square items-center justify-center rounded-xl text-muted-foreground transition-colors [&_svg]:size-5',
                   iconId === id
                     ? 'bg-primary/10 text-primary'
                     : 'hover:bg-accent hover:text-accent-foreground'
@@ -401,7 +401,7 @@ export function IconPicker({ icon }: IconPickerProps) {
               if (file) onFile(file)
             }}
             className={cn(
-              'flex h-72 flex-col items-center justify-center gap-2 rounded-lg border border-dashed transition-colors',
+              'flex h-72 flex-col items-center justify-center gap-2 rounded-xl border border-dashed transition-colors',
               dragOver
                 ? 'border-primary bg-primary/5 text-primary'
                 : 'border-border text-muted-foreground hover:border-muted-foreground/30 hover:text-foreground'

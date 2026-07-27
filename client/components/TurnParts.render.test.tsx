@@ -2,9 +2,9 @@
 // the live streaming preview turn. Asserts the two states that matter for
 // streaming thinking:
 //   1) live thinking (reasoning is the last row while processing) → "Thinking",
-//      EXPANDED (streaming thought visible);
+//      expanded;
 //   2) once text/tools follow, the reasoning is no longer live → "Thought",
-//      COLLAPSED (body unmounted).
+//      collapsed.
 import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
@@ -21,11 +21,10 @@ describe('TurnParts (shared render path)', () => {
     const html = render([{ type: 'reasoning', text: 'I am thinking about X' }], true)
     expect(html).toContain('Thinking')
     expect(html).not.toContain('Thought')
-    // Expanded → body mounted; the thought appears in both title and body.
-    expect((html.match(/I am thinking about X/g) ?? []).length).toBeGreaterThanOrEqual(2)
+    expect(html).toContain('aria-expanded="true"')
   })
 
-  test('once text follows, the thought collapses (body unmounted)', () => {
+  test('once text follows, the thought collapses', () => {
     const html = render(
       [
         { type: 'reasoning', text: 'DONE_THINKING' },
@@ -35,8 +34,7 @@ describe('TurnParts (shared render path)', () => {
     )
     expect(html).toContain('Thought')
     expect(html).toContain('the answer')
-    // Collapsed → reasoning body unmounted; its text only in the title (once).
-    expect((html.match(/DONE_THINKING/g) ?? []).length).toBe(1)
+    expect(html).toContain('aria-expanded="false"')
   })
 
   test('a lone text part renders standalone (no thinking group)', () => {

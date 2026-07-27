@@ -265,6 +265,15 @@ export type ThreadConfig = {
   effort?: string
 }
 
+// App-wide settings, persisted server-side as `settings.json` in moi's data
+// dir and exposed via GET/PATCH /api/settings. Every key has a default, so
+// GET always returns a complete object.
+export type AppSettings = {
+  // Apply bundled workspace-skill updates automatically when a workspace
+  // with outdated skills is opened, instead of prompting each time.
+  autoUpdateSkills: boolean
+}
+
 // Re-export the display format
 export type {
   Citation,
@@ -357,6 +366,21 @@ export type WorkspaceSwitchMessage = {
 }
 
 export type WorkspaceType = 'claude-code' | 'openclaw' | 'codex'
+
+export type WorkspaceSkillStatus = {
+  name: string
+  installed: string | null
+  bundled: string | null
+}
+
+export type WorkspaceSkillsStatus = {
+  skills: WorkspaceSkillStatus[]
+  updateAvailable: boolean
+}
+
+export type WorkspaceSkillsUpdateFailure = WorkspaceSkillsStatus & {
+  error: string
+}
 
 // Whether an agent backend's runtime is installed on this machine. `reason` is
 // user-facing copy explaining what to do next. Surfaced by

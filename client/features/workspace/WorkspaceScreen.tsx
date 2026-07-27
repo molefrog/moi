@@ -30,6 +30,8 @@ import { ViewBuilderTab } from '@/client/features/views/ViewBuilderTab'
 import { useViewBuilderActions } from '@/client/features/views/useViewBuilderActions'
 import { useFitsSplitLayout } from '@/client/features/workspace/useFitsSplitLayout'
 import { useWorkspaceAvailability } from '@/client/features/workspace/api'
+import { WorkspaceSkillUpdateBanner } from '@/client/features/workspace/WorkspaceSkillUpdateBanner'
+import { useWorkspaceSkillUpdates } from '@/client/features/workspace/useWorkspaceSkillUpdates'
 import { useWorkspaceTheme } from '@/client/features/workspace/useWorkspaceTheme'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
@@ -254,6 +256,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   // Keep the composer read/write, but block sends when its agent executable is
   // missing. The Send button explains how to install it.
   const availability = useWorkspaceAvailability(workspaceId).data
+  const { bannerProps: skillUpdateBanner } = useWorkspaceSkillUpdates(workspaceId)
   const unavailableReason =
     availability === undefined ? undefined : availability.available ? null : availability.reason
   const builderActions = useViewBuilderActions()
@@ -543,6 +546,9 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       processing={processing}
       error={error}
       onDismissError={dismissError}
+      composerBanner={
+        skillUpdateBanner ? <WorkspaceSkillUpdateBanner {...skillUpdateBanner} /> : undefined
+      }
       unavailableReason={unavailableReason}
       send={send}
       stop={stop}
@@ -561,6 +567,9 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       processing={processing}
       error={error}
       onDismissError={dismissError}
+      composerBanner={
+        skillUpdateBanner ? <WorkspaceSkillUpdateBanner {...skillUpdateBanner} /> : undefined
+      }
       unavailableReason={unavailableReason}
       send={send}
       stop={stop}
@@ -588,7 +597,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
                   <img
                     src={icon ?? workspaceProviderIcon[provider ?? 'claude-code']}
                     alt=""
-                    className="size-5 shrink-0 rounded-[4px]"
+                    className="size-5 shrink-0 rounded-xs"
                   />
                   {name && (
                     <span className="truncate text-sm font-medium text-foreground">{name}</span>
@@ -692,6 +701,11 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               processing={processing}
               error={error}
               onDismissError={dismissError}
+              composerBanner={
+                skillUpdateBanner ? (
+                  <WorkspaceSkillUpdateBanner {...skillUpdateBanner} />
+                ) : undefined
+              }
               unavailableReason={unavailableReason}
               send={send}
               stop={stop}

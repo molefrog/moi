@@ -33,7 +33,7 @@ export function ChatPromptBubble({
       disabled={disabled}
       onClick={() => onSelect(prompt)}
       className={cn(
-        'h-auto items-start justify-start gap-2 rounded-lg p-3 px-4 text-left leading-snug whitespace-normal',
+        'h-auto items-start justify-start gap-2 rounded-xl p-3 px-4 text-left leading-snug whitespace-normal',
         'hover:bg-accent',
         className
       )}

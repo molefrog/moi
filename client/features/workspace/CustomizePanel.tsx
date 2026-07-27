@@ -59,7 +59,7 @@ export function CustomizePanel({ ref }: CustomizePanelProps) {
                 type="button"
                 onClick={() => setTheme({ font: key })}
                 className={cn(
-                  'flex flex-col items-start rounded-md px-3 py-2 text-left transition-colors',
+                  'flex flex-col items-start rounded-lg px-3 py-2 text-left transition-colors',
                   key === currentFont
                     ? 'bg-primary/5 ring-2 ring-primary'
                     : 'border-transparent hover:bg-accent'
@@ -87,7 +87,7 @@ export function CustomizePanel({ ref }: CustomizePanelProps) {
                     setTheme({ background: preset.background, foreground: preset.foreground })
                   }
                   className={cn(
-                    'flex items-center gap-2 rounded-md border px-3 py-2 transition-colors',
+                    'flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors',
                     active
                       ? 'bg-primary/5 ring-2 ring-primary'
                       : 'border-transparent hover:bg-accent'

@@ -24,7 +24,7 @@ type SegmentedProps<T extends string | number> = {
 
 function Segmented<T extends string | number>({ options, value, onChange }: SegmentedProps<T>) {
   return (
-    <div className="flex gap-1 rounded-lg bg-accent p-1">
+    <div className="flex gap-1 rounded-xl bg-accent p-1">
       {options.map(o => (
         <Button
           key={String(o.value)}

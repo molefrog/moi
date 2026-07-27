@@ -5,9 +5,8 @@
  *
  * The actual CSS variables (`--background`, `--foreground`, `--card`, etc.)
  * are owned by the host and declared on `:root` / `.dark` in
- * `client/index.css`. This file only maps Tailwind's `--color-*` /
- * `--radius-*` tokens onto those host-owned variables via `@theme inline`,
- * which:
+ * `client/index.css`. This file maps Tailwind's `--color-*` / `--radius-*`
+ * tokens onto those host-owned variables via `@theme inline`, which:
  *   - generates utilities like `.bg-background { background-color: var(--background) }`
  *   - does NOT emit `--color-background` or `--background` into the output
  *
@@ -34,14 +33,14 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --radius-xs: calc(var(--radius) * 0.5);
-  --radius-sm: calc(var(--radius) * 0.625);
-  --radius-md: calc(var(--radius) * 0.75);
-  --radius-lg: calc(var(--radius) * 0.875);
-  --radius-xl: var(--radius);
-  --radius-2xl: calc(var(--radius) * 1.25);
-  --radius-3xl: calc(var(--radius) * 1.5);
-  --radius-4xl: calc(var(--radius) * 2);
+  --radius-xs: calc(var(--radius) * 0.4);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.4);
+  --radius-4xl: calc(var(--radius) * 2.8);
 
   --shadow-xs:
     0px 0px 0px 1px rgba(0, 0, 0, 0.06), 0px 1px 2px -1px rgba(0, 0, 0, 0.06),

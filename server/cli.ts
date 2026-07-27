@@ -19,7 +19,8 @@ import type {
   ScratchOp,
   ScratchSize,
   ScratchStyle,
-  WorkspaceEntry
+  WorkspaceEntry,
+  WorkspaceSkillStatus
 } from '@/lib/types'
 
 import {
@@ -35,21 +36,20 @@ import { type OpenClawAgent, discoverOpenClawAgents } from './harness/openclaw/d
 import { liftToWorkspaceRoot, registerWorkspace } from './registry'
 import { serverCwd } from './server-cwd'
 import {
-  type SkillStatus,
   isBehind,
   isMinorBehind,
   resolveWorkspace,
   skillStatuses,
   staleSkillNotice
 } from './skill-version'
-import { installBundledSkills } from './skills-template'
+import { updateWorkspaceSkills } from './skill-update'
 import {
   getWorkspaceEnvView,
   isValidEnvKey,
   secretBackend,
   updateWorkspaceEnv
 } from './workspace-env'
-import { provisionWorkspace, skillsDirFor } from './workspace-init'
+import { provisionWorkspace } from './workspace-init'
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -1944,11 +1944,17 @@ async function runSkillUpdate(cwd: string): Promise<void> {
   // Type-aware: an OpenClaw workspace keeps its skills in `skills/`, so the
   // update must target the same dir the agent actually loads from.
   const { root, type } = await resolveWorkspace(cwd)
-  const before = await skillStatuses(root, type)
-  await installBundledSkills(skillsDirFor(root, type))
-  const after = await skillStatuses(root, type)
+  const { before, status } = await updateWorkspaceSkills(root, type ?? 'claude-code')
+  const after = status.skills
 
   console.log('\n' + pc.green('✓') + ' Skills updated in ' + pc.bold(root) + '\n')
+  printSkillUpdateTable(before, after)
+}
+
+function printSkillUpdateTable(
+  before: WorkspaceSkillStatus[],
+  after: WorkspaceSkillStatus[]
+): void {
   console.log(
     columns(
       ['skill', 'from', 'to'].map(h => pc.dim(h)),
@@ -1974,7 +1980,7 @@ async function runSkillUpdate(cwd: string): Promise<void> {
 
 // Colored status label for one skill row: minor+ behind is actionable, a patch
 // gap is informational, otherwise current.
-function skillState(s: SkillStatus): string {
+function skillState(s: WorkspaceSkillStatus): string {
   if (isMinorBehind(s.installed, s.bundled)) return pc.yellow('update available')
   if (isBehind(s.installed, s.bundled)) return pc.dim('patch behind')
   return pc.green('up to date')
