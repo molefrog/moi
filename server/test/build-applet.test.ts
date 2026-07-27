@@ -332,6 +332,16 @@ describe('moi fileUrl module', () => {
     expect(result.js).not.toContain('window.moi')
   })
 
+  test('bundles sendChatMessage forwarding to the same per-bundle bridge', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-sendchatmessage.tsx'), undefined, 'view')
+    expect(result.js).toContain('function sendChatMessage')
+    expect(result.js).toMatch(/bridge\s*(\?\.|&&|==)/)
+    // Two args only: the applet cannot pass a source, because attribution is
+    // stamped host-side (applet-runtime.ts) from the identity the bridge was
+    // attached with.
+    expect(result.js).toContain('sendChatMessage(label, context)')
+  })
+
   test('every bundle entry exports the bridge wiring, even without a moi import', async () => {
     // `hello` never imports moi at all — the entry still re-exports the host
     // wiring so attach works uniformly across bundles.

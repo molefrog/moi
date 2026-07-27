@@ -13,10 +13,21 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useLocation, useParams } from 'wouter'
 import { useHistoryState } from 'wouter/use-browser-location'
 
-import { normalizeTabsState, resolveActiveTab } from '@/client/features/workspace/tab-resolution'
+import { reportAppletError } from '@/client/features/applets/applet-log'
+import { clearTabAddress, publishTabAddress } from '@/client/features/workspace/moi-context'
+import {
+  isStaleTabLink,
+  normalizeTabsState,
+  resolveActiveTab
+} from '@/client/features/workspace/tab-resolution'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import type { ViewBuilder, ViewInfo, WorkspaceTabId, WorkspaceTabsState } from '@/lib/types'
-import { parseWorkspaceTab, readAppletParams, workspaceTabPath } from '@/lib/workspace-tabs'
+import {
+  parseWorkspaceTab,
+  readAppletParams,
+  viewIdFromTab,
+  workspaceTabPath
+} from '@/lib/workspace-tabs'
 
 type UseWorkspaceNavigationOptions = {
   // What exists right now — a URL naming anything else falls back to the
@@ -78,8 +89,23 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
   // hides it.
   useEffect(() => {
     if (urlTab === activeTab) return
+    // A URL that named a view and didn't get it is a stale link — a deleted
+    // view, an old bookmark, a `focusTab` the agent wrote against a view it
+    // later renamed. The agent can't see the redirect happen, so journal it
+    // for `moi debug logs`.
+    if (isStaleTabLink(urlTab)) reportDeadTab(workspaceId, urlTab, activeTab)
     navigateToTab(activeTab)
-  }, [activeTab, navigateToTab, urlTab])
+  }, [activeTab, navigateToTab, urlTab, workspaceId])
+
+  // Publish the settled address for the chat envelope (see moi-context.ts).
+  // Only an honored URL publishes: mid-redirect the address is about to change,
+  // and a message sent in that window should carry where the user lands.
+  useEffect(() => {
+    if (!urlTabHonored) return
+    publishTabAddress(workspaceId, activeTab, appletParams)
+  }, [activeTab, appletParams, urlTabHonored, workspaceId])
+
+  useEffect(() => () => clearTabAddress(workspaceId), [workspaceId])
 
   // Navigating IS the tab switch, so persist its effects through the same write
   // path as before: the saved default follows the URL, and a URL-navigated tab
@@ -95,4 +121,19 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
   }, [activeTab, setTabs, urlTabHonored])
 
   return { tabsState, activeTab, appletParams, navigateToTab, setTabs }
+}
+
+// Journal a stale link (see `isStaleTabLink` for which URLs qualify).
+// Attributed to the view when the dead id names one — that's the file the agent
+// would fix, and the entry then clears the moment a view by that name builds.
+// A malformed segment names no applet and lands unattributed. The journal's own
+// dedup keeps a redirect loop to a single line.
+function reportDeadTab(workspaceId: string, urlTab: string, activeTab: WorkspaceTabId): void {
+  const requested = parseWorkspaceTab(urlTab)
+  const viewId = requested ? viewIdFromTab(requested) : null
+  reportAppletError(workspaceId, {
+    source: 'runtime',
+    ...(viewId ? { kind: 'view' as const, name: viewId } : {}),
+    message: `Tab "${urlTab}" does not exist in this workspace — the URL redirected to "${activeTab}". A link, bookmark, or focusTab call is pointing at a tab that was deleted or renamed.`
+  })
 }

@@ -2,13 +2,14 @@ import type { QueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { liveStore } from '@/client/features/chat/chat-store'
+import type { MoiUserMessageOptions } from '@/client/features/workspace/moi-context'
 import { STREAM_RESPONSES } from '@/client/lib/flags'
 import { applyEvent, emptyViewState } from '@/lib/format'
 import type { Part, ViewState, WorkspaceModels } from '@/lib/types'
 
-export type ChatSendOptions = {
-  directives?: readonly string[]
-}
+// What a caller may attach to one message beyond its text. All of it is
+// envelope material — the agent sees it, the chat bubble does not.
+export type ChatSendOptions = MoiUserMessageOptions
 
 type StartOptimisticTurnInput = {
   queryClient: QueryClient

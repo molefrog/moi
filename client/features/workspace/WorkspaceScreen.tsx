@@ -23,6 +23,7 @@ import { workspaceProviderIcon } from '@/client/features/home/workspace-presenta
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { WorkspaceSettings } from '@/client/features/settings/WorkspaceSettings'
+import { useAppletChatMessage } from '@/client/features/chat/useAppletChatMessage'
 import { useChat } from '@/client/features/chat/useChat'
 import { useView } from '@/client/features/applets/useApplet'
 import { ViewBuilderTab } from '@/client/features/views/ViewBuilderTab'
@@ -455,6 +456,11 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     }
     setChatFocusRequest(request => request + 1)
   }
+
+  // Chat messages fired from applet UI. `openChat` is the reveal: on a view tab
+  // in full-screen mode the chat is a closed popover, and a run the user can't
+  // see is worse than a panel that opens itself.
+  useAppletChatMessage({ send, revealChat: openChat, unavailableReason })
 
   const createItems: CreateWorkspaceTabItem[] = [
     ...(!dockedSplit && !openSet.has('agent')

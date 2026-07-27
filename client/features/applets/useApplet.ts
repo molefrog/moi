@@ -57,10 +57,11 @@ const VIEW_KIND: AppletKindSpec = {
 }
 
 function loadApplet(
-  segment: AppletSegment,
+  kind: AppletKindSpec,
   workspaceId: string,
   name: string
 ): Promise<ComponentType<AppletComponentProps>> {
+  const { segment } = kind
   const key = appletKey(segment, workspaceId, name)
   const existing = getCachedApplet(key) as Promise<ComponentType<AppletComponentProps>> | undefined
   if (existing) return existing
@@ -72,8 +73,9 @@ function loadApplet(
     if (!mod.default) throw new Error(`"${name}" has no default export`)
     // Wire this module instance's `moi` bridge to the workspace's applet
     // runtime — the only moment the namespace is in hand, before React renders
-    // the component. Disposal rides invalidateApplet (same key).
-    attachAppletBridge(mod, workspaceId, key)
+    // the component. Disposal rides invalidateApplet (same key). The identity
+    // passed here is what the applet's chat messages are attributed to.
+    attachAppletBridge(mod, workspaceId, key, { kind: kind.kind, name })
     return mod.default as ComponentType<AppletComponentProps>
   })
 
@@ -87,7 +89,7 @@ function useApplet(kind: AppletKindSpec, name: string): AppletState {
 
   const load = useCallback(() => {
     setState(prev => ({ status: 'loading', version: prev.version }))
-    loadApplet(kind.segment, workspaceId, name)
+    loadApplet(kind, workspaceId, name)
       .then(Component =>
         setState(prev => ({ status: 'ready', Component, version: prev.version + 1 }))
       )

@@ -1,0 +1,52 @@
+// Chat's half of the applet `sendChatMessage` API: turn a validated runtime
+// event into a real send on the active chat.
+//
+// The runtime already did the untrusted work — narrowed the args, stamped the
+// applet's `<kind>:<name>` as `source`, and rate-limited repeats
+// (applet-runtime.ts). What's left is chat policy: reveal the chat, then send
+// the label as an ordinary user message with the applet attribution riding the
+// `<moi-context>` envelope.
+//
+// Sending while a turn is running is fine and deliberate — the composer offers
+// the same ("Queue a follow-up"), and the harness queues the message into the
+// live session rather than rejecting it.
+import { reportAppletError } from '@/client/features/applets/applet-log'
+import { type AppletChatMessage, useAppletEvent } from '@/client/features/applets/applet-runtime'
+import type { ChatSendOptions } from '@/client/features/chat/chat-send'
+import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
+
+type UseAppletChatMessageOptions = {
+  send: (draft: string, options?: ChatSendOptions) => void
+  // Bring the chat on screen before the run starts. On a view tab in
+  // full-screen mode the chat is a popover that is closed by default, so
+  // without this the agent would start working somewhere the user can't see.
+  revealChat: () => void
+  // Same gate the composer's send button uses: when the workspace's agent
+  // executable is missing, a send would start a turn that cannot run.
+  unavailableReason: string | null | undefined
+}
+
+export function useAppletChatMessage({
+  send,
+  revealChat,
+  unavailableReason
+}: UseAppletChatMessageOptions): void {
+  const workspaceId = useWorkspaceId()
+
+  useAppletEvent(workspaceId, 'sendChatMessage', (message: AppletChatMessage) => {
+    if (unavailableReason) {
+      // Journaled rather than dropped quietly: from the applet's side the
+      // button did nothing, and this is the only place that says why.
+      reportAppletError(workspaceId, {
+        source: 'runtime',
+        message: `sendChatMessage("${message.label}") was dropped: this workspace's agent is unavailable (${unavailableReason}).`
+      })
+      return
+    }
+    // `label` is the visible message; everything else in the event IS the
+    // envelope's applet attribution.
+    const { label, ...applet } = message
+    revealChat()
+    send(label, { applet })
+  })
+}
