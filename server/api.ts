@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 
 import type {
+  AppSettings,
   HarnessAvailability,
   UploadInfo,
   ViewBuilderInput,
@@ -15,6 +16,8 @@ import type {
 import type { MoiContext } from '@/lib/moi-context'
 import { viewBuilderDirectives } from '@/lib/view-builder-directives'
 
+import { getAppSettings, saveAppSettings } from './app-settings'
+import type { AppSettingsPatch } from './app-settings'
 import { appletForModule, recordAppletError } from './applet-log'
 import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from './applets'
 import { applyEnvChanged } from './env-apply'
@@ -951,6 +954,27 @@ workspaces.route('/:id', one)
 export const api = new Hono()
 
 api.route('/api/workspaces', workspaces)
+
+// App-wide settings (settings.json in the data dir). GET returns every key
+// with defaults applied; PATCH merges a partial body and returns the result.
+api.get('/api/settings', c => c.json(getAppSettings()))
+
+api.patch('/api/settings', async c => {
+  let body: Partial<Record<keyof AppSettings, unknown>>
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.text('Invalid JSON body', 400)
+  }
+  const patch: AppSettingsPatch = {}
+  if (body.autoUpdateSkills !== undefined) {
+    if (typeof body.autoUpdateSkills !== 'boolean') {
+      return c.text('autoUpdateSkills must be a boolean', 400)
+    }
+    patch.autoUpdateSkills = body.autoUpdateSkills
+  }
+  return c.json(saveAppSettings(patch))
+})
 
 // Everything else: in production, serve the prebuilt client from `dist/` via
 // Hono's static handler (mime types, traversal-safe, optional precompression).

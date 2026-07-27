@@ -13,18 +13,25 @@ const useUiStore = createUiStore(localStorage)
 
 beforeEach(() => {
   storedValues.clear()
-  useUiStore.setState({ skillAutoUpdateEnabled: false })
+  useUiStore.setState({ hasSentMessageFromMoi: false, workspaceIdsPendingAnalysis: [] })
 })
 
-describe('skill Auto-update preference', () => {
-  test('enables one persisted preference for every workspace', () => {
-    expect(useUiStore.getState().skillAutoUpdateEnabled).toBe(false)
+describe('first-message onboarding markers', () => {
+  test('persists the pending-analysis workspace until a message is sent', () => {
+    useUiStore.getState().markWorkspacePendingAnalysis('ws-1')
+    useUiStore.getState().markWorkspacePendingAnalysis('ws-1')
 
-    useUiStore.getState().enableSkillAutoUpdate()
-
-    expect(useUiStore.getState().skillAutoUpdateEnabled).toBe(true)
+    expect(useUiStore.getState().workspaceIdsPendingAnalysis).toEqual(['ws-1'])
     expect(JSON.parse(storedValues.get('moi:ui') ?? '{}')).toMatchObject({
-      state: { skillAutoUpdateEnabled: true }
+      state: { workspaceIdsPendingAnalysis: ['ws-1'] }
+    })
+
+    useUiStore.getState().markMessageSentFromMoi('ws-1')
+
+    expect(useUiStore.getState().hasSentMessageFromMoi).toBe(true)
+    expect(useUiStore.getState().workspaceIdsPendingAnalysis).toEqual([])
+    expect(JSON.parse(storedValues.get('moi:ui') ?? '{}')).toMatchObject({
+      state: { hasSentMessageFromMoi: true, workspaceIdsPendingAnalysis: [] }
     })
   })
 })
