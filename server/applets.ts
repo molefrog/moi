@@ -68,7 +68,7 @@ async function resolveSource(sourceDir: string, name: string): Promise<string | 
 // safe degradation, and the cap keeps the per-bundle check bounded no matter
 // what the imports look like. Far above any sane applet (the walk never enters
 // node_modules), so hitting it means something is off anyway.
-const MAX_GRAPH_FILES = 512
+const MAX_GRAPH_FILES = 128
 
 // A bundle is stale if its entry `index.js` is missing, or any file in its
 // local import graph has an mtime >= the built entry's. The graph is walked

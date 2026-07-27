@@ -155,7 +155,7 @@ describe('dependency staleness', () => {
   })
 
   test('a graph larger than the file cap always rebuilds (fails toward stale)', async () => {
-    // 520+ chained modules exceed MAX_GRAPH_FILES: the walk aborts and reports
+    // 130+ chained modules exceed MAX_GRAPH_FILES: the walk aborts and reports
     // stale, so the applet rebuilds every bundle instead of risking a stale
     // skip. Degenerate by design — no sane applet wires this many local files.
     seed(
@@ -166,7 +166,7 @@ describe('dependency staleness', () => {
       ].join('\n')
     )
     seed('.moi/widgets/_head.ts', [`import '../lib/c0'`, `export const label = 'big'`].join('\n'))
-    const LAST = 520
+    const LAST = 130
     for (let i = 0; i <= LAST; i++) {
       const next = i < LAST ? `import './c${i + 1}'\n` : ''
       seed(`.moi/lib/c${i}.ts`, `${next}export const v${i} = ${i}`)
