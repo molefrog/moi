@@ -67,7 +67,8 @@ async function evictModule(name: string) {
 
 type CallMessage = { id: string; type: 'call'; module: string; name: string; args: string }
 type ReloadMessage = { type: 'reload'; modules: string[] }
-type IncomingMessage = CallMessage | ReloadMessage
+type ShutdownMessage = { type: 'shutdown' }
+type IncomingMessage = CallMessage | ReloadMessage | ShutdownMessage
 
 process.on('message', async (raw: IncomingMessage) => {
   if (raw.type === 'reload') {
@@ -75,6 +76,19 @@ process.on('message', async (raw: IncomingMessage) => {
       await evictModule(name)
     }
     return
+  }
+
+  // Graceful exit. The parent kills this process to pick up edited server code
+  // — evicting from moduleCache isn't enough, because a module's own imports
+  // are pinned in Bun's ESM registry with no way to invalidate them (the
+  // `?t=` buster below only busts the .server.ts itself, one level deep). Run
+  // every cached module's `dispose()` first so a hard kill doesn't strand a db
+  // handle or timer; the parent hard-kills us if we take too long.
+  if (raw.type === 'shutdown') {
+    for (const name of [...moduleCache.keys()]) {
+      await evictModule(name)
+    }
+    process.exit(0)
   }
 
   if (raw.type === 'call') {

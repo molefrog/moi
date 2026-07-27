@@ -519,44 +519,28 @@ export function scanServerImports(source: string): string[] {
   return specifiers
 }
 
-// Relative asset import specifiers in an applet source (`./logo.png`,
-// `../shared/icon.svg`). Used by the rebuild staleness check so editing an
-// imported image rebuilds the bundle even when the `.tsx` itself is untouched.
-const ASSET_IMPORT_RE =
-  /from\s+['"](\.\.?\/[^'"]+?\.(?:png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf))['"]/gi
-export function scanAssetImports(source: string): string[] {
-  const specifiers: string[] = []
-  let match
-  while ((match = ASSET_IMPORT_RE.exec(source)) !== null) {
-    specifiers.push(match[1])
-  }
-  return specifiers
-}
-
-// Relative module import specifiers in an applet source (`./_utils`,
-// `../lib/data`, `./table.tsx`) — static, re-export, side-effect, and dynamic
-// forms alike, lexed by Bun's own transpiler so comments and string literals
-// can't false-positive. Type-only imports are erased by the lexer — correct
-// here, since they never affect the emitted bundle. `.server` imports and
-// assets are excluded (each has its own scanner above); bare specifiers
-// (node_modules) are filtered out. A file that fails to lex contributes no
+// Every relative import specifier in an applet source — modules (`./_utils`,
+// `../lib/data`), assets (`./logo.png`), `.server` stubs, JSON, CSS alike, in
+// static, re-export, side-effect, and dynamic form. Lexed by Bun's own
+// transpiler, so comments and string literals can't false-positive. Type-only
+// imports are erased by the lexer — correct here, since they never affect the
+// emitted bundle. Bare specifiers (node_modules) are filtered out: the
+// staleness check doesn't walk them. A file that fails to lex contributes no
 // imports — the build itself surfaces the syntax error. Used by the rebuild
-// staleness check to walk the applet's local import graph, so editing a shared
-// module marks every applet that (transitively) imports it stale.
+// staleness check to walk the applet's local import graph, so editing anything
+// it (transitively) pulls in marks every applet using it stale.
 const IMPORT_SCANNERS = {
   ts: new Bun.Transpiler({ loader: 'ts' }),
   tsx: new Bun.Transpiler({ loader: 'tsx' })
 }
-export function scanModuleImports(source: string, loader: 'ts' | 'tsx' = 'tsx'): string[] {
+export function scanRelativeImports(source: string, loader: 'ts' | 'tsx' = 'tsx'): string[] {
   let imports: { path: string }[]
   try {
     imports = IMPORT_SCANNERS[loader].scanImports(source)
   } catch {
     return []
   }
-  return imports
-    .map(i => i.path)
-    .filter(p => /^\.\.?\//.test(p) && !/\.server(\.ts)?$/.test(p) && !ASSET_EXTENSIONS.test(p))
+  return imports.map(i => i.path).filter(p => /^\.\.?\//.test(p))
 }
 
 async function prevalidateServerFiles(entrypoint: string): Promise<void> {

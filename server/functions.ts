@@ -68,6 +68,41 @@ function killSlot(slot: Slot, reason: string) {
   } catch {}
 }
 
+// How long a worker gets to run its modules' `dispose()` and exit on its own
+// before we kill it outright.
+const SHUTDOWN_GRACE_MS = 2_000
+
+// Same end state as killSlot — a dead worker — but the worker is asked to exit
+// so it can run each cached module's `dispose()` first. Used when server code
+// changed: a hard kill would strand whatever those modules hold open (db
+// handles, timers, watchers).
+//
+// The slot is marked killed immediately, so a call arriving mid-shutdown spawns
+// a fresh worker rather than queueing behind a dying one. In-flight calls are
+// rejected rather than left to hit the 30s timeout.
+function gracefulKillSlot(slot: Slot, reason: string) {
+  if (slot.killed) return
+  slot.killed = true
+  rejectAndClearPending(slot, reason)
+
+  const timer = setTimeout(() => {
+    try {
+      slot.worker.kill()
+    } catch {}
+  }, SHUTDOWN_GRACE_MS)
+  timer.unref?.()
+  void slot.worker.exited.then(() => clearTimeout(timer)).catch(() => clearTimeout(timer))
+
+  try {
+    slot.worker.send({ type: 'shutdown' })
+  } catch {
+    clearTimeout(timer)
+    try {
+      slot.worker.kill()
+    } catch {}
+  }
+}
+
 const slots = new LRUCache<string, Slot>({
   max: MAX_WORKERS,
   ttl: WORKER_IDLE_TTL_MS,
@@ -331,16 +366,26 @@ export function getWorkersDebugSnapshot(): WorkerDebugInfo[] {
   return out
 }
 
+// Make edited server code take effect: recycle the workspace's worker so the
+// next call loads it fresh.
+//
+// This RECYCLES THE WHOLE WORKER rather than evicting the named modules,
+// because eviction cannot actually reload edited code. `loadModule` busts its
+// import with `?t=<mtime>`, which only makes a new URL for the `.server.ts`
+// itself — everything that file imports stays pinned in Bun's ESM registry
+// with no API to invalidate it. So a module whose *dependency* changed re-
+// executes against the old dependency, and one whose own mtime is unchanged
+// doesn't re-execute at all. A fresh process is the only reliable reset.
+//
+// `modules` is the reason, not the scope: every module in the worker is
+// dropped. Kept in the signature for the kill reason surfaced to callers.
 export function reloadModules(modules: string[], workspacePath: string) {
   if (modules.length === 0) return
   // peek: don't refresh TTL just because files changed. If the worker was
   // already idle-evicted, the next callFunction will re-spawn fresh anyway.
   const slot = slots.peek(workspacePath)
   if (!slot || slot.killed) return
-  try {
-    slot.worker.send({ type: 'reload', modules })
-    // The worker evicts these from its module cache; it re-reports 'loaded'
-    // on the next call, so drop them from the introspection set too.
-    for (const m of modules) slot.modules.delete(m)
-  } catch {}
+  // No need to prune `slot.modules`: the whole slot is going away, and
+  // getStatus already skips killed slots.
+  gracefulKillSlot(slot, `Server code changed (${modules.join(', ')})`)
 }
