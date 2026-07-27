@@ -15,6 +15,7 @@ import { type ReactNode, useState } from 'react'
 import { IconLoader2, IconPackage } from '@tabler/icons-react'
 
 import { cn } from '@/client/lib/cn'
+import { PlainMarkdownText } from '@/client/features/chat/MarkdownContent'
 import { formatMcpServerName, getMcpIcon } from '@/client/features/connectors/mcp-icons'
 import type { Part, ToolCall } from '@/lib/types'
 
@@ -157,7 +158,7 @@ function ReasoningRow({ isFirst, isLast, text, inProgress = false }: ReasoningRo
         </button>
         <Collapse open={expanded}>
           <div className="mt-1 mb-1 pr-2 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
-            {text}
+            <PlainMarkdownText content={text} />
           </div>
         </Collapse>
       </div>
