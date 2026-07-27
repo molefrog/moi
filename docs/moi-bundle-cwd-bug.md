@@ -148,6 +148,9 @@ has an mtime `>=` the built entry's (`needsRebuild`). `--force` ignores mtimes e
   deps are not walked — after a package bump, use `--force`. A content-hash of
   Bun.build's full input graph would close these.
 - mtime comparison is `>=`, so same-second edits err toward rebuilding (safe).
+- The walk is cycle-safe (visited set) and capped at 512 distinct files per entry —
+  beyond that it stops and reports stale, so a degenerate graph rebuilds every time
+  rather than risking a stale skip.
 
 ## The event model
 

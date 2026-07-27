@@ -535,20 +535,28 @@ export function scanAssetImports(source: string): string[] {
 
 // Relative module import specifiers in an applet source (`./_utils`,
 // `../lib/data`, `./table.tsx`) — static, re-export, side-effect, and dynamic
-// forms alike. `.server` imports and assets are excluded (each has its own
-// scanner above); bare specifiers (node_modules) are never matched. Used by the
-// rebuild staleness check to walk the applet's local import graph, so editing a
-// shared module marks every applet that (transitively) imports it stale.
-const MODULE_IMPORT_RE = /(?:\bfrom|\bimport)\s*\(?\s*['"](\.\.?\/[^'"]+)['"]/g
-export function scanModuleImports(source: string): string[] {
-  const specifiers: string[] = []
-  let match
-  while ((match = MODULE_IMPORT_RE.exec(source)) !== null) {
-    const specifier = match[1]
-    if (/\.server(\.ts)?$/.test(specifier) || ASSET_EXTENSIONS.test(specifier)) continue
-    specifiers.push(specifier)
+// forms alike, lexed by Bun's own transpiler so comments and string literals
+// can't false-positive. Type-only imports are erased by the lexer — correct
+// here, since they never affect the emitted bundle. `.server` imports and
+// assets are excluded (each has its own scanner above); bare specifiers
+// (node_modules) are filtered out. A file that fails to lex contributes no
+// imports — the build itself surfaces the syntax error. Used by the rebuild
+// staleness check to walk the applet's local import graph, so editing a shared
+// module marks every applet that (transitively) imports it stale.
+const IMPORT_SCANNERS = {
+  ts: new Bun.Transpiler({ loader: 'ts' }),
+  tsx: new Bun.Transpiler({ loader: 'tsx' })
+}
+export function scanModuleImports(source: string, loader: 'ts' | 'tsx' = 'tsx'): string[] {
+  let imports: { path: string }[]
+  try {
+    imports = IMPORT_SCANNERS[loader].scanImports(source)
+  } catch {
+    return []
   }
-  return specifiers
+  return imports
+    .map(i => i.path)
+    .filter(p => /^\.\.?\//.test(p) && !/\.server(\.ts)?$/.test(p) && !ASSET_EXTENSIONS.test(p))
 }
 
 async function prevalidateServerFiles(entrypoint: string): Promise<void> {

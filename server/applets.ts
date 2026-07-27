@@ -63,6 +63,13 @@ async function resolveSource(sourceDir: string, name: string): Promise<string | 
   return null
 }
 
+// Backstop for pathological graphs: an applet wiring more distinct files than
+// this is reported stale without walking further — stale-but-rebuilt is the
+// safe degradation, and the cap keeps the per-bundle check bounded no matter
+// what the imports look like. Far above any sane applet (the walk never enters
+// node_modules), so hitting it means something is off anyway.
+const MAX_GRAPH_FILES = 512
+
 // A bundle is stale if its entry `index.js` is missing, or any file in its
 // local import graph has an mtime >= the built entry's. The graph is walked
 // transitively over relative module imports (shared `_utils.tsx`,
@@ -83,6 +90,7 @@ async function needsRebuild(buildDir: string, name: string, srcPath: string): Pr
     const path = queue.pop()!
     if (visited.has(path)) continue
     visited.add(path)
+    if (visited.size > MAX_GRAPH_FILES) return true
     const file = Bun.file(path)
     if (!(await file.exists())) continue
     if (file.lastModified >= builtMtime) return true
@@ -99,7 +107,7 @@ async function needsRebuild(buildDir: string, name: string, srcPath: string): Pr
       const assetFile = Bun.file(join(dir, specifier))
       if ((await assetFile.exists()) && assetFile.lastModified >= builtMtime) return true
     }
-    for (const specifier of scanModuleImports(source)) {
+    for (const specifier of scanModuleImports(source, /\.(tsx|jsx)$/.test(path) ? 'tsx' : 'ts')) {
       const resolved = await resolveModuleImport(dir, specifier)
       if (resolved) queue.push(resolved)
     }

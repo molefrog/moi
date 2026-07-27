@@ -68,12 +68,14 @@ describe('scanModuleImports', () => {
     const src = [
       `import { a } from './_utils'`,
       `export * from '../lib/shared'`,
+      `export { b } from './re-export'`,
       `import './side-effect'`,
       `const lazy = await import('./panels/heavy')`
     ].join('\n')
     expect(scanModuleImports(src)).toEqual([
       './_utils',
       '../lib/shared',
+      './re-export',
       './side-effect',
       './panels/heavy'
     ])
@@ -87,6 +89,25 @@ describe('scanModuleImports', () => {
       `import { helper } from './helper'`
     ].join('\n')
     expect(scanModuleImports(src)).toEqual(['./helper'])
+  })
+
+  test('lexes real syntax — comments, strings, and type-only imports never count', () => {
+    const src = [
+      `// import { ghost } from './commented-out'`,
+      `const s = "import { x } from './in-a-string'"`,
+      `import type { T } from './types-only'`,
+      `import { real } from './real'`
+    ].join('\n')
+    expect(scanModuleImports(src)).toEqual(['./real'])
+  })
+
+  test('a file that fails to lex contributes no imports', () => {
+    expect(scanModuleImports(`import { from`)).toEqual([])
+  })
+
+  test('the ts loader handles angle-bracket casts tsx cannot', () => {
+    const src = [`const v = <string>window.name`, `import { q } from './cast-file'`].join('\n')
+    expect(scanModuleImports(src, 'ts')).toEqual(['./cast-file'])
   })
 })
 
@@ -131,5 +152,28 @@ describe('dependency staleness', () => {
     seed('.moi/lib/deep.ts', DEEP + '\n// edited')
     expect((await build())[0]).toMatchObject({ status: 'built' })
     expect((await build())[0]).toMatchObject({ status: 'skipped' })
+  })
+
+  test('a graph larger than the file cap always rebuilds (fails toward stale)', async () => {
+    // 520+ chained modules exceed MAX_GRAPH_FILES: the walk aborts and reports
+    // stale, so the applet rebuilds every bundle instead of risking a stale
+    // skip. Degenerate by design — no sane applet wires this many local files.
+    seed(
+      '.moi/widgets/big.tsx',
+      [
+        `import { label } from './_head'`,
+        `export default function Big() { return <div>{label}</div> }`
+      ].join('\n')
+    )
+    seed('.moi/widgets/_head.ts', [`import '../lib/c0'`, `export const label = 'big'`].join('\n'))
+    const LAST = 520
+    for (let i = 0; i <= LAST; i++) {
+      const next = i < LAST ? `import './c${i + 1}'\n` : ''
+      seed(`.moi/lib/c${i}.ts`, `${next}export const v${i} = ${i}`)
+    }
+
+    expect((await build())[0]).toMatchObject({ name: 'big', status: 'built' })
+    // Would be 'skipped' under the cap — the oversized graph forces a rebuild.
+    expect((await build())[0]).toMatchObject({ status: 'built' })
   })
 })
