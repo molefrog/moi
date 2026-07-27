@@ -61,8 +61,8 @@ type ThemeColorSource = {
 
 const THEME_COLOR_DERIVATIONS = {
   background: ({ background }) => background,
-  foreground: ({ background }) =>
-    `color-mix(in oklch, oklch(from ${background} l calc(c * 10) h) 32%, black 68%)`,
+  foreground: () =>
+    `color-mix(in oklch, oklch(from var(--background) l calc(c * 10) h) 32%, black 68%)`,
   muted: () => 'color-mix(in oklch, var(--background) 95%, var(--foreground) 5%)',
   mutedForeground: () => 'color-mix(in oklch, var(--background) 58%, var(--foreground) 42%)',
   accent: () =>
