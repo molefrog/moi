@@ -10,16 +10,13 @@
 //     stores, non-React code. It rides the NEXT chat message's
 //     "# This message only" section and is delivered exactly once.
 //
-//   useMoiUserMessageContext()
-//     Hook for the chat send path: returns a builder that snapshots ambient
-//     state (active tab, view title, the active view's params), drains the
-//     directive queue, and accepts per-message extras — directives, and the
-//     applet attribution when the message came from applet UI rather than the
+//   useMoiUserMessageContext({ activeTab, appletParams })
+//     Hook for the chat send path: takes the workspace's live tab address
+//     (from useWorkspaceNavigation, threaded through useChat) and returns a
+//     builder that resolves the tab's title and params, drains the directive
+//     queue, and accepts per-message extras — directives, and the applet
+//     attribution when the message came from applet UI rather than the
 //     composer. Call the builder only for a message that actually goes out.
-//
-//   publishTabAddress(workspaceId, activeTab, params)
-//     Called by useWorkspaceNavigation whenever the tab address settles, so
-//     the builder can read live navigation state at send time.
 //
 //   Adding a new ambient field (e.g. scratchpad selection): extend the
 //   `MoiContext` type and its renderer in lib/moi-context.ts, then supply
@@ -29,7 +26,6 @@ import { useCallback } from 'react'
 import { useViewBuilders } from '@/client/features/views/api'
 import { useWorkspaceViews } from '@/client/features/workspace/api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
-import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import type { MoiAppletMessage, MoiContext } from '@/lib/moi-context'
 import type { ViewBuilder, ViewInfo, WorkspaceTabId } from '@/lib/types'
 
@@ -64,43 +60,23 @@ export function takeChatDirectives(
   return [...drainChatDirectives(workspaceId), ...messageDirectives]
 }
 
-// The live tab address per workspace — the URL's tab plus the params the view
-// is rendering with. Module-level for the same reason the directive queue is,
-// plus one of its own: `useWorkspaceNavigation` (which owns this state) runs
-// BELOW `useChat` in the workspace screen, so a React context provided there
-// would not be readable from the send path. Nothing here needs to be reactive
-// — the builder snapshots at send time, never at render.
-type TabAddress = { activeTab: WorkspaceTabId; params: Record<string, unknown> }
+// The workspace's live tab address, owned by useWorkspaceNavigation and passed
+// down through useChat. The URL is the truth for which tab is active, and
+// navigation state is the truth for what the view is rendering with.
+export type WorkspaceTabAddress = {
+  activeTab: WorkspaceTabId
+  appletParams: Record<string, unknown>
+}
 
-const tabAddresses = new Map<string, TabAddress>()
-
-export function publishTabAddress(
-  workspaceId: string,
+// The params the envelope should report, or undefined when there are none
+// worth reporting: views are the only tabs with addressable state, and an
+// empty record says nothing.
+export function envelopeTabParams(
   activeTab: WorkspaceTabId,
-  params: Record<string, unknown>
-): void {
-  tabAddresses.set(workspaceId, { activeTab, params })
-}
-
-export function clearTabAddress(workspaceId: string): void {
-  tabAddresses.delete(workspaceId)
-}
-
-// The envelope's tab fields for a workspace right now. Params belong in there
-// only where they mean something: views are the only tabs with addressable
-// state, and an empty record says nothing. `defaultTab` (the layout's saved
-// default) answers for the window before navigation has published anything.
-export function tabAddressFields(
-  workspaceId: string,
-  defaultTab: WorkspaceTabId
-): { activeTab: WorkspaceTabId; tabParams?: Record<string, unknown> } {
-  const address = tabAddresses.get(workspaceId)
-  if (!address) return { activeTab: defaultTab }
-  const hasParams = address.activeTab.startsWith('view:') && Object.keys(address.params).length > 0
-  return {
-    activeTab: address.activeTab,
-    ...(hasParams ? { tabParams: address.params } : {})
-  }
+  appletParams: Record<string, unknown>
+): Record<string, unknown> | undefined {
+  if (!activeTab.startsWith('view:')) return undefined
+  return Object.keys(appletParams).length > 0 ? appletParams : undefined
 }
 
 // The UI label of the active tab when it has one beyond its id: a view's
@@ -131,19 +107,17 @@ export type MoiUserMessageOptions = {
 // it when the message is actually sent, not at render. Draining the
 // directive queue is part of the snapshot, so only call it for a message
 // that will really go out.
-export function useMoiUserMessageContext(): (options?: MoiUserMessageOptions) => MoiContext {
+export function useMoiUserMessageContext({
+  activeTab,
+  appletParams
+}: WorkspaceTabAddress): (options?: MoiUserMessageOptions) => MoiContext {
   const workspaceId = useWorkspaceId()
-  const { layout } = useWorkspaceLayoutCtx()
   const views = useWorkspaceViews(workspaceId).data
   const builders = useViewBuilders(workspaceId).data
-  // Fallback only: the saved default answers where a bare `/workspace/:id`
-  // lands, which is the right answer before navigation has published an
-  // address (first paint) and a stale one after.
-  const defaultTab = layout.tabs.active
   return useCallback(
     (options: MoiUserMessageOptions = {}) => {
       const directives = takeChatDirectives(workspaceId, options.directives ?? [])
-      const { activeTab, tabParams } = tabAddressFields(workspaceId, defaultTab)
+      const tabParams = envelopeTabParams(activeTab, appletParams)
       return {
         activeTab,
         tabTitle: activeTabTitle(activeTab, views, builders),
@@ -152,6 +126,6 @@ export function useMoiUserMessageContext(): (options?: MoiUserMessageOptions) =>
         ...(directives.length > 0 ? { directives } : {})
       }
     },
-    [workspaceId, defaultTab, views, builders]
+    [workspaceId, activeTab, appletParams, views, builders]
   )
 }

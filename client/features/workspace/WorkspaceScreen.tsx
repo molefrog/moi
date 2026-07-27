@@ -250,18 +250,6 @@ function applyVisibleTabOrder(
 }
 
 export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenProps) {
-  const {
-    view,
-    chatLoaded,
-    previewTurn,
-    sessionId,
-    processing,
-    error,
-    send,
-    stop,
-    switchThread,
-    dismissError
-  } = useChat()
   const { layout, setLayout, name, icon, provider, workspaceId } = useWorkspaceLayoutCtx()
   // Keep the composer read/write, but block sends when its agent executable is
   // missing. The Send button explains how to install it.
@@ -299,6 +287,23 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     builders,
     split: dockedSplit
   })
+
+  // Chat comes after navigation, and takes the address: every message carries
+  // where the user is (active tab, and the params the view is rendering with)
+  // in its `<moi-context>` envelope.
+  const {
+    view,
+    chatLoaded,
+    previewTurn,
+    sessionId,
+    processing,
+    error,
+    send,
+    stop,
+    switchThread,
+    dismissError
+  } = useChat({ activeTab, appletParams })
+
   const openSet = new Set(tabsState.open)
 
   // Entering split with the agent tab on screen needs no special-casing

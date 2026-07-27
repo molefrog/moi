@@ -9,7 +9,10 @@ import {
   useWorkspaceModels,
   useWorkspaceSessions
 } from '@/client/features/chat/api'
-import { useMoiUserMessageContext } from '@/client/features/workspace/moi-context'
+import {
+  type WorkspaceTabAddress,
+  useMoiUserMessageContext
+} from '@/client/features/workspace/moi-context'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { sendMessage } from '@/client/features/chat/chat-connection'
@@ -31,7 +34,11 @@ const EMPTY: ViewState = emptyViewState()
 // Thin projection over app-level state: the active thread + spinner/error come
 // from the live store; the transcript comes from the React Query cache (kept
 // current by the connection manager's WS deltas). No socket lifecycle here.
-export function useChat() {
+//
+// Takes the workspace's tab address because every message carries it: the
+// envelope tells the agent which tab the user is on and what the active view
+// is rendering with. Call this BELOW `useWorkspaceNavigation`, which owns it.
+export function useChat(address: WorkspaceTabAddress) {
   const workspaceId = useWorkspaceId()
   const qc = useQueryClient()
   const { layout } = useWorkspaceLayoutCtx()
@@ -39,7 +46,7 @@ export function useChat() {
   const sessions = useWorkspaceSessions(workspaceId).data
   // Snapshot of the workspace's ambient UI state + queued one-shot
   // directives, taken when the message actually goes out.
-  const buildMoiContext = useMoiUserMessageContext()
+  const buildMoiContext = useMoiUserMessageContext(address)
 
   const activeSessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
   const sessionSelectionInitialized = useLive(s =>
