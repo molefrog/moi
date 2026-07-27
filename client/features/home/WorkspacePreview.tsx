@@ -12,8 +12,8 @@ type WorkspacePreviewProps = {
 const FOLDER = {
   width: 320,
   height: 180,
-  radius: 24,
-  topLeftRadius: 14,
+  radius: 32,
+  topLeftRadius: 20,
   bodyTop: 24,
   tabEnd: 124,
   shoulder: {
@@ -185,7 +185,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
 
       <div
         className={cn(
-          'absolute inset-x-2 top-[40%] bottom-2 rounded-lg bg-[color-mix(in_oklch,var(--accent),var(--foreground)_5%)]',
+          'absolute inset-x-2 top-[40%] bottom-2 rounded-2xl bg-[color-mix(in_oklch,var(--accent),var(--foreground)_5%)]',
           'mask-[linear-gradient(to_bottom,rgba(0,0,0,0.9)_0%,black_50%)] backdrop-blur-lg',
           'inset-shadow-[0_0_12px_color-mix(in_oklab,var(--background)_20%,transparent)]'
         )}
