@@ -19,6 +19,7 @@ import { useEffect, useRef } from 'react'
 import { createNanoEvents } from 'nanoevents'
 
 import { reportAppletError } from '@/client/features/applets/applet-log'
+import { createRateLimiter } from '@/client/lib/rate-limit'
 import { MAX_APPLET_CONTEXT_CHARS } from '@/lib/moi-context'
 import type { AppletKind, WorkspaceTabId } from '@/lib/types'
 import { isParamsRecord, isWorkspaceTabId } from '@/lib/workspace-tabs'
@@ -63,20 +64,16 @@ const MAX_LABEL_CHARS = 1000
 // `sendChatMessage` starts an agent run, which makes a stuck applet expensive
 // in a way `focusTab` is not: a widget calling it during render fires once per
 // render, and the bridge is per BUNDLE, so two simultaneous mounts of one
-// applet double every call. Two bounds per workspace: identical messages
-// collapse within the cooldown (which also absorbs the double-mount), and the
-// window cap bounds everything else, including a loop that varies its label.
-const CHAT_COOLDOWN_MS = 2_000
-const CHAT_RATE_WINDOW_MS = 60_000
-const CHAT_MAX_PER_WINDOW = 10
+// applet double every call. The cooldown collapses identical messages (which
+// also absorbs the double-mount); the window cap bounds everything else,
+// including a loop that varies its label. Limits are per workspace runtime, so
+// one runaway applet can't mute another workspace.
+const CHAT_LIMITS = { cooldownMs: 2_000, windowMs: 60_000, maxPerWindow: 10, maxKeys: 64 }
 
 function createRuntime(workspaceId: string) {
   const emitter = createNanoEvents<AppletEvents>()
-  // `${source}\0${label}` → last send. Bounded by the applet count in practice;
-  // a label that varies every call is caught by the window cap instead.
-  const lastSentAt = new Map<string, number>()
-  let windowStart = 0
-  let windowCount = 0
+  // Keyed by `${source}\0${label}` — same applet, same message.
+  const chatLimiter = createRateLimiter(CHAT_LIMITS)
 
   // Drops are journaled, never silent: a message the agent never received has
   // to be discoverable in `moi debug logs`, or the applet author sees a dead
@@ -91,33 +88,24 @@ function createRuntime(workspaceId: string) {
     })
   }
 
-  // True when this message may go out; records the send as a side effect.
+  // True when this message may go out; records the send as a side effect. Each
+  // tier gets its own explanation — "you called this in render" and "you are
+  // sending too much" need different fixes.
   const admitChatMessage = (identity: AppletIdentity, source: string, label: string): boolean => {
-    const now = Date.now()
-    const key = `${source}\0${label}`
-    const last = lastSentAt.get(key)
-    if (last !== undefined && now - last < CHAT_COOLDOWN_MS) {
+    const verdict = chatLimiter.admit(`${source}\0${label}`)
+    if (verdict === 'cooldown') {
       drop(
         identity,
-        `sendChatMessage("${label}") was dropped: the same message was already sent less than ${CHAT_COOLDOWN_MS / 1000}s ago. Call it from an event handler, not during render.`
+        `sendChatMessage("${label}") was dropped: the same message was already sent less than ${CHAT_LIMITS.cooldownMs / 1000}s ago. Call it from an event handler, not during render.`
       )
       return false
     }
-    if (now - windowStart >= CHAT_RATE_WINDOW_MS) {
-      windowStart = now
-      windowCount = 0
-    }
-    if (windowCount >= CHAT_MAX_PER_WINDOW) {
+    if (verdict === 'window') {
       drop(
         identity,
-        `sendChatMessage("${label}") was dropped: more than ${CHAT_MAX_PER_WINDOW} messages in a minute from this workspace. Each one starts an agent run, so send only on a real user action.`
+        `sendChatMessage("${label}") was dropped: more than ${CHAT_LIMITS.maxPerWindow} messages in a minute from this workspace. Each one starts an agent run, so send only on a real user action.`
       )
       return false
-    }
-    windowCount++
-    lastSentAt.set(key, now)
-    if (lastSentAt.size > 64) {
-      for (const stale of [...lastSentAt.keys()].slice(0, 32)) lastSentAt.delete(stale)
     }
     return true
   }
