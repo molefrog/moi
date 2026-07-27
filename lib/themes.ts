@@ -1,55 +1,55 @@
-export type FontTheme = 'default' | 'serif' | 'mono' | 'bubbly' | 'geometric' | 'retro'
+export type FontTheme = 'default' | 'serif' | 'mono' | 'blobby' | 'geometric' | 'awkward'
 
 export type FontThemeConfig = {
   label: string
+  feel: string
   sans: string
   mono: string
-  feel: string
   googleFontsQuery?: string // passed as `family=` param to Google Fonts API
 }
 
 export const FONT_THEMES: Record<FontTheme, FontThemeConfig> = {
   default: {
     label: 'Default',
+    feel: 'System font',
     sans: 'system-ui',
     mono: 'JetBrains Mono',
-    feel: 'Native OS, zero load',
     googleFontsQuery: 'JetBrains+Mono:wght@400;500'
   },
   serif: {
     label: 'Serif',
-    sans: 'Libre Baskerville',
+    feel: 'PT Serif',
+    sans: 'PT Serif',
     mono: 'JetBrains Mono',
-    feel: 'Classic serif, literary',
-    googleFontsQuery: 'Libre+Baskerville:wght@400;700&family=JetBrains+Mono:wght@400;500'
+    googleFontsQuery: 'PT+Serif:wght@400;600;700&family=JetBrains+Mono:wght@400;500'
   },
   mono: {
     label: 'Mono',
+    feel: 'JetBrains Mono',
     sans: 'JetBrains Mono',
     mono: 'JetBrains Mono',
-    feel: 'Full terminal, hacker',
     googleFontsQuery: 'JetBrains+Mono:wght@400;500;600'
   },
-  bubbly: {
-    label: 'Bubbly',
-    sans: 'Fredoka',
+  blobby: {
+    label: 'Blobby',
+    feel: 'Sour Gummy',
+    sans: 'Sour Gummy',
     mono: 'Azeret Mono',
-    feel: 'Very round, toy-like',
-    googleFontsQuery: 'Fredoka:wght@400;500;600&family=Azeret+Mono:wght@400;500'
+    googleFontsQuery: 'Sour+Gummy:wght@400;500;600&family=Azeret+Mono:wght@400;500'
   },
   geometric: {
     label: 'Geometric',
-    sans: 'Outfit',
-    mono: 'DM Mono',
-    feel: 'Swiss design, neutral',
-    googleFontsQuery: 'Outfit:wght@400;500;600&family=DM+Mono:wght@400;500'
+    feel: 'Manrope',
+    sans: 'Manrope',
+    mono: 'JetBrains Mono',
+    googleFontsQuery: 'Manrope:wght@400;500;600&family=DM+Mono:wght@400;500'
   },
-  retro: {
-    label: 'Retro',
-    sans: 'Courier Prime',
-    mono: 'Courier Prime',
-    feel: 'Typewriter nostalgia',
-    googleFontsQuery: 'Courier+Prime:wght@400;700'
+  awkward: {
+    label: 'Awkward',
+    feel: 'Averia Sans Libre',
+    sans: 'Averia Sans Libre',
+    mono: 'Azeret Mono',
+    googleFontsQuery: 'Averia+Sans+Libre:wght@400;500;600&family=Azeret+Mono:wght@400;500'
   }
 }
 

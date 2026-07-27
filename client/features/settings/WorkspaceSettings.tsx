@@ -30,14 +30,14 @@ export function WorkspaceSettings() {
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Space settings"
+              aria-label="Settings"
               onClick={() => setOpen(true)}
             >
               <IconSettings stroke={1.75} />
             </Button>
           }
         />
-        <TooltipContent>Space settings</TooltipContent>
+        <TooltipContent>Settings</TooltipContent>
       </Tooltip>
 
       <Dialog open={open} onOpenChange={setOpen}>
