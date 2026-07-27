@@ -69,6 +69,7 @@
     "citty": "^0.2.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "conf": "^15.1.0",
     "devalue": "^5.6.4",
     "env-paths": "^4.0.0",
     "frimousse": "^0.3.0",
