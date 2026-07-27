@@ -973,7 +973,11 @@ api.patch('/api/settings', async c => {
     }
     patch.autoUpdateSkills = body.autoUpdateSkills
   }
-  return c.json(saveAppSettings(patch))
+  const settings = saveAppSettings(patch)
+  // Other open clients hold these in a query cache with no polling; broadcast
+  // the new value so an app-wide preference applies everywhere immediately.
+  publishEvent({ type: 'settings:updated', settings })
+  return c.json(settings)
 })
 
 // Everything else: in production, serve the prebuilt client from `dist/` via

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
+import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import type { AppSettings, WorkspaceEntry, WorkspaceEnvView } from '@/lib/types'
 
 // App-wide settings (server-side settings.json, GET/PATCH /api/settings) —
@@ -10,6 +11,14 @@ import type { AppSettings, WorkspaceEntry, WorkspaceEnvView } from '@/lib/types'
 export const appSettingsKey = ['app-settings'] as const
 
 export function useAppSettings() {
+  const queryClient = useQueryClient()
+  // Another client can change settings; the server broadcasts the new value
+  // over the live-events socket so every open client stays in sync.
+  useWorkspaceEvent(event => {
+    if (event.type === 'settings:updated') {
+      queryClient.setQueryData<AppSettings>(appSettingsKey, event.settings)
+    }
+  })
   return useQuery<AppSettings>({
     queryKey: appSettingsKey,
     queryFn: () => requestJson('/api/settings'),
