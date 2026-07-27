@@ -1,7 +1,8 @@
 # RFC: workspace tab navigation and applet messaging (intents v2)
 
-Status: MVP 1 (tab foundation) implemented; MVP 2–3 staged · Supersedes the prototypes reviewed
-in PR #52 (direction kept, code dropped) and PR #53 (capability routing not taken).
+Status: MVP 1 (tab foundation) and MVP 2 (chat messaging) implemented; MVP 3 staged · Supersedes
+the prototypes reviewed in PR #52 (direction kept, code dropped) and PR #53 (capability routing
+not taken).
 
 ## Summary
 
@@ -166,9 +167,24 @@ sendChatMessage(label: string, context?: Record<string, unknown>): void
 - `focusTab` from an applet is client-local navigation (replace) — no server round-trip.
 - `sendChatMessage` always targets the **active chat**. Envelope discipline: `label` is the
   visible message text; `{ source, context }` rides the `<moi-context>` envelope under an
-  `# Applet message` section; busy chat parks the label as the composer draft (context dropped —
-  accepted gap). Envelope symmetry: while a view is active, user messages carry its current
-  `params` values, read from navigation state.
+  `# Applet message` section. Envelope symmetry: while a view is active, user messages carry its
+  current `params` values, read from navigation state.
+- **Reveal before send.** The chat is a closed popover on a view tab in full-screen mode, so an
+  applet message opens it first (the same `openChat` path the widget grid and view builder use).
+  A run the user cannot see is worse than a panel that opens itself.
+- **Rate limiting is the host's job.** Each call starts an agent run, and the bridge is per
+  bundle, so a `sendChatMessage` in render — or one applet mounted twice — would bill the user
+  per frame. The runtime collapses an identical `source`+`label` inside a 2s cooldown and caps a
+  workspace at 10 messages per minute. Drops are journaled to `moi debug logs`, never silent —
+  from the applet's side a dropped call is a button that did nothing.
+- **Validation caps.** A label over 1000 chars is dropped (it would land in a bubble verbatim); a
+  `context` that isn't a plain object, doesn't serialize, or exceeds 2000 chars is dropped while
+  the message still goes — the label carries the user's intent and must not be lost with the
+  payload.
+- **Envelope integrity.** Every applet-authored string interpolated into the envelope (view
+  titles, applet names, both JSON blobs) has every `<` replaced by its JSON unicode escape — the
+  same string to a reader, minus the ability to close `<moi-context>` early and forge a section
+  the host never wrote.
 
 ## 6. Naming
 
@@ -183,8 +199,14 @@ The word "intent" stays out of the API: the focus event is `tab:focus`, the enve
    visible source chip with inspectable context is future UI work. (The trust/injection concern
    stands — the envelope still names the source applet, so the agent knows, even though the user
    can't see it yet.)
-3. **Busy chat** — draft-parking stays: the label lands in the composer, the structured `context`
-   is dropped, the user sends manually. A real queue is a possible later upgrade, not v2 scope.
+3. **Busy chat** — ~~draft-parking~~ **revised during MVP 2: applet messages send straight
+   through, running turn or not.** Draft-parking was written before the composer offered
+   "Queue a follow-up": typed messages already queue into the live session, so parking would have
+   made applet messages a special case whose only distinction was losing the structured
+   `context`. An applet message is now exactly a typed one, minus the typing.
+4. **Unavailable agent** — an applet message is dropped when the workspace's agent executable is
+   missing, the same gate the composer's send button uses, and journaled so the dead button has
+   an explanation.
 
 ## Staging
 
@@ -193,7 +215,10 @@ The word "intent" stays out of the API: the focus event is `tab:focus`, the enve
   views from navigation state; `focusTab` in the `moi` module; `moi tabs` / `moi tab focus` CLI
   with the `tab:focus` event. Explicitly out: skill changes, `sendChatMessage`, envelope changes,
   dead-URL journaling.
-- **MVP 2 — chat messaging:** `sendChatMessage` + the `# Applet message` envelope section +
-  params symmetry in the envelope; dead-URL journaling.
+- **MVP 2 — chat messaging (implemented):** `sendChatMessage` + the `# Applet message` envelope
+  section + params symmetry in the envelope; dead-URL journaling. Added on the way, not in the
+  original plan: rate limiting, envelope escaping, and the `runtime` journal source — one line
+  for anything the applet API refuses (a dead tab id, a dropped message), which the applet's own
+  code never sees.
 - **MVP 3 — authoring:** skill guidance (`Params` type convention, read-the-source rule, CLI
   usage), then fold the surviving parts of this RFC into permanent docs.

@@ -21,6 +21,7 @@
 // Display paths strip with `stripMoiContext` so the envelope never surfaces
 // in a bubble, live or replayed from a transcript.
 import type { WorkspaceTabId } from './types'
+import { isParamsRecord } from './workspace-tabs'
 
 const MOI_CONTEXT_OPEN = '<moi-context>'
 const MOI_CONTEXT_CLOSE = '</moi-context>'
@@ -31,6 +32,17 @@ const MOI_CONTEXT_MARKER = 'You are running in a `moi` workspace'
 
 const SYSTEM_REMINDER_OPEN = '<system-reminder>'
 const SYSTEM_REMINDER_CLOSE = '</system-reminder>'
+
+// A chat message fired from applet UI (`sendChatMessage`) rather than typed.
+// `source` is the applet's `<kind>:<name>`, stamped host-side by the applet
+// runtime from the identity the bridge was attached with — an applet cannot
+// claim to be another one.
+export type MoiAppletMessage = {
+  source: string
+  // The structured payload the applet attached to the call. JSON-plain, and
+  // dropped entirely when it doesn't survive serialization.
+  context?: Record<string, unknown>
+}
 
 // The structured form built at send time — by the client for chat sends, by
 // the server for programmatic sends (the view builder). Extend this (and
@@ -44,9 +56,66 @@ export type MoiContext = {
   // view builder's claimed title while the build runs. The tab bar falls
   // back to the id when unset; so does the envelope.
   tabTitle?: string
+  // The params the active view is rendering with right now, straight from
+  // navigation state. The emitter side of the same contract (`focusTab`) sets
+  // them, so the agent sees a view's addressable state in both directions.
+  // Absent for tabs that take no params (widgets, scratchpad, agent).
+  tabParams?: Record<string, unknown>
+  // Set when this message came from applet UI instead of the composer.
+  applet?: MoiAppletMessage
   // One-shot imperative lines for this message only (e.g. the view-builder
   // bootstrap instructions from lib/view-builder-directives.ts).
   directives?: string[]
+}
+
+// Cap on applet-authored JSON rendered into the envelope. Shared with the
+// client applet runtime, which drops an oversized `context` at the trust
+// boundary rather than letting it ride the wire — the renderer's truncation is
+// the backstop for anything that still gets through (e.g. a server-built
+// context).
+export const MAX_APPLET_CONTEXT_CHARS = 2000
+
+// Applet-authored strings (view titles, applet names, attached context) get
+// interpolated into the envelope, and applet code is agent-authored — a
+// crafted value containing `</moi-context>` would otherwise close the envelope
+// early and forge sections the host never wrote. Escaping `<` defuses every
+// such value at once: inside JSON it is the standard `<` string escape
+// (same string, no tag), and in prose the model reads it the same.
+function escapeTags(text: string): string {
+  return text.replaceAll('<', '\\u003c')
+}
+
+// Render an applet-authored record for the envelope, or null when there's
+// nothing worth printing. Non-serializable values (cycles, BigInt) drop rather
+// than throw mid-send.
+function renderAppletJson(value: Record<string, unknown>): string | null {
+  let json: string
+  try {
+    json = JSON.stringify(value)
+  } catch {
+    return null
+  }
+  if (!json || json === '{}') return null
+  const capped =
+    json.length > MAX_APPLET_CONTEXT_CHARS
+      ? `${json.slice(0, MAX_APPLET_CONTEXT_CHARS)}… (truncated)`
+      : json
+  return escapeTags(capped)
+}
+
+// `<kind>:<name>` → a sentence fragment that names the applet the way the user
+// sees it AND the file the agent edits, the same pairing `describeTab` makes
+// for view tabs.
+function describeAppletSource(source: string): string {
+  if (source.startsWith('widget:')) {
+    const name = escapeTags(source.slice('widget:'.length))
+    return `"${name}" widget (.moi/widgets/${name}.tsx)`
+  }
+  if (source.startsWith('view:')) {
+    const name = escapeTags(source.slice('view:'.length))
+    return `"${name}" view (.moi/views/${name}.tsx)`
+  }
+  return `"${escapeTags(source)}" applet`
 }
 
 // One sentence per tab, using the labels the user sees in the tab bar (except
@@ -54,7 +123,10 @@ export type MoiContext = {
 // set` needs). A view tab also names its backing file: the user speaks in
 // titles ("fix the Grading review page") while the agent edits
 // `.moi/views/<id>.tsx` — this line connects the two.
-function describeTab(tab: WorkspaceTabId, title?: string): string {
+function describeTab(tab: WorkspaceTabId, rawTitle?: string): string {
+  // Titles come from applet config, so they carry the same forgery risk as any
+  // other applet-authored string in here.
+  const title = rawTitle === undefined ? undefined : escapeTags(rawTitle)
   if (tab === 'agent') return 'The user is on the "Agent" tab (full page chat).'
   if (tab === 'widgets') return 'The user is on the "Widgets" tab.'
   if (tab === 'scratchpad') return 'The user is on the "Scratchpad" tab.'
@@ -82,7 +154,18 @@ export function renderMoiContextBody(ctx: MoiContext): string {
     `${MOI_CONTEXT_MARKER} — a shared UI the user chats with you from, which you can extend and customize.`,
     'Read the **`moi-workspace` skill** before responding — even to a simple question — unless you already read it in this chat.'
   ].join('\n')
-  const sections = [`# Active tab\n${describeTab(ctx.activeTab, ctx.tabTitle)}`]
+  const tabLines = [describeTab(ctx.activeTab, ctx.tabTitle)]
+  const tabParams = ctx.tabParams ? renderAppletJson(ctx.tabParams) : null
+  if (tabParams) tabLines.push(`Params it is rendering with right now: ${tabParams}`)
+  const sections = [`# Active tab\n${tabLines.join('\n')}`]
+  if (ctx.applet) {
+    const appletLines = [
+      `The message above was not typed by the user — the ${describeAppletSource(ctx.applet.source)} sent it when the user acted in its UI.`
+    ]
+    const context = ctx.applet.context ? renderAppletJson(ctx.applet.context) : null
+    if (context) appletLines.push(`It attached this context: ${context}`)
+    sections.push(`# Applet message\n${appletLines.join('\n')}`)
+  }
   if (ctx.directives?.length) {
     sections.push(`# This message only\n${ctx.directives.join('\n')}`)
   }
@@ -100,12 +183,30 @@ export function renderMoiContext(ctx: MoiContext): string {
 // Wire-shape guard for the chat frame's `context` field (see web.ts).
 export function isMoiContext(value: unknown): value is MoiContext {
   if (typeof value !== 'object' || value === null) return false
-  const v = value as { activeTab?: unknown; tabTitle?: unknown; directives?: unknown }
+  const v = value as {
+    activeTab?: unknown
+    tabTitle?: unknown
+    tabParams?: unknown
+    applet?: unknown
+    directives?: unknown
+  }
   return (
     typeof v.activeTab === 'string' &&
     (v.tabTitle === undefined || typeof v.tabTitle === 'string') &&
+    (v.tabParams === undefined || isParamsRecord(v.tabParams)) &&
+    (v.applet === undefined || isMoiAppletMessage(v.applet)) &&
     (v.directives === undefined ||
       (Array.isArray(v.directives) && v.directives.every(d => typeof d === 'string')))
+  )
+}
+
+function isMoiAppletMessage(value: unknown): value is MoiAppletMessage {
+  if (!isParamsRecord(value)) return false
+  const v = value as { source?: unknown; context?: unknown }
+  return (
+    typeof v.source === 'string' &&
+    v.source.length > 0 &&
+    (v.context === undefined || isParamsRecord(v.context))
   )
 }
 

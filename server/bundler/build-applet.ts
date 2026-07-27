@@ -238,9 +238,11 @@ export function rpc(module, name) {
 // per-segment URL-encoded so spaces / unicode in filenames survive. A leading
 // slash is stripped so both `clips/a.mp4` and `/clips/a.mp4` work.
 //
-// `focusTab(tab, params?)` forwards to this bundle's host-attached bridge —
-// client-local replace-navigation to a workspace tab, params delivered to the
-// target view via navigation state. This virtual module is INLINED PER BUNDLE,
+// `focusTab(tab, params?)` and `sendChatMessage(label, context?)` forward to
+// this bundle's host-attached bridge — client-local replace-navigation to a
+// workspace tab (params delivered to the target view via navigation state),
+// and a chat message sent to the workspace's active chat as if the user had
+// typed it. This virtual module is INLINED PER BUNDLE,
 // so `bridge` is private to one applet: the host attaches it right after the
 // dynamic import and neuters it on invalidation (see
 // client/features/applets/applet-runtime.ts). Optional-chained so calls no-op
@@ -267,6 +269,10 @@ export function fileUrl(path) {
 
 export function focusTab(tab, params) {
   bridge?.focusTab(tab, params);
+}
+
+export function sendChatMessage(label, context) {
+  bridge?.sendChatMessage(label, context);
 }
 `
 

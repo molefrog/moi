@@ -3,7 +3,7 @@
 // keeps the open set and the saved DEFAULT tab (`tabs.active`). These helpers
 // turn (URL segment + layout + what actually exists) into the rendered state.
 import type { ViewBuilder, ViewInfo, WorkspaceTabId, WorkspaceTabsState } from '@/lib/types'
-import { viewBuilderIdFromTab, viewIdFromTab } from '@/lib/workspace-tabs'
+import { parseWorkspaceTab, viewBuilderIdFromTab, viewIdFromTab } from '@/lib/workspace-tabs'
 import { createDefaultWorkspaceTabs } from '@/lib/workspace-layout'
 
 const DEFAULT_TABS = createDefaultWorkspaceTabs()
@@ -34,6 +34,19 @@ export function effectiveOpenTabs(
 ): WorkspaceTabId[] {
   const open = tabs.open.filter(tab => tabAvailable(tab, views, builders))
   return open.length > 0 ? open : DEFAULT_TABS.open
+}
+
+// Whether a URL segment that lost its redirect is worth reporting as a stale
+// link (see the journaling in useWorkspaceNavigation). Only two shapes qualify:
+// a view tab — `resolveActiveTab` honors every view that exists, so losing the
+// redirect means it is gone — and a segment that isn't a tab id at all. The two
+// deliberate exclusions are the routine redirects, not broken links: the agent
+// tab bounces whenever split mode docks it as a column, and a view-builder tab
+// bounces the moment its build finishes and the screen swaps in the real view.
+export function isStaleTabLink(urlTab: string | null | undefined): urlTab is string {
+  if (!urlTab) return false
+  const requested = parseWorkspaceTab(urlTab)
+  return requested === null || viewIdFromTab(requested) !== null
 }
 
 // The active tab for a URL-requested tab id: the request wins when it names an

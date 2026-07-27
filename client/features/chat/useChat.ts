@@ -139,7 +139,7 @@ export function useChat() {
         model,
         effort,
         stream,
-        context: buildMoiContext(options?.directives),
+        context: buildMoiContext(options),
         ...(ready.length > 0 ? { attachments: ready.map(a => a.upload!.id) } : {})
       })
       useUiStore.getState().markMessageSentFromMoi(workspaceId)

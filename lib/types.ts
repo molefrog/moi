@@ -68,9 +68,13 @@ export type ViewBuilder = {
 // ---- Applet error journal (see docs/self-correction.md) ------------------
 
 // Where an applet error was observed. `build` and `rpc` are recorded
-// server-side (bundle pipeline, RPC route); `load`/`render`/`window` are
-// browser-side and reach the journal via POST /api/workspaces/:id/applet-log.
-export type AppletLogSource = 'build' | 'load' | 'render' | 'window' | 'rpc'
+// server-side (bundle pipeline, RPC route); `load`/`render`/`window`/`runtime`
+// are browser-side and reach the journal via POST
+// /api/workspaces/:id/applet-log. `runtime` is the applet API refusing a
+// request rather than code throwing — a `focusTab` at a tab that no longer
+// exists, a `sendChatMessage` dropped by the rate limit — which the applet's
+// own code never sees.
+export type AppletLogSource = 'build' | 'load' | 'render' | 'window' | 'rpc' | 'runtime'
 
 // One journal entry, as returned to `moi debug logs`. `kind`/`name` attribute
 // the applet when known; `module`/`fn` pin down the server function for `rpc`
@@ -89,12 +93,14 @@ export type AppletLogEntry = {
 }
 
 // The browser-reported subset (the server-side sources can't be spoofed by a
-// tab — the POST route rejects them).
-export type AppletClientErrorSource = 'load' | 'render' | 'window'
+// tab — the POST route rejects them). `kind`/`name` are optional because a
+// `runtime` entry may have no applet to blame: a stale bookmark pointing at a
+// deleted view is the host redirecting, not an applet misbehaving.
+export type AppletClientErrorSource = 'load' | 'render' | 'window' | 'runtime'
 export type AppletClientError = {
   source: AppletClientErrorSource
-  kind: AppletKind
-  name: string
+  kind?: AppletKind
+  name?: string
   message: string
   stack?: string
 }
