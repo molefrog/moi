@@ -5,7 +5,6 @@ import { existsSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 
 import type {
-  AppSettings,
   HarnessAvailability,
   UploadInfo,
   ViewBuilderInput,
@@ -16,8 +15,7 @@ import type {
 import type { MoiContext } from '@/lib/moi-context'
 import { viewBuilderDirectives } from '@/lib/view-builder-directives'
 
-import { getAppSettings, saveAppSettings } from './app-settings'
-import type { AppSettingsPatch } from './app-settings'
+import { getAppSettings, parseAppSettingsPatch, saveAppSettings } from './app-settings'
 import { appletForModule, recordAppletError } from './applet-log'
 import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from './applets'
 import { applyEnvChanged } from './env-apply'
@@ -960,20 +958,16 @@ api.route('/api/workspaces', workspaces)
 api.get('/api/settings', c => c.json(getAppSettings()))
 
 api.patch('/api/settings', async c => {
-  let body: Partial<Record<keyof AppSettings, unknown>>
+  let body: unknown
   try {
     body = await c.req.json()
   } catch {
     return c.text('Invalid JSON body', 400)
   }
-  const patch: AppSettingsPatch = {}
-  if (body.autoUpdateSkills !== undefined) {
-    if (typeof body.autoUpdateSkills !== 'boolean') {
-      return c.text('autoUpdateSkills must be a boolean', 400)
-    }
-    patch.autoUpdateSkills = body.autoUpdateSkills
-  }
-  const settings = saveAppSettings(patch)
+  // app-settings declares which fields are API-updatable and validates them.
+  const parsed = parseAppSettingsPatch(body)
+  if ('error' in parsed) return c.text(parsed.error, 400)
+  const settings = saveAppSettings(parsed.patch)
   // Other open clients hold these in a query cache with no polling; broadcast
   // the new value so an app-wide preference applies everywhere immediately.
   publishEvent({ type: 'settings:updated', settings })
