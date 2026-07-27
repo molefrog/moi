@@ -668,7 +668,9 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
         )}
       </div>
 
-      <AnimatePresence>{widgetMode === 'customizing' && <CustomizePanel />}</AnimatePresence>
+      <AnimatePresence>
+        {widgetMode === 'customizing' && <CustomizePanel onClose={() => setWidgetMode('idle')} />}
+      </AnimatePresence>
 
       {mode === 'fullscreen' && activeTab !== 'agent' && hasWorkspaceContent && (
         <ChatPopup

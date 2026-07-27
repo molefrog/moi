@@ -264,6 +264,7 @@ export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: W
               ref={panelRef}
               items={hiddenItems}
               renderItem={renderItem}
+              onClose={() => onEditingChange(false)}
               onRestore={restore}
             />
           )}

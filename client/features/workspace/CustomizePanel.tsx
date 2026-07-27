@@ -41,7 +41,7 @@ type CustomizeOptionGroupProps = {
 function CustomizeOptionGroup({ children, label }: CustomizeOptionGroupProps) {
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className="text-xs font-medium">{label}</p>
       <div role="group" aria-label={label} className="grid grid-cols-3 gap-2">
         {children}
       </div>
@@ -76,10 +76,11 @@ function CustomizeOption({ active, children, fontFamily, onSelect }: CustomizeOp
 }
 
 type CustomizePanelProps = {
+  onClose: () => void
   ref?: Ref<HTMLDivElement>
 }
 
-export function CustomizePanel({ ref }: CustomizePanelProps) {
+export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
   usePreloadAllFonts()
   const { layout, setLayout } = useWorkspaceLayoutCtx()
   const currentFont = layout.theme?.font ?? 'default'
@@ -90,8 +91,8 @@ export function CustomizePanel({ ref }: CustomizePanelProps) {
   }
 
   return (
-    <BottomPanel ref={ref} title="Customize">
-      <div className="flex flex-col gap-6">
+    <BottomPanel ref={ref} title="Customize" onClose={onClose}>
+      <div className="flex flex-col gap-4">
         <CustomizeOptionGroup label="Font">
           {FONT_OPTIONS.map(([key, config]) => (
             <CustomizeOption

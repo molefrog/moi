@@ -2,19 +2,29 @@ import type { ReactNode, Ref } from 'react'
 
 import { motion } from 'motion/react'
 
+import { IconX } from '@tabler/icons-react'
+
+import { Button } from '@/client/components/ui/button'
+import { cn } from '@/client/lib/cn'
+
 type BottomPanelProps = {
+  className?: string
   title: string
   children: ReactNode
+  onClose: () => void
   // Forwarded to the panel element so the working area can measure its height
   // and reserve matching space below the grid.
   ref?: Ref<HTMLDivElement>
 }
 
-export function BottomPanel({ title, children, ref }: BottomPanelProps) {
+export function BottomPanel({ className, title, children, onClose, ref }: BottomPanelProps) {
   return (
     <motion.div
       ref={ref}
-      className="absolute inset-x-6 bottom-0 z-20 flex max-h-[60vh] flex-col rounded-t-2xl bg-card p-(--page-pad) text-card-foreground shadow-md"
+      className={cn(
+        'absolute inset-x-4 bottom-4 no-scrollbar flex max-h-full flex-col gap-4 overflow-y-auto rounded-2xl bg-card p-(--page-pad) pb-0 text-card-foreground shadow-md',
+        className
+      )}
       variants={{
         hidden: { opacity: 0, y: 40, filter: 'blur(4px)' },
         visible: { opacity: 1, y: 0, filter: 'blur(0px)' }
@@ -24,10 +34,19 @@ export function BottomPanel({ title, children, ref }: BottomPanelProps) {
       exit="hidden"
       transition={{ type: 'spring', duration: 0.25, bounce: 0 }}
     >
-      <p className="mb-4 shrink-0 text-sm font-medium text-muted-foreground">{title}</p>
-      <div className="-my-1 mr-[calc(var(--page-pad)*-1)] ml-[calc(var(--page-pad)*-1)] flex-1 overflow-y-auto px-(--page-pad) py-1">
-        {children}
+      <div className="flex shrink-0 items-center justify-between gap-4">
+        <p className="text-sm font-medium">{title}</p>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          onClick={onClose}
+          aria-label="Close panel"
+        >
+          <IconX stroke={1.75} />
+        </Button>
       </div>
+      <div className="flex-1 pb-(--page-pad)">{children}</div>
     </motion.div>
   )
 }

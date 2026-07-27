@@ -78,7 +78,7 @@ const THEME_COLOR_DERIVATIONS = {
   foreground: () => 'color-mix(in oklch, var(--primary) 24%, black 76%)',
   muted: () => 'color-mix(in oklch, var(--background) 95%, var(--foreground) 5%)',
   mutedForeground: () => 'color-mix(in oklch, var(--background) 58%, var(--foreground) 42%)',
-  accent: () => 'color-mix(in oklch, var(--primary) 5%, var(--foreground) 5%)'
+  accent: () => 'color-mix(in oklch, var(--primary) 4%, var(--foreground) 4%)'
 } satisfies Record<string, (primary: string) => string>
 
 export type ThemeColorToken = keyof typeof THEME_COLOR_DERIVATIONS
@@ -120,7 +120,7 @@ export const COLOR_THEMES: Record<ColorTheme, ColorThemeConfig> = {
   },
   mint: {
     label: 'Tropics',
-    primary: '#00914a'
+    primary: '#009155'
   },
   sky: {
     label: 'Sky',

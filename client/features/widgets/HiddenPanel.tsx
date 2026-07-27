@@ -43,17 +43,18 @@ const ROW_SPAN: Record<number, string> = {
 type HiddenPanelProps = {
   items: GridItem[]
   renderItem: (id: string) => ReactNode
+  onClose: () => void
   onRestore: (id: string) => void
   ref?: Ref<HTMLDivElement>
 }
 
-export function HiddenPanel({ items, renderItem, onRestore, ref }: HiddenPanelProps) {
+export function HiddenPanel({ items, renderItem, onClose, onRestore, ref }: HiddenPanelProps) {
   const layout = useMemo(() => packItems(items), [items])
 
   return (
-    <BottomPanel ref={ref} title="Hidden">
+    <BottomPanel ref={ref} title="Hidden widgets" onClose={onClose} className="max-h-[60vh]">
       {/* gap-2 + grid-cols-4 + [grid-auto-rows:160px] matches RGL's margin/rowHeight exactly */}
-      <div className="grid [grid-auto-rows:160px] grid-cols-4 gap-2">
+      <div className="grid auto-rows-[160px] grid-cols-4 gap-2">
         <AnimatePresence>
           {layout.map(item => (
             <motion.div
