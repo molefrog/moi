@@ -6,40 +6,28 @@ import { DATA_DIR } from './data-dir'
 
 // App-wide user settings, stored as `settings.json` in moi's data dir next to
 // the workspace registry. Backed by `conf`: atomic writes, per-key JSON-schema
-// validation, and migrations when the settings shape evolves. Add new keys to
-// `AppSettings` (lib/types.ts) and to the schema here — with a default, so GET
-// /api/settings always returns a complete object.
+// validation, and migrations when the settings shape evolves. Adding a key
+// means extending `AppSettings` (lib/types.ts) and the schema here — with a
+// default, so GET /api/settings always returns a complete object — plus
+// `API_UPDATABLE` if clients may change it.
 
 export type AppSettingsPatch = Partial<AppSettings>
 
-// Which fields the API may update, each with its runtime check. Declared here
-// so the PATCH /api/settings route stays generic — a new settings key only
-// touches this module (schema below, and this map if it is API-updatable).
-type FieldRule<K extends keyof AppSettings> = {
-  expects: string
-  check: (value: unknown) => value is AppSettings[K]
-}
+// Whitelist of fields the API may update. Type validation is NOT duplicated
+// here — `saveAppSettings` validates the merged store against the conf schema
+// before anything is written, so a bad value throws with nothing persisted.
+const API_UPDATABLE = ['autoUpdateSkills'] as const satisfies readonly (keyof AppSettings)[]
 
-const apiUpdatable: { [K in keyof AppSettings]?: FieldRule<K> } = {
-  autoUpdateSkills: { expects: 'a boolean', check: value => typeof value === 'boolean' }
-}
-
-// Pick the API-updatable fields out of an untrusted body. Unknown keys are
-// ignored; a declared key holding the wrong type rejects the whole patch.
-export function parseAppSettingsPatch(
-  body: unknown
-): { patch: AppSettingsPatch } | { error: string } {
-  if (!body || typeof body !== 'object') return { error: 'Settings patch must be an object' }
-  const raw = body as Record<string, unknown>
-  const patch: AppSettingsPatch = {}
-  for (const key of Object.keys(apiUpdatable) as (keyof AppSettings)[]) {
-    const rule = apiUpdatable[key]
-    const value = raw[key]
-    if (!rule || value === undefined) continue
-    if (!rule.check(value)) return { error: `${key} must be ${rule.expects}` }
-    patch[key] = value
+// Pick the API-updatable fields out of an untrusted body; unknown keys are
+// dropped. Values are intentionally unchecked — the conf schema rejects wrong
+// types when the patch is saved.
+export function pickAppSettingsPatch(body: Record<string, unknown>): AppSettingsPatch {
+  const picked: Record<string, unknown> = {}
+  for (const key of API_UPDATABLE) {
+    if (body[key] !== undefined) picked[key] = body[key]
   }
-  return { patch }
+  // Not yet schema-validated; saveAppSettings is the enforcement point.
+  return picked as AppSettingsPatch
 }
 
 let _dir = DATA_DIR
@@ -66,14 +54,12 @@ export function getAppSettings(): AppSettings {
   return store().store
 }
 
-// Merge a partial settings object over the stored one. `undefined` fields are
-// left untouched; there is no clear-to-default, since every key always holds a
-// concrete value. Returns the full merged settings.
+// Merge a partial settings object over the stored one and return the result.
+// The object-form `set` validates the whole merged store against the schema
+// before writing, so an invalid patch throws (`Config schema violation: …`)
+// and persists nothing.
 export function saveAppSettings(patch: AppSettingsPatch): AppSettings {
   const settings = store()
-  for (const key of Object.keys(patch) as (keyof AppSettings)[]) {
-    const value = patch[key]
-    if (value !== undefined) settings.set(key, value)
-  }
+  if (Object.keys(patch).length > 0) settings.set(patch)
   return settings.store
 }
