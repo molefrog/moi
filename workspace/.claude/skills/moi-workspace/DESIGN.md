@@ -19,6 +19,11 @@ interaction, or satisfying state change. It is optional. Use it when it helps th
 the rest restrained so it remains meaningful. Avoid decorative clutter, competing effects, and a
 different visual system for every section.
 
+Every visible element must help the user understand useful content, see a real state, or take an
+action. Do not add category eyebrows that repeat the title, readiness badges for an obvious default
+state, helper copy that repeats nearby text, decorative status pills, or icons with no useful
+meaning. Clear and simple applets contain fewer elements, and each one earns its place.
+
 Widgets and views in one workspace should feel like a family through shared typography, palette,
 spacing, or interaction patterns. They do not need to look identical.
 
@@ -39,24 +44,29 @@ and states readable and consistent.
 | Subdued surface | `bg-muted` | Skeletons, quiet fills, and disabled structure |
 | Interaction | `bg-accent text-accent-foreground` | Hover, active, selected, and subtle highlighted states |
 | Error or danger | `text-destructive` / `bg-destructive` | Errors, destructive actions, and invalid states |
-| Structure | `border-border`, `border-input`, `ring-ring` | Dividers, controls, and visible focus |
+| Structure | `ring-1 ring-border`, `border-input`, `ring-ring` | Custom container edges, controls, and visible focus |
 
 Use lower foreground opacity only for tertiary metadata that remains readable. Avoid weak alpha text
 for important labels or values. Keep inset surfaces rare so a widget does not become a stack of
 cards.
 
+Keep container edges subtle. Use `ring-1 ring-border` for custom container outlines. Do not use a
+bare `border`, black borders, or raw high-contrast border colors as custom container chrome.
+
 Custom color is welcome when it carries identity, data, status, or useful emphasis. On a saturated
 surface, choose an explicit light or dark foreground with strong contrast. Keep state colors
 consistent and pair them with text, shape, or an icon when they convey meaning.
 
-A tonal gradient may use two or three stops from one hue family. A soft glow or image can add depth
-when it supports the subject. Avoid rainbow palettes and decorative color with no connection to the
-content.
+Use solid filled surfaces by default. A restrained shadow, glow, texture, image, or visualization
+may add depth when it supports the subject. Do not use gradients as generic visual polish. Use a
+gradient only when it encodes information or is essential to the specific content.
+
+Use purple, violet, and fuchsia only when the content, brand, or user preference calls for them.
+Never use a purple gradient as a default creativity or technology cue.
 
 ### Color starting points
 
-These are anchors, not fixed palettes. Tint them, turn them into a tonal gradient, or use a single
-accent.
+These are anchors, not fixed palettes. Tint them or use a single accent.
 
 | Content | Useful color families | Typical range |
 | --- | --- | --- |
@@ -65,7 +75,7 @@ accent.
 | Overcast or neutral data | Slate, zinc, neutral | 500–800 |
 | Nature and health | Emerald, green, teal | 500–700 |
 | Finance and positive movement | Emerald, teal | 600–700 |
-| Music and creative media | Violet, fuchsia | 500–700 |
+| Music and creative media | Blue, teal, amber, rose | 500–700 |
 | Alerts and urgency | Red, orange | 500–700 |
 | Notes and text | Amber, yellow | 400–600 |
 | Social and communication | Pink, rose | 400–600 |
@@ -80,9 +90,19 @@ Inherit the workspace font. Use sentence case for headings, labels, actions, and
 regular weight for most text and medium for emphasis. Other weights are reserved for owner
 hand-tuning.
 
-Use monospace and tabular numbers for code, identifiers, timers, and values that need stable
-alignment. A stronger display treatment may lead a widget or view when it serves the content, but it
-should not become a separate type system. Keep no more than two clear type roles in one applet.
+Use a small, consistent type scale. `text-sm` (14 px) is the default for UI text. Use smaller text
+only for genuinely compact metadata and larger text only for clear headings or one meaningful
+display value. Do not create many label styles with slightly different sizes.
+
+Keep text contrast clear. Use `text-foreground` for primary content and `text-muted-foreground` for
+genuinely secondary content. Avoid several near-identical text styles that make hierarchy hard to
+read.
+
+Reserve `font-mono` for code, command text, and truly code-like identifiers. Do not use monospace for
+numeric UI values, measurements, percentages, timers, timestamps, prices, counts, or labels. Numbers
+inherit the workspace's default font; add `tabular-nums` when stable digit widths or alignment help.
+A stronger display treatment may lead a widget or view when it serves the content, but it should not
+become a separate type system. Keep no more than two clear type roles in one applet.
 
 Build hierarchy with a visible size gap. Give the main value, message, or task the strongest
 emphasis, keep supporting content quieter, and make tertiary metadata easy to ignore. A widget may
@@ -159,7 +179,7 @@ direct actions while keeping one clear first reading.
 
 The host card owns the outer radius, border, shadow, clipping, and elevation. A widget owns only its
 content surface. Its root fills the available rectangle and must not add outer card chrome. The
-content may use a semantic background, color, gradient, image, or visualization.
+content may use a semantic background, solid color, image, or visualization.
 
 Use a column layout when content needs a footer or timestamp, and keep lower-priority information at
 the bottom. Important content needs safe padding from every edge. Use `p-4` as the compact default;
@@ -228,11 +248,20 @@ stretching a widget-like card to fill the page.
 
 ## Final review
 
+After implementation, do a removal pass from top to bottom. For every label, badge, icon, helper
+sentence, container, divider, and decoration, ask which user decision, action, or understanding it
+improves. Remove it when the screen stays equally clear and usable without it.
+
 Before finishing an applet, confirm:
 
+- Every visible element has a clear purpose.
 - Its purpose and first reading are clear at the intended size.
 - Semantic colors handle structure and custom color has a reason.
+- Surfaces use solid fills by default; gradients have a content-specific reason.
+- Purple appears only for a content, brand, or user reason and never as a default gradient.
 - Type, spacing, density, and expression support the content.
+- Numeric UI values use the default font, with `tabular-nums` when alignment helps.
+- Custom container outlines use a subtle `ring-border`.
 - The layout handles realistic content and deliberate overflow.
 - Every reachable state and interaction is complete and accessible.
 - The widget or view follows its frame, sizing, and scrolling rules.
