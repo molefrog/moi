@@ -21,9 +21,25 @@ type UseAppletChatMessageOptions = {
   // full-screen mode the chat is a popover that is closed by default, so
   // without this the agent would start working somewhere the user can't see.
   revealChat: () => void
-  // Same gate the composer's send button uses: when the workspace's agent
-  // executable is missing, a send would start a turn that cannot run.
+  // Same gate the composer's send button uses: `null` means the agent is
+  // ready, a string names why it isn't, and `undefined` means the availability
+  // query hasn't answered yet. Only `null` may send.
   unavailableReason: string | null | undefined
+}
+
+// Why an applet message can't go out right now, or null when it can. The gate
+// is exactly the composer's — `canSubmitComposerAction` requires `null`, so
+// `undefined` (availability still loading) blocks there too. Starting a run the
+// visible UI would have refused is worse than dropping a click the user can
+// repeat a moment later.
+export function appletSendBlockedReason(
+  unavailableReason: string | null | undefined
+): string | null {
+  if (unavailableReason === null) return null
+  if (unavailableReason === undefined) {
+    return "this workspace's agent availability has not resolved yet"
+  }
+  return `this workspace's agent is unavailable (${unavailableReason})`
 }
 
 export function useAppletChatMessage({
@@ -34,12 +50,13 @@ export function useAppletChatMessage({
   const workspaceId = useWorkspaceId()
 
   useAppletEvent(workspaceId, 'sendChatMessage', (event: AppletChatMessage) => {
-    if (unavailableReason) {
+    const blocked = appletSendBlockedReason(unavailableReason)
+    if (blocked) {
       // Journaled rather than dropped quietly: from the applet's side the
       // button did nothing, and this is the only place that says why.
       reportAppletError(workspaceId, {
         source: 'runtime',
-        message: `sendChatMessage("${event.message}") was dropped: this workspace's agent is unavailable (${unavailableReason}).`
+        message: `sendChatMessage("${event.message}") was dropped: ${blocked}.`
       })
       return
     }
