@@ -15,6 +15,7 @@ import { type ReactNode, useState } from 'react'
 import { IconLoader2, IconPackage } from '@tabler/icons-react'
 
 import { cn } from '@/client/lib/cn'
+import { PlainMarkdownText } from '@/client/features/chat/MarkdownContent'
 import { formatMcpServerName, getMcpIcon } from '@/client/features/connectors/mcp-icons'
 import type { Part, ToolCall } from '@/lib/types'
 
@@ -144,12 +145,11 @@ function ReasoningRow({ isFirst, isLast, text, inProgress = false }: ReasoningRo
   const expanded = inProgress || open
   return (
     <TimelineRow isFirst={isFirst} isLast={isLast} loading={inProgress}>
-      <div className="min-w-0 flex-1">
-        <button
-          type="button"
-          title={`${label}: ${text}`}
-          aria-expanded={expanded}
-          onClick={() => setOpen(o => !o)}
+        <div className="min-w-0 flex-1">
+          <button
+            type="button"
+            aria-expanded={expanded}
+            onClick={() => setOpen(o => !o)}
           className={cn(HEADER, 'cursor-pointer')}
         >
           <span className="text-xs font-medium text-muted-foreground">{label}</span>
@@ -157,7 +157,7 @@ function ReasoningRow({ isFirst, isLast, text, inProgress = false }: ReasoningRo
         </button>
         <Collapse open={expanded}>
           <div className="mt-1 mb-1 pr-2 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
-            {text}
+            <PlainMarkdownText content={text} />
           </div>
         </Collapse>
       </div>

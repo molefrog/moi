@@ -24,6 +24,22 @@ describe('TurnParts (shared render path)', () => {
     expect(html).toContain('aria-expanded="true"')
   })
 
+  test('live thinking renders Markdown as plain text', () => {
+    const html = render(
+      [
+        {
+          type: 'reasoning',
+          text: '**Inspecting components**\nPlanning with `code` and [a link](https://example.com)'
+        }
+      ],
+      true
+    )
+    expect(html).toContain('Inspecting components')
+    expect(html).toContain('Planning with code and a link')
+    expect(html).not.toContain('**')
+    expect(html).not.toContain('https://example.com')
+  })
+
   test('once text follows, the thought collapses', () => {
     const html = render(
       [

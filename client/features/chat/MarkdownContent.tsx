@@ -39,6 +39,10 @@ type MarkdownContentProps = {
   content: string
 }
 
+type PlainMarkdownTextProps = {
+  content: string
+}
+
 export function MarkdownContent({ size = 'sm', content }: MarkdownContentProps) {
   return (
     <div
@@ -55,5 +59,13 @@ export function MarkdownContent({ size = 'sm', content }: MarkdownContentProps) 
         {content}
       </ReactMarkdown>
     </div>
+  )
+}
+
+export function PlainMarkdownText({ content }: PlainMarkdownTextProps) {
+  return (
+    <ReactMarkdown allowedElements={[]} skipHtml unwrapDisallowed>
+      {content}
+    </ReactMarkdown>
   )
 }
