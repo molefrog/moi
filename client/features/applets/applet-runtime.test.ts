@@ -95,7 +95,7 @@ describe('bridge validation', () => {
 })
 
 describe('sendChatMessage validation', () => {
-  test('trims the label and stamps the applet source the host attached', () => {
+  test('trims the message and stamps the applet source the host attached', () => {
     const ws = `ws-${crypto.randomUUID()}`
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(WIDGET)
@@ -103,11 +103,11 @@ describe('sendChatMessage validation', () => {
     bridge.sendChatMessage('  Chase order A-1042  ', { order: 'A-1042' })
 
     expect(calls).toEqual([
-      { label: 'Chase order A-1042', source: 'widget:clock', context: { order: 'A-1042' } }
+      { message: 'Chase order A-1042', source: 'widget:clock', context: { order: 'A-1042' } }
     ])
   })
 
-  test('drops a label that is empty, blank, or not a string', () => {
+  test('drops a message that is empty, blank, or not a string', () => {
     const ws = `ws-${crypto.randomUUID()}`
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
@@ -121,7 +121,7 @@ describe('sendChatMessage validation', () => {
     expect(calls).toEqual([])
   })
 
-  test('drops a label too long to be a chat message', () => {
+  test('drops a message too long to be a chat bubble', () => {
     const ws = `ws-${crypto.randomUUID()}`
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
@@ -143,8 +143,8 @@ describe('sendChatMessage validation', () => {
     bridge.sendChatMessage('cyclic context', cyclic)
     bridge.sendChatMessage('huge context', { blob: 'x'.repeat(2001) })
 
-    // The label carries the user's intent, so a bad payload must not lose it.
-    expect(calls.map(c => [c.label, c.context])).toEqual([
+    // The message carries the user's intent, so a bad payload must not lose it.
+    expect(calls.map(c => [c.message, c.context])).toEqual([
       ['array context', undefined],
       ['cyclic context', undefined],
       ['huge context', undefined]
@@ -160,7 +160,7 @@ describe('sendChatMessage validation', () => {
     dispose()
     bridge.sendChatMessage('after')
 
-    expect(calls.map(c => c.label)).toEqual(['before'])
+    expect(calls.map(c => c.message)).toEqual(['before'])
   })
 })
 
@@ -176,28 +176,28 @@ describe('sendChatMessage rate limiting', () => {
     bridge.sendChatMessage('Sync now')
     bridge.sendChatMessage('Sync now')
 
-    expect(calls.map(c => c.label)).toEqual(['Sync now'])
+    expect(calls.map(c => c.message)).toEqual(['Sync now'])
   })
 
-  test('the cooldown is per applet and label, not a global mute', () => {
+  test('the cooldown is per applet and message, not a global mute', () => {
     const ws = `ws-${crypto.randomUUID()}`
     const { calls } = subscribeChat(ws)
     const widget = appletRuntime(ws).connect(WIDGET)
     const view = appletRuntime(ws).connect(VIEW)
 
     widget.bridge.sendChatMessage('Sync now')
-    // Same label, different applet — a real second message.
+    // Same text, different applet — a real second message.
     view.bridge.sendChatMessage('Sync now')
     widget.bridge.sendChatMessage('Something else')
 
-    expect(calls.map(c => [c.source, c.label])).toEqual([
+    expect(calls.map(c => [c.source, c.message])).toEqual([
       ['widget:clock', 'Sync now'],
       ['view:board', 'Sync now'],
       ['widget:clock', 'Something else']
     ])
   })
 
-  test('caps a loop that varies its label every call', () => {
+  test('caps a loop that varies its message every call', () => {
     const ws = `ws-${crypto.randomUUID()}`
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(WIDGET)
@@ -219,7 +219,7 @@ describe('sendChatMessage rate limiting', () => {
     appletRuntime(wsB).connect(WIDGET).bridge.sendChatMessage('b 0')
 
     expect(a.calls).toHaveLength(10)
-    expect(b.calls.map(c => c.label)).toEqual(['b 0'])
+    expect(b.calls.map(c => c.message)).toEqual(['b 0'])
   })
 })
 

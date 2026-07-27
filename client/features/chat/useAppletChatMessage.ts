@@ -4,7 +4,7 @@
 // The runtime already did the untrusted work — narrowed the args, stamped the
 // applet's `<kind>:<name>` as `source`, and rate-limited repeats
 // (applet-runtime.ts). What's left is chat policy: reveal the chat, then send
-// the label as an ordinary user message with the applet attribution riding the
+// the text as an ordinary user message with the applet attribution riding the
 // `<moi-context>` envelope.
 //
 // Sending while a turn is running is fine and deliberate — the composer offers
@@ -33,20 +33,20 @@ export function useAppletChatMessage({
 }: UseAppletChatMessageOptions): void {
   const workspaceId = useWorkspaceId()
 
-  useAppletEvent(workspaceId, 'sendChatMessage', (message: AppletChatMessage) => {
+  useAppletEvent(workspaceId, 'sendChatMessage', (event: AppletChatMessage) => {
     if (unavailableReason) {
       // Journaled rather than dropped quietly: from the applet's side the
       // button did nothing, and this is the only place that says why.
       reportAppletError(workspaceId, {
         source: 'runtime',
-        message: `sendChatMessage("${message.label}") was dropped: this workspace's agent is unavailable (${unavailableReason}).`
+        message: `sendChatMessage("${event.message}") was dropped: this workspace's agent is unavailable (${unavailableReason}).`
       })
       return
     }
-    // `label` is the visible message; everything else in the event IS the
+    // `message` is the visible chat text; everything else in the event IS the
     // envelope's applet attribution.
-    const { label, ...applet } = message
+    const { message, ...applet } = event
     revealChat()
-    send(label, { applet })
+    send(message, { applet })
   })
 }

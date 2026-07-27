@@ -147,7 +147,7 @@ const chaseOrder = (order: string, carrier: string) =>
 import { focusTab, sendChatMessage } from 'moi'
 
 focusTab(tab: WorkspaceTabId, params?: Record<string, unknown>): void
-sendChatMessage(label: string, context?: Record<string, unknown>): void
+sendChatMessage(message: string, context?: Record<string, unknown>): void
 ```
 
 - Delivery mechanics: the `moi` module is inlined **per bundle**, and the host attaches a thin
@@ -165,8 +165,8 @@ sendChatMessage(label: string, context?: Record<string, unknown>): void
   plumbing: it stays out of the author-facing ambient types (`.moi/applet-env.d.ts`), which
   declare only the public API — `fileUrl`, `focusTab`, and the config types.
 - `focusTab` from an applet is client-local navigation (replace) — no server round-trip.
-- `sendChatMessage` always targets the **active chat**. Envelope discipline: `label` is the
-  visible message text; `{ source, context }` rides the `<moi-context>` envelope under an
+- `sendChatMessage` always targets the **active chat**. Envelope discipline: `message` is the
+  visible chat text; `{ source, context }` rides the `<moi-context>` envelope under an
   `# Applet message` section. Envelope symmetry: while a view is active, user messages carry its
   current `params` values, read from navigation state.
 - **Reveal before send.** The chat is a closed popover on a view tab in full-screen mode, so an
@@ -174,12 +174,12 @@ sendChatMessage(label: string, context?: Record<string, unknown>): void
   A run the user cannot see is worse than a panel that opens itself.
 - **Rate limiting is the host's job.** Each call starts an agent run, and the bridge is per
   bundle, so a `sendChatMessage` in render — or one applet mounted twice — would bill the user
-  per frame. The runtime collapses an identical `source`+`label` inside a 2s cooldown and caps a
+  per frame. The runtime collapses an identical `source`+`message` inside a 2s cooldown and caps a
   workspace at 10 messages per minute. Drops are journaled to `moi debug logs`, never silent —
   from the applet's side a dropped call is a button that did nothing.
-- **Validation caps.** A label over 1000 chars is dropped (it would land in a bubble verbatim); a
+- **Validation caps.** A message over 1000 chars is dropped (it would land in a bubble verbatim); a
   `context` that isn't a plain object, doesn't serialize, or exceeds 2000 chars is dropped while
-  the message still goes — the label carries the user's intent and must not be lost with the
+  the message still goes — it carries the user's intent and must not be lost with the
   payload.
 - **Envelope integrity.** Every applet-authored string interpolated into the envelope (view
   titles, applet names, both JSON blobs) has every `<` replaced by its JSON unicode escape — the
