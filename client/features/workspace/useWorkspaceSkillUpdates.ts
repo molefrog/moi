@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import { useUiStore } from '@/client/store/ui'
+import { useAppSettings, useSaveAppSettings } from '@/client/features/settings/api'
 import { useUpdateWorkspaceSkills, useWorkspaceSkills } from '@/client/features/workspace/api'
 
 import type {
@@ -62,8 +62,17 @@ export function useWorkspaceSkillUpdates(workspaceId: string): WorkspaceSkillUpd
     mutate: updateSkills,
     reset: resetUpdate
   } = useUpdateWorkspaceSkills(workspaceId)
-  const autoUpdateEnabled = useUiStore(state => state.skillAutoUpdateEnabled)
-  const enableAutoUpdate = useUiStore(state => state.enableSkillAutoUpdate)
+  // The auto-update flag is an app setting (server-side, shared across
+  // clients). Until it loads, neither prompt nor auto-update — acting on the
+  // default would flash the banner or skip an enabled auto-update.
+  const settings = useAppSettings()
+  const { mutate: saveSettings } = useSaveAppSettings()
+  const settingsReady = settings.data !== undefined
+  const autoUpdateEnabled = settings.data?.autoUpdateSkills ?? false
+  const enableAutoUpdate = useCallback(
+    () => saveSettings({ autoUpdateSkills: true }),
+    [saveSettings]
+  )
   const [visit, setVisit] = useState<VisitState>(() => initialVisitState(workspaceId))
   const currentVisit = visit.workspaceId === workspaceId ? visit : initialVisitState(workspaceId)
 
@@ -106,6 +115,7 @@ export function useWorkspaceSkillUpdates(workspaceId: string): WorkspaceSkillUpd
 
   useEffect(() => {
     if (
+      settingsReady &&
       shouldAutomaticallyUpdateWorkspaceSkills({
         updateAvailable,
         autoUpdateEnabled,
@@ -115,13 +125,22 @@ export function useWorkspaceSkillUpdates(workspaceId: string): WorkspaceSkillUpd
     ) {
       onUpdate('auto')
     }
-  }, [autoUpdateEnabled, currentVisit.phase, onUpdate, updateAvailable, updatePending])
-
-  const visible = shouldShowWorkspaceSkillUpdateBanner({
-    updateAvailable,
+  }, [
     autoUpdateEnabled,
-    phase: currentVisit.phase
-  })
+    currentVisit.phase,
+    onUpdate,
+    settingsReady,
+    updateAvailable,
+    updatePending
+  ])
+
+  const visible =
+    settingsReady &&
+    shouldShowWorkspaceSkillUpdateBanner({
+      updateAvailable,
+      autoUpdateEnabled,
+      phase: currentVisit.phase
+    })
   return {
     bannerProps: visible
       ? {

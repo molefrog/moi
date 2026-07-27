@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 
 import type {
+  AppSettings,
   HarnessAvailability,
   UploadInfo,
   ViewBuilderInput,
@@ -15,6 +16,7 @@ import type {
 import type { MoiContext } from '@/lib/moi-context'
 import { viewBuilderDirectives } from '@/lib/view-builder-directives'
 
+import { getAppSettings, pickAppSettingsPatch, saveAppSettings } from './app-settings'
 import { appletForModule, recordAppletError } from './applet-log'
 import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from './applets'
 import { applyEnvChanged } from './env-apply'
@@ -951,6 +953,34 @@ workspaces.route('/:id', one)
 export const api = new Hono()
 
 api.route('/api/workspaces', workspaces)
+
+// App-wide settings (settings.json in the data dir). GET returns every key
+// with defaults applied; PATCH merges a partial body and returns the result.
+api.get('/api/settings', c => c.json(getAppSettings()))
+
+api.patch('/api/settings', async c => {
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.text('Invalid JSON body', 400)
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return c.text('Settings patch must be an object', 400)
+  }
+  // app-settings whitelists the updatable fields; the conf schema validates
+  // the values on save, rejecting the whole patch before anything persists.
+  let settings: AppSettings
+  try {
+    settings = saveAppSettings(pickAppSettingsPatch(body as Record<string, unknown>))
+  } catch (error) {
+    return c.text(error instanceof Error ? error.message : 'Invalid settings patch', 400)
+  }
+  // Other open clients hold these in a query cache with no polling; broadcast
+  // the new value so an app-wide preference applies everywhere immediately.
+  publishEvent({ type: 'settings:updated', settings })
+  return c.json(settings)
+})
 
 // Everything else: in production, serve the prebuilt client from `dist/` via
 // Hono's static handler (mime types, traversal-safe, optional precompression).
