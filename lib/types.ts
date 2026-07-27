@@ -457,16 +457,6 @@ export type WorkspaceTabsState = {
   active: WorkspaceTabId
 }
 
-// The host-installed applet runtime bridge (`window.moi`). Applet bundles get a
-// virtual `moi` module whose functions delegate here via optional chaining, so
-// an applet no-ops cleanly outside the moi host (see server/bundler/build-applet.ts).
-export type MoiAppletRuntime = {
-  // Client-local replace-navigation to a workspace tab. `params` reach the
-  // target view as its `params` prop via navigation state — JSON-plain only
-  // (history state is structured-cloned).
-  focusTab: (tab: WorkspaceTabId, params?: Record<string, unknown>) => void
-}
-
 export type { FontTheme, ColorTheme } from './themes'
 
 export type WorkspaceLayout = {

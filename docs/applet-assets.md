@@ -87,6 +87,7 @@ by `moi init`:
 declare module 'moi' {
   // required: virtual module, Bun won't type it
   export function fileUrl(path: string): string
+  export function focusTab(tab: string, params?: Record<string, unknown>): void
   export type WidgetConfig = {
     colSpan: 1 | 2 | 3 | 4
     rowSpan: 1 | 2 | 3 | 4

@@ -15,7 +15,7 @@ import { ChatPanel } from '@/client/features/chat/ChatPanel'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { CustomizePanel } from '@/client/features/workspace/CustomizePanel'
 import { AppletMount } from '@/client/features/applets/AppletMount'
-import { useMoiAppletBridge } from '@/client/features/applets/applet-bridge'
+import { useAppletHandlers } from '@/client/features/applets/applet-runtime'
 import { WidgetErrorBoundary } from '@/client/features/applets/WidgetErrorBoundary'
 import { Widgets } from '@/client/features/widgets/Widgets'
 import { PanelHeader } from '@/client/components/shared/PanelHeader'
@@ -49,8 +49,6 @@ import {
 } from '@/client/features/workspace/WorkspaceTabs'
 import type { LayoutMode, ViewBuilder, ViewInfo, WidgetInfo, WorkspaceTabId } from '@/lib/types'
 import {
-  isParamsRecord,
-  isWorkspaceTabId,
   viewBuilderIdFromTab,
   viewBuilderTabId,
   viewIdFromTab,
@@ -391,20 +389,17 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     }
   }
 
-  // Focus requests from outside the tab bar — the `window.moi` applet bridge
-  // and `moi tab focus` events. The tab id crosses a trust boundary, so
-  // validate the shape; a well-formed id for a missing view just resolves to
-  // the default like any dead URL.
-  const focusTab = (tab: WorkspaceTabId, params?: Record<string, unknown>) => {
-    if (!isWorkspaceTabId(tab)) return
-    openTab(tab, isParamsRecord(params) ? params : undefined)
-  }
+  // Focus requests from applet bridges land here already validated — the
+  // applet runtime narrows the untrusted tab id and params shape at the trust
+  // boundary (applet-runtime.ts). A well-formed id for a missing view just
+  // resolves to the default like any dead URL.
+  useAppletHandlers(workspaceId, { focusTab: openTab })
 
-  useMoiAppletBridge({ focusTab })
-
+  // `moi tab focus` — a workspace event, not an applet call: the control
+  // server validated the target and params before publishing.
   useWorkspaceEvent(event => {
     if (event.type === 'tab:focus' && event.workspaceId === workspaceId) {
-      focusTab(event.tab, event.params)
+      openTab(event.tab, event.params)
     }
   })
 

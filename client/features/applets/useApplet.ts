@@ -10,6 +10,7 @@ import {
   invalidateAppletSegment,
   setCachedApplet
 } from '@/client/features/applets/applet-cache'
+import { attachAppletBridge } from '@/client/features/applets/applet-runtime'
 import { reportAppletError } from '@/client/features/applets/applet-log'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { type WorkspaceEvent, useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
@@ -69,6 +70,10 @@ function loadApplet(
   // while this applet is unmounted — so a backgrounded tab never serves stale.
   const promise = import(/* @vite-ignore */ appletUrl(segment, workspaceId, name)).then(mod => {
     if (!mod.default) throw new Error(`"${name}" has no default export`)
+    // Wire this module instance's `moi` bridge to the workspace's applet
+    // runtime — the only moment the namespace is in hand, before React renders
+    // the component. Disposal rides invalidateApplet (same key).
+    attachAppletBridge(mod, workspaceId, key)
     return mod.default as ComponentType<AppletComponentProps>
   })
 

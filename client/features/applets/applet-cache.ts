@@ -13,6 +13,8 @@
 // `useAppletCacheInvalidation`), and the per-applet hook invalidates the mounted
 // one too. Either path bumps the version + drops the cached module, so the next
 // load() fetches the rebuilt bundle.
+import { disposeAppletBridge } from '@/client/features/applets/applet-runtime'
+
 export type AppletSegment = 'widgets' | 'views'
 
 // `${segment}/${workspaceId}/${name}` — namespaced so a widget and a view (or
@@ -54,11 +56,13 @@ export function setCachedApplet(key: string, mod: Promise<unknown>): void {
 // Drop the cached module and bump the load version for one applet, so the next
 // load() — including a fresh mount of a previously-backgrounded tab — fetches the
 // rebuilt bundle instead of the memoized old one. Safe (and intended) to call
-// when nothing for this applet is mounted.
+// when nothing for this applet is mounted. The old module instance stays in
+// browser memory forever; disposing its bridge is what makes it inert.
 export function invalidateApplet(segment: AppletSegment, workspaceId: string, name: string): void {
   const key = appletKey(segment, workspaceId, name)
   moduleCache.delete(key)
   versions.set(key, (versions.get(key) ?? 0) + 1)
+  disposeAppletBridge(key)
 }
 
 // Invalidate every applet of one kind across all workspaces — the
@@ -71,6 +75,7 @@ export function invalidateAppletSegment(segment: AppletSegment): void {
     if (key.startsWith(prefix)) {
       moduleCache.delete(key)
       versions.set(key, (versions.get(key) ?? 0) + 1)
+      disposeAppletBridge(key)
     }
   }
 }

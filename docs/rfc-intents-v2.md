@@ -149,8 +149,15 @@ focusTab(tab: WorkspaceTabId, params?: Record<string, unknown>): void
 sendChatMessage(label: string, context?: Record<string, unknown>): void
 ```
 
-- Delivery mechanics: bundle stubs delegating to the host `window.moi` bridge; no-ops outside
-  the moi host; `sendChatMessage` self-attributes with the applet's `<kind>:<name>`.
+- Delivery mechanics: the `moi` module is inlined **per bundle**, and the host attaches a thin
+  **bridge** to each loaded module instance right after dynamic import (and neuters it on
+  invalidation, so a stale rebuilt module can no longer act). All bridges forward to one
+  **applet runtime** per workspace, which validates the untrusted args and owns the behavior
+  (`client/features/applets/applet-runtime.ts`). Calls no-op before attach and outside the moi
+  host. One applet cannot reach another's bridge — separate module scopes. Caveat: the bridge is
+  per bundle, not per mount, so two simultaneous mounts of one applet share a bridge.
+  `sendChatMessage` self-attributes with the applet's `<kind>:<name>`, derived by the runtime —
+  never passed by the caller.
 - `focusTab` from an applet is client-local navigation (replace) — no server round-trip.
 - `sendChatMessage` always targets the **active chat**. Envelope discipline: `label` is the
   visible message text; `{ source, context }` rides the `<moi-context>` envelope under an
