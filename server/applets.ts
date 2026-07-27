@@ -20,9 +20,7 @@ import {
   APPLET_API_BASE_SENTINEL,
   type AppletKind,
   buildApplet,
-  scanAssetImports,
-  scanModuleImports,
-  scanServerImports
+  scanRelativeImports
 } from './bundler/build-applet'
 
 export type AppletPaths = {
@@ -66,13 +64,16 @@ async function resolveSource(sourceDir: string, name: string): Promise<string | 
 // Backstop for pathological graphs: an applet wiring more distinct files than
 // this is reported stale without walking further — stale-but-rebuilt is the
 // safe degradation, and the cap keeps the per-bundle check bounded no matter
-// what the imports look like. Far above any sane applet (the walk never enters
-// node_modules), so hitting it means something is off anyway.
-const MAX_GRAPH_FILES = 128
+// what the imports look like. Counts every input, images and JSON included, so
+// it sits well above what an asset-heavy applet reaches (the walk never enters
+// node_modules); hitting it means something is off anyway.
+const MAX_GRAPH_FILES = 256
 
 // Files the walk keeps descending through — anything Bun treats as a module
-// (`.ts`, `.mjs`, `.cts`, …). Everything else (`.json`, `.css`) is a leaf.
+// (`.ts`, `.mjs`, `.cts`, …). Everything else (`.json`, `.css`, images) is a
+// leaf, and so are `.server.ts` modules.
 const MODULE_FILE_RE = /\.[mc]?[jt]sx?$/
+const SERVER_FILE_RE = /\.server\.tsx?$/
 // Which transpiler loader lexes a module's imports. Only `.ts`/`.mts`/`.cts`
 // take the `ts` loader: angle-bracket casts (`<string>x`) parse there and are
 // JSX everywhere else. `.js`/`.mjs`/`.cjs` go through `tsx`, which accepts both
@@ -81,14 +82,16 @@ const TS_ONLY_FILE_RE = /\.[mc]?ts$/
 
 // A bundle is stale if its entry `index.js` is missing, any file in its local
 // import graph has an mtime >= the built entry's, or one of those imports no
-// longer resolves to a file at all. The graph is walked
-// transitively over relative module imports (shared `_utils.tsx`,
-// `../lib/*.ts`, `./data.json`), and every visited module's `.server.ts`
-// imports (RPC stubs are inlined) and asset imports (emitted into the bundle
-// dir) are checked as leaves. Bare specifiers (node_modules) are not walked —
-// after a dependency bump, `moi bundle --force`. The bundle itself is
-// React-mode-agnostic (see buildApplet), so it needs no rebuild when the server
-// switches between the development and production React.
+// longer resolves to a file at all.
+//
+// The graph is one uniform walk over every RELATIVE import the entry reaches:
+// shared `_utils.tsx`, `../lib/*.ts`, `./data.json`, `./logo.png`,
+// `./db.server`. Each is resolved to a real path, mtime-checked, and descended
+// into when it's a module — so an imported image and a transitively imported
+// helper are the same case, not two mechanisms. Bare specifiers (node_modules)
+// are not walked: after a dependency bump, `moi bundle --force`. The bundle
+// itself is React-mode-agnostic (see buildApplet), so it needs no rebuild when
+// the server switches between the development and production React.
 async function needsRebuild(buildDir: string, name: string, srcPath: string): Promise<boolean> {
   const built = Bun.file(join(buildDir, name, 'index.js'))
   if (!(await built.exists())) return true
@@ -104,28 +107,22 @@ async function needsRebuild(buildDir: string, name: string, srcPath: string): Pr
     const file = Bun.file(path)
     if (!(await file.exists())) continue
     if (file.lastModified >= builtMtime) return true
-    // Only JS/TS modules can import further files; other leaves (JSON, CSS)
-    // end at the mtime check above.
-    if (!MODULE_FILE_RE.test(path)) continue
+    // Leaves stop at the mtime check above: an asset, JSON, or CSS file can't
+    // import anything, and a `.server.ts` module contributes only its export
+    // list to the bundle — what its own imports do is invisible here (edit one
+    // of those and `moi bundle --force`).
+    if (!MODULE_FILE_RE.test(path) || SERVER_FILE_RE.test(path)) continue
     const source = await file.text()
     const dir = dirname(path)
-    for (const specifier of scanServerImports(source)) {
-      const serverFile = Bun.file(join(dir, `${specifier}.server.ts`))
-      if ((await serverFile.exists()) && serverFile.lastModified >= builtMtime) return true
-    }
-    for (const specifier of scanAssetImports(source)) {
-      const assetFile = Bun.file(join(dir, specifier))
-      if ((await assetFile.exists()) && assetFile.lastModified >= builtMtime) return true
-    }
-    for (const specifier of scanModuleImports(source, TS_ONLY_FILE_RE.test(path) ? 'ts' : 'tsx')) {
+    for (const specifier of scanRelativeImports(
+      source,
+      TS_ONLY_FILE_RE.test(path) ? 'ts' : 'tsx'
+    )) {
       const resolved = await resolveModuleImport(dir, specifier)
       // Nothing on disk answers this import, so the next build will fail on it.
       // Report stale rather than skip: a helper deleted since the last build
       // would otherwise leave `moi bundle` serving the last good bundle and
-      // never surfacing the missing-import error. Only this branch fails toward
-      // stale — it's the one lexed by the transpiler, so a specifier here is
-      // really imported. The regex-based server/asset scanners above can match
-      // inside a comment or string, where a missing file means nothing.
+      // never surfacing the missing-import error.
       if (!resolved) return true
       queue.push(resolved)
     }

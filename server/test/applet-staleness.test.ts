@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { dirname, join } from 'path'
 
 import { buildApplets, scanSources } from '../applets'
-import { buildApplet, scanModuleImports } from '../bundler/build-applet'
+import { buildApplet, scanRelativeImports } from '../bundler/build-applet'
 
 // Entry-point and staleness rules for the applet build loop: `_`-prefixed
 // files are shared modules (never entries), and a bundle goes stale when
@@ -63,7 +63,7 @@ describe('underscore-prefixed shared modules', () => {
   })
 })
 
-describe('scanModuleImports', () => {
+describe('scanRelativeImports', () => {
   test('catches static, re-export, side-effect, and dynamic relative imports', () => {
     const src = [
       `import { a } from './_utils'`,
@@ -72,7 +72,7 @@ describe('scanModuleImports', () => {
       `import './side-effect'`,
       `const lazy = await import('./panels/heavy')`
     ].join('\n')
-    expect(scanModuleImports(src)).toEqual([
+    expect(scanRelativeImports(src)).toEqual([
       './_utils',
       '../lib/shared',
       './re-export',
@@ -81,14 +81,25 @@ describe('scanModuleImports', () => {
     ])
   })
 
-  test('skips bare specifiers, .server imports, and assets', () => {
+  test('reports every kind of relative import, skipping only bare specifiers', () => {
+    // Assets, `.server` stubs, and JSON are dependencies like any other — the
+    // staleness walk resolves each and treats non-modules as leaves, so they
+    // need no scanner of their own.
     const src = [
       `import React from 'react'`,
       `import { getData } from './data.server'`,
       `import logo from './logo.png'`,
+      `import rows from './rows.json'`,
+      `import './styles.css'`,
       `import { helper } from './helper'`
     ].join('\n')
-    expect(scanModuleImports(src)).toEqual(['./helper'])
+    expect(scanRelativeImports(src)).toEqual([
+      './data.server',
+      './logo.png',
+      './rows.json',
+      './styles.css',
+      './helper'
+    ])
   })
 
   test('lexes real syntax — comments, strings, and type-only imports never count', () => {
@@ -98,16 +109,16 @@ describe('scanModuleImports', () => {
       `import type { T } from './types-only'`,
       `import { real } from './real'`
     ].join('\n')
-    expect(scanModuleImports(src)).toEqual(['./real'])
+    expect(scanRelativeImports(src)).toEqual(['./real'])
   })
 
   test('a file that fails to lex contributes no imports', () => {
-    expect(scanModuleImports(`import { from`)).toEqual([])
+    expect(scanRelativeImports(`import { from`)).toEqual([])
   })
 
   test('the ts loader handles angle-bracket casts tsx cannot', () => {
     const src = [`const v = <string>window.name`, `import { q } from './cast-file'`].join('\n')
-    expect(scanModuleImports(src, 'ts')).toEqual(['./cast-file'])
+    expect(scanRelativeImports(src, 'ts')).toEqual(['./cast-file'])
   })
 })
 
@@ -210,10 +221,54 @@ describe('dependency staleness', () => {
     }
   })
 
+  test('imported assets and .server modules ride the same walk, as leaves', async () => {
+    // Neither has a scanner of its own any more: both are just relative imports
+    // that resolve to a non-descendable file.
+    seed(
+      '.moi/widgets/photo.tsx',
+      [
+        `import logo from './logo.png'`,
+        `import { rows } from './data.server'`,
+        `export default function Photo() { return <img src={logo} alt={String(rows)} /> }`
+      ].join('\n')
+    )
+    seed('.moi/widgets/logo.png', 'not-really-a-png-but-bytes-are-bytes')
+    seed(
+      '.moi/widgets/data.server.ts',
+      [`import { table } from './_schema'`, `export async function rows() { return [table] }`].join(
+        '\n'
+      )
+    )
+    seed('.moi/widgets/_schema.ts', `export const table = 'rows'`)
+
+    expect((await build())[0]).toMatchObject({ name: 'photo', status: 'built' })
+    expect((await build())[0]).toMatchObject({ status: 'skipped' })
+
+    seed('.moi/widgets/logo.png', 'different-bytes')
+    expect((await build())[0]).toMatchObject({ status: 'built' })
+    expect((await build())[0]).toMatchObject({ status: 'skipped' })
+
+    // The server module's own mtime counts — its export list is inlined.
+    seed(
+      '.moi/widgets/data.server.ts',
+      [
+        `import { table } from './_schema'`,
+        `export async function rows() { return [table, 1] }`
+      ].join('\n')
+    )
+    expect((await build())[0]).toMatchObject({ status: 'built' })
+    expect((await build())[0]).toMatchObject({ status: 'skipped' })
+
+    // What the server module imports does not: none of it reaches the bundle,
+    // so the walk stops at `.server.ts` and this edit is deliberately ignored.
+    seed('.moi/widgets/_schema.ts', `export const table = 'renamed'`)
+    expect((await build())[0]).toMatchObject({ status: 'skipped' })
+  })
+
   test('a graph larger than the file cap always rebuilds (fails toward stale)', async () => {
-    // 130+ chained modules exceed MAX_GRAPH_FILES: the walk aborts and reports
-    // stale, so the applet rebuilds every bundle instead of risking a stale
-    // skip. Degenerate by design — no sane applet wires this many local files.
+    // A chain longer than MAX_GRAPH_FILES: the walk aborts and reports stale,
+    // so the applet rebuilds every bundle instead of risking a stale skip.
+    // Degenerate by design — no sane applet wires this many local files.
     seed(
       '.moi/widgets/big.tsx',
       [
@@ -222,7 +277,7 @@ describe('dependency staleness', () => {
       ].join('\n')
     )
     seed('.moi/widgets/_head.ts', [`import '../lib/c0'`, `export const label = 'big'`].join('\n'))
-    const LAST = 130
+    const LAST = 260
     for (let i = 0; i <= LAST; i++) {
       const next = i < LAST ? `import './c${i + 1}'\n` : ''
       seed(`.moi/lib/c${i}.ts`, `${next}export const v${i} = ${i}`)
