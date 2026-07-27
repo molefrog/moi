@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 
 import { AnimatePresence, motion } from 'motion/react'
 
