@@ -13,7 +13,7 @@ const FOLDER = {
   width: 320,
   height: 180,
   radius: 32,
-  topLeftRadius: 20,
+  topLeftRadius: 18,
   bodyTop: 24,
   tabEnd: 124,
   shoulder: {
