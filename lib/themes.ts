@@ -13,22 +13,22 @@ export const FONT_THEMES: Record<FontTheme, FontThemeConfig> = {
     label: 'Default',
     feel: 'System font',
     sans: 'system-ui',
-    mono: 'JetBrains Mono',
-    googleFontsQuery: 'JetBrains+Mono:wght@400;500'
+    mono: 'Geist Mono',
+    googleFontsQuery: 'Geist+Mono:wght@400;500'
   },
   serif: {
     label: 'Serif',
     feel: 'Literata',
     sans: 'Literata',
-    mono: 'JetBrains Mono',
-    googleFontsQuery: 'Literata:wght@400;600;700&family=JetBrains+Mono:wght@400;500'
+    mono: 'Geist Mono',
+    googleFontsQuery: 'Literata:wght@400;600;700&family=Geist+Mono:wght@400;500'
   },
   mono: {
     label: 'Mono',
-    feel: 'JetBrains Mono',
-    sans: 'JetBrains Mono',
-    mono: 'JetBrains Mono',
-    googleFontsQuery: 'JetBrains+Mono:wght@400;500;600'
+    feel: 'Geist Mono',
+    sans: 'Geist Mono',
+    mono: 'Geist Mono',
+    googleFontsQuery: 'Geist+Mono:wght@400;500;600'
   },
   blobby: {
     label: 'Blobby',
@@ -41,7 +41,7 @@ export const FONT_THEMES: Record<FontTheme, FontThemeConfig> = {
     label: 'Geometric',
     feel: 'Manrope',
     sans: 'Manrope',
-    mono: 'JetBrains Mono',
+    mono: 'Geist Mono',
     googleFontsQuery: 'Manrope:wght@400;500;600&family=DM+Mono:wght@400;500'
   },
   awkward: {
