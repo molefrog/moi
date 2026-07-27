@@ -8,7 +8,7 @@ import {
   IconGhost,
   IconLayout2,
   IconLayoutSidebarRight,
-  IconPalette,
+  IconLetterCase,
   IconSketching
 } from '@tabler/icons-react'
 import { ChatPanel } from '@/client/features/chat/ChatPanel'
@@ -172,7 +172,7 @@ function WorkspaceCustomizeAction({ active, onToggle }: WorkspaceCustomizeAction
             aria-pressed={active}
             onClick={onToggle}
           >
-            <IconPalette stroke={1.75} />
+            <IconLetterCase stroke={1.75} />
           </Button>
         }
       />

@@ -87,7 +87,7 @@ export function CustomizePanel({ ref }: CustomizePanelProps) {
                     setTheme({ background: preset.background, foreground: preset.foreground })
                   }
                   className={cn(
-                    'flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors',
+                    'flex items-center gap-2 rounded-md px-3 py-2 ring-border transition-colors',
                     active
                       ? 'bg-primary/5 ring-2 ring-primary'
                       : 'border-transparent hover:bg-accent'
