@@ -76,6 +76,7 @@ my-agent-folder/
     widgets/                  <- source code of Widget React components
       total-users.tsx
       rps-chart.tsx
+      _utils.tsx              <- `_`-prefixed files are shared code, not applets (optional)
       server-metrics.server.ts <- Server-side async functions the widget can call (optional)
       ...
     views/
@@ -156,7 +157,10 @@ export default function Hello() {
 }
 ```
 
-Imports resolve from the same folder or `.moi/package.json` deps only — no `@/` aliases.
+Imports resolve relatively (same folder, or elsewhere under `.moi/` — e.g. `../lib/format`) or
+from `.moi/package.json` deps — no `@/` aliases. Files starting with `_` (e.g. `_utils.tsx`) in
+`widgets/` and `views/` are never applet entry points — put code shared between applets there.
+`moi bundle` tracks these local imports: editing a shared module rebuilds every applet using it.
 
 ## Server functions — `<name>.server.ts`
 

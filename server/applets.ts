@@ -21,6 +21,7 @@ import {
   type AppletKind,
   buildApplet,
   scanAssetImports,
+  scanModuleImports,
   scanServerImports
 } from './bundler/build-applet'
 
@@ -40,12 +41,14 @@ export function getAppletPaths(workspacePath: string, kind: AppletKind): AppletP
   return { moiRoot, sourceDir, buildDir, manifestPath }
 }
 
-// Source module names in a kind's directory: `*.tsx`/`*.ts` minus `.server.ts`.
+// Source module names in a kind's directory: `*.tsx`/`*.ts` minus `.server.ts`
+// and minus `_`-prefixed files (`_utils.tsx`) — those are shared modules for
+// entries to import, never entry points themselves.
 export async function scanSources(sourceDir: string): Promise<string[]> {
   try {
     const entries = await readdir(sourceDir)
     return entries
-      .filter(f => /\.(tsx|ts)$/.test(f) && !f.endsWith('.server.ts'))
+      .filter(f => /\.(tsx|ts)$/.test(f) && !f.startsWith('_') && !f.endsWith('.server.ts'))
       .map(f => f.replace(/\.tsx?$/, ''))
   } catch {
     return []
@@ -60,30 +63,70 @@ async function resolveSource(sourceDir: string, name: string): Promise<string | 
   return null
 }
 
-// A bundle is stale if its entry `index.js` is missing, or the source — or any
-// `.server.ts` it imports (RPC stubs are inlined) or asset it imports (emitted
-// into the bundle dir) — is newer than the built entry. The bundle itself is
+// A bundle is stale if its entry `index.js` is missing, or any file in its
+// local import graph has an mtime >= the built entry's. The graph is walked
+// transitively over relative module imports (shared `_utils.tsx`,
+// `../lib/*.ts`, `./data.json`), and every visited module's `.server.ts`
+// imports (RPC stubs are inlined) and asset imports (emitted into the bundle
+// dir) are checked as leaves. Bare specifiers (node_modules) are not walked —
+// after a dependency bump, `moi bundle --force`. The bundle itself is
 // React-mode-agnostic (see buildApplet), so it needs no rebuild when the server
 // switches between the development and production React.
 async function needsRebuild(buildDir: string, name: string, srcPath: string): Promise<boolean> {
   const built = Bun.file(join(buildDir, name, 'index.js'))
   if (!(await built.exists())) return true
-  let sourceMtime = Bun.file(srcPath).lastModified
-  const source = await Bun.file(srcPath).text()
-  const dir = dirname(srcPath)
-  for (const specifier of scanServerImports(source)) {
-    const serverFile = Bun.file(join(dir, `${specifier}.server.ts`))
-    if (await serverFile.exists()) {
-      sourceMtime = Math.max(sourceMtime, serverFile.lastModified)
+  const builtMtime = built.lastModified
+
+  const queue = [srcPath]
+  const visited = new Set<string>()
+  while (queue.length > 0) {
+    const path = queue.pop()!
+    if (visited.has(path)) continue
+    visited.add(path)
+    const file = Bun.file(path)
+    if (!(await file.exists())) continue
+    if (file.lastModified >= builtMtime) return true
+    // Only JS/TS modules can import further files; other leaves (JSON, CSS)
+    // end at the mtime check above.
+    if (!/\.[jt]sx?$/.test(path)) continue
+    const source = await file.text()
+    const dir = dirname(path)
+    for (const specifier of scanServerImports(source)) {
+      const serverFile = Bun.file(join(dir, `${specifier}.server.ts`))
+      if ((await serverFile.exists()) && serverFile.lastModified >= builtMtime) return true
+    }
+    for (const specifier of scanAssetImports(source)) {
+      const assetFile = Bun.file(join(dir, specifier))
+      if ((await assetFile.exists()) && assetFile.lastModified >= builtMtime) return true
+    }
+    for (const specifier of scanModuleImports(source)) {
+      const resolved = await resolveModuleImport(dir, specifier)
+      if (resolved) queue.push(resolved)
     }
   }
-  for (const specifier of scanAssetImports(source)) {
-    const assetFile = Bun.file(join(dir, specifier))
-    if (await assetFile.exists()) {
-      sourceMtime = Math.max(sourceMtime, assetFile.lastModified)
-    }
+  return false
+}
+
+// Resolve a relative import the way the bundler would, limited to what the
+// staleness check needs: the literal file (explicit-extension imports like
+// `./data.json`), the `.tsx`/`.ts`/`.jsx`/`.js` variants, or a directory
+// index. Unresolvable specifiers are skipped — the build itself surfaces those
+// as errors.
+async function resolveModuleImport(dir: string, specifier: string): Promise<string | null> {
+  const base = join(dir, specifier)
+  const candidates = [
+    base,
+    `${base}.tsx`,
+    `${base}.ts`,
+    `${base}.jsx`,
+    `${base}.js`,
+    join(base, 'index.tsx'),
+    join(base, 'index.ts')
+  ]
+  for (const candidate of candidates) {
+    if (await Bun.file(candidate).exists()) return candidate
   }
-  return sourceMtime >= built.lastModified
+  return null
 }
 
 // Built applet names: subdirectories of `buildDir` that hold an `index.js`

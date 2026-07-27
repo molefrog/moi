@@ -533,6 +533,24 @@ export function scanAssetImports(source: string): string[] {
   return specifiers
 }
 
+// Relative module import specifiers in an applet source (`./_utils`,
+// `../lib/data`, `./table.tsx`) — static, re-export, side-effect, and dynamic
+// forms alike. `.server` imports and assets are excluded (each has its own
+// scanner above); bare specifiers (node_modules) are never matched. Used by the
+// rebuild staleness check to walk the applet's local import graph, so editing a
+// shared module marks every applet that (transitively) imports it stale.
+const MODULE_IMPORT_RE = /(?:\bfrom|\bimport)\s*\(?\s*['"](\.\.?\/[^'"]+)['"]/g
+export function scanModuleImports(source: string): string[] {
+  const specifiers: string[] = []
+  let match
+  while ((match = MODULE_IMPORT_RE.exec(source)) !== null) {
+    const specifier = match[1]
+    if (/\.server(\.ts)?$/.test(specifier) || ASSET_EXTENSIONS.test(specifier)) continue
+    specifiers.push(specifier)
+  }
+  return specifiers
+}
+
 async function prevalidateServerFiles(entrypoint: string): Promise<void> {
   const sourceDir = dirname(entrypoint)
   const source = await Bun.file(entrypoint).text()

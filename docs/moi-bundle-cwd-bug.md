@@ -136,18 +136,17 @@ rm -rf <workspace>/.moi/.moi
 ## The cache (staleness) model
 
 It is **file-mtime based, per entry** — no content hashing, no sidecar cache file. An
-entry rebuilds when its built `index.js` is missing, or when the source — or any
-`.server.ts` / asset it **directly** imports — has an mtime `>=` the built entry's
-(`needsRebuild`). `--force` ignores mtimes entirely.
+entry rebuilds when its built `index.js` is missing, or when any file in its local
+import graph — the source, every relative module it transitively imports (shared
+`_utils.tsx`, `../lib/*.ts`), plus the `.server.ts` / asset files any of them import —
+has an mtime `>=` the built entry's (`needsRebuild`). `--force` ignores mtimes entirely.
 
 - **Good:** zero extra state, survives restarts, trivially correct for the common
   "edit a widget, rebundle" loop.
-- **Blind spot — transitive deps.** `needsRebuild` only scans the _entry source_ for
-  `.server.ts` and asset imports (`scanServerImports` / `scanAssetImports`). A shared
-  helper imported by the entry (a plain local `.ts` that's neither a `.server.ts` nor an
-  asset), or a file imported _by_ a `.server.ts`, is **not** tracked — editing it won't
-  mark the entry stale, so you need `--force`. A content-hash of the full input graph (or
-  walking Bun.build's module graph) would close this.
+- **Blind spots.** A file imported _by_ a `.server.ts` (only the `.server.ts` itself is
+  tracked — its export list is all that's inlined into the bundle) and `node_modules`
+  deps are not walked — after a package bump, use `--force`. A content-hash of
+  Bun.build's full input graph would close these.
 - mtime comparison is `>=`, so same-second edits err toward rebuilding (safe).
 
 ## The event model
