@@ -60,8 +60,7 @@ export function SidebarLayout({
       <main
         className={cn(
           'flex min-w-0 flex-1 flex-col overflow-hidden',
-          panel === 'default' &&
-            'rounded-l-xl border-l border-border bg-background shadow-[1px_0_3px_0_var(--border)]'
+          panel === 'default' && 'rounded-l-md bg-background shadow-md'
         )}
       >
         {children}
