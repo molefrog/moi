@@ -519,6 +519,7 @@ export type WorkspaceLayout = {
     background?: string
     foreground?: string
     muted?: string
+    accent?: string
   }
   // Widget thumbnails captured client-side from the live grid, used for
   // home-screen previews. Saved through their own endpoint (PUT

@@ -118,7 +118,8 @@ export function CustomizePanel({ ref }: CustomizePanelProps) {
                 setTheme({
                   background: preset.background,
                   foreground: preset.foreground,
-                  muted: preset.muted
+                  muted: preset.muted,
+                  accent: preset.accent
                 })
               }
             >

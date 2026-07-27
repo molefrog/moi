@@ -32,7 +32,7 @@ import { useFitsSplitLayout } from '@/client/features/workspace/useFitsSplitLayo
 import { useWorkspaceAvailability } from '@/client/features/workspace/api'
 import { WorkspaceSkillUpdateBanner } from '@/client/features/workspace/WorkspaceSkillUpdateBanner'
 import { useWorkspaceSkillUpdates } from '@/client/features/workspace/useWorkspaceSkillUpdates'
-import { useWorkspaceTheme } from '@/client/features/workspace/useWorkspaceTheme'
+import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import {

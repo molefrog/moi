@@ -161,14 +161,16 @@ describe('mergeLayoutForSave', () => {
 })
 
 describe('getWorkspacePreview', () => {
-  test('includes the workspace color theme', async () => {
+  test('includes the workspace color theme with refreshed generated tokens', async () => {
     await withWorkspaceFile(
       {
         ...base,
         theme: {
           font: 'default',
           background: '#fdf2f4',
-          foreground: '#3b1c26'
+          foreground: '#3b1c26',
+          muted: 'stale-muted',
+          accent: 'color-mix(in oklch, #3b1c26 7%, transparent)'
         }
       },
       async dir => {
@@ -178,7 +180,8 @@ describe('getWorkspacePreview', () => {
             font: 'default',
             background: '#fdf2f4',
             foreground: '#3b1c26',
-            muted: 'color-mix(in oklch, #fdf2f4 95%, #3b1c26 5%)'
+            muted: 'color-mix(in oklch, #fdf2f4 95%, #3b1c26 5%)',
+            accent: 'color-mix(in oklch, oklch(from #fdf2f4 l calc(c * 2) h) 20%, #3b1c26 5%)'
           }
         })
       }

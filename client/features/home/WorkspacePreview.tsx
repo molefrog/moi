@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 
 import { cn } from '@/client/lib/cn'
+import { getWorkspaceThemeStyle } from '@/client/runtime/workspace-theme'
 
 import { useWorkspacePreview } from './api'
 
@@ -109,13 +110,14 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
   const thumbnails = query.data ? [...query.data.thumbnails].reverse() : []
   const slots = STACK.slice(STACK.length - thumbnails.length)
   const firstUserMessage = query.data?.firstUserMessage
+  const theme = query.data?.theme
   const { ref, horizontalRadiusScale } = useFolderRadiusScale()
   const backdropPath = folderBackdropPath(horizontalRadiusScale)
   const noiseFilterId = `folder-noise-${workspaceId}`
-  const backdropFill = query.data?.theme?.muted
+  const themeStyle = getWorkspaceThemeStyle(theme)
 
   return (
-    <div ref={ref} className="relative h-40 w-full">
+    <div ref={ref} style={themeStyle} className="relative h-40 w-full">
       <svg
         viewBox={`0 0 ${FOLDER.width} ${FOLDER.height}`}
         preserveAspectRatio="none"
@@ -149,11 +151,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
         <path
           d={backdropPath}
           filter={`url(#${noiseFilterId})`}
-          fill={backdropFill}
-          className={cn(
-            'mask-[linear-gradient(to_bottom,rgba(0,0,0,0.5),black_40%)]',
-            !backdropFill && 'fill-accent'
-          )}
+          className="mask-[linear-gradient(to_bottom,rgba(0,0,0,0.5),black_40%)] fill-accent"
         />
       </svg>
 

@@ -24,11 +24,13 @@ function normalizeLayout(parsed: Record<string, unknown>): WorkspaceLayout {
   delete layout.chatMode
   const normalized = layout as unknown as WorkspaceLayout
   const theme = normalized.theme
-  if (theme && !theme.muted && theme.background && theme.foreground) {
-    theme.muted = deriveThemeColors({
+  if (theme?.background && theme.foreground) {
+    const colors = deriveThemeColors({
       background: theme.background,
       foreground: theme.foreground
-    }).muted
+    })
+    theme.muted = colors.muted
+    theme.accent = colors.accent
   }
   return normalized
 }

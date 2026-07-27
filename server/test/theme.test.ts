@@ -14,16 +14,21 @@ describe('color themes', () => {
     expect(deriveThemeColors({ background: '#fdf2f4', foreground: '#3b1c26' })).toEqual({
       background: '#fdf2f4',
       foreground: '#3b1c26',
-      muted: 'color-mix(in oklch, #fdf2f4 95%, #3b1c26 5%)'
+      muted: 'color-mix(in oklch, #fdf2f4 95%, #3b1c26 5%)',
+      accent: 'color-mix(in oklch, oklch(from #fdf2f4 l calc(c * 2) h) 20%, #3b1c26 5%)'
     })
   })
 
-  test('leaves the default theme on the root muted token', () => {
+  test('leaves the default theme on the root color tokens', () => {
     expect(COLOR_THEMES.default.muted).toBeUndefined()
+    expect(COLOR_THEMES.default.accent).toBeUndefined()
   })
 
-  test('stores the generated muted token on each color preset', () => {
+  test('stores the generated supporting tokens on each color preset', () => {
     expect(COLOR_THEMES.rose.muted).toBe('color-mix(in oklch, #fdf2f4 95%, #3b1c26 5%)')
+    expect(COLOR_THEMES.rose.accent).toBe(
+      'color-mix(in oklch, oklch(from #fdf2f4 l calc(c * 2) h) 20%, #3b1c26 5%)'
+    )
   })
 })
 
@@ -46,6 +51,7 @@ describe('applyThemeUpdate', () => {
     expect(result.theme.background).toBe('#faf8f5')
     expect(result.theme.foreground).toBe('#2c2825')
     expect(result.theme.muted).toBe(COLOR_THEMES.paper.muted)
+    expect(result.theme.accent).toBe(COLOR_THEMES.paper.accent)
     expect(result.applied).toEqual({ color: 'paper' })
   })
 
@@ -54,13 +60,15 @@ describe('applyThemeUpdate', () => {
       font: 'serif' as const,
       background: '#faf8f5',
       foreground: '#2c2825',
-      muted: COLOR_THEMES.paper.muted
+      muted: COLOR_THEMES.paper.muted,
+      accent: COLOR_THEMES.paper.accent
     }
     const result = applyThemeUpdate(current, { color: 'default' })
     if (!result.ok) throw new Error('expected ok')
     expect(result.theme.background).toBeUndefined()
     expect(result.theme.foreground).toBeUndefined()
     expect(result.theme.muted).toBeUndefined()
+    expect(result.theme.accent).toBeUndefined()
     expect(result.theme.font).toBe('serif')
 
     // Round-trip: undefined values should not survive JSON serialization
@@ -68,6 +76,7 @@ describe('applyThemeUpdate', () => {
     expect('background' in roundTripped).toBe(false)
     expect('foreground' in roundTripped).toBe(false)
     expect('muted' in roundTripped).toBe(false)
+    expect('accent' in roundTripped).toBe(false)
   })
 
   test('combined font + color updates apply both', () => {
@@ -76,6 +85,7 @@ describe('applyThemeUpdate', () => {
     expect(result.theme.font).toBe('serif')
     expect(result.theme.background).toBe('#f0faf6')
     expect(result.theme.muted).toBe(COLOR_THEMES.mint.muted)
+    expect(result.theme.accent).toBe(COLOR_THEMES.mint.accent)
     expect(result.applied).toEqual({ font: 'serif', color: 'mint' })
   })
 
@@ -140,7 +150,8 @@ describe('loadLayout/saveLayout round-trip with theme', () => {
         font: 'serif',
         background: '#faf8f5',
         foreground: '#2c2825',
-        muted: COLOR_THEMES.paper.muted
+        muted: COLOR_THEMES.paper.muted,
+        accent: COLOR_THEMES.paper.accent
       }
     }
     await saveLayout(layout, tmpDir)

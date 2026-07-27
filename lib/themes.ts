@@ -57,10 +57,11 @@ export type ColorTheme = 'default' | 'paper' | 'sand' | 'rose' | 'lavender' | 'm
 
 export type ColorThemeConfig = {
   label: string
-  // undefined background/foreground = no override, reveals :root defaults
+  // undefined colors = no override, reveals :root defaults
   background?: string
   foreground?: string
   muted?: string
+  accent?: string
 }
 
 type ThemeColorSource = {
@@ -68,14 +69,20 @@ type ThemeColorSource = {
   foreground: string
 }
 
+type DerivedThemeColors = ThemeColorSource & {
+  muted: string
+  accent: string
+}
+
 export function deriveThemeColors({
   background,
   foreground
-}: ThemeColorSource): ThemeColorSource & { muted: string } {
+}: ThemeColorSource): DerivedThemeColors {
   return {
     background,
     foreground,
-    muted: `color-mix(in oklch, ${background} 95%, ${foreground} 5%)`
+    muted: `color-mix(in oklch, ${background} 95%, ${foreground} 5%)`,
+    accent: `color-mix(in oklch, oklch(from ${background} l calc(c * 10) h) 8%, ${foreground} 6%)`
   }
 }
 

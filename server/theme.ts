@@ -10,7 +10,7 @@ export type ThemeUpdateResult =
 
 // Pure merge + validation for a theme update. Spreads the existing theme so
 // setting one axis never wipes the other. 'default' color is stored as
-// `undefined` bg/fg, which JSON.stringify drops on save.
+// undefined color tokens, which JSON.stringify drops on save.
 export function applyThemeUpdate(
   current: WorkspaceLayout['theme'],
   update: ThemeUpdate
@@ -32,6 +32,7 @@ export function applyThemeUpdate(
     theme.background = preset.background
     theme.foreground = preset.foreground
     theme.muted = preset.muted
+    theme.accent = preset.accent
   }
 
   return {
