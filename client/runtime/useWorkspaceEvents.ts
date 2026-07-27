@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 
 import { wsUrl } from '@/client/lib/ws-url'
-import type { AppSettings, ViewBuilder, ViewInfo, WidgetInfo } from '@/lib/types'
+import type { AppSettings, ViewBuilder, ViewInfo, WidgetInfo, WorkspaceTabId } from '@/lib/types'
 
 export type WorkspaceEvent =
   | { type: 'widget:updated'; name: string }
@@ -26,6 +26,14 @@ export type WorkspaceEvent =
   // App settings changed (PATCH /api/settings from any client) — carries the
   // new value so caches update without a refetch.
   | { type: 'settings:updated'; settings: AppSettings }
+  // `moi tab focus` — every open client of `workspaceId` navigates (replace)
+  // to `tab`, delivering `params` to the target view via navigation state.
+  | {
+      type: 'tab:focus'
+      workspaceId: string
+      tab: WorkspaceTabId
+      params?: Record<string, unknown>
+    }
 
 type WorkspaceEventHandler = (event: WorkspaceEvent) => void
 

@@ -64,7 +64,7 @@ For OpenClaw or a manual setup, read on.
 
 ## Manual install
 
-Make sure [Bun](https://bun.sh) is installed. moi uses it to run the web server and bundle the dynamic UI.
+Make sure [Bun](https://bun.sh) 1.3 or newer is installed. moi uses it to run the web server and bundle the dynamic UI.
 
 Install the `moi-computer` package from npm and start the web UI:
 

@@ -78,6 +78,7 @@
     "lru-cache": "^11.3.5",
     "modern-screenshot": "^4.7.0",
     "motion": "^12.35.1",
+    "nanoevents": "^10.0.0",
     "nanoid": "^6.0.0",
     "pathe": "^2.0.3",
     "picocolors": "^1.1.1",

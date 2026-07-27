@@ -9,17 +9,22 @@ import {
   useWorkspaceModels,
   useWorkspaceSessions
 } from '@/client/features/chat/api'
-import { useMoiUserMessageContext } from '@/client/features/workspace/moi-context'
+import {
+  type WorkspaceTabAddress,
+  useMoiUserMessageContext
+} from '@/client/features/workspace/moi-context'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { sendMessage } from '@/client/features/chat/chat-connection'
 import {
   type ChatSendOptions,
+  attachmentsForSend,
+  ownsComposerAttachments,
   resolveChatRunOptions,
   startOptimisticTurn
 } from '@/client/features/chat/chat-send'
 import { buildPreviewTurn } from '@/client/features/chat/preview-turn'
-import { draftKey, liveStore, selectPreviews, useLive } from '@/client/features/chat/chat-store'
+import { liveStore, selectPreviews, useLive } from '@/client/features/chat/chat-store'
 import { useUiStore } from '@/client/store/ui'
 import { emptyViewState } from '@/lib/format'
 import type { Part, ViewState } from '@/lib/types'
@@ -29,7 +34,11 @@ const EMPTY: ViewState = emptyViewState()
 // Thin projection over app-level state: the active thread + spinner/error come
 // from the live store; the transcript comes from the React Query cache (kept
 // current by the connection manager's WS deltas). No socket lifecycle here.
-export function useChat() {
+//
+// Takes the workspace's tab address because every message carries it: the
+// envelope tells the agent which tab the user is on and what the active view
+// is rendering with. Call this BELOW `useWorkspaceNavigation`, which owns it.
+export function useChat(address: WorkspaceTabAddress) {
   const workspaceId = useWorkspaceId()
   const qc = useQueryClient()
   const { layout } = useWorkspaceLayoutCtx()
@@ -37,7 +46,7 @@ export function useChat() {
   const sessions = useWorkspaceSessions(workspaceId).data
   // Snapshot of the workspace's ambient UI state + queued one-shot
   // directives, taken when the message actually goes out.
-  const buildMoiContext = useMoiUserMessageContext()
+  const buildMoiContext = useMoiUserMessageContext(address)
 
   const activeSessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
   const sessionSelectionInitialized = useLive(s =>
@@ -85,9 +94,9 @@ export function useChat() {
       const text = draft.trim()
       // Attachments for the active thread, keyed exactly like the draft. Only
       // fully-uploaded ones are sent; the composer disables send while any are
-      // still uploading, so in practice they're all ready here.
-      const pending = liveStore.getState().attachments[draftKey(workspaceId, activeSessionId)] ?? []
-      const ready = pending.filter(a => a.status === 'ready' && a.upload)
+      // still uploading, so in practice they're all ready here. An applet send
+      // gets none — the staged files are the user's, not the widget's.
+      const ready = attachmentsForSend(workspaceId, activeSessionId, options)
       // No `processing` guard: sending while a turn is in flight QUEUES the
       // message into the same live server session (streaming-input mode).
       if (!text && ready.length === 0) return
@@ -139,7 +148,7 @@ export function useChat() {
         model,
         effort,
         stream,
-        context: buildMoiContext(options?.directives),
+        context: buildMoiContext(options),
         ...(ready.length > 0 ? { attachments: ready.map(a => a.upload!.id) } : {})
       })
       useUiStore.getState().markMessageSentFromMoi(workspaceId)
@@ -148,8 +157,11 @@ export function useChat() {
       }
       // Drop the thread's attachments now that they've been sent (revokes the
       // preview object URLs). Keyed by the pre-mint id, matching where they were
-      // stored by the composer.
-      liveStore.getState().clearAttachments(workspaceId, activeSessionId)
+      // stored by the composer. Skipped for an applet send, which carried none:
+      // clearing here would discard the user's staged (and in-flight) files.
+      if (ownsComposerAttachments(options)) {
+        liveStore.getState().clearAttachments(workspaceId, activeSessionId)
+      }
     },
     [
       activeSessionId,

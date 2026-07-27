@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   activeTabTitle,
   drainChatDirectives,
+  envelopeTabParams,
   pushChatDirective,
   takeChatDirectives
 } from './moi-context'
@@ -60,5 +61,26 @@ describe('moi context assembly', () => {
     expect(activeTabTitle('view-builder:b-draft', views, builders)).toBeUndefined()
     expect(activeTabTitle('scratchpad', views, builders)).toBeUndefined()
     expect(activeTabTitle('view:color-studio', undefined, undefined)).toBeUndefined()
+  })
+})
+
+describe('envelopeTabParams', () => {
+  const params = { order: 'A-1042' }
+
+  test('a view reports what it is rendering with', () => {
+    expect(envelopeTabParams('view:orders', params)).toEqual(params)
+  })
+
+  test('a view with nothing addressable reports nothing', () => {
+    expect(envelopeTabParams('view:orders', {})).toBeUndefined()
+  })
+
+  test('tabs without addressable state report nothing, params or not', () => {
+    // Widgets are not navigation targets, and the static tabs take no params —
+    // so a stray record here means nothing and must not reach the envelope.
+    expect(envelopeTabParams('widgets', params)).toBeUndefined()
+    expect(envelopeTabParams('agent', params)).toBeUndefined()
+    expect(envelopeTabParams('scratchpad', params)).toBeUndefined()
+    expect(envelopeTabParams('view-builder:b-42', params)).toBeUndefined()
   })
 })

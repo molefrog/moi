@@ -334,6 +334,35 @@ describe('moi fileUrl module', () => {
     expect(result.js).toContain('%%MOI_APPLET_API_BASE%%')
     expect(result.js).toContain('"/fs/"')
   })
+
+  test('bundles focusTab forwarding to the per-bundle bridge, not a global', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-focustab.tsx'), undefined, 'view')
+    expect(result.js).toContain('function focusTab')
+    // Optional-chained so calls no-op before the host attaches (and outside
+    // the moi host). The compiled form may or may not keep the `?.` sugar.
+    expect(result.js).toMatch(/bridge\s*(\?\.|&&|==)/)
+    expect(result.js).not.toContain('window.moi')
+  })
+
+  test('bundles sendChatMessage forwarding to the same per-bundle bridge', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-sendchatmessage.tsx'), undefined, 'view')
+    expect(result.js).toContain('function sendChatMessage')
+    expect(result.js).toMatch(/bridge\s*(\?\.|&&|==)/)
+    // Two args only: the applet cannot pass a source, because attribution is
+    // stamped host-side (applet-runtime.ts) from the identity the bridge was
+    // attached with.
+    expect(result.js).toContain('sendChatMessage(message, context)')
+  })
+
+  test('every bundle entry exports the bridge wiring, even without a moi import', async () => {
+    // `hello` never imports moi at all — the entry still re-exports the host
+    // wiring so attach works uniformly across bundles.
+    for (const fixture of ['with-focustab.tsx', 'hello.tsx']) {
+      const result = await buildApplet(join(FIXTURES, fixture), undefined, 'view')
+      expect(result.js).toContain('__attachBridge')
+      expect(result.js).toContain('__getBridge')
+    }
+  })
 })
 
 describe('mixed widget + view build (Tailwind isolation)', () => {

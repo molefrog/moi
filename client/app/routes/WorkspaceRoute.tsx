@@ -24,6 +24,8 @@ type WorkspaceRouteProps = {
   id: string
 }
 
+// The URL's tab segment is not threaded down — useWorkspaceNavigation reads it
+// off the matched route with wouter's `useParams`.
 export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
   return (
     <Workspace id={id}>

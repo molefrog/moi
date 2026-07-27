@@ -10,11 +10,13 @@
 //     stores, non-React code. It rides the NEXT chat message's
 //     "# This message only" section and is delivered exactly once.
 //
-//   useMoiUserMessageContext()
-//     Hook for the chat send path: returns a builder that snapshots ambient
-//     state (active tab, view title), drains the directive queue, and accepts
-//     directives tied directly to that message. Call the builder only for a
-//     message that actually goes out.
+//   useMoiUserMessageContext({ activeTab, appletParams })
+//     Hook for the chat send path: takes the workspace's live tab address
+//     (from useWorkspaceNavigation, threaded through useChat) and returns a
+//     builder that resolves the tab's title and params, drains the directive
+//     queue, and accepts per-message extras — directives, and the applet
+//     attribution when the message came from applet UI rather than the
+//     composer. Call the builder only for a message that actually goes out.
 //
 //   Adding a new ambient field (e.g. scratchpad selection): extend the
 //   `MoiContext` type and its renderer in lib/moi-context.ts, then supply
@@ -24,8 +26,7 @@ import { useCallback } from 'react'
 import { useViewBuilders } from '@/client/features/views/api'
 import { useWorkspaceViews } from '@/client/features/workspace/api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
-import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
-import type { MoiContext } from '@/lib/moi-context'
+import type { MoiAppletMessage, MoiContext } from '@/lib/moi-context'
 import type { ViewBuilder, ViewInfo, WorkspaceTabId } from '@/lib/types'
 
 // One-shot directives queued per workspace, drained into the NEXT chat
@@ -59,6 +60,25 @@ export function takeChatDirectives(
   return [...drainChatDirectives(workspaceId), ...messageDirectives]
 }
 
+// The workspace's live tab address, owned by useWorkspaceNavigation and passed
+// down through useChat. The URL is the truth for which tab is active, and
+// navigation state is the truth for what the view is rendering with.
+export type WorkspaceTabAddress = {
+  activeTab: WorkspaceTabId
+  appletParams: Record<string, unknown>
+}
+
+// The params the envelope should report, or undefined when there are none
+// worth reporting: views are the only tabs with addressable state, and an
+// empty record says nothing.
+export function envelopeTabParams(
+  activeTab: WorkspaceTabId,
+  appletParams: Record<string, unknown>
+): Record<string, unknown> | undefined {
+  if (!activeTab.startsWith('view:')) return undefined
+  return Object.keys(appletParams).length > 0 ? appletParams : undefined
+}
+
 // The UI label of the active tab when it has one beyond its id: a view's
 // configured title, or a builder's claimed title while the build runs.
 // Undefined otherwise (the envelope then falls back to the id, like the tab
@@ -75,25 +95,37 @@ export function activeTabTitle(
   return undefined
 }
 
+// Per-message extras the send path supplies — everything else in the envelope
+// is ambient state the builder snapshots for itself.
+export type MoiUserMessageOptions = {
+  directives?: readonly string[]
+  // Present when applet UI sent this message instead of the user typing it.
+  applet?: MoiAppletMessage
+}
+
 // Returns a builder that snapshots the workspace state at call time — invoke
 // it when the message is actually sent, not at render. Draining the
 // directive queue is part of the snapshot, so only call it for a message
 // that will really go out.
-export function useMoiUserMessageContext(): (directives?: readonly string[]) => MoiContext {
+export function useMoiUserMessageContext({
+  activeTab,
+  appletParams
+}: WorkspaceTabAddress): (options?: MoiUserMessageOptions) => MoiContext {
   const workspaceId = useWorkspaceId()
-  const { layout } = useWorkspaceLayoutCtx()
   const views = useWorkspaceViews(workspaceId).data
   const builders = useViewBuilders(workspaceId).data
-  const activeTab = layout.tabs.active
   return useCallback(
-    (messageDirectives: readonly string[] = []) => {
-      const directives = takeChatDirectives(workspaceId, messageDirectives)
+    (options: MoiUserMessageOptions = {}) => {
+      const directives = takeChatDirectives(workspaceId, options.directives ?? [])
+      const tabParams = envelopeTabParams(activeTab, appletParams)
       return {
         activeTab,
         tabTitle: activeTabTitle(activeTab, views, builders),
+        ...(tabParams ? { tabParams } : {}),
+        ...(options.applet ? { applet: options.applet } : {}),
         ...(directives.length > 0 ? { directives } : {})
       }
     },
-    [workspaceId, activeTab, views, builders]
+    [workspaceId, activeTab, appletParams, views, builders]
   )
 }

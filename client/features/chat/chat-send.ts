@@ -1,13 +1,34 @@
 import type { QueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { liveStore } from '@/client/features/chat/chat-store'
+import { type ChatAttachment, draftKey, liveStore } from '@/client/features/chat/chat-store'
+import type { MoiUserMessageOptions } from '@/client/features/workspace/moi-context'
 import { STREAM_RESPONSES } from '@/client/lib/flags'
 import { applyEvent, emptyViewState } from '@/lib/format'
 import type { Part, ViewState, WorkspaceModels } from '@/lib/types'
 
-export type ChatSendOptions = {
-  directives?: readonly string[]
+// What a caller may attach to one message beyond its text. All of it is
+// envelope material — the agent sees it, the chat bubble does not.
+export type ChatSendOptions = MoiUserMessageOptions
+
+// Whether this send owns what the user has staged in the composer. Only a send
+// FROM the composer does. An applet's message is not the message the user is
+// building, so it must neither carry files they staged for their own message
+// nor clear ones still uploading out from under them.
+export function ownsComposerAttachments(options?: ChatSendOptions): boolean {
+  return !options?.applet
+}
+
+// The fully-uploaded attachments this send should carry — none for a send that
+// doesn't own the composer's.
+export function attachmentsForSend(
+  workspaceId: string,
+  sessionId: string | null,
+  options?: ChatSendOptions
+): ChatAttachment[] {
+  if (!ownsComposerAttachments(options)) return []
+  const pending = liveStore.getState().attachments[draftKey(workspaceId, sessionId)] ?? []
+  return pending.filter(a => a.status === 'ready' && a.upload)
 }
 
 type StartOptimisticTurnInput = {

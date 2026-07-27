@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 
 import type {
+  AppletKind,
   AppSettings,
   HarnessAvailability,
   UploadInfo,
@@ -342,14 +343,23 @@ one.post('/applet-log', async c => {
       message?: unknown
       stack?: unknown
     }
-    if (e.source !== 'load' && e.source !== 'render' && e.source !== 'window') continue
-    if (e.kind !== 'widget' && e.kind !== 'view') continue
-    if (typeof e.name !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(e.name)) continue
+    if (
+      e.source !== 'load' &&
+      e.source !== 'render' &&
+      e.source !== 'window' &&
+      e.source !== 'runtime'
+    )
+      continue
+    // `runtime` entries may be unattributed (a stale link to a deleted view
+    // names no applet), so attribution is optional there and dropped when
+    // malformed — every other source must name the applet that broke.
+    const attributed = (e.kind === 'widget' || e.kind === 'view') && typeof e.name === 'string'
+    const named = attributed && /^[a-zA-Z0-9_-]+$/.test(e.name as string)
+    if (!named && e.source !== 'runtime') continue
     if (typeof e.message !== 'string' || !e.message) continue
     recordAppletError(c.get('ws').path, {
       source: e.source,
-      kind: e.kind,
-      name: e.name,
+      ...(named ? { kind: e.kind as AppletKind, name: e.name as string } : {}),
       message: e.message,
       ...(typeof e.stack === 'string' ? { stack: e.stack } : {})
     })
