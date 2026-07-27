@@ -18,10 +18,10 @@ export const FONT_THEMES: Record<FontTheme, FontThemeConfig> = {
   },
   serif: {
     label: 'Serif',
-    feel: 'PT Serif',
-    sans: 'PT Serif',
+    feel: 'Literata',
+    sans: 'Literata',
     mono: 'JetBrains Mono',
-    googleFontsQuery: 'PT+Serif:wght@400;600;700&family=JetBrains+Mono:wght@400;500'
+    googleFontsQuery: 'Literata:wght@400;600;700&family=JetBrains+Mono:wght@400;500'
   },
   mono: {
     label: 'Mono',
@@ -102,7 +102,7 @@ export const COLOR_THEMES: Record<ColorTheme, ColorThemeConfig> = {
   default: { label: 'Default' },
   paper: {
     label: 'Paper',
-    ...deriveThemeColors({ background: '#faf8f5' })
+    ...deriveThemeColors({ background: '#fcfaf8' })
   },
   sand: {
     label: 'Sand',
@@ -110,18 +110,18 @@ export const COLOR_THEMES: Record<ColorTheme, ColorThemeConfig> = {
   },
   rose: {
     label: 'Rose',
-    ...deriveThemeColors({ background: '#fdf2f4' })
+    ...deriveThemeColors({ background: '#fef6f8' })
   },
   lavender: {
     label: 'Lavender',
-    ...deriveThemeColors({ background: '#f4f2fb' })
+    ...deriveThemeColors({ background: '#f8f7fd' })
   },
   mint: {
     label: 'Mint',
-    ...deriveThemeColors({ background: '#f0faf6' })
+    ...deriveThemeColors({ background: '#f7fcfa' })
   },
   sky: {
     label: 'Sky',
-    ...deriveThemeColors({ background: '#f0f6fc' })
+    ...deriveThemeColors({ background: '#f6fafd' })
   }
 }
