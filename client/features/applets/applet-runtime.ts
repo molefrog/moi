@@ -33,7 +33,7 @@ export const appletSource = ({ kind, name }: AppletIdentity): string => `${kind}
 // the bridge was attached with, so an applet can neither omit it nor claim to
 // be another applet.
 export type AppletChatMessage = {
-  label: string
+  message: string
   source: string
   context?: Record<string, unknown>
 }
@@ -45,7 +45,7 @@ export type AppletEvents = {
   // (history state is structured-cloned).
   focusTab: (tab: WorkspaceTabId, params?: Record<string, unknown>) => void
   // A message for the workspace's active chat, sent as if the user typed
-  // `label`. `context` rides the `<moi-context>` envelope, not the bubble.
+  // `message`. `context` rides the `<moi-context>` envelope, not the bubble.
   sendChatMessage: (message: AppletChatMessage) => void
 }
 
@@ -54,56 +54,56 @@ export type AppletEvents = {
 // them before emitting.
 export type AppletBridge = {
   focusTab: (tab: unknown, params?: unknown) => void
-  sendChatMessage: (label: unknown, context?: unknown) => void
+  sendChatMessage: (message: unknown, context?: unknown) => void
 }
 
-// A label longer than this is a bug, not a message — it would land in a chat
-// bubble verbatim.
-const MAX_LABEL_CHARS = 1000
+// A message longer than this is a bug, not a chat message — it would land in
+// a bubble verbatim.
+const MAX_MESSAGE_CHARS = 1000
 
 // `sendChatMessage` starts an agent run, which makes a stuck applet expensive
 // in a way `focusTab` is not: a widget calling it during render fires once per
 // render, and the bridge is per BUNDLE, so two simultaneous mounts of one
 // applet double every call. The cooldown collapses identical messages (which
 // also absorbs the double-mount); the window cap bounds everything else,
-// including a loop that varies its label. Limits are per workspace runtime, so
+// including a loop that varies its text. Limits are per workspace runtime, so
 // one runaway applet can't mute another workspace.
 const CHAT_LIMITS = { cooldownMs: 2_000, windowMs: 60_000, maxPerWindow: 10, maxKeys: 64 }
 
 function createRuntime(workspaceId: string) {
   const emitter = createNanoEvents<AppletEvents>()
-  // Keyed by `${source}\0${label}` — same applet, same message.
+  // Keyed by `${source}\0${text}` — same applet, same message.
   const chatLimiter = createRateLimiter(CHAT_LIMITS)
 
   // Drops are journaled, never silent: a message the agent never received has
   // to be discoverable in `moi debug logs`, or the applet author sees a dead
   // button with no explanation. `reportAppletError` has its own per-message
   // cooldown, so journaling a per-frame drop can't become a POST storm.
-  const drop = (identity: AppletIdentity, message: string) => {
+  const drop = (identity: AppletIdentity, reason: string) => {
     reportAppletError(workspaceId, {
       source: 'runtime',
       kind: identity.kind,
       name: identity.name,
-      message
+      message: reason
     })
   }
 
   // True when this message may go out; records the send as a side effect. Each
   // tier gets its own explanation — "you called this in render" and "you are
   // sending too much" need different fixes.
-  const admitChatMessage = (identity: AppletIdentity, source: string, label: string): boolean => {
-    const verdict = chatLimiter.admit(`${source}\0${label}`)
+  const admitChatMessage = (identity: AppletIdentity, source: string, text: string): boolean => {
+    const verdict = chatLimiter.admit(`${source}\0${text}`)
     if (verdict === 'cooldown') {
       drop(
         identity,
-        `sendChatMessage("${label}") was dropped: the same message was already sent less than ${CHAT_LIMITS.cooldownMs / 1000}s ago. Call it from an event handler, not during render.`
+        `sendChatMessage("${text}") was dropped: the same message was already sent less than ${CHAT_LIMITS.cooldownMs / 1000}s ago. Call it from an event handler, not during render.`
       )
       return false
     }
     if (verdict === 'window') {
       drop(
         identity,
-        `sendChatMessage("${label}") was dropped: more than ${CHAT_LIMITS.maxPerWindow} messages in a minute from this workspace. Each one starts an agent run, so send only on a real user action.`
+        `sendChatMessage("${text}") was dropped: more than ${CHAT_LIMITS.maxPerWindow} messages in a minute from this workspace. Each one starts an agent run, so send only on a real user action.`
       )
       return false
     }
@@ -128,21 +128,21 @@ function createRuntime(workspaceId: string) {
           if (!isWorkspaceTabId(tab)) return
           emitter.emit('focusTab', tab, isParamsRecord(params) ? params : undefined)
         },
-        sendChatMessage(label, context) {
+        sendChatMessage(message, context) {
           if (!alive) return
-          if (typeof label !== 'string') return
-          const text = label.trim()
+          if (typeof message !== 'string') return
+          const text = message.trim()
           if (!text) return
-          if (text.length > MAX_LABEL_CHARS) {
+          if (text.length > MAX_MESSAGE_CHARS) {
             drop(
               identity,
-              `sendChatMessage() was dropped: the label is ${text.length} characters (max ${MAX_LABEL_CHARS}). Put long content in the context argument, not the label.`
+              `sendChatMessage() was dropped: the message is ${text.length} characters (max ${MAX_MESSAGE_CHARS}). Put long content in the context argument, not the message.`
             )
             return
           }
           if (!admitChatMessage(identity, source, text)) return
           emitter.emit('sendChatMessage', {
-            label: text,
+            message: text,
             source,
             ...(context !== undefined
               ? { context: narrowChatContext(identity, context, drop) }
@@ -160,7 +160,7 @@ function createRuntime(workspaceId: string) {
   }
 }
 
-// The label carries the user's intent, so a bad `context` drops the payload
+// The message carries the user's intent, so a bad `context` drops the payload
 // and keeps the message rather than losing the whole call. Returns undefined
 // for anything that can't ride the envelope: a non-record, something that
 // won't serialize (cycles, functions, BigInt), or an oversized blob.
