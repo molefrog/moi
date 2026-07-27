@@ -2,11 +2,9 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   activeTabTitle,
-  clearTabAddress,
   drainChatDirectives,
-  publishTabAddress,
+  envelopeTabParams,
   pushChatDirective,
-  tabAddressFields,
   takeChatDirectives
 } from './moi-context'
 import type { ViewBuilder, ViewInfo } from '@/lib/types'
@@ -66,37 +64,23 @@ describe('moi context assembly', () => {
   })
 })
 
-describe('tab address', () => {
-  test('falls back to the saved default until navigation publishes', () => {
-    const ws = `ws-${crypto.randomUUID()}`
-    expect(tabAddressFields(ws, 'widgets')).toEqual({ activeTab: 'widgets' })
+describe('envelopeTabParams', () => {
+  const params = { order: 'A-1042' }
+
+  test('a view reports what it is rendering with', () => {
+    expect(envelopeTabParams('view:orders', params)).toEqual(params)
   })
 
-  test('a published address wins over the saved default', () => {
-    const ws = `ws-${crypto.randomUUID()}`
-    publishTabAddress(ws, 'view:orders', { order: 'A-1042' })
-    expect(tabAddressFields(ws, 'widgets')).toEqual({
-      activeTab: 'view:orders',
-      tabParams: { order: 'A-1042' }
-    })
+  test('a view with nothing addressable reports nothing', () => {
+    expect(envelopeTabParams('view:orders', {})).toBeUndefined()
   })
 
-  test('only view tabs report params, and never an empty record', () => {
-    const ws = `ws-${crypto.randomUUID()}`
-    publishTabAddress(ws, 'view:orders', {})
-    expect(tabAddressFields(ws, 'agent')).toEqual({ activeTab: 'view:orders' })
-    // Widgets are not navigation targets, so params there mean nothing even if
-    // history state somehow carries them.
-    publishTabAddress(ws, 'widgets', { order: 'A-1042' })
-    expect(tabAddressFields(ws, 'agent')).toEqual({ activeTab: 'widgets' })
-  })
-
-  test('addresses are per workspace and cleared on unmount', () => {
-    const wsA = `ws-${crypto.randomUUID()}`
-    const wsB = `ws-${crypto.randomUUID()}`
-    publishTabAddress(wsA, 'view:orders', { order: 'A-1042' })
-    expect(tabAddressFields(wsB, 'agent')).toEqual({ activeTab: 'agent' })
-    clearTabAddress(wsA)
-    expect(tabAddressFields(wsA, 'agent')).toEqual({ activeTab: 'agent' })
+  test('tabs without addressable state report nothing, params or not', () => {
+    // Widgets are not navigation targets, and the static tabs take no params —
+    // so a stray record here means nothing and must not reach the envelope.
+    expect(envelopeTabParams('widgets', params)).toBeUndefined()
+    expect(envelopeTabParams('agent', params)).toBeUndefined()
+    expect(envelopeTabParams('scratchpad', params)).toBeUndefined()
+    expect(envelopeTabParams('view-builder:b-42', params)).toBeUndefined()
   })
 })

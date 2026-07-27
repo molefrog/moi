@@ -14,7 +14,6 @@ import { useLocation, useParams } from 'wouter'
 import { useHistoryState } from 'wouter/use-browser-location'
 
 import { reportAppletError } from '@/client/features/applets/applet-log'
-import { clearTabAddress, publishTabAddress } from '@/client/features/workspace/moi-context'
 import {
   isStaleTabLink,
   normalizeTabsState,
@@ -96,16 +95,6 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
     if (isStaleTabLink(urlTab)) reportDeadTab(workspaceId, urlTab, activeTab)
     navigateToTab(activeTab)
   }, [activeTab, navigateToTab, urlTab, workspaceId])
-
-  // Publish the settled address for the chat envelope (see moi-context.ts).
-  // Only an honored URL publishes: mid-redirect the address is about to change,
-  // and a message sent in that window should carry where the user lands.
-  useEffect(() => {
-    if (!urlTabHonored) return
-    publishTabAddress(workspaceId, activeTab, appletParams)
-  }, [activeTab, appletParams, urlTabHonored, workspaceId])
-
-  useEffect(() => () => clearTabAddress(workspaceId), [workspaceId])
 
   // Navigating IS the tab switch, so persist its effects through the same write
   // path as before: the saved default follows the URL, and a URL-navigated tab
