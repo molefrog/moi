@@ -51,7 +51,9 @@ for important labels or values. Keep inset surfaces rare so a widget does not be
 cards.
 
 Keep container edges subtle. Use `ring-1 ring-border` for custom container outlines. Do not use a
-bare `border`, black borders, or raw high-contrast border colors as custom container chrome.
+bare `border`, black borders, or raw high-contrast border colors as custom container chrome. Leave
+the default `border`, `border-input`, and related classes inside generated shadcn components
+unchanged.
 
 Custom color is welcome when it carries identity, data, status, or useful emphasis. On a saturated
 surface, choose an explicit light or dark foreground with strong contrast. Keep state colors
@@ -125,6 +127,32 @@ fields, list rows, and repeated sections should use `rounded-lg` or `rounded-xl`
 `rounded-2xl` and `rounded-3xl` for one expressive focal surface, and use `rounded-full` only for
 real pills, circular buttons, avatars, and status dots. Controls and rectangular content regions
 must not look capsule-shaped.
+
+## Components and controls
+
+Use shadcn for standard controls in widgets and views: buttons, inputs, textareas, selects, sliders,
+switches, checkboxes, tabs, dialogs, menus, popovers, tooltips, and similar UI. Read the installed
+official `shadcn` skill before working with them. Reuse an existing generated component when
+possible, and add only what the applet needs.
+
+Run the CLI from the workspace root. Keep generated components inside the relevant applet kind so
+Tailwind scans their classes:
+
+```sh
+bunx --bun shadcn@latest add <components...> --cwd .moi --path views/components/ui --yes
+```
+
+Use `widgets/components/ui` for widgets. The CLI adds each component's dependencies. If
+`.moi/components.json` or `.moi/lib/utils.ts` is missing, report that the workspace scaffold is
+incomplete. Do not run shadcn initialization, invent a replacement control, or continue with native
+controls. Native controls are allowed when shadcn has no suitable component or browser-native
+behavior is required.
+
+Keep shadcn's default variants, sizing, behavior, and accessibility. Style with moi's existing
+semantic tokens. Do not replace theme CSS, add tokens, or introduce another visual system. Generated
+source still follows the applet rules: relative imports, local `cx()`, Tabler icons, and Tailwind
+styling. Keep portalled menus and overlays inside the nearest `[data-applet]` root so scoped styles
+and theme values apply.
 
 ## Interaction and motion
 
@@ -261,8 +289,9 @@ Before finishing an applet, confirm:
 - Purple appears only for a content, brand, or user reason and never as a default gradient.
 - Type, spacing, density, and expression support the content.
 - Numeric UI values use the default font, with `tabular-nums` when alignment helps.
-- Custom container outlines use a subtle `ring-border`.
+- Custom container outlines use a subtle `ring-border`; generated shadcn borders keep their defaults.
 - The layout handles realistic content and deliberate overflow.
 - Every reachable state and interaction is complete and accessible.
+- Standard controls use shadcn and cover hover, focus, disabled, open, and error states.
 - The widget or view follows its frame, sizing, and scrolling rules.
 - It feels related to the workspace without copying the quieter host shell.

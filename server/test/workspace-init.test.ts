@@ -1,11 +1,17 @@
-import { describe, expect, test } from 'bun:test'
-import { join } from 'path'
+import { afterEach, describe, expect, spyOn, test } from 'bun:test'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
-import { skillsDirFor, validateWorkspaceFolderName } from '../workspace-init'
+import { provisionWorkspace, skillsDirFor, validateWorkspaceFolderName } from '../workspace-init'
 
-// Pure helpers only — `provisionWorkspace` composes `installBundledSkills` and
-// `scaffoldMoiDir` (covered by their own tests) and would hit the network via
-// `bun install`.
+let workspaceRoot = ''
+
+afterEach(async () => {
+  if (!workspaceRoot) return
+  await rm(workspaceRoot, { recursive: true, force: true })
+  workspaceRoot = ''
+})
 
 describe('skillsDirFor', () => {
   test('claude-code (and untyped) workspaces load skills from .claude/skills', () => {
@@ -51,5 +57,55 @@ describe('validateWorkspaceFolderName', () => {
   test('rejects trailing dots and spaces', () => {
     expect(validateWorkspaceFolderName('name.')).not.toBeNull()
     expect(validateWorkspaceFolderName('name ')).not.toBeNull()
+  })
+})
+
+describe('provisionWorkspace', () => {
+  test('continues workspace initialization when the shadcn installer fails', async () => {
+    workspaceRoot = await mkdtemp(join(tmpdir(), 'moi-provision-'))
+    await mkdir(join(workspaceRoot, '.moi'), { recursive: true })
+    await Bun.write(join(workspaceRoot, '.moi', 'package.json'), '{}\n')
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+
+    try {
+      const result = await provisionWorkspace(workspaceRoot, 'codex', async (root, type) => {
+        expect(root).toBe(workspaceRoot)
+        expect(type).toBe('codex')
+        return { ok: false, reason: 'network unavailable' }
+      })
+
+      expect(result).toEqual({
+        skillsDir: join(workspaceRoot, '.agents', 'skills'),
+        scaffold: 'exists'
+      })
+      expect(await Bun.file(join(result.skillsDir, 'moi-workspace', 'SKILL.md')).exists()).toBe(
+        true
+      )
+      expect(warn).toHaveBeenCalledWith(
+        '[skills] official shadcn skill install failed: network unavailable'
+      )
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  test('continues workspace initialization when the installer process throws', async () => {
+    workspaceRoot = await mkdtemp(join(tmpdir(), 'moi-provision-'))
+    await mkdir(join(workspaceRoot, '.moi'), { recursive: true })
+    await Bun.write(join(workspaceRoot, '.moi', 'package.json'), '{}\n')
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+
+    try {
+      const result = await provisionWorkspace(workspaceRoot, 'claude-code', async () => {
+        throw new Error('spawn failed')
+      })
+
+      expect(result.scaffold).toBe('exists')
+      expect(warn).toHaveBeenCalledWith(
+        '[skills] official shadcn skill install failed: spawn failed'
+      )
+    } finally {
+      warn.mockRestore()
+    }
   })
 })

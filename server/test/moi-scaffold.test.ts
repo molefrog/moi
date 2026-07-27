@@ -39,7 +39,27 @@ describe('scaffoldMoiDir install', () => {
 
     expect(result).toBe(137)
     expect(existsSync(join(moiDir, 'package.json'))).toBe(true)
+    expect(existsSync(join(moiDir, 'components.json'))).toBe(true)
+    expect(existsSync(join(moiDir, 'tsconfig.json'))).toBe(true)
+    expect(existsSync(join(moiDir, 'lib', 'utils.ts'))).toBe(true)
     expect(existsSync(join(moiDir, 'widgets'))).toBe(true)
+
+    const packageJson = (await Bun.file(join(moiDir, 'package.json')).json()) as {
+      dependencies: Record<string, string>
+    }
+    const componentsJson = (await Bun.file(join(moiDir, 'components.json')).json()) as {
+      style: string
+      iconLibrary: string
+      tailwind: { css: string }
+    }
+    expect(packageJson.dependencies.clsx).toBeDefined()
+    expect(packageJson.dependencies['tailwind-merge']).toBeDefined()
+    expect(componentsJson).toMatchObject({
+      style: 'base-nova',
+      iconLibrary: 'tabler',
+      tailwind: { css: '' }
+    })
+    expect(await Bun.file(join(moiDir, 'lib', 'utils.ts')).text()).toContain('export const cn = cx')
     expect(await Bun.file(join(moiDir, 'applet-env.d.ts')).text()).toContain('icon?: string')
   })
 
@@ -67,5 +87,6 @@ describe('scaffoldMoiDir install', () => {
 
     expect(result).toBe('exists')
     expect(installs).toBe(0)
+    expect(existsSync(join(moiDir, 'components.json'))).toBe(false)
   })
 })

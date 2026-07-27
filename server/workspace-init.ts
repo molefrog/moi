@@ -10,6 +10,7 @@ import { join } from 'node:path'
 import type { WorkspaceType } from '@/lib/types'
 export { validateWorkspaceFolderName } from '@/lib/workspace-name'
 
+import { installOfficialShadcnSkill, type ShadcnSkillInstallResult } from './external-skills'
 import { harnessFor } from './harness/registry'
 import { scaffoldMoiDir } from './moi-scaffold'
 import { installBundledSkills } from './skills-template'
@@ -36,17 +37,43 @@ export type ProvisionResult = {
   scaffold: 'exists' | 'installing' | number
 }
 
-// Lay down everything a workspace needs: create the folder, copy the bundled
-// skills into the backend's skills dir, and bootstrap `.moi/`. Idempotent —
-// re-running refreshes skills and leaves an existing `.moi/` untouched.
+type InstallShadcnSkill = (
+  workspaceRoot: string,
+  type: WorkspaceType
+) => Promise<ShadcnSkillInstallResult>
+
+async function installShadcnBestEffort(
+  workspaceRoot: string,
+  type: WorkspaceType,
+  installShadcn: InstallShadcnSkill
+): Promise<void> {
+  try {
+    const result = await installShadcn(workspaceRoot, type)
+    if (!result.ok) {
+      console.warn(`[skills] official shadcn skill install failed: ${result.reason}`)
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.warn(`[skills] official shadcn skill install failed: ${message}`)
+  }
+}
+
+// Lay down everything a workspace needs: create the folder, copy moi's bundled
+// skill, fetch the current official shadcn skill, and bootstrap `.moi/`.
+// Idempotent — re-running refreshes skills and leaves an existing `.moi/`
+// untouched. The external skill is best-effort so offline init still works.
 // Registration in the workspace registry is a separate, caller-owned step.
 export async function provisionWorkspace(
   workspaceRoot: string,
-  type?: WorkspaceType
+  type: WorkspaceType = 'claude-code',
+  installShadcn: InstallShadcnSkill = installOfficialShadcnSkill
 ): Promise<ProvisionResult> {
   const skillsDir = skillsDirFor(workspaceRoot, type)
   await mkdir(workspaceRoot, { recursive: true })
   await installBundledSkills(skillsDir)
-  const scaffold = await scaffoldMoiDir(workspaceRoot)
+  const [scaffold] = await Promise.all([
+    scaffoldMoiDir(workspaceRoot),
+    installShadcnBestEffort(workspaceRoot, type, installShadcn)
+  ])
   return { skillsDir, scaffold }
 }

@@ -135,6 +135,8 @@ For more options, commands, use `moi help`.
 Every applet — a **Widget** or a **View** — is a default-exported React component in
 `.moi/<type>/<name>.tsx`, optionally paired with a `<name>.server.ts`. `moi bundle` compiles each
 into a live module the browser loads (edits hot-reload). Read `DESIGN.md` first.
+Before implementing interactive controls, read the installed official `shadcn` skill too. The moi
+workspace rules take precedence for applet paths, imports, icons, styling, and portalled content.
 Write normal React + Tailwind — below is only what's **moi-specific**.
 
 ## Anatomy
@@ -346,4 +348,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.8.0" />
+<moi-skill version="0.9.0" />

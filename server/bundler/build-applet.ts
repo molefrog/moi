@@ -388,8 +388,9 @@ function appletRuntimePlugin(
 // Inlined into the widget's synthetic CSS at build time so Tailwind sees the
 // theme tokens.
 const HOST_THEME_PATH = join(import.meta.dir, '..', '..', 'client', 'theme.css')
+const APPLET_SHADCN_CSS_PATH = join(import.meta.dir, 'applet-shadcn.css')
 
-// Three things matter for widget styling:
+// Five things matter for widget styling:
 //   1. The umbrella `@import 'tailwindcss'` brings in @layer theme + base +
 //      utilities — which is what spacing/color utilities like `left-2.5`,
 //      `gap-1.5`, `text-amber-500` need to resolve. The split
@@ -402,9 +403,17 @@ const HOST_THEME_PATH = join(import.meta.dir, '..', '..', 'client', 'theme.css')
 //      means the widget's CSS does NOT redefine the underlying
 //      `--background`/`--foreground` variables — those stay host-owned and
 //      the widget picks them up from `:root` at runtime.
-//   3. Tailwind's auto-detection treats `.moi/` as a hidden directory
+//   3. Tailwind preflight resets border color to `currentColor`. The standard
+//      shadcn base rule in applet-shadcn.css restores semantic border and
+//      outline colors before the compiled CSS is scoped to the applet.
+//   4. Tailwind's auto-detection treats `.moi/` as a hidden directory
 //      and skips it. An explicit `@source` bypasses the dot-dir + gitignore
 //      filters.
+//   5. Generated shadcn components use named data variants such as
+//      `data-horizontal:` and `data-open:`. Their definitions live in
+//      `shadcn/tailwind.css`, while their default transition utilities come
+//      from `tw-animate-css`. applet-shadcn.css resolves both from moi's pinned
+//      dependencies so workspaces need no extra CSS setup.
 //
 // Important: the synthetic CSS must live on disk in the `file` namespace
 // because `bun-plugin-tailwind`'s `onLoad` only matches that namespace —
@@ -424,6 +433,7 @@ async function writeSyntheticTailwindCss(
   const cssPath = join(buildDir, `${kind}-tailwind.css`)
   const contents = [
     `@import 'tailwindcss';`,
+    `@import ${JSON.stringify(APPLET_SHADCN_CSS_PATH)};`,
     await Bun.file(HOST_THEME_PATH).text(),
     // Mirror the host's class-based dark mode (client/index.css) so an applet's
     // `dark:` variants flip with the app theme. Without this Tailwind falls

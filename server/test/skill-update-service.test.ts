@@ -45,17 +45,36 @@ describe('workspace skill update service', () => {
     })
   }
 
-  test('updates bundled skills and preserves custom skills', async () => {
+  test('updates bundled skills, preserves custom skills, and refreshes shadcn', async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-update-'))
     await writeInstalledVersion(tempRoot, 'codex', '0.7.1')
     const customSkill = join(skillsDirFor(tempRoot, 'codex'), 'custom', 'SKILL.md')
     await mkdir(join(customSkill, '..'), { recursive: true })
     await Bun.write(customSkill, 'custom\n')
+    const calls: Array<[string, WorkspaceType]> = []
 
-    const result = await updateWorkspaceSkills(tempRoot, 'codex')
+    const result = await updateWorkspaceSkills(tempRoot, 'codex', async (root, type) => {
+      calls.push([root, type])
+      return { ok: true }
+    })
 
     expect(result.before.find(skill => skill.name === 'moi-workspace')?.installed).toBe('0.7.1')
     expect(result.status.updateAvailable).toBe(false)
+    expect(result.shadcn).toEqual({ ok: true })
+    expect(calls).toEqual([[tempRoot, 'codex']])
     expect(await Bun.file(customSkill).text()).toBe('custom\n')
+  })
+
+  test('reports a shadcn failure after updating the bundled skill', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-update-failure-'))
+    await writeInstalledVersion(tempRoot, 'claude-code', '0.7.1')
+
+    const result = await updateWorkspaceSkills(tempRoot, 'claude-code', async () => ({
+      ok: false,
+      reason: 'network unavailable'
+    }))
+
+    expect(result.status.updateAvailable).toBe(false)
+    expect(result.shadcn).toEqual({ ok: false, reason: 'network unavailable' })
   })
 })
