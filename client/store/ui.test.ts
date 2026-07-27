@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 
+import { createUiStore } from './ui'
+
 const storedValues = new Map<string, string>()
 const localStorage = {
   getItem: (key: string) => storedValues.get(key) ?? null,
@@ -7,12 +9,7 @@ const localStorage = {
   removeItem: (key: string) => storedValues.delete(key)
 }
 
-Object.defineProperty(globalThis, 'window', {
-  configurable: true,
-  value: { localStorage }
-})
-
-const { useUiStore } = await import('./ui')
+const useUiStore = createUiStore(localStorage)
 
 beforeEach(() => {
   storedValues.clear()
