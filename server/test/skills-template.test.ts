@@ -14,25 +14,22 @@ afterEach(async () => {
 })
 
 describe('installBundledSkills', () => {
-  test('removes retired files while preserving unrelated workspace skills', async () => {
+  test('installs bundled skills while preserving unrelated workspace files', async () => {
     targetSkillsDir = await mkdtemp(join(tmpdir(), 'moi-skills-'))
     const workspaceSkillDir = join(targetSkillsDir, 'moi-workspace')
     const customSkillDir = join(targetSkillsDir, 'custom-skill')
-    const retiredViewDesign = join(workspaceSkillDir, 'VIEW-DESIGN.md')
     const workspaceNote = join(workspaceSkillDir, 'NOTES.md')
     const customSkill = join(customSkillDir, 'SKILL.md')
 
     await mkdir(workspaceSkillDir, { recursive: true })
     await mkdir(customSkillDir, { recursive: true })
     await Promise.all([
-      Bun.write(retiredViewDesign, 'Old view guidance\n'),
       Bun.write(workspaceNote, 'Keep this note\n'),
       Bun.write(customSkill, 'Keep this skill\n')
     ])
 
     await installBundledSkills(targetSkillsDir)
 
-    expect(await Bun.file(retiredViewDesign).exists()).toBe(false)
     expect(await Bun.file(join(workspaceSkillDir, 'DESIGN.md')).exists()).toBe(true)
     expect(await Bun.file(join(workspaceSkillDir, 'SKILL.md')).text()).toContain(
       '<moi-skill version="0.8.0" />'
