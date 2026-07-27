@@ -34,7 +34,11 @@ export function AppRouter() {
     <Switch>
       <Route path="/" component={HomeRoute} />
       <Route path="/dev/*?" component={DevLazy} />
-      <Route path="/workspace/:id">
+      {/* The wildcard is the workspace tab id (`view:orders`, `widgets`, …) —
+          the URL is the tab address, read downstream with `useParams`. This
+          pattern is its only definition. Keyed by workspace id only, so tab
+          switches never remount the workspace tree. */}
+      <Route path="/workspace/:id/*?">
         {(params: { id: string }) => <WorkspaceRoute key={params.id} id={params.id} />}
       </Route>
     </Switch>

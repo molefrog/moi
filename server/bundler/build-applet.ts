@@ -231,17 +231,42 @@ export function rpc(module, name) {
 }
 `
 
-// The `moi` virtual module — the applet-facing runtime API. Today just
-// `fileUrl(path)`, which maps a workspace-relative path to its streaming URL
+// The `moi` virtual module — the applet-facing runtime API.
+//
+// `fileUrl(path)` maps a workspace-relative path to its streaming URL
 // (`/api/workspaces/<id>/fs/<path>`). Same sentinel base as RPC; the path is
 // per-segment URL-encoded so spaces / unicode in filenames survive. A leading
 // slash is stripped so both `clips/a.mp4` and `/clips/a.mp4` work.
+//
+// `focusTab(tab, params?)` forwards to this bundle's host-attached bridge —
+// client-local replace-navigation to a workspace tab, params delivered to the
+// target view via navigation state. This virtual module is INLINED PER BUNDLE,
+// so `bridge` is private to one applet: the host attaches it right after the
+// dynamic import and neuters it on invalidation (see
+// client/features/applets/applet-runtime.ts). Optional-chained so calls no-op
+// before attach and outside the moi host. The `__` exports are host wiring,
+// surfaced from the bundle entry below — they are deliberately NOT part of the
+// author-facing `declare module 'moi'` ambient types (server/moi-scaffold.ts).
 const MOI_MODULE_SOURCE = `
 const BASE = ${JSON.stringify(APPLET_API_BASE_SENTINEL)};
+
+let bridge = null;
+
+export function __attachBridge(next) {
+  bridge = next;
+}
+
+export function __getBridge() {
+  return bridge;
+}
 
 export function fileUrl(path) {
   const clean = String(path).replace(/^\\/+/, "");
   return BASE + "/fs/" + clean.split("/").map(encodeURIComponent).join("/");
+}
+
+export function focusTab(tab, params) {
+  bridge?.focusTab(tab, params);
 }
 `
 
@@ -437,7 +462,13 @@ function widgetEntryPlugin(widgetPath: string, syntheticCssPath: string): BunPlu
       build.onLoad({ filter: /.*/, namespace: 'widget-entry' }, () => ({
         contents: [
           `import ${JSON.stringify(syntheticCssPath)};`,
-          `export { default } from ${JSON.stringify(widgetPath)};`
+          `export { default } from ${JSON.stringify(widgetPath)};`,
+          // Surface the bridge wiring on every bundle's `index.js` so the host
+          // can attach after dynamic import. Bun dedupes the `moi` virtual
+          // module within a bundle, so this re-export and the applet's own
+          // `import { focusTab } from 'moi'` share one module instance — the
+          // attached bridge is the one focusTab reads.
+          `export { __attachBridge, __getBridge } from "moi";`
         ].join('\n'),
         loader: 'js'
       }))

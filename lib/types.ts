@@ -447,6 +447,11 @@ export type WorkspaceTabId =
   | `view:${string}`
   | `view-builder:${string}`
 
+// Open tabs plus the workspace's saved DEFAULT tab. `active` is not live focus
+// state — the live active tab is each browser tab's URL (`/workspace/:id/<tab>`).
+// The saved default answers one question: where a bare `/workspace/:id` lands
+// (and which row `moi tabs` marks). Navigating writes it, so it tracks the last
+// tab switch, last writer wins across clients.
 export type WorkspaceTabsState = {
   open: WorkspaceTabId[]
   active: WorkspaceTabId

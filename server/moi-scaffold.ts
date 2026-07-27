@@ -60,6 +60,10 @@ declare module 'moi' {
   // Absolute URL to a workspace file, streamed by the server. Pass a
   // workspace-relative path (e.g. 'clips/001.mp4'). Media/asset files only.
   export function fileUrl(path: string): string
+  // Switch the workspace to a tab (replace navigation). \`params\` reach the
+  // target view as its \`params\` prop — JSON-plain values only. No-ops outside
+  // the moi host. Tab ids: 'agent' | 'widgets' | 'scratchpad' | 'view:<id>'.
+  export function focusTab(tab: string, params?: Record<string, unknown>): void
   export type WidgetConfig = {
     rowSpan: 1 | 2 | 3 | 4
     colSpan: 1 | 2 | 3 | 4
