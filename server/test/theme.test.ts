@@ -18,7 +18,7 @@ describe('color themes', () => {
   test('derives all theme colors from the background', () => {
     expect(deriveThemeColors({ background: '#fdf2f4' })).toEqual({
       background: '#fdf2f4',
-      foreground: 'color-mix(in oklch, oklch(from #fdf2f4 l calc(c * 10) h) 28%, black 72%)',
+      foreground: 'color-mix(in oklch, oklch(from #fdf2f4 l calc(c * 10) h) 32%, black 68%)',
       muted: 'color-mix(in oklch, var(--background) 95%, var(--foreground) 5%)',
       mutedForeground: 'color-mix(in oklch, var(--background) 58%, var(--foreground) 42%)',
       accent:

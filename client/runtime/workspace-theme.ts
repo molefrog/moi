@@ -2,13 +2,21 @@ import { useEffect } from 'react'
 import type { CSSProperties } from 'react'
 
 import { FONT_THEMES, THEME_COLOR_TOKENS } from '@/lib/themes'
-import type { ThemeColorOverrides, ThemeColorToken } from '@/lib/themes'
+import type { ThemeColorToken } from '@/lib/themes'
 import type { WorkspaceLayout } from '@/lib/types'
 
 const FONT_LINK_ID = 'mei-fonts'
+const WORKSPACE_FONT_PROPERTIES = [
+  ['sans', '--sans'],
+  ['mono', '--mono']
+] as const
 const WORKSPACE_COLOR_PROPERTIES = THEME_COLOR_TOKENS.map(
   token => [token, themeColorProperty(token)] as const
 )
+const WORKSPACE_THEME_PROPERTIES = [
+  ...WORKSPACE_FONT_PROPERTIES.map(([, property]) => property),
+  ...WORKSPACE_COLOR_PROPERTIES.map(([, property]) => property)
+]
 
 type WorkspaceThemeStyle = CSSProperties & {
   [property: `--${string}`]: string | undefined
@@ -19,22 +27,24 @@ function themeColorProperty(token: ThemeColorToken): `--${string}` {
   return `--${name}`
 }
 
-export function getWorkspaceThemeStyle(
-  theme: ThemeColorOverrides | undefined
-): WorkspaceThemeStyle {
+export function getWorkspaceThemeStyle(theme: WorkspaceLayout['theme']): WorkspaceThemeStyle {
   const style: WorkspaceThemeStyle = {}
+  const font = FONT_THEMES[theme?.font ?? 'default'] ?? FONT_THEMES.default
+  for (const [token, property] of WORKSPACE_FONT_PROPERTIES) {
+    style[property] = font[token]
+  }
   for (const [token, property] of WORKSPACE_COLOR_PROPERTIES) {
     style[property] = theme?.[token]
   }
   return style
 }
 
-function useDocumentWorkspaceThemeStyle(theme: ThemeColorOverrides | undefined) {
+function useDocumentWorkspaceThemeStyle(theme: WorkspaceLayout['theme']) {
   useEffect(() => {
     const element = document.documentElement
     const style = getWorkspaceThemeStyle(theme)
 
-    for (const [, property] of WORKSPACE_COLOR_PROPERTIES) {
+    for (const property of WORKSPACE_THEME_PROPERTIES) {
       const value = style[property]
       if (value) {
         element.style.setProperty(property, value)
@@ -44,7 +54,7 @@ function useDocumentWorkspaceThemeStyle(theme: ThemeColorOverrides | undefined) 
     }
 
     return () => {
-      for (const [, property] of WORKSPACE_COLOR_PROPERTIES) {
+      for (const property of WORKSPACE_THEME_PROPERTIES) {
         element.style.removeProperty(property)
       }
     }
@@ -58,11 +68,7 @@ export function useWorkspaceTheme(theme: WorkspaceLayout['theme']) {
   useDocumentWorkspaceThemeStyle(theme)
 
   useEffect(() => {
-    const element = document.documentElement
     const config = FONT_THEMES[font] ?? FONT_THEMES.default
-
-    element.style.setProperty('--font-sans', config.sans)
-    element.style.setProperty('--font-mono', config.mono)
 
     const existing = document.getElementById(FONT_LINK_ID) as HTMLLinkElement | null
     if (!config.googleFontsQuery) {
@@ -81,8 +87,6 @@ export function useWorkspaceTheme(theme: WorkspaceLayout['theme']) {
     }
 
     return () => {
-      element.style.removeProperty('--font-sans')
-      element.style.removeProperty('--font-mono')
       document.getElementById(FONT_LINK_ID)?.remove()
     }
   }, [font])

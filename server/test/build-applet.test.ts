@@ -55,6 +55,20 @@ describe('buildApplet', () => {
     expect(result.js).toContain('widget:hello')
   })
 
+  test('maps widget and view fonts to workspace-owned variables', async () => {
+    const [widget, view] = await Promise.all([
+      buildApplet(join(FIXTURES, 'hello.tsx')),
+      buildApplet(join(FIXTURES, 'hello.tsx'), undefined, 'view')
+    ])
+
+    for (const result of [widget, view]) {
+      expect(result.js).toContain('font-family: var(--sans)')
+      expect(result.js).toContain('font-family: var(--mono)')
+      expect(result.js).not.toContain('--font-sans: ui-sans-serif')
+      expect(result.js).not.toContain('--font-mono: ui-monospace')
+    }
+  })
+
   test('rewrites .server.ts imports to rpc() stubs', async () => {
     const result = await buildApplet(join(FIXTURES, 'with-server.tsx'))
 

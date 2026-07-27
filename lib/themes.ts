@@ -42,7 +42,7 @@ export const FONT_THEMES: Record<FontTheme, FontThemeConfig> = {
     feel: 'Manrope',
     sans: 'Manrope',
     mono: 'Geist Mono',
-    googleFontsQuery: 'Manrope:wght@400;500;600&family=DM+Mono:wght@400;500'
+    googleFontsQuery: 'Manrope:wght@400;500;600&family=Geist+Mono:wght@400;500'
   },
   awkward: {
     label: 'Awkward',

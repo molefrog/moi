@@ -31,6 +31,8 @@
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
   --radius: 0.625rem;
+  --sans: ui-sans-serif, system-ui, sans-serif;
+  --mono: ui-monospace, monospace;
 
   /* Workspace page layout — single source of truth for the widget/chat panel.
      Read by routes/workspace/[id].tsx; don't hardcode equivalents. (The app
@@ -73,14 +75,7 @@
   --ring: oklch(0.556 0 0);
 }
 
-/* Font vars are NOT inline so Tailwind generates var(--font-*) references,
-   allowing runtime overrides via document.documentElement.style.setProperty */
-@theme {
-  --font-sans: ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, monospace;
-}
-
-/* Color/radius/shadow tokens — shared with widget bundles via theme.css */
+/* Font/color/radius/shadow tokens — shared with applet bundles via theme.css */
 @import './theme.css';
 
 /* Dragged card floats above all others */
