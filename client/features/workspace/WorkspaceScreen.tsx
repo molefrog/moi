@@ -265,10 +265,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const [floatingChatOpen, setFloatingChatOpen] = useState(false)
   const [chatFocusRequest, setChatFocusRequest] = useState(0)
 
-  // Theme is scoped to this wrapper, not :root — the sidebar keeps the default
-  // tokens. The floating chat portals into the same element so it inherits them.
-  const themeRef = useRef<HTMLDivElement>(null)
-  useWorkspaceTheme(layout.theme, themeRef)
+  useWorkspaceTheme(layout.theme)
 
   // Split needs the open set to decide whether it's available at all, and the
   // navigation hook needs split to resolve the active tab — so the open set is
@@ -578,13 +575,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   )
 
   return (
-    // Themed wrapper: scoped CSS vars (bg/fg/font) live here so the panel — and
-    // the portaled floating chat — pick up the workspace theme, while the
-    // sidebar outside stays default.
-    <div
-      ref={themeRef}
-      className="relative flex h-full min-h-0 flex-col bg-background font-sans text-foreground"
-    >
+    <div className="relative flex h-full min-h-0 flex-col bg-background font-sans text-foreground">
       <div ref={rowRef} className="flex min-h-0 flex-1">
         {/* Full-screen: whole panel. Split: the left content column. */}
         {(mode === 'fullscreen' || hasWorkspaceContent) && (
@@ -688,7 +679,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               setChatFocusRequest(request => request + 1)
             }
           }}
-          container={themeRef}
         >
           {onClose => (
             <ChatPanel

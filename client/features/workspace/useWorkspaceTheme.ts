@@ -1,36 +1,25 @@
-import { type RefObject, useEffect } from 'react'
+import { useEffect } from 'react'
 
 import { FONT_THEMES } from '@/lib/themes'
 import type { WorkspaceLayout } from '@/lib/types'
 
-const COLOR_OVERRIDES = ['background', 'foreground'] as const
+const COLOR_OVERRIDES = ['background', 'foreground', 'muted'] as const
 const FONT_LINK_ID = 'mei-fonts'
 
-// Applies the workspace theme (font + color overrides) to a target element —
-// the workspace panel, NOT :root — so the sidebar and other pages keep the
-// default tokens. CSS custom properties inherit and every Tailwind token is a
-// `var(--…)` reference, so `bg-background` / `text-foreground` / `font-sans`
-// inside the subtree resolve the scoped values (the element re-declares
-// `font-family: var(--font-sans)` via the `font-sans` class so the font
-// re-resolves locally rather than inheriting the already-resolved root font).
+// Applies the active workspace theme to the app root so the workspace, sidebar,
+// and body-level portals all resolve the same Tailwind tokens.
 //
-// Everything is torn down on unmount: the inline vars are removed (the element
-// usually unmounts with the page anyway) and the injected Google Fonts <link>
-// is dropped, so leaving the workspace leaves no global residue.
-export function useWorkspaceTheme(
-  theme: WorkspaceLayout['theme'],
-  target: RefObject<HTMLElement | null>
-) {
+// Everything is torn down on unmount: the root vars and injected Google Fonts
+// <link> are removed, so pages outside a workspace return to the app defaults.
+export function useWorkspaceTheme(theme: WorkspaceLayout['theme']) {
   const font = theme?.font ?? 'default'
-  // Read the scoped color overrides up front so the color effect below depends
-  // on these exact values rather than the whole `theme` object (it accesses
-  // them via a dynamic key, which the deps linter can't see through).
+  // Read the color overrides up front so the color effect below depends on
+  // these exact values rather than the whole `theme` object.
   const background = theme?.background
   const foreground = theme?.foreground
 
   useEffect(() => {
-    const el = target.current
-    if (!el) return
+    const el = document.documentElement
     const config = FONT_THEMES[font] ?? FONT_THEMES.default
 
     el.style.setProperty('--font-sans', config.sans)
@@ -58,12 +47,17 @@ export function useWorkspaceTheme(
       el.style.removeProperty('--font-sans')
       el.style.removeProperty('--font-mono')
     }
-  }, [font, target])
+  }, [font])
 
   useEffect(() => {
-    const el = target.current
-    if (!el) return
-    const overrides = { background, foreground }
+    const el = document.documentElement
+    const overrides = {
+      background,
+      foreground,
+      muted: background
+        ? 'color-mix(in oklch, var(--background) 5%, var(--foreground) 5%)'
+        : undefined
+    }
     for (const key of COLOR_OVERRIDES) {
       const value = overrides[key]
       if (value) {
@@ -75,7 +69,7 @@ export function useWorkspaceTheme(
     return () => {
       for (const key of COLOR_OVERRIDES) el.style.removeProperty(`--${key}`)
     }
-  }, [background, foreground, target])
+  }, [background, foreground])
 
   // Drop the shared font <link> when the workspace unmounts.
   useEffect(() => () => document.getElementById(FONT_LINK_ID)?.remove(), [])
