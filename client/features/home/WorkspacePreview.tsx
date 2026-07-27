@@ -117,7 +117,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
   const themeStyle = getWorkspaceThemeStyle(theme)
 
   return (
-    <div ref={ref} style={themeStyle} className="relative h-40 w-full">
+    <div ref={ref} style={themeStyle} className="relative h-40 w-full font-sans">
       <svg
         viewBox={`0 0 ${FOLDER.width} ${FOLDER.height}`}
         preserveAspectRatio="none"

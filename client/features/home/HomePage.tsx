@@ -18,6 +18,7 @@ import {
   CollapsibleTrigger
 } from '@/client/components/ui/collapsible'
 import { cn } from '@/client/lib/cn'
+import { getWorkspaceThemeStyle, usePreloadWorkspaceFonts } from '@/client/runtime/workspace-theme'
 import { useUiStore } from '@/client/store/ui'
 import {
   WorkspaceAgentIcons,
@@ -29,6 +30,7 @@ import type { DiscoveredWorkspace, WorkspaceEntry } from '@/lib/types'
 import { WorkspacePreview } from './WorkspacePreview'
 
 export function HomePage() {
+  usePreloadWorkspaceFonts()
   const [, navigate] = useLocation()
   const workspacesQuery = useWorkspaces()
   const discoveredQuery = useDiscoveredWorkspaces()
@@ -158,6 +160,7 @@ type WorkspaceCardProps = {
 function WorkspaceCard({ workspace }: WorkspaceCardProps) {
   const name = workspaceDisplayName(workspace)
   const previewQuery = useWorkspacePreview(workspace.id)
+  const theme = previewQuery.data?.theme
   const updatedAt = previewQuery.data?.updatedAt ?? new Date(workspace.addedAt).getTime()
 
   return (
@@ -167,7 +170,10 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
     >
       <WorkspacePreview workspaceId={workspace.id} />
       <div className="flex min-w-0 flex-col gap-2 px-2 pb-2">
-        <div className="flex min-w-0 items-center gap-1.5">
+        <div
+          className="flex min-w-0 items-center gap-1.5 font-sans"
+          style={getWorkspaceThemeStyle(theme)}
+        >
           <img
             src={workspace.icon ?? workspaceProviderIcon[workspace.type ?? 'claude-code']}
             alt=""

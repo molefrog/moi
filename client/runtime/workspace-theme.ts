@@ -6,6 +6,11 @@ import type { ThemeColorToken } from '@/lib/themes'
 import type { WorkspaceLayout } from '@/lib/types'
 
 const FONT_LINK_ID = 'mei-fonts'
+const FONT_PREVIEW_LINK_ID = 'mei-font-previews'
+const ALL_FONTS_QUERY = Object.values(FONT_THEMES)
+  .map(theme => theme.googleFontsQuery)
+  .filter(Boolean)
+  .join('&family=')
 const WORKSPACE_FONT_PROPERTIES = [
   ['sans', '--sans'],
   ['mono', '--mono']
@@ -38,6 +43,18 @@ export function getWorkspaceThemeStyle(theme: WorkspaceLayout['theme']): Workspa
     style[property] = colors?.[token]
   }
   return style
+}
+
+export function usePreloadWorkspaceFonts() {
+  useEffect(() => {
+    if (document.getElementById(FONT_PREVIEW_LINK_ID)) return
+
+    const link = document.createElement('link')
+    link.id = FONT_PREVIEW_LINK_ID
+    link.rel = 'stylesheet'
+    link.href = `https://fonts.googleapis.com/css2?family=${ALL_FONTS_QUERY}&display=swap`
+    document.head.appendChild(link)
+  }, [])
 }
 
 function useDocumentWorkspaceThemeStyle(theme: WorkspaceLayout['theme']) {

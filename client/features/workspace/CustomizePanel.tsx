@@ -1,30 +1,13 @@
-import { type CSSProperties, type ReactNode, type Ref, useEffect } from 'react'
+import type { CSSProperties, ReactNode, Ref } from 'react'
 
 import { IconCircleCheckFilled } from '@tabler/icons-react'
 
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { BottomPanel } from '@/client/components/shared/BottomPanel'
 import { cn } from '@/client/lib/cn'
-import { getWorkspaceThemeStyle } from '@/client/runtime/workspace-theme'
+import { getWorkspaceThemeStyle, usePreloadWorkspaceFonts } from '@/client/runtime/workspace-theme'
 import { COLOR_THEMES, type ColorThemeConfig, FONT_THEMES } from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/types'
-
-const ALL_FONT_PREVIEW_ID = 'mei-font-previews'
-const ALL_FONTS_QUERY = Object.values(FONT_THEMES)
-  .map(f => f.googleFontsQuery)
-  .filter(Boolean)
-  .join('&family=')
-
-function usePreloadAllFonts() {
-  useEffect(() => {
-    if (document.getElementById(ALL_FONT_PREVIEW_ID)) return
-    const link = document.createElement('link')
-    link.id = ALL_FONT_PREVIEW_ID
-    link.rel = 'stylesheet'
-    link.href = `https://fonts.googleapis.com/css2?family=${ALL_FONTS_QUERY}&display=swap`
-    document.head.appendChild(link)
-  }, [])
-}
 
 const FONT_OPTIONS = Object.entries(FONT_THEMES) as [FontTheme, (typeof FONT_THEMES)[FontTheme]][]
 
@@ -84,7 +67,7 @@ type CustomizePanelProps = {
 }
 
 export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
-  usePreloadAllFonts()
+  usePreloadWorkspaceFonts()
   const { layout, setLayout } = useWorkspaceLayoutCtx()
   const currentFont = layout.theme?.font ?? 'default'
   const currentPrimary = layout.theme?.primary
