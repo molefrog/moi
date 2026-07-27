@@ -24,12 +24,11 @@ function normalizeLayout(parsed: Record<string, unknown>): WorkspaceLayout {
   delete layout.chatMode
   const normalized = layout as unknown as WorkspaceLayout
   const theme = normalized.theme
-  if (theme?.background && theme.foreground) {
+  if (theme?.background) {
     Object.assign(
       theme,
       deriveThemeColors({
-        background: theme.background,
-        foreground: theme.foreground
+        background: theme.background
       })
     )
   }

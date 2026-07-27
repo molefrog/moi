@@ -181,8 +181,7 @@ describe('getWorkspacePreview', () => {
           theme: {
             font: 'default',
             ...deriveThemeColors({
-              background: '#fdf2f4',
-              foreground: '#3b1c26'
+              background: '#fdf2f4'
             })
           }
         })

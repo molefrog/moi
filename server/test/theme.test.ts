@@ -15,13 +15,14 @@ import { loadLayout, saveLayout } from '../layout'
 import { applyThemeUpdate, matchColorTheme } from '../theme'
 
 describe('color themes', () => {
-  test('derives all theme colors from the background and foreground', () => {
-    expect(deriveThemeColors({ background: '#fdf2f4', foreground: '#3b1c26' })).toEqual({
+  test('derives all theme colors from the background', () => {
+    expect(deriveThemeColors({ background: '#fdf2f4' })).toEqual({
       background: '#fdf2f4',
-      foreground: '#3b1c26',
-      muted: 'color-mix(in oklch, #fdf2f4 95%, #3b1c26 5%)',
-      mutedForeground: 'color-mix(in oklch, #fdf2f4 58%, #3b1c26 42%)',
-      accent: 'color-mix(in oklch, oklch(from #fdf2f4 l calc(c * 10) h) 6%, #3b1c26 6%)'
+      foreground: 'color-mix(in oklch, oklch(from #fdf2f4 l calc(c * 10) h) 28%, black 72%)',
+      muted: 'color-mix(in oklch, var(--background) 95%, var(--foreground) 5%)',
+      mutedForeground: 'color-mix(in oklch, var(--background) 58%, var(--foreground) 42%)',
+      accent:
+        'color-mix(in oklch, oklch(from var(--background) l calc(c * 10) h) 6%, var(--foreground) 6%)'
     })
   })
 
@@ -37,8 +38,7 @@ describe('color themes', () => {
       if (!preset.background || !preset.foreground) continue
       expect(getThemeColorOverrides(preset)).toEqual(
         deriveThemeColors({
-          background: preset.background,
-          foreground: preset.foreground
+          background: preset.background
         })
       )
     }
@@ -118,9 +118,11 @@ describe('matchColorTheme', () => {
     expect(matchColorTheme(undefined, undefined)).toBe('default')
   })
 
-  test('matching hex maps to preset key', () => {
-    expect(matchColorTheme('#faf8f5', '#2c2825')).toBe('paper')
-    expect(matchColorTheme('#f0faf6', '#1a3028')).toBe('mint')
+  test('matching generated colors map to preset keys', () => {
+    expect(matchColorTheme(COLOR_THEMES.paper.background, COLOR_THEMES.paper.foreground)).toBe(
+      'paper'
+    )
+    expect(matchColorTheme(COLOR_THEMES.mint.background, COLOR_THEMES.mint.foreground)).toBe('mint')
   })
 
   test('non-matching custom values return null', () => {

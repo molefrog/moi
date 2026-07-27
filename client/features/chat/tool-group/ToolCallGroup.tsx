@@ -110,12 +110,18 @@ function ToolRow({ isFirst, isLast, call, leading, marker, name, brief, preview 
           {leading}
           <span className="shrink-0 text-xs font-medium whitespace-nowrap">{name}</span>
           {brief && (
-            <span className="min-w-0 self-baseline truncate text-[12px] text-ring">{brief}</span>
+            <span className="min-w-0 self-baseline truncate text-[12px] text-muted-foreground">
+              {brief}
+            </span>
           )}
           {/* Dotted rows spin at the node instead; only icon (MCP) rows, whose
               node can't spin, keep a header spinner. */}
           {isRunning && marker && (
-            <IconLoader2 size={12} stroke={1.75} className="shrink-0 animate-spin text-ring" />
+            <IconLoader2
+              size={12}
+              stroke={1.75}
+              className="shrink-0 animate-spin text-muted-foreground"
+            />
           )}
           {hasBody && <RowChevron open={open} />}
         </button>

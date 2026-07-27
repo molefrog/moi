@@ -37,7 +37,7 @@ export function ChatPopup({ open, onOpenChange, onOpenChangeComplete, children }
               <Button
                 variant="outline"
                 size="icon-lg"
-                className="shadow-md hover:shadow-lg"
+                className="bg-card shadow-md hover:shadow-lg"
                 aria-label="Agent"
               >
                 <IconGhost stroke={1.75} />

@@ -57,17 +57,16 @@ export type ColorTheme = 'default' | 'paper' | 'sand' | 'rose' | 'lavender' | 'm
 
 type ThemeColorSource = {
   background: string
-  foreground: string
 }
 
 const THEME_COLOR_DERIVATIONS = {
   background: ({ background }) => background,
-  foreground: ({ foreground }) => foreground,
-  muted: ({ background, foreground }) => `color-mix(in oklch, ${background} 95%, ${foreground} 5%)`,
-  mutedForeground: ({ background, foreground }) =>
-    `color-mix(in oklch, ${background} 58%, ${foreground} 42%)`,
-  accent: ({ background, foreground }) =>
-    `color-mix(in oklch, oklch(from ${background} l calc(c * 10) h) 6%, ${foreground} 6%)`
+  foreground: ({ background }) =>
+    `color-mix(in oklch, oklch(from ${background} l calc(c * 10) h) 32%, black 68%)`,
+  muted: () => 'color-mix(in oklch, var(--background) 95%, var(--foreground) 5%)',
+  mutedForeground: () => 'color-mix(in oklch, var(--background) 58%, var(--foreground) 42%)',
+  accent: () =>
+    'color-mix(in oklch, oklch(from var(--background) l calc(c * 10) h) 6%, var(--foreground) 6%)'
 } satisfies Record<string, (source: ThemeColorSource) => string>
 
 export type ThemeColorToken = keyof typeof THEME_COLOR_DERIVATIONS
@@ -103,26 +102,26 @@ export const COLOR_THEMES: Record<ColorTheme, ColorThemeConfig> = {
   default: { label: 'Default' },
   paper: {
     label: 'Paper',
-    ...deriveThemeColors({ background: '#faf8f5', foreground: '#2c2825' })
+    ...deriveThemeColors({ background: '#faf8f5' })
   },
   sand: {
     label: 'Sand',
-    ...deriveThemeColors({ background: '#f5f0e8', foreground: '#3d3529' })
+    ...deriveThemeColors({ background: '#f5f0e8' })
   },
   rose: {
     label: 'Rose',
-    ...deriveThemeColors({ background: '#fdf2f4', foreground: '#3b1c26' })
+    ...deriveThemeColors({ background: '#fdf2f4' })
   },
   lavender: {
     label: 'Lavender',
-    ...deriveThemeColors({ background: '#f4f2fb', foreground: '#2b2640' })
+    ...deriveThemeColors({ background: '#f4f2fb' })
   },
   mint: {
     label: 'Mint',
-    ...deriveThemeColors({ background: '#f0faf6', foreground: '#1a3028' })
+    ...deriveThemeColors({ background: '#f0faf6' })
   },
   sky: {
     label: 'Sky',
-    ...deriveThemeColors({ background: '#f0f6fc', foreground: '#1a2a3b' })
+    ...deriveThemeColors({ background: '#f0f6fc' })
   }
 }
