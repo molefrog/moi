@@ -154,6 +154,62 @@ describe('dependency staleness', () => {
     expect((await build())[0]).toMatchObject({ status: 'skipped' })
   })
 
+  test('a dependency deleted since the last build marks the applet stale', async () => {
+    seedGraph()
+
+    expect((await build())[0]).toMatchObject({ name: 'clock', status: 'built' })
+    expect((await build())[0]).toMatchObject({ status: 'skipped' })
+
+    // `clock.tsx` itself is untouched and still older than the built entry, so
+    // the only signal that `./_utils` is gone is the unresolved import. Skipping
+    // here would keep serving the last good bundle and hide the broken import.
+    rmSync(join(WS, '.moi', 'widgets', '_utils.ts'))
+    expect((await build())[0]).toMatchObject({ name: 'clock', status: 'failed' })
+  })
+
+  test('extensionless, directory, and non-TS dependencies resolve the way Bun resolves them', async () => {
+    // Every import here misses a naive `.tsx`/`.ts`/`index.tsx` candidate list:
+    // it takes Bun's own resolver to land on the file the build reads.
+    seed(
+      '.moi/widgets/chart.tsx',
+      [
+        `import data from './_data'`, // → _data.json
+        `import { helper } from '../lib/helpers'`, // → helpers/index.js
+        `import { scale } from '../lib/scale'`, // → scale.mjs → ratio.mjs
+        `import { fmt } from './_fmt.js'`, // → _fmt.ts (TS .js rewrite)
+        `import { tint } from '../lib/paint'`, // → paint/main.js via package.json
+        `export default function Chart() { return <div>{fmt(data.n * scale + helper) + tint}</div> }`
+      ].join('\n')
+    )
+    seed('.moi/widgets/_data.json', '{ "n": 2 }')
+    seed('.moi/widgets/_fmt.ts', `export const fmt = (n: number) => String(n)`)
+    seed('.moi/lib/helpers/index.js', `export const helper = 3`)
+    // A non-TS module is walked like any other, so its own imports count too.
+    seed(
+      '.moi/lib/scale.mjs',
+      [`import { ratio } from './ratio.mjs'`, `export const scale = ratio`].join('\n')
+    )
+    seed('.moi/lib/ratio.mjs', `export const ratio = 4`)
+    seed('.moi/lib/paint/package.json', `{ "main": "main.js" }`)
+    seed('.moi/lib/paint/main.js', `export const tint = 'red'`)
+
+    expect((await build())[0]).toMatchObject({ name: 'chart', status: 'built' })
+    expect((await build())[0]).toMatchObject({ status: 'skipped' })
+
+    // Each one, edited on its own, must mark the applet stale.
+    for (const [rel, contents] of [
+      ['.moi/widgets/_data.json', '{ "n": 5 }'],
+      ['.moi/lib/helpers/index.js', `export const helper = 6`],
+      ['.moi/lib/ratio.mjs', `export const ratio = 7`],
+      ['.moi/lib/paint/main.js', `export const tint = 'blue'`],
+      ['.moi/widgets/_fmt.ts', `export const fmt = (n: number) => \`\${n}\``]
+    ] as const) {
+      seed(rel, contents)
+      expect((await build())[0]).toMatchObject({ status: 'built' })
+      expect((await build())[0]).toMatchObject({ status: 'skipped' })
+    }
+  })
+
   test('a graph larger than the file cap always rebuilds (fails toward stale)', async () => {
     // 130+ chained modules exceed MAX_GRAPH_FILES: the walk aborts and reports
     // stale, so the applet rebuilds every bundle instead of risking a stale
