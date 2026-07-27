@@ -35,7 +35,7 @@ export function CodeBlock({ code, className }: CodeBlockProps) {
       )}
     >
       {/* sugar-high escapes token text, so this HTML is safe to inject. */}
-      <code dangerouslySetInnerHTML={{ __html: html }} />
+      <code className="font-mono" dangerouslySetInnerHTML={{ __html: html }} />
     </pre>
   )
 }
