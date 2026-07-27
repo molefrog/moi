@@ -112,6 +112,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
   const { ref, horizontalRadiusScale } = useFolderRadiusScale()
   const backdropPath = folderBackdropPath(horizontalRadiusScale)
   const noiseFilterId = `folder-noise-${workspaceId}`
+  const backdropFill = query.data?.theme?.muted
 
   return (
     <div ref={ref} className="relative h-40 w-full">
@@ -148,7 +149,11 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
         <path
           d={backdropPath}
           filter={`url(#${noiseFilterId})`}
-          className="mask-[linear-gradient(to_bottom,rgba(0,0,0,0.5),black_40%)] fill-accent"
+          fill={backdropFill}
+          className={cn(
+            'mask-[linear-gradient(to_bottom,rgba(0,0,0,0.5),black_40%)]',
+            !backdropFill && 'fill-accent'
+          )}
         />
       </svg>
 

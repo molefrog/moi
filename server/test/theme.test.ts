@@ -3,10 +3,29 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'path'
 
+import { COLOR_THEMES, deriveThemeColors } from '@/lib/themes'
 import type { WorkspaceLayout } from '@/lib/types'
 
 import { loadLayout, saveLayout } from '../layout'
 import { applyThemeUpdate, matchColorTheme } from '../theme'
+
+describe('color themes', () => {
+  test('derives all theme colors from the background and foreground', () => {
+    expect(deriveThemeColors({ background: '#fdf2f4', foreground: '#3b1c26' })).toEqual({
+      background: '#fdf2f4',
+      foreground: '#3b1c26',
+      muted: 'color-mix(in oklch, #fdf2f4 95%, #3b1c26 5%)'
+    })
+  })
+
+  test('leaves the default theme on the root muted token', () => {
+    expect(COLOR_THEMES.default.muted).toBeUndefined()
+  })
+
+  test('stores the generated muted token on each color preset', () => {
+    expect(COLOR_THEMES.rose.muted).toBe('color-mix(in oklch, #fdf2f4 95%, #3b1c26 5%)')
+  })
+})
 
 describe('applyThemeUpdate', () => {
   test('setting font preserves existing background/foreground (regression guard)', () => {
@@ -26,21 +45,29 @@ describe('applyThemeUpdate', () => {
     expect(result.theme.font).toBe('mono')
     expect(result.theme.background).toBe('#faf8f5')
     expect(result.theme.foreground).toBe('#2c2825')
+    expect(result.theme.muted).toBe(COLOR_THEMES.paper.muted)
     expect(result.applied).toEqual({ color: 'paper' })
   })
 
-  test("'default' color clears overrides (undefined bg/fg drop via JSON.stringify)", () => {
-    const current = { font: 'serif' as const, background: '#faf8f5', foreground: '#2c2825' }
+  test("'default' color clears overrides (undefined values drop via JSON.stringify)", () => {
+    const current = {
+      font: 'serif' as const,
+      background: '#faf8f5',
+      foreground: '#2c2825',
+      muted: COLOR_THEMES.paper.muted
+    }
     const result = applyThemeUpdate(current, { color: 'default' })
     if (!result.ok) throw new Error('expected ok')
     expect(result.theme.background).toBeUndefined()
     expect(result.theme.foreground).toBeUndefined()
+    expect(result.theme.muted).toBeUndefined()
     expect(result.theme.font).toBe('serif')
 
     // Round-trip: undefined values should not survive JSON serialization
     const roundTripped = JSON.parse(JSON.stringify(result.theme))
     expect('background' in roundTripped).toBe(false)
     expect('foreground' in roundTripped).toBe(false)
+    expect('muted' in roundTripped).toBe(false)
   })
 
   test('combined font + color updates apply both', () => {
@@ -48,6 +75,7 @@ describe('applyThemeUpdate', () => {
     if (!result.ok) throw new Error('expected ok')
     expect(result.theme.font).toBe('serif')
     expect(result.theme.background).toBe('#f0faf6')
+    expect(result.theme.muted).toBe(COLOR_THEMES.mint.muted)
     expect(result.applied).toEqual({ font: 'serif', color: 'mint' })
   })
 
@@ -108,7 +136,12 @@ describe('loadLayout/saveLayout round-trip with theme', () => {
       widgetGrid: [],
       layoutMode: 'fullscreen',
       tabs: { open: ['agent'], active: 'agent' },
-      theme: { font: 'serif', background: '#faf8f5', foreground: '#2c2825' }
+      theme: {
+        font: 'serif',
+        background: '#faf8f5',
+        foreground: '#2c2825',
+        muted: COLOR_THEMES.paper.muted
+      }
     }
     await saveLayout(layout, tmpDir)
     const loaded = await loadLayout(tmpDir)

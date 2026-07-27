@@ -115,7 +115,11 @@ export function CustomizePanel({ ref }: CustomizePanelProps) {
               key={key}
               active={presetMatches(preset, currentBg, currentFg)}
               onSelect={() =>
-                setTheme({ background: preset.background, foreground: preset.foreground })
+                setTheme({
+                  background: preset.background,
+                  foreground: preset.foreground,
+                  muted: preset.muted
+                })
               }
             >
               <div className="flex gap-2">

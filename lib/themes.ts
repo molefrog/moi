@@ -60,30 +60,49 @@ export type ColorThemeConfig = {
   // undefined background/foreground = no override, reveals :root defaults
   background?: string
   foreground?: string
-  feel: string
+  muted?: string
+}
+
+type ThemeColorSource = {
+  background: string
+  foreground: string
+}
+
+export function deriveThemeColors({
+  background,
+  foreground
+}: ThemeColorSource): ThemeColorSource & { muted: string } {
+  return {
+    background,
+    foreground,
+    muted: `color-mix(in oklch, ${background} 95%, ${foreground} 5%)`
+  }
 }
 
 export const COLOR_THEMES: Record<ColorTheme, ColorThemeConfig> = {
-  default: { label: 'Default', feel: 'System neutral' },
+  default: { label: 'Default' },
   paper: {
     label: 'Paper',
-    background: '#faf8f5',
-    foreground: '#2c2825',
-    feel: 'Warm off-white'
+    ...deriveThemeColors({ background: '#faf8f5', foreground: '#2c2825' })
   },
   sand: {
     label: 'Sand',
-    background: '#f5f0e8',
-    foreground: '#3d3529',
-    feel: 'Beige earth tones'
+    ...deriveThemeColors({ background: '#f5f0e8', foreground: '#3d3529' })
   },
-  rose: { label: 'Rose', background: '#fdf2f4', foreground: '#3b1c26', feel: 'Soft blush' },
+  rose: {
+    label: 'Rose',
+    ...deriveThemeColors({ background: '#fdf2f4', foreground: '#3b1c26' })
+  },
   lavender: {
     label: 'Lavender',
-    background: '#f4f2fb',
-    foreground: '#2b2640',
-    feel: 'Cool violet'
+    ...deriveThemeColors({ background: '#f4f2fb', foreground: '#2b2640' })
   },
-  mint: { label: 'Mint', background: '#f0faf6', foreground: '#1a3028', feel: 'Cool green' },
-  sky: { label: 'Sky', background: '#f0f6fc', foreground: '#1a2a3b', feel: 'Cool blue' }
+  mint: {
+    label: 'Mint',
+    ...deriveThemeColors({ background: '#f0faf6', foreground: '#1a3028' })
+  },
+  sky: {
+    label: 'Sky',
+    ...deriveThemeColors({ background: '#f0f6fc', foreground: '#1a2a3b' })
+  }
 }

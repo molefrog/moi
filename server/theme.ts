@@ -31,6 +31,7 @@ export function applyThemeUpdate(
     const preset = COLOR_THEMES[update.color as ColorTheme]
     theme.background = preset.background
     theme.foreground = preset.foreground
+    theme.muted = preset.muted
   }
 
   return {

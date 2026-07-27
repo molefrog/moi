@@ -518,6 +518,7 @@ export type WorkspaceLayout = {
     font: import('./themes').FontTheme
     background?: string
     foreground?: string
+    muted?: string
   }
   // Widget thumbnails captured client-side from the live grid, used for
   // home-screen previews. Saved through their own endpoint (PUT
@@ -549,6 +550,7 @@ export type WorkspacePreview = {
   thumbnails: string[]
   firstUserMessage?: string
   updatedAt?: number
+  theme?: WorkspaceLayout['theme']
 }
 
 // One effective env var, as surfaced by GET /api/workspaces/:id/env. Values are

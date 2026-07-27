@@ -721,14 +721,13 @@ const theme = defineCommand({
           selected ? pc.green('→') : ' ',
           selected ? pc.bold(key) : key,
           c.label,
-          swatch(c.background, c.foreground),
-          pc.dim(c.feel)
+          swatch(c.background, c.foreground)
         ]
       })
       console.log(pc.dim('  Colors'))
       console.log(
         columns(
-          ['', 'key', 'label', 'swatch', 'feel'].map(h => pc.dim(h)),
+          ['', 'key', 'label', 'swatch'].map(h => pc.dim(h)),
           colorRows
         ) + '\n'
       )

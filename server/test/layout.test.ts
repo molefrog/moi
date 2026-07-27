@@ -161,6 +161,30 @@ describe('mergeLayoutForSave', () => {
 })
 
 describe('getWorkspacePreview', () => {
+  test('includes the workspace color theme', async () => {
+    await withWorkspaceFile(
+      {
+        ...base,
+        theme: {
+          font: 'default',
+          background: '#fdf2f4',
+          foreground: '#3b1c26'
+        }
+      },
+      async dir => {
+        expect(await getWorkspacePreview(dir)).toEqual({
+          thumbnails: [],
+          theme: {
+            font: 'default',
+            background: '#fdf2f4',
+            foreground: '#3b1c26',
+            muted: 'color-mix(in oklch, #fdf2f4 95%, #3b1c26 5%)'
+          }
+        })
+      }
+    )
+  })
+
   test('sorts thumbnails top-to-bottom and left-to-right, then caps the stack', async () => {
     await withWorkspaceFile(
       {

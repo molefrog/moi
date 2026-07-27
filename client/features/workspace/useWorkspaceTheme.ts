@@ -17,6 +17,7 @@ export function useWorkspaceTheme(theme: WorkspaceLayout['theme']) {
   // these exact values rather than the whole `theme` object.
   const background = theme?.background
   const foreground = theme?.foreground
+  const muted = theme?.muted
 
   useEffect(() => {
     const el = document.documentElement
@@ -51,13 +52,7 @@ export function useWorkspaceTheme(theme: WorkspaceLayout['theme']) {
 
   useEffect(() => {
     const el = document.documentElement
-    const overrides = {
-      background,
-      foreground,
-      muted: background
-        ? 'color-mix(in oklch, var(--background) 5%, var(--foreground) 5%)'
-        : undefined
-    }
+    const overrides = { background, foreground, muted }
     for (const key of COLOR_OVERRIDES) {
       const value = overrides[key]
       if (value) {
@@ -69,7 +64,7 @@ export function useWorkspaceTheme(theme: WorkspaceLayout['theme']) {
     return () => {
       for (const key of COLOR_OVERRIDES) el.style.removeProperty(`--${key}`)
     }
-  }, [background, foreground])
+  }, [background, foreground, muted])
 
   // Drop the shared font <link> when the workspace unmounts.
   useEffect(() => () => document.getElementById(FONT_LINK_ID)?.remove(), [])

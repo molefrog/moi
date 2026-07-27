@@ -1,5 +1,6 @@
 import { join } from 'path'
 
+import { deriveThemeColors } from '@/lib/themes'
 import type { WorkspaceLayout, WorkspacePreview } from '@/lib/types'
 import { createDefaultWorkspaceLayout, createDefaultWorkspaceTabs } from '@/lib/workspace-layout'
 import { isWorkspaceTabId } from '@/lib/workspace-tabs'
@@ -21,7 +22,15 @@ function normalizeLayout(parsed: Record<string, unknown>): WorkspaceLayout {
   layout.tabs = normalizeTabs(layout.tabs)
   delete layout.sectionMode
   delete layout.chatMode
-  return layout as unknown as WorkspaceLayout
+  const normalized = layout as unknown as WorkspaceLayout
+  const theme = normalized.theme
+  if (theme && !theme.muted && theme.background && theme.foreground) {
+    theme.muted = deriveThemeColors({
+      background: theme.background,
+      foreground: theme.foreground
+    }).muted
+  }
+  return normalized
 }
 
 export function getLayoutPath(workspacePath: string): string {
@@ -132,19 +141,22 @@ export async function getWorkspacePreview(
       () => undefined
     )
     const updatedAt = providerPreview?.updatedAt
+    const theme = layout.theme
 
     if (includeFirstUserMessage) {
       const firstUserMessage = normalizePreviewMessage(providerPreview?.firstUserMessage)
       return {
         thumbnails,
         ...(firstUserMessage ? { firstUserMessage } : {}),
-        ...(updatedAt !== undefined ? { updatedAt } : {})
+        ...(updatedAt !== undefined ? { updatedAt } : {}),
+        ...(theme ? { theme } : {})
       }
     }
 
     return {
       thumbnails,
-      ...(updatedAt !== undefined ? { updatedAt } : {})
+      ...(updatedAt !== undefined ? { updatedAt } : {}),
+      ...(theme ? { theme } : {})
     }
   } catch {
     return { thumbnails: [] }
