@@ -533,6 +533,32 @@ export function scanAssetImports(source: string): string[] {
   return specifiers
 }
 
+// Relative module import specifiers in an applet source (`./_utils`,
+// `../lib/data`, `./table.tsx`) — static, re-export, side-effect, and dynamic
+// forms alike, lexed by Bun's own transpiler so comments and string literals
+// can't false-positive. Type-only imports are erased by the lexer — correct
+// here, since they never affect the emitted bundle. `.server` imports and
+// assets are excluded (each has its own scanner above); bare specifiers
+// (node_modules) are filtered out. A file that fails to lex contributes no
+// imports — the build itself surfaces the syntax error. Used by the rebuild
+// staleness check to walk the applet's local import graph, so editing a shared
+// module marks every applet that (transitively) imports it stale.
+const IMPORT_SCANNERS = {
+  ts: new Bun.Transpiler({ loader: 'ts' }),
+  tsx: new Bun.Transpiler({ loader: 'tsx' })
+}
+export function scanModuleImports(source: string, loader: 'ts' | 'tsx' = 'tsx'): string[] {
+  let imports: { path: string }[]
+  try {
+    imports = IMPORT_SCANNERS[loader].scanImports(source)
+  } catch {
+    return []
+  }
+  return imports
+    .map(i => i.path)
+    .filter(p => /^\.\.?\//.test(p) && !/\.server(\.ts)?$/.test(p) && !ASSET_EXTENSIONS.test(p))
+}
+
 async function prevalidateServerFiles(entrypoint: string): Promise<void> {
   const sourceDir = dirname(entrypoint)
   const source = await Bun.file(entrypoint).text()
