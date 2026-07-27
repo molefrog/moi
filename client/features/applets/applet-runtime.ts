@@ -6,15 +6,23 @@
 // host connects that instance to the workspace's runtime by attaching a thin
 // bridge (`attachAppletBridge`); invalidation disposes it (`disposeAppletBridge`),
 // leaving a stale module instance — old timers, old listeners — inert instead
-// of steering the app. One runtime per workspace id; the workspace screen
-// publishes the actual behavior via `useAppletHandlers`.
-import { useEffect, useRef, useState } from 'react'
+// of steering the app. One runtime per workspace id.
+//
+// Applet calls surface as runtime EVENTS: the bridge validates the untrusted
+// args, then emits, and each host feature subscribes to its own concern with
+// `useAppletEvent` (navigation owns `focusTab`; chat will own `sendChatMessage`)
+// — no central handlers object assembled by the screen. Applet → host only;
+// if a host → applet direction is ever added (`moi.on(...)`), `dispose` must
+// also unbind those listeners or a disposed module leaks.
+import { useEffect, useRef } from 'react'
+
+import { createNanoEvents } from 'nanoevents'
 
 import type { WorkspaceTabId } from '@/lib/types'
 import { isParamsRecord, isWorkspaceTabId } from '@/lib/workspace-tabs'
 
-// What the host implements — validated, typed calls.
-export type AppletHandlers = {
+// Events a workspace runtime emits — already validated, typed for host code.
+export type AppletEvents = {
   // Client-local replace-navigation to a workspace tab. `params` reach the
   // target view as its `params` prop via navigation state — JSON-plain only
   // (history state is structured-cloned).
@@ -23,40 +31,30 @@ export type AppletHandlers = {
 
 // What a bundle's `moi` module calls. Args are `unknown` on purpose: they
 // cross the trust boundary from agent-authored code, and the runtime narrows
-// them before touching a handler.
+// them before emitting.
 export type AppletBridge = {
   focusTab: (tab: unknown, params?: unknown) => void
 }
 
-type AppletRuntime = {
-  setHandlers: (next: AppletHandlers) => void
-  // Ownership-checked so an unmounting screen never clears a successor's
-  // handlers (StrictMode replay, workspace remounts).
-  clearHandlers: (current: AppletHandlers) => void
-  connect: () => { bridge: AppletBridge; dispose: () => void }
-}
-
-function createRuntime(): AppletRuntime {
-  let handlers: AppletHandlers | null = null
+function createRuntime() {
+  const emitter = createNanoEvents<AppletEvents>()
 
   return {
-    setHandlers(next) {
-      handlers = next
-    },
-    clearHandlers(current) {
-      if (handlers === current) handlers = null
+    on<K extends keyof AppletEvents>(event: K, cb: AppletEvents[K]) {
+      return emitter.on(event, cb)
     },
     // One connection per loaded module instance. The bridge validates every
     // call — a malformed tab id or params shape from applet code drops the
-    // call instead of reaching a handler — and `dispose` flips the connection
-    // dead so a disposed module can never act again.
+    // call instead of being emitted — and `dispose` flips the connection dead
+    // so a disposed module can never act again. Emitting with no subscribers
+    // (workspace screen unmounted) is a no-op by nanoevents semantics.
     connect() {
       let alive = true
       const bridge: AppletBridge = {
         focusTab(tab, params) {
-          if (!alive || !handlers) return
+          if (!alive) return
           if (!isWorkspaceTabId(tab)) return
-          handlers.focusTab(tab, isParamsRecord(params) ? params : undefined)
+          emitter.emit('focusTab', tab, isParamsRecord(params) ? params : undefined)
         }
       }
       return {
@@ -69,6 +67,8 @@ function createRuntime(): AppletRuntime {
   }
 }
 
+type AppletRuntime = ReturnType<typeof createRuntime>
+
 const runtimes = new Map<string, AppletRuntime>()
 
 export function appletRuntime(workspaceId: string): AppletRuntime {
@@ -80,27 +80,25 @@ export function appletRuntime(workspaceId: string): AppletRuntime {
   return runtime
 }
 
-// Publish the workspace screen's handlers to its runtime. Published DURING
-// render (idempotent — the forwarder is stable per hook instance and reads the
-// latest handlers through a ref), not in an effect: an applet can call its
-// bridge the moment it mounts, and child effects run before parent effects.
-// The effect exists only to re-publish after StrictMode's cleanup replay and
-// to clear on unmount, so a cached applet from a backgrounded workspace can't
-// navigate the app through dead handlers.
-export function useAppletHandlers(workspaceId: string, handlers: AppletHandlers): void {
-  const latest = useRef(handlers)
-  latest.current = handlers
-  const [forwarder] = useState<AppletHandlers>(() => ({
-    focusTab: (tab, params) => latest.current.focusTab(tab, params)
-  }))
-
-  appletRuntime(workspaceId).setHandlers(forwarder)
+// Subscribe a host feature to one applet event for the lifetime of the
+// component. The subscription is stable across re-renders — the listener reads
+// the latest `handler` through a ref, so an inline arrow doesn't churn the
+// emitter — and StrictMode's effect replay just unbinds and re-binds.
+export function useAppletEvent<K extends keyof AppletEvents>(
+  workspaceId: string,
+  event: K,
+  handler: AppletEvents[K]
+): void {
+  const latest = useRef(handler)
+  latest.current = handler
 
   useEffect(() => {
-    const runtime = appletRuntime(workspaceId)
-    runtime.setHandlers(forwarder)
-    return () => runtime.clearHandlers(forwarder)
-  }, [workspaceId, forwarder])
+    // TS can't call a generic indexed function type with its own Parameters
+    // tuple, so the forwarder is loosely typed inside and cast at the boundary.
+    const forward = ((...args: unknown[]) =>
+      (latest.current as (...forwarded: unknown[]) => void)(...args)) as AppletEvents[K]
+    return appletRuntime(workspaceId).on(event, forward)
+  }, [workspaceId, event])
 }
 
 // The shape of the host wiring every bundle entry re-exports (see the entry

@@ -15,7 +15,7 @@ import { ChatPanel } from '@/client/features/chat/ChatPanel'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { CustomizePanel } from '@/client/features/workspace/CustomizePanel'
 import { AppletMount } from '@/client/features/applets/AppletMount'
-import { useAppletHandlers } from '@/client/features/applets/applet-runtime'
+import { useAppletEvent } from '@/client/features/applets/applet-runtime'
 import { WidgetErrorBoundary } from '@/client/features/applets/WidgetErrorBoundary'
 import { Widgets } from '@/client/features/widgets/Widgets'
 import { PanelHeader } from '@/client/components/shared/PanelHeader'
@@ -389,11 +389,11 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     }
   }
 
-  // Focus requests from applet bridges land here already validated — the
+  // Focus requests from applet bridges arrive here already validated — the
   // applet runtime narrows the untrusted tab id and params shape at the trust
   // boundary (applet-runtime.ts). A well-formed id for a missing view just
   // resolves to the default like any dead URL.
-  useAppletHandlers(workspaceId, { focusTab: openTab })
+  useAppletEvent(workspaceId, 'focusTab', openTab)
 
   // `moi tab focus` — a workspace event, not an applet call: the control
   // server validated the target and params before publishing.

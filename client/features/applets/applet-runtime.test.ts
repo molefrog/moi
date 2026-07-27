@@ -8,7 +8,6 @@ import {
 } from './applet-cache'
 import {
   type AppletBridge,
-  type AppletHandlers,
   appletRuntime,
   attachAppletBridge,
   disposeAppletBridge
@@ -16,23 +15,22 @@ import {
 
 // The runtime is the trust boundary between agent-authored applet bundles and
 // the host: every bridge call arrives with `unknown` args and must be narrowed
-// before a handler sees it, and a disposed bridge (stale module after a
-// rebuild) must never act again.
+// before it's emitted to subscribers, and a disposed bridge (stale module
+// after a rebuild) must never act again.
 
-function recordingHandlers() {
+function subscribeFocus(workspaceId: string) {
   const calls: [string, Record<string, unknown> | undefined][] = []
-  const handlers: AppletHandlers = {
-    focusTab: (tab, params) => calls.push([tab, params])
-  }
-  return { calls, handlers }
+  const unbind = appletRuntime(workspaceId).on('focusTab', (tab, params) =>
+    calls.push([tab, params])
+  )
+  return { calls, unbind }
 }
 
 describe('bridge validation', () => {
-  test('forwards a well-formed call and narrows malformed params to undefined', () => {
-    const runtime = appletRuntime(`ws-${crypto.randomUUID()}`)
-    const { calls, handlers } = recordingHandlers()
-    runtime.setHandlers(handlers)
-    const { bridge } = runtime.connect()
+  test('emits a well-formed call and narrows malformed params to undefined', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const { calls } = subscribeFocus(ws)
+    const { bridge } = appletRuntime(ws).connect()
 
     bridge.focusTab('view:orders', { order: 'o-1' })
     bridge.focusTab('widgets')
@@ -48,11 +46,10 @@ describe('bridge validation', () => {
     ])
   })
 
-  test('drops calls with a malformed tab id instead of reaching a handler', () => {
-    const runtime = appletRuntime(`ws-${crypto.randomUUID()}`)
-    const { calls, handlers } = recordingHandlers()
-    runtime.setHandlers(handlers)
-    const { bridge } = runtime.connect()
+  test('drops calls with a malformed tab id instead of emitting', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const { calls } = subscribeFocus(ws)
+    const { bridge } = appletRuntime(ws).connect()
 
     bridge.focusTab('not-a-tab')
     bridge.focusTab('view:multi/segment')
@@ -62,38 +59,36 @@ describe('bridge validation', () => {
     expect(calls).toEqual([])
   })
 
-  test('drops calls when no handlers are published (screen unmounted)', () => {
-    const runtime = appletRuntime(`ws-${crypto.randomUUID()}`)
-    const { bridge } = runtime.connect()
+  test('emitting with no subscribers (screen unmounted) is a no-op', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const { bridge } = appletRuntime(ws).connect()
     expect(() => bridge.focusTab('agent')).not.toThrow()
-
-    const { calls, handlers } = recordingHandlers()
-    runtime.setHandlers(handlers)
-    runtime.clearHandlers(handlers)
-    bridge.focusTab('agent')
-    expect(calls).toEqual([])
   })
 
-  test('clearHandlers is ownership-checked, so a stale unmount cannot clear a successor', () => {
-    const runtime = appletRuntime(`ws-${crypto.randomUUID()}`)
-    const first = recordingHandlers()
-    const second = recordingHandlers()
-    runtime.setHandlers(first.handlers)
-    runtime.setHandlers(second.handlers)
-    runtime.clearHandlers(first.handlers)
+  test('an unbound subscriber stops receiving; others keep receiving', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const first = subscribeFocus(ws)
+    const second = subscribeFocus(ws)
+    const { bridge } = appletRuntime(ws).connect()
 
-    runtime.connect().bridge.focusTab('agent')
-    expect(second.calls).toEqual([['agent', undefined]])
+    bridge.focusTab('agent')
+    first.unbind()
+    bridge.focusTab('widgets')
+
+    expect(first.calls).toEqual([['agent', undefined]])
+    expect(second.calls).toEqual([
+      ['agent', undefined],
+      ['widgets', undefined]
+    ])
   })
 })
 
 describe('disposal', () => {
-  test('a disposed connection is inert even while handlers are live', () => {
-    const runtime = appletRuntime(`ws-${crypto.randomUUID()}`)
-    const { calls, handlers } = recordingHandlers()
-    runtime.setHandlers(handlers)
+  test('a disposed connection is inert even while subscribers are live', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const { calls } = subscribeFocus(ws)
 
-    const { bridge, dispose } = runtime.connect()
+    const { bridge, dispose } = appletRuntime(ws).connect()
     bridge.focusTab('agent')
     dispose()
     bridge.focusTab('agent')
@@ -116,8 +111,7 @@ function fakeModule() {
 describe('attachAppletBridge', () => {
   test('wires a module to its workspace runtime; invalidateApplet neuters it', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    const { calls, handlers } = recordingHandlers()
-    appletRuntime(ws).setHandlers(handlers)
+    const { calls } = subscribeFocus(ws)
 
     const mod = fakeModule()
     attachAppletBridge(mod, ws, appletKey('views', ws, 'board'))
@@ -132,8 +126,7 @@ describe('attachAppletBridge', () => {
 
   test('invalidateAppletSegment disposes bridges kind-wide', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    const { calls, handlers } = recordingHandlers()
-    appletRuntime(ws).setHandlers(handlers)
+    const { calls } = subscribeFocus(ws)
 
     const mod = fakeModule()
     const key = appletKey('widgets', ws, 'clock')
@@ -154,8 +147,7 @@ describe('attachAppletBridge', () => {
 
   test('re-attaching under a key disposes the previous connection', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    const { calls, handlers } = recordingHandlers()
-    appletRuntime(ws).setHandlers(handlers)
+    const { calls } = subscribeFocus(ws)
     const key = appletKey('views', ws, 'board')
 
     const oldMod = fakeModule()
@@ -173,10 +165,8 @@ describe('workspace isolation', () => {
   test('bridges reach only their own workspace runtime', () => {
     const wsA = `ws-${crypto.randomUUID()}`
     const wsB = `ws-${crypto.randomUUID()}`
-    const a = recordingHandlers()
-    const b = recordingHandlers()
-    appletRuntime(wsA).setHandlers(a.handlers)
-    appletRuntime(wsB).setHandlers(b.handlers)
+    const a = subscribeFocus(wsA)
+    const b = subscribeFocus(wsB)
 
     appletRuntime(wsA).connect().bridge.focusTab('agent')
     expect(a.calls).toEqual([['agent', undefined]])
