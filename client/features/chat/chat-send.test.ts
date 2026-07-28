@@ -9,7 +9,7 @@ import {
   resolveChatRunOptions,
   startOptimisticTurn
 } from '@/client/features/chat/chat-send'
-import { type ChatAttachment, draftKey, liveStore } from '@/client/features/chat/chat-store'
+import { attachmentKey, type ChatAttachment, liveStore } from '@/client/features/chat/chat-store'
 import type { ViewState, WorkspaceModels } from '@/lib/types'
 
 const workspaceId = 'workspace-1'
@@ -141,7 +141,7 @@ describe('composer attachments', () => {
   ]
 
   const stage = () =>
-    liveStore.setState({ attachments: { [draftKey(workspaceId, sessionId)]: staged } })
+    liveStore.setState({ attachments: { [attachmentKey(workspaceId, sessionId)]: staged } })
 
   test('a composer send carries the uploaded ones and skips those still uploading', () => {
     stage()

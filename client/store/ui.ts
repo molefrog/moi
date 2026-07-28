@@ -8,9 +8,11 @@ type UiStore = {
   discoveredWorkspacesOpen: boolean
   hasSentMessageFromMoi: boolean
   workspaceIdsPendingAnalysis: string[]
+  composerDrafts: Record<string, string>
   setDiscoveredWorkspacesOpen: (open: boolean) => void
   markWorkspacePendingAnalysis: (workspaceId: string) => void
   markMessageSentFromMoi: (workspaceId: string) => void
+  setComposerDraft: (workspaceId: string, value: string) => void
 }
 
 export const createUiStore = (storage?: StateStorage) =>
@@ -20,6 +22,7 @@ export const createUiStore = (storage?: StateStorage) =>
         discoveredWorkspacesOpen: true,
         hasSentMessageFromMoi: false,
         workspaceIdsPendingAnalysis: [],
+        composerDrafts: {},
         setDiscoveredWorkspacesOpen: open => set({ discoveredWorkspacesOpen: open }),
         markWorkspacePendingAnalysis: workspaceId =>
           set(state => {
@@ -36,7 +39,14 @@ export const createUiStore = (storage?: StateStorage) =>
             workspaceIdsPendingAnalysis: (state.workspaceIdsPendingAnalysis ?? []).filter(
               id => id !== workspaceId
             )
-          }))
+          })),
+        setComposerDraft: (workspaceId, value) =>
+          set(state => {
+            const composerDrafts = { ...(state.composerDrafts ?? {}) }
+            if (value) composerDrafts[workspaceId] = value
+            else delete composerDrafts[workspaceId]
+            return { composerDrafts }
+          })
       }),
       storage
         ? {

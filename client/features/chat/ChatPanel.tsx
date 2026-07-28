@@ -5,7 +5,7 @@ import { IconChevronDown, IconX } from '@tabler/icons-react'
 import { canSubmitComposerAction } from '@/client/components/shared/Composer'
 import { useStickToBottom } from '@/client/features/chat/useStickToBottom'
 import { groupTurns } from '@/client/features/chat/group-turns'
-import { draftKey, useLive } from '@/client/features/chat/chat-store'
+import { attachmentKey, useLive } from '@/client/features/chat/chat-store'
 import type { ChatPromptBubble } from '@/client/features/chat/ChatPromptBubbles'
 import type { ChatSendOptions } from '@/client/features/chat/chat-send'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
@@ -69,7 +69,7 @@ export function ChatPanel({
     (state.workspaceIdsPendingAnalysis ?? []).includes(workspaceId)
   )
   const attachmentsUploading = useLive(state =>
-    (state.attachments[draftKey(workspaceId, sessionId ?? null)] ?? []).some(
+    (state.attachments[attachmentKey(workspaceId, sessionId ?? null)] ?? []).some(
       attachment => attachment.status === 'uploading'
     )
   )

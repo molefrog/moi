@@ -35,11 +35,9 @@ function key(workspaceId: string, sessionId: string): string {
   return `${workspaceId}:${sessionId}`
 }
 
-// Draft text is keyed per thread. A brand-new chat has no session id yet, so it
-// gets a stable `'new'` sentinel; once `send` mints the real id the input reads
-// the (empty) draft under the new key. Exported so `ChatInput` builds the same
-// key it reads as the store writes.
-export function draftKey(workspaceId: string, sessionId: string | null): string {
+// Attachments stay with the chat they were added to. A brand-new chat has no
+// session id yet, so it gets a stable `'new'` sentinel until send mints one.
+export function attachmentKey(workspaceId: string, sessionId: string | null): string {
   return key(workspaceId, sessionId ?? 'new')
 }
 
@@ -65,14 +63,8 @@ export type LiveStore = {
   // so concurrent streams never collide. Reconciled against the durable
   // transcript: a preview is dropped the instant its finalized turn arrives.
   previews: Record<string, LivePreview>
-  // Unsent composer text, keyed per thread (`${workspaceId}:${sessionId}`, with
-  // a `'new'` sentinel for a not-yet-created thread). Lives here — not in the
-  // chat component — so a keystroke re-renders only the composer (which alone
-  // subscribes), not the whole workspace, and the draft survives the chat
-  // panel's remounts on mode switch.
-  drafts: Record<string, string>
-  // Composer attachments, keyed per thread exactly like `drafts` (so they follow
-  // the active thread and survive composer remounts). Cleared on send.
+  // Composer attachments are per chat, survive composer remounts, and clear on
+  // send. Draft text is workspace-local persisted UI state (client/store/ui).
   attachments: Record<string, ChatAttachment[]>
 
   setActive: (workspaceId: string, sessionId: string | null) => void
@@ -84,7 +76,6 @@ export type LiveStore = {
     sessions: { workspaceId: string; sessionId: string; activity: SessionActivity }[]
   ) => void
   setError: (workspaceId: string, sessionId: string, message: string | null) => void
-  setDraft: (workspaceId: string, sessionId: string | null, value: string) => void
   addAttachments: (workspaceId: string, sessionId: string | null, items: ChatAttachment[]) => void
   updateAttachment: (
     workspaceId: string,
@@ -114,7 +105,6 @@ export const liveStore = createStore<LiveStore>()(set => ({
   activeByWorkspace: {},
   activity: {},
   errors: {},
-  drafts: {},
   previews: {},
   attachments: {},
 
@@ -131,9 +121,6 @@ export const liveStore = createStore<LiveStore>()(set => ({
 
   setError: (workspaceId, sessionId, message) =>
     set(s => ({ errors: { ...s.errors, [key(workspaceId, sessionId)]: message } })),
-
-  setDraft: (workspaceId, sessionId, value) =>
-    set(s => ({ drafts: { ...s.drafts, [draftKey(workspaceId, sessionId)]: value } })),
 
   setPreview: frame =>
     set(s => ({
@@ -182,13 +169,13 @@ export const liveStore = createStore<LiveStore>()(set => ({
 
   addAttachments: (workspaceId, sessionId, items) =>
     set(s => {
-      const k = draftKey(workspaceId, sessionId)
+      const k = attachmentKey(workspaceId, sessionId)
       return { attachments: { ...s.attachments, [k]: [...(s.attachments[k] ?? []), ...items] } }
     }),
 
   updateAttachment: (workspaceId, sessionId, localId, patch) =>
     set(s => {
-      const k = draftKey(workspaceId, sessionId)
+      const k = attachmentKey(workspaceId, sessionId)
       const list = s.attachments[k]
       if (!list) return {}
       return {
@@ -201,7 +188,7 @@ export const liveStore = createStore<LiveStore>()(set => ({
 
   removeAttachment: (workspaceId, sessionId, localId) =>
     set(s => {
-      const k = draftKey(workspaceId, sessionId)
+      const k = attachmentKey(workspaceId, sessionId)
       const list = s.attachments[k]
       if (!list) return {}
       const target = list.find(a => a.localId === localId)
@@ -211,7 +198,7 @@ export const liveStore = createStore<LiveStore>()(set => ({
 
   clearAttachments: (workspaceId, sessionId) =>
     set(s => {
-      const k = draftKey(workspaceId, sessionId)
+      const k = attachmentKey(workspaceId, sessionId)
       for (const a of s.attachments[k] ?? []) {
         if (a.previewUrl) URL.revokeObjectURL(a.previewUrl)
       }

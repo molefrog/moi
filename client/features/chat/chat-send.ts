@@ -1,7 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { type ChatAttachment, draftKey, liveStore } from '@/client/features/chat/chat-store'
+import { attachmentKey, type ChatAttachment, liveStore } from '@/client/features/chat/chat-store'
 import type { MoiUserMessageOptions } from '@/client/features/workspace/moi-context'
 import { STREAM_RESPONSES } from '@/client/lib/flags'
 import { applyEvent, emptyViewState } from '@/lib/format'
@@ -27,7 +27,7 @@ export function attachmentsForSend(
   options?: ChatSendOptions
 ): ChatAttachment[] {
   if (!ownsComposerAttachments(options)) return []
-  const pending = liveStore.getState().attachments[draftKey(workspaceId, sessionId)] ?? []
+  const pending = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)] ?? []
   return pending.filter(a => a.status === 'ready' && a.upload)
 }
 

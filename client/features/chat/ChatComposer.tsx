@@ -15,10 +15,11 @@ import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { uploadFiles } from '@/client/features/chat/uploads'
 import {
   type ChatAttachment,
-  draftKey,
+  attachmentKey,
   liveStore,
   useLive
 } from '@/client/features/chat/chat-store'
+import { useUiStore } from '@/client/store/ui'
 
 import { ModelPicker } from './ModelPicker'
 
@@ -30,11 +31,9 @@ type ChatComposerProps = {
   unavailableReason: string | null | undefined
 }
 
-// The composer owns the draft: it reads/writes the per-thread draft in the live
-// store directly, so a keystroke re-renders only this component — not the chat
-// panel, message list, or surrounding workspace. The draft is keyed by the
-// active thread, so switching threads swaps the unsent text with you. Attachments
-// (drag/drop, paste, attach button) are tracked the same way and cleared on send.
+// Draft text is persisted per workspace, while attachments remain ephemeral and
+// follow the active chat. Both stores are subscribed here so a keystroke or
+// upload re-renders only the composer.
 export function ChatComposer({
   composerRef,
   onSend,
@@ -45,8 +44,8 @@ export function ChatComposer({
   const fileRef = useRef<HTMLInputElement>(null)
   const workspaceId = useWorkspaceId()
   const sessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
-  const value = useLive(s => s.drafts[draftKey(workspaceId, sessionId)] ?? '')
-  const attachments = useLive(s => s.attachments[draftKey(workspaceId, sessionId)] ?? EMPTY)
+  const value = useUiStore(s => s.composerDrafts[workspaceId] ?? '')
+  const attachments = useLive(s => s.attachments[attachmentKey(workspaceId, sessionId)] ?? EMPTY)
   const [dragOver, setDragOver] = useState(false)
 
   const uploading = attachments.some(a => a.status === 'uploading')
@@ -54,7 +53,7 @@ export function ChatComposer({
   const hasContent = value.trim().length > 0 || hasReady
   const canSend = canSubmitComposerAction(hasContent, uploading, unavailableReason)
 
-  const onChange = (next: string) => liveStore.getState().setDraft(workspaceId, sessionId, next)
+  const onChange = (next: string) => useUiStore.getState().setComposerDraft(workspaceId, next)
 
   // Upload each picked file immediately, tracking its in-flight status so the
   // thumbnail row can show a spinner / error per file.
@@ -90,10 +89,7 @@ export function ChatComposer({
   const send = () => {
     if (!canSend) return
     onSend(value)
-    // Clear under the current key. On a new chat `sessionId` is still null, so
-    // this clears the `'new'` draft; `send` then mints the real id and the input
-    // re-renders empty under the new key. (Attachments are cleared by `send`.)
-    liveStore.getState().setDraft(workspaceId, sessionId, '')
+    useUiStore.getState().setComposerDraft(workspaceId, '')
   }
 
   return (

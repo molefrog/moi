@@ -86,16 +86,15 @@ export function useChat(address: WorkspaceTabAddress) {
   // yet) this is empty and `send` falls back to the workspace defaults below.
   const threadCfg = useThreadConfig(workspaceId, activeSessionId).data
 
-  // The composer owns the draft (in the live store) and hands the text in, so a
-  // keystroke re-renders only the composer — not this hook's host (WorkspaceView)
-  // and its whole subtree. See `ChatInput`.
+  // The composer owns the workspace draft in the persisted UI store and hands
+  // the text in, so a keystroke re-renders only the composer.
   const send = useCallback(
     (draft: string, options?: ChatSendOptions) => {
       const text = draft.trim()
-      // Attachments for the active thread, keyed exactly like the draft. Only
-      // fully-uploaded ones are sent; the composer disables send while any are
-      // still uploading, so in practice they're all ready here. An applet send
-      // gets none — the staged files are the user's, not the widget's.
+      // Attachments stay with the active thread. Only fully-uploaded ones are
+      // sent; the composer disables send while any are still uploading, so in
+      // practice they're all ready here. An applet send gets none — the staged
+      // files are the user's, not the widget's.
       const ready = attachmentsForSend(workspaceId, activeSessionId, options)
       // No `processing` guard: sending while a turn is in flight QUEUES the
       // message into the same live server session (streaming-input mode).
