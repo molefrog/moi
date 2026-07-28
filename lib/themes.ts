@@ -1,3 +1,9 @@
+import { colord, extend } from 'colord'
+import a11yPlugin from 'colord/plugins/a11y'
+
+// Registers optional WCAG helpers such as luminance() on Colord.
+extend([a11yPlugin])
+
 export type FontTheme = 'default' | 'serif' | 'mono' | 'blobby' | 'geometric' | 'awkward'
 
 export type FontThemeConfig = {
@@ -55,20 +61,12 @@ export const FONT_THEMES: Record<FontTheme, FontThemeConfig> = {
 
 export type ColorTheme = 'default' | 'paper' | 'sand' | 'rose' | 'lavender' | 'mint' | 'sky'
 
-function relativeLuminance(hex: string): number {
-  if (!/^#[0-9a-f]{6}$/i.test(hex)) {
-    throw new Error(`Primary theme color must use #rrggbb: ${hex}`)
+function foregroundForPrimary(primary: string): string {
+  if (!/^#[0-9a-f]{6}$/i.test(primary)) {
+    throw new Error(`Primary theme color must use #rrggbb: ${primary}`)
   }
 
-  const channels = [1, 3, 5].map(index => {
-    const channel = Number.parseInt(hex.slice(index, index + 2), 16) / 255
-    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
-  })
-  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
-}
-
-function foregroundForPrimary(primary: string): string {
-  return relativeLuminance(primary) > 0.24 ? '#000000' : '#ffffff'
+  return colord(primary).luminance() > 0.24 ? '#000000' : '#ffffff'
 }
 
 const THEME_COLOR_DERIVATIONS = {

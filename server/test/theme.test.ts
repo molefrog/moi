@@ -50,6 +50,13 @@ describe('color themes', () => {
     }
   })
 
+  test('requires primary colors to use six-digit hex', () => {
+    expect(() => deriveThemeColors('#fff')).toThrow('Primary theme color must use #rrggbb: #fff')
+    expect(() => deriveThemeColors('rgb(255, 255, 255)')).toThrow(
+      'Primary theme color must use #rrggbb: rgb(255, 255, 255)'
+    )
+  })
+
   test('stores only the primary source on color presets', () => {
     expect(COLOR_THEMES.default).toEqual({ label: 'Default' })
     for (const [key, preset] of Object.entries(COLOR_THEMES)) {
