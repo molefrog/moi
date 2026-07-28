@@ -80,7 +80,7 @@ function ModelDropdown({ current, model, models, onValueChange }: ModelDropdownP
       <DropdownMenuTrigger
         render={<PickerTrigger label={label} aria-label={`Model: ${label}`} />}
       />
-      <DropdownMenuContent align="end" side="top" className="min-w-60">
+      <DropdownMenuContent align="end" side="top" className="w-max max-w-64 min-w-40">
         <DropdownMenuGroup>
           <DropdownMenuLabel>Models</DropdownMenuLabel>
           <DropdownMenuRadioGroup value={current} onValueChange={onValueChange}>
