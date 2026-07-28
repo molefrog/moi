@@ -24,10 +24,8 @@ deployment in GitHub after it. Everything else runs unattended.
 1. `git status` — clean tree, on `main`. Stop and ask if not.
 2. `git fetch && git status -sb` — up to date with `origin/main`.
 3. `git log origin/main..HEAD --oneline` — if anything is unpushed, show it and confirm it should ship.
-4. **Record the starting state so §8 can restore it exactly:**
-   - `readlink ~/.bun/bin/moi` — a path into this repo means a dev `bun link`; absent means a
-     clean container with nothing to restore.
-   - `lsof -ti:13337` — a running server that must come back up afterwards.
+4. `readlink ~/.bun/bin/moi` — record it. A path into this repo means a dev `bun link` that §8
+   must restore; absent means a clean container with nothing to put back.
 
 Both a cloud container and the user's machine run every phase below. The only difference is what
 §8 restores, which is why you captured it here rather than assuming.
@@ -57,14 +55,12 @@ failing here costs nothing, failing after the tag push costs a burned version.
    tar -tzf moi-computer-*.tgz | grep -c '^package/dist/'   # must be > 0
    tar -tzf moi-computer-*.tgz | grep -Ei '\.env|secret'    # must be empty
    ```
-3. **Smoke the packed artifact** — the only check that exercises the real install tree:
-   - Kill the server on 13337 if §0 found one.
-   - `bun remove -g moi-computer` first. Installing over an existing install fails with
-     ENOENT/DependencyLoop because the global `package.json` pins the old range.
-   - `bun install -g /absolute/path/to/moi-computer-X.Y.Z.tgz` — a relative path fails.
-   - `moi version`, `moi env`, then `moi start` and curl `/` and `/api/workspaces`.
-4. **Skim what is shipping**: `git log <last tag>..HEAD --oneline`. If a change is quick to poke
-   at in the smoke server, do it. Time-box this — it is a sanity check, not a QA pass.
+3. **Skim what is shipping**: `git log <last tag>..HEAD --oneline`. Enough to describe the
+   release and to know what §6 should poke at. Time-box it — a sanity check, not a QA pass.
+
+Do **not** globally install the tarball here. It cannot coexist with a running dev server (see
+§6), and §6 smoke-tests the real published package anyway, which is better evidence. Delete the
+tarball once inspected.
 
 ## 3. Report and ask
 
@@ -105,11 +101,19 @@ Recovery, if `verify` fails or the run is rejected:
 
 1. `npm view moi-computer dist-tags` — the intended tag moved, and for a preview confirm
    `latest` did **not**.
-2. Install the real thing from the registry and smoke it exactly as in §2.3:
-   `bun remove -g moi-computer` → `bun install -g moi-computer@<version>` → `moi version`,
-   `moi env`, `moi start` + curl.
-3. `npm view moi-computer@<version> dist.attestations` — trusted publishing attaches provenance
+2. `npm view moi-computer@<version> dist.attestations` — trusted publishing attaches provenance
    automatically; its absence means the publish did not go through OIDC.
+3. **Smoke the published package.** This needs the moi ports to itself: `CONTROL_PORT` is a
+   hardcoded `13059` (`server/constants.ts`) that `server/control.ts` binds unconditionally, so
+   `--port` does not let a second instance coexist. Before installing:
+   - `lsof -ti:13059 -ti:13337` — if anything is running, it is almost certainly the user's own
+     `bun run dev` in their terminal. Stop it, and **tell the user you stopped it**. Do not
+     silently respawn it in §8; a detached agent-owned supervisor is not the same thing and its
+     output goes where they are not looking.
+   - `bun remove -g moi-computer` first. Installing over an existing install fails with
+     ENOENT/DependencyLoop because the global `package.json` pins the old range.
+   - `bun install -g moi-computer@<version>`, then `moi version`, `moi env`, `moi start`, and
+     curl `/` and `/api/workspaces`. Poke at anything §2.3 flagged as new, if it is quick.
 
 If this fails, publishing cannot be undone cleanly. Unpublish is only possible within 72 hours
 and breaks anyone who already installed. The realistic remedy is `npm deprecate` on the bad
@@ -132,12 +136,13 @@ For a stable release:
 
 Always run this, including after a failure or an abandoned release.
 
-1. Kill the smoke-test server.
-2. Restore whatever §0 recorded:
+1. Kill the smoke-test server from §6.
+2. Restore whatever §0.4 recorded:
    - Dev link present before: `bun remove -g moi-computer`, then `bun link` in the repo.
      Verify `~/.bun/install/global/node_modules/moi-computer` symlinks back to the repo, and
      `moi version` reports `X.Y.Z (githash)`.
    - Nothing installed before: `bun remove -g moi-computer`.
 3. `rm -f moi-computer-*.tgz` and `rm -rf dist/`. A leftover `dist/index.html` silently shadows
    the dev client for linked `moi` runs (`server/static.ts`); only `bun run dev` ignores it.
-4. If a server was running on 13337 before you started, bring it back up.
+4. If §6 stopped a dev server, say so plainly in the final report and leave restarting it to the
+   user — `bun run dev` belongs in their terminal, not in a background process you own.
