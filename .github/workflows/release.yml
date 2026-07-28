@@ -47,7 +47,7 @@ jobs:
     environment: release
     permissions:
       id-token: write # OIDC token for npm trusted publishing
-      contents: write # creating/publishing the GitHub release
+      contents: read
     steps:
       - uses: actions/checkout@v5
         with:
@@ -82,17 +82,3 @@ jobs:
       # short-lived credential. Provenance is attached automatically.
       - name: Publish to npm
         run: npm publish --tag ${{ steps.meta.outputs.dist_tag }}
-
-      # Prereleases never get a GitHub release. Stable ones publish the draft
-      # the agent prepared, or fall back to generated notes.
-      - name: Publish the GitHub release
-        if: steps.meta.outputs.dist_tag == 'latest'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.meta.outputs.tag }}
-        run: |
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --draft=false --latest
-          else
-            gh release create "$TAG" --title "$TAG" --generate-notes --latest
-          fi
