@@ -1,6 +1,24 @@
 import { describe, expect, test } from 'bun:test'
 
-import { canSubmitComposerAction } from './Composer'
+import { canSubmitComposerAction, focusComposer } from './Composer'
+
+test('focuses a composer with the caret after its draft', () => {
+  let focused = false
+  let selection = [-1, -1]
+
+  focusComposer({
+    value: 'Persisted draft',
+    focus: () => {
+      focused = true
+    },
+    setSelectionRange: (start, end) => {
+      selection = [start ?? -1, end ?? -1]
+    }
+  })
+
+  expect(focused).toBe(true)
+  expect(selection).toEqual([15, 15])
+})
 
 describe('canSubmitComposerAction', () => {
   test('allows complete input while the provider is available', () => {

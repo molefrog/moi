@@ -2,7 +2,7 @@ import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 
 import { IconChevronDown, IconX } from '@tabler/icons-react'
 
-import { canSubmitComposerAction } from '@/client/components/shared/Composer'
+import { canSubmitComposerAction, focusComposer } from '@/client/components/shared/Composer'
 import { useStickToBottom } from '@/client/features/chat/useStickToBottom'
 import { groupTurns } from '@/client/features/chat/group-turns'
 import { attachmentKey, useLive } from '@/client/features/chat/chat-store'
@@ -100,7 +100,7 @@ export function ChatPanel({
   // The active chat surface owns initial focus. A monotonically increasing
   // request also refocuses an already-visible composer after intent actions.
   useEffect(() => {
-    if (active) composerRef.current?.focus()
+    if (active) focusComposer(composerRef.current)
   }, [active, focusRequest])
 
   // Sending always returns the user to the bottom, even if they'd scrolled up —

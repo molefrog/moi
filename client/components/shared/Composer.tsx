@@ -10,6 +10,15 @@ type ComposerProps = Omit<ComponentProps<'form'>, 'ref'> & {
   composerRef: RefObject<HTMLTextAreaElement | null>
 }
 
+type ComposerFocusTarget = Pick<HTMLTextAreaElement, 'focus' | 'setSelectionRange' | 'value'>
+
+export function focusComposer(composer: ComposerFocusTarget | null) {
+  if (!composer) return
+  composer.focus()
+  const end = composer.value.length
+  composer.setSelectionRange(end, end)
+}
+
 export function Composer({
   composerRef,
   className,
@@ -28,7 +37,7 @@ export function Composer({
           event.target.closest('button, input, textarea, select, a, [contenteditable="true"]')
         )
           return
-        composerRef.current?.focus()
+        focusComposer(composerRef.current)
       }}
       className={cn(
         'group/composer flex w-full cursor-text flex-col gap-1 rounded-xl bg-card p-2 text-card-foreground shadow-xs transition-[color,box-shadow] outline-none focus-within:shadow-sm',
