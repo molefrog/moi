@@ -1,0 +1,98 @@
+name: Release
+
+# Tag push starts the run. `verify` runs immediately; `publish` waits on the
+# `release` environment's required reviewer, which is the single approval link.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release (e.g. v0.5.0)
+        required: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run format:check
+      - run: bun test
+
+      - name: Pack and inspect the tarball
+        run: |
+          bun pm pack
+          tar -tzf moi-computer-*.tgz > files.txt
+          grep -q '^package/dist/' files.txt || { echo "::error::tarball has no dist/"; exit 1; }
+          if grep -Ei '\.env|secret' files.txt; then echo "::error::tarball contains secrets"; exit 1; fi
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    # Gates the job on the `release` environment's reviewers, and is also the
+    # environment claim npm's trusted publisher config matches against.
+    environment: release
+    permissions:
+      id-token: write # OIDC token for npm trusted publishing
+      contents: write # creating/publishing the GitHub release
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      # Trusted publishing needs npm >= 11.5.1 on Node >= 22.14.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install -g npm@latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Resolve tag and dist-tag
+        id: meta
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          PKG=$(node -p "require('./package.json').version")
+          [ "$VERSION" = "$PKG" ] || { echo "::error::tag $TAG does not match package.json $PKG"; exit 1; }
+          case "$VERSION" in
+            *-*) echo "dist_tag=next" >> "$GITHUB_OUTPUT" ;;
+            *)   echo "dist_tag=latest" >> "$GITHUB_OUTPUT" ;;
+          esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      # No NODE_AUTH_TOKEN: npm detects the OIDC environment and mints a
+      # short-lived credential. Provenance is attached automatically.
+      - name: Publish to npm
+        run: npm publish --tag ${{ steps.meta.outputs.dist_tag }}
+
+      # Prereleases never get a GitHub release. Stable ones publish the draft
+      # the agent prepared, or fall back to generated notes.
+      - name: Publish the GitHub release
+        if: steps.meta.outputs.dist_tag == 'latest'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --draft=false --latest
+          else
+            gh release create "$TAG" --title "$TAG" --generate-notes --latest
+          fi
