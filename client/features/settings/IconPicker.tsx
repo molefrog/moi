@@ -182,11 +182,11 @@ export function IconPicker({ icon }: IconPickerProps) {
       <div className="flex w-24 shrink-0 flex-col items-center gap-2.5">
         <div
           className={cn(
-            'flex size-24 items-center justify-center overflow-hidden rounded-xl shadow-sm ring-1 ring-border',
+            'flex size-24 items-center justify-center overflow-hidden rounded-xl',
             // Checkerboard hints at transparency when no background is chosen.
             previewKind !== 'image' &&
               !onGradient &&
-              'bg-[repeating-conic-gradient(#0000000d_0%_25%,transparent_0%_50%)] bg-[length:16px_16px]'
+              'bg-[repeating-conic-gradient(#0000000d_0%_25%,transparent_0%_50%)] bg-size-[16px_16px]'
           )}
           // Gradient colors are generated at runtime (shuffle), so they can't be
           // static Tailwind classes — set the composed background inline.
