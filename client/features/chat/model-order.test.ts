@@ -69,18 +69,14 @@ describe('sortModelsByProviderOrder', () => {
     ])
   })
 
-  test('sorts Codex models by display name in descending alphabetical order', () => {
+  test('preserves Codex backend order while its configuration is empty', () => {
     const models = [
       { ...model('gpt-5.4'), displayName: '5.4' },
       { ...model('gpt-5.6-sol'), displayName: '5.6 Sol' },
       { ...model('gpt-5.6-terra'), displayName: '5.6 Terra' }
     ]
 
-    expect(sortModelsByProviderOrder(models, 'codex').map(item => item.value)).toEqual([
-      'gpt-5.6-terra',
-      'gpt-5.6-sol',
-      'gpt-5.4'
-    ])
+    expect(sortModelsByProviderOrder(models, 'codex')).toEqual(models)
   })
 
   test('preserves OpenClaw backend order while its configuration is empty', () => {
