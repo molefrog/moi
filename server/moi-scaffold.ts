@@ -2,7 +2,7 @@
 // `moi openclaw init`). Creates `.moi/widgets/`, writes the widget
 // dependency manifest, and installs dependencies — so the agent never has to
 // bootstrap the folder itself.
-import { mkdir } from 'node:fs/promises'
+import { mkdir, stat } from 'node:fs/promises'
 import { join, resolve, sep } from 'node:path'
 
 // Dependency set available to widgets. `react`/`react-dom` are stubs — at
@@ -88,6 +88,30 @@ declare module '*.avif' { const s: string; export default s }
 declare module '*.svg' { const s: string; export default s }
 `
 
+// Write `.moi/applet-env.d.ts` from the template this CLI ships, overwriting
+// whatever is there. The file is auto-generated and declares the `moi` module's
+// public API, so it drifts the moment the CLI grows an applet-facing function
+// (`focusTab`, `sendChatMessage`) while a workspace keeps the copy written at
+// `moi init` time — leaving the agent's editor and `tsc` insisting a real API
+// doesn't exist. Regenerated alongside skills, the other agent-facing contract
+// moi ships. Refreshes an existing `.moi/` only — never creates one, so a
+// directory that was never scaffolded doesn't sprout a `.moi/` holding nothing
+// but a declaration file. Returns whether it wrote.
+export async function writeAppletEnvDts(workspacePath: string): Promise<boolean> {
+  const moiDir = join(workspacePath, '.moi')
+  if (!(await isDirectory(moiDir))) return false
+  await Bun.write(join(moiDir, 'applet-env.d.ts'), APPLET_ENV_DTS)
+  return true
+}
+
+async function isDirectory(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isDirectory()
+  } catch {
+    return false
+  }
+}
+
 // Bootstraps `.moi/` ONLY when it doesn't exist yet. Re-running `moi init`
 // on an existing workspace overwrites skills but must leave the user's
 // `.moi/` (their deps, widgets, lockfile) completely untouched.
@@ -116,7 +140,7 @@ export async function scaffoldMoiDir(
 
   await mkdir(join(moiDir, 'widgets'), { recursive: true })
   await Bun.write(packagePath, JSON.stringify(MOI_PACKAGE_JSON, null, 2) + '\n')
-  await Bun.write(join(moiDir, 'applet-env.d.ts'), APPLET_ENV_DTS)
+  await writeAppletEnvDts(workspacePath)
 
   const exited = installDependencies(moiDir)
   let timer: ReturnType<typeof setTimeout> | undefined
