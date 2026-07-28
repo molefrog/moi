@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { exists, mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import type { WorkspaceType } from '@/lib/types'
 
+import { APPLET_ENV_DTS } from '../moi-scaffold'
 import { readSkillVersion } from '../skill-version'
 import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from '../skill-update'
 import { BUNDLED_SKILLS_DIR } from '../skills-template'
@@ -57,5 +58,34 @@ describe('workspace skill update service', () => {
     expect(result.before.find(skill => skill.name === 'moi-workspace')?.installed).toBe('0.7.1')
     expect(result.status.updateAvailable).toBe(false)
     expect(await Bun.file(customSkill).text()).toBe('custom\n')
+  })
+
+  // The ambient applet types are the other agent-facing contract the CLI ships,
+  // and drift the same way skills do — a workspace scaffolded before `focusTab`
+  // existed keeps declaring a `moi` module without it until something rewrites
+  // the file. `moi skill update` and the UI's update button both land here.
+  test('regenerates the ambient applet types, replacing a stale copy', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-applet-env-'))
+    await writeInstalledVersion(tempRoot, 'codex', '0.7.1')
+    const dts = join(tempRoot, '.moi', 'applet-env.d.ts')
+    await Bun.write(dts, "declare module 'moi' { export function fileUrl(p: string): string }\n")
+
+    const result = await updateWorkspaceSkills(tempRoot, 'codex')
+
+    expect(result.appletTypesWritten).toBe(true)
+    expect(await Bun.file(dts).text()).toBe(APPLET_ENV_DTS)
+  })
+
+  // Skills install anywhere, applet types only belong to a scaffolded
+  // workspace: updating in a directory with no `.moi/` must not create one
+  // holding a lone declaration file.
+  test('skips the applet types when the workspace has no .moi', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-no-moi-'))
+    await writeInstalledVersion(tempRoot, 'codex', '0.7.1')
+
+    const result = await updateWorkspaceSkills(tempRoot, 'codex')
+
+    expect(result.appletTypesWritten).toBe(false)
+    expect(await exists(join(tempRoot, '.moi'))).toBe(false)
   })
 })

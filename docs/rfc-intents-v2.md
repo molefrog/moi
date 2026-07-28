@@ -1,6 +1,7 @@
 # RFC: workspace tab navigation and applet messaging (intents v2)
 
-Status: MVP 1 (tab foundation) and MVP 2 (chat messaging) implemented; MVP 3 staged · Supersedes
+Status: MVP 1 (tab foundation) and MVP 2 (chat messaging) implemented; MVP 3 skill guidance
+landed, permanent docs pending · Supersedes
 the prototypes reviewed in PR #52 (direction kept, code dropped) and PR #53 (capability routing
 not taken).
 
@@ -220,5 +221,9 @@ The word "intent" stays out of the API: the focus event is `tab:focus`, the enve
   original plan: rate limiting, envelope escaping, and the `runtime` journal source — one line
   for anything the applet API refuses (a dead tab id, a dropped message), which the applet's own
   code never sees.
-- **MVP 3 — authoring:** skill guidance (`Params` type convention, read-the-source rule, CLI
-  usage), then fold the surviving parts of this RFC into permanent docs.
+- **MVP 3 — authoring (skill guidance done):** the workspace skill now documents the API —
+  `SKILL.md` gained a "Driving the workspace" section (`focusTab`, `sendChatMessage`, the render-time
+  ban and rate limits, the `Params` type convention with the read-the-source rule) plus `moi tabs` /
+  `moi tab focus` in its CLI list, and the skill version marker moved to `0.9.0` so installed
+  workspace copies are prompted to update. Still open: folding the surviving parts of this RFC into
+  permanent docs.
