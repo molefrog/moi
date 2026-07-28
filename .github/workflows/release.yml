@@ -33,6 +33,9 @@ jobs:
       - run: bun test
 
       - name: Pack and inspect the tarball
+        # prepack inlines the tldraw license key into the client bundle
+        env:
+          PUBLIC_TLDRAW_LICENSE_KEY: ${{ vars.PUBLIC_TLDRAW_LICENSE_KEY }}
         run: |
           rm -f moi-computer-*.tgz
           bun pm pack
@@ -86,4 +89,10 @@ jobs:
       # No NODE_AUTH_TOKEN: npm detects the OIDC environment and mints a
       # short-lived credential. Provenance is attached automatically.
       - name: Publish to npm
-        run: npm publish --tag ${{ steps.meta.outputs.dist_tag }}
+        # prepack inlines the tldraw license key into the client bundle; fail
+        # rather than ship a build that nags about a missing license.
+        env:
+          PUBLIC_TLDRAW_LICENSE_KEY: ${{ vars.PUBLIC_TLDRAW_LICENSE_KEY }}
+        run: |
+          [ -n "$PUBLIC_TLDRAW_LICENSE_KEY" ] || { echo "::error::PUBLIC_TLDRAW_LICENSE_KEY variable is not set"; exit 1; }
+          npm publish --tag ${{ steps.meta.outputs.dist_tag }}
