@@ -1,59 +1,77 @@
+import type { ComponentProps } from 'react'
 import { Slider as SliderPrimitive } from '@base-ui/react/slider'
 
 import { cn } from '@/client/lib/cn'
 
-type SliderProps = Omit<SliderPrimitive.Root.Props<number>, 'children' | 'className'> & {
-  className?: string
-  marks?: number
-  getAriaLabel?: SliderPrimitive.Thumb.Props['getAriaLabel']
-  getAriaValueText?: SliderPrimitive.Thumb.Props['getAriaValueText']
-}
-
 function Slider({
+  children,
   className,
-  marks = 0,
-  getAriaLabel,
-  getAriaValueText,
+  defaultValue,
+  value,
   min = 0,
   max = 100,
   ...props
-}: SliderProps) {
+}: SliderPrimitive.Root.Props) {
+  const _values = Array.isArray(value)
+    ? value
+    : Array.isArray(defaultValue)
+      ? defaultValue
+      : [min, max]
+
   return (
     <SliderPrimitive.Root
+      className={cn('data-horizontal:w-full data-vertical:h-full', className)}
       data-slot="slider"
-      className={cn('w-full', className)}
+      defaultValue={defaultValue}
+      value={value}
       min={min}
       max={max}
       thumbAlignment="edge"
       {...props}
     >
-      <SliderPrimitive.Control
-        data-slot="slider-control"
-        className="relative flex h-8 w-full touch-none items-center select-none data-disabled:opacity-50"
-      >
+      <SliderPrimitive.Control className="relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-vertical:h-full data-vertical:min-h-40 data-vertical:w-auto data-vertical:flex-col">
         <SliderPrimitive.Track
           data-slot="slider-track"
-          className="relative h-7 w-full grow overflow-hidden rounded-lg bg-muted"
-        />
-        {marks > 0 && (
-          <div
-            className="pointer-events-none absolute inset-x-3 flex items-center justify-between"
-            aria-hidden="true"
-          >
-            {Array.from({ length: marks }, (_, index) => (
-              <span key={index} className="size-1 rounded-full bg-muted-foreground" />
-            ))}
-          </div>
-        )}
-        <SliderPrimitive.Thumb
-          data-slot="slider-thumb"
-          className="relative block size-6 shrink-0 rounded-full bg-background shadow-sm ring-1 ring-border transition-[box-shadow] after:absolute after:-inset-2 hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
-          getAriaLabel={getAriaLabel}
-          getAriaValueText={getAriaValueText}
-        />
+          className="relative grow overflow-hidden rounded-full bg-muted select-none data-horizontal:h-1 data-horizontal:w-full data-vertical:h-full data-vertical:w-1"
+        >
+          <SliderPrimitive.Indicator
+            data-slot="slider-range"
+            className="bg-primary select-none data-horizontal:h-full data-vertical:w-full"
+          />
+        </SliderPrimitive.Track>
+        {children}
+        {Array.from({ length: _values.length }, (_, index) => (
+          <SliderPrimitive.Thumb
+            data-slot="slider-thumb"
+            key={index}
+            className="relative block size-3 shrink-0 cursor-ew-resize rounded-full border border-ring bg-white ring-ring/50 transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50"
+          />
+        ))}
       </SliderPrimitive.Control>
     </SliderPrimitive.Root>
   )
 }
 
-export { Slider }
+type SliderMarksProps = ComponentProps<'span'> & {
+  count: number
+}
+
+function SliderMarks({ className, count, ...props }: SliderMarksProps) {
+  return (
+    <span
+      data-slot="slider-marks"
+      aria-hidden="true"
+      className={cn(
+        'pointer-events-none absolute inset-x-1.5 flex items-center justify-between',
+        className
+      )}
+      {...props}
+    >
+      {Array.from({ length: count }, (_, index) => (
+        <span key={index} className="size-1 rounded-full bg-accent" />
+      ))}
+    </span>
+  )
+}
+
+export { Slider, SliderMarks }

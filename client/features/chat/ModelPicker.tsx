@@ -21,10 +21,9 @@ import {
   Popover,
   PopoverContent,
   PopoverHeader,
-  PopoverTitle,
   PopoverTrigger
 } from '@/client/components/ui/popover'
-import { Slider } from '@/client/components/ui/slider'
+import { Slider, SliderMarks } from '@/client/components/ui/slider'
 import { useLive } from '@/client/features/chat/chat-store'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
@@ -46,6 +45,10 @@ function effortLabel(level: string): string {
   return level === 'xhigh' ? 'Extra' : capitalize(level)
 }
 
+function singleSliderValue(value: number | readonly number[]): number {
+  return typeof value === 'number' ? value : (value[0] ?? 0)
+}
+
 type PickerTriggerProps = Omit<ComponentProps<typeof Button>, 'children' | 'variant'> & {
   label: string
 }
@@ -57,14 +60,7 @@ function PickerTrigger({ label, className, ...props }: PickerTriggerProps) {
       variant="ghost"
       className={cn('group/picker max-w-56 min-w-0 px-2', className)}
     >
-      <span
-        className={cn(
-          'truncate font-normal',
-          'text-muted-foreground transition-colors delay-50 duration-300 group-focus-within/composer:text-foreground group-data-popup-open/picker:text-foreground'
-        )}
-      >
-        {label}
-      </span>
+      <span className="truncate font-normal text-muted-foreground">{label}</span>
     </Button>
   )
 }
@@ -129,7 +125,7 @@ function EffortPicker({ currentEffort, effortLevels, onValueChange }: EffortPick
       <PopoverTrigger
         render={<PickerTrigger label={displayedLabel} aria-label={`Effort: ${displayedLabel}`} />}
       />
-      <PopoverContent align="end" side="top" className="w-64">
+      <PopoverContent align="end" side="top" className="w-64" disableAnchorTracking>
         <PopoverHeader className="flex-row items-center gap-1">
           <span className="text-muted-foreground">Effort</span>
           <output aria-live="polite">{displayedLabel}</output>
@@ -142,19 +138,23 @@ function EffortPicker({ currentEffort, effortLevels, onValueChange }: EffortPick
             <span>Faster</span>
             <span>Smarter</span>
           </div>
-          <Slider
-            value={draftIndex}
-            min={0}
-            max={effortLevels.length - 1}
-            step={1}
-            marks={effortLevels.length}
-            onValueChange={setDraftIndex}
-            onValueCommitted={commitEffort}
-            getAriaLabel={() => 'Reasoning effort'}
-            getAriaValueText={(_formattedValue, value) =>
-              effortLabel(effortLevels[value] ?? currentEffort)
-            }
-          />
+          <label className="block">
+            <span className="sr-only">Reasoning effort</span>
+            <Slider
+              value={draftIndex}
+              min={0}
+              max={effortLevels.length - 1}
+              step={1}
+              onValueChange={value => setDraftIndex(singleSliderValue(value))}
+              onValueCommitted={value => commitEffort(singleSliderValue(value))}
+              className={cn(
+                '**:data-[slot=slider-track]:h-6 **:data-[slot=slider-track]:rounded-sm',
+                '**:data-[slot=slider-thumb]:h-6 **:data-[slot=slider-thumb]:w-5 **:data-[slot=slider-thumb]:rounded-sm **:data-[slot=slider-thumb]:border-0 **:data-[slot=slider-thumb]:bg-card **:data-[slot=slider-thumb]:shadow-xs **:data-[slot=slider-thumb]:ring-0'
+              )}
+            >
+              <SliderMarks count={effortLevels.length} className="inset-x-2" />
+            </Slider>
+          </label>
         </div>
       </PopoverContent>
     </Popover>

@@ -12,23 +12,30 @@ function PopoverTrigger({ ...props }: PopoverPrimitive.Trigger.Props) {
   return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />
 }
 
+type PopoverContentProps = PopoverPrimitive.Popup.Props &
+  Pick<
+    PopoverPrimitive.Positioner.Props,
+    'align' | 'alignOffset' | 'disableAnchorTracking' | 'side' | 'sideOffset'
+  > &
+  Pick<PopoverPrimitive.Portal.Props, 'keepMounted' | 'container'>
+
 function PopoverContent({
   className,
   align = 'center',
   alignOffset = 0,
+  disableAnchorTracking = false,
   side = 'bottom',
   sideOffset = 4,
   keepMounted = false,
   container,
   ...props
-}: PopoverPrimitive.Popup.Props &
-  Pick<PopoverPrimitive.Positioner.Props, 'align' | 'alignOffset' | 'side' | 'sideOffset'> &
-  Pick<PopoverPrimitive.Portal.Props, 'keepMounted' | 'container'>) {
+}: PopoverContentProps) {
   return (
     <PopoverPrimitive.Portal keepMounted={keepMounted} container={container}>
       <PopoverPrimitive.Positioner
         align={align}
         alignOffset={alignOffset}
+        disableAnchorTracking={disableAnchorTracking}
         side={side}
         sideOffset={sideOffset}
         className="isolate z-50"
