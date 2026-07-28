@@ -48,7 +48,7 @@ function CustomizeOption({ active, children, className, onSelect, style }: Custo
       aria-pressed={active}
       onClick={onSelect}
       className={cn(
-        'relative w-full rounded-md bg-card text-left ring-1 ring-border transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+        'relative w-full rounded-lg bg-card text-left ring-1 ring-border transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
         'flex items-center gap-2 p-3',
         className,
         !active && 'cursor-pointer pr-9 opacity-70 hover:opacity-100'
@@ -111,7 +111,7 @@ export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
               <div className="flex gap-2">
                 <span
                   className={cn(
-                    'flex size-5 shrink-0 items-center justify-center rounded-xs text-[9px] leading-none font-bold',
+                    'flex size-5 shrink-0 items-center justify-center rounded-sm text-[9px] leading-none font-bold',
                     preset.primary
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-foreground text-background'
