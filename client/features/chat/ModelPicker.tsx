@@ -25,7 +25,7 @@ import {
   PopoverHeader,
   PopoverTrigger
 } from '@/client/components/ui/popover'
-import { Slider, SliderMarks } from '@/client/components/ui/slider'
+import { Slider } from '@/client/components/ui/slider'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { useLive } from '@/client/features/chat/chat-store'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
@@ -205,11 +205,21 @@ function EffortPicker({
                 '**:data-[slot=slider-thumb]:h-6 **:data-[slot=slider-thumb]:w-5 **:data-[slot=slider-thumb]:rounded-sm **:data-[slot=slider-thumb]:border-0 **:data-[slot=slider-thumb]:bg-card **:data-[slot=slider-thumb]:shadow-xs **:data-[slot=slider-thumb]:ring-0'
               )}
             >
-              <SliderMarks
-                activeIndex={draftIndex}
-                count={effortLevels.length}
-                className="inset-x-2"
-              />
+              <span
+                data-slot="slider-marks"
+                aria-hidden="true"
+                className="absolute inset-x-2 flex items-center justify-between"
+              >
+                {Array.from({ length: effortLevels.length }, (_, index) => (
+                  <span
+                    key={index}
+                    className={cn(
+                      'size-1 rounded-full',
+                      index <= draftIndex ? 'bg-primary-foreground/30' : 'bg-foreground/30'
+                    )}
+                  />
+                ))}
+              </span>
             </Slider>
           </label>
         </div>

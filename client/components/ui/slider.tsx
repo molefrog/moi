@@ -67,33 +67,4 @@ function Slider({
   )
 }
 
-type SliderMarksProps = {
-  activeIndex: number
-  className?: string
-  count: number
-}
-
-function SliderMarks({ activeIndex, className, count }: SliderMarksProps) {
-  return (
-    <span
-      data-slot="slider-marks"
-      aria-hidden="true"
-      className={cn(
-        'pointer-events-none absolute inset-x-1.5 flex items-center justify-between',
-        className
-      )}
-    >
-      {Array.from({ length: count }, (_, index) => (
-        <span
-          key={index}
-          className={cn(
-            'size-1 rounded-full transition-colors',
-            index <= activeIndex ? 'bg-primary-foreground/30' : 'bg-foreground/30'
-          )}
-        />
-      ))}
-    </span>
-  )
-}
-
-export { Slider, SliderMarks }
+export { Slider }
