@@ -13,9 +13,10 @@ function model(value: string, resolvedModel?: string): Model {
 }
 
 describe('sortModelsByProviderOrder', () => {
-  test('uses the configured Claude Code order', () => {
+  test('orders Anthropic model families while preserving SDK order within each family', () => {
     const models = [
       model('haiku', 'claude-haiku-4-5-20251001'),
+      model('opus-5', 'claude-opus-5'),
       model('opus[1m]', 'claude-opus-4-8[1m]'),
       model('sonnet', 'claude-sonnet-5'),
       model('fable', 'claude-fable-5'),
@@ -24,7 +25,19 @@ describe('sortModelsByProviderOrder', () => {
 
     expect(sortModelsByProviderOrder(models, 'claude-code').map(item => item.value)).toEqual([
       'fable',
+      'opus-5',
+      'opus[1m]',
       'opus',
+      'sonnet',
+      'haiku'
+    ])
+  })
+
+  test('recognizes Anthropic aliases without a resolved model', () => {
+    const models = [model('haiku'), model('opus[1m]'), model('fable'), model('sonnet')]
+
+    expect(sortModelsByProviderOrder(models, 'claude-code').map(item => item.value)).toEqual([
+      'fable',
       'opus[1m]',
       'sonnet',
       'haiku'
@@ -47,12 +60,26 @@ describe('sortModelsByProviderOrder', () => {
     ])
   })
 
-  test('handles missing configured models', () => {
+  test('handles missing Anthropic model families', () => {
     const models = [model('sonnet', 'claude-sonnet-5'), model('fable', 'claude-fable-5')]
 
     expect(sortModelsByProviderOrder(models, 'claude-code').map(item => item.value)).toEqual([
       'fable',
       'sonnet'
+    ])
+  })
+
+  test('sorts Codex models by display name in descending alphabetical order', () => {
+    const models = [
+      { ...model('gpt-5.4'), displayName: '5.4' },
+      { ...model('gpt-5.6-sol'), displayName: '5.6 Sol' },
+      { ...model('gpt-5.6-terra'), displayName: '5.6 Terra' }
+    ]
+
+    expect(sortModelsByProviderOrder(models, 'codex').map(item => item.value)).toEqual([
+      'gpt-5.6-terra',
+      'gpt-5.6-sol',
+      'gpt-5.4'
     ])
   })
 
