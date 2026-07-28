@@ -140,6 +140,9 @@ type LiveSession = {
   // idle TTL — tearing down the subprocess would kill its background children.
   bgTasks: Set<string>
   model: string | undefined
+  // Fast mode is a live flag setting. Undefined clears moi's override and
+  // inherits the provider configuration.
+  fastMode: boolean | undefined
   // Reasoning effort the query was created with. The SDK has no live setter for
   // it (unlike setModel), so a change tears the session down and resumes.
   effort: string | undefined
@@ -208,6 +211,7 @@ export type CCDebugSession = {
   workspaceId: string
   sessionId: string
   model: string | undefined
+  fastMode: boolean | undefined
   effort: string | undefined
   desiredEffort: string | undefined
   stream: boolean
@@ -229,6 +233,7 @@ export function getCCDebugSnapshot(): { sessions: CCDebugSession[]; aliases: num
       workspaceId: s.workspaceId,
       sessionId: s.sessionId,
       model: s.model,
+      fastMode: s.fastMode,
       effort: s.effort,
       desiredEffort: s.desiredEffort,
       stream: s.stream,
@@ -383,12 +388,16 @@ async function consume(s: LiveSession) {
         }
         // Seed the thread's config from what it actually ran with — but only if
         // it has none yet, so an explicit user PUT (or a migrated temp-id edit)
-        // always wins. A default run (no model/effort) leaves no file and falls
-        // back to the workspace defaults.
-        if ((s.model || s.effort) && !(await hasThreadConfig(s.workspacePath, s.sessionId))) {
+        // always wins. A default run leaves no file and falls back to the
+        // workspace defaults.
+        if (
+          (s.model || s.effort || s.fastMode !== undefined) &&
+          !(await hasThreadConfig(s.workspacePath, s.sessionId))
+        ) {
           await saveThreadConfig(s.workspacePath, s.sessionId, {
             model: s.model,
-            effort: s.effort
+            effort: s.effort,
+            fastMode: s.fastMode
           })
         }
       }
@@ -514,6 +523,7 @@ function createLiveSession(input: {
   isNew: boolean
   model: string | undefined
   effort: string | undefined
+  fastMode: boolean | undefined
   // Live token streaming (`includePartialMessages`). Only enabled when the
   // client opts in; off leaves the query byte-for-byte as before.
   stream: boolean
@@ -544,6 +554,7 @@ function createLiveSession(input: {
     // is valid for the model; the SDK silently downgrades otherwise. Cast because
     // the SDK under-types the union (no 'xhigh') vs our pass-through string.
     ...(input.effort ? { effort: input.effort as Options['effort'] } : {}),
+    ...(input.fastMode !== undefined ? { settings: { fastMode: input.fastMode } } : {}),
     // Emit `stream_event` partial-message frames so the adapter can surface a
     // live token-by-token preview. Off = unchanged behavior (whole blocks only).
     includePartialMessages: input.stream,
@@ -568,6 +579,7 @@ function createLiveSession(input: {
     sawStateEvents: false,
     bgTasks: new Set(),
     model: input.model,
+    fastMode: input.fastMode,
     effort: input.effort,
     desiredEffort: input.effort,
     stream: input.stream,
@@ -581,7 +593,7 @@ function createLiveSession(input: {
   }
   sessions.set(recKey(session.workspaceId, session.sessionId), session)
   debug(
-    `cc create ${input.isNew ? 'new' : 'resume'} ws=${input.workspaceId} session=${input.sessionId} model=${input.model ?? 'default'} effort=${input.effort ?? 'default'} live=${sessions.size}`
+    `cc create ${input.isNew ? 'new' : 'resume'} ws=${input.workspaceId} session=${input.sessionId} model=${input.model ?? 'default'} effort=${input.effort ?? 'default'} fast=${input.fastMode ?? 'default'} live=${sessions.size}`
   )
   void consume(session)
   return session
@@ -600,6 +612,7 @@ export async function sendCCMessage(input: {
   optimisticId?: string
   model?: string
   effort?: string
+  fastMode?: boolean
   stream?: boolean
   // Structured moi context (lib/moi-context.ts), rendered here and injected
   // as a leading system-reminder text block; the display parts never see it.
@@ -654,6 +667,15 @@ export async function sendCCMessage(input: {
       // silently lose the message and hang the spinner).
       if (s.closed) s = undefined
     }
+    if (s && input.fastMode !== s.fastMode) {
+      try {
+        await s.q.applyFlagSettings({ fastMode: input.fastMode ?? null })
+        s.fastMode = input.fastMode
+      } catch (err) {
+        console.error('[cc-session] applyFlagSettings failed', err)
+      }
+      if (s.closed) s = undefined
+    }
     if (s) {
       // Effort/streaming can't change on a running query; record the request so
       // the session rebuilds once its turns drain (see the `result` handler).
@@ -671,6 +693,7 @@ export async function sendCCMessage(input: {
       isNew: input.isNew,
       model: input.model,
       effort: input.effort,
+      fastMode: input.fastMode,
       stream: wantStream,
       // The agent only sees secrets scoped to the 'agent' sink (plus .env).
       workspaceEnv: await resolveWorkspaceEnv(input.workspacePath)

@@ -1,4 +1,6 @@
-import { type ComponentProps, memo, useState } from 'react'
+import { type ComponentProps, type ReactNode, memo, useState } from 'react'
+
+import { IconBolt, IconBoltFilled } from '@tabler/icons-react'
 
 import { useSaveThreadConfig, useThreadConfig, useWorkspaceModels } from './api'
 import {
@@ -24,6 +26,7 @@ import {
   PopoverTrigger
 } from '@/client/components/ui/popover'
 import { Slider, SliderMarks } from '@/client/components/ui/slider'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { useLive } from '@/client/features/chat/chat-store'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
@@ -51,16 +54,21 @@ function singleSliderValue(value: number | readonly number[]): number {
 
 type PickerTriggerProps = Omit<ComponentProps<typeof Button>, 'children' | 'variant'> & {
   label: string
+  leadingIcon?: ReactNode
 }
 
-function PickerTrigger({ label, className, ...props }: PickerTriggerProps) {
+function PickerTrigger({ label, leadingIcon, className, ...props }: PickerTriggerProps) {
   return (
     <Button
       {...props}
       variant="ghost"
-      className={cn('group/picker max-w-56 min-w-0 px-2', className)}
+      className={cn(
+        'group/picker max-w-56 min-w-0 px-2 text-muted-foreground hover:text-muted-foreground',
+        className
+      )}
     >
-      <span className="truncate font-normal text-muted-foreground">{label}</span>
+      {leadingIcon}
+      <span className="truncate font-normal">{label}</span>
     </Button>
   )
 }
@@ -99,10 +107,20 @@ function ModelDropdown({ current, model, models, onValueChange }: ModelDropdownP
 type EffortPickerProps = {
   currentEffort: string
   effortLevels: readonly string[]
+  fastMode: boolean
+  showFastMode: boolean
+  onFastModeChange: (value: boolean) => void
   onValueChange: (value: string) => void
 }
 
-function EffortPicker({ currentEffort, effortLevels, onValueChange }: EffortPickerProps) {
+function EffortPicker({
+  currentEffort,
+  effortLevels,
+  fastMode,
+  showFastMode,
+  onFastModeChange,
+  onValueChange
+}: EffortPickerProps) {
   const currentIndex = resolveEffortIndex(effortLevels, currentEffort)
   const [open, setOpen] = useState(false)
   const [draftIndex, setDraftIndex] = useState(currentIndex)
@@ -123,12 +141,47 @@ function EffortPicker({ currentEffort, effortLevels, onValueChange }: EffortPick
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger
-        render={<PickerTrigger label={displayedLabel} aria-label={`Effort: ${displayedLabel}`} />}
+        render={
+          <PickerTrigger
+            label={displayedLabel}
+            leadingIcon={fastMode ? <IconBolt stroke={1.5} /> : undefined}
+            aria-label={`Effort: ${displayedLabel}`}
+          />
+        }
       />
       <PopoverContent align="end" side="top" className="w-64" disableAnchorTracking>
-        <PopoverHeader className="flex-row items-center gap-1">
-          <span className="text-muted-foreground">Effort</span>
-          <output aria-live="polite">{displayedLabel}</output>
+        <PopoverHeader className="flex-row items-center justify-between gap-2">
+          <div className="flex items-center gap-1">
+            <span className="text-muted-foreground">Effort</span>
+            <output aria-live="polite">{displayedLabel}</output>
+          </div>
+          {showFastMode && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={fastMode ? 'Turn off Fast mode' : 'Turn on Fast mode'}
+                    aria-pressed={fastMode}
+                    onClick={() => onFastModeChange(!fastMode)}
+                    className="-my-1 -mr-1"
+                  >
+                    {fastMode ? (
+                      <IconBoltFilled className="text-primary" />
+                    ) : (
+                      <IconBolt className="text-muted-foreground" stroke={1.5} />
+                    )}
+                  </Button>
+                }
+              />
+              <TooltipContent align="center" className="flex-col gap-0">
+                <span>Fast mode</span>
+                <span className="font-normal text-muted-foreground">More usage</span>
+              </TooltipContent>
+            </Tooltip>
+          )}
         </PopoverHeader>
         <div className="flex flex-col gap-2">
           <div
@@ -171,10 +224,10 @@ type ModelPickerProps = {
 
 // Model selector for composer surfaces. The workspace's available models come
 // from `/api/workspaces/:id/models`; effort options follow the selected model.
-// Model + effort persist per chat once one exists. A new chat edits the
-// workspace defaults that seed it. Both values are sent with each chat frame.
-// The workspace scope gives new-chat surfaces such as the view builder the same
-// defaults that their submit path reads.
+// Model, effort, and Fast mode persist per chat once one exists. A new chat
+// edits the workspace defaults that seed it. All values are sent with each chat
+// frame. The workspace scope gives new-chat surfaces such as the view builder
+// the same defaults that their submit path reads.
 export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: ModelPickerProps) {
   const { workspaceId, layout, setLayout } = useWorkspaceLayoutCtx()
   const { data } = useWorkspaceModels(workspaceId)
@@ -201,6 +254,8 @@ export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: 
   const selectedModel = (activeSessionId ? threadConfig?.model : undefined) ?? layout.selectedModel
   const selectedEffort =
     (activeSessionId ? threadConfig?.effort : undefined) ?? layout.selectedEffort
+  const selectedFastMode =
+    (activeSessionId ? threadConfig?.fastMode : undefined) ?? layout.selectedFastMode
 
   const setSelectedModel = (value: string) => {
     if (activeSessionId)
@@ -212,6 +267,12 @@ export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: 
     if (activeSessionId)
       saveThreadConfig.mutate({ sessionId: activeSessionId, patch: { effort: value } })
     else setLayout({ selectedEffort: value })
+  }
+
+  const setSelectedFastMode = (value: boolean) => {
+    if (activeSessionId)
+      saveThreadConfig.mutate({ sessionId: activeSessionId, patch: { fastMode: value } })
+    else setLayout({ selectedFastMode: value })
   }
 
   if (models.length === 0) return null
@@ -244,6 +305,9 @@ export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: 
           key={model.value}
           currentEffort={currentEffort}
           effortLevels={effortLevels}
+          fastMode={selectedFastMode === true}
+          showFastMode={model.supportsFastMode === true}
+          onFastModeChange={setSelectedFastMode}
           onValueChange={setSelectedEffort}
         />
       )}

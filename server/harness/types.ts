@@ -15,8 +15,8 @@ import type {
 } from '@/lib/types'
 
 // The superset of what any backend needs to accept a user message; harnesses
-// ignore fields they don't support (e.g. OpenClaw ignores model/effort/stream,
-// only OpenClaw reads agentId).
+// ignore fields they don't support (e.g. OpenClaw ignores
+// model/effort/Fast-mode/stream, only OpenClaw reads agentId).
 export type SendMessageInput = {
   workspaceId: string
   workspacePath: string
@@ -29,6 +29,7 @@ export type SendMessageInput = {
   optimisticId?: string
   model?: string
   effort?: string
+  fastMode?: boolean
   stream?: boolean
   // Structured moi context (lib/moi-context.ts). Each harness renders and
   // injects it its own way: Claude Code as a leading system-reminder text

@@ -112,9 +112,21 @@ export type CodexModel = {
   supportedReasoningEfforts?: { reasoningEffort: string; description?: string }[]
   defaultReasoningEffort?: string
   isDefault?: boolean
+  serviceTiers?: { id: string; name: string; description: string }[]
+  // Older app-server versions advertised Fast mode through this field.
+  additionalSpeedTiers?: string[]
 }
 
 // ---- discovery mappings ------------------------------------------------------
+
+const CODEX_FAST_SERVICE_TIER = 'priority'
+
+export function codexServiceTierForFastMode(
+  fastMode: boolean | undefined
+): typeof CODEX_FAST_SERVICE_TIER | null | undefined {
+  if (fastMode === undefined) return undefined
+  return fastMode ? CODEX_FAST_SERVICE_TIER : null
+}
 
 // `thread/list.preview` snippets come from the raw first user message — on
 // the pre-0.135 fallback path that text carries the appended context envelope,
@@ -167,6 +179,9 @@ export function selectCodexWorkspacePreview(
 export function codexModelToModel(m: CodexModel): Model {
   const efforts = (m.supportedReasoningEfforts ?? []).map(e => e.reasoningEffort)
   const displayName = m.displayName.replace(/^GPT-/, '').replaceAll('-', ' ')
+  const supportsFastMode =
+    (m.serviceTiers ?? []).some(tier => tier.id === CODEX_FAST_SERVICE_TIER) ||
+    (m.additionalSpeedTiers ?? []).includes('fast')
   return {
     value: m.id,
     resolvedModel: m.model,
@@ -178,7 +193,8 @@ export function codexModelToModel(m: CodexModel): Model {
       ? { description: `${displayName} · ${m.description}` }
       : { description: displayName }),
     supportsEffort: efforts.length > 0,
-    ...(efforts.length > 0 ? { supportedEffortLevels: efforts } : {})
+    ...(efforts.length > 0 ? { supportedEffortLevels: efforts } : {}),
+    ...(supportsFastMode ? { supportsFastMode: true } : {})
   }
 }
 

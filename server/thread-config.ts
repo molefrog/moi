@@ -5,10 +5,10 @@ import type { ThreadConfig } from '@/lib/types'
 
 import { DATA_DIR } from './data-dir'
 
-// Per-thread model/effort overrides for chat threads. Stored OUTSIDE the user's
-// workspace (no repo churn) in ONE global JSON file in moi's data dir, alongside
-// the workspace registry. Keyed by workspace path then sessionId:
-//   { "<workspacePath>": { "<sessionId>": { model?, effort? } } }
+// Per-thread model/effort/Fast-mode overrides for chat threads. Stored OUTSIDE
+// the user's workspace (no repo churn) in ONE global JSON file in moi's data
+// dir, alongside the workspace registry. Keyed by workspace path then sessionId:
+//   { "<workspacePath>": { "<sessionId>": { model?, effort?, fastMode? } } }
 // Path (not registry id) is the key so config survives re-registration and lines
 // up with the SDK's path-based session storage.
 
@@ -16,6 +16,7 @@ import { DATA_DIR } from './data-dir'
 export type ThreadConfigPatch = {
   model?: string | null
   effort?: string | null
+  fastMode?: boolean | null
 }
 
 type Store = Record<string, Record<string, ThreadConfig>>
@@ -31,11 +32,12 @@ function clean(cfg: ThreadConfig | undefined): ThreadConfig {
   const out: ThreadConfig = {}
   if (typeof cfg?.model === 'string') out.model = cfg.model
   if (typeof cfg?.effort === 'string') out.effort = cfg.effort
+  if (typeof cfg?.fastMode === 'boolean') out.fastMode = cfg.fastMode
   return out
 }
 
 function isEmpty(cfg: ThreadConfig): boolean {
-  return cfg.model === undefined && cfg.effort === undefined
+  return cfg.model === undefined && cfg.effort === undefined && cfg.fastMode === undefined
 }
 
 async function readStore(): Promise<Store> {
@@ -76,8 +78,8 @@ export async function hasThreadConfig(workspacePath: string, sessionId: string):
 }
 
 // Merge a patch over the stored config and write it back. `null` clears a field,
-// `undefined` leaves it untouched, a string sets it. An emptied entry is dropped
-// to keep the file tidy. Returns the merged config.
+// `undefined` leaves it untouched, and a typed value sets it. An emptied entry
+// is dropped to keep the file tidy. Returns the merged config.
 export async function saveThreadConfig(
   workspacePath: string,
   sessionId: string,
@@ -93,6 +95,8 @@ export async function saveThreadConfig(
       if (value === null) delete next[key]
       else next[key] = value
     }
+    if (patch.fastMode === null) delete next.fastMode
+    else if (patch.fastMode !== undefined) next.fastMode = patch.fastMode
     if (isEmpty(next)) delete threads[sessionId]
     else threads[sessionId] = next
     if (Object.keys(threads).length === 0) delete store[workspacePath]

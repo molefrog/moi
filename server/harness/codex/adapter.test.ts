@@ -6,6 +6,7 @@ import {
   codexItemToNotice,
   codexItemToTurn,
   codexModelToModel,
+  codexServiceTierForFastMode,
   codexThreadToEvents,
   codexThreadToSessionInfo
 } from './adapter'
@@ -355,5 +356,37 @@ describe('discovery mappings', () => {
       supportsEffort: true,
       supportedEffortLevels: ['low', 'high']
     })
+  })
+
+  test('maps current and legacy Codex Fast mode capabilities', () => {
+    const current = codexModelToModel({
+      id: 'current',
+      model: 'current',
+      displayName: 'Current',
+      serviceTiers: [{ id: 'priority', name: 'Fast', description: 'Faster responses' }]
+    })
+    const legacy = codexModelToModel({
+      id: 'legacy',
+      model: 'legacy',
+      displayName: 'Legacy',
+      additionalSpeedTiers: ['fast']
+    })
+    const unsupported = codexModelToModel({
+      id: 'unsupported',
+      model: 'unsupported',
+      displayName: 'Unsupported',
+      serviceTiers: [{ id: 'flex', name: 'Flex', description: 'Flexible processing' }],
+      additionalSpeedTiers: ['slow']
+    })
+
+    expect(current.supportsFastMode).toBe(true)
+    expect(legacy.supportsFastMode).toBe(true)
+    expect(unsupported.supportsFastMode).toBeUndefined()
+  })
+
+  test('maps Fast preference to Codex service tier wire values', () => {
+    expect(codexServiceTierForFastMode(true)).toBe('priority')
+    expect(codexServiceTierForFastMode(false)).toBeNull()
+    expect(codexServiceTierForFastMode(undefined)).toBeUndefined()
   })
 })

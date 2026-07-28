@@ -65,8 +65,9 @@ export function startOptimisticTurn({
 export function resolveChatRunOptions(
   modelsData: WorkspaceModels | undefined,
   pickedModel: string | undefined,
-  pickedEffort: string | undefined
-): { model?: string; effort?: string; stream?: true } {
+  pickedEffort: string | undefined,
+  pickedFastMode?: boolean
+): { model?: string; effort?: string; fastMode?: boolean; stream?: true } {
   const models = modelsData?.models
   const model =
     !pickedModel || !models || models.some(candidate => candidate.value === pickedModel)
@@ -77,6 +78,15 @@ export function resolveChatRunOptions(
     pickedEffort && (!modelInfo || (modelInfo.supportedEffortLevels ?? []).includes(pickedEffort))
       ? pickedEffort
       : undefined
+  const fastMode =
+    pickedFastMode === undefined || !modelInfo || modelInfo.supportsFastMode
+      ? pickedFastMode
+      : false
   const stream = STREAM_RESPONSES && modelsData?.supportsStreaming ? true : undefined
-  return { model, effort, stream }
+  return {
+    model,
+    effort,
+    ...(fastMode !== undefined ? { fastMode } : {}),
+    stream
+  }
 }

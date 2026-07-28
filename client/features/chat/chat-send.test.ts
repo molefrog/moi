@@ -44,6 +44,12 @@ describe('resolveChatRunOptions', () => {
       {
         value: 'sonnet',
         displayName: 'Sonnet',
+        supportsFastMode: true,
+        supportedEffortLevels: ['low', 'high']
+      },
+      {
+        value: 'haiku',
+        displayName: 'Haiku',
         supportedEffortLevels: ['low', 'high']
       }
     ]
@@ -79,6 +85,43 @@ describe('resolveChatRunOptions', () => {
       effort: undefined,
       stream: true
     })
+  })
+
+  test('keeps enabled and explicitly disabled Fast mode for a supported model', () => {
+    expect(resolveChatRunOptions(models, 'sonnet', 'high', true)).toEqual({
+      model: 'sonnet',
+      effort: 'high',
+      fastMode: true,
+      stream: true
+    })
+    expect(resolveChatRunOptions(models, 'sonnet', 'high', false)).toEqual({
+      model: 'sonnet',
+      effort: 'high',
+      fastMode: false,
+      stream: true
+    })
+  })
+
+  test('disables Fast mode for a known unsupported model without dropping the preference', () => {
+    expect(resolveChatRunOptions(models, 'haiku', 'high', true)).toEqual({
+      model: 'haiku',
+      effort: 'high',
+      fastMode: false,
+      stream: true
+    })
+  })
+
+  test('keeps Fast mode for a stale model that the client cannot validate', () => {
+    expect(resolveChatRunOptions(models, 'removed-model', 'high', true)).toEqual({
+      model: undefined,
+      effort: 'high',
+      fastMode: true,
+      stream: true
+    })
+  })
+
+  test('omits Fast mode when no moi preference exists', () => {
+    expect(resolveChatRunOptions(models, 'sonnet', 'high')).not.toHaveProperty('fastMode')
   })
 })
 

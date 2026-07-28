@@ -132,12 +132,19 @@ export function useChat(address: WorkspaceTabAddress) {
 
       // The thread's persisted choice (workspace defaults for a new chat). Drop a
       // model the loaded list no longer offers (stale alias) so the SDK doesn't
-      // reject model_not_found. Drop an effort the resolved model doesn't support
-      // (e.g. model changed under it); when the model is unknown/default we can't
-      // check, so pass it through — the SDK silently downgrades unsupported effort.
+      // reject model_not_found. Drop an effort the resolved model doesn't
+      // support and explicitly disable Fast mode on a known unsupported model.
+      // When the model is unknown/default we can't validate either capability,
+      // so pass the stored choices through.
       const pickedModel = threadCfg?.model ?? layout.selectedModel
       const pickedEffort = threadCfg?.effort ?? layout.selectedEffort
-      const { model, effort, stream } = resolveChatRunOptions(modelsData, pickedModel, pickedEffort)
+      const pickedFastMode = threadCfg?.fastMode ?? layout.selectedFastMode
+      const { model, effort, fastMode, stream } = resolveChatRunOptions(
+        modelsData,
+        pickedModel,
+        pickedEffort,
+        pickedFastMode
+      )
       sendMessage({
         type: 'chat',
         workspaceId,
@@ -147,6 +154,7 @@ export function useChat(address: WorkspaceTabAddress) {
         optimisticId,
         model,
         effort,
+        fastMode,
         stream,
         context: buildMoiContext(options),
         ...(ready.length > 0 ? { attachments: ready.map(a => a.upload!.id) } : {})
@@ -169,9 +177,11 @@ export function useChat(address: WorkspaceTabAddress) {
       qc,
       layout.selectedModel,
       layout.selectedEffort,
+      layout.selectedFastMode,
       buildMoiContext,
       threadCfg?.model,
       threadCfg?.effort,
+      threadCfg?.fastMode,
       modelsData
     ]
   )
