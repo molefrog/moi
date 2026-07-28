@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { type ComponentProps, memo, useState } from 'react'
 
 import { useSaveThreadConfig, useThreadConfig, useWorkspaceModels } from './api'
 import {
@@ -27,6 +27,7 @@ import {
 import { Slider } from '@/client/components/ui/slider'
 import { useLive } from '@/client/features/chat/chat-store'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
+import { cn } from '@/client/lib/cn'
 import type { Model } from '@/lib/types'
 
 // Models describe themselves with a " · "-joined blurb; we show only the
@@ -45,6 +46,29 @@ function effortLabel(level: string): string {
   return level === 'xhigh' ? 'Extra' : capitalize(level)
 }
 
+type PickerTriggerProps = Omit<ComponentProps<typeof Button>, 'children' | 'variant'> & {
+  label: string
+}
+
+function PickerTrigger({ label, className, ...props }: PickerTriggerProps) {
+  return (
+    <Button
+      {...props}
+      variant="ghost"
+      className={cn('group/picker max-w-56 min-w-0 px-2', className)}
+    >
+      <span
+        className={cn(
+          'truncate font-normal',
+          'text-muted-foreground transition-colors delay-50 duration-300 group-focus-within/composer:text-foreground group-data-popup-open/picker:text-foreground'
+        )}
+      >
+        {label}
+      </span>
+    </Button>
+  )
+}
+
 type ModelDropdownProps = {
   current: string
   model: Model
@@ -58,19 +82,9 @@ function ModelDropdown({ current, model, models, onValueChange }: ModelDropdownP
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            className="group/model max-w-56 min-w-0 px-2"
-            aria-label={`Model: ${label}`}
-          >
-            <span className="truncate font-normal text-muted-foreground transition-colors group-focus-within/composer:text-foreground group-data-[popup-open]/model:text-foreground">
-              {label}
-            </span>
-          </Button>
-        }
+        render={<PickerTrigger label={label} aria-label={`Model: ${label}`} />}
       />
-      <DropdownMenuContent align="end" side="top" className="min-w-40">
+      <DropdownMenuContent align="end" side="top" className="min-w-60">
         <DropdownMenuGroup>
           <DropdownMenuLabel>Models</DropdownMenuLabel>
           <DropdownMenuRadioGroup value={current} onValueChange={onValueChange}>
@@ -113,38 +127,35 @@ function EffortPicker({ currentEffort, effortLevels, onValueChange }: EffortPick
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger
-        render={
-          <Button variant="ghost" className="px-2" aria-label={`Effort: ${displayedLabel}`}>
-            <span className="font-normal text-muted-foreground transition-colors group-focus-within/composer:text-foreground">
-              {displayedLabel}
-            </span>
-          </Button>
-        }
+        render={<PickerTrigger label={displayedLabel} aria-label={`Effort: ${displayedLabel}`} />}
       />
       <PopoverContent align="end" side="top" className="w-64">
         <PopoverHeader className="flex-row items-center gap-1">
-          <PopoverTitle>Effort</PopoverTitle>
-          <output className="text-muted-foreground" aria-live="polite">
-            {displayedLabel}
-          </output>
+          <span className="text-muted-foreground">Effort</span>
+          <output aria-live="polite">{displayedLabel}</output>
         </PopoverHeader>
-        <div className="flex items-center justify-between text-muted-foreground" aria-hidden="true">
-          <span>Faster</span>
-          <span>Smarter</span>
+        <div className="flex flex-col gap-2">
+          <div
+            className="flex items-center justify-between text-xs text-muted-foreground"
+            aria-hidden="true"
+          >
+            <span>Faster</span>
+            <span>Smarter</span>
+          </div>
+          <Slider
+            value={draftIndex}
+            min={0}
+            max={effortLevels.length - 1}
+            step={1}
+            marks={effortLevels.length}
+            onValueChange={setDraftIndex}
+            onValueCommitted={commitEffort}
+            getAriaLabel={() => 'Reasoning effort'}
+            getAriaValueText={(_formattedValue, value) =>
+              effortLabel(effortLevels[value] ?? currentEffort)
+            }
+          />
         </div>
-        <Slider
-          value={draftIndex}
-          min={0}
-          max={effortLevels.length - 1}
-          step={1}
-          marks={effortLevels.length}
-          onValueChange={setDraftIndex}
-          onValueCommitted={commitEffort}
-          getAriaLabel={() => 'Reasoning effort'}
-          getAriaValueText={(_formattedValue, value) =>
-            effortLabel(effortLevels[value] ?? currentEffort)
-          }
-        />
       </PopoverContent>
     </Popover>
   )
