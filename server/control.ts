@@ -341,7 +341,7 @@ export const control = Bun.serve({
             ws.send(
               JSON.stringify({
                 currentFont: layout.theme?.font ?? 'default',
-                currentColor: matchColorTheme(layout.theme?.background, layout.theme?.foreground)
+                currentColor: matchColorTheme(layout.theme?.primary)
               })
             )
             return

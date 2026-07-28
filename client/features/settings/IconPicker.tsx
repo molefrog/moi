@@ -182,7 +182,7 @@ export function IconPicker({ icon }: IconPickerProps) {
       <div className="flex w-24 shrink-0 flex-col items-center gap-2.5">
         <div
           className={cn(
-            'flex size-24 items-center justify-center overflow-hidden rounded-[24px] shadow-sm ring-1 ring-border',
+            'flex size-24 items-center justify-center overflow-hidden rounded-xl shadow-sm ring-1 ring-border',
             // Checkerboard hints at transparency when no background is chosen.
             previewKind !== 'image' &&
               !onGradient &&

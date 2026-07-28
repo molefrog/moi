@@ -18,6 +18,7 @@ import {
   CollapsibleTrigger
 } from '@/client/components/ui/collapsible'
 import { cn } from '@/client/lib/cn'
+import { getWorkspaceThemeStyle, usePreloadWorkspaceFonts } from '@/client/runtime/workspace-theme'
 import { useUiStore } from '@/client/store/ui'
 import {
   WorkspaceAgentIcons,
@@ -29,6 +30,7 @@ import type { DiscoveredWorkspace, WorkspaceEntry } from '@/lib/types'
 import { WorkspacePreview } from './WorkspacePreview'
 
 export function HomePage() {
+  usePreloadWorkspaceFonts()
   const [, navigate] = useLocation()
   const workspacesQuery = useWorkspaces()
   const discoveredQuery = useDiscoveredWorkspaces()
@@ -65,11 +67,11 @@ export function HomePage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-8 pt-14 pb-16">
-      <HomeLogo className="mb-8" />
+      <HomeLogo className="mb-10" />
 
       {count > 0 ? (
-        <section className="mb-10">
-          <div className="mb-2 flex items-center justify-between gap-2">
+        <section className="mb-12">
+          <div className="mb-4 flex items-center justify-between gap-2">
             <h1 className="text-sm font-medium text-foreground">My workspaces</h1>
             <CreateWorkspaceDialog
               trigger={
@@ -81,14 +83,14 @@ export function HomePage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2 md:grid-cols-3">
             {workspaces.map(workspace => (
               <WorkspaceCard key={workspace.id} workspace={workspace} />
             ))}
           </div>
         </section>
       ) : (
-        <div className="mb-10 flex flex-col items-center gap-4 px-8 pt-6 pb-12 text-center">
+        <div className="mb-10 flex flex-col items-center gap-4 px-8 pt-8 pb-16 text-center">
           <IconEggCracked size={32} stroke={1.5} className="text-muted-foreground" />
           <div className="flex flex-col gap-1.5">
             <h2 className="font-medium">Let’s start with creating your first workspace</h2>
@@ -158,16 +160,17 @@ type WorkspaceCardProps = {
 function WorkspaceCard({ workspace }: WorkspaceCardProps) {
   const name = workspaceDisplayName(workspace)
   const previewQuery = useWorkspacePreview(workspace.id)
+  const theme = previewQuery.data?.theme
   const updatedAt = previewQuery.data?.updatedAt ?? new Date(workspace.addedAt).getTime()
 
   return (
-    <Link
-      href={`/workspace/${workspace.id}`}
-      className="group flex min-w-0 flex-col gap-4 rounded-xl bg-card p-2 shadow-xs transition-shadow hover:shadow-sm"
-    >
+    <Link href={`/workspace/${workspace.id}`} className="group flex min-w-0 flex-col gap-3">
       <WorkspacePreview workspaceId={workspace.id} />
-      <div className="flex min-w-0 flex-col gap-2 px-2 pb-2">
-        <div className="flex min-w-0 items-center gap-1.5">
+      <div className="flex min-w-0 flex-col gap-2 px-2">
+        <div
+          className="flex min-w-0 items-center gap-1.5 font-sans"
+          style={getWorkspaceThemeStyle(theme)}
+        >
           <img
             src={workspace.icon ?? workspaceProviderIcon[workspace.type ?? 'claude-code']}
             alt=""

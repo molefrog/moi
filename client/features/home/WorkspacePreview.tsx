@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 
 import { cn } from '@/client/lib/cn'
+import { getWorkspaceThemeStyle } from '@/client/runtime/workspace-theme'
 
 import { useWorkspacePreview } from './api'
 
@@ -10,9 +11,9 @@ type WorkspacePreviewProps = {
 
 const FOLDER = {
   width: 320,
-  height: 160,
-  radius: 24,
-  topLeftRadius: 10,
+  height: 180,
+  radius: 32,
+  topLeftRadius: 18,
   bodyTop: 24,
   tabEnd: 124,
   shoulder: {
@@ -109,12 +110,14 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
   const thumbnails = query.data ? [...query.data.thumbnails].reverse() : []
   const slots = STACK.slice(STACK.length - thumbnails.length)
   const firstUserMessage = query.data?.firstUserMessage
+  const theme = query.data?.theme
   const { ref, horizontalRadiusScale } = useFolderRadiusScale()
   const backdropPath = folderBackdropPath(horizontalRadiusScale)
   const noiseFilterId = `folder-noise-${workspaceId}`
+  const themeStyle = getWorkspaceThemeStyle(theme)
 
   return (
-    <div ref={ref} className="relative h-40 w-full">
+    <div ref={ref} style={themeStyle} className="relative h-45 w-full font-sans">
       <svg
         viewBox={`0 0 ${FOLDER.width} ${FOLDER.height}`}
         preserveAspectRatio="none"
@@ -145,11 +148,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
             <feBlend in="SourceGraphic" in2="clippedNoise" mode="soft-light" />
           </filter>
         </defs>
-        <path
-          d={backdropPath}
-          filter={`url(#${noiseFilterId})`}
-          className="mask-[linear-gradient(to_bottom,rgba(0,0,0,0.5),black_40%)] fill-accent"
-        />
+        <path d={backdropPath} filter={`url(#${noiseFilterId})`} className="fill-accent" />
       </svg>
 
       {thumbnails.map((src, index) => (
@@ -167,7 +166,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
       ))}
 
       {thumbnails.length === 0 && firstUserMessage && (
-        <div className="absolute inset-x-[12%] top-[20%] flex justify-end">
+        <div className="absolute inset-x-[12%] top-[22%] flex justify-end">
           <div
             aria-hidden="true"
             className={cn(
@@ -186,7 +185,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
 
       <div
         className={cn(
-          'absolute inset-x-2 top-[40%] bottom-2 rounded-xl bg-accent',
+          'absolute inset-x-2 top-[40%] bottom-2 rounded-2xl bg-[color-mix(in_oklch,var(--accent),var(--foreground)_5%)]',
           'mask-[linear-gradient(to_bottom,rgba(0,0,0,0.9)_0%,black_50%)] backdrop-blur-lg',
           'inset-shadow-[0_0_12px_color-mix(in_oklab,var(--background)_20%,transparent)]'
         )}

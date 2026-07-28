@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 
 import { AnimatePresence, motion } from 'motion/react'
 
@@ -8,7 +8,7 @@ import {
   IconGhost,
   IconLayout2,
   IconLayoutSidebarRight,
-  IconPalette,
+  IconLetterCase,
   IconSketching
 } from '@tabler/icons-react'
 import { ChatPanel } from '@/client/features/chat/ChatPanel'
@@ -32,7 +32,7 @@ import { useFitsSplitLayout } from '@/client/features/workspace/useFitsSplitLayo
 import { useWorkspaceAvailability } from '@/client/features/workspace/api'
 import { WorkspaceSkillUpdateBanner } from '@/client/features/workspace/WorkspaceSkillUpdateBanner'
 import { useWorkspaceSkillUpdates } from '@/client/features/workspace/useWorkspaceSkillUpdates'
-import { useWorkspaceTheme } from '@/client/features/workspace/useWorkspaceTheme'
+import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import {
@@ -172,7 +172,7 @@ function WorkspaceCustomizeAction({ active, onToggle }: WorkspaceCustomizeAction
             aria-pressed={active}
             onClick={onToggle}
           >
-            <IconPalette stroke={1.75} />
+            <IconLetterCase stroke={1.75} />
           </Button>
         }
       />
@@ -265,10 +265,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const [floatingChatOpen, setFloatingChatOpen] = useState(false)
   const [chatFocusRequest, setChatFocusRequest] = useState(0)
 
-  // Theme is scoped to this wrapper, not :root — the sidebar keeps the default
-  // tokens. The floating chat portals into the same element so it inherits them.
-  const themeRef = useRef<HTMLDivElement>(null)
-  useWorkspaceTheme(layout.theme, themeRef)
+  useWorkspaceTheme(layout.theme)
 
   // Split needs the open set to decide whether it's available at all, and the
   // navigation hook needs split to resolve the active tab — so the open set is
@@ -578,13 +575,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   )
 
   return (
-    // Themed wrapper: scoped CSS vars (bg/fg/font) live here so the panel — and
-    // the portaled floating chat — pick up the workspace theme, while the
-    // sidebar outside stays default.
-    <div
-      ref={themeRef}
-      className="relative flex h-full min-h-0 flex-col bg-background font-sans text-foreground"
-    >
+    <div className="relative flex h-full min-h-0 flex-col bg-background font-sans text-foreground">
       <div ref={rowRef} className="flex min-h-0 flex-1">
         {/* Full-screen: whole panel. Split: the left content column. */}
         {(mode === 'fullscreen' || hasWorkspaceContent) && (
@@ -677,7 +668,9 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
         )}
       </div>
 
-      <AnimatePresence>{widgetMode === 'customizing' && <CustomizePanel />}</AnimatePresence>
+      <AnimatePresence>
+        {widgetMode === 'customizing' && <CustomizePanel onClose={() => setWidgetMode('idle')} />}
+      </AnimatePresence>
 
       {mode === 'fullscreen' && activeTab !== 'agent' && hasWorkspaceContent && (
         <ChatPopup
@@ -688,7 +681,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               setChatFocusRequest(request => request + 1)
             }
           }}
-          container={themeRef}
         >
           {onClose => (
             <ChatPanel

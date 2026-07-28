@@ -132,19 +132,22 @@ export async function getWorkspacePreview(
       () => undefined
     )
     const updatedAt = providerPreview?.updatedAt
+    const theme = layout.theme
 
     if (includeFirstUserMessage) {
       const firstUserMessage = normalizePreviewMessage(providerPreview?.firstUserMessage)
       return {
         thumbnails,
         ...(firstUserMessage ? { firstUserMessage } : {}),
-        ...(updatedAt !== undefined ? { updatedAt } : {})
+        ...(updatedAt !== undefined ? { updatedAt } : {}),
+        ...(theme ? { theme } : {})
       }
     }
 
     return {
       thumbnails,
-      ...(updatedAt !== undefined ? { updatedAt } : {})
+      ...(updatedAt !== undefined ? { updatedAt } : {}),
+      ...(theme ? { theme } : {})
     }
   } catch {
     return { thumbnails: [] }

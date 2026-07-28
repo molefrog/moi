@@ -105,7 +105,7 @@ function LogRow({ time, badge, badgeClass, label, body }: LogRowProps) {
         <span className="shrink-0 font-semibold">{label}</span>
         <span className="truncate text-muted-foreground">{shortJson(body)}</span>
       </summary>
-      <pre className="mt-1 max-h-80 overflow-auto rounded bg-muted p-2 text-[10px] whitespace-pre-wrap">
+      <pre className="mt-1 max-h-80 overflow-auto rounded bg-muted p-2 font-mono text-[10px] whitespace-pre-wrap">
         {JSON.stringify(body, null, 2)}
       </pre>
     </details>

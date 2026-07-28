@@ -55,13 +55,12 @@ export function SidebarLayout({
   })
 
   return (
-    <div className="flex h-dvh bg-muted">
+    <div className={cn('flex h-dvh bg-muted')}>
       <Sidebar workspaces={showWorkspaces ? (workspaces ?? []) : []} />
       <main
         className={cn(
           'flex min-w-0 flex-1 flex-col overflow-hidden',
-          panel === 'default' &&
-            'rounded-l-xl border-l border-border bg-background shadow-[1px_0_3px_0_var(--border)]'
+          panel === 'default' && 'bg-background shadow-xs'
         )}
       >
         {children}

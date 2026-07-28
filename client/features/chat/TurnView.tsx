@@ -185,7 +185,7 @@ function DataPart({ name, data }: DataPartProps) {
   return (
     <details>
       <summary className="cursor-pointer text-xs text-muted-foreground">data:{name}</summary>
-      <pre className="mt-1 overflow-auto rounded bg-muted p-2 text-xs text-muted-foreground">
+      <pre className="mt-1 overflow-auto rounded bg-muted p-2 font-mono text-xs text-muted-foreground">
         {JSON.stringify(data, null, 2)}
       </pre>
     </details>

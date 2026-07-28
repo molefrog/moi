@@ -59,7 +59,7 @@ export function TimelineRow({
         ) : loading ? (
           // A spinner node stands in for the dot; bg-background carves the rule.
           <span className="absolute top-[15px] left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 rounded-full bg-background p-0.5">
-            <IconLoader2 size={12} stroke={1.75} className="animate-spin text-ring" />
+            <IconLoader2 size={12} stroke={1.75} className="animate-spin text-muted-foreground" />
           </span>
         ) : (
           // Background-colored ring carves a gap in the rule around the dot.
