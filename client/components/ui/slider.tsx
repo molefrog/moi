@@ -1,4 +1,3 @@
-import type { ComponentProps } from 'react'
 import { Slider as SliderPrimitive } from '@base-ui/react/slider'
 
 import { cn } from '@/client/lib/cn'
@@ -52,11 +51,13 @@ function Slider({
   )
 }
 
-type SliderMarksProps = ComponentProps<'span'> & {
+type SliderMarksProps = {
+  activeIndex: number
+  className?: string
   count: number
 }
 
-function SliderMarks({ className, count, ...props }: SliderMarksProps) {
+function SliderMarks({ activeIndex, className, count }: SliderMarksProps) {
   return (
     <span
       data-slot="slider-marks"
@@ -65,10 +66,15 @@ function SliderMarks({ className, count, ...props }: SliderMarksProps) {
         'pointer-events-none absolute inset-x-1.5 flex items-center justify-between',
         className
       )}
-      {...props}
     >
       {Array.from({ length: count }, (_, index) => (
-        <span key={index} className="size-1 rounded-full bg-accent" />
+        <span
+          key={index}
+          className={cn(
+            'size-1 rounded-full',
+            index <= activeIndex ? 'bg-primary-foreground/30' : 'bg-foreground/30'
+          )}
+        />
       ))}
     </span>
   )

@@ -152,7 +152,11 @@ function EffortPicker({ currentEffort, effortLevels, onValueChange }: EffortPick
                 '**:data-[slot=slider-thumb]:h-6 **:data-[slot=slider-thumb]:w-5 **:data-[slot=slider-thumb]:rounded-sm **:data-[slot=slider-thumb]:border-0 **:data-[slot=slider-thumb]:bg-card **:data-[slot=slider-thumb]:shadow-xs **:data-[slot=slider-thumb]:ring-0'
               )}
             >
-              <SliderMarks count={effortLevels.length} className="inset-x-2" />
+              <SliderMarks
+                activeIndex={draftIndex}
+                count={effortLevels.length}
+                className="inset-x-2"
+              />
             </Slider>
           </label>
         </div>
