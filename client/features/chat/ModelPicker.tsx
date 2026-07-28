@@ -1,6 +1,6 @@
 import { type ComponentProps, type ReactNode, memo, useState } from 'react'
 
-import { AnimatePresence, delay, motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 
 import { IconBolt, IconBoltFilled } from '@tabler/icons-react'
 
