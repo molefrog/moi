@@ -29,9 +29,11 @@ spacing, or interaction patterns. They do not need to look identical.
 
 ## Color
 
-Start with the semantic colors supplied by the applet's surface. Widgets use the host's dark card
-theme. Views inherit the workspace surface. Semantic colors keep ordinary text, structure, controls,
-and states readable and consistent.
+The host supplies semantic color values; it does not paint a widget's fill. Every widget root must
+cover the full frame with an opaque background. Start with `bg-background text-foreground`, or use
+an intentional solid color, image, or visualization with a solid fallback. Widgets resolve semantic
+tokens through the host's dark card theme. Views inherit the workspace surface. Semantic colors keep
+ordinary text, structure, controls, and states readable and consistent.
 
 | Intent | Tailwind token | Use |
 | --- | --- | --- |
@@ -177,9 +179,11 @@ direct actions while keeping one clear first reading.
 
 ### Frame
 
-The host card owns the outer radius, border, shadow, clipping, and elevation. A widget owns only its
-content surface. Its root fills the available rectangle and must not add outer card chrome. The
-content may use a semantic background, solid color, image, or visualization.
+The host card owns the outer radius, border, shadow, clipping, and elevation. It leaves the inside
+transparent. The widget root fills that rectangle and must paint an opaque content surface while
+adding no outer card chrome. Use `h-full w-full bg-background text-foreground` as the safe default.
+A solid color, image, or visualization can replace the semantic background when it has a solid
+fallback. Keep loading, error, and empty states opaque too.
 
 Use a column layout when content needs a footer or timestamp, and keep lower-priority information at
 the bottom. Important content needs safe padding from every edge. Use `p-4` as the compact default;
@@ -256,6 +260,7 @@ Before finishing an applet, confirm:
 
 - Every visible element has a clear purpose.
 - Its purpose and first reading are clear at the intended size.
+- Every widget root fills the frame with an opaque background in every state.
 - Semantic colors handle structure and custom color has a reason.
 - Surfaces use solid fills by default; gradients have a content-specific reason.
 - Purple appears only for a content, brand, or user reason and never as a default gradient.
