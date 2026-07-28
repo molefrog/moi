@@ -178,22 +178,22 @@ export function ChatPanel({
         <div
           className={cn(
             '@container flex w-full flex-col transition-[padding]',
-            (composerBanner || error) && 'gap-1 rounded-2xl p-2',
+            (composerBanner || error) && 'gap-2 rounded-t-xl rounded-b-2xl p-2',
             composerBanner && 'bg-muted',
             error && 'bg-destructive/10'
           )}
         >
           {composerBanner}
           {error && (
-            <div className="flex w-full items-start gap-2 px-3 py-2 text-sm text-destructive">
-              <span className="flex-1 wrap-break-word">{error}</span>
+            <div className="flex w-full items-center gap-2 p-1 pl-4 text-sm">
+              <span className="flex-1 wrap-break-word text-destructive">{error}</span>
               {onDismissError && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon-sm"
                   onClick={onDismissError}
-                  className="-m-1"
+                  className="text-destructive hover:text-destructive"
                   aria-label="Dismiss error"
                 >
                   <IconX stroke={1.75} />

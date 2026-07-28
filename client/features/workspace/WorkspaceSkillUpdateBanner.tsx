@@ -22,7 +22,7 @@ export function WorkspaceSkillUpdateBanner({
     return (
       <div
         role="status"
-        className="flex w-full items-center gap-1.5 p-2 text-sm text-muted-foreground"
+        className="flex w-full items-center gap-1.5 p-2 pl-3 text-sm text-muted-foreground"
       >
         <IconLoader2 size={20} stroke={1.5} className="shrink-0 animate-spin" />
         <span className="wrap-break-word">Updating moi skills…</span>
@@ -37,7 +37,7 @@ export function WorkspaceSkillUpdateBanner({
       role={error ? 'alert' : 'status'}
       className={cn(
         'grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-2 p-2 text-sm',
-        '@xl:flex @xl:items-center @xl:px-2 @xl:pl-3',
+        '@xl:flex @xl:items-center @xl:p-1 @xl:pl-3',
         error && 'text-destructive'
       )}
     >
