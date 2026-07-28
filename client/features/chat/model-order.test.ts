@@ -4,6 +4,7 @@ import {
   hasEffortChoice,
   resolveDisplayedEffort,
   resolveEffortIndex,
+  resolveFastMode,
   sortModelsByProviderOrder
 } from '@/client/features/chat/model-order'
 import type { Model } from '@/lib/types'
@@ -129,5 +130,26 @@ describe('hasEffortChoice', () => {
     expect(hasEffortChoice([])).toBe(false)
     expect(hasEffortChoice(['high'])).toBe(false)
     expect(hasEffortChoice(['low', 'high'])).toBe(true)
+  })
+})
+
+describe('resolveFastMode', () => {
+  const supported = {
+    ...model('fast-model'),
+    supportsFastMode: true,
+    defaultFastMode: true
+  }
+
+  test('uses the provider default until moi stores a preference', () => {
+    expect(resolveFastMode(supported, undefined)).toBe(true)
+  })
+
+  test('lets an explicit moi preference override the provider default', () => {
+    expect(resolveFastMode(supported, false)).toBe(false)
+    expect(resolveFastMode({ ...supported, defaultFastMode: false }, true)).toBe(true)
+  })
+
+  test('stays disabled for an unsupported model', () => {
+    expect(resolveFastMode(model('unsupported'), true)).toBe(false)
   })
 })

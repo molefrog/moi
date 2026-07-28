@@ -363,7 +363,8 @@ describe('discovery mappings', () => {
       id: 'current',
       model: 'current',
       displayName: 'Current',
-      serviceTiers: [{ id: 'priority', name: 'Fast', description: 'Faster responses' }]
+      serviceTiers: [{ id: 'priority', name: 'Fast', description: 'Faster responses' }],
+      defaultServiceTier: 'priority'
     })
     const legacy = codexModelToModel({
       id: 'legacy',
@@ -380,8 +381,11 @@ describe('discovery mappings', () => {
     })
 
     expect(current.supportsFastMode).toBe(true)
+    expect(current.defaultFastMode).toBe(true)
     expect(legacy.supportsFastMode).toBe(true)
+    expect(legacy.defaultFastMode).toBe(false)
     expect(unsupported.supportsFastMode).toBeUndefined()
+    expect(unsupported.defaultFastMode).toBeUndefined()
   })
 
   test('maps Fast preference to Codex service tier wire values', () => {

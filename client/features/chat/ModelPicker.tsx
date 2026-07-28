@@ -7,6 +7,7 @@ import {
   hasEffortChoice,
   resolveDisplayedEffort,
   resolveEffortIndex,
+  resolveFastMode,
   sortModelsByProviderOrder
 } from './model-order'
 import { Button } from '@/client/components/ui/button'
@@ -301,6 +302,7 @@ export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: 
   const effortLevels = model.supportsEffort ? (model.supportedEffortLevels ?? []) : []
   const currentEffort = resolveDisplayedEffort(effortLevels, selectedEffort)
   const showEffort = hasEffortChoice(effortLevels) && currentEffort !== undefined
+  const fastMode = resolveFastMode(model, selectedFastMode)
 
   return (
     <div className="flex shrink-0 items-center gap-1">
@@ -315,7 +317,7 @@ export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: 
           key={model.value}
           currentEffort={currentEffort}
           effortLevels={effortLevels}
-          fastMode={selectedFastMode === true}
+          fastMode={fastMode}
           showFastMode={model.supportsFastMode === true}
           onFastModeChange={setSelectedFastMode}
           onValueChange={setSelectedEffort}

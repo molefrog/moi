@@ -58,6 +58,11 @@ export function hasEffortChoice(levels: readonly string[]): boolean {
   return levels.length > 1
 }
 
+export function resolveFastMode(model: Model, selectedFastMode: boolean | undefined): boolean {
+  if (model.supportsFastMode !== true) return false
+  return selectedFastMode ?? model.defaultFastMode ?? false
+}
+
 export function sortModelsByProviderOrder(models: Model[], provider: WorkspaceType): Model[] {
   const compare = PROVIDER_MODEL_COMPARATORS[provider]
   return compare ? stableSortModels(models, compare) : models

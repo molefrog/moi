@@ -606,6 +606,8 @@ export type Model = {
   supportedEffortLevels?: string[]
   supportsAdaptiveThinking?: boolean
   supportsFastMode?: boolean
+  // Provider-resolved default when moi has no stored Fast-mode preference.
+  defaultFastMode?: boolean
   supportsAutoMode?: boolean
 }
 

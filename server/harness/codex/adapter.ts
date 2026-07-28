@@ -113,6 +113,7 @@ export type CodexModel = {
   defaultReasoningEffort?: string
   isDefault?: boolean
   serviceTiers?: { id: string; name: string; description: string }[]
+  defaultServiceTier?: string | null
   // Older app-server versions advertised Fast mode through this field.
   additionalSpeedTiers?: string[]
 }
@@ -194,7 +195,12 @@ export function codexModelToModel(m: CodexModel): Model {
       : { description: displayName }),
     supportsEffort: efforts.length > 0,
     ...(efforts.length > 0 ? { supportedEffortLevels: efforts } : {}),
-    ...(supportsFastMode ? { supportsFastMode: true } : {})
+    ...(supportsFastMode
+      ? {
+          supportsFastMode: true,
+          defaultFastMode: m.defaultServiceTier === CODEX_FAST_SERVICE_TIER
+        }
+      : {})
   }
 }
 
