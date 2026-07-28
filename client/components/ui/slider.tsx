@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+
 import { Slider as SliderPrimitive } from '@base-ui/react/slider'
 
 import { cn } from '@/client/lib/cn'
@@ -11,11 +13,18 @@ function Slider({
   max = 100,
   ...props
 }: SliderPrimitive.Root.Props) {
+  const [animationReady, setAnimationReady] = useState(false)
   const _values = Array.isArray(value)
     ? value
     : Array.isArray(defaultValue)
       ? defaultValue
       : [min, max]
+
+  // Let Base UI measure the initial positions before transitions are enabled.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setAnimationReady(true))
+    return () => cancelAnimationFrame(frame)
+  }, [])
 
   return (
     <SliderPrimitive.Root
@@ -35,7 +44,10 @@ function Slider({
         >
           <SliderPrimitive.Indicator
             data-slot="slider-range"
-            className="bg-primary select-none data-horizontal:h-full data-vertical:w-full"
+            className={cn(
+              'bg-primary select-none data-horizontal:h-full data-vertical:w-full',
+              animationReady && 'transition-[width] duration-150 ease-in-out'
+            )}
           />
         </SliderPrimitive.Track>
         {children}
@@ -43,7 +55,11 @@ function Slider({
           <SliderPrimitive.Thumb
             data-slot="slider-thumb"
             key={index}
-            className="relative block size-3 shrink-0 cursor-ew-resize rounded-full border border-ring bg-white ring-ring/50 transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50"
+            className={cn(
+              'relative block size-3 shrink-0 cursor-ew-resize rounded-full border border-ring bg-white ring-ring/50 select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50',
+              animationReady &&
+                'transition-[inset-inline-start,color,box-shadow] duration-150 ease-in-out'
+            )}
           />
         ))}
       </SliderPrimitive.Control>
@@ -71,7 +87,7 @@ function SliderMarks({ activeIndex, className, count }: SliderMarksProps) {
         <span
           key={index}
           className={cn(
-            'size-1 rounded-full',
+            'size-1 rounded-full transition-colors',
             index <= activeIndex ? 'bg-primary-foreground/30' : 'bg-foreground/30'
           )}
         />
