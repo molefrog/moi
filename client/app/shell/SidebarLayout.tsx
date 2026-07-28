@@ -77,7 +77,7 @@ function Sidebar({ workspaces }: SidebarProps) {
   const reorder = useReorderWorkspaces()
 
   return (
-    <aside className="flex h-full shrink-0 flex-col items-center gap-4 px-2 py-5">
+    <aside className="flex h-full shrink-0 flex-col items-center gap-4 px-2 py-5 [font-family:var(--default-sans)]">
       <Link href="/" aria-label="Home" title="Home" className={sidebarNavButtonClass}>
         <IconSmartHome stroke={1.5} />
       </Link>
