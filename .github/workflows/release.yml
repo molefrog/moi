@@ -34,8 +34,13 @@ jobs:
 
       - name: Pack and inspect the tarball
         run: |
+          rm -f moi-computer-*.tgz
           bun pm pack
-          tar -tzf moi-computer-*.tgz > files.txt
+          # Pin the exact name: a glob matching >1 tarball makes tar read the first as the
+          # archive and the rest as members, and every check below fails against a good build.
+          TGZ=$(ls moi-computer-*.tgz)
+          [ "$(printf '%s\n' "$TGZ" | wc -l)" -eq 1 ] || { echo "::error::expected exactly one tarball, got: $TGZ"; exit 1; }
+          tar -tzf "$TGZ" > files.txt
           grep -q '^package/dist/' files.txt || { echo "::error::tarball has no dist/"; exit 1; }
           if grep -Ei '\.env|secret' files.txt; then echo "::error::tarball contains secrets"; exit 1; fi
 

@@ -24,8 +24,19 @@ deployment in GitHub after it. Everything else runs unattended.
 1. `git status` — clean tree, on `main`. Stop and ask if not.
 2. `git fetch && git status -sb` — up to date with `origin/main`.
 3. `git log origin/main..HEAD --oneline` — if anything is unpushed, show it and confirm it should ship.
-4. `readlink ~/.bun/bin/moi` — record it. A path into this repo means a dev `bun link` that §8
-   must restore; absent means a clean container with nothing to put back.
+4. Record whether a dev `bun link` is active, because §8 branches on it:
+
+   ```sh
+   readlink ~/.bun/install/global/node_modules/moi-computer
+   ```
+
+   A path into this repo means a dev link that §8 must restore. No output (it is a real
+   directory) means an ordinary global install; a missing path means a clean container with
+   nothing to put back.
+
+   Do **not** check `~/.bun/bin/moi` for this. That symlink reads
+   `../install/global/node_modules/moi-computer/bin/moi.mjs` in *every* case — linked or
+   installed — so it cannot answer the question §8 asks. Only the level below discriminates.
 
 Both a cloud container and the user's machine run every phase below. The only difference is what
 §8 restores, which is why you captured it here rather than assuming.
@@ -49,11 +60,17 @@ Everything here is read-only with respect to git. It duplicates the CI `verify` 
 failing here costs nothing, failing after the tag push costs a burned version.
 
 1. `bun install --frozen-lockfile`, `bun run lint`, `bun run format:check`, `bun test`.
-2. **Pack and inspect:**
+2. **Pack and inspect.** Clear stale tarballs *first* — they accumulate in the repo root, and a
+   bare `moi-computer-*.tgz` glob that matches more than one file makes `tar` read the first as
+   the archive and the rest as members to list. Every check then fails against a perfectly good
+   tarball. Pin the exact filename instead of globbing:
+
    ```sh
+   rm -f moi-computer-*.tgz                                 # before packing, not after
    bun pm pack
-   tar -tzf moi-computer-*.tgz | grep -c '^package/dist/'   # must be > 0
-   tar -tzf moi-computer-*.tgz | grep -Ei '\.env|secret'    # must be empty
+   TGZ=$(ls moi-computer-*.tgz)                             # exactly one now
+   tar -tzf "$TGZ" | grep -c '^package/dist/'               # must be > 0
+   tar -tzf "$TGZ" | grep -Ei '\.env|secret'                # must be empty
    ```
 3. **Skim what is shipping**: `git log <last tag>..HEAD --oneline`. Enough to describe the
    release and to know what §6 should poke at. Time-box it — a sanity check, not a QA pass.
@@ -64,8 +81,12 @@ tarball once inspected.
 
 ## 3. Report and ask
 
-Show the user, compactly: the version you propose, what is shipping since the last tag, the
-tarball check results, and the smoke output. Then ask whether to bump and push.
+Show the user, compactly: the version you propose, what is shipping since the last tag, and the
+§2 check results (lint, format, test counts, tarball `dist/` count, secrets scan). Then ask
+whether to bump and push.
+
+There is no smoke output at this point — §2 deliberately skips the global install, and §6 does
+the smoke against the published package. Do not go looking for it.
 
 Wait for a real answer. This is the checkpoint that gates the version number.
 
@@ -78,12 +99,21 @@ git tag vX.Y.Z
 git push origin main vX.Y.Z          # push the tag by name; --tags would push every local tag
 ```
 
-Then surface the approval link and stop:
+The commit fires `.githooks` (`oxlint --fix`, `oxfmt`). Normally they touch nothing, since only
+`package.json` changed — but if they do reformat files, those changes land in the release commit
+silently. Check `git show --stat HEAD` and confirm it is the one-line version bump you expect.
+
+Then surface the approval link and stop. Do **not** trust `--limit 1` on its own: GitHub may not
+have created the run yet when the push returns, so the newest run can still be the *previous*
+release. Match on the tag:
 
 ```sh
-gh run list --workflow=release.yml --limit 1 --json databaseId,url
+gh run list --workflow=release.yml --limit 5 \
+  --json databaseId,url,status,headBranch \
+  --jq '.[] | select(.headBranch == "vX.Y.Z")'
 ```
 
+If that comes back empty, wait a few seconds and repeat until the run for your tag appears.
 Give the user that URL and tell them to approve the `release` environment. One link, one click.
 
 ## 5. Wait for the run
@@ -111,7 +141,11 @@ Recovery, if `verify` fails or the run is rejected:
      silently respawn it in §8; a detached agent-owned supervisor is not the same thing and its
      output goes where they are not looking.
    - `bun remove -g moi-computer` first. Installing over an existing install fails with
-     ENOENT/DependencyLoop because the global `package.json` pins the old range.
+     ENOENT/DependencyLoop because the global `package.json` pins the old range. Despite `-g`,
+     this still treats the **current directory as a project** and writes a `package.json` and
+     lockfile there. Run it from the repo root (where both already exist and are git-tracked, so
+     stray writes are visible) — never from `/tmp` or the scratchpad, where it leaves a junk
+     `package.json` behind that will break `bun link` in §8.
    - `bun install -g moi-computer@<version>`, then `moi version`, `moi env`, `moi start`, and
      curl `/` and `/api/workspaces`. Poke at anything §2.3 flagged as new, if it is quick.
 
@@ -138,7 +172,11 @@ Always run this, including after a failure or an abandoned release.
 
 1. Kill the smoke-test server from §6.
 2. Restore whatever §0.4 recorded:
-   - Dev link present before: `bun remove -g moi-computer`, then `bun link` in the repo.
+   - Dev link present before: `bun remove -g moi-computer`, then `bun link` — **both run from
+     the repo root**. `bun link` registers *the package in the current directory*, so running it
+     anywhere else either errors (`package.json missing "name"`) or links the wrong thing. These
+     are two separate commands with a directory requirement, not one chained sequence; if your
+     tooling resets the working directory between calls, set it explicitly for each.
      Verify `~/.bun/install/global/node_modules/moi-computer` symlinks back to the repo, and
      `moi version` reports `X.Y.Z (githash)`.
    - Nothing installed before: `bun remove -g moi-computer`.
