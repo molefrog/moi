@@ -18,17 +18,25 @@ function modelOrderKey(model: Model): string {
   return model.resolvedModel ?? model.value
 }
 
-export function reverseEffortLevels(levels: readonly string[]): string[] {
-  return [...levels].reverse()
-}
-
 export function resolveDisplayedEffort(
   levels: readonly string[],
   selectedEffort: string | undefined
 ): string | undefined {
   if (selectedEffort && levels.includes(selectedEffort)) return selectedEffort
   if (levels.includes(DEFAULT_EFFORT)) return DEFAULT_EFFORT
-  return levels[0]
+  return levels[levels.length - 1]
+}
+
+export function resolveEffortIndex(
+  levels: readonly string[],
+  selectedEffort: string | undefined
+): number {
+  const displayedEffort = resolveDisplayedEffort(levels, selectedEffort)
+  return displayedEffort ? levels.indexOf(displayedEffort) : -1
+}
+
+export function hasEffortChoice(levels: readonly string[]): boolean {
+  return levels.length > 1
 }
 
 export function sortModelsByProviderOrder(models: Model[], provider: WorkspaceType): Model[] {

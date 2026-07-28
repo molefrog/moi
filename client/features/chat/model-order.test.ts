@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 
 import {
+  hasEffortChoice,
   resolveDisplayedEffort,
-  reverseEffortLevels,
+  resolveEffortIndex,
   sortModelsByProviderOrder
 } from '@/client/features/chat/model-order'
 import type { Model } from '@/lib/types'
@@ -62,21 +63,8 @@ describe('sortModelsByProviderOrder', () => {
   })
 })
 
-describe('reverseEffortLevels', () => {
-  test('orders SDK effort levels from highest to lowest without mutating them', () => {
-    const levels = ['low', 'medium', 'high', 'xhigh', 'max']
-
-    expect(reverseEffortLevels(levels)).toEqual(['max', 'xhigh', 'high', 'medium', 'low'])
-    expect(levels).toEqual(['low', 'medium', 'high', 'xhigh', 'max'])
-  })
-
-  test('reverses partial effort lists', () => {
-    expect(reverseEffortLevels(['low', 'high', 'max'])).toEqual(['max', 'high', 'low'])
-  })
-})
-
 describe('resolveDisplayedEffort', () => {
-  const levels = ['max', 'xhigh', 'high', 'medium', 'low']
+  const levels = ['low', 'medium', 'high', 'xhigh', 'max']
 
   test('keeps the last supported explicit choice', () => {
     expect(resolveDisplayedEffort(levels, 'medium')).toBe('medium')
@@ -88,6 +76,35 @@ describe('resolveDisplayedEffort', () => {
   })
 
   test('uses the highest available level when High is unavailable', () => {
-    expect(resolveDisplayedEffort(['max', 'medium', 'low'], undefined)).toBe('max')
+    expect(resolveDisplayedEffort(['low', 'medium', 'max'], undefined)).toBe('max')
+  })
+})
+
+describe('resolveEffortIndex', () => {
+  const levels = ['low', 'medium', 'high', 'xhigh', 'max']
+
+  test('maps SDK effort order from faster to smarter', () => {
+    expect(resolveEffortIndex(levels, 'low')).toBe(0)
+    expect(resolveEffortIndex(levels, 'high')).toBe(2)
+    expect(resolveEffortIndex(levels, 'max')).toBe(4)
+  })
+
+  test('maps partial lists and their fallback', () => {
+    const partial = ['low', 'high', 'max']
+
+    expect(resolveEffortIndex(partial, 'high')).toBe(1)
+    expect(resolveEffortIndex(partial, 'unsupported')).toBe(1)
+  })
+
+  test('returns no position for an empty effort list', () => {
+    expect(resolveEffortIndex([], undefined)).toBe(-1)
+  })
+})
+
+describe('hasEffortChoice', () => {
+  test('only offers the control when the model has multiple levels', () => {
+    expect(hasEffortChoice([])).toBe(false)
+    expect(hasEffortChoice(['high'])).toBe(false)
+    expect(hasEffortChoice(['low', 'high'])).toBe(true)
   })
 })

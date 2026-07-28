@@ -1,16 +1,12 @@
 import { memo, useState } from 'react'
 
-import { IconChevronDown } from '@tabler/icons-react'
-
 import { useSaveThreadConfig, useThreadConfig, useWorkspaceModels } from './api'
 import {
+  hasEffortChoice,
   resolveDisplayedEffort,
-  reverseEffortLevels,
+  resolveEffortIndex,
   sortModelsByProviderOrder
 } from './model-order'
-import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
-import { useLive } from '@/client/features/chat/chat-store'
-
 import { Button } from '@/client/components/ui/button'
 import {
   DropdownMenu,
@@ -19,13 +15,19 @@ import {
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger
 } from '@/client/components/ui/dropdown-menu'
-import { Switch } from '@/client/components/ui/switch'
+import {
+  Popover,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger
+} from '@/client/components/ui/popover'
+import { Slider } from '@/client/components/ui/slider'
+import { useLive } from '@/client/features/chat/chat-store'
+import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
+import type { Model } from '@/lib/types'
 
 // Models describe themselves with a " · "-joined blurb; we show only the
 // headline (e.g. "Opus 4.8 with 1M context · Most capable…" → "Opus 4.8 with 1M context").
@@ -43,30 +45,129 @@ function effortLabel(level: string): string {
   return level === 'xhigh' ? 'Extra' : capitalize(level)
 }
 
+type ModelDropdownProps = {
+  current: string
+  model: Model
+  models: readonly Model[]
+  onValueChange: (value: string) => void
+}
+
+function ModelDropdown({ current, model, models, onValueChange }: ModelDropdownProps) {
+  const label = headline(model.description) || model.displayName
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="ghost"
+            className="group/model max-w-56 min-w-0 px-2"
+            aria-label={`Model: ${label}`}
+          >
+            <span className="truncate font-normal text-muted-foreground transition-colors group-focus-within/composer:text-foreground group-data-[popup-open]/model:text-foreground">
+              {label}
+            </span>
+          </Button>
+        }
+      />
+      <DropdownMenuContent align="end" side="top" className="min-w-40">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Models</DropdownMenuLabel>
+          <DropdownMenuRadioGroup value={current} onValueChange={onValueChange}>
+            {models.map(item => (
+              <DropdownMenuRadioItem key={item.value} value={item.value} closeOnClick>
+                {headline(item.description) || item.displayName}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+type EffortPickerProps = {
+  currentEffort: string
+  effortLevels: readonly string[]
+  onValueChange: (value: string) => void
+}
+
+function EffortPicker({ currentEffort, effortLevels, onValueChange }: EffortPickerProps) {
+  const currentIndex = resolveEffortIndex(effortLevels, currentEffort)
+  const [open, setOpen] = useState(false)
+  const [draftIndex, setDraftIndex] = useState(currentIndex)
+  const displayedIndex = open ? draftIndex : currentIndex
+  const displayedEffort = effortLevels[displayedIndex] ?? currentEffort
+  const displayedLabel = effortLabel(displayedEffort)
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) setDraftIndex(currentIndex)
+    setOpen(nextOpen)
+  }
+
+  const commitEffort = (index: number) => {
+    const nextEffort = effortLevels[index]
+    if (nextEffort && nextEffort !== currentEffort) onValueChange(nextEffort)
+  }
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger
+        render={
+          <Button variant="ghost" className="px-2" aria-label={`Effort: ${displayedLabel}`}>
+            <span className="font-normal text-muted-foreground transition-colors group-focus-within/composer:text-foreground">
+              {displayedLabel}
+            </span>
+          </Button>
+        }
+      />
+      <PopoverContent align="end" side="top" className="w-64">
+        <PopoverHeader className="flex-row items-center gap-1">
+          <PopoverTitle>Effort</PopoverTitle>
+          <output className="text-muted-foreground" aria-live="polite">
+            {displayedLabel}
+          </output>
+        </PopoverHeader>
+        <div className="flex items-center justify-between text-muted-foreground" aria-hidden="true">
+          <span>Faster</span>
+          <span>Smarter</span>
+        </div>
+        <Slider
+          value={draftIndex}
+          min={0}
+          max={effortLevels.length - 1}
+          step={1}
+          marks={effortLevels.length}
+          onValueChange={setDraftIndex}
+          onValueCommitted={commitEffort}
+          getAriaLabel={() => 'Reasoning effort'}
+          getAriaValueText={(_formattedValue, value) =>
+            effortLabel(effortLevels[value] ?? currentEffort)
+          }
+        />
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 type ModelPickerProps = {
   scope?: 'active-chat' | 'workspace'
 }
 
-// Model selector for the chat composer. Renders the workspace's available
-// models from `/api/workspaces/:id/models`. Model + reasoning effort are
-// persisted PER THREAD (so a thread reopens with the settings it last ran with)
-// once a thread exists; while no thread is open (a brand-new chat) the picker
-// edits the workspace defaults, which seed the new thread. Both are sent with
-// each chat frame (see useChat); leaving them untouched runs on the SDK default.
-// Fast mode remains local-only for now.
+// Model selector for composer surfaces. The workspace's available models come
+// from `/api/workspaces/:id/models`; effort options follow the selected model.
+// Model + effort persist per chat once one exists. A new chat edits the
+// workspace defaults that seed it. Both values are sent with each chat frame.
 // The workspace scope gives new-chat surfaces such as the view builder the same
-// defaults that their submit path reads. The active-chat scope persists per
-// thread once one exists.
-// Memoized because composer text changes should not re-render the picker.
+// defaults that their submit path reads.
 export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: ModelPickerProps) {
   const { workspaceId, layout, setLayout } = useWorkspaceLayoutCtx()
   const { data } = useWorkspaceModels(workspaceId)
+
   // The SDK prepends a synthetic "default" entry ("Use the default model
-  // (currently …)"). Drop it and surface the concrete model it resolves to
-  // instead, so the picker shows e.g. "Opus (1M context)" rather than the meta
-  // "use default" row.
+  // (currently …)"). Drop it and name the concrete model it resolves to.
   const allModels = data?.models ?? []
-  const defaultEntry = allModels.find(m => m.value === 'default')
+  const defaultEntry = allModels.find(model => model.value === 'default')
   const models = data
     ? sortModelsByProviderOrder(
         allModels.filter(model => model.value !== 'default'),
@@ -74,113 +175,63 @@ export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: 
       )
     : []
 
-  // The active thread, if any. Its stored config is the source of truth; a new
-  // chat (no active thread) falls back to — and edits — the workspace defaults.
-  const activeSessionId = useLive(s =>
-    scope === 'active-chat' ? (s.activeByWorkspace[workspaceId] ?? null) : null
+  // The active chat's stored config is the source of truth. With no active chat,
+  // the picker reads and edits workspace defaults.
+  const activeSessionId = useLive(state =>
+    scope === 'active-chat' ? (state.activeByWorkspace[workspaceId] ?? null) : null
   )
-  const threadCfg = useThreadConfig(workspaceId, activeSessionId).data
-  const saveThreadCfg = useSaveThreadConfig(workspaceId)
-  const [fastMode, setFastMode] = useState(false)
+  const threadConfig = useThreadConfig(workspaceId, activeSessionId).data
+  const saveThreadConfig = useSaveThreadConfig(workspaceId)
 
-  const selected = (activeSessionId ? threadCfg?.model : undefined) ?? layout.selectedModel
-  const selectedEffort = (activeSessionId ? threadCfg?.effort : undefined) ?? layout.selectedEffort
-  const setSelected = (value: string) => {
+  const selectedModel = (activeSessionId ? threadConfig?.model : undefined) ?? layout.selectedModel
+  const selectedEffort =
+    (activeSessionId ? threadConfig?.effort : undefined) ?? layout.selectedEffort
+
+  const setSelectedModel = (value: string) => {
     if (activeSessionId)
-      saveThreadCfg.mutate({ sessionId: activeSessionId, patch: { model: value } })
+      saveThreadConfig.mutate({ sessionId: activeSessionId, patch: { model: value } })
     else setLayout({ selectedModel: value })
   }
-  const setEffort = (value: string) => {
+
+  const setSelectedEffort = (value: string) => {
     if (activeSessionId)
-      saveThreadCfg.mutate({ sessionId: activeSessionId, patch: { effort: value } })
+      saveThreadConfig.mutate({ sessionId: activeSessionId, patch: { effort: value } })
     else setLayout({ selectedEffort: value })
   }
 
   if (models.length === 0) return null
 
-  // Show the persisted pick when it's still in the list; otherwise fall back to
-  // the concrete model the SDK default resolves to (matched by resolvedModel),
-  // or the first model. An unset pick sends no model id, so the run still uses
-  // the SDK default — the display just names it instead of showing "default".
-  const persisted = models.some(m => m.value === selected) ? selected : undefined
+  // Show a persisted pick when it still exists. Otherwise name the concrete
+  // model behind the SDK default, or fall back to the first available model.
+  const persistedModel = models.some(model => model.value === selectedModel)
+    ? selectedModel
+    : undefined
   const defaultModel =
     models.find(
-      m => defaultEntry?.resolvedModel && m.resolvedModel === defaultEntry.resolvedModel
+      model => defaultEntry?.resolvedModel && model.resolvedModel === defaultEntry.resolvedModel
     ) ?? models[0]
-  const current = persisted ?? defaultModel.value
-  const model = models.find(m => m.value === current) ?? models[0]
-  const effortLevels = reverseEffortLevels(
-    model.supportsEffort ? (model.supportedEffortLevels ?? []) : []
-  )
+  const currentModelValue = persistedModel ?? defaultModel.value
+  const model = models.find(item => item.value === currentModelValue) ?? models[0]
+  const effortLevels = model.supportsEffort ? (model.supportedEffortLevels ?? []) : []
   const currentEffort = resolveDisplayedEffort(effortLevels, selectedEffort)
-  const showReasoning = effortLevels.length > 0
-  // Fast mode is Claude-only (Opus); OpenClaw models never report supportsFastMode.
-  const showFastMode = !!model.supportsFastMode
+  const showEffort = hasEffortChoice(effortLevels) && currentEffort !== undefined
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button variant="ghost">
-            <span className="font-normal text-foreground">
-              {headline(model.description) || model.displayName}
-            </span>
-            {currentEffort && (
-              <span className="font-normal text-muted-foreground">
-                {effortLabel(currentEffort)}
-              </span>
-            )}
-            <IconChevronDown stroke={1.5} className="text-muted-foreground" />
-          </Button>
-        }
+    <div className="flex shrink-0 items-center gap-1">
+      <ModelDropdown
+        current={currentModelValue}
+        model={model}
+        models={models}
+        onValueChange={setSelectedModel}
       />
-      <DropdownMenuContent align="start" side="top" className="min-w-56">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>Models</DropdownMenuLabel>
-          <DropdownMenuRadioGroup value={current} onValueChange={setSelected}>
-            {models.map(m => (
-              <DropdownMenuRadioItem key={m.value} value={m.value} closeOnClick>
-                {headline(m.description) || m.displayName}
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuGroup>
-
-        {(showReasoning || showFastMode) && <DropdownMenuSeparator />}
-
-        {showReasoning && (
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <div className="flex flex-1 items-center justify-between">
-                Reasoning
-                {currentEffort && (
-                  <span className="ml-auto text-muted-foreground">
-                    {effortLabel(currentEffort)}
-                  </span>
-                )}
-              </div>
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent>
-              <DropdownMenuRadioGroup value={currentEffort} onValueChange={setEffort}>
-                {effortLevels.map(level => (
-                  <DropdownMenuRadioItem key={level} value={level} closeOnClick>
-                    {effortLabel(level)}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-        )}
-
-        {showFastMode && (
-          <DropdownMenuGroup className="mt-0.5">
-            <label className="flex cursor-pointer items-center justify-between gap-4 rounded-md px-2 py-1 text-sm">
-              Fast mode
-              <Switch checked={fastMode} onCheckedChange={setFastMode} />
-            </label>
-          </DropdownMenuGroup>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      {showEffort && (
+        <EffortPicker
+          key={model.value}
+          currentEffort={currentEffort}
+          effortLevels={effortLevels}
+          onValueChange={setSelectedEffort}
+        />
+      )}
+    </div>
   )
 })

@@ -31,7 +31,7 @@ export function Composer({
         composerRef.current?.focus()
       }}
       className={cn(
-        'flex w-full cursor-text flex-col gap-1 rounded-xl bg-card p-2 text-card-foreground shadow-xs transition-[color,box-shadow] outline-none focus-within:shadow-sm',
+        'group/composer flex w-full cursor-text flex-col gap-1 rounded-xl bg-card p-2 text-card-foreground shadow-xs transition-[color,box-shadow] outline-none focus-within:shadow-sm',
         className
       )}
     >
@@ -61,7 +61,7 @@ type ComposerFooterProps = ComponentProps<'div'>
 
 export function ComposerFooter({ className, children, ...props }: ComposerFooterProps) {
   return (
-    <div {...props} className={cn('flex items-center justify-end gap-1.5', className)}>
+    <div {...props} className={cn('flex items-center justify-end gap-3', className)}>
       {children}
     </div>
   )
