@@ -54,6 +54,10 @@ export function usePreloadWorkspaceFonts() {
     link.rel = 'stylesheet'
     link.href = `https://fonts.googleapis.com/css2?family=${ALL_FONTS_QUERY}&display=swap`
     document.head.appendChild(link)
+
+    return () => {
+      link.remove()
+    }
   }, [])
 }
 
