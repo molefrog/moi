@@ -1,5 +1,7 @@
 import { type ComponentProps, type ReactNode, memo, useState } from 'react'
 
+import { AnimatePresence, delay, motion } from 'motion/react'
+
 import { IconBolt, IconBoltFilled } from '@tabler/icons-react'
 
 import { useSaveThreadConfig, useThreadConfig, useWorkspaceModels } from './api'
@@ -52,6 +54,13 @@ function effortLabel(level: string): string {
 function singleSliderValue(value: number | readonly number[]): number {
   return typeof value === 'number' ? value : (value[0] ?? 0)
 }
+
+const effortHeaderVariants = {
+  from: { opacity: 0, filter: 'blur(4px)' },
+  to: { opacity: 1, filter: 'blur(0px)' }
+}
+
+const effortHeaderTransition = { type: 'spring', duration: 0.3, delay: 0.1, bounce: 0 } as const
 
 type PickerTriggerProps = Omit<ComponentProps<typeof Button>, 'children' | 'variant'> & {
   label: string
@@ -125,12 +134,14 @@ function EffortPicker({
   const currentIndex = resolveEffortIndex(effortLevels, currentEffort)
   const [open, setOpen] = useState(false)
   const [draftIndex, setDraftIndex] = useState(currentIndex)
+  const [dragging, setDragging] = useState(false)
   const displayedIndex = open ? draftIndex : currentIndex
   const displayedEffort = effortLevels[displayedIndex] ?? currentEffort
   const displayedLabel = effortLabel(displayedEffort)
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (nextOpen) setDraftIndex(currentIndex)
+    else setDragging(false)
     setOpen(nextOpen)
   }
 
@@ -151,79 +162,105 @@ function EffortPicker({
         }
       />
       <PopoverContent align="end" side="top" className="w-64" disableAnchorTracking>
-        <PopoverHeader className="flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-1">
-            <span className="text-muted-foreground">Effort</span>
-            <output aria-live="polite">{displayedLabel}</output>
-          </div>
-          {showFastMode && (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={fastMode ? 'Turn off Fast mode' : 'Turn on Fast mode'}
-                    aria-pressed={fastMode}
-                    onClick={() => onFastModeChange(!fastMode)}
-                    className="-my-1 -mr-1"
-                  >
-                    {fastMode ? (
-                      <IconBoltFilled className="text-primary" />
-                    ) : (
-                      <IconBolt className="text-muted-foreground" stroke={1.5} />
-                    )}
-                  </Button>
-                }
-              />
-              <TooltipContent align="center" className="flex-col gap-0">
-                <span>Fast mode</span>
-                <span className="font-normal text-muted-foreground">More usage</span>
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </PopoverHeader>
-        <div className="flex flex-col gap-2">
-          <div
-            className="flex items-center justify-between text-xs text-muted-foreground"
-            aria-hidden="true"
-          >
-            <span>Faster</span>
-            <span>Smarter</span>
-          </div>
-          <label className="block">
-            <span className="sr-only">Reasoning effort</span>
-            <Slider
-              value={draftIndex}
-              min={0}
-              max={effortLevels.length - 1}
-              step={1}
-              onValueChange={value => setDraftIndex(singleSliderValue(value))}
-              onValueCommitted={value => commitEffort(singleSliderValue(value))}
-              className={cn(
-                '**:data-[slot=slider-track]:h-6 **:data-[slot=slider-track]:rounded-sm',
-                '**:data-[slot=slider-thumb]:h-6 **:data-[slot=slider-thumb]:w-5 **:data-[slot=slider-thumb]:rounded-sm **:data-[slot=slider-thumb]:border-0 **:data-[slot=slider-thumb]:bg-card **:data-[slot=slider-thumb]:shadow-xs **:data-[slot=slider-thumb]:ring-0'
-              )}
-            >
-              <span
-                data-slot="slider-marks"
+        <PopoverHeader className="relative h-5 flex-row items-center">
+          <AnimatePresence mode="popLayout" initial={false}>
+            {dragging ? (
+              <motion.div
+                key="range"
+                className="flex h-5 w-full items-center justify-between text-sm text-muted-foreground"
                 aria-hidden="true"
-                className="absolute inset-x-2 flex items-center justify-between"
+                variants={effortHeaderVariants}
+                initial="from"
+                animate="to"
+                exit="from"
+                transition={effortHeaderTransition}
               >
-                {Array.from({ length: effortLevels.length }, (_, index) => (
-                  <span
-                    key={index}
-                    className={cn(
-                      'size-1 rounded-full',
-                      index <= draftIndex ? 'bg-primary-foreground/30' : 'bg-foreground/30'
-                    )}
-                  />
-                ))}
-              </span>
-            </Slider>
-          </label>
-        </div>
+                <span>Faster</span>
+                <span>Smarter</span>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="effort"
+                className="flex h-5 w-full items-center justify-between gap-2"
+                variants={effortHeaderVariants}
+                initial="from"
+                animate="to"
+                exit="from"
+                transition={effortHeaderTransition}
+              >
+                <div className="flex items-center gap-1">
+                  <span className="text-muted-foreground">Effort</span>
+                  <output aria-live="polite">{displayedLabel}</output>
+                </div>
+                {showFastMode && (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={fastMode ? 'Turn off Fast mode' : 'Turn on Fast mode'}
+                          aria-pressed={fastMode}
+                          onClick={() => onFastModeChange(!fastMode)}
+                          className="-my-1 -mr-1"
+                        >
+                          {fastMode ? (
+                            <IconBoltFilled className="text-primary" />
+                          ) : (
+                            <IconBolt className="text-muted-foreground" stroke={1.5} />
+                          )}
+                        </Button>
+                      }
+                    />
+                    <TooltipContent align="center" className="flex-col gap-0">
+                      <span>Fast mode</span>
+                      <span className="font-normal text-muted-foreground">More usage</span>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </PopoverHeader>
+        <label className="block">
+          <span className="sr-only">Reasoning effort</span>
+          <Slider
+            value={draftIndex}
+            min={0}
+            max={effortLevels.length - 1}
+            step={1}
+            onPointerDown={event => {
+              if (event.button === 0) setDragging(true)
+            }}
+            onPointerCancel={() => setDragging(false)}
+            onValueChange={value => setDraftIndex(singleSliderValue(value))}
+            onValueCommitted={value => {
+              setDragging(false)
+              commitEffort(singleSliderValue(value))
+            }}
+            className={cn(
+              '**:data-[slot=slider-track]:h-6 **:data-[slot=slider-track]:rounded-sm',
+              '**:data-[slot=slider-thumb]:h-6 **:data-[slot=slider-thumb]:w-5 **:data-[slot=slider-thumb]:rounded-sm **:data-[slot=slider-thumb]:border-0 **:data-[slot=slider-thumb]:bg-card **:data-[slot=slider-thumb]:shadow-xs **:data-[slot=slider-thumb]:ring-0'
+            )}
+          >
+            <span
+              data-slot="slider-marks"
+              aria-hidden="true"
+              className="absolute inset-x-2 flex items-center justify-between"
+            >
+              {Array.from({ length: effortLevels.length }, (_, index) => (
+                <span
+                  key={index}
+                  className={cn(
+                    'size-1 rounded-full',
+                    index <= draftIndex ? 'bg-primary-foreground/30' : 'bg-foreground/30'
+                  )}
+                />
+              ))}
+            </span>
+          </Slider>
+        </label>
       </PopoverContent>
     </Popover>
   )
