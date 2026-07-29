@@ -30,11 +30,20 @@ export function appletVersion(segment: AppletSegment, workspaceId: string, name:
   return versions.get(appletKey(segment, workspaceId, name)) ?? 0
 }
 
+// The url segment the entry is served at. NOT `index.js`, which is only its name
+// on disk: proxies in front of moi (Cloudflare, notably) pick cacheability from
+// the url's extension rather than the content type, and on a `.js` url the
+// zone's Browser Cache TTL — 4 hours by default — gets stamped over the server's
+// `no-cache`, pinning a stale bundle in the browser with no way to revalidate it
+// away. Extensionless keeps the server's headers intact. `parseAppletTail` in
+// `server/applets.ts` maps this back to `index.js`; the two must agree.
+const ENTRY_ROUTE = 'module'
+
 // The cache-busting import URL for an applet's entry at its current version.
 // Assets + chunks resolve module-relative from the entry (via import.meta.url),
 // so they don't inherit `?v` and aren't re-fetched needlessly.
 export function appletUrl(segment: AppletSegment, workspaceId: string, name: string): string {
-  return `/api/workspaces/${workspaceId}/${segment}/${name}/index.js?v=${appletVersion(segment, workspaceId, name)}`
+  return `/api/workspaces/${workspaceId}/${segment}/${name}/${ENTRY_ROUTE}?v=${appletVersion(segment, workspaceId, name)}`
 }
 
 // The key an applet bundle registers its CSS under (`window.__moiAppletCss`):

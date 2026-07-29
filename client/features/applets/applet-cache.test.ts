@@ -27,14 +27,24 @@ describe('appletUrl + version', () => {
     const seg = 'views'
     const ws = `wsv-${crypto.randomUUID()}`
     expect(appletVersion(seg, ws, 'a')).toBe(0)
-    expect(appletUrl(seg, ws, 'a')).toBe(`/api/workspaces/${ws}/views/a/index.js?v=0`)
+    expect(appletUrl(seg, ws, 'a')).toBe(`/api/workspaces/${ws}/views/a/module?v=0`)
 
     invalidateApplet(seg, ws, 'a')
     expect(appletVersion(seg, ws, 'a')).toBe(1)
-    expect(appletUrl(seg, ws, 'a')).toBe(`/api/workspaces/${ws}/views/a/index.js?v=1`)
+    expect(appletUrl(seg, ws, 'a')).toBe(`/api/workspaces/${ws}/views/a/module?v=1`)
 
     invalidateApplet(seg, ws, 'a')
-    expect(appletUrl(seg, ws, 'a')).toBe(`/api/workspaces/${ws}/views/a/index.js?v=2`)
+    expect(appletUrl(seg, ws, 'a')).toBe(`/api/workspaces/${ws}/views/a/module?v=2`)
+  })
+
+  test('the entry url carries no file extension', () => {
+    // Load-bearing, not cosmetic: proxies (Cloudflare) decide cacheability from
+    // the url extension, and a `.js` entry gets its `no-cache` overwritten by the
+    // zone's Browser Cache TTL — which pins a stale bundle in the browser.
+    const ws = `wsv-${crypto.randomUUID()}`
+    const path = new URL(appletUrl('widgets', ws, 'clock'), 'http://h').pathname
+    expect(path).toBe(`/api/workspaces/${ws}/widgets/clock/module`)
+    expect(path).not.toMatch(/\.\w+$/)
   })
 
   test('versions are independent per applet', () => {
@@ -58,6 +68,6 @@ describe('invalidateApplet drops the cached module', () => {
     invalidateApplet('views', ws, 'board')
     expect(getCachedApplet(key)).toBeUndefined()
     // And the URL the next load uses is now a fresh version.
-    expect(appletUrl('views', ws, 'board')).toBe(`/api/workspaces/${ws}/views/board/index.js?v=1`)
+    expect(appletUrl('views', ws, 'board')).toBe(`/api/workspaces/${ws}/views/board/module?v=1`)
   })
 })

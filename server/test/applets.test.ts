@@ -75,14 +75,15 @@ describe('serveApplet', () => {
     expect(res.status).toBe(200)
   })
 
-  test('entry index.js revalidates: ETag + no-cache, 304 on match', async () => {
+  test('entry index.js revalidates: ETag + private, no-cache, 304 on match', async () => {
     // The entry's url is stable across rebuilds, so an edge cache must revalidate
-    // it or it serves a stale bundle. It carries an ETag + `no-cache`; a request
-    // echoing that ETag gets a bodyless 304.
+    // it or it serves a stale bundle. It carries an ETag + `private, no-cache`; a
+    // request echoing that ETag gets a bodyless 304. `private` is what Cloudflare
+    // preserves when its Browser Cache TTL rewrites the header.
     seedApplet('views', 'editor', { 'index.js': 'export default 1' })
     const res = await serveApplet('view', 'editor', 'index.js', WS, BASE)
     expect(res.status).toBe(200)
-    expect(res.headers.get('cache-control')).toBe('no-cache')
+    expect(res.headers.get('cache-control')).toBe('private, no-cache')
     const etag = res.headers.get('etag')
     expect(etag).toBeTruthy()
 
@@ -126,7 +127,7 @@ describe('serveApplet', () => {
     })
     for (const f of ['banner.png', 'sprite-map.png']) {
       const res = await serveApplet('widget', 'clock', f, WS, BASE)
-      expect(res.headers.get('cache-control')).toBe('no-cache')
+      expect(res.headers.get('cache-control')).toBe('private, no-cache')
       expect(res.headers.get('etag')).toBeTruthy()
     }
   })
@@ -182,6 +183,19 @@ describe('parseAppletTail', () => {
     expect(
       parseAppletTail('http://h/api/workspaces/w1/widgets/clips/logo-x.png', 'w1', 'widgets')
     ).toEqual({ name: 'clips', file: 'logo-x.png' })
+  })
+
+  test('the extensionless `module` alias resolves to the on-disk entry', () => {
+    // The client asks for `…/<name>/module` so proxies that key cacheability off
+    // the url extension leave the response's headers alone; the bundle dir still
+    // holds `index.js`, and mapping here keeps serveApplet's content-type and
+    // sentinel-swap keyed off the real `.js` name.
+    expect(
+      parseAppletTail('http://h/api/workspaces/w1/views/editor/module?v=2', 'w1', 'views')
+    ).toEqual({ name: 'editor', file: 'index.js' })
+    expect(
+      parseAppletTail('http://h/api/workspaces/w1/widgets/clock/module', 'w1', 'widgets')
+    ).toEqual({ name: 'clock', file: 'index.js' })
   })
 
   test('a bare name (or legacy <name>.js) targets the entry', () => {

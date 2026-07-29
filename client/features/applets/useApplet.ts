@@ -66,7 +66,7 @@ function loadApplet(
   const existing = getCachedApplet(key) as Promise<ComponentType<AppletComponentProps>> | undefined
   if (existing) return existing
 
-  // Import the bundle dir's `index.js` at its current `?v`; the version is bumped
+  // Import the bundle dir's entry at its current `?v`; the version is bumped
   // (and this entry dropped) by `invalidateApplet` on every rebuild — including
   // while this applet is unmounted — so a backgrounded tab never serves stale.
   const promise = import(/* @vite-ignore */ appletUrl(segment, workspaceId, name)).then(mod => {

@@ -21,10 +21,13 @@ self-locate via `import.meta.url`. This replaces the `window.__MEI_WS__` global.
 
 ```
 .moi/.build/views/editor/      served at  /api/workspaces/<id>/views/editor/
-  index.js          entry      ← served, sentinel-swapped
+  index.js          entry      ← served at `module`, sentinel-swapped
   chunk-<hash>.js   chunk      ← served, sentinel-swapped
   img-<hash>.png    asset      ← streamed raw
 ```
+
+The entry is the one file whose route name differs from its disk name — see
+[Why the entry url has no extension](#why-the-entry-url-has-no-extension).
 
 Two route families — applet files (per applet) and workspace I/O (per workspace).
 Kind is a **literal** segment (`widgets`/`views`), not a param — a param would
@@ -40,12 +43,56 @@ POST /api/workspaces/:id/rpc/<module>/<fn> → workspace worker (run server fn)
 Example paths (widget `clips`, workspace `wsab12`):
 
 ```
-entry   /api/workspaces/wsab12/widgets/clips/index.js
+entry   /api/workspaces/wsab12/widgets/clips/module?v=0
 asset   /api/workspaces/wsab12/widgets/clips/logo-9f3a2b1c.png
 chunk   /api/workspaces/wsab12/widgets/clips/chunk-7d4e1a09.js
 fs      /api/workspaces/wsab12/fs/clips/001_copenhagen.mp4
 rpc     /api/workspaces/wsab12/rpc/widgets/clips/listClips
 ```
+
+## Why the entry url has no extension
+
+The entry is served at `…/<name>/module`, not `…/<name>/index.js`. That is a
+proxy workaround, not a naming preference.
+
+Cloudflare — which sits between many users and their moi, typically as a tunnel
+— decides whether a response is **cache-eligible from the url's file extension**,
+not from its content type, and [`JS` is on its default cached-extension
+list](https://developers.cloudflare.com/cache/concepts/default-cache-behavior/#default-cached-file-extensions).
+Once a response is cache-eligible, the zone's [Browser Cache
+TTL](https://developers.cloudflare.com/cache/how-to/edge-browser-cache-ttl/#browser-cache-ttl)
+applies, and it **overrides the origin's `Cache-Control`** on the way to the
+browser whenever the origin's freshness is lower than the TTL. The default is
+4 hours on every plan, so moi's `no-cache` reached the browser as
+`max-age=14400`.
+
+The entry lives at one stable url across rebuilds, so that rewrite pinned a
+stale bundle in the user's browser for hours. Neither existing defence helped:
+the browser had been told not to revalidate, so the ETag never got to fire, and
+`?v` is an in-memory counter that resets to `0` on reload — a full refresh lands
+straight back on the poisoned url.
+
+An extensionless path isn't cache-eligible by default (`CF-Cache-Status:
+DYNAMIC`), so the response reaches the browser with the headers moi actually
+sent. Chunks and assets keep their extensions on purpose: they're content-hashed
+and _want_ the edge cache.
+
+Consequences to keep in mind when touching this:
+
+- `parseAppletTail` (`server/applets.ts`) maps `module` → `index.js` **before**
+  `serveApplet` runs, so content-type and the sentinel swap keep keying off the
+  real `.js` name. Deciding those from the requested url would ship the entry as
+  `application/octet-stream` and fail the browser's module MIME check.
+- `appletUrl` (`client/features/applets/applet-cache.ts`) and `parseAppletTail`
+  must agree on the spelling; both sides pin it in tests.
+- The entry carries `Cache-Control: private, no-cache` + an ETag. `private` is
+  the one directive Cloudflare preserves through the Browser Cache TTL rewrite,
+  so it's cheap insurance for any shared cache that stores the response anyway.
+  `no-cache` (not `no-store`) is deliberate — the browser keeps the bytes and
+  revalidates, which the origin answers with a bodyless 304.
+- Other stable-url routes on cacheable extensions (`/fs/*`, `/preview/*`,
+  `/vendor/react/*.js`) have the same exposure and are **not** fixed by this;
+  their urls can't drop the extension as cheaply.
 
 ## Three ways out
 
@@ -121,9 +168,10 @@ declare module '*.png' {
   emits the entry's CSS sibling as an "entry" output too, so a literal `index.js`
   collides; we inject that CSS and drop the file.
 - **Serve** (`applets.ts` `serveApplet`): the `…/widgets/*` / `…/views/*` routes
-  (literal kind) parse the tail as `<name>/<file>`; `.js` is sentinel-swapped and
-  sent as `text/javascript`, anything else streams raw (`Bun.file` infers
-  content-type). `…/<id>/rpc/<module>/<fn>` reuses the existing worker call.
+  (literal kind) parse the tail as `<name>/<file>`, resolving the entry alias
+  `module` to `index.js`; `.js` is sentinel-swapped and sent as `text/javascript`,
+  anything else streams raw (`Bun.file` infers content-type).
+  `…/<id>/rpc/<module>/<fn>` reuses the existing worker call.
 - **`/fs`** (`applets.ts` `serveWorkspaceFile`): reject empty/`.`/`..`/dotfile
   segments and anything resolving outside the root, allowlist media extensions —
   the secret-leak guard, not the localhost bind. Range is handled **explicitly**
