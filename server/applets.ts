@@ -7,8 +7,9 @@
 //
 // Each applet builds into its OWN directory `.build/<kind>/<name>/`, holding a
 // fixed `index.js` entry plus any code chunks and bundled assets (hashed
-// images/fonts). The client dynamic-imports `<name>/index.js`; assets and
-// chunks resolve module-relative from there. `.js` files carry the
+// images/fonts). The client dynamic-imports that entry at `<name>/module` — an
+// extensionless alias, see `ENTRY_ROUTE_FILE` — and assets and chunks resolve
+// module-relative from there. `.js` files carry the
 // `%%MOI_APPLET_API_BASE%%` sentinel (for RPC + `fileUrl`), swapped to the real
 // `/api/workspaces/<id>` base when served — so the on-disk bundle is
 // workspace-agnostic.
@@ -271,12 +272,21 @@ const HASHED_FILE_RE = /^chunk-[0-9a-z]+\.\w+$|-[0-9a-f]{6,}\.\w+$/i
 // prefix — substituted for the build-time sentinel in every `.js` so RPC and
 // `fileUrl` calls hit the right workspace. Assets stream untouched.
 //
+// `file` is the ON-DISK name (the route's extensionless entry alias is already
+// mapped back to `index.js` by `parseAppletTail`), so the content-type and
+// sentinel-swap decisions below key off the real `.js` — do not switch them to
+// the requested url, or the entry would ship as `application/octet-stream` and
+// fail the browser's module MIME check.
+//
 // Caching turns on the hashed-vs-stable split. A content-hashed chunk/asset gets
 // a new url whenever its bytes change, so it's cached forever. The `index.js`
 // entry (and anything not recognizably hashed) lives at ONE url across rebuilds,
 // so a shared cache (e.g. Cloudflare) that stored it once would hand back a
 // STALE copy after the next `moi bundle` — it gets an ETag (size+mtime) +
-// `no-cache` instead, so an unchanged file costs a 304 and a rebuilt one busts.
+// `private, no-cache` instead, so an unchanged file costs a 304 and a rebuilt
+// one busts. `private` keeps it out of any shared cache that would store it
+// anyway, and is the one directive Cloudflare preserves when its Browser Cache
+// TTL rewrites the header (see `ENTRY_ROUTE_FILE` for the rest of that story).
 export async function serveApplet(
   kind: AppletKind,
   name: string,
@@ -306,7 +316,7 @@ export async function serveApplet(
     cache = { 'Cache-Control': IMMUTABLE_CACHE }
   } else {
     const etag = `"${bunFile.size}-${Math.trunc(bunFile.lastModified)}"`
-    cache = { ETag: etag, 'Cache-Control': 'no-cache' }
+    cache = { ETag: etag, 'Cache-Control': 'private, no-cache' }
     if (ifNoneMatch === etag) return new Response(null, { status: 304, headers: cache })
   }
 
@@ -329,8 +339,36 @@ export function apiBaseFor(id: string): string {
   return `/api/workspaces/${id}`
 }
 
+// The entry's real name in the bundle dir (`.build/<kind>/<name>/index.js`).
+const ENTRY_DISK_FILE = 'index.js'
+
+// …and the url the client asks for it at: `…/<segment>/<name>/module`. The route
+// name and the disk name differ ON PURPOSE, and the reason is proxies.
+//
+// Cloudflare — which sits between many users and their moi, usually as a tunnel
+// — decides whether a response is cache-eligible from the url's FILE EXTENSION,
+// not from its content type, and `JS` is on its default cached-extension list.
+// Once a response is cache-eligible, the zone's Browser Cache TTL applies, and
+// that setting overrides the origin's `Cache-Control` on the way to the browser
+// whenever the origin's freshness is lower than the TTL. Its default is 4 hours
+// on every plan, so our `no-cache` came back to the browser as `max-age=14400`.
+// The entry lives at ONE url across rebuilds, so that rewrite pinned a stale
+// bundle in the user's browser for hours: no revalidation, so the ETag never got
+// a chance to bust it, and `?v` couldn't either (it's an in-memory counter that
+// resets to 0 on reload, landing right back on the poisoned url).
+//
+// An extensionless path isn't cache-eligible by default, so it reaches the
+// browser with the headers we actually sent. Chunks and assets keep their
+// extensions deliberately — they're content-hashed and WANT the edge cache.
+// The build only ever emits `index.js`, `chunk-<hash>.js` and hashed assets, so
+// this name can never collide with a real bundle file. Mirrors `appletUrl` in
+// `client/features/applets/applet-cache.ts`.
+const ENTRY_ROUTE_FILE = 'module'
+
 // Split an applet file request `…/<segment>/<name>/<file>` into name + file. A
-// bare `…/<segment>/<name>` (or legacy `…/<name>.js`) targets the entry.
+// bare `…/<segment>/<name>` (or legacy `…/<name>.js`) targets the entry, as does
+// the extensionless `…/<name>/module` alias. `file` is always the on-disk name,
+// so `serveApplet` never has to know the route spelling.
 export function parseAppletTail(
   url: string,
   id: string,
@@ -338,8 +376,12 @@ export function parseAppletTail(
 ): { name: string; file: string } {
   const tail = new URL(url).pathname.split(`/api/workspaces/${id}/${segment}/`)[1] ?? ''
   const slash = tail.indexOf('/')
-  if (slash === -1) return { name: tail.replace(/\.js$/, ''), file: 'index.js' }
-  return { name: tail.slice(0, slash), file: tail.slice(slash + 1) }
+  if (slash === -1) return { name: tail.replace(/\.js$/, ''), file: ENTRY_DISK_FILE }
+  const file = tail.slice(slash + 1)
+  return {
+    name: tail.slice(0, slash),
+    file: file === ENTRY_ROUTE_FILE ? ENTRY_DISK_FILE : file
+  }
 }
 
 // Extensions `fileUrl()` may stream from the workspace. Media + image/doc

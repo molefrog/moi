@@ -27,7 +27,9 @@ describe('matchBundleUrl', () => {
   })
 
   test('matches inside a Firefox-style stack frame (fn@url)', () => {
-    const stack = `onClick@http://localhost:13337/api/workspaces/${WS}/views/crm/index.js:10:5`
+    // The entry is requested at the extensionless `…/<name>/module` alias, so
+    // that — not `index.js` — is what the browser prints in real stack frames.
+    const stack = `onClick@http://localhost:13337/api/workspaces/${WS}/views/crm/module?v=1:10:5`
     expect(matchBundleUrl(stack)).toEqual({ workspaceId: WS, kind: 'view', name: 'crm' })
   })
 
