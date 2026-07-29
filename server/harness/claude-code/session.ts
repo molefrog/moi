@@ -18,7 +18,7 @@ import {
   query
 } from '@anthropic-ai/claude-agent-sdk'
 
-import { ATTACHMENT_ONLY_PLACEHOLDER, appendAttachmentNote } from '@/lib/attachment-note'
+import { appendAttachmentNote, attachmentOnlyPlaceholder } from '@/lib/attachment-note'
 import { ClaudeAdapter } from './adapter'
 import type { Part } from '@/lib/format'
 import type { SessionActivity } from '@/lib/types'
@@ -80,11 +80,11 @@ export function buildUserMessage(
 
   const files = uploads.filter(u => u.kind === 'file' && u.path)
   const agentText = appendAttachmentNote(
-    text,
+    text || attachmentOnlyPlaceholder(uploads.map(upload => upload.filename)),
     files.map(f => ({ filename: f.filename, path: f.path! }))
   )
   // Always end with a text block so an image-only message still has a prompt.
-  blocks.push({ type: 'text', text: agentText || ATTACHMENT_ONLY_PLACEHOLDER })
+  blocks.push({ type: 'text', text: agentText })
   return { content: blocks, parts }
 }
 
@@ -166,6 +166,7 @@ type LiveSession = {
   createdAt: number
   lastActivityAt: number
   lastUserText: string | undefined
+  refreshSessionsOnResult: boolean
 }
 
 const sessions = new Map<string, LiveSession>()
@@ -475,6 +476,10 @@ async function consume(s: LiveSession) {
             ? undefined
             : msg.errors.join('\n') || msg.subtype.replaceAll('_', ' ')
         debug(`cc result ws=${s.workspaceId} session=${s.sessionId} subtype=${msg.subtype}`)
+        if (s.refreshSessionsOnResult) {
+          s.refreshSessionsOnResult = false
+          broadcast(s.workspaceId, { type: 'sessions_changed', sessionId: s.sessionId })
+        }
         // Fallback for CLIs that never emit `session_state_changed`: treat
         // every result as turn-over. With state events, `idle` follows the
         // result and drives the same path.
@@ -589,7 +594,8 @@ function createLiveSession(input: {
     lastBuilderError: undefined,
     createdAt: Date.now(),
     lastActivityAt: Date.now(),
-    lastUserText: undefined
+    lastUserText: undefined,
+    refreshSessionsOnResult: input.isNew
   }
   sessions.set(recKey(session.workspaceId, session.sessionId), session)
   debug(

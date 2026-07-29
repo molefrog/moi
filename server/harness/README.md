@@ -34,6 +34,8 @@ Socket-protocol notes the layers rely on (all defined in `lib/types.ts`):
 
 - **`session_renamed`** — a new thread is created under the client's temporary
   uuid, then rekeyed to the backend's real session/thread id.
+- **`sessions_changed`** — a provider changed session-list metadata such as a
+  generated chat title; clients refresh that workspace's session list.
 - **Optimistic-id rendezvous** — the client sends `optimisticId` with each
   chat; the user's bubble must upsert under that id. Backends differ: Codex
   echoes it natively (`clientUserMessageId` → `clientId`), Claude Code never

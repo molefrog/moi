@@ -9,6 +9,7 @@ import type {
   PreviewFrame,
   ScratchOp,
   SessionActivity,
+  SessionInfo,
   StreamEvent,
   ThreadConfig,
   ViewState
@@ -58,6 +59,11 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
     const from = data.from as string
     const to = data.to as string
     store.renameSession(workspaceId, from, to)
+    queryClient?.setQueryData<SessionInfo[]>(workspaceKeys.sessions(workspaceId), current =>
+      current?.map(session =>
+        session.sessionId === from ? { ...session, sessionId: to } : session
+      )
+    )
 
     const previousView = queryClient?.getQueryData<ViewState>(
       workspaceKeys.events(workspaceId, from)
@@ -76,6 +82,12 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
     }
     queryClient?.invalidateQueries({ queryKey: workspaceKeys.sessions(workspaceId) })
     queryClient?.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
+    return
+  }
+  if (data.type === 'sessions_changed') {
+    queryClient?.invalidateQueries({
+      queryKey: workspaceKeys.sessions(data.workspaceId as string)
+    })
     return
   }
   if (data.type === 'workspace:switch') {

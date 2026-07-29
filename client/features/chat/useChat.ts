@@ -21,6 +21,7 @@ import {
   attachmentsForSend,
   ownsComposerAttachments,
   resolveChatRunOptions,
+  startOptimisticSession,
   startOptimisticTurn
 } from '@/client/features/chat/chat-send'
 import { buildPreviewTurn } from '@/client/features/chat/preview-turn'
@@ -106,6 +107,13 @@ export function useChat(address: WorkspaceTabAddress) {
         sid = crypto.randomUUID()
         isNew = true
         liveStore.getState().setActive(workspaceId, sid)
+        startOptimisticSession({
+          queryClient: qc,
+          workspaceId,
+          sessionId: sid,
+          text,
+          filenames: ready.map(attachment => attachment.name)
+        })
       }
 
       // Optimistic user turn — primed into the RQ transcript cache so it renders

@@ -7,6 +7,8 @@ import { beforeEach, describe, expect, test } from 'bun:test'
 
 import { __setQueryClientForTests, handleFrame } from '@/client/features/chat/chat-connection'
 import { liveStore } from '@/client/features/chat/chat-store'
+import { workspaceKeys } from '@/client/api/workspace-keys'
+import type { SessionInfo } from '@/lib/types'
 
 const WS = 'ws1'
 const SID = 'sess-1'
@@ -82,5 +84,33 @@ describe('session rename', () => {
     handleFrame({ type: 'session_renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
     expect(activityOf('temp-1')).toBeUndefined()
     expect(activityOf('real-1')).toBe('running')
+  })
+
+  test('the optimistic title follows the real session id', () => {
+    const queryClient = new QueryClient()
+    __setQueryClientForTests(queryClient)
+    queryClient.setQueryData<SessionInfo[]>(workspaceKeys.sessions(WS), [
+      { sessionId: 'temp-1', summary: 'Fix picker focus', lastModified: 1 }
+    ])
+
+    handleFrame({ type: 'session_renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
+
+    expect(queryClient.getQueryData<SessionInfo[]>(workspaceKeys.sessions(WS))?.[0]).toEqual({
+      sessionId: 'real-1',
+      summary: 'Fix picker focus',
+      lastModified: 1
+    })
+  })
+})
+
+describe('session list changes', () => {
+  test('invalidates the affected workspace session list', () => {
+    const queryClient = new QueryClient()
+    __setQueryClientForTests(queryClient)
+    queryClient.setQueryData(workspaceKeys.sessions(WS), [])
+
+    handleFrame({ type: 'sessions_changed', workspaceId: WS, sessionId: SID })
+
+    expect(queryClient.getQueryState(workspaceKeys.sessions(WS))?.isInvalidated).toBe(true)
   })
 })

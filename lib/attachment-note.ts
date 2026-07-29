@@ -16,6 +16,24 @@ export const ATTACHMENT_ONLY_PLACEHOLDER = '(see attached files)'
 
 export type AttachmentNoteFile = { filename: string; path: string }
 
+export function attachmentOnlyPlaceholder(filenames: readonly string[]): string {
+  return filenames.length > 0
+    ? `${ATTACHMENT_ONLY_PLACEHOLDER} ${filenames.join(', ')}`
+    : ATTACHMENT_ONLY_PLACEHOLDER
+}
+
+export function attachmentOnlyFilenames(text: string): string[] {
+  if (!text.startsWith(`${ATTACHMENT_ONLY_PLACEHOLDER} `)) return []
+  return text
+    .slice(ATTACHMENT_ONLY_PLACEHOLDER.length + 1)
+    .split(', ')
+    .filter(Boolean)
+}
+
+export function isAttachmentOnlyPlaceholder(text: string): boolean {
+  return text === ATTACHMENT_ONLY_PLACEHOLDER || text.startsWith(`${ATTACHMENT_ONLY_PLACEHOLDER} `)
+}
+
 // `text` plus the note listing each attachment as `- <filename>: <path>`.
 // Filenames are sanitized at upload time (no colons/newlines), so the line
 // format is unambiguous for `splitAttachmentNote`.

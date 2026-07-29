@@ -16,6 +16,7 @@
 //     `clientUserMessageId` as `clientId`, so the optimistic-id rendezvous is
 //     first-class (no text matching like OpenClaw needs).
 import { appendAttachmentNote } from '@/lib/attachment-note'
+import { formatChatTitle } from '@/lib/chat-title'
 import {
   type MoiContext,
   appendMoiContext,
@@ -36,7 +37,13 @@ import {
   codexItemToTurn,
   codexThreadToEvents
 } from './adapter'
-import { type CodexClient, getCodexClient, readSubagentRecords } from './client'
+import {
+  type CodexClient,
+  getCodexClient,
+  getCodexModelCatalog,
+  readSubagentRecords
+} from './client'
+import { generateCodexChatTitle } from './title'
 import { debug } from '../../debug'
 import { broadcast } from '../../state'
 import { hasThreadConfig, renameThreadConfig, saveThreadConfig } from '../../thread-config'
@@ -493,6 +500,46 @@ async function buildUserInput(
   return { input, parts }
 }
 
+async function saveCodexChatTitle(
+  client: CodexClient,
+  workspaceId: string,
+  sessionId: string,
+  title: string
+): Promise<void> {
+  await client.rpc('thread/name/set', { threadId: sessionId, name: title })
+  broadcast(workspaceId, { type: 'sessions_changed', sessionId })
+}
+
+async function refineCodexChatTitle(input: {
+  client: CodexClient
+  workspaceId: string
+  workspacePath: string
+  sessionId: string
+  source: string
+  fallbackTitle: string
+}): Promise<void> {
+  try {
+    const models = await getCodexModelCatalog(input.workspacePath)
+    const title = await generateCodexChatTitle({
+      client: input.client,
+      workspacePath: input.workspacePath,
+      source: input.source,
+      models
+    })
+    if (!title || title === input.fallbackTitle) return
+    const current = await input.client.rpc<{ thread?: CodexThread }>('thread/read', {
+      threadId: input.sessionId,
+      includeTurns: false
+    })
+    if (current.thread?.name && current.thread.name !== input.fallbackTitle) return
+    await saveCodexChatTitle(input.client, input.workspaceId, input.sessionId, title)
+  } catch (err) {
+    debug(
+      `codex title skipped ws=${input.workspaceId} thread=${input.sessionId}: ${err instanceof Error ? err.message : String(err)}`
+    )
+  }
+}
+
 export async function sendCodexMessage(input: {
   workspaceId: string
   workspacePath: string
@@ -518,11 +565,20 @@ export async function sendCodexMessage(input: {
   const { input: userInput, parts } = await buildUserInput(input.content, uploads)
   if (userInput.length === 0) return
   const serviceTier = codexServiceTierForFastMode(input.fastMode)
+  const titleSource = input.content || uploads.map(upload => upload.filename).join(', ')
+  const fallbackTitle = input.isNew
+    ? formatChatTitle(
+        input.content,
+        uploads.map(upload => upload.filename)
+      )
+    : ''
 
   let rec: SessionRecord
+  let titleClient: CodexClient | undefined
   try {
     if (input.isNew) {
       const client = await getCodexClient(input.workspacePath)
+      titleClient = client
       const started = await client.rpc<{ thread: CodexThread }>('thread/start', {
         cwd: input.workspacePath,
         sandbox: SANDBOX_MODE,
@@ -546,6 +602,15 @@ export async function sendCodexMessage(input: {
         sessionId: realId,
         client
       })
+      if (fallbackTitle) {
+        try {
+          await saveCodexChatTitle(client, input.workspaceId, realId, fallbackTitle)
+        } catch (err) {
+          debug(
+            `codex fallback title skipped ws=${input.workspaceId} thread=${realId}: ${err instanceof Error ? err.message : String(err)}`
+          )
+        }
+      }
       if (
         (input.model || input.effort || input.fastMode !== undefined) &&
         !(await hasThreadConfig(input.workspacePath, realId))
@@ -639,6 +704,16 @@ export async function sendCodexMessage(input: {
     } else {
       const res = await client.rpc<{ turn: CodexTurn }>('turn/start', turnParams)
       setProcessing(rec, true, res.turn.id)
+    }
+    if (titleClient && fallbackTitle) {
+      void refineCodexChatTitle({
+        client: titleClient,
+        workspaceId: input.workspaceId,
+        workspacePath: input.workspacePath,
+        sessionId: rec.sessionId,
+        source: titleSource,
+        fallbackTitle
+      })
     }
     debug(`codex send ws=${rec.workspaceId} thread=${rec.sessionId} turn=${rec.activeTurnId}`)
   } catch (err) {

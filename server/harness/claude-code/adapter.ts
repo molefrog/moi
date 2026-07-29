@@ -14,7 +14,7 @@ import type {
   TurnOrigin
 } from '@/lib/format'
 
-import { ATTACHMENT_ONLY_PLACEHOLDER, splitAttachmentNote } from '@/lib/attachment-note'
+import { isAttachmentOnlyPlaceholder, splitAttachmentNote } from '@/lib/attachment-note'
 import { stripMoiContext } from '@/lib/moi-context'
 
 // Loose SDK message shape — we don't pull in the full SDK type tree; the
@@ -532,7 +532,7 @@ export class ClaudeAdapter {
               }
               // An attachment-only message carries a synthesized placeholder
               // prompt; the bubble should show just the attachments.
-              if (text === ATTACHMENT_ONLY_PLACEHOLDER && parts.some(p => p.type === 'file')) {
+              if (isAttachmentOnlyPlaceholder(text) && parts.some(p => p.type === 'file')) {
                 text = ''
               }
             }

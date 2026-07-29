@@ -350,7 +350,7 @@ describe('buildUserMessage', () => {
     const blocks = asBlocks(content as unknown[])
     expect(blocks[0].type).toBe('image')
     expect(blocks.at(-1)?.type).toBe('text')
-    expect(blocks.at(-1)?.text).toBe('(see attached files)')
+    expect(blocks.at(-1)?.text).toBe('(see attached files) shot.png')
     // No empty text display part for an image-only turn.
     expect(textPart(parts)).toBeUndefined()
     expect(fileParts(parts)).toHaveLength(1)

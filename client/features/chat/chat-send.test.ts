@@ -7,10 +7,11 @@ import {
   attachmentsForSend,
   ownsComposerAttachments,
   resolveChatRunOptions,
+  startOptimisticSession,
   startOptimisticTurn
 } from '@/client/features/chat/chat-send'
 import { attachmentKey, type ChatAttachment, liveStore } from '@/client/features/chat/chat-store'
-import type { ViewState, WorkspaceModels } from '@/lib/types'
+import type { SessionInfo, ViewState, WorkspaceModels } from '@/lib/types'
 
 const workspaceId = 'workspace-1'
 const sessionId = 'session-1'
@@ -33,6 +34,42 @@ describe('startOptimisticTurn', () => {
     expect(optimisticId).toStartWith('optimistic:')
     expect(view?.turns[0]?.parts).toEqual([{ type: 'text', text: 'Build a dashboard' }])
     expect(liveStore.getState().activity[`${workspaceId}:${sessionId}`]).toBe('running')
+  })
+})
+
+describe('startOptimisticSession', () => {
+  test('adds a first-message fallback to the session list immediately', () => {
+    const queryClient = new QueryClient()
+    startOptimisticSession({
+      queryClient,
+      workspaceId,
+      sessionId,
+      text: 'Build a customer dashboard with useful charts'
+    })
+
+    expect(
+      queryClient.getQueryData<SessionInfo[]>(workspaceKeys.sessions(workspaceId))
+    ).toMatchObject([
+      {
+        sessionId,
+        summary: 'Build a customer dashboard with useful charts'
+      }
+    ])
+  })
+
+  test('uses filenames for an attachment-only chat', () => {
+    const queryClient = new QueryClient()
+    startOptimisticSession({
+      queryClient,
+      workspaceId,
+      sessionId,
+      text: '',
+      filenames: ['brief.pdf']
+    })
+
+    expect(
+      queryClient.getQueryData<SessionInfo[]>(workspaceKeys.sessions(workspaceId))?.[0]?.summary
+    ).toBe('brief.pdf')
   })
 })
 

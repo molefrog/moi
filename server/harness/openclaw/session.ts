@@ -12,6 +12,7 @@
 //   - Disk persistence — the gateway is the source of truth; we re-seed from
 //     `sessions.get` on cold start.
 import { appendAttachmentNote } from '@/lib/attachment-note'
+import { formatChatTitle } from '@/lib/chat-title'
 import { type MoiContext, appendMoiContext, renderMoiContext } from '@/lib/moi-context'
 import { applyEvent, emptyViewState } from '@/lib/format'
 import type { SessionActivity, StreamEvent, ViewState } from '@/lib/types'
@@ -421,9 +422,17 @@ export async function sendOpenClawMessage(input: {
   context?: MoiContext
 }): Promise<void> {
   // Fold any attachments into the message text as file-path references.
+  const uploads = input.attachments?.length
+    ? resolveUploads(input.workspaceId, input.attachments)
+    : []
+  const fallbackTitle = input.isNew
+    ? formatChatTitle(
+        input.content,
+        uploads.map(upload => upload.filename)
+      )
+    : ''
   let content = input.content
-  if (input.attachments?.length) {
-    const uploads = resolveUploads(input.workspaceId, input.attachments)
+  if (uploads.length > 0) {
     const files: { filename: string; path: string }[] = []
     for (const u of uploads) {
       const p = await materializeToPath(u)
@@ -434,7 +443,7 @@ export async function sendOpenClawMessage(input: {
   // Attachment-only send whose ids all expired → nothing to say; don't open a
   // session for an empty message.
   if (!content) return
-  return sendOpenClawMessageImpl({ ...input, content })
+  return sendOpenClawMessageImpl({ ...input, content, fallbackTitle })
 }
 
 async function sendOpenClawMessageImpl(input: {
@@ -446,6 +455,7 @@ async function sendOpenClawMessageImpl(input: {
   content: string
   optimisticId?: string
   context?: MoiContext
+  fallbackTitle: string
 }): Promise<void> {
   // New threads: ask the gateway to create one, then rename the client's
   // tentative UUID to the real session id. Mirrors the Claude Code flow
@@ -479,6 +489,21 @@ async function sendOpenClawMessageImpl(input: {
       agentId: input.agentId,
       sessionId: realSessionId
     })
+    if (input.isNew && input.fallbackTitle) {
+      try {
+        const gw = await getGateway()
+        await gw.rpc('sessions.patch', {
+          key: rec.sessionKey,
+          label: input.fallbackTitle
+        })
+        broadcast(input.workspaceId, {
+          type: 'sessions_changed',
+          sessionId: realSessionId
+        })
+      } catch (err) {
+        console.error('[openclaw] failed to save chat title', err)
+      }
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'failed to start session'
     broadcast(input.workspaceId, {

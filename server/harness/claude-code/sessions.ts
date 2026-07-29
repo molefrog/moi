@@ -1,7 +1,14 @@
 // Session discovery + history replay for Claude Code workspaces, backed by
 // the Agent SDK's persisted `.jsonl` session files.
 import { getSessionMessages, listSessions } from '@anthropic-ai/claude-agent-sdk'
+import type { SDKSessionInfo } from '@anthropic-ai/claude-agent-sdk'
 
+import {
+  attachmentOnlyFilenames,
+  isAttachmentOnlyPlaceholder,
+  splitAttachmentNote
+} from '@/lib/attachment-note'
+import { formatChatTitle } from '@/lib/chat-title'
 import type { SessionInfo, StreamEvent } from '@/lib/types'
 
 import { ClaudeAdapter } from './adapter'
@@ -18,11 +25,24 @@ export type SessionWorkspacePreview = {
   updatedAt?: number
 }
 
+export function claudeSessionSummary(
+  session: Pick<SDKSessionInfo, 'customTitle' | 'firstPrompt' | 'summary'>
+): string {
+  if (session.customTitle || !session.firstPrompt || session.summary !== session.firstPrompt) {
+    return session.summary
+  }
+  const split = splitAttachmentNote(session.firstPrompt)
+  const filenames = isAttachmentOnlyPlaceholder(split.text)
+    ? attachmentOnlyFilenames(split.text)
+    : split.files.map(file => file.filename)
+  return formatChatTitle(isAttachmentOnlyPlaceholder(split.text) ? '' : split.text, filenames)
+}
+
 export async function getSessions(workspacePath: string): Promise<SessionInfo[]> {
   const sessions = await listSessions({ dir: workspacePath })
   return sessions.map(s => ({
     sessionId: s.sessionId,
-    summary: s.summary,
+    summary: claudeSessionSummary(s),
     lastModified: s.lastModified,
     cwd: s.cwd
   }))
