@@ -71,9 +71,24 @@ function ChatSessionItem({
         className={cn(active && 'bg-accent text-accent-foreground')}
         onClick={() => onSelect(session.sessionId)}
       >
-        <span className="flex-1 truncate" title={session.summary}>
-          {session.summary}
-        </span>
+        <div
+          className={cn(
+            'flex min-w-0 flex-1 overflow-hidden',
+            canArchive &&
+              'group-focus-within/chat:mr-4 group-focus-within/chat:mask-r-from-[calc(100%-16px)] group-hover/chat:mr-4 group-hover/chat:mask-r-from-[calc(100%-16px)] [@media(hover:none)]:mr-4 [@media(hover:none)]:mask-r-from-[calc(100%-16px)]'
+          )}
+        >
+          <span
+            className={cn(
+              'min-w-0 truncate',
+              canArchive &&
+                'group-focus-within/chat:-mr-4 group-hover/chat:-mr-4 [@media(hover:none)]:-mr-4'
+            )}
+            title={session.summary}
+          >
+            {session.summary}
+          </span>
+        </div>
         {canArchive && (
           <Tooltip>
             <TooltipTrigger
@@ -84,8 +99,8 @@ function ChatSessionItem({
                   size="icon-sm"
                   aria-label={`Archive ${session.summary}`}
                   className={cn(
-                    '-m-1 text-muted-foreground opacity-100 transition-opacity',
-                    'group-hover/chat:opacity-100 hover:bg-transparent hover:text-foreground focus:opacity-100 [@media(hover:hover)]:opacity-0',
+                    'absolute top-1/2 right-0 -translate-y-1/2 text-muted-foreground opacity-100 transition-none',
+                    'group-focus-within/chat:opacity-100 group-hover/chat:opacity-100 hover:bg-transparent hover:text-foreground [@media(hover:hover)]:opacity-0',
                     pending && 'opacity-100!'
                   )}
                   disabled={pending}
