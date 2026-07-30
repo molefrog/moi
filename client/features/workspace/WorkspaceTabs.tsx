@@ -1,6 +1,7 @@
 import { IconPlus, IconX, type TablerIcon } from '@tabler/icons-react'
 import { cva } from 'class-variance-authority'
 
+import { IconGhost } from '@/client/components/shared/IconGhost'
 import { ReorderableList } from '@/client/components/shared/ReorderableList'
 import type { ReorderableRenderState } from '@/client/components/shared/ReorderableList'
 import { Button, buttonVariants } from '@/client/components/ui/button'
@@ -133,7 +134,9 @@ function WorkspaceTab(props: WorkspaceTabProps) {
           tab.closable && 'group-hover/tab:mr-3'
         )}
       >
-        {tab.loading ? (
+        {tab.Icon === IconGhost ? (
+          <IconGhost data-icon="inline-start" stroke={2} animated={tab.loading} />
+        ) : tab.loading ? (
           <Spinner data-icon="inline-start" />
         ) : (
           <tab.Icon data-icon="inline-start" stroke={2} />

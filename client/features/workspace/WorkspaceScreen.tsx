@@ -5,12 +5,13 @@ import { AnimatePresence, motion } from 'motion/react'
 import {
   IconArticle,
   IconBrowserPlus,
-  IconGhost,
   IconLayout2,
   IconLayoutSidebarRight,
   IconLetterCase,
   IconSketching
 } from '@tabler/icons-react'
+
+import { IconGhost } from '@/client/components/shared/IconGhost'
 import { ChatPanel } from '@/client/features/chat/ChatPanel'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { CustomizePanel } from '@/client/features/workspace/CustomizePanel'

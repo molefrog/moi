@@ -594,6 +594,7 @@ export async function sendCodexMessage(input: {
         aliases.set(recKey(input.workspaceId, input.sessionId), realId)
         await renameSessionConfig(input.workspacePath, input.sessionId, realId)
         await renameSelectedSession(input.workspacePath, input.sessionId, realId)
+        // Builder tabs follow the same temporary-to-real session rename.
         await renameViewBuilderSession(
           input.workspaceId,
           input.workspacePath,

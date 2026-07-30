@@ -2,11 +2,9 @@ import type { ReactNode } from 'react'
 
 import { motion } from 'motion/react'
 
-import { IconGhost } from '@tabler/icons-react'
-
+import { IconGhost } from '@/client/components/shared/IconGhost'
 import { Button } from '@/client/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/client/components/ui/popover'
-import { Spinner } from '@/client/components/ui/spinner'
 
 type ChatPopupProps = {
   loading: boolean
@@ -48,7 +46,7 @@ export function ChatPopup({
                 className="bg-card shadow-md hover:shadow-lg"
                 aria-label="Agent"
               >
-                {loading ? <Spinner /> : <IconGhost stroke={1.75} />}
+                <IconGhost animated={loading} stroke={1.75} />
               </Button>
             </motion.div>
           </div>
