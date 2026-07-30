@@ -1,9 +1,10 @@
-import { IconChevronDown, IconPlus } from '@tabler/icons-react'
+import { IconChevronDown, IconEdit } from '@tabler/icons-react'
 
 import { useWorkspaceSessions } from './api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
 import { useLive } from '@/client/features/chat/chat-store'
+import type { SessionInfo } from '@/lib/types'
 
 import { Button } from '@/client/components/ui/button'
 import {
@@ -11,7 +12,8 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuShortcut,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/client/components/ui/dropdown-menu'
 
@@ -19,17 +21,52 @@ type ChatSelectorProps = {
   onSwitch: (sessionId: string | null) => void
 }
 
-function formatDate(ms: number) {
-  const date = new Date(ms)
-  const now = new Date()
-  const isToday = date.toDateString() === now.toDateString()
-  const yesterday = new Date(now)
-  yesterday.setDate(yesterday.getDate() - 1)
-  const isYesterday = date.toDateString() === yesterday.toDateString()
+type ChatSessionGroup = {
+  key: string
+  label: string
+  sessions: SessionInfo[]
+}
 
-  if (isToday) return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-  if (isYesterday) return 'Yesterday'
-  return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
+function localDateKey(date: Date): string {
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+}
+
+function calendarDayNumber(date: Date): number {
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000
+}
+
+function formatGroupLabel(date: Date, now: Date): string {
+  const daysAgo = calendarDayNumber(now) - calendarDayNumber(date)
+  if (daysAgo === 0) return 'Today'
+  if (daysAgo === 1) return 'Yesterday'
+  if (daysAgo >= 2 && daysAgo <= 5) return `${daysAgo} days ago`
+
+  return date.toLocaleDateString([], {
+    month: 'short',
+    day: 'numeric',
+    ...(date.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' })
+  })
+}
+
+export function groupSessionsByDate(sessions: SessionInfo[], now = new Date()): ChatSessionGroup[] {
+  const groups = new Map<string, ChatSessionGroup>()
+
+  for (const session of sessions.slice().sort((a, b) => b.lastModified - a.lastModified)) {
+    const date = new Date(session.lastModified)
+    const key = localDateKey(date)
+    const group = groups.get(key)
+    if (group) {
+      group.sessions.push(session)
+      continue
+    }
+    groups.set(key, {
+      key,
+      label: formatGroupLabel(date, now),
+      sessions: [session]
+    })
+  }
+
+  return [...groups.values()]
 }
 
 export function ChatSelector({ onSwitch }: ChatSelectorProps) {
@@ -39,6 +76,7 @@ export function ChatSelector({ onSwitch }: ChatSelectorProps) {
 
   const active = sessions.find(s => s.sessionId === activeSessionId)
   const label = active?.summary ?? 'New chat'
+  const sessionGroups = groupSessionsByDate(sessions)
 
   function handleSelect(sessionId: string | null) {
     onSwitch(sessionId)
@@ -58,32 +96,34 @@ export function ChatSelector({ onSwitch }: ChatSelectorProps) {
           </Button>
         }
       />
-      <DropdownMenuContent align="start" className="max-h-80 w-80 overflow-y-auto">
+      <DropdownMenuContent
+        align="start"
+        className="max-h-100 w-max max-w-72 min-w-40 overflow-y-auto"
+      >
         <DropdownMenuItem
           className="text-muted-foreground! **:text-muted-foreground!"
           onClick={() => handleSelect(null)}
         >
-          <IconPlus size={16} stroke={1.75} />
+          <IconEdit size={16} stroke={1.75} />
           New chat
         </DropdownMenuItem>
-        {sessions.length > 0 && (
-          <DropdownMenuGroup>
-            {sessions.map(s => (
+        {sessionGroups.length > 0 && <DropdownMenuSeparator />}
+        {sessionGroups.map(group => (
+          <DropdownMenuGroup key={group.key}>
+            <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+            {group.sessions.map(session => (
               <DropdownMenuItem
-                key={s.sessionId}
+                key={session.sessionId}
                 className={cn(
-                  activeSessionId === s.sessionId && 'bg-accent text-accent-foreground'
+                  activeSessionId === session.sessionId && 'bg-accent text-accent-foreground'
                 )}
-                onClick={() => handleSelect(s.sessionId)}
+                onClick={() => handleSelect(session.sessionId)}
               >
-                <span className="truncate">{s.summary}</span>
-                <DropdownMenuShortcut className="shrink-0 tracking-normal">
-                  {formatDate(s.lastModified)}
-                </DropdownMenuShortcut>
+                <span className="truncate">{session.summary}</span>
               </DropdownMenuItem>
             ))}
           </DropdownMenuGroup>
-        )}
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   )
