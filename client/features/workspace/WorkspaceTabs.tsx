@@ -4,6 +4,7 @@ import { cva } from 'class-variance-authority'
 import { ReorderableList } from '@/client/components/shared/ReorderableList'
 import type { ReorderableRenderState } from '@/client/components/shared/ReorderableList'
 import { Button, buttonVariants } from '@/client/components/ui/button'
+import { Spinner } from '@/client/components/ui/spinner'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +20,7 @@ export type WorkspaceTabItem = {
   Icon: TablerIcon
   label: string
   closable?: boolean
+  loading?: boolean
 }
 
 export type CreateWorkspaceTabItem = {
@@ -131,7 +133,11 @@ function WorkspaceTab(props: WorkspaceTabProps) {
           tab.closable && 'group-hover/tab:mr-3'
         )}
       >
-        <tab.Icon data-icon="inline-start" stroke={2} />
+        {tab.loading ? (
+          <Spinner data-icon="inline-start" />
+        ) : (
+          <tab.Icon data-icon="inline-start" stroke={2} />
+        )}
         <span
           className={cn(
             'truncate',

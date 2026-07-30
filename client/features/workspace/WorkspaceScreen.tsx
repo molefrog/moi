@@ -33,6 +33,7 @@ import { useWorkspaceAvailability } from '@/client/features/workspace/api'
 import { WorkspaceSkillUpdateBanner } from '@/client/features/workspace/WorkspaceSkillUpdateBanner'
 import { useWorkspaceSkillUpdates } from '@/client/features/workspace/useWorkspaceSkillUpdates'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
+import { hasRunningWorkspaceActivity, useLive } from '@/client/features/chat/chat-store'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import {
@@ -193,14 +194,16 @@ function tabItemFor(
   tab: WorkspaceTabId,
   views: ViewInfo[],
   builders: ViewBuilder[],
-  closable: boolean
+  closable: boolean,
+  agentRunning: boolean
 ): WorkspaceTabItem | null {
   if (tab === 'agent') {
     return {
       key: tab,
       Icon: IconGhost,
       label: 'Agent',
-      closable
+      closable,
+      loading: agentRunning
     }
   }
   if (tab === 'widgets') {
@@ -264,6 +267,9 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
   const [floatingChatOpen, setFloatingChatOpen] = useState(false)
   const [chatFocusRequest, setChatFocusRequest] = useState(0)
+  const hasRunningSession = useLive(state =>
+    hasRunningWorkspaceActivity(state.activity, workspaceId)
+  )
 
   useWorkspaceTheme(layout.theme)
 
@@ -317,7 +323,13 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const canCloseTabs = openTabIds.length > 1
   const tabItems = visibleTabIds
     .map(tab =>
-      tabItemFor(tab, views, builders, canCloseTabs || viewBuilderIdFromTab(tab) !== null)
+      tabItemFor(
+        tab,
+        views,
+        builders,
+        canCloseTabs || viewBuilderIdFromTab(tab) !== null,
+        hasRunningSession
+      )
     )
     .filter((tab): tab is WorkspaceTabItem => Boolean(tab))
   const activeViewId = viewIdFromTab(activeTab)
@@ -675,6 +687,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
 
       {mode === 'fullscreen' && activeTab !== 'agent' && hasWorkspaceContent && (
         <ChatPopup
+          loading={hasRunningSession}
           open={floatingChatOpen}
           onOpenChange={setFloatingChatOpen}
           onOpenChangeComplete={open => {
