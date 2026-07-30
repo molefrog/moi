@@ -7,7 +7,7 @@ import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useSta
 //     they read history.
 //   • Re-pin automatically when they scroll back to (near) the bottom.
 //   • `scrollToBottom()` for the "jump to latest" button and for send.
-//   • On mount and whenever `resetKey` changes (thread switch), jump to bottom.
+//   • On mount and whenever `resetKey` changes (session switch), jump to bottom.
 //
 // Content growth is followed via a ResizeObserver on the scroll content, so we
 // don't depend on React deps to know when to scroll — it just works for any
@@ -85,8 +85,8 @@ export function useStickToBottom(
     return () => ro.disconnect()
   }, [scrollRef])
 
-  // Jump to bottom on mount and on thread switch (before paint, so no flash).
-  // If the new thread's content is still loading, the ResizeObserver above lands
+  // Jump to bottom on mount and on session switch (before paint, so no flash).
+  // If the new session's content is still loading, the ResizeObserver above lands
   // us at the bottom once it arrives (pin is set here).
   useLayoutEffect(() => {
     scrollToBottom('auto')

@@ -1,12 +1,12 @@
-import { useEffect } from 'react'
-
 import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { LedLogo } from '@/client/components/shared/LedLogo'
 import { SidebarLayout } from '@/client/app/shell/SidebarLayout'
-import { liveStore } from '@/client/features/chat/chat-store'
-import { useWorkspaceSessions } from '@/client/features/chat/api'
+import {
+  SelectedSessionProvider,
+  useSelectedSession
+} from '@/client/features/chat/SelectedSessionContext'
 import { useAppletCacheInvalidation } from '@/client/features/applets/useApplet'
 import { Workspace } from '@/client/features/workspace/WorkspaceContext'
 import {
@@ -18,7 +18,6 @@ import { useWorkspaceViews, useWorkspaceWidgets } from '@/client/features/worksp
 import { useViewBuilders } from '@/client/features/views/api'
 import { useGridReconcile } from '@/client/features/widgets/useGridReconcile'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
-import type { SessionInfo } from '@/lib/types'
 
 type WorkspaceRouteProps = {
   id: string
@@ -30,7 +29,9 @@ export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
   return (
     <Workspace id={id}>
       <WorkspaceLayoutProvider id={id}>
-        <WorkspaceLoader id={id} />
+        <SelectedSessionProvider workspaceId={id}>
+          <WorkspaceLoader id={id} />
+        </SelectedSessionProvider>
       </WorkspaceLayoutProvider>
     </Workspace>
   )
@@ -38,12 +39,11 @@ export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
 
 function WorkspaceLoader({ id }: WorkspaceRouteProps) {
   const queryClient = useQueryClient()
+  const { isLoading: selectedSessionLoading } = useSelectedSession()
   const { layout, setLayout, isLoading: layoutLoading } = useWorkspaceLayoutCtx()
   const widgets = useWorkspaceWidgets(id)
   const views = useWorkspaceViews(id)
   const builders = useViewBuilders(id)
-  const sessions = useWorkspaceSessions(id)
-
   useGridReconcile(id, widgets.data, layout, setLayout)
   useAppletCacheInvalidation()
 
@@ -59,11 +59,15 @@ function WorkspaceLoader({ id }: WorkspaceRouteProps) {
     }
   })
 
-  const fresh = layoutLoading || widgets.isLoading || views.isLoading || builders.isLoading
+  const fresh =
+    layoutLoading ||
+    selectedSessionLoading ||
+    widgets.isLoading ||
+    views.isLoading ||
+    builders.isLoading
 
   return (
     <>
-      <SeedActiveSession workspaceId={id} sessions={sessions.data} />
       <SidebarLayout>
         {fresh ? (
           <div className="flex h-full items-center justify-center">
@@ -79,23 +83,4 @@ function WorkspaceLoader({ id }: WorkspaceRouteProps) {
       </SidebarLayout>
     </>
   )
-}
-
-type SeedActiveSessionProps = {
-  workspaceId: string
-  sessions: SessionInfo[] | undefined
-}
-
-function SeedActiveSession({ workspaceId, sessions }: SeedActiveSessionProps) {
-  useEffect(() => {
-    if (!sessions) return
-    const activeByWorkspace = liveStore.getState().activeByWorkspace
-    const hasActiveSelection = Object.prototype.hasOwnProperty.call(activeByWorkspace, workspaceId)
-    const activeSessionId = activeByWorkspace[workspaceId]
-    const activeStillValid =
-      activeSessionId === null || sessions.some(session => session.sessionId === activeSessionId)
-    if (hasActiveSelection && activeStillValid) return
-    liveStore.getState().setActive(workspaceId, sessions[0]?.sessionId ?? null)
-  }, [workspaceId, sessions])
-  return null
 }

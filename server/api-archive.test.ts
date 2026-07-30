@@ -7,6 +7,12 @@ import { api } from './api'
 import { claudeCodeHarness } from './harness/claude-code'
 import { codexHarness } from './harness/codex'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from './registry'
+import {
+  DEFAULT_SELECTED_SESSION_PATH,
+  getSelectedSession,
+  saveSelectedSession,
+  setSelectedSessionPath
+} from './selected-session'
 
 let tempDir: string
 const originalClaudeInterrupt = claudeCodeHarness.interrupt
@@ -17,6 +23,7 @@ const originalCodexListModels = codexHarness.listModels
 beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), 'moi-api-archive-'))
   setRegistryPath(join(tempDir, 'workspaces.json'))
+  setSelectedSessionPath(join(tempDir, 'selected-sessions.json'))
 })
 
 afterEach(async () => {
@@ -25,6 +32,7 @@ afterEach(async () => {
   claudeCodeHarness.listModels = originalClaudeListModels
   codexHarness.listModels = originalCodexListModels
   setRegistryPath(DEFAULT_REGISTRY_PATH)
+  setSelectedSessionPath(DEFAULT_SELECTED_SESSION_PATH)
   await rm(tempDir, { recursive: true, force: true })
 })
 
@@ -79,6 +87,20 @@ test('one archive failure does not block another chat', async () => {
   expect(failed.status).toBe(500)
   expect(await failed.text()).toBe('Couldn’t archive chat')
   expect(succeeded.status).toBe(204)
+})
+
+test('archiving the selected session switches the workspace to New chat', async () => {
+  const workspace = await registerWorkspace(join(tempDir, 'claude'), { type: 'claude-code' })
+  await saveSelectedSession(workspace.path, 'selected')
+  claudeCodeHarness.interrupt = async () => {}
+  claudeCodeHarness.archiveSession = async () => {}
+
+  const response = await api.request(`/api/workspaces/${workspace.id}/sessions/selected/archive`, {
+    method: 'POST'
+  })
+
+  expect(response.status).toBe(204)
+  expect(await getSelectedSession(workspace.path)).toBeNull()
 })
 
 test('archive support is provider-specific', async () => {

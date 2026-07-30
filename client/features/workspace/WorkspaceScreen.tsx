@@ -43,7 +43,6 @@ import {
 import { useWorkspaceNavigation } from '@/client/features/workspace/useWorkspaceNavigation'
 import { resolveAppIcon } from '@/client/lib/app-icon-registry'
 import { cn } from '@/client/lib/cn'
-import { liveStore } from '@/client/features/chat/chat-store'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import { useUiStore } from '@/client/store/ui'
 import {
@@ -301,7 +300,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     error,
     send,
     stop,
-    switchThread,
+    selectSession,
     dismissError
   } = useChat({ activeTab, appletParams })
 
@@ -374,11 +373,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     const active = replacements.get(tabsState.active) ?? tabsState.active
     setLayout({ tabs: { open: open.length > 0 ? open : ['agent'], active } })
   }, [activeTab, builders, navigateToTab, setLayout, tabsState, views])
-
-  useEffect(() => {
-    const linked = activeBuilder ?? builders.find(builder => builder.viewId === activeViewId)
-    if (linked) liveStore.getState().setActive(workspaceId, linked.sessionId)
-  }, [activeBuilder, activeViewId, builders, workspaceId])
 
   useEffect(() => {
     if (mode !== 'fullscreen' || activeTab === 'agent') {
@@ -527,7 +521,10 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       Icon: IconBrowserPlus,
       label: 'New view',
       onClick: () => {
-        void builderActions.create().then(builder => openTab(viewBuilderTabId(builder.id)))
+        void builderActions.create().then(builder => {
+          selectSession(builder.sessionId)
+          openTab(viewBuilderTabId(builder.id))
+        })
       }
     }
   ]
@@ -550,7 +547,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       unavailableReason={unavailableReason}
       send={send}
       stop={stop}
-      onSwitchThread={switchThread}
+      onSelectSession={selectSession}
     />
   )
 
@@ -571,7 +568,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       unavailableReason={unavailableReason}
       send={send}
       stop={stop}
-      onSwitchThread={switchThread}
+      onSelectSession={selectSession}
     />
   )
 
@@ -628,7 +625,10 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
                 editing={widgetMode === 'editing'}
                 onEditingChange={editing => setWidgetMode(editing ? 'editing' : 'idle')}
                 widgets={widgets}
-                onCreateWidget={() => openChat('Create widget')}
+                onCreateWidget={() => {
+                  selectSession(null)
+                  openChat('Create widget')
+                }}
               />
             ) : activeTab === 'scratchpad' ? (
               <Suspense fallback={null}>
@@ -645,7 +645,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
                   return builderActions.submit(activeBuilder, requirements)
                 }}
                 onOpenChat={() => {
-                  liveStore.getState().setActive(workspaceId, activeBuilder.sessionId)
+                  selectSession(activeBuilder.sessionId)
                   openChat()
                 }}
                 onDiscard={() => discardBuilder(activeBuilder)}
@@ -702,7 +702,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               unavailableReason={unavailableReason}
               send={send}
               stop={stop}
-              onSwitchThread={switchThread}
+              onSelectSession={selectSession}
               onClose={onClose}
             />
           )}

@@ -27,8 +27,7 @@ beforeEach(() => {
   liveStore.setState({
     previews: {},
     activity: {},
-    errors: {},
-    activeByWorkspace: {}
+    errors: {}
   })
 })
 

@@ -28,22 +28,23 @@ type ChatComposerProps = {
   onSend: (text: string) => void
   onStop: () => void
   processing: boolean
+  sessionId: string | null
   unavailableReason: string | null | undefined
 }
 
 // Draft text is persisted per workspace, while attachments remain ephemeral and
-// follow the active chat. Both stores are subscribed here so a keystroke or
+// follow the selected chat. Both stores are subscribed here so a keystroke or
 // upload re-renders only the composer.
 export function ChatComposer({
   composerRef,
   onSend,
   onStop,
   processing,
+  sessionId,
   unavailableReason
 }: ChatComposerProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const workspaceId = useWorkspaceId()
-  const sessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
   const value = useUiStore(s => s.composerDrafts[workspaceId] ?? '')
   const attachments = useLive(s => s.attachments[attachmentKey(workspaceId, sessionId)] ?? EMPTY)
   const [dragOver, setDragOver] = useState(false)

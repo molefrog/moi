@@ -3,7 +3,7 @@ import { createStore } from 'zustand/vanilla'
 
 import type { PreviewBlock, PreviewFrame, SessionActivity, UploadInfo } from '@/lib/types'
 
-// One composer attachment, tracked per thread until the message is sent. It is
+// One composer attachment, tracked per session until the message is sent. It is
 // uploaded as soon as it's added (drop/paste/pick); `status` reflects that
 // in-flight upload, and `upload` holds the server handle once ready. `previewUrl`
 // is a local object URL for image thumbnails (revoked on remove/clear).
@@ -19,15 +19,13 @@ export type ChatAttachment = {
 
 // App-level ephemeral chat state — the bits that are *pushed* from the server
 // over the WebSocket and can't be re-fetched as request/response data:
-//   - which thread is active per workspace (a UI selection),
 //   - per-session `activity` (spinner) state,
 //   - per-session error banners.
 //
 // The durable message transcripts live in the React Query cache (see
 // useSessionView), which is also app-level — so nothing here needs to mirror
-// them. This is a single module-singleton store (not React-context scoped), so
-// it survives route navigation: leaving and re-entering a workspace keeps the
-// active thread and any in-flight spinner intact.
+// them. The selected session has its own persisted React Query context; this
+// store only owns disposable live state.
 //
 // Per-session entries are keyed `${workspaceId}:${sessionId}`.
 
@@ -53,7 +51,6 @@ export type LivePreview = {
 }
 
 export type LiveStore = {
-  activeByWorkspace: Record<string, string | null>
   // Per-session activity mirrored from server `status` frames. Only `running`
   // shows the loader/Stop; `requires-action` is tracked but not rendered yet.
   // Missing key = idle.
@@ -67,7 +64,6 @@ export type LiveStore = {
   // send. Draft text is workspace-local persisted UI state (client/store/ui).
   attachments: Record<string, ChatAttachment[]>
 
-  setActive: (workspaceId: string, sessionId: string | null) => void
   setActivity: (workspaceId: string, sessionId: string, value: SessionActivity) => void
   // Authoritative reconcile from a server `status_snapshot`: exactly the listed
   // sessions are active; everything else is cleared to idle (fixes a spinner
@@ -102,14 +98,10 @@ export type LiveStore = {
 }
 
 export const liveStore = createStore<LiveStore>()(set => ({
-  activeByWorkspace: {},
   activity: {},
   errors: {},
   previews: {},
   attachments: {},
-
-  setActive: (workspaceId, sessionId) =>
-    set(s => ({ activeByWorkspace: { ...s.activeByWorkspace, [workspaceId]: sessionId } })),
 
   setActivity: (workspaceId, sessionId, value) =>
     set(s => ({ activity: { ...s.activity, [key(workspaceId, sessionId)]: value } })),
@@ -221,12 +213,8 @@ export const liveStore = createStore<LiveStore>()(set => ({
         errors[toKey] = errors[fromKey]
         delete errors[fromKey]
       }
-      const activeByWorkspace =
-        s.activeByWorkspace[workspaceId] === from
-          ? { ...s.activeByWorkspace, [workspaceId]: to }
-          : s.activeByWorkspace
       // Retarget any in-flight previews from the temp id to the real one so a
-      // preview that arrived before the rename keeps routing to the thread.
+      // preview that arrived before the rename keeps routing to the session.
       let previews = s.previews
       let previewsChanged = false
       for (const [id, p] of Object.entries(s.previews)) {
@@ -238,11 +226,11 @@ export const liveStore = createStore<LiveStore>()(set => ({
           previews[id] = { ...p, sessionId: to }
         }
       }
-      return { activity, errors, activeByWorkspace, previews }
+      return { activity, errors, previews }
     })
 }))
 
-// Select the live previews for a thread, split into the root (top-level
+// Select the live previews for a session, split into the root (top-level
 // assistant) stream and per-subagent streams. Takes the raw `previews` record
 // (a stable store slice) so callers select that slice and run this inside a
 // `useMemo` — never return a fresh object straight from a zustand selector.

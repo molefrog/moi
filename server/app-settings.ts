@@ -33,7 +33,7 @@ export function pickAppSettingsPatch(body: Record<string, unknown>): AppSettings
 let _dir = DATA_DIR
 let _store: Conf<AppSettings> | null = null
 
-// Test seam: point the store at a scratch dir (mirrors setThreadConfigPath).
+// Test seam: point the store at a scratch dir (mirrors setSessionConfigPath).
 export function setAppSettingsDir(dir: string): void {
   _dir = dir
   _store = null

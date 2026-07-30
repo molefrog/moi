@@ -22,6 +22,7 @@ import {
   type OpenClawSessionDetail,
   getOpenClawSessionMessages
 } from './discovery'
+import { renameSelectedSession } from '../../selected-session'
 import {
   type ToolResultInfo,
   findToolCallOwners,
@@ -469,18 +470,19 @@ async function sendOpenClawMessageImpl(input: {
         agentId: input.agentId
       })
       if (created?.sessionId && created.sessionId !== input.sessionId) {
-        broadcast(input.workspaceId, {
-          type: 'session_renamed',
-          from: input.sessionId,
-          to: created.sessionId
-        })
         realSessionId = created.sessionId
+        await renameSelectedSession(input.workspacePath, input.sessionId, realSessionId)
         await renameViewBuilderSession(
           input.workspaceId,
           input.workspacePath,
           input.sessionId,
           realSessionId
         )
+        broadcast(input.workspaceId, {
+          type: 'session_renamed',
+          from: input.sessionId,
+          to: realSessionId
+        })
       }
     }
     rec = await getOrCreateOpenClawSession({

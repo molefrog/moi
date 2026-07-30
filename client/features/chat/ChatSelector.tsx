@@ -4,7 +4,7 @@ import { IconArchive, IconChevronDown, IconEdit, IconLoader2 } from '@tabler/ico
 import { useArchiveWorkspaceSession, useWorkspaceModels, useWorkspaceSessions } from './api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
-import { liveStore, useLive } from '@/client/features/chat/chat-store'
+import { liveStore } from '@/client/features/chat/chat-store'
 import type { SessionInfo } from '@/lib/types'
 
 import { Button } from '@/client/components/ui/button'
@@ -21,7 +21,8 @@ import {
 } from '@/client/components/ui/dropdown-menu'
 
 type ChatSelectorProps = {
-  onSwitch: (sessionId: string | null) => void
+  onSelectSession: (sessionId: string | null) => void
+  selectedSessionId: string | null
 }
 
 type ChatSessionGroup = {
@@ -164,19 +165,17 @@ export function groupSessionsByDate(sessions: SessionInfo[], now = new Date()): 
   return [...groups.values()]
 }
 
-export function ChatSelector({ onSwitch }: ChatSelectorProps) {
+export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelectorProps) {
   const workspaceId = useWorkspaceId()
   const { data: sessions = [], refetch } = useWorkspaceSessions(workspaceId)
   const canArchive = useWorkspaceModels(workspaceId).data?.supportsArchiving === true
   const archiveSession = useArchiveWorkspaceSession(workspaceId)
-  const activeSessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
-
-  const active = sessions.find(s => s.sessionId === activeSessionId)
+  const active = sessions.find(s => s.sessionId === selectedSessionId)
   const label = active?.summary ?? 'New chat'
   const sessionGroups = groupSessionsByDate(sessions)
 
   function handleSelect(sessionId: string | null) {
-    onSwitch(sessionId)
+    onSelectSession(sessionId)
   }
 
   async function handleArchive(sessionId: string) {
@@ -184,8 +183,8 @@ export function ChatSelector({ onSwitch }: ChatSelectorProps) {
     const store = liveStore.getState()
     store.clearAttachments(workspaceId, sessionId)
     store.clearPreviewsForSession(workspaceId, sessionId)
-    if (store.activeByWorkspace[workspaceId] === sessionId) {
-      onSwitch(null)
+    if (selectedSessionId === sessionId) {
+      onSelectSession(null)
     }
   }
 
@@ -225,7 +224,7 @@ export function ChatSelector({ onSwitch }: ChatSelectorProps) {
                     <ChatSessionItem
                       key={session.sessionId}
                       session={session}
-                      active={activeSessionId === session.sessionId}
+                      active={selectedSessionId === session.sessionId}
                       canArchive={canArchive}
                       onSelect={handleSelect}
                       onArchive={handleArchive}

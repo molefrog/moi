@@ -27,7 +27,8 @@ import { type MoiContext, moiContextSystemReminder, renderMoiContext } from '@/l
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
 import { broadcast } from '../../state'
-import { hasThreadConfig, renameThreadConfig, saveThreadConfig } from '../../thread-config'
+import { renameSelectedSession } from '../../selected-session'
+import { hasSessionConfig, renameSessionConfig, saveSessionConfig } from '../../session-config'
 import { type StoredUpload, resolveUploads, uploadToDisplayPart } from '../../uploads'
 import {
   markViewBuilderBuildingBySession,
@@ -350,13 +351,13 @@ function teardown(s: LiveSession) {
 // that differs from the client's temporary id, so we rekey the registry and
 // tell the client to move its optimistic state. Subsequent inits report the
 // same id and no-op.
-function renameSession(s: LiveSession, realId: string) {
+function renameSession(s: LiveSession, realId: string): string {
   const from = s.sessionId
   sessions.delete(recKey(s.workspaceId, from))
   s.sessionId = realId
   sessions.set(recKey(s.workspaceId, realId), s)
   aliases.set(recKey(s.workspaceId, from), realId)
-  broadcast(s.workspaceId, { type: 'session_renamed', from, to: realId })
+  return from
 }
 
 // The session just went idle (state event, or `result` on a CLI without state
@@ -381,21 +382,22 @@ async function consume(s: LiveSession) {
       if (msg.type === 'system' && msg.subtype === 'init') {
         const realId = msg.session_id
         if (realId && realId !== s.sessionId) {
-          const from = s.sessionId
-          renameSession(s, realId)
+          const from = renameSession(s, realId)
           // Carry any config the picker wrote under the temp id to the real id.
-          await renameThreadConfig(s.workspacePath, from, s.sessionId)
+          await renameSessionConfig(s.workspacePath, from, s.sessionId)
+          await renameSelectedSession(s.workspacePath, from, s.sessionId)
           await renameViewBuilderSession(s.workspaceId, s.workspacePath, from, s.sessionId)
+          broadcast(s.workspaceId, { type: 'session_renamed', from, to: s.sessionId })
         }
-        // Seed the thread's config from what it actually ran with — but only if
+        // Seed the session's config from what it actually ran with — but only if
         // it has none yet, so an explicit user PUT (or a migrated temp-id edit)
         // always wins. A default run leaves no file and falls back to the
         // workspace defaults.
         if (
           (s.model || s.effort || s.fastMode !== undefined) &&
-          !(await hasThreadConfig(s.workspacePath, s.sessionId))
+          !(await hasSessionConfig(s.workspacePath, s.sessionId))
         ) {
-          await saveThreadConfig(s.workspacePath, s.sessionId, {
+          await saveSessionConfig(s.workspacePath, s.sessionId, {
             model: s.model,
             effort: s.effort,
             fastMode: s.fastMode

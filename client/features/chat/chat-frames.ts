@@ -2,6 +2,7 @@ import type { QueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { getScratchExecutor } from '@/client/features/scratchpad/scratch-executor'
+import { renameSelectedSessionInCache } from '@/client/features/chat/SelectedSessionContext'
 import { liveStore } from '@/client/features/chat/chat-store'
 import { applyEvent } from '@/lib/format'
 import type {
@@ -9,9 +10,9 @@ import type {
   PreviewFrame,
   ScratchOp,
   SessionActivity,
+  SessionConfig,
   SessionInfo,
   StreamEvent,
-  ThreadConfig,
   ViewState
 } from '@/lib/types'
 
@@ -59,6 +60,7 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
     const from = data.from as string
     const to = data.to as string
     store.renameSession(workspaceId, from, to)
+    if (queryClient) renameSelectedSessionInCache(queryClient, workspaceId, from, to)
     queryClient?.setQueryData<SessionInfo[]>(workspaceKeys.sessions(workspaceId), current =>
       current?.map(session =>
         session.sessionId === from ? { ...session, sessionId: to } : session
@@ -73,12 +75,12 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
       queryClient?.removeQueries({ queryKey: workspaceKeys.events(workspaceId, from) })
     }
 
-    const previousConfig = queryClient?.getQueryData<ThreadConfig>(
-      workspaceKeys.threadConfig(workspaceId, from)
+    const previousConfig = queryClient?.getQueryData<SessionConfig>(
+      workspaceKeys.sessionConfig(workspaceId, from)
     )
     if (previousConfig !== undefined) {
-      queryClient?.setQueryData(workspaceKeys.threadConfig(workspaceId, to), previousConfig)
-      queryClient?.removeQueries({ queryKey: workspaceKeys.threadConfig(workspaceId, from) })
+      queryClient?.setQueryData(workspaceKeys.sessionConfig(workspaceId, to), previousConfig)
+      queryClient?.removeQueries({ queryKey: workspaceKeys.sessionConfig(workspaceId, from) })
     }
     queryClient?.invalidateQueries({ queryKey: workspaceKeys.sessions(workspaceId) })
     queryClient?.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })

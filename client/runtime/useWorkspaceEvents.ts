@@ -13,6 +13,7 @@ export type WorkspaceEvent =
   | { type: 'view-layout:updated'; views: ViewInfo[] }
   | { type: 'view-builder:updated'; workspaceId: string; builder: ViewBuilder }
   | { type: 'view-builder:deleted'; workspaceId: string; builderId: string }
+  | { type: 'selected-session:updated'; workspaceId: string; sessionId: string | null }
   | { type: 'theme:updated' }
   | { type: 'workspace:updated' }
   // The registry list changed (reorder, create) without touching any open

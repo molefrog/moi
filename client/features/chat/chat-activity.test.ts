@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, test } from 'bun:test'
 import { __setQueryClientForTests, handleFrame } from '@/client/features/chat/chat-connection'
 import { liveStore } from '@/client/features/chat/chat-store'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import type { SessionInfo } from '@/lib/types'
+import type { SelectedSessionState, SessionInfo } from '@/lib/types'
 
 const WS = 'ws1'
 const SID = 'sess-1'
@@ -22,8 +22,7 @@ beforeEach(() => {
   liveStore.setState({
     previews: {},
     activity: {},
-    errors: {},
-    activeByWorkspace: {}
+    errors: {}
   })
 })
 
@@ -99,6 +98,22 @@ describe('session rename', () => {
       sessionId: 'real-1',
       summary: 'Fix picker focus',
       lastModified: 1
+    })
+  })
+
+  test('the selected session follows the provider id', () => {
+    const queryClient = new QueryClient()
+    __setQueryClientForTests(queryClient)
+    queryClient.setQueryData(workspaceKeys.selectedSession(WS), {
+      sessionId: 'temp-1'
+    })
+
+    handleFrame({ type: 'session_renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
+
+    expect(
+      queryClient.getQueryData<SelectedSessionState>(workspaceKeys.selectedSession(WS))
+    ).toEqual({
+      sessionId: 'real-1'
     })
   })
 })

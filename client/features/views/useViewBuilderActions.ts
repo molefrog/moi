@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 
 import { useWorkspaceModels } from '@/client/features/chat/api'
+import { useSelectedSession } from '@/client/features/chat/SelectedSessionContext'
 import { resolveChatRunOptions, startOptimisticTurn } from '@/client/features/chat/chat-send'
 import { liveStore } from '@/client/features/chat/chat-store'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
@@ -15,6 +16,7 @@ import type { ViewBuilder } from '@/lib/types'
 export function useViewBuilderActions() {
   const queryClient = useQueryClient()
   const { workspaceId, layout } = useWorkspaceLayoutCtx()
+  const { selectSession } = useSelectedSession()
   const modelData = useWorkspaceModels(workspaceId).data
   const createMutation = useCreateViewBuilder(workspaceId)
   const saveMutation = useSaveViewBuilder(workspaceId)
@@ -36,7 +38,7 @@ export function useViewBuilderActions() {
       sessionId: builder.sessionId,
       parts: [{ type: 'text', text }]
     })
-    liveStore.getState().setActive(workspaceId, builder.sessionId)
+    selectSession(builder.sessionId)
 
     const { model, effort, fastMode, stream } = resolveChatRunOptions(
       modelData,

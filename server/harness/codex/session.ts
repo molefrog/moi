@@ -47,7 +47,8 @@ import {
 import { generateCodexChatTitle } from './title'
 import { debug } from '../../debug'
 import { broadcast } from '../../state'
-import { hasThreadConfig, renameThreadConfig, saveThreadConfig } from '../../thread-config'
+import { renameSelectedSession } from '../../selected-session'
+import { hasSessionConfig, renameSessionConfig, saveSessionConfig } from '../../session-config'
 import {
   type StoredUpload,
   materializeToPath,
@@ -590,12 +591,13 @@ export async function sendCodexMessage(input: {
       const realId = started.thread.id
       if (realId !== input.sessionId) {
         aliases.set(recKey(input.workspaceId, input.sessionId), realId)
+        await renameSessionConfig(input.workspacePath, input.sessionId, realId)
+        await renameSelectedSession(input.workspacePath, input.sessionId, realId)
         broadcast(input.workspaceId, {
           type: 'session_renamed',
           from: input.sessionId,
           to: realId
         })
-        await renameThreadConfig(input.workspacePath, input.sessionId, realId)
       }
       rec = createRecord({
         workspaceId: input.workspaceId,
@@ -614,9 +616,9 @@ export async function sendCodexMessage(input: {
       }
       if (
         (input.model || input.effort || input.fastMode !== undefined) &&
-        !(await hasThreadConfig(input.workspacePath, realId))
+        !(await hasSessionConfig(input.workspacePath, realId))
       ) {
-        await saveThreadConfig(input.workspacePath, realId, {
+        await saveSessionConfig(input.workspacePath, realId, {
           model: input.model,
           effort: input.effort,
           fastMode: input.fastMode
