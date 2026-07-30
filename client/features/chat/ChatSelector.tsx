@@ -1,10 +1,10 @@
 import { type MouseEvent, useRef, useState } from 'react'
-import { IconArchive, IconChevronDown, IconEdit, IconLoader2 } from '@tabler/icons-react'
+import { IconArchive, IconChevronDown, IconEdit } from '@tabler/icons-react'
 
 import { useArchiveWorkspaceSession, useWorkspaceModels, useWorkspaceSessions } from './api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
-import { liveStore } from '@/client/features/chat/chat-store'
+import { isRunningActivity, liveStore, useLive } from '@/client/features/chat/chat-store'
 import type { SessionInfo } from '@/lib/types'
 
 import { Button } from '@/client/components/ui/button'
@@ -19,6 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/client/components/ui/dropdown-menu'
+import { Spinner } from '@/client/components/ui/spinner'
 
 type ChatSelectorProps = {
   onSelectSession: (sessionId: string | null) => void
@@ -37,6 +38,7 @@ type ChatSessionItemProps = {
   onArchive: (sessionId: string) => Promise<void>
   onSelect: (sessionId: string) => void
   session: SessionInfo
+  workspaceId: string
 }
 
 function ChatSessionItem({
@@ -44,10 +46,14 @@ function ChatSessionItem({
   canArchive,
   onArchive,
   onSelect,
-  session
+  session,
+  workspaceId
 }: ChatSessionItemProps) {
   const pendingRef = useRef(false)
   const [pending, setPending] = useState(false)
+  const running = useLive(state =>
+    isRunningActivity(state.activity[`${workspaceId}:${session.sessionId}`])
+  )
 
   async function handleArchive(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault()
@@ -75,6 +81,7 @@ function ChatSessionItem({
         <div
           className={cn(
             'flex min-w-0 flex-1 overflow-hidden',
+            (running || pending) && 'mr-4 mask-r-from-[calc(100%-16px)]',
             canArchive &&
               'group-focus-within/chat:mr-4 group-focus-within/chat:mask-r-from-[calc(100%-16px)] [@media(hover:none)]:mr-4 [@media(hover:none)]:mask-r-from-[calc(100%-16px)]'
           )}
@@ -82,12 +89,22 @@ function ChatSessionItem({
           <span
             className={cn(
               'min-w-0 truncate',
+              (running || pending) && '-mr-4',
               canArchive && 'group-focus-within/chat:-mr-4 [@media(hover:none)]:-mr-4'
             )}
           >
             {session.summary}
           </span>
         </div>
+        {running && (
+          <Spinner
+            className={cn(
+              'pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground',
+              canArchive && 'group-focus-within/chat:hidden [@media(hover:none)]:hidden',
+              pending && 'hidden'
+            )}
+          />
+        )}
         {canArchive && (
           <Tooltip>
             <TooltipTrigger
@@ -107,11 +124,7 @@ function ChatSessionItem({
                   onClick={handleArchive}
                   onPointerDown={event => event.stopPropagation()}
                 >
-                  {pending ? (
-                    <IconLoader2 className="animate-spin" stroke={1.75} />
-                  ) : (
-                    <IconArchive stroke={1.75} />
-                  )}
+                  <IconArchive stroke={1.75} />
                 </Button>
               }
             />
@@ -228,6 +241,7 @@ export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelecto
                       canArchive={canArchive}
                       onSelect={handleSelect}
                       onArchive={handleArchive}
+                      workspaceId={workspaceId}
                     />
                   ))}
                 </DropdownMenuGroup>

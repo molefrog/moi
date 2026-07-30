@@ -33,6 +33,10 @@ function key(workspaceId: string, sessionId: string): string {
   return `${workspaceId}:${sessionId}`
 }
 
+export function isRunningActivity(activity: SessionActivity | undefined): boolean {
+  return activity === 'running'
+}
+
 // Attachments stay with the chat they were added to. A brand-new chat has no
 // session id yet, so it gets a stable `'new'` sentinel until send mints one.
 export function attachmentKey(workspaceId: string, sessionId: string | null): string {

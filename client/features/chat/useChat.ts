@@ -26,7 +26,12 @@ import {
   startOptimisticTurn
 } from '@/client/features/chat/chat-send'
 import { buildPreviewTurn } from '@/client/features/chat/preview-turn'
-import { liveStore, selectPreviews, useLive } from '@/client/features/chat/chat-store'
+import {
+  isRunningActivity,
+  liveStore,
+  selectPreviews,
+  useLive
+} from '@/client/features/chat/chat-store'
 import { useUiStore } from '@/client/store/ui'
 import { emptyViewState } from '@/lib/format'
 import type { Part, ViewState } from '@/lib/types'
@@ -56,7 +61,7 @@ export function useChat(address: WorkspaceTabAddress) {
   )
   // Only `running` shows the loader/Stop. `requires-action` (agent blocked on
   // user input) deliberately renders like idle until it gets its own UI.
-  const processing = activity === 'running'
+  const processing = isRunningActivity(activity)
   const error = useLive(s =>
     selectedSessionId ? (s.errors[`${workspaceId}:${selectedSessionId}`] ?? null) : null
   )

@@ -6,7 +6,7 @@ import { QueryClient } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test } from 'bun:test'
 
 import { __setQueryClientForTests, handleFrame } from '@/client/features/chat/chat-connection'
-import { liveStore } from '@/client/features/chat/chat-store'
+import { isRunningActivity, liveStore } from '@/client/features/chat/chat-store'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import type { SelectedSessionState, SessionInfo } from '@/lib/types'
 
@@ -16,6 +16,13 @@ const SID = 'sess-1'
 function activityOf(sessionId = SID) {
   return liveStore.getState().activity[`${WS}:${sessionId}`]
 }
+
+test('only running activity shows in-progress UI', () => {
+  expect(isRunningActivity('running')).toBe(true)
+  expect(isRunningActivity('requires-action')).toBe(false)
+  expect(isRunningActivity('idle')).toBe(false)
+  expect(isRunningActivity(undefined)).toBe(false)
+})
 
 beforeEach(() => {
   __setQueryClientForTests(new QueryClient())
