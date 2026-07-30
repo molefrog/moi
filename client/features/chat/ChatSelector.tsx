@@ -185,7 +185,7 @@ export function groupSessionsByDate(sessions: SessionInfo[], now = new Date()): 
 
 export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelectorProps) {
   const workspaceId = useWorkspaceId()
-  const { data: sessions = [], refetch } = useWorkspaceSessions(workspaceId)
+  const { data: sessions = [] } = useWorkspaceSessions(workspaceId)
   const canArchive = useWorkspaceModels(workspaceId).data?.supportsArchiving === true
   const archiveSession = useArchiveWorkspaceSession(workspaceId)
   const hasRunningSession = useLive(state =>
@@ -210,11 +210,7 @@ export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelecto
   }
 
   return (
-    <DropdownMenu
-      onOpenChange={open => {
-        if (open) refetch()
-      }}
-    >
+    <DropdownMenu>
       <DropdownMenuTrigger
         render={
           <Button variant="ghost">
