@@ -33,6 +33,7 @@ import {
 } from './layout'
 import { getClientFrameLog, getWireLog } from './harness/debug'
 import { allHarnesses, harnessFor, isHarnessType } from './harness/registry'
+import { broadcast } from './state'
 import {
   discoverWorkspace,
   discoverWorkspaces,
@@ -441,6 +442,23 @@ one.get('/sessions', async c => {
   return c.json(await harnessFor(ws).listSessions(ws))
 })
 
+one.post('/sessions/:sessionId/archive', async c => {
+  const ws = c.get('ws')
+  const harness = harnessFor(ws)
+  const sessionId = c.req.param('sessionId')
+  if (!harness.archiveSession) return c.text('Chat archiving is not supported', 501)
+
+  try {
+    await harness.interrupt(ws.id, sessionId)
+    await harness.archiveSession(ws, sessionId)
+    broadcast(ws.id, { type: 'sessions_changed', sessionId })
+    return c.body(null, 204)
+  } catch (error) {
+    console.error(`[api] archive chat failed for ${harness.id}`, error)
+    return c.text('Couldn’t archive chat', 500)
+  }
+})
+
 one.get('/sessions/:sessionId/events', async c => {
   const ws = c.get('ws')
   return c.json(await harnessFor(ws).sessionEvents(ws, c.req.param('sessionId')))
@@ -594,7 +612,8 @@ one.get('/models', async c => {
   return c.json({
     provider: harness.id,
     models,
-    supportsStreaming: harness.capabilities.supportsStreaming
+    supportsStreaming: harness.capabilities.supportsStreaming,
+    supportsArchiving: Boolean(harness.archiveSession)
   } satisfies WorkspaceModels)
 })
 

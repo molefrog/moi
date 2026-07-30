@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { claudeSessionSummary } from './sessions'
+import { MOI_ARCHIVED_SESSION_TAG, claudeSessionSummary, visibleClaudeSessions } from './sessions'
 
 describe('claudeSessionSummary', () => {
   test('formats a raw first-prompt fallback', () => {
@@ -35,5 +35,17 @@ describe('claudeSessionSummary', () => {
         firstPrompt: '(see attached files) chart.png, notes.pdf'
       })
     ).toBe('chart.png, notes.pdf')
+  })
+})
+
+describe('visibleClaudeSessions', () => {
+  test('excludes chats carrying the moi archive tag', () => {
+    expect(
+      visibleClaudeSessions([
+        { sessionId: 'visible', tag: 'keep-me' },
+        { sessionId: 'archived', tag: MOI_ARCHIVED_SESSION_TAG },
+        { sessionId: 'untagged' }
+      ]).map(session => session.sessionId)
+    ).toEqual(['visible', 'untagged'])
   })
 })

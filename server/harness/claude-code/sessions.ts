@@ -1,6 +1,6 @@
 // Session discovery + history replay for Claude Code workspaces, backed by
 // the Agent SDK's persisted `.jsonl` session files.
-import { getSessionMessages, listSessions } from '@anthropic-ai/claude-agent-sdk'
+import { getSessionMessages, listSessions, tagSession } from '@anthropic-ai/claude-agent-sdk'
 import type { SDKSessionInfo } from '@anthropic-ai/claude-agent-sdk'
 
 import {
@@ -12,6 +12,8 @@ import { formatChatTitle } from '@/lib/chat-title'
 import type { SessionInfo, StreamEvent } from '@/lib/types'
 
 import { ClaudeAdapter } from './adapter'
+
+export const MOI_ARCHIVED_SESSION_TAG = 'moi:archived'
 
 export type SessionFirstPromptCandidate = {
   sessionId: string
@@ -38,8 +40,12 @@ export function claudeSessionSummary(
   return formatChatTitle(isAttachmentOnlyPlaceholder(split.text) ? '' : split.text, filenames)
 }
 
+export function visibleClaudeSessions<T extends Pick<SDKSessionInfo, 'tag'>>(sessions: T[]): T[] {
+  return sessions.filter(session => session.tag !== MOI_ARCHIVED_SESSION_TAG)
+}
+
 export async function getSessions(workspacePath: string): Promise<SessionInfo[]> {
-  const sessions = await listSessions({ dir: workspacePath })
+  const sessions = visibleClaudeSessions(await listSessions({ dir: workspacePath }))
   return sessions.map(s => ({
     sessionId: s.sessionId,
     summary: claudeSessionSummary(s),
@@ -75,7 +81,7 @@ export async function getSessionWorkspacePreview(
   workspacePath: string,
   includeFirstUserMessage: boolean
 ): Promise<SessionWorkspacePreview> {
-  const sessions = await listSessions({ dir: workspacePath })
+  const sessions = visibleClaudeSessions(await listSessions({ dir: workspacePath }))
   const updatedAt = selectLatestSessionUpdatedAt(sessions)
   const firstUserMessage = includeFirstUserMessage
     ? selectOldestSessionFirstUserMessage(sessions)
@@ -85,6 +91,13 @@ export async function getSessionWorkspacePreview(
     ...(firstUserMessage ? { firstUserMessage } : {}),
     ...(updatedAt !== undefined ? { updatedAt } : {})
   }
+}
+
+export async function archiveClaudeSession(
+  sessionId: string,
+  workspacePath: string
+): Promise<void> {
+  await tagSession(sessionId, MOI_ARCHIVED_SESSION_TAG, { dir: workspacePath })
 }
 
 /**

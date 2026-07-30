@@ -18,7 +18,12 @@ import {
   restartWorkspaceSessions,
   sendCCMessage
 } from './session'
-import { getSessionEvents, getSessions, getSessionWorkspacePreview } from './sessions'
+import {
+  archiveClaudeSession,
+  getSessionEvents,
+  getSessions,
+  getSessionWorkspacePreview
+} from './sessions'
 
 function fmtDuration(ms: number): string {
   const s = Math.floor(ms / 1000)
@@ -79,6 +84,7 @@ export const claudeCodeHarness: Harness = {
 
   sendMessage: input => sendCCMessage(input),
   interrupt: (workspaceId, sessionId) => interruptCCSession(workspaceId, sessionId),
+  archiveSession: (ws, sessionId) => archiveClaudeSession(sessionId, ws.path),
   activeSessions: () => getCCActiveSessions(),
 
   listSessions: ws => getSessions(ws.path),

@@ -104,13 +104,15 @@ describe('session rename', () => {
 })
 
 describe('session list changes', () => {
-  test('invalidates the affected workspace session list', () => {
+  test('invalidates the affected workspace session list and preview', () => {
     const queryClient = new QueryClient()
     __setQueryClientForTests(queryClient)
     queryClient.setQueryData(workspaceKeys.sessions(WS), [])
+    queryClient.setQueryData(workspaceKeys.preview(WS), {})
 
     handleFrame({ type: 'sessions_changed', workspaceId: WS, sessionId: SID })
 
     expect(queryClient.getQueryState(workspaceKeys.sessions(WS))?.isInvalidated).toBe(true)
+    expect(queryClient.getQueryState(workspaceKeys.preview(WS))?.isInvalidated).toBe(true)
   })
 })

@@ -628,4 +628,6 @@ export type WorkspaceModels = {
   // shows the "Live typing" toggle only when true). Provider-wide, not per-model
   // — Claude Code streams uniformly via `includePartialMessages`.
   supportsStreaming?: boolean
+  // Whether the provider can archive chats from the chat selector.
+  supportsArchiving?: boolean
 }

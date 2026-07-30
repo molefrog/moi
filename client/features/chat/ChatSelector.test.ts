@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { SessionInfo } from '@/lib/types'
 
+import { removeArchivedSession } from './api'
 import { groupSessionsByDate } from './ChatSelector'
 
 function session(sessionId: string, summary: string, lastModified: string): SessionInfo {
@@ -68,4 +69,17 @@ describe('groupSessionsByDate', () => {
       new Date(2026, 6, 24).toLocaleDateString([], { month: 'short', day: 'numeric' })
     ])
   })
+})
+
+test('overlapping archive completions remove every successful chat', () => {
+  let sessions: SessionInfo[] | undefined = [
+    session('first', 'First', new Date(2026, 6, 30, 8).toISOString()),
+    session('second', 'Second', new Date(2026, 6, 30, 9).toISOString()),
+    session('third', 'Third', new Date(2026, 6, 30, 10).toISOString())
+  ]
+
+  sessions = removeArchivedSession(sessions, 'second')
+  sessions = removeArchivedSession(sessions, 'first')
+
+  expect(sessions?.map(item => item.sessionId)).toEqual(['third'])
 })

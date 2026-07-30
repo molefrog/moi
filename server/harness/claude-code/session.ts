@@ -777,6 +777,7 @@ export async function interruptCCSession(workspaceId: string, sessionId: string)
     }
   } catch (err) {
     console.error('[cc-session] interrupt failed', err)
+    teardown(s)
   } finally {
     clearTimeout(timer)
   }

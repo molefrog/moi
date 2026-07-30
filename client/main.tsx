@@ -3,6 +3,7 @@ import { Agentation } from 'agentation'
 import { createRoot } from 'react-dom/client'
 import { Router, useRoute } from 'wouter'
 
+import { Toaster } from '@/client/components/ui/toast'
 import { TooltipProvider } from '@/client/components/ui/tooltip'
 import { installAppletErrorHook } from '@/client/features/applets/applet-log'
 import { initConnection } from '@/client/features/chat/chat-connection'
@@ -35,6 +36,7 @@ export function mount(el: HTMLElement) {
           <Router>
             <AppRouter />
           </Router>
+          <Toaster />
           {process.env.NODE_ENV === 'development' && <DevAgentation />}
         </TooltipProvider>
       </QueryClientProvider>

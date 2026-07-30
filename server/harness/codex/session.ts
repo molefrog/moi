@@ -41,6 +41,7 @@ import {
   type CodexClient,
   getCodexClient,
   getCodexModelCatalog,
+  interruptCodexTurn,
   readSubagentRecords
 } from './client'
 import { generateCodexChatTitle } from './title'
@@ -735,10 +736,7 @@ export async function interruptCodexRun(input: {
   try {
     if (rec.activeTurnId) {
       const client = await getCodexClient(rec.workspacePath)
-      await client.rpc('turn/interrupt', {
-        threadId: rec.sessionId,
-        turnId: rec.activeTurnId
-      })
+      await interruptCodexTurn(client, rec.sessionId, rec.activeTurnId)
     }
     broadcast(rec.workspaceId, { kind: 'stopped', sessionId: rec.sessionId })
     setProcessing(rec, false, null)
@@ -748,6 +746,7 @@ export async function interruptCodexRun(input: {
       sessionId: rec.sessionId,
       content: err instanceof Error ? err.message : 'interrupt failed'
     })
+    throw err
   }
 }
 

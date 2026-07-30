@@ -1,12 +1,15 @@
-import { IconChevronDown, IconEdit } from '@tabler/icons-react'
+import { type MouseEvent, useRef, useState } from 'react'
+import { IconArchive, IconChevronDown, IconEdit, IconLoader2 } from '@tabler/icons-react'
 
-import { useWorkspaceSessions } from './api'
+import { useArchiveWorkspaceSession, useWorkspaceModels, useWorkspaceSessions } from './api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
-import { useLive } from '@/client/features/chat/chat-store'
+import { liveStore, useLive } from '@/client/features/chat/chat-store'
 import type { SessionInfo } from '@/lib/types'
 
 import { Button } from '@/client/components/ui/button'
+import { toast } from '@/client/components/ui/toast'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +28,84 @@ type ChatSessionGroup = {
   key: string
   label: string
   sessions: SessionInfo[]
+}
+
+type ChatSessionItemProps = {
+  active: boolean
+  canArchive: boolean
+  onArchive: (sessionId: string) => Promise<void>
+  onSelect: (sessionId: string) => void
+  session: SessionInfo
+}
+
+function ChatSessionItem({
+  active,
+  canArchive,
+  onArchive,
+  onSelect,
+  session
+}: ChatSessionItemProps) {
+  const pendingRef = useRef(false)
+  const [pending, setPending] = useState(false)
+
+  async function handleArchive(event: MouseEvent<HTMLButtonElement>) {
+    event.preventDefault()
+    event.stopPropagation()
+    if (pendingRef.current) return
+
+    pendingRef.current = true
+    setPending(true)
+    try {
+      await onArchive(session.sessionId)
+    } catch {
+      toast.add({ title: 'Couldn’t archive chat', type: 'error' })
+    } finally {
+      pendingRef.current = false
+      setPending(false)
+    }
+  }
+
+  return (
+    <div className="group/chat relative">
+      <DropdownMenuItem
+        className={cn(active && 'bg-accent text-accent-foreground')}
+        onClick={() => onSelect(session.sessionId)}
+      >
+        <span className="flex-1 truncate" title={session.summary}>
+          {session.summary}
+        </span>
+        {canArchive && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Archive ${session.summary}`}
+                  className={cn(
+                    '-m-1 text-muted-foreground opacity-100 transition-opacity',
+                    'group-hover/chat:opacity-100 hover:bg-transparent hover:text-foreground focus:opacity-100 [@media(hover:hover)]:opacity-0',
+                    pending && 'opacity-100!'
+                  )}
+                  disabled={pending}
+                  onClick={handleArchive}
+                  onPointerDown={event => event.stopPropagation()}
+                >
+                  {pending ? (
+                    <IconLoader2 className="animate-spin" stroke={1.75} />
+                  ) : (
+                    <IconArchive stroke={1.75} />
+                  )}
+                </Button>
+              }
+            />
+            <TooltipContent side="right">Archive chat</TooltipContent>
+          </Tooltip>
+        )}
+      </DropdownMenuItem>
+    </div>
+  )
 }
 
 function localDateKey(date: Date): string {
@@ -72,6 +153,8 @@ export function groupSessionsByDate(sessions: SessionInfo[], now = new Date()): 
 export function ChatSelector({ onSwitch }: ChatSelectorProps) {
   const workspaceId = useWorkspaceId()
   const { data: sessions = [], refetch } = useWorkspaceSessions(workspaceId)
+  const canArchive = useWorkspaceModels(workspaceId).data?.supportsArchiving === true
+  const archiveSession = useArchiveWorkspaceSession(workspaceId)
   const activeSessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
 
   const active = sessions.find(s => s.sessionId === activeSessionId)
@@ -80,6 +163,16 @@ export function ChatSelector({ onSwitch }: ChatSelectorProps) {
 
   function handleSelect(sessionId: string | null) {
     onSwitch(sessionId)
+  }
+
+  async function handleArchive(sessionId: string) {
+    await archiveSession.mutateAsync(sessionId)
+    const store = liveStore.getState()
+    store.clearAttachments(workspaceId, sessionId)
+    store.clearPreviewsForSession(workspaceId, sessionId)
+    if (store.activeByWorkspace[workspaceId] === sessionId) {
+      onSwitch(null)
+    }
   }
 
   return (
@@ -115,15 +208,14 @@ export function ChatSelector({ onSwitch }: ChatSelectorProps) {
                 <DropdownMenuGroup key={group.key}>
                   <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
                   {group.sessions.map(session => (
-                    <DropdownMenuItem
+                    <ChatSessionItem
                       key={session.sessionId}
-                      className={cn(
-                        activeSessionId === session.sessionId && 'bg-accent text-accent-foreground'
-                      )}
-                      onClick={() => handleSelect(session.sessionId)}
-                    >
-                      <span className="truncate">{session.summary}</span>
-                    </DropdownMenuItem>
+                      session={session}
+                      active={activeSessionId === session.sessionId}
+                      canArchive={canArchive}
+                      onSelect={handleSelect}
+                      onArchive={handleArchive}
+                    />
                   ))}
                 </DropdownMenuGroup>
               ))}

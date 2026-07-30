@@ -320,6 +320,25 @@ export async function getCodexSessions(workspacePath: string): Promise<SessionIn
   }
 }
 
+export async function archiveCodexThread(
+  client: Pick<CodexClient, 'rpc'>,
+  threadId: string
+): Promise<void> {
+  await client.rpc('thread/archive', { threadId })
+}
+
+export async function interruptCodexTurn(
+  client: Pick<CodexClient, 'rpc'>,
+  threadId: string,
+  turnId: string
+): Promise<void> {
+  await client.rpc('turn/interrupt', { threadId, turnId })
+}
+
+export async function archiveCodexSession(workspacePath: string, threadId: string): Promise<void> {
+  await archiveCodexThread(await getCodexClient(workspacePath), threadId)
+}
+
 // Home-page card preview. Peek-only: with no live app-server the card simply
 // omits the activity fields until the workspace is opened once.
 export async function getCodexWorkspacePreview(
