@@ -98,32 +98,38 @@ export function ChatSelector({ onSwitch }: ChatSelectorProps) {
       />
       <DropdownMenuContent
         align="start"
-        className="max-h-100 w-max max-w-72 min-w-40 overflow-y-auto"
+        className="flex max-h-100 w-max max-w-72 min-w-40 flex-col overflow-hidden"
       >
         <DropdownMenuItem
-          className="text-muted-foreground! **:text-muted-foreground!"
+          className="shrink-0 text-muted-foreground! **:text-muted-foreground!"
           onClick={() => handleSelect(null)}
         >
           <IconEdit size={16} stroke={1.75} />
           New chat
         </DropdownMenuItem>
-        {sessionGroups.length > 0 && <DropdownMenuSeparator />}
-        {sessionGroups.map(group => (
-          <DropdownMenuGroup key={group.key}>
-            <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
-            {group.sessions.map(session => (
-              <DropdownMenuItem
-                key={session.sessionId}
-                className={cn(
-                  activeSessionId === session.sessionId && 'bg-accent text-accent-foreground'
-                )}
-                onClick={() => handleSelect(session.sessionId)}
-              >
-                <span className="truncate">{session.summary}</span>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuGroup>
-        ))}
+        {sessionGroups.length > 0 && (
+          <>
+            <DropdownMenuSeparator className="shrink-0" />
+            <div className="no-scrollbar min-h-0 flex-1 scroll-fade overflow-y-auto overscroll-contain [--scroll-fade-reveal:8px]">
+              {sessionGroups.map(group => (
+                <DropdownMenuGroup key={group.key}>
+                  <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+                  {group.sessions.map(session => (
+                    <DropdownMenuItem
+                      key={session.sessionId}
+                      className={cn(
+                        activeSessionId === session.sessionId && 'bg-accent text-accent-foreground'
+                      )}
+                      onClick={() => handleSelect(session.sessionId)}
+                    >
+                      <span className="truncate">{session.summary}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuGroup>
+              ))}
+            </div>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )
