@@ -96,6 +96,7 @@ function ChatSessionItem({
                   variant="ghost"
                   size="icon-sm"
                   aria-label={`Archive ${session.summary}`}
+                  tabIndex={-1}
                   className={cn(
                     'absolute top-1/2 right-0 -translate-y-1/2 text-muted-foreground opacity-100 transition-none',
                     'group-focus-within/chat:opacity-100 group-hover/chat:opacity-100 hover:bg-transparent hover:text-foreground [@media(hover:hover)]:opacity-0',
