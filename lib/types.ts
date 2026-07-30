@@ -441,12 +441,14 @@ export type SessionRenamedMessage = {
   workspaceId: string
   from: string
   to: string
+  summary?: string
 }
 
 export type SessionsChangedMessage = {
   type: 'sessions_changed'
   workspaceId: string
   sessionId: string
+  summary?: string
 }
 
 export type ErrorFrame = {

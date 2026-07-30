@@ -122,17 +122,68 @@ describe('session rename', () => {
   test('the optimistic title follows the real session id', () => {
     const queryClient = new QueryClient()
     __setQueryClientForTests(queryClient)
-    queryClient.setQueryData<SessionInfo[]>(workspaceKeys.sessions(WS), [
+    const sessionsKey = workspaceKeys.sessions(WS)
+    queryClient.setQueryData<SessionInfo[]>(sessionsKey, [
       { sessionId: 'temp-1', summary: 'Fix picker focus', lastModified: 1 }
     ])
 
     handleFrame({ type: 'session_renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
 
-    expect(queryClient.getQueryData<SessionInfo[]>(workspaceKeys.sessions(WS))?.[0]).toEqual({
+    expect(queryClient.getQueryData<SessionInfo[]>(sessionsKey)?.[0]).toEqual({
       sessionId: 'real-1',
       summary: 'Fix picker focus',
       lastModified: 1
     })
+    expect(queryClient.getQueryState(sessionsKey)?.isInvalidated).toBe(false)
+  })
+
+  test('a client without the optimistic session refreshes after the rename', () => {
+    const queryClient = new QueryClient()
+    __setQueryClientForTests(queryClient)
+    const sessionsKey = workspaceKeys.sessions(WS)
+    queryClient.setQueryData<SessionInfo[]>(sessionsKey, [
+      { sessionId: 'existing', summary: 'Existing chat', lastModified: 1 }
+    ])
+
+    handleFrame({ type: 'session_renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
+
+    expect(queryClient.getQueryState(sessionsKey)?.isInvalidated).toBe(true)
+  })
+
+  test('a rename carrying a title still refreshes clients without the temporary session', () => {
+    const queryClient = new QueryClient()
+    __setQueryClientForTests(queryClient)
+    const sessionsKey = workspaceKeys.sessions(WS)
+    queryClient.setQueryData<SessionInfo[]>(sessionsKey, [
+      { sessionId: 'existing', summary: 'Existing chat', lastModified: 1 }
+    ])
+
+    handleFrame({
+      type: 'session_renamed',
+      workspaceId: WS,
+      from: 'temp-1',
+      to: 'real-1',
+      summary: 'Fix picker focus'
+    })
+
+    expect(queryClient.getQueryData<SessionInfo[]>(sessionsKey)).toEqual([
+      { sessionId: 'existing', summary: 'Existing chat', lastModified: 1 }
+    ])
+    expect(queryClient.getQueryState(sessionsKey)?.isInvalidated).toBe(true)
+  })
+
+  test('an attachment-only optimistic title survives the session rename', () => {
+    const queryClient = new QueryClient()
+    __setQueryClientForTests(queryClient)
+    const sessionsKey = workspaceKeys.sessions(WS)
+    queryClient.setQueryData<SessionInfo[]>(sessionsKey, [
+      { sessionId: 'temp-1', summary: 'brief.pdf', lastModified: 1 }
+    ])
+
+    handleFrame({ type: 'session_renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
+
+    expect(queryClient.getQueryData<SessionInfo[]>(sessionsKey)?.[0]?.summary).toBe('brief.pdf')
+    expect(queryClient.getQueryState(sessionsKey)?.isInvalidated).toBe(false)
   })
 
   test('the selected session follows the provider id', () => {
@@ -153,6 +204,98 @@ describe('session rename', () => {
 })
 
 describe('session list changes', () => {
+  test('known title changes update the row without a provider-list refetch', () => {
+    const queryClient = new QueryClient()
+    __setQueryClientForTests(queryClient)
+    const sessionsKey = workspaceKeys.sessions(WS)
+    queryClient.setQueryData<SessionInfo[]>(sessionsKey, [
+      {
+        sessionId: SID,
+        summary: 'Build a customer dashboard with useful charts',
+        lastModified: 1
+      }
+    ])
+
+    handleFrame({
+      type: 'sessions_changed',
+      workspaceId: WS,
+      sessionId: SID,
+      summary: 'Customer dashboard'
+    })
+
+    expect(queryClient.getQueryData<SessionInfo[]>(sessionsKey)?.[0]).toEqual({
+      sessionId: SID,
+      summary: 'Customer dashboard',
+      lastModified: 1
+    })
+    expect(queryClient.getQueryState(sessionsKey)?.isInvalidated).toBe(false)
+  })
+
+  test('a title for an unknown session refreshes the complete provider list', () => {
+    const queryClient = new QueryClient()
+    __setQueryClientForTests(queryClient)
+    const sessionsKey = workspaceKeys.sessions(WS)
+    queryClient.setQueryData<SessionInfo[]>(sessionsKey, [
+      { sessionId: 'existing', summary: 'Existing chat', lastModified: 1 }
+    ])
+
+    handleFrame({
+      type: 'sessions_changed',
+      workspaceId: WS,
+      sessionId: SID,
+      summary: 'Customer dashboard'
+    })
+
+    expect(queryClient.getQueryData<SessionInfo[]>(sessionsKey)).toEqual([
+      { sessionId: 'existing', summary: 'Existing chat', lastModified: 1 }
+    ])
+    expect(queryClient.getQueryState(sessionsKey)?.isInvalidated).toBe(true)
+  })
+
+  test('the Codex fallback and inferred title sequence never drops its row', () => {
+    const queryClient = new QueryClient()
+    __setQueryClientForTests(queryClient)
+    const sessionsKey = workspaceKeys.sessions(WS)
+    queryClient.setQueryData<SessionInfo[]>(sessionsKey, [
+      {
+        sessionId: 'temp-1',
+        summary: 'The effort picker loses focus after opening',
+        lastModified: 1
+      }
+    ])
+
+    handleFrame({
+      type: 'session_renamed',
+      workspaceId: WS,
+      from: 'temp-1',
+      to: 'real-1',
+      summary: 'The effort picker loses focus after opening'
+    })
+    handleFrame({
+      type: 'sessions_changed',
+      workspaceId: WS,
+      sessionId: 'real-1',
+      summary: 'The effort picker loses focus after opening'
+    })
+
+    expect(queryClient.getQueryData<SessionInfo[]>(sessionsKey)?.[0]?.summary).toBe(
+      'The effort picker loses focus after opening'
+    )
+    expect(queryClient.getQueryState(sessionsKey)?.isInvalidated).toBe(false)
+
+    handleFrame({
+      type: 'sessions_changed',
+      workspaceId: WS,
+      sessionId: 'real-1',
+      summary: 'Fix picker focus'
+    })
+
+    expect(queryClient.getQueryData<SessionInfo[]>(sessionsKey)?.[0]?.summary).toBe(
+      'Fix picker focus'
+    )
+    expect(queryClient.getQueryState(sessionsKey)?.isInvalidated).toBe(false)
+  })
+
   test('invalidates the affected workspace session list and preview', () => {
     const queryClient = new QueryClient()
     __setQueryClientForTests(queryClient)

@@ -15,11 +15,16 @@ import {
   type Options,
   type Query,
   type SDKUserMessage,
+  getSessionInfo,
+  renameSession as renameClaudeSession,
   query
 } from '@anthropic-ai/claude-agent-sdk'
 
 import { appendAttachmentNote, attachmentOnlyPlaceholder } from '@/lib/attachment-note'
+import { formatChatTitle } from '@/lib/chat-title'
 import { ClaudeAdapter } from './adapter'
+import { canReplaceClaudeSessionTitle, claudeSessionSummary } from './sessions'
+import { generateClaudeChatTitle } from './title'
 import type { Part } from '@/lib/format'
 import type { SessionActivity } from '@/lib/types'
 import { type MoiContext, moiContextSystemReminder, renderMoiContext } from '@/lib/moi-context'
@@ -119,9 +124,15 @@ type InputQueue = {
   close: () => void
 }
 
+type PendingSessionTitle = {
+  source: string
+  fallbackTitle: string
+}
+
 type LiveSession = {
   workspaceId: string
   workspacePath: string
+  workspaceEnv: Record<string, string>
   sessionId: string // current real id (rekeyed on rename)
   q: Query
   adapter: ClaudeAdapter
@@ -168,6 +179,7 @@ type LiveSession = {
   lastActivityAt: number
   lastUserText: string | undefined
   refreshSessionsOnResult: boolean
+  pendingTitle: PendingSessionTitle | undefined
 }
 
 const sessions = new Map<string, LiveSession>()
@@ -360,6 +372,51 @@ function renameSession(s: LiveSession, realId: string): string {
   return from
 }
 
+async function refineClaudeChatTitle(input: {
+  workspaceId: string
+  workspacePath: string
+  workspaceEnv: Record<string, string>
+  sessionId: string
+  source: string
+  fallbackTitle: string
+}): Promise<void> {
+  try {
+    const title = await generateClaudeChatTitle({
+      workspacePath: input.workspacePath,
+      workspaceEnv: input.workspaceEnv,
+      source: input.source
+    })
+    if (!title) {
+      debug(`cc title skipped ws=${input.workspaceId} session=${input.sessionId}: no title`)
+      return
+    }
+    if (title === input.fallbackTitle) return
+
+    const current = await getSessionInfo(input.sessionId, { dir: input.workspacePath })
+    if (!canReplaceClaudeSessionTitle(current)) {
+      if (current) {
+        broadcast(input.workspaceId, {
+          type: 'sessions_changed',
+          sessionId: input.sessionId,
+          summary: claudeSessionSummary(current)
+        })
+      }
+      return
+    }
+
+    await renameClaudeSession(input.sessionId, title, { dir: input.workspacePath })
+    broadcast(input.workspaceId, {
+      type: 'sessions_changed',
+      sessionId: input.sessionId,
+      summary: title
+    })
+  } catch (err) {
+    debug(
+      `cc title skipped ws=${input.workspaceId} session=${input.sessionId}: ${err instanceof Error ? err.message : String(err)}`
+    )
+  }
+}
+
 // The session just went idle (state event, or `result` on a CLI without state
 // events): settle the view builder, then either rebuild for a deferred
 // effort/streaming change or arm the idle timer.
@@ -387,7 +444,12 @@ async function consume(s: LiveSession) {
           await renameSessionConfig(s.workspacePath, from, s.sessionId)
           await renameSelectedSession(s.workspacePath, from, s.sessionId)
           await renameViewBuilderSession(s.workspaceId, s.workspacePath, from, s.sessionId)
-          broadcast(s.workspaceId, { type: 'session_renamed', from, to: s.sessionId })
+          broadcast(s.workspaceId, {
+            type: 'session_renamed',
+            from,
+            to: s.sessionId,
+            ...(s.pendingTitle ? { summary: s.pendingTitle.fallbackTitle } : {})
+          })
         }
         // Seed the session's config from what it actually ran with — but only if
         // it has none yet, so an explicit user PUT (or a migrated temp-id edit)
@@ -401,6 +463,17 @@ async function consume(s: LiveSession) {
             model: s.model,
             effort: s.effort,
             fastMode: s.fastMode
+          })
+        }
+        if (s.pendingTitle) {
+          const pendingTitle = s.pendingTitle
+          s.pendingTitle = undefined
+          void refineClaudeChatTitle({
+            workspaceId: s.workspaceId,
+            workspacePath: s.workspacePath,
+            workspaceEnv: s.workspaceEnv,
+            sessionId: s.sessionId,
+            ...pendingTitle
           })
         }
       }
@@ -534,6 +607,7 @@ function createLiveSession(input: {
   // Live token streaming (`includePartialMessages`). Only enabled when the
   // client opts in; off leaves the query byte-for-byte as before.
   stream: boolean
+  pendingTitle: PendingSessionTitle | undefined
   // Resolved workspace env (.env + UI custom overrides), injected so the agent's
   // Bash tool can use workspace secrets. Frozen at spawn — see restartWorkspaceSessions.
   workspaceEnv: Record<string, string>
@@ -577,6 +651,7 @@ function createLiveSession(input: {
   const session: LiveSession = {
     workspaceId: input.workspaceId,
     workspacePath: input.workspacePath,
+    workspaceEnv: input.workspaceEnv,
     sessionId: input.sessionId,
     q: query({ prompt: queue.iterator, options }),
     adapter: new ClaudeAdapter(),
@@ -597,7 +672,8 @@ function createLiveSession(input: {
     createdAt: Date.now(),
     lastActivityAt: Date.now(),
     lastUserText: undefined,
-    refreshSessionsOnResult: input.isNew
+    refreshSessionsOnResult: input.isNew,
+    pendingTitle: input.pendingTitle
   }
   sessions.set(recKey(session.workspaceId, session.sessionId), session)
   debug(
@@ -634,6 +710,19 @@ export async function sendCCMessage(input: {
     : []
   if (!input.content && uploads.length === 0) return
   const { content: userContent, parts } = buildUserMessage(input.content, uploads)
+  const fallbackTitle = input.isNew
+    ? formatChatTitle(
+        input.content,
+        uploads.map(upload => upload.filename)
+      )
+    : ''
+  const pendingTitle =
+    fallbackTitle.length > 0
+      ? {
+          source: input.content || uploads.map(upload => upload.filename).join(', '),
+          fallbackTitle
+        }
+      : undefined
   // The envelope goes in as its OWN leading text block, never merged into the
   // user's string: the SDK's first-prompt extraction (session titles,
   // home-card previews) skips tag-leading text, so a prefixed string would
@@ -703,6 +792,7 @@ export async function sendCCMessage(input: {
       effort: input.effort,
       fastMode: input.fastMode,
       stream: wantStream,
+      pendingTitle,
       // The agent only sees secrets scoped to the 'agent' sink (plus .env).
       workspaceEnv: await resolveWorkspaceEnv(input.workspacePath)
     })

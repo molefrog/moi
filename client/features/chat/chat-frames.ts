@@ -59,13 +59,27 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
     const workspaceId = data.workspaceId as string
     const from = data.from as string
     const to = data.to as string
+    const summary = typeof data.summary === 'string' ? data.summary : undefined
+    const sessionsKey = workspaceKeys.sessions(workspaceId)
+    const cachedSessions = queryClient?.getQueryData<SessionInfo[]>(sessionsKey)
+    const cachedSession = cachedSessions?.find(
+      session => session.sessionId === from || session.sessionId === to
+    )
+    if (cachedSession) {
+      void queryClient?.cancelQueries({ queryKey: sessionsKey })
+    }
     store.renameSession(workspaceId, from, to)
     if (queryClient) renameSelectedSessionInCache(queryClient, workspaceId, from, to)
-    queryClient?.setQueryData<SessionInfo[]>(workspaceKeys.sessions(workspaceId), current =>
-      current?.map(session =>
-        session.sessionId === from ? { ...session, sessionId: to } : session
-      )
-    )
+    if (cachedSession) {
+      queryClient?.setQueryData<SessionInfo[]>(sessionsKey, current => [
+        {
+          ...cachedSession,
+          sessionId: to,
+          ...(summary !== undefined ? { summary } : {})
+        },
+        ...(current ?? []).filter(session => session.sessionId !== from && session.sessionId !== to)
+      ])
+    }
 
     const previousView = queryClient?.getQueryData<ViewState>(
       workspaceKeys.events(workspaceId, from)
@@ -82,15 +96,30 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
       queryClient?.setQueryData(workspaceKeys.sessionConfig(workspaceId, to), previousConfig)
       queryClient?.removeQueries({ queryKey: workspaceKeys.sessionConfig(workspaceId, from) })
     }
-    queryClient?.invalidateQueries({ queryKey: workspaceKeys.sessions(workspaceId) })
+    if (!cachedSession) {
+      queryClient?.invalidateQueries({ queryKey: sessionsKey })
+    }
     queryClient?.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
     return
   }
   if (data.type === 'sessions_changed') {
     const workspaceId = data.workspaceId as string
-    queryClient?.invalidateQueries({
-      queryKey: workspaceKeys.sessions(workspaceId)
-    })
+    const sessionId = data.sessionId as string
+    const summary = typeof data.summary === 'string' ? data.summary : undefined
+    const sessionsKey = workspaceKeys.sessions(workspaceId)
+    const cachedSession = queryClient
+      ?.getQueryData<SessionInfo[]>(sessionsKey)
+      ?.find(session => session.sessionId === sessionId)
+    if (summary !== undefined && cachedSession) {
+      void queryClient?.cancelQueries({ queryKey: sessionsKey })
+      queryClient?.setQueryData<SessionInfo[]>(sessionsKey, current => {
+        return current?.map(session =>
+          session.sessionId === sessionId ? { ...session, summary } : session
+        )
+      })
+    } else {
+      queryClient?.invalidateQueries({ queryKey: sessionsKey })
+    }
     queryClient?.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
     return
   }

@@ -481,7 +481,8 @@ async function sendOpenClawMessageImpl(input: {
         broadcast(input.workspaceId, {
           type: 'session_renamed',
           from: input.sessionId,
-          to: realSessionId
+          to: realSessionId,
+          ...(input.fallbackTitle ? { summary: input.fallbackTitle } : {})
         })
       }
     }
@@ -500,7 +501,8 @@ async function sendOpenClawMessageImpl(input: {
         })
         broadcast(input.workspaceId, {
           type: 'sessions_changed',
-          sessionId: realSessionId
+          sessionId: realSessionId,
+          summary: input.fallbackTitle
         })
       } catch (err) {
         console.error('[openclaw] failed to save chat title', err)

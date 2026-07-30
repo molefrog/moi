@@ -509,7 +509,7 @@ async function saveCodexChatTitle(
   title: string
 ): Promise<void> {
   await client.rpc('thread/name/set', { threadId: sessionId, name: title })
-  broadcast(workspaceId, { type: 'sessions_changed', sessionId })
+  broadcast(workspaceId, { type: 'sessions_changed', sessionId, summary: title })
 }
 
 async function refineCodexChatTitle(input: {
@@ -596,7 +596,8 @@ export async function sendCodexMessage(input: {
         broadcast(input.workspaceId, {
           type: 'session_renamed',
           from: input.sessionId,
-          to: realId
+          to: realId,
+          ...(fallbackTitle ? { summary: fallbackTitle } : {})
         })
       }
       rec = createRecord({
