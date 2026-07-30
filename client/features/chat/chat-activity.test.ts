@@ -6,9 +6,13 @@ import { QueryClient } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test } from 'bun:test'
 
 import { __setQueryClientForTests, handleFrame } from '@/client/features/chat/chat-connection'
-import { isRunningActivity, liveStore } from '@/client/features/chat/chat-store'
+import {
+  hasRunningWorkspaceActivity,
+  isRunningActivity,
+  liveStore
+} from '@/client/features/chat/chat-store'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import type { SelectedSessionState, SessionInfo } from '@/lib/types'
+import type { SelectedSessionState, SessionActivity, SessionInfo } from '@/lib/types'
 
 const WS = 'ws1'
 const SID = 'sess-1'
@@ -22,6 +26,29 @@ test('only running activity shows in-progress UI', () => {
   expect(isRunningActivity('requires-action')).toBe(false)
   expect(isRunningActivity('idle')).toBe(false)
   expect(isRunningActivity(undefined)).toBe(false)
+})
+
+test('workspace activity includes every session and excludes other workspaces', () => {
+  const activity = {
+    'ws1:idle': 'idle',
+    'ws1:blocked': 'requires-action',
+    'ws1:running': 'running',
+    'ws2:running': 'running'
+  } satisfies Record<string, SessionActivity>
+
+  expect(hasRunningWorkspaceActivity(activity, 'ws1')).toBe(true)
+  expect(hasRunningWorkspaceActivity(activity, 'ws2')).toBe(true)
+  expect(hasRunningWorkspaceActivity(activity, 'ws3')).toBe(false)
+  expect(
+    hasRunningWorkspaceActivity(
+      {
+        'ws1:idle': 'idle',
+        'ws1:blocked': 'requires-action',
+        'ws2:running': 'running'
+      },
+      'ws1'
+    )
+  ).toBe(false)
 })
 
 beforeEach(() => {

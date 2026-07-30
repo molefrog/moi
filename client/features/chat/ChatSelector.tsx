@@ -4,7 +4,12 @@ import { IconArchive, IconChevronDown, IconEdit } from '@tabler/icons-react'
 import { useArchiveWorkspaceSession, useWorkspaceModels, useWorkspaceSessions } from './api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
-import { isRunningActivity, liveStore, useLive } from '@/client/features/chat/chat-store'
+import {
+  hasRunningWorkspaceActivity,
+  isRunningActivity,
+  liveStore,
+  useLive
+} from '@/client/features/chat/chat-store'
 import type { SessionInfo } from '@/lib/types'
 
 import { Button } from '@/client/components/ui/button'
@@ -128,7 +133,7 @@ function ChatSessionItem({
                 </Button>
               }
             />
-            <TooltipContent side="right">Archive chat</TooltipContent>
+            <TooltipContent side="right">Archive</TooltipContent>
           </Tooltip>
         )}
       </DropdownMenuItem>
@@ -183,6 +188,9 @@ export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelecto
   const { data: sessions = [], refetch } = useWorkspaceSessions(workspaceId)
   const canArchive = useWorkspaceModels(workspaceId).data?.supportsArchiving === true
   const archiveSession = useArchiveWorkspaceSession(workspaceId)
+  const hasRunningSession = useLive(state =>
+    hasRunningWorkspaceActivity(state.activity, workspaceId)
+  )
   const active = sessions.find(s => s.sessionId === selectedSessionId)
   const label = active?.summary ?? 'New chat'
   const sessionGroups = groupSessionsByDate(sessions)
@@ -211,7 +219,11 @@ export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelecto
         render={
           <Button variant="ghost">
             <span className="max-w-64 truncate">{label}</span>
-            <IconChevronDown stroke={1.5} />
+            {hasRunningSession ? (
+              <Spinner className="size-4!" stroke={2} />
+            ) : (
+              <IconChevronDown data-icon="inline-end" stroke={1.5} />
+            )}
           </Button>
         }
       />

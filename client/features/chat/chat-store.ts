@@ -37,6 +37,16 @@ export function isRunningActivity(activity: SessionActivity | undefined): boolea
   return activity === 'running'
 }
 
+export function hasRunningWorkspaceActivity(
+  activity: Record<string, SessionActivity>,
+  workspaceId: string
+): boolean {
+  const prefix = `${workspaceId}:`
+  return Object.entries(activity).some(
+    ([activityKey, value]) => activityKey.startsWith(prefix) && isRunningActivity(value)
+  )
+}
+
 // Attachments stay with the chat they were added to. A brand-new chat has no
 // session id yet, so it gets a stable `'new'` sentinel until send mints one.
 export function attachmentKey(workspaceId: string, sessionId: string | null): string {
