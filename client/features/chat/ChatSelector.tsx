@@ -75,16 +75,14 @@ function ChatSessionItem({
           className={cn(
             'flex min-w-0 flex-1 overflow-hidden',
             canArchive &&
-              'group-focus-within/chat:mr-4 group-focus-within/chat:mask-r-from-[calc(100%-16px)] group-hover/chat:mr-4 group-hover/chat:mask-r-from-[calc(100%-16px)] [@media(hover:none)]:mr-4 [@media(hover:none)]:mask-r-from-[calc(100%-16px)]'
+              'group-focus-within/chat:mr-4 group-focus-within/chat:mask-r-from-[calc(100%-16px)] [@media(hover:none)]:mr-4 [@media(hover:none)]:mask-r-from-[calc(100%-16px)]'
           )}
         >
           <span
             className={cn(
               'min-w-0 truncate',
-              canArchive &&
-                'group-focus-within/chat:-mr-4 group-hover/chat:-mr-4 [@media(hover:none)]:-mr-4'
+              canArchive && 'group-focus-within/chat:-mr-4 [@media(hover:none)]:-mr-4'
             )}
-            title={session.summary}
           >
             {session.summary}
           </span>
