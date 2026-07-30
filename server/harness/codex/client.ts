@@ -340,21 +340,50 @@ export async function getCodexWorkspacePreview(
 }
 
 // Account-wide model catalog (identical for every workspace); cached like the
-// Claude list in agent.ts, cleared on failure so a later call can retry.
-let codexModelsPromise: Promise<Model[]> | null = null
+// Claude list in agent.ts, cleared on failure so a later call can retry. Keep
+// the raw catalog cached because the effective service tier is cwd-scoped.
+let codexModelsPromise: Promise<CodexModel[]> | null = null
 
-export function getCodexModels(workspacePath: string): Promise<Model[]> {
+function getCachedCodexModels(workspacePath: string): Promise<CodexModel[]> {
   if (!codexModelsPromise) {
     codexModelsPromise = (async () => {
       const client = await getCodexClient(workspacePath)
       const res = await client.rpc<{ data?: CodexModel[] }>('model/list', {})
-      return (res.data ?? []).filter(m => !m.hidden).map(codexModelToModel)
+      return res.data ?? []
     })().catch(err => {
       codexModelsPromise = null
       throw err
     })
   }
   return codexModelsPromise
+}
+
+async function getCodexConfiguredServiceTier(
+  workspacePath: string
+): Promise<string | null | undefined> {
+  try {
+    const client = await getCodexClient(workspacePath)
+    const res = await client.rpc<{ config?: { service_tier?: string | null } }>('config/read', {
+      cwd: workspacePath,
+      includeLayers: false
+    })
+    return res.config?.service_tier
+  } catch (err) {
+    debug(
+      `codex config/read failed cwd=${workspacePath}: ${err instanceof Error ? err.message : String(err)}`
+    )
+    return undefined
+  }
+}
+
+export async function getCodexModels(workspacePath: string): Promise<Model[]> {
+  const [models, configuredServiceTier] = await Promise.all([
+    getCachedCodexModels(workspacePath),
+    getCodexConfiguredServiceTier(workspacePath)
+  ])
+  return models
+    .filter(model => !model.hidden)
+    .map(model => codexModelToModel(model, configuredServiceTier))
 }
 
 // MCP servers as Codex sees them (from ~/.codex/config.toml), for the

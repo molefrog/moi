@@ -177,12 +177,15 @@ export function selectCodexWorkspacePreview(
   }
 }
 
-export function codexModelToModel(m: CodexModel): Model {
+export function codexModelToModel(m: CodexModel, configuredServiceTier?: string | null): Model {
   const efforts = (m.supportedReasoningEfforts ?? []).map(e => e.reasoningEffort)
   const displayName = m.displayName.replace(/^GPT-/, '').replaceAll('-', ' ')
   const supportsFastMode =
     (m.serviceTiers ?? []).some(tier => tier.id === CODEX_FAST_SERVICE_TIER) ||
     (m.additionalSpeedTiers ?? []).includes('fast')
+  // The effective user/project config governs omitted wire values. A null
+  // config value leaves the model catalog's default in charge.
+  const defaultServiceTier = configuredServiceTier ?? m.defaultServiceTier
   return {
     value: m.id,
     resolvedModel: m.model,
@@ -198,7 +201,7 @@ export function codexModelToModel(m: CodexModel): Model {
     ...(supportsFastMode
       ? {
           supportsFastMode: true,
-          defaultFastMode: m.defaultServiceTier === CODEX_FAST_SERVICE_TIER
+          defaultFastMode: defaultServiceTier === CODEX_FAST_SERVICE_TIER
         }
       : {})
   }
