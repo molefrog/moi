@@ -49,6 +49,7 @@ import { debug } from '../../debug'
 import { broadcast } from '../../state'
 import { renameSelectedSession } from '../../selected-session'
 import { hasSessionConfig, renameSessionConfig, saveSessionConfig } from '../../session-config'
+import { renameViewBuilderSession } from '../../view-builders'
 import {
   type StoredUpload,
   materializeToPath,
@@ -593,6 +594,12 @@ export async function sendCodexMessage(input: {
         aliases.set(recKey(input.workspaceId, input.sessionId), realId)
         await renameSessionConfig(input.workspacePath, input.sessionId, realId)
         await renameSelectedSession(input.workspacePath, input.sessionId, realId)
+        await renameViewBuilderSession(
+          input.workspaceId,
+          input.workspacePath,
+          input.sessionId,
+          realId
+        )
         broadcast(input.workspaceId, {
           type: 'session_renamed',
           from: input.sessionId,

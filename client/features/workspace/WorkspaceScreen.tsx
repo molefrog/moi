@@ -33,7 +33,11 @@ import { useWorkspaceAvailability } from '@/client/features/workspace/api'
 import { WorkspaceSkillUpdateBanner } from '@/client/features/workspace/WorkspaceSkillUpdateBanner'
 import { useWorkspaceSkillUpdates } from '@/client/features/workspace/useWorkspaceSkillUpdates'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
-import { hasRunningWorkspaceActivity, useLive } from '@/client/features/chat/chat-store'
+import {
+  hasRunningWorkspaceActivity,
+  isSessionRunning,
+  useLive
+} from '@/client/features/chat/chat-store'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import {
@@ -195,7 +199,8 @@ function tabItemFor(
   views: ViewInfo[],
   builders: ViewBuilder[],
   closable: boolean,
-  agentRunning: boolean
+  agentRunning: boolean,
+  builderRunning: (sessionId: string) => boolean
 ): WorkspaceTabItem | null {
   if (tab === 'agent') {
     return {
@@ -229,7 +234,8 @@ function tabItemFor(
       key: tab,
       Icon: viewBuilderIcon(builder),
       label: builder.title || builder.viewId || 'New view',
-      closable
+      closable,
+      loading: builderRunning(builder.sessionId)
     }
   }
   const viewId = viewIdFromTab(tab)
@@ -267,9 +273,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
   const [floatingChatOpen, setFloatingChatOpen] = useState(false)
   const [chatFocusRequest, setChatFocusRequest] = useState(0)
-  const hasRunningSession = useLive(state =>
-    hasRunningWorkspaceActivity(state.activity, workspaceId)
-  )
+  const sessionActivity = useLive(state => state.activity)
+  const hasRunningSession = hasRunningWorkspaceActivity(sessionActivity, workspaceId)
 
   useWorkspaceTheme(layout.theme)
 
@@ -328,7 +333,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
         views,
         builders,
         canCloseTabs || viewBuilderIdFromTab(tab) !== null,
-        hasRunningSession
+        hasRunningSession,
+        sessionId => isSessionRunning(sessionActivity, workspaceId, sessionId)
       )
     )
     .filter((tab): tab is WorkspaceTabItem => Boolean(tab))

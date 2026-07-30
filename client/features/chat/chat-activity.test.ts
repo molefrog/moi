@@ -9,6 +9,7 @@ import { __setQueryClientForTests, handleFrame } from '@/client/features/chat/ch
 import {
   hasRunningWorkspaceActivity,
   isRunningActivity,
+  isSessionRunning,
   liveStore
 } from '@/client/features/chat/chat-store'
 import { workspaceKeys } from '@/client/api/workspace-keys'
@@ -49,6 +50,19 @@ test('workspace activity includes every session and excludes other workspaces', 
       'ws1'
     )
   ).toBe(false)
+})
+
+test('session activity is scoped to its workspace and session', () => {
+  const activity = {
+    'ws1:running': 'running',
+    'ws1:idle': 'idle',
+    'ws2:running': 'running'
+  } satisfies Record<string, SessionActivity>
+
+  expect(isSessionRunning(activity, 'ws1', 'running')).toBe(true)
+  expect(isSessionRunning(activity, 'ws1', 'idle')).toBe(false)
+  expect(isSessionRunning(activity, 'ws1', 'missing')).toBe(false)
+  expect(isSessionRunning(activity, 'ws2', 'running')).toBe(true)
 })
 
 beforeEach(() => {

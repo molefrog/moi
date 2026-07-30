@@ -6,7 +6,7 @@ import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
 import {
   hasRunningWorkspaceActivity,
-  isRunningActivity,
+  isSessionRunning,
   liveStore,
   useLive
 } from '@/client/features/chat/chat-store'
@@ -56,9 +56,7 @@ function ChatSessionItem({
 }: ChatSessionItemProps) {
   const pendingRef = useRef(false)
   const [pending, setPending] = useState(false)
-  const running = useLive(state =>
-    isRunningActivity(state.activity[`${workspaceId}:${session.sessionId}`])
-  )
+  const running = useLive(state => isSessionRunning(state.activity, workspaceId, session.sessionId))
 
   async function handleArchive(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault()
