@@ -1,5 +1,7 @@
-import { query } from '@anthropic-ai/claude-agent-sdk'
+import { query, resolveSettings } from '@anthropic-ai/claude-agent-sdk'
 import type { ModelInfo } from '@anthropic-ai/claude-agent-sdk'
+
+import type { Model } from '@/lib/types'
 
 import { requireHarnessExecutable } from '../executable'
 
@@ -31,7 +33,7 @@ async function fetchClaudeModels(cwd: string): Promise<ModelInfo[]> {
 // it so a later request can retry instead of caching the rejection forever.
 let claudeModelsPromise: Promise<ModelInfo[]> | null = null
 
-export function getClaudeModels(cwd: string): Promise<ModelInfo[]> {
+function getCachedClaudeModels(cwd: string): Promise<ModelInfo[]> {
   if (!claudeModelsPromise) {
     claudeModelsPromise = fetchClaudeModels(cwd).catch(err => {
       claudeModelsPromise = null
@@ -39,4 +41,25 @@ export function getClaudeModels(cwd: string): Promise<ModelInfo[]> {
     })
   }
   return claudeModelsPromise
+}
+
+export function withClaudeFastModeDefault(
+  models: readonly ModelInfo[],
+  defaultFastMode: boolean
+): Model[] {
+  return models.map(model =>
+    model.supportsFastMode ? { ...model, defaultFastMode } : { ...model }
+  )
+}
+
+export async function getClaudeModels(cwd: string): Promise<Model[]> {
+  const [models, settings] = await Promise.all([
+    getCachedClaudeModels(cwd),
+    resolveSettings({ cwd, settingSources: ['user', 'project'] })
+  ])
+  const defaultFastMode =
+    settings.effective.fastModePerSessionOptIn === true
+      ? false
+      : settings.effective.fastMode === true
+  return withClaudeFastModeDefault(models, defaultFastMode)
 }

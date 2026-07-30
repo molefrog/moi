@@ -9,7 +9,7 @@ import {
   resolveChatRunOptions,
   startOptimisticTurn
 } from '@/client/features/chat/chat-send'
-import { type ChatAttachment, draftKey, liveStore } from '@/client/features/chat/chat-store'
+import { attachmentKey, type ChatAttachment, liveStore } from '@/client/features/chat/chat-store'
 import type { ViewState, WorkspaceModels } from '@/lib/types'
 
 const workspaceId = 'workspace-1'
@@ -44,6 +44,12 @@ describe('resolveChatRunOptions', () => {
       {
         value: 'sonnet',
         displayName: 'Sonnet',
+        supportsFastMode: true,
+        supportedEffortLevels: ['low', 'high']
+      },
+      {
+        value: 'haiku',
+        displayName: 'Haiku',
         supportedEffortLevels: ['low', 'high']
       }
     ]
@@ -80,6 +86,43 @@ describe('resolveChatRunOptions', () => {
       stream: true
     })
   })
+
+  test('keeps enabled and explicitly disabled Fast mode for a supported model', () => {
+    expect(resolveChatRunOptions(models, 'sonnet', 'high', true)).toEqual({
+      model: 'sonnet',
+      effort: 'high',
+      fastMode: true,
+      stream: true
+    })
+    expect(resolveChatRunOptions(models, 'sonnet', 'high', false)).toEqual({
+      model: 'sonnet',
+      effort: 'high',
+      fastMode: false,
+      stream: true
+    })
+  })
+
+  test('disables Fast mode for a known unsupported model without dropping the preference', () => {
+    expect(resolveChatRunOptions(models, 'haiku', 'high', true)).toEqual({
+      model: 'haiku',
+      effort: 'high',
+      fastMode: false,
+      stream: true
+    })
+  })
+
+  test('keeps Fast mode for a stale model that the client cannot validate', () => {
+    expect(resolveChatRunOptions(models, 'removed-model', 'high', true)).toEqual({
+      model: undefined,
+      effort: 'high',
+      fastMode: true,
+      stream: true
+    })
+  })
+
+  test('omits Fast mode when no moi preference exists', () => {
+    expect(resolveChatRunOptions(models, 'sonnet', 'high')).not.toHaveProperty('fastMode')
+  })
 })
 
 // The composer's staged files belong to the message the USER is writing. An
@@ -98,7 +141,7 @@ describe('composer attachments', () => {
   ]
 
   const stage = () =>
-    liveStore.setState({ attachments: { [draftKey(workspaceId, sessionId)]: staged } })
+    liveStore.setState({ attachments: { [attachmentKey(workspaceId, sessionId)]: staged } })
 
   test('a composer send carries the uploaded ones and skips those still uploading', () => {
     stage()

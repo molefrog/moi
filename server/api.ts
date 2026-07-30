@@ -229,6 +229,7 @@ one.post('/view-builders/:builderId/submit', async c => {
     optimisticId?: string
     model?: string
     effort?: string
+    fastMode?: boolean
     stream?: boolean
     availableIcons?: unknown
   }>()
@@ -267,6 +268,7 @@ one.post('/view-builders/:builderId/submit', async c => {
         optimisticId: body.optimisticId,
         model: typeof body.model === 'string' ? body.model : undefined,
         effort: typeof body.effort === 'string' ? body.effort : undefined,
+        fastMode: typeof body.fastMode === 'boolean' ? body.fastMode : undefined,
         stream: body.stream === true ? true : undefined,
         agentId: ws.agentId
       })
@@ -444,10 +446,10 @@ one.get('/sessions/:sessionId/events', async c => {
   return c.json(await harnessFor(ws).sessionEvents(ws, c.req.param('sessionId')))
 })
 
-// Per-thread agent settings (model + reasoning effort). GET returns the stored
-// config ({} for threads that never overrode the workspace defaults); PUT patches
-// it (a field as `null` clears it, omitted leaves it). The change takes effect on
-// the thread's next message — see ClientMessage/effort handling in cc-session.
+// Per-thread agent settings (model, reasoning effort, and Fast mode). GET
+// returns the stored config ({} for threads that never overrode the workspace
+// defaults); PUT patches it (a field as `null` clears it, omitted leaves it).
+// The change takes effect on the thread's next message.
 one.get('/sessions/:sessionId/config', async c => {
   return c.json(await getThreadConfig(c.get('ws').path, c.req.param('sessionId')))
 })
@@ -466,6 +468,13 @@ one.put('/sessions/:sessionId/config', async c => {
       return c.text(`${key} must be a string or null`, 400)
     }
     patch[key] = value
+  }
+  if ('fastMode' in record) {
+    const value = record.fastMode
+    if (value !== null && typeof value !== 'boolean') {
+      return c.text('fastMode must be a boolean or null', 400)
+    }
+    patch.fastMode = value
   }
   return c.json(await saveThreadConfig(c.get('ws').path, c.req.param('sessionId'), patch))
 })

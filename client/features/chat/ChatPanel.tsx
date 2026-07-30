@@ -2,10 +2,10 @@ import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 
 import { IconChevronDown, IconX } from '@tabler/icons-react'
 
-import { canSubmitComposerAction } from '@/client/components/shared/Composer'
+import { canSubmitComposerAction, focusComposer } from '@/client/components/shared/Composer'
 import { useStickToBottom } from '@/client/features/chat/useStickToBottom'
 import { groupTurns } from '@/client/features/chat/group-turns'
-import { draftKey, useLive } from '@/client/features/chat/chat-store'
+import { attachmentKey, useLive } from '@/client/features/chat/chat-store'
 import type { ChatPromptBubble } from '@/client/features/chat/ChatPromptBubbles'
 import type { ChatSendOptions } from '@/client/features/chat/chat-send'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
@@ -69,7 +69,7 @@ export function ChatPanel({
     (state.workspaceIdsPendingAnalysis ?? []).includes(workspaceId)
   )
   const attachmentsUploading = useLive(state =>
-    (state.attachments[draftKey(workspaceId, sessionId ?? null)] ?? []).some(
+    (state.attachments[attachmentKey(workspaceId, sessionId ?? null)] ?? []).some(
       attachment => attachment.status === 'uploading'
     )
   )
@@ -100,7 +100,7 @@ export function ChatPanel({
   // The active chat surface owns initial focus. A monotonically increasing
   // request also refocuses an already-visible composer after intent actions.
   useEffect(() => {
-    if (active) composerRef.current?.focus()
+    if (active) focusComposer(composerRef.current)
   }, [active, focusRequest])
 
   // Sending always returns the user to the bottom, even if they'd scrolled up —
@@ -178,22 +178,22 @@ export function ChatPanel({
         <div
           className={cn(
             '@container flex w-full flex-col transition-[padding]',
-            (composerBanner || error) && 'gap-1 rounded-2xl p-2',
+            (composerBanner || error) && 'gap-2 rounded-t-xl rounded-b-2xl p-2',
             composerBanner && 'bg-muted',
             error && 'bg-destructive/10'
           )}
         >
           {composerBanner}
           {error && (
-            <div className="flex w-full items-start gap-2 px-3 py-2 text-sm text-destructive">
-              <span className="flex-1 wrap-break-word">{error}</span>
+            <div className="flex w-full items-center gap-2 p-1 pl-4 text-sm">
+              <span className="flex-1 wrap-break-word text-destructive">{error}</span>
               {onDismissError && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon-sm"
                   onClick={onDismissError}
-                  className="-m-1"
+                  className="text-destructive hover:text-destructive"
                   aria-label="Dismiss error"
                 >
                   <IconX stroke={1.75} />

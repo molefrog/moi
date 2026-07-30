@@ -28,8 +28,7 @@ beforeEach(() => {
     previews: {},
     activity: {},
     errors: {},
-    activeByWorkspace: {},
-    drafts: {}
+    activeByWorkspace: {}
   })
 })
 

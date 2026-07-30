@@ -2,24 +2,39 @@ import type { Model, WorkspaceType } from '@/lib/types'
 
 export const DEFAULT_EFFORT = 'high'
 
-export const MODEL_ORDER = {
-  'claude-code': [
-    'claude-fable-5',
-    'claude-opus-4-8',
-    'claude-opus-4-8[1m]',
-    'claude-sonnet-5',
-    'claude-haiku-4-5-20251001'
-  ],
-  codex: [],
-  openclaw: []
-} as const satisfies Record<WorkspaceType, readonly string[]>
+const ANTHROPIC_MODEL_FAMILY_ORDER = ['fable', 'opus', 'sonnet', 'haiku'] as const
 
-function modelOrderKey(model: Model): string {
-  return model.resolvedModel ?? model.value
+type ModelComparator = (a: Model, b: Model) => number
+
+function anthropicModelFamilyRank(model: Model): number | undefined {
+  const key = model.resolvedModel ?? model.value
+  const rank = ANTHROPIC_MODEL_FAMILY_ORDER.findIndex(
+    family => key === family || key.startsWith(`${family}[`) || key.includes(`-${family}-`)
+  )
+
+  return rank === -1 ? undefined : rank
 }
 
-export function reverseEffortLevels(levels: readonly string[]): string[] {
-  return [...levels].reverse()
+function compareOptionalRanks(a: number | undefined, b: number | undefined): number {
+  if (a === undefined && b === undefined) return 0
+  if (a === undefined) return -1
+  if (b === undefined) return 1
+  return a - b
+}
+
+function compareAnthropicModels(a: Model, b: Model): number {
+  return compareOptionalRanks(anthropicModelFamilyRank(a), anthropicModelFamilyRank(b))
+}
+
+const PROVIDER_MODEL_COMPARATORS: Partial<Record<WorkspaceType, ModelComparator>> = {
+  'claude-code': compareAnthropicModels
+}
+
+function stableSortModels(models: Model[], compare: ModelComparator): Model[] {
+  return models
+    .map((model, index) => ({ model, index }))
+    .sort((a, b) => compare(a.model, b.model) || a.index - b.index)
+    .map(({ model }) => model)
 }
 
 export function resolveDisplayedEffort(
@@ -28,20 +43,27 @@ export function resolveDisplayedEffort(
 ): string | undefined {
   if (selectedEffort && levels.includes(selectedEffort)) return selectedEffort
   if (levels.includes(DEFAULT_EFFORT)) return DEFAULT_EFFORT
-  return levels[0]
+  return levels[levels.length - 1]
+}
+
+export function resolveEffortIndex(
+  levels: readonly string[],
+  selectedEffort: string | undefined
+): number {
+  const displayedEffort = resolveDisplayedEffort(levels, selectedEffort)
+  return displayedEffort ? levels.indexOf(displayedEffort) : -1
+}
+
+export function hasEffortChoice(levels: readonly string[]): boolean {
+  return levels.length > 1
+}
+
+export function resolveFastMode(model: Model, selectedFastMode: boolean | undefined): boolean {
+  if (model.supportsFastMode !== true) return false
+  return selectedFastMode ?? model.defaultFastMode ?? false
 }
 
 export function sortModelsByProviderOrder(models: Model[], provider: WorkspaceType): Model[] {
-  const configuredOrder: readonly string[] = MODEL_ORDER[provider]
-  const rank = new Map<string, number>(configuredOrder.map((model, index) => [model, index]))
-
-  return models
-    .map((model, index) => ({ model, index, rank: rank.get(modelOrderKey(model)) }))
-    .sort((a, b) => {
-      if (a.rank === undefined && b.rank === undefined) return a.index - b.index
-      if (a.rank === undefined) return -1
-      if (b.rank === undefined) return 1
-      return a.rank - b.rank || a.index - b.index
-    })
-    .map(({ model }) => model)
+  const compare = PROVIDER_MODEL_COMPARATORS[provider]
+  return compare ? stableSortModels(models, compare) : models
 }

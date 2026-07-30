@@ -31,6 +31,7 @@ import {
   type CodexTokenUsage,
   type CodexTurn,
   type SubagentReplay,
+  codexServiceTierForFastMode,
   codexItemToNotice,
   codexItemToTurn,
   codexThreadToEvents
@@ -502,6 +503,7 @@ export async function sendCodexMessage(input: {
   optimisticId?: string
   model?: string
   effort?: string
+  fastMode?: boolean
   stream?: boolean
   // Structured moi context (lib/moi-context.ts), rendered here. Servers
   // >= 0.135 take it via `additionalContext` (never enters userMessage
@@ -515,6 +517,7 @@ export async function sendCodexMessage(input: {
   if (!input.content && uploads.length === 0) return
   const { input: userInput, parts } = await buildUserInput(input.content, uploads)
   if (userInput.length === 0) return
+  const serviceTier = codexServiceTierForFastMode(input.fastMode)
 
   let rec: SessionRecord
   try {
@@ -524,7 +527,8 @@ export async function sendCodexMessage(input: {
         cwd: input.workspacePath,
         sandbox: SANDBOX_MODE,
         approvalPolicy: APPROVAL_POLICY,
-        ...(input.model ? { model: input.model } : {})
+        ...(input.model ? { model: input.model } : {}),
+        ...(serviceTier !== undefined ? { serviceTier } : {})
       })
       const realId = started.thread.id
       if (realId !== input.sessionId) {
@@ -542,10 +546,14 @@ export async function sendCodexMessage(input: {
         sessionId: realId,
         client
       })
-      if ((input.model || input.effort) && !(await hasThreadConfig(input.workspacePath, realId))) {
+      if (
+        (input.model || input.effort || input.fastMode !== undefined) &&
+        !(await hasThreadConfig(input.workspacePath, realId))
+      ) {
         await saveThreadConfig(input.workspacePath, realId, {
           model: input.model,
-          effort: input.effort
+          effort: input.effort,
+          fastMode: input.fastMode
         })
       }
     } else {
@@ -610,7 +618,8 @@ export async function sendCodexMessage(input: {
       // thinking — 'auto' tends to emit one short blob near the end.
       summary: 'detailed',
       ...(input.model ? { model: input.model } : {}),
-      ...(input.effort ? { effort: input.effort } : {})
+      ...(input.effort ? { effort: input.effort } : {}),
+      ...(serviceTier !== undefined ? { serviceTier } : {})
     }
     if (rec.activeTurnId) {
       // A turn is running — steer the new input into it. If the turn ended

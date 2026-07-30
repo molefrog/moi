@@ -38,10 +38,11 @@ export function useViewBuilderActions() {
     })
     liveStore.getState().setActive(workspaceId, builder.sessionId)
 
-    const { model, effort, stream } = resolveChatRunOptions(
+    const { model, effort, fastMode, stream } = resolveChatRunOptions(
       modelData,
       layout.selectedModel,
-      layout.selectedEffort
+      layout.selectedEffort,
+      layout.selectedFastMode
     )
 
     try {
@@ -51,6 +52,7 @@ export function useViewBuilderActions() {
         optimisticId,
         model,
         effort,
+        fastMode,
         stream
       })
     } catch (error) {

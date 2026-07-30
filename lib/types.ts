@@ -231,6 +231,9 @@ export type ClientMessage =
       // Omitted means the SDK default. Unlike model, the SDK has no live setter,
       // so a change forces the live session to resume (see server/cc-session.ts).
       effort?: string
+      // Opt into the selected model's faster processing mode. Omitted inherits
+      // the provider configuration; false explicitly disables a stored default.
+      fastMode?: boolean
       // Opt into live token-by-token streaming for this turn. Omitted/false runs
       // the current whole-block behavior. Only honored for providers that report
       // `supportsStreaming` (Claude Code); ignored otherwise. Like effort, a
@@ -258,11 +261,12 @@ export type SessionInfo = {
 // Per-thread agent settings, persisted server-side in one global file in moi's
 // data dir (NOT in the workspace), exposed via GET/PUT
 // /api/workspaces/:id/sessions/:sessionId/config. A thread reopens with the same
-// model/effort it last ran with; a brand-new thread is seeded from the workspace
-// defaults (`WorkspaceLayout.selectedModel`/`selectedEffort`).
+// model/effort/Fast mode it last ran with; a brand-new thread is seeded from the
+// corresponding workspace defaults.
 export type ThreadConfig = {
   model?: string
   effort?: string
+  fastMode?: boolean
 }
 
 // App-wide settings, persisted server-side as `settings.json` in moi's data
@@ -508,12 +512,15 @@ export type WorkspaceLayout = {
   // the transcript records the *resolved* id (e.g. `claude-sonnet-4-6`), which
   // doesn't map back to these aliases — hence we persist the pick here.
   //
-  // This (and `selectedEffort`) is the *workspace default*: the value the picker
-  // edits when no thread is open, and the seed a brand-new thread copies. Once a
-  // thread exists it carries its own per-thread override (see `ThreadConfig`).
+  // This (with `selectedEffort` and `selectedFastMode`) is the *workspace
+  // default*: the value the picker edits when no thread is open, and the seed a
+  // brand-new thread copies. Once a thread exists it carries its own per-thread
+  // override (see `ThreadConfig`).
   selectedModel?: string
   // Reasoning-effort default for new threads (a `supportedEffortLevels` value).
   selectedEffort?: string
+  // Fast-mode default for new threads. Undefined inherits the provider setting.
+  selectedFastMode?: boolean
   theme?: {
     font: import('./themes').FontTheme
     primary?: string
@@ -599,6 +606,8 @@ export type Model = {
   supportedEffortLevels?: string[]
   supportsAdaptiveThinking?: boolean
   supportsFastMode?: boolean
+  // Provider-resolved default when moi has no stored Fast-mode preference.
+  defaultFastMode?: boolean
   supportsAutoMode?: boolean
 }
 

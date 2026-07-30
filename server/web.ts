@@ -29,6 +29,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
     optimisticId?: unknown
     model?: unknown
     effort?: unknown
+    fastMode?: unknown
     stream?: unknown
     context?: unknown
     attachments?: unknown
@@ -43,6 +44,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
       (v.optimisticId === undefined || typeof v.optimisticId === 'string') &&
       (v.model === undefined || typeof v.model === 'string') &&
       (v.effort === undefined || typeof v.effort === 'string') &&
+      (v.fastMode === undefined || typeof v.fastMode === 'boolean') &&
       (v.stream === undefined || typeof v.stream === 'boolean') &&
       (v.context === undefined || isMoiContext(v.context)) &&
       (v.attachments === undefined ||
@@ -151,6 +153,7 @@ export const app = Bun.serve<WsData>({
               optimisticId: data.optimisticId,
               model: data.model,
               effort: data.effort,
+              fastMode: data.fastMode,
               stream: data.stream,
               context: data.context,
               agentId: workspace.agentId

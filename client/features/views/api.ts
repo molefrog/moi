@@ -82,6 +82,7 @@ export type SubmitViewBuilderInput = {
   optimisticId: string
   model?: string
   effort?: string
+  fastMode?: boolean
   stream?: boolean
 }
 

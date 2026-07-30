@@ -86,16 +86,15 @@ export function useChat(address: WorkspaceTabAddress) {
   // yet) this is empty and `send` falls back to the workspace defaults below.
   const threadCfg = useThreadConfig(workspaceId, activeSessionId).data
 
-  // The composer owns the draft (in the live store) and hands the text in, so a
-  // keystroke re-renders only the composer — not this hook's host (WorkspaceView)
-  // and its whole subtree. See `ChatInput`.
+  // The composer owns the workspace draft in the persisted UI store and hands
+  // the text in, so a keystroke re-renders only the composer.
   const send = useCallback(
     (draft: string, options?: ChatSendOptions) => {
       const text = draft.trim()
-      // Attachments for the active thread, keyed exactly like the draft. Only
-      // fully-uploaded ones are sent; the composer disables send while any are
-      // still uploading, so in practice they're all ready here. An applet send
-      // gets none — the staged files are the user's, not the widget's.
+      // Attachments stay with the active thread. Only fully-uploaded ones are
+      // sent; the composer disables send while any are still uploading, so in
+      // practice they're all ready here. An applet send gets none — the staged
+      // files are the user's, not the widget's.
       const ready = attachmentsForSend(workspaceId, activeSessionId, options)
       // No `processing` guard: sending while a turn is in flight QUEUES the
       // message into the same live server session (streaming-input mode).
@@ -132,12 +131,19 @@ export function useChat(address: WorkspaceTabAddress) {
 
       // The thread's persisted choice (workspace defaults for a new chat). Drop a
       // model the loaded list no longer offers (stale alias) so the SDK doesn't
-      // reject model_not_found. Drop an effort the resolved model doesn't support
-      // (e.g. model changed under it); when the model is unknown/default we can't
-      // check, so pass it through — the SDK silently downgrades unsupported effort.
+      // reject model_not_found. Drop an effort the resolved model doesn't
+      // support and explicitly disable Fast mode on a known unsupported model.
+      // When the model is unknown/default we can't validate either capability,
+      // so pass the stored choices through.
       const pickedModel = threadCfg?.model ?? layout.selectedModel
       const pickedEffort = threadCfg?.effort ?? layout.selectedEffort
-      const { model, effort, stream } = resolveChatRunOptions(modelsData, pickedModel, pickedEffort)
+      const pickedFastMode = threadCfg?.fastMode ?? layout.selectedFastMode
+      const { model, effort, fastMode, stream } = resolveChatRunOptions(
+        modelsData,
+        pickedModel,
+        pickedEffort,
+        pickedFastMode
+      )
       sendMessage({
         type: 'chat',
         workspaceId,
@@ -147,6 +153,7 @@ export function useChat(address: WorkspaceTabAddress) {
         optimisticId,
         model,
         effort,
+        fastMode,
         stream,
         context: buildMoiContext(options),
         ...(ready.length > 0 ? { attachments: ready.map(a => a.upload!.id) } : {})
@@ -169,9 +176,11 @@ export function useChat(address: WorkspaceTabAddress) {
       qc,
       layout.selectedModel,
       layout.selectedEffort,
+      layout.selectedFastMode,
       buildMoiContext,
       threadCfg?.model,
       threadCfg?.effort,
+      threadCfg?.fastMode,
       modelsData
     ]
   )

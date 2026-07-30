@@ -30,9 +30,18 @@ describe('installBundledSkills', () => {
 
     await installBundledSkills(targetSkillsDir)
 
-    expect(await Bun.file(join(workspaceSkillDir, 'DESIGN.md')).exists()).toBe(true)
+    const design = await Bun.file(join(workspaceSkillDir, 'DESIGN.md')).text()
+    expect(design).toMatch(
+      /every widget\s+root must cover the full frame with an opaque background\./
+    )
+    expect(design).toContain('The host applies the `.dark` class around every widget')
+    expect(design).toContain("Choose each widget's background deliberately")
+    expect(design).toMatch(/Prefer an intentional solid color for most widgets/)
+    expect(design).not.toContain('### Color starting points')
+    expect(design).toMatch(/`h-full w-full bg-background text-foreground` is a sensible\s+fallback/)
+    expect(design).toMatch(/Views are separate pages\.\s+Their semantic tokens inherit/)
     expect(await Bun.file(join(workspaceSkillDir, 'SKILL.md')).text()).toContain(
-      '<moi-skill version="0.9.0" />'
+      '<moi-skill version="0.9.2" />'
     )
     expect(await Bun.file(workspaceNote).text()).toBe('Keep this note\n')
     expect(await Bun.file(customSkill).text()).toBe('Keep this skill\n')

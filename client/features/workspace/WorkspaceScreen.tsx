@@ -45,6 +45,7 @@ import { resolveAppIcon } from '@/client/lib/app-icon-registry'
 import { cn } from '@/client/lib/cn'
 import { liveStore } from '@/client/features/chat/chat-store'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
+import { useUiStore } from '@/client/store/ui'
 import {
   type CreateWorkspaceTabItem,
   type WorkspaceTabItem,
@@ -450,7 +451,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
 
   const openChat = (intent?: string) => {
     if (intent !== undefined) {
-      liveStore.getState().setDraft(workspaceId, sessionId, intent)
+      useUiStore.getState().setComposerDraft(workspaceId, intent)
     }
     if (mode === 'fullscreen' && activeTab !== 'agent') {
       setFloatingChatOpen(true)

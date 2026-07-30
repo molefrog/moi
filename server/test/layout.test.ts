@@ -150,12 +150,14 @@ describe('mergeLayoutForSave', () => {
       layoutMode: 'split',
       tabs: { open: ['agent', 'widgets'], active: 'widgets' },
       selectedModel: 'sonnet',
+      selectedFastMode: false,
       theme: { font: 'default', primary: '#123456' }
     }
     const merged = mergeLayoutForSave(existing, body)
     expect(merged.layoutMode).toBe('split')
     expect(merged.tabs).toEqual({ open: ['agent', 'widgets'], active: 'widgets' })
     expect(merged.selectedModel).toBe('sonnet')
+    expect(merged.selectedFastMode).toBe(false)
     expect(merged.theme).toEqual({ font: 'default', primary: '#123456' })
     expect(merged.name).toBe('Keep')
   })

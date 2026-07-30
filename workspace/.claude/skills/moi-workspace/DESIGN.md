@@ -5,8 +5,8 @@ precise, and quiet. Applets may be more expressive and information-rich while st
 to the workspace around them.
 
 This file owns visual direction, layout, states, and interaction design. `SKILL.md` owns file layout,
-imports, styling syntax, and build instructions. The workspace theme owns fonts and semantic color
-values.
+imports, styling syntax, and build instructions. The host owns fonts and semantic color values.
+Widgets and views resolve color tokens in different scopes, described below.
 
 ## Visual direction
 
@@ -29,29 +29,46 @@ spacing, or interaction patterns. They do not need to look identical.
 
 ## Color
 
-Start with the semantic colors supplied by the applet's surface. Widgets use the host's dark card
-theme. Views inherit the workspace surface. Semantic colors keep ordinary text, structure, controls,
-and states readable and consistent.
+### Widget surfaces
 
-| Intent | Tailwind token | Use |
+The host applies the `.dark` class around every widget. Semantic tokens inside a widget therefore
+use dark-mode values regardless of the workspace color preset. The host frame stays transparent, so
+every widget root must cover the full frame with an opaque background.
+
+Choose each widget's background deliberately. Prefer an intentional solid color for most widgets,
+using your design judgment to fit the content, purpose, mood, data, status, and surrounding widgets.
+Pair it with a readable foreground and keep the surface consistent through every state. An image or
+visualization may own the surface when it has an opaque fallback.
+
+`h-full w-full bg-background text-foreground` is a sensible fallback when no more specific surface
+fits. In the widget scope, it resolves to a dark background with light text.
+
+### View surfaces
+
+Views are separate pages. Their semantic tokens inherit the workspace theme, so
+`h-full w-full bg-background text-foreground` is a sensible default root.
+
+| Context or intent | Tailwind classes | Use |
 | --- | --- | --- |
-| Primary content | `text-foreground` | Headings, values, body text, and important icons |
-| Secondary content | `text-muted-foreground` | Labels, captions, timestamps, and supporting metadata |
-| Main surface | `bg-background text-foreground` | The default applet surface |
+| Widget fallback | `bg-background text-foreground` | Dark semantic surface when no content-led color fits |
+| Default view root | `bg-background text-foreground` | The workspace page surface and text |
+| Primary content | `text-foreground` | Content on the default dark widget surface or normal view surface |
+| Secondary content | `text-muted-foreground` | Supporting content on the default dark widget surface or normal view surface |
 | Inset surface | `bg-card text-card-foreground` | A real contained object or raised region inside the applet |
 | Floating surface | `bg-popover text-popover-foreground` | Menus, tooltips, and other floating content |
 | Primary action | `bg-primary text-primary-foreground` | The most important action in a local region |
 | Subdued surface | `bg-muted` | Skeletons, quiet fills, and disabled structure |
 | Interaction | `bg-accent text-accent-foreground` | Hover, active, selected, and subtle highlighted states |
 | Error or danger | `text-destructive` / `bg-destructive` | Errors, destructive actions, and invalid states |
-| Structure | `ring-1 ring-border`, `border-input`, `ring-ring` | Custom container edges, controls, and visible focus |
+| Structure | `ring-border`, `border-input`, `ring-ring` | Container edges, controls, and visible focus on semantic surfaces |
 
-Use lower foreground opacity only for tertiary metadata that remains readable. Avoid weak alpha text
-for important labels or values. Keep inset surfaces rare so a widget does not become a stack of
-cards.
+Use lower opacity from the surface's foreground only for tertiary metadata that remains readable.
+Avoid weak alpha text for important labels or values. Keep inset surfaces rare so a widget does not
+become a stack of cards.
 
-Keep container edges subtle. Use `ring-1 ring-border` for custom container outlines. Do not use a
-bare `border`, black borders, or raw high-contrast border colors as custom container chrome.
+Keep container edges subtle. Use `ring-1 ring-border` on semantic surfaces and an equally restrained
+outline suited to a custom light or colored surface. Avoid a bare `border` or raw high-contrast
+colors as custom container chrome.
 
 Custom color is welcome when it carries identity, data, status, or useful emphasis. On a saturated
 surface, choose an explicit light or dark foreground with strong contrast. Keep state colors
@@ -64,26 +81,6 @@ gradient only when it encodes information or is essential to the specific conten
 Use purple, violet, and fuchsia only when the content, brand, or user preference calls for them.
 Never use a purple gradient as a default creativity or technology cue.
 
-### Color starting points
-
-These are anchors, not fixed palettes. Tint them or use a single accent.
-
-| Content | Useful color families | Typical range |
-| --- | --- | --- |
-| Weather, sky, time | Sky, blue, indigo | 500–700 |
-| Night or dark environments | Indigo, slate | 800–900 |
-| Overcast or neutral data | Slate, zinc, neutral | 500–800 |
-| Nature and health | Emerald, green, teal | 500–700 |
-| Finance and positive movement | Emerald, teal | 600–700 |
-| Music and creative media | Blue, teal, amber, rose | 500–700 |
-| Alerts and urgency | Red, orange | 500–700 |
-| Notes and text | Amber, yellow | 400–600 |
-| Social and communication | Pink, rose | 400–600 |
-| Productivity and systems | Cyan, sky | 500–700 |
-
-Use the middle and darker parts of a Tailwind color scale for substantial surfaces, then verify the
-foreground contrast. Brighter values work better as small accents, chart marks, and status signals.
-
 ## Typography and hierarchy
 
 Inherit the workspace font. Use sentence case for headings, labels, actions, and navigation. Use
@@ -94,9 +91,8 @@ Use a small, consistent type scale. `text-sm` (14 px) is the default for UI text
 only for genuinely compact metadata and larger text only for clear headings or one meaningful
 display value. Do not create many label styles with slightly different sizes.
 
-Keep text contrast clear. Use `text-foreground` for primary content and `text-muted-foreground` for
-genuinely secondary content. Avoid several near-identical text styles that make hierarchy hard to
-read.
+Keep text contrast clear and follow the foreground pairing for the chosen surface. Avoid several
+near-identical text styles that make hierarchy hard to read.
 
 Reserve `font-mono` for code, command text, and truly code-like identifiers. Do not use monospace for
 numeric UI values, measurements, percentages, timers, timestamps, prices, counts, or labels. Numbers
@@ -177,9 +173,9 @@ direct actions while keeping one clear first reading.
 
 ### Frame
 
-The host card owns the outer radius, border, shadow, clipping, and elevation. A widget owns only its
-content surface. Its root fills the available rectangle and must not add outer card chrome. The
-content may use a semantic background, solid color, image, or visualization.
+The host card owns the outer radius, border, shadow, clipping, and elevation. It leaves the inside
+transparent. The widget root fills that rectangle and adds no outer card chrome. Its surface follows
+the color guidance above.
 
 Use a column layout when content needs a footer or timestamp, and keep lower-priority information at
 the bottom. Important content needs safe padding from every edge. Use `p-4` as the compact default;
@@ -261,7 +257,7 @@ Before finishing an applet, confirm:
 - Purple appears only for a content, brand, or user reason and never as a default gradient.
 - Type, spacing, density, and expression support the content.
 - Numeric UI values use the default font, with `tabular-nums` when alignment helps.
-- Custom container outlines use a subtle `ring-border`.
+- Custom container outlines suit their surface and stay subtle.
 - The layout handles realistic content and deliberate overflow.
 - Every reachable state and interaction is complete and accessible.
 - The widget or view follows its frame, sizing, and scrolling rules.
