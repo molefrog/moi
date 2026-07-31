@@ -78,7 +78,7 @@ function ChatSessionItem({
   return (
     <div className="group/chat relative">
       <DropdownMenuItem
-        className={cn(active && 'bg-accent text-accent-foreground')}
+        className={cn('font-medium', active && 'bg-accent text-accent-foreground')}
         onClick={() => onSelect(session.sessionId)}
       >
         <div
@@ -226,7 +226,7 @@ export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelecto
         className="flex max-h-100 w-max max-w-72 min-w-40 flex-col overflow-hidden"
       >
         <DropdownMenuItem
-          className="shrink-0 text-muted-foreground! **:text-muted-foreground!"
+          className="shrink-0 gap-1 font-medium text-muted-foreground! **:text-muted-foreground!"
           onClick={() => handleSelect(null)}
         >
           <IconEdit size={16} stroke={1.75} />
