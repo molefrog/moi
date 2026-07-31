@@ -1,4 +1,4 @@
-import { type MouseEvent, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { IconArchive, IconChevronDown, IconEdit } from '@tabler/icons-react'
 
 import { useArchiveWorkspaceSession, useWorkspaceModels, useWorkspaceSessions } from './api'
@@ -40,7 +40,9 @@ type ChatSessionGroup = {
 type ChatSessionItemProps = {
   active: boolean
   canArchive: boolean
+  confirmingArchive: boolean
   onArchive: (sessionId: string) => Promise<void>
+  onRequestArchive: (sessionId: string) => void
   onSelect: (sessionId: string) => void
   session: SessionInfo
   workspaceId: string
@@ -49,7 +51,9 @@ type ChatSessionItemProps = {
 function ChatSessionItem({
   active,
   canArchive,
+  confirmingArchive,
   onArchive,
+  onRequestArchive,
   onSelect,
   session,
   workspaceId
@@ -58,9 +62,11 @@ function ChatSessionItem({
   const [pending, setPending] = useState(false)
   const running = useLive(state => isSessionRunning(state.activity, workspaceId, session.sessionId))
 
-  async function handleArchive(event: MouseEvent<HTMLButtonElement>) {
-    event.preventDefault()
-    event.stopPropagation()
+  function handleRequestArchive() {
+    onRequestArchive(session.sessionId)
+  }
+
+  async function handleConfirmArchive() {
     if (pendingRef.current) return
 
     pendingRef.current = true
@@ -78,7 +84,10 @@ function ChatSessionItem({
   return (
     <div className="group/chat relative">
       <DropdownMenuItem
-        className={cn('font-medium', active && 'bg-accent text-accent-foreground')}
+        className={cn(
+          'font-medium group-hover/chat:bg-accent group-hover/chat:text-accent-foreground',
+          active && 'bg-accent text-accent-foreground'
+        )}
         onClick={() => onSelect(session.sessionId)}
       >
         <div
@@ -86,55 +95,82 @@ function ChatSessionItem({
             'flex min-w-0 flex-1 overflow-hidden',
             (running || pending) && 'mr-4 mask-r-from-[calc(100%-16px)]',
             canArchive &&
-              'group-focus-within/chat:mr-4 group-focus-within/chat:mask-r-from-[calc(100%-16px)] [@media(hover:none)]:mr-4 [@media(hover:none)]:mask-r-from-[calc(100%-16px)]'
+              !confirmingArchive &&
+              'group-focus-within/chat:mr-4 group-focus-within/chat:mask-r-from-[calc(100%-16px)] group-hover/chat:mr-4 group-hover/chat:mask-r-from-[calc(100%-16px)] [@media(hover:none)]:mr-4 [@media(hover:none)]:mask-r-from-[calc(100%-16px)]',
+            confirmingArchive && 'mr-14 mask-r-from-[calc(100%-16px)]'
           )}
         >
           <span
             className={cn(
               'min-w-0 truncate',
               (running || pending) && '-mr-4',
-              canArchive && 'group-focus-within/chat:-mr-4 [@media(hover:none)]:-mr-4'
+              confirmingArchive
+                ? '-4'
+                : canArchive &&
+                    'group-focus-within/chat:-mr-4 group-hover/chat:-mr-4 [@media(hover:none)]:-mr-4'
             )}
           >
             {session.summary}
           </span>
         </div>
-        {running && (
-          <Spinner
-            className={cn(
-              'pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground',
-              canArchive && 'group-focus-within/chat:hidden [@media(hover:none)]:hidden',
-              pending && 'hidden'
-            )}
-          />
-        )}
-        {canArchive && (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Archive ${session.summary}`}
-                  tabIndex={-1}
-                  className={cn(
-                    'absolute top-1/2 right-0 -translate-y-1/2 text-muted-foreground opacity-100 transition-none',
-                    'group-focus-within/chat:opacity-100 group-hover/chat:opacity-100 hover:bg-transparent hover:text-foreground [@media(hover:hover)]:opacity-0',
-                    pending && 'opacity-100!'
-                  )}
-                  disabled={pending}
-                  onClick={handleArchive}
-                  onPointerDown={event => event.stopPropagation()}
-                >
-                  <IconArchive stroke={1.75} />
-                </Button>
-              }
-            />
-            <TooltipContent side="right">Archive</TooltipContent>
-          </Tooltip>
-        )}
       </DropdownMenuItem>
+      {running && (
+        <Spinner
+          className={cn(
+            'pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground',
+            canArchive &&
+              'group-focus-within/chat:hidden group-hover/chat:hidden [@media(hover:none)]:hidden',
+            (confirmingArchive || pending) && 'hidden'
+          )}
+        />
+      )}
+      {canArchive && (
+        <div
+          className={cn(
+            'absolute top-1/2 right-0 flex -translate-y-1/2 items-center opacity-100 transition-none',
+            !confirmingArchive &&
+              'group-focus-within/chat:opacity-100 group-hover/chat:opacity-100 [@media(hover:hover)]:opacity-0',
+            pending && 'opacity-100!'
+          )}
+        >
+          {confirmingArchive ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              aria-label={`Confirm archive ${session.summary}`}
+              tabIndex={-1}
+              className="mr-1 h-5 rounded-sm px-1.5 text-xs hover:bg-accent"
+              disabled={pending}
+              onClick={handleConfirmArchive}
+              onPointerDown={event => event.stopPropagation()}
+            >
+              Confirm
+            </Button>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Archive ${session.summary}`}
+                    tabIndex={-1}
+                    className="text-muted-foreground hover:bg-transparent hover:text-foreground"
+                    disabled={pending}
+                    onClick={handleRequestArchive}
+                    onPointerDown={event => event.stopPropagation()}
+                  >
+                    <IconArchive stroke={1.75} />
+                  </Button>
+                }
+              />
+              <TooltipContent side="right">Archive</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -183,6 +219,7 @@ export function groupSessionsByDate(sessions: SessionInfo[], now = new Date()): 
 
 export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelectorProps) {
   const workspaceId = useWorkspaceId()
+  const [confirmingSessionId, setConfirmingSessionId] = useState<string | null>(null)
   const { data: sessions = [] } = useWorkspaceSessions(workspaceId)
   const canArchive = useWorkspaceModels(workspaceId).data?.supportsArchiving === true
   const archiveSession = useArchiveWorkspaceSession(workspaceId)
@@ -197,7 +234,12 @@ export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelecto
     onSelectSession(sessionId)
   }
 
+  function handleMenuOpenChange(open: boolean) {
+    if (!open) setConfirmingSessionId(null)
+  }
+
   async function handleArchive(sessionId: string) {
+    setConfirmingSessionId(null)
     await archiveSession.mutateAsync(sessionId)
     const store = liveStore.getState()
     store.clearAttachments(workspaceId, sessionId)
@@ -208,7 +250,7 @@ export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelecto
   }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={handleMenuOpenChange}>
       <DropdownMenuTrigger
         render={
           <Button variant="ghost">
@@ -235,7 +277,7 @@ export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelecto
         {sessionGroups.length > 0 && (
           <>
             <DropdownMenuSeparator className="shrink-0" />
-            <div className="no-scrollbar min-h-0 flex-1 scroll-fade overflow-y-auto overscroll-contain [--scroll-fade-reveal:8px]">
+            <div className="no-scrollbar flex min-h-0 flex-1 scroll-fade flex-col gap-1 overflow-y-auto overscroll-contain [--scroll-fade-reveal:8px]">
               {sessionGroups.map(group => (
                 <DropdownMenuGroup key={group.key}>
                   <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
@@ -245,8 +287,10 @@ export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelecto
                       session={session}
                       active={selectedSessionId === session.sessionId}
                       canArchive={canArchive}
+                      confirmingArchive={confirmingSessionId === session.sessionId}
                       onSelect={handleSelect}
                       onArchive={handleArchive}
+                      onRequestArchive={setConfirmingSessionId}
                       workspaceId={workspaceId}
                     />
                   ))}
