@@ -35,7 +35,7 @@ Socket-protocol notes the layers rely on (all defined in `lib/types.ts`):
 - **`session_renamed`** — a new thread is created under the client's temporary
   uuid, then rekeyed to the backend's real session/thread id.
 - **`sessions_changed`** — a provider changed session-list metadata such as a
-  generated chat title; clients refresh that workspace's session list.
+  generated session title; clients refresh that workspace's session list.
 - **Optimistic-id rendezvous** — the client sends `optimisticId` with each
   chat; the user's bubble must upsert under that id. Backends differ: Codex
   echoes it natively (`clientUserMessageId` → `clientId`), Claude Code never
@@ -71,6 +71,10 @@ server/harness/
 ```
 
 - Nothing inside one harness folder imports from a sibling harness.
+- Internal harness metadata and helpers use session naming, including
+  `sessionTitle`, `generateSessionTitle`, and `session-title.ts`. Chat naming is
+  for client and UI labels. Thread naming stays at provider wire and RPC
+  boundaries.
 - Outside code imports only this folder's top level. Documented exceptions:
   `cli.ts` (`moi openclaw init` provisioning) imports
   `harness/openclaw/discovery.ts`; tests may import harness internals.

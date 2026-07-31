@@ -36,6 +36,7 @@ export function toSessionInfo(row: OpenClawSessionRow, cwd: string): SessionInfo
   const summary =
     row.label?.trim() ||
     row.displayName?.trim() ||
+    row.derivedTitle?.trim() ||
     formatChatTitle(stripMoiContextLoose(row.lastMessagePreview ?? '')) ||
     ''
   return {

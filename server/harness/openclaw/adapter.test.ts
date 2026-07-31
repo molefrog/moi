@@ -19,7 +19,7 @@ describe('toSessionInfo', () => {
     ).toBe('Customer dashboard')
   })
 
-  test('uses display name before the latest-message preview', () => {
+  test('uses display name before derived title and latest-message preview', () => {
     expect(
       toSessionInfo(
         {
@@ -27,6 +27,7 @@ describe('toSessionInfo', () => {
           sessionId: 'one',
           updatedAt: 1,
           displayName: 'Stable display name',
+          derivedTitle: 'Derived title',
           lastMessagePreview: 'The latest reply'
         },
         '/workspace'
@@ -34,7 +35,22 @@ describe('toSessionInfo', () => {
     ).toBe('Stable display name')
   })
 
-  test('formats a raw preview when no stable name exists', () => {
+  test('uses a derived title before the latest-message preview', () => {
+    expect(
+      toSessionInfo(
+        {
+          key: 'agent:main:one',
+          sessionId: 'one',
+          updatedAt: 1,
+          derivedTitle: 'First message title',
+          lastMessagePreview: 'The latest reply'
+        },
+        '/workspace'
+      ).summary
+    ).toBe('First message title')
+  })
+
+  test('uses a normalized preview when no title exists', () => {
     expect(
       toSessionInfo(
         {
@@ -45,6 +61,6 @@ describe('toSessionInfo', () => {
         },
         '/workspace'
       ).summary
-    ).toBe('Build a dashboard')
+    ).toBe('**Build a dashboard**')
   })
 })

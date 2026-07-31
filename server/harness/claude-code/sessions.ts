@@ -8,7 +8,6 @@ import {
   isAttachmentOnlyPlaceholder,
   splitAttachmentNote
 } from '@/lib/attachment-note'
-import { formatChatTitle } from '@/lib/chat-title'
 import type { SessionInfo, StreamEvent } from '@/lib/types'
 
 import { ClaudeAdapter } from './adapter'
@@ -30,18 +29,13 @@ export type SessionWorkspacePreview = {
 export function claudeSessionSummary(
   session: Pick<SDKSessionInfo, 'customTitle' | 'firstPrompt' | 'summary'>
 ): string {
-  if (session.customTitle || !session.firstPrompt) return session.summary
+  if (session.customTitle || !session.firstPrompt || session.summary !== session.firstPrompt) {
+    return session.summary
+  }
   const split = splitAttachmentNote(session.firstPrompt)
-  const filenames = isAttachmentOnlyPlaceholder(split.text)
-    ? attachmentOnlyFilenames(split.text)
-    : split.files.map(file => file.filename)
-  return formatChatTitle(isAttachmentOnlyPlaceholder(split.text) ? '' : split.text, filenames)
-}
-
-export function canReplaceClaudeSessionTitle(
-  session: Pick<SDKSessionInfo, 'customTitle' | 'firstPrompt' | 'summary'> | undefined
-): boolean {
-  return !session?.customTitle
+  return isAttachmentOnlyPlaceholder(split.text)
+    ? attachmentOnlyFilenames(split.text).join(', ')
+    : session.summary
 }
 
 export function visibleClaudeSessions<T extends Pick<SDKSessionInfo, 'tag'>>(sessions: T[]): T[] {

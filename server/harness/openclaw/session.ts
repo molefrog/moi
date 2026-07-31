@@ -12,7 +12,6 @@
 //   - Disk persistence — the gateway is the source of truth; we re-seed from
 //     `sessions.get` on cold start.
 import { appendAttachmentNote } from '@/lib/attachment-note'
-import { formatChatTitle } from '@/lib/chat-title'
 import { type MoiContext, appendMoiContext, renderMoiContext } from '@/lib/moi-context'
 import { applyEvent, emptyViewState } from '@/lib/format'
 import type { SessionActivity, StreamEvent, ViewState } from '@/lib/types'
@@ -314,6 +313,10 @@ async function ensureSubscribed(rec: SessionRecord): Promise<void> {
       ingest(rec, message)
     } else if (event === 'sessions.changed') {
       if (payload.sessionKey !== rec.sessionKey) return
+      if (payload.reason === 'chat.title') {
+        broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+        return
+      }
       const phase = payload.phase as string | undefined
       const runId = payload.runId as string | undefined
       if (phase === 'start' && runId) {
@@ -426,12 +429,6 @@ export async function sendOpenClawMessage(input: {
   const uploads = input.attachments?.length
     ? resolveUploads(input.workspaceId, input.attachments)
     : []
-  const fallbackTitle = input.isNew
-    ? formatChatTitle(
-        input.content,
-        uploads.map(upload => upload.filename)
-      )
-    : ''
   let content = input.content
   if (uploads.length > 0) {
     const files: { filename: string; path: string }[] = []
@@ -444,7 +441,7 @@ export async function sendOpenClawMessage(input: {
   // Attachment-only send whose ids all expired → nothing to say; don't open a
   // session for an empty message.
   if (!content) return
-  return sendOpenClawMessageImpl({ ...input, content, fallbackTitle })
+  return sendOpenClawMessageImpl({ ...input, content })
 }
 
 async function sendOpenClawMessageImpl(input: {
@@ -456,7 +453,6 @@ async function sendOpenClawMessageImpl(input: {
   content: string
   optimisticId?: string
   context?: MoiContext
-  fallbackTitle: string
 }): Promise<void> {
   // New threads: ask the gateway to create one, then rename the client's
   // tentative UUID to the real session id. Mirrors the Claude Code flow
@@ -481,8 +477,7 @@ async function sendOpenClawMessageImpl(input: {
         broadcast(input.workspaceId, {
           type: 'session_renamed',
           from: input.sessionId,
-          to: realSessionId,
-          ...(input.fallbackTitle ? { summary: input.fallbackTitle } : {})
+          to: realSessionId
         })
       }
     }
@@ -492,22 +487,6 @@ async function sendOpenClawMessageImpl(input: {
       agentId: input.agentId,
       sessionId: realSessionId
     })
-    if (input.isNew && input.fallbackTitle) {
-      try {
-        const gw = await getGateway()
-        await gw.rpc('sessions.patch', {
-          key: rec.sessionKey,
-          label: input.fallbackTitle
-        })
-        broadcast(input.workspaceId, {
-          type: 'sessions_changed',
-          sessionId: realSessionId,
-          summary: input.fallbackTitle
-        })
-      } catch (err) {
-        console.error('[openclaw] failed to save chat title', err)
-      }
-    }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'failed to start session'
     broadcast(input.workspaceId, {

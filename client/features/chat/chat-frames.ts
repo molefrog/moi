@@ -59,7 +59,6 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
     const workspaceId = data.workspaceId as string
     const from = data.from as string
     const to = data.to as string
-    const summary = typeof data.summary === 'string' ? data.summary : undefined
     const sessionsKey = workspaceKeys.sessions(workspaceId)
     const cachedSessions = queryClient?.getQueryData<SessionInfo[]>(sessionsKey)
     const cachedSession = cachedSessions?.find(
@@ -74,8 +73,7 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
       queryClient?.setQueryData<SessionInfo[]>(sessionsKey, current => [
         {
           ...cachedSession,
-          sessionId: to,
-          ...(summary !== undefined ? { summary } : {})
+          sessionId: to
         },
         ...(current ?? []).filter(session => session.sessionId !== from && session.sessionId !== to)
       ])
@@ -104,22 +102,8 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
   }
   if (data.type === 'sessions_changed') {
     const workspaceId = data.workspaceId as string
-    const sessionId = data.sessionId as string
-    const summary = typeof data.summary === 'string' ? data.summary : undefined
     const sessionsKey = workspaceKeys.sessions(workspaceId)
-    const cachedSession = queryClient
-      ?.getQueryData<SessionInfo[]>(sessionsKey)
-      ?.find(session => session.sessionId === sessionId)
-    if (summary !== undefined && cachedSession) {
-      void queryClient?.cancelQueries({ queryKey: sessionsKey })
-      queryClient?.setQueryData<SessionInfo[]>(sessionsKey, current => {
-        return current?.map(session =>
-          session.sessionId === sessionId ? { ...session, summary } : session
-        )
-      })
-    } else {
-      queryClient?.invalidateQueries({ queryKey: sessionsKey })
-    }
+    queryClient?.invalidateQueries({ queryKey: sessionsKey })
     queryClient?.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
     return
   }

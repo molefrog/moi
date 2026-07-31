@@ -16,7 +16,7 @@
 //     `clientUserMessageId` as `clientId`, so the optimistic-id rendezvous is
 //     first-class (no text matching like OpenClaw needs).
 import { appendAttachmentNote } from '@/lib/attachment-note'
-import { formatChatTitle } from '@/lib/chat-title'
+import { buildSessionTitleSource } from '../session-title'
 import {
   type MoiContext,
   appendMoiContext,
@@ -37,14 +37,8 @@ import {
   codexItemToTurn,
   codexThreadToEvents
 } from './adapter'
-import {
-  type CodexClient,
-  getCodexClient,
-  getCodexModelCatalog,
-  interruptCodexTurn,
-  readSubagentRecords
-} from './client'
-import { generateCodexChatTitle } from './title'
+import { type CodexClient, getCodexClient, interruptCodexTurn, readSubagentRecords } from './client'
+import { generateCodexSessionTitle, renameCodexSessionIfUnchanged } from './session-title'
 import { debug } from '../../debug'
 import { broadcast } from '../../state'
 import { renameSelectedSession } from '../../selected-session'
@@ -91,6 +85,9 @@ type SessionRecord = {
   lastUsage: CodexTokenUsage | null
   // Child agent threads keyed by their thread id (see ChildThread).
   children: Map<string, ChildThread>
+  refreshSessionsOnTurnComplete: boolean
+  sessionTitleSource: string | undefined
+  sessionTitleAbort: AbortController | null
   unsubscribe?: () => void
 }
 
@@ -275,6 +272,8 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
     // The app-server died (crash or env-change restart). Drop the record so
     // the next message re-resumes against a fresh process.
     setProcessing(rec, false, null)
+    rec.sessionTitleAbort?.abort()
+    rec.sessionTitleAbort = null
     rec.unsubscribe?.()
     sessions.delete(recKey(rec.workspaceId, rec.sessionId))
     return
@@ -328,6 +327,10 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
       rec.previews.clear()
       applyUsage(rec)
       setProcessing(rec, false, null)
+      if (rec.refreshSessionsOnTurnComplete) {
+        rec.refreshSessionsOnTurnComplete = false
+        broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+      }
       if (turn?.status === 'failed' && turn.error?.message) {
         broadcast(rec.workspaceId, {
           kind: 'error',
@@ -414,11 +417,53 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
   }
 }
 
+function isCurrentCodexSession(rec: SessionRecord, abort: AbortController): boolean {
+  return !abort.signal.aborted && sessions.get(recKey(rec.workspaceId, rec.sessionId)) === rec
+}
+
+function startCodexSessionTitleJob(rec: SessionRecord, client: CodexClient) {
+  if (!rec.sessionTitleSource) return
+  const source = rec.sessionTitleSource
+  rec.sessionTitleSource = undefined
+  const abort = new AbortController()
+  rec.sessionTitleAbort = abort
+
+  void (async () => {
+    try {
+      const title = await generateCodexSessionTitle({
+        source,
+        abortController: abort
+      })
+      if (!title || !isCurrentCodexSession(rec, abort)) return
+
+      const renamed = await renameCodexSessionIfUnchanged({
+        client,
+        threadId: rec.sessionId,
+        title,
+        isCurrent: () => isCurrentCodexSession(rec, abort)
+      })
+      if (!renamed || !isCurrentCodexSession(rec, abort)) return
+      broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+      debug(
+        `codex session title ws=${rec.workspaceId} thread=${rec.sessionId} title=${JSON.stringify(title)}`
+      )
+    } catch (err) {
+      debug(
+        `codex session title failed ws=${rec.workspaceId} thread=${rec.sessionId}: ${err instanceof Error ? err.message : String(err)}`
+      )
+    } finally {
+      if (rec.sessionTitleAbort === abort) rec.sessionTitleAbort = null
+    }
+  })()
+}
+
 function createRecord(input: {
   workspaceId: string
   workspacePath: string
   sessionId: string
   client: CodexClient
+  refreshSessionsOnTurnComplete?: boolean
+  sessionTitleSource?: string
 }): SessionRecord {
   const rec: SessionRecord = {
     workspaceId: input.workspaceId,
@@ -430,7 +475,10 @@ function createRecord(input: {
     stream: false,
     previews: new Map(),
     children: new Map(),
-    lastUsage: null
+    lastUsage: null,
+    refreshSessionsOnTurnComplete: input.refreshSessionsOnTurnComplete === true,
+    sessionTitleSource: input.sessionTitleSource,
+    sessionTitleAbort: null
   }
   rec.unsubscribe = input.client.onNotification((method, params) =>
     handleNotification(rec, method, params)
@@ -503,46 +551,6 @@ async function buildUserInput(
   return { input, parts }
 }
 
-async function saveCodexChatTitle(
-  client: CodexClient,
-  workspaceId: string,
-  sessionId: string,
-  title: string
-): Promise<void> {
-  await client.rpc('thread/name/set', { threadId: sessionId, name: title })
-  broadcast(workspaceId, { type: 'sessions_changed', sessionId, summary: title })
-}
-
-async function refineCodexChatTitle(input: {
-  client: CodexClient
-  workspaceId: string
-  workspacePath: string
-  sessionId: string
-  source: string
-  fallbackTitle: string
-}): Promise<void> {
-  try {
-    const models = await getCodexModelCatalog(input.workspacePath)
-    const title = await generateCodexChatTitle({
-      client: input.client,
-      workspacePath: input.workspacePath,
-      source: input.source,
-      models
-    })
-    if (!title || title === input.fallbackTitle) return
-    const current = await input.client.rpc<{ thread?: CodexThread }>('thread/read', {
-      threadId: input.sessionId,
-      includeTurns: false
-    })
-    if (current.thread?.name && current.thread.name !== input.fallbackTitle) return
-    await saveCodexChatTitle(input.client, input.workspaceId, input.sessionId, title)
-  } catch (err) {
-    debug(
-      `codex title skipped ws=${input.workspaceId} thread=${input.sessionId}: ${err instanceof Error ? err.message : String(err)}`
-    )
-  }
-}
-
 export async function sendCodexMessage(input: {
   workspaceId: string
   workspacePath: string
@@ -565,23 +573,20 @@ export async function sendCodexMessage(input: {
     ? resolveUploads(input.workspaceId, input.attachments)
     : []
   if (!input.content && uploads.length === 0) return
-  const { input: userInput, parts } = await buildUserInput(input.content, uploads)
-  if (userInput.length === 0) return
-  const serviceTier = codexServiceTierForFastMode(input.fastMode)
-  const titleSource = input.content || uploads.map(upload => upload.filename).join(', ')
-  const fallbackTitle = input.isNew
-    ? formatChatTitle(
+  const sessionTitleSource = input.isNew
+    ? buildSessionTitleSource(
         input.content,
         uploads.map(upload => upload.filename)
       )
-    : ''
+    : undefined
+  const { input: userInput, parts } = await buildUserInput(input.content, uploads)
+  if (userInput.length === 0) return
+  const serviceTier = codexServiceTierForFastMode(input.fastMode)
 
   let rec: SessionRecord
-  let titleClient: CodexClient | undefined
   try {
     if (input.isNew) {
       const client = await getCodexClient(input.workspacePath)
-      titleClient = client
       const started = await client.rpc<{ thread: CodexThread }>('thread/start', {
         cwd: input.workspacePath,
         sandbox: SANDBOX_MODE,
@@ -604,25 +609,17 @@ export async function sendCodexMessage(input: {
         broadcast(input.workspaceId, {
           type: 'session_renamed',
           from: input.sessionId,
-          to: realId,
-          ...(fallbackTitle ? { summary: fallbackTitle } : {})
+          to: realId
         })
       }
       rec = createRecord({
         workspaceId: input.workspaceId,
         workspacePath: input.workspacePath,
         sessionId: realId,
-        client
+        client,
+        refreshSessionsOnTurnComplete: true,
+        sessionTitleSource
       })
-      if (fallbackTitle) {
-        try {
-          await saveCodexChatTitle(client, input.workspaceId, realId, fallbackTitle)
-        } catch (err) {
-          debug(
-            `codex fallback title skipped ws=${input.workspaceId} thread=${realId}: ${err instanceof Error ? err.message : String(err)}`
-          )
-        }
-      }
       if (
         (input.model || input.effort || input.fastMode !== undefined) &&
         !(await hasSessionConfig(input.workspacePath, realId))
@@ -717,16 +714,7 @@ export async function sendCodexMessage(input: {
       const res = await client.rpc<{ turn: CodexTurn }>('turn/start', turnParams)
       setProcessing(rec, true, res.turn.id)
     }
-    if (titleClient && fallbackTitle) {
-      void refineCodexChatTitle({
-        client: titleClient,
-        workspaceId: input.workspaceId,
-        workspacePath: input.workspacePath,
-        sessionId: rec.sessionId,
-        source: titleSource,
-        fallbackTitle
-      })
-    }
+    if (input.isNew) startCodexSessionTitleJob(rec, client)
     debug(`codex send ws=${rec.workspaceId} thread=${rec.sessionId} turn=${rec.activeTurnId}`)
   } catch (err) {
     setProcessing(rec, false, null)

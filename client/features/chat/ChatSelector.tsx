@@ -166,7 +166,7 @@ function ChatSessionItem({
                   </Button>
                 }
               />
-              <TooltipContent side="right">Archive</TooltipContent>
+              <TooltipContent side="right">Archive chat</TooltipContent>
             </Tooltip>
           )}
         </div>

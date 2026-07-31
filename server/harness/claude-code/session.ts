@@ -15,16 +15,13 @@ import {
   type Options,
   type Query,
   type SDKUserMessage,
-  getSessionInfo,
-  renameSession as renameClaudeSession,
   query
 } from '@anthropic-ai/claude-agent-sdk'
 
 import { appendAttachmentNote, attachmentOnlyPlaceholder } from '@/lib/attachment-note'
-import { formatChatTitle } from '@/lib/chat-title'
+import { buildSessionTitleSource } from '../session-title'
 import { ClaudeAdapter } from './adapter'
-import { canReplaceClaudeSessionTitle, claudeSessionSummary } from './sessions'
-import { generateClaudeChatTitle } from './title'
+import { generateClaudeSessionTitle, renameClaudeSessionIfUnchanged } from './session-title'
 import type { Part } from '@/lib/format'
 import type { SessionActivity } from '@/lib/types'
 import { type MoiContext, moiContextSystemReminder, renderMoiContext } from '@/lib/moi-context'
@@ -124,11 +121,6 @@ type InputQueue = {
   close: () => void
 }
 
-type PendingSessionTitle = {
-  source: string
-  fallbackTitle: string
-}
-
 type LiveSession = {
   workspaceId: string
   workspacePath: string
@@ -179,7 +171,8 @@ type LiveSession = {
   lastActivityAt: number
   lastUserText: string | undefined
   refreshSessionsOnResult: boolean
-  pendingTitle: PendingSessionTitle | undefined
+  sessionTitleSource: string | undefined
+  sessionTitleAbort: AbortController | null
 }
 
 const sessions = new Map<string, LiveSession>()
@@ -347,6 +340,8 @@ function teardown(s: LiveSession) {
   setActivity(s, 'idle')
   s.closed = true
   clearIdle(s)
+  s.sessionTitleAbort?.abort()
+  s.sessionTitleAbort = null
   s.input.close()
   try {
     s.q.close?.()
@@ -357,6 +352,48 @@ function teardown(s: LiveSession) {
   if (sessions.get(recKey(s.workspaceId, s.sessionId)) === s) {
     sessions.delete(recKey(s.workspaceId, s.sessionId))
   }
+}
+
+function isCurrentLiveSession(s: LiveSession, abort: AbortController): boolean {
+  return (
+    !s.closed && !abort.signal.aborted && sessions.get(recKey(s.workspaceId, s.sessionId)) === s
+  )
+}
+
+function startClaudeSessionTitleJob(s: LiveSession) {
+  if (!s.sessionTitleSource || s.closed) return
+  const source = s.sessionTitleSource
+  s.sessionTitleSource = undefined
+  const abort = new AbortController()
+  s.sessionTitleAbort = abort
+
+  void (async () => {
+    try {
+      const title = await generateClaudeSessionTitle({
+        source,
+        abortController: abort
+      })
+      if (!title || !isCurrentLiveSession(s, abort)) return
+
+      const renamed = await renameClaudeSessionIfUnchanged({
+        sessionId: s.sessionId,
+        workspacePath: s.workspacePath,
+        title,
+        isCurrent: () => isCurrentLiveSession(s, abort)
+      })
+      if (!renamed || !isCurrentLiveSession(s, abort)) return
+      broadcast(s.workspaceId, { type: 'sessions_changed', sessionId: s.sessionId })
+      debug(
+        `cc session title ws=${s.workspaceId} session=${s.sessionId} title=${JSON.stringify(title)}`
+      )
+    } catch (err) {
+      debug(
+        `cc session title failed ws=${s.workspaceId} session=${s.sessionId}: ${err instanceof Error ? err.message : String(err)}`
+      )
+    } finally {
+      if (s.sessionTitleAbort === abort) s.sessionTitleAbort = null
+    }
+  })()
 }
 
 // On `system/init` the SDK reports the real session id. For a brand-new session
@@ -370,51 +407,6 @@ function renameSession(s: LiveSession, realId: string): string {
   sessions.set(recKey(s.workspaceId, realId), s)
   aliases.set(recKey(s.workspaceId, from), realId)
   return from
-}
-
-async function refineClaudeChatTitle(input: {
-  workspaceId: string
-  workspacePath: string
-  workspaceEnv: Record<string, string>
-  sessionId: string
-  source: string
-  fallbackTitle: string
-}): Promise<void> {
-  try {
-    const title = await generateClaudeChatTitle({
-      workspacePath: input.workspacePath,
-      workspaceEnv: input.workspaceEnv,
-      source: input.source
-    })
-    if (!title) {
-      debug(`cc title skipped ws=${input.workspaceId} session=${input.sessionId}: no title`)
-      return
-    }
-    if (title === input.fallbackTitle) return
-
-    const current = await getSessionInfo(input.sessionId, { dir: input.workspacePath })
-    if (!canReplaceClaudeSessionTitle(current)) {
-      if (current) {
-        broadcast(input.workspaceId, {
-          type: 'sessions_changed',
-          sessionId: input.sessionId,
-          summary: claudeSessionSummary(current)
-        })
-      }
-      return
-    }
-
-    await renameClaudeSession(input.sessionId, title, { dir: input.workspacePath })
-    broadcast(input.workspaceId, {
-      type: 'sessions_changed',
-      sessionId: input.sessionId,
-      summary: title
-    })
-  } catch (err) {
-    debug(
-      `cc title skipped ws=${input.workspaceId} session=${input.sessionId}: ${err instanceof Error ? err.message : String(err)}`
-    )
-  }
 }
 
 // The session just went idle (state event, or `result` on a CLI without state
@@ -447,10 +439,10 @@ async function consume(s: LiveSession) {
           broadcast(s.workspaceId, {
             type: 'session_renamed',
             from,
-            to: s.sessionId,
-            ...(s.pendingTitle ? { summary: s.pendingTitle.fallbackTitle } : {})
+            to: s.sessionId
           })
         }
+        startClaudeSessionTitleJob(s)
         // Seed the session's config from what it actually ran with — but only if
         // it has none yet, so an explicit user PUT (or a migrated temp-id edit)
         // always wins. A default run leaves no file and falls back to the
@@ -463,17 +455,6 @@ async function consume(s: LiveSession) {
             model: s.model,
             effort: s.effort,
             fastMode: s.fastMode
-          })
-        }
-        if (s.pendingTitle) {
-          const pendingTitle = s.pendingTitle
-          s.pendingTitle = undefined
-          void refineClaudeChatTitle({
-            workspaceId: s.workspaceId,
-            workspacePath: s.workspacePath,
-            workspaceEnv: s.workspaceEnv,
-            sessionId: s.sessionId,
-            ...pendingTitle
           })
         }
       }
@@ -607,10 +588,10 @@ function createLiveSession(input: {
   // Live token streaming (`includePartialMessages`). Only enabled when the
   // client opts in; off leaves the query byte-for-byte as before.
   stream: boolean
-  pendingTitle: PendingSessionTitle | undefined
   // Resolved workspace env (.env + UI custom overrides), injected so the agent's
   // Bash tool can use workspace secrets. Frozen at spawn — see restartWorkspaceSessions.
   workspaceEnv: Record<string, string>
+  sessionTitleSource: string | undefined
 }): LiveSession {
   evictIfNeeded()
 
@@ -673,7 +654,8 @@ function createLiveSession(input: {
     lastActivityAt: Date.now(),
     lastUserText: undefined,
     refreshSessionsOnResult: input.isNew,
-    pendingTitle: input.pendingTitle
+    sessionTitleSource: input.sessionTitleSource,
+    sessionTitleAbort: null
   }
   sessions.set(recKey(session.workspaceId, session.sessionId), session)
   debug(
@@ -709,20 +691,13 @@ export async function sendCCMessage(input: {
     ? resolveUploads(input.workspaceId, input.attachments)
     : []
   if (!input.content && uploads.length === 0) return
-  const { content: userContent, parts } = buildUserMessage(input.content, uploads)
-  const fallbackTitle = input.isNew
-    ? formatChatTitle(
+  const sessionTitleSource = input.isNew
+    ? buildSessionTitleSource(
         input.content,
         uploads.map(upload => upload.filename)
       )
-    : ''
-  const pendingTitle =
-    fallbackTitle.length > 0
-      ? {
-          source: input.content || uploads.map(upload => upload.filename).join(', '),
-          fallbackTitle
-        }
-      : undefined
+    : undefined
+  const { content: userContent, parts } = buildUserMessage(input.content, uploads)
   // The envelope goes in as its OWN leading text block, never merged into the
   // user's string: the SDK's first-prompt extraction (session titles,
   // home-card previews) skips tag-leading text, so a prefixed string would
@@ -792,7 +767,7 @@ export async function sendCCMessage(input: {
       effort: input.effort,
       fastMode: input.fastMode,
       stream: wantStream,
-      pendingTitle,
+      sessionTitleSource,
       // The agent only sees secrets scoped to the 'agent' sink (plus .env).
       workspaceEnv: await resolveWorkspaceEnv(input.workspacePath)
     })

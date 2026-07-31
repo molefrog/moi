@@ -181,28 +181,6 @@ describe('session rename', () => {
     expect(queryClient.getQueryState(sessionsKey)?.isInvalidated).toBe(true)
   })
 
-  test('a rename carrying a title still refreshes clients without the temporary session', () => {
-    const queryClient = new QueryClient()
-    __setQueryClientForTests(queryClient)
-    const sessionsKey = workspaceKeys.sessions(WS)
-    queryClient.setQueryData<SessionInfo[]>(sessionsKey, [
-      { sessionId: 'existing', summary: 'Existing chat', lastModified: 1 }
-    ])
-
-    handleFrame({
-      type: 'session_renamed',
-      workspaceId: WS,
-      from: 'temp-1',
-      to: 'real-1',
-      summary: 'Fix picker focus'
-    })
-
-    expect(queryClient.getQueryData<SessionInfo[]>(sessionsKey)).toEqual([
-      { sessionId: 'existing', summary: 'Existing chat', lastModified: 1 }
-    ])
-    expect(queryClient.getQueryState(sessionsKey)?.isInvalidated).toBe(true)
-  })
-
   test('an attachment-only optimistic title survives the session rename', () => {
     const queryClient = new QueryClient()
     __setQueryClientForTests(queryClient)
@@ -233,7 +211,7 @@ describe('session rename', () => {
 })
 
 describe('session list changes', () => {
-  test('known title changes update the row without a provider-list refetch', () => {
+  test('provider metadata changes refresh the complete session list', () => {
     const queryClient = new QueryClient()
     __setQueryClientForTests(queryClient)
     const sessionsKey = workspaceKeys.sessions(WS)
@@ -245,43 +223,17 @@ describe('session list changes', () => {
       }
     ])
 
-    handleFrame({
-      type: 'sessions_changed',
-      workspaceId: WS,
-      sessionId: SID,
-      summary: 'Customer dashboard'
-    })
+    handleFrame({ type: 'sessions_changed', workspaceId: WS, sessionId: SID })
 
     expect(queryClient.getQueryData<SessionInfo[]>(sessionsKey)?.[0]).toEqual({
       sessionId: SID,
-      summary: 'Customer dashboard',
+      summary: 'Build a customer dashboard with useful charts',
       lastModified: 1
     })
-    expect(queryClient.getQueryState(sessionsKey)?.isInvalidated).toBe(false)
-  })
-
-  test('a title for an unknown session refreshes the complete provider list', () => {
-    const queryClient = new QueryClient()
-    __setQueryClientForTests(queryClient)
-    const sessionsKey = workspaceKeys.sessions(WS)
-    queryClient.setQueryData<SessionInfo[]>(sessionsKey, [
-      { sessionId: 'existing', summary: 'Existing chat', lastModified: 1 }
-    ])
-
-    handleFrame({
-      type: 'sessions_changed',
-      workspaceId: WS,
-      sessionId: SID,
-      summary: 'Customer dashboard'
-    })
-
-    expect(queryClient.getQueryData<SessionInfo[]>(sessionsKey)).toEqual([
-      { sessionId: 'existing', summary: 'Existing chat', lastModified: 1 }
-    ])
     expect(queryClient.getQueryState(sessionsKey)?.isInvalidated).toBe(true)
   })
 
-  test('the Codex fallback and inferred title sequence never drops its row', () => {
+  test('keeps an optimistic title until the provider refetch resolves', () => {
     const queryClient = new QueryClient()
     __setQueryClientForTests(queryClient)
     const sessionsKey = workspaceKeys.sessions(WS)
@@ -297,32 +249,14 @@ describe('session list changes', () => {
       type: 'session_renamed',
       workspaceId: WS,
       from: 'temp-1',
-      to: 'real-1',
-      summary: 'The effort picker loses focus after opening'
+      to: 'real-1'
     })
-    handleFrame({
-      type: 'sessions_changed',
-      workspaceId: WS,
-      sessionId: 'real-1',
-      summary: 'The effort picker loses focus after opening'
-    })
+    handleFrame({ type: 'sessions_changed', workspaceId: WS, sessionId: 'real-1' })
 
     expect(queryClient.getQueryData<SessionInfo[]>(sessionsKey)?.[0]?.summary).toBe(
       'The effort picker loses focus after opening'
     )
-    expect(queryClient.getQueryState(sessionsKey)?.isInvalidated).toBe(false)
-
-    handleFrame({
-      type: 'sessions_changed',
-      workspaceId: WS,
-      sessionId: 'real-1',
-      summary: 'Fix picker focus'
-    })
-
-    expect(queryClient.getQueryData<SessionInfo[]>(sessionsKey)?.[0]?.summary).toBe(
-      'Fix picker focus'
-    )
-    expect(queryClient.getQueryState(sessionsKey)?.isInvalidated).toBe(false)
+    expect(queryClient.getQueryState(sessionsKey)?.isInvalidated).toBe(true)
   })
 
   test('invalidates the affected workspace session list and preview', () => {
