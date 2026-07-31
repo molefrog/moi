@@ -60,8 +60,10 @@ export function hasRunningBackgroundSession(
   workspaceId: string,
   selectedSessionId: string | null
 ): boolean {
+  if (!selectedSessionId) return false
+
   const prefix = `${workspaceId}:`
-  const selectedKey = selectedSessionId ? key(workspaceId, selectedSessionId) : null
+  const selectedKey = key(workspaceId, selectedSessionId)
   return Object.entries(activity).some(
     ([activityKey, value]) =>
       activityKey.startsWith(prefix) && activityKey !== selectedKey && isRunningActivity(value)

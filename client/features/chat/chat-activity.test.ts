@@ -62,7 +62,7 @@ test('background activity excludes the selected session', () => {
 
   expect(hasRunningBackgroundSession(activity, 'ws1', 'selected')).toBe(false)
   expect(hasRunningBackgroundSession(activity, 'ws1', 'idle')).toBe(true)
-  expect(hasRunningBackgroundSession(activity, 'ws1', null)).toBe(true)
+  expect(hasRunningBackgroundSession(activity, 'ws1', null)).toBe(false)
   expect(
     hasRunningBackgroundSession({ ...activity, 'ws1:other': 'running' }, 'ws1', 'selected')
   ).toBe(true)
