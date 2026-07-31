@@ -55,6 +55,19 @@ export function hasRunningWorkspaceActivity(
   )
 }
 
+export function hasRunningBackgroundSession(
+  activity: Record<string, SessionActivity>,
+  workspaceId: string,
+  selectedSessionId: string | null
+): boolean {
+  const prefix = `${workspaceId}:`
+  const selectedKey = selectedSessionId ? key(workspaceId, selectedSessionId) : null
+  return Object.entries(activity).some(
+    ([activityKey, value]) =>
+      activityKey.startsWith(prefix) && activityKey !== selectedKey && isRunningActivity(value)
+  )
+}
+
 // Attachments stay with the chat they were added to. A brand-new chat has no
 // session id yet, so it gets a stable `'new'` sentinel until send mints one.
 export function attachmentKey(workspaceId: string, sessionId: string | null): string {

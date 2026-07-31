@@ -5,7 +5,7 @@ import { useArchiveWorkspaceSession, useWorkspaceModels, useWorkspaceSessions } 
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
 import {
-  hasRunningWorkspaceActivity,
+  hasRunningBackgroundSession,
   isSessionRunning,
   liveStore,
   useLive
@@ -223,8 +223,8 @@ export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelecto
   const { data: sessions = [] } = useWorkspaceSessions(workspaceId)
   const canArchive = useWorkspaceModels(workspaceId).data?.supportsArchiving === true
   const archiveSession = useArchiveWorkspaceSession(workspaceId)
-  const hasRunningSession = useLive(state =>
-    hasRunningWorkspaceActivity(state.activity, workspaceId)
+  const hasRunningBackgroundChat = useLive(state =>
+    hasRunningBackgroundSession(state.activity, workspaceId, selectedSessionId)
   )
   const active = sessions.find(s => s.sessionId === selectedSessionId)
   const label = active?.summary ?? 'New chat'
@@ -255,10 +255,10 @@ export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelecto
         render={
           <Button variant="ghost">
             <span className="max-w-64 truncate">{label}</span>
-            {hasRunningSession ? (
+            {hasRunningBackgroundChat ? (
               <Spinner className="size-4!" stroke={2} />
             ) : (
-              <IconChevronDown data-icon="inline-end" stroke={1.5} />
+              <IconChevronDown stroke={1.5} />
             )}
           </Button>
         }

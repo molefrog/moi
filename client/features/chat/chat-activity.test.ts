@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, test } from 'bun:test'
 
 import { __setQueryClientForTests, handleFrame } from '@/client/features/chat/chat-connection'
 import {
+  hasRunningBackgroundSession,
   hasRunningWorkspaceActivity,
   isRunningActivity,
   isSessionRunning,
@@ -50,6 +51,21 @@ test('workspace activity includes every session and excludes other workspaces', 
       'ws1'
     )
   ).toBe(false)
+})
+
+test('background activity excludes the selected session', () => {
+  const activity = {
+    'ws1:selected': 'running',
+    'ws1:idle': 'idle',
+    'ws2:running': 'running'
+  } satisfies Record<string, SessionActivity>
+
+  expect(hasRunningBackgroundSession(activity, 'ws1', 'selected')).toBe(false)
+  expect(hasRunningBackgroundSession(activity, 'ws1', 'idle')).toBe(true)
+  expect(hasRunningBackgroundSession(activity, 'ws1', null)).toBe(true)
+  expect(
+    hasRunningBackgroundSession({ ...activity, 'ws1:other': 'running' }, 'ws1', 'selected')
+  ).toBe(true)
 })
 
 test('session activity is scoped to its workspace and session', () => {
