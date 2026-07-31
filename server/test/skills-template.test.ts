@@ -40,8 +40,15 @@ describe('installBundledSkills', () => {
     expect(design).not.toContain('### Color starting points')
     expect(design).toMatch(/`h-full w-full bg-background text-foreground` is a sensible\s+fallback/)
     expect(design).toMatch(/Views are separate pages\.\s+Their semantic tokens inherit/)
+    expect(design).toMatch(
+      /Keep\s+interaction feedback on the control that performs\s+the action\./
+    )
+    expect(design).toMatch(/The widget surface stays unchanged on\s+hover\./)
+    expect(design).not.toContain('tactile interaction')
+    expect(design).not.toContain('| Interaction |')
+    expect(design).not.toContain('Interaction feedback covers hover')
     expect(await Bun.file(join(workspaceSkillDir, 'SKILL.md')).text()).toContain(
-      '<moi-skill version="0.9.2" />'
+      '<moi-skill version="0.10.0" />'
     )
     expect(await Bun.file(workspaceNote).text()).toBe('Keep this note\n')
     expect(await Bun.file(customSkill).text()).toBe('Keep this skill\n')
