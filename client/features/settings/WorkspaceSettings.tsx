@@ -67,23 +67,23 @@ export function WorkspaceSettings() {
 
           {/* Page */}
           <div className="relative scrollbar-thin min-w-0 flex-1 overflow-y-auto">
+            <div className="px-8 py-7">
+              {page === 'general' && <GeneralSettings />}
+              {page === 'connectors' && <ConnectorsSettings />}
+              {page === 'environment' && <EnvironmentSettings />}
+            </div>
             <DialogClose
               render={
                 <Button
                   variant="ghost"
                   size="icon"
                   aria-label="Close"
-                  className="absolute top-3 right-3 z-10"
+                  className="absolute top-3 right-3"
                 >
                   <IconX stroke={1.5} />
                 </Button>
               }
             />
-            <div className="px-8 py-7">
-              {page === 'general' && <GeneralSettings />}
-              {page === 'connectors' && <ConnectorsSettings />}
-              {page === 'environment' && <EnvironmentSettings />}
-            </div>
           </div>
         </DialogContent>
       </Dialog>

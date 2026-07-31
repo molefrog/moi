@@ -148,7 +148,7 @@ export function ScratchToolbar({ editor }: ScratchToolbarProps) {
   }
 
   return (
-    <div className="absolute top-1/2 left-2 z-10 -translate-y-1/2">
+    <div className="absolute top-1/2 left-2 -translate-y-1/2">
       <motion.div
         initial={{ x: -72, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
@@ -491,7 +491,7 @@ export function ScratchStyleBar({ editor }: ScratchStyleBarProps) {
   }
 
   return (
-    <div className="absolute top-1/2 left-14 z-10 flex -translate-y-1/2 flex-col items-center gap-1.5 rounded-full bg-background/95 px-1 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.08),0_4px_16px_rgba(0,0,0,0.06),0_0_0_1px_rgba(0,0,0,0.04)] backdrop-blur">
+    <div className="absolute top-1/2 left-14 flex -translate-y-1/2 flex-col items-center gap-1.5 rounded-full bg-background/95 px-1 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.08),0_4px_16px_rgba(0,0,0,0.06),0_0_0_1px_rgba(0,0,0,0.04)] backdrop-blur">
       {state.controls.map((control, i) => (
         <Fragment key={control}>
           {i > 0 && <div className="h-px w-5 bg-border" />}
