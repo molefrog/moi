@@ -5,6 +5,7 @@
 import { QueryClient } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test } from 'bun:test'
 
+import { appUiKeys } from '@/client/api/app-ui-keys'
 import { __setQueryClientForTests, handleFrame } from '@/client/features/chat/chat-connection'
 import {
   hasRunningBackgroundSession,
@@ -216,18 +217,16 @@ describe('session rename', () => {
     expect(queryClient.getQueryState(sessionsKey)?.isInvalidated).toBe(false)
   })
 
-  test('the selected session follows the provider id', () => {
+  test('the current chat session follows the provider id', () => {
     const queryClient = new QueryClient()
     __setQueryClientForTests(queryClient)
-    queryClient.setQueryData(workspaceKeys.selectedSession(WS), {
+    queryClient.setQueryData(appUiKeys.selectedSession(WS), {
       sessionId: 'temp-1'
     })
 
     handleFrame({ type: 'session_renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
 
-    expect(
-      queryClient.getQueryData<SelectedSessionState>(workspaceKeys.selectedSession(WS))
-    ).toEqual({
+    expect(queryClient.getQueryData<SelectedSessionState>(appUiKeys.selectedSession(WS))).toEqual({
       sessionId: 'real-1'
     })
   })

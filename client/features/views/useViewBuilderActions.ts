@@ -1,9 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query'
 
 import { useWorkspaceModels } from '@/client/features/chat/api'
-import { useSelectedSession } from '@/client/features/chat/SelectedSessionContext'
 import { resolveChatRunOptions, startOptimisticTurn } from '@/client/features/chat/chat-send'
 import { liveStore } from '@/client/features/chat/chat-store'
+import { useSelectedSession } from '@/client/features/chat/useSelectedSession'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import {
   useCreateViewBuilder,
@@ -16,7 +16,7 @@ import type { ViewBuilder } from '@/lib/types'
 export function useViewBuilderActions() {
   const queryClient = useQueryClient()
   const { workspaceId, layout } = useWorkspaceLayoutCtx()
-  const { selectSession } = useSelectedSession()
+  const [, selectSession] = useSelectedSession()
   const modelData = useWorkspaceModels(workspaceId).data
   const createMutation = useCreateViewBuilder(workspaceId)
   const saveMutation = useSaveViewBuilder(workspaceId)

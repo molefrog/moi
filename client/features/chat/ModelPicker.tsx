@@ -30,7 +30,7 @@ import {
 } from '@/client/components/ui/popover'
 import { Slider } from '@/client/components/ui/slider'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
-import { useSelectedSession } from '@/client/features/chat/SelectedSessionContext'
+import { useSelectedSession } from '@/client/features/chat/useSelectedSession'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
 import type { Model } from '@/lib/types'
@@ -278,7 +278,7 @@ type ModelPickerProps = {
 // the same defaults that their submit path reads.
 export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: ModelPickerProps) {
   const { workspaceId, layout, setLayout } = useWorkspaceLayoutCtx()
-  const { selectedSessionId } = useSelectedSession()
+  const [selectedSessionId] = useSelectedSession()
   const { data } = useWorkspaceModels(workspaceId)
 
   // The SDK prepends a synthetic "default" entry ("Use the default model
@@ -294,7 +294,7 @@ export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: 
 
   // The selected chat's stored config is the source of truth. With New chat,
   // the picker reads and edits workspace defaults.
-  const sessionId = scope === 'active-chat' ? selectedSessionId : null
+  const sessionId = scope === 'active-chat' ? (selectedSessionId ?? null) : null
   const sessionConfig = useSessionConfig(workspaceId, sessionId).data
   const saveSessionConfig = useSaveSessionConfig(workspaceId)
 

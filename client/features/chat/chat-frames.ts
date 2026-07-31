@@ -2,8 +2,8 @@ import type { QueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { getScratchExecutor } from '@/client/features/scratchpad/scratch-executor'
-import { renameSelectedSessionInCache } from '@/client/features/chat/SelectedSessionContext'
 import { liveStore } from '@/client/features/chat/chat-store'
+import { renameSelectedSessionInCache } from '@/client/features/chat/useSelectedSession'
 import { applyEvent } from '@/lib/format'
 import type {
   ClientMessage,

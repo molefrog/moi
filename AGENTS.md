@@ -27,6 +27,13 @@ Claude-only config (`.claude/settings.json` hooks, `.claude/launch.json`) stays 
 
 Client connects via WebSocket. Agent responses stream back and are broadcast to all clients.
 
+## State ownership
+
+- Store workspace state in `.moi/` only when it is useful to commit and share with people who clone the project.
+- Store per-user app state that should follow the local moi installation in the server-side `DATA_DIR`. Expose it through the API and use React Query for client caching and optimistic updates.
+- Store per-browser or per-device UI preferences in `client/store/ui.ts`.
+- Decide ownership before adding persistence. Selected sessions and other user-specific choices do not belong in `.moi/`.
+
 ## Main app design
 
 `DESIGN.md` is the canonical design guidance for the main app frontend. Before editing host app UI in `client/` (`*.tsx` or `*.css`), read `DESIGN.md` together with `client/AGENTS.md` and the relevant `.agents/rules/` files. It applies to the app shell, chat, settings, menus, workspace list, tabs, panels, and host widget/view chrome. It does **not** govern workspace widget/view internals or generated applets; use workspace-local design guidance for those.

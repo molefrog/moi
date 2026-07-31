@@ -4,7 +4,6 @@ export const workspaceKeys = {
   setupInfo: ['workspaces', 'setup-info'] as const,
   preview: (id: string) => ['workspaces', 'preview', id] as const,
   layout: (id: string) => ['workspaces', 'layout', id] as const,
-  selectedSession: (id: string) => ['workspaces', 'selectedSession', id] as const,
   widgets: (id: string) => ['workspaces', 'widgets', id] as const,
   views: (id: string) => ['workspaces', 'views', id] as const,
   viewBuilders: (id: string) => ['workspaces', 'view-builders', id] as const,

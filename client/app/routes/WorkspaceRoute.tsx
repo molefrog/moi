@@ -3,10 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { LedLogo } from '@/client/components/shared/LedLogo'
 import { SidebarLayout } from '@/client/app/shell/SidebarLayout'
-import {
-  SelectedSessionProvider,
-  useSelectedSession
-} from '@/client/features/chat/SelectedSessionContext'
+import { useSelectedSession } from '@/client/features/chat/useSelectedSession'
 import { useAppletCacheInvalidation } from '@/client/features/applets/useApplet'
 import { Workspace } from '@/client/features/workspace/WorkspaceContext'
 import {
@@ -29,9 +26,7 @@ export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
   return (
     <Workspace id={id}>
       <WorkspaceLayoutProvider id={id}>
-        <SelectedSessionProvider workspaceId={id}>
-          <WorkspaceLoader id={id} />
-        </SelectedSessionProvider>
+        <WorkspaceLoader id={id} />
       </WorkspaceLayoutProvider>
     </Workspace>
   )
@@ -39,7 +34,7 @@ export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
 
 function WorkspaceLoader({ id }: WorkspaceRouteProps) {
   const queryClient = useQueryClient()
-  const { isLoading: selectedSessionLoading } = useSelectedSession()
+  const [selectedSessionId] = useSelectedSession()
   const { layout, setLayout, isLoading: layoutLoading } = useWorkspaceLayoutCtx()
   const widgets = useWorkspaceWidgets(id)
   const views = useWorkspaceViews(id)
@@ -61,7 +56,7 @@ function WorkspaceLoader({ id }: WorkspaceRouteProps) {
 
   const fresh =
     layoutLoading ||
-    selectedSessionLoading ||
+    selectedSessionId === undefined ||
     widgets.isLoading ||
     views.isLoading ||
     builders.isLoading

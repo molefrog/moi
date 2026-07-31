@@ -9,7 +9,7 @@ import {
   useWorkspaceModels,
   useWorkspaceSessions
 } from '@/client/features/chat/api'
-import { useSelectedSession } from '@/client/features/chat/SelectedSessionContext'
+import { useSelectedSession } from '@/client/features/chat/useSelectedSession'
 import {
   type WorkspaceTabAddress,
   useMoiUserMessageContext
@@ -38,8 +38,8 @@ import type { Part, ViewState } from '@/lib/types'
 
 const EMPTY: ViewState = emptyViewState()
 
-// Thin projection over app-level state: the selected session is persisted by
-// SelectedSessionProvider, spinner/error come from the live store, and the
+// Thin projection over app-level state: the selected session comes from
+// useSelectedSession, spinner/error come from the live store, and the
 // transcript comes from the React Query cache. No socket lifecycle here.
 //
 // Takes the workspace's tab address because every message carries it: the
@@ -49,7 +49,8 @@ export function useChat(address: WorkspaceTabAddress) {
   const workspaceId = useWorkspaceId()
   const qc = useQueryClient()
   const { layout } = useWorkspaceLayoutCtx()
-  const { selectedSessionId, selectSession } = useSelectedSession()
+  const [selectedSession, selectSession] = useSelectedSession()
+  const selectedSessionId = selectedSession ?? null
   const modelsData = useWorkspaceModels(workspaceId).data
   const sessions = useWorkspaceSessions(workspaceId).data
   // Snapshot of the workspace's ambient UI state + queued one-shot
