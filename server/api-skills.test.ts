@@ -41,7 +41,7 @@ describe('workspace skills API', () => {
     expect(status.updateAvailable).toBe(true)
     expect(status.skills.find(skill => skill.name === 'moi-workspace')).toMatchObject({
       installed: '0.7.1',
-      bundled: '0.9.2'
+      bundled: '0.10.0'
     })
   })
 

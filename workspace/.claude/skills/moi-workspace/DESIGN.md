@@ -14,10 +14,10 @@ Design around the content and the task. Give every applet a clear first reading,
 proportion to its size and purpose. Dense information is welcome when hierarchy and alignment keep
 it easy to scan.
 
-An applet may have one expressive focal point: a visualization, strong surface, image, tactile
-interaction, or satisfying state change. It is optional. Use it when it helps the content and keep
-the rest restrained so it remains meaningful. Avoid decorative clutter, competing effects, and a
-different visual system for every section.
+An applet may have one expressive focal point: a visualization, strong surface, image, or satisfying
+state change. It is optional. Use it when it helps the content and keep the rest restrained so it
+remains meaningful. Avoid decorative clutter, competing effects, and a different visual system for
+every section.
 
 Every visible element must help the user understand useful content, see a real state, or take an
 action. Do not add category eyebrows that repeat the title, readiness badges for an obvious default
@@ -58,7 +58,7 @@ Views are separate pages. Their semantic tokens inherit the workspace theme, so
 | Floating surface | `bg-popover text-popover-foreground` | Menus, tooltips, and other floating content |
 | Primary action | `bg-primary text-primary-foreground` | The most important action in a local region |
 | Subdued surface | `bg-muted` | Skeletons, quiet fills, and disabled structure |
-| Interaction | `bg-accent text-accent-foreground` | Hover, active, selected, and subtle highlighted states |
+| Control state | `bg-accent text-accent-foreground` | Hover, active, and selected states on interactive controls |
 | Error or danger | `text-destructive` / `bg-destructive` | Errors, destructive actions, and invalid states |
 | Structure | `ring-border`, `border-input`, `ring-ring` | Container edges, controls, and visible focus on semantic surfaces |
 
@@ -124,28 +124,18 @@ must not look capsule-shaped.
 
 ## Interaction and motion
 
-Widgets support quick interactions such as a filter, toggle, refresh, or direct action. Multi-step
-workflows and deep navigation belong in a view. Views may use tabs, filters, and master-detail
-layouts when they organize one coherent screen.
+Widgets may include compact controls such as filters, toggles, refresh actions, and links. Keep
+interaction feedback on the control that performs the action. The widget surface stays unchanged on
+hover. Multi-step workflows and deep navigation belong in a view.
 
-Every interactive area must be obvious, keyboard-operable, and large enough to use comfortably.
-Controls need a visible focus state and an accessible name. Use Tabler icons with consistent visual
-weight. Do not rely on color alone, and keep charts understandable with labels, legends, patterns,
-or direct values where needed.
+Controls must be obvious, keyboard-operable, and large enough to use comfortably. Give them a
+visible focus state and an accessible name. Use Tabler icons with consistent visual weight. Do not
+rely on color alone, and keep charts understandable with labels, legends, patterns, or direct values
+where needed.
 
-Rank motion by purpose:
-
-1. Optional entrance motion introduces the applet or a newly revealed region.
-2. Interaction feedback covers hover, active, loading, disabled, and optimistic states.
-3. At most one signature animation may act as the expressive focal point.
-
-Keep motion short, interruptible, and safe for reduced-motion preferences. Animate transform and
-opacity where possible. Do not loop decorative motion or animate frequently updating numbers. Audio
-and video must be user-initiated.
-
-A single interactive surface may use a restrained tactile treatment such as an inset highlight,
-ring, or soft shadow. Keep this away from the widget's outer root because the host owns the card
-shell.
+Use short, interruptible motion for meaningful state changes and control feedback. Respect
+reduced-motion preferences and animate transform and opacity where possible. Do not loop decorative
+motion or animate frequently updating numbers. Audio and video must be user-initiated.
 
 ## States
 
@@ -259,6 +249,6 @@ Before finishing an applet, confirm:
 - Numeric UI values use the default font, with `tabular-nums` when alignment helps.
 - Custom container outlines suit their surface and stay subtle.
 - The layout handles realistic content and deliberate overflow.
-- Every reachable state and interaction is complete and accessible.
+- Every control is necessary, complete, and accessible.
 - The widget or view follows its frame, sizing, and scrolling rules.
 - It feels related to the workspace without copying the quieter host shell.

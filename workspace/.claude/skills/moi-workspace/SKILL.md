@@ -1,6 +1,12 @@
 ---
 name: moi-workspace
-description: The moi workspace — the web UI the user chats from, extended with agent-authored applets (widgets, views) plus theme & config. Read this FIRST in two cases. (a) A message carries a hidden <moi-context>…</moi-context> envelope: it was fired from a moi workspace, so you are running inside one even if nothing else says so. (b) The user uses moi vocab — workspace, applet, widget, view, scratchpad, dashboard, or a `moi` command — or asks to build, edit, customize, or theme the workspace UI or its layout.
+description: >-
+  The moi workspace — the web UI the user chats from, extended with agent-authored applets
+  (widgets, views) plus theme & config. Read this FIRST in two cases. (a) A message carries a hidden
+  moi-context envelope: it was fired from a moi workspace, so you are running inside one even if
+  nothing else says so. (b) The user uses moi vocab — workspace, applet, widget, view, scratchpad,
+  dashboard, or a `moi` command — or asks to build, edit, customize, or theme the workspace UI or
+  its layout.
 ---
 
 # Workspace
@@ -402,4 +408,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.9.2" />
+<moi-skill version="0.10.0" />
