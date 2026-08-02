@@ -453,9 +453,28 @@ async function writeSyntheticTailwindCss(
   // (`@source .moi/views`) build concurrently in one `moi bundle`; a shared
   // file would race and point Tailwind at the wrong source dir.
   const cssPath = join(buildDir, `${kind}-tailwind.css`)
+  // EXPERIMENT: mirror the host's Tailwind extensions (client/index.css) in the
+  // applet build — tw-animate-css utilities and shadcn's data-* variants /
+  // keyframes / scroll utilities. Text-inlined from moi's own node_modules
+  // (same approach as HOST_THEME_PATH) so the workspace needs no extra deps.
+  const repoRoot = join(import.meta.dir, '..', '..')
+  const shadcnTailwind = await Bun.file(
+    join(repoRoot, 'node_modules', 'shadcn', 'dist', 'tailwind.css')
+  ).text()
+  const twAnimate = await Bun.file(
+    join(repoRoot, 'node_modules', 'tw-animate-css', 'dist', 'tw-animate.css')
+  ).text()
   const contents = [
     `@import 'tailwindcss';`,
+    twAnimate,
+    shadcnTailwind,
     await Bun.file(HOST_THEME_PATH).text(),
+    // EXPERIMENT: tokens base-nova components use but theme.css lacks. The
+    // alias makes Tailwind emit the utilities; the raw values belong in the
+    // host's index.css `:root`/`.dark` (demo values here — scoping rewrites
+    // `:root` onto the applet container).
+    `@theme inline { --color-secondary: var(--secondary); --color-secondary-foreground: var(--secondary-foreground); }`,
+    `:root { --secondary: oklch(0.269 0 0); --secondary-foreground: oklch(0.985 0 0); }`,
     // Mirror the host's class-based dark mode (client/index.css) so an applet's
     // `dark:` variants flip with the app theme. Without this Tailwind falls
     // back to `@media (prefers-color-scheme: dark)`, which diverges from the
