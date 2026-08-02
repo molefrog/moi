@@ -1,14 +1,18 @@
 # RFCs — shadcn components for applets
 
-Two proposals for how agents get shadcn components in workspaces. Read both
-(one page each), decide on a call. Evidence behind every claim:
+Three proposals, one page each. 0001 and 0002 were explored first and
+rejected on review (0001 means maintaining our own registry; 0002 puts
+`components.json` + `tsconfig.json` into every workspace — both
+non-starters). **0003 is the current proposal**, built on a source dive into
+the `shadcn` package. Evidence behind every claim:
 `docs/shadcn-applet-experiments.md`.
 
-**Shared foundation (ships in either case):**
+**Shared foundation (ships in any case):**
 
 1. Inline `tw-animate-css` + `shadcn/tailwind.css` into the applet's synthetic
    Tailwind entry — without it every shadcn idiom is silently dropped
-   (verified, +11 KB, patch already on this branch).
+   (verified, +11 KB, patch already on this branch). This is exactly the css
+   the base-nova style item declares.
 2. Fix the missing `secondary` token in the host theme — secondary buttons
    render with no fill today, shadcn or not.
 3. Components live in `.moi/ui/`, one fixed place; overlays must portal into
@@ -16,19 +20,19 @@ Two proposals for how agents get shadcn components in workspaces. Read both
 4. Skill guidance collapses to one file under `references/`; rules: always
    Base UI, tabler icons, tokens only. Nothing exists until first use.
 
-**The actual decision — who owns the component source:**
+**The comparison:**
 
-|                      | 0001 blessed registry        | 0002 vanilla shadcn            |
-| -------------------- | ---------------------------- | ------------------------------ |
-| Agent runs           | `moi ui add button`          | `bunx shadcn add button`       |
-| Config in workspace  | none                         | `components.json` + `tsconfig` |
-| Catalog on day one   | ~15–20 curated               | full upstream + community      |
-| Components look like | the host app (demo quality)  | upstream base-nova defaults    |
-| Maintenance          | moi curates and updates      | upstream; moi serves overlays  |
-| Portal fix delivered | baked into every component   | `@moi/*` namespace only        |
-| Main risk            | catalog upkeep, no discovery | `@/` alias resolution, rebuild |
+|                     | 0001 blessed registry   | 0002 vanilla CLI               | 0003 engine (proposed)     |
+| ------------------- | ----------------------- | ------------------------------ | -------------------------- |
+| Agent runs          | `moi ui add`            | `bunx shadcn add`              | `moi ui add`               |
+| Config in workspace | none                    | `components.json` + `tsconfig` | none                       |
+| Catalog             | ~15–20 moi-curated      | full upstream                  | full upstream              |
+| Maintained by moi   | whole component catalog | scaffold + `@moi` overlays     | thin shim + portal codemod |
+| Transforms          | pre-applied by hand     | CLI defaults only              | shadcn's own, programmatic |
+| Rejected because    | fancy registry to own   | config files in workspace      | — (current proposal)       |
 
-They compose: 0001 can add an upstream escape hatch later; 0002 can narrow
-into 0001 by shadowing the default registry. Starting point differs — 0001
-optimizes for self-contained and demo-quality output, 0002 for agent
-familiarity and catalog breadth.
+0003 keeps 0001's agent surface (`moi ui add`, zero config) and 0002's
+upstream catalog, without either's cost: the `shadcn` package exports its
+engine (`shadcn/registry`, `shadcn/utils`), every function accepts an
+in-memory config, and its own `transformIcons` maps registry content to
+tabler. Verified end to end in a PoC — see the experiment log, round 2.

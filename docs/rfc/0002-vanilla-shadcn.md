@@ -1,5 +1,8 @@
 # RFC 0002 — vanilla shadcn on a pre-wired workspace
 
+> **Status: rejected on review** (config files in the workspace) — superseded by
+> [RFC 0003](./0003-shadcn-engine.md).
+
 **One-liner:** moi lays down the config the real shadcn CLI needs, pre-wired
 for applets. The agent then uses the tool it was trained on — `bunx shadcn
 add/search/docs` — with the full upstream catalog from day one.

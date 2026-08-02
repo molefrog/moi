@@ -99,3 +99,52 @@ complaints. Fix: add the alias to `theme.css` and raw values to `index.css`
 Repro: fixtures and scripts live in the session scratchpad; the flow is
 `shadcn add` into a scaffolded `.moi`-shaped dir → `buildApplet` via a small
 runner → grep the CSS payload registered on `__moiAppletCss`.
+
+## Round 2 — source dive: the engine is public, the CLI is optional
+
+Read the `shadcn` package source (4.13.0, already a moi dependency). The
+config-file requirements belong to the CLI layer only.
+
+- **Public programmatic API.** The package exports `shadcn/registry`
+  (`getRegistryItems`, `resolveRegistryItems`, `searchRegistries`, …),
+  `shadcn/utils` (`transformIcons`, `transformFont`, `transformRender`, …),
+  `shadcn/schema`, `shadcn/icons` (library map incl. tabler), `shadcn/preset`.
+  Every registry function takes `config?: Partial<Config>` — an **in-memory
+  object**, no file.
+- **Why `components.json` exists** (all CLI-layer): pick the style for
+  registry URLs; aliases for import rewriting; `tailwind.css` path for
+  injecting item CSS at init; `iconLibrary`; custom `registries` map. **Why
+  `tsconfig.json` exists**: only to resolve those aliases to disk paths
+  (`tsconfig-paths` dep → `resolvedPaths` on `Config`). Driving the engine
+  directly replaces both files with a ~10-line object literal inside moi.
+- **Icons are a solved transform.** Registry content ships
+  `<IconPlaceholder lucide="…" tabler="IconChevronRight" …/>` with
+  per-library attributes; the exported `transformIcons` (ts-morph) picks the
+  configured library's attribute, rewrites the JSX, and adds the
+  `@tabler/icons-react` import. Verified: dropdown-menu came out importing
+  `IconChevronRight`/`IconCheck` from tabler.
+- **Zero-config installer PoC ran end to end** (node script, ~40 lines):
+  `getRegistryItems(['button','popover','dropdown-menu','alert-dialog'],
+{config})` → `transformIcons` → two string replacements
+  (`@/registry/<style>/lib/utils` → `./utils`, `…/ui/x` → `./x`) → write to
+  `ui/`. No `components.json`, no `tsconfig.json` anywhere. All four compiled
+  through `buildApplet`; unused subcomponents and their icons tree-shake out
+  of the widget bundle.
+- **The style item documents the environment contract.**
+  `/r/styles/base-nova/index.json` declares css = `@import "tw-animate-css"`
+  - `@import "shadcn/tailwind.css"` (exactly what the synthetic-entry patch
+    inlines) + a 2-rule `@layer base`; deps `@base-ui/react`,
+    `class-variance-authority`, `lucide-react` (replaced by tabler);
+    registryDependencies `utils` — the `cn` file is itself a registry item
+    declaring `clsx` + `tailwind-merge`. Nothing is hand-maintained.
+- **Version-skew caveat.** Registry content can run ahead of the npm package:
+  live dropdown-menu uses a `cn-rtl-flip` utility that no published
+  `shadcn/tailwind.css` (4.13.0 or 4.16.1) defines — cosmetic (RTL flip),
+  but argues for pinning the package and refreshing deliberately.
+- **Sandbox-only quirk:** the engine's registry fetch failed under Bun here
+  (egress relay closes BoringSSL handshakes) and works under node; in real
+  environments Bun is fine. `useCache` exists on the fetch API.
+
+Conclusion drawn from both rounds: drive shadcn's engine from moi (`moi ui
+add` as a thin shim), keep the upstream registry as the source of truth, and
+never materialize CLI config in the workspace — see RFC 0003.

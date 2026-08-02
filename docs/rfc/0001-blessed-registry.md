@@ -1,5 +1,8 @@
 # RFC 0001 — `moi ui add`: a blessed component registry
 
+> **Status: rejected on review** (moi-curated registry to maintain) — superseded by
+> [RFC 0003](./0003-shadcn-engine.md).
+
 **One-liner:** moi ships its own curated set of shadcn-format components and a
 single command to install them. The shadcn CLI never runs in the workspace;
 zero config files appear.
