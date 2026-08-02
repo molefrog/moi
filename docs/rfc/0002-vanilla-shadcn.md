@@ -12,9 +12,9 @@ $ bunx shadcn search @shadcn -q table   # discovery
 $ bunx shadcn docs button               # docs + usage examples
 ```
 
-The skill says: _"shadcn is set up. Components install to `.moi/ui/`. Use
-`@moi/_`for overlay components (dialog, popover, tooltip). Run`moi bundle`
-after adding."\*
+The skill says: "shadcn is set up. Components install to `.moi/ui/`. Use
+`@moi/*` for overlay components (dialog, popover, tooltip). Run `moi bundle`
+after adding."
 
 ## What lands in the workspace
 
