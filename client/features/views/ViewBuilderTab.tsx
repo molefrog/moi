@@ -1,7 +1,5 @@
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react'
 
-import { IconLoader2 } from '@tabler/icons-react'
-
 import { Button } from '@/client/components/ui/button'
 import {
   canSubmitComposerAction,
@@ -12,6 +10,7 @@ import {
 } from '@/client/components/shared/Composer'
 import { ModelPicker } from '@/client/features/chat/ModelPicker'
 import type { ViewBuilder } from '@/lib/types'
+import { Spinner } from '@/client/components/ui/spinner'
 
 type ViewBuilderTabProps = {
   builder: ViewBuilder
@@ -144,8 +143,8 @@ export function ViewBuilderTab({
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center p-6">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <IconLoader2 stroke={1.75} className="animate-spin" />
-        {builder.status === 'ready' ? 'Opening view…' : 'Building your view…'}
+        <Spinner />
+        {builder.status === 'ready' ? 'Opening view…' : 'Building view…'}
       </div>
     </div>
   )

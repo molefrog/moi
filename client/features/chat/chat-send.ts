@@ -4,8 +4,9 @@ import { workspaceKeys } from '@/client/api/workspace-keys'
 import { attachmentKey, type ChatAttachment, liveStore } from '@/client/features/chat/chat-store'
 import type { MoiUserMessageOptions } from '@/client/features/workspace/moi-context'
 import { STREAM_RESPONSES } from '@/client/lib/flags'
+import { formatChatTitle } from '@/lib/chat-title'
 import { applyEvent, emptyViewState } from '@/lib/format'
-import type { Part, ViewState, WorkspaceModels } from '@/lib/types'
+import type { Part, SessionInfo, ViewState, WorkspaceModels } from '@/lib/types'
 
 // What a caller may attach to one message beyond its text. All of it is
 // envelope material — the agent sees it, the chat bubble does not.
@@ -60,6 +61,29 @@ export function startOptimisticTurn({
   liveStore.getState().setActivity(workspaceId, sessionId, 'running')
   liveStore.getState().setError(workspaceId, sessionId, null)
   return optimisticId
+}
+
+type StartOptimisticSessionInput = {
+  queryClient: QueryClient
+  workspaceId: string
+  sessionId: string
+  text: string
+  filenames?: readonly string[]
+}
+
+export function startOptimisticSession({
+  queryClient,
+  workspaceId,
+  sessionId,
+  text,
+  filenames = []
+}: StartOptimisticSessionInput): void {
+  const summary = formatChatTitle(text, filenames)
+  if (!summary) return
+  queryClient.setQueryData<SessionInfo[]>(workspaceKeys.sessions(workspaceId), current => [
+    { sessionId, summary, lastModified: Date.now() },
+    ...(current ?? []).filter(session => session.sessionId !== sessionId)
+  ])
 }
 
 export function resolveChatRunOptions(

@@ -25,7 +25,12 @@ Claude-only config (`.claude/settings.json` hooks, `.claude/launch.json`) stays 
 
 ## Data flow
 
-Client connects via WebSocket. Agent responses stream back and are broadcast to all clients.
+- Each workspace added/imported to moi stores its settings in a `.moi/workspace.json` file in the workspace folder.
+- Everything inside `.moi/` is safe to commit, so the same workspace can be shared with others.
+- Prefer `.moi/workspace.json` for state that describes the workspace itself rather than the person or device using it — e.g. chat/thread settings, widget layout, connectors. Litmus test: anyone who clones the workspace should get the same value.
+- Store per-user app state that should follow the local moi installation in the server-side `DATA_DIR`. Expose it through the API and use React Query for client caching and optimistic updates.
+- Store per-browser or per-device UI preferences in `client/store/ui.ts`.
+- Decide ownership before adding persistence. Selected sessions and other user-specific choices do not belong in `.moi/`.
 
 ## Main app design
 

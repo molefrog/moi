@@ -28,8 +28,8 @@ type ChatPanelProps = {
   // into the transcript through the same groupTurns pipeline so a thinking-only
   // preview folds into the current tool group. See client/lib/preview-turn.ts.
   previewTurn?: Turn | null
-  // Active thread id — used only as the scroll reset key (jump to bottom on
-  // thread switch).
+  // Selected session id — used only as the scroll reset key (jump to bottom on
+  // session switch).
   sessionId?: string | null
   processing: boolean
   error?: string | null
@@ -38,7 +38,7 @@ type ChatPanelProps = {
   unavailableReason: string | null | undefined
   send: (text: string, options?: ChatSendOptions) => void
   stop: () => void
-  onSwitchThread: (sessionId: string | null) => void
+  onSelectSession: (sessionId: string | null) => void
   // Floating popup: render a close (X) button that dismisses the popup.
   onClose?: () => void
 }
@@ -57,7 +57,7 @@ export function ChatPanel({
   unavailableReason,
   send,
   stop,
-  onSwitchThread,
+  onSelectSession,
   onClose
 }: ChatPanelProps) {
   const workspaceId = useWorkspaceId()
@@ -90,7 +90,7 @@ export function ChatPanel({
     isWorkspacePendingAnalysis
   })
 
-  // Stick to the bottom while pinned; respect scroll-up; jump on thread switch.
+  // Stick to the bottom while pinned; respect scroll-up; jump on session switch.
   const { atBottom, scrollToBottom, scrollToTop } = useStickToBottom(scrollRef, sessionId)
 
   useLayoutEffect(() => {
@@ -124,7 +124,7 @@ export function ChatPanel({
   return (
     <div className="flex min-h-0 flex-1 flex-col pt-2 pb-3">
       <header className="mx-auto flex w-full max-w-[calc(var(--chat-max-container)+40px)] items-center justify-between pr-2 pb-2 pl-2">
-        <ChatSelector onSwitch={onSwitchThread} />
+        <ChatSelector selectedSessionId={sessionId ?? null} onSelectSession={onSelectSession} />
         {onClose && (
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close chat">
             <IconX stroke={1.5} />
@@ -206,6 +206,7 @@ export function ChatPanel({
             onSend={handleSend}
             onStop={stop}
             processing={processing}
+            sessionId={sessionId ?? null}
             unavailableReason={unavailableReason}
           />
         </div>

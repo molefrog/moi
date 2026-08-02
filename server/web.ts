@@ -5,12 +5,13 @@ import index from '../client/index.html'
 import { api } from './api'
 import { PORT } from './constants'
 import { control } from './control'
-import { EVENTS_TOPIC, setEventServer } from './events'
+import { EVENTS_TOPIC, publishEvent, setEventServer } from './events'
 import { killAllWorkers } from './functions'
 import { startScratchpadSweeper } from './scratchpad'
 import { resolveScratchOp } from './scratchpad-relay'
 import { allHarnesses, harnessFor } from './harness/registry'
 import { getWorkspace } from './registry'
+import { saveSelectedSession } from './selected-session'
 import { addClient, broadcastAll, getClientCount, removeClient, sendToClient } from './state'
 import { distShell, prebuilt } from './static'
 import { renderStatus } from './status'
@@ -140,6 +141,16 @@ export const app = Bun.serve<WsData>({
         if (data.type === 'chat' && (data.content?.trim() || data.attachments?.length)) {
           const workspace = await getWorkspace(data.workspaceId)
           if (!workspace) return
+          if (data.isNew) {
+            const selection = await saveSelectedSession(workspace.path, data.sessionId, null)
+            if (selection.changed) {
+              publishEvent({
+                type: 'selected-session:updated',
+                workspaceId: workspace.id,
+                sessionId: selection.sessionId
+              })
+            }
+          }
           // Harnesses ignore fields they don't support (see SendMessageInput);
           // failures surface as error frames from inside the harness.
           void harnessFor(workspace)

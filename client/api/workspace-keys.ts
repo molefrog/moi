@@ -9,8 +9,8 @@ export const workspaceKeys = {
   viewBuilders: (id: string) => ['workspaces', 'view-builders', id] as const,
   sessions: (id: string) => ['workspaces', 'sessions', id] as const,
   events: (id: string, sessionId: string) => ['workspaces', 'events', id, sessionId] as const,
-  threadConfig: (id: string, sessionId: string) =>
-    ['workspaces', 'threadConfig', id, sessionId] as const,
+  sessionConfig: (id: string, sessionId: string) =>
+    ['workspaces', 'sessionConfig', id, sessionId] as const,
   mcp: (id: string) => ['workspaces', 'mcp', id] as const,
   models: (id: string) => ['workspaces', 'models', id] as const,
   availability: (id: string) => ['workspaces', 'availability', id] as const,

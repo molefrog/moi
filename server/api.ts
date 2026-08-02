@@ -8,6 +8,7 @@ import type {
   AppletKind,
   AppSettings,
   HarnessAvailability,
+  SessionInfo,
   UploadInfo,
   ViewBuilderInput,
   WorkspaceEntry,
@@ -33,6 +34,7 @@ import {
 } from './layout'
 import { getClientFrameLog, getWireLog } from './harness/debug'
 import { allHarnesses, harnessFor, isHarnessType } from './harness/registry'
+import { broadcast } from './state'
 import {
   discoverWorkspace,
   discoverWorkspaces,
@@ -45,10 +47,17 @@ import {
 } from './registry'
 import { loadScratchpadDoc, saveScratchpadDoc } from './scratchpad'
 import { MAX_ASSET_BYTES, scratchpadAssetFile, storeScratchpadAsset } from './scratchpad-assets'
+import {
+  clearSelectedSession,
+  getSelectedSession,
+  initializeSelectedSession,
+  saveSelectedSession
+} from './selected-session'
+import type { SelectedSessionUpdate } from './selected-session'
+import { getSessionConfig, saveSessionConfig } from './session-config'
+import type { SessionConfigPatch } from './session-config'
 import { DIST_DIR, prebuilt } from './static'
 import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from './skill-update'
-import { getThreadConfig, saveThreadConfig } from './thread-config'
-import type { ThreadConfigPatch } from './thread-config'
 import { serveWorkspaceImagePreview } from './preview'
 import { MAX_UPLOAD_BYTES, addUpload, getUpload } from './uploads'
 import { requiredEnvFor } from './required-env'
@@ -77,6 +86,15 @@ import type { EnvUpdate } from './workspace-env'
 // The resolved workspace is stashed on the context by `withWorkspace`, so every
 // `/api/workspaces/:id/*` handler can read it without re-querying the registry.
 type ApiEnv = { Variables: { ws: WorkspaceEntry } }
+
+function publishSelectedSession(workspaceId: string, update: SelectedSessionUpdate): void {
+  if (!update.changed) return
+  publishEvent({
+    type: 'selected-session:updated',
+    workspaceId,
+    sessionId: update.sessionId
+  })
+}
 
 async function handleFunctionCall(
   req: Request,
@@ -258,6 +276,7 @@ one.post('/view-builders/:builderId/submit', async c => {
       directives: viewBuilderDirectives(builder.id, availableIcons)
     }
     try {
+      publishSelectedSession(ws.id, await saveSelectedSession(ws.path, builder.sessionId))
       await harnessFor(ws).sendMessage({
         workspaceId: ws.id,
         workspacePath: ws.path,
@@ -441,17 +460,78 @@ one.get('/sessions', async c => {
   return c.json(await harnessFor(ws).listSessions(ws))
 })
 
+one.get('/selected-session', async c => {
+  const ws = c.get('ws')
+  let sessionId = await getSelectedSession(ws.path)
+  if (sessionId === undefined) {
+    const sessions = await harnessFor(ws).listSessions(ws)
+    const latest = sessions.reduce<SessionInfo | undefined>(
+      (current, session) =>
+        !current ||
+        session.lastModified > current.lastModified ||
+        (session.lastModified === current.lastModified &&
+          session.sessionId.localeCompare(current.sessionId) < 0)
+          ? session
+          : current,
+      undefined
+    )
+    sessionId = await initializeSelectedSession(ws.path, latest?.sessionId ?? null)
+  }
+  return c.json({ sessionId })
+})
+
+one.put('/selected-session', async c => {
+  const ws = c.get('ws')
+  const body: unknown = await c.req.json().catch(() => null)
+  if (!body || typeof body !== 'object') return c.text('Bad request', 400)
+
+  const input = body as { sessionId?: unknown; previousSessionId?: unknown }
+  const validSessionId = input.sessionId === null || typeof input.sessionId === 'string'
+  const hasPreviousSessionId = Object.prototype.hasOwnProperty.call(input, 'previousSessionId')
+  const validPreviousSessionId =
+    !hasPreviousSessionId ||
+    input.previousSessionId === null ||
+    typeof input.previousSessionId === 'string'
+  if (!validSessionId || !validPreviousSessionId) return c.text('Bad request', 400)
+
+  const update = await saveSelectedSession(
+    ws.path,
+    input.sessionId as string | null,
+    hasPreviousSessionId ? (input.previousSessionId as string | null) : undefined
+  )
+  publishSelectedSession(ws.id, update)
+  return c.json({ sessionId: update.sessionId })
+})
+
+one.post('/sessions/:sessionId/archive', async c => {
+  const ws = c.get('ws')
+  const harness = harnessFor(ws)
+  const sessionId = c.req.param('sessionId')
+  if (!harness.archiveSession) return c.text('Chat archiving is not supported', 501)
+
+  try {
+    await harness.interrupt(ws.id, sessionId)
+    await harness.archiveSession(ws, sessionId)
+    publishSelectedSession(ws.id, await clearSelectedSession(ws.path, sessionId))
+    broadcast(ws.id, { type: 'sessions_changed', sessionId })
+    return c.body(null, 204)
+  } catch (error) {
+    console.error(`[api] archive chat failed for ${harness.id}`, error)
+    return c.text('Couldn’t archive chat', 500)
+  }
+})
+
 one.get('/sessions/:sessionId/events', async c => {
   const ws = c.get('ws')
   return c.json(await harnessFor(ws).sessionEvents(ws, c.req.param('sessionId')))
 })
 
-// Per-thread agent settings (model, reasoning effort, and Fast mode). GET
-// returns the stored config ({} for threads that never overrode the workspace
+// Per-session agent settings (model, reasoning effort, and Fast mode). GET
+// returns the stored config ({} for sessions that never overrode the workspace
 // defaults); PUT patches it (a field as `null` clears it, omitted leaves it).
-// The change takes effect on the thread's next message.
+// The change takes effect on the session's next message.
 one.get('/sessions/:sessionId/config', async c => {
-  return c.json(await getThreadConfig(c.get('ws').path, c.req.param('sessionId')))
+  return c.json(await getSessionConfig(c.get('ws').path, c.req.param('sessionId')))
 })
 
 one.put('/sessions/:sessionId/config', async c => {
@@ -459,7 +539,7 @@ one.put('/sessions/:sessionId/config', async c => {
   if (typeof body !== 'object' || body === null) {
     return c.text('Expected a JSON object', 400)
   }
-  const patch: ThreadConfigPatch = {}
+  const patch: SessionConfigPatch = {}
   const record = body as Record<string, unknown>
   for (const key of ['model', 'effort'] as const) {
     if (!(key in record)) continue
@@ -476,7 +556,7 @@ one.put('/sessions/:sessionId/config', async c => {
     }
     patch.fastMode = value
   }
-  return c.json(await saveThreadConfig(c.get('ws').path, c.req.param('sessionId'), patch))
+  return c.json(await saveSessionConfig(c.get('ws').path, c.req.param('sessionId'), patch))
 })
 
 one.get('/mcp', async c => {
@@ -594,7 +674,8 @@ one.get('/models', async c => {
   return c.json({
     provider: harness.id,
     models,
-    supportsStreaming: harness.capabilities.supportsStreaming
+    supportsStreaming: harness.capabilities.supportsStreaming,
+    supportsArchiving: Boolean(harness.archiveSession)
   } satisfies WorkspaceModels)
 })
 

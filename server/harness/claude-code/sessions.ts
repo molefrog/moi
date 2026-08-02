@@ -1,10 +1,18 @@
 // Session discovery + history replay for Claude Code workspaces, backed by
 // the Agent SDK's persisted `.jsonl` session files.
-import { getSessionMessages, listSessions } from '@anthropic-ai/claude-agent-sdk'
+import { getSessionMessages, listSessions, tagSession } from '@anthropic-ai/claude-agent-sdk'
+import type { SDKSessionInfo } from '@anthropic-ai/claude-agent-sdk'
 
+import {
+  attachmentOnlyFilenames,
+  isAttachmentOnlyPlaceholder,
+  splitAttachmentNote
+} from '@/lib/attachment-note'
 import type { SessionInfo, StreamEvent } from '@/lib/types'
 
 import { ClaudeAdapter } from './adapter'
+
+export const MOI_ARCHIVED_SESSION_TAG = 'moi:archived'
 
 export type SessionFirstPromptCandidate = {
   sessionId: string
@@ -18,11 +26,27 @@ export type SessionWorkspacePreview = {
   updatedAt?: number
 }
 
+export function claudeSessionSummary(
+  session: Pick<SDKSessionInfo, 'customTitle' | 'firstPrompt' | 'summary'>
+): string {
+  if (session.customTitle || !session.firstPrompt || session.summary !== session.firstPrompt) {
+    return session.summary
+  }
+  const split = splitAttachmentNote(session.firstPrompt)
+  return isAttachmentOnlyPlaceholder(split.text)
+    ? attachmentOnlyFilenames(split.text).join(', ')
+    : session.summary
+}
+
+export function visibleClaudeSessions<T extends Pick<SDKSessionInfo, 'tag'>>(sessions: T[]): T[] {
+  return sessions.filter(session => session.tag !== MOI_ARCHIVED_SESSION_TAG)
+}
+
 export async function getSessions(workspacePath: string): Promise<SessionInfo[]> {
-  const sessions = await listSessions({ dir: workspacePath })
+  const sessions = visibleClaudeSessions(await listSessions({ dir: workspacePath }))
   return sessions.map(s => ({
     sessionId: s.sessionId,
-    summary: s.summary,
+    summary: claudeSessionSummary(s),
     lastModified: s.lastModified,
     cwd: s.cwd
   }))
@@ -55,7 +79,7 @@ export async function getSessionWorkspacePreview(
   workspacePath: string,
   includeFirstUserMessage: boolean
 ): Promise<SessionWorkspacePreview> {
-  const sessions = await listSessions({ dir: workspacePath })
+  const sessions = visibleClaudeSessions(await listSessions({ dir: workspacePath }))
   const updatedAt = selectLatestSessionUpdatedAt(sessions)
   const firstUserMessage = includeFirstUserMessage
     ? selectOldestSessionFirstUserMessage(sessions)
@@ -65,6 +89,13 @@ export async function getSessionWorkspacePreview(
     ...(firstUserMessage ? { firstUserMessage } : {}),
     ...(updatedAt !== undefined ? { updatedAt } : {})
   }
+}
+
+export async function archiveClaudeSession(
+  sessionId: string,
+  workspacePath: string
+): Promise<void> {
+  await tagSession(sessionId, MOI_ARCHIVED_SESSION_TAG, { dir: workspacePath })
 }
 
 /**

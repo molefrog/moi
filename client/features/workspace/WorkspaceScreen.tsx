@@ -5,12 +5,13 @@ import { AnimatePresence, motion } from 'motion/react'
 import {
   IconArticle,
   IconBrowserPlus,
-  IconGhost,
   IconLayout2,
   IconLayoutSidebarRight,
   IconLetterCase,
   IconSketching
 } from '@tabler/icons-react'
+
+import { IconGhost } from '@/client/components/shared/IconGhost'
 import { ChatPanel } from '@/client/features/chat/ChatPanel'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { CustomizePanel } from '@/client/features/workspace/CustomizePanel'
@@ -33,6 +34,11 @@ import { useWorkspaceAvailability } from '@/client/features/workspace/api'
 import { WorkspaceSkillUpdateBanner } from '@/client/features/workspace/WorkspaceSkillUpdateBanner'
 import { useWorkspaceSkillUpdates } from '@/client/features/workspace/useWorkspaceSkillUpdates'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
+import {
+  hasRunningWorkspaceActivity,
+  isSessionRunning,
+  useLive
+} from '@/client/features/chat/chat-store'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import {
@@ -43,7 +49,6 @@ import {
 import { useWorkspaceNavigation } from '@/client/features/workspace/useWorkspaceNavigation'
 import { resolveAppIcon } from '@/client/lib/app-icon-registry'
 import { cn } from '@/client/lib/cn'
-import { liveStore } from '@/client/features/chat/chat-store'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import { useUiStore } from '@/client/store/ui'
 import {
@@ -194,14 +199,17 @@ function tabItemFor(
   tab: WorkspaceTabId,
   views: ViewInfo[],
   builders: ViewBuilder[],
-  closable: boolean
+  closable: boolean,
+  agentRunning: boolean,
+  builderRunning: (sessionId: string) => boolean
 ): WorkspaceTabItem | null {
   if (tab === 'agent') {
     return {
       key: tab,
       Icon: IconGhost,
       label: 'Agent',
-      closable
+      closable,
+      loading: agentRunning
     }
   }
   if (tab === 'widgets') {
@@ -227,7 +235,8 @@ function tabItemFor(
       key: tab,
       Icon: viewBuilderIcon(builder),
       label: builder.title || builder.viewId || 'New view',
-      closable
+      closable,
+      loading: builderRunning(builder.sessionId)
     }
   }
   const viewId = viewIdFromTab(tab)
@@ -265,6 +274,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
   const [floatingChatOpen, setFloatingChatOpen] = useState(false)
   const [chatFocusRequest, setChatFocusRequest] = useState(0)
+  const sessionActivity = useLive(state => state.activity)
+  const hasRunningSession = hasRunningWorkspaceActivity(sessionActivity, workspaceId)
 
   useWorkspaceTheme(layout.theme)
 
@@ -301,7 +312,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     error,
     send,
     stop,
-    switchThread,
+    selectSession,
     dismissError
   } = useChat({ activeTab, appletParams })
 
@@ -318,7 +329,14 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const canCloseTabs = openTabIds.length > 1
   const tabItems = visibleTabIds
     .map(tab =>
-      tabItemFor(tab, views, builders, canCloseTabs || viewBuilderIdFromTab(tab) !== null)
+      tabItemFor(
+        tab,
+        views,
+        builders,
+        canCloseTabs || viewBuilderIdFromTab(tab) !== null,
+        hasRunningSession,
+        sessionId => isSessionRunning(sessionActivity, workspaceId, sessionId)
+      )
     )
     .filter((tab): tab is WorkspaceTabItem => Boolean(tab))
   const activeViewId = viewIdFromTab(activeTab)
@@ -374,11 +392,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     const active = replacements.get(tabsState.active) ?? tabsState.active
     setLayout({ tabs: { open: open.length > 0 ? open : ['agent'], active } })
   }, [activeTab, builders, navigateToTab, setLayout, tabsState, views])
-
-  useEffect(() => {
-    const linked = activeBuilder ?? builders.find(builder => builder.viewId === activeViewId)
-    if (linked) liveStore.getState().setActive(workspaceId, linked.sessionId)
-  }, [activeBuilder, activeViewId, builders, workspaceId])
 
   useEffect(() => {
     if (mode !== 'fullscreen' || activeTab === 'agent') {
@@ -527,7 +540,10 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       Icon: IconBrowserPlus,
       label: 'New view',
       onClick: () => {
-        void builderActions.create().then(builder => openTab(viewBuilderTabId(builder.id)))
+        void builderActions.create().then(builder => {
+          selectSession(builder.sessionId)
+          openTab(viewBuilderTabId(builder.id))
+        })
       }
     }
   ]
@@ -550,7 +566,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       unavailableReason={unavailableReason}
       send={send}
       stop={stop}
-      onSwitchThread={switchThread}
+      onSelectSession={selectSession}
     />
   )
 
@@ -571,7 +587,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       unavailableReason={unavailableReason}
       send={send}
       stop={stop}
-      onSwitchThread={switchThread}
+      onSelectSession={selectSession}
     />
   )
 
@@ -628,7 +644,10 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
                 editing={widgetMode === 'editing'}
                 onEditingChange={editing => setWidgetMode(editing ? 'editing' : 'idle')}
                 widgets={widgets}
-                onCreateWidget={() => openChat('Create widget')}
+                onCreateWidget={() => {
+                  selectSession(null)
+                  openChat('Create widget')
+                }}
               />
             ) : activeTab === 'scratchpad' ? (
               <Suspense fallback={null}>
@@ -645,7 +664,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
                   return builderActions.submit(activeBuilder, requirements)
                 }}
                 onOpenChat={() => {
-                  liveStore.getState().setActive(workspaceId, activeBuilder.sessionId)
+                  selectSession(activeBuilder.sessionId)
                   openChat()
                 }}
                 onDiscard={() => discardBuilder(activeBuilder)}
@@ -675,6 +694,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
 
       {mode === 'fullscreen' && activeTab !== 'agent' && hasWorkspaceContent && (
         <ChatPopup
+          loading={hasRunningSession}
           open={floatingChatOpen}
           onOpenChange={setFloatingChatOpen}
           onOpenChangeComplete={open => {
@@ -702,7 +722,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               unavailableReason={unavailableReason}
               send={send}
               stop={stop}
-              onSwitchThread={switchThread}
+              onSelectSession={selectSession}
               onClose={onClose}
             />
           )}

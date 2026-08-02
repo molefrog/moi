@@ -25,6 +25,7 @@ import type {
   OpenClawSessionDetail,
   OpenClawSessionRow
 } from './discovery'
+import { formatChatTitle } from '@/lib/chat-title'
 import { stripMoiContextLoose } from '@/lib/moi-context'
 import { stripUserMessageMetadata } from './strip'
 
@@ -33,9 +34,10 @@ export function toSessionInfo(row: OpenClawSessionRow, cwd: string): SessionInfo
   // includes the appended context envelope, and truncation can cut it open,
   // so clean with the loose strip like the Codex previews do.
   const summary =
-    stripMoiContextLoose(row.lastMessagePreview ?? '').trim() ||
-    row.displayName?.trim() ||
     row.label?.trim() ||
+    row.displayName?.trim() ||
+    row.derivedTitle?.trim() ||
+    formatChatTitle(stripMoiContextLoose(row.lastMessagePreview ?? '')) ||
     ''
   return {
     sessionId: row.sessionId,

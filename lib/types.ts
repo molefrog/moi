@@ -258,15 +258,19 @@ export type SessionInfo = {
   cwd?: string
 }
 
-// Per-thread agent settings, persisted server-side in one global file in moi's
+// Per-session agent settings, persisted server-side in one global file in moi's
 // data dir (NOT in the workspace), exposed via GET/PUT
-// /api/workspaces/:id/sessions/:sessionId/config. A thread reopens with the same
-// model/effort/Fast mode it last ran with; a brand-new thread is seeded from the
+// /api/workspaces/:id/sessions/:sessionId/config. A session reopens with the same
+// model/effort/Fast mode it last ran with; a brand-new session is seeded from the
 // corresponding workspace defaults.
-export type ThreadConfig = {
+export type SessionConfig = {
   model?: string
   effort?: string
   fastMode?: boolean
+}
+
+export type SelectedSessionState = {
+  sessionId: string | null
 }
 
 // App-wide settings, persisted server-side as `settings.json` in moi's data
@@ -308,6 +312,7 @@ export type ServerMessage =
   | PreviewFrame
   | StatusMessage
   | SessionRenamedMessage
+  | SessionsChangedMessage
   | WorkspaceSwitchMessage
   | ErrorFrame
   | StoppedFrame
@@ -351,6 +356,7 @@ export type BroadcastFrame =
   | Omit<PreviewFrame, 'workspaceId'>
   | Omit<StatusMessage, 'workspaceId'>
   | Omit<SessionRenamedMessage, 'workspaceId'>
+  | Omit<SessionsChangedMessage, 'workspaceId'>
   | Omit<ErrorFrame, 'workspaceId'>
   | Omit<StoppedFrame, 'workspaceId'>
 
@@ -437,6 +443,12 @@ export type SessionRenamedMessage = {
   to: string
 }
 
+export type SessionsChangedMessage = {
+  type: 'sessions_changed'
+  workspaceId: string
+  sessionId: string
+}
+
 export type ErrorFrame = {
   kind: 'error'
   workspaceId: string
@@ -513,13 +525,13 @@ export type WorkspaceLayout = {
   // doesn't map back to these aliases — hence we persist the pick here.
   //
   // This (with `selectedEffort` and `selectedFastMode`) is the *workspace
-  // default*: the value the picker edits when no thread is open, and the seed a
-  // brand-new thread copies. Once a thread exists it carries its own per-thread
-  // override (see `ThreadConfig`).
+  // default*: the value the picker edits when no session is open, and the seed a
+  // brand-new session copies. Once a session exists it carries its own per-session
+  // override (see `SessionConfig`).
   selectedModel?: string
-  // Reasoning-effort default for new threads (a `supportedEffortLevels` value).
+  // Reasoning-effort default for new sessions (a `supportedEffortLevels` value).
   selectedEffort?: string
-  // Fast-mode default for new threads. Undefined inherits the provider setting.
+  // Fast-mode default for new sessions. Undefined inherits the provider setting.
   selectedFastMode?: boolean
   theme?: {
     font: import('./themes').FontTheme
@@ -550,7 +562,7 @@ export type WidgetThumbnails = {
 // Home-screen workspace card preview: a few captured widget thumbnails (WebP
 // data URLs) from the stored layout, rendered as a loose stack, plus the latest
 // provider session activity. A workspace with no widgets may instead carry its
-// oldest thread's first user message.
+// oldest session's first user message.
 export type WorkspacePreview = {
   thumbnails: string[]
   firstUserMessage?: string
@@ -620,4 +632,6 @@ export type WorkspaceModels = {
   // shows the "Live typing" toggle only when true). Provider-wide, not per-model
   // — Claude Code streams uniformly via `includePartialMessages`.
   supportsStreaming?: boolean
+  // Whether the provider can archive chats from the chat selector.
+  supportsArchiving?: boolean
 }

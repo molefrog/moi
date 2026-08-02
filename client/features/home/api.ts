@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { liveStore } from '@/client/features/chat/chat-store'
 import { useUiStore } from '@/client/store/ui'
 import type {
   DiscoveredWorkspace,
@@ -52,7 +51,6 @@ export function useImportWorkspace() {
     mutationFn: input =>
       requestJson('/api/workspaces', jsonRequest('POST', input), 'Failed to add workspace'),
     onSuccess: (entry, input) => {
-      liveStore.getState().setActive(entry.id, null)
       useUiStore.getState().markWorkspacePendingAnalysis(entry.id)
       queryClient.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, previous =>
         upsertWorkspaceEntry(previous, entry)

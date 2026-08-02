@@ -4,11 +4,12 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import {
+  useSessionConfig,
   useSessionView,
-  useThreadConfig,
   useWorkspaceModels,
   useWorkspaceSessions
 } from '@/client/features/chat/api'
+import { useSelectedSession } from '@/client/features/chat/useSelectedSession'
 import {
   type WorkspaceTabAddress,
   useMoiUserMessageContext
@@ -21,19 +22,25 @@ import {
   attachmentsForSend,
   ownsComposerAttachments,
   resolveChatRunOptions,
+  startOptimisticSession,
   startOptimisticTurn
 } from '@/client/features/chat/chat-send'
 import { buildPreviewTurn } from '@/client/features/chat/preview-turn'
-import { liveStore, selectPreviews, useLive } from '@/client/features/chat/chat-store'
+import {
+  isRunningActivity,
+  liveStore,
+  selectPreviews,
+  useLive
+} from '@/client/features/chat/chat-store'
 import { useUiStore } from '@/client/store/ui'
 import { emptyViewState } from '@/lib/format'
 import type { Part, ViewState } from '@/lib/types'
 
 const EMPTY: ViewState = emptyViewState()
 
-// Thin projection over app-level state: the active thread + spinner/error come
-// from the live store; the transcript comes from the React Query cache (kept
-// current by the connection manager's WS deltas). No socket lifecycle here.
+// Thin projection over app-level state: the selected session comes from
+// useSelectedSession, spinner/error come from the live store, and the
+// transcript comes from the React Query cache. No socket lifecycle here.
 //
 // Takes the workspace's tab address because every message carries it: the
 // envelope tells the agent which tab the user is on and what the active view
@@ -42,34 +49,28 @@ export function useChat(address: WorkspaceTabAddress) {
   const workspaceId = useWorkspaceId()
   const qc = useQueryClient()
   const { layout } = useWorkspaceLayoutCtx()
+  const [selectedSession, selectSession] = useSelectedSession()
+  const selectedSessionId = selectedSession ?? null
   const modelsData = useWorkspaceModels(workspaceId).data
   const sessions = useWorkspaceSessions(workspaceId).data
   // Snapshot of the workspace's ambient UI state + queued one-shot
   // directives, taken when the message actually goes out.
   const buildMoiContext = useMoiUserMessageContext(address)
 
-  const activeSessionId = useLive(s => s.activeByWorkspace[workspaceId] ?? null)
-  const sessionSelectionInitialized = useLive(s =>
-    Object.prototype.hasOwnProperty.call(s.activeByWorkspace, workspaceId)
-  )
   const activity = useLive(s =>
-    activeSessionId ? (s.activity[`${workspaceId}:${activeSessionId}`] ?? 'idle') : 'idle'
+    selectedSessionId ? (s.activity[`${workspaceId}:${selectedSessionId}`] ?? 'idle') : 'idle'
   )
   // Only `running` shows the loader/Stop. `requires-action` (agent blocked on
   // user input) deliberately renders like idle until it gets its own UI.
-  const processing = activity === 'running'
+  const processing = isRunningActivity(activity)
   const error = useLive(s =>
-    activeSessionId ? (s.errors[`${workspaceId}:${activeSessionId}`] ?? null) : null
+    selectedSessionId ? (s.errors[`${workspaceId}:${selectedSessionId}`] ?? null) : null
   )
 
-  const viewQuery = useSessionView(workspaceId, activeSessionId)
+  const viewQuery = useSessionView(workspaceId, selectedSessionId)
   const view = viewQuery.data ?? EMPTY
   const chatLoaded =
-    sessionSelectionInitialized &&
-    sessions !== undefined &&
-    (activeSessionId === null ||
-      (sessions.some(session => session.sessionId === activeSessionId) &&
-        viewQuery.data !== undefined))
+    sessions !== undefined && (selectedSessionId === null || viewQuery.data !== undefined)
 
   // The live streaming preview as a synthetic assistant turn, so the ChatPanel
   // can run it through the SAME groupTurns pipeline as finalized turns — a
@@ -78,34 +79,41 @@ export function useChat(address: WorkspaceTabAddress) {
   // stable across other updates); null when there's nothing visible yet.
   const previews = useLive(s => s.previews)
   const previewTurn = useMemo(
-    () => buildPreviewTurn(selectPreviews(previews, workspaceId, activeSessionId).root),
-    [previews, workspaceId, activeSessionId]
+    () => buildPreviewTurn(selectPreviews(previews, workspaceId, selectedSessionId).root),
+    [previews, workspaceId, selectedSessionId]
   )
 
-  // The active thread's persisted model/effort. For a brand-new chat (no thread
-  // yet) this is empty and `send` falls back to the workspace defaults below.
-  const threadCfg = useThreadConfig(workspaceId, activeSessionId).data
+  // The selected session's persisted model/effort. For a brand-new chat (no
+  // session yet) this is empty and `send` falls back to workspace defaults.
+  const sessionConfig = useSessionConfig(workspaceId, selectedSessionId).data
 
   // The composer owns the workspace draft in the persisted UI store and hands
   // the text in, so a keystroke re-renders only the composer.
   const send = useCallback(
     (draft: string, options?: ChatSendOptions) => {
       const text = draft.trim()
-      // Attachments stay with the active thread. Only fully-uploaded ones are
+      // Attachments stay with the selected session. Only fully-uploaded ones are
       // sent; the composer disables send while any are still uploading, so in
       // practice they're all ready here. An applet send gets none — the staged
       // files are the user's, not the widget's.
-      const ready = attachmentsForSend(workspaceId, activeSessionId, options)
+      const ready = attachmentsForSend(workspaceId, selectedSessionId, options)
       // No `processing` guard: sending while a turn is in flight QUEUES the
       // message into the same live server session (streaming-input mode).
       if (!text && ready.length === 0) return
 
-      let sid = activeSessionId
+      let sid = selectedSessionId
       let isNew = false
       if (!sid) {
         sid = crypto.randomUUID()
         isNew = true
-        liveStore.getState().setActive(workspaceId, sid)
+        selectSession(sid)
+        startOptimisticSession({
+          queryClient: qc,
+          workspaceId,
+          sessionId: sid,
+          text,
+          filenames: ready.map(attachment => attachment.name)
+        })
       }
 
       // Optimistic user turn — primed into the RQ transcript cache so it renders
@@ -129,15 +137,15 @@ export function useChat(address: WorkspaceTabAddress) {
         parts
       })
 
-      // The thread's persisted choice (workspace defaults for a new chat). Drop a
+      // The session's persisted choice (workspace defaults for a new chat). Drop a
       // model the loaded list no longer offers (stale alias) so the SDK doesn't
       // reject model_not_found. Drop an effort the resolved model doesn't
       // support and explicitly disable Fast mode on a known unsupported model.
       // When the model is unknown/default we can't validate either capability,
       // so pass the stored choices through.
-      const pickedModel = threadCfg?.model ?? layout.selectedModel
-      const pickedEffort = threadCfg?.effort ?? layout.selectedEffort
-      const pickedFastMode = threadCfg?.fastMode ?? layout.selectedFastMode
+      const pickedModel = sessionConfig?.model ?? layout.selectedModel
+      const pickedEffort = sessionConfig?.effort ?? layout.selectedEffort
+      const pickedFastMode = sessionConfig?.fastMode ?? layout.selectedFastMode
       const { model, effort, fastMode, stream } = resolveChatRunOptions(
         modelsData,
         pickedModel,
@@ -162,56 +170,50 @@ export function useChat(address: WorkspaceTabAddress) {
       if (isNew) {
         qc.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
       }
-      // Drop the thread's attachments now that they've been sent (revokes the
+      // Drop the session's attachments now that they've been sent (revokes the
       // preview object URLs). Keyed by the pre-mint id, matching where they were
       // stored by the composer. Skipped for an applet send, which carried none:
       // clearing here would discard the user's staged (and in-flight) files.
       if (ownsComposerAttachments(options)) {
-        liveStore.getState().clearAttachments(workspaceId, activeSessionId)
+        liveStore.getState().clearAttachments(workspaceId, selectedSessionId)
       }
     },
     [
-      activeSessionId,
+      selectedSessionId,
       workspaceId,
       qc,
       layout.selectedModel,
       layout.selectedEffort,
       layout.selectedFastMode,
       buildMoiContext,
-      threadCfg?.model,
-      threadCfg?.effort,
-      threadCfg?.fastMode,
+      sessionConfig?.model,
+      sessionConfig?.effort,
+      sessionConfig?.fastMode,
+      selectSession,
       modelsData
     ]
   )
 
   const dismissError = useCallback(() => {
-    if (!activeSessionId) return
-    liveStore.getState().setError(workspaceId, activeSessionId, null)
-  }, [activeSessionId, workspaceId])
+    if (!selectedSessionId) return
+    liveStore.getState().setError(workspaceId, selectedSessionId, null)
+  }, [selectedSessionId, workspaceId])
 
   const stop = useCallback(() => {
-    if (!processing || !activeSessionId) return
-    sendMessage({ type: 'stop', workspaceId, sessionId: activeSessionId })
-  }, [processing, activeSessionId, workspaceId])
-
-  const switchThread = useCallback(
-    (sessionId: string | null) => {
-      liveStore.getState().setActive(workspaceId, sessionId)
-    },
-    [workspaceId]
-  )
+    if (!processing || !selectedSessionId) return
+    sendMessage({ type: 'stop', workspaceId, sessionId: selectedSessionId })
+  }, [processing, selectedSessionId, workspaceId])
 
   return {
     view,
     chatLoaded,
     previewTurn,
-    sessionId: activeSessionId,
+    sessionId: selectedSessionId,
     processing,
     error,
     send,
     stop,
-    switchThread,
+    selectSession,
     dismissError
   }
 }

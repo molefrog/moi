@@ -339,6 +339,17 @@ describe('discovery mappings', () => {
     })
   })
 
+  test('thread row prefers an explicit name over its preview', () => {
+    expect(
+      codexThreadToSessionInfo({
+        id: 'th-1',
+        name: 'My chat name',
+        preview: 'Fix the bug',
+        updatedAt: 200
+      }).summary
+    ).toBe('My chat name')
+  })
+
   test('codex model → picker Model with effort levels', () => {
     const model = codexModelToModel({
       id: 'gpt-5.6-sol',

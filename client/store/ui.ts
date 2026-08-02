@@ -2,8 +2,8 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import type { StateStorage } from 'zustand/middleware'
 
-// Device-local UI preferences and onboarding markers, persisted to localStorage
-// so they survive reloads. Server-owned workspace data does NOT belong here.
+// Per-browser UI preferences and onboarding markers, persisted to localStorage
+// so they survive reloads. Server-backed per-user app state belongs in DATA_DIR.
 type UiStore = {
   discoveredWorkspacesOpen: boolean
   hasSentMessageFromMoi: boolean

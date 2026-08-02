@@ -76,6 +76,8 @@ export type Harness = {
   // -- chat lifecycle ---------------------------------------------------------
   sendMessage(input: SendMessageInput): Promise<void>
   interrupt(workspaceId: string, sessionId: string): Promise<void>
+  // Optional because some providers do not expose an archive operation.
+  archiveSession?(ws: WorkspaceEntry, sessionId: string): Promise<void>
   // Every session whose activity is not `idle`, across all workspaces (drives
   // the status snapshot and view-builder reconciliation). Activity is mirrored
   // from the backend's native lifecycle signal, never derived by counting.

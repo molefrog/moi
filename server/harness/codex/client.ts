@@ -320,6 +320,25 @@ export async function getCodexSessions(workspacePath: string): Promise<SessionIn
   }
 }
 
+export async function archiveCodexThread(
+  client: Pick<CodexClient, 'rpc'>,
+  threadId: string
+): Promise<void> {
+  await client.rpc('thread/archive', { threadId })
+}
+
+export async function interruptCodexTurn(
+  client: Pick<CodexClient, 'rpc'>,
+  threadId: string,
+  turnId: string
+): Promise<void> {
+  await client.rpc('turn/interrupt', { threadId, turnId })
+}
+
+export async function archiveCodexSession(workspacePath: string, threadId: string): Promise<void> {
+  await archiveCodexThread(await getCodexClient(workspacePath), threadId)
+}
+
 // Home-page card preview. Peek-only: with no live app-server the card simply
 // omits the activity fields until the workspace is opened once.
 export async function getCodexWorkspacePreview(
@@ -341,21 +360,22 @@ export async function getCodexWorkspacePreview(
 
 // Account-wide model catalog (identical for every workspace); cached like the
 // Claude list in agent.ts, cleared on failure so a later call can retry. Keep
-// the raw catalog cached because the effective service tier is cwd-scoped.
-let codexModelsPromise: Promise<CodexModel[]> | null = null
+// the raw rows so internal helpers can read isDefault and effort ordering.
+// The effective service tier is cwd-scoped and applied after reading the cache.
+let codexModelCatalogPromise: Promise<CodexModel[]> | null = null
 
-function getCachedCodexModels(workspacePath: string): Promise<CodexModel[]> {
-  if (!codexModelsPromise) {
-    codexModelsPromise = (async () => {
+export function getCodexModelCatalog(workspacePath: string): Promise<CodexModel[]> {
+  if (!codexModelCatalogPromise) {
+    codexModelCatalogPromise = (async () => {
       const client = await getCodexClient(workspacePath)
       const res = await client.rpc<{ data?: CodexModel[] }>('model/list', {})
-      return res.data ?? []
+      return (res.data ?? []).filter(model => !model.hidden)
     })().catch(err => {
-      codexModelsPromise = null
+      codexModelCatalogPromise = null
       throw err
     })
   }
-  return codexModelsPromise
+  return codexModelCatalogPromise
 }
 
 async function getCodexConfiguredServiceTier(
@@ -378,12 +398,10 @@ async function getCodexConfiguredServiceTier(
 
 export async function getCodexModels(workspacePath: string): Promise<Model[]> {
   const [models, configuredServiceTier] = await Promise.all([
-    getCachedCodexModels(workspacePath),
+    getCodexModelCatalog(workspacePath),
     getCodexConfiguredServiceTier(workspacePath)
   ])
-  return models
-    .filter(model => !model.hidden)
-    .map(model => codexModelToModel(model, configuredServiceTier))
+  return models.map(model => codexModelToModel(model, configuredServiceTier))
 }
 
 // MCP servers as Codex sees them (from ~/.codex/config.toml), for the

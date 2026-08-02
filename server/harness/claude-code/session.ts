@@ -18,8 +18,10 @@ import {
   query
 } from '@anthropic-ai/claude-agent-sdk'
 
-import { ATTACHMENT_ONLY_PLACEHOLDER, appendAttachmentNote } from '@/lib/attachment-note'
+import { appendAttachmentNote, attachmentOnlyPlaceholder } from '@/lib/attachment-note'
+import { buildSessionTitleSource } from '../session-title'
 import { ClaudeAdapter } from './adapter'
+import { generateClaudeSessionTitle, renameClaudeSessionIfUnchanged } from './session-title'
 import type { Part } from '@/lib/format'
 import type { SessionActivity } from '@/lib/types'
 import { type MoiContext, moiContextSystemReminder, renderMoiContext } from '@/lib/moi-context'
@@ -27,7 +29,8 @@ import { type MoiContext, moiContextSystemReminder, renderMoiContext } from '@/l
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
 import { broadcast } from '../../state'
-import { hasThreadConfig, renameThreadConfig, saveThreadConfig } from '../../thread-config'
+import { renameSelectedSession } from '../../selected-session'
+import { hasSessionConfig, renameSessionConfig, saveSessionConfig } from '../../session-config'
 import { type StoredUpload, resolveUploads, uploadToDisplayPart } from '../../uploads'
 import {
   markViewBuilderBuildingBySession,
@@ -80,11 +83,11 @@ export function buildUserMessage(
 
   const files = uploads.filter(u => u.kind === 'file' && u.path)
   const agentText = appendAttachmentNote(
-    text,
+    text || attachmentOnlyPlaceholder(uploads.map(upload => upload.filename)),
     files.map(f => ({ filename: f.filename, path: f.path! }))
   )
   // Always end with a text block so an image-only message still has a prompt.
-  blocks.push({ type: 'text', text: agentText || ATTACHMENT_ONLY_PLACEHOLDER })
+  blocks.push({ type: 'text', text: agentText })
   return { content: blocks, parts }
 }
 
@@ -121,6 +124,7 @@ type InputQueue = {
 type LiveSession = {
   workspaceId: string
   workspacePath: string
+  workspaceEnv: Record<string, string>
   sessionId: string // current real id (rekeyed on rename)
   q: Query
   adapter: ClaudeAdapter
@@ -166,6 +170,9 @@ type LiveSession = {
   createdAt: number
   lastActivityAt: number
   lastUserText: string | undefined
+  refreshSessionsOnResult: boolean
+  sessionTitleSource: string | undefined
+  sessionTitleAbort: AbortController | null
 }
 
 const sessions = new Map<string, LiveSession>()
@@ -333,6 +340,8 @@ function teardown(s: LiveSession) {
   setActivity(s, 'idle')
   s.closed = true
   clearIdle(s)
+  s.sessionTitleAbort?.abort()
+  s.sessionTitleAbort = null
   s.input.close()
   try {
     s.q.close?.()
@@ -345,17 +354,59 @@ function teardown(s: LiveSession) {
   }
 }
 
+function isCurrentLiveSession(s: LiveSession, abort: AbortController): boolean {
+  return (
+    !s.closed && !abort.signal.aborted && sessions.get(recKey(s.workspaceId, s.sessionId)) === s
+  )
+}
+
+function startClaudeSessionTitleJob(s: LiveSession) {
+  if (!s.sessionTitleSource || s.closed) return
+  const source = s.sessionTitleSource
+  s.sessionTitleSource = undefined
+  const abort = new AbortController()
+  s.sessionTitleAbort = abort
+
+  void (async () => {
+    try {
+      const title = await generateClaudeSessionTitle({
+        source,
+        abortController: abort
+      })
+      if (!title || !isCurrentLiveSession(s, abort)) return
+
+      const renamed = await renameClaudeSessionIfUnchanged({
+        sessionId: s.sessionId,
+        workspacePath: s.workspacePath,
+        title,
+        isCurrent: () => isCurrentLiveSession(s, abort)
+      })
+      if (!renamed || !isCurrentLiveSession(s, abort)) return
+      broadcast(s.workspaceId, { type: 'sessions_changed', sessionId: s.sessionId })
+      debug(
+        `cc session title ws=${s.workspaceId} session=${s.sessionId} title=${JSON.stringify(title)}`
+      )
+    } catch (err) {
+      debug(
+        `cc session title failed ws=${s.workspaceId} session=${s.sessionId}: ${err instanceof Error ? err.message : String(err)}`
+      )
+    } finally {
+      if (s.sessionTitleAbort === abort) s.sessionTitleAbort = null
+    }
+  })()
+}
+
 // On `system/init` the SDK reports the real session id. For a brand-new session
 // that differs from the client's temporary id, so we rekey the registry and
 // tell the client to move its optimistic state. Subsequent inits report the
 // same id and no-op.
-function renameSession(s: LiveSession, realId: string) {
+function renameSession(s: LiveSession, realId: string): string {
   const from = s.sessionId
   sessions.delete(recKey(s.workspaceId, from))
   s.sessionId = realId
   sessions.set(recKey(s.workspaceId, realId), s)
   aliases.set(recKey(s.workspaceId, from), realId)
-  broadcast(s.workspaceId, { type: 'session_renamed', from, to: realId })
+  return from
 }
 
 // The session just went idle (state event, or `result` on a CLI without state
@@ -380,21 +431,27 @@ async function consume(s: LiveSession) {
       if (msg.type === 'system' && msg.subtype === 'init') {
         const realId = msg.session_id
         if (realId && realId !== s.sessionId) {
-          const from = s.sessionId
-          renameSession(s, realId)
+          const from = renameSession(s, realId)
           // Carry any config the picker wrote under the temp id to the real id.
-          await renameThreadConfig(s.workspacePath, from, s.sessionId)
+          await renameSessionConfig(s.workspacePath, from, s.sessionId)
+          await renameSelectedSession(s.workspacePath, from, s.sessionId)
           await renameViewBuilderSession(s.workspaceId, s.workspacePath, from, s.sessionId)
+          broadcast(s.workspaceId, {
+            type: 'session_renamed',
+            from,
+            to: s.sessionId
+          })
         }
-        // Seed the thread's config from what it actually ran with — but only if
+        startClaudeSessionTitleJob(s)
+        // Seed the session's config from what it actually ran with — but only if
         // it has none yet, so an explicit user PUT (or a migrated temp-id edit)
         // always wins. A default run leaves no file and falls back to the
         // workspace defaults.
         if (
           (s.model || s.effort || s.fastMode !== undefined) &&
-          !(await hasThreadConfig(s.workspacePath, s.sessionId))
+          !(await hasSessionConfig(s.workspacePath, s.sessionId))
         ) {
-          await saveThreadConfig(s.workspacePath, s.sessionId, {
+          await saveSessionConfig(s.workspacePath, s.sessionId, {
             model: s.model,
             effort: s.effort,
             fastMode: s.fastMode
@@ -475,6 +532,10 @@ async function consume(s: LiveSession) {
             ? undefined
             : msg.errors.join('\n') || msg.subtype.replaceAll('_', ' ')
         debug(`cc result ws=${s.workspaceId} session=${s.sessionId} subtype=${msg.subtype}`)
+        if (s.refreshSessionsOnResult) {
+          s.refreshSessionsOnResult = false
+          broadcast(s.workspaceId, { type: 'sessions_changed', sessionId: s.sessionId })
+        }
         // Fallback for CLIs that never emit `session_state_changed`: treat
         // every result as turn-over. With state events, `idle` follows the
         // result and drives the same path.
@@ -530,6 +591,7 @@ function createLiveSession(input: {
   // Resolved workspace env (.env + UI custom overrides), injected so the agent's
   // Bash tool can use workspace secrets. Frozen at spawn — see restartWorkspaceSessions.
   workspaceEnv: Record<string, string>
+  sessionTitleSource: string | undefined
 }): LiveSession {
   evictIfNeeded()
 
@@ -570,6 +632,7 @@ function createLiveSession(input: {
   const session: LiveSession = {
     workspaceId: input.workspaceId,
     workspacePath: input.workspacePath,
+    workspaceEnv: input.workspaceEnv,
     sessionId: input.sessionId,
     q: query({ prompt: queue.iterator, options }),
     adapter: new ClaudeAdapter(),
@@ -589,7 +652,10 @@ function createLiveSession(input: {
     lastBuilderError: undefined,
     createdAt: Date.now(),
     lastActivityAt: Date.now(),
-    lastUserText: undefined
+    lastUserText: undefined,
+    refreshSessionsOnResult: input.isNew,
+    sessionTitleSource: input.sessionTitleSource,
+    sessionTitleAbort: null
   }
   sessions.set(recKey(session.workspaceId, session.sessionId), session)
   debug(
@@ -625,6 +691,12 @@ export async function sendCCMessage(input: {
     ? resolveUploads(input.workspaceId, input.attachments)
     : []
   if (!input.content && uploads.length === 0) return
+  const sessionTitleSource = input.isNew
+    ? buildSessionTitleSource(
+        input.content,
+        uploads.map(upload => upload.filename)
+      )
+    : undefined
   const { content: userContent, parts } = buildUserMessage(input.content, uploads)
   // The envelope goes in as its OWN leading text block, never merged into the
   // user's string: the SDK's first-prompt extraction (session titles,
@@ -695,6 +767,7 @@ export async function sendCCMessage(input: {
       effort: input.effort,
       fastMode: input.fastMode,
       stream: wantStream,
+      sessionTitleSource,
       // The agent only sees secrets scoped to the 'agent' sink (plus .env).
       workspaceEnv: await resolveWorkspaceEnv(input.workspacePath)
     })
@@ -771,6 +844,7 @@ export async function interruptCCSession(workspaceId: string, sessionId: string)
     }
   } catch (err) {
     console.error('[cc-session] interrupt failed', err)
+    teardown(s)
   } finally {
     clearTimeout(timer)
   }

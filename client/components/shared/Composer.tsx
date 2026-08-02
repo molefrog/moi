@@ -1,10 +1,11 @@
 import type { ComponentProps, RefObject } from 'react'
 
-import { IconArrowUp, IconLoader2 } from '@tabler/icons-react'
+import { IconArrowUp } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { cn } from '@/client/lib/cn'
+import { Spinner } from '../ui/spinner'
 
 type ComposerProps = Omit<ComponentProps<'form'>, 'ref'> & {
   composerRef: RefObject<HTMLTextAreaElement | null>
@@ -102,11 +103,7 @@ export function ComposerSubmitButton({
   const canSubmit = canSubmitComposerAction(hasContent, busy || loading, unavailableReason)
   const button = (
     <Button type="submit" size="icon" disabled={!canSubmit} aria-label={label}>
-      {loading ? (
-        <IconLoader2 stroke={1.5} className="animate-spin" />
-      ) : (
-        <IconArrowUp stroke={1.5} />
-      )}
+      {loading ? <Spinner /> : <IconArrowUp stroke={1.5} />}
     </Button>
   )
 

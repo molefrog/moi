@@ -21,6 +21,7 @@ import {
   type OpenClawSessionDetail,
   getOpenClawSessionMessages
 } from './discovery'
+import { renameSelectedSession } from '../../selected-session'
 import {
   type ToolResultInfo,
   findToolCallOwners,
@@ -312,6 +313,10 @@ async function ensureSubscribed(rec: SessionRecord): Promise<void> {
       ingest(rec, message)
     } else if (event === 'sessions.changed') {
       if (payload.sessionKey !== rec.sessionKey) return
+      if (payload.reason === 'chat.title') {
+        broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+        return
+      }
       const phase = payload.phase as string | undefined
       const runId = payload.runId as string | undefined
       if (phase === 'start' && runId) {
@@ -421,9 +426,11 @@ export async function sendOpenClawMessage(input: {
   context?: MoiContext
 }): Promise<void> {
   // Fold any attachments into the message text as file-path references.
+  const uploads = input.attachments?.length
+    ? resolveUploads(input.workspaceId, input.attachments)
+    : []
   let content = input.content
-  if (input.attachments?.length) {
-    const uploads = resolveUploads(input.workspaceId, input.attachments)
+  if (uploads.length > 0) {
     const files: { filename: string; path: string }[] = []
     for (const u of uploads) {
       const p = await materializeToPath(u)
@@ -459,18 +466,19 @@ async function sendOpenClawMessageImpl(input: {
         agentId: input.agentId
       })
       if (created?.sessionId && created.sessionId !== input.sessionId) {
-        broadcast(input.workspaceId, {
-          type: 'session_renamed',
-          from: input.sessionId,
-          to: created.sessionId
-        })
         realSessionId = created.sessionId
+        await renameSelectedSession(input.workspacePath, input.sessionId, realSessionId)
         await renameViewBuilderSession(
           input.workspaceId,
           input.workspacePath,
           input.sessionId,
           realSessionId
         )
+        broadcast(input.workspaceId, {
+          type: 'session_renamed',
+          from: input.sessionId,
+          to: realSessionId
+        })
       }
     }
     rec = await getOrCreateOpenClawSession({

@@ -2,19 +2,25 @@ import type { ReactNode } from 'react'
 
 import { motion } from 'motion/react'
 
-import { IconGhost } from '@tabler/icons-react'
-
+import { IconGhost } from '@/client/components/shared/IconGhost'
 import { Button } from '@/client/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/client/components/ui/popover'
 
 type ChatPopupProps = {
+  loading: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
   onOpenChangeComplete: (open: boolean) => void
   children: (onClose: () => void) => ReactNode
 }
 
-export function ChatPopup({ open, onOpenChange, onOpenChangeComplete, children }: ChatPopupProps) {
+export function ChatPopup({
+  loading,
+  open,
+  onOpenChange,
+  onOpenChangeComplete,
+  children
+}: ChatPopupProps) {
   const onClose = () => onOpenChange(false)
 
   return (
@@ -40,7 +46,7 @@ export function ChatPopup({ open, onOpenChange, onOpenChangeComplete, children }
                 className="bg-card shadow-md hover:shadow-lg"
                 aria-label="Agent"
               >
-                <IconGhost stroke={1.75} />
+                <IconGhost animated={loading} stroke={1.75} />
               </Button>
             </motion.div>
           </div>

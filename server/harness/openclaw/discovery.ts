@@ -24,6 +24,7 @@ export type OpenClawSessionRow = {
   updatedAt: number
   lastMessagePreview?: string
   displayName?: string
+  derivedTitle?: string
   label?: string
   model?: string
   modelProvider?: string
@@ -196,6 +197,7 @@ export async function getOpenClawSessions(
     if (!id) return []
     const res = await rpc<{ sessions: OpenClawSessionRow[] }>('sessions.list', {
       agentId: id,
+      includeDerivedTitles: true,
       includeLastMessage: true
     })
     return res.sessions

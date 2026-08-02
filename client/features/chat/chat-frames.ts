@@ -3,14 +3,16 @@ import type { QueryClient } from '@tanstack/react-query'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { getScratchExecutor } from '@/client/features/scratchpad/scratch-executor'
 import { liveStore } from '@/client/features/chat/chat-store'
+import { renameSelectedSessionInCache } from '@/client/features/chat/useSelectedSession'
 import { applyEvent } from '@/lib/format'
 import type {
   ClientMessage,
   PreviewFrame,
   ScratchOp,
   SessionActivity,
+  SessionConfig,
+  SessionInfo,
   StreamEvent,
-  ThreadConfig,
   ViewState
 } from '@/lib/types'
 
@@ -57,7 +59,25 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
     const workspaceId = data.workspaceId as string
     const from = data.from as string
     const to = data.to as string
+    const sessionsKey = workspaceKeys.sessions(workspaceId)
+    const cachedSessions = queryClient?.getQueryData<SessionInfo[]>(sessionsKey)
+    const cachedSession = cachedSessions?.find(
+      session => session.sessionId === from || session.sessionId === to
+    )
+    if (cachedSession) {
+      void queryClient?.cancelQueries({ queryKey: sessionsKey })
+    }
     store.renameSession(workspaceId, from, to)
+    if (queryClient) renameSelectedSessionInCache(queryClient, workspaceId, from, to)
+    if (cachedSession) {
+      queryClient?.setQueryData<SessionInfo[]>(sessionsKey, current => [
+        {
+          ...cachedSession,
+          sessionId: to
+        },
+        ...(current ?? []).filter(session => session.sessionId !== from && session.sessionId !== to)
+      ])
+    }
 
     const previousView = queryClient?.getQueryData<ViewState>(
       workspaceKeys.events(workspaceId, from)
@@ -67,14 +87,23 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
       queryClient?.removeQueries({ queryKey: workspaceKeys.events(workspaceId, from) })
     }
 
-    const previousConfig = queryClient?.getQueryData<ThreadConfig>(
-      workspaceKeys.threadConfig(workspaceId, from)
+    const previousConfig = queryClient?.getQueryData<SessionConfig>(
+      workspaceKeys.sessionConfig(workspaceId, from)
     )
     if (previousConfig !== undefined) {
-      queryClient?.setQueryData(workspaceKeys.threadConfig(workspaceId, to), previousConfig)
-      queryClient?.removeQueries({ queryKey: workspaceKeys.threadConfig(workspaceId, from) })
+      queryClient?.setQueryData(workspaceKeys.sessionConfig(workspaceId, to), previousConfig)
+      queryClient?.removeQueries({ queryKey: workspaceKeys.sessionConfig(workspaceId, from) })
     }
-    queryClient?.invalidateQueries({ queryKey: workspaceKeys.sessions(workspaceId) })
+    if (!cachedSession) {
+      queryClient?.invalidateQueries({ queryKey: sessionsKey })
+    }
+    queryClient?.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
+    return
+  }
+  if (data.type === 'sessions_changed') {
+    const workspaceId = data.workspaceId as string
+    const sessionsKey = workspaceKeys.sessions(workspaceId)
+    queryClient?.invalidateQueries({ queryKey: sessionsKey })
     queryClient?.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
     return
   }

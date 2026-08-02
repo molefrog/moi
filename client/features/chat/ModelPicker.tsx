@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 
 import { IconBolt, IconBoltFilled } from '@tabler/icons-react'
 
-import { useSaveThreadConfig, useThreadConfig, useWorkspaceModels } from './api'
+import { useSaveSessionConfig, useSessionConfig, useWorkspaceModels } from './api'
 import {
   hasEffortChoice,
   resolveDisplayedEffort,
@@ -30,7 +30,7 @@ import {
 } from '@/client/components/ui/popover'
 import { Slider } from '@/client/components/ui/slider'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
-import { useLive } from '@/client/features/chat/chat-store'
+import { useSelectedSession } from '@/client/features/chat/useSelectedSession'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
 import type { Model } from '@/lib/types'
@@ -278,6 +278,7 @@ type ModelPickerProps = {
 // the same defaults that their submit path reads.
 export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: ModelPickerProps) {
   const { workspaceId, layout, setLayout } = useWorkspaceLayoutCtx()
+  const [selectedSessionId] = useSelectedSession()
   const { data } = useWorkspaceModels(workspaceId)
 
   // The SDK prepends a synthetic "default" entry ("Use the default model
@@ -291,35 +292,29 @@ export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: 
       )
     : []
 
-  // The active chat's stored config is the source of truth. With no active chat,
+  // The selected chat's stored config is the source of truth. With New chat,
   // the picker reads and edits workspace defaults.
-  const activeSessionId = useLive(state =>
-    scope === 'active-chat' ? (state.activeByWorkspace[workspaceId] ?? null) : null
-  )
-  const threadConfig = useThreadConfig(workspaceId, activeSessionId).data
-  const saveThreadConfig = useSaveThreadConfig(workspaceId)
+  const sessionId = scope === 'active-chat' ? (selectedSessionId ?? null) : null
+  const sessionConfig = useSessionConfig(workspaceId, sessionId).data
+  const saveSessionConfig = useSaveSessionConfig(workspaceId)
 
-  const selectedModel = (activeSessionId ? threadConfig?.model : undefined) ?? layout.selectedModel
-  const selectedEffort =
-    (activeSessionId ? threadConfig?.effort : undefined) ?? layout.selectedEffort
+  const selectedModel = (sessionId ? sessionConfig?.model : undefined) ?? layout.selectedModel
+  const selectedEffort = (sessionId ? sessionConfig?.effort : undefined) ?? layout.selectedEffort
   const selectedFastMode =
-    (activeSessionId ? threadConfig?.fastMode : undefined) ?? layout.selectedFastMode
+    (sessionId ? sessionConfig?.fastMode : undefined) ?? layout.selectedFastMode
 
   const setSelectedModel = (value: string) => {
-    if (activeSessionId)
-      saveThreadConfig.mutate({ sessionId: activeSessionId, patch: { model: value } })
+    if (sessionId) saveSessionConfig.mutate({ sessionId, patch: { model: value } })
     else setLayout({ selectedModel: value })
   }
 
   const setSelectedEffort = (value: string) => {
-    if (activeSessionId)
-      saveThreadConfig.mutate({ sessionId: activeSessionId, patch: { effort: value } })
+    if (sessionId) saveSessionConfig.mutate({ sessionId, patch: { effort: value } })
     else setLayout({ selectedEffort: value })
   }
 
   const setSelectedFastMode = (value: boolean) => {
-    if (activeSessionId)
-      saveThreadConfig.mutate({ sessionId: activeSessionId, patch: { fastMode: value } })
+    if (sessionId) saveSessionConfig.mutate({ sessionId, patch: { fastMode: value } })
     else setLayout({ selectedFastMode: value })
   }
 

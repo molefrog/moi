@@ -3,6 +3,7 @@
 import type { Harness } from '../types'
 import { findHarnessExecutable, pathHarnessAvailability } from '../executable'
 import {
+  archiveCodexSession,
   getCodexMcpStatus,
   getCodexModels,
   getCodexProcessInfo,
@@ -33,6 +34,7 @@ export const codexHarness: Harness = {
 
   sendMessage: input => sendCodexMessage(input),
   interrupt: (workspaceId, sessionId) => interruptCodexRun({ workspaceId, sessionId }),
+  archiveSession: (ws, sessionId) => archiveCodexSession(ws.path, sessionId),
   activeSessions: () => getCodexActiveSessions(),
 
   listSessions: ws => getCodexSessions(ws.path),
