@@ -9,6 +9,7 @@ import {
   analyzeInstall,
   captureServiceEnv,
   launchdPlist,
+  parseLaunchdPrint,
   parseUnitBin,
   rotateServiceLog,
   systemdUnit,
@@ -112,11 +113,30 @@ describe('captureServiceEnv', () => {
     expect(captureServiceEnv({ PATH: '/a:/a:/b' }, '/a').PATH).toBe('/a:/b')
   })
 
-  test('drops multiline values and invalid keys', () => {
-    const env = captureServiceEnv({ PATH: '/bin', WEIRD: 'a\nb', 'BAD-KEY': 'x', OK: 'fine' }, '/x')
+  test('drops control-character values and invalid keys', () => {
+    const env = captureServiceEnv(
+      {
+        PATH: '/bin',
+        WEIRD: 'a\nb',
+        // Terminal decorations carry raw ESC bytes (invalid in plists/units).
+        LESS_TERMCAP_md: '\x1b[1m',
+        'BAD-KEY': 'x',
+        OK: 'fine'
+      },
+      '/x'
+    )
     expect(env).not.toHaveProperty('WEIRD')
+    expect(env).not.toHaveProperty('LESS_TERMCAP_md')
     expect(env).not.toHaveProperty('BAD-KEY')
     expect(env.OK).toBe('fine')
+  })
+
+  test('drops the per-boot ssh agent socket', () => {
+    const env = captureServiceEnv(
+      { PATH: '/bin', SSH_AUTH_SOCK: '/private/tmp/com.apple.launchd.abc/Listeners' },
+      '/x'
+    )
+    expect(env).not.toHaveProperty('SSH_AUTH_SOCK')
   })
 })
 
@@ -137,16 +157,22 @@ const spec: ServiceSpec = {
 describe('launchdPlist', () => {
   const plist = launchdPlist(spec)
 
-  test('execs the moi bin directly with start', () => {
-    expect(plist).toContain(
-      '<key>ProgramArguments</key>\n\t<array>\n\t\t<string>/home/u/.bun/bin/moi</string>\n\t\t<string>start</string>'
-    )
+  test('execs the moi bin through the sh preflight, bin as $0', () => {
+    expect(plist).toContain('<string>/bin/sh</string>\n\t\t<string>-c</string>')
+    // The preflight execs $0 (the bin) so the supervised pid is the server,
+    // and exits 0 into the idle protocol when bun is gone from PATH.
+    expect(plist).toContain('exec "$0" start')
+    expect(plist).toContain('command -v bun')
+    expect(plist).toContain('<string>/home/u/.bun/bin/moi</string>\n\t</array>')
   })
 
   test('restarts on crash but not after a deliberate clean exit', () => {
     expect(plist).toContain('<key>KeepAlive</key>')
     expect(plist).toContain('<key>SuccessfulExit</key>\n\t\t<false/>')
     expect(plist).toContain('<key>RunAtLoad</key>\n\t<true/>')
+    // Backstop for crashes that bypass the exit-0 guard: at most one respawn
+    // a minute.
+    expect(plist).toContain('<key>ThrottleInterval</key>\n\t<integer>60</integer>')
   })
 
   test('captures env with XML escaping', () => {
@@ -205,6 +231,24 @@ describe('parseUnitBin', () => {
   test('returns null on unrecognized content', () => {
     expect(parseUnitBin('not a unit', 'darwin')).toBeNull()
     expect(parseUnitBin('not a unit', 'linux')).toBeNull()
+  })
+})
+
+describe('parseLaunchdPrint', () => {
+  test('running service with pid', () => {
+    const out = 'system info\n\tstate = running\n\tpid = 4242\n'
+    expect(parseLaunchdPrint(out)).toEqual({ state: 'running', pid: 4242, detail: null })
+  })
+
+  test('multi-word "not running" maps to idle', () => {
+    // Real launchctl print emits multi-word states — the exact shape a user
+    // sees after a deliberate exit-0 startup failure left the job loaded.
+    const out = '\tstate = not running\n\tlast exit code = 0\n'
+    expect(parseLaunchdPrint(out)).toEqual({ state: 'idle', pid: null, detail: null })
+  })
+
+  test('other multi-word states pass through verbatim', () => {
+    expect(parseLaunchdPrint('\tstate = spawn scheduled\n').state).toBe('spawn scheduled')
   })
 })
 

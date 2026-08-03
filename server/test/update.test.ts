@@ -127,16 +127,16 @@ describe('fetchLatestVersion', () => {
 
   test('friendly error on a registry error status', async () => {
     mockRegistry(() => new Response('nope', { status: 503 }))
-    expect(fetchLatestVersion()).rejects.toThrow(/registry returned 503/)
+    await expect(fetchLatestVersion()).rejects.toThrow(/registry returned 503/)
   })
 
   test('friendly error on malformed payload', async () => {
     mockRegistry(() => Response.json({ nope: true }))
-    expect(fetchLatestVersion()).rejects.toThrow(/Unexpected npm registry response/)
+    await expect(fetchLatestVersion()).rejects.toThrow(/Unexpected npm registry response/)
   })
 
   test('friendly error when unreachable', async () => {
     process.env.MOI_NPM_REGISTRY = 'http://127.0.0.1:1'
-    expect(fetchLatestVersion()).rejects.toThrow(/Could not reach the npm registry/)
+    await expect(fetchLatestVersion()).rejects.toThrow(/Could not reach the npm registry/)
   })
 })

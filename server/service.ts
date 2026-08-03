@@ -112,6 +112,10 @@ const ENV_DENY = new Set([
   'SSH_TTY',
   'SSH_CONNECTION',
   'SSH_CLIENT',
+  // Per-boot/per-session agent socket. On macOS launchd hands agents a fresh
+  // one each boot anyway — a captured copy could only override it with a
+  // stale path.
+  'SSH_AUTH_SOCK',
   'GPG_TTY',
   'PS1',
   'PROMPT',
@@ -133,9 +137,10 @@ const ENV_DENY_PREFIXES = ['XDG_SESSION_']
 const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/
 
 // Snapshot the installing shell's environment for the unit file. Values with
-// newlines are dropped (unit formats are line-based), PATH gets the running
-// bun's dir prepended, and MOI_SERVER/MOI_SERVICE mark the process as the
-// service-managed server.
+// control characters are dropped (unit formats are line-based, plists are
+// XML, and terminal decorations like LESS_TERMCAP_* carry raw ESC bytes),
+// PATH gets the running bun's dir prepended, and MOI_SERVER/MOI_SERVICE mark
+// the process as the service-managed server.
 export function captureServiceEnv(
   base: Record<string, string | undefined> = process.env,
   execDir: string = dirname(process.execPath)
@@ -146,7 +151,8 @@ export function captureServiceEnv(
     if (!ENV_KEY_RE.test(key)) continue
     if (ENV_DENY.has(key)) continue
     if (ENV_DENY_PREFIXES.some(p => key.startsWith(p))) continue
-    if (value.includes('\n') || value.includes('\0')) continue
+    // eslint-disable-next-line no-control-regex
+    if (/[\0-\x1f\x7f]/.test(value)) continue
     env[key] = value
   }
   env.PATH = mergeSearchPaths(execDir, base.PATH)
@@ -172,10 +178,23 @@ function xmlEscape(s: string): string {
   return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
 }
 
+// The launchd preflight: exit-0 into the idle protocol when the interpreter is
+// gone (bun moved/uninstalled — the moi bin's `#!/usr/bin/env bun` would die
+// with 127 forever otherwise, and launchd has no systemd-style start limit).
+// `exec "$0" start` replaces the shell, so the PID launchd supervises IS the
+// server, and the bin path rides as $0 — never spliced into the script.
+const LAUNCHD_PREFLIGHT =
+  'command -v bun >/dev/null 2>&1 || ' +
+  '{ echo "moi service: bun not found on the unit PATH - reinstall bun, then run: moi service install" >&2; exit 0; }; ' +
+  'exec "$0" start'
+
 // launchd user agent. KeepAlive.SuccessfulExit=false means: restart on crash
 // (non-zero exit), stop respawning after a deliberate exit 0 — which is how
 // the server signals a permanent startup failure (port taken, config error)
 // under MOI_SERVICE, so a broken unit idles instead of respawn-looping.
+// Crashes that bypass that guard (bun panic mid-boot) have no launchd
+// give-up; ThrottleInterval=60 caps them at one respawn a minute — accepted
+// residual.
 export function launchdPlist(spec: ServiceSpec): string {
   const envEntries = Object.keys(spec.env)
     .sort()
@@ -191,8 +210,10 @@ export function launchdPlist(spec: ServiceSpec): string {
 \t<string>${LAUNCHD_LABEL}</string>
 \t<key>ProgramArguments</key>
 \t<array>
+\t\t<string>/bin/sh</string>
+\t\t<string>-c</string>
+\t\t<string>${xmlEscape(LAUNCHD_PREFLIGHT)}</string>
 \t\t<string>${xmlEscape(spec.bin)}</string>
-\t\t<string>start</string>
 \t</array>
 \t<key>RunAtLoad</key>
 \t<true/>
@@ -201,6 +222,8 @@ export function launchdPlist(spec: ServiceSpec): string {
 \t\t<key>SuccessfulExit</key>
 \t\t<false/>
 \t</dict>
+\t<key>ThrottleInterval</key>
+\t<integer>60</integer>
 \t<key>WorkingDirectory</key>
 \t<string>${xmlEscape(spec.cwd)}</string>
 \t<key>StandardOutPath</key>
@@ -254,10 +277,16 @@ WantedBy=default.target
 
 // Pull the exec path back out of a unit file this module wrote, to detect a
 // captured bin that has gone stale (moved/uninstalled) in `moi service` status.
+// darwin: the moi bin is the LAST ProgramArguments string (it rides as $0 of
+// the sh preflight); linux: the quoted ExecStart word.
 export function parseUnitBin(content: string, platform: ServicePlatform): string | null {
   if (platform === 'darwin') {
-    const m = content.match(/<key>ProgramArguments<\/key>\s*<array>\s*<string>([^<]*)<\/string>/)
-    return m ? m[1].replaceAll('&amp;', '&').replaceAll('&lt;', '<').replaceAll('&gt;', '>') : null
+    const block = content.match(/<key>ProgramArguments<\/key>\s*<array>([\s\S]*?)<\/array>/)
+    if (!block) return null
+    const strings = [...block[1].matchAll(/<string>([^<]*)<\/string>/g)].map(m => m[1])
+    const last = strings.at(-1)
+    if (last === undefined) return null
+    return last.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&')
   }
   const m = content.match(/^ExecStart="(.*)" start$/m)
   return m ? m[1].replaceAll('%%', '%').replaceAll('\\"', '"').replaceAll('\\\\', '\\') : null
@@ -410,19 +439,27 @@ export type ServiceRuntime = {
   detail: string | null
 }
 
+// Parse `launchctl print` output. States can be multi-word (`not running`,
+// `spawn scheduled`), so capture to end of line; `not running` maps onto this
+// module's 'idle' vocabulary.
+export function parseLaunchdPrint(stdout: string): ServiceRuntime {
+  const pid = stdout.match(/\bpid = (\d+)/)
+  const state = stdout.match(/\bstate = ([^\n]+)/)
+  const raw = state?.[1].trim()
+  return {
+    state: raw === 'not running' ? 'idle' : (raw ?? (pid ? 'running' : 'idle')),
+    pid: pid ? Number(pid[1]) : null,
+    detail: null
+  }
+}
+
 export async function serviceRuntime(
   platform: ServicePlatform = servicePlatform()
 ): Promise<ServiceRuntime> {
   if (platform === 'darwin') {
     const res = await run(['launchctl', 'print', `gui/${uid()}/${LAUNCHD_LABEL}`])
     if (res.code !== 0) return { state: 'not-loaded', pid: null, detail: null }
-    const pid = res.stdout.match(/\bpid = (\d+)/)
-    const state = res.stdout.match(/\bstate = (\S+)/)
-    return {
-      state: state ? state[1] : pid ? 'running' : 'idle',
-      pid: pid ? Number(pid[1]) : null,
-      detail: null
-    }
+    return parseLaunchdPrint(res.stdout)
   }
   if (!(await userManagerAvailable())) {
     return { state: 'unavailable', pid: null, detail: 'systemd user manager is not running' }
@@ -533,10 +570,19 @@ export async function installService(opts: { port?: number } = {}): Promise<Inst
   const unitPath = await writeUnit(platform, systemdUnit(spec))
   await run(['systemctl', '--user', 'daemon-reload'])
   await run(['systemctl', '--user', 'reset-failed', SYSTEMD_UNIT])
-  const enable = await run(['systemctl', '--user', 'enable', '--now', SYSTEMD_UNIT])
+  const enable = await run(['systemctl', '--user', 'enable', SYSTEMD_UNIT])
   if (enable.code !== 0) {
     throw new ServiceError(
-      `systemctl enable --now failed (${enable.stderr.trim() || `exit ${enable.code}`})`
+      `systemctl enable failed (${enable.stderr.trim() || `exit ${enable.code}`})`
+    )
+  }
+  // `restart`, not `enable --now`: start on an already-active unit is a no-op,
+  // so a reinstall over a running service would keep the old process (old
+  // env/port/bin). restart starts an inactive unit and replaces an active one.
+  const start = await run(['systemctl', '--user', 'restart', SYSTEMD_UNIT])
+  if (start.code !== 0) {
+    throw new ServiceError(
+      `systemctl restart failed (${start.stderr.trim() || `exit ${start.code}`})`
     )
   }
   if ((await lingerState()) !== 'enabled') {
