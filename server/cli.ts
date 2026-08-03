@@ -2,7 +2,7 @@
 import './cli-colors' // must precede citty: sets NO_COLOR before its color flag is computed
 import { defineCommand, runMain, showUsage } from 'citty'
 import { parse as devalueParse } from 'devalue'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'path'
 import pc from './cli-pc'
@@ -43,6 +43,26 @@ import {
   staleSkillNotice
 } from './skill-version'
 import { updateWorkspaceSkills } from './skill-update'
+import {
+  ServiceError,
+  analyzeInstall,
+  installService,
+  queryServerInfo,
+  restartService,
+  serviceLogPath,
+  serviceStatus,
+  uninstallService
+} from './service'
+import {
+  detectPackageManager,
+  fetchLatestVersion,
+  installedBinVersion,
+  isNewer,
+  manualUpdateLines,
+  runPackageManager,
+  updateArgv
+} from './update'
+import { VERSION, isPrerelease, versionWithCommit } from './version'
 import {
   getWorkspaceEnvView,
   isValidEnvKey,
@@ -344,9 +364,26 @@ const start = defineCommand({
     // server. Skipped when MOI_SERVER=1 (we are the spawned server itself).
     if (!process.env.MOI_SERVER) {
       if (await isServerRunning()) {
-        console.log(
-          '\n' + pc.yellow('◆') + ' Server is already running on http://localhost:' + PORT + '\n'
-        )
+        // Say who owns the running server: a service-managed one is expected
+        // to be here, and `moi service` is how to manage it.
+        const info = await queryServerInfo()
+        const port = info?.port || PORT
+        if (info?.service) {
+          console.log(
+            '\n' +
+              pc.yellow('◆') +
+              ' The moi service is already running on http://localhost:' +
+              port +
+              pc.dim(` (v${info.version})`) +
+              '\n' +
+              pc.dim('  Manage it with `moi service` — restart, logs, uninstall.') +
+              '\n'
+          )
+        } else {
+          console.log(
+            '\n' + pc.yellow('◆') + ' Server is already running on http://localhost:' + port + '\n'
+          )
+        }
         process.exit(0)
       }
 
@@ -378,7 +415,28 @@ const start = defineCommand({
     // This IS the server process (MOI_SERVER=1). cwd is the package root when the
     // dev bundler runs (bunfig loaded at Bun startup) or a neutral dir for a
     // prebuilt install — see serverCwd().
-    await import('./web')
+    try {
+      await import('./web')
+    } catch (err) {
+      // Startup failure (port taken, config error). Under the service manager
+      // exit 0 on purpose: launchd (KeepAlive.SuccessfulExit=false) and
+      // systemd (Restart=on-failure) both read a clean exit as "do not
+      // respawn", so a permanently-broken start idles instead of looping.
+      const code = (err as { code?: string })?.code
+      if (code === 'EADDRINUSE') {
+        console.error(
+          `\n${pc.red('✗')} Port already in use (http :${PORT} / control :${CONTROL_PORT}) — ` +
+            'is another moi server running?'
+        )
+      } else {
+        console.error(`\n${pc.red('✗')} Server failed to start: ${String(err)}`)
+      }
+      if (process.env.MOI_SERVICE) {
+        console.error(pc.dim('  The service stays idle — fix this, then `moi service restart`.\n'))
+        process.exit(0)
+      }
+      process.exit(1)
+    }
     console.log(`\n${pc.green('✓')} Server started on http://localhost:${PORT}`)
     console.log(pc.dim('  Press Ctrl+C to stop\n'))
     // Stay alive as the server
@@ -750,6 +808,20 @@ const theme = defineCommand({
   }
 })
 
+// The CLI-vs-server freshness check, shared by `moi status` and `moi update`:
+// compares this CLI's version against what the running server reports over the
+// control port. Works no matter how the upgrade happened (`moi update` or a
+// manual package-manager install) — the comparison reads live state, it does
+// not live inside the update command.
+function versionMismatchNotice(serverVersion: string): string | null {
+  if (serverVersion === VERSION) return null
+  return (
+    pc.yellow('⚠') +
+    ` Server is running v${serverVersion}, this CLI is v${VERSION}.\n` +
+    pc.dim('  Restart to match: `moi service restart` (service) or Ctrl-C + `moi start`.')
+  )
+}
+
 const status = defineCommand({
   meta: { name: 'status', description: 'Show server status and registered workspaces' },
   async run() {
@@ -757,17 +829,32 @@ const status = defineCommand({
     const notice = await staleSkillNotice(process.cwd())
 
     if (!running) {
-      console.log('\n' + pc.dim('○') + ' Server is ' + pc.bold('not running') + '\n')
+      console.log('\n' + pc.dim('○') + ' Server is ' + pc.bold('not running'))
+      console.log(pc.dim(`  cli version ${VERSION}`) + '\n')
       process.exit(0)
     }
 
+    const info = await queryServerInfo()
     console.log(
       '\n' +
         pc.green('●') +
         ' Server is ' +
         pc.bold('running') +
-        pc.dim(`  (http port: ${PORT}, control port: ${CONTROL_PORT})`)
+        pc.dim(
+          `  (http port: ${info?.port || PORT}, control port: ${CONTROL_PORT}` +
+            (info?.pid ? `, pid: ${info.pid}` : '') +
+            ')'
+        )
     )
+    if (info) {
+      console.log(
+        pc.dim(`  server version ${info.version}`) +
+          (info.service ? pc.dim('  · service-managed (`moi service`)') : '')
+      )
+    }
+    console.log(pc.dim(`  cli version    ${VERSION}`))
+    const mismatch = info ? versionMismatchNotice(info.version) : null
+    if (mismatch) console.log('\n' + mismatch)
 
     await new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
@@ -2050,35 +2137,437 @@ const skill = defineCommand({
   }
 })
 
-// `<package version> (<8-char commit>)`, e.g. `0.1.3 (27e17e80)`. The commit is
-// read from git at call time, so it appears for a source/`bun link` checkout and
-// is simply omitted for a published package (which ships no .git).
-function moiVersion(): string {
-  const root = join(import.meta.dir, '..')
-  let version = '0.0.0'
+// ---- service ----------------------------------------------------------------
+
+function serviceFail(err: unknown): never {
+  const message = err instanceof ServiceError ? err.message : String(err)
+  console.error('\n' + pc.red('✗') + ' ' + message + '\n')
+  process.exit(1)
+}
+
+// Shared success line after install/restart: did the server actually come up,
+// and on which version?
+function printServiceServer(info: Awaited<ReturnType<typeof queryServerInfo>>) {
+  if (info) {
+    console.log(
+      '  server   ' +
+        pc.bold(`v${info.version}`) +
+        ` running on http://localhost:${info.port}` +
+        pc.dim(` (pid ${info.pid})`)
+    )
+    const mismatch = versionMismatchNotice(info.version)
+    if (mismatch) console.log('\n' + mismatch)
+  } else {
+    console.log(
+      '  ' +
+        pc.yellow('server did not come up — check `moi service logs`') +
+        pc.dim(' (it may still be starting)')
+    )
+  }
+}
+
+const serviceInstall = defineCommand({
+  meta: {
+    name: 'install',
+    description: 'Install and start the user service (launchd on macOS, systemd on Linux)'
+  },
+  args: {
+    port: { type: 'string', description: 'HTTP port for the service server (default: 13337)' }
+  },
+  async run({ args }) {
+    // Check the install shape first: telling someone to stop their server only
+    // to then refuse the checkout would be a pointless round-trip.
+    const analysis = analyzeInstall()
+    if (analysis.kind !== 'global') {
+      try {
+        await installService() // throws the precise refusal for this analysis
+      } catch (err) {
+        serviceFail(err)
+      }
+    }
+    // A foreground `moi start` holds the same ports the service needs. Refuse
+    // rather than install a unit that instantly fails on bind.
+    const runningInfo = await queryServerInfo()
+    const foreground = (await isServerRunning()) && !runningInfo?.service
+    if (foreground) {
+      serviceFail(
+        new ServiceError(
+          'A foreground server is running' +
+            (runningInfo?.pid ? ` (pid ${runningInfo.pid})` : '') +
+            '.\n  Stop it (Ctrl-C in its terminal), then rerun `moi service install`.'
+        )
+      )
+    }
+    const port = args.port ? Number(args.port) : undefined
+    if (port !== undefined && (!Number.isInteger(port) || port < 1 || port > 65535)) {
+      serviceFail(new ServiceError(`Invalid --port value "${args.port}" — use a port number.`))
+    }
+    try {
+      const result = await installService({ port })
+      console.log(
+        '\n' +
+          pc.green('✓') +
+          ' Service installed ' +
+          pc.dim(`(${process.platform === 'darwin' ? 'launchd' : 'systemd user unit'})`)
+      )
+      console.log('  unit     ' + pc.dim(tildifyPath(result.unitPath)))
+      if (result.logPath) console.log('  logs     ' + pc.dim(tildifyPath(result.logPath)))
+      printServiceServer(result.info)
+      console.log(pc.dim('\n  Starts on login, restarts on crash, survives reboots.'))
+      for (const note of result.notes) console.log(pc.yellow('  ' + note))
+      console.log()
+    } catch (err) {
+      serviceFail(err)
+    }
+  }
+})
+
+const serviceUninstall = defineCommand({
+  meta: { name: 'uninstall', description: 'Stop the service and remove its unit' },
+  async run() {
+    try {
+      const { unitPath, existed } = await uninstallService()
+      if (!existed) {
+        console.log(
+          '\n' +
+            pc.dim('○') +
+            ' Service is not installed ' +
+            pc.dim(`(${tildifyPath(unitPath)})`) +
+            '\n'
+        )
+        return
+      }
+      console.log(
+        '\n' + pc.green('✓') + ' Service removed ' + pc.dim(`(${tildifyPath(unitPath)})`) + '\n'
+      )
+    } catch (err) {
+      serviceFail(err)
+    }
+  }
+})
+
+const serviceRestart = defineCommand({
+  meta: { name: 'restart', description: 'Restart the service server' },
+  async run() {
+    try {
+      const info = await restartService()
+      console.log('\n' + pc.green('✓') + ' Service restarted')
+      printServiceServer(info)
+      console.log()
+    } catch (err) {
+      serviceFail(err)
+    }
+  }
+})
+
+const serviceLogs = defineCommand({
+  meta: { name: 'logs', description: 'Show server logs (journalctl on Linux, log file on macOS)' },
+  args: {
+    lines: { type: 'string', default: '80', description: 'How many trailing lines to show' },
+    follow: {
+      type: 'boolean',
+      alias: 'f',
+      default: false,
+      description: 'Keep following new output'
+    }
+  },
+  async run({ args }) {
+    const n = Math.max(1, Number(args.lines) || 80)
+    if (process.platform === 'linux') {
+      // journald owns the log (bounded, rotated). Inherit stdio so -f streams.
+      const argv = ['journalctl', '--user', '-u', 'moi.service', '-n', String(n), '--no-pager']
+      if (args.follow) argv.push('-f')
+      const proc = Bun.spawn(argv, { stdin: 'inherit', stdout: 'inherit', stderr: 'inherit' })
+      process.exit(await proc.exited)
+    }
+    const logPath = serviceLogPath()
+    if (!existsSync(logPath)) {
+      console.log('\n' + pc.dim('○') + ' No logs yet ' + pc.dim(`(${tildifyPath(logPath)})`) + '\n')
+      process.exit(0)
+    }
+    console.error(pc.dim(tildifyPath(logPath)))
+    const proc = Bun.spawn(['tail', '-n', String(n), ...(args.follow ? ['-F'] : []), logPath], {
+      stdin: 'inherit',
+      stdout: 'inherit',
+      stderr: 'inherit'
+    })
+    process.exit(await proc.exited)
+  }
+})
+
+function tildifyPath(p: string): string {
+  const home = process.env.HOME
+  return home && p.startsWith(home) ? '~' + p.slice(home.length) : p
+}
+
+async function runServiceStatus() {
   try {
-    version = (JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { version: string })
-      .version
-  } catch {}
-  let commit = ''
-  try {
-    const out = Bun.spawnSync(['git', 'rev-parse', '--short=8', 'HEAD'], { cwd: root })
-    if (out.success) commit = out.stdout.toString().trim()
-  } catch {}
-  return commit ? `${version} (${commit})` : version
+    const s = await serviceStatus()
+    const flavor = s.platform === 'darwin' ? 'launchd user agent' : 'systemd user unit'
+    console.log('\n' + pc.bold('moi service') + pc.dim(` — ${flavor}`))
+    console.log()
+    if (!s.installed) {
+      console.log('  ' + pc.dim('○') + ' Not installed')
+      console.log(
+        pc.dim('    Run `moi service install` to start moi on login and keep it running.')
+      )
+      console.log()
+      process.exit(0)
+    }
+    const rt = s.runtime
+    const stateLabel =
+      rt === null
+        ? pc.dim('unknown')
+        : rt.state === 'running'
+          ? pc.green('● running') + (rt.pid ? pc.dim(` (pid ${rt.pid})`) : '')
+          : rt.state === 'failed'
+            ? pc.red('✗ failed') + pc.dim(rt.detail ? ` (${rt.detail})` : '')
+            : rt.state === 'unavailable'
+              ? pc.yellow('? unavailable') + pc.dim(rt.detail ? ` — ${rt.detail}` : '')
+              : pc.dim('○ ' + rt.state)
+    console.log('  state    ' + stateLabel)
+    console.log('  unit     ' + pc.dim(tildifyPath(s.unitPath)))
+    if (s.logPath)
+      console.log('  logs     ' + pc.dim(tildifyPath(s.logPath)) + pc.dim('  (`moi service logs`)'))
+    else
+      console.log('  logs     ' + pc.dim('journalctl --user -u moi.service  (`moi service logs`)'))
+    const info = await queryServerInfo()
+    if (info) {
+      console.log(
+        '  server   ' +
+          pc.bold(`v${info.version}`) +
+          pc.dim(` on http://localhost:${info.port} (pid ${info.pid})`)
+      )
+      if (!info.service) {
+        console.log(
+          pc.yellow('  ⚠ The running server is a foreground `moi start`, not the service.')
+        )
+      }
+    } else if (rt?.state === 'running') {
+      console.log('  server   ' + pc.yellow('unreachable on the control port'))
+    }
+    console.log()
+    if (s.binMissing && s.bin) {
+      console.log(
+        pc.yellow(`  ⚠ The service execs ${s.bin}, which no longer exists`) +
+          pc.dim(' (moi moved or was reinstalled elsewhere).') +
+          '\n' +
+          pc.dim('    Rerun `moi service install` to re-capture paths.')
+      )
+    }
+    if (s.linger === 'disabled') {
+      console.log(
+        pc.yellow('  ⚠ Lingering is off — the service stops when your last session ends.') +
+          '\n' +
+          pc.dim('    Enable: loginctl enable-linger')
+      )
+    }
+    const mismatch = info ? versionMismatchNotice(info.version) : null
+    if (mismatch) console.log(mismatch.replace(/^/gm, '  ').replace(/^ {2}⚠/, '  ⚠') + '\n')
+    process.exit(0)
+  } catch (err) {
+    serviceFail(err)
+  }
+}
+
+const serviceSubCommands = {
+  install: serviceInstall,
+  uninstall: serviceUninstall,
+  restart: serviceRestart,
+  logs: serviceLogs
+}
+
+const service = defineCommand({
+  meta: {
+    name: 'service',
+    description: 'Run moi as a user service: `moi service install|uninstall|restart|logs`'
+  },
+  subCommands: serviceSubCommands,
+  async run({ rawArgs }) {
+    // citty invokes the parent run even after dispatching a subcommand — only
+    // show status when none ran (same pattern as `moi env` / `moi tab`).
+    const sub = rawArgs.find(a => !a.startsWith('-'))
+    if (sub && Object.hasOwn(serviceSubCommands, sub)) return
+    await runServiceStatus()
+  }
+})
+
+// ---- update -----------------------------------------------------------------
+
+const update = defineCommand({
+  meta: {
+    name: 'update',
+    description: 'Update moi to the latest published version'
+  },
+  async run() {
+    // A checkout has no owning package manager — updating means `git pull`.
+    const analysis = analyzeInstall()
+    if (analysis.kind === 'checkout') {
+      console.log(
+        '\n' +
+          pc.yellow('◆') +
+          ` This moi runs from a source tree (${analysis.reason}) — update it with git instead.\n`
+      )
+      process.exit(0)
+    }
+
+    console.log('\n' + pc.bold('moi update') + pc.dim(` — installed v${VERSION}`))
+
+    if (isPrerelease(VERSION)) {
+      console.log(
+        '\n' +
+          pc.yellow('◆') +
+          ' Prerelease installs are updated manually — pick the tag you want:\n' +
+          pc.dim('  bun i -g moi-computer@next   (or @latest to leave the prerelease)\n')
+      )
+      process.exit(0)
+    }
+
+    let latest: string
+    try {
+      latest = await fetchLatestVersion()
+    } catch (err) {
+      console.error(
+        '\n' + pc.red('✗') + ' ' + (err instanceof Error ? err.message : String(err)) + '\n'
+      )
+      process.exit(1)
+    }
+
+    if (!isNewer(latest, VERSION)) {
+      console.log(pc.green('✓') + ` Already up to date (latest is v${latest})`)
+      await reportServerFreshness()
+      process.exit(0)
+    }
+
+    console.log(`  latest is ${pc.bold('v' + latest)} — updating`)
+
+    const pm = await detectPackageManager()
+    if (!pm) {
+      console.error(
+        '\n' +
+          pc.red('✗') +
+          ' Could not tell which package manager owns this install' +
+          pc.dim(` (${analysis.root})`) +
+          '.\n  Update it yourself with the one you installed moi with:\n' +
+          manualUpdateLines(latest)
+            .map(l => pc.dim('    ' + l))
+            .join('\n') +
+          '\n'
+      )
+      process.exit(1)
+    }
+
+    const argv = updateArgv(pm, latest)
+    console.log(pc.dim(`  via ${pm}: ${argv.join(' ')}\n`))
+    const code = await runPackageManager(argv)
+    if (code !== 0) {
+      console.error('\n' + pc.red('✗') + ` ${pm} exited with code ${code}.`)
+      console.error(pc.dim('  Run it manually: ') + argv.join(' '))
+      if (pm === 'npm') {
+        console.error(
+          pc.dim(
+            '  If it failed with EACCES, your npm prefix is root-owned — fix ownership or use a user-level prefix.'
+          )
+        )
+      }
+      console.error()
+      process.exit(1)
+    }
+
+    // Trust but verify: ask the bin users actually run what version it is now.
+    // A stale answer means the update landed somewhere PATH does not point.
+    const binVersion = analysis.kind === 'global' ? await installedBinVersion(analysis.bin) : null
+    if (binVersion === latest) {
+      console.log('\n' + pc.green('✓') + ` moi updated to ${pc.bold('v' + latest)}`)
+    } else if (binVersion) {
+      console.log(
+        '\n' +
+          pc.yellow('⚠') +
+          ` ${pm} finished, but \`moi\` on PATH reports v${binVersion} (expected v${latest}).` +
+          '\n' +
+          pc.dim('  Another install may shadow the updated one — check `which moi`.')
+      )
+    } else {
+      console.log('\n' + pc.green('✓') + ` ${pm} finished (v${latest})`)
+    }
+
+    await reportServerFreshness(latest)
+    console.log()
+    process.exit(0)
+  }
+})
+
+// After an update (or an up-to-date check), bring the running server along:
+// restart a service-managed one and verify the version it comes back with; a
+// foreground server in someone's terminal only ever gets a warning.
+async function reportServerFreshness(expected?: string) {
+  const running = await isServerRunning()
+  if (!running) return
+  const info = await queryServerInfo()
+  if (!info) {
+    console.log(
+      pc.yellow('⚠') +
+        ' A server is running but too old to report its version — restart it to finish the update.'
+    )
+    return
+  }
+  const target = expected ?? VERSION
+  if (info.version === target) {
+    if (expected) console.log(pc.green('✓') + ` Server already on v${info.version}`)
+    return
+  }
+  if (info.service) {
+    console.log(pc.dim(`  restarting the service (server was v${info.version})…`))
+    try {
+      const fresh = await restartService()
+      if (fresh && fresh.version === target) {
+        console.log(pc.green('✓') + ` Service restarted on ${pc.bold('v' + fresh.version)}`)
+      } else if (fresh) {
+        console.log(
+          pc.yellow('⚠') +
+            ` Service restarted but reports v${fresh.version} (expected v${target}).` +
+            '\n' +
+            pc.dim('  The unit may exec a different install — see `moi service`.')
+        )
+      } else {
+        console.log(
+          pc.yellow('⚠') +
+            ' Service restarted but the server has not come back up — `moi service logs`.'
+        )
+      }
+    } catch (err) {
+      console.log(
+        pc.yellow('⚠') +
+          ' Could not restart the service: ' +
+          (err instanceof Error ? err.message : String(err))
+      )
+    }
+    return
+  }
+  console.log(
+    pc.yellow('⚠') +
+      ` A foreground server is still running v${info.version}` +
+      (info.pid ? pc.dim(` (pid ${info.pid})`) : '') +
+      '.\n' +
+      pc.dim(`  Restart it when convenient (Ctrl-C, then \`moi start\`) to get v${target}.`)
+  )
 }
 
 const version = defineCommand({
   meta: { name: 'version', description: 'Print the moi version' },
   run() {
-    console.log(moiVersion())
+    console.log(versionWithCommit())
   }
 })
 
 const main = defineCommand({
   // A function so the git lookup runs only for `moi --version` / `--help`, not on
   // every command. citty resolves a function meta (used for --version + usage).
-  meta: () => ({ name: 'moi', description: 'moi — local AI workspace', version: moiVersion() }),
+  meta: () => ({
+    name: 'moi',
+    description: 'moi — local AI workspace',
+    version: versionWithCommit()
+  }),
   subCommands: {
     init,
     start,
@@ -2091,6 +2580,8 @@ const main = defineCommand({
     config,
     env,
     status,
+    service,
+    update,
     openclaw,
     scratch,
     skill,

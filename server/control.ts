@@ -6,7 +6,7 @@ import { isParamsRecord } from '@/lib/workspace-tabs'
 
 import { clearAppletLog, getAppletLog, getAppletLogCount } from './applet-log'
 import { serializeWorkspaceBundle } from './bundle-queue'
-import { CONTROL_PORT } from './constants'
+import { CONTROL_PORT, PORT } from './constants'
 import { applyEnvChanged } from './env-apply'
 import { callFunctionEphemeral, parseFunctionPath } from './functions'
 import { processIcon } from './icon'
@@ -28,6 +28,7 @@ import {
   setBuilder
 } from './view-builders'
 import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
+import { VERSION } from './version'
 
 type ControlSocket = { send(data: string): void }
 
@@ -83,6 +84,22 @@ export const control = Bun.serve({
         if (data.type === 'workspace:list') {
           const workspaces = await listWorkspaces()
           ws.send(JSON.stringify({ workspaces }))
+          return
+        }
+
+        // Identity of the running server, for the CLI (`moi status`, `moi
+        // update`, `moi service`). VERSION is snapshotted at boot, so this
+        // reports the code actually running even after the install tree on
+        // disk was replaced by an update.
+        if (data.type === 'server:info') {
+          ws.send(
+            JSON.stringify({
+              version: VERSION,
+              pid: process.pid,
+              port: PORT,
+              service: !!process.env.MOI_SERVICE
+            })
+          )
           return
         }
 

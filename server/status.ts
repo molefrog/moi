@@ -11,6 +11,7 @@ import { WORKER_LIMITS, type WorkerDebugInfo, getWorkersDebugSnapshot } from './
 import { allHarnesses } from './harness/registry'
 import { tildify } from './registry'
 import { getClientCount } from './state'
+import { VERSION } from './version'
 
 const STARTED_AT = Date.now()
 
@@ -70,6 +71,7 @@ export function renderStatus(): string {
   lines.push('moi server status')
   lines.push('=================')
   lines.push('')
+  lines.push(`version         ${VERSION}${process.env.MOI_SERVICE ? '  (service-managed)' : ''}`)
   lines.push(`uptime          ${fmtDuration(now - STARTED_AT)}`)
   lines.push(`http port       ${PORT}`)
   lines.push(`control port    ${CONTROL_PORT}`)

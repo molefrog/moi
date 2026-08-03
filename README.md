@@ -79,6 +79,40 @@ Then bring in your project, either way works:
   (or import an existing folder) right from the web UI;
 - or run `moi init` inside a folder to turn it into a workspace.
 
+## Run as a service
+
+Instead of keeping `moi start` in a terminal, install moi as a user-level
+service — it starts on login, restarts on crash, and survives reboots
+(launchd on macOS, a systemd user unit on Linux; no root needed):
+
+```sh
+moi service install     # install and start
+moi service             # state, unit path, server version
+moi service logs -f     # follow server logs
+moi service restart
+moi service uninstall
+```
+
+The service captures your shell environment at install time — rerun
+`moi service install` after changing env vars (or moving bun) so the unit
+picks them up. On macOS the first install may show a "background item added"
+notification for "bun"; that is the moi service. On headless Linux, lingering
+is enabled automatically when possible so the service outlives your SSH
+session.
+
+## Updating
+
+```sh
+moi update
+```
+
+Checks npm for the latest release and updates through whichever package
+manager owns the install (bun, npm, pnpm, or yarn). A service-managed server
+is restarted onto the new version; a foreground `moi start` only gets a
+warning — restart it yourself. Prerelease installs (`…-next.N`) are left
+alone. `moi status` shows when the running server and CLI versions differ,
+however the update happened.
+
 ## OpenClaw
 
 In OpenClaw, moi is installed per _agent workspace_. First, list the agents

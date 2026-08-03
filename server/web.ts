@@ -13,6 +13,7 @@ import { allHarnesses, harnessFor } from './harness/registry'
 import { getWorkspace } from './registry'
 import { saveSelectedSession } from './selected-session'
 import { addClient, broadcastAll, getClientCount, removeClient, sendToClient } from './state'
+import { startServiceLogMaintenance } from './service'
 import { distShell, prebuilt } from './static'
 import { renderStatus } from './status'
 import { serveVendorEmojibase, serveVendorReact } from './vendor'
@@ -207,6 +208,10 @@ setInterval(() => {
 // deleting an image in the browser (or an upload whose tab died) otherwise
 // leaves its file behind forever. See sweepOrphanAssets.
 startScratchpadSweeper()
+
+// Under launchd the service log is a plain file nothing rotates — bound it
+// here. No-op outside the macOS service context.
+startServiceLogMaintenance()
 
 // Graceful shutdown. In dev the supervisor sends SIGTERM on server-file
 // changes; in any context Ctrl-C sends SIGINT. Close both servers and kill the
