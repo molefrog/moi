@@ -90,6 +90,14 @@ describe('moi service (e2e)', () => {
     expect(res.stderr).toContain('Invalid --port')
   })
 
+  test('install: --env with an unset var fails with the var named', async () => {
+    const res = await runCli(['service', 'install', '--env', 'DEFINITELY_UNSET_VAR_42'])
+    expect(res.code).toBe(1)
+    expect(res.stderr).toContain('DEFINITELY_UNSET_VAR_42')
+    expect(res.stderr).toContain('not set in this shell')
+    expect(await Bun.file(unitPath()).exists()).toBe(false)
+  })
+
   linuxOnly('restart: not installed yet', async () => {
     const res = await runCli(['service', 'restart'])
     expect(res.code).toBe(1)

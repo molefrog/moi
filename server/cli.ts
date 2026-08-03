@@ -2172,7 +2172,12 @@ const serviceInstall = defineCommand({
     description: 'Install and start the user service (launchd on macOS, systemd on Linux)'
   },
   args: {
-    port: { type: 'string', description: 'HTTP port for the service server (default: 13337)' }
+    port: { type: 'string', description: 'HTTP port for the service server (default: 13337)' },
+    env: {
+      type: 'string',
+      description:
+        'Extra env var names to capture from this shell, comma-separated (e.g. --env MY_TOKEN,OTHER)'
+    }
   },
   async run({ args }) {
     // Check the install shape first: telling someone to stop their server only
@@ -2202,8 +2207,14 @@ const serviceInstall = defineCommand({
     if (port !== undefined && (!Number.isInteger(port) || port < 1 || port > 65535)) {
       serviceFail(new ServiceError(`Invalid --port value "${args.port}" — use a port number.`))
     }
+    // citty hands back an array when the flag repeats — accept both shapes.
+    const envArg = Array.isArray(args.env) ? args.env.join(',') : args.env
+    const extraEnv = (envArg ?? '')
+      .split(',')
+      .map(k => k.trim())
+      .filter(Boolean)
     try {
-      const result = await installService({ port })
+      const result = await installService({ port, extraEnv })
       console.log(
         '\n' +
           pc.green('✓') +

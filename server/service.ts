@@ -8,11 +8,14 @@
 // the launched process IS the server — so the service manager supervises the
 // real thing, not a wrapper that spawned it.
 //
-// The environment is captured once, at install time (decided in the RFC): a
-// snapshot of the installing shell's env minus per-terminal/per-boot noise and
-// a few generic names (HOST, PORT) that would silently redirect the server
-// bind. PATH is handled deliberately — the running bun's dir is prepended so
-// the unit always finds the interpreter that installed it.
+// The environment is captured once, at install time (decided in the RFC — no
+// runtime env file), and it is an ALLOWLIST, not a shell snapshot: PATH plus
+// system basics, proxy settings, and moi/agent vars. The server itself reads
+// almost nothing ambient, agent secrets have a proper channel (workspace env
+// overlays every agent session), and anything custom can be captured by name
+// with `moi service install --env KEY`. PATH is handled deliberately — the
+// running bun's dir is prepended so the unit always finds the interpreter
+// that installed it.
 import { existsSync } from 'node:fs'
 import { copyFile, mkdir, readFile, rm, stat, truncate, writeFile } from 'node:fs/promises'
 import { homedir, userInfo } from 'node:os'
@@ -77,82 +80,87 @@ export function analyzeInstall(
 
 // ---- environment capture ----------------------------------------------------
 
-// Per-terminal, per-session, and per-boot variables that must not be baked
-// into a unit that outlives them — plus generic names (HOST, PORT, HOSTNAME)
-// that shells commonly export and that would silently redirect the server
-// bind. MOI_* runtime flags are owned by the unit itself.
-const ENV_DENY = new Set([
-  '_',
-  'SHLVL',
-  'PWD',
-  'OLDPWD',
-  'TERM',
-  'COLORTERM',
-  'TERM_PROGRAM',
-  'TERM_PROGRAM_VERSION',
-  'TERM_SESSION_ID',
-  'TERMINFO',
-  'ITERM_SESSION_ID',
-  'ITERM_PROFILE',
-  'LC_TERMINAL',
-  'LC_TERMINAL_VERSION',
-  'TMUX',
-  'TMUX_PANE',
-  'STY',
-  'WINDOW',
-  'WINDOWID',
-  'XPC_SERVICE_NAME',
-  'XPC_FLAGS',
-  'SECURITYSESSIONID',
-  'LaunchInstanceID',
-  'DBUS_SESSION_BUS_ADDRESS',
-  'XDG_RUNTIME_DIR',
-  'DISPLAY',
-  'WAYLAND_DISPLAY',
-  'SSH_TTY',
-  'SSH_CONNECTION',
-  'SSH_CLIENT',
-  // Per-boot/per-session agent socket. On macOS launchd hands agents a fresh
-  // one each boot anyway — a captured copy could only override it with a
-  // stale path.
-  'SSH_AUTH_SOCK',
-  'GPG_TTY',
-  'PS1',
-  'PROMPT',
-  'PROMPT_COMMAND',
-  'LS_COLORS',
-  'LSCOLORS',
-  'CLICOLOR',
-  'HOST',
-  'HOSTNAME',
-  'PORT',
-  'MOI_SERVER',
-  'MOI_SERVICE',
-  'MOI_DEV',
-  'MOI_DEBUG'
+// What the unit captures is an allowlist, not a shell snapshot. The server's
+// own code reads almost nothing ambient (HOME, PATH, XDG dirs), agent secrets
+// have a proper channel (workspace env — `moi env`/.env — overlays every
+// agent session), and a full snapshot would bake every exported shell secret
+// and per-session value into a file that outlives them. Notably absent on
+// purpose: HOST/PORT/HOSTNAME (shells export these; they would redirect the
+// server bind), SSH_AUTH_SOCK (per-boot socket; launchd provides a fresh one
+// anyway), and terminal/session state. Custom vars are captured by name via
+// `moi service install --env KEY`.
+const ENV_ALLOW = new Set([
+  // System identity and locale — agents and tools misbehave without them.
+  'HOME',
+  'USER',
+  'LOGNAME',
+  'SHELL',
+  'TMPDIR',
+  'LANG',
+  'TZ',
+  // Stable XDG dirs (never the per-boot XDG_RUNTIME_DIR / XDG_SESSION_*).
+  'XDG_CONFIG_HOME',
+  'XDG_DATA_HOME',
+  'XDG_STATE_HOME',
+  'XDG_CACHE_HOME',
+  // Networking: proxies and corporate CA bundles, both cases.
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'NO_PROXY',
+  'ALL_PROXY',
+  'http_proxy',
+  'https_proxy',
+  'no_proxy',
+  'all_proxy',
+  'NODE_EXTRA_CA_CERTS',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR'
 ])
 
-const ENV_DENY_PREFIXES = ['XDG_SESSION_']
+// moi itself, the agent harnesses, and their runtimes.
+const ENV_ALLOW_PREFIXES = [
+  'MOI_',
+  'ANTHROPIC_',
+  'CLAUDE_',
+  'OPENCLAW_',
+  'OPENAI_',
+  'PUBLIC_',
+  'BUN_',
+  'LC_'
+]
+
+// Runtime flags the unit stamps itself — never inherited from the installing
+// shell (a dev shell must not bake MOI_DEV into the service).
+const ENV_OWNED = new Set(['MOI_SERVER', 'MOI_SERVICE', 'MOI_DEV', 'MOI_DEBUG'])
 
 const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/
 
-// Snapshot the installing shell's environment for the unit file. Values with
-// control characters are dropped (unit formats are line-based, plists are
-// XML, and terminal decorations like LESS_TERMCAP_* carry raw ESC bytes),
-// PATH gets the running bun's dir prepended, and MOI_SERVER/MOI_SERVICE mark
-// the process as the service-managed server.
+// A value the unit formats can hold: no control characters (unit files are
+// line-based, plists are XML, and things like LESS_TERMCAP_* carry raw ESC).
+function capturableValue(value: string | undefined): value is string {
+  // eslint-disable-next-line no-control-regex
+  return value !== undefined && value !== '' && !/[\0-\x1f\x7f]/.test(value)
+}
+
+// Build the unit environment: the allowlist above, plus any extra keys the
+// user named at install time (still read from the installing shell — captured
+// at install, no runtime env file). PATH gets the running bun's dir
+// prepended, and MOI_SERVER/MOI_SERVICE mark the process as the
+// service-managed server.
 export function captureServiceEnv(
   base: Record<string, string | undefined> = process.env,
-  execDir: string = dirname(process.execPath)
+  execDir: string = dirname(process.execPath),
+  extraKeys: string[] = []
 ): Record<string, string> {
+  const extras = new Set(extraKeys)
   const env: Record<string, string> = {}
   for (const [key, value] of Object.entries(base)) {
-    if (value === undefined || value === '') continue
     if (!ENV_KEY_RE.test(key)) continue
-    if (ENV_DENY.has(key)) continue
-    if (ENV_DENY_PREFIXES.some(p => key.startsWith(p))) continue
-    // eslint-disable-next-line no-control-regex
-    if (/[\0-\x1f\x7f]/.test(value)) continue
+    if (ENV_OWNED.has(key)) continue
+    const allowed =
+      ENV_ALLOW.has(key) || extras.has(key) || ENV_ALLOW_PREFIXES.some(p => key.startsWith(p))
+    if (!allowed) continue
+    if (!capturableValue(value)) continue
     env[key] = value
   }
   env.PATH = mergeSearchPaths(execDir, base.PATH)
@@ -510,7 +518,9 @@ export type InstallResult = {
   notes: string[]
 }
 
-export async function installService(opts: { port?: number } = {}): Promise<InstallResult> {
+export async function installService(
+  opts: { port?: number; extraEnv?: string[] } = {}
+): Promise<InstallResult> {
   const platform = servicePlatform()
   // A reinstall replaces a running service server — remember its pid so the
   // up-again poll below never mistakes the outgoing process for the new one.
@@ -529,7 +539,16 @@ export async function installService(opts: { port?: number } = {}): Promise<Inst
     )
   }
 
-  const env = captureServiceEnv()
+  const extraEnv = opts.extraEnv ?? []
+  const env = captureServiceEnv(process.env, dirname(process.execPath), extraEnv)
+  // A key asked for by name must actually land — silently baking nothing
+  // would read as "captured" until the agent fails weeks later.
+  const missing = extraEnv.filter(key => !(key in env))
+  if (missing.length > 0) {
+    throw new ServiceError(
+      `--env ${missing.join(', ')}: not set in this shell (or the value is not capturable).`
+    )
+  }
   if (opts.port) env.PORT = String(opts.port)
   const spec: ServiceSpec = {
     bin: analysis.bin,

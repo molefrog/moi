@@ -61,16 +61,28 @@ describe('analyzeInstall', () => {
 describe('captureServiceEnv', () => {
   const base = {
     PATH: '/usr/bin:/bin',
+    // Allowlisted: system basics, moi/agent vars, proxies (either case).
     HOME: '/home/u',
+    SHELL: '/bin/zsh',
+    LANG: 'en_US.UTF-8',
+    LC_ALL: 'en_US.UTF-8',
+    XDG_CONFIG_HOME: '/home/u/.config',
     ANTHROPIC_API_KEY: 'sk-test',
-    // Per-terminal noise that must not be captured.
+    MOI_DATA_DIR: '/home/u/moi-data',
+    PUBLIC_TLDRAW_LICENSE_KEY: 'tlkey',
+    https_proxy: 'http://proxy:3128',
+    NODE_EXTRA_CA_CERTS: '/etc/corp-ca.pem',
+    // Not allowlisted: arbitrary shell exports stay out of the unit.
+    MY_COMPANY_TOKEN: 'hunter2',
+    GOPATH: '/home/u/go',
+    // Per-terminal/per-session state.
     TERM: 'xterm-256color',
     PWD: '/somewhere',
     SHLVL: '3',
     TMUX: '/tmp/tmux-1000/default,123,0',
     XDG_SESSION_ID: '42',
     XDG_RUNTIME_DIR: '/run/user/1000',
-    DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/1000/bus',
+    SSH_AUTH_SOCK: '/private/tmp/com.apple.launchd.abc/Listeners',
     // Generic names that would redirect the server bind (zsh exports HOST).
     HOST: 'my-laptop.local',
     HOSTNAME: 'my-laptop',
@@ -80,18 +92,27 @@ describe('captureServiceEnv', () => {
     MOI_SERVER: '1'
   }
 
-  test('captures real vars, drops noise and dangerous generics', () => {
+  test('captures the allowlist, drops everything else', () => {
     const env = captureServiceEnv(base, '/home/u/.bun/bin')
-    expect(env.ANTHROPIC_API_KEY).toBe('sk-test')
     expect(env.HOME).toBe('/home/u')
+    expect(env.SHELL).toBe('/bin/zsh')
+    expect(env.LC_ALL).toBe('en_US.UTF-8')
+    expect(env.XDG_CONFIG_HOME).toBe('/home/u/.config')
+    expect(env.ANTHROPIC_API_KEY).toBe('sk-test')
+    expect(env.MOI_DATA_DIR).toBe('/home/u/moi-data')
+    expect(env.PUBLIC_TLDRAW_LICENSE_KEY).toBe('tlkey')
+    expect(env.https_proxy).toBe('http://proxy:3128')
+    expect(env.NODE_EXTRA_CA_CERTS).toBe('/etc/corp-ca.pem')
     for (const key of [
+      'MY_COMPANY_TOKEN',
+      'GOPATH',
       'TERM',
       'PWD',
       'SHLVL',
       'TMUX',
       'XDG_SESSION_ID',
       'XDG_RUNTIME_DIR',
-      'DBUS_SESSION_BUS_ADDRESS',
+      'SSH_AUTH_SOCK',
       'HOST',
       'HOSTNAME',
       'PORT',
@@ -99,6 +120,16 @@ describe('captureServiceEnv', () => {
     ]) {
       expect(env).not.toHaveProperty(key)
     }
+  })
+
+  test('extra keys are captured by name, still filtered for capturability', () => {
+    const env = captureServiceEnv(base, '/x', ['MY_COMPANY_TOKEN', 'GOPATH'])
+    expect(env.MY_COMPANY_TOKEN).toBe('hunter2')
+    expect(env.GOPATH).toBe('/home/u/go')
+    // Named but unset or unusable → simply absent (installService errors).
+    const withBad = captureServiceEnv({ PATH: '/bin', ESC: '\x1b[1m' }, '/x', ['ESC', 'UNSET'])
+    expect(withBad).not.toHaveProperty('ESC')
+    expect(withBad).not.toHaveProperty('UNSET')
   })
 
   test('marks the process as the service-managed server', () => {
@@ -113,30 +144,13 @@ describe('captureServiceEnv', () => {
     expect(captureServiceEnv({ PATH: '/a:/a:/b' }, '/a').PATH).toBe('/a:/b')
   })
 
-  test('drops control-character values and invalid keys', () => {
+  test('drops control-character values even for allowlisted keys', () => {
     const env = captureServiceEnv(
-      {
-        PATH: '/bin',
-        WEIRD: 'a\nb',
-        // Terminal decorations carry raw ESC bytes (invalid in plists/units).
-        LESS_TERMCAP_md: '\x1b[1m',
-        'BAD-KEY': 'x',
-        OK: 'fine'
-      },
+      { PATH: '/bin', ANTHROPIC_API_KEY: 'sk\nbroken', LC_COLORS: '\x1b[1m' },
       '/x'
     )
-    expect(env).not.toHaveProperty('WEIRD')
-    expect(env).not.toHaveProperty('LESS_TERMCAP_md')
-    expect(env).not.toHaveProperty('BAD-KEY')
-    expect(env.OK).toBe('fine')
-  })
-
-  test('drops the per-boot ssh agent socket', () => {
-    const env = captureServiceEnv(
-      { PATH: '/bin', SSH_AUTH_SOCK: '/private/tmp/com.apple.launchd.abc/Listeners' },
-      '/x'
-    )
-    expect(env).not.toHaveProperty('SSH_AUTH_SOCK')
+    expect(env).not.toHaveProperty('ANTHROPIC_API_KEY')
+    expect(env).not.toHaveProperty('LC_COLORS')
   })
 })
 
