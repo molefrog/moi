@@ -103,15 +103,17 @@ session.
 ## Updating
 
 ```sh
-moi update
+moi update            # update to the latest release
+moi update --check    # only check; exit 0 up to date, 1 update available, 2 check failed
 ```
 
-Checks npm for the latest release and updates through whichever package
-manager owns the install (bun, npm, pnpm, or yarn). A service-managed server
-is restarted onto the new version; a foreground `moi start` only gets a
-warning — restart it yourself. Prerelease installs (`…-next.N`) are left
-alone. `moi status` shows when the running server and CLI versions differ,
-however the update happened.
+`moi update` checks npm for the latest release and updates through whichever
+package manager owns the install (bun, npm, pnpm, or yarn). A service-managed
+server is restarted onto the new version; a foreground `moi start` only gets
+a warning — restart it yourself. Prerelease installs (`…-next.N`) are left
+alone. `--check` changes nothing and is made for scripts and agents.
+`moi status` shows when the running server and CLI versions differ, however
+the update happened.
 
 ## OpenClaw
 
