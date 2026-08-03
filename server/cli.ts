@@ -2590,6 +2590,34 @@ const version = defineCommand({
   }
 })
 
+// The root help splits the surface by audience: workspace commands are the
+// agent's day-to-day toolkit (skills tell it to run them); system commands
+// manage moi itself and are for the human at the keyboard.
+const workspaceCommands = {
+  bundle,
+  refresh,
+  builder,
+  'call-server-fn': callServerFn,
+  debug,
+  theme,
+  config,
+  env,
+  scratch,
+  skill,
+  tab,
+  tabs
+}
+
+const systemCommands = {
+  init,
+  start,
+  status,
+  service,
+  update,
+  openclaw,
+  version
+}
+
 const main = defineCommand({
   // A function so the git lookup runs only for `moi --version` / `--help`, not on
   // every command. citty resolves a function meta (used for --version + usage).
@@ -2598,34 +2626,56 @@ const main = defineCommand({
     description: 'moi — local AI workspace',
     version: versionWithCommit()
   }),
-  subCommands: {
-    init,
-    start,
-    bundle,
-    builder,
-    refresh,
-    'call-server-fn': callServerFn,
-    debug,
-    theme,
-    config,
-    env,
-    status,
-    service,
-    update,
-    openclaw,
-    scratch,
-    skill,
-    tab,
-    tabs,
-    version
-  }
+  subCommands: { ...workspaceCommands, ...systemCommands }
 })
 
-// Route `moi config --help` to the same terse cheat sheet as `moi config help`;
-// every other command keeps citty's default usage renderer.
+type HelpCommand = { meta?: unknown }
+
+async function commandDescription(cmd: HelpCommand): Promise<string> {
+  const meta = typeof cmd.meta === 'function' ? await cmd.meta() : await cmd.meta
+  return (meta as { description?: string })?.description ?? ''
+}
+
+// Two-section root help (replaces citty's flat list). The system section
+// carries an explicit note for agents: those commands change moi itself
+// (server lifecycle, service, updates) and are not theirs to run unprompted.
+async function printMainHelp() {
+  const pad =
+    Math.max(...Object.keys({ ...workspaceCommands, ...systemCommands }).map(n => n.length)) + 4
+  const row = async (name: string, cmd: HelpCommand) =>
+    '  ' + pc.cyan(name.padEnd(pad)) + pc.dim(await commandDescription(cmd))
+  console.log()
+  console.log(
+    pc.bold('moi') + pc.dim(' — local AI workspace  ') + pc.dim(`v${versionWithCommit()}`)
+  )
+  console.log()
+  console.log(pc.dim('USAGE  ') + 'moi <command> [options]')
+  console.log()
+  console.log(pc.bold('Workspace commands') + pc.dim(' — day-to-day, for agents and humans alike'))
+  console.log()
+  for (const [name, cmd] of Object.entries(workspaceCommands)) console.log(await row(name, cmd))
+  console.log()
+  console.log(
+    pc.bold('System commands') + pc.dim(' — manage moi itself (server, service, updates)')
+  )
+  console.log(pc.yellow('  Agents: do not run these unless explicitly asked.'))
+  console.log()
+  for (const [name, cmd] of Object.entries(systemCommands)) console.log(await row(name, cmd))
+  console.log()
+  console.log(pc.dim('Use moi <command> --help for more information about a command.'))
+  console.log()
+}
+
+// Route `moi --help` (and bare `moi`) to the two-section help, and
+// `moi config --help` to its terse cheat sheet; every other command keeps
+// citty's default usage renderer.
 runMain(main, {
   async showUsage(cmd, parent) {
     const meta = typeof cmd.meta === 'function' ? await cmd.meta() : await cmd.meta
+    if (meta?.name === 'moi') {
+      await printMainHelp()
+      return
+    }
     if (meta?.name === 'config') {
       printConfigHelp()
       return
