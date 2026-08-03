@@ -1,6 +1,11 @@
 // Session discovery + history replay for Claude Code workspaces, backed by
 // the Agent SDK's persisted `.jsonl` session files.
-import { getSessionMessages, listSessions, tagSession } from '@anthropic-ai/claude-agent-sdk'
+import {
+  getSessionInfo,
+  getSessionMessages,
+  listSessions,
+  tagSession
+} from '@anthropic-ai/claude-agent-sdk'
 import type { SDKSessionInfo } from '@anthropic-ai/claude-agent-sdk'
 
 import {
@@ -88,6 +93,21 @@ export async function getSessionWorkspacePreview(
   return {
     ...(firstUserMessage ? { firstUserMessage } : {}),
     ...(updatedAt !== undefined ? { updatedAt } : {})
+  }
+}
+
+// Whether the session's file exists on disk in this workspace's project dir —
+// i.e. whether `resume` can possibly succeed. Reads only that session's file
+// (unlike listSessions). A probe failure counts as existing, so a transient
+// fs error still attempts the resume instead of silently forking a new chat.
+export async function claudeSessionExists(
+  sessionId: string,
+  workspacePath: string
+): Promise<boolean> {
+  try {
+    return (await getSessionInfo(sessionId, { dir: workspacePath })) !== undefined
+  } catch {
+    return true
   }
 }
 

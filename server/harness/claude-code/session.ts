@@ -21,6 +21,7 @@ import {
 import { appendAttachmentNote, attachmentOnlyPlaceholder } from '@/lib/attachment-note'
 import { buildSessionTitleSource } from '../session-title'
 import { ClaudeAdapter } from './adapter'
+import { claudeSessionExists } from './sessions'
 import { generateClaudeSessionTitle, renameClaudeSessionIfUnchanged } from './session-title'
 import type { Part } from '@/lib/format'
 import type { SessionActivity } from '@/lib/types'
@@ -691,12 +692,6 @@ export async function sendCCMessage(input: {
     ? resolveUploads(input.workspaceId, input.attachments)
     : []
   if (!input.content && uploads.length === 0) return
-  const sessionTitleSource = input.isNew
-    ? buildSessionTitleSource(
-        input.content,
-        uploads.map(upload => upload.filename)
-      )
-    : undefined
   const { content: userContent, parts } = buildUserMessage(input.content, uploads)
   // The envelope goes in as its OWN leading text block, never merged into the
   // user's string: the SDK's first-prompt extraction (session titles,
@@ -758,16 +753,31 @@ export async function sendCCMessage(input: {
     }
   }
   if (!s) {
+    // Resuming a session with no file on disk hard-fails the CLI with "No
+    // conversation found" — and a dangling id can be selected forever (a
+    // brand-new chat whose first turn died before init persisted anything,
+    // or session files cleaned up externally), wedging the chat. Start fresh
+    // instead: the init rename then migrates this id to the real one
+    // everywhere (selected session, session config, view builders, client).
+    const isNew = input.isNew || !(await claudeSessionExists(input.sessionId, input.workspacePath))
+    if (isNew !== input.isNew) {
+      debug(`cc resume-missing ws=${input.workspaceId} session=${input.sessionId} — starting fresh`)
+    }
     s = createLiveSession({
       workspaceId: input.workspaceId,
       workspacePath: input.workspacePath,
       sessionId: input.sessionId,
-      isNew: input.isNew,
+      isNew,
       model: input.model,
       effort: input.effort,
       fastMode: input.fastMode,
       stream: wantStream,
-      sessionTitleSource,
+      sessionTitleSource: isNew
+        ? buildSessionTitleSource(
+            input.content,
+            uploads.map(upload => upload.filename)
+          )
+        : undefined,
       // The agent only sees secrets scoped to the 'agent' sink (plus .env).
       workspaceEnv: await resolveWorkspaceEnv(input.workspacePath)
     })
