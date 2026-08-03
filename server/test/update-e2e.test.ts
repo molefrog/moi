@@ -118,8 +118,8 @@ afterAll(async () => {
   await rm(home, { recursive: true, force: true })
 })
 
-function runUpdate() {
-  return Bun.spawn(['bun', join(fakeRoot, 'server', 'cli.ts'), 'update'], {
+function runUpdate(args: string[] = [], envExtra: Record<string, string> = {}) {
+  return Bun.spawn(['bun', join(fakeRoot, 'server', 'cli.ts'), 'update', ...args], {
     cwd: fakeRoot,
     stdin: 'ignore',
     stdout: 'pipe',
@@ -131,7 +131,8 @@ function runUpdate() {
       PATH: `${join(home, '.bun', 'bin')}:${process.env.PATH}`,
       MOI_NPM_REGISTRY: `http://127.0.0.1:${registry.port}`,
       NPM_CONFIG_REGISTRY: `http://127.0.0.1:${registry.port}`,
-      NO_COLOR: '1'
+      NO_COLOR: '1',
+      ...envExtra
     }
   })
 }
@@ -156,6 +157,47 @@ describe('moi update (e2e)', () => {
     expect(stdout).toContain('Prerelease installs are updated manually')
     expect(stdout).not.toContain('via bun:')
     await setFakeVersion('0.5.2')
+  }, 60_000)
+
+  test('--check: prerelease is nothing to update, exit 0', async () => {
+    await setFakeVersion('0.6.0-next.1')
+    const proc = runUpdate(['--check'])
+    const [code, stdout] = await Promise.all([proc.exited, new Response(proc.stdout).text()])
+    expect(code).toBe(0)
+    expect(stdout).toContain('Prerelease installs are updated manually')
+    await setFakeVersion('0.5.2')
+  }, 60_000)
+
+  test('--check: update available exits 1 and changes nothing', async () => {
+    const proc = runUpdate(['--check'])
+    const [code, stdout] = await Promise.all([proc.exited, new Response(proc.stdout).text()])
+    expect(code).toBe(1)
+    expect(stdout).toContain(`installed v0.5.2`)
+    expect(stdout).toContain(`update available: v${NEW_VERSION}`)
+    expect(stdout).toContain('run `moi update` to install')
+    expect(stdout).not.toContain('via bun:')
+    // Side-effect-free: the install tree was not touched.
+    expect(await Bun.file(join(fakeRoot, 'server', 'cli.ts')).exists()).toBe(true)
+    const pkg = JSON.parse(await Bun.file(join(fakeRoot, 'package.json')).text()) as {
+      version: string
+    }
+    expect(pkg.version).toBe('0.5.2')
+  }, 60_000)
+
+  test('--check: up to date exits 0', async () => {
+    await setFakeVersion(NEW_VERSION)
+    const proc = runUpdate(['--check'])
+    const [code, stdout] = await Promise.all([proc.exited, new Response(proc.stdout).text()])
+    expect(code).toBe(0)
+    expect(stdout).toContain(`Already up to date (latest is v${NEW_VERSION})`)
+    await setFakeVersion('0.5.2')
+  }, 60_000)
+
+  test('--check: unreachable registry exits 2', async () => {
+    const proc = runUpdate(['--check'], { MOI_NPM_REGISTRY: 'http://127.0.0.1:1' })
+    const [code, stderr] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
+    expect(code).toBe(2)
+    expect(stderr).toContain('Could not reach the npm registry')
   }, 60_000)
 
   test('updates a bun global install through bun and verifies the new bin', async () => {

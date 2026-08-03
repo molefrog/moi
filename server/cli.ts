@@ -2399,7 +2399,15 @@ const update = defineCommand({
     name: 'update',
     description: 'Update moi to the latest published version'
   },
-  async run() {
+  args: {
+    check: {
+      type: 'boolean',
+      default: false,
+      description:
+        'Only check the registry, change nothing. Exit 0: up to date (or nothing to update), 1: update available, 2: check failed.'
+    }
+  },
+  async run({ args }) {
     // A checkout has no owning package manager — updating means `git pull`.
     const analysis = analyzeInstall()
     if (analysis.kind === 'checkout') {
@@ -2430,13 +2438,24 @@ const update = defineCommand({
       console.error(
         '\n' + pc.red('✗') + ' ' + (err instanceof Error ? err.message : String(err)) + '\n'
       )
-      process.exit(1)
+      // Under --check, exit 2 keeps "check failed" distinct from "update
+      // available" (exit 1) for scripts and agents.
+      process.exit(args.check ? 2 : 1)
     }
 
     if (!isNewer(latest, VERSION)) {
       console.log(pc.green('✓') + ` Already up to date (latest is v${latest})`)
-      await reportServerFreshness()
+      // --check is side-effect-free: skip the server sync, which can restart
+      // a lagging service. `moi status` reports that lag without acting on it.
+      if (!args.check) await reportServerFreshness()
       process.exit(0)
+    }
+
+    if (args.check) {
+      console.log(
+        `  update available: ${pc.bold('v' + latest)}` + pc.dim(' — run `moi update` to install\n')
+      )
+      process.exit(1)
     }
 
     console.log(`  latest is ${pc.bold('v' + latest)} — updating`)
