@@ -148,3 +148,50 @@ config-file requirements belong to the CLI layer only.
 Conclusion drawn from both rounds: drive shadcn's engine from moi (`moi ui
 add` as a thin shim), keep the upstream registry as the source of truth, and
 never materialize CLI config in the workspace — see RFC 0003.
+
+## Round 3 — registry internals, the command surface, and docs
+
+How the registry actually works (from `dist/` source + live probes):
+
+- **Addressing.** `@registry/item` parses via one regex; a plain `button`
+  falls to the default registry. Also accepted: direct URLs, local JSON
+  paths (`~/` expanded), and GitHub `owner/repo#ref` (resolved with
+  `git ls-remote`).
+- **Registries are URL templates.** The whole registry concept is a map
+  `@name → template` with `{name}`/`{style}` placeholders; builtin is
+  `@shadcn → ${REGISTRY_URL}/styles/{style}/{name}.json` and the
+  **`REGISTRY_URL` env var swaps the base** — a one-variable mirror/cache
+  lever. Templates take optional `params`/`headers` (auth), with a full
+  401/403/404/410 error taxonomy — private registries are first-class.
+- **Well-known endpoints** under the base: `registries.json` (public
+  directory), `index.json` (item index with `meta.links` — what search and
+  docs read), `styles/index.json`, `icons/index.json`, `colors/<n>.json`.
+- **Fetch layer**: one wrapper — `Accept: application/vnd.shadcn.v1+json`,
+  in-memory promise cache (`useCache` default true), per-registry headers.
+  `resolveRegistryItems` walks `registryDependencies` recursively against
+  the index. Items are self-contained JSON with file contents inline — a
+  registry is just static JSON hosting.
+
+Command surface moi can re-ship over the engine (`moi ui *`, zero config):
+`add` (RFC 0003), `search` (fuzzysort over the index), `view` (item
+source/JSON without installing), `docs`, `example`, and `diff`
+(installed file vs upstream — the update-flow answer). Not applicable:
+`init` (moi is init), `migrate`/`preset`/`apply` (project templates),
+`build`/`registry` (publishing registries — only if moi ever ships its own
+items). `shadcn/mcp` exports a ready MCP server with 7 tools
+(search/list/view items, examples, add-command, audit checklist) — an
+alternative agent surface worth a config-shim test.
+
+The docs story, verified live:
+
+- `shadcn docs` prints only `meta.links` from the index (per base,
+  `--json`). No content fetching in the CLI.
+- **Full docs are fetchable as markdown**: `ui.shadcn.com/docs/components/
+base/button.md` → 200 (frontmatter + MDX) and `base-ui.com/react/
+components/popover.md` → 200 (API reference). Zero-maintenance agent
+  docs.
+- **Examples are registry items**: `button-example` (type
+  `registry:example`) returns ~32 KB of real usage source through the same
+  `getRegistryItems` call — the highest-value input for an agent writing
+  UI. (Example files import an internal `Example` wrapper and
+  `IconPlaceholder` — read-only material, not for installing.)
