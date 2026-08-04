@@ -7,7 +7,12 @@ import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { systemdUnit } from '../service'
+import { systemdUnit, userManagerAvailable } from '../service'
+
+// The Linux paths differ by environment: dev sandboxes have no systemd user
+// manager (bus errors), CI runners have a live one. Probe once and let the
+// assertions branch — both worlds must stay green.
+const hasUserManager = process.platform === 'linux' && (await userManagerAvailable())
 
 const REPO_ROOT = join(import.meta.dir, '..', '..')
 
@@ -75,11 +80,18 @@ describe('moi service (e2e)', () => {
     expect(res.stdout).toContain('moi service install')
   })
 
-  linuxOnly('install: clear error without a systemd user manager', async () => {
+  linuxOnly('install: fails cleanly, leaving no half-installed unit', async () => {
     const res = await runCli(['service', 'install'])
     expect(res.code).toBe(1)
-    expect(res.stderr).toContain('No systemd user manager is running')
-    expect(res.stderr).toContain('enable-linger')
+    if (hasUserManager) {
+      // A live manager reads its own config dir, not this test's temp
+      // XDG_CONFIG_HOME — enable fails against the real search path. The
+      // point stands either way: the failed install rolls the unit back.
+      expect(res.stderr).toContain('systemctl')
+    } else {
+      expect(res.stderr).toContain('No systemd user manager is running')
+      expect(res.stderr).toContain('enable-linger')
+    }
     // Nothing half-installed left behind.
     expect(await Bun.file(unitPath()).exists()).toBe(false)
   })
@@ -119,9 +131,9 @@ describe('moi service (e2e)', () => {
     expect(res.code).toBe(0)
     expect(res.stdout).toContain('unit')
     expect(res.stdout).toContain('systemd user unit')
-    // No user manager in the sandbox: state is reported as unavailable, not a
-    // crash or a raw dbus error dump.
-    expect(res.stdout).toContain('unavailable')
+    // Without a user manager the state reads unavailable; with one (CI) the
+    // manager answers for the unknown unit (inactive). Never a raw dbus dump.
+    expect(res.stdout).toContain(hasUserManager ? 'state' : 'unavailable')
     expect(res.stdout).not.toMatch(/Failed to connect to bus/)
     // The unit's exec no longer exists → stale-bin warning with the fix.
     expect(res.stdout).toContain('no longer exists')
