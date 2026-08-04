@@ -69,6 +69,13 @@ describe('buildApplet', () => {
     }
   })
 
+  test('maps semantic success colors to the host-owned variable', async () => {
+    const result = await buildApplet(join(FIXTURES, 'hello.tsx'))
+
+    expect(result.js).toContain('var(--success)')
+    expect(result.js).not.toContain('--success:')
+  })
+
   test('rewrites .server.ts imports to rpc() stubs', async () => {
     const result = await buildApplet(join(FIXTURES, 'with-server.tsx'))
 

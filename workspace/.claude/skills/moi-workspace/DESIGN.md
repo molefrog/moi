@@ -35,13 +35,11 @@ The host applies the `.dark` class around every widget. Semantic tokens inside a
 use dark-mode values regardless of the workspace color preset. The host frame stays transparent, so
 every widget root must cover the full frame with an opaque background.
 
-Choose each widget's background deliberately. Prefer an intentional solid color for most widgets,
-using your design judgment to fit the content, purpose, mood, data, status, and surrounding widgets.
-Pair it with a readable foreground and keep the surface consistent through every state. An image or
+Use `h-full w-full bg-background text-foreground` for most widget roots. In the widget scope, it
+resolves to a dark background with light text. When the whole widget has a clear positive or
+negative state, tint the opaque background by mixing `--background` with `--success` or
+`--destructive`. Use opacity variants such as `bg-success/10` for contained elements. An image or
 visualization may own the surface when it has an opaque fallback.
-
-`h-full w-full bg-background text-foreground` is a sensible fallback when no more specific surface
-fits. In the widget scope, it resolves to a dark background with light text.
 
 ### View surfaces
 
@@ -50,7 +48,7 @@ Views are separate pages. Their semantic tokens inherit the workspace theme, so
 
 | Context or intent | Tailwind classes | Use |
 | --- | --- | --- |
-| Widget fallback | `bg-background text-foreground` | Dark semantic surface when no content-led color fits |
+| Default widget root | `bg-background text-foreground` | Dark semantic surface for most widgets |
 | Default view root | `bg-background text-foreground` | The workspace page surface and text |
 | Primary content | `text-foreground` | Content on the default dark widget surface or normal view surface |
 | Secondary content | `text-muted-foreground` | Supporting content on the default dark widget surface or normal view surface |
@@ -59,7 +57,8 @@ Views are separate pages. Their semantic tokens inherit the workspace theme, so
 | Primary action | `bg-primary text-primary-foreground` | The most important action in a local region |
 | Subdued surface | `bg-muted` | Skeletons, quiet fills, and disabled structure |
 | Control state | `bg-accent text-accent-foreground` | Hover, active, and selected states on interactive controls |
-| Error or danger | `text-destructive` / `bg-destructive` | Errors, destructive actions, and invalid states |
+| Positive or active state | `text-success` / `bg-success/10` | Positive outcomes, healthy states, presence, and progress indicators |
+| Error or danger | `text-destructive` / `bg-destructive/10` | Errors, destructive actions, and invalid states |
 | Structure | `ring-border`, `border-input`, `ring-ring` | Container edges, controls, and visible focus on semantic surfaces |
 
 Use lower opacity from the surface's foreground only for tertiary metadata that remains readable.
@@ -70,9 +69,12 @@ Keep container edges subtle. Use `ring-1 ring-border` on semantic surfaces and a
 outline suited to a custom light or colored surface. Avoid a bare `border` or raw high-contrast
 colors as custom container chrome.
 
-Custom color is welcome when it carries identity, data, status, or useful emphasis. On a saturated
-surface, choose an explicit light or dark foreground with strong contrast. Keep state colors
-consistent and pair them with text, shape, or an icon when they convey meaning.
+Derive extra neutral or tonal colors from semantic tokens with `color-mix()`. Use Tailwind palette
+colors when they have clear content meaning, such as blue for clear-sky weather, or when an
+infographic needs multiple colors to distinguish categories or series. A user-requested palette is
+also a clear reason. Keep each mapping consistent and explain it with labels, legends, shapes, or
+direct values. Do not use palette colors for generic decoration or unrelated widget backgrounds.
+On a saturated surface, choose an explicit light or dark foreground with strong contrast.
 
 Use solid filled surfaces by default. A restrained shadow, glow, texture, image, or visualization
 may add depth when it supports the subject. Do not use gradients as generic visual polish. Use a
@@ -242,7 +244,8 @@ Before finishing an applet, confirm:
 
 - Every visible element has a clear purpose.
 - Its purpose and first reading are clear at the intended size.
-- Semantic colors handle structure and custom color has a reason.
+- Semantic colors handle structure, and widget roots use the default semantic surface.
+- Palette colors communicate content, distinguish infographic data, or follow a user request.
 - Surfaces use solid fills by default; gradients have a content-specific reason.
 - Purple appears only for a content, brand, or user reason and never as a default gradient.
 - Type, spacing, density, and expression support the content.

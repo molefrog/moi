@@ -25,6 +25,7 @@ Use semantic color tokens by intent:
 - `primary` for the single most important action in a local region.
 - `muted` for quiet structure or disabled fills and `muted-foreground` for secondary content.
 - `accent` for hover, active, selection, and subtle highlights.
+- `success` for positive outcomes, healthy or active states, and presence or progress indicators.
 - `destructive` for destructive actions, invalid states, and errors.
 - `border`, `input`, and `ring` for structure, controls, and focus.
 
