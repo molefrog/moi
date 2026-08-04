@@ -57,7 +57,7 @@ Using Claude Code or Codex? Paste this prompt into an existing session and the
 agent will set everything up for you:
 
 ```
-Set up the moi workspace for this project. Fetch https://moi.computer/CC-INSTALL.md, and follow the steps.
+Set up the moi workspace for this project. Fetch https://moi.computer/INSTALL.md, and follow the steps.
 ```
 
 For OpenClaw or a manual setup, read on.
