@@ -83,19 +83,24 @@ On a saturated surface, choose an explicit light or dark foreground with strong 
 Use an open layout by default. Group content with spacing, alignment, type hierarchy, and, when
 needed, a one-sided separator. Add a wrapper with its own fill, ring, radius, or shadow only when it
 marks an interactive object, an independently scrolling region, a distinct state, or the main work
-surface above a texture. Page headers, tab rows, empty states, summaries, metrics, and ordinary
-sections stay unboxed. Standard controls keep their normal component surfaces.
+surface above a texture. Page headers, tab rows, summaries, metrics, and ordinary sections stay
+unboxed by default. Standard controls keep their normal component surfaces.
 
 Keep related content in one surface. Avoid adjacent or nested cards and wrappers that only repeat
 the page structure. Remove a container when it does not clarify interaction, state, scrolling, or
 content ownership.
 
+Align page-level content to shared edges or grid columns. Apply outer padding once on the root or
+layout grid, then use gaps to group unboxed content. When removing a surface, remove its card-like
+padding and radius and realign its children; do not leave spacing that implies an invisible card.
+
 ### Textures
 
-Apply at most one texture, usually to the applet root. Pair it with an opaque semantic base, such as
-`h-full w-full bg-background texture-checker`. If content needs contrast, place one solid semantic
-work surface above the texture and keep related content together inside it. Skip texture if the
-layout would need several solid wrappers to stay readable.
+Use one texture on every widget or view root and pair it with an opaque semantic base, such as
+`h-full w-full bg-background texture-checker`. Skip it only when an opaque full-bleed image, map,
+canvas, or visualization owns the background, or when the user explicitly asks for a plain surface.
+Place one solid semantic work surface above the texture for the primary content and keep related
+content together inside it. Additional surfaces still need an independent functional reason.
 
 | Texture | Tailwind class | Character |
 | --- | --- | --- |
@@ -106,8 +111,7 @@ layout would need several solid wrappers to stay readable.
 | Inset shadow | `texture-inset-shadow` | A soft edge glow derived from `primary` |
 
 Textures add an effect without setting `background-color`; the base color remains visible through
-them. An internal textured component is a rare exception and must act as a background behind solid
-child objects. Do not apply texture to a card, panel, control, or text region. Do not stack textures
+them. Do not apply a second texture to a card, panel, control, or text region. Do not stack textures
 or add tuning variables.
 
 Check nearby widgets and views before choosing one. Give unrelated applets different textures so
@@ -193,6 +197,8 @@ Data-driven applets need the following when applicable:
 
 Keep state layouts stable so loading, success, empty, and error do not cause avoidable jumps. Errors
 and empty states should still fit the configured widget height or the view's normal content frame.
+When the populated state uses a main work surface, loading, empty, success, and error states stay in
+that same surface and preserve its position and dimensions.
 
 ## Widgets
 
@@ -274,7 +280,7 @@ stretching a widget-like card to fill the page.
 ## Final review
 
 After implementation, do a removal pass from top to bottom. Review every visible element and
-wrapper, and remove anything that does not improve understanding, interaction, state, or hierarchy.
+wrapper, and remove anything that does not improve understanding, interaction, state, or hierarchy. Realign children after removing a wrapper.
 
 Before finishing an applet, confirm:
 
@@ -284,9 +290,14 @@ Before finishing an applet, confirm:
 - Palette colors communicate content, distinguish infographic data, or follow a user request.
 - Custom gradients mix semantic tokens unless content meaning or a user request calls for a palette.
 - Purple appears only for a content, brand, or user reason and never as a default gradient.
+- The root uses one texture unless a full-bleed visual owns the background or the user requested a
+  plain surface.
 - Type, spacing, density, and expression support the content.
 - Numeric UI values use the default font, with `tabular-nums` when alignment helps.
 - Complete object outlines use rings, borders act as one-sided separators, and no element uses both.
+- Page-level content shares clear alignment axes, with no card-like padding left around an unboxed
+  region.
+- Loading, populated, empty, success, and error states preserve the same main region and surface.
 - The layout handles realistic content and deliberate overflow.
 - Every control is necessary, complete, and accessible.
 - The widget or view follows its frame, sizing, and scrolling rules.
