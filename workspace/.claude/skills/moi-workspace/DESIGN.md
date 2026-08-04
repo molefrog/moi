@@ -76,9 +76,34 @@ also a clear reason. Keep each mapping consistent and explain it with labels, le
 direct values. Do not use palette colors for generic decoration or unrelated widget backgrounds.
 On a saturated surface, choose an explicit light or dark foreground with strong contrast.
 
-Use solid filled surfaces by default. A restrained shadow, glow, texture, image, or visualization
-may add depth when it supports the subject. Do not use gradients as generic visual polish. Use a
-gradient only when it encodes information or is essential to the specific content.
+### Textures
+
+Textures create depth between a background and the objects placed on it. Use one when that depth
+supports the applet's subject or hierarchy, such as on a widget root behind cards and controls, or
+on a large view section behind its main object.
+
+| Texture | Tailwind class | Character |
+| --- | --- | --- |
+| Checker | `texture-checker` | Two softly tinted semantic squares with no empty cells |
+| Grid | `texture-grid` | Fine semantic graph-paper lines over the base color |
+| Noise | `texture-noise` | Foreground-tinted fractal grain that lets the base tint show through |
+| Linear gradient | `texture-gradient-linear` | A restrained top-to-bottom wash derived from `primary` |
+| Inset shadow | `texture-inset-shadow` | A soft edge glow derived from `primary` |
+
+Textures add an effect without setting `background-color`. Pair the texture and an opaque semantic
+base on the same element, such as `bg-background texture-checker` or `bg-card texture-noise`. The base
+color remains visible through every texture.
+
+Use at most one texture per widget or view and apply it to one component. Prefer the root background
+or the layer directly behind the applet's main object. Do not stack textures or add tuning variables.
+Texture is optional when it does not improve hierarchy or applet recognition.
+
+Check nearby widgets and views before choosing one. Give unrelated applets different textures so
+they remain distinct at a glance. A widget that opens, summarizes, or represents a view shares that
+view's texture as part of the same visual language.
+
+Custom gradients mix semantic tokens by default. Tailwind palette colors are appropriate when they
+have clear content meaning, distinguish infographic data, or follow an explicit user request.
 
 Use purple, violet, and fuchsia only when the content, brand, or user preference calls for them.
 Never use a purple gradient as a default creativity or technology cue.
@@ -246,7 +271,8 @@ Before finishing an applet, confirm:
 - Its purpose and first reading are clear at the intended size.
 - Semantic colors handle structure, and widget roots use the default semantic surface.
 - Palette colors communicate content, distinguish infographic data, or follow a user request.
-- Surfaces use solid fills by default; gradients have a content-specific reason.
+- Any texture follows the placement, contrast, and applet-pairing rules above.
+- Custom gradients mix semantic tokens unless content meaning or a user request calls for a palette.
 - Purple appears only for a content, brand, or user reason and never as a default gradient.
 - Type, spacing, density, and expression support the content.
 - Numeric UI values use the default font, with `tabular-nums` when alignment helps.

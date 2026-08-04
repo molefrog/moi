@@ -42,6 +42,27 @@ describe('installBundledSkills', () => {
     expect(design).toMatch(/tint the opaque background by mixing `--background` with `--success`/)
     expect(design).toMatch(/infographic needs multiple colors to distinguish categories or series/)
     expect(design).toMatch(/Do not use palette colors for generic decoration/)
+    expect(design).toContain('`texture-checker`')
+    expect(design).toContain('`texture-grid`')
+    expect(design).toContain('`texture-noise`')
+    expect(design).toContain('`texture-gradient-linear`')
+    expect(design).toContain('`texture-inset-shadow`')
+    expect(design).not.toContain('`surface-')
+    expect(design).toMatch(/without setting `background-color`/)
+    expect(design).toContain('`bg-muted texture-checker`')
+    expect(design).toContain('`bg-card texture-noise`')
+    expect(design).toMatch(
+      /Textures create depth between a background and the objects placed on it/
+    )
+    expect(design).toMatch(
+      /Keep text-only regions and small standalone labels\s+on a solid surface/
+    )
+    expect(design).toMatch(
+      /Use at most one texture per widget or view and apply it to one component/
+    )
+    expect(design).toMatch(/Give unrelated applets different textures/)
+    expect(design).toMatch(/represents a view shares that\s+view's texture/)
+    expect(design).toMatch(/Custom gradients mix semantic tokens by default/)
     expect(design).not.toContain('Prefer an intentional solid color for most widgets')
     expect(design).not.toContain('### Color starting points')
     expect(design).toMatch(/Views are separate pages\.\s+Their semantic tokens inherit/)

@@ -79,7 +79,7 @@
   --ring: oklch(0.556 0 0);
 }
 
-/* Font/color/radius/shadow tokens — shared with applet bundles via theme.css */
+/* Theme tokens and texture utilities shared with applet bundles. */
 @import './theme.css';
 
 /* Dragged card floats above all others */

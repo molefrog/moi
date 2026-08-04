@@ -415,12 +415,11 @@ function appletRuntimePlugin(
   return { plugin, serverModules, assets }
 }
 
-// Path to the host's `@theme inline` block — shared with `client/index.css`.
-// Inlined into the widget's synthetic CSS at build time so Tailwind sees the
-// theme tokens.
+// Shared Tailwind input for applet bundles. It maps semantic tokens and
+// provides the same texture utilities available to host components.
 const HOST_THEME_PATH = join(import.meta.dir, '..', '..', 'client', 'theme.css')
 
-// Three things matter for widget styling:
+// Three things matter for applet styling:
 //   1. The umbrella `@import 'tailwindcss'` brings in @layer theme + base +
 //      utilities — which is what spacing/color utilities like `left-2.5`,
 //      `gap-1.5`, `text-amber-500` need to resolve. The split
@@ -433,6 +432,7 @@ const HOST_THEME_PATH = join(import.meta.dir, '..', '..', 'client', 'theme.css')
 //      means the widget's CSS does NOT redefine the underlying
 //      `--background`/`--foreground` variables — those stay host-owned and
 //      the widget picks them up from `:root` at runtime.
+//      The same shared file also defines texture utilities for both surfaces.
 //   3. Tailwind's auto-detection treats `.moi/` as a hidden directory
 //      and skips it. An explicit `@source` bypasses the dot-dir + gitignore
 //      filters.
