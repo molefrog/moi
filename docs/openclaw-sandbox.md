@@ -44,17 +44,18 @@ device-approval dance in NOTES.md §3 does not bite here.
 ## Model auth — the one thing the sandbox cannot self-serve
 
 The environment carries no model provider credential, so agent turns fail
-until one is added (`openclaw models status` → `missing auth`). Provide an
-API key env var (for Claude Code on the web, set it in the environment
-settings so every session inherits it), then point the default model at that
-provider — e.g. for Anthropic:
+until one is added (`openclaw models status` → `missing auth`). Shell env
+keys are off by default; the verified path is the auth store:
 
 ```sh
+printf '%s' "$KEY" | node_modules/.bin/openclaw models auth paste-api-key --provider anthropic
 node_modules/.bin/openclaw models set anthropic/claude-sonnet-5
 ```
 
 `openclaw models list --all` shows the catalog ids (`anthropic/…`,
-`openai/…`).
+`openai/…`). Keys land in the per-agent auth store under
+`~/.openclaw/agents/main/agent/`. Restart the gateway afterwards — the
+default model is resolved at startup.
 
 `openclaw models auth login --provider <p>` is the interactive OAuth
 alternative; in a headless sandbox an API key is simpler.
@@ -63,6 +64,10 @@ alternative; in a headless sandbox an API key is simpler.
 
 - Restart the gateway after any `openclaw config` write — config is read at
   start.
+- The CLI wrapper detaches the real server as a process named
+  `openclaw-gateway`, so killing the wrapper leaves the gateway (and its
+  stale in-memory config) running. Stop it with `pkill -f openclaw-gateway`
+  and confirm the port is free before relaunching.
 - moi reads `~/.openclaw/openclaw.json` (the real profile). `openclaw --dev`
   isolates under `~/.openclaw-dev/` on port 19001, which moi will not see.
 - `registry.npmjs.org`, `nodejs.org`, and `api.anthropic.com` are all
