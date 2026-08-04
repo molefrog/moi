@@ -77,7 +77,7 @@ export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
   }
 
   return (
-    <BottomPanel ref={ref} title="Customize" onClose={onClose}>
+    <BottomPanel ref={ref} title="Customize" onClose={onClose} className="mx-auto w-auto max-w-160">
       <div className="flex flex-col gap-4">
         <CustomizeOptionGroup label="Font">
           {FONT_OPTIONS.map(([key, config]) => (
