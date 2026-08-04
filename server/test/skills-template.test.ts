@@ -55,12 +55,19 @@ describe('installBundledSkills', () => {
     expect(design).not.toContain('`surface-')
     expect(design).toMatch(/without setting `background-color`/)
     expect(design).toContain('`bg-background texture-checker`')
-    expect(design).toContain('`bg-card texture-noise`')
+    expect(design).toContain('`bg-background texture-noise`')
+    expect(design).toMatch(/Textures are background treatments/)
+    expect(design).toMatch(/apply it to the applet root by default/)
+    expect(design).toMatch(/Place the main content in opaque semantic blocks above\s+it/)
     expect(design).toMatch(
-      /Textures create depth between a background and the objects placed on it/
+      /Skip texture when the layout has no meaningful solid block above the root/
     )
     expect(design).toMatch(
       /Use at most one texture per widget or view and apply it to one component/
+    )
+    expect(design).toMatch(/An internal textured\s+component is a rare exception/)
+    expect(design).toMatch(
+      /Do not apply texture directly to a main card, panel, control, or text region/
     )
     expect(design).toMatch(/Give unrelated applets different textures/)
     expect(design).toMatch(/represents a view shares that\s+view's texture/)

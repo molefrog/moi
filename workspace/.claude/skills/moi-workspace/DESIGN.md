@@ -81,9 +81,9 @@ On a saturated surface, choose an explicit light or dark foreground with strong 
 
 ### Textures
 
-Textures create depth between a background and the objects placed on it. Use one when that depth
-supports the applet's subject or hierarchy, such as on a widget root behind cards and controls, or
-on a large view section behind its main object.
+Textures are background treatments. When using one, apply it to the applet root by default, such as
+`h-full w-full bg-background texture-checker`. Place the main content in opaque semantic blocks above
+it, so the blocks stand out and their text stays easy to read. Skip texture when there's no need for a solid block above the root.
 
 | Texture | Tailwind class | Character |
 | --- | --- | --- |
@@ -94,12 +94,13 @@ on a large view section behind its main object.
 | Inset shadow | `texture-inset-shadow` | A soft edge glow derived from `primary` |
 
 Textures add an effect without setting `background-color`. Pair the texture and an opaque semantic
-base on the same element, such as `bg-background texture-checker` or `bg-card texture-noise`. The base
-color remains visible through every texture.
+base on the same element, such as `bg-background texture-checker` or
+`bg-background texture-noise`. The base color remains visible through every texture.
 
-Use at most one texture per widget or view and apply it to one component. Prefer the root background
-or the layer directly behind the applet's main object. Do not stack textures or add tuning variables.
-Texture is optional when it does not improve hierarchy or applet recognition.
+Use at most one texture per widget or view and apply it to one component. An internal textured
+component is a rare exception: it must act as a background layer containing solid child objects.
+Do not apply texture directly to a main card, panel, control, or text region. Do not stack textures
+or add tuning variables.
 
 Check nearby widgets and views before choosing one. Give unrelated applets different textures so
 they remain distinct at a glance. A widget that opens, summarizes, or represents a view shares that
@@ -274,7 +275,8 @@ Before finishing an applet, confirm:
 - Its purpose and first reading are clear at the intended size.
 - Semantic colors handle structure, and widget roots use the default semantic surface.
 - Palette colors communicate content, distinguish infographic data, or follow a user request.
-- Any texture follows the placement, contrast, and applet-pairing rules above.
+- Any texture sits on the applet background with solid semantic content blocks above it; an internal
+  exception still acts as a background behind solid child objects.
 - Custom gradients mix semantic tokens unless content meaning or a user request calls for a palette.
 - Purple appears only for a content, brand, or user reason and never as a default gradient.
 - Type, spacing, density, and expression support the content.
