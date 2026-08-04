@@ -308,9 +308,11 @@ function handleChatFrame(rec: SessionRecord, payload: Record<string, unknown>): 
       parentToolUseId: null,
       blocks
     })
-  } else if (state === 'final' || state === 'error') {
+  } else if (state === 'final' || state === 'error' || state === 'aborted') {
     // Belt-and-braces clear: the durable turn's apiMessageId already clears
     // the slot, but a trailing delta after the durable row would repaint it.
+    // 'aborted' arrives when a steer/abort interrupts the run mid-stream —
+    // without the clear the dead preview would linger (verified live).
     broadcast(rec.workspaceId, {
       type: 'preview',
       sessionId: rec.sessionId,
