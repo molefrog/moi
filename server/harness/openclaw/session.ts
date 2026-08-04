@@ -434,7 +434,12 @@ function ingest(rec: SessionRecord, msg: OpenClawMessage): void {
         const notice = {
           id: `openclaw:model-change:${id}`,
           kind: 'model-change' as const,
-          at: new Date().toISOString(),
+          // The switching turn's own timestamp, so live and cold placement
+          // agree (the client sorts equal-time notices before the turn).
+          at:
+            typeof msg.timestamp === 'number'
+              ? new Date(msg.timestamp).toISOString()
+              : new Date().toISOString(),
           model,
           prev
         }
