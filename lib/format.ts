@@ -74,6 +74,11 @@ export type TurnOrigin =
   | { kind: 'user-input' }
   | { kind: 'tool-return'; toolCallId: string }
   | { kind: 'synthetic'; reason: SyntheticTurnReason }
+  // A backend notification (e.g. a background-task completion) rewritten to
+  // readable text by lib/system-messages.ts. Rendered as plain text in the
+  // flow for now — a dedicated notification block is planned; key it off
+  // this origin.
+  | { kind: 'notification' }
   | { kind: 'subagent-prompt'; parentToolCallId: string }
   | { kind: 'inter-session' }
   | { kind: 'replay' }

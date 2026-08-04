@@ -154,4 +154,59 @@ describe('ClaudeAdapter system-message filtering', () => {
     expect(turn.origin).toEqual({ kind: 'user-input' })
     expect(turn.parts).toEqual([{ type: 'text', text }])
   })
+
+  test('task notification surfaces as a readable notification turn', () => {
+    const a = new ClaudeAdapter()
+    const events = a.ingest(
+      userMsg([
+        {
+          type: 'text',
+          text:
+            '[SYSTEM NOTIFICATION - NOT USER INPUT]\n' +
+            'This is an automated background-task event, NOT a message from the user.\n\n' +
+            '<task-notification>\n<task-id>b1</task-id>\n<status>completed</status>\n' +
+            '<summary>Background command "Install repo dependencies" completed (exit code 0)</summary>\n' +
+            '</task-notification>'
+        }
+      ])
+    )
+    const [turn] = turns(events as StreamEvent[])
+    expect(turn.role).toBe('user')
+    expect(turn.origin).toEqual({ kind: 'notification' })
+    expect(turn.parts).toEqual([
+      {
+        type: 'text',
+        text: 'Background command "Install repo dependencies" completed (exit code 0)'
+      }
+    ])
+    // Not a bubble: TurnView renders notification turns as plain flow text.
+    expect(visibleUserTurns([turn]).length).toBe(0)
+  })
+
+  test('an isSynthetic-flagged task notification still surfaces', () => {
+    const a = new ClaudeAdapter()
+    const events = a.ingest(
+      userMsg(
+        [
+          {
+            type: 'text',
+            text: '<task-notification><status>failed</status></task-notification>'
+          }
+        ],
+        { isSynthetic: true }
+      )
+    )
+    const [turn] = turns(events as StreamEvent[])
+    expect(turn.origin).toEqual({ kind: 'notification' })
+    expect(turn.parts).toEqual([{ type: 'text', text: 'Background task failed' }])
+  })
+
+  test('a typed message starting with the tag name keeps its bubble', () => {
+    const a = new ClaudeAdapter()
+    const text = '<task-notification> -> transform into some readable message instead'
+    const events = a.ingest(userMsg([{ type: 'text', text }]))
+    const [turn] = turns(events as StreamEvent[])
+    expect(turn.origin).toEqual({ kind: 'user-input' })
+    expect(turn.parts).toEqual([{ type: 'text', text }])
+  })
 })
