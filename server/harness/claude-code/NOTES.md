@@ -135,13 +135,14 @@ Of these the repo currently handles only `tool_result`.
 
 At the SDK wire level, **every tool result and every harness-injected prompt is a `user` message**, because Anthropic's Messages API has no dedicated role for them. Classify by content and flags, in this priority order:
 
-| #   | Condition                                                      | What it really is                                                                                | UI behavior                                                                                  |
-| --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| 1   | `isReplay: true`                                               | Replay from a resumed session; not new content                                                   | Skip (or render only once from the persisted log)                                            |
-| 2   | `content[]` contains a `tool_result` block                     | Tool return back to the model                                                                    | Route into the paired tool-use card; may carry extra metadata in top-level `tool_use_result` |
-| 3   | `isSynthetic: true`                                            | Harness-injected context (skill body, slash-command expansion, `<system-reminder>`, hook output) | Transcript-only context; hide by default, expose behind a toggle                             |
-| 4   | `parent_tool_use_id !== null` AND first user turn of a subtask | The `Agent` tool's `prompt` argument being replayed as the subtask's opening user turn           | Render as the subtask's prompt inside the nested view, not in the main thread                |
-| 5   | none of the above                                              | Actual user input typed into the chat                                                            | Render as the user bubble                                                                    |
+| #   | Condition                                                      | What it really is                                                                                                                                                  | UI behavior                                                                                  |
+| --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| 1   | `isReplay: true`                                               | Replay from a resumed session; not new content                                                                                                                     | Skip (or render only once from the persisted log)                                            |
+| 2   | `content[]` contains a `tool_result` block                     | Tool return back to the model                                                                                                                                      | Route into the paired tool-use card; may carry extra metadata in top-level `tool_use_result` |
+| 3   | `isSynthetic: true`                                            | Harness-injected context (skill body, slash-command expansion, `<system-reminder>`, hook output)                                                                   | Transcript-only context; hide by default, expose behind a toggle                             |
+| 4   | Text matches a `lib/system-messages.ts` rule (all blocks)      | CLI machinery written **without** flags: slash-command records, `[Request interrupted by user]`, `<local-command-stdout>`, bash-mode I/O, compact continuations, … | Same as #3: keep raw parts, mark `origin: synthetic`, hide                                   |
+| 5   | `parent_tool_use_id !== null` AND first user turn of a subtask | The `Agent` tool's `prompt` argument being replayed as the subtask's opening user turn                                                                             | Render as the subtask's prompt inside the nested view, not in the main thread                |
+| 6   | none of the above                                              | Actual user input typed into the chat                                                                                                                              | Render as the user bubble (embedded `<system-reminder>`/hook envelopes strip out first)      |
 
 ### On `isSynthetic` specifically — the docs don't say, the source does
 
@@ -155,6 +156,20 @@ if (isSynthetic || q.isReplay) return // early-exit in an internal processing lo
 So `isSynthetic = true` means: _this user turn was fabricated by the harness and exists only so the model can see it in the transcript; don't treat it as a real utterance._ Practically, it covers skill bodies, slash-command expansions, system reminders, hook outputs, and similar injections.
 
 `isSynthetic` and `parent_tool_use_id` are **orthogonal**. A sub-agent's initial prompt (observed on line 14 of the captured log) has `parent_tool_use_id` set but `isSynthetic` absent — from the subagent's frame, that IS real user input.
+
+### Machinery the CLI does NOT flag (row #4)
+
+Several user entries the CLI writes for itself carry **no** `isMeta`/`isSynthetic`, so they'd render as user bubbles without text classification. Inventory (verified against the CLI binary's strings and live transcripts; the rules live in `lib/system-messages.ts`):
+
+- `<command-name>/<command-message>/<command-args>` (+ legacy `<command-contents>`) — slash-command invocation records
+- `<local-command-stdout>` / `<local-command-stderr>` — local command output
+- `[Request interrupted by user]` / `[Request interrupted by user for tool use]` — abort markers; the tool-use variant rides next to the aborted `tool_result` block
+- `<bash-input>` / `<bash-stdout>` / `<bash-stderr>` — `!command` bash mode
+- `<user-memory-input>` — `#note` memory mode
+- `<task-notification>` (and the cloud `[SYSTEM NOTIFICATION - NOT USER INPUT]` preamble) — background-task notices
+- `Caveat: The messages below were generated by the user while running local commands.` — `isMeta` in current CLIs, unflagged in older transcripts
+- `This session is being continued from a previous conversation that ran out of context.` — post-compaction continuation summary
+- `<system-reminder>` / `<user-prompt-submit-hook>` — envelopes attached to real messages; stripped from the text rather than hiding the turn
 
 ---
 

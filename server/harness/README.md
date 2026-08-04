@@ -30,6 +30,15 @@ Rules: **adapters are the only code that sees layer 1** — everything above
 speaks layers 2/3 only. `lib/format.ts` and `lib/types.ts` never move into
 this folder: the client imports them; they are the shared contract.
 
+System machinery that backends leave in user-role text (slash-command
+records, interrupt markers, injected reminder envelopes) is classified by
+the shared rule registry in `lib/system-messages.ts` — provider-agnostic,
+text-level. Adapters call it when building user turns: an all-machinery
+message keeps its raw parts but lands as `origin: synthetic` (hidden by the
+client), embedded envelopes strip out of real text. Add new patterns there,
+not as ad-hoc regexes in an adapter. (Exception: OpenClaw's inbound-meta
+stripper mirrors upstream code verbatim and stays in `openclaw/strip.ts`.)
+
 Socket-protocol notes the layers rely on (all defined in `lib/types.ts`):
 
 - **`session_renamed`** — a new thread is created under the client's temporary
