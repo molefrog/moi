@@ -511,6 +511,31 @@ async function writeUnit(platform: ServicePlatform, content: string): Promise<st
   return unitPath
 }
 
+// Write the unit, run the activation commands, and put things back on
+// failure: a failed fresh install must not leave a half-installed unit behind
+// (status would claim "installed" for a service that never activated), and a
+// failed reinstall must not destroy the previous working unit.
+async function writeUnitWithRollback(
+  platform: ServicePlatform,
+  content: string,
+  activate: () => Promise<void>
+): Promise<string> {
+  const unitPath = serviceUnitPath(platform)
+  let previous: string | null = null
+  try {
+    previous = await readFile(unitPath, 'utf8')
+  } catch {}
+  await writeUnit(platform, content)
+  try {
+    await activate()
+  } catch (err) {
+    if (previous === null) await rm(unitPath, { force: true })
+    else await writeFile(unitPath, previous, { mode: 0o600 })
+    throw err
+  }
+  return unitPath
+}
+
 export type InstallResult = {
   unitPath: string
   logPath: string | null
@@ -561,18 +586,20 @@ export async function installService(
 
   if (platform === 'darwin') {
     await mkdir(dirname(spec.logPath), { recursive: true })
-    const unitPath = await writeUnit(platform, launchdPlist(spec))
-    const domain = `gui/${uid()}`
-    // Reinstall: drop any loaded copy first so bootstrap reads the new plist.
-    await run(['launchctl', 'bootout', `${domain}/${LAUNCHD_LABEL}`])
-    // Clear a leftover `launchctl disable` so bootstrap isn't refused.
-    await run(['launchctl', 'enable', `${domain}/${LAUNCHD_LABEL}`])
-    const boot = await run(['launchctl', 'bootstrap', domain, unitPath])
-    if (boot.code !== 0) {
-      throw new ServiceError(
-        `launchctl bootstrap failed (${boot.stderr.trim() || `exit ${boot.code}`})`
-      )
-    }
+    const unitPath = serviceUnitPath(platform)
+    await writeUnitWithRollback(platform, launchdPlist(spec), async () => {
+      const domain = `gui/${uid()}`
+      // Reinstall: drop any loaded copy first so bootstrap reads the new plist.
+      await run(['launchctl', 'bootout', `${domain}/${LAUNCHD_LABEL}`])
+      // Clear a leftover `launchctl disable` so bootstrap isn't refused.
+      await run(['launchctl', 'enable', `${domain}/${LAUNCHD_LABEL}`])
+      const boot = await run(['launchctl', 'bootstrap', domain, unitPath])
+      if (boot.code !== 0) {
+        throw new ServiceError(
+          `launchctl bootstrap failed (${boot.stderr.trim() || `exit ${boot.code}`})`
+        )
+      }
+    })
     notes.push('macOS may report a new login item named "bun" or "moi" — that is this service.')
     const info = await waitForServerInfo(12_000, before?.pid)
     return { unitPath, logPath: spec.logPath, info, notes }
@@ -586,24 +613,27 @@ export async function installService(
         '  then log in again and rerun `moi service install`.'
     )
   }
-  const unitPath = await writeUnit(platform, systemdUnit(spec))
-  await run(['systemctl', '--user', 'daemon-reload'])
-  await run(['systemctl', '--user', 'reset-failed', SYSTEMD_UNIT])
-  const enable = await run(['systemctl', '--user', 'enable', SYSTEMD_UNIT])
-  if (enable.code !== 0) {
-    throw new ServiceError(
-      `systemctl enable failed (${enable.stderr.trim() || `exit ${enable.code}`})`
-    )
-  }
-  // `restart`, not `enable --now`: start on an already-active unit is a no-op,
-  // so a reinstall over a running service would keep the old process (old
-  // env/port/bin). restart starts an inactive unit and replaces an active one.
-  const start = await run(['systemctl', '--user', 'restart', SYSTEMD_UNIT])
-  if (start.code !== 0) {
-    throw new ServiceError(
-      `systemctl restart failed (${start.stderr.trim() || `exit ${start.code}`})`
-    )
-  }
+  const unitPath = serviceUnitPath(platform)
+  await writeUnitWithRollback(platform, systemdUnit(spec), async () => {
+    await run(['systemctl', '--user', 'daemon-reload'])
+    await run(['systemctl', '--user', 'reset-failed', SYSTEMD_UNIT])
+    const enable = await run(['systemctl', '--user', 'enable', SYSTEMD_UNIT])
+    if (enable.code !== 0) {
+      throw new ServiceError(
+        `systemctl enable failed (${enable.stderr.trim() || `exit ${enable.code}`})`
+      )
+    }
+    // `restart`, not `enable --now`: start on an already-active unit is a
+    // no-op, so a reinstall over a running service would keep the old process
+    // (old env/port/bin). restart starts an inactive unit and replaces an
+    // active one.
+    const start = await run(['systemctl', '--user', 'restart', SYSTEMD_UNIT])
+    if (start.code !== 0) {
+      throw new ServiceError(
+        `systemctl restart failed (${start.stderr.trim() || `exit ${start.code}`})`
+      )
+    }
+  })
   if ((await lingerState()) !== 'enabled') {
     if (await tryEnableLinger()) {
       notes.push('Lingering enabled — the service keeps running after you log out.')
