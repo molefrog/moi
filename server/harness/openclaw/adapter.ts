@@ -39,11 +39,26 @@ export function toSessionInfo(row: OpenClawSessionRow, cwd: string): SessionInfo
     row.derivedTitle?.trim() ||
     formatChatTitle(stripMoiContextLoose(row.lastMessagePreview ?? '')) ||
     ''
+  // External channel provenance. 'webchat' is moi's own chat surface — only
+  // real external channels (telegram/irc/discord/…) get an origin badge.
+  const provider = row.origin?.provider
+  const label = row.origin?.label
+  const origin =
+    provider && provider !== 'webchat' ? { provider, ...(label ? { label } : {}) } : undefined
+  // Flavor from the gateway key layout: cron buckets are `…:cron:<jobId>`,
+  // spawned subagents carry `spawnedBy` (and live under `…:subagent:<uuid>`).
+  const flavor: SessionInfo['flavor'] = row.key.includes(':cron:')
+    ? 'cron'
+    : row.spawnedBy || row.key.includes(':subagent:')
+      ? 'subagent'
+      : undefined
   return {
     sessionId: row.sessionId,
     summary,
     lastModified: row.updatedAt,
-    cwd
+    cwd,
+    ...(origin ? { origin } : {}),
+    ...(flavor ? { flavor } : {})
   }
 }
 
@@ -227,10 +242,40 @@ export function toStreamEvents(
 ): StreamEvent[] {
   if (!detail?.messages) return []
   const results = collectToolResults(detail.messages)
-  const turns = detail.messages
-    .map((m, i) => messageToTurn(m, sessionKey, i, results))
-    .filter((t): t is Turn => t !== null)
-  return turns.map(turn => ({ kind: 'turn', turn }))
+  const events: StreamEvent[] = []
+  // Cold-path twin of the live model-change notice in session.ts: an
+  // assistant row on a different model than the previous assistant row marks
+  // a mid-session switch (sessions.patch from moi's picker or any other
+  // client) — interleave a notice before that turn instead of letting the
+  // switch pass silently. `prev` tracks every assistant row's model, even
+  // ones that render no turn.
+  let prevModel: string | undefined
+  detail.messages.forEach((msg, i) => {
+    if (msg.role === 'assistant') {
+      const model = (msg as { model?: unknown }).model
+      if (typeof model === 'string') {
+        if (prevModel !== undefined && prevModel !== model) {
+          events.push({
+            kind: 'notice',
+            notice: {
+              id: `openclaw:model-change:${msg.__openclaw?.id ?? i}`,
+              kind: 'model-change',
+              at:
+                typeof msg.timestamp === 'number'
+                  ? new Date(msg.timestamp).toISOString()
+                  : new Date().toISOString(),
+              model,
+              prev: prevModel
+            }
+          })
+        }
+        prevModel = model
+      }
+    }
+    const turn = messageToTurn(msg, sessionKey, i, results)
+    if (turn) events.push({ kind: 'turn', turn })
+  })
+  return events
 }
 
 // Find every assistant message that has a `toolCall` block with `toolCallId`.

@@ -73,3 +73,37 @@ alternative; in a headless sandbox an API key is simpler.
 - `registry.npmjs.org`, `nodejs.org`, and `api.anthropic.com` are all
   reachable through the egress relay; `github.com` browsing is not (git goes
   through the git proxy).
+
+## Multi-version test rig
+
+Used to verify the protocol-4 compatibility claims in
+`server/harness/openclaw/NOTES.md` (2026-08-04). Old gateway versions run
+side by side with the pinned one — profiles isolate state, scratch npm
+installs isolate code:
+
+- `npm install openclaw@<version>` into a scratch dir per version
+  (`<scratchpad>/run-2026.6.33/`, `<scratchpad>/run-2026.4.22/`), using the
+  nvm Node from the section above.
+- `--profile <name>` isolates everything: state root `~/.openclaw-<name>`,
+  own config, agents, sessions. Patch each profile's gateway port before
+  launch (same `config patch` recipe as "Per session", plus
+  `--profile <name>`). The rig used: `--profile v633` → `~/.openclaw-v633`,
+  port 19003; `--profile v422` → `~/.openclaw-v422`, port 19004; the pinned
+  2026.7.1 gateway stays on 18789 with `~/.openclaw`.
+- Launch: `run-<version>/node_modules/.bin/openclaw --profile <name> gateway`
+  in the background. The detached `openclaw-gateway` process gotcha above
+  applies per profile.
+
+Probe scripts (session scratchpad, both take `<port> <token>`):
+
+- `probe-compat.ts` — connects moi's pinned SDK client
+  (`openclaw/plugin-sdk/gateway-runtime` from `node_modules`) to an arbitrary
+  gateway and replays every RPC moi issues, printing hello-ok info and
+  per-RPC ok/err. Verified protocol-4 parity on 2026.6.33 (every RPC moi
+  uses answers shape-identically, hello reports protocol 4) and the
+  protocol-3 handshake rejection on 2026.4.22 (`protocol mismatch` — the
+  exact string `compat.ts → classifyGatewayError` keys on).
+- `dump-events-port.ts` — subscribes, sends one message, and captures every
+  event frame to JSONL; produced the live-event skeletons and the
+  6.33-vs-7.1 wire-parity evidence in NOTES.md §6. It spends real tokens on
+  gateways with model auth — point it only at rigs whose keys you own.

@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { api } from './api'
 import { claudeCodeHarness } from './harness/claude-code'
 import { codexHarness } from './harness/codex'
+import { openclawHarness } from './harness/openclaw'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from './registry'
 import {
   DEFAULT_SELECTED_SESSION_PATH,
@@ -19,6 +20,8 @@ const originalClaudeInterrupt = claudeCodeHarness.interrupt
 const originalClaudeArchive = claudeCodeHarness.archiveSession
 const originalClaudeListModels = claudeCodeHarness.listModels
 const originalCodexListModels = codexHarness.listModels
+const originalOpenclawInterrupt = openclawHarness.interrupt
+const originalOpenclawArchive = openclawHarness.archiveSession
 
 beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), 'moi-api-archive-'))
@@ -31,6 +34,8 @@ afterEach(async () => {
   claudeCodeHarness.archiveSession = originalClaudeArchive
   claudeCodeHarness.listModels = originalClaudeListModels
   codexHarness.listModels = originalCodexListModels
+  openclawHarness.interrupt = originalOpenclawInterrupt
+  openclawHarness.archiveSession = originalOpenclawArchive
   setRegistryPath(DEFAULT_REGISTRY_PATH)
   setSelectedSessionPath(DEFAULT_SELECTED_SESSION_PATH)
   await rm(tempDir, { recursive: true, force: true })
@@ -85,7 +90,8 @@ test('one archive failure does not block another chat', async () => {
   ])
 
   expect(failed.status).toBe(500)
-  expect(await failed.text()).toBe('Couldn’t archive chat')
+  // Harness error messages pass through so backend refusals stay actionable.
+  expect(await failed.text()).toBe('archive failed')
   expect(succeeded.status).toBe(204)
 })
 
@@ -103,12 +109,17 @@ test('archiving the selected session switches the workspace to New chat', async 
   expect(await getSelectedSession(workspace.path)).toBeNull()
 })
 
-test('archive support is provider-specific', async () => {
+test('every provider supports archiving, openclaw via gateway patch', async () => {
   const claude = await registerWorkspace(join(tempDir, 'claude'), { type: 'claude-code' })
   const codex = await registerWorkspace(join(tempDir, 'codex'), { type: 'codex' })
   const openclaw = await registerWorkspace(join(tempDir, 'openclaw'), { type: 'openclaw' })
   claudeCodeHarness.listModels = async () => []
   codexHarness.listModels = async () => []
+  const archived: string[] = []
+  openclawHarness.interrupt = async () => {}
+  openclawHarness.archiveSession = async (_, sessionId) => {
+    archived.push(sessionId)
+  }
 
   const [claudeModels, codexModels, openclawArchive] = await Promise.all([
     api.request(`/api/workspaces/${claude.id}/models`),
@@ -118,5 +129,6 @@ test('archive support is provider-specific', async () => {
 
   expect((await claudeModels.json()).supportsArchiving).toBe(true)
   expect((await codexModels.json()).supportsArchiving).toBe(true)
-  expect(openclawArchive.status).toBe(501)
+  expect(openclawArchive.status).toBe(204)
+  expect(archived).toEqual(['chat'])
 })

@@ -37,6 +37,15 @@ type ChatSessionGroup = {
   sessions: SessionInfo[]
 }
 
+// One tiny text badge per row at most: a cron/subagent flavor wins; otherwise
+// an external origin shows its provider lowercase (e.g. "irc", "telegram").
+// Plain app chats get none.
+export function sessionBadge(session: SessionInfo): string | null {
+  if (session.flavor === 'cron' || session.flavor === 'subagent') return session.flavor
+  const provider = session.origin?.provider.trim().toLowerCase()
+  return provider ? provider : null
+}
+
 type ChatSessionItemProps = {
   active: boolean
   canArchive: boolean
@@ -61,6 +70,7 @@ function ChatSessionItem({
   const pendingRef = useRef(false)
   const [pending, setPending] = useState(false)
   const running = useLive(state => isSessionRunning(state.activity, workspaceId, session.sessionId))
+  const badge = sessionBadge(session)
 
   function handleRequestArchive() {
     onRequestArchive(session.sessionId)
@@ -102,7 +112,7 @@ function ChatSessionItem({
         >
           <span
             className={cn(
-              'min-w-0 truncate',
+              'flex min-w-0 items-baseline gap-1.5',
               (running || pending) && '-mr-4',
               confirmingArchive
                 ? '-4'
@@ -110,7 +120,8 @@ function ChatSessionItem({
                     'group-focus-within/chat:-mr-4 group-hover/chat:-mr-4 [@media(hover:none)]:-mr-4'
             )}
           >
-            {session.summary}
+            <span className="min-w-0 truncate">{session.summary}</span>
+            {badge && <span className="shrink-0 text-xs text-muted-foreground">{badge}</span>}
           </span>
         </div>
       </DropdownMenuItem>

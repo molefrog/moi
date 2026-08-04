@@ -181,6 +181,10 @@ async function reconcileAfterRun(rec: SessionRecord): Promise<void> {
       const existing = rec.results.get(result.id)
       if (
         !existing ||
+        // A live `session.tool` start whose result frame was lost (disconnect)
+        // must be finalized even when the durable output is identical-empty —
+        // otherwise the card spins forever.
+        existing.running ||
         existing.output !== result.info.output ||
         existing.isError !== result.info.isError
       ) {
@@ -251,8 +255,17 @@ function emitTurn(rec: SessionRecord, msg: OpenClawMessage, idx: number): void {
   }
   // Stamp the run's preview slot id so the client clears the streaming
   // preview when this turn upserts (chat deltas can trail the durable row).
-  if (turn.role === 'assistant' && rec.activeRunId) {
-    turn.meta = { ...turn.meta, apiMessageId: previewMessageId(rec.sessionKey, rec.activeRunId) }
+  // Only FRESH turns get the current run's slot — a re-emitted older turn
+  // (tool-result fold-in, reconcile) keeps whatever it was stamped with, so
+  // it can never clear a newer run's live preview.
+  if (turn.role === 'assistant') {
+    const prior = rec.view.turns.find(t => t.id === turn.id)
+    if (prior) {
+      const kept = prior.meta?.apiMessageId
+      if (kept) turn.meta = { ...turn.meta, apiMessageId: kept }
+    } else if (rec.activeRunId) {
+      turn.meta = { ...turn.meta, apiMessageId: previewMessageId(rec.sessionKey, rec.activeRunId) }
+    }
   }
   rec.view = applyEvent(rec.view, { kind: 'turn', turn })
   broadcast(rec.workspaceId, { kind: 'turn', turn, sessionId: rec.sessionId })
@@ -352,8 +365,12 @@ function handleToolFrame(rec: SessionRecord, payload: Record<string, unknown>): 
 
 // Debounced workspace session-list refresh — `sessions.changed` fires for
 // every session under the agent (cron spawns, subagents, patches), and
-// several records can hold subscriptions for the same workspace.
-const lastListRefresh = new Map<string, number>()
+// several records can hold subscriptions for the same workspace. `send` is in
+// the set because 2026.6.x never emits `chat.title` — the post-send refresh
+// is what keeps titles/previews fresh there. A trailing flush covers bursts
+// (create immediately followed by the title patch) that a leading-edge-only
+// throttle would drop.
+const lastListRefresh = new Map<string, { at: number; trailing?: ReturnType<typeof setTimeout> }>()
 const LIST_REFRESH_MIN_MS = 400
 const LIST_REFRESH_REASONS = new Set([
   'chat.title',
@@ -362,12 +379,27 @@ const LIST_REFRESH_REASONS = new Set([
   'patch',
   'label',
   'compact',
+  'send',
+  'steer',
   'subagent-status'
 ])
 function broadcastSessionsChanged(rec: SessionRecord): void {
   const now = Date.now()
-  if (now - (lastListRefresh.get(rec.workspaceId) ?? 0) < LIST_REFRESH_MIN_MS) return
-  lastListRefresh.set(rec.workspaceId, now)
+  const entry = lastListRefresh.get(rec.workspaceId)
+  if (entry && now - entry.at < LIST_REFRESH_MIN_MS) {
+    if (!entry.trailing) {
+      entry.trailing = setTimeout(
+        () => {
+          lastListRefresh.set(rec.workspaceId, { at: Date.now() })
+          broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+        },
+        LIST_REFRESH_MIN_MS - (now - entry.at)
+      )
+    }
+    return
+  }
+  if (entry?.trailing) clearTimeout(entry.trailing)
+  lastListRefresh.set(rec.workspaceId, { at: now })
   broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
 }
 
@@ -399,17 +431,17 @@ function ingest(rec: SessionRecord, msg: OpenClawMessage): void {
         if (typeof pm === 'string') prev = pm
       }
       if (prev !== undefined && prev !== model) {
-        broadcast(rec.workspaceId, {
-          kind: 'notice',
-          sessionId: rec.sessionId,
-          notice: {
-            id: `openclaw:model-change:${id}`,
-            kind: 'model-change',
-            at: new Date().toISOString(),
-            model,
-            prev
-          }
-        })
+        const notice = {
+          id: `openclaw:model-change:${id}`,
+          kind: 'model-change' as const,
+          at: new Date().toISOString(),
+          model,
+          prev
+        }
+        // Fold into the view too — the REST events replay must agree with
+        // the WS frames the client already saw.
+        rec.view = applyEvent(rec.view, { kind: 'notice', notice })
+        broadcast(rec.workspaceId, { kind: 'notice', sessionId: rec.sessionId, notice })
       }
     }
   }
@@ -489,15 +521,13 @@ async function ensureSubscribed(rec: SessionRecord): Promise<void> {
       if (reason && LIST_REFRESH_REASONS.has(reason)) broadcastSessionsChanged(rec)
       if (payload.sessionKey !== rec.sessionKey) return
       if (reason === 'compact') {
-        broadcast(rec.workspaceId, {
-          kind: 'notice',
-          sessionId: rec.sessionId,
-          notice: {
-            id: `openclaw:compact:${typeof payload.ts === 'number' ? payload.ts : Date.now()}`,
-            kind: 'compact',
-            at: new Date().toISOString()
-          }
-        })
+        const notice = {
+          id: `openclaw:compact:${typeof payload.ts === 'number' ? payload.ts : Date.now()}`,
+          kind: 'compact' as const,
+          at: new Date().toISOString()
+        }
+        rec.view = applyEvent(rec.view, { kind: 'notice', notice })
+        broadcast(rec.workspaceId, { kind: 'notice', sessionId: rec.sessionId, notice })
       }
       // Frames embed the fresh session row — keep the applied-model cache
       // truthful even when the session is patched outside moi.
@@ -657,7 +687,25 @@ async function applySessionSettings(
   if (effort && effort !== rec.appliedThinking) patch.thinkingLevel = effort
   if (Object.keys(patch).length === 0) return
   const gw = await getGateway()
-  await gw.rpc('sessions.patch', { key: rec.sessionKey, ...patch })
+  try {
+    await gw.rpc('sessions.patch', { key: rec.sessionKey, ...patch })
+  } catch (err) {
+    // The effort menu is a static superset (compat.ts) — a gateway/model can
+    // reject a level. Degrade to the model-only patch instead of blocking the
+    // send; a rejected MODEL still throws (running on the wrong model is
+    // worse than not sending).
+    if (typeof patch.thinkingLevel === 'string' && typeof patch.model === 'string') {
+      console.warn('[openclaw-session] thinkingLevel patch rejected, retrying model-only', err)
+      await gw.rpc('sessions.patch', { key: rec.sessionKey, model: patch.model })
+      rec.appliedModel = patch.model
+      return
+    }
+    if (typeof patch.thinkingLevel === 'string' && !patch.model) {
+      console.warn('[openclaw-session] thinkingLevel patch rejected, sending anyway', err)
+      return
+    }
+    throw err
+  }
   if (typeof patch.model === 'string') rec.appliedModel = patch.model
   if (typeof patch.thinkingLevel === 'string') rec.appliedThinking = patch.thinkingLevel
 }

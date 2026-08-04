@@ -53,9 +53,11 @@ export type GatewayFailure = {
 
 // Map a connect/RPC error onto a stable category the UI can explain. The
 // protocol-mismatch string is the gateway's own wording (verified against a
-// live 2026.4.22 gateway).
+// live 2026.4.22 gateway). `gatewayCode` (GatewayClientRequestError) is
+// preferred over message sniffing when present.
 export function classifyGatewayError(err: unknown): GatewayFailure {
   const raw = err instanceof Error ? err.message : String(err)
+  const code = (err as { gatewayCode?: unknown } | undefined)?.gatewayCode
   const lower = raw.toLowerCase()
   if (lower.includes('protocol mismatch')) {
     return {
@@ -64,7 +66,7 @@ export function classifyGatewayError(err: unknown): GatewayFailure {
         'OpenClaw gateway speaks an older protocol than this moi build. Update OpenClaw (2026.6 or newer) to reconnect.'
     }
   }
-  if (lower.includes('unauthorized') || lower.includes('auth') || lower.includes('token')) {
+  if (code === 'UNAUTHORIZED' || lower.includes('unauthorized')) {
     return { kind: 'auth', message: `OpenClaw gateway rejected the connection: ${raw}` }
   }
   if (

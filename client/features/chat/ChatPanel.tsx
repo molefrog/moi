@@ -5,11 +5,12 @@ import { IconChevronDown, IconX } from '@tabler/icons-react'
 import { canSubmitComposerAction, focusComposer } from '@/client/components/shared/Composer'
 import { useStickToBottom } from '@/client/features/chat/useStickToBottom'
 import { groupTurns } from '@/client/features/chat/group-turns'
+import { chatNoticeLabel, interleaveNotices } from '@/client/features/chat/interleave-notices'
 import { attachmentKey, useLive } from '@/client/features/chat/chat-store'
 import type { ChatPromptBubble } from '@/client/features/chat/ChatPromptBubbles'
 import type { ChatSendOptions } from '@/client/features/chat/chat-send'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
-import type { Turn, ViewState } from '@/lib/types'
+import type { SystemNotice, Turn, ViewState } from '@/lib/types'
 
 import { ChatComposer } from './ChatComposer'
 import { ChatEmptyState, resolveChatEmptyState } from './ChatEmptyState'
@@ -84,7 +85,15 @@ export function ChatPanel({
     () => groupTurns(previewTurn ? [...turns, previewTurn] : turns),
     [turns, previewTurn]
   )
-  const showEmptyChat = chatLoaded && groupedTurns.length === 0 && !processing
+  // Grouped turns plus the renderable notices (compaction, model changes)
+  // woven in at the moment they happened. Interleaving runs AFTER grouping so
+  // a notice never splits a tool-only run apart.
+  const timeline = useMemo(
+    () => interleaveNotices(groupedTurns, view.notices),
+    [groupedTurns, view.notices]
+  )
+  const lastTurnId = groupedTurns.length > 0 ? groupedTurns[groupedTurns.length - 1].id : null
+  const showEmptyChat = chatLoaded && timeline.length === 0 && !processing
   const emptyStateKind = resolveChatEmptyState({
     hasSentMessageFromMoi,
     isWorkspacePendingAnalysis
@@ -145,13 +154,17 @@ export function ChatPanel({
                 onSelectPrompt={handlePromptSelect}
               />
             )}
-            {groupedTurns.map((turn, i) => (
-              <TurnView
-                key={turn.id}
-                turn={turn}
-                processing={processing && i === groupedTurns.length - 1}
-              />
-            ))}
+            {timeline.map(item =>
+              item.kind === 'notice' ? (
+                <ChatNoticeRow key={`notice:${item.notice.id}`} notice={item.notice} />
+              ) : (
+                <TurnView
+                  key={item.turn.id}
+                  turn={item.turn}
+                  processing={processing && item.turn.id === lastTurnId}
+                />
+              )
+            )}
             {/* Pulsing dots only before the first token — once the preview has
                 visible content it renders as a (possibly merged) grouped turn. */}
             {processing && !previewTurn && <ThinkingIndicator />}
@@ -211,6 +224,21 @@ export function ChatPanel({
           />
         </div>
       </div>
+    </div>
+  )
+}
+
+type ChatNoticeRowProps = { notice: SystemNotice }
+
+// A quiet, centered one-liner marking a session event (context compacted,
+// model changed) at its place in the transcript. Kinds without designed copy
+// render nothing (see chatNoticeLabel).
+function ChatNoticeRow({ notice }: ChatNoticeRowProps) {
+  const label = chatNoticeLabel(notice)
+  if (!label) return null
+  return (
+    <div className="flex justify-center">
+      <span className="max-w-full truncate text-xs text-muted-foreground">{label}</span>
     </div>
   )
 }
