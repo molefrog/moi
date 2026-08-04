@@ -147,7 +147,16 @@ function fanout(event: string, payload: Record<string, unknown>) {
 async function startClient(): Promise<{ handle: GatewayHandle; client: GatewayInstance }> {
   const cfg = await readGatewayConfig()
   if (!cfg) throw new Error('openclaw config missing or invalid')
-  const { GatewayClient } = await import('openclaw/plugin-sdk/gateway-runtime')
+  let GatewayClient: typeof import('openclaw/plugin-sdk/gateway-runtime').GatewayClient
+  try {
+    ;({ GatewayClient } = await import('openclaw/plugin-sdk/gateway-runtime'))
+  } catch {
+    // Optional dependency absent — callers surface the rejection as a chat
+    // error; keep the category visible in /status.
+    const err = new Error('openclaw package is not installed')
+    lastFailure = { kind: 'unreachable', message: err.message }
+    throw err
+  }
 
   let connected = false
   // The SDK's `opts` is private since 2026.7.x — connect callbacks must be
@@ -291,7 +300,14 @@ export async function getGateway(): Promise<GatewayHandle> {
 export async function withOneShotGateway<T>(fn: (rpc: Rpc) => Promise<T>): Promise<T | null> {
   const cfg = await readGatewayConfig()
   if (!cfg) return null
-  const { GatewayClient } = await import('openclaw/plugin-sdk/gateway-runtime')
+  // `openclaw` is an optionalDependency — a missing package must degrade to
+  // the silent-null path (no agents discovered), never a rejected promise.
+  let GatewayClient: typeof import('openclaw/plugin-sdk/gateway-runtime').GatewayClient
+  try {
+    ;({ GatewayClient } = await import('openclaw/plugin-sdk/gateway-runtime'))
+  } catch {
+    return null
+  }
   let settleConnect!: { res: () => void; rej: (err: Error) => void }
   const connectPromise = new Promise<void>((res, rej) => {
     settleConnect = { res, rej }

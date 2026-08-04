@@ -217,10 +217,39 @@ async function reconcileAfterRun(rec: SessionRecord): Promise<void> {
 function rebuildView(rec: SessionRecord): void {
   let view: ViewState = emptyViewState()
   let i = 0
+  // Mirror the cold path (adapter.toStreamEvents): reconstruct model-change
+  // notices from the durable rows so a seeded live view replays the same
+  // notices the static transcript would show. Same ids as the live emitter,
+  // so a notice seen live upserts instead of duplicating.
+  let prevModel: string | undefined
   for (const msg of rec.messagesById.values()) {
+    if (msg.role === 'assistant') {
+      const model = (msg as { model?: unknown }).model
+      if (typeof model === 'string') {
+        if (prevModel !== undefined && prevModel !== model) {
+          view = applyEvent(view, {
+            kind: 'notice',
+            notice: {
+              id: `openclaw:model-change:${msg.__openclaw?.id ?? i}`,
+              kind: 'model-change',
+              at:
+                typeof msg.timestamp === 'number'
+                  ? new Date(msg.timestamp).toISOString()
+                  : new Date().toISOString(),
+              model,
+              prev: prevModel
+            }
+          })
+        }
+        prevModel = model
+      }
+    }
     const turn = messageToTurn(msg, rec.sessionKey, i++, rec.results)
     if (turn) view = applyEvent(view, { kind: 'turn', turn })
   }
+  // Compaction notices have no durable twin in `sessions.get` — they exist
+  // only while a live record witnesses the compact frame (known gap; the
+  // gateway's `sessions.compaction.list` could backfill them).
   rec.view = view
 }
 
@@ -777,7 +806,8 @@ async function sendOpenClawMessageImpl(input: {
     throw err
   }
 
-  rec.streamEnabled = input.stream !== false
+  // Omitted means whole-block delivery, same as the other harnesses.
+  rec.streamEnabled = input.stream === true
 
   const echo: { optimisticId: string; text: string; runId?: string } | null = input.optimisticId
     ? { optimisticId: input.optimisticId, text: input.content }
