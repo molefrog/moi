@@ -67,13 +67,19 @@ describe('claudeSessionExists', () => {
     await rm(scratchDir, { recursive: true, force: true })
   })
 
+  // Mirrors the SDK's project dir naming: every non-alphanumeric character in
+  // the workspace path becomes `-`, not just the separators. Encoding only `/`
+  // happens to work on Linux, where the temp path is alphanumeric, but not on
+  // macOS, whose `tmpdir()` carries an underscore.
+  const encodeWorkspacePath = (path: string) => path.replaceAll(/[^a-zA-Z0-9]/g, '-')
+
   async function writeSessionFile(sessionId: string): Promise<void> {
     // Mirrors the SDK's storage layout: one .jsonl per session under the
-    // project dir named after the workspace path with `/` → `-`.
+    // project dir named after the workspace path.
     const projectDir = join(
       process.env.CLAUDE_CONFIG_DIR!,
       'projects',
-      workspacePath.replaceAll('/', '-')
+      encodeWorkspacePath(workspacePath)
     )
     await mkdir(projectDir, { recursive: true })
     const line = {
