@@ -58,13 +58,22 @@ export type Part =
   | { type: 'source-document'; mediaType: string; title: string; sourceId: string }
   | { type: 'data'; name: string; data: unknown }
 
+// Why a synthetic turn exists. Set by adapters — from the backend's own
+// synthetic flag or from lib/system-messages.ts text classification. The UI
+// hides every synthetic turn; the reason is kept for debugging and future
+// "show system messages" affordances.
+export type SyntheticTurnReason =
+  | 'skill-body'
+  | 'system-reminder'
+  | 'hook-output'
+  | 'slash-command'
+  | 'interrupt'
+  | 'other'
+
 export type TurnOrigin =
   | { kind: 'user-input' }
   | { kind: 'tool-return'; toolCallId: string }
-  | {
-      kind: 'synthetic'
-      reason: 'skill-body' | 'system-reminder' | 'hook-output' | 'slash-command' | 'other'
-    }
+  | { kind: 'synthetic'; reason: SyntheticTurnReason }
   | { kind: 'subagent-prompt'; parentToolCallId: string }
   | { kind: 'inter-session' }
   | { kind: 'replay' }

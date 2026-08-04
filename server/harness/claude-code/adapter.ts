@@ -6,6 +6,7 @@ import type {
   SessionSnapshot,
   StreamEvent,
   SubagentRecord,
+  SyntheticTurnReason,
   SystemNotice,
   ToolCall,
   ToolCaller,
@@ -16,6 +17,7 @@ import type {
 
 import { isAttachmentOnlyPlaceholder, splitAttachmentNote } from '@/lib/attachment-note'
 import { stripMoiContext } from '@/lib/moi-context'
+import { classifySystemMessage, filterSystemText } from '@/lib/system-messages'
 
 // Loose SDK message shape — we don't pull in the full SDK type tree; the
 // adapter tolerates missing fields. Reference: ./NOTES.md.
@@ -154,9 +156,9 @@ function callerFromBlockType(type: string, name: string): ToolCaller {
   return 'model'
 }
 
-function classifySyntheticReason(
-  firstText: string
-): Exclude<Extract<TurnOrigin, { kind: 'synthetic' }>['reason'], never> {
+function classifySyntheticReason(firstText: string): SyntheticTurnReason {
+  const verdict = classifySystemMessage([firstText])
+  if (verdict) return verdict.reason
   if (/<system-reminder>/i.test(firstText)) return 'system-reminder'
   return 'other'
 }
@@ -509,19 +511,32 @@ export class ClaudeAdapter {
     const parts: Part[] = []
     let firstText = ''
 
+    // A user message whose text is entirely backend machinery — a
+    // slash-command record, an interrupt marker, local command output (see
+    // lib/system-messages.ts) — keeps its raw parts but lands as a synthetic
+    // turn, hidden exactly like the SDK's own isSynthetic injections.
+    // Text-only messages qualify; real content (attachments, images) vetoes.
+    const systemVerdict =
+      msg.type === 'user' && !msg.isSynthetic && blocks.every(b => b.type === 'text')
+        ? classifySystemMessage(blocks.map(b => b.text ?? ''))
+        : undefined
+
     for (const b of blocks) {
       switch (b.type) {
         case 'text':
           if (b.text) {
             let text = b.text
-            if (msg.type === 'user' && !msg.isSynthetic) {
+            if (msg.type === 'user' && !msg.isSynthetic && !systemVerdict) {
               // Non-image attachments reach the agent as a temp-path note
               // appended to the user's text (see lib/attachment-note.ts). The
               // SDK persists that appended text, so fold the note back into
               // file chips here — a reloaded bubble matches the live one
               // instead of leaking temp paths into it.
               const split = splitAttachmentNote(text)
-              text = stripMoiContext(split.text)
+              // moi's own context envelope strips precisely (marker-guarded);
+              // other embedded machinery — system reminders, hook output —
+              // strips by the shared rules, keeping the typed text.
+              text = filterSystemText(stripMoiContext(split.text)).text
               for (const f of split.files) {
                 parts.push({
                   type: 'file',
@@ -604,6 +619,8 @@ export class ClaudeAdapter {
       origin = { kind: 'replay' }
     } else if (msg.isSynthetic) {
       origin = { kind: 'synthetic', reason: classifySyntheticReason(firstText) }
+    } else if (systemVerdict) {
+      origin = { kind: 'synthetic', reason: systemVerdict.reason }
     } else if (msg.parent_tool_use_id) {
       origin = { kind: 'subagent-prompt', parentToolCallId: msg.parent_tool_use_id }
     } else {
