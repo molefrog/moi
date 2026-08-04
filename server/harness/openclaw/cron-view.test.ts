@@ -78,13 +78,13 @@ describe('cronRunsToStreamEvents', () => {
     })
   })
 
-  test('a run summary wins over its error; error-only runs show the error', () => {
+  test('an errored run shows its error even when a summary exists', () => {
     const events = cronRunsToStreamEvents(realEntries)
     const failed = events[0]
-    expect(failed.kind === 'turn' && failed.turn.parts[0]).toEqual({
-      type: 'text',
-      text: 'cron probe OK.'
-    })
+    const text =
+      failed.kind === 'turn' && failed.turn.parts[0].type === 'text' && failed.turn.parts[0].text
+    expect(text).toStartWith('⚠ Channel is required')
+    expect(text).toEndWith('cron probe OK.')
 
     const errorOnly = cronRunsToStreamEvents([
       { ts: 5, jobId: 'j', status: 'error', error: 'model preflight failed' }

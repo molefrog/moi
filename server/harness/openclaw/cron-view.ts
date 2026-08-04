@@ -36,16 +36,20 @@ export function openClawCronJobIdFromKey(key: string): string | null {
   return m ? m[1] : null
 }
 
-// One assistant turn per recorded run, ascending by run time. Text is the
-// run's reply summary; failed runs without a summary show the error, and
-// runs with neither (skipped, timed out before output) still get a status
-// line so the chat never renders empty while runs exist.
+// One assistant turn per recorded run, ascending by run time. An errored run
+// shows its error even when a reply summary exists (delivery failures record
+// both — the summary alone would render indistinguishable from success);
+// clean runs show the summary, and runs with neither (skipped, timed out
+// before output) still get a status line so the chat never renders empty
+// while runs exist.
 export function cronRunsToStreamEvents(entries: OpenClawCronRunEntry[]): StreamEvent[] {
   const events: StreamEvent[] = []
   for (const entry of [...entries].sort((a, b) => a.ts - b.ts)) {
-    const text =
-      entry.summary?.trim() ||
-      (entry.error ? `⚠ ${entry.error}` : entry.status ? `(run ${entry.status})` : '')
+    const summary = entry.summary?.trim()
+    const failed = entry.status === 'error' && entry.error
+    const text = failed
+      ? `⚠ ${entry.error}${summary ? `\n\n${summary}` : ''}`
+      : summary || (entry.error ? `⚠ ${entry.error}` : entry.status ? `(run ${entry.status})` : '')
     if (!text) continue
     const meta: TurnMeta = {}
     if (entry.model) meta.model = entry.model
