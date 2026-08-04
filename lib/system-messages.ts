@@ -13,16 +13,20 @@
 //   - `classifySystemMessage` all of a message's text blocks → a synthetic-turn
 //                            reason when the message as a whole is machinery
 //
-// Adapters keep a classified message's raw text and mark the turn
+// Adapters keep a hide-classified message's raw text and mark the turn
 // `origin: { kind: 'synthetic', reason }` — the same treatment the Claude SDK's
 // own `isSynthetic` injections get — so nothing renders but nothing is lost.
+// A `notify`-classified message instead SURFACES: its machinery is rewritten
+// to a short readable sentence and the turn lands as
+// `origin: { kind: 'notification' }`, plain text in the flow (a dedicated
+// notification block in the UI is planned; the origin is its hook).
 //
 // Adding rules: append to SYSTEM_TEXT_RULES with a `<provider>:<what>` id.
-// Registry order is priority — the first matching hide rule names the reason.
-// `hide` patterns are anchored at the start of the block (`^\s*`) or match the
-// whole block, so a person merely *mentioning* an envelope mid-message keeps
-// their bubble. Keep `hide` regexes non-global (`.test` on a /g regex is
-// stateful) and `strip` regexes global.
+// Registry order is priority — the first matching hide/notify rule decides the
+// block. `hide`/`notify` patterns are anchored at the start of the block
+// (`^\s*`) or match the whole block, so a person merely *mentioning* an
+// envelope mid-message keeps their bubble. Keep `hide`/`notify` regexes
+// non-global (`.test` on a /g regex is stateful) and `strip` regexes global.
 //
 // Current rules cover Claude Code. Sources: the patterns were verified against
 // the `claude` CLI binary's strings and live `~/.claude/projects/*.jsonl`
@@ -44,7 +48,25 @@ export type SystemTextRule = {
     // Machinery embedded in otherwise-real text: remove every `pattern` match,
     // keep the rest. A block left empty counts as fully consumed.
     | { action: 'strip'; pattern: RegExp }
+    // The whole block is machinery worth SHOWING: `render` turns the raw
+    // payload into a short readable sentence for the chat flow.
+    | { action: 'notify'; test: RegExp; render: (text: string) => string }
   )
+
+function xmlField(text: string, tag: string): string | undefined {
+  const m = text.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`))
+  return m?.[1].trim() || undefined
+}
+
+// `<summary>` is already a human sentence ("Background command "…" completed
+// (exit code 0)"); fall back to `<status>` (completed | failed | stopped)
+// when a producer omits it.
+function renderTaskNotification(text: string): string {
+  const summary = xmlField(text, 'summary')
+  if (summary) return summary
+  const status = xmlField(text, 'status')
+  return status ? `Background task ${status}` : 'Background task update'
+}
 
 export const SYSTEM_TEXT_RULES: readonly SystemTextRule[] = [
   // -- Claude Code: whole-message records ------------------------------------
@@ -89,13 +111,17 @@ export const SYSTEM_TEXT_RULES: readonly SystemTextRule[] = [
     action: 'hide',
     test: /^\s*<user-memory-input>/
   },
-  // Background-task completion notices delivered as user turns. Local CC
-  // leads with the tag; cloud harnesses prepend a NOT-USER-INPUT preamble.
+  // Background-task completion notices delivered as user turns — surfaced
+  // as readable text rather than hidden. Local CC is the bare tag block;
+  // cloud harnesses prepend a NOT-USER-INPUT preamble. The test requires a
+  // COMPLETE `<task-notification>…</task-notification>` message: a person
+  // typing the tag name (or an unterminated fragment) keeps their bubble.
   {
     id: 'claude-code:task-notification',
     reason: 'other',
-    action: 'hide',
-    test: /^\s*(\[SYSTEM NOTIFICATION - NOT USER INPUT\]|<task-notification>)/
+    action: 'notify',
+    test: /^\s*(\[SYSTEM NOTIFICATION - NOT USER INPUT\][\s\S]*)?<task-notification>[\s\S]*<\/task-notification>\s*$/,
+    render: renderTaskNotification
   },
   // Preamble injected before replayed local-command messages. `isMeta` in
   // current CLI versions (so usually pre-hidden), but older transcripts
@@ -134,10 +160,12 @@ export const SYSTEM_TEXT_RULES: readonly SystemTextRule[] = [
 ]
 
 export type SystemTextFilter = {
-  // What remains for display — '' when the block was entirely machinery.
+  // What remains for display — '' when the block was entirely machinery,
+  // the readable rendering when a `notify` rule consumed it.
   text: string
   // Rules that consumed the block or stripped something from it, in
-  // application order (first entry names the dominant reason).
+  // application order (first entry names the dominant reason; its `action`
+  // says whether the block was hidden, rewritten, or partially stripped).
   matched: SystemTextRule[]
 }
 
@@ -147,6 +175,9 @@ export function filterSystemText(
 ): SystemTextFilter {
   for (const rule of rules) {
     if (rule.action === 'hide' && rule.test.test(text)) return { text: '', matched: [rule] }
+    if (rule.action === 'notify' && rule.test.test(text)) {
+      return { text: rule.render(text), matched: [rule] }
+    }
   }
   let out = text
   const matched: SystemTextRule[] = []
@@ -163,26 +194,39 @@ export function filterSystemText(
   return { text: matched.length > 0 ? out.trim() : out, matched }
 }
 
-export type SystemMessageVerdict = {
-  reason: SyntheticTurnReason
-  // Every rule that fired across the blocks, for tests and debugging.
-  rules: SystemTextRule[]
-}
+export type SystemMessageVerdict =
+  // Transcript plumbing: keep the raw parts, mark the turn synthetic, hide.
+  | { kind: 'hide'; reason: SyntheticTurnReason; rules: SystemTextRule[] }
+  // A backend notification: show `text` as an `origin: 'notification'` turn.
+  | { kind: 'notification'; text: string; rules: SystemTextRule[] }
 
 /**
  * Decide whether a message is, in aggregate, all machinery: every text block
- * either matched a hide rule or was stripped down to nothing, and at least one
- * rule fired. Blocks that were already blank neither veto nor count.
+ * either matched a hide/notify rule or was stripped down to nothing, and at
+ * least one rule fired. Blocks that were already blank neither veto nor
+ * count. Any notify match makes the whole message a notification (its
+ * rendered texts joined); real surviving text makes it a normal message.
  */
 export function classifySystemMessage(
   texts: readonly string[],
   rules: readonly SystemTextRule[] = SYSTEM_TEXT_RULES
 ): SystemMessageVerdict | undefined {
   const matched: SystemTextRule[] = []
+  const rendered: string[] = []
   for (const text of texts) {
     const f = filterSystemText(text, rules)
+    if (f.matched[0]?.action === 'notify') {
+      if (f.text.trim()) rendered.push(f.text)
+      matched.push(...f.matched)
+      continue
+    }
     if (f.text.trim() !== '') return undefined
     matched.push(...f.matched)
   }
-  return matched.length > 0 ? { reason: matched[0].reason, rules: matched } : undefined
+  if (rendered.length > 0) {
+    return { kind: 'notification', text: rendered.join('\n\n'), rules: matched }
+  }
+  return matched.length > 0
+    ? { kind: 'hide', reason: matched[0].reason, rules: matched }
+    : undefined
 }

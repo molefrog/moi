@@ -158,7 +158,7 @@ function callerFromBlockType(type: string, name: string): ToolCaller {
 
 function classifySyntheticReason(firstText: string): SyntheticTurnReason {
   const verdict = classifySystemMessage([firstText])
-  if (verdict) return verdict.reason
+  if (verdict?.kind === 'hide') return verdict.reason
   if (/<system-reminder>/i.test(firstText)) return 'system-reminder'
   return 'other'
 }
@@ -511,15 +511,32 @@ export class ClaudeAdapter {
     const parts: Part[] = []
     let firstText = ''
 
-    // A user message whose text is entirely backend machinery — a
-    // slash-command record, an interrupt marker, local command output (see
-    // lib/system-messages.ts) — keeps its raw parts but lands as a synthetic
-    // turn, hidden exactly like the SDK's own isSynthetic injections.
+    // A user message whose text is entirely backend machinery (see
+    // lib/system-messages.ts). Two fates: hide-classified messages — a
+    // slash-command record, an interrupt marker — keep their raw parts but
+    // land as synthetic turns, hidden exactly like the SDK's own isSynthetic
+    // injections; notify-classified messages (task notifications) surface as
+    // readable text below. Computed for isSynthetic entries too — local CC
+    // flags task notifications isMeta, and those must still surface. Replays
+    // stay untouched so their persisted-log counterpart renders once.
     // Text-only messages qualify; real content (attachments, images) vetoes.
     const systemVerdict =
-      msg.type === 'user' && !msg.isSynthetic && blocks.every(b => b.type === 'text')
+      msg.type === 'user' && !msg.isReplay && blocks.every(b => b.type === 'text')
         ? classifySystemMessage(blocks.map(b => b.text ?? ''))
         : undefined
+
+    // A notification renders as plain text in the flow: none of the bubble
+    // machinery (attachment notes, echo matching, skill stashing) applies.
+    if (systemVerdict?.kind === 'notification') {
+      return {
+        id: turnId(msg),
+        role: 'user',
+        origin: { kind: 'notification' },
+        parentTaskId: msg.parent_tool_use_id ?? undefined,
+        parts: [{ type: 'text', text: systemVerdict.text }],
+        timestamp: msg.timestamp
+      }
+    }
 
     for (const b of blocks) {
       switch (b.type) {

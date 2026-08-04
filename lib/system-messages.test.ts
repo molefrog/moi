@@ -58,13 +58,6 @@ describe('filterSystemText — hide rules', () => {
     expect(filterSystemText('<user-memory-input>always use bun</user-memory-input>').text).toBe('')
   })
 
-  test('task notifications are consumed, local and cloud shapes', () => {
-    expect(filterSystemText('<task-notification>\n<task-id>b1</task-id>').text).toBe('')
-    expect(
-      filterSystemText('[SYSTEM NOTIFICATION - NOT USER INPUT]\nThis is an automated event.').text
-    ).toBe('')
-  })
-
   test('local-command caveat is consumed', () => {
     expect(
       filterSystemText(
@@ -79,6 +72,53 @@ describe('filterSystemText — hide rules', () => {
         'This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.'
       ).text
     ).toBe('')
+  })
+})
+
+const TASK_NOTIFICATION =
+  '<task-notification>\n' +
+  '<task-id>b1</task-id>\n' +
+  '<status>completed</status>\n' +
+  '<summary>Background command "Install repo dependencies" completed (exit code 0)</summary>\n' +
+  '</task-notification>'
+
+describe('filterSystemText — notify rules', () => {
+  test('task notification renders its summary', () => {
+    const f = filterSystemText(TASK_NOTIFICATION)
+    expect(f.text).toBe('Background command "Install repo dependencies" completed (exit code 0)')
+    expect(f.matched.map(r => r.id)).toEqual(['claude-code:task-notification'])
+  })
+
+  test('cloud shape with NOT-USER-INPUT preamble renders too', () => {
+    const cloud =
+      '[SYSTEM NOTIFICATION - NOT USER INPUT]\n' +
+      'This is an automated background-task event, NOT a message from the user.\n\n' +
+      TASK_NOTIFICATION
+    expect(filterSystemText(cloud).text).toBe(
+      'Background command "Install repo dependencies" completed (exit code 0)'
+    )
+  })
+
+  test('falls back to status, then to a generic line', () => {
+    expect(
+      filterSystemText('<task-notification><status>failed</status></task-notification>').text
+    ).toBe('Background task failed')
+    expect(
+      filterSystemText('<task-notification><task-id>b2</task-id></task-notification>').text
+    ).toBe('Background task update')
+  })
+
+  test('a message merely starting with the tag name is NOT a notification', () => {
+    // Real regression: a user message beginning with the literal tag.
+    const typed = '<task-notification> -> transform into some readable message instead'
+    const f = filterSystemText(typed)
+    expect(f.text).toBe(typed)
+    expect(f.matched).toEqual([])
+  })
+
+  test('a complete block followed by user commentary is not consumed', () => {
+    const quoted = `${TASK_NOTIFICATION}\nwhy did I get this?`
+    expect(filterSystemText(quoted).text).toBe(quoted)
   })
 })
 
@@ -124,21 +164,45 @@ describe('filterSystemText — real text passes through', () => {
 })
 
 describe('classifySystemMessage', () => {
-  test('single command record classifies as slash-command', () => {
-    expect(classifySystemMessage([COMMAND_RECORD])?.reason).toBe('slash-command')
+  test('single command record classifies as hide/slash-command', () => {
+    expect(classifySystemMessage([COMMAND_RECORD])).toMatchObject({
+      kind: 'hide',
+      reason: 'slash-command'
+    })
   })
 
-  test('interrupt marker classifies as interrupt', () => {
-    expect(classifySystemMessage(['[Request interrupted by user]'])?.reason).toBe('interrupt')
+  test('interrupt marker classifies as hide/interrupt', () => {
+    expect(classifySystemMessage(['[Request interrupted by user]'])).toMatchObject({
+      kind: 'hide',
+      reason: 'interrupt'
+    })
   })
 
   test('all-machinery multi-block message classifies by first rule', () => {
     const verdict = classifySystemMessage([COMMAND_RECORD, REMINDER])
-    expect(verdict?.reason).toBe('slash-command')
+    expect(verdict).toMatchObject({ kind: 'hide', reason: 'slash-command' })
     expect(verdict?.rules.map(r => r.id)).toEqual([
       'claude-code:slash-command',
       'claude-code:system-reminder'
     ])
+  })
+
+  test('task notification classifies as a notification with rendered text', () => {
+    expect(classifySystemMessage([TASK_NOTIFICATION])).toMatchObject({
+      kind: 'notification',
+      text: 'Background command "Install repo dependencies" completed (exit code 0)'
+    })
+  })
+
+  test('a notification block plus hidden machinery is still a notification', () => {
+    expect(classifySystemMessage([REMINDER, TASK_NOTIFICATION])).toMatchObject({
+      kind: 'notification',
+      text: 'Background command "Install repo dependencies" completed (exit code 0)'
+    })
+  })
+
+  test('a notification block plus real text does not classify', () => {
+    expect(classifySystemMessage([TASK_NOTIFICATION, 'thanks, continue'])).toBeUndefined()
   })
 
   test('machinery plus real text does not classify', () => {
@@ -147,7 +211,7 @@ describe('classifySystemMessage', () => {
   })
 
   test('blank blocks neither veto nor count', () => {
-    expect(classifySystemMessage(['  \n', COMMAND_RECORD])?.reason).toBe('slash-command')
+    expect(classifySystemMessage(['  \n', COMMAND_RECORD])).toMatchObject({ kind: 'hide' })
     expect(classifySystemMessage(['   '])).toBeUndefined()
     expect(classifySystemMessage([])).toBeUndefined()
   })
