@@ -62,7 +62,10 @@ shadcn/ui`). Extraction is mandatory, not cosmetic: the official skill's
 - **Deps:** the scaffold pre-seeds `@base-ui/react` + `class-variance-authority`
   (+ `clsx`/`tailwind-merge`) at init. The command never installs — `add`
   ends with "component added; make sure deps are installed", and the skill
-  makes install the agent's job.
+  makes install the agent's job. Old workspaces without the pre-seed are
+  covered by the same fallback: the skill lists the required deps, a
+  failing build is the signal, and the agent adds them itself. Pre-seeding
+  is the ideal path, not a requirement.
 - **Rebuilds:** the command never rebuilds. `add` writes source files only
   and prints next steps; the agent runs `bun install` / `moi bundle`. The
   command is deliberately not smart.
@@ -78,9 +81,9 @@ shadcn/ui`). Extraction is mandatory, not cosmetic: the official skill's
 - **Pinning, in plain words:** the engine functions are public exports but
   the shadcn team doesn't promise API stability for them — so moi pins an
   exact version (no `^`) and upgrades deliberately behind smoke tests.
-- **Reference regeneration, in plain words:** `references/shadcn.md` is
-  condensed from the official skill; re-derive it (an agent task, scripted
-  prompt) whenever the pinned shadcn version is bumped, so it can't drift.
+- **Reference regeneration:** manual updates ruled acceptable — the
+  one-pager is refreshed by hand when the pinned shadcn version bumps; the
+  scripted re-derivation stays available if that gets tiresome.
 
 ## Ship plan
 
