@@ -13,6 +13,10 @@ import {
   saveSelectedSession,
   setSelectedSessionPath
 } from './selected-session'
+import { silenceConsole } from './test/quiet'
+
+// One test makes `archiveSession` throw; the route logs that error on purpose.
+silenceConsole('error')
 
 let tempDir: string
 const originalClaudeInterrupt = claudeCodeHarness.interrupt

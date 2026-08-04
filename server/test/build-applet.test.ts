@@ -256,7 +256,7 @@ describe('extractWidgetConfig', () => {
   })
 
   test('warns and uses defaults for out-of-range values', async () => {
-    const warn = spyOn(console, 'warn')
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
     const config = await extractWidgetConfig(join(FIXTURES, 'with-bad-config.tsx'))
     expect(config).toEqual({ rowSpan: 1, colSpan: 2 })
     expect(warn).toHaveBeenCalledTimes(2)

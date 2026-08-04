@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'path'
 
@@ -70,11 +70,17 @@ describe('scratchpad version skew', () => {
 
   test('a newer-schema snapshot fails with the actionable message, naming the stamp', async () => {
     const before = await writeSkewedFixture({ moi: '9.9.9', tldraw: '99.0.0' })
+    // tldraw prints its own `Error migrating store` on a failed migration. That
+    // must not reach the caller: it lands before our message and reads like
+    // corruption. Muted here too, so a regression fails instead of printing.
+    const logged = spyOn(console, 'error').mockImplementation(() => {})
 
     const err = await run({ kind: 'add-rect', name: 'box', x: 0, y: 0, w: 10, h: 10 }).then(
       () => null,
       (e: Error) => e
     )
+    expect(logged).not.toHaveBeenCalled()
+    logged.mockRestore()
     expect(err?.message).toContain('written by a newer moi')
     expect(err?.message).toContain('moi 9.9.9, tldraw 99.0.0')
     expect(err?.message).toContain(`this server has tldraw ${SCRATCHPAD_WRITER.tldraw}`)

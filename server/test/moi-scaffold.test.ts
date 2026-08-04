@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { join } from 'path'
 
 import { scaffoldMoiDir } from '../moi-scaffold'
+import { silenceConsole } from './quiet'
 
 // The scaffold backstop: `scaffoldMoiDir` must refuse to create a `.moi/` inside
 // another `.moi/` (the nested-workspace bug). The guard runs before any fs work,
@@ -29,6 +30,9 @@ describe('scaffoldMoiDir guard', () => {
 })
 
 describe('scaffoldMoiDir install', () => {
+  // The overrunning install reports itself as it backgrounds and as it finishes.
+  silenceConsole('log')
+
   test('returns the exit code when the install finishes within the wait', async () => {
     const moiDir = join(WS, '.moi')
 

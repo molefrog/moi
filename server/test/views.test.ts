@@ -10,11 +10,15 @@ import {
   reconcileOrder,
   serveView
 } from '../views'
+import { silenceConsole } from './quiet'
 
 // These tests exercise the view orchestration logic WITHOUT invoking Bun.build:
 // they seed `.moi/.build/views/` with stub `.js` files + a manifest and call the
 // read paths. The actual compile path (kind='view') is covered in
 // build-applet.test.ts, and end-to-end via `moi bundle`.
+
+// `buildAllViews` prints its per-run bundle summary.
+silenceConsole('log')
 
 let WS: string
 

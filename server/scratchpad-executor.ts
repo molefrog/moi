@@ -76,6 +76,26 @@ function styleProps(style: ScratchStyle): Record<string, unknown> {
   }
 }
 
+// Run a synchronous load with tldraw's own logging held back. On a failed
+// migration `StoreSchema` prints `Error migrating store Incompatible schema?`
+// itself, which reaches the `moi scratch` caller ahead of — and contradicting —
+// the actionable error we throw below ("the file is intact"). Whatever it says
+// is replayed if the load actually succeeds, so only the swallowed-by-a-throw
+// case is lost. Safe to swap `console.error` around: `loadSnapshot` is sync.
+function loadQuietly(load: () => void): void {
+  const original = console.error
+  const held: unknown[][] = []
+  console.error = (...args: unknown[]) => {
+    held.push(args)
+  }
+  try {
+    load()
+  } finally {
+    console.error = original
+  }
+  for (const args of held) original(...args)
+}
+
 // A fresh headless store hydrated from the saved snapshot (or empty). The
 // snapshot shape (`{ document }`) matches what the browser PUTs and loads.
 // A failed load is inspected for version skew: tldraw has no down-migrations,
@@ -86,7 +106,9 @@ function buildStore(doc: ScratchpadDoc | null, writer: ScratchpadWriter | undefi
   const store = createTLStore({ shapeUtils: defaultShapeUtils, bindingUtils: defaultBindingUtils })
   if (doc?.store) {
     try {
-      loadSnapshot(store, { document: doc } as unknown as Parameters<typeof loadSnapshot>[1])
+      loadQuietly(() =>
+        loadSnapshot(store, { document: doc } as unknown as Parameters<typeof loadSnapshot>[1])
+      )
     } catch (err) {
       const ahead = sequencesAhead(doc.schema, store.schema.serialize().sequences)
       if (ahead.length > 0) {

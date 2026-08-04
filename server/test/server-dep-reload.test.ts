@@ -5,6 +5,7 @@ import { dirname, join } from 'path'
 
 import { callFunction, killAllWorkers } from '../functions'
 import { handleBundle } from '../widgets'
+import { silenceConsole } from './quiet'
 
 // Editing a helper that ONLY a `.server.ts` module imports has to reach a live
 // functions worker. Two mechanisms have to line up for that, and each was
@@ -20,6 +21,9 @@ import { handleBundle } from '../widgets'
 //
 // This drives the real build and a real worker subprocess, so it fails if
 // either half regresses.
+
+// Each `handleBundle` prints its bundle summary.
+silenceConsole('log')
 
 let WS: string
 let prevFunctionsDir: string | undefined
