@@ -1,6 +1,7 @@
 // OpenClaw as a Harness. Thin wiring over this folder's modules — see
 // ../types.ts for the contract and ../README.md for the architecture.
 import type { DiscoveredWorkspaceCandidate, Harness } from '../types'
+import { OPENCLAW_WIRE_SCOPE, getOpenClawGatewayStatus } from './gateway'
 import { toSessionInfo, toStreamEvents } from './adapter'
 import {
   discoverOpenClawAgents,
@@ -20,11 +21,11 @@ import {
 export const openclawHarness: Harness = {
   id: 'openclaw',
   capabilities: {
-    supportsStreaming: false, // durable message rows only — deliberate v2 cut
+    supportsStreaming: true, // `chat` delta frames → StreamPreview
     imagesInline: 'path-note',
-    liveModelSwitch: false,
-    liveEffortSwitch: false,
-    nativeUserEcho: true // gateway echoes sends (lagged); matched by text
+    liveModelSwitch: true, // sessions.patch { model } before each send
+    liveEffortSwitch: true, // sessions.patch { thinkingLevel }
+    nativeUserEcho: true // echo matched by `<runId>:user` idempotency key, text fallback
   },
 
   sendMessage: async input => {
@@ -80,9 +81,19 @@ export const openclawHarness: Harness = {
 
   skillsDir: workspaceRoot => `${workspaceRoot}/skills`,
 
+  // One process-global gateway connection → one shared wire-tap scope.
+  wireScope: () => OPENCLAW_WIRE_SCOPE,
+
   statusLines: () => {
     const active = getOpenClawActiveSessions()
+    const status = getOpenClawGatewayStatus()
+    const gateway = status.connected
+      ? `gateway  connected · protocol ${status.info?.protocol ?? '?'} · server ${status.info?.serverVersion ?? '?'}`
+      : status.failure
+        ? `gateway  ${status.failure.kind}: ${status.failure.message}`
+        : 'gateway  not connected yet'
     return [
+      gateway,
       `live OpenClaw runs  ${active.length}`,
       ...active.map(r => `  ▶ busy  ws=${r.workspaceId}  session=${r.sessionId}`)
     ]

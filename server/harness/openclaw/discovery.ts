@@ -1,10 +1,9 @@
-import { readFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { resolve } from 'node:path'
 
 import type { Model } from '@/lib/types'
 
-import { getGateway } from './gateway'
+import { OPENCLAW_THINKING_LEVELS } from './compat'
+import { getGateway, withOneShotGateway } from './gateway'
 import type { GatewayHandle } from './gateway'
 import { stripUserMessageMetadata } from './strip'
 
@@ -97,53 +96,10 @@ function parseIdentityName(md: string | undefined): string | undefined {
 type Rpc = <T>(method: string, params?: Record<string, unknown>) => Promise<T>
 
 // Connect, hand the scoped `rpc(method, params)` to `fn`, then stop the client.
-// Any connect/auth/timeout failure → returns `null` silently (caller's choice).
+// Any connect/auth/timeout failure → returns `null` silently (caller's choice);
+// the failure category still lands in gateway.ts's status for /status lines.
 async function withGatewayClient<T>(fn: (rpc: Rpc) => Promise<T>): Promise<T | null> {
-  let cfg: { gateway?: { port?: number; auth?: { token?: string } } }
-  try {
-    const raw = await readFile(join(homedir(), '.openclaw/openclaw.json'), 'utf8')
-    cfg = JSON.parse(raw)
-  } catch {
-    return null
-  }
-  const port = cfg.gateway?.port
-  const token = cfg.gateway?.auth?.token
-  if (!port || !token) return null
-
-  let GatewayClient: typeof import('openclaw/plugin-sdk/gateway-runtime').GatewayClient
-  try {
-    ;({ GatewayClient } = await import('openclaw/plugin-sdk/gateway-runtime'))
-  } catch {
-    return null
-  }
-
-  // The SDK's `opts` is private since 2026.7.x — connect callbacks must be
-  // handed to the constructor, so wire them to a deferred promise up front.
-  let settleConnect!: { res: () => void; rej: (err: Error) => void }
-  const connect = new Promise<void>((res, rej) => {
-    settleConnect = { res, rej }
-  })
-  const client = new GatewayClient({
-    url: `ws://127.0.0.1:${port}`,
-    token,
-    role: 'operator',
-    scopes: ['operator.admin', 'operator.read', 'operator.write'],
-    requestTimeoutMs: TIMEOUT_MS,
-    onHelloOk: () => settleConnect.res(),
-    onConnectError: err => settleConnect.rej(err)
-  })
-
-  try {
-    client.start()
-    await withTimeout(connect, TIMEOUT_MS, 'connect')
-    const rpc: Rpc = (method, params = {}) =>
-      withTimeout(client.request(method, params), TIMEOUT_MS, method)
-    return await fn(rpc)
-  } catch {
-    return null
-  } finally {
-    client.stop()
-  }
+  return withOneShotGateway(fn)
 }
 
 export async function discoverOpenClawAgents(): Promise<OpenClawAgent[]> {
@@ -358,6 +314,14 @@ export async function getOpenClawModels(): Promise<Model[]> {
     const res = await rpc<{ models: OpenClawModelChoice[] }>('models.list')
     return res.models
   })
-  // Map the gateway catalog onto the raw Model shape (value/displayName).
-  return (out ?? []).map(m => ({ value: m.id, displayName: m.name }))
+  // Map the gateway catalog onto the Model shape. Thinking levels double as
+  // the picker's effort menu — they are session-level in OpenClaw, so every
+  // reasoning-capable model advertises the same set (see compat.ts).
+  return (out ?? []).map(m => ({
+    value: m.id,
+    displayName: m.name,
+    ...(m.reasoning
+      ? { supportsEffort: true, supportedEffortLevels: [...OPENCLAW_THINKING_LEVELS] }
+      : {})
+  }))
 }

@@ -6,15 +6,22 @@
 // endpoint) or sends a chat into it; thereafter it stays subscribed so the
 // view is up to date for reattach without re-fetching `sessions.get`.
 //
-// What this module does NOT do:
-//   - Token-delta streaming from `agent`/`chat` events (v2 — we use durable
-//     `session.message` rows only, per the design call).
-//   - Disk persistence — the gateway is the source of truth; we re-seed from
-//     `sessions.get` on cold start.
+// Live layers on top of the durable rows (all verified against gateways
+// 2026.7.1 and 2026.6.33 — same wire shapes on both):
+//   - `chat` frames (state delta/final/error, cumulative partial message) →
+//     StreamPreview broadcasts; cleared by the client when the durable turn
+//     lands carrying the matching `meta.apiMessageId`.
+//   - `session.tool` frames (phase start/update/result with full output) →
+//     tool cards flip pending→running→success/error mid-run;
+//     `reconcileAfterRun` remains the safety net for anything missed.
+//   - Disk persistence stays out — the gateway is the source of truth; we
+//     re-seed from `sessions.get` on cold start.
 import { appendAttachmentNote } from '@/lib/attachment-note'
 import { type MoiContext, appendMoiContext, renderMoiContext } from '@/lib/moi-context'
-import { applyEvent, emptyViewState } from '@/lib/format'
+import { type PreviewBlock, applyEvent, emptyViewState } from '@/lib/format'
 import type { SessionActivity, StreamEvent, ViewState } from '@/lib/types'
+
+import { messageIdempotencyKey } from './compat'
 
 import {
   type OpenClawMessage,
@@ -25,6 +32,7 @@ import { renameSelectedSession } from '../../selected-session'
 import {
   type ToolResultInfo,
   findToolCallOwners,
+  flattenToolResultContent,
   messageToTurn,
   toolResultFromMessage
 } from './adapter'
@@ -57,11 +65,17 @@ type SessionRecord = {
   seeded: boolean
   pendingFrames: OpenClawMessage[]
   // Optimistic id rendezvous: when the client sends a message we push the
-  // optimistic id + text onto this FIFO. The next matching durable user-row
-  // consumes the head entry and is re-emitted with that id (preventing a
-  // duplicate bubble). A queue rather than a single slot so two rapid sends
-  // don't lose the first rendezvous when the gateway echo lags ~6s behind.
-  pendingUserEchoes: { optimisticId: string; text: string }[]
+  // optimistic id + text onto this FIFO. The durable user-row is matched by
+  // its idempotency key (`<runId>:user`, exact) when the send's runId is
+  // known, else by text. A queue rather than a single slot so two rapid sends
+  // don't lose the first rendezvous when the gateway echo lags behind.
+  pendingUserEchoes: { optimisticId: string; text: string; runId?: string }[]
+  // Whether the client asked for token previews on the latest send.
+  streamEnabled: boolean
+  // Last model/thinking applied via sessions.patch, in `provider/model` form —
+  // avoids a patch round-trip per send when nothing changed.
+  appliedModel?: string
+  appliedThinking?: string
 }
 
 const MAX_PENDING_USER_ECHOES = 16
@@ -206,24 +220,153 @@ function rebuildView(rec: SessionRecord): void {
   rec.view = view
 }
 
+// The preview slot for a run. Doubles as `meta.apiMessageId` on the run's
+// committed assistant turns so the client's native preview reconciliation
+// clears the live text the instant the durable turn lands.
+function previewMessageId(sessionKey: string, runId: string): string {
+  return `openclaw:${sessionKey}:${runId}`
+}
+
 function emitTurn(rec: SessionRecord, msg: OpenClawMessage, idx: number): void {
   const turn = messageToTurn(msg, rec.sessionKey, idx, rec.results)
   if (!turn) return
-  // Optimistic-id rendezvous: if this is the first user-text turn that
-  // matches what the client just sent, re-id it to the optimistic id so the
-  // optimistic bubble upserts in place instead of duplicating.
+  // Optimistic-id rendezvous: prefer the exact idempotency-key match
+  // (`<runId>:user`; nested under `__openclaw` on 2026.7.x, message-level on
+  // 2026.6.x), fall back to first-matching-text for old rows and unknown
+  // runIds. Re-id to the optimistic id so the optimistic bubble upserts in
+  // place instead of duplicating.
   if (rec.pendingUserEchoes.length > 0 && turn.role === 'user') {
-    const text = turn.parts.find(p => p.type === 'text')?.text?.trim()
-    if (text !== undefined) {
-      const idx = rec.pendingUserEchoes.findIndex(e => e.text.trim() === text)
-      if (idx >= 0) {
-        turn.id = rec.pendingUserEchoes[idx].optimisticId
-        rec.pendingUserEchoes.splice(idx, 1)
+    const idem = messageIdempotencyKey(msg)
+    let at = idem ? rec.pendingUserEchoes.findIndex(e => e.runId && `${e.runId}:user` === idem) : -1
+    if (at < 0) {
+      const text = turn.parts.find(p => p.type === 'text')?.text?.trim()
+      if (text !== undefined) {
+        at = rec.pendingUserEchoes.findIndex(e => e.text.trim() === text)
       }
     }
+    if (at >= 0) {
+      turn.id = rec.pendingUserEchoes[at].optimisticId
+      rec.pendingUserEchoes.splice(at, 1)
+    }
+  }
+  // Stamp the run's preview slot id so the client clears the streaming
+  // preview when this turn upserts (chat deltas can trail the durable row).
+  if (turn.role === 'assistant' && rec.activeRunId) {
+    turn.meta = { ...turn.meta, apiMessageId: previewMessageId(rec.sessionKey, rec.activeRunId) }
   }
   rec.view = applyEvent(rec.view, { kind: 'turn', turn })
   broadcast(rec.workspaceId, { kind: 'turn', turn, sessionId: rec.sessionId })
+}
+
+// Re-emit every assistant turn that references `toolCallId` so its tool card
+// reflects the latest entry in `rec.results`.
+function reemitToolCallOwners(rec: SessionRecord, toolCallId: string): void {
+  const owners = findToolCallOwners(rec.messagesById.values(), toolCallId)
+  const ownerSet = new Set(owners)
+  let idx = 0
+  for (const m of rec.messagesById.values()) {
+    if (ownerSet.has(m)) emitTurn(rec, m, idx)
+    idx++
+  }
+}
+
+// `chat` delta frames carry the full in-progress assistant message; map its
+// content blocks onto cumulative PreviewBlocks (text + thinking only — tool
+// calls surface through `session.tool`, not the preview). Exported for tests.
+export function chatPreviewBlocks(content: unknown): PreviewBlock[] {
+  if (typeof content === 'string') {
+    return content ? [{ index: 0, kind: 'text', text: content }] : []
+  }
+  if (!Array.isArray(content)) return []
+  const blocks: PreviewBlock[] = []
+  content.forEach((block, index) => {
+    if (!block || typeof block !== 'object') return
+    const b = block as { type?: unknown; text?: unknown; thinking?: unknown }
+    if (b.type === 'text' && typeof b.text === 'string' && b.text) {
+      blocks.push({ index, kind: 'text', text: b.text })
+    } else if (b.type === 'thinking' && typeof b.thinking === 'string' && b.thinking) {
+      blocks.push({ index, kind: 'reasoning', text: b.thinking })
+    }
+  })
+  return blocks
+}
+
+function handleChatFrame(rec: SessionRecord, payload: Record<string, unknown>): void {
+  if (!rec.streamEnabled) return
+  const runId = typeof payload.runId === 'string' ? payload.runId : rec.activeRunId
+  if (!runId) return
+  const messageId = previewMessageId(rec.sessionKey, runId)
+  const state = payload.state
+  if (state === 'delta') {
+    const message = payload.message as { content?: unknown } | undefined
+    const blocks = chatPreviewBlocks(message?.content)
+    if (blocks.length === 0) return
+    broadcast(rec.workspaceId, {
+      type: 'preview',
+      sessionId: rec.sessionId,
+      messageId,
+      parentToolUseId: null,
+      blocks
+    })
+  } else if (state === 'final' || state === 'error') {
+    // Belt-and-braces clear: the durable turn's apiMessageId already clears
+    // the slot, but a trailing delta after the durable row would repaint it.
+    broadcast(rec.workspaceId, {
+      type: 'preview',
+      sessionId: rec.sessionId,
+      messageId,
+      parentToolUseId: null,
+      blocks: []
+    })
+  }
+}
+
+// `session.tool` frames flip tool cards live: start/update → running,
+// result → success/error with the full output (both gateway lines emit the
+// output inline; `reconcileAfterRun` stays as the safety net).
+function handleToolFrame(rec: SessionRecord, payload: Record<string, unknown>): void {
+  const data = payload.data as
+    | { phase?: unknown; name?: unknown; toolCallId?: unknown; isError?: unknown; result?: unknown }
+    | undefined
+  if (!data || typeof data.toolCallId !== 'string') return
+  const id = data.toolCallId
+  const toolName = typeof data.name === 'string' ? { toolName: data.name } : {}
+  if (data.phase === 'start' || data.phase === 'update') {
+    const existing = rec.results.get(id)
+    if (existing && !existing.running) return // final result already landed
+    rec.results.set(id, { output: '', isError: false, running: true, ...toolName })
+  } else if (data.phase === 'result') {
+    const result = data.result as { content?: unknown } | undefined
+    rec.results.set(id, {
+      output: flattenToolResultContent((result?.content ?? '') as OpenClawMessage['content']),
+      isError: data.isError === true,
+      ...toolName
+    })
+  } else {
+    return
+  }
+  reemitToolCallOwners(rec, id)
+}
+
+// Debounced workspace session-list refresh — `sessions.changed` fires for
+// every session under the agent (cron spawns, subagents, patches), and
+// several records can hold subscriptions for the same workspace.
+const lastListRefresh = new Map<string, number>()
+const LIST_REFRESH_MIN_MS = 400
+const LIST_REFRESH_REASONS = new Set([
+  'chat.title',
+  'create',
+  'delete',
+  'patch',
+  'label',
+  'compact',
+  'subagent-status'
+])
+function broadcastSessionsChanged(rec: SessionRecord): void {
+  const now = Date.now()
+  if (now - (lastListRefresh.get(rec.workspaceId) ?? 0) < LIST_REFRESH_MIN_MS) return
+  lastListRefresh.set(rec.workspaceId, now)
+  broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
 }
 
 function ingest(rec: SessionRecord, msg: OpenClawMessage): void {
@@ -232,15 +375,7 @@ function ingest(rec: SessionRecord, msg: OpenClawMessage): void {
   const result = toolResultFromMessage(msg)
   if (result) {
     rec.results.set(result.id, result.info)
-    const owners = findToolCallOwners(rec.messagesById.values(), result.id)
-    const i = 0
-    const ownerSet = new Set(owners)
-    let idx = 0
-    for (const m of rec.messagesById.values()) {
-      if (ownerSet.has(m)) emitTurn(rec, m, idx)
-      idx++
-    }
-    void i
+    reemitToolCallOwners(rec, result.id)
     return
   }
 
@@ -249,6 +384,33 @@ function ingest(rec: SessionRecord, msg: OpenClawMessage): void {
   // `__openclaw.id`. The durable row arrives ~6s later with id + envelope.
   const id = msg.__openclaw?.id
   if (typeof id !== 'string') return
+  // A durable assistant row on a different model than the previous one marks
+  // a mid-session model switch (sessions.patch here or anywhere else) —
+  // surface it as a notice instead of letting it pass silently.
+  if (msg.role === 'assistant') {
+    const model = (msg as { model?: unknown }).model
+    if (typeof model === 'string') {
+      let prev: string | undefined
+      for (const m of rec.messagesById.values()) {
+        if (m.role !== 'assistant') continue
+        const pm = (m as { model?: unknown }).model
+        if (typeof pm === 'string') prev = pm
+      }
+      if (prev !== undefined && prev !== model) {
+        broadcast(rec.workspaceId, {
+          kind: 'notice',
+          sessionId: rec.sessionId,
+          notice: {
+            id: `openclaw:model-change:${id}`,
+            kind: 'model-change',
+            at: new Date().toISOString(),
+            model,
+            prev
+          }
+        })
+      }
+    }
+  }
   const wasUpdate = rec.messagesById.has(id)
   rec.messagesById.set(id, msg)
   // Compute idx as insertion order — for an update use the existing position,
@@ -311,12 +473,39 @@ async function ensureSubscribed(rec: SessionRecord): Promise<void> {
         return
       }
       ingest(rec, message)
-    } else if (event === 'sessions.changed') {
+    } else if (event === 'chat') {
       if (payload.sessionKey !== rec.sessionKey) return
-      if (payload.reason === 'chat.title') {
-        broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
-        return
+      handleChatFrame(rec, payload)
+    } else if (event === 'session.tool') {
+      if (payload.sessionKey !== rec.sessionKey) return
+      handleToolFrame(rec, payload)
+    } else if (event === 'sessions.changed') {
+      // List refreshes apply to ANY session of the workspace's agent — cron
+      // spawns, subagents, titles, patches. (2026.6.x never emits
+      // `chat.title`; the other reasons cover title refreshes there.)
+      const reason = typeof payload.reason === 'string' ? payload.reason : undefined
+      if (reason && LIST_REFRESH_REASONS.has(reason)) broadcastSessionsChanged(rec)
+      if (payload.sessionKey !== rec.sessionKey) return
+      if (reason === 'compact') {
+        broadcast(rec.workspaceId, {
+          kind: 'notice',
+          sessionId: rec.sessionId,
+          notice: {
+            id: `openclaw:compact:${typeof payload.ts === 'number' ? payload.ts : Date.now()}`,
+            kind: 'compact',
+            at: new Date().toISOString()
+          }
+        })
       }
+      // Frames embed the fresh session row — keep the applied-model cache
+      // truthful even when the session is patched outside moi.
+      const row = payload.session as
+        | { model?: unknown; modelProvider?: unknown; thinkingLevel?: unknown }
+        | undefined
+      if (row && typeof row.model === 'string' && typeof row.modelProvider === 'string') {
+        rec.appliedModel = `${row.modelProvider}/${row.model}`
+      }
+      if (row && typeof row.thinkingLevel === 'string') rec.appliedThinking = row.thinkingLevel
       const phase = payload.phase as string | undefined
       const runId = payload.runId as string | undefined
       if (phase === 'start' && runId) {
@@ -383,6 +572,7 @@ export async function getOrCreateOpenClawSession(input: {
     view: emptyViewState(),
     activeRunId: null,
     seeded: false,
+    streamEnabled: true,
     pendingFrames: [],
     pendingUserEchoes: []
   }
@@ -420,6 +610,12 @@ export async function sendOpenClawMessage(input: {
   // (see dev/file-uploads.md).
   attachments?: string[]
   optimisticId?: string
+  // Picker selections, applied to the gateway session via `sessions.patch`
+  // before the send (see applySessionSettings).
+  model?: string
+  effort?: string
+  // Client's live-typing toggle; previews are only broadcast when on.
+  stream?: boolean
   // Structured moi context (lib/moi-context.ts), rendered and appended at
   // the gateway send only — `content` stays clean so the optimistic-id echo
   // rendezvous keeps matching on the user's text.
@@ -444,6 +640,26 @@ export async function sendOpenClawMessage(input: {
   return sendOpenClawMessageImpl({ ...input, content })
 }
 
+// Apply the picker's model/effort onto the gateway session before the send.
+// `sessions.patch {model, thinkingLevel}` exists on both supported lines
+// (verified live on 2026.7.1 and 2026.6.33); values come from `models.list`
+// ids and the thinking-level menu, so a rejection means the gateway's
+// allowlist disagrees — surfaced to the chat, not swallowed.
+async function applySessionSettings(
+  rec: SessionRecord,
+  model: string | undefined,
+  effort: string | undefined
+): Promise<void> {
+  const patch: Record<string, unknown> = {}
+  if (model && model !== rec.appliedModel) patch.model = model
+  if (effort && effort !== rec.appliedThinking) patch.thinkingLevel = effort
+  if (Object.keys(patch).length === 0) return
+  const gw = await getGateway()
+  await gw.rpc('sessions.patch', { key: rec.sessionKey, ...patch })
+  if (typeof patch.model === 'string') rec.appliedModel = patch.model
+  if (typeof patch.thinkingLevel === 'string') rec.appliedThinking = patch.thinkingLevel
+}
+
 async function sendOpenClawMessageImpl(input: {
   workspaceId: string
   workspacePath: string
@@ -452,6 +668,9 @@ async function sendOpenClawMessageImpl(input: {
   isNew: boolean
   content: string
   optimisticId?: string
+  model?: string
+  effort?: string
+  stream?: boolean
   context?: MoiContext
 }): Promise<void> {
   // New threads: ask the gateway to create one, then rename the client's
@@ -503,11 +722,13 @@ async function sendOpenClawMessageImpl(input: {
     throw err
   }
 
-  if (input.optimisticId) {
-    rec.pendingUserEchoes.push({
-      optimisticId: input.optimisticId,
-      text: input.content
-    })
+  rec.streamEnabled = input.stream !== false
+
+  const echo: { optimisticId: string; text: string; runId?: string } | null = input.optimisticId
+    ? { optimisticId: input.optimisticId, text: input.content }
+    : null
+  if (echo) {
+    rec.pendingUserEchoes.push(echo)
     if (rec.pendingUserEchoes.length > MAX_PENDING_USER_ECHOES) {
       rec.pendingUserEchoes.shift()
     }
@@ -517,6 +738,7 @@ async function sendOpenClawMessageImpl(input: {
   setProcessing(rec, true, rec.activeRunId)
 
   try {
+    await applySessionSettings(rec, input.model, input.effort)
     const gw = await getGateway()
     const resp = await gw.rpc<{ runId?: string; status?: string }>('sessions.send', {
       key: rec.sessionKey,
@@ -524,7 +746,11 @@ async function sendOpenClawMessageImpl(input: {
         ? appendMoiContext(input.content, renderMoiContext(input.context))
         : input.content
     })
-    if (resp?.runId) setProcessing(rec, true, resp.runId)
+    if (resp?.runId) {
+      setProcessing(rec, true, resp.runId)
+      // The durable user echo carries `<runId>:user` — arm the exact match.
+      if (echo) echo.runId = resp.runId
+    }
   } catch (err) {
     setProcessing(rec, false, null)
     if (input.optimisticId) {

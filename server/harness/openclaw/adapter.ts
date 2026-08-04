@@ -47,13 +47,21 @@ export function toSessionInfo(row: OpenClawSessionRow, cwd: string): SessionInfo
   }
 }
 
-export type ToolResultInfo = { output: string; isError: boolean; toolName?: string }
+// `running` marks a live `session.tool` start/update frame — the call is
+// executing and has no output yet. A final result (stream or durable row)
+// overwrites the entry.
+export type ToolResultInfo = {
+  output: string
+  isError: boolean
+  toolName?: string
+  running?: boolean
+}
 
 // Pull a readable `output` string out of a `toolResult` message. OpenClaw
 // ships content as blocks; in practice tool output is one or more text
 // blocks, so we concatenate them. Non-text blocks (images, etc.) are
 // represented as a `[type]` placeholder so we don't silently drop them.
-function flattenToolResultContent(content: OpenClawMessage['content']): string {
+export function flattenToolResultContent(content: OpenClawMessage['content']): string {
   if (typeof content === 'string') return content
   if (!Array.isArray(content)) return ''
   return content
@@ -129,7 +137,7 @@ function blockToPart(
       if (typeof id !== 'string' || typeof name !== 'string') return null
       const result = results.get(id)
       let state: ToolState = 'pending'
-      if (result) state = result.isError ? 'error' : 'success'
+      if (result) state = result.running ? 'running' : result.isError ? 'error' : 'success'
       const call: ToolCall = {
         toolCallId: id,
         name,
@@ -138,7 +146,7 @@ function blockToPart(
         state,
         input: (block as { arguments?: unknown }).arguments
       }
-      if (result) {
+      if (result && !result.running) {
         if (result.isError) call.errorText = result.output
         else call.output = result.output
       }

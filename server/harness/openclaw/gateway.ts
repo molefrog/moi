@@ -17,8 +17,29 @@ import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
+import { type GatewayFailure, type GatewayInfo, classifyGatewayError, parseHelloOk } from './compat'
+import { tapWire } from '../debug'
+
 type Rpc = <T>(method: string, params?: Record<string, unknown>) => Promise<T>
 type Listener = (event: string, payload: Record<string, unknown>) => void
+
+// All openclaw wire frames are tapped under one scope: the gateway connection
+// is process-global, not per-workspace (index.ts `wireScope` returns this).
+export const OPENCLAW_WIRE_SCOPE = 'openclaw'
+
+// Last connect outcome, for /status lines and user-facing errors — a
+// protocol-3 gateway (≤ 2026.5.x) must surface "too old", never silent
+// empty lists. Cleared on the next successful hello.
+let lastFailure: GatewayFailure | null = null
+let lastInfo: GatewayInfo | null = null
+
+export function getOpenClawGatewayStatus(): {
+  connected: boolean
+  info: GatewayInfo | null
+  failure: GatewayFailure | null
+} {
+  return { connected: current !== null, info: lastInfo, failure: lastFailure }
+}
 
 type ClientCtor = typeof import('openclaw/plugin-sdk/gateway-runtime').GatewayClient
 type GatewayInstance = InstanceType<ClientCtor>
@@ -79,15 +100,28 @@ function scheduleReconnect() {
 
 export type GatewayHandle = {
   rpc: Rpc
+  // hello-ok metadata of the live connection (protocol, server version,
+  // advertised methods/events); null before the first successful hello.
+  info: () => GatewayInfo | null
   on: (l: Listener) => () => void
   ensureSessionSubscribed: (sessionKey: string) => Promise<void>
   ensureTopLevelSubscribed: () => Promise<void>
   isConnected: () => boolean
 }
 
-async function readGatewayConfig(): Promise<{ port: number; token: string } | null> {
+// Config resolution mirrors the OpenClaw CLI: explicit OPENCLAW_CONFIG_PATH
+// wins, then OPENCLAW_STATE_DIR (profile runs), then the default state root.
+export function openClawConfigPath(): string {
+  const explicit = process.env.OPENCLAW_CONFIG_PATH
+  if (explicit) return explicit
+  const stateDir = process.env.OPENCLAW_STATE_DIR
+  if (stateDir) return join(stateDir, 'openclaw.json')
+  return join(homedir(), '.openclaw/openclaw.json')
+}
+
+export async function readGatewayConfig(): Promise<{ port: number; token: string } | null> {
   try {
-    const raw = await readFile(join(homedir(), '.openclaw/openclaw.json'), 'utf8')
+    const raw = await readFile(openClawConfigPath(), 'utf8')
     const cfg = JSON.parse(raw) as {
       gateway?: { port?: number; auth?: { token?: string } }
     }
@@ -128,17 +162,21 @@ async function startClient(): Promise<{ handle: GatewayHandle; client: GatewayIn
     role: 'operator',
     scopes: ['operator.admin', 'operator.read', 'operator.write'],
     requestTimeoutMs: REQUEST_TIMEOUT_MS,
-    onHelloOk: () => {
+    onHelloOk: (hello: unknown) => {
       connected = true
+      lastInfo = parseHelloOk(hello)
+      lastFailure = null
       settleConnect.res()
     },
     onConnectError: err => {
+      lastFailure = classifyGatewayError(err)
       settleConnect.rej(err)
     },
     onEvent: evt => {
       const event = (evt as unknown as { event?: unknown }).event
       const payload = (evt as unknown as { payload?: unknown }).payload
       if (typeof event !== 'string') return
+      tapWire(OPENCLAW_WIRE_SCOPE, 'recv', evt)
       fanout(
         event,
         (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>
@@ -159,10 +197,11 @@ async function startClient(): Promise<{ handle: GatewayHandle; client: GatewayIn
   })
 
   await new Promise<void>((res, rej) => {
-    const t = setTimeout(
-      () => rej(new Error(`openclaw connect timeout after ${CONNECT_TIMEOUT_MS}ms`)),
-      CONNECT_TIMEOUT_MS
-    )
+    const t = setTimeout(() => {
+      const err = new Error(`openclaw connect timeout after ${CONNECT_TIMEOUT_MS}ms`)
+      lastFailure = classifyGatewayError(err)
+      rej(err)
+    }, CONNECT_TIMEOUT_MS)
     connectPromise.then(
       () => {
         clearTimeout(t)
@@ -176,10 +215,23 @@ async function startClient(): Promise<{ handle: GatewayHandle; client: GatewayIn
     client.start()
   })
 
-  const rpc: Rpc = (method, params = {}) => client.request(method, params) as Promise<never>
+  const rpc: Rpc = (method, params = {}) => {
+    tapWire(OPENCLAW_WIRE_SCOPE, 'send', { method, params })
+    const p = client.request(method, params) as Promise<never>
+    p.then(
+      result => tapWire(OPENCLAW_WIRE_SCOPE, 'recv', { method, result }),
+      (err: unknown) =>
+        tapWire(OPENCLAW_WIRE_SCOPE, 'recv', {
+          method,
+          error: err instanceof Error ? err.message : String(err)
+        })
+    )
+    return p
+  }
 
   const handle: GatewayHandle = {
     rpc,
+    info: () => lastInfo,
     on(l) {
       listeners.add(l)
       return () => listeners.delete(l)
@@ -250,8 +302,18 @@ export async function withOneShotGateway<T>(fn: (rpc: Rpc) => Promise<T>): Promi
     role: 'operator',
     scopes: ['operator.admin', 'operator.read', 'operator.write'],
     requestTimeoutMs: 2000,
-    onHelloOk: () => settleConnect.res(),
-    onConnectError: err => settleConnect.rej(err)
+    onHelloOk: (hello: unknown) => {
+      lastInfo = parseHelloOk(hello)
+      lastFailure = null
+      settleConnect.res()
+    },
+    onConnectError: err => {
+      // One-shot callers stay silent by design, but the failure category must
+      // still reach /status — a too-old gateway looks like "no agents"
+      // otherwise.
+      lastFailure = classifyGatewayError(err)
+      settleConnect.rej(err)
+    }
   })
   try {
     await new Promise<void>((res, rej) => {
