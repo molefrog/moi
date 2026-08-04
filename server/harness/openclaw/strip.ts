@@ -188,6 +188,21 @@ export function stripBootstrapPreamble(text: string): string {
   return lines.slice(i).join('\n')
 }
 
+// moi-side (not part of the upstream mirror above): the spawn tool wraps a
+// subagent's first user message as
+//   "[Subagent Context] <paragraph>\n\n[Subagent Task]\n\n<task>\n\nBegin. …"
+// — surface the task itself in titles/previews/transcripts. Truncated
+// previews/derived titles can cut before the task marker; fall back to a
+// plain label rather than leaking the envelope.
+export function stripSubagentEnvelope(text: string): string {
+  if (!text.startsWith('[Subagent Context]')) return text
+  const taskAt = text.indexOf('[Subagent Task]')
+  if (taskAt < 0) return 'Subagent task'
+  let task = text.slice(taskAt + '[Subagent Task]'.length).trim()
+  task = task.replace(/\n\nBegin\.[^\n]*$/, '').trim()
+  return task || 'Subagent task'
+}
+
 export function stripUserMessageMetadata(text: string): string {
-  return stripMoiContext(stripInboundMetadata(stripBootstrapPreamble(text)))
+  return stripSubagentEnvelope(stripMoiContext(stripInboundMetadata(stripBootstrapPreamble(text))))
 }

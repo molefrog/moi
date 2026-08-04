@@ -27,7 +27,7 @@ import type {
 } from './discovery'
 import { formatChatTitle } from '@/lib/chat-title'
 import { stripMoiContextLoose } from '@/lib/moi-context'
-import { stripUserMessageMetadata } from './strip'
+import { stripSubagentEnvelope, stripUserMessageMetadata } from './strip'
 
 export function toSessionInfo(row: OpenClawSessionRow, cwd: string): SessionInfo {
   // Gateway previews carry the raw stored message — for a user send that
@@ -36,8 +36,8 @@ export function toSessionInfo(row: OpenClawSessionRow, cwd: string): SessionInfo
   const summary =
     row.label?.trim() ||
     row.displayName?.trim() ||
-    row.derivedTitle?.trim() ||
-    formatChatTitle(stripMoiContextLoose(row.lastMessagePreview ?? '')) ||
+    stripSubagentEnvelope(row.derivedTitle?.trim() ?? '') ||
+    formatChatTitle(stripSubagentEnvelope(stripMoiContextLoose(row.lastMessagePreview ?? ''))) ||
     ''
   // External channel provenance. 'webchat' is moi's own chat surface — only
   // real external channels (telegram/irc/discord/…) get an origin badge.
