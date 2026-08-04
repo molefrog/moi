@@ -159,6 +159,11 @@ describe('captureServiceEnv', () => {
     expect(env.MOI_SERVICE).toBe('1')
   })
 
+  test('never inherits the agent marker from an agent-run install', () => {
+    const env = captureServiceEnv({ PATH: '/bin', MOI_AGENT: '1' }, '/x')
+    expect(env).not.toHaveProperty('MOI_AGENT')
+  })
+
   test('prepends the running bun dir to PATH and dedupes', () => {
     const env = captureServiceEnv(base, '/home/u/.bun/bin')
     expect(env.PATH).toBe('/home/u/.bun/bin:/usr/bin:/bin')

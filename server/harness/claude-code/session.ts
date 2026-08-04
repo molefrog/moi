@@ -625,7 +625,9 @@ function createLiveSession(input: {
     permissionMode: 'bypassPermissions',
     allowDangerouslySkipPermissions: true,
     settingSources: ['user', 'project'],
-    env: { ...process.env, ...input.workspaceEnv, CLAUDECODE: undefined },
+    // MOI_AGENT marks every shell this session spawns as agent-driven (the
+    // moi CLI reads it — see agent-caller.ts), surviving the CLAUDECODE strip.
+    env: { ...process.env, ...input.workspaceEnv, CLAUDECODE: undefined, MOI_AGENT: '1' },
     stderr: (data: string) => console.error('[SDK stderr]', data)
   }
   if (!input.isNew) options.resume = input.sessionId
