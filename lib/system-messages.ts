@@ -23,10 +23,14 @@
 //
 // Adding rules: append to SYSTEM_TEXT_RULES with a `<provider>:<what>` id.
 // Registry order is priority — the first matching hide/notify rule decides the
-// block. `hide`/`notify` patterns are anchored at the start of the block
-// (`^\s*`) or match the whole block, so a person merely *mentioning* an
-// envelope mid-message keeps their bubble. Keep `hide`/`notify` regexes
-// non-global (`.test` on a /g regex is stateful) and `strip` regexes global.
+// block. `hide`/`notify` patterns must match the WHOLE block (`^…$`), and
+// tag-shaped ones require every element complete (open + close), so a person
+// typing a tag name, pasting an unterminated fragment, or quoting a record
+// with commentary around it keeps their bubble. Prose-anchored rules (the
+// caveat, the compaction summary) are prefix matches by necessity — the
+// accepted tradeoff is that pasting that exact sentence at position 0 hides
+// the message. Keep `hide`/`notify` regexes non-global (`.test` on a /g
+// regex is stateful) and `strip` regexes global.
 //
 // Current rules cover Claude Code. Sources: the patterns were verified against
 // the `claude` CLI binary's strings and live `~/.claude/projects/*.jsonl`
@@ -73,12 +77,15 @@ export const SYSTEM_TEXT_RULES: readonly SystemTextRule[] = [
   // Slash-command invocation, e.g. `<command-name>/clear</command-name>
   // <command-message>clear</command-message><command-args></command-args>`.
   // Tag order varies across CLI versions; `<command-contents>` carries older
-  // expanded-command payloads.
+  // expanded-command payloads. The block must be NOTHING BUT complete
+  // `<command-*>…</command-*>` elements — a typed message that merely starts
+  // with the tag name, or a pasted record followed by a question, keeps its
+  // bubble.
   {
     id: 'claude-code:slash-command',
     reason: 'slash-command',
     action: 'hide',
-    test: /^\s*<command-(name|message|args|contents)>/
+    test: /^\s*(<command-(name|message|args|contents)>[\s\S]*?<\/command-\2>\s*)+$/
   },
   // Output of a local slash command, e.g. `<local-command-stdout>Compacted.
   // ...</local-command-stdout>` — the other half of the invocation record.
@@ -86,7 +93,7 @@ export const SYSTEM_TEXT_RULES: readonly SystemTextRule[] = [
     id: 'claude-code:local-command-output',
     reason: 'slash-command',
     action: 'hide',
-    test: /^\s*<local-command-(stdout|stderr)>/
+    test: /^\s*(<local-command-(stdout|stderr)>[\s\S]*?<\/local-command-\2>\s*)+$/
   },
   // Marker the CLI writes when the user aborts a turn (Esc / moi's stop).
   // Full-block match only: someone quoting the marker inside a longer
@@ -97,19 +104,21 @@ export const SYSTEM_TEXT_RULES: readonly SystemTextRule[] = [
     action: 'hide',
     test: /^\s*\[Request interrupted by user( for tool use)?\]\s*$/
   },
-  // `!command` bash mode: the input echo and its captured output.
+  // `!command` bash mode: the input echo and its captured output
+  // (`<bash-stdout>…</bash-stdout><bash-stderr>…</bash-stderr>` ride in one
+  // message).
   {
     id: 'claude-code:bash-mode',
     reason: 'other',
     action: 'hide',
-    test: /^\s*<bash-(input|stdout|stderr)>/
+    test: /^\s*(<bash-(input|stdout|stderr)>[\s\S]*?<\/bash-\2>\s*)+$/
   },
   // `#note` memory mode.
   {
     id: 'claude-code:memory-input',
     reason: 'other',
     action: 'hide',
-    test: /^\s*<user-memory-input>/
+    test: /^\s*<user-memory-input>[\s\S]*?<\/user-memory-input>\s*$/
   },
   // Background-task completion notices delivered as user turns — surfaced
   // as readable text rather than hidden. Local CC is the bare tag block;
