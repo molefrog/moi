@@ -57,6 +57,31 @@ shadcn/ui`). Extraction is mandatory, not cosmetic: the official skill's
 6. **Reference-file drift.** Regenerate `references/shadcn.md` as part of
    `moi skill update` (version marker exists); a script, not a chore.
 
+## Rulings (Aug 2 review)
+
+- **Deps:** the scaffold pre-seeds `@base-ui/react` + `class-variance-authority`
+  (+ `clsx`/`tailwind-merge`) at init. The command never installs — `add`
+  ends with "component added; make sure deps are installed", and the skill
+  makes install the agent's job.
+- **Rebuilds:** the command never rebuilds. `add` writes source files only
+  and prints next steps; the agent runs `bun install` / `moi bundle`. The
+  command is deliberately not smart.
+- **Overwrite:** existing file → `add` fails with a message naming the
+  `--force` flag.
+- **Imports:** the relative-import rule lives in the skill; no bundler
+  changes (unresolved imports already fail loudly).
+- **Offline:** unsupported for now — `add` goes straight to the shadcn
+  registry.
+- **`ui/utils.ts`:** auto-installed on first `add`. Confirmed.
+- **Portals/overlays:** parked as a dedicated review point (options:
+  codemod in `add`, pre-patched overlay copies, runtime portal host).
+- **Pinning, in plain words:** the engine functions are public exports but
+  the shadcn team doesn't promise API stability for them — so moi pins an
+  exact version (no `^`) and upgrades deliberately behind smoke tests.
+- **Reference regeneration, in plain words:** `references/shadcn.md` is
+  condensed from the official skill; re-derive it (an agent task, scripted
+  prompt) whenever the pinned shadcn version is bumped, so it can't drift.
+
 ## Ship plan
 
 1. **Foundation PR** — synthetic Tailwind inline, `secondary` token,
