@@ -2366,6 +2366,13 @@ async function runServiceStatus() {
           pc.dim('    Rerun `moi service install` to re-capture paths.')
       )
     }
+    if (s.bunMissing) {
+      console.log(
+        pc.yellow('  ⚠ No bun on the service PATH — the server cannot start.') +
+          '\n' +
+          pc.dim('    Reinstall bun, then rerun `moi service install`.')
+      )
+    }
     if (s.linger === 'disabled') {
       console.log(
         pc.yellow('  ⚠ Lingering is off — the service stops when your last session ends.') +
