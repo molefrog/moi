@@ -1,7 +1,9 @@
 # RFCs — shadcn components for applets
 
-Final call document: `0004-two-strategies.md` (live engine vs. bundled
-lite + the hybrid). Earlier proposals, one page each: 0001 and 0002 were explored first and
+**Decision: `0005-final-moi-shadcn.md` — `moi shadcn`, an opinionated
+shadcn-lite proxy (strategy A's engine, moi's opinions), with the blind-spot
+list to settle before building.** Earlier stages: `0004-two-strategies.md`
+was the comparison document; 0001 and 0002 were explored first and
 rejected on review (0001 means maintaining our own registry; 0002 puts
 `components.json` + `tsconfig.json` into every workspace — both
 non-starters). **0003 is the current proposal**, built on a source dive into
