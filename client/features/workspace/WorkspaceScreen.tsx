@@ -598,8 +598,47 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
         {/* Full-screen: whole panel. Split: the left content column. */}
         {(mode === 'fullscreen' || hasWorkspaceContent) && (
           <div
-            className={cn('flex min-h-0 flex-1 flex-col', mode === 'split' && 'min-w-(--column-w)')}
+            className={cn(
+              'flex min-h-0 flex-1 flex-col-reverse',
+              mode === 'split' && 'min-w-(--column-w)'
+            )}
           >
+            {activeTab === 'agent' ? (
+              tabbedChat
+            ) : activeTab === 'widgets' ? (
+              <Widgets
+                editing={widgetMode === 'editing'}
+                onEditingChange={editing => setWidgetMode(editing ? 'editing' : 'idle')}
+                widgets={widgets}
+                onCreateWidget={() => {
+                  selectSession(null)
+                  openChat('Create widget')
+                }}
+              />
+            ) : activeTab === 'scratchpad' ? (
+              <Suspense fallback={null}>
+                <Scratchpad />
+              </Suspense>
+            ) : activeBuilder ? (
+              <ViewBuilderTab
+                key={activeBuilder.id}
+                builder={activeBuilder}
+                unavailableReason={unavailableReason}
+                onSave={requirements => builderActions.save(activeBuilder.id, requirements)}
+                onSubmit={requirements => {
+                  if (mode === 'fullscreen') setFloatingChatOpen(true)
+                  return builderActions.submit(activeBuilder, requirements)
+                }}
+                onOpenChat={() => {
+                  selectSession(activeBuilder.sessionId)
+                  openChat()
+                }}
+                onDiscard={() => discardBuilder(activeBuilder)}
+              />
+            ) : activeView ? (
+              <ViewApp view={activeView} params={appletParams} />
+            ) : null}
+
             <PanelHeader>
               <div className="flex min-w-0 flex-1 items-center gap-4">
                 <div className="flex items-center gap-2">
@@ -637,42 +676,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
                 )}
               </div>
             </PanelHeader>
-
-            {activeTab === 'agent' ? (
-              tabbedChat
-            ) : activeTab === 'widgets' ? (
-              <Widgets
-                editing={widgetMode === 'editing'}
-                onEditingChange={editing => setWidgetMode(editing ? 'editing' : 'idle')}
-                widgets={widgets}
-                onCreateWidget={() => {
-                  selectSession(null)
-                  openChat('Create widget')
-                }}
-              />
-            ) : activeTab === 'scratchpad' ? (
-              <Suspense fallback={null}>
-                <Scratchpad />
-              </Suspense>
-            ) : activeBuilder ? (
-              <ViewBuilderTab
-                key={activeBuilder.id}
-                builder={activeBuilder}
-                unavailableReason={unavailableReason}
-                onSave={requirements => builderActions.save(activeBuilder.id, requirements)}
-                onSubmit={requirements => {
-                  if (mode === 'fullscreen') setFloatingChatOpen(true)
-                  return builderActions.submit(activeBuilder, requirements)
-                }}
-                onOpenChat={() => {
-                  selectSession(activeBuilder.sessionId)
-                  openChat()
-                }}
-                onDiscard={() => discardBuilder(activeBuilder)}
-              />
-            ) : activeView ? (
-              <ViewApp view={activeView} params={appletParams} />
-            ) : null}
           </div>
         )}
 
