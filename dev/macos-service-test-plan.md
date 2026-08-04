@@ -78,14 +78,16 @@ moi status                                          # EXPECT: service-managed, v
 moi service                                         # EXPECT: ● running (pid N)
 ```
 
-Inspect the plist (`plutil -p`): ProgramArguments is `/bin/sh -c <preflight>
-<moi-bin>`; env contains `PATH` (starting with the bun dir), `MOI_SERVER=1`,
-`MOI_SERVICE=1`, `HOME`; env does NOT contain `TERM`, `PWD`, `HOST`,
-`HOSTNAME`, `PORT`, or `SSH_AUTH_SOCK`.
+Inspect the plist (`plutil -p`): ProgramArguments is `<moi-bin> start`
+(argv[0] is the moi bin — its basename is the login-item display name); env
+contains `PATH` (starting with the bun dir), `MOI_SERVER=1`, `MOI_SERVICE=1`,
+`HOME`; env does NOT contain `TERM`, `PWD`, `HOST`, `HOSTNAME`, `PORT`,
+`SSH_AUTH_SOCK`, or any `CLAUDE_*` session vars (even when installing from
+inside a Claude Code session).
 
 Ask the user: did macOS show a "background items added" notification, and
-does a "bun" (or "moi") item appear under System Settings → General → Login
-Items? Record their answer.
+does a "moi" item appear under System Settings → General → Login Items?
+Record their answer.
 
 ## 3. Crash restart
 

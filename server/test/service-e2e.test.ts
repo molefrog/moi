@@ -68,9 +68,11 @@ async function runCli(args: string[], envExtra: Record<string, string> = {}): Pr
 
 const unitPath = () => join(home, '.config', 'systemd', 'user', 'moi.service')
 
-// These tests exercise the Linux paths; the sandbox they run in has no systemd
-// user manager, which is exactly the environment the errors are written for.
-const linuxOnly = process.platform === 'linux' ? test : test.skip
+// The Linux systemd paths run only on CI (GitHub Actions sets CI=1): that is
+// the environment they pin — a real Ubuntu with a live user manager — and
+// locally they would only re-test whichever half of the branch the dev
+// machine happens to be.
+const linuxCI = process.platform === 'linux' && process.env.CI ? test : test.skip
 
 describe('moi service (e2e)', () => {
   test('status: not installed', async () => {
@@ -80,7 +82,7 @@ describe('moi service (e2e)', () => {
     expect(res.stdout).toContain('moi service install')
   })
 
-  linuxOnly('install: fails cleanly, leaving no half-installed unit', async () => {
+  linuxCI('install: fails cleanly, leaving no half-installed unit', async () => {
     const res = await runCli(['service', 'install'])
     expect(res.code).toBe(1)
     if (hasUserManager) {
@@ -110,13 +112,13 @@ describe('moi service (e2e)', () => {
     expect(await Bun.file(unitPath()).exists()).toBe(false)
   })
 
-  linuxOnly('restart: not installed yet', async () => {
+  linuxCI('restart: not installed yet', async () => {
     const res = await runCli(['service', 'restart'])
     expect(res.code).toBe(1)
     expect(res.stderr).toContain('not installed')
   })
 
-  linuxOnly('status: installed unit renders state and flags a stale bin', async () => {
+  linuxCI('status: installed unit renders state and flags a stale bin', async () => {
     await mkdir(join(home, '.config', 'systemd', 'user'), { recursive: true })
     await writeFile(
       unitPath(),
@@ -141,7 +143,7 @@ describe('moi service (e2e)', () => {
     await rm(unitPath())
   })
 
-  linuxOnly('uninstall: removes the unit even without a user manager', async () => {
+  linuxCI('uninstall: removes the unit even without a user manager', async () => {
     await mkdir(join(home, '.config', 'systemd', 'user'), { recursive: true })
     await writeFile(unitPath(), 'stub')
     const res = await runCli(['service', 'uninstall'])

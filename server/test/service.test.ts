@@ -7,10 +7,12 @@ import {
   LAUNCHD_LABEL,
   SERVICE_LOG_MAX_BYTES,
   analyzeInstall,
+  bunOnSearchPath,
   captureServiceEnv,
   launchdPlist,
   parseLaunchdPrint,
   parseUnitBin,
+  parseUnitSearchPath,
   rotateServiceLog,
   systemdUnit,
   type ServiceSpec
@@ -122,6 +124,25 @@ describe('captureServiceEnv', () => {
     }
   })
 
+  test('drops Claude Code session runtime vars (agent-driven installs)', () => {
+    // `moi service install` is often run BY a Claude Code agent — its session
+    // vars must not convince the daemon it lives inside that session forever.
+    const env = captureServiceEnv(
+      {
+        PATH: '/bin',
+        CLAUDE_CODE_CHILD_SESSION: '1',
+        CLAUDE_CODE_ENTRYPOINT: 'cli',
+        CLAUDECODE: '1',
+        ANTHROPIC_API_KEY: 'sk-keep'
+      },
+      '/x'
+    )
+    expect(env).not.toHaveProperty('CLAUDE_CODE_CHILD_SESSION')
+    expect(env).not.toHaveProperty('CLAUDE_CODE_ENTRYPOINT')
+    expect(env).not.toHaveProperty('CLAUDECODE')
+    expect(env.ANTHROPIC_API_KEY).toBe('sk-keep')
+  })
+
   test('extra keys are captured by name, still filtered for capturability', () => {
     const env = captureServiceEnv(base, '/x', ['MY_COMPANY_TOKEN', 'GOPATH'])
     expect(env.MY_COMPANY_TOKEN).toBe('hunter2')
@@ -171,13 +192,13 @@ const spec: ServiceSpec = {
 describe('launchdPlist', () => {
   const plist = launchdPlist(spec)
 
-  test('execs the moi bin through the sh preflight, bin as $0', () => {
-    expect(plist).toContain('<string>/bin/sh</string>\n\t\t<string>-c</string>')
-    // The preflight execs $0 (the bin) so the supervised pid is the server,
-    // and exits 0 into the idle protocol when bun is gone from PATH.
-    expect(plist).toContain('exec "$0" start')
-    expect(plist).toContain('command -v bun')
-    expect(plist).toContain('<string>/home/u/.bun/bin/moi</string>\n\t</array>')
+  test('execs the moi bin directly — argv[0] names the login item', () => {
+    // No /bin/sh wrapper: macOS shows argv[0]'s basename as the login item,
+    // and "sh" from an unidentified developer is what users would see.
+    expect(plist).toContain(
+      '<key>ProgramArguments</key>\n\t<array>\n\t\t<string>/home/u/.bun/bin/moi</string>\n\t\t<string>start</string>\n\t</array>'
+    )
+    expect(plist).not.toContain('/bin/sh')
   })
 
   test('restarts on crash but not after a deliberate clean exit', () => {
@@ -245,6 +266,21 @@ describe('parseUnitBin', () => {
   test('returns null on unrecognized content', () => {
     expect(parseUnitBin('not a unit', 'darwin')).toBeNull()
     expect(parseUnitBin('not a unit', 'linux')).toBeNull()
+  })
+})
+
+describe('parseUnitSearchPath + bunOnSearchPath', () => {
+  test('round-trips the captured PATH out of both formats', () => {
+    expect(parseUnitSearchPath(launchdPlist(spec), 'darwin')).toBe(spec.env.PATH)
+    expect(parseUnitSearchPath(systemdUnit(spec), 'linux')).toBe(spec.env.PATH)
+  })
+
+  test('finds bun only when a captured dir still holds it', () => {
+    mkdirSync(join(dir, 'has-bun'), { recursive: true })
+    writeFileSync(join(dir, 'has-bun', 'bun'), '#!/bin/sh\n')
+    expect(bunOnSearchPath(`${join(dir, 'empty')}:${join(dir, 'has-bun')}`)).toBe(true)
+    expect(bunOnSearchPath(join(dir, 'empty'))).toBe(false)
+    expect(bunOnSearchPath('')).toBe(false)
   })
 })
 

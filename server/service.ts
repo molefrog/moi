@@ -117,17 +117,13 @@ const ENV_ALLOW = new Set([
   'SSL_CERT_DIR'
 ])
 
-// moi itself, the agent harnesses, and their runtimes.
-const ENV_ALLOW_PREFIXES = [
-  'MOI_',
-  'ANTHROPIC_',
-  'CLAUDE_',
-  'OPENCLAW_',
-  'OPENAI_',
-  'PUBLIC_',
-  'BUN_',
-  'LC_'
-]
+// moi itself, the agent harnesses, and their runtimes. CLAUDE_* is
+// deliberately NOT here: `moi service install` is often run by a Claude Code
+// agent, and capturing that session's runtime vars (CLAUDE_CODE_CHILD_SESSION
+// and friends) would bake "you are inside a Claude Code session" into the
+// daemon permanently, skewing every agent it spawns. Config-style CLAUDE_*
+// vars can be captured explicitly with --env.
+const ENV_ALLOW_PREFIXES = ['MOI_', 'ANTHROPIC_', 'OPENCLAW_', 'OPENAI_', 'PUBLIC_', 'BUN_', 'LC_']
 
 // Runtime flags the unit stamps itself — never inherited from the installing
 // shell (a dev shell must not bake MOI_DEV into the service).
@@ -186,23 +182,18 @@ function xmlEscape(s: string): string {
   return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
 }
 
-// The launchd preflight: exit-0 into the idle protocol when the interpreter is
-// gone (bun moved/uninstalled — the moi bin's `#!/usr/bin/env bun` would die
-// with 127 forever otherwise, and launchd has no systemd-style start limit).
-// `exec "$0" start` replaces the shell, so the PID launchd supervises IS the
-// server, and the bin path rides as $0 — never spliced into the script.
-const LAUNCHD_PREFLIGHT =
-  'command -v bun >/dev/null 2>&1 || ' +
-  '{ echo "moi service: bun not found on the unit PATH - reinstall bun, then run: moi service install" >&2; exit 0; }; ' +
-  'exec "$0" start'
-
-// launchd user agent. KeepAlive.SuccessfulExit=false means: restart on crash
-// (non-zero exit), stop respawning after a deliberate exit 0 — which is how
-// the server signals a permanent startup failure (port taken, config error)
-// under MOI_SERVICE, so a broken unit idles instead of respawn-looping.
-// Crashes that bypass that guard (bun panic mid-boot) have no launchd
-// give-up; ThrottleInterval=60 caps them at one respawn a minute — accepted
-// residual.
+// launchd user agent. ProgramArguments execs the moi bin directly — argv[0]'s
+// basename is what macOS shows as the login item, so wrapping in /bin/sh
+// would surface an anonymous "sh" entry (verified on a real Mac). The
+// missing-interpreter case (bun moved/uninstalled → shebang dies with 127) is
+// therefore a throttled respawn, not a graceful idle: ThrottleInterval=60
+// caps it at one attempt a minute, and `moi service` status flags a unit PATH
+// with no bun on it — accepted residual.
+//
+// KeepAlive.SuccessfulExit=false means: restart on crash (non-zero exit),
+// stop respawning after a deliberate exit 0 — which is how the server signals
+// a permanent startup failure (port taken, config error) under MOI_SERVICE,
+// so a broken unit idles instead of respawn-looping.
 export function launchdPlist(spec: ServiceSpec): string {
   const envEntries = Object.keys(spec.env)
     .sort()
@@ -218,10 +209,8 @@ export function launchdPlist(spec: ServiceSpec): string {
 \t<string>${LAUNCHD_LABEL}</string>
 \t<key>ProgramArguments</key>
 \t<array>
-\t\t<string>/bin/sh</string>
-\t\t<string>-c</string>
-\t\t<string>${xmlEscape(LAUNCHD_PREFLIGHT)}</string>
 \t\t<string>${xmlEscape(spec.bin)}</string>
+\t\t<string>start</string>
 \t</array>
 \t<key>RunAtLoad</key>
 \t<true/>
@@ -283,21 +272,40 @@ WantedBy=default.target
 `
 }
 
+function xmlUnescape(s: string): string {
+  return s.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&')
+}
+
+function systemdUnquote(s: string): string {
+  return s.replaceAll('%%', '%').replaceAll('\\"', '"').replaceAll('\\\\', '\\')
+}
+
 // Pull the exec path back out of a unit file this module wrote, to detect a
 // captured bin that has gone stale (moved/uninstalled) in `moi service` status.
-// darwin: the moi bin is the LAST ProgramArguments string (it rides as $0 of
-// the sh preflight); linux: the quoted ExecStart word.
+// darwin: the first ProgramArguments string; linux: the quoted ExecStart word.
 export function parseUnitBin(content: string, platform: ServicePlatform): string | null {
   if (platform === 'darwin') {
-    const block = content.match(/<key>ProgramArguments<\/key>\s*<array>([\s\S]*?)<\/array>/)
-    if (!block) return null
-    const strings = [...block[1].matchAll(/<string>([^<]*)<\/string>/g)].map(m => m[1])
-    const last = strings.at(-1)
-    if (last === undefined) return null
-    return last.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&')
+    const m = content.match(/<key>ProgramArguments<\/key>\s*<array>\s*<string>([^<]*)<\/string>/)
+    return m ? xmlUnescape(m[1]) : null
   }
   const m = content.match(/^ExecStart="(.*)" start$/m)
-  return m ? m[1].replaceAll('%%', '%').replaceAll('\\"', '"').replaceAll('\\\\', '\\') : null
+  return m ? systemdUnquote(m[1]) : null
+}
+
+// The PATH the unit will hand the server, read back out of the unit file —
+// so status can tell when no `bun` remains anywhere on it (the moi bin's
+// `#!/usr/bin/env bun` then dies at exec, before any moi code runs).
+export function parseUnitSearchPath(content: string, platform: ServicePlatform): string | null {
+  if (platform === 'darwin') {
+    const m = content.match(/<key>PATH<\/key>\s*<string>([^<]*)<\/string>/)
+    return m ? xmlUnescape(m[1]) : null
+  }
+  const m = content.match(/^Environment="PATH=(.*)"$/m)
+  return m ? systemdUnquote(m[1]) : null
+}
+
+export function bunOnSearchPath(searchPath: string): boolean {
+  return searchPath.split(':').some(dir => dir && existsSync(join(dir, 'bun')))
 }
 
 // ---- process helpers --------------------------------------------------------
@@ -600,7 +608,7 @@ export async function installService(
         )
       }
     })
-    notes.push('macOS may report a new login item named "bun" or "moi" — that is this service.')
+    notes.push('macOS may report a new login item named "moi" — that is this service.')
     const info = await waitForServerInfo(12_000, before?.pid)
     return { unitPath, logPath: spec.logPath, info, notes }
   }
@@ -708,9 +716,12 @@ export type ServiceStatus = {
   logPath: string | null
   runtime: ServiceRuntime | null
   // The bin the unit execs, and whether it still exists (a moved/reinstalled
-  // bun or moi leaves a stale unit behind).
+  // moi leaves a stale unit behind).
   bin: string | null
   binMissing: boolean
+  // No `bun` anywhere on the unit's captured PATH — the bin's shebang dies at
+  // exec, so the service respawn-throttles without ever running moi code.
+  bunMissing: boolean
   linger: LingerState | null
 }
 
@@ -720,10 +731,14 @@ export async function serviceStatus(): Promise<ServiceStatus> {
   const installed = existsSync(unitPath)
   let bin: string | null = null
   let binMissing = false
+  let bunMissing = false
   if (installed) {
     try {
-      bin = parseUnitBin(await readFile(unitPath, 'utf8'), platform)
+      const content = await readFile(unitPath, 'utf8')
+      bin = parseUnitBin(content, platform)
       binMissing = bin !== null && !existsSync(bin)
+      const searchPath = parseUnitSearchPath(content, platform)
+      bunMissing = searchPath !== null && !bunOnSearchPath(searchPath)
     } catch {}
   }
   return {
@@ -734,6 +749,7 @@ export async function serviceStatus(): Promise<ServiceStatus> {
     runtime: installed ? await serviceRuntime(platform) : null,
     bin,
     binMissing,
+    bunMissing,
     linger: platform === 'linux' ? await lingerState() : null
   }
 }

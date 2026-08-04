@@ -95,14 +95,13 @@ moi service uninstall
 
 The service captures a small, fixed slice of your shell environment at
 install time: `PATH`, system basics (home, locale, proxies), and moi/agent
-vars (`MOI_*`, `ANTHROPIC_*`, `CLAUDE_*`, `OPENCLAW_*`, `OPENAI_*`,
-`PUBLIC_*`). Anything else your agents need belongs in the workspace env
-(`moi env set`, `.env`) — or capture it by name:
-`moi service install --env MY_TOKEN,OTHER`. Rerun `moi service install`
-after changing captured vars (or moving bun). On macOS the first install may
-show a "background item added" notification for "bun"; that is the moi
-service. On headless Linux, lingering is enabled automatically when possible
-so the service outlives your SSH session.
+vars (`MOI_*`, `ANTHROPIC_*`, `OPENCLAW_*`, `OPENAI_*`, `PUBLIC_*`).
+Anything else your agents need belongs in the workspace env (`moi env set`,
+`.env`) — or capture it by name: `moi service install --env MY_TOKEN,OTHER`.
+Rerun `moi service install` after changing captured vars (or moving bun). On
+macOS the first install may show a "background item added" notification for
+"moi"; that is the moi service. On headless Linux, lingering is enabled
+automatically when possible so the service outlives your SSH session.
 
 ## Updating
 
