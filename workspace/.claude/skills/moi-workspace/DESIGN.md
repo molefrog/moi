@@ -59,15 +59,18 @@ Views are separate pages. Their semantic tokens inherit the workspace theme, so
 | Control state | `bg-accent text-accent-foreground` | Hover, active, and selected states on interactive controls |
 | Positive or active state | `text-success` / `bg-success/10` | Positive outcomes, healthy states, presence, and progress indicators |
 | Error or danger | `text-destructive` / `bg-destructive/10` | Errors, destructive actions, and invalid states |
-| Structure | `ring-border`, `border-input`, `ring-ring` | Container edges, controls, and visible focus on semantic surfaces |
+| Object edge | `ring-1 ring-border` | Complete outlines around containers and controls |
+| Focus | `focus-visible:ring-2 focus-visible:ring-ring` | Visible keyboard focus on interactive elements |
+| Separator | `border-b border-border` | A one-sided division between adjacent regions |
 
 Use lower opacity from the surface's foreground only for tertiary metadata that remains readable.
 Avoid weak alpha text for important labels or values. Keep inset surfaces rare so a widget does not
 become a stack of cards.
 
-Keep container edges subtle. Use `ring-1 ring-border` on semantic surfaces and an equally restrained
-outline suited to a custom light or colored surface. Avoid a bare `border` or raw high-contrast
-colors as custom container chrome.
+Prefer a subtle ring for the complete outline of a container or control. Use `ring-1 ring-border` on
+semantic surfaces and an equally restrained ring color on custom light or colored surfaces. Reserve
+one-sided borders such as `border-b` for separators between adjacent regions. Never use a border
+and a ring on the same element. Avoid raw high-contrast colors for either treatment.
 
 Derive extra neutral or tonal colors from semantic tokens with `color-mix()`. Use Tailwind palette
 colors when they have clear content meaning, such as blue for clear-sky weather, or when an
@@ -276,7 +279,7 @@ Before finishing an applet, confirm:
 - Purple appears only for a content, brand, or user reason and never as a default gradient.
 - Type, spacing, density, and expression support the content.
 - Numeric UI values use the default font, with `tabular-nums` when alignment helps.
-- Custom container outlines suit their surface and stay subtle.
+- Complete object outlines use rings, borders act as one-sided separators, and no element uses both.
 - The layout handles realistic content and deliberate overflow.
 - Every control is necessary, complete, and accessible.
 - The widget or view follows its frame, sizing, and scrolling rules.

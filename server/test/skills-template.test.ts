@@ -42,6 +42,11 @@ describe('installBundledSkills', () => {
     expect(design).toMatch(/tint the opaque background by mixing `--background` with `--success`/)
     expect(design).toMatch(/infographic needs multiple colors to distinguish categories or series/)
     expect(design).toMatch(/Do not use palette colors for generic decoration/)
+    expect(design).toContain('| Object edge | `ring-1 ring-border` |')
+    expect(design).toContain('| Separator | `border-b border-border` |')
+    expect(design).toMatch(/Reserve\s+one-sided borders such as `border-b` for separators/)
+    expect(design).toMatch(/Never use a border\s+and a ring on the same element/)
+    expect(design).not.toContain('`border-input`')
     expect(design).toContain('`texture-checker`')
     expect(design).toContain('`texture-grid`')
     expect(design).toContain('`texture-noise`')
@@ -49,13 +54,10 @@ describe('installBundledSkills', () => {
     expect(design).toContain('`texture-inset-shadow`')
     expect(design).not.toContain('`surface-')
     expect(design).toMatch(/without setting `background-color`/)
-    expect(design).toContain('`bg-muted texture-checker`')
+    expect(design).toContain('`bg-background texture-checker`')
     expect(design).toContain('`bg-card texture-noise`')
     expect(design).toMatch(
       /Textures create depth between a background and the objects placed on it/
-    )
-    expect(design).toMatch(
-      /Keep text-only regions and small standalone labels\s+on a solid surface/
     )
     expect(design).toMatch(
       /Use at most one texture per widget or view and apply it to one component/
