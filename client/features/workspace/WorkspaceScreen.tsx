@@ -540,10 +540,11 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       Icon: IconBrowserPlus,
       label: 'New view',
       onClick: () => {
-        void builderActions.create().then(builder => {
-          selectSession(builder.sessionId)
-          openTab(viewBuilderTabId(builder.id))
-        })
+        // Do NOT select the draft's pre-minted sessionId here: no session
+        // exists behind it until submit, so making it the chat selection turns
+        // the chat into a dead "New chat" whose sends try to resume a session
+        // that isn't there. Submit selects it once the chat actually starts.
+        void builderActions.create().then(builder => openTab(viewBuilderTabId(builder.id)))
       }
     }
   ]

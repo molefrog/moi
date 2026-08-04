@@ -1,6 +1,11 @@
 // Session discovery + history replay for Claude Code workspaces, backed by
 // the Agent SDK's persisted `.jsonl` session files.
-import { getSessionMessages, listSessions, tagSession } from '@anthropic-ai/claude-agent-sdk'
+import {
+  getSessionInfo,
+  getSessionMessages,
+  listSessions,
+  tagSession
+} from '@anthropic-ai/claude-agent-sdk'
 import type { SDKSessionInfo } from '@anthropic-ai/claude-agent-sdk'
 
 import {
@@ -88,6 +93,29 @@ export async function getSessionWorkspacePreview(
   return {
     ...(firstUserMessage ? { firstUserMessage } : {}),
     ...(updatedAt !== undefined ? { updatedAt } : {})
+  }
+}
+
+// Whether the session's file exists on disk in this workspace's project dir —
+// i.e. whether `resume` can possibly succeed. Reads only that session's file
+// (unlike listSessions). Fails open — a probe that can't answer reliably
+// counts as existing, so the resume is still attempted instead of silently
+// forking a new chat:
+// - a transient fs error, and
+// - a workspace env that redirects CLAUDE_CONFIG_DIR: the CLI subprocess gets
+//   workspaceEnv on top of process.env, so its session store is somewhere
+//   this process (and the SDK's ambient-env resolution) can't see.
+export async function claudeSessionExists(
+  sessionId: string,
+  workspacePath: string,
+  workspaceEnv: Record<string, string> = {}
+): Promise<boolean> {
+  const override = workspaceEnv.CLAUDE_CONFIG_DIR
+  if (override && override !== process.env.CLAUDE_CONFIG_DIR) return true
+  try {
+    return (await getSessionInfo(sessionId, { dir: workspacePath })) !== undefined
+  } catch {
+    return true
   }
 }
 
