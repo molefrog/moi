@@ -161,6 +161,27 @@ describe('filterSystemText — real text passes through', () => {
     const text = 'why does the transcript contain <command-name> tags?'
     expect(filterSystemText(text).text).toBe(text)
   })
+
+  test('starting with a bare command tag is not a match', () => {
+    const text = '<command-name> -> transform this tag'
+    expect(filterSystemText(text).text).toBe(text)
+    expect(filterSystemText(text).matched).toEqual([])
+  })
+
+  test('a pasted command record followed by a question is not a match', () => {
+    const text = `${COMMAND_RECORD}\nwhat does this mean?`
+    expect(filterSystemText(text).text).toBe(text)
+  })
+
+  test('unterminated tag fragments are not a match', () => {
+    for (const text of [
+      '<local-command-stdout>partial output',
+      '<bash-input>ls',
+      '<user-memory-input>always use bun'
+    ]) {
+      expect(filterSystemText(text).text).toBe(text)
+    }
+  })
 })
 
 describe('classifySystemMessage', () => {
