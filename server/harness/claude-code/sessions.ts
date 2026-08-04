@@ -98,12 +98,20 @@ export async function getSessionWorkspacePreview(
 
 // Whether the session's file exists on disk in this workspace's project dir —
 // i.e. whether `resume` can possibly succeed. Reads only that session's file
-// (unlike listSessions). A probe failure counts as existing, so a transient
-// fs error still attempts the resume instead of silently forking a new chat.
+// (unlike listSessions). Fails open — a probe that can't answer reliably
+// counts as existing, so the resume is still attempted instead of silently
+// forking a new chat:
+// - a transient fs error, and
+// - a workspace env that redirects CLAUDE_CONFIG_DIR: the CLI subprocess gets
+//   workspaceEnv on top of process.env, so its session store is somewhere
+//   this process (and the SDK's ambient-env resolution) can't see.
 export async function claudeSessionExists(
   sessionId: string,
-  workspacePath: string
+  workspacePath: string,
+  workspaceEnv: Record<string, string> = {}
 ): Promise<boolean> {
+  const override = workspaceEnv.CLAUDE_CONFIG_DIR
+  if (override && override !== process.env.CLAUDE_CONFIG_DIR) return true
   try {
     return (await getSessionInfo(sessionId, { dir: workspacePath })) !== undefined
   } catch {

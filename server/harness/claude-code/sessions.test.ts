@@ -107,6 +107,24 @@ describe('claudeSessionExists', () => {
       false
     )
   })
+
+  test('fails open when the workspace env redirects CLAUDE_CONFIG_DIR', async () => {
+    // The CLI subprocess would read a store this process can't see — the
+    // probe must not declare the session missing.
+    expect(
+      await claudeSessionExists('bb0dd21d-53bf-4910-b308-bcf3d2c67009', workspacePath, {
+        CLAUDE_CONFIG_DIR: join(scratchDir, 'elsewhere')
+      })
+    ).toBe(true)
+  })
+
+  test('probes normally when the workspace env matches the ambient config dir', async () => {
+    expect(
+      await claudeSessionExists('bb0dd21d-53bf-4910-b308-bcf3d2c67009', workspacePath, {
+        CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR!
+      })
+    ).toBe(false)
+  })
 })
 
 describe('visibleClaudeSessions', () => {

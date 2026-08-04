@@ -753,13 +753,18 @@ export async function sendCCMessage(input: {
     }
   }
   if (!s) {
+    // The agent only sees secrets scoped to the 'agent' sink (plus .env).
+    // Resolved before the probe below so both see the same env.
+    const workspaceEnv = await resolveWorkspaceEnv(input.workspacePath)
     // Resuming a session with no file on disk hard-fails the CLI with "No
     // conversation found" — and a dangling id can be selected forever (a
     // brand-new chat whose first turn died before init persisted anything,
     // or session files cleaned up externally), wedging the chat. Start fresh
     // instead: the init rename then migrates this id to the real one
     // everywhere (selected session, session config, view builders, client).
-    const isNew = input.isNew || !(await claudeSessionExists(input.sessionId, input.workspacePath))
+    const isNew =
+      input.isNew ||
+      !(await claudeSessionExists(input.sessionId, input.workspacePath, workspaceEnv))
     if (isNew !== input.isNew) {
       debug(`cc resume-missing ws=${input.workspaceId} session=${input.sessionId} — starting fresh`)
     }
@@ -778,8 +783,7 @@ export async function sendCCMessage(input: {
             uploads.map(upload => upload.filename)
           )
         : undefined,
-      // The agent only sees secrets scoped to the 'agent' sink (plus .env).
-      workspaceEnv: await resolveWorkspaceEnv(input.workspacePath)
+      workspaceEnv
     })
   }
   // Streaming-input mode does NOT echo the pushed user message back in the
