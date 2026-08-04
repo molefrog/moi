@@ -73,6 +73,17 @@ bun i -g moi-computer
 moi start        # http://localhost:13337
 ```
 
+The repository also contains a no-Bun standalone CLI and desktop app for macOS
+and Linux. Use them once the
+[latest release](https://github.com/molefrog/moi/releases/latest) lists
+`moi-standalone-*` assets; see [docs/standalone.md](docs/standalone.md). The
+installer fails without changing the machine when a platform build or checksum
+is absent:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/molefrog/moi/main/packaging/install.sh | sh
+```
+
 Then bring in your project, either way works:
 
 - open [http://localhost:13337](http://localhost:13337) and create a workspace
@@ -110,11 +121,13 @@ moi update            # update to the latest release
 moi update --check    # only check; exit 0 up to date, 1 update available, 2 check failed
 ```
 
-`moi update` checks npm for the latest release and updates through whichever
-package manager owns the install (bun, npm, pnpm, or yarn). A service-managed
-server is restarted onto the new version; a foreground `moi start` only gets
-a warning — restart it yourself. Prerelease installs (`…-next.N`) are left
-alone. `--check` changes nothing and is made for scripts and agents.
+For package-manager installs, `moi update` checks npm for the latest release and
+updates through whichever package manager owns the install (bun, npm, pnpm, or
+yarn). Standalone installs use the matching GitHub release asset and checksum.
+A service-managed server is restarted onto the new version; a foreground
+`moi start` only gets a warning — restart it yourself. Prerelease installs
+(`…-next.N`) are left alone. `--check` changes nothing and is made for scripts
+and agents.
 `moi status` shows when the running server and CLI versions differ, however
 the update happened.
 
