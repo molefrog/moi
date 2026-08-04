@@ -97,7 +97,9 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
     stdin: 'pipe',
     stdout: 'pipe',
     stderr: 'pipe',
-    env: { ...process.env, ...workspaceEnv }
+    // MOI_AGENT marks the agent's shells as agent-driven for the moi CLI
+    // (see agent-caller.ts).
+    env: { ...process.env, ...workspaceEnv, MOI_AGENT: '1' }
   })
 
   let alive = true

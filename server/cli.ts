@@ -7,6 +7,8 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'path'
 import pc from './cli-pc'
 
+import { isAgentCaller } from './agent-caller'
+
 import { COLOR_THEMES, FONT_THEMES, deriveThemeColors } from '@/lib/themes'
 import type { ColorTheme, FontTheme } from '@/lib/themes'
 import { isParamsRecord } from '@/lib/workspace-tabs'
@@ -2643,9 +2645,10 @@ async function commandDescription(cmd: HelpCommand): Promise<string> {
   return (meta as { description?: string })?.description ?? ''
 }
 
-// Two-section root help (replaces citty's flat list). The system section
-// carries an explicit note for agents: those commands change moi itself
-// (server lifecycle, service, updates) and are not theirs to run unprompted.
+// Two-section root help (replaces citty's flat list). For a human, the
+// system section carries an explicit note that agents should leave those
+// commands alone; for a detected agent caller, the section is omitted
+// entirely — an agent's `moi --help` shows only the workspace toolkit.
 async function printMainHelp() {
   const pad =
     Math.max(...Object.keys({ ...workspaceCommands, ...systemCommands }).map(n => n.length)) + 4
@@ -2662,11 +2665,15 @@ async function printMainHelp() {
   console.log()
   for (const [name, cmd] of Object.entries(workspaceCommands)) console.log(await row(name, cmd))
   console.log()
-  console.log(pc.bold('System commands:') + pc.dim(' manage moi itself (server, service, updates)'))
-  console.log(pc.yellow('  AGENTS: do not run these unless explicitly asked!'))
-  console.log()
-  for (const [name, cmd] of Object.entries(systemCommands)) console.log(await row(name, cmd))
-  console.log()
+  if (!isAgentCaller()) {
+    console.log(
+      pc.bold('System commands:') + pc.dim(' manage moi itself (server, service, updates)')
+    )
+    console.log(pc.yellow('  AGENTS: do not run these unless explicitly asked!'))
+    console.log()
+    for (const [name, cmd] of Object.entries(systemCommands)) console.log(await row(name, cmd))
+    console.log()
+  }
   console.log(pc.dim('Use moi <command> --help for more information about a command.'))
   console.log()
 }
