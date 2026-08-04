@@ -47,6 +47,11 @@ describe('installBundledSkills', () => {
     expect(design).toMatch(/Reserve\s+one-sided borders such as `border-b` for separators/)
     expect(design).toMatch(/Never use a border\s+and a ring on the same element/)
     expect(design).not.toContain('`border-input`')
+    expect(design).toMatch(/Use an open layout by default/)
+    expect(design).toMatch(/Add a wrapper with its own fill, ring, radius, or shadow only when it/)
+    expect(design).toMatch(/Page headers, tab rows, empty states, summaries, metrics/)
+    expect(design).toMatch(/Keep related content in one surface/)
+    expect(design).toMatch(/Avoid adjacent or nested cards/)
     expect(design).toContain('`texture-checker`')
     expect(design).toContain('`texture-grid`')
     expect(design).toContain('`texture-noise`')
@@ -54,27 +59,21 @@ describe('installBundledSkills', () => {
     expect(design).toContain('`texture-inset-shadow`')
     expect(design).not.toContain('`surface-')
     expect(design).toMatch(/without setting `background-color`/)
-    expect(design).toContain('`bg-background texture-checker`')
-    expect(design).toContain('`bg-background texture-noise`')
-    expect(design).toMatch(/Textures are background treatments/)
-    expect(design).toMatch(/apply it to the applet root by default/)
-    expect(design).toMatch(/Place the main content in opaque semantic blocks above\s+it/)
-    expect(design).toMatch(
-      /Skip texture when the layout has no meaningful solid block above the root/
-    )
-    expect(design).toMatch(
-      /Use at most one texture per widget or view and apply it to one component/
-    )
-    expect(design).toMatch(/An internal textured\s+component is a rare exception/)
-    expect(design).toMatch(
-      /Do not apply texture directly to a main card, panel, control, or text region/
-    )
+    expect(design).toContain('`h-full w-full bg-background texture-checker`')
+    expect(design).toMatch(/Apply at most one texture, usually to the applet root/)
+    expect(design).toMatch(/place one solid semantic\s+work surface above the texture/)
+    expect(design).toMatch(/Skip texture if the\s+layout would need several solid wrappers/)
+    expect(design).not.toMatch(/Place the main content in opaque semantic blocks/)
+    expect(design).toMatch(/An internal textured component is a rare exception/)
+    expect(design).toMatch(/Do not apply texture to a card, panel, control, or text region/)
     expect(design).toMatch(/Give unrelated applets different textures/)
     expect(design).toMatch(/represents a view shares that\s+view's texture/)
     expect(design).toMatch(/Custom gradients mix semantic tokens by default/)
     expect(design).not.toContain('Prefer an intentional solid color for most widgets')
     expect(design).not.toContain('### Color starting points')
     expect(design).toMatch(/Views are separate pages\.\s+Their semantic tokens inherit/)
+    expect(design).toMatch(/do a removal pass from top to bottom/)
+    expect(design).toMatch(/Review every visible element and\s+wrapper/)
     expect(design).toMatch(
       /Keep\s+interaction feedback on the control that performs\s+the action\./
     )

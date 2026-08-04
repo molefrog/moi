@@ -52,7 +52,7 @@ Views are separate pages. Their semantic tokens inherit the workspace theme, so
 | Default view root | `bg-background text-foreground` | The workspace page surface and text |
 | Primary content | `text-foreground` | Content on the default dark widget surface or normal view surface |
 | Secondary content | `text-muted-foreground` | Supporting content on the default dark widget surface or normal view surface |
-| Inset surface | `bg-card text-card-foreground` | A real contained object or raised region inside the applet |
+| Inset surface | `bg-card text-card-foreground` | A functionally distinct contained region, used sparingly |
 | Floating surface | `bg-popover text-popover-foreground` | Menus, tooltips, and other floating content |
 | Primary action | `bg-primary text-primary-foreground` | The most important action in a local region |
 | Subdued surface | `bg-muted` | Skeletons, quiet fills, and disabled structure |
@@ -64,8 +64,7 @@ Views are separate pages. Their semantic tokens inherit the workspace theme, so
 | Separator | `border-b border-border` | A one-sided division between adjacent regions |
 
 Use lower opacity from the surface's foreground only for tertiary metadata that remains readable.
-Avoid weak alpha text for important labels or values. Keep inset surfaces rare so a widget does not
-become a stack of cards.
+Avoid weak alpha text for important labels or values.
 
 Prefer a subtle ring for the complete outline of a container or control. Use `ring-1 ring-border` on
 semantic surfaces and an equally restrained ring color on custom light or colored surfaces. Reserve
@@ -79,11 +78,24 @@ also a clear reason. Keep each mapping consistent and explain it with labels, le
 direct values. Do not use palette colors for generic decoration or unrelated widget backgrounds.
 On a saturated surface, choose an explicit light or dark foreground with strong contrast.
 
+### Surfaces and grouping
+
+Use an open layout by default. Group content with spacing, alignment, type hierarchy, and, when
+needed, a one-sided separator. Add a wrapper with its own fill, ring, radius, or shadow only when it
+marks an interactive object, an independently scrolling region, a distinct state, or the main work
+surface above a texture. Page headers, tab rows, empty states, summaries, metrics, and ordinary
+sections stay unboxed. Standard controls keep their normal component surfaces.
+
+Keep related content in one surface. Avoid adjacent or nested cards and wrappers that only repeat
+the page structure. Remove a container when it does not clarify interaction, state, scrolling, or
+content ownership.
+
 ### Textures
 
-Textures are background treatments. When using one, apply it to the applet root by default, such as
-`h-full w-full bg-background texture-checker`. Place the main content in opaque semantic blocks above
-it, so the blocks stand out and their text stays easy to read. Skip texture when there's no need for a solid block above the root.
+Apply at most one texture, usually to the applet root. Pair it with an opaque semantic base, such as
+`h-full w-full bg-background texture-checker`. If content needs contrast, place one solid semantic
+work surface above the texture and keep related content together inside it. Skip texture if the
+layout would need several solid wrappers to stay readable.
 
 | Texture | Tailwind class | Character |
 | --- | --- | --- |
@@ -93,13 +105,9 @@ it, so the blocks stand out and their text stays easy to read. Skip texture when
 | Linear gradient | `texture-gradient-linear` | A restrained top-to-bottom wash derived from `primary` |
 | Inset shadow | `texture-inset-shadow` | A soft edge glow derived from `primary` |
 
-Textures add an effect without setting `background-color`. Pair the texture and an opaque semantic
-base on the same element, such as `bg-background texture-checker` or
-`bg-background texture-noise`. The base color remains visible through every texture.
-
-Use at most one texture per widget or view and apply it to one component. An internal textured
-component is a rare exception: it must act as a background layer containing solid child objects.
-Do not apply texture directly to a main card, panel, control, or text region. Do not stack textures
+Textures add an effect without setting `background-color`; the base color remains visible through
+them. An internal textured component is a rare exception and must act as a background behind solid
+child objects. Do not apply texture to a card, panel, control, or text region. Do not stack textures
 or add tuning variables.
 
 Check nearby widgets and views before choosing one. Give unrelated applets different textures so
@@ -265,9 +273,8 @@ stretching a widget-like card to fill the page.
 
 ## Final review
 
-After implementation, do a removal pass from top to bottom. For every label, badge, icon, helper
-sentence, container, divider, and decoration, ask which user decision, action, or understanding it
-improves. Remove it when the screen stays equally clear and usable without it.
+After implementation, do a removal pass from top to bottom. Review every visible element and
+wrapper, and remove anything that does not improve understanding, interaction, state, or hierarchy.
 
 Before finishing an applet, confirm:
 
@@ -275,8 +282,6 @@ Before finishing an applet, confirm:
 - Its purpose and first reading are clear at the intended size.
 - Semantic colors handle structure, and widget roots use the default semantic surface.
 - Palette colors communicate content, distinguish infographic data, or follow a user request.
-- Any texture sits on the applet background with solid semantic content blocks above it; an internal
-  exception still acts as a background behind solid child objects.
 - Custom gradients mix semantic tokens unless content meaning or a user request calls for a palette.
 - Purple appears only for a content, brand, or user reason and never as a default gradient.
 - Type, spacing, density, and expression support the content.
