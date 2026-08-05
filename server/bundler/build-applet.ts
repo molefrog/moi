@@ -8,7 +8,6 @@ import tailwind from 'bun-plugin-tailwind'
 import { realpathSync } from 'node:fs'
 import { basename, dirname, join, relative, sep } from 'path'
 
-import { APP_ICON_IDS, isAppIconId } from '@/lib/app-icons'
 import type { AppletKind, ViewConfig, WidgetConfig } from '@/lib/types'
 
 import { scopeAppletCss } from './applet-css'
@@ -162,19 +161,9 @@ export async function extractViewConfig(srcPath: string): Promise<ViewConfig | n
     if (prop.type !== 'Property' || prop.key?.type !== 'Identifier') continue
     const key = prop.key.name as string
 
-    if (key === 'title') {
+    if (key === 'title' || key === 'icon') {
       if (prop.value?.type === 'Literal' && typeof prop.value.value === 'string') {
-        result.title = prop.value.value
-      }
-      continue
-    }
-    if (key === 'icon') {
-      if (prop.value?.type === 'Literal' && typeof prop.value.value === 'string') {
-        const icon = prop.value.value
-        if (!isAppIconId(icon)) {
-          throw new Error(`Unknown view icon id "${icon}". Use one of: ${APP_ICON_IDS.join(', ')}`)
-        }
-        result.icon = icon
+        result[key] = prop.value.value
       }
       continue
     }
@@ -242,48 +231,17 @@ export function rpc(module, name) {
 }
 `
 
-// The `moi` virtual module — the applet-facing runtime API.
-//
-// `fileUrl(path)` maps a workspace-relative path to its streaming URL
+// The `moi` virtual module — the applet-facing runtime API. Today just
+// `fileUrl(path)`, which maps a workspace-relative path to its streaming URL
 // (`/api/workspaces/<id>/fs/<path>`). Same sentinel base as RPC; the path is
 // per-segment URL-encoded so spaces / unicode in filenames survive. A leading
 // slash is stripped so both `clips/a.mp4` and `/clips/a.mp4` work.
-//
-// `focusTab(tab, params?)` and `sendChatMessage(message, context?)` forward to
-// this bundle's host-attached bridge — client-local replace-navigation to a
-// workspace tab (params delivered to the target view via navigation state),
-// and a chat message sent to the workspace's active chat as if the user had
-// typed it. This virtual module is INLINED PER BUNDLE,
-// so `bridge` is private to one applet: the host attaches it right after the
-// dynamic import and neuters it on invalidation (see
-// client/features/applets/applet-runtime.ts). Optional-chained so calls no-op
-// before attach and outside the moi host. The `__` exports are host wiring,
-// surfaced from the bundle entry below — they are deliberately NOT part of the
-// author-facing `declare module 'moi'` ambient types (server/moi-scaffold.ts).
 const MOI_MODULE_SOURCE = `
 const BASE = ${JSON.stringify(APPLET_API_BASE_SENTINEL)};
-
-let bridge = null;
-
-export function __attachBridge(next) {
-  bridge = next;
-}
-
-export function __getBridge() {
-  return bridge;
-}
 
 export function fileUrl(path) {
   const clean = String(path).replace(/^\\/+/, "");
   return BASE + "/fs/" + clean.split("/").map(encodeURIComponent).join("/");
-}
-
-export function focusTab(tab, params) {
-  bridge?.focusTab(tab, params);
-}
-
-export function sendChatMessage(message, context) {
-  bridge?.sendChatMessage(message, context);
 }
 `
 
@@ -453,28 +411,9 @@ async function writeSyntheticTailwindCss(
   // (`@source .moi/views`) build concurrently in one `moi bundle`; a shared
   // file would race and point Tailwind at the wrong source dir.
   const cssPath = join(buildDir, `${kind}-tailwind.css`)
-  // EXPERIMENT: mirror the host's Tailwind extensions (client/index.css) in the
-  // applet build — tw-animate-css utilities and shadcn's data-* variants /
-  // keyframes / scroll utilities. Text-inlined from moi's own node_modules
-  // (same approach as HOST_THEME_PATH) so the workspace needs no extra deps.
-  const repoRoot = join(import.meta.dir, '..', '..')
-  const shadcnTailwind = await Bun.file(
-    join(repoRoot, 'node_modules', 'shadcn', 'dist', 'tailwind.css')
-  ).text()
-  const twAnimate = await Bun.file(
-    join(repoRoot, 'node_modules', 'tw-animate-css', 'dist', 'tw-animate.css')
-  ).text()
   const contents = [
     `@import 'tailwindcss';`,
-    twAnimate,
-    shadcnTailwind,
     await Bun.file(HOST_THEME_PATH).text(),
-    // EXPERIMENT: tokens base-nova components use but theme.css lacks. The
-    // alias makes Tailwind emit the utilities; the raw values belong in the
-    // host's index.css `:root`/`.dark` (demo values here — scoping rewrites
-    // `:root` onto the applet container).
-    `@theme inline { --color-secondary: var(--secondary); --color-secondary-foreground: var(--secondary-foreground); }`,
-    `:root { --secondary: oklch(0.269 0 0); --secondary-foreground: oklch(0.985 0 0); }`,
     // Mirror the host's class-based dark mode (client/index.css) so an applet's
     // `dark:` variants flip with the app theme. Without this Tailwind falls
     // back to `@media (prefers-color-scheme: dark)`, which diverges from the
@@ -498,13 +437,7 @@ function widgetEntryPlugin(widgetPath: string, syntheticCssPath: string): BunPlu
       build.onLoad({ filter: /.*/, namespace: 'widget-entry' }, () => ({
         contents: [
           `import ${JSON.stringify(syntheticCssPath)};`,
-          `export { default } from ${JSON.stringify(widgetPath)};`,
-          // Surface the bridge wiring on every bundle's `index.js` so the host
-          // can attach after dynamic import. Bun dedupes the `moi` virtual
-          // module within a bundle, so this re-export and the applet's own
-          // `import { focusTab } from 'moi'` share one module instance — the
-          // attached bridge is the one focusTab reads.
-          `export { __attachBridge, __getBridge } from "moi";`
+          `export { default } from ${JSON.stringify(widgetPath)};`
         ].join('\n'),
         loader: 'js'
       }))
@@ -555,28 +488,18 @@ export function scanServerImports(source: string): string[] {
   return specifiers
 }
 
-// Every relative import specifier in an applet source — modules (`./_utils`,
-// `../lib/data`), assets (`./logo.png`), `.server` stubs, JSON, CSS alike, in
-// static, re-export, side-effect, and dynamic form. Lexed by Bun's own
-// transpiler, so comments and string literals can't false-positive. Type-only
-// imports are erased by the lexer — correct here, since they never affect the
-// emitted bundle. Bare specifiers (node_modules) are filtered out: the
-// staleness check doesn't walk them. A file that fails to lex contributes no
-// imports — the build itself surfaces the syntax error. Used by the rebuild
-// staleness check to walk the applet's local import graph, so editing anything
-// it (transitively) pulls in marks every applet using it stale.
-const IMPORT_SCANNERS = {
-  ts: new Bun.Transpiler({ loader: 'ts' }),
-  tsx: new Bun.Transpiler({ loader: 'tsx' })
-}
-export function scanRelativeImports(source: string, loader: 'ts' | 'tsx' = 'tsx'): string[] {
-  let imports: { path: string }[]
-  try {
-    imports = IMPORT_SCANNERS[loader].scanImports(source)
-  } catch {
-    return []
+// Relative asset import specifiers in an applet source (`./logo.png`,
+// `../shared/icon.svg`). Used by the rebuild staleness check so editing an
+// imported image rebuilds the bundle even when the `.tsx` itself is untouched.
+const ASSET_IMPORT_RE =
+  /from\s+['"](\.\.?\/[^'"]+?\.(?:png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf))['"]/gi
+export function scanAssetImports(source: string): string[] {
+  const specifiers: string[] = []
+  let match
+  while ((match = ASSET_IMPORT_RE.exec(source)) !== null) {
+    specifiers.push(match[1])
   }
-  return imports.map(i => i.path).filter(p => /^\.\.?\//.test(p))
+  return specifiers
 }
 
 async function prevalidateServerFiles(entrypoint: string): Promise<void> {
