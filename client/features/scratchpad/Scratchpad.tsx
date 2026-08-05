@@ -107,9 +107,7 @@ function makeAssetStore(workspaceId: string): TLAssetStore {
 // from the panel, leaving just the zoom menu. Kept on defaults: NavigationPanel
 // (zoom), ContextMenu, KeyboardShortcutsDialog.
 function ScratchBackground() {
-  return (
-    <div className="absolute inset-0 bg-[color-mix(in_oklch,var(--muted),var(--background)_50%)]" />
-  )
+  return <div className="absolute inset-0 bg-background" />
 }
 
 function UniformGrid({ x, y, z, size }: TLGridProps) {
