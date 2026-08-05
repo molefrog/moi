@@ -19,6 +19,7 @@ import {
   ensureOpenClawSessionLive,
   getLiveOpenClawEvents,
   getOpenClawActiveSessions,
+  killAllOpenClawSessions,
   sendOpenClawMessage
 } from './session'
 
@@ -98,6 +99,10 @@ export const openclawHarness: Harness = {
       )
   },
 
+  // Server shutdown: tear down every live session (unsubscribe + stop ingest).
+  // The shared gateway client is left running — process exit drops it. Invoked
+  // from web.ts's SIGTERM/SIGINT handler via allHarnesses().shutdown().
+  shutdown: () => killAllOpenClawSessions(),
   skillsDir: workspaceRoot => `${workspaceRoot}/skills`,
 
   // One process-global gateway connection → one shared wire-tap scope.

@@ -47,12 +47,86 @@ type GatewayInstance = InstanceType<ClientCtor>
 const CONNECT_TIMEOUT_MS = 5_000
 const REQUEST_TIMEOUT_MS = 30_000
 
+// Capabilities moi advertises to the gateway on connect. OpenClaw registers a
+// connection as a live tool-event recipient only when it advertises the
+// `tool-events` capability; the SDK sends `caps: []` by default, so without
+// this the `session.tool` frames that drive our live tool cards
+// (session.ts `handleToolFrame`) never reach our socket. BOTH the persistent
+// streaming client and the one-shot discovery client must advertise it.
+export const OPENCLAW_CLIENT_CAPS = ['tool-events'] as const
+
+// The connect options shared by the persistent streaming client and the
+// one-shot discovery client: identity (role/scopes), the advertised caps, and
+// the pinned wire-protocol window. moi speaks protocol 4 (compat.ts); the SDK
+// already defaults minProtocol/maxProtocol to 4, so pinning them is
+// self-documenting rather than a behavior change. Each caller layers its own
+// timeouts and event callbacks on top. Exported as a pure builder so the caps
+// contract is unit-testable without opening a socket.
+export function gatewayClientBaseOptions(
+  url: string,
+  token: string
+): Pick<
+  ConstructorParameters<ClientCtor>[0],
+  'url' | 'token' | 'role' | 'scopes' | 'caps' | 'minProtocol' | 'maxProtocol'
+> {
+  return {
+    url,
+    token,
+    role: 'operator',
+    scopes: ['operator.admin', 'operator.read', 'operator.write'],
+    caps: [...OPENCLAW_CLIENT_CAPS],
+    minProtocol: 4,
+    maxProtocol: 4
+  }
+}
+
 let pending: Promise<GatewayHandle> | null = null
 let current: { handle: GatewayHandle; client: GatewayInstance } | null = null
 
 const listeners = new Set<Listener>()
-const sessionSubscriptions = new Set<string>() // sessionKeys we hold open
+// Wire state: sessionKeys with a live `sessions.messages.subscribe` on the
+// CURRENT socket. Cleared on disconnect, re-issued on reconnect. Separate from
+// demand (refcounts) so a reconnect can re-subscribe without disturbing counts.
+const sessionSubscriptions = new Set<string>()
+// Demand: how many live session records depend on each key. Survives
+// disconnects (the records are still alive), so it is the source of truth for
+// what to re-subscribe on reconnect and when it is safe to unsubscribe. We
+// subscribe on the wire on the 0→1 transition and unsubscribe on the 1→0 one.
+const sessionSubscriptionRefcounts = new Map<string, number>()
 let topLevelSubscribed = false
+
+// Refcount bookkeeping split out (and exported) so the demand logic is
+// unit-testable without opening a socket; the handle methods below wrap these
+// with the actual subscribe/unsubscribe wire calls.
+
+// Record a new holder for a key. Returns true when this is the FIRST holder —
+// the caller should then issue the wire `sessions.messages.subscribe`.
+export function acquireSessionSubscriptionRef(sessionKey: string): boolean {
+  const next = (sessionSubscriptionRefcounts.get(sessionKey) ?? 0) + 1
+  sessionSubscriptionRefcounts.set(sessionKey, next)
+  return next === 1
+}
+
+// Drop a holder for a key. Returns true when that was the LAST holder — the
+// caller should then `sessions.messages.unsubscribe`; the key is also dropped
+// from the wire set so a reconnect won't replay it. Releasing an unheld key
+// returns false (idempotent), so a double teardown is safe.
+export function releaseSessionSubscriptionRef(sessionKey: string): boolean {
+  const cur = sessionSubscriptionRefcounts.get(sessionKey)
+  if (!cur) return false
+  if (cur > 1) {
+    sessionSubscriptionRefcounts.set(sessionKey, cur - 1)
+    return false
+  }
+  sessionSubscriptionRefcounts.delete(sessionKey)
+  sessionSubscriptions.delete(sessionKey)
+  return true
+}
+
+// Current holder count for a key (0 when none). Exported for tests.
+export function sessionSubscriptionRefcount(sessionKey: string): number {
+  return sessionSubscriptionRefcounts.get(sessionKey) ?? 0
+}
 
 // Side-effect hook: callers (the live session module) register a one-time
 // callback that fires after the gateway has reconnected and re-issued every
@@ -66,7 +140,6 @@ export function onGatewayReconnected(cb: ReconnectCallback): () => void {
 }
 
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
-let droppedSessionKeys: string[] = []
 const RECONNECT_DELAY_MS = 1500
 
 function scheduleReconnect() {
@@ -76,11 +149,12 @@ function scheduleReconnect() {
     if (current) return // someone else already reconnected via getGateway()
     try {
       const gw = await getGateway()
-      // Replay any keys that were held before the drop.
-      const keys = droppedSessionKeys
-      droppedSessionKeys = []
-      for (const key of keys) {
-        await gw.ensureSessionSubscribed(key).catch(() => {})
+      // Re-subscribe every key that still has a live holder (demand survived
+      // the disconnect; the wire set was cleared). Wire-only re-issue — leaves
+      // the refcounts untouched, and a key released during the disconnect
+      // (refcount 0) is simply not replayed.
+      for (const key of sessionSubscriptionRefcounts.keys()) {
+        await gw.resubscribeSessionKey(key).catch(() => {})
       }
       // Notify session-level holders so they can run a transcript reconcile.
       for (const cb of reconnectCallbacks) {
@@ -92,7 +166,6 @@ function scheduleReconnect() {
       }
     } catch {
       // Connect still failing — schedule another attempt.
-      droppedSessionKeys = droppedSessionKeys.length ? droppedSessionKeys : []
       scheduleReconnect()
     }
   }, RECONNECT_DELAY_MS)
@@ -104,9 +177,27 @@ export type GatewayHandle = {
   // advertised methods/events); null before the first successful hello.
   info: () => GatewayInfo | null
   on: (l: Listener) => () => void
+  // Acquire a live-holder reference on a session key: subscribes on the wire on
+  // the first holder (refcount 0→1), then increments. Idempotent per holder.
   ensureSessionSubscribed: (sessionKey: string) => Promise<void>
+  // Release a live-holder reference: decrements; on the last holder (1→0) it
+  // best-effort `sessions.messages.unsubscribe`s and drops the key from the
+  // wire set so a reconnect won't replay it. Never unsubscribes while other
+  // holders remain.
+  releaseSessionSubscription: (sessionKey: string) => Promise<void>
+  // Wire-only re-subscribe, used by the reconnect replay to re-issue a key
+  // whose demand outlived the dropped socket. Does not touch refcounts.
+  resubscribeSessionKey: (sessionKey: string) => Promise<void>
   ensureTopLevelSubscribed: () => Promise<void>
   isConnected: () => boolean
+}
+
+// The live handle if the gateway is currently connected, else null. Non-
+// connecting (unlike getGateway) so callers on a teardown path — session idle
+// eviction, shutdown, tests without a gateway — can release a subscription
+// without forcing a connect or awaiting a reconnect.
+export function currentGatewayHandle(): GatewayHandle | null {
+  return current?.handle ?? null
 }
 
 // Config resolution mirrors the OpenClaw CLI: explicit OPENCLAW_CONFIG_PATH
@@ -166,10 +257,7 @@ async function startClient(): Promise<{ handle: GatewayHandle; client: GatewayIn
     settleConnect = { res, rej }
   })
   const client = new GatewayClient({
-    url: `ws://127.0.0.1:${cfg.port}`,
-    token: cfg.token,
-    role: 'operator',
-    scopes: ['operator.admin', 'operator.read', 'operator.write'],
+    ...gatewayClientBaseOptions(`ws://127.0.0.1:${cfg.port}`, cfg.token),
     requestTimeoutMs: REQUEST_TIMEOUT_MS,
     onHelloOk: (hello: unknown) => {
       connected = true
@@ -195,12 +283,11 @@ async function startClient(): Promise<{ handle: GatewayHandle; client: GatewayIn
       connected = false
       current = null
       pending = null
-      // Mark every held subscription as needing re-issue after the next
-      // connect. The Set entries themselves stay so we know what to re-issue.
+      // The socket is gone: clear the wire state (top-level + per-session
+      // subscriptions). Demand (refcounts) is untouched — the reconnect replay
+      // re-subscribes every key that still has a live holder.
       topLevelSubscribed = false
-      const dropped = [...sessionSubscriptions]
       sessionSubscriptions.clear()
-      droppedSessionKeys = dropped
       scheduleReconnect()
     }
   })
@@ -238,6 +325,20 @@ async function startClient(): Promise<{ handle: GatewayHandle; client: GatewayIn
     return p
   }
 
+  // Issue the `sessions.messages.subscribe` RPC once per socket for a key,
+  // tracked by the wire set. Shared by the first-holder path and the reconnect
+  // replay; touches no refcounts.
+  async function subscribeWire(sessionKey: string): Promise<void> {
+    if (sessionSubscriptions.has(sessionKey)) return
+    sessionSubscriptions.add(sessionKey)
+    try {
+      await rpc('sessions.messages.subscribe', { key: sessionKey })
+    } catch (err) {
+      sessionSubscriptions.delete(sessionKey)
+      throw err
+    }
+  }
+
   const handle: GatewayHandle = {
     rpc,
     info: () => lastInfo,
@@ -246,14 +347,26 @@ async function startClient(): Promise<{ handle: GatewayHandle; client: GatewayIn
       return () => listeners.delete(l)
     },
     async ensureSessionSubscribed(sessionKey: string) {
-      if (sessionSubscriptions.has(sessionKey)) return
-      sessionSubscriptions.add(sessionKey)
+      if (!acquireSessionSubscriptionRef(sessionKey)) return // a holder has it
       try {
-        await rpc('sessions.messages.subscribe', { key: sessionKey })
+        await subscribeWire(sessionKey)
       } catch (err) {
-        sessionSubscriptions.delete(sessionKey)
+        releaseSessionSubscriptionRef(sessionKey) // roll back the demand bump
         throw err
       }
+    },
+    async releaseSessionSubscription(sessionKey: string) {
+      if (!releaseSessionSubscriptionRef(sessionKey)) return // holders remain
+      try {
+        await rpc('sessions.messages.unsubscribe', { key: sessionKey })
+      } catch (err) {
+        // Best-effort — the run may already be gone, or the socket dropping is
+        // itself an unsubscribe. Log and move on; never throw from teardown.
+        console.error('[openclaw-gateway] unsubscribe failed', sessionKey, err)
+      }
+    },
+    resubscribeSessionKey(sessionKey: string) {
+      return subscribeWire(sessionKey)
     },
     async ensureTopLevelSubscribed() {
       if (topLevelSubscribed) return
@@ -313,10 +426,7 @@ export async function withOneShotGateway<T>(fn: (rpc: Rpc) => Promise<T>): Promi
     settleConnect = { res, rej }
   })
   const client = new GatewayClient({
-    url: `ws://127.0.0.1:${cfg.port}`,
-    token: cfg.token,
-    role: 'operator',
-    scopes: ['operator.admin', 'operator.read', 'operator.write'],
+    ...gatewayClientBaseOptions(`ws://127.0.0.1:${cfg.port}`, cfg.token),
     requestTimeoutMs: 2000,
     onHelloOk: (hello: unknown) => {
       lastInfo = parseHelloOk(hello)

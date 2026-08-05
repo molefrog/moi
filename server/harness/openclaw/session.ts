@@ -41,7 +41,12 @@ import {
   messageToTurn,
   toolResultFromMessage
 } from './adapter'
-import { getGateway, onGatewayReconnected } from './gateway'
+import {
+  currentGatewayHandle,
+  getGateway,
+  onGatewayReconnected,
+  releaseSessionSubscriptionRef
+} from './gateway'
 import { broadcast } from '../../state'
 import { materializeToPath, resolveUploads } from '../../uploads'
 import {
@@ -81,9 +86,29 @@ type SessionRecord = {
   // avoids a patch round-trip per send when nothing changed.
   appliedModel?: string
   appliedThinking?: string
+  // Model of the most recent assistant row seen (seed scan + live ingest). Lets
+  // ingest detect a mid-session model switch without re-scanning the whole
+  // messagesById map each frame; the model-change notice reads its `prev` here.
+  lastAssistantModel?: string
+  // Idle-eviction timer, armed when the session goes idle and cleared when it
+  // goes busy or is torn down. OpenClaw holds only WS listeners (no subprocess),
+  // so eviction just drops the record and releases the subscription.
+  idleTimer?: ReturnType<typeof setTimeout> | null
+  // In-flight reconcile, so the two run-end signals (sessions.changed + agent
+  // lifecycle) coalesce onto one transcript fetch instead of racing two.
+  reconcilePromise?: Promise<void>
 }
 
 const MAX_PENDING_USER_ECHOES = 16
+
+// OpenClaw sessions hold only WebSocket listeners — no subprocess, unlike Claude
+// Code — so eviction is cheap to redo and a looser TTL avoids churning the
+// cold-reopen re-seed. 10 minutes rather than Claude Code's 5.
+const IDLE_TTL_MS = 10 * 60_000
+// Soft cap on concurrently-held live records. Each is just a subscription +
+// in-memory view, so the cap is generous; the oldest idle record is evicted
+// when a new one would exceed it (a busy record is never evicted).
+const MAX_LIVE_SESSIONS = 32
 
 const sessions = new Map<string, SessionRecord>() // key: `${workspaceId}:${sessionId}`
 const openclawAgents = new Map<
@@ -158,6 +183,10 @@ function setProcessing(rec: SessionRecord, processing: boolean, runId: string | 
     sessionKey: rec.sessionKey,
     activeRunId: runId
   })
+  // Idle eviction must never fire mid-run: hold the timer off while busy, and
+  // (re)arm it whenever the session is idle.
+  if (processing) clearIdleTimer(rec)
+  else armIdleTimer(rec)
   if (existing?.processing === processing) return
   broadcast(rec.workspaceId, {
     type: 'status',
@@ -171,12 +200,95 @@ function setProcessing(rec: SessionRecord, processing: boolean, runId: string | 
   }
 }
 
-// On run end the gateway has flushed every durable row — including
-// `toolResult` messages, which the live `session.message` stream does NOT
-// emit (verified empirically). Pull a fresh transcript and merge any new
-// toolResult rows so our tool-call cards flip from `pending` to
+function clearIdleTimer(rec: SessionRecord): void {
+  if (rec.idleTimer) {
+    clearTimeout(rec.idleTimer)
+    rec.idleTimer = null
+  }
+}
+
+function armIdleTimer(rec: SessionRecord): void {
+  clearIdleTimer(rec)
+  rec.idleTimer = setTimeout(() => {
+    rec.idleTimer = null
+    // A run may have started after the timer was armed — re-check and never
+    // evict a busy session.
+    if (isOpenClawProcessing(rec.workspaceId, rec.sessionId)) return
+    teardownOpenClawSession(rec)
+  }, IDLE_TTL_MS)
+}
+
+// Drop a live session: stop consuming its frames, release the gateway
+// subscription, and forget it. Idempotent — a record already removed from the
+// map is a no-op. REST reads (`sessionEvents`/`ensureOpenClawSessionLive`) still
+// work afterward: `getOrCreateOpenClawSession` cold-reopens and re-seeds from
+// `sessions.get` (or synthesizes cron turns), so eviction only costs a re-seed.
+export function teardownOpenClawSession(rec: SessionRecord): void {
+  const k = recKey(rec.workspaceId, rec.sessionId)
+  if (sessions.get(k) !== rec) return
+  clearIdleTimer(rec)
+  rec.ingestUnsubscribe?.()
+  rec.ingestUnsubscribe = undefined
+  // Release the refcounted subscription. When connected, go through the handle
+  // (drops demand + issues the wire unsubscribe on the last holder); never force
+  // a connect from teardown. With no live handle (disconnected, or a test
+  // without a gateway) still drop the demand so a reconnect won't replay a dead
+  // key — the wire is already down.
+  const gw = currentGatewayHandle()
+  if (gw) {
+    void gw
+      .releaseSessionSubscription(rec.sessionKey)
+      .catch(err => console.error('[openclaw-session] releaseSessionSubscription failed', err))
+  } else {
+    releaseSessionSubscriptionRef(rec.sessionKey)
+  }
+  // Clear this workspace's trailing list-refresh timer only when no other live
+  // session remains for it — otherwise a sibling still needs it.
+  const workspaceHasOtherLive = [...sessions.values()].some(
+    r => r !== rec && r.workspaceId === rec.workspaceId
+  )
+  if (!workspaceHasOtherLive) {
+    const entry = lastListRefresh.get(rec.workspaceId)
+    if (entry?.trailing) clearTimeout(entry.trailing)
+    lastListRefresh.delete(rec.workspaceId)
+  }
+  const wasProcessing = isOpenClawProcessing(rec.workspaceId, rec.sessionId)
+  sessions.delete(k)
+  openclawAgents.delete(k)
+  // If it was mid-run, mirror setProcessing(rec, false, null)'s client-visible
+  // effect so no spinner is left hanging.
+  if (wasProcessing) {
+    broadcast(rec.workspaceId, { type: 'status', sessionId: rec.sessionId, activity: 'idle' })
+  }
+}
+
+// Server shutdown: tear down every live record so no session keeps consuming
+// frames. We deliberately do NOT stop the shared gateway client — process exit
+// drops it, and discovery may still need it during the same run. A cold reopen
+// re-seeds from `sessions.get`.
+export function killAllOpenClawSessions(): void {
+  for (const rec of [...sessions.values()]) teardownOpenClawSession(rec)
+}
+
+// Safety net for `toolResult` rows the live stream missed. `toolResult`
+// messages DO stream on `session.message` (and `session.tool` carries the same
+// output inline — NOTES §6), so this is not the only path; it covers gaps from
+// a disconnect, a dropped frame, or a start/result race. On run end the gateway
+// has flushed every durable row, so pulling a fresh transcript and merging any
+// new toolResult rows flips lingering tool-call cards from `pending` to
 // `success`/`error` with output. Idempotent.
-async function reconcileAfterRun(rec: SessionRecord): Promise<void> {
+function reconcileAfterRun(rec: SessionRecord): Promise<void> {
+  // Both sessions.changed and agent lifecycle can end a run; coalesce onto one
+  // in-flight transcript fetch rather than racing two.
+  if (rec.reconcilePromise) return rec.reconcilePromise
+  const p = reconcileAfterRunImpl(rec).finally(() => {
+    if (rec.reconcilePromise === p) rec.reconcilePromise = undefined
+  })
+  rec.reconcilePromise = p
+  return p
+}
+
+async function reconcileAfterRunImpl(rec: SessionRecord): Promise<void> {
   const detail = await getOpenClawSessionMessages(rec.sessionId, rec.workspacePath, rec.agentId)
   if (!detail?.messages) return
   const owners = new Set<OpenClawMessage>()
@@ -256,6 +368,9 @@ function rebuildView(rec: SessionRecord): void {
   // only while a live record witnesses the compact frame (known gap; the
   // gateway's `sessions.compaction.list` could backfill them).
   rec.view = view
+  // Seed the model cache so live ingest can detect the next switch off the last
+  // assistant model without re-scanning the transcript.
+  rec.lastAssistantModel = prevModel
 }
 
 // The preview slot for a run. Doubles as `meta.apiMessageId` on the run's
@@ -478,12 +593,10 @@ function ingest(rec: SessionRecord, msg: OpenClawMessage): void {
   if (msg.role === 'assistant') {
     const model = (msg as { model?: unknown }).model
     if (typeof model === 'string') {
-      let prev: string | undefined
-      for (const m of rec.messagesById.values()) {
-        if (m.role !== 'assistant') continue
-        const pm = (m as { model?: unknown }).model
-        if (typeof pm === 'string') prev = pm
-      }
+      // Compare against the cached last assistant model instead of re-scanning
+      // the whole messagesById map each frame. Same notice id (`__openclaw.id`)
+      // as the cold rebuildView path, so live and cold agree on upsert.
+      const prev = rec.lastAssistantModel
       if (prev !== undefined && prev !== model) {
         const notice = {
           id: `openclaw:model-change:${id}`,
@@ -502,9 +615,9 @@ function ingest(rec: SessionRecord, msg: OpenClawMessage): void {
         rec.view = applyEvent(rec.view, { kind: 'notice', notice })
         broadcast(rec.workspaceId, { kind: 'notice', sessionId: rec.sessionId, notice })
       }
+      rec.lastAssistantModel = model
     }
   }
-  const wasUpdate = rec.messagesById.has(id)
   rec.messagesById.set(id, msg)
   // Compute idx as insertion order — for an update use the existing position,
   // for a new message it's the last slot.
@@ -513,7 +626,6 @@ function ingest(rec: SessionRecord, msg: OpenClawMessage): void {
     if (k === id) break
     idx++
   }
-  void wasUpdate
   emitTurn(rec, msg, idx)
 }
 
@@ -604,7 +716,7 @@ async function ensureSubscribed(rec: SessionRecord): Promise<void> {
       } else if ((phase === 'end' || phase === 'error') && runId) {
         if (rec.activeRunId === runId) {
           setProcessing(rec, false, null)
-          // Pick up any toolResult rows the live stream did not push.
+          // Safety net: pick up any toolResult rows the live stream missed.
           reconcileAfterRun(rec).catch(err =>
             console.error('[openclaw-session] reconcile failed', err)
           )
@@ -655,6 +767,7 @@ export async function getOrCreateOpenClawSession(input: {
   const sessionKey = resolved?.key
   if (!sessionKey) throw new Error(`unable to resolve session ${input.sessionId}`)
 
+  evictIdleIfNeeded()
   rec = {
     ...input,
     sessionKey,
@@ -663,7 +776,10 @@ export async function getOrCreateOpenClawSession(input: {
     view: emptyViewState(),
     activeRunId: null,
     seeded: false,
-    streamEnabled: true,
+    // Default to whole-block delivery like the other harnesses: a cold-opened
+    // (REST-ensured) live session must not broadcast previews until a send opts
+    // in (send sets `streamEnabled = input.stream === true`).
+    streamEnabled: false,
     pendingFrames: [],
     pendingUserEchoes: []
   }
@@ -671,6 +787,19 @@ export async function getOrCreateOpenClawSession(input: {
   await ensureSubscribed(rec)
   await seed(rec)
   return rec
+}
+
+// Evict one idle record to stay under the soft cap. A processing session is
+// never evicted; if every record is busy we allow a temporary overflow rather
+// than tearing down a live run.
+function evictIdleIfNeeded(): void {
+  if (sessions.size < MAX_LIVE_SESSIONS) return
+  for (const rec of sessions.values()) {
+    if (!isOpenClawProcessing(rec.workspaceId, rec.sessionId)) {
+      teardownOpenClawSession(rec)
+      return
+    }
+  }
 }
 
 // Cold-load helper for the REST events endpoint. If we already have a live
@@ -932,4 +1061,37 @@ export async function ensureOpenClawSessionLive(input: {
 }): Promise<StreamEvent[]> {
   const rec = await getOrCreateOpenClawSession(input)
   return viewAsEvents(rec)
+}
+
+// Test seam. The README sanctions tests importing harness internals; the live
+// `sessions` map is otherwise private and creating a real record needs a
+// gateway. This seeds a minimal live record so teardown/idle behavior can be
+// exercised in unit tests without a connection.
+export function createOpenClawSessionForTest(input: {
+  workspaceId: string
+  sessionId: string
+  sessionKey: string
+}): SessionRecord {
+  const rec: SessionRecord = {
+    workspaceId: input.workspaceId,
+    workspacePath: '/test-workspace',
+    agentId: 'test-agent',
+    sessionId: input.sessionId,
+    sessionKey: input.sessionKey,
+    messagesById: new Map(),
+    results: new Map(),
+    view: emptyViewState(),
+    activeRunId: null,
+    seeded: true,
+    streamEnabled: false,
+    pendingFrames: [],
+    pendingUserEchoes: []
+  }
+  sessions.set(recKey(input.workspaceId, input.sessionId), rec)
+  return rec
+}
+
+// Test seam: is a live record held for this (workspaceId, sessionId)?
+export function hasOpenClawLiveSessionForTest(workspaceId: string, sessionId: string): boolean {
+  return sessions.has(recKey(workspaceId, sessionId))
 }

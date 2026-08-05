@@ -230,7 +230,12 @@ abortedRunId, status: 'aborted' | 'no-active-run' }`. `sessions.steer` is
 
 One WebSocket connection: `sessions.subscribe({})` for the agent-wide
 firehose, `sessions.messages.subscribe({ key })` per session. Events arrive
-as `{ type: 'event', event, payload, seq? }` frames. **Every session-scoped
+as `{ type: 'event', event, payload, seq? }` frames. moi refcounts the
+per-session subscriptions (`gateway.ts`): the first live record subscribes a
+key, later records reuse it, and the last one to tear down (idle eviction or
+shutdown) `sessions.messages.unsubscribe({ key })`s it — best-effort, since a
+dropped socket already unsubscribes server-side. On reconnect it re-subscribes
+every key that still has a live holder. **Every session-scoped
 event embeds a fresh session row** (`payload.session` and/or flattened
 fields): `model`/`modelProvider`, `thinkingLevel` (+`thinkingLevels`),
 `inputTokens`/`outputTokens`/`totalTokens`, `estimatedCostUsd`, `status`,
@@ -401,6 +406,14 @@ const client = new GatewayClient({
   token, // from openclaw.json gateway.auth.token
   role: 'operator',
   scopes: ['operator.admin', 'operator.read', 'operator.write'],
+  // REQUIRED for live tool cards: the gateway registers a connection as a
+  // tool-event recipient only when it advertises this cap. Omit it and
+  // `session.tool` frames never arrive (the SDK defaults `caps` to `[]`).
+  caps: ['tool-events'],
+  // moi speaks wire protocol 4 (compat.ts). The SDK already defaults both to 4,
+  // so pinning them is self-documenting, not a behavior change.
+  minProtocol: 4,
+  maxProtocol: 4,
   requestTimeoutMs: 2000,
   onHelloOk: hello => {
     /* parseHelloOk(hello) → GatewayInfo */
@@ -416,6 +429,10 @@ client.start()
 const result = await client.request('sessions.list', { includeGlobal: true })
 client.stop()
 ```
+
+moi builds these shared options once in `gateway.ts → gatewayClientBaseOptions`
+and spreads them into both the persistent streaming client and the one-shot
+discovery client, so both advertise `caps: ['tool-events']`.
 
 Important: **always wrap `connect` in your own timeout**. `GatewayClient`
 doesn't enforce one on the initial handshake (only on individual RPCs), so a
