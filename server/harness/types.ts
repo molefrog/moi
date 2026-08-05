@@ -5,6 +5,7 @@
 import type { MoiContext } from '@/lib/moi-context'
 import type {
   HarnessAvailability,
+  HarnessLoginFlow,
   McpServer,
   Model,
   SessionActivity,
@@ -102,6 +103,12 @@ export type Harness = {
   // Is the backend's runtime present on this machine? Absent = always
   // available. Cheap enough to call per request (a PATH lookup, not a probe).
   availability?(): Promise<HarnessAvailability>
+  // Workspace-level readiness after the runtime check. Use this for state
+  // such as an expired or missing provider login that should block sends but
+  // should not prevent creating/importing the workspace itself.
+  readiness?(ws: WorkspaceEntry): Promise<HarnessAvailability>
+  // Optional recovery flow the host can start without a terminal.
+  startLogin?(ws: WorkspaceEntry): Promise<HarnessLoginFlow>
 
   // -- host integration hooks -------------------------------------------------
   // Env is frozen at spawn everywhere; this reaps idle sessions/processes so

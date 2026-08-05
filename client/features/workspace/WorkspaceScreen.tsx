@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 
 import { AnimatePresence } from 'motion/react'
 
@@ -28,7 +28,8 @@ import { ViewBuilderTab } from '@/client/features/views/ViewBuilderTab'
 import { ViewManager } from '@/client/features/views/ViewManager'
 import { useViewBuilderActions } from '@/client/features/views/useViewBuilderActions'
 import { useFitsSplitLayout } from '@/client/features/workspace/useFitsSplitLayout'
-import { useWorkspaceAvailability } from '@/client/features/workspace/api'
+import { startWorkspaceLogin, useWorkspaceAvailability } from '@/client/features/workspace/api'
+import { WorkspaceAgentAvailabilityBanner } from '@/client/features/workspace/WorkspaceAgentAvailabilityBanner'
 import { WorkspaceSkillUpdateBanner } from '@/client/features/workspace/WorkspaceSkillUpdateBanner'
 import { useWorkspaceSkillUpdates } from '@/client/features/workspace/useWorkspaceSkillUpdates'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
@@ -199,12 +200,24 @@ function applyVisibleTabOrder(
 
 export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenProps) {
   const { layout, setLayout, name, icon, provider, workspaceId } = useWorkspaceLayoutCtx()
-  // Keep the composer read/write, but block sends when its agent executable is
-  // missing. The Send button explains how to install it.
-  const availability = useWorkspaceAvailability(workspaceId).data
+  // Keep the composer read/write, but block sends until the agent runtime and
+  // provider account are ready.
+  const availabilityQuery = useWorkspaceAvailability(workspaceId)
+  const { refetch: refetchAvailability } = availabilityQuery
+  const availability = availabilityQuery.error
+    ? {
+        available: false as const,
+        reason: `Could not check agent status: ${availabilityQuery.error.message}`
+      }
+    : availabilityQuery.data
   const { bannerProps: skillUpdateBanner } = useWorkspaceSkillUpdates(workspaceId)
   const unavailableReason =
     availability === undefined ? undefined : availability.available ? null : availability.reason
+  const refreshAvailability = useCallback(async () => {
+    const result = await refetchAvailability()
+    if (result.error) throw result.error
+  }, [refetchAvailability])
+  const beginWorkspaceLogin = useCallback(() => startWorkspaceLogin(workspaceId), [workspaceId])
   const builderActions = useViewBuilderActions()
   const { ref: rowRef, fits: canUseSplit } = useFitsSplitLayout<HTMLDivElement>()
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
@@ -252,7 +265,30 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     dismissError
   } = useChat({ activeTab, appletParams })
 
+  // Auth can change between the periodic probe and a send. The server checks
+  // readiness again and emits an error; re-probe on that frame so the composer
+  // immediately switches to the actionable blocked state.
+  useEffect(() => {
+    if (error) void refreshAvailability().catch(() => {})
+  }, [error, refreshAvailability])
+
   const openSet = new Set(tabsState.open)
+
+  const renderComposerBanner = () => {
+    if (availability?.available !== false && !skillUpdateBanner) return undefined
+    return (
+      <>
+        {availability?.available === false && (
+          <WorkspaceAgentAvailabilityBanner
+            availability={availability}
+            onRefresh={refreshAvailability}
+            onStartLogin={beginWorkspaceLogin}
+          />
+        )}
+        {skillUpdateBanner && <WorkspaceSkillUpdateBanner {...skillUpdateBanner} />}
+      </>
+    )
+  }
 
   // Entering split with the agent tab on screen needs no special-casing
   // anymore: the URL resolution below derives a visible tab and the redirect
@@ -497,9 +533,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       processing={processing}
       error={error}
       onDismissError={dismissError}
-      composerBanner={
-        skillUpdateBanner ? <WorkspaceSkillUpdateBanner {...skillUpdateBanner} /> : undefined
-      }
+      composerBanner={renderComposerBanner()}
       unavailableReason={unavailableReason}
       send={send}
       stop={stop}
@@ -518,9 +552,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       processing={processing}
       error={error}
       onDismissError={dismissError}
-      composerBanner={
-        skillUpdateBanner ? <WorkspaceSkillUpdateBanner {...skillUpdateBanner} /> : undefined
-      }
+      composerBanner={renderComposerBanner()}
       unavailableReason={unavailableReason}
       send={send}
       stop={stop}
@@ -663,11 +695,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               processing={processing}
               error={error}
               onDismissError={dismissError}
-              composerBanner={
-                skillUpdateBanner ? (
-                  <WorkspaceSkillUpdateBanner {...skillUpdateBanner} />
-                ) : undefined
-              }
+              composerBanner={renderComposerBanner()}
               unavailableReason={unavailableReason}
               send={send}
               stop={stop}

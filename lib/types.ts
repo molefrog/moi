@@ -392,11 +392,29 @@ export type WorkspaceSkillsUpdateFailure = WorkspaceSkillsStatus & {
   error: string
 }
 
-// Whether an agent backend's runtime is installed on this machine. `reason` is
-// user-facing copy explaining what to do next. Surfaced by
-// GET /api/workspaces/create (per-type map, drives setup dialogs) and
-// GET /api/workspaces/:id/availability (disables Send in existing workspaces).
-export type HarnessAvailability = { available: true } | { available: false; reason: string }
+// A recovery path for an unavailable agent. `command` is always a working
+// terminal fallback; `inApp` tells the host whether it can also start the
+// recovery flow itself.
+export type HarnessRecovery = {
+  kind: 'install' | 'login'
+  command: string
+  inApp: boolean
+}
+
+export type HarnessUnavailable = {
+  available: false
+  reason: string
+  recovery?: HarnessRecovery
+}
+
+// Whether an agent backend can accept messages right now. Setup endpoints use
+// the runtime-only check, while a workspace also checks provider readiness
+// such as account authentication. `reason` is user-facing recovery copy.
+export type HarnessAvailability = { available: true } | HarnessUnavailable
+
+// A login flow that the host can launch. The terminal command remains on the
+// corresponding HarnessRecovery even when an in-app flow is available.
+export type HarnessLoginFlow = { type: 'browser'; url: string }
 
 // One MCP server's connection status, as surfaced by GET /api/workspaces/:id/mcp
 // (a subset of the agent SDK's McpServerStatus — only what the UI renders).

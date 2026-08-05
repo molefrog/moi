@@ -6,6 +6,7 @@ import type { McpServer } from '@/lib/types'
 
 import type { DiscoveredWorkspaceCandidate, Harness } from '../types'
 import { findHarnessExecutable, pathHarnessAvailability } from '../executable'
+import { getClaudeAuthReadiness } from './auth'
 import { isLinkedGitWorktree } from './git-worktree'
 import { getMcpStatus } from './mcp'
 import { getClaudeModels } from './models'
@@ -97,6 +98,7 @@ export const claudeCodeHarness: Harness = {
   mcpStatus: async ws => (await getMcpStatus(ws.path)) as unknown as McpServer[],
   discoverWorkspaces,
   availability: async () => pathHarnessAvailability('claude-code'),
+  readiness: ws => getClaudeAuthReadiness(ws.path),
 
   onEnvChanged: workspacePath => restartWorkspaceSessions(workspacePath),
   shutdown: () => killAllCCSessions(),

@@ -33,7 +33,7 @@ import {
   saveWidgetThumbnails
 } from './layout'
 import { getClientFrameLog, getWireLog } from './harness/debug'
-import { allHarnesses, harnessFor, isHarnessType } from './harness/registry'
+import { allHarnesses, harnessFor, harnessReadiness, isHarnessType } from './harness/registry'
 import { broadcast } from './state'
 import {
   discoverWorkspaces,
@@ -258,7 +258,7 @@ one.post('/view-builders/:builderId/submit', async c => {
   }
   const availableIcons = parseAvailableViewIcons(body.availableIcons)
   if (!availableIcons) return c.text('Available view icons are required', 400)
-  const availability = await workspaceTypeAvailability(ws.type ?? 'claude-code')
+  const availability = await harnessReadiness(ws)
   if (!availability.available) return c.text(availability.reason, 400)
   try {
     const builder = await beginViewBuilder(
@@ -638,12 +638,28 @@ one.put('/env', async c => {
   return c.json(await getWorkspaceEnvView(ws.path, requiredEnvFor(ws.path)))
 })
 
-// Is the workspace's agent backend usable right now? (e.g. a codex workspace
-// on a machine without the codex CLI). The chat surfaces the `reason` as a
-// banner instead of letting the first send fail cold.
+// Is the workspace's agent backend usable right now? This covers both runtime
+// presence and provider state such as authentication. The chat surfaces the
+// recovery state before the first send can fail cold.
 one.get('/availability', async c => {
-  const availability = await workspaceTypeAvailability(c.get('ws').type ?? 'claude-code')
+  const availability = await harnessReadiness(c.get('ws'))
   return c.json(availability satisfies HarnessAvailability)
+})
+
+// Start a provider-owned login ceremony. Codex returns a browser OAuth URL;
+// providers without an in-app flow keep exposing their terminal command in
+// the availability response and do not implement this hook.
+one.post('/auth/login', async c => {
+  const ws = c.get('ws')
+  const runtime = await workspaceTypeAvailability(ws.type ?? 'claude-code')
+  if (!runtime.available) return c.text(runtime.reason, 400)
+  const startLogin = harnessFor(ws).startLogin
+  if (!startLogin) return c.text('This agent requires terminal sign-in', 409)
+  try {
+    return c.json(await startLogin(ws))
+  } catch (err) {
+    return c.text(err instanceof Error ? err.message : 'Could not start sign-in', 500)
+  }
 })
 
 one.get('/skills', async c => {

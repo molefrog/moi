@@ -9,10 +9,17 @@ import { EVENTS_TOPIC, publishEvent, setEventServer } from './events'
 import { killAllWorkers } from './functions'
 import { startScratchpadSweeper } from './scratchpad'
 import { resolveScratchOp } from './scratchpad-relay'
-import { allHarnesses, harnessFor } from './harness/registry'
+import { allHarnesses, harnessFor, harnessReadiness } from './harness/registry'
 import { getWorkspace } from './registry'
 import { saveSelectedSession } from './selected-session'
-import { addClient, broadcastAll, getClientCount, removeClient, sendToClient } from './state'
+import {
+  addClient,
+  broadcast,
+  broadcastAll,
+  getClientCount,
+  removeClient,
+  sendToClient
+} from './state'
 import { startServiceLogMaintenance } from './service'
 import { distShell, prebuilt } from './static'
 import { renderStatus } from './status'
@@ -142,6 +149,15 @@ export const app = Bun.serve<WsData>({
         if (data.type === 'chat' && (data.content?.trim() || data.attachments?.length)) {
           const workspace = await getWorkspace(data.workspaceId)
           if (!workspace) return
+          const readiness = await harnessReadiness(workspace)
+          if (!readiness.available) {
+            broadcast(workspace.id, {
+              kind: 'error',
+              sessionId: data.sessionId,
+              content: readiness.reason
+            })
+            return
+          }
           if (data.isNew) {
             const selection = await saveSelectedSession(workspace.path, data.sessionId, null)
             if (selection.changed) {
