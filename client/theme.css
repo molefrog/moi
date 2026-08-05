@@ -82,6 +82,16 @@
   background-size: 32px 32px;
 }
 
+@utility texture-checker-* {
+  background-image: repeating-conic-gradient(
+    color-mix(in oklch, var(--primary) 1%, var(--foreground) 1%) 0 25%,
+    color-mix(in oklch, var(--primary) 3%, var(--foreground) 3%) 0 50%
+  );
+  background-position: 0 0;
+  background-repeat: repeat;
+  background-size: --value([length]) --value([length]);
+}
+
 @utility texture-grid {
   background-image:
     linear-gradient(

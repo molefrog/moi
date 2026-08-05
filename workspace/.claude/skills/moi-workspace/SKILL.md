@@ -121,6 +121,7 @@ never from inside `.moi/` itself. You don't pass paths; moi resolves the workspa
 - `moi debug logs` — applet runtime errors on record (experimental)
 - `moi theme --font=<key>` — change font theme (omit `--font` to list options)
 - `moi theme --color=<key>` — change color preset (omit `--color` to list options)
+- `moi theme --radius=<key>` — change corner-radius preset (omit `--radius` to list options)
 - `moi config` — set the workspace name & icon (`moi config --help` for usage)
 - `moi env` — list available env keys and where they come from (never values);
   `moi env exec -- <cmd>` runs a command with the workspace env (see Environment & secrets)

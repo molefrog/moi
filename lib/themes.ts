@@ -59,6 +59,20 @@ export const FONT_THEMES: Record<FontTheme, FontThemeConfig> = {
   }
 }
 
+export type RadiusTheme = 'squishy' | 'rounded' | 'subtle' | 'square'
+
+export type RadiusThemeConfig = {
+  label: string
+  radius: string
+}
+
+export const RADIUS_THEMES: Record<RadiusTheme, RadiusThemeConfig> = {
+  squishy: { label: 'Squishy', radius: '0.875rem' },
+  rounded: { label: 'Rounded', radius: '0.625rem' },
+  subtle: { label: 'Subtle', radius: '0.375rem' },
+  square: { label: 'Square', radius: '0' }
+}
+
 export type ColorTheme = 'default' | 'paper' | 'sand' | 'rose' | 'lavender' | 'mint' | 'sky'
 
 function foregroundForPrimary(primary: string): string {
@@ -124,4 +138,20 @@ export const COLOR_THEMES: Record<ColorTheme, ColorThemeConfig> = {
     label: 'Sky',
     primary: '#007ae3'
   }
+}
+
+export type WorkspaceTheme = {
+  font: FontTheme
+  color: ColorTheme
+  radius: RadiusTheme
+}
+
+export const DEFAULT_WORKSPACE_THEME: WorkspaceTheme = {
+  font: 'default',
+  color: 'default',
+  radius: 'rounded'
+}
+
+export function resolveWorkspaceTheme(theme?: Partial<WorkspaceTheme>): WorkspaceTheme {
+  return { ...DEFAULT_WORKSPACE_THEME, ...theme }
 }

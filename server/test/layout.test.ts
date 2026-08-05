@@ -3,7 +3,6 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-import { COLOR_THEMES } from '@/lib/themes'
 import type { WorkspaceLayout } from '@/lib/types'
 
 import { getLayoutPath, getWorkspacePreview, loadLayout, mergeLayoutForSave } from '../layout'
@@ -151,23 +150,24 @@ describe('mergeLayoutForSave', () => {
       tabs: { open: ['agent', 'widgets'], active: 'widgets' },
       selectedModel: 'sonnet',
       selectedFastMode: false,
-      theme: { font: 'default', primary: '#123456' }
+      theme: { font: 'default', color: 'rose', radius: 'square' }
     }
     const merged = mergeLayoutForSave(existing, body)
     expect(merged.layoutMode).toBe('split')
     expect(merged.tabs).toEqual({ open: ['agent', 'widgets'], active: 'widgets' })
     expect(merged.selectedModel).toBe('sonnet')
     expect(merged.selectedFastMode).toBe(false)
-    expect(merged.theme).toEqual({ font: 'default', primary: '#123456' })
+    expect(merged.theme).toEqual({ font: 'default', color: 'rose', radius: 'square' })
     expect(merged.name).toBe('Keep')
   })
 })
 
 describe('getWorkspacePreview', () => {
-  test('includes the persisted workspace color theme', async () => {
+  test('includes the persisted workspace theme', async () => {
     const theme = {
       font: 'default' as const,
-      primary: COLOR_THEMES.rose.primary
+      color: 'rose' as const,
+      radius: 'squishy' as const
     }
     await withWorkspaceFile(
       {

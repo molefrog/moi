@@ -1,14 +1,15 @@
 import { describe, expect, test } from 'bun:test'
 
-import { COLOR_THEMES, FONT_THEMES, deriveThemeColors } from '@/lib/themes'
+import { COLOR_THEMES, FONT_THEMES, RADIUS_THEMES, deriveThemeColors } from '@/lib/themes'
 
 import { getWorkspaceThemeStyle } from './workspace-theme'
 
 describe('getWorkspaceThemeStyle', () => {
-  test('uses the default workspace font variables', () => {
+  test('uses the default workspace theme variables', () => {
     expect(getWorkspaceThemeStyle(undefined)).toMatchObject({
       '--sans': FONT_THEMES.default.sans,
-      '--mono': FONT_THEMES.default.mono
+      '--mono': FONT_THEMES.default.mono,
+      '--radius': RADIUS_THEMES.rounded.radius
     })
   })
 
@@ -18,7 +19,8 @@ describe('getWorkspaceThemeStyle', () => {
     const colors = deriveThemeColors(primary)
     const style = getWorkspaceThemeStyle({
       font: 'blobby',
-      primary
+      color: 'paper',
+      radius: 'squishy'
     })
 
     expect(style).toMatchObject({
@@ -28,7 +30,8 @@ describe('getWorkspaceThemeStyle', () => {
       '--primary-foreground': colors.primaryForeground,
       '--background': colors.background,
       '--foreground': colors.foreground,
-      '--accent': colors.accent
+      '--accent': colors.accent,
+      '--radius': RADIUS_THEMES.squishy.radius
     })
   })
 

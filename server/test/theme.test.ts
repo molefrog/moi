@@ -3,11 +3,17 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'path'
 
-import { COLOR_THEMES, deriveThemeColors } from '@/lib/themes'
+import {
+  COLOR_THEMES,
+  DEFAULT_WORKSPACE_THEME,
+  RADIUS_THEMES,
+  deriveThemeColors,
+  resolveWorkspaceTheme
+} from '@/lib/themes'
 import type { WorkspaceLayout } from '@/lib/types'
 
 import { loadLayout, saveLayout } from '../layout'
-import { applyThemeUpdate, matchColorTheme } from '../theme'
+import { applyThemeUpdate } from '../theme'
 
 function relativeLuminance(hex: string): number {
   const channels = [1, 3, 5].map(index => {
@@ -66,51 +72,60 @@ describe('color themes', () => {
   })
 })
 
+describe('radius themes', () => {
+  test('defines the four shared radius presets', () => {
+    expect(RADIUS_THEMES).toEqual({
+      squishy: { label: 'Squishy', radius: '0.875rem' },
+      rounded: { label: 'Rounded', radius: '0.625rem' },
+      subtle: { label: 'Subtle', radius: '0.375rem' },
+      square: { label: 'Square', radius: '0' }
+    })
+  })
+})
+
 describe('applyThemeUpdate', () => {
-  test('setting font preserves the existing primary', () => {
-    const current = { font: 'default' as const, primary: '#123456' }
+  test('setting one option preserves the others', () => {
+    const current = {
+      font: 'default' as const,
+      color: 'paper' as const,
+      radius: 'squishy' as const
+    }
     const result = applyThemeUpdate(current, { font: 'serif' })
     if (!result.ok) throw new Error('expected ok')
-    expect(result.theme).toEqual({ font: 'serif', primary: '#123456' })
+    expect(result.theme).toEqual({ font: 'serif', color: 'paper', radius: 'squishy' })
     expect(result.applied).toEqual({ font: 'serif' })
   })
 
-  test('setting color preserves existing font', () => {
-    const current = { font: 'mono' as const }
+  test('setting color uses its preset key', () => {
+    const current = { font: 'mono' as const, color: 'default' as const, radius: 'subtle' as const }
     const result = applyThemeUpdate(current, { color: 'paper' })
     if (!result.ok) throw new Error('expected ok')
-    expect(result.theme).toEqual({
-      font: 'mono',
-      primary: COLOR_THEMES.paper.primary
-    })
+    expect(result.theme).toEqual({ font: 'mono', color: 'paper', radius: 'subtle' })
     expect(result.applied).toEqual({ color: 'paper' })
   })
 
-  test("'default' color clears the primary", () => {
-    const current = {
-      font: 'serif' as const,
-      primary: COLOR_THEMES.paper.primary
-    }
+  test("'default' remains an explicit preset", () => {
+    const current = { font: 'serif' as const, color: 'paper' as const, radius: 'rounded' as const }
     const result = applyThemeUpdate(current, { color: 'default' })
     if (!result.ok) throw new Error('expected ok')
-    expect(result.theme).toEqual({ font: 'serif' })
-    expect(JSON.parse(JSON.stringify(result.theme))).toEqual({ font: 'serif' })
+    expect(result.theme).toEqual({ font: 'serif', color: 'default', radius: 'rounded' })
   })
 
   test('combined font + color updates apply both', () => {
-    const result = applyThemeUpdate(undefined, { font: 'serif', color: 'mint' })
-    if (!result.ok) throw new Error('expected ok')
-    expect(result.theme).toEqual({
+    const result = applyThemeUpdate(undefined, {
       font: 'serif',
-      primary: COLOR_THEMES.mint.primary
+      color: 'mint',
+      radius: 'square'
     })
-    expect(result.applied).toEqual({ font: 'serif', color: 'mint' })
+    if (!result.ok) throw new Error('expected ok')
+    expect(result.theme).toEqual({ font: 'serif', color: 'mint', radius: 'square' })
+    expect(result.applied).toEqual({ font: 'serif', color: 'mint', radius: 'square' })
   })
 
-  test('falls back to default font when no current and none provided', () => {
+  test('fills missing options with the workspace defaults', () => {
     const result = applyThemeUpdate(undefined, { color: 'paper' })
     if (!result.ok) throw new Error('expected ok')
-    expect(result.theme.font).toBe('default')
+    expect(result.theme).toEqual({ ...DEFAULT_WORKSPACE_THEME, color: 'paper' })
   })
 
   test('rejects unknown font key', () => {
@@ -126,20 +141,34 @@ describe('applyThemeUpdate', () => {
     if (result.ok) throw new Error('expected error')
     expect(result.error).toContain('neon')
   })
+
+  test("'rounded' remains an explicit preset", () => {
+    const current = { font: 'serif' as const, color: 'rose' as const, radius: 'squishy' as const }
+    const result = applyThemeUpdate(current, { radius: 'rounded' })
+    if (!result.ok) throw new Error('expected ok')
+    expect(result.theme).toEqual({ font: 'serif', color: 'rose', radius: 'rounded' })
+    expect(result.applied).toEqual({ radius: 'rounded' })
+  })
+
+  test('rejects unknown radius key', () => {
+    const result = applyThemeUpdate(undefined, { radius: 'pillowy' })
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected error')
+    expect(result.error).toContain('pillowy')
+  })
 })
 
-describe('matchColorTheme', () => {
-  test('no overrides maps to default', () => {
-    expect(matchColorTheme(undefined)).toBe('default')
+describe('resolveWorkspaceTheme', () => {
+  test('returns one complete default theme', () => {
+    expect(resolveWorkspaceTheme()).toEqual(DEFAULT_WORKSPACE_THEME)
   })
 
-  test('matching primary colors map to preset keys', () => {
-    expect(matchColorTheme(COLOR_THEMES.paper.primary)).toBe('paper')
-    expect(matchColorTheme(COLOR_THEMES.mint.primary)).toBe('mint')
-  })
-
-  test('non-matching custom values return null', () => {
-    expect(matchColorTheme('#123456')).toBe(null)
+  test('fills missing preset keys', () => {
+    expect(resolveWorkspaceTheme({ font: 'serif' })).toEqual({
+      font: 'serif',
+      color: 'default',
+      radius: 'rounded'
+    })
   })
 })
 
@@ -154,7 +183,7 @@ describe('loadLayout/saveLayout round-trip with theme', () => {
     await rm(tmpDir, { recursive: true, force: true })
   })
 
-  test('persists the font and primary source', async () => {
+  test('persists the selected preset keys', async () => {
     const layout: WorkspaceLayout = {
       version: 1,
       widgetGrid: [],
@@ -162,7 +191,8 @@ describe('loadLayout/saveLayout round-trip with theme', () => {
       tabs: { open: ['agent'], active: 'agent' },
       theme: {
         font: 'serif',
-        primary: COLOR_THEMES.paper.primary
+        color: 'paper',
+        radius: 'subtle'
       }
     }
     await saveLayout(layout, tmpDir)
@@ -170,17 +200,16 @@ describe('loadLayout/saveLayout round-trip with theme', () => {
     expect(loaded.theme).toEqual(layout.theme)
   })
 
-  test('theme without overrides persists as minimal shape', async () => {
+  test('persists the complete default theme', async () => {
     const layout: WorkspaceLayout = {
       version: 1,
       widgetGrid: [],
       layoutMode: 'fullscreen',
       tabs: { open: ['agent'], active: 'agent' },
-      theme: { font: 'default' }
+      theme: DEFAULT_WORKSPACE_THEME
     }
     await saveLayout(layout, tmpDir)
     const loaded = await loadLayout(tmpDir)
-    expect(loaded.theme).toEqual({ font: 'default' })
-    expect('primary' in (loaded.theme ?? {})).toBe(false)
+    expect(loaded.theme).toEqual(DEFAULT_WORKSPACE_THEME)
   })
 })

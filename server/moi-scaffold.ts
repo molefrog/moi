@@ -13,7 +13,7 @@ export const MOI_PACKAGE_JSON = {
   private: true,
   dependencies: {
     '@tabler/icons-react': '^3.40.0',
-    tailwindcss: '^4.0.0',
+    tailwindcss: '^4.3.3',
     react: '^19.0.0',
     'react-dom': '^19.0.0'
   },

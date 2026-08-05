@@ -107,6 +107,9 @@ describe('installBundledSkills', () => {
     expect(await Bun.file(join(workspaceSkillDir, 'SKILL.md')).text()).toContain(
       '<moi-skill version="0.11.0" />'
     )
+    expect(await Bun.file(join(workspaceSkillDir, 'SKILL.md')).text()).toContain(
+      '`moi theme --radius=<key>`'
+    )
     expect(await Bun.file(workspaceNote).text()).toBe('Keep this note\n')
     expect(await Bun.file(customSkill).text()).toBe('Keep this skill\n')
   })

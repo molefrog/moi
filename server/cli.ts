@@ -9,8 +9,14 @@ import pc from './cli-pc'
 
 import { isAgentCaller } from './agent-caller'
 
-import { COLOR_THEMES, FONT_THEMES, deriveThemeColors } from '@/lib/themes'
-import type { ColorTheme, FontTheme } from '@/lib/themes'
+import {
+  COLOR_THEMES,
+  DEFAULT_WORKSPACE_THEME,
+  FONT_THEMES,
+  RADIUS_THEMES,
+  deriveThemeColors
+} from '@/lib/themes'
+import type { ColorTheme, FontTheme, RadiusTheme } from '@/lib/themes'
 import { isParamsRecord } from '@/lib/workspace-tabs'
 import type {
   AppletLogEntry,
@@ -699,7 +705,7 @@ function themeSwatch(primary?: string): string {
 }
 
 const theme = defineCommand({
-  meta: { name: 'theme', description: 'Show or set the workspace font and color themes' },
+  meta: { name: 'theme', description: 'Show or set the workspace appearance' },
   args: {
     dir: {
       type: 'positional',
@@ -707,7 +713,8 @@ const theme = defineCommand({
       description: 'Workspace directory (default: current)'
     },
     font: { type: 'string', description: 'Font theme key to apply' },
-    color: { type: 'string', description: 'Color preset key to apply' }
+    color: { type: 'string', description: 'Color preset key to apply' },
+    radius: { type: 'string', description: 'Radius preset key to apply' }
   },
   async run({ args }) {
     const path = resolve(args.dir)
@@ -720,7 +727,8 @@ const theme = defineCommand({
           type: 'theme',
           path,
           font: args.font ?? null,
-          color: args.color ?? null
+          color: args.color ?? null,
+          radius: args.radius ?? null
         })
       )
 
@@ -749,16 +757,21 @@ const theme = defineCommand({
           const chip = themeSwatch(preset.primary)
           console.log(pc.green('✓') + ' Color set to ' + pc.bold(preset.label) + ' ' + chip)
         }
+        if (res.radius) {
+          const preset = RADIUS_THEMES[res.radius as RadiusTheme]
+          console.log(pc.green('✓') + ' Radius set to ' + pc.bold(preset.label))
+        }
         console.log()
         if (notice) console.log(pc.yellow(notice) + '\n')
         ws.close()
         process.exit(0)
       }
 
-      const currentFont: FontTheme = res.currentFont ?? 'default'
-      const currentColor: ColorTheme | null = res.currentColor ?? null
+      const currentFont: FontTheme = res.currentFont ?? DEFAULT_WORKSPACE_THEME.font
+      const currentColor: ColorTheme = res.currentColor ?? DEFAULT_WORKSPACE_THEME.color
+      const currentRadius: RadiusTheme = res.currentRadius ?? DEFAULT_WORKSPACE_THEME.radius
       console.log('\n' + pc.bold('moi theme') + ' — workspace appearance')
-      console.log(pc.dim('  Usage: moi theme --font=<key> --color=<key>') + '\n')
+      console.log(pc.dim('  Usage: moi theme --font=<key> --color=<key> --radius=<key>') + '\n')
 
       const fontRows = (Object.keys(FONT_THEMES) as FontTheme[]).map(key => {
         const f = FONT_THEMES[key]
@@ -795,6 +808,24 @@ const theme = defineCommand({
         columns(
           ['', 'key', 'label', 'swatch'].map(h => pc.dim(h)),
           colorRows
+        ) + '\n'
+      )
+
+      const radiusRows = (Object.keys(RADIUS_THEMES) as RadiusTheme[]).map(key => {
+        const radius = RADIUS_THEMES[key]
+        const selected = key === currentRadius
+        return [
+          selected ? pc.green('→') : ' ',
+          selected ? pc.bold(key) : key,
+          radius.label,
+          pc.dim(radius.radius)
+        ]
+      })
+      console.log(pc.dim('  Radius'))
+      console.log(
+        columns(
+          ['', 'key', 'label', 'value'].map(h => pc.dim(h)),
+          radiusRows
         ) + '\n'
       )
 
