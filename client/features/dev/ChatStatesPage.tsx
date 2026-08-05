@@ -327,6 +327,89 @@ export function ChatStatesPage() {
                   Empty-chat states (<code>ChatEmptyState</code>: placeholder and first-run welcome)
                   cannot appear in a continuous transcript — find them in the chat with no turns.
                 </li>
+                <li>
+                  Text-part <code>citations</code> (the sources reply carries one) are not rendered
+                  — only the standalone <code>source-url</code> / <code>source-document</code> parts
+                  show, as small underlined links.
+                </li>
+                <li>
+                  <code>Edit</code> results render as plain text — <code>ToolOutput</code>{' '}
+                  highlights only read/write-with-content or JSON outputs.
+                </li>
+                <li>
+                  The image <code>Read</code> row's expanded body holds a{' '}
+                  <code>ReadImagePreview</code> that loads the workspace preview endpoint; with this
+                  page's fake workspace id the request 404s and the preview hides itself, leaving
+                  the body empty. It needs a live workspace to show the picture.
+                </li>
+                <li>
+                  <code>TurnOrigin</code> <code>'tool-return'</code> turns never reach the
+                  transcript: adapters strip <code>tool_result</code> blocks and fold them into the
+                  owning tool call, so no adapter emits one. (If one ever appeared, TurnView would
+                  render its parts left-aligned, without the user bubble.)
+                </li>
+              </ul>
+
+              <p className="mt-5 font-medium text-foreground">No rendering yet</p>
+              <p className="mt-1">
+                These claude-code states reach the client but currently render nothing in the chat —
+                each needs a designed treatment, not just styling (shapes in{' '}
+                <code>lib/format.ts</code>):
+              </p>
+              <ul className="mt-2 flex list-disc flex-col gap-1.5 pl-4">
+                <li>
+                  <code>rate-limit</code> notice —{' '}
+                  <code>{"{ kind: 'rate-limit', at, info: { resetsAt: 1754300400 } }"}</code>
+                </li>
+                <li>
+                  <code>api-retry</code> notice —{' '}
+                  <code>
+                    {
+                      "{ kind: 'api-retry', at, attempt: 2, maxRetries: 10, delayMs: 8000, error: 'overloaded_error' }"
+                    }
+                  </code>
+                </li>
+                <li>
+                  <code>hook</code> notice —{' '}
+                  <code>
+                    {
+                      "{ kind: 'hook', at, hookId: 'hook_1a2b', hookName: 'PostToolUse', event: 'PostToolUse', status: 'response', output: 'ok', exitCode: 0, outcome: 'success' }"
+                    }
+                  </code>
+                </li>
+                <li>
+                  <code>session-state</code> notice —{' '}
+                  <code>{"{ kind: 'session-state', at, state: 'requires-action' }"}</code> (blocked
+                  on a permission prompt; no loader or banner exists for it).
+                </li>
+                <li>
+                  <code>files-persisted</code> notice —{' '}
+                  <code>
+                    {
+                      "{ kind: 'files-persisted', at, files: ['notes/summary.md'], failed: [{ filename: 'shots/huge.png', error: 'exceeds size limit' }] }"
+                    }
+                  </code>
+                </li>
+                <li>
+                  <code>elicitation</code> notice —{' '}
+                  <code>
+                    {"{ kind: 'elicitation', at, server: 'github', elicitationId: 'elic_7f3a' }"}
+                  </code>
+                </li>
+                <li>
+                  <code>SessionSnapshot</code> —{' '}
+                  <code>
+                    {
+                      "{ sessionId, model: 'claude-sonnet-4-6', cwd, permissionMode: 'bypassPermissions', tools: ['Bash', 'Read', …], mcpServers: [{ name: 'github', status: 'connected' }], skills: ['moi-workspace'], … }"
+                    }
+                  </code>
+                </li>
+                <li>
+                  <code>ResultSummary</code> —{' '}
+                  <code>{"{ subtype: 'success', cost: 0.1129, turns: 6, durationMs: 48210 }"}</code>{' '}
+                  (error subtypes: <code>error_during_execution</code>, <code>error_max_turns</code>
+                  , budget and structured-output variants).
+                </li>
               </ul>
             </details>
           </main>

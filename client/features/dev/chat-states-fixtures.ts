@@ -48,6 +48,104 @@ export const CHECKERBOARD_PNG =
 
 // ---- Tool calls (in narrative order) ---------------------------------------
 
+// Claude Code investigation run: plan, search the web, fetch the docs.
+const todoWrite: ToolCall = {
+  toolCallId: 'toolu_01Km2NdQeYvXr6Pa',
+  name: 'TodoWrite',
+  caller: 'model',
+  provider: 'claude-code',
+  state: 'success',
+  input: {
+    todos: [
+      {
+        content: 'Verify call-time capture against the TanStack Query docs',
+        status: 'completed',
+        activeForm: 'Verifying call-time capture against the docs'
+      },
+      {
+        content: 'Inspect the layout-race screenshot',
+        status: 'in_progress',
+        activeForm: 'Inspecting the layout-race screenshot'
+      },
+      {
+        content: 'Patch the board widget’s debounced writer',
+        status: 'pending',
+        activeForm: 'Patching the board widget’s debounced writer'
+      }
+    ]
+  },
+  output:
+    'Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress.'
+}
+
+const webSearchDocs: ToolCall = {
+  toolCallId: 'toolu_01Ln8PeRfZwYs2Qb',
+  name: 'WebSearch',
+  caller: 'model',
+  provider: 'claude-code',
+  state: 'success',
+  input: { query: 'tanstack query optimistic updates concurrent writers race' },
+  output: [
+    'Did 1 search in 9s. Found 10 results for "tanstack query optimistic updates concurrent writers race":',
+    '',
+    '1. Optimistic Updates | TanStack Query Docs — tanstack.com',
+    '2. Concurrent Optimistic Updates in React Query — tkdodo.eu',
+    '3. Mutations | TanStack Query Docs — tanstack.com',
+    '4. Race conditions with useMutation and query invalidation — github.com/TanStack/query/discussions',
+    '5. Optimistic UI patterns that survive concurrency — swizec.com'
+  ].join('\n')
+}
+
+const webFetchDocs: ToolCall = {
+  toolCallId: 'toolu_01Mp4QfSgAxZt8Rc',
+  name: 'WebFetch',
+  caller: 'model',
+  provider: 'claude-code',
+  state: 'success',
+  input: {
+    url: 'https://tanstack.com/query/latest/docs/framework/react/guides/optimistic-updates',
+    prompt: 'How should concurrent writers avoid clobbering optimistic cache updates?'
+  },
+  output:
+    'The guide recommends cancelling in-flight queries before writing the cache (queryClient.cancelQueries), snapshotting the previous value for rollback in onError, and using the mutation variables — not a later cache read — as the source of the write payload, so concurrent writers cannot clobber each other.'
+}
+
+// Edit tool row. Its result is neither a read/write-with-content nor JSON, so
+// ToolOutput renders it as plain text (see detect.ts).
+const editWriter: ToolCall = {
+  toolCallId: 'toolu_01Nq6RgThByAu4Sd',
+  name: 'Edit',
+  caller: 'model',
+  provider: 'claude-code',
+  state: 'success',
+  input: {
+    file_path: '/Users/mole/.openclaw/workspace/widgets/board/save.ts',
+    old_string: '  mutate(layout)',
+    new_string: '  mutate(next) // value captured at call time'
+  },
+  output: [
+    "The file /Users/mole/.openclaw/workspace/widgets/board/save.ts has been updated. Here's the result of running `cat -n` on a snippet of the edited file:",
+    '    10\tconst save = useDebouncedCallback((layout: WorkspaceLayout) => {',
+    '    11\t  const next = layout',
+    '    12\t  qc.setQueryData(workspaceKeys.layout(id), next)',
+    '    13\t  mutate(next) // value captured at call time',
+    '    14\t}, 600)'
+  ].join('\n')
+}
+
+// Read of a workspace image: the expanded body carries a ReadImagePreview that
+// loads /api/workspaces/<id>/preview/… — with this page's fake workspace id
+// the request 404s and the preview hides itself, so the expanded body stays
+// empty. Needs a live workspace to show the picture.
+const readScreenshot: ToolCall = {
+  toolCallId: 'toolu_01Pr8ShUiCzBv2Te',
+  name: 'Read',
+  caller: 'model',
+  provider: 'claude-code',
+  state: 'success',
+  input: { file_path: '/Users/mole/.openclaw/workspace/shots/layout-race.png' }
+}
+
 const readSkill: ToolCall = {
   toolCallId: 'toolu_01Za3RgSeBvYh8Ue',
   name: 'read',
@@ -309,60 +407,110 @@ const layoutRaceAnswer = turn('assistant', 4, 3, [
   )
 ])
 
-// Beat 4 — merged tool-only run: four assistant turns off the wire (Codex-style
+// Beat 4 — Claude Code investigation: the user wants the fix sanity-checked, so
+// the agent plans (TodoWrite), searches, and fetches the docs.
+const docsAsk = turn('user', 5, 4, [
+  text(
+    'before that — sanity-check the approach against the react-query docs. my screenshot of the revert is in shots/layout-race.png. if it holds up, patch my board widget’s writer too'
+  )
+])
+const researchRun = turn('assistant', 6, 5, [
+  tool(todoWrite),
+  tool(webSearchDocs),
+  tool(webFetchDocs)
+])
+
+// Beat 5 — findings with `citations` on the text part, then a source-url and a
+// source-document part.
+const sourcesReply = turn('assistant', 7, 6, [
+  {
+    type: 'text',
+    text: 'Confirmed — the docs agree: cancel in-flight queries, snapshot for rollback, and persist the value captured at call time instead of re-reading the cache. Sources below.',
+    citations: [
+      {
+        url: 'https://tanstack.com/query/latest/docs/framework/react/guides/optimistic-updates',
+        title: 'Optimistic Updates — TanStack Query',
+        quote: 'cancel any outgoing refetches so they don’t overwrite our optimistic update'
+      }
+    ]
+  },
+  {
+    type: 'source-url',
+    url: 'https://tanstack.com/query/latest/docs/framework/react/guides/optimistic-updates',
+    title: 'Optimistic Updates — TanStack Query',
+    sourceId: 'src_tanstack_optimistic'
+  },
+  {
+    type: 'source-document',
+    mediaType: 'application/pdf',
+    title: 'moi RFC 007 — workspace layout persistence',
+    sourceId: 'src_rfc_007'
+  }
+])
+
+// Beat 6 — Edit row + image Read, then the handoff back to the main thread.
+const patchTurn = turn('assistant', 8, 7, [
+  tool(editWriter),
+  tool(readScreenshot),
+  text(
+    'Patched the writer to persist the captured value, and your screenshot shows the double PUT exactly as described. Want the full workspace check now?'
+  )
+])
+
+// Beat 7 — merged tool-only run: four assistant turns off the wire (Codex-style
 // one-message-per-step) that groupTurns folds into a single rail.
-const checkAsk = turn('user', 5, 5, [text('yes — run the check, and write down what you find')])
-const checkStep1 = turn('assistant', 6, 6, [
+const checkAsk = turn('user', 9, 9, [text('yes — run the check, and write down what you find')])
+const checkStep1 = turn('assistant', 10, 10, [
   {
     type: 'reasoning',
     text: 'Check the installed skill version first, probe the workspace, confirm the GitHub connector account, then note everything down.'
   },
   tool(readSkill)
 ])
-const checkStep2 = turn('assistant', 7, 7, [tool(execTwelveLines)])
-const checkStep3 = turn('assistant', 8, 8, [tool(mcpGithubGetMe)])
-const checkStep4 = turn('assistant', 9, 9, [tool(writeSummary)])
+const checkStep2 = turn('assistant', 11, 11, [tool(execTwelveLines)])
+const checkStep3 = turn('assistant', 12, 12, [tool(mcpGithubGetMe)])
+const checkStep4 = turn('assistant', 13, 13, [tool(writeSummary)])
 
-// Beat 5 — exec error and the follow-up.
-const slownessAsk = turn('user', 10, 10, [
+// Beat 8 — exec error and the follow-up.
+const slownessAsk = turn('user', 14, 14, [
   text('nice. separate thing — saving sometimes feels stuck for ages. can you reproduce a hang?')
 ])
-const timeoutProbe = turn('assistant', 11, 11, [tool(execTimeout)])
-const timeoutFollowUp = turn('assistant', 12, 12, [
+const timeoutProbe = turn('assistant', 15, 15, [tool(execTimeout)])
+const timeoutFollowUp = turn('assistant', 16, 16, [
   text(
     'That probe hit the 30 s exec timeout — the sandbox kills anything longer, so a real hang would die the same way. Your “stuck” saves are more likely the 600 ms debounce plus a slow refetch, not the PUT itself. While I’m here: want me to clear the old build output? It’s full of stale chunks.'
   )
 ])
 
-// Beat 6 — the user declines, and the queued cleanup shows as denied.
-const cleanupDecline = turn('user', 13, 13, [text('not yet — leave build alone for now')])
-const cleanupDeniedTurn = turn('assistant', 14, 14, [
+// Beat 9 — the user declines, and the queued cleanup shows as denied.
+const cleanupDecline = turn('user', 17, 17, [text('not yet — leave build alone for now')])
+const cleanupDeniedTurn = turn('assistant', 18, 18, [
   tool(cleanupDenied),
   text('Dropped the cleanup — build stays.')
 ])
 
-// Beat 7 — a run failure, reported by the gateway as a plain assistant turn.
-const moonAsk = turn('user', 15, 16, [text('random one — how far away is the moon, actually?')])
-const runFailure = turn('assistant', 16, 17, [
+// Beat 10 — a run failure, reported by the gateway as a plain assistant turn.
+const moonAsk = turn('user', 19, 20, [text('random one — how far away is the moon, actually?')])
+const runFailure = turn('assistant', 20, 21, [
   text(
     '⚠️ Agent failed before reply: Unknown model: anthropic/claude-sonnet-5. Run `openclaw models list` to see available ids.'
   )
 ])
-const retryAsk = turn('user', 17, 18, [text('try again?')])
+const retryAsk = turn('user', 21, 22, [text('try again?')])
 
-// Beat 8 — the model switch lands right before the reply that carries full
+// Beat 11 — the model switch lands right before the reply that carries full
 // TurnMeta. NOTE: the meta payload is kept verbatim from a live capture (model
 // 'claude-sonnet-5') even though the notice switches to claude-sonnet-4-6 —
 // meta is not rendered anywhere yet, so the transcript stays coherent.
 const modelChangeNotice: SystemNotice = {
-  id: 'openclaw:model-change:19',
+  id: 'openclaw:model-change:23',
   kind: 'model-change',
-  at: at(19),
+  at: at(23),
   model: 'claude-sonnet-4-6',
   prev: 'claude-sonnet-5'
 }
 const moonReplyWithMeta: Turn = {
-  ...turn('assistant', 18, 19, [
+  ...turn('assistant', 22, 23, [
     text(
       'The moon orbits at an average distance of 384,400 km — light covers that in about 1.3 seconds. It is tidally locked (we always see the same face), and its gravity drives the ocean tides.'
     )
@@ -375,8 +523,8 @@ const moonReplyWithMeta: Turn = {
   }
 }
 
-// Beat 9 — attachments: image thumbnail + non-image file chip on one user turn.
-const attachmentsTurn = turn('user', 19, 22, [
+// Beat 12 — attachments: image thumbnail + non-image file chip on one user turn.
+const attachmentsTurn = turn('user', 23, 26, [
   { type: 'file', mediaType: 'image/png', url: CHECKERBOARD_PNG, filename: 'pattern.png' },
   { type: 'file', mediaType: 'application/pdf', url: '', filename: 'report.pdf' },
   text(
@@ -384,8 +532,8 @@ const attachmentsTurn = turn('user', 19, 22, [
   )
 ])
 
-// Beat 10 — skill row + message tool in one turn.
-const skillAndMessage = turn('assistant', 20, 23, [
+// Beat 13 — skill row + message tool in one turn.
+const skillAndMessage = turn('assistant', 24, 27, [
   tool(skillLaunch),
   tool(messageMole),
   text(
@@ -393,22 +541,22 @@ const skillAndMessage = turn('assistant', 20, 23, [
   )
 ])
 
-// Beat 11 — channel-routed user turn. On the wire this arrived over IRC: the
+// Beat 14 — channel-routed user turn. On the wire this arrived over IRC: the
 // session carries origin { provider: 'irc', label: 'mole!mole@127.0.0.1' } and
 // the gateway's inbound metadata envelope is stripped at the adapter, so the
 // turn itself reads as plain input.
-const ircHello = turn('user', 21, 25, [
+const ircHello = turn('user', 25, 29, [
   text('quick hello over IRC — glad it landed. ping me when the final version ships')
 ])
-const ircReply = turn('assistant', 22, 26, [
+const ircReply = turn('assistant', 26, 30, [
   text('Will do — I’ll message you the moment it ships.')
 ])
 
-// Beat 12 — subagent probes: the first attempt fails, the retry completes.
-const probeAsk = turn('user', 23, 28, [
+// Beat 15 — subagent probes: the first attempt fails, the retry completes.
+const probeAsk = turn('user', 27, 32, [
   text('one more — spawn a subagent to check the gateway answers. simple ping-pong is fine')
 ])
-const probeFirstTry = turn('assistant', 24, 29, [
+const probeFirstTry = turn('assistant', 28, 33, [
   {
     type: 'reasoning',
     text: 'A liveness probe: spawn a session that must answer with a single word.'
@@ -416,25 +564,25 @@ const probeFirstTry = turn('assistant', 24, 29, [
   tool(probeFailed),
   text('The first probe session ended before replying — spawning a fresh one.')
 ])
-const probeSecondTry = turn('assistant', 25, 30, [
+const probeSecondTry = turn('assistant', 29, 34, [
   tool(probeCompleted),
   text('Second probe came back clean — “pong” in 4.1 s, 33k tokens total.')
 ])
 
-// Beat 13 — the gateway compacts the context.
+// Beat 16 — the gateway compacts the context.
 const compactNotice: SystemNotice = {
-  id: 'openclaw:compact:31',
+  id: 'openclaw:compact:35',
   kind: 'compact',
-  at: at(31)
+  at: at(35)
 }
 
-// Beat 14 — "now": three things in flight, then the live tail.
-const wrapUpAsk = turn('user', 26, 32, [
+// Beat 17 — "now": three things in flight, then the live tail.
+const wrapUpAsk = turn('user', 30, 36, [
   text(
     'great. before we wrap: count the workspace entries, clear the old build output — go ahead this time — and rerun the probe'
   )
 ])
-const nowCluster = turn('assistant', 27, 33, [
+const nowCluster = turn('assistant', 31, 37, [
   text('On it — three in flight:'),
   tool(execCounting),
   tool(cleanupPending),
@@ -446,6 +594,10 @@ export const conversationTurns: Turn[] = [
   greetingReply,
   layoutRaceQuestion,
   layoutRaceAnswer,
+  docsAsk,
+  researchRun,
+  sourcesReply,
+  patchTurn,
   checkAsk,
   checkStep1,
   checkStep2,
@@ -482,6 +634,9 @@ export const conversationAnchors: ConversationAnchor[] = [
   { anchor: 'greeting', label: 'User turn — short text', itemId: greeting.id },
   { anchor: 'long-markdown', label: 'User turn — long markdown', itemId: layoutRaceQuestion.id },
   { anchor: 'rich-markdown', label: 'Assistant turn — rich markdown', itemId: layoutRaceAnswer.id },
+  { anchor: 'web-tools', label: 'Web search, fetch, todos', itemId: researchRun.id },
+  { anchor: 'sources', label: 'Citations and sources', itemId: sourcesReply.id },
+  { anchor: 'edit-read', label: 'Edit and image read', itemId: patchTurn.id },
   { anchor: 'tool-runs', label: 'Tool calls — merged run', itemId: checkStep1.id },
   { anchor: 'exec-error', label: 'Tool call — exec error', itemId: timeoutProbe.id },
   { anchor: 'approval-denied', label: 'Tool call — approval denied', itemId: cleanupDeniedTurn.id },
