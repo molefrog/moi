@@ -23,7 +23,14 @@ import {
   renderMoiContext,
   stripMoiContext
 } from '@/lib/moi-context'
-import { type PreviewBlock, applyEvent, emptyViewState } from '@/lib/format'
+import {
+  type PreviewBlock,
+  type ToolCall,
+  type ToolState,
+  type Turn,
+  applyEvent,
+  emptyViewState
+} from '@/lib/format'
 import type { SessionActivity, StreamEvent, ViewState } from '@/lib/types'
 
 import { messageIdempotencyKey } from './compat'
@@ -87,6 +94,12 @@ type SessionRecord = {
   // doesn't double-broadcast (see claimPreviewSource).
   previewRunId?: string
   previewSource?: 'chat' | 'agent'
+  // Live tool cards rendered from `agent/tool` / `session.tool` frames before
+  // the durable owner row exists (the codex-app-server backend batches durable
+  // rows at run end). Keyed by toolCallId → the tool name + input captured off
+  // the start frame; the matching durable row merges into the live turn by
+  // re-iding to `livetool:<toolCallId>` (see emitTurn).
+  liveTools: Map<string, { name: string; input: unknown }>
   // Last model/thinking applied via sessions.patch, in `provider/model` form —
   // avoids a patch round-trip per send when nothing changed.
   appliedModel?: string
@@ -427,6 +440,20 @@ function emitTurn(rec: SessionRecord, msg: OpenClawMessage, idx: number): void {
       rec.pendingUserEchoes.splice(at, 1)
     }
   }
+  // Live-tool rendezvous: a durable assistant row carrying a toolCall we
+  // already rendered as a live tool turn re-ids to that live turn so the card
+  // upserts in place (the codex-app-server backend delivers the durable owner
+  // only in the run-end batch, after the live card is already on screen).
+  if (turn.role === 'assistant' && rec.liveTools.size > 0) {
+    const toolPart = turn.parts.find(p => p.type === 'tool-call')
+    const toolCallId = toolPart?.type === 'tool-call' ? toolPart.call.toolCallId : undefined
+    // Keep the mapping (don't delete): the run-end reconcile re-emits the same
+    // durable row, and it must re-id to the SAME live turn every time or it
+    // lands as a second card.
+    if (toolCallId && rec.liveTools.has(toolCallId)) {
+      turn.id = liveToolTurnId(rec.sessionKey, toolCallId)
+    }
+  }
   // Stamp the run's preview slot id so the client clears the streaming
   // preview when this turn upserts (chat deltas can trail the durable row).
   // Only FRESH turns get the current run's slot — a re-emitted older turn
@@ -556,17 +583,66 @@ function handleChatFrame(rec: SessionRecord, payload: Record<string, unknown>): 
   }
 }
 
-// `session.tool` frames flip tool cards live: start/update → running,
-// result → success/error with the full output (both gateway lines emit the
-// output inline; `reconcileAfterRun` stays as the safety net).
-function handleToolFrame(rec: SessionRecord, payload: Record<string, unknown>): void {
+// The id of the run-scoped live tool turn for a toolCallId. The durable owner
+// row re-ids to this so the live card upserts in place instead of duplicating.
+function liveToolTurnId(sessionKey: string, toolCallId: string): string {
+  return `openclaw:${sessionKey}:livetool:${toolCallId}`
+}
+
+// Build (and broadcast) a synthetic assistant turn holding a single tool card,
+// from the live tool state in `rec.liveTools` + `rec.results`. Used when a
+// tool executes before its durable owner row exists.
+function emitLiveToolTurn(rec: SessionRecord, toolCallId: string): void {
+  const meta = rec.liveTools.get(toolCallId)
+  if (!meta) return
+  const result = rec.results.get(toolCallId)
+  let state: ToolState = 'pending'
+  if (result) state = result.running ? 'running' : result.isError ? 'error' : 'success'
+  const call: ToolCall = {
+    toolCallId,
+    name: meta.name,
+    caller: 'model',
+    provider: 'openclaw',
+    state,
+    input: meta.input
+  }
+  if (result && !result.running) {
+    if (result.isError) call.errorText = result.output
+    else call.output = result.output
+  }
+  const turn: Turn = {
+    id: liveToolTurnId(rec.sessionKey, toolCallId),
+    role: 'assistant',
+    origin: { kind: 'user-input' },
+    parts: [{ type: 'tool-call', call }]
+  }
+  rec.view = applyEvent(rec.view, { kind: 'turn', turn })
+  broadcast(rec.workspaceId, { kind: 'turn', turn, sessionId: rec.sessionId })
+}
+
+// `session.tool` and `agent`/tool frames flip tool cards live: start/update →
+// running, result → success/error with output. When the durable owner row
+// already exists we re-emit it; otherwise (codex-app-server batches durable
+// rows at run end) we render a live tool turn so tools appear during the run,
+// before the streaming text — not all at once after it. `reconcileAfterRun`
+// stays as the safety net. Exported for tests.
+export function handleToolFrame(rec: SessionRecord, payload: Record<string, unknown>): void {
   const data = payload.data as
-    | { phase?: unknown; name?: unknown; toolCallId?: unknown; isError?: unknown; result?: unknown }
+    | {
+        phase?: unknown
+        name?: unknown
+        toolCallId?: unknown
+        isError?: unknown
+        result?: unknown
+        args?: unknown
+      }
     | undefined
   if (!data || typeof data.toolCallId !== 'string') return
   const id = data.toolCallId
-  const toolName = typeof data.name === 'string' ? { toolName: data.name } : {}
+  const name = typeof data.name === 'string' ? data.name : undefined
+  const toolName = name ? { toolName: name } : {}
   if (data.phase === 'start' || data.phase === 'update') {
+    if (name && !rec.liveTools.has(id)) rec.liveTools.set(id, { name, input: data.args })
     const existing = rec.results.get(id)
     if (existing && !existing.running) return // final result already landed
     rec.results.set(id, { output: '', isError: false, running: true, ...toolName })
@@ -580,7 +656,9 @@ function handleToolFrame(rec: SessionRecord, payload: Record<string, unknown>): 
   } else {
     return
   }
-  reemitToolCallOwners(rec, id)
+  const owners = findToolCallOwners(rec.messagesById.values(), id)
+  if (owners.length > 0) reemitToolCallOwners(rec, id)
+  else if (rec.liveTools.has(id)) emitLiveToolTurn(rec, id)
 }
 
 // Debounced workspace session-list refresh — `sessions.changed` fires for
@@ -623,7 +701,8 @@ function broadcastSessionsChanged(rec: SessionRecord): void {
   broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
 }
 
-function ingest(rec: SessionRecord, msg: OpenClawMessage): void {
+// Exported for tests (the live subscription is the only production caller).
+export function ingest(rec: SessionRecord, msg: OpenClawMessage): void {
   // toolResult: update the results map and re-emit each owner turn so the
   // tool-call card gets `state: 'success'/'error'` + output folded in.
   const result = toolResultFromMessage(msg)
@@ -783,6 +862,13 @@ async function ensureSubscribed(rec: SessionRecord): Promise<void> {
         handleAgentStreamFrame(rec, payload)
         return
       }
+      // The codex-app-server backend (OpenAI models on newer OpenClaw) streams
+      // tool activity as `agent`/tool frames instead of `session.tool`; same
+      // `data` shape, so route it through the shared handler for live cards.
+      if (stream === 'tool') {
+        handleToolFrame(rec, payload)
+        return
+      }
       // Backstop for run lifecycle — `sessions.changed` should already cover
       // this, but `agent` lifecycle frames are the authoritative signal.
       if (stream !== 'lifecycle') return
@@ -839,7 +925,8 @@ export async function getOrCreateOpenClawSession(input: {
     // in (send sets `streamEnabled = input.stream === true`).
     streamEnabled: false,
     pendingFrames: [],
-    pendingUserEchoes: []
+    pendingUserEchoes: [],
+    liveTools: new Map()
   }
   sessions.set(k, rec)
   await ensureSubscribed(rec)
@@ -1143,7 +1230,8 @@ export function createOpenClawSessionForTest(input: {
     seeded: true,
     streamEnabled: false,
     pendingFrames: [],
-    pendingUserEchoes: []
+    pendingUserEchoes: [],
+    liveTools: new Map()
   }
   sessions.set(recKey(input.workspaceId, input.sessionId), rec)
   return rec
