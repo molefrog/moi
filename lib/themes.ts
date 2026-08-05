@@ -1,6 +1,14 @@
 import { wcagLuminance } from 'culori'
 
-export type FontTheme = 'sans' | 'serif' | 'mono' | 'blobby' | 'geometric' | 'awkward'
+export type FontTheme =
+  | 'sans'
+  | 'serif'
+  | 'mono'
+  | 'geometric'
+  | 'rounded'
+  | 'blobby'
+  | 'awkward'
+  | 'comic'
 
 export type FontThemeConfig = {
   label: string
@@ -28,27 +36,39 @@ export const FONT_THEMES: Record<FontTheme, FontThemeConfig> = {
     mono: 'Geist Mono',
     googleFontsQuery: 'Geist+Mono:wght@400;500;600'
   },
-  blobby: {
-    label: 'Blobby',
-    sans: 'Sour Gummy',
-    mono: 'Azeret Mono',
-    googleFontsQuery: 'Sour+Gummy:wght@400;500;600&family=Azeret+Mono:wght@400;500'
-  },
   geometric: {
     label: 'Geometric',
     sans: 'Manrope',
     mono: 'Geist Mono',
     googleFontsQuery: 'Manrope:wght@400;500;600&family=Geist+Mono:wght@400;500'
   },
+  rounded: {
+    label: 'Rounded',
+    sans: 'SN Pro',
+    mono: 'Geist Mono',
+    googleFontsQuery: 'SN+Pro:wght@400;500;600&family=Geist+Mono:wght@400;500'
+  },
+  blobby: {
+    label: 'Blobby',
+    sans: 'Sour Gummy',
+    mono: 'Azeret Mono',
+    googleFontsQuery: 'Sour+Gummy:wght@400;500;600&family=Azeret+Mono:wght@400;500'
+  },
   awkward: {
     label: 'Awkward',
     sans: 'Averia Sans Libre',
     mono: 'Azeret Mono',
     googleFontsQuery: 'Averia+Sans+Libre:wght@400;500;600&family=Azeret+Mono:wght@400;500'
+  },
+  comic: {
+    label: 'Comic',
+    sans: 'Comic Sans MS, Comic Sans, cursive',
+    mono: 'Geist Mono',
+    googleFontsQuery: 'Geist+Mono:wght@400;500'
   }
 }
 
-export type RadiusTheme = 'squishy' | 'rounded' | 'subtle' | 'square'
+export type RadiusTheme = 'squishy' | 'soft' | 'subtle' | 'square'
 
 export type RadiusThemeConfig = {
   label: string
@@ -57,7 +77,7 @@ export type RadiusThemeConfig = {
 
 export const RADIUS_THEMES: Record<RadiusTheme, RadiusThemeConfig> = {
   squishy: { label: 'Squishy', radius: '0.875rem' },
-  rounded: { label: 'Rounded', radius: '0.625rem' },
+  soft: { label: 'Soft', radius: '0.625rem' },
   subtle: { label: 'Subtle', radius: '0.375rem' },
   square: { label: 'Square', radius: '0' }
 }
@@ -171,7 +191,7 @@ export type WorkspaceTheme = {
 export const DEFAULT_WORKSPACE_THEME: WorkspaceTheme = {
   font: 'sans',
   color: 'default',
-  radius: 'rounded'
+  radius: 'soft'
 }
 
 export function resolveWorkspaceTheme(theme?: Partial<WorkspaceTheme>): WorkspaceTheme {

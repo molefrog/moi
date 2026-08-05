@@ -124,7 +124,7 @@ describe('radius themes', () => {
   test('defines the four shared radius presets', () => {
     expect(RADIUS_THEMES).toEqual({
       squishy: { label: 'Squishy', radius: '0.875rem' },
-      rounded: { label: 'Rounded', radius: '0.625rem' },
+      soft: { label: 'Soft', radius: '0.625rem' },
       subtle: { label: 'Subtle', radius: '0.375rem' },
       square: { label: 'Square', radius: '0' }
     })
@@ -153,10 +153,10 @@ describe('applyThemeUpdate', () => {
   })
 
   test("'sans' remains an explicit font preset", () => {
-    const current = { font: 'serif' as const, color: 'paper' as const, radius: 'rounded' as const }
+    const current = { font: 'serif' as const, color: 'paper' as const, radius: 'soft' as const }
     const result = applyThemeUpdate(current, { font: 'sans' })
     if (!result.ok) throw new Error('expected ok')
-    expect(result.theme).toEqual({ font: 'sans', color: 'paper', radius: 'rounded' })
+    expect(result.theme).toEqual({ font: 'sans', color: 'paper', radius: 'soft' })
   })
 
   test('combined font + color updates apply both', () => {
@@ -190,12 +190,12 @@ describe('applyThemeUpdate', () => {
     expect(result.error).toContain('neon')
   })
 
-  test("'rounded' remains an explicit preset", () => {
+  test("'soft' remains an explicit preset", () => {
     const current = { font: 'serif' as const, color: 'rose' as const, radius: 'squishy' as const }
-    const result = applyThemeUpdate(current, { radius: 'rounded' })
+    const result = applyThemeUpdate(current, { radius: 'soft' })
     if (!result.ok) throw new Error('expected ok')
-    expect(result.theme).toEqual({ font: 'serif', color: 'rose', radius: 'rounded' })
-    expect(result.applied).toEqual({ radius: 'rounded' })
+    expect(result.theme).toEqual({ font: 'serif', color: 'rose', radius: 'soft' })
+    expect(result.applied).toEqual({ radius: 'soft' })
   })
 
   test('rejects unknown radius key', () => {
@@ -215,7 +215,7 @@ describe('resolveWorkspaceTheme', () => {
     expect(resolveWorkspaceTheme({ font: 'serif' })).toEqual({
       font: 'serif',
       color: 'default',
-      radius: 'rounded'
+      radius: 'soft'
     })
   })
 })

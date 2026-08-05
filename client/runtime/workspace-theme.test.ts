@@ -17,7 +17,7 @@ describe('getWorkspaceThemeStyle', () => {
     expect(style).toMatchObject({
       '--sans': FONT_THEMES.sans.sans,
       '--mono': FONT_THEMES.sans.mono,
-      '--radius': RADIUS_THEMES.rounded.radius
+      '--radius': RADIUS_THEMES.soft.radius
     })
     expect(style['--primary']).toBeUndefined()
   })
@@ -52,7 +52,7 @@ describe('getWorkspaceThemeStyle', () => {
     const colors = deriveThemeColors(primary, 'widget')
 
     expect(
-      getWorkspaceThemeStyle({ font: 'sans', color: 'paper', radius: 'rounded' }, 'widget')
+      getWorkspaceThemeStyle({ font: 'sans', color: 'paper', radius: 'soft' }, 'widget')
     ).toMatchObject({
       '--background': colors.background,
       '--foreground': colors.foreground,
