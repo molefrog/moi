@@ -42,11 +42,11 @@ describe('color themes', () => {
     expect(deriveThemeColors(primary)).toEqual({
       primary,
       primaryForeground: 'oklch(0 0 0)',
-      background: 'color-mix(in oklch, var(--primary) 3%, oklch(1 0 0) 97%)',
-      foreground: 'color-mix(in oklch, var(--primary) 24%, oklch(0 0 0) 76%)',
-      muted: 'color-mix(in oklch, var(--background) 95%, var(--foreground) 5%)',
-      mutedForeground: 'color-mix(in oklch, var(--background) 58%, var(--foreground) 42%)',
-      accent: 'color-mix(in oklch, var(--primary) 4%, var(--foreground) 4%)'
+      background: 'color-mix(var(--primary) 3%, oklch(1 0 0) 97%)',
+      foreground: 'color-mix(var(--primary) 20%, oklch(0 0 0) 80%)',
+      muted: 'color-mix(var(--background) 95%, var(--foreground) 5%)',
+      mutedForeground: 'color-mix(var(--background) 50%, var(--foreground) 50%)',
+      accent: 'color-mix(var(--primary) 4%, var(--foreground) 4%)'
     })
   })
 
@@ -55,13 +55,13 @@ describe('color themes', () => {
     const colors = deriveThemeColors(primary, 'widget')
 
     expect(colors).toEqual({
-      primary: 'color-mix(in oklch, var(--background) 3%, oklch(1 0 0) 97%)',
-      primaryForeground: 'color-mix(in oklch, var(--background) 24%, oklch(0 0 0) 76%)',
+      primary: 'color-mix(var(--background) 3%, oklch(1 0 0) 97%)',
+      primaryForeground: 'color-mix(var(--background) 20%, oklch(0 0 0) 80%)',
       background: primary,
       foreground: 'oklch(0 0 0)',
-      muted: 'color-mix(in oklch, var(--background) 95%, var(--foreground) 5%)',
-      mutedForeground: 'color-mix(in oklch, var(--background) 58%, var(--foreground) 42%)',
-      accent: 'color-mix(in oklch, var(--primary) 4%, var(--foreground) 4%)'
+      muted: 'color-mix(var(--background) 95%, var(--foreground) 5%)',
+      mutedForeground: 'color-mix(var(--background) 50%, var(--foreground) 50%)',
+      accent: 'color-mix(var(--primary) 4%, var(--foreground) 4%)'
     })
     expect(colors.primary).not.toContain('var(--primary)')
     expect(deriveThemeColors(DEFAULT_PRIMARY_COLOR, 'widget').background).toBe(
@@ -90,7 +90,7 @@ describe('color themes', () => {
 
   test('serializes the OKLCH presets for terminal swatches', () => {
     const expectedHex = {
-      paper: '#453521',
+      paper: '#5e4d3c',
       rose: '#f13c3c',
       tangerine: '#ff5718',
       sand: '#ffb868',
