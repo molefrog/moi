@@ -6,8 +6,9 @@ Upstream registry as the source of truth, zero config files in the
 workspace, Base UI only. The command writes source files; the agent owns
 everything else.
 
-Status: decided (Aug 2026). Decision history in `docs/rfc/`, empirical
-evidence for every claim in `docs/shadcn-applet-experiments.md` (4 rounds).
+Status: decided (Aug 2026). Every empirical claim below (build behavior,
+registry mechanics, theming cascade) was verified by experiment; the full
+research trail lives in PR #78.
 
 ## Opinions (non-negotiable)
 
