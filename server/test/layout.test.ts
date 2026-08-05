@@ -150,14 +150,14 @@ describe('mergeLayoutForSave', () => {
       tabs: { open: ['agent', 'widgets'], active: 'widgets' },
       selectedModel: 'sonnet',
       selectedFastMode: false,
-      theme: { font: 'default', color: 'rose', radius: 'square' }
+      theme: { font: 'sans', color: 'rose', radius: 'square' }
     }
     const merged = mergeLayoutForSave(existing, body)
     expect(merged.layoutMode).toBe('split')
     expect(merged.tabs).toEqual({ open: ['agent', 'widgets'], active: 'widgets' })
     expect(merged.selectedModel).toBe('sonnet')
     expect(merged.selectedFastMode).toBe(false)
-    expect(merged.theme).toEqual({ font: 'default', color: 'rose', radius: 'square' })
+    expect(merged.theme).toEqual({ font: 'sans', color: 'rose', radius: 'square' })
     expect(merged.name).toBe('Keep')
   })
 })
@@ -165,7 +165,7 @@ describe('mergeLayoutForSave', () => {
 describe('getWorkspacePreview', () => {
   test('includes the persisted workspace theme', async () => {
     const theme = {
-      font: 'default' as const,
+      font: 'sans' as const,
       color: 'rose' as const,
       radius: 'squishy' as const
     }

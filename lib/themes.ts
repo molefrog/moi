@@ -1,6 +1,6 @@
 import { wcagLuminance } from 'culori'
 
-export type FontTheme = 'default' | 'serif' | 'mono' | 'blobby' | 'geometric' | 'awkward'
+export type FontTheme = 'sans' | 'serif' | 'mono' | 'blobby' | 'geometric' | 'awkward'
 
 export type FontThemeConfig = {
   label: string
@@ -10,8 +10,8 @@ export type FontThemeConfig = {
 }
 
 export const FONT_THEMES: Record<FontTheme, FontThemeConfig> = {
-  default: {
-    label: 'Default',
+  sans: {
+    label: 'Sans',
     sans: 'system-ui',
     mono: 'Geist Mono',
     googleFontsQuery: 'Geist+Mono:wght@400;500'
@@ -169,7 +169,7 @@ export type WorkspaceTheme = {
 }
 
 export const DEFAULT_WORKSPACE_THEME: WorkspaceTheme = {
-  font: 'default',
+  font: 'sans',
   color: 'default',
   radius: 'rounded'
 }

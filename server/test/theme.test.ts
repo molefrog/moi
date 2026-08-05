@@ -134,7 +134,7 @@ describe('radius themes', () => {
 describe('applyThemeUpdate', () => {
   test('setting one option preserves the others', () => {
     const current = {
-      font: 'default' as const,
+      font: 'sans' as const,
       color: 'paper' as const,
       radius: 'squishy' as const
     }
@@ -152,11 +152,11 @@ describe('applyThemeUpdate', () => {
     expect(result.applied).toEqual({ color: 'paper' })
   })
 
-  test("'default' remains an explicit preset", () => {
+  test("'sans' remains an explicit font preset", () => {
     const current = { font: 'serif' as const, color: 'paper' as const, radius: 'rounded' as const }
-    const result = applyThemeUpdate(current, { color: 'default' })
+    const result = applyThemeUpdate(current, { font: 'sans' })
     if (!result.ok) throw new Error('expected ok')
-    expect(result.theme).toEqual({ font: 'serif', color: 'default', radius: 'rounded' })
+    expect(result.theme).toEqual({ font: 'sans', color: 'paper', radius: 'rounded' })
   })
 
   test('combined font + color updates apply both', () => {
