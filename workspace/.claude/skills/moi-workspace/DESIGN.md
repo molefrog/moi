@@ -29,34 +29,34 @@ spacing, or interaction patterns. They do not need to look identical.
 
 ## Color
 
-### Widget surfaces
+Widgets and views use the same semantic token vocabulary. Use
+`h-full w-full bg-background text-foreground` for most applet roots. Each token keeps the same
+purpose in both applet types; the host changes its value to suit the surrounding surface.
 
-The host applies the `.dark` class around every widget. Semantic tokens inside a widget therefore
-use dark-mode values regardless of the workspace color preset. The host frame stays transparent, so
-every widget root must cover the full frame with an opaque background.
+### How tokens resolve
 
-Use `h-full w-full bg-background text-foreground` for most widget roots. In the widget scope, it
-resolves to a dark background with light text. When the whole widget has a clear positive or
-negative state, tint the opaque background by mixing `--background` with `--success` or
-`--destructive`. Use opacity variants such as `bg-success/10` for contained elements. An image or
-visualization may own the surface when it has an opaque fallback.
+- **Widgets:** The host applies a widget-local semantic theme derived from the selected workspace
+  color. `background` is the workspace `primary`, `foreground` is its paired readable color, and
+  the local `primary` pair becomes the light action surface derived from that color. The host frame
+  stays transparent, so every widget root must cover the full frame with an opaque background. An
+  image or visualization may own the surface when it has an opaque fallback.
+- **Views:** Semantic tokens inherit the workspace page theme. The default root uses the normal
+  workspace page surface and text.
+- **Portalled UI:** Menus, tooltips, and popovers render in workspace scope and keep
+  `bg-popover text-popover-foreground`.
 
-### View surfaces
-
-Views are separate pages. Their semantic tokens inherit the workspace theme, so
-`h-full w-full bg-background text-foreground` is a sensible default root.
+### Semantic token reference
 
 | Context or intent | Tailwind classes | Use |
 | --- | --- | --- |
-| Default widget root | `bg-background text-foreground` | Dark semantic surface for most widgets |
-| Default view root | `bg-background text-foreground` | The workspace page surface and text |
-| Primary content | `text-foreground` | Content on the default dark widget surface or normal view surface |
-| Secondary content | `text-muted-foreground` | Supporting content on the default dark widget surface or normal view surface |
+| Applet root | `bg-background text-foreground` | The full widget surface or view page |
+| Main content | `text-foreground` | Titles, labels, values, and important icons |
+| Supporting content | `text-muted-foreground` | Descriptions and secondary information |
 | Inset surface | `bg-card text-card-foreground` | A functionally distinct contained region, used sparingly |
 | Floating surface | `bg-popover text-popover-foreground` | Menus, tooltips, and other floating content |
-| Primary action | `bg-primary text-primary-foreground` | The most important action in a local region |
-| Subdued surface | `bg-muted` | Skeletons, quiet fills, and disabled structure |
-| Control state | `bg-accent text-accent-foreground` | Hover, active, and selected states on interactive controls |
+| Quiet fill | `bg-muted` | Inset regions, skeletons, and disabled structure |
+| Control state | `bg-accent text-accent-foreground` | Hover, active, and selected controls |
+| Main action | `bg-primary text-primary-foreground hover:bg-primary/90` | The most important action in a local region |
 | Positive or active state | `text-success` / `bg-success/10` | Positive outcomes, healthy states, presence, and progress indicators |
 | Error or danger | `text-destructive` / `bg-destructive/10` | Errors, destructive actions, and invalid states |
 | Object edge | `ring-1 ring-border` | Complete outlines around containers and controls |
@@ -67,17 +67,17 @@ Use lower opacity from the surface's foreground only for tertiary metadata that 
 Avoid weak alpha text for important labels or values.
 
 Prefer a subtle ring for the complete outline of a container or control. Use `ring-1 ring-border` on
-semantic surfaces and an equally restrained ring color on custom light or colored surfaces. Reserve
-one-sided borders such as `border-b` for separators between adjacent regions. Never use a border
-and a ring on the same element. Avoid raw high-contrast colors for either treatment.
+semantic surfaces. Reserve one-sided borders such as `border-b` for separators between adjacent
+regions. Never use a border and a ring on the same element. Avoid raw high-contrast colors for
+either treatment.
 
-Derive extra neutral or tonal colors and custom gradients from semantic tokens with `color-mix()`.
-Use Tailwind palette colors only when they have clear content meaning, distinguish infographic
-data, or follow an explicit user request. Keep each mapping consistent and explain it with labels,
-legends, shapes, or direct values. Do not use palette colors for generic decoration or unrelated
-widget backgrounds. Purple, violet, and fuchsia need a content, brand, or user reason; never use a
-purple gradient as a default creativity or technology cue. On a saturated surface, choose an
-explicit light or dark foreground with strong contrast.
+Derive extra neutral or tonal colors and custom gradients from the local semantic tokens with
+`color-mix()`. Use Tailwind palette colors only when they have clear content meaning, distinguish
+infographic data, or follow an explicit user request. Keep each mapping consistent and explain it
+with labels, legends, shapes, or direct values. Do not use palette colors for generic decoration or
+unrelated widget backgrounds. Purple, violet, and fuchsia need a content, brand, or user reason;
+never use a purple gradient as a default creativity or technology cue. On a saturated surface,
+choose an explicit light or dark foreground with strong contrast.
 
 ### Surfaces and grouping
 
@@ -98,7 +98,8 @@ padding and radius and realign its children; do not leave spacing that implies a
 ### Textures
 
 Use one texture on every widget or view root and no more than one per applet. Pair it with an opaque
-semantic base, such as `h-full w-full bg-background texture-checker`. Skip it only when an opaque
+semantic base, such as `h-full w-full bg-background text-foreground texture-checker`. The same
+classes resolve through the widget-local theme or view page theme. Skip it only when an opaque
 full-bleed image, map, canvas, or visualization owns the background, the user explicitly asks for a
 plain surface, or preserving readability would require several extra solid wrappers.
 

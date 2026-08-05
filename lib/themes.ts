@@ -72,21 +72,36 @@ export type ColorTheme =
   | 'sky'
   | 'lavender'
 
+export type ThemeColorMode = 'workspace' | 'widget'
+
+export const DEFAULT_PRIMARY_COLOR = 'oklch(0.205 0 0)'
+
 function foregroundForPrimary(primary: string): string {
   return wcagLuminance(primary) > 0.3 ? 'oklch(0 0 0)' : 'oklch(1 0 0)'
 }
 
 const THEME_COLOR_DERIVATIONS = {
-  primary: primary => primary,
-  primaryForeground: primary => foregroundForPrimary(primary),
-  background: () => 'color-mix(in oklch, var(--primary) 3%, oklch(1 0 0) 97%)',
-  foreground: () => 'color-mix(in oklch, var(--primary) 24%, oklch(0 0 0) 76%)',
-  muted: () => 'color-mix(in oklch, var(--background) 95%, var(--foreground) 5%)',
-  mutedForeground: () => 'color-mix(in oklch, var(--background) 58%, var(--foreground) 42%)',
-  accent: () => 'color-mix(in oklch, var(--primary) 4%, var(--foreground) 4%)'
-} satisfies Record<string, (primary: string) => string>
+  workspace: {
+    primary: primary => primary,
+    primaryForeground: primary => foregroundForPrimary(primary),
+    background: () => 'color-mix(in oklch, var(--primary) 3%, oklch(1 0 0) 97%)',
+    foreground: () => 'color-mix(var(--primary) 20%, oklch(0 0 0) 80%)',
+    muted: () => 'color-mix(in oklch, var(--background) 95%, var(--foreground) 5%)',
+    mutedForeground: () => 'color-mix(var(--background) 50%, var(--foreground) 50%)',
+    accent: () => 'color-mix(in oklch, var(--primary) 4%, var(--foreground) 4%)'
+  },
+  widget: {
+    background: primary => primary,
+    foreground: primary => foregroundForPrimary(primary),
+    primary: () => 'color-mix(in oklch, var(--background) 3%, oklch(1 0 0) 97%)',
+    primaryForeground: () => 'color-mix(var(--background) 20%, oklch(0 0 0) 80%)',
+    muted: () => 'color-mix(in oklch, var(--background) 95%, var(--foreground) 5%)',
+    mutedForeground: () => 'color-mix(var(--background) 50%, var(--foreground) 50%)',
+    accent: () => 'color-mix(in oklch, var(--primary) 4%, var(--foreground) 4%)'
+  }
+} satisfies Record<ThemeColorMode, Record<string, (primary: string) => string>>
 
-export type ThemeColorToken = keyof typeof THEME_COLOR_DERIVATIONS
+export type ThemeColorToken = keyof (typeof THEME_COLOR_DERIVATIONS)['workspace']
 export type ThemeColors = Record<ThemeColorToken, string>
 
 export type ColorThemeConfig = {
@@ -95,12 +110,18 @@ export type ColorThemeConfig = {
   primary?: string
 }
 
-export const THEME_COLOR_TOKENS = Object.keys(THEME_COLOR_DERIVATIONS) as ThemeColorToken[]
+export const THEME_COLOR_TOKENS = Object.keys(
+  THEME_COLOR_DERIVATIONS.workspace
+) as ThemeColorToken[]
 
-export function deriveThemeColors(primary: string): ThemeColors {
+export function deriveThemeColors(
+  primary: string,
+  mode: ThemeColorMode = 'workspace'
+): ThemeColors {
   const colors = {} as ThemeColors
+  const derivations = THEME_COLOR_DERIVATIONS[mode]
   for (const token of THEME_COLOR_TOKENS) {
-    colors[token] = THEME_COLOR_DERIVATIONS[token](primary)
+    colors[token] = derivations[token](primary)
   }
   return colors
 }
@@ -117,7 +138,7 @@ export const COLOR_THEMES: Record<ColorTheme, ColorThemeConfig> = {
   },
   tangerine: {
     label: 'Tangerine',
-    primary: 'oklch(0.6886 0.259 37.15)'
+    primary: 'oklch(0.6886 0.22 37.15)'
   },
   sand: {
     label: 'Sand',

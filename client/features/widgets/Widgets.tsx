@@ -243,6 +243,7 @@ export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: W
                     items={visibleItems}
                     editing={editing}
                     renderItem={renderItem}
+                    theme={layout.theme}
                     onRemove={hide}
                     onLayoutChange={items =>
                       setLayout({
@@ -264,6 +265,7 @@ export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: W
               ref={panelRef}
               items={hiddenItems}
               renderItem={renderItem}
+              theme={layout.theme}
               onClose={() => onEditingChange(false)}
               onRestore={restore}
             />

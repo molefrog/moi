@@ -6,6 +6,7 @@ import { join } from 'path'
 
 import {
   COLOR_THEMES,
+  DEFAULT_PRIMARY_COLOR,
   DEFAULT_WORKSPACE_THEME,
   RADIUS_THEMES,
   deriveThemeColors,
@@ -17,6 +18,12 @@ import { loadLayout, saveLayout } from '../layout'
 import { applyThemeUpdate } from '../theme'
 
 describe('color themes', () => {
+  test('keeps the default primary source aligned with the root theme', async () => {
+    const css = await Bun.file(join(import.meta.dir, '../../client/index.css')).text()
+
+    expect(css).toContain(`--primary: ${DEFAULT_PRIMARY_COLOR};`)
+  })
+
   test('keeps the picker order', () => {
     expect(Object.keys(COLOR_THEMES)).toEqual([
       'default',
@@ -43,6 +50,25 @@ describe('color themes', () => {
     })
   })
 
+  test('swaps the primary pair into the widget surface roles', () => {
+    const primary = 'oklch(0.7426 0.1817 56.01)'
+    const colors = deriveThemeColors(primary, 'widget')
+
+    expect(colors).toEqual({
+      primary: 'color-mix(in oklch, var(--background) 3%, oklch(1 0 0) 97%)',
+      primaryForeground: 'color-mix(in oklch, var(--background) 24%, oklch(0 0 0) 76%)',
+      background: primary,
+      foreground: 'oklch(0 0 0)',
+      muted: 'color-mix(in oklch, var(--background) 95%, var(--foreground) 5%)',
+      mutedForeground: 'color-mix(in oklch, var(--background) 58%, var(--foreground) 42%)',
+      accent: 'color-mix(in oklch, var(--primary) 4%, var(--foreground) 4%)'
+    })
+    expect(colors.primary).not.toContain('var(--primary)')
+    expect(deriveThemeColors(DEFAULT_PRIMARY_COLOR, 'widget').background).toBe(
+      DEFAULT_PRIMARY_COLOR
+    )
+  })
+
   test('chooses primary text using the UI luminance threshold', () => {
     const expectedForegrounds = {
       paper: 'oklch(1 0 0)',
@@ -66,7 +92,7 @@ describe('color themes', () => {
     const expectedHex = {
       paper: '#453521',
       rose: '#f13c3c',
-      tangerine: '#ff3c00',
+      tangerine: '#ff5718',
       sand: '#ffb868',
       mint: '#009155',
       sky: '#007ae3',

@@ -12,6 +12,7 @@
 @plugin '@tailwindcss/typography';
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant dark-or-widget (&:is(.dark *, [data-widget-chrome] *));
 
 :root {
   --background: oklch(1 0 0);
