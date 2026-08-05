@@ -84,20 +84,20 @@ const THEME_COLOR_DERIVATIONS = {
   workspace: {
     primary: primary => primary,
     primaryForeground: primary => foregroundForPrimary(primary),
-    background: () => 'color-mix(in oklch, var(--primary) 3%, oklch(1 0 0) 97%)',
+    background: () => 'color-mix(var(--primary) 3%, oklch(1 0 0) 97%)',
     foreground: () => 'color-mix(var(--primary) 20%, oklch(0 0 0) 80%)',
-    muted: () => 'color-mix(in oklch, var(--background) 95%, var(--foreground) 5%)',
+    muted: () => 'color-mix(var(--background) 95%, var(--foreground) 5%)',
     mutedForeground: () => 'color-mix(var(--background) 50%, var(--foreground) 50%)',
-    accent: () => 'color-mix(in oklch, var(--primary) 4%, var(--foreground) 4%)'
+    accent: () => 'color-mix(var(--primary) 4%, var(--foreground) 4%)'
   },
   widget: {
     background: primary => primary,
     foreground: primary => foregroundForPrimary(primary),
-    primary: () => 'color-mix(in oklch, var(--background) 3%, oklch(1 0 0) 97%)',
+    primary: () => 'color-mix(var(--background) 3%, oklch(1 0 0) 97%)',
     primaryForeground: () => 'color-mix(var(--background) 20%, oklch(0 0 0) 80%)',
-    muted: () => 'color-mix(in oklch, var(--background) 95%, var(--foreground) 5%)',
+    muted: () => 'color-mix(var(--background) 95%, var(--foreground) 5%)',
     mutedForeground: () => 'color-mix(var(--background) 50%, var(--foreground) 50%)',
-    accent: () => 'color-mix(in oklch, var(--primary) 4%, var(--foreground) 4%)'
+    accent: () => 'color-mix(var(--primary) 4%, var(--foreground) 4%)'
   }
 } satisfies Record<ThemeColorMode, Record<string, (primary: string) => string>>
 
@@ -130,7 +130,7 @@ export const COLOR_THEMES: Record<ColorTheme, ColorThemeConfig> = {
   default: { label: 'Default' },
   paper: {
     label: 'Paper',
-    primary: 'oklch(0.3413 0.0393 72.10)'
+    primary: 'oklch(0.4328 0.0351 66.67)'
   },
   rose: {
     label: 'Rose',
