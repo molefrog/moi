@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { formatHex, wcagContrast } from 'culori'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'path'
@@ -15,20 +16,6 @@ import type { WorkspaceLayout } from '@/lib/types'
 import { loadLayout, saveLayout } from '../layout'
 import { applyThemeUpdate } from '../theme'
 
-function relativeLuminance(hex: string): number {
-  const channels = [1, 3, 5].map(index => {
-    const channel = Number.parseInt(hex.slice(index, index + 2), 16) / 255
-    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
-  })
-  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
-}
-
-function contrastRatio(first: string, second: string): number {
-  const lighter = Math.max(relativeLuminance(first), relativeLuminance(second))
-  const darker = Math.min(relativeLuminance(first), relativeLuminance(second))
-  return (lighter + 0.05) / (darker + 0.05)
-}
-
 describe('color themes', () => {
   test('keeps the picker order', () => {
     expect(Object.keys(COLOR_THEMES)).toEqual([
@@ -44,11 +31,12 @@ describe('color themes', () => {
   })
 
   test('derives all theme colors from the primary', () => {
-    expect(deriveThemeColors('#eab308')).toEqual({
-      primary: '#eab308',
-      primaryForeground: '#000000',
-      background: 'color-mix(in oklch, var(--primary) 3%, white 97%)',
-      foreground: 'color-mix(in oklch, var(--primary) 24%, black 76%)',
+    const primary = 'oklch(0.7426 0.1817 56.01)'
+    expect(deriveThemeColors(primary)).toEqual({
+      primary,
+      primaryForeground: 'oklch(0 0 0)',
+      background: 'color-mix(in oklch, var(--primary) 3%, oklch(1 0 0) 97%)',
+      foreground: 'color-mix(in oklch, var(--primary) 24%, oklch(0 0 0) 76%)',
       muted: 'color-mix(in oklch, var(--background) 95%, var(--foreground) 5%)',
       mutedForeground: 'color-mix(in oklch, var(--background) 58%, var(--foreground) 42%)',
       accent: 'color-mix(in oklch, var(--primary) 4%, var(--foreground) 4%)'
@@ -56,24 +44,40 @@ describe('color themes', () => {
   })
 
   test('chooses primary text using the UI luminance threshold', () => {
-    expect(deriveThemeColors('#eab308').primaryForeground).toBe('#000000')
-    expect(deriveThemeColors('#e11d48').primaryForeground).toBe('#ffffff')
-    expect(deriveThemeColors('#7c3aed').primaryForeground).toBe('#ffffff')
-    expect(deriveThemeColors('#059669').primaryForeground).toBe('#ffffff')
-    expect(deriveThemeColors('#2563eb').primaryForeground).toBe('#ffffff')
+    const expectedForegrounds = {
+      paper: 'oklch(1 0 0)',
+      rose: 'oklch(1 0 0)',
+      tangerine: 'oklch(1 0 0)',
+      sand: 'oklch(0 0 0)',
+      mint: 'oklch(1 0 0)',
+      sky: 'oklch(1 0 0)',
+      lavender: 'oklch(1 0 0)'
+    }
 
-    for (const preset of Object.values(COLOR_THEMES)) {
-      if (!preset.primary) continue
+    for (const [key, preset] of Object.entries(COLOR_THEMES)) {
+      if (!preset.primary || key === 'default') continue
       const foreground = deriveThemeColors(preset.primary).primaryForeground
-      expect(contrastRatio(preset.primary, foreground)).toBeGreaterThanOrEqual(3)
+      expect(foreground).toBe(expectedForegrounds[key as keyof typeof expectedForegrounds])
+      expect(wcagContrast(preset.primary, foreground)).toBeGreaterThanOrEqual(3)
     }
   })
 
-  test('requires primary colors to use six-digit hex', () => {
-    expect(() => deriveThemeColors('#fff')).toThrow('Primary theme color must use #rrggbb: #fff')
-    expect(() => deriveThemeColors('rgb(255, 255, 255)')).toThrow(
-      'Primary theme color must use #rrggbb: rgb(255, 255, 255)'
-    )
+  test('serializes the OKLCH presets for terminal swatches', () => {
+    const expectedHex = {
+      paper: '#453521',
+      rose: '#f13c3c',
+      tangerine: '#ff3c00',
+      sand: '#ffb868',
+      mint: '#009155',
+      sky: '#007ae3',
+      lavender: '#9051ff'
+    }
+
+    for (const [key, hex] of Object.entries(expectedHex)) {
+      const primary = COLOR_THEMES[key as keyof typeof expectedHex].primary
+      if (!primary) throw new Error(`expected ${key} primary`)
+      expect(formatHex(primary)).toBe(hex)
+    }
   })
 
   test('stores only the primary source on color presets', () => {
@@ -81,6 +85,7 @@ describe('color themes', () => {
     for (const [key, preset] of Object.entries(COLOR_THEMES)) {
       if (key === 'default') continue
       expect(Object.keys(preset).sort()).toEqual(['label', 'primary'])
+      expect(preset.primary).toMatch(/^oklch\(/)
     }
   })
 })

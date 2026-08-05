@@ -1,8 +1,4 @@
-import { colord, extend } from 'colord'
-import a11yPlugin from 'colord/plugins/a11y'
-
-// Registers optional WCAG helpers such as luminance() on Colord.
-extend([a11yPlugin])
+import { wcagLuminance } from 'culori'
 
 export type FontTheme = 'default' | 'serif' | 'mono' | 'blobby' | 'geometric' | 'awkward'
 
@@ -84,18 +80,14 @@ export type ColorTheme =
   | 'lavender'
 
 function foregroundForPrimary(primary: string): string {
-  if (!/^#[0-9a-f]{6}$/i.test(primary)) {
-    throw new Error(`Primary theme color must use #rrggbb: ${primary}`)
-  }
-
-  return colord(primary).luminance() > 0.24 ? '#000000' : '#ffffff'
+  return wcagLuminance(primary) > 0.3 ? 'oklch(0 0 0)' : 'oklch(1 0 0)'
 }
 
 const THEME_COLOR_DERIVATIONS = {
   primary: primary => primary,
   primaryForeground: primary => foregroundForPrimary(primary),
-  background: () => 'color-mix(in oklch, var(--primary) 3%, white 97%)',
-  foreground: () => 'color-mix(in oklch, var(--primary) 24%, black 76%)',
+  background: () => 'color-mix(in oklch, var(--primary) 3%, oklch(1 0 0) 97%)',
+  foreground: () => 'color-mix(in oklch, var(--primary) 24%, oklch(0 0 0) 76%)',
   muted: () => 'color-mix(in oklch, var(--background) 95%, var(--foreground) 5%)',
   mutedForeground: () => 'color-mix(in oklch, var(--background) 58%, var(--foreground) 42%)',
   accent: () => 'color-mix(in oklch, var(--primary) 4%, var(--foreground) 4%)'
@@ -124,31 +116,31 @@ export const COLOR_THEMES: Record<ColorTheme, ColorThemeConfig> = {
   default: { label: 'Default' },
   paper: {
     label: 'Paper',
-    primary: '#453521'
+    primary: 'oklch(0.3413 0.0393 72.10)'
   },
   rose: {
     label: 'Rose',
-    primary: '#f13c3c'
+    primary: 'oklch(0.6322 0.2171 26.02)'
   },
   tangerine: {
     label: 'Tangerine',
-    primary: '#ff5c35'
+    primary: 'oklch(0.6886 0.259 37.15)'
   },
   sand: {
     label: 'Sand',
-    primary: '#ff8700'
+    primary: 'oklch(0.8334 0.1271 67.80)'
   },
   mint: {
     label: 'Tropics',
-    primary: '#009155'
+    primary: 'oklch(0.5774 0.1399 156.06)'
   },
   sky: {
     label: 'Sky',
-    primary: '#007ae3'
+    primary: 'oklch(0.5824 0.1830 253.59)'
   },
   lavender: {
     label: 'Lavender',
-    primary: '#9051ff'
+    primary: 'oklch(0.6025 0.2426 294.58)'
   }
 }
 

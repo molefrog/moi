@@ -69,8 +69,8 @@
     "citty": "^0.2.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "colord": "^2.9.3",
     "conf": "^15.1.0",
+    "culori": "^4.0.2",
     "devalue": "^5.6.4",
     "env-paths": "^4.0.0",
     "frimousse": "^0.3.0",
@@ -107,6 +107,7 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "@types/culori": "^4.0.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-grid-layout": "^2.1.0",

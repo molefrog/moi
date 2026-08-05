@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import './cli-colors' // must precede citty: sets NO_COLOR before its color flag is computed
 import { defineCommand, runMain, showUsage } from 'citty'
+import { formatHex } from 'culori'
 import { parse as devalueParse } from 'devalue'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -684,9 +685,9 @@ const refresh = defineCommand({
   }
 })
 
-function hexToRgb(h: string): [number, number, number] {
-  const n = parseInt(h.replace('#', ''), 16)
-  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff]
+function hexToRgb(hex: string): [number, number, number] {
+  const value = Number.parseInt(hex.slice(1), 16)
+  return [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff]
 }
 
 // Truecolor swatch using raw ANSI 24-bit escapes (picocolors maxes at 8 colors).
@@ -701,7 +702,7 @@ function swatch(bg?: string, fg?: string): string {
 function themeSwatch(primary?: string): string {
   if (!primary) return swatch()
   const colors = deriveThemeColors(primary)
-  return swatch(colors.primary, colors.primaryForeground)
+  return swatch(formatHex(colors.primary), formatHex(colors.primaryForeground))
 }
 
 const theme = defineCommand({
