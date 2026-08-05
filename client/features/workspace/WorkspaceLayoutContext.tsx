@@ -41,6 +41,14 @@ export function useWorkspaceLayoutCtx(): WorkspaceLayoutContextValue {
   return ctx
 }
 
+// The theme alone, for chrome that only needs to paint itself (widget frames,
+// previews). Unlike `useWorkspaceLayoutCtx` this tolerates being read outside a
+// provider and returns `undefined` there, which callers already treat as "use
+// the default theme" — so the same component still renders in isolation.
+export function useWorkspaceThemeSetting(): WorkspaceLayout['theme'] {
+  return useContext(WorkspaceLayoutContext)?.layout.theme
+}
+
 // Strip the server-only metadata so what we PUT back (and expose as `layout`)
 // is just the persisted `WorkspaceLayout`.
 function stripMeta(data: WorkspaceLayoutResponse): WorkspaceLayout {

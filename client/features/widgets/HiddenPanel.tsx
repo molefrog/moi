@@ -7,7 +7,6 @@ import { cn } from '@/client/lib/cn'
 import { packItems } from '@/client/features/widgets/grid'
 import type { GridItem } from '@/client/features/widgets/grid'
 import { BottomPanel } from '@/client/components/shared/BottomPanel'
-import type { WorkspaceLayout } from '@/lib/types'
 
 import { WidgetFrame } from './WidgetFrame'
 
@@ -44,20 +43,12 @@ const ROW_SPAN: Record<number, string> = {
 type HiddenPanelProps = {
   items: GridItem[]
   renderItem: (id: string) => ReactNode
-  theme?: WorkspaceLayout['theme']
   onClose: () => void
   onRestore: (id: string) => void
   ref?: Ref<HTMLDivElement>
 }
 
-export function HiddenPanel({
-  items,
-  renderItem,
-  theme,
-  onClose,
-  onRestore,
-  ref
-}: HiddenPanelProps) {
+export function HiddenPanel({ items, renderItem, onClose, onRestore, ref }: HiddenPanelProps) {
   const layout = useMemo(() => packItems(items), [items])
 
   return (
@@ -77,7 +68,7 @@ export function HiddenPanel({
               )}
               transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
             >
-              <WidgetFrame editing onRemove={() => onRestore(item.i)} theme={theme} hidden>
+              <WidgetFrame editing onRemove={() => onRestore(item.i)} hidden>
                 {renderItem(item.i)}
               </WidgetFrame>
             </motion.div>

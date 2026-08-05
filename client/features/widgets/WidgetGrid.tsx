@@ -9,7 +9,6 @@ import 'react-resizable/css/styles.css'
 
 import { packItems } from '@/client/features/widgets/grid'
 import type { GridItem } from '@/client/features/widgets/grid'
-import type { WorkspaceLayout } from '@/lib/types'
 
 import { WidgetFrame } from './WidgetFrame'
 
@@ -98,7 +97,6 @@ export type WidgetGridProps = {
   items: GridItem[]
   editing?: boolean
   renderItem: (id: string) => ReactNode
-  theme?: WorkspaceLayout['theme']
   onLayoutChange?: (items: GridItem[]) => void
   onRemove?: (id: string) => void
 }
@@ -107,7 +105,6 @@ export function WidgetGrid({
   items,
   editing,
   renderItem,
-  theme,
   onLayoutChange,
   onRemove
 }: WidgetGridProps) {
@@ -117,11 +114,7 @@ export function WidgetGrid({
       editing={editing}
       onLayoutChange={onLayoutChange}
       renderItem={id => (
-        <WidgetFrame
-          editing={editing}
-          onRemove={onRemove ? () => onRemove(id) : undefined}
-          theme={theme}
-        >
+        <WidgetFrame editing={editing} onRemove={onRemove ? () => onRemove(id) : undefined}>
           {renderItem(id)}
         </WidgetFrame>
       )}

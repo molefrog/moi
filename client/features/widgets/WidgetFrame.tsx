@@ -7,18 +7,19 @@ import { IconMinus, IconPlus } from '@tabler/icons-react'
 import { cn } from '@/client/lib/cn'
 
 import { Button } from '@/client/components/ui/button'
+import { useWorkspaceThemeSetting } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { getWorkspaceThemeStyle } from '@/client/runtime/workspace-theme'
-import type { WorkspaceLayout } from '@/lib/types'
 
 type WidgetFrameProps = {
   editing?: boolean
   hidden?: boolean
   onRemove?: () => void
-  theme?: WorkspaceLayout['theme']
   children?: ReactNode
 }
 
-export function WidgetFrame({ editing, hidden, onRemove, theme, children }: WidgetFrameProps) {
+export function WidgetFrame({ editing, hidden, onRemove, children }: WidgetFrameProps) {
+  const theme = useWorkspaceThemeSetting()
+
   return (
     <motion.div
       variants={{
