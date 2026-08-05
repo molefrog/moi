@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 
 import {
   COLOR_THEMES,
+  DEFAULT_PRIMARY_COLOR,
   DEFAULT_WORKSPACE_THEME,
   FONT_THEMES,
   RADIUS_THEMES,
@@ -10,11 +11,11 @@ import {
   deriveThemeColors,
   resolveWorkspaceTheme
 } from '@/lib/themes'
-import type { ThemeColorToken } from '@/lib/themes'
+import type { ThemeColorMode, ThemeColorToken } from '@/lib/themes'
 import type { WorkspaceLayout } from '@/lib/types'
 
-const FONT_LINK_ID = 'mei-fonts'
-const FONT_PREVIEW_LINK_ID = 'mei-font-previews'
+const FONT_LINK_ID = 'moi-fonts'
+const FONT_PREVIEW_LINK_ID = 'moi-font-previews'
 const ALL_FONTS_QUERY = Object.values(FONT_THEMES)
   .map(theme => theme.googleFontsQuery)
   .filter(Boolean)
@@ -42,13 +43,16 @@ function themeColorProperty(token: ThemeColorToken): `--${string}` {
   return `--${name}`
 }
 
-export function getWorkspaceThemeStyle(theme: WorkspaceLayout['theme']): WorkspaceThemeStyle {
+export function getWorkspaceThemeStyle(
+  theme: WorkspaceLayout['theme'],
+  colorMode: ThemeColorMode = 'workspace'
+): WorkspaceThemeStyle {
   const style: WorkspaceThemeStyle = {}
   const resolved = resolveWorkspaceTheme(theme)
   const font = FONT_THEMES[resolved.font] ?? FONT_THEMES[DEFAULT_WORKSPACE_THEME.font]
   const color = COLOR_THEMES[resolved.color] ?? COLOR_THEMES[DEFAULT_WORKSPACE_THEME.color]
-  const primary = color.primary
-  const colors = primary ? deriveThemeColors(primary) : undefined
+  const primary = color.primary ?? (colorMode === 'widget' ? DEFAULT_PRIMARY_COLOR : undefined)
+  const colors = primary ? deriveThemeColors(primary, colorMode) : undefined
   const radius = RADIUS_THEMES[resolved.radius] ?? RADIUS_THEMES[DEFAULT_WORKSPACE_THEME.radius]
   for (const [token, property] of WORKSPACE_FONT_PROPERTIES) {
     style[property] = font[token]
