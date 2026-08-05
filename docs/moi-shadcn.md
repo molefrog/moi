@@ -64,7 +64,11 @@ config management.
    `@/registry/<style>/…` paths, the CLI's alias rewrite is internal (not
    exported), and aliases are validated against tsconfig paths or
    `package.json` `imports` — a relative value like `./utils` is rejected
-   outright (verified). The string maps are the "no `@`" mechanism.
+   outright (verified). Implementation: rewrite on the same ts-morph
+   `SourceFile` already built for `transformIcons` (walk import and
+   export declarations, `setModuleSpecifier`) — AST-accurate, catches
+   re-exports, and adds no dependency since ts-morph ships with the
+   pinned `shadcn` package.
 4. Write files to `.moi/ui/`. On first add, also install `ui/utils.ts`
    (`cn` — itself a registry item; declares `clsx` + `tailwind-merge`).
 5. Print next steps. Nothing else — no install, no rebuild.
