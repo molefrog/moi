@@ -1,22 +1,26 @@
-// Designer-facing catalog of every chat state, rendered by the PRODUCTION chat
-// components (TurnView, tool groups, subagent cards, notice rows, the preview
-// turn path, selector rows) over inline fixtures — no server data. Each section
-// runs its turns through the same groupTurns + interleaveNotices pipeline as
-// ChatPanel, so restyling the chat can happen by looking at this one page and
-// the page stays truthful as components evolve.
-import { type ReactNode, useEffect } from 'react'
+// Designer-facing dev route: ONE continuous conversation rendered by the
+// PRODUCTION chat components (TurnView, tool groups, subagent cards, notice
+// rows, the preview-turn path, selector rows) over inline fixtures — no server
+// data. The transcript runs through the exact ChatPanel pipeline (groupTurns →
+// interleaveNotices → TurnView/ChatNoticeRow, plus the live tail), so a
+// designer can restyle the chat by looking at this page and it stays truthful
+// as components evolve. A fixed control switches the live tail state and the
+// error banner; the sidebar holds jump links to each scripted state.
+import { useEffect, useState } from 'react'
 
-import { IconChevronDown } from '@tabler/icons-react'
+import { IconChevronDown, IconEdit } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
+  DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/client/components/ui/dropdown-menu'
-import { ChatEmptyState } from '@/client/features/chat/ChatEmptyState'
+import { Switch } from '@/client/components/ui/switch'
 import { ChatErrorBanner, ChatNoticeRow } from '@/client/features/chat/ChatPanel'
 import { ChatSessionItem } from '@/client/features/chat/ChatSelector'
 import { ThinkingIndicator, TurnView } from '@/client/features/chat/TurnView'
@@ -35,40 +39,14 @@ import {
   DEV_CWD,
   DEV_WORKSPACE_ID,
   RUNNING_SELECTOR_SESSION_ID,
-  approvalDenied,
-  approvalPending,
-  assistantReasoningFirst,
-  assistantRichMarkdown,
-  assistantWithMeta,
-  busyPrompt,
   chatError,
-  compactNotice,
-  execError,
-  execPending,
-  execRunning,
-  execSuccess,
-  mcpGithubGetMe,
-  messageTool,
-  modelChangeNotice,
-  modelChangeNoticeNoPrev,
-  readSuccess,
+  conversationAnchors,
+  conversationNotices,
+  conversationTurns,
   reasoningStreamPreview,
-  runFailureTurn,
   selectorSessions,
-  skillRow,
-  streamPrompt,
-  subagentCompleted,
-  subagentFailed,
-  subagentRunning,
   textStreamPreview,
-  toLivePreview,
-  toolMergeTurns,
-  userChannelRouted,
-  userFileAttachment,
-  userImageAttachment,
-  userLongMarkdown,
-  userShort,
-  writeSuccess
+  toLivePreview
 } from './chat-states-fixtures'
 
 // Static stand-in for the query-backed workspace layout provider: TurnView
@@ -84,75 +62,68 @@ const layoutCtxValue: WorkspaceLayoutContextValue = {
   isLoading: false
 }
 
-const GROUPS = [
-  { id: 'turns', title: 'Turns' },
-  { id: 'tool-calls', title: 'Tool calls' },
-  { id: 'subagents', title: 'Subagents' },
-  { id: 'streaming', title: 'Streaming' },
-  { id: 'notices', title: 'Notices' },
-  { id: 'errors', title: 'Errors and edge states' },
-  { id: 'selector', title: 'Chat selector rows' }
-] as const
+// Map from timeline item id (turn or notice) → anchor slug, for the invisible
+// jump targets woven between conversation items.
+const ANCHOR_BY_ITEM_ID: Record<string, string> = Object.fromEntries(
+  conversationAnchors.map(a => [a.itemId, a.anchor])
+)
+
+type TailState = 'none' | 'dots' | 'thinking' | 'text'
+
+const TAIL_OPTIONS: { value: TailState; label: string }[] = [
+  { value: 'none', label: 'None' },
+  { value: 'dots', label: 'Dots' },
+  { value: 'thinking', label: 'Thinking' },
+  { value: 'text', label: 'Text' }
+]
+
+function tailPreviewTurn(tail: TailState): Turn | null {
+  if (tail === 'thinking') return buildPreviewTurn(toLivePreview(reasoningStreamPreview))
+  if (tail === 'text') return buildPreviewTurn(toLivePreview(textStreamPreview))
+  return null
+}
 
 type TranscriptProps = {
   turns: Turn[]
   notices?: SystemNotice[]
   previewTurn?: Turn | null
   processing?: boolean
+  // Timeline item id (turn/notice) → anchor element id injected before it.
+  anchors?: Record<string, string>
 }
 
 // Mirrors ChatPanel's timeline: append the preview turn, fold tool-only turns
 // (groupTurns), weave notices in, then map to the real row components. The
 // pulsing dots appear exactly when ChatPanel shows them — processing with no
-// preview content yet.
+// preview content yet. Anchors render as zero-size absolute spans so the
+// gap-6 rhythm between items stays untouched.
 function Transcript({
   turns,
   notices = [],
   previewTurn = null,
-  processing = false
+  processing = false,
+  anchors = {}
 }: TranscriptProps) {
   const grouped = groupTurns(previewTurn ? [...turns, previewTurn] : turns)
   const timeline = interleaveNotices(grouped, notices)
   const lastTurnId = grouped.length > 0 ? grouped[grouped.length - 1].id : null
   return (
     <div className="flex w-full flex-col gap-6">
-      {timeline.map(item =>
-        item.kind === 'notice' ? (
-          <ChatNoticeRow key={`notice:${item.notice.id}`} notice={item.notice} />
-        ) : (
-          <TurnView
-            key={item.turn.id}
-            turn={item.turn}
-            processing={processing && item.turn.id === lastTurnId}
-          />
+      {timeline.map(item => {
+        const id = item.kind === 'notice' ? item.notice.id : item.turn.id
+        const anchor = anchors[id]
+        return (
+          <div key={item.kind === 'notice' ? `notice:${id}` : id} className="relative">
+            {anchor && <span id={anchor} aria-hidden className="absolute -top-8" />}
+            {item.kind === 'notice' ? (
+              <ChatNoticeRow notice={item.notice} />
+            ) : (
+              <TurnView turn={item.turn} processing={processing && item.turn.id === lastTurnId} />
+            )}
+          </div>
         )
-      )}
+      })}
       {processing && !previewTurn && <ThinkingIndicator />}
-    </div>
-  )
-}
-
-type SectionProps = { label: string; note?: string; children: ReactNode }
-
-function Section({ label, note, children }: SectionProps) {
-  return (
-    <section className="flex flex-col gap-3">
-      <div className="flex flex-col gap-0.5">
-        <h3 className="text-xs font-medium text-muted-foreground">{label}</h3>
-        {note && <p className="max-w-prose text-xs text-muted-foreground">{note}</p>}
-      </div>
-      {children}
-    </section>
-  )
-}
-
-type GroupProps = { id: string; title: string; children: ReactNode }
-
-function Group({ id, title, children }: GroupProps) {
-  return (
-    <div id={id} className="flex scroll-mt-8 flex-col gap-8 border-t border-border pt-8">
-      <h2 className="text-sm font-medium">{title}</h2>
-      {children}
     </div>
   )
 }
@@ -160,54 +131,97 @@ function Group({ id, title, children }: GroupProps) {
 function noop() {}
 async function asyncNoop() {}
 
-// The selector menu held open over reserved space, composed from the same
-// primitives ChatSelector uses, with the real ChatSessionItem rows inside.
-function SelectorShowcase() {
+// The real chat header strip: the session dropdown, closed by default, with
+// the fixture rows (badges, running spinner) inside — same composition as
+// ChatSelector's menu.
+function SelectorHeader() {
   return (
-    <div className="flex flex-col">
-      <div>
-        <DropdownMenu open modal={false}>
-          <DropdownMenuTrigger
-            render={
-              <Button variant="ghost">
-                <span className="max-w-64 truncate">Fix the layout save race</span>
-                <IconChevronDown stroke={1.5} />
-              </Button>
-            }
-          />
-          <DropdownMenuContent
-            align="start"
-            className="flex max-h-100 w-max max-w-72 min-w-40 flex-col overflow-hidden"
+    <header className="flex w-full items-center justify-between pr-2 pb-2 pl-2">
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger
+          render={
+            <Button variant="ghost">
+              <span className="max-w-64 truncate">{selectorSessions[0].summary}</span>
+              <IconChevronDown stroke={1.5} />
+            </Button>
+          }
+        />
+        <DropdownMenuContent
+          align="start"
+          className="flex max-h-100 w-max max-w-72 min-w-40 flex-col overflow-hidden"
+        >
+          <DropdownMenuItem
+            className="shrink-0 gap-1 font-medium text-muted-foreground! **:text-muted-foreground!"
+            onClick={noop}
           >
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Today</DropdownMenuLabel>
-              {selectorSessions.map(session => (
-                <ChatSessionItem
-                  key={session.sessionId}
-                  session={session}
-                  active={session.sessionId === selectorSessions[0].sessionId}
-                  // The archive affordance replaces the running spinner on
-                  // hover/touch, so the running row keeps archiving off to
-                  // show the pure spinner treatment.
-                  canArchive={session.sessionId !== RUNNING_SELECTOR_SESSION_ID}
-                  confirmingArchive={false}
-                  onSelect={noop}
-                  onArchive={asyncNoop}
-                  onRequestArchive={noop}
-                  workspaceId={DEV_WORKSPACE_ID}
-                />
-              ))}
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            <IconEdit size={16} stroke={1.75} />
+            New chat
+          </DropdownMenuItem>
+          <DropdownMenuSeparator className="shrink-0" />
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Today</DropdownMenuLabel>
+            {selectorSessions.map(session => (
+              <ChatSessionItem
+                key={session.sessionId}
+                session={session}
+                active={session.sessionId === selectorSessions[0].sessionId}
+                // The archive affordance replaces the running spinner on
+                // hover/touch, so the running row keeps archiving off to show
+                // the pure spinner treatment.
+                canArchive={session.sessionId !== RUNNING_SELECTOR_SESSION_ID}
+                confirmingArchive={false}
+                onSelect={noop}
+                onArchive={asyncNoop}
+                onRequestArchive={noop}
+                workspaceId={DEV_WORKSPACE_ID}
+              />
+            ))}
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </header>
+  )
+}
+
+type TailControlsProps = {
+  tail: TailState
+  onTail: (tail: TailState) => void
+  showError: boolean
+  onShowError: (show: boolean) => void
+}
+
+// Fixed dev control for the conversation's live tail and the error banner.
+// Sits at the end of the page DOM, so it paints above the content without
+// z-index.
+function TailControls({ tail, onTail, showError, onShowError }: TailControlsProps) {
+  return (
+    <div className="fixed right-4 bottom-20 flex flex-col gap-2 rounded-xl bg-popover p-2 text-popover-foreground shadow-md ring-1 ring-border">
+      <span className="px-1 text-xs text-muted-foreground">Live tail</span>
+      <div className="flex gap-1 rounded-lg bg-accent p-1">
+        {TAIL_OPTIONS.map(option => (
+          <Button
+            key={option.value}
+            type="button"
+            variant={tail === option.value ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => onTail(option.value)}
+          >
+            {option.label}
+          </Button>
+        ))}
       </div>
-      {/* The open menu portals over this reserved space. */}
-      <div aria-hidden className="h-64" />
+      <label className="flex items-center justify-between gap-2 px-1 text-xs text-muted-foreground">
+        Error banner
+        <Switch checked={showError} onCheckedChange={onShowError} />
+      </label>
     </div>
   )
 }
 
 export function ChatStatesPage() {
+  const [tail, setTail] = useState<TailState>('text')
+  const [showError, setShowError] = useState(false)
+
   // The running selector row's spinner reads the live activity store. Seed it,
   // and re-seed after any server status_snapshot reconcile (which rebuilds the
   // activity map and would drop this fixture entry).
@@ -226,201 +240,104 @@ export function ChatStatesPage() {
     }
   }, [])
 
+  const previewTurn = tailPreviewTurn(tail)
+  const processing = tail !== 'none'
+
   return (
     <WorkspaceLayoutContext value={layoutCtxValue}>
       <div className="min-h-dvh bg-background font-sans text-foreground">
         <div className="mx-auto flex w-full max-w-5xl gap-10 px-6 py-10">
-          <nav className="sticky top-10 hidden h-fit w-40 shrink-0 flex-col gap-1.5 self-start xl:flex">
+          <nav className="sticky top-10 hidden h-fit w-44 shrink-0 flex-col gap-1.5 self-start xl:flex">
             <span className="pb-1 text-[11px] font-medium tracking-widest text-muted-foreground uppercase">
-              Contents
+              Chat states
             </span>
-            {GROUPS.map(group => (
+            {conversationAnchors.map(entry => (
               <a
-                key={group.id}
-                href={`#${group.id}`}
+                key={entry.anchor}
+                href={`#${entry.anchor}`}
                 className="text-xs text-muted-foreground hover:text-foreground"
               >
-                {group.title}
+                {entry.label}
               </a>
             ))}
           </nav>
 
-          <main className="flex w-full max-w-(--chat-max-container) min-w-0 flex-1 flex-col gap-8">
-            <header className="flex flex-col gap-1">
+          <main className="flex w-full max-w-(--chat-max-container) min-w-0 flex-1 flex-col">
+            <header className="flex flex-col gap-1 pb-6">
               <span className="text-[11px] font-medium tracking-widest text-muted-foreground uppercase">
                 Playground / Chat states
               </span>
               <p className="text-sm text-muted-foreground">
-                Every chat state, rendered by the production components over inline fixtures on the
-                normal chat background.
+                One continuous conversation covering every chat state, rendered by the production
+                components over inline fixtures.
               </p>
             </header>
 
-            <Group id="turns" title="Turns">
-              <Section label="User turn — short text">
-                <Transcript turns={[userShort]} />
-              </Section>
-              <Section
-                label="User turn — long markdown"
-                note="User bubbles keep the text verbatim — fences and blank lines render as typed."
-              >
-                <Transcript turns={[userLongMarkdown]} />
-              </Section>
-              <Section
-                label="User turn — channel-routed message"
-                note="Arrived over IRC (session origin { provider: 'irc', label: 'mole!mole@127.0.0.1' }). The gateway's inbound metadata envelope is stripped at the adapter, so the turn reads as plain input."
-              >
-                <Transcript turns={[userChannelRouted]} />
-              </Section>
-              <Section label="Assistant turn — rich markdown">
-                <Transcript turns={[assistantRichMarkdown]} />
-              </Section>
-              <Section
-                label="Assistant turn — with usage meta"
-                note="Carries meta { model: 'claude-sonnet-5', provider: 'anthropic', stopReason: 'stop', usage { 4 in / 151 out / 41811 total / $0.1129 } }. The transcript does not render meta yet — it rides on the turn for future treatments."
-              >
-                <Transcript turns={[assistantWithMeta]} />
-              </Section>
-              <Section label="Assistant turn — reasoning then text">
-                <Transcript turns={[assistantReasoningFirst]} />
-              </Section>
-              <Section
-                label="Consecutive tool-only turns — merged"
-                note="Three assistant turns off the wire; the two tool-only ones fold into a single group (group-turns), so the rail reads as one run."
-              >
-                <Transcript turns={toolMergeTurns} />
-              </Section>
-              <Section label="User turn — image attachment">
-                <Transcript turns={[userImageAttachment]} />
-              </Section>
-              <Section label="User turn — file attachment">
-                <Transcript turns={[userFileAttachment]} />
-              </Section>
-            </Group>
+            <SelectorHeader />
 
-            <Group id="tool-calls" title="Tool calls">
-              <Section label="Tool call — exec pending">
-                <Transcript turns={[execPending]} processing />
-              </Section>
-              <Section
-                label="Tool call — exec running"
-                note="Pending and running render alike today: spinner node, no output body."
-              >
-                <Transcript turns={[execRunning]} processing />
-              </Section>
-              <Section label="Tool call — exec success" note="Click the row to expand the output.">
-                <Transcript turns={[execSuccess]} />
-              </Section>
-              <Section label="Tool call — exec error">
-                <Transcript turns={[execError]} />
-              </Section>
-              <Section label="Tool call — read success">
-                <Transcript turns={[readSuccess]} />
-              </Section>
-              <Section label="Tool call — write success">
-                <Transcript turns={[writeSuccess]} />
-              </Section>
-              <Section label="Tool call — MCP (GitHub)">
-                <Transcript turns={[mcpGithubGetMe]} />
-              </Section>
-              <Section label="Tool call — skill row">
-                <Transcript turns={[skillRow]} />
-              </Section>
-              <Section label="Tool call — approval pending">
-                <Transcript turns={[approvalPending]} />
-              </Section>
-              <Section label="Tool call — approval denied">
-                <Transcript turns={[approvalDenied]} />
-              </Section>
-              <Section label="Tool call — message tool">
-                <Transcript turns={[messageTool]} />
-              </Section>
-            </Group>
+            <div className="flex flex-col pt-4">
+              <Transcript
+                turns={conversationTurns}
+                notices={conversationNotices}
+                previewTurn={previewTurn}
+                processing={processing}
+                anchors={ANCHOR_BY_ITEM_ID}
+              />
 
-            <Group id="subagents" title="Subagents">
-              <Section label="Subagent — running">
-                <Transcript turns={[subagentRunning]} processing />
-              </Section>
-              <Section
-                label="Subagent — completed"
-                note="Expand the card for the nested transcript and the final summary."
-              >
-                <Transcript turns={[subagentCompleted]} />
-              </Section>
-              <Section label="Subagent — failed">
-                <Transcript turns={[subagentFailed]} />
-              </Section>
-            </Group>
-
-            <Group id="streaming" title="Streaming">
-              <Section
-                label="Streaming — text preview"
-                note="A live PreviewFrame rendered through the real preview-turn path (buildPreviewTurn → groupTurns)."
-              >
-                <Transcript
-                  turns={[streamPrompt]}
-                  previewTurn={buildPreviewTurn(toLivePreview(textStreamPreview))}
-                  processing
-                />
-              </Section>
-              <Section label="Streaming — live thinking">
-                <Transcript
-                  turns={[streamPrompt]}
-                  previewTurn={buildPreviewTurn(toLivePreview(reasoningStreamPreview))}
-                  processing
-                />
-              </Section>
-              <Section label="Streaming — busy, no preview yet">
-                <Transcript turns={[busyPrompt]} processing />
-              </Section>
-            </Group>
-
-            <Group id="notices" title="Notices">
-              <Section label="Notice — context compacted">
-                <Transcript turns={[]} notices={[compactNotice]} />
-              </Section>
-              <Section label="Notice — model change">
-                <Transcript turns={[]} notices={[modelChangeNotice, modelChangeNoticeNoPrev]} />
-              </Section>
-            </Group>
-
-            <Group id="errors" title="Errors and edge states">
-              <Section
-                label="Chat error banner"
-                note="Sits above the composer inside the tinted group; the copy comes from the chat-store errors slice."
-              >
-                <div className="flex w-full flex-col gap-2 rounded-t-xl rounded-b-2xl bg-destructive/10 p-2">
-                  <ChatErrorBanner error={chatError} onDismiss={noop} />
+              {showError && (
+                <div className="mt-6 flex w-full flex-col gap-2 rounded-t-xl rounded-b-2xl bg-destructive/10 p-2">
+                  <ChatErrorBanner error={chatError} onDismiss={() => setShowError(false)} />
                 </div>
-              </Section>
-              <Section
-                label="Run failure turn"
-                note="Gateways report a failed run as a plain assistant turn."
-              >
-                <Transcript turns={[runFailureTurn]} />
-              </Section>
-              <Section label="Empty chat — placeholder">
-                <div className="flex min-h-32 flex-col">
-                  <ChatEmptyState kind="empty" onSelectPrompt={noop} />
-                </div>
-              </Section>
-              <Section label="Empty chat — first-run welcome">
-                <div className="flex flex-col">
-                  <ChatEmptyState kind="chat-welcome" onSelectPrompt={noop} />
-                </div>
-              </Section>
-            </Group>
+              )}
+            </div>
 
-            <Group id="selector" title="Chat selector rows">
-              <Section
-                label="Selector menu — row variants"
-                note="Plain (active), cron badge, subagent badge, channel origin badge, and a running chat with its spinner. Hover a row for the archive affordance."
-              >
-                <SelectorShowcase />
-              </Section>
-            </Group>
+            <details className="mt-16 border-t border-border pt-6 text-xs text-muted-foreground">
+              <summary className="cursor-pointer font-medium">Notes for designers</summary>
+              <ul className="mt-3 flex list-disc flex-col gap-1.5 pl-4">
+                <li>
+                  User bubbles render markdown verbatim (whitespace preserved, no markdown parsing)
+                  — the fenced code block in the long question is intentional.
+                </li>
+                <li>
+                  The moon reply carries a full <code>TurnMeta</code> payload (model, provider, stop
+                  reason, usage, cost) but nothing in the transcript renders meta yet — it rides on
+                  the turn for future treatments.
+                </li>
+                <li>
+                  Approval-pending and approval-denied tool rows render as plain dot rows with no
+                  body; there is no dedicated approval treatment yet.
+                </li>
+                <li>
+                  Pending and running tool calls render identically (spinner node, no output).
+                </li>
+                <li>
+                  Channel provenance (the IRC hello) lives on the session (<code>origin</code> badge
+                  in the selector), not on the turn — the gateway's inbound metadata envelope is
+                  stripped before display.
+                </li>
+                <li>
+                  Nested subagent transcripts render reasoning and tool rows only; nested plain text
+                  is skipped, and the final answer shows in the summary segment.
+                </li>
+                <li>
+                  The busy dots follow ChatPanel's rule — they show whenever the agent is processing
+                  and no preview content is visible yet, including under running tool rows.
+                </li>
+                <li>
+                  Empty-chat states (<code>ChatEmptyState</code>: placeholder and first-run welcome)
+                  cannot appear in a continuous transcript — find them in the chat with no turns.
+                </li>
+              </ul>
+            </details>
           </main>
         </div>
+
+        <TailControls
+          tail={tail}
+          onTail={setTail}
+          showError={showError}
+          onShowError={setShowError}
+        />
       </div>
     </WorkspaceLayoutContext>
   )
