@@ -105,7 +105,7 @@ function ChatSessionItem({
               'min-w-0 truncate',
               (running || pending) && '-mr-4',
               confirmingArchive
-                ? '-4'
+                ? '-mr-14'
                 : canArchive &&
                     'group-focus-within/chat:-mr-4 group-hover/chat:-mr-4 [@media(hover:none)]:-mr-4'
             )}
