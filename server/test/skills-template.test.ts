@@ -104,11 +104,12 @@ describe('installBundledSkills', () => {
     ]) {
       expect(design).not.toContain(staleGuidance)
     }
-    expect(await Bun.file(join(workspaceSkillDir, 'SKILL.md')).text()).toContain(
-      '<moi-skill version="0.11.0" />'
-    )
-    expect(await Bun.file(join(workspaceSkillDir, 'SKILL.md')).text()).toContain(
-      '`moi theme --radius=<key>`'
+    const skill = await Bun.file(join(workspaceSkillDir, 'SKILL.md')).text()
+    for (const contract of ['<moi-skill version="0.11.0" />', '`moi theme --radius=<key>`']) {
+      expect(skill).toContain(contract)
+    }
+    expect(skill).toMatch(
+      /After the final successful bundle and any checks[\s\S]*`moi tab focus widgets`[\s\S]*`moi tab focus view:<view-id>`/
     )
     expect(await Bun.file(workspaceNote).text()).toBe('Keep this note\n')
     expect(await Bun.file(customSkill).text()).toBe('Keep this skill\n')

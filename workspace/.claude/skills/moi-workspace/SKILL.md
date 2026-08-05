@@ -331,9 +331,12 @@ Render **content only**: a plain `h-full w-full` region with no card chrome (`ro
 own the fill, so the widget must set its own opaque background.
 Changing `colSpan`/`rowSpan` needs `moi bundle --force`. See `DESIGN.md`.
 
-Typical loop: check/`bun install` deps → write `.moi/widgets/<name>.tsx` → `moi bundle` → it appears
-on the dashboard → change it and re-`bundle`, or `moi refresh` after mutating data, or any other `moi`
-command as needed. Views work the same way (`.moi/views/<name>.tsx`, appears as a nav tab).
+Typical loop: check/`bun install` deps → write the applet → `moi bundle` → run any checks.
+After the final successful bundle and any checks, always make tab focus the final workspace action:
+
+- After building or editing a widget, run `moi tab focus widgets`.
+- After building or editing a view, run `moi tab focus view:<view-id>`, using its file name or claimed
+  builder id.
 
 # Debugging applets
 
@@ -376,7 +379,7 @@ moi builder set <view-id> --builder <builder-id> --kind view --title "<title>" -
 Choose the icon id from the available view icons in the hidden context. The id must use lowercase
 letters, numbers, `_`, or `-`. The first call locks the id; running the same command again may update
 its title and icon. After claiming, write `.moi/views/<view-id>.tsx`, use the same icon id in its
-config, and finish with `moi bundle --only views`. The tab uses the claimed title and icon while you
+config, and build it with `moi bundle --only views`. The tab uses the claimed title and icon while you
 work and changes into the built view after a successful bundle. (Bundling marks the view ready; the
 build state is otherwise server-managed, so you never set it to done by hand.)
 
