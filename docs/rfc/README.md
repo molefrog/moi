@@ -1,14 +1,13 @@
 # RFCs — shadcn components for applets
 
 **The living spec is `docs/moi-shadcn.md` — this directory is decision
-history only.** Decision record: `0005-final-moi-shadcn.md` — `moi shadcn`, an opinionated
-shadcn-lite proxy (strategy A's engine, moi's opinions), with the blind-spot
-list to settle before building.** Earlier stages: `0004-two-strategies.md`
-was the comparison document; 0001 and 0002 were explored first and
-rejected on review (0001 means maintaining our own registry; 0002 puts
-`components.json` + `tsconfig.json` into every workspace — both
-non-starters). **0003 is the current proposal\*\*, built on a source dive into
-the `shadcn` package. Evidence behind every claim:
+history only.** The decision record is `0005-final-moi-shadcn.md`:
+`moi shadcn`, an opinionated shadcn-lite proxy (0003's engine, moi's
+opinions), with review rulings. Earlier stages: `0004-two-strategies.md`
+compared the finalists; `0003-shadcn-engine.md` came from the source dive
+into the `shadcn` package; 0001 and 0002 were explored first and rejected
+(0001 means maintaining our own registry; 0002 puts `components.json` +
+`tsconfig.json` into every workspace). Evidence behind every claim:
 `docs/shadcn-applet-experiments.md`.
 
 **Shared foundation (ships in any case):**
