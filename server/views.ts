@@ -3,7 +3,13 @@ import { existsSync } from 'node:fs'
 import type { ViewConfig, ViewInfo } from '@/lib/types'
 
 import { syncAppletLogAfterBuild } from './applet-log'
-import { buildApplets, getAppletPaths, listBuilt, scanSources, serveApplet } from './applets'
+import {
+  buildAppletsEphemeral,
+  getAppletPaths,
+  listBuilt,
+  scanSources,
+  serveApplet
+} from './applets'
 import { reloadModules } from './functions'
 import { markViewBuilderReady } from './view-builders'
 
@@ -55,7 +61,13 @@ export async function buildAllViews(
   workspacePath: string,
   force = false
 ): Promise<ViewBuildResult[]> {
-  const { names, results, ms } = await buildApplets<ViewConfig>(workspacePath, 'view', force)
+  // Ephemeral: compiles run in a fresh worker process so a package installed
+  // after a failed build actually resolves (see applets.ts).
+  const { names, results, ms } = await buildAppletsEphemeral<ViewConfig>(
+    workspacePath,
+    'view',
+    force
+  )
 
   const manifest = await readManifest(workspacePath)
   for (const r of results) {

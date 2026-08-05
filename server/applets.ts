@@ -624,3 +624,116 @@ export async function buildApplets<C>(
 
   return { names, results, ms: Math.round(performance.now() - t0) }
 }
+
+// ---- ephemeral bundling -------------------------------------------------------
+// Bun's module resolver caches a FAILED bare-specifier lookup for the life of
+// the process, and nothing invalidates the negative entry — not `bun add`, not
+// a fresh `Bun.build()` call, not even importing from a directory created after
+// the install (verified on Bun 1.3.11; `Bun.resolveSync` shares the cache both
+// ways). In the long-running server that turned the agent's normal loop into a
+// dead end: widget imports a package → `moi bundle` fails → agent runs
+// `bun add` → every rebuild still fails with `Could not resolve … Maybe you
+// need to "bun install"?` until the server restarts. So actual compiles run in
+// a one-shot worker process (`bundler/bundle-worker.ts`) that always sees the
+// node_modules on disk; everything resolver-free (scan, staleness, prune,
+// manifest bookkeeping) stays in-process.
+
+const BUNDLE_WORKER_PATH = join(import.meta.dir, 'bundler', 'bundle-worker.ts')
+
+// Ceiling for one whole compile batch (every stale applet of one kind). Real
+// builds are seconds even with Tailwind scanning; kill only what must be a hang.
+const BUNDLE_WORKER_TIMEOUT_MS = 3 * 60_000
+
+// Wire shape between `buildAppletsEphemeral` and the worker. The result is
+// exactly `buildApplets`' return value — plain JSON.
+export type EphemeralBundleResult = {
+  names: string[]
+  results: AppletBuildResult<unknown>[]
+  ms: number
+}
+export type EphemeralBundleReply =
+  | { type: 'result'; result: EphemeralBundleResult }
+  | { type: 'error'; message: string }
+
+// Would `buildApplets` compile anything right now? Mirrors its skip logic
+// (same scan + staleness inputs) without touching the module resolver, so the
+// host can answer compile-free bundles in-process instead of paying a worker
+// spawn (~0.7s) for a no-op.
+async function hasPendingCompiles(
+  workspacePath: string,
+  kind: AppletKind,
+  force: boolean
+): Promise<boolean> {
+  const { sourceDir, buildDir } = getAppletPaths(workspacePath, kind)
+  const names = await scanSources(sourceDir)
+  if (names.length === 0) return false
+  if (force) return true
+  for (const name of names) {
+    const srcPath = await resolveSource(sourceDir, name)
+    if (srcPath && (await needsRebuild(buildDir, name, srcPath))) return true
+  }
+  return false
+}
+
+// `buildApplets`, but any actual compiling happens in a fresh worker process —
+// the only build entry the long-running server should use (widgets.ts /
+// views.ts). Same signature, same return shape, same on-disk effects. When
+// nothing needs compiling the batch runs in-process: scan/prune/skip/manifest
+// work never consults the resolver, so it cannot hit (or plant) a poisoned
+// cache entry, and `moi bundle` on an unchanged workspace stays fast.
+export async function buildAppletsEphemeral<C>(
+  workspacePath: string,
+  kind: AppletKind,
+  force: boolean
+): Promise<{ names: string[]; results: AppletBuildResult<C>[]; ms: number }> {
+  if (!(await hasPendingCompiles(workspacePath, kind, force))) {
+    return buildApplets<C>(workspacePath, kind, force)
+  }
+
+  const payload = JSON.stringify({ workspacePath, kind, force })
+  return await new Promise((resolve, reject) => {
+    let settled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const settle = (fn: () => void) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      fn()
+    }
+
+    const proc = Bun.spawn([process.execPath, BUNDLE_WORKER_PATH, payload], {
+      stdout: 'inherit',
+      stderr: 'inherit',
+      ipc(raw: unknown) {
+        const msg = raw as EphemeralBundleReply
+        if (msg?.type === 'result') {
+          // The wire is untyped JSON; C is the caller's config type for this
+          // kind, same trust as buildApplets' own `artifact.config as C`.
+          settle(() =>
+            resolve(msg.result as EphemeralBundleResult & { results: AppletBuildResult<C>[] })
+          )
+        } else {
+          settle(() =>
+            reject(
+              new Error(
+                msg?.type === 'error' ? msg.message : 'Bundle worker sent a malformed reply'
+              )
+            )
+          )
+        }
+        proc.kill()
+      }
+    })
+
+    timer = setTimeout(() => {
+      settle(() =>
+        reject(new Error(`Bundle worker timed out after ${BUNDLE_WORKER_TIMEOUT_MS / 1000}s`))
+      )
+      proc.kill()
+    }, BUNDLE_WORKER_TIMEOUT_MS)
+
+    void proc.exited.then(code =>
+      settle(() => reject(new Error(`Bundle worker exited with code ${code} before reporting`)))
+    )
+  })
+}

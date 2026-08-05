@@ -4,7 +4,7 @@ import { join } from 'path'
 import type { WidgetConfig, WidgetInfo } from '@/lib/types'
 
 import { syncAppletLogAfterBuild } from './applet-log'
-import { buildApplets, getAppletPaths, listBuilt, serveApplet } from './applets'
+import { buildAppletsEphemeral, getAppletPaths, listBuilt, serveApplet } from './applets'
 import { reloadModules } from './functions'
 
 const DEFAULT_CONFIG: WidgetConfig = { rowSpan: 1, colSpan: 2 }
@@ -43,7 +43,13 @@ export async function buildAllWidgets(
   workspacePath: string,
   force = false
 ): Promise<WidgetBuildResult[]> {
-  const { names, results, ms } = await buildApplets<WidgetConfig>(workspacePath, 'widget', force)
+  // Ephemeral: compiles run in a fresh worker process so a package installed
+  // after a failed build actually resolves (see applets.ts).
+  const { names, results, ms } = await buildAppletsEphemeral<WidgetConfig>(
+    workspacePath,
+    'widget',
+    force
+  )
 
   const manifest = await readManifest(workspacePath)
   for (const r of results) {

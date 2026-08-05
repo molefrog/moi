@@ -577,6 +577,13 @@ async function prevalidateServerFiles(entrypoint: string): Promise<void> {
 // basename keys for callers that build a file directly (tests, fixtures).
 // `kind` selects the config schema, synthetic-CSS filename, and CSS scope
 // namespace; it defaults to 'widget' so existing callers are unaffected.
+//
+// CAUTION: only call this from a short-lived process (tests, the bundle
+// worker). Bun caches a failed bare-specifier resolution for the life of the
+// process, so a long-running server that builds in-process can never compile
+// an import whose package was installed after one failed attempt. The server
+// path is `buildAppletsEphemeral` (applets.ts), which compiles in a one-shot
+// worker.
 export async function buildApplet(
   entrypoint: string,
   moiRoot = dirname(entrypoint),
