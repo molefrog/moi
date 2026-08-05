@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
 import type { OpenClawMessage } from './discovery'
-import { toSessionInfo, toStreamEvents } from './adapter'
+import { flattenToolResultContent, toSessionInfo, toStreamEvents } from './adapter'
 
 describe('toSessionInfo', () => {
   test('prefers a stable label over display name and changing preview text', () => {
@@ -199,5 +199,80 @@ describe('toStreamEvents model-change notices', () => {
     const id = (events: typeof first) => events.find(e => e.kind === 'notice')?.notice.id
     expect(id(first)).toBe('openclaw:model-change:a2')
     expect(id(second)).toBe('openclaw:model-change:a2')
+  })
+})
+
+describe('toSessionInfo — moi-context stripping (issue: envelope in title)', () => {
+  const envelope =
+    'Sup fool\n\n<moi-context>\nYou are running in a `moi` workspace — a shared UI.\n# Active tab\nThe user is on the "Agent" tab.\n</moi-context>'
+
+  test('strips the moi-context envelope from a derived title', () => {
+    // The gateway derives titles from the sent message, which carries the
+    // appended envelope (sessions.send has no system channel).
+    expect(
+      toSessionInfo(
+        { key: 'agent:main:main', sessionId: 'm', updatedAt: 1, derivedTitle: envelope },
+        '/ws'
+      ).summary
+    ).toBe('Sup fool')
+  })
+
+  test('strips a truncated envelope from a display name', () => {
+    expect(
+      toSessionInfo(
+        {
+          key: 'agent:main:main',
+          sessionId: 'm',
+          updatedAt: 1,
+          displayName: 'Sup fool <moi-context> You are runni…'
+        },
+        '/ws'
+      ).summary
+    ).toBe('Sup fool')
+  })
+
+  test('leaves a channel display name untouched', () => {
+    expect(
+      toSessionInfo(
+        {
+          key: 'agent:main:main',
+          sessionId: 'm',
+          updatedAt: 1,
+          displayName: 'mole!mole@127.0.0.1'
+        },
+        '/ws'
+      ).summary
+    ).toBe('mole!mole@127.0.0.1')
+  })
+})
+
+describe('flattenToolResultContent — cross-version tool result shapes', () => {
+  test('flat text blocks (2026.7.1)', () => {
+    expect(flattenToolResultContent([{ type: 'text', text: 'hello from bash' }])).toBe(
+      'hello from bash'
+    )
+  })
+
+  test('unwraps a nested toolResult block instead of showing [toolResult]', () => {
+    // 2026.7.2+ can wrap the result in a toolResult-typed block; before the
+    // recursion fix this rendered as a bare "[toolResult]" placeholder.
+    expect(
+      flattenToolResultContent([
+        { type: 'toolResult', content: [{ type: 'text', text: 'ok done' }] } as never
+      ])
+    ).toBe('ok done')
+  })
+
+  test('reads text off a wrapper block that carries it directly', () => {
+    expect(flattenToolResultContent([{ type: 'toolResult', text: 'inline' } as never])).toBe(
+      'inline'
+    )
+  })
+
+  test('image blocks and truly opaque blocks keep a placeholder', () => {
+    expect(
+      flattenToolResultContent([{ type: 'image', data: 'x', mimeType: 'image/png' } as never])
+    ).toBe('[image]')
+    expect(flattenToolResultContent([{ type: 'mystery' } as never])).toBe('[mystery]')
   })
 })

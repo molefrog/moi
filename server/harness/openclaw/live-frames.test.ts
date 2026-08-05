@@ -7,7 +7,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { OpenClawMessage } from './discovery'
 import { type ToolResultInfo, flattenToolResultContent, messageToTurn } from './adapter'
-import { chatPreviewBlocks } from './session'
+import { chatPreviewBlocks, normalizeEchoText } from './session'
 
 describe('chatPreviewBlocks', () => {
   test('maps a real first chat delta onto one text block', () => {
@@ -238,5 +238,22 @@ describe('messageToTurn meta (extractTurnMeta)', () => {
       ]
     })
     expect(turn?.meta).toBeUndefined()
+  })
+})
+
+describe('normalizeEchoText — optimistic-echo rendezvous (issue: duplicated user bubble)', () => {
+  test('collapses whitespace so newline/trim drift still matches', () => {
+    expect(normalizeEchoText('Sup fool')).toBe(normalizeEchoText('  Sup  fool\n'))
+  })
+
+  test('strips a moi-context envelope defensively', () => {
+    const withEnvelope =
+      'Sup fool\n\n<moi-context>\nYou are running in a `moi` workspace\n</moi-context>'
+    expect(normalizeEchoText(withEnvelope)).toBe('Sup fool')
+  })
+
+  test('empty and non-string inputs are safe', () => {
+    expect(normalizeEchoText(undefined)).toBe('')
+    expect(normalizeEchoText('')).toBe('')
   })
 })

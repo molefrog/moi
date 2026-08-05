@@ -17,7 +17,12 @@
 //   - Disk persistence stays out — the gateway is the source of truth; we
 //     re-seed from `sessions.get` on cold start.
 import { appendAttachmentNote } from '@/lib/attachment-note'
-import { type MoiContext, appendMoiContext, renderMoiContext } from '@/lib/moi-context'
+import {
+  type MoiContext,
+  appendMoiContext,
+  renderMoiContext,
+  stripMoiContext
+} from '@/lib/moi-context'
 import { type PreviewBlock, applyEvent, emptyViewState } from '@/lib/format'
 import type { SessionActivity, StreamEvent, ViewState } from '@/lib/types'
 
@@ -260,6 +265,15 @@ function previewMessageId(sessionKey: string, runId: string): string {
   return `openclaw:${sessionKey}:${runId}`
 }
 
+// Compare the optimistic send text against the durable user-row text
+// tolerantly: drop any moi-context envelope (defensive — the optimistic side
+// shouldn't carry it) and collapse all whitespace runs so newline/trim drift
+// between what we sent and what the gateway stored can't defeat the match.
+export function normalizeEchoText(text: string | undefined): string {
+  if (typeof text !== 'string') return ''
+  return stripMoiContext(text).replace(/\s+/g, ' ').trim()
+}
+
 function emitTurn(rec: SessionRecord, msg: OpenClawMessage, idx: number): void {
   const turn = messageToTurn(msg, rec.sessionKey, idx, rec.results)
   if (!turn) return
@@ -270,12 +284,23 @@ function emitTurn(rec: SessionRecord, msg: OpenClawMessage, idx: number): void {
   // place instead of duplicating.
   if (rec.pendingUserEchoes.length > 0 && turn.role === 'user') {
     const idem = messageIdempotencyKey(msg)
-    let at = idem ? rec.pendingUserEchoes.findIndex(e => e.runId && `${e.runId}:user` === idem) : -1
+    // 1. Exact idempotency-key match (`<runId>:user`) when the send's runId is
+    //    already known. 2. Same key with the runId extracted from the durable
+    //    row itself, covering the race where the echo lands before the
+    //    `sessions.send` response set `echo.runId`. 3. Normalized-text match
+    //    as the version-agnostic fallback: strip the moi-context envelope from
+    //    both sides (the durable row is already stripped for display; the
+    //    optimistic text never carries it) and collapse whitespace, so a
+    //    trailing newline or metadata difference can't split the bubble.
+    const idemRunId = idem?.endsWith(':user') ? idem.slice(0, -':user'.length) : undefined
+    let at = idem
+      ? rec.pendingUserEchoes.findIndex(
+          e => (e.runId && `${e.runId}:user` === idem) || (idemRunId && e.runId === idemRunId)
+        )
+      : -1
     if (at < 0) {
-      const text = turn.parts.find(p => p.type === 'text')?.text?.trim()
-      if (text !== undefined) {
-        at = rec.pendingUserEchoes.findIndex(e => e.text.trim() === text)
-      }
+      const text = normalizeEchoText(turn.parts.find(p => p.type === 'text')?.text)
+      if (text) at = rec.pendingUserEchoes.findIndex(e => normalizeEchoText(e.text) === text)
     }
     if (at >= 0) {
       turn.id = rec.pendingUserEchoes[at].optimisticId
