@@ -4,7 +4,6 @@ export type FontTheme = 'default' | 'serif' | 'mono' | 'blobby' | 'geometric' | 
 
 export type FontThemeConfig = {
   label: string
-  feel: string
   sans: string
   mono: string
   googleFontsQuery?: string // passed as `family=` param to Google Fonts API
@@ -13,42 +12,36 @@ export type FontThemeConfig = {
 export const FONT_THEMES: Record<FontTheme, FontThemeConfig> = {
   default: {
     label: 'Default',
-    feel: 'System font',
     sans: 'system-ui',
     mono: 'Geist Mono',
     googleFontsQuery: 'Geist+Mono:wght@400;500'
   },
   serif: {
     label: 'Serif',
-    feel: 'Literata',
     sans: 'Literata',
     mono: 'Geist Mono',
     googleFontsQuery: 'Literata:wght@400;600;700&family=Geist+Mono:wght@400;500'
   },
   mono: {
     label: 'Mono',
-    feel: 'Geist Mono',
     sans: 'Geist Mono',
     mono: 'Geist Mono',
     googleFontsQuery: 'Geist+Mono:wght@400;500;600'
   },
   blobby: {
     label: 'Blobby',
-    feel: 'Sour Gummy',
     sans: 'Sour Gummy',
     mono: 'Azeret Mono',
     googleFontsQuery: 'Sour+Gummy:wght@400;500;600&family=Azeret+Mono:wght@400;500'
   },
   geometric: {
     label: 'Geometric',
-    feel: 'Manrope',
     sans: 'Manrope',
     mono: 'Geist Mono',
     googleFontsQuery: 'Manrope:wght@400;500;600&family=Geist+Mono:wght@400;500'
   },
   awkward: {
     label: 'Awkward',
-    feel: 'Averia Sans Libre',
     sans: 'Averia Sans Libre',
     mono: 'Azeret Mono',
     googleFontsQuery: 'Averia+Sans+Libre:wght@400;500;600&family=Azeret+Mono:wght@400;500'

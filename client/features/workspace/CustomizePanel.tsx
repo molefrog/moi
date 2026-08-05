@@ -60,7 +60,7 @@ function CustomizeOption({ active, children, className, onSelect, style }: Custo
       )}
       style={style}
     >
-      <div className="flex-1">{children}</div>
+      <div className="flex flex-1 flex-col justify-center">{children}</div>
       {active && <IconCircleCheckFilled size={20} stroke={1.5} aria-hidden="true" />}
     </button>
   )
@@ -91,10 +91,7 @@ export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
               onSelect={() => setTheme({ font: key })}
               style={{ fontFamily: config.sans }}
             >
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">{config.label}</span>
-                <span className="text-xs text-muted-foreground">{config.feel}</span>
-              </div>
+              <span className="text-sm font-medium">{config.label}</span>
             </CustomizeOption>
           ))}
         </CustomizeOptionGroup>

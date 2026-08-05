@@ -782,14 +782,13 @@ const theme = defineCommand({
           selected ? pc.bold(key) : key,
           f.label,
           pc.dim(f.sans),
-          pc.dim(f.mono),
-          pc.dim(f.feel)
+          pc.dim(f.mono)
         ]
       })
       console.log(pc.dim('  Fonts'))
       console.log(
         columns(
-          ['', 'key', 'label', 'sans', 'mono', 'feel'].map(h => pc.dim(h)),
+          ['', 'key', 'label', 'sans', 'mono'].map(h => pc.dim(h)),
           fontRows
         ) + '\n'
       )
