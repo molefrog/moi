@@ -88,7 +88,9 @@ const THEME_COLOR_DERIVATIONS = {
     foreground: () => 'color-mix(var(--primary) 20%, oklch(0 0 0) 80%)',
     muted: () => 'color-mix(var(--background) 95%, var(--foreground) 5%)',
     mutedForeground: () => 'color-mix(var(--background) 50%, var(--foreground) 50%)',
-    accent: () => 'color-mix(var(--primary) 4%, var(--foreground) 4%)'
+    accent: () => 'color-mix(var(--primary) 4%, var(--foreground) 4%)',
+    accentForeground: () => 'var(--foreground)',
+    border: () => 'color-mix(var(--foreground) 7%, transparent)'
   },
   widget: {
     background: primary => primary,
@@ -97,7 +99,9 @@ const THEME_COLOR_DERIVATIONS = {
     primaryForeground: () => 'color-mix(var(--background) 20%, oklch(0 0 0) 80%)',
     muted: () => 'color-mix(var(--background) 95%, var(--foreground) 5%)',
     mutedForeground: () => 'color-mix(var(--background) 50%, var(--foreground) 50%)',
-    accent: () => 'color-mix(var(--primary) 4%, var(--foreground) 4%)'
+    accent: () => 'color-mix(var(--primary) 4%, var(--foreground) 4%)',
+    accentForeground: () => 'var(--foreground)',
+    border: () => 'color-mix(var(--foreground) 15%, transparent)'
   }
 } satisfies Record<ThemeColorMode, Record<string, (primary: string) => string>>
 

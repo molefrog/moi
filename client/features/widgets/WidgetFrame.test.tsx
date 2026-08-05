@@ -17,5 +17,7 @@ describe('WidgetFrame', () => {
     expect(chromeClasses?.split(' ')).not.toContain('dark')
     expect(html).toContain(`--background:${DEFAULT_PRIMARY_COLOR}`)
     expect(html).toContain('--primary:color-mix(var(--background) 3%, oklch(1 0 0) 97%)')
+    expect(html).toContain('--accent-foreground:var(--foreground)')
+    expect(html).toContain('--border:color-mix(var(--foreground) 15%, transparent)')
   })
 })

@@ -40,6 +40,8 @@ describe('getWorkspaceThemeStyle', () => {
       '--background': colors.background,
       '--foreground': colors.foreground,
       '--accent': colors.accent,
+      '--accent-foreground': colors.accentForeground,
+      '--border': colors.border,
       '--radius': RADIUS_THEMES.squishy.radius
     })
   })
@@ -58,7 +60,9 @@ describe('getWorkspaceThemeStyle', () => {
       '--primary-foreground': colors.primaryForeground,
       '--muted': colors.muted,
       '--muted-foreground': colors.mutedForeground,
-      '--accent': colors.accent
+      '--accent': colors.accent,
+      '--accent-foreground': colors.accentForeground,
+      '--border': colors.border
     })
   })
 
