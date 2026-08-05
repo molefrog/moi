@@ -60,6 +60,11 @@ config management.
    never enters the workspace.
 3. Import rewrite to relative paths (two string maps:
    `@/registry/<style>/lib/utils` → `./utils`, `…/ui/<x>` → `./<x>`).
+   There is no config knob for this: raw registry content hardcodes
+   `@/registry/<style>/…` paths, the CLI's alias rewrite is internal (not
+   exported), and aliases are validated against tsconfig paths or
+   `package.json` `imports` — a relative value like `./utils` is rejected
+   outright (verified). The string maps are the "no `@`" mechanism.
 4. Write files to `.moi/ui/`. On first add, also install `ui/utils.ts`
    (`cn` — itself a registry item; declares `clsx` + `tailwind-merge`).
 5. Print next steps. Nothing else — no install, no rebuild.
