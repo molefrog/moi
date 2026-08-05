@@ -113,7 +113,7 @@ export const TurnView = memo(function TurnView({ turn, processing = false }: Tur
           <FilePart key={i} mediaType={p.mediaType} url={p.url} filename={p.filename} />
         ))}
         {text && (
-          <p className="max-w-full min-w-0 rounded-lg bg-accent px-3 py-2 text-sm leading-normal wrap-anywhere whitespace-pre-wrap text-accent-foreground">
+          <p className="max-w-full min-w-0 rounded-lg bg-primary px-3 py-2 text-sm leading-normal wrap-anywhere whitespace-pre-wrap text-primary-foreground">
             {text}
           </p>
         )}
