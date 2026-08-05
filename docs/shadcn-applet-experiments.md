@@ -195,3 +195,43 @@ components/popover.md` → 200 (API reference). Zero-maintenance agent
   `getRegistryItems` call — the highest-value input for an agent writing
   UI. (Example files import an internal `Example` wrapper and
   `IconPlaceholder` — read-only material, not for installing.)
+
+## Round 4 — theming: `moi theme` coexistence and host-var inheritance
+
+**Can widget CSS ride host-inherited vars? Yes — measured.** The compiled
+widget bundle (button, popover, dropdown-menu, alert-dialog) contains 911
+declarations with 473 `var()` references. Every paint property resolves
+through the semantic token set inherited from the host at runtime
+(`background`/`foreground`/`card`/`popover`/`primary`/`muted`/`accent`/
+`destructive`/`border`/`input`/`ring` + `-foreground` variants, `--radius`,
+`--sans`/`--mono`); the only hardcoded color literals are 4× transparent.
+Bundle-local vars are structural Tailwind mechanics (`--spacing`,
+`--text-*`, `--tw-*`) and Base UI positioning vars — correctly not
+themable. The themable/structural split is exactly right by construction.
+
+**`moi theme` coexistence — works for views, silently broken for widgets.**
+`moi theme` sets 9 runtime vars on `documentElement` (fonts + 7 colors,
+all derived from one primary via `color-mix`; stored in workspace config;
+no rebuild needed — values resolve at runtime). Verified live with
+`--color sand --font blobby`:
+
+- A view-context probe resolves `--primary: #ff8700` — full inheritance.
+- Inside a widget, `--primary` resolves to `oklch(.985 0 0)`: the frame's
+  forced `.dark` class redefines every color token with neutral constants
+  closer in the cascade than the documentElement inline props. **Workspace
+  color themes never reach widgets; only fonts pass through** (`.dark`
+  doesn't redefine `--sans`/`--mono` — the button renders Sour Gummy).
+- Screenshot: warm sand chrome, monochrome black widget. This is the
+  mechanical root cause of the "widgets look black and white" user
+  feedback and the accent-colors complaint.
+
+**Coexistence design implied: separate hue from mode.** The theme's input
+stays one primary; derivations should produce a light _and_ a dark value
+set, with dark applied under `.dark` (injected rule or CSS `light-dark()`
+
+- `color-scheme`). Widgets then keep their dark mode but adopt the
+  workspace hue. shadcn components need zero changes — they are pure token
+  consumers. Gaps to fill alongside: `moi theme` derives only 7 tokens
+  (card/popover/border/input/ring/destructive/accent-foreground fall back to
+  neutral `:root` defaults), and the vocabulary lacks `secondary` +
+  `chart-1…5`, which base-nova components and dashboards need.
