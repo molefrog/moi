@@ -57,7 +57,9 @@ type ChatSessionItemProps = {
   workspaceId: string
 }
 
-function ChatSessionItem({
+// One chat row inside the selector menu (summary, flavor/origin badge, running
+// spinner, archive affordance). Exported for the /dev/chat-states catalog.
+export function ChatSessionItem({
   active,
   canArchive,
   confirmingArchive,

@@ -197,23 +197,7 @@ export function ChatPanel({
           )}
         >
           {composerBanner}
-          {error && (
-            <div className="flex w-full items-center gap-2 p-1 pl-4 text-sm">
-              <span className="flex-1 wrap-break-word text-destructive">{error}</span>
-              {onDismissError && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={onDismissError}
-                  className="text-destructive hover:text-destructive"
-                  aria-label="Dismiss error"
-                >
-                  <IconX stroke={1.75} />
-                </Button>
-              )}
-            </div>
-          )}
+          {error && <ChatErrorBanner error={error} onDismiss={onDismissError} />}
           <ChatComposer
             composerRef={composerRef}
             onSend={handleSend}
@@ -228,12 +212,37 @@ export function ChatPanel({
   )
 }
 
+type ChatErrorBannerProps = { error: string; onDismiss?: () => void }
+
+// The session error row shown above the composer, inside its tinted
+// (bg-destructive/10) group. Exported for the /dev/chat-states catalog.
+export function ChatErrorBanner({ error, onDismiss }: ChatErrorBannerProps) {
+  return (
+    <div className="flex w-full items-center gap-2 p-1 pl-4 text-sm">
+      <span className="flex-1 wrap-break-word text-destructive">{error}</span>
+      {onDismiss && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          onClick={onDismiss}
+          className="text-destructive hover:text-destructive"
+          aria-label="Dismiss error"
+        >
+          <IconX stroke={1.75} />
+        </Button>
+      )}
+    </div>
+  )
+}
+
 type ChatNoticeRowProps = { notice: SystemNotice }
 
 // A quiet, centered one-liner marking a session event (context compacted,
 // model changed) at its place in the transcript. Kinds without designed copy
-// render nothing (see chatNoticeLabel).
-function ChatNoticeRow({ notice }: ChatNoticeRowProps) {
+// render nothing (see chatNoticeLabel). Exported for the /dev/chat-states
+// catalog.
+export function ChatNoticeRow({ notice }: ChatNoticeRowProps) {
   const label = chatNoticeLabel(notice)
   if (!label) return null
   return (

@@ -1,5 +1,6 @@
 import { Route, Switch } from 'wouter'
 
+import { ChatStatesPage } from './ChatStatesPage'
 import { HarnessDebugPage } from './HarnessDebugPage'
 import { PlaygroundPage } from './PlaygroundPage'
 import { ToolCallsPage } from './ToolCallsPage'
@@ -11,6 +12,7 @@ export default function DevRoutes() {
   return (
     <Switch>
       <Route path="/dev/harness" component={HarnessDebugPage} />
+      <Route path="/dev/chat-states" component={ChatStatesPage} />
       <Route path="/dev/tool-calls" component={ToolCallsPage} />
       <Route path="/dev" component={PlaygroundPage} />
     </Switch>
