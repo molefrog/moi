@@ -22,7 +22,8 @@ export function BottomPanel({ className, title, children, onClose, ref }: Bottom
     <motion.div
       ref={ref}
       className={cn(
-        'absolute inset-x-4 bottom-4 no-scrollbar flex max-h-full flex-col gap-4 overflow-y-auto rounded-2xl bg-card p-(--page-pad) pb-0 text-card-foreground shadow-md',
+        'absolute inset-x-4 bottom-4 no-scrollbar flex max-h-full flex-col gap-4 overflow-y-auto rounded-2xl bg-card text-card-foreground shadow-md',
+        'mx-auto max-w-[calc(var(--chat-max-container)+var(--page-pad)*2)] p-(--page-pad) pb-0',
         className
       )}
       variants={{

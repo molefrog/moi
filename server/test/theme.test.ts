@@ -30,6 +30,19 @@ function contrastRatio(first: string, second: string): number {
 }
 
 describe('color themes', () => {
+  test('keeps the picker order', () => {
+    expect(Object.keys(COLOR_THEMES)).toEqual([
+      'default',
+      'paper',
+      'rose',
+      'tangerine',
+      'sand',
+      'mint',
+      'sky',
+      'lavender'
+    ])
+  })
+
   test('derives all theme colors from the primary', () => {
     expect(deriveThemeColors('#eab308')).toEqual({
       primary: '#eab308',

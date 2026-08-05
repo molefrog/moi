@@ -73,7 +73,15 @@ export const RADIUS_THEMES: Record<RadiusTheme, RadiusThemeConfig> = {
   square: { label: 'Square', radius: '0' }
 }
 
-export type ColorTheme = 'default' | 'paper' | 'sand' | 'rose' | 'lavender' | 'mint' | 'sky'
+export type ColorTheme =
+  | 'default'
+  | 'paper'
+  | 'rose'
+  | 'tangerine'
+  | 'sand'
+  | 'mint'
+  | 'sky'
+  | 'lavender'
 
 function foregroundForPrimary(primary: string): string {
   if (!/^#[0-9a-f]{6}$/i.test(primary)) {
@@ -118,17 +126,17 @@ export const COLOR_THEMES: Record<ColorTheme, ColorThemeConfig> = {
     label: 'Paper',
     primary: '#453521'
   },
-  sand: {
-    label: 'Sand',
-    primary: '#ff8700'
-  },
   rose: {
     label: 'Rose',
     primary: '#f13c3c'
   },
-  lavender: {
-    label: 'Lavender',
-    primary: '#9051ff'
+  tangerine: {
+    label: 'Tangerine',
+    primary: '#ff5c35'
+  },
+  sand: {
+    label: 'Sand',
+    primary: '#ff8700'
   },
   mint: {
     label: 'Tropics',
@@ -137,6 +145,10 @@ export const COLOR_THEMES: Record<ColorTheme, ColorThemeConfig> = {
   sky: {
     label: 'Sky',
     primary: '#007ae3'
+  },
+  lavender: {
+    label: 'Lavender',
+    primary: '#9051ff'
   }
 }
 
