@@ -6,8 +6,13 @@
 import { describe, expect, test } from 'bun:test'
 
 import type { OpenClawMessage } from './discovery'
-import { type ToolResultInfo, flattenToolResultContent, messageToTurn } from './adapter'
-import { chatPreviewBlocks, normalizeEchoText } from './session'
+import {
+  type ToolResultInfo,
+  flattenToolResultContent,
+  messageToTurn,
+  toStreamEvents
+} from './adapter'
+import { chatPreviewBlocks, claimPreviewSource, normalizeEchoText } from './session'
 
 describe('chatPreviewBlocks', () => {
   test('maps a real first chat delta onto one text block', () => {
@@ -255,5 +260,56 @@ describe('normalizeEchoText — optimistic-echo rendezvous (issue: duplicated us
   test('empty and non-string inputs are safe', () => {
     expect(normalizeEchoText(undefined)).toBe('')
     expect(normalizeEchoText('')).toBe('')
+  })
+})
+
+describe('reasoning field drift (issue: no thinking blocks on newer gateways)', () => {
+  test('chatPreviewBlocks maps every thinking/reasoning field variant', () => {
+    // 2026.7.1 ships `{ type: 'thinking', thinking }`; newer lines emit
+    // `reasoning` and/or carry the text in `text`.
+    expect(chatPreviewBlocks([{ type: 'thinking', thinking: 'hm' }])).toEqual([
+      { index: 0, kind: 'reasoning', text: 'hm' }
+    ])
+    expect(chatPreviewBlocks([{ type: 'reasoning', reasoning: 'why' }])).toEqual([
+      { index: 0, kind: 'reasoning', text: 'why' }
+    ])
+    expect(chatPreviewBlocks([{ type: 'reasoning', text: 'because' }])).toEqual([
+      { index: 0, kind: 'reasoning', text: 'because' }
+    ])
+  })
+
+  test('toStreamEvents renders a reasoning part from a thinking or reasoning block', () => {
+    const withThinking = toStreamEvents({
+      messages: [
+        {
+          role: 'assistant',
+          content: [{ type: 'reasoning', text: 'step one' }],
+          __openclaw: { id: 'a1' }
+        } as unknown as OpenClawMessage
+      ]
+    })
+    const parts = withThinking[0]?.kind === 'turn' ? withThinking[0].turn.parts : []
+    expect(parts).toContainEqual({ type: 'reasoning', text: 'step one' })
+  })
+})
+
+describe('claimPreviewSource (issue: streaming preview source per run)', () => {
+  test('first source to emit a delta wins the run; the other is ignored', () => {
+    const rec: { previewRunId?: string; previewSource?: 'chat' | 'agent' } = {}
+    // chat delta arrives first for run r1 → claims it.
+    expect(claimPreviewSource(rec, 'r1', 'chat')).toBe(true)
+    // agent frames for the same run are then ignored (no double-broadcast).
+    expect(claimPreviewSource(rec, 'r1', 'agent')).toBe(false)
+    // chat keeps streaming r1.
+    expect(claimPreviewSource(rec, 'r1', 'chat')).toBe(true)
+  })
+
+  test('agent wins a run where chat never emits, and a new run re-arbitrates', () => {
+    const rec: { previewRunId?: string; previewSource?: 'chat' | 'agent' } = {}
+    expect(claimPreviewSource(rec, 'r1', 'agent')).toBe(true)
+    expect(claimPreviewSource(rec, 'r1', 'chat')).toBe(false)
+    // r2 is a fresh run — whichever source speaks first claims it.
+    expect(claimPreviewSource(rec, 'r2', 'chat')).toBe(true)
+    expect(claimPreviewSource(rec, 'r2', 'agent')).toBe(false)
   })
 })

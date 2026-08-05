@@ -82,6 +82,11 @@ type SessionRecord = {
   pendingUserEchoes: { optimisticId: string; text: string; runId?: string }[]
   // Whether the client asked for token previews on the latest send.
   streamEnabled: boolean
+  // Which frame family owns the current run's streaming preview. The first of
+  // `chat` / `agent` to emit a delta claims the run so a gateway emitting both
+  // doesn't double-broadcast (see claimPreviewSource).
+  previewRunId?: string
+  previewSource?: 'chat' | 'agent'
   // Last model/thinking applied via sessions.patch, in `provider/model` form —
   // avoids a patch round-trip per send when nothing changed.
   appliedModel?: string
@@ -463,14 +468,71 @@ export function chatPreviewBlocks(content: unknown): PreviewBlock[] {
   const blocks: PreviewBlock[] = []
   content.forEach((block, index) => {
     if (!block || typeof block !== 'object') return
-    const b = block as { type?: unknown; text?: unknown; thinking?: unknown }
+    const b = block as { type?: unknown; text?: unknown; thinking?: unknown; reasoning?: unknown }
     if (b.type === 'text' && typeof b.text === 'string' && b.text) {
       blocks.push({ index, kind: 'text', text: b.text })
-    } else if (b.type === 'thinking' && typeof b.thinking === 'string' && b.thinking) {
-      blocks.push({ index, kind: 'reasoning', text: b.thinking })
+    } else if (b.type === 'thinking' || b.type === 'reasoning') {
+      // Same field drift as the durable path (adapter.blockToPart): the text
+      // lives in `thinking`, `reasoning`, or `text` depending on the line.
+      const text =
+        (typeof b.thinking === 'string' && b.thinking) ||
+        (typeof b.reasoning === 'string' && b.reasoning) ||
+        (typeof b.text === 'string' && b.text) ||
+        ''
+      if (text) blocks.push({ index, kind: 'reasoning', text })
     }
   })
   return blocks
+}
+
+// Two frame families carry the streaming assistant text, and which one a
+// gateway emits has drifted: 2026.7.x sends `chat` state=delta frames, while
+// other lines stream via `agent` stream=assistant frames (cumulative `text`).
+// The first source to produce a delta for a run wins it, so a gateway that
+// emits both doesn't double-broadcast (which would flicker as the two
+// cumulative snapshots race), and a gateway that emits only `agent` frames
+// still streams instead of dumping the whole reply at run end.
+type PreviewSource = 'chat' | 'agent'
+// Exported for tests: only reads/writes the two preview-source fields.
+export function claimPreviewSource(
+  rec: Pick<SessionRecord, 'previewRunId' | 'previewSource'>,
+  runId: string,
+  source: PreviewSource
+): boolean {
+  if (rec.previewRunId !== runId) {
+    rec.previewRunId = runId
+    rec.previewSource = source
+    return true
+  }
+  return rec.previewSource === source
+}
+
+function broadcastPreview(rec: SessionRecord, messageId: string, blocks: PreviewBlock[]): void {
+  broadcast(rec.workspaceId, {
+    type: 'preview',
+    sessionId: rec.sessionId,
+    messageId,
+    parentToolUseId: null,
+    blocks
+  })
+}
+
+// `agent` stream=assistant / reasoning frames carry the cumulative in-progress
+// text in `data.text` — the fallback streaming source for gateways that don't
+// emit `chat` delta frames.
+function handleAgentStreamFrame(rec: SessionRecord, payload: Record<string, unknown>): void {
+  if (!rec.streamEnabled) return
+  const stream = payload.stream
+  const kind: PreviewBlock['kind'] | null =
+    stream === 'assistant' ? 'text' : stream === 'reasoning' ? 'reasoning' : null
+  if (!kind) return
+  const runId = typeof payload.runId === 'string' ? payload.runId : rec.activeRunId
+  if (!runId) return
+  const data = payload.data as { text?: unknown } | undefined
+  const text = typeof data?.text === 'string' ? data.text : ''
+  if (!text) return
+  if (!claimPreviewSource(rec, runId, 'agent')) return
+  broadcastPreview(rec, previewMessageId(rec.sessionKey, runId), [{ index: 0, kind, text }])
 }
 
 function handleChatFrame(rec: SessionRecord, payload: Record<string, unknown>): void {
@@ -483,25 +545,14 @@ function handleChatFrame(rec: SessionRecord, payload: Record<string, unknown>): 
     const message = payload.message as { content?: unknown } | undefined
     const blocks = chatPreviewBlocks(message?.content)
     if (blocks.length === 0) return
-    broadcast(rec.workspaceId, {
-      type: 'preview',
-      sessionId: rec.sessionId,
-      messageId,
-      parentToolUseId: null,
-      blocks
-    })
+    if (!claimPreviewSource(rec, runId, 'chat')) return
+    broadcastPreview(rec, messageId, blocks)
   } else if (state === 'final' || state === 'error' || state === 'aborted') {
     // Belt-and-braces clear: the durable turn's apiMessageId already clears
     // the slot, but a trailing delta after the durable row would repaint it.
     // 'aborted' arrives when a steer/abort interrupts the run mid-stream —
     // without the clear the dead preview would linger (verified live).
-    broadcast(rec.workspaceId, {
-      type: 'preview',
-      sessionId: rec.sessionId,
-      messageId,
-      parentToolUseId: null,
-      blocks: []
-    })
+    broadcastPreview(rec, messageId, [])
   }
 }
 
@@ -723,10 +774,17 @@ async function ensureSubscribed(rec: SessionRecord): Promise<void> {
         }
       }
     } else if (event === 'agent') {
-      // Backstop for run lifecycle — `sessions.changed` should already cover
-      // this, but `agent` lifecycle frames are the authoritative signal.
       if (payload.sessionKey !== rec.sessionKey) return
       const stream = payload.stream as string | undefined
+      // Streaming text/reasoning fallback for gateways that don't emit `chat`
+      // delta frames (handleAgentStreamFrame no-ops when `chat` already owns
+      // the run's preview).
+      if (stream === 'assistant' || stream === 'reasoning') {
+        handleAgentStreamFrame(rec, payload)
+        return
+      }
+      // Backstop for run lifecycle — `sessions.changed` should already cover
+      // this, but `agent` lifecycle frames are the authoritative signal.
       if (stream !== 'lifecycle') return
       const runId = payload.runId as string | undefined
       const data = payload.data as { phase?: string } | undefined

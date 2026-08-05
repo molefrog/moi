@@ -158,17 +158,33 @@ function blockToPart(
       if (!text) return null
       return { type: 'text', text }
     }
-    case 'thinking': {
+    case 'thinking':
+    case 'reasoning': {
+      // Field drift across OpenClaw lines: 2026.7.1 ships `{ type: 'thinking',
+      // thinking, thinkingSignature }`; newer lines emit `reasoning` and/or
+      // carry the text in `text`. Read whichever is present so the Thought row
+      // never silently vanishes.
+      const b = block as {
+        thinking?: unknown
+        reasoning?: unknown
+        text?: unknown
+        thinkingSignature?: unknown
+        signature?: unknown
+      }
       const text =
-        typeof (block as { thinking?: unknown }).thinking === 'string'
-          ? (block as { thinking: string }).thinking
-          : ''
+        (typeof b.thinking === 'string' && b.thinking) ||
+        (typeof b.reasoning === 'string' && b.reasoning) ||
+        (typeof b.text === 'string' && b.text) ||
+        ''
       if (!text) return null
-      const sig = (block as { thinkingSignature?: unknown }).thinkingSignature
+      const sig =
+        (typeof b.thinkingSignature === 'string' && b.thinkingSignature) ||
+        (typeof b.signature === 'string' && b.signature) ||
+        undefined
       return {
         type: 'reasoning',
         text,
-        ...(typeof sig === 'string' ? { signature: sig } : {})
+        ...(sig ? { signature: sig } : {})
       }
     }
     case 'toolCall': {
