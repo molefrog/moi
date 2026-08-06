@@ -6,7 +6,7 @@ import { useUpdateWorkspaceSkills, useWorkspaceSkills } from '@/client/features/
 import type {
   WorkspaceSkillUpdateAction,
   WorkspaceSkillUpdateBannerProps
-} from './WorkspaceSkillUpdateBanner'
+} from './banners/WorkspaceSkillUpdateBanner'
 
 type VisitPhase = 'idle' | 'active' | 'dismissed'
 

@@ -28,7 +28,7 @@ import { ViewBuilderTab } from '@/client/features/views/ViewBuilderTab'
 import { ViewManager } from '@/client/features/views/ViewManager'
 import { useViewBuilderActions } from '@/client/features/views/useViewBuilderActions'
 import { useFitsSplitLayout } from '@/client/features/workspace/useFitsSplitLayout'
-import { useWorkspaceComposerState } from '@/client/features/workspace/useWorkspaceComposerState'
+import { useWorkspaceComposerState } from '@/client/features/chat/composer/useWorkspaceComposerState'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
 import {
   hasRunningWorkspaceActivity,
@@ -197,7 +197,6 @@ function applyVisibleTabOrder(
 
 export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenProps) {
   const { layout, setLayout, name, icon, provider, workspaceId } = useWorkspaceLayoutCtx()
-  const { composerBanner, composerAvailability } = useWorkspaceComposerState(workspaceId)
   const builderActions = useViewBuilderActions()
   const { ref: rowRef, fits: canUseSplit } = useFitsSplitLayout<HTMLDivElement>()
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
@@ -244,6 +243,10 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     selectSession,
     dismissError
   } = useChat({ activeTab, appletParams })
+  const { composerBanner, composerAvailability } = useWorkspaceComposerState(workspaceId, {
+    chatError: error,
+    onDismissChatError: dismissError
+  })
 
   const openSet = new Set(tabsState.open)
 
@@ -488,8 +491,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       previewTurn={previewTurn}
       sessionId={sessionId}
       processing={processing}
-      error={error}
-      onDismissError={dismissError}
       composerBanner={composerBanner}
       composerAvailability={composerAvailability}
       send={send}
@@ -507,8 +508,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       previewTurn={previewTurn}
       sessionId={sessionId}
       processing={processing}
-      error={error}
-      onDismissError={dismissError}
       composerBanner={composerBanner}
       composerAvailability={composerAvailability}
       send={send}
@@ -650,8 +649,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               previewTurn={previewTurn}
               sessionId={sessionId}
               processing={processing}
-              error={error}
-              onDismissError={dismissError}
               composerBanner={composerBanner}
               composerAvailability={composerAvailability}
               send={send}

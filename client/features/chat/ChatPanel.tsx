@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
 import { IconChevronDown, IconX } from '@tabler/icons-react'
 
@@ -15,7 +15,8 @@ import type { ChatSendOptions } from '@/client/features/chat/chat-send'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import type { Turn, ViewState } from '@/lib/types'
 
-import { ChatComposer } from './ChatComposer'
+import type { ComposerBanner } from './composer/banners/ComposerBanner'
+import { ChatComposer } from './composer/ChatComposer'
 import { ChatEmptyState, resolveChatEmptyState } from './ChatEmptyState'
 import { ChatSelector } from './ChatSelector'
 import { ThinkingIndicator, TurnView } from './TurnView'
@@ -36,9 +37,7 @@ type ChatPanelProps = {
   // session switch).
   sessionId?: string | null
   processing: boolean
-  error?: string | null
-  onDismissError?: () => void
-  composerBanner?: ReactNode
+  composerBanner?: ComposerBanner
   composerAvailability: ComposerAvailability
   send: (text: string, options?: ChatSendOptions) => void
   stop: () => void
@@ -55,8 +54,6 @@ export function ChatPanel({
   previewTurn,
   sessionId,
   processing,
-  error,
-  onDismissError,
   composerBanner,
   composerAvailability,
   send,
@@ -182,29 +179,12 @@ export function ChatPanel({
         <div
           className={cn(
             '@container flex w-full flex-col transition-[padding]',
-            (composerBanner || error) && 'gap-2 rounded-t-xl rounded-b-2xl p-2',
-            composerBanner && 'bg-muted',
-            error && 'bg-destructive/10'
+            composerBanner && 'gap-2 rounded-t-xl rounded-b-2xl p-2',
+            composerBanner?.tone === 'muted' && 'bg-muted',
+            composerBanner?.tone === 'destructive' && 'bg-destructive/10'
           )}
         >
-          {composerBanner}
-          {error && (
-            <div className="flex w-full items-center gap-2 p-1 pl-4 text-sm">
-              <span className="flex-1 wrap-break-word text-destructive">{error}</span>
-              {onDismissError && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={onDismissError}
-                  className="text-destructive hover:text-destructive"
-                  aria-label="Dismiss error"
-                >
-                  <IconX stroke={1.75} />
-                </Button>
-              )}
-            </div>
-          )}
+          {composerBanner?.content}
           <ChatComposer
             composerRef={composerRef}
             onSend={handleSend}

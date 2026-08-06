@@ -5,6 +5,8 @@ import { IconAlertCircle, IconLoader2, IconLogin } from '@tabler/icons-react'
 import { Button } from '@/client/components/ui/button'
 import type { HarnessAvailability, HarnessLogin } from '@/lib/types'
 
+import { ComposerBannerShell } from './ComposerBanner'
+
 type WorkspaceAgentAvailabilityBannerProps = {
   availability: Extract<HarnessAvailability, { available: false }>
   onStartLogin: () => Promise<HarnessLogin>
@@ -39,11 +41,11 @@ export function WorkspaceAgentAvailabilityBanner({
   }
 
   return (
-    <div
+    <ComposerBannerShell
       role="alert"
-      className="grid w-full grid-cols-[auto_minmax(0,1fr)] gap-2 p-2 text-sm @xl:grid-cols-[auto_minmax(0,1fr)_auto] @xl:items-center @xl:p-1 @xl:pl-3"
+      className="grid grid-cols-[auto_minmax(0,1fr)] gap-2 @xl:grid-cols-[auto_minmax(0,1fr)_auto] @xl:items-center"
     >
-      <IconAlertCircle size={20} stroke={1.5} className="text-destructive" />
+      <IconAlertCircle size={20} stroke={1.5} />
       <div className="min-w-0 space-y-1">
         <div className="wrap-break-word">{availability.reason}</div>
         {error && <div className="wrap-break-word text-destructive">{error}</div>}
@@ -69,6 +71,6 @@ export function WorkspaceAgentAvailabilityBanner({
               : 'Sign in'}
         </Button>
       )}
-    </div>
+    </ComposerBannerShell>
   )
 }

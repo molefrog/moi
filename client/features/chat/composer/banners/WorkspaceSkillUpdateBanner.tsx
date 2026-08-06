@@ -3,6 +3,8 @@ import { IconFolderExclamation, IconLoader2, IconX } from '@tabler/icons-react'
 import { Button } from '@/client/components/ui/button'
 import { cn } from '@/client/lib/cn'
 
+import { ComposerBannerShell } from './ComposerBanner'
+
 export type WorkspaceSkillUpdateAction = 'auto' | 'once'
 
 export type WorkspaceSkillUpdateBannerProps = {
@@ -20,24 +22,24 @@ export function WorkspaceSkillUpdateBanner({
 }: WorkspaceSkillUpdateBannerProps) {
   if (!error && pendingAction === 'auto') {
     return (
-      <div
+      <ComposerBannerShell
         role="status"
-        className="flex w-full items-center gap-1.5 p-2 pl-3 text-sm text-muted-foreground"
+        className="flex items-center gap-1.5 text-muted-foreground"
       >
         <IconLoader2 size={20} stroke={1.5} className="shrink-0 animate-spin" />
         <span className="wrap-break-word">Updating moi skills…</span>
-      </div>
+      </ComposerBannerShell>
     )
   }
 
   const pending = pendingAction !== null
 
   return (
-    <div
+    <ComposerBannerShell
       role={error ? 'alert' : 'status'}
       className={cn(
-        'grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-2 p-2 text-sm',
-        '@xl:flex @xl:items-center @xl:p-1 @xl:pl-3',
+        'grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-2',
+        '@xl:flex @xl:items-center',
         error && 'text-destructive'
       )}
     >
@@ -86,6 +88,6 @@ export function WorkspaceSkillUpdateBanner({
           {pendingAction === 'once' ? 'Updating…' : 'Update once'}
         </Button>
       </div>
-    </div>
+    </ComposerBannerShell>
   )
 }
