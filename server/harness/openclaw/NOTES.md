@@ -305,6 +305,26 @@ start|update|end, kind, status, name, toolCallId }`), `command_output`
 (phases `start` → `finishing` `{ stopReason, aborted }` → `end`, or `error`
 `{ error }`).
 
+**codex-app-server tool output is run-end only.** On the codex backend
+(OpenAI models — the `agent`/`tool` + `codex_app_server.*` streams, not
+`session.tool`; `codex_app_server.item` frames are present and no
+`command_output` frames are), the live `agent`/`tool` `phase:'result'` frame
+carries only `{ status, exitCode, durationMs }` — **never the stdout**.
+Verified on the wire (result frame at t≈16.2s has no `content`; the command's
+output first appears in the run-end `session.message` `toolResult` at t≈20.0s)
+and in the plugin: `@openclaw/codex` `itemToolResult(commandExecution)`
+returns exactly those three fields. A turn's assistant/`toolCall`/`toolResult`
+rows all commit together when the turn ends, so the durable `toolResult` (the
+only frame that carries stdout **with** a `toolCallId`) is run-end-gated. The
+one live-stdout path — the plugin's `handleOutputDelta`/`emitToolResultOutput`
+→ `onToolResult` — is gated behind the agent's `verboseLevel:'full'` and
+arrives as formatted channel-progress text with no `toolCallId`, so it can't
+attach to a card. Net: moi renders a codex tool running and flips it to
+success/error (from `isError`/exitCode) live at the result frame, but the
+**output body only fills when the run ends**. This is a backend property, not
+a moi gap — `session.tool` (Anthropic) carries output live, which is why the
+two backends feel different.
+
 **`task`** — subagent runs (2026.7.x; the event family is new there):
 
 ```jsonc
