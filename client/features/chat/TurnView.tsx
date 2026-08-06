@@ -2,10 +2,12 @@ import { memo } from 'react'
 
 import { IconFile } from '@tabler/icons-react'
 
+import type { Part, Turn } from '@/lib/types'
+
 import { MarkdownContent } from '@/client/features/chat/MarkdownContent'
 import { ToolCallGroup } from '@/client/features/chat/tool-group/ToolCallGroup'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
-import type { Part, Turn } from '@/lib/types'
+import { cn } from '@/client/lib/cn'
 
 export function ThinkingIndicator() {
   return (
@@ -113,7 +115,12 @@ export const TurnView = memo(function TurnView({ turn, processing = false }: Tur
           <FilePart key={i} mediaType={p.mediaType} url={p.url} filename={p.filename} />
         ))}
         {text && (
-          <p className="max-w-full min-w-0 rounded-lg bg-primary px-3 py-2 text-sm leading-normal wrap-anywhere whitespace-pre-wrap text-primary-foreground">
+          <p
+            className={cn(
+              'max-w-full min-w-0 rounded-lg bg-primary px-3 py-2 text-sm leading-normal wrap-anywhere whitespace-pre-wrap text-primary-foreground',
+              'inset-shadow-[0_0_10px_color-mix(in_oklab,var(--color-white)_30%,transparent)]'
+            )}
+          >
             {text}
           </p>
         )}
