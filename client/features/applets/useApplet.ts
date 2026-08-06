@@ -24,7 +24,7 @@ export type AppletComponentProps = {
   params?: Record<string, unknown>
 }
 
-type AppletState =
+export type AppletState =
   | { status: 'loading'; version: number }
   | { status: 'ready'; Component: ComponentType<AppletComponentProps>; version: number }
   | { status: 'error'; error: string; version: number }
