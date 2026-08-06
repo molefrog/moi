@@ -1,13 +1,15 @@
 import { describe, expect, test } from 'bun:test'
 
-import { canSubmitComposerAction, type ComposerAvailability, focusComposer } from './Composer'
+import {
+  canSubmitComposerAction,
+  type ComposerAvailability,
+  composerAvailabilityTooltip,
+  focusComposer
+} from './Composer'
 
 const available: ComposerAvailability = { status: 'available' }
 const checking: ComposerAvailability = { status: 'checking' }
-const unavailable: ComposerAvailability = {
-  status: 'unavailable',
-  reason: 'Run curl -fsSL https://claude.ai/install.sh | sh to install Claude'
-}
+const unavailable: ComposerAvailability = { status: 'unavailable' }
 
 test('focuses a composer with the caret after its draft', () => {
   let focused = false
@@ -39,5 +41,13 @@ describe('canSubmitComposerAction', () => {
     { hasContent: true, busy: false, availability: unavailable }
   ])('blocks unavailable or incomplete composer actions', ({ hasContent, busy, availability }) => {
     expect(canSubmitComposerAction(hasContent, busy, availability)).toBe(false)
+  })
+})
+
+describe('composerAvailabilityTooltip', () => {
+  test('uses composer-owned copy for availability states', () => {
+    expect(composerAvailabilityTooltip(checking)).toBe('Checking agent status…')
+    expect(composerAvailabilityTooltip(unavailable)).toBe('Agent unavailable')
+    expect(composerAvailabilityTooltip(available)).toBeUndefined()
   })
 })

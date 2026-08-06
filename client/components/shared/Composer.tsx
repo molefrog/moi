@@ -80,7 +80,15 @@ export function ComposerFooter({ className, children, ...props }: ComposerFooter
 export type ComposerAvailability =
   | { status: 'checking' }
   | { status: 'available' }
-  | { status: 'unavailable'; reason: string }
+  | { status: 'unavailable' }
+
+export function composerAvailabilityTooltip(
+  availability: ComposerAvailability
+): string | undefined {
+  if (availability.status === 'checking') return 'Checking agent status…'
+  if (availability.status === 'unavailable') return 'Agent unavailable'
+  return undefined
+}
 
 export function canSubmitComposerAction(
   hasContent: boolean,
@@ -106,24 +114,19 @@ export function ComposerSubmitButton({
   availability
 }: ComposerSubmitButtonProps) {
   const canSubmit = canSubmitComposerAction(hasContent, busy || loading, availability)
-  const unavailableReason =
-    availability.status === 'checking'
-      ? 'Checking agent status…'
-      : availability.status === 'unavailable'
-        ? availability.reason
-        : undefined
+  const availabilityTooltip = composerAvailabilityTooltip(availability)
   const button = (
     <Button type="submit" size="icon" disabled={!canSubmit} aria-label={label}>
       {loading ? <Spinner /> : <IconArrowUp stroke={1.5} />}
     </Button>
   )
 
-  if (loading || !unavailableReason) return button
+  if (loading || !availabilityTooltip) return button
 
   return (
     <Tooltip>
       <TooltipTrigger render={<span className="inline-flex">{button}</span>} />
-      <TooltipContent className="max-w-64 text-center">{unavailableReason}</TooltipContent>
+      <TooltipContent className="max-w-64 text-center">{availabilityTooltip}</TooltipContent>
     </Tooltip>
   )
 }

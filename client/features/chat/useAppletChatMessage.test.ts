@@ -13,10 +13,10 @@ describe('appletSendBlockedReason', () => {
     expect(appletSendBlockedReason({ status: 'available' })).toBeNull()
   })
 
-  test('a known reason blocks and is quoted back for the journal', () => {
-    expect(
-      appletSendBlockedReason({ status: 'unavailable', reason: 'claude is not installed' })
-    ).toContain('claude is not installed')
+  test('an unavailable workspace is reported without server details', () => {
+    expect(appletSendBlockedReason({ status: 'unavailable' })).toBe(
+      "this workspace's agent is unavailable"
+    )
   })
 
   test('an unresolved availability query blocks', () => {
@@ -29,7 +29,7 @@ describe('appletSendBlockedReason', () => {
     const states: ComposerAvailability[] = [
       { status: 'available' },
       { status: 'checking' },
-      { status: 'unavailable', reason: 'claude is not installed' }
+      { status: 'unavailable' }
     ]
     for (const availability of states) {
       const composerWouldSend = canSubmitComposerAction(true, false, availability)

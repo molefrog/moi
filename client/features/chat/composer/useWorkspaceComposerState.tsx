@@ -34,7 +34,7 @@ export function useWorkspaceComposerState(
 
   let composerAvailability: ComposerAvailability = { status: 'checking' }
   if (unavailable) {
-    composerAvailability = { status: 'unavailable', reason: unavailable.reason }
+    composerAvailability = { status: 'unavailable' }
   } else if (availability) {
     composerAvailability = { status: 'available' }
   }

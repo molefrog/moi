@@ -34,7 +34,7 @@ export function appletSendBlockedReason(availability: ComposerAvailability): str
   if (availability.status === 'checking') {
     return "this workspace's agent availability has not resolved yet"
   }
-  return `this workspace's agent is unavailable (${availability.reason})`
+  return "this workspace's agent is unavailable"
 }
 
 export function useAppletChatMessage({
