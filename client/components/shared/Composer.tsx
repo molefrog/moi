@@ -77,12 +77,17 @@ export function ComposerFooter({ className, children, ...props }: ComposerFooter
   )
 }
 
+export type ComposerAvailability =
+  | { status: 'checking' }
+  | { status: 'available' }
+  | { status: 'unavailable'; reason: string }
+
 export function canSubmitComposerAction(
   hasContent: boolean,
   busy: boolean,
-  unavailableReason: string | null | undefined
+  availability: ComposerAvailability
 ): boolean {
-  return hasContent && !busy && unavailableReason === null
+  return hasContent && !busy && availability.status === 'available'
 }
 
 type ComposerSubmitButtonProps = {
@@ -90,7 +95,7 @@ type ComposerSubmitButtonProps = {
   hasContent: boolean
   busy?: boolean
   loading?: boolean
-  unavailableReason: string | null | undefined
+  availability: ComposerAvailability
 }
 
 export function ComposerSubmitButton({
@@ -98,9 +103,15 @@ export function ComposerSubmitButton({
   hasContent,
   busy = false,
   loading = false,
-  unavailableReason
+  availability
 }: ComposerSubmitButtonProps) {
-  const canSubmit = canSubmitComposerAction(hasContent, busy || loading, unavailableReason)
+  const canSubmit = canSubmitComposerAction(hasContent, busy || loading, availability)
+  const unavailableReason =
+    availability.status === 'checking'
+      ? 'Checking agent status…'
+      : availability.status === 'unavailable'
+        ? availability.reason
+        : undefined
   const button = (
     <Button type="submit" size="icon" disabled={!canSubmit} aria-label={label}>
       {loading ? <Spinner /> : <IconArrowUp stroke={1.5} />}

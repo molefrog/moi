@@ -46,6 +46,9 @@ export function WorkspaceAgentAvailabilityBanner({
       <IconAlertCircle size={20} stroke={1.5} className="text-destructive" />
       <div className="min-w-0 space-y-1">
         <div className="wrap-break-word">{availability.reason}</div>
+        {availability.loginCommand && (
+          <code className="block text-xs text-muted-foreground">{availability.loginCommand}</code>
+        )}
         {error && <div className="wrap-break-word text-destructive">{error}</div>}
       </div>
 

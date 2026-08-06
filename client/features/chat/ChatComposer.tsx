@@ -10,6 +10,7 @@ import {
 
 import {
   canSubmitComposerAction,
+  type ComposerAvailability,
   Composer,
   ComposerFooter,
   ComposerSubmitButton,
@@ -36,7 +37,7 @@ type ChatComposerProps = {
   onStop: () => void
   processing: boolean
   sessionId: string | null
-  unavailableReason: string | null | undefined
+  availability: ComposerAvailability
 }
 
 // Draft text is persisted per workspace, while attachments remain ephemeral and
@@ -48,7 +49,7 @@ export function ChatComposer({
   onStop,
   processing,
   sessionId,
-  unavailableReason
+  availability
 }: ChatComposerProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const workspaceId = useWorkspaceId()
@@ -59,7 +60,7 @@ export function ChatComposer({
   const uploading = attachments.some(a => a.status === 'uploading')
   const hasReady = attachments.some(a => a.status === 'ready')
   const hasContent = value.trim().length > 0 || hasReady
-  const canSend = canSubmitComposerAction(hasContent, uploading, unavailableReason)
+  const canSend = canSubmitComposerAction(hasContent, uploading, availability)
 
   const onChange = (next: string) => useUiStore.getState().setComposerDraft(workspaceId, next)
 
@@ -198,7 +199,7 @@ export function ChatComposer({
             label="Send message"
             hasContent={hasContent}
             busy={uploading}
-            unavailableReason={unavailableReason}
+            availability={availability}
           />
         )}
       </ComposerFooter>

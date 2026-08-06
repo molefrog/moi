@@ -13,6 +13,7 @@
 import { reportAppletError } from '@/client/features/applets/applet-log'
 import { type AppletChatMessage, useAppletEvent } from '@/client/features/applets/applet-runtime'
 import type { ChatSendOptions } from '@/client/features/chat/chat-send'
+import type { ComposerAvailability } from '@/client/components/shared/Composer'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 
 type UseAppletChatMessageOptions = {
@@ -21,36 +22,30 @@ type UseAppletChatMessageOptions = {
   // full-screen mode the chat is a popover that is closed by default, so
   // without this the agent would start working somewhere the user can't see.
   revealChat: () => void
-  // Same gate the composer's send button uses: `null` means the agent is
-  // ready, a string names why it isn't, and `undefined` means the availability
-  // query hasn't answered yet. Only `null` may send.
-  unavailableReason: string | null | undefined
+  // Same explicit availability state the composer's send button uses.
+  composerAvailability: ComposerAvailability
 }
 
 // Why an applet message can't go out right now, or null when it can. The gate
-// is exactly the composer's — `canSubmitComposerAction` requires `null`, so
-// `undefined` (availability still loading) blocks there too. Starting a run the
-// visible UI would have refused is worse than dropping a click the user can
-// repeat a moment later.
-export function appletSendBlockedReason(
-  unavailableReason: string | null | undefined
-): string | null {
-  if (unavailableReason === null) return null
-  if (unavailableReason === undefined) {
+// is exactly the composer's. Starting a run the visible UI would have refused
+// is worse than dropping a click the user can repeat a moment later.
+export function appletSendBlockedReason(availability: ComposerAvailability): string | null {
+  if (availability.status === 'available') return null
+  if (availability.status === 'checking') {
     return "this workspace's agent availability has not resolved yet"
   }
-  return `this workspace's agent is unavailable (${unavailableReason})`
+  return `this workspace's agent is unavailable (${availability.reason})`
 }
 
 export function useAppletChatMessage({
   send,
   revealChat,
-  unavailableReason
+  composerAvailability
 }: UseAppletChatMessageOptions): void {
   const workspaceId = useWorkspaceId()
 
   useAppletEvent(workspaceId, 'sendChatMessage', (event: AppletChatMessage) => {
-    const blocked = appletSendBlockedReason(unavailableReason)
+    const blocked = appletSendBlockedReason(composerAvailability)
     if (blocked) {
       // Journaled rather than dropped quietly: from the applet's side the
       // button did nothing, and this is the only place that says why.

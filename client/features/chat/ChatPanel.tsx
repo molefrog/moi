@@ -2,7 +2,11 @@ import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 
 import { IconChevronDown, IconX } from '@tabler/icons-react'
 
-import { canSubmitComposerAction, focusComposer } from '@/client/components/shared/Composer'
+import {
+  canSubmitComposerAction,
+  type ComposerAvailability,
+  focusComposer
+} from '@/client/components/shared/Composer'
 import { useStickToBottom } from '@/client/features/chat/useStickToBottom'
 import { groupTurns } from '@/client/features/chat/group-turns'
 import { attachmentKey, useLive } from '@/client/features/chat/chat-store'
@@ -35,7 +39,7 @@ type ChatPanelProps = {
   error?: string | null
   onDismissError?: () => void
   composerBanner?: ReactNode
-  unavailableReason: string | null | undefined
+  composerAvailability: ComposerAvailability
   send: (text: string, options?: ChatSendOptions) => void
   stop: () => void
   onSelectSession: (sessionId: string | null) => void
@@ -54,7 +58,7 @@ export function ChatPanel({
   error,
   onDismissError,
   composerBanner,
-  unavailableReason,
+  composerAvailability,
   send,
   stop,
   onSelectSession,
@@ -73,7 +77,7 @@ export function ChatPanel({
       attachment => attachment.status === 'uploading'
     )
   )
-  const promptDisabled = !canSubmitComposerAction(true, attachmentsUploading, unavailableReason)
+  const promptDisabled = !canSubmitComposerAction(true, attachmentsUploading, composerAvailability)
   // Visual grouping: fold consecutive tool-only assistant turns into one
   // synthetic turn so OpenAI Codex–style traces (which serialize one
   // assistant message per agent step) don't render with the wider
@@ -207,7 +211,7 @@ export function ChatPanel({
             onStop={stop}
             processing={processing}
             sessionId={sessionId ?? null}
-            unavailableReason={unavailableReason}
+            availability={composerAvailability}
           />
         </div>
       </div>
