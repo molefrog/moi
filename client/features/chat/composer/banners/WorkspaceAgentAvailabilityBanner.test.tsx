@@ -4,21 +4,18 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { WorkspaceAgentAvailabilityBanner } from './WorkspaceAgentAvailabilityBanner'
 
-test.each([
-  ['Codex', 'codex login'],
-  ['Claude', 'claude auth login']
-])('offers sign-in for %s', (provider, loginCommand) => {
+test('offers login when the agent supports it', () => {
   const html = renderToStaticMarkup(
     createElement(WorkspaceAgentAvailabilityBanner, {
       availability: {
         available: false,
-        reason: `${provider} is signed out. Sign in to send messages`,
-        loginCommand
+        reason: 'Provider unavailable',
+        loginCommand: 'codex login'
       },
       onStartLogin: async () => ({})
     })
   )
 
-  expect(html).toContain(`${provider} is signed out`)
-  expect(html).toContain('Sign in')
+  expect(html).toContain('Log in to your agent provider to send messages')
+  expect(html).toContain('>Log in</button>')
 })
