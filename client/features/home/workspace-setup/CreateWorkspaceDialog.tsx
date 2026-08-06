@@ -2,7 +2,7 @@ import { type FormEvent, type ReactElement, useState } from 'react'
 
 import { useLocation } from 'wouter'
 
-import { useChooseFolder, useCreateWorkspace, useWorkspaceSetupInfo } from '../api'
+import { useCreateWorkspace, useWorkspaceSetupInfo } from '../api'
 import { Button } from '@/client/components/ui/button'
 import {
   Dialog,
@@ -12,15 +12,12 @@ import {
 } from '@/client/components/ui/dialog'
 import { Input } from '@/client/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
-import { cn } from '@/client/lib/cn'
 import { validateWorkspaceFolderName } from '@/lib/workspace-name'
 import { WORKSPACE_TYPE_ORDER } from '@/lib/workspace-types'
 import type { WorkspaceType } from '@/lib/types'
 
-import { ImportWorkspaceStep } from './ImportWorkspaceDialog'
 import { WorkspaceAgentStep } from './WorkspaceAgentStep'
 import { WorkspaceDialogContent } from './WorkspaceDialogContent'
-import { useWorkspaceImport } from './useWorkspaceImport'
 
 type CreateWorkspaceDialogProps = {
   trigger: ReactElement
@@ -34,8 +31,6 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   const [, navigate] = useLocation()
   const info = useWorkspaceSetupInfo()
   const createMutation = useCreateWorkspace()
-  const chooseFolder = useChooseFolder()
-  const importFlow = useWorkspaceImport({ onSuccess: entry => finish(entry.id) })
 
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<CreateWorkspaceStep>('agent')
@@ -44,8 +39,6 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
 
   const trimmedName = name.trim()
   const nameError = trimmedName ? validateWorkspaceFolderName(trimmedName) : null
-  const canChooseFolder = info.data?.canChooseFolder ?? true
-  const isImporting = chooseFolder.isPending || importFlow.isPending
   const isCreating = createMutation.isPending
 
   function finish(workspaceId: string) {
@@ -57,21 +50,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
     setStep('agent')
     setType(DEFAULT_WORKSPACE_TYPE)
     setName('')
-    chooseFolder.reset()
-    importFlow.reset()
     createMutation.reset()
-  }
-
-  async function chooseExistingFolder() {
-    if (isImporting) return
-    chooseFolder.reset()
-
-    try {
-      const result = await chooseFolder.mutateAsync()
-      if (!('canceled' in result)) importFlow.startImport(result)
-    } catch {
-      // The agent step renders the folder-picker error.
-    }
   }
 
   function continueToName() {
@@ -95,30 +74,13 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
     >
       <DialogTrigger render={trigger} />
       <WorkspaceDialogContent>
-        {importFlow.choice ? (
-          <ImportWorkspaceStep
-            choice={importFlow.choice}
-            availability={info.data?.availability}
-            isPending={importFlow.isPending}
-            errorMessage={importFlow.error?.message}
-            onTypeChange={importFlow.selectType}
-            onCancel={importFlow.reset}
-            onSubmit={importFlow.submit}
-          />
-        ) : step === 'agent' ? (
+        {step === 'agent' ? (
           <WorkspaceAgentStep
             title="Create new workspace"
             selectedType={type}
             availability={info.data?.availability}
-            isPending={isImporting}
-            errorMessage={(chooseFolder.error ?? importFlow.error)?.message}
-            secondaryAction={
-              <ExistingFolderButton
-                available={canChooseFolder}
-                disabled={isImporting}
-                onClick={chooseExistingFolder}
-              />
-            }
+            isPending={false}
+            secondaryAction={<ExistingFolderButton />}
             primaryLabel="Next"
             onTypeChange={setType}
             onSubmit={continueToName}
@@ -204,39 +166,34 @@ function WorkspaceNameStep({
   )
 }
 
-type ExistingFolderButtonProps = {
-  available: boolean
-  disabled: boolean
-  onClick: () => void
-}
-
-function ExistingFolderButton({ available, disabled, onClick }: ExistingFolderButtonProps) {
+// Importing a folder from the app is on hold: the native picker only ever ran on
+// macOS and cannot work at all when moi is opened from another device. The
+// button stays as the signpost for the console route.
+function ExistingFolderButton() {
   const button = (
     <Button
       variant="secondary"
-      disabled={available && disabled}
-      aria-disabled={!available || undefined}
-      onClick={event => {
-        if (!available) {
-          event.preventDefault()
-          return
-        }
-        onClick()
-      }}
-      className={cn(!available && 'cursor-not-allowed opacity-50')}
+      aria-disabled
+      onClick={event => event.preventDefault()}
+      className="cursor-not-allowed opacity-50"
     >
       Use existing folder
     </Button>
   )
 
-  if (available) return button
-
   return (
     <Tooltip>
       <TooltipTrigger render={button} />
-      <TooltipContent>
-        Run <code className="rounded-xs bg-accent px-1 py-0.5 font-mono">moi init</code> in the
-        folder to add it manually
+      <TooltipContent className="max-w-64">
+        {/* The popup lays its children out in a row — one span keeps the copy
+            flowing as a sentence with the command inline. */}
+        <span className="text-center">
+          Not supported yet — run{' '}
+          <code className="rounded-xs bg-accent px-1 py-0.5 font-mono whitespace-nowrap">
+            moi init
+          </code>{' '}
+          in the folder from your console to add it
+        </span>
       </TooltipContent>
     </Tooltip>
   )

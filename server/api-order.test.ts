@@ -5,7 +5,7 @@ import { join } from 'node:path'
 
 import type { WorkspaceEntry } from '@/lib/types'
 
-import { api, isSameOriginRequest } from './api'
+import { api } from './api'
 import { setEventServer } from './events'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from './registry'
 
@@ -44,57 +44,4 @@ test('reordering workspaces broadcasts a workspace update', async () => {
     second.id
   ])
   expect(published).toEqual([JSON.stringify({ type: 'workspaces-list:updated' })])
-})
-
-test('native folder picker rejects cross-origin requests before spawning OS UI', async () => {
-  const response = await api.request('/api/workspaces/choose-folder', {
-    method: 'POST',
-    headers: {
-      Origin: 'https://example.test'
-    }
-  })
-
-  expect(response.status).toBe(403)
-  expect(await response.text()).toBe('Forbidden')
-})
-
-test('same-origin detection survives TLS-terminating proxies', () => {
-  // Modern browser behind Cloudflare Tunnel / nginx / ngrok: Origin is https://
-  // while the server's own URL is plain http — sec-fetch-site decides.
-  expect(
-    isSameOriginRequest(
-      new Request('http://moi.example.com/api/workspaces/choose-folder', {
-        method: 'POST',
-        headers: { Origin: 'https://moi.example.com', 'sec-fetch-site': 'same-origin' }
-      })
-    )
-  ).toBe(true)
-
-  // Older browser, no sec-fetch-site: hosts match even though schemes differ.
-  expect(
-    isSameOriginRequest(
-      new Request('http://moi.example.com/api/workspaces/choose-folder', {
-        method: 'POST',
-        headers: { Origin: 'https://moi.example.com' }
-      })
-    )
-  ).toBe(true)
-
-  // Cross-site stays rejected, with or without sec-fetch-site.
-  expect(
-    isSameOriginRequest(
-      new Request('http://localhost:13337/api/workspaces/choose-folder', {
-        method: 'POST',
-        headers: { Origin: 'https://evil.test', 'sec-fetch-site': 'cross-site' }
-      })
-    )
-  ).toBe(false)
-  expect(
-    isSameOriginRequest(
-      new Request('http://localhost:13337/api/workspaces/choose-folder', {
-        method: 'POST',
-        headers: { Origin: 'https://evil.test' }
-      })
-    )
-  ).toBe(false)
 })

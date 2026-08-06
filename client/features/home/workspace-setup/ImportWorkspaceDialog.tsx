@@ -19,7 +19,7 @@ type ImportWorkspaceStepProps = {
   onSubmit: () => void
 }
 
-export function ImportWorkspaceStep({
+function ImportWorkspaceStep({
   choice,
   availability,
   isPending,

@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'path'
 
 import {
-  discoveredWorkspaceForPath,
   findWorkspaceForPath,
   getWorkspace,
   groupDiscoveredWorkspaces,
@@ -88,25 +87,6 @@ describe('workspace discovery grouping', () => {
     )
 
     expect(grouped).toEqual([])
-  })
-
-  test('returns zero, one, or multiple types for one chosen folder', () => {
-    const path = '/Users/foo/project'
-
-    expect(discoveredWorkspaceForPath(path, [])).toEqual({ path, types: [] })
-    expect(discoveredWorkspaceForPath(path, [{ path, type: 'codex' }])).toEqual({
-      path,
-      types: ['codex']
-    })
-    expect(
-      discoveredWorkspaceForPath(path, [
-        { path, type: 'openclaw' },
-        { path, type: 'claude-code' }
-      ])
-    ).toEqual({
-      path,
-      types: ['claude-code', 'openclaw']
-    })
   })
 })
 

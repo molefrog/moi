@@ -173,30 +173,10 @@ export function groupDiscoveredWorkspaces(
   }))
 }
 
-export function discoveredWorkspaceForPath(
-  path: string,
-  candidates: DiscoveredWorkspaceCandidate[]
-): DiscoveredWorkspace {
-  const normalizedPath = resolve(path)
-  return (
-    groupDiscoveredWorkspaces(candidates).find(workspace => workspace.path === normalizedPath) ?? {
-      path: normalizedPath,
-      types: []
-    }
-  )
-}
-
 // Ask every harness for workspaces it knows about that aren't registered yet,
 // then combine providers that claim the same normalized folder.
 export async function discoverWorkspaces(): Promise<DiscoveredWorkspace[]> {
   const registeredPaths = new Set((await readRegistry()).map(e => e.path))
   const found = await collectDiscoveredWorkspaces(registeredPaths)
   return groupDiscoveredWorkspaces(found, registeredPaths).map(withDisplayPath)
-}
-
-// Inspect one folder through the same provider discovery used by the home
-// suggestions. An empty types list means no provider recognized the folder.
-export async function discoverWorkspace(path: string): Promise<DiscoveredWorkspace> {
-  const found = await collectDiscoveredWorkspaces(new Set())
-  return withDisplayPath(discoveredWorkspaceForPath(path, found))
 }

@@ -76,7 +76,7 @@ moi start        # http://localhost:13337
 Then bring in your project, either way works:
 
 - open [http://localhost:13337](http://localhost:13337) and create a workspace
-  (or import an existing folder) right from the web UI;
+  (or import one moi found on this computer) right from the web UI;
 - or run `moi init` inside a folder to turn it into a workspace.
 
 ## Run as a service
