@@ -1,0 +1,187 @@
+// The workspace's view surface: every view the user has open lives here, and
+// switching tabs picks one of them instead of tearing the old one down and
+// building the new one up.
+//
+// Why not a transition: a view is an agent-authored bundle with its own styles
+// and its own state. Animating the swap means keeping the outgoing DOM alive
+// past the moment React drops the applet's <style> tag, so the view spends its
+// exit unstyled. Keeping views mounted removes the problem instead of timing
+// around it — the switch is instant, and a view only ever loads once.
+import { Activity, type ComponentType, useCallback, useEffect, useRef, useState } from 'react'
+
+import { Spinner } from '@/client/components/ui/spinner'
+import { appletScope, appletStyleKey } from '@/client/features/applets/applet-cache'
+import { useAppletStyle } from '@/client/features/applets/applet-styles'
+import {
+  type AppletComponentProps,
+  type AppletState,
+  useView
+} from '@/client/features/applets/useApplet'
+import { WidgetErrorBoundary } from '@/client/features/applets/WidgetErrorBoundary'
+import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
+import { cn } from '@/client/lib/cn'
+import type { ViewInfo } from '@/lib/types'
+
+import {
+  nextEvictionDelay,
+  reconcileResidents,
+  type ResidentView,
+  sameResidents
+} from './view-residency'
+
+type ViewManagerProps = {
+  views: ViewInfo[]
+  // The view the active tab names, or null when another tab is on screen. The
+  // manager stays mounted either way — that is what makes coming back from the
+  // agent or widgets tab instant too.
+  activeViewId: string | null
+  // The active view's addressable state, read from navigation state (focusTab /
+  // `moi tab focus`). `{}` on a fresh mount, a new browser tab, or a plain
+  // tab-bar click — a view must render sensibly with that.
+  params: Record<string, unknown>
+}
+
+export function ViewManager({ views, activeViewId, params }: ViewManagerProps) {
+  const residents = useResidentViews(activeViewId, views)
+  // Render in workspace order, not residency order: the policy ranks views by
+  // recency, and reordering the children would make React move live DOM around
+  // on every switch. The slots are stacked absolutely with one visible, so
+  // their order on the page carries no meaning.
+  const resident = new Set(residents.map(entry => entry.id))
+
+  return (
+    // Hidden rather than unmounted when no view tab is on screen: the parked
+    // views keep their DOM, and `display: none` keeps this layer out of the
+    // layout and out of the way of pointer events on the tab that IS on screen.
+    <div className={cn('relative min-h-0 flex-1 overflow-hidden', !activeViewId && 'hidden')}>
+      {views
+        .filter(view => resident.has(view.id))
+        .map(view => (
+          <ViewSlot key={view.id} view={view} active={view.id === activeViewId} params={params} />
+        ))}
+    </div>
+  )
+}
+
+// The views mounted right now: the active one, plus the recently-visited ones
+// parked offscreen. The policy (and its timing) lives in view-residency.ts.
+function useResidentViews(activeId: string | null, views: ViewInfo[]): ResidentView[] {
+  const [residents, setResidents] = useState<ResidentView[]>([])
+  // A workspace refetch hands us a new array on every event; residency only
+  // cares whether a view appeared or disappeared. So the effect keys off the id
+  // set, and the reconcile reads the current list through the ref.
+  const viewsRef = useRef(views)
+  viewsRef.current = views
+  const availableIds = views.map(view => view.id).join('\n')
+
+  const reconcile = useCallback(() => {
+    setResidents(current => {
+      const next = reconcileResidents(current, {
+        activeId,
+        available: new Set(viewsRef.current.map(view => view.id)),
+        now: Date.now()
+      })
+      return sameResidents(current, next) ? current : next
+    })
+  }, [activeId])
+
+  // Promote the view the user switched to, and release the one it replaced.
+  useEffect(() => {
+    reconcile()
+  }, [availableIds, reconcile])
+
+  // Then evict on the retention deadline — one timer, for the nearest one.
+  useEffect(() => {
+    const delay = nextEvictionDelay(residents, Date.now())
+    if (delay === null) return
+    const timer = setTimeout(reconcile, delay)
+    return () => clearTimeout(timer)
+  }, [reconcile, residents])
+
+  return residents
+}
+
+type ViewSlotProps = {
+  view: ViewInfo
+  active: boolean
+  params: Record<string, unknown>
+}
+
+// One resident view. The bundle it holds is loaded and kept fresh for as long
+// as the slot lives — a view rebuilt while parked picks the new build up in
+// place, so it is current the moment the user comes back to it.
+function ViewSlot({ view, active, params }: ViewSlotProps) {
+  const workspaceId = useWorkspaceId()
+  const bundle = useView(view.id)
+  const loaded = useLoadedBundle(bundle)
+  // A parked view keeps rendering with the params it was last shown with: the
+  // active view's `focusTab` state is not its to render.
+  const [shownParams, setShownParams] = useState(params)
+  if (active && shownParams !== params) setShownParams(params)
+
+  // The applet's <style> is acquired HERE, outside the Activity below. Hiding
+  // an Activity unmounts its children's effects, which would strip the styles
+  // off the page while the DOM they style is still parked — the exact flash
+  // this component exists to remove. The tag drops when the slot is evicted.
+  useAppletStyle(appletStyleKey('views', workspaceId, view.id), loaded?.version ?? bundle.version)
+
+  const failed = bundle.status === 'error'
+
+  return (
+    <>
+      {active && failed && (
+        <p className="absolute inset-0 p-4 text-xs text-destructive">{bundle.error}</p>
+      )}
+      {active && !failed && !loaded && <ViewSplash />}
+      {loaded && !failed && (
+        <Activity mode={active ? 'visible' : 'hidden'}>
+          {/* React hides this node with `display: none` while the Activity is
+              hidden, so a parked view neither paints nor swallows clicks. */}
+          <div
+            key={loaded.version}
+            data-applet={appletScope('views', view.id)}
+            className="absolute inset-0 overflow-auto"
+          >
+            <WidgetErrorBoundary
+              name={view.id}
+              kind="view"
+              workspaceId={workspaceId}
+              resetKey={loaded.version}
+            >
+              <loaded.Component params={shownParams} />
+            </WidgetErrorBoundary>
+          </div>
+        </Activity>
+      )}
+    </>
+  )
+}
+
+type LoadedView = {
+  Component: ComponentType<AppletComponentProps>
+  version: number
+}
+
+// The last build that actually loaded, held across reloads. A rebuild flips the
+// bundle back to `loading` for as long as the fetch takes, and swapping a live
+// view for a spinner every time the agent edits it is worse than showing the
+// previous build for that moment. The splash is for a view with nothing to show
+// yet — the first time it is opened.
+function useLoadedBundle(bundle: AppletState): LoadedView | null {
+  const [loaded, setLoaded] = useState<LoadedView | null>(null)
+  if (bundle.status === 'ready' && loaded?.version !== bundle.version) {
+    setLoaded({ Component: bundle.Component, version: bundle.version })
+  }
+  return loaded
+}
+
+// A view's one loading moment: the first open, while its bundle is fetched. The
+// delay keeps it off screen entirely for a fast load — the common case, since
+// the module cache outlives eviction and only the network trip is new.
+function ViewSplash() {
+  return (
+    <div className="absolute inset-0 flex animate-in items-center justify-center delay-150 duration-200 fill-mode-both fade-in">
+      <Spinner className="text-muted-foreground" />
+    </div>
+  )
+}
