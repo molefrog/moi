@@ -21,6 +21,7 @@ import 'tldraw/tldraw.css'
 
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { setScratchExecutor } from '@/client/features/scratchpad/scratch-executor'
+import { persistScratchSession } from '@/client/features/scratchpad/scratch-session'
 import { type WorkspaceEvent, useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import type { ScratchOp, ScratchOpResult } from '@/lib/types'
 import {
@@ -268,6 +269,8 @@ export function Scratchpad() {
         // a lock. ('fill' = the style bar's "Solid"; 'solid' there means "Semi".)
         editor.setStyleForNextShapes(DefaultFillStyle, 'fill')
       })
+      // Restore this browser's camera/zoom for the workspace, then keep it saved.
+      const stopSessionSave = persistScratchSession(editor, workspaceId)
       const unlisten = editor.store.listen(
         () => {
           if (applyingRemote.current) {
@@ -307,6 +310,7 @@ export function Scratchpad() {
       editor.focus()
       return () => {
         unlisten()
+        stopSessionSave()
         doc.removeEventListener('pointerdown', onPointerDown, true)
         if (saveTimer.current) clearTimeout(saveTimer.current)
         setScratchExecutor(workspaceId, null)
