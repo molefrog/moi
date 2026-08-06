@@ -99,13 +99,18 @@ switch back is instant and the view's component state survives it.
 
 - **First open** — the bundle is fetched behind a centered splash, then rendered.
 - **Switching between loaded views** — instant, no transition. There is no
-  enter/exit animation: a view carries its own styles, and animating the swap
-  means painting frames after the styles are gone.
+  enter/exit animation between views: a view carries its own styles, and
+  animating the swap means painting frames after the styles are gone.
 - **Parked** — hidden with `display: none`. React unmounts the subtree's effects
   while it is hidden and runs them again on return, so a view's effects behave
   like a remount even though its state does not. Scroll position is not kept.
 - **Disposed** — after the retention window (`view-residency.ts`), when the view
   is deleted, or immediately when the workspace closes.
-- A view rebuilt while parked picks the new build up in place. A view rebuilt
-  while on screen keeps showing the previous build until the new one is ready —
-  no splash between edits.
+- **Rebuilt** — a view rebuilt while parked picks the new build up in place. One
+  rebuilt while you are looking at it keeps showing the previous build until the
+  new one is ready, then dissolves the new build in over it (200ms blurred fade,
+  the only animation the view surface has). No splash between edits.
+
+Only the active view's stylesheet is kept last in `<head>`. Applet CSS is scoped
+per container, but the names of global at-rules (`@keyframes`, `@property`) are
+not — so with several views mounted at once, the one on screen wins those names.

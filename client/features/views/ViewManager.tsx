@@ -2,11 +2,17 @@
 // switching tabs picks one of them instead of tearing the old one down and
 // building the new one up.
 //
-// Why not a transition: a view is an agent-authored bundle with its own styles
-// and its own state. Animating the swap means keeping the outgoing DOM alive
-// past the moment React drops the applet's <style> tag, so the view spends its
-// exit unstyled. Keeping views mounted removes the problem instead of timing
-// around it — the switch is instant, and a view only ever loads once.
+// Why no transition between views: a view is an agent-authored bundle with its
+// own styles and its own state. Animating the swap means keeping the outgoing
+// DOM alive past the moment React drops the applet's <style> tag, so the view
+// spends its exit unstyled. Keeping views mounted removes the problem instead
+// of timing around it — the switch is instant, and a view only ever loads once.
+//
+// The one animation left is the rebuild dissolve: when the view you are looking
+// at is rebuilt, the new build fades in over the old one. That is safe here
+// because both builds share the slot's style tag (see ViewSlot), and it is
+// worth the 200ms — it is the only signal that the thing under your cursor just
+// changed underneath you.
 import { Activity, type ComponentType, useCallback, useEffect, useRef, useState } from 'react'
 
 import { Spinner } from '@/client/components/ui/spinner'
@@ -113,7 +119,7 @@ type ViewSlotProps = {
 function ViewSlot({ view, active, params }: ViewSlotProps) {
   const workspaceId = useWorkspaceId()
   const bundle = useView(view.id)
-  const loaded = useLoadedBundle(bundle)
+  const { current, outgoing } = useLoadedBundle(bundle, active)
   // A parked view keeps rendering with the params it was last shown with: the
   // active view's `focusTab` state is not its to render.
   const [shownParams, setShownParams] = useState(params)
@@ -123,7 +129,15 @@ function ViewSlot({ view, active, params }: ViewSlotProps) {
   // an Activity unmounts its children's effects, which would strip the styles
   // off the page while the DOM they style is still parked — the exact flash
   // this component exists to remove. The tag drops when the slot is evicted.
-  useAppletStyle(appletStyleKey('views', workspaceId, view.id), loaded?.version ?? bundle.version)
+  // Holding it here is also what lets the dissolve below overlap two builds:
+  // the styles belong to the slot, not to either frame. The active view's sheet
+  // is raised to the end of <head> so the global at-rule names it shares with
+  // the parked views resolve to the one on screen.
+  useAppletStyle(
+    appletStyleKey('views', workspaceId, view.id),
+    current?.version ?? bundle.version,
+    active
+  )
 
   const failed = bundle.status === 'error'
 
@@ -132,46 +146,103 @@ function ViewSlot({ view, active, params }: ViewSlotProps) {
       {active && failed && (
         <p className="absolute inset-0 p-4 text-xs text-destructive">{bundle.error}</p>
       )}
-      {active && !failed && !loaded && <ViewSplash />}
-      {loaded && !failed && (
-        <Activity mode={active ? 'visible' : 'hidden'}>
-          {/* React hides this node with `display: none` while the Activity is
-              hidden, so a parked view neither paints nor swallows clicks. */}
-          <div
-            key={loaded.version}
-            data-applet={appletScope('views', view.id)}
-            className="absolute inset-0 overflow-auto"
-          >
-            <WidgetErrorBoundary
-              name={view.id}
-              kind="view"
-              workspaceId={workspaceId}
-              resetKey={loaded.version}
-            >
-              <loaded.Component params={shownParams} />
-            </WidgetErrorBoundary>
-          </div>
-        </Activity>
-      )}
+      {active && !failed && !current && <ViewSplash />}
+      {current &&
+        !failed && (
+          // React hides these nodes with `display: none` while the Activity is
+          // hidden, so a parked view neither paints nor swallows clicks.
+          <Activity mode={active ? 'visible' : 'hidden'}>
+            {outgoing && (
+              <ViewFrame key={outgoing.version} view={view} build={outgoing} params={shownParams} />
+            )}
+            <ViewFrame
+              key={current.version}
+              view={view}
+              build={current}
+              params={shownParams}
+              entering={outgoing !== null}
+            />
+          </Activity>
+        )}
     </>
   )
 }
 
-type LoadedView = {
+type ViewFrameProps = {
+  view: ViewInfo
+  build: ViewBuild
+  params: Record<string, unknown>
+  // Play the rebuild dissolve. Set on the incoming build only, and only while
+  // the build it replaced is still rendered underneath it.
+  entering?: boolean
+}
+
+// One build of one view, in its style scope. Frames stack absolutely, so during
+// a rebuild the incoming one dissolves in over the outgoing one still on screen.
+function ViewFrame({ view, build, params, entering }: ViewFrameProps) {
+  const workspaceId = useWorkspaceId()
+
+  return (
+    <div
+      data-applet={appletScope('views', view.id)}
+      className={cn(
+        'absolute inset-0 overflow-auto',
+        entering && 'animate-in duration-200 ease-out blur-in-4 fade-in'
+      )}
+    >
+      <WidgetErrorBoundary
+        name={view.id}
+        kind="view"
+        workspaceId={workspaceId}
+        resetKey={build.version}
+      >
+        <build.Component params={params} />
+      </WidgetErrorBoundary>
+    </div>
+  )
+}
+
+type ViewBuild = {
   Component: ComponentType<AppletComponentProps>
   version: number
 }
 
-// The last build that actually loaded, held across reloads. A rebuild flips the
-// bundle back to `loading` for as long as the fetch takes, and swapping a live
-// view for a spinner every time the agent edits it is worse than showing the
-// previous build for that moment. The splash is for a view with nothing to show
-// yet — the first time it is opened.
-function useLoadedBundle(bundle: AppletState): LoadedView | null {
-  const [loaded, setLoaded] = useState<LoadedView | null>(null)
-  if (bundle.status === 'ready' && loaded?.version !== bundle.version) {
-    setLoaded({ Component: bundle.Component, version: bundle.version })
+type LoadedBundle = {
+  // The build to render, held across reloads. A rebuild flips the bundle back
+  // to `loading` for as long as the fetch takes, and swapping a live view for a
+  // spinner every time the agent edits it is worse than showing the previous
+  // build for that moment. The splash is for a view with nothing to show yet —
+  // the first time it is opened.
+  current: ViewBuild | null
+  // The build `current` just replaced, kept underneath for the length of the
+  // dissolve so the new one fades in over the view instead of over an empty
+  // panel. Null except during a rebuild swap on screen.
+  outgoing: ViewBuild | null
+}
+
+// How long the outgoing build stays underneath. Matches the `duration-200` the
+// incoming frame animates with.
+const DISSOLVE_MS = 200
+
+function useLoadedBundle(bundle: AppletState, dissolve: boolean): LoadedBundle {
+  const [loaded, setLoaded] = useState<LoadedBundle>({ current: null, outgoing: null })
+
+  if (bundle.status === 'ready' && loaded.current?.version !== bundle.version) {
+    const build = { Component: bundle.Component, version: bundle.version }
+    // The first build of a view has nothing to dissolve from, and a parked view
+    // has nobody watching — both swap straight in.
+    setLoaded(previous => ({ current: build, outgoing: dissolve ? previous.current : null }))
   }
+
+  useEffect(() => {
+    if (!loaded.outgoing) return
+    const timer = setTimeout(
+      () => setLoaded(previous => ({ ...previous, outgoing: null })),
+      DISSOLVE_MS
+    )
+    return () => clearTimeout(timer)
+  }, [loaded.outgoing])
+
   return loaded
 }
 
