@@ -35,7 +35,8 @@ import {
   codexServiceTierForFastMode,
   codexItemToNotice,
   codexItemToTurn,
-  codexThreadToEvents
+  codexThreadToEvents,
+  withCodexTurnDuration
 } from './adapter'
 import { type CodexClient, getCodexClient, interruptCodexTurn, readSubagentRecords } from './client'
 import { generateCodexSessionTitle, renameCodexSessionIfUnchanged } from './session-title'
@@ -243,25 +244,29 @@ function forwardPreview(
   })
 }
 
-// Fold the thread's latest per-turn usage into the newest assistant turn so
-// the meta strip can show tokens. Re-emits that turn (upsert-by-id).
-function applyUsage(rec: SessionRecord) {
+// Fold native completion metadata into the newest assistant turn so replay and
+// live rendering use the same display shape. Re-emits that turn (upsert-by-id).
+function applyCompletionMeta(rec: SessionRecord, durationMs: number | null | undefined) {
   const last = rec.lastUsage?.last
-  if (!last) return
   for (let i = rec.view.turns.length - 1; i >= 0; i--) {
     const t = rec.view.turns[i]
+    if (t.role === 'user' && t.origin.kind === 'user-input') return
     if (t.role !== 'assistant') continue
-    const updated = {
-      ...t,
-      meta: {
-        ...t.meta,
-        usage: {
-          inputTokens: last.inputTokens,
-          outputTokens: last.outputTokens,
-          totalTokens: last.totalTokens
+    let updated = withCodexTurnDuration(t, durationMs)
+    if (last) {
+      updated = {
+        ...updated,
+        meta: {
+          ...updated.meta,
+          usage: {
+            inputTokens: last.inputTokens,
+            outputTokens: last.outputTokens,
+            totalTokens: last.totalTokens
+          }
         }
       }
     }
+    if (updated === t) return
     emitTurnEvent(rec, { kind: 'turn', turn: updated })
     return
   }
@@ -325,7 +330,7 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
     case 'turn/completed': {
       const turn = params.turn as CodexTurn | undefined
       rec.previews.clear()
-      applyUsage(rec)
+      applyCompletionMeta(rec, turn?.durationMs)
       setProcessing(rec, false, null)
       if (rec.refreshSessionsOnTurnComplete) {
         rec.refreshSessionsOnTurnComplete = false

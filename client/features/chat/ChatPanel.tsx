@@ -8,7 +8,7 @@ import {
   focusComposer
 } from '@/client/components/shared/Composer'
 import { useStickToBottom } from '@/client/features/chat/useStickToBottom'
-import { groupTurns } from '@/client/features/chat/group-turns'
+import { groupTurns, resolveAgentRunDuration } from '@/client/features/chat/group-turns'
 import { attachmentKey, useLive } from '@/client/features/chat/chat-store'
 import type { ChatPromptBubble } from '@/client/features/chat/ChatPromptBubbles'
 import type { ChatSendOptions } from '@/client/features/chat/chat-send'
@@ -146,13 +146,17 @@ export function ChatPanel({
                 onSelectPrompt={handlePromptSelect}
               />
             )}
-            {groupedTurns.map((turn, i) => (
-              <TurnView
-                key={turn.id}
-                turn={turn}
-                processing={processing && i === groupedTurns.length - 1}
-              />
-            ))}
+            {groupedTurns.map((turn, i) => {
+              const durationMs = resolveAgentRunDuration(groupedTurns[i - 1], turn)
+              return (
+                <TurnView
+                  key={turn.id}
+                  turn={turn}
+                  processing={processing && i === groupedTurns.length - 1}
+                  durationMs={durationMs}
+                />
+              )
+            })}
             {/* Pulsing dots only before the first token — once the preview has
                 visible content it renders as a (possibly merged) grouped turn. */}
             {processing && !previewTurn && <ThinkingIndicator />}

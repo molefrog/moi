@@ -118,6 +118,11 @@ export type CodexModel = {
   additionalSpeedTiers?: string[]
 }
 
+export function withCodexTurnDuration(turn: Turn, durationMs: number | null | undefined): Turn {
+  if (typeof durationMs !== 'number' || !Number.isFinite(durationMs) || durationMs < 0) return turn
+  return { ...turn, meta: { ...turn.meta, durationMs } }
+}
+
 // ---- discovery mappings ------------------------------------------------------
 
 const CODEX_FAST_SERVICE_TIER = 'priority'
@@ -557,6 +562,7 @@ export function codexThreadToEvents(
 ): StreamEvent[] {
   const events: StreamEvent[] = []
   for (const turn of thread.turns ?? []) {
+    const firstTurnEvent = events.length
     for (const item of turn.items ?? []) {
       const t = codexItemToTurn(item, thread.id)
       if (t) {
@@ -570,6 +576,12 @@ export function codexThreadToEvents(
       }
       const n = codexItemToNotice(item, thread.id)
       if (n) events.push({ kind: 'notice', notice: n })
+    }
+    for (let i = events.length - 1; i >= firstTurnEvent; i--) {
+      const event = events[i]
+      if (event.kind !== 'turn' || event.turn.role !== 'assistant') continue
+      events[i] = { kind: 'turn', turn: withCodexTurnDuration(event.turn, turn.durationMs) }
+      break
     }
   }
   return events

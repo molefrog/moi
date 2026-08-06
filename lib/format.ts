@@ -87,6 +87,9 @@ export type TurnMeta = {
   model?: string
   provider?: string
   stopReason?: string
+  // Native agent-run duration when transcript timestamps are unavailable.
+  // Currently populated by the Codex adapter.
+  durationMs?: number
   usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number; costUsd?: number }
   // The API message id (`msg_...`) that produced this assistant turn, when the
   // backend reports one. NOT the Turn `id`. Used to reconcile a live streaming

@@ -1,7 +1,5 @@
-// Tests for turning the live preview into a synthetic turn, and — the crux of
-// the grouping fix — that a thinking-only preview turn MERGES into the current
-// tool group via groupTurns (instead of rendering as a detached block), while a
-// preview with text stands alone, exactly matching finalized behavior.
+// Tests for turning the live preview into a synthetic turn and merging every
+// root preview into the current assistant run, whether it is thinking or text.
 import { describe, expect, test } from 'bun:test'
 
 import { groupTurns } from '@/client/features/chat/group-turns'
@@ -67,7 +65,7 @@ describe('buildPreviewTurn', () => {
   })
 })
 
-describe('grouping: preview merges into the current tool group', () => {
+describe('grouping: preview merges into the current assistant run', () => {
   // Mirrors the screenshot: an assistant turn with text + tool calls, then a new
   // message that begins with thinking (streaming).
   const toolTurn = assistantTurn('t1', [
@@ -95,13 +93,14 @@ describe('grouping: preview merges into the current tool group', () => {
     ])
   })
 
-  test('a preview WITH text stands alone as its own group', () => {
+  test('a preview with text also folds into the current run', () => {
     const preview = buildPreviewTurn(
       previewOf([{ index: 0, kind: 'text', text: 'The answer is…' }])
     )!
     const grouped = groupTurns([toolTurn, preview])
-    expect(grouped).toHaveLength(2)
-    expect(grouped[1].id).toBe(LIVE_PREVIEW_TURN_ID)
+    expect(grouped).toHaveLength(1)
+    expect(grouped[0].id).toBe('t1')
+    expect(grouped[0].parts.at(-1)).toEqual({ type: 'text', text: 'The answer is…' })
   })
 
   test('first preview after a user turn does not merge into the user turn', () => {

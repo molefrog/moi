@@ -1,11 +1,18 @@
 import { memo } from 'react'
 
-import { IconFile } from '@tabler/icons-react'
+import { IconChevronRight, IconFile } from '@tabler/icons-react'
 
 import type { Part, Turn } from '@/lib/types'
 
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger
+} from '@/client/components/ui/collapsible'
 import { MarkdownContent } from '@/client/features/chat/MarkdownContent'
+import { isVisibleChatTurn } from '@/client/features/chat/group-turns'
 import { ToolCallGroup } from '@/client/features/chat/tool-group/ToolCallGroup'
+import { formatDuration } from '@/client/features/chat/tool-group/format'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
 
@@ -82,21 +89,97 @@ export function TurnParts({ parts, cwd, processing = false }: TurnPartsProps) {
   )
 }
 
-type TurnViewProps = { turn: Turn; processing?: boolean }
+type CompletedAssistantParts = { work: Part[]; response: Part[] }
+
+function hasVisibleResponse(parts: Part[]): boolean {
+  return parts.some(part => part.type !== 'text' || part.text.trim().length > 0)
+}
+
+export function splitCompletedAssistantParts(parts: Part[]): CompletedAssistantParts | null {
+  let lastWorkIndex = -1
+  for (let i = parts.length - 1; i >= 0; i--) {
+    if (isRunPart(parts[i])) {
+      lastWorkIndex = i
+      break
+    }
+  }
+  if (lastWorkIndex < 0) return null
+
+  const response = parts.slice(lastWorkIndex + 1)
+  if (!hasVisibleResponse(response)) return null
+  return { work: parts.slice(0, lastWorkIndex + 1), response }
+}
+
+type AgentWorkDisclosureProps = {
+  parts: Part[]
+  cwd: string | null
+  durationMs?: number
+  defaultOpen?: boolean
+}
+
+export function AgentWorkDisclosure({
+  parts,
+  cwd,
+  durationMs,
+  defaultOpen
+}: AgentWorkDisclosureProps) {
+  const label = durationMs === undefined ? 'Worked' : `Worked for ${formatDuration(durationMs)}`
+  return (
+    <Collapsible defaultOpen={defaultOpen} className="group/collapsible">
+      <CollapsibleTrigger className="flex w-fit items-center gap-1 rounded-sm py-1 text-left text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+        <span>{label}</span>
+        <IconChevronRight
+          size={16}
+          stroke={1.5}
+          className="shrink-0 transition-transform group-data-open/collapsible:rotate-90"
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="overflow-hidden pt-2">
+        <TurnParts parts={parts} cwd={cwd} />
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
+type AssistantTurnPartsProps = {
+  parts: Part[]
+  cwd: string | null
+  processing?: boolean
+  durationMs?: number
+}
+
+export function AssistantTurnParts({
+  parts,
+  cwd,
+  processing = false,
+  durationMs
+}: AssistantTurnPartsProps) {
+  if (processing) return <TurnParts parts={parts} cwd={cwd} processing />
+
+  const completed = splitCompletedAssistantParts(parts)
+  if (!completed) return <TurnParts parts={parts} cwd={cwd} />
+
+  return (
+    <div className="flex flex-col gap-3">
+      <AgentWorkDisclosure parts={completed.work} cwd={cwd} durationMs={durationMs} />
+      <TurnParts parts={completed.response} cwd={cwd} />
+    </div>
+  )
+}
+
+type TurnViewProps = { turn: Turn; processing?: boolean; durationMs?: number }
 
 // Memoized: the message list maps over grouped turns (stable identities — see
 // `groupTurns` in ChatPanel), so parent re-renders only update rows whose `turn`
 // or `processing` actually changed.
-export const TurnView = memo(function TurnView({ turn, processing = false }: TurnViewProps) {
+export const TurnView = memo(function TurnView({
+  turn,
+  processing = false,
+  durationMs
+}: TurnViewProps) {
   const cwd = useWorkspaceLayoutCtx().cwd
 
-  if (turn.origin.kind === 'replay') return null
-
-  // The SKILL.md body is captured as the owning Skill tool call's `skill.body`
-  // and not surfaced in the scroll. Other synthetic turns (system reminders,
-  // hook output) and subagent prompts stay hidden by default.
-  if (turn.origin.kind === 'synthetic') return null
-  if (turn.origin.kind === 'subagent-prompt') return null
+  if (!isVisibleChatTurn(turn)) return null
 
   if (turn.role === 'user' && turn.origin.kind === 'user-input') {
     // Plain user input — right-aligned. Attachments (images/files) stack above
@@ -128,7 +211,14 @@ export const TurnView = memo(function TurnView({ turn, processing = false }: Tur
     )
   }
 
-  return <TurnParts parts={turn.parts} cwd={cwd} processing={processing} />
+  return (
+    <AssistantTurnParts
+      parts={turn.parts}
+      cwd={cwd}
+      processing={processing}
+      durationMs={durationMs}
+    />
+  )
 })
 
 type PartRendererProps = { part: Part }

@@ -8,7 +8,8 @@ import {
   codexModelToModel,
   codexServiceTierForFastMode,
   codexThreadToEvents,
-  codexThreadToSessionInfo
+  codexThreadToSessionInfo,
+  withCodexTurnDuration
 } from './adapter'
 
 const THREAD = 'thread-1'
@@ -248,6 +249,7 @@ describe('codexThreadToEvents', () => {
         {
           id: 't1',
           status: 'completed',
+          durationMs: 12_345,
           items: [
             {
               type: 'userMessage',
@@ -263,7 +265,18 @@ describe('codexThreadToEvents', () => {
     const events = codexThreadToEvents(thread)
     expect(events).toHaveLength(2)
     expect(events[0]).toMatchObject({ kind: 'turn', turn: { role: 'user' } })
-    expect(events[1]).toMatchObject({ kind: 'turn', turn: { role: 'assistant' } })
+    expect(events[1]).toMatchObject({
+      kind: 'turn',
+      turn: { role: 'assistant', meta: { durationMs: 12_345 } }
+    })
+  })
+
+  test('live completion duration preserves existing assistant metadata', () => {
+    const turn = codexItemToTurn({ type: 'agentMessage', id: 'msg_1', text: 'Done' }, THREAD)!
+    expect(withCodexTurnDuration(turn, 9_000).meta).toEqual({
+      apiMessageId: 'msg_1',
+      durationMs: 9_000
+    })
   })
 
   test('reattaches subagent records to subAgentActivity cards', () => {
