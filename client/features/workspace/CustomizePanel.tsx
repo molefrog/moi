@@ -6,16 +6,21 @@ import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayo
 import { BottomPanel } from '@/client/components/shared/BottomPanel'
 import { cn } from '@/client/lib/cn'
 import { getWorkspaceThemeStyle, usePreloadWorkspaceFonts } from '@/client/runtime/workspace-theme'
-import { COLOR_THEMES, type ColorThemeConfig, FONT_THEMES } from '@/lib/themes'
-import type { ColorTheme, FontTheme } from '@/lib/types'
+import {
+  COLOR_THEMES,
+  type ColorThemeConfig,
+  FONT_THEMES,
+  RADIUS_THEMES,
+  type RadiusThemeConfig,
+  resolveWorkspaceTheme
+} from '@/lib/themes'
+import type { ColorTheme, FontTheme, RadiusTheme, WorkspaceTheme } from '@/lib/types'
 
 const FONT_OPTIONS = Object.entries(FONT_THEMES) as [FontTheme, (typeof FONT_THEMES)[FontTheme]][]
 
 const COLOR_OPTIONS = Object.entries(COLOR_THEMES) as [ColorTheme, ColorThemeConfig][]
 
-function presetMatches(preset: ColorThemeConfig, primary?: string): boolean {
-  return (preset.primary ?? undefined) === primary
-}
+const RADIUS_OPTIONS = Object.entries(RADIUS_THEMES) as [RadiusTheme, RadiusThemeConfig][]
 
 type CustomizeOptionGroupProps = {
   children: ReactNode
@@ -26,7 +31,7 @@ function CustomizeOptionGroup({ children, label }: CustomizeOptionGroupProps) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-xs font-medium">{label}</p>
-      <div role="group" aria-label={label} className="grid grid-cols-3 gap-2">
+      <div role="group" aria-label={label} className="grid grid-cols-4 gap-2">
         {children}
       </div>
     </div>
@@ -55,7 +60,7 @@ function CustomizeOption({ active, children, className, onSelect, style }: Custo
       )}
       style={style}
     >
-      <div className="flex-1">{children}</div>
+      <div className="flex flex-1 flex-col justify-center">{children}</div>
       {active && <IconCircleCheckFilled size={20} stroke={1.5} aria-hidden="true" />}
     </button>
   )
@@ -69,11 +74,10 @@ type CustomizePanelProps = {
 export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
   usePreloadWorkspaceFonts()
   const { layout, setLayout } = useWorkspaceLayoutCtx()
-  const currentFont = layout.theme?.font ?? 'default'
-  const currentPrimary = layout.theme?.primary
+  const theme = resolveWorkspaceTheme(layout.theme)
 
-  function setTheme(font: FontTheme, primary: string | undefined) {
-    setLayout({ theme: { font, ...(primary ? { primary } : {}) } })
+  function setTheme(update: Partial<WorkspaceTheme>) {
+    setLayout({ theme: { ...theme, ...update } })
   }
 
   return (
@@ -83,14 +87,11 @@ export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
           {FONT_OPTIONS.map(([key, config]) => (
             <CustomizeOption
               key={key}
-              active={key === currentFont}
-              onSelect={() => setTheme(key, currentPrimary)}
+              active={key === theme.font}
+              onSelect={() => setTheme({ font: key })}
               style={{ fontFamily: config.sans }}
             >
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">{config.label}</span>
-                <span className="text-xs text-muted-foreground">{config.feel}</span>
-              </div>
+              <span className="text-sm font-medium">{config.label}</span>
             </CustomizeOption>
           ))}
         </CustomizeOptionGroup>
@@ -99,14 +100,10 @@ export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
           {COLOR_OPTIONS.map(([key, preset]) => (
             <CustomizeOption
               key={key}
-              active={presetMatches(preset, currentPrimary)}
+              active={key === theme.color}
               className={preset.primary && 'bg-background text-foreground'}
-              onSelect={() => setTheme(currentFont, preset.primary)}
-              style={
-                preset.primary
-                  ? getWorkspaceThemeStyle({ font: currentFont, primary: preset.primary })
-                  : undefined
-              }
+              onSelect={() => setTheme({ color: key })}
+              style={getWorkspaceThemeStyle({ ...theme, color: key })}
             >
               <div className="flex gap-2">
                 <span
@@ -119,6 +116,25 @@ export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
                 >
                   Aa
                 </span>
+                <span className="text-sm font-medium">{preset.label}</span>
+              </div>
+            </CustomizeOption>
+          ))}
+        </CustomizeOptionGroup>
+
+        <CustomizeOptionGroup label="Radius">
+          {RADIUS_OPTIONS.map(([key, preset]) => (
+            <CustomizeOption
+              key={key}
+              active={key === theme.radius}
+              onSelect={() => setTheme({ radius: key })}
+              style={getWorkspaceThemeStyle({ ...theme, radius: key })}
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  className="size-5 shrink-0 rounded-sm bg-card texture-checker-[10px] shadow-xs"
+                  aria-hidden="true"
+                />
                 <span className="text-sm font-medium">{preset.label}</span>
               </div>
             </CustomizeOption>

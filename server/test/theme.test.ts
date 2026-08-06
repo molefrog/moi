@@ -1,60 +1,113 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { formatHex, wcagContrast } from 'culori'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'path'
 
-import { COLOR_THEMES, deriveThemeColors } from '@/lib/themes'
+import {
+  COLOR_THEMES,
+  DEFAULT_PRIMARY_COLOR,
+  DEFAULT_WORKSPACE_THEME,
+  RADIUS_THEMES,
+  deriveThemeColors,
+  resolveWorkspaceTheme
+} from '@/lib/themes'
 import type { WorkspaceLayout } from '@/lib/types'
 
 import { loadLayout, saveLayout } from '../layout'
-import { applyThemeUpdate, matchColorTheme } from '../theme'
-
-function relativeLuminance(hex: string): number {
-  const channels = [1, 3, 5].map(index => {
-    const channel = Number.parseInt(hex.slice(index, index + 2), 16) / 255
-    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
-  })
-  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
-}
-
-function contrastRatio(first: string, second: string): number {
-  const lighter = Math.max(relativeLuminance(first), relativeLuminance(second))
-  const darker = Math.min(relativeLuminance(first), relativeLuminance(second))
-  return (lighter + 0.05) / (darker + 0.05)
-}
+import { applyThemeUpdate } from '../theme'
 
 describe('color themes', () => {
+  test('keeps the default primary source aligned with the root theme', async () => {
+    const css = await Bun.file(join(import.meta.dir, '../../client/index.css')).text()
+
+    expect(css).toContain(`--primary: ${DEFAULT_PRIMARY_COLOR};`)
+  })
+
+  test('keeps the picker order', () => {
+    expect(Object.keys(COLOR_THEMES)).toEqual([
+      'default',
+      'paper',
+      'rose',
+      'tangerine',
+      'sand',
+      'mint',
+      'sky',
+      'lavender'
+    ])
+  })
+
   test('derives all theme colors from the primary', () => {
-    expect(deriveThemeColors('#eab308')).toEqual({
-      primary: '#eab308',
-      primaryForeground: '#000000',
-      background: 'color-mix(in oklch, var(--primary) 3%, white 97%)',
-      foreground: 'color-mix(in oklch, var(--primary) 24%, black 76%)',
-      muted: 'color-mix(in oklch, var(--background) 95%, var(--foreground) 5%)',
-      mutedForeground: 'color-mix(in oklch, var(--background) 58%, var(--foreground) 42%)',
-      accent: 'color-mix(in oklch, var(--primary) 4%, var(--foreground) 4%)'
+    const primary = 'oklch(0.7426 0.1817 56.01)'
+    expect(deriveThemeColors(primary)).toEqual({
+      primary,
+      primaryForeground: 'oklch(0 0 0)',
+      background: 'color-mix(var(--primary) 3%, oklch(1 0 0) 97%)',
+      foreground: 'color-mix(var(--primary) 20%, oklch(0 0 0) 80%)',
+      muted: 'color-mix(var(--background) 95%, var(--foreground) 5%)',
+      mutedForeground: 'color-mix(var(--background) 50%, var(--foreground) 50%)',
+      accent: 'color-mix(var(--primary) 4%, var(--foreground) 4%)',
+      accentForeground: 'var(--foreground)',
+      border: 'color-mix(var(--foreground) 7%, transparent)'
     })
   })
 
-  test('chooses primary text using the UI luminance threshold', () => {
-    expect(deriveThemeColors('#eab308').primaryForeground).toBe('#000000')
-    expect(deriveThemeColors('#e11d48').primaryForeground).toBe('#ffffff')
-    expect(deriveThemeColors('#7c3aed').primaryForeground).toBe('#ffffff')
-    expect(deriveThemeColors('#059669').primaryForeground).toBe('#ffffff')
-    expect(deriveThemeColors('#2563eb').primaryForeground).toBe('#ffffff')
+  test('swaps the primary pair into the widget surface roles', () => {
+    const primary = 'oklch(0.7426 0.1817 56.01)'
+    const colors = deriveThemeColors(primary, 'widget')
 
-    for (const preset of Object.values(COLOR_THEMES)) {
-      if (!preset.primary) continue
+    expect(colors).toEqual({
+      primary: 'color-mix(var(--background) 3%, oklch(1 0 0) 97%)',
+      primaryForeground: 'color-mix(var(--background) 20%, oklch(0 0 0) 80%)',
+      background: primary,
+      foreground: 'oklch(0 0 0)',
+      muted: 'color-mix(var(--background) 95%, var(--foreground) 5%)',
+      mutedForeground: 'color-mix(var(--background) 50%, var(--foreground) 50%)',
+      accent: 'color-mix(var(--primary) 4%, var(--foreground) 4%)',
+      accentForeground: 'var(--foreground)',
+      border: 'color-mix(var(--foreground) 15%, transparent)'
+    })
+    expect(colors.primary).not.toContain('var(--primary)')
+    expect(deriveThemeColors(DEFAULT_PRIMARY_COLOR, 'widget').background).toBe(
+      DEFAULT_PRIMARY_COLOR
+    )
+  })
+
+  test('chooses primary text using the UI luminance threshold', () => {
+    const expectedForegrounds = {
+      paper: 'oklch(1 0 0)',
+      rose: 'oklch(1 0 0)',
+      tangerine: 'oklch(1 0 0)',
+      sand: 'oklch(0 0 0)',
+      mint: 'oklch(1 0 0)',
+      sky: 'oklch(1 0 0)',
+      lavender: 'oklch(1 0 0)'
+    }
+
+    for (const [key, preset] of Object.entries(COLOR_THEMES)) {
+      if (!preset.primary || key === 'default') continue
       const foreground = deriveThemeColors(preset.primary).primaryForeground
-      expect(contrastRatio(preset.primary, foreground)).toBeGreaterThanOrEqual(3)
+      expect(foreground).toBe(expectedForegrounds[key as keyof typeof expectedForegrounds])
+      expect(wcagContrast(preset.primary, foreground)).toBeGreaterThanOrEqual(3)
     }
   })
 
-  test('requires primary colors to use six-digit hex', () => {
-    expect(() => deriveThemeColors('#fff')).toThrow('Primary theme color must use #rrggbb: #fff')
-    expect(() => deriveThemeColors('rgb(255, 255, 255)')).toThrow(
-      'Primary theme color must use #rrggbb: rgb(255, 255, 255)'
-    )
+  test('serializes the OKLCH presets for terminal swatches', () => {
+    const expectedHex = {
+      paper: '#5e4d3c',
+      rose: '#f13c3c',
+      tangerine: '#ff5718',
+      sand: '#ffb868',
+      mint: '#009155',
+      sky: '#007ae3',
+      lavender: '#9051ff'
+    }
+
+    for (const [key, hex] of Object.entries(expectedHex)) {
+      const primary = COLOR_THEMES[key as keyof typeof expectedHex].primary
+      if (!primary) throw new Error(`expected ${key} primary`)
+      expect(formatHex(primary)).toBe(hex)
+    }
   })
 
   test('stores only the primary source on color presets', () => {
@@ -62,55 +115,65 @@ describe('color themes', () => {
     for (const [key, preset] of Object.entries(COLOR_THEMES)) {
       if (key === 'default') continue
       expect(Object.keys(preset).sort()).toEqual(['label', 'primary'])
+      expect(preset.primary).toMatch(/^oklch\(/)
     }
   })
 })
 
+describe('radius themes', () => {
+  test('defines the four shared radius presets', () => {
+    expect(RADIUS_THEMES).toEqual({
+      squishy: { label: 'Squishy', radius: '0.875rem' },
+      soft: { label: 'Soft', radius: '0.625rem' },
+      subtle: { label: 'Subtle', radius: '0.375rem' },
+      square: { label: 'Square', radius: '0' }
+    })
+  })
+})
+
 describe('applyThemeUpdate', () => {
-  test('setting font preserves the existing primary', () => {
-    const current = { font: 'default' as const, primary: '#123456' }
+  test('setting one option preserves the others', () => {
+    const current = {
+      font: 'sans' as const,
+      color: 'paper' as const,
+      radius: 'squishy' as const
+    }
     const result = applyThemeUpdate(current, { font: 'serif' })
     if (!result.ok) throw new Error('expected ok')
-    expect(result.theme).toEqual({ font: 'serif', primary: '#123456' })
+    expect(result.theme).toEqual({ font: 'serif', color: 'paper', radius: 'squishy' })
     expect(result.applied).toEqual({ font: 'serif' })
   })
 
-  test('setting color preserves existing font', () => {
-    const current = { font: 'mono' as const }
+  test('setting color uses its preset key', () => {
+    const current = { font: 'mono' as const, color: 'default' as const, radius: 'subtle' as const }
     const result = applyThemeUpdate(current, { color: 'paper' })
     if (!result.ok) throw new Error('expected ok')
-    expect(result.theme).toEqual({
-      font: 'mono',
-      primary: COLOR_THEMES.paper.primary
-    })
+    expect(result.theme).toEqual({ font: 'mono', color: 'paper', radius: 'subtle' })
     expect(result.applied).toEqual({ color: 'paper' })
   })
 
-  test("'default' color clears the primary", () => {
-    const current = {
-      font: 'serif' as const,
-      primary: COLOR_THEMES.paper.primary
-    }
-    const result = applyThemeUpdate(current, { color: 'default' })
+  test("'sans' remains an explicit font preset", () => {
+    const current = { font: 'serif' as const, color: 'paper' as const, radius: 'soft' as const }
+    const result = applyThemeUpdate(current, { font: 'sans' })
     if (!result.ok) throw new Error('expected ok')
-    expect(result.theme).toEqual({ font: 'serif' })
-    expect(JSON.parse(JSON.stringify(result.theme))).toEqual({ font: 'serif' })
+    expect(result.theme).toEqual({ font: 'sans', color: 'paper', radius: 'soft' })
   })
 
   test('combined font + color updates apply both', () => {
-    const result = applyThemeUpdate(undefined, { font: 'serif', color: 'mint' })
-    if (!result.ok) throw new Error('expected ok')
-    expect(result.theme).toEqual({
+    const result = applyThemeUpdate(undefined, {
       font: 'serif',
-      primary: COLOR_THEMES.mint.primary
+      color: 'mint',
+      radius: 'square'
     })
-    expect(result.applied).toEqual({ font: 'serif', color: 'mint' })
+    if (!result.ok) throw new Error('expected ok')
+    expect(result.theme).toEqual({ font: 'serif', color: 'mint', radius: 'square' })
+    expect(result.applied).toEqual({ font: 'serif', color: 'mint', radius: 'square' })
   })
 
-  test('falls back to default font when no current and none provided', () => {
+  test('fills missing options with the workspace defaults', () => {
     const result = applyThemeUpdate(undefined, { color: 'paper' })
     if (!result.ok) throw new Error('expected ok')
-    expect(result.theme.font).toBe('default')
+    expect(result.theme).toEqual({ ...DEFAULT_WORKSPACE_THEME, color: 'paper' })
   })
 
   test('rejects unknown font key', () => {
@@ -126,20 +189,34 @@ describe('applyThemeUpdate', () => {
     if (result.ok) throw new Error('expected error')
     expect(result.error).toContain('neon')
   })
+
+  test("'soft' remains an explicit preset", () => {
+    const current = { font: 'serif' as const, color: 'rose' as const, radius: 'squishy' as const }
+    const result = applyThemeUpdate(current, { radius: 'soft' })
+    if (!result.ok) throw new Error('expected ok')
+    expect(result.theme).toEqual({ font: 'serif', color: 'rose', radius: 'soft' })
+    expect(result.applied).toEqual({ radius: 'soft' })
+  })
+
+  test('rejects unknown radius key', () => {
+    const result = applyThemeUpdate(undefined, { radius: 'pillowy' })
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected error')
+    expect(result.error).toContain('pillowy')
+  })
 })
 
-describe('matchColorTheme', () => {
-  test('no overrides maps to default', () => {
-    expect(matchColorTheme(undefined)).toBe('default')
+describe('resolveWorkspaceTheme', () => {
+  test('returns one complete default theme', () => {
+    expect(resolveWorkspaceTheme()).toEqual(DEFAULT_WORKSPACE_THEME)
   })
 
-  test('matching primary colors map to preset keys', () => {
-    expect(matchColorTheme(COLOR_THEMES.paper.primary)).toBe('paper')
-    expect(matchColorTheme(COLOR_THEMES.mint.primary)).toBe('mint')
-  })
-
-  test('non-matching custom values return null', () => {
-    expect(matchColorTheme('#123456')).toBe(null)
+  test('fills missing preset keys', () => {
+    expect(resolveWorkspaceTheme({ font: 'serif' })).toEqual({
+      font: 'serif',
+      color: 'default',
+      radius: 'soft'
+    })
   })
 })
 
@@ -154,7 +231,7 @@ describe('loadLayout/saveLayout round-trip with theme', () => {
     await rm(tmpDir, { recursive: true, force: true })
   })
 
-  test('persists the font and primary source', async () => {
+  test('persists the selected preset keys', async () => {
     const layout: WorkspaceLayout = {
       version: 1,
       widgetGrid: [],
@@ -162,7 +239,8 @@ describe('loadLayout/saveLayout round-trip with theme', () => {
       tabs: { open: ['agent'], active: 'agent' },
       theme: {
         font: 'serif',
-        primary: COLOR_THEMES.paper.primary
+        color: 'paper',
+        radius: 'subtle'
       }
     }
     await saveLayout(layout, tmpDir)
@@ -170,17 +248,16 @@ describe('loadLayout/saveLayout round-trip with theme', () => {
     expect(loaded.theme).toEqual(layout.theme)
   })
 
-  test('theme without overrides persists as minimal shape', async () => {
+  test('persists the complete default theme', async () => {
     const layout: WorkspaceLayout = {
       version: 1,
       widgetGrid: [],
       layoutMode: 'fullscreen',
       tabs: { open: ['agent'], active: 'agent' },
-      theme: { font: 'default' }
+      theme: DEFAULT_WORKSPACE_THEME
     }
     await saveLayout(layout, tmpDir)
     const loaded = await loadLayout(tmpDir)
-    expect(loaded.theme).toEqual({ font: 'default' })
-    expect('primary' in (loaded.theme ?? {})).toBe(false)
+    expect(loaded.theme).toEqual(DEFAULT_WORKSPACE_THEME)
   })
 })

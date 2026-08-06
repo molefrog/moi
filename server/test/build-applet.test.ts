@@ -69,6 +69,90 @@ describe('buildApplet', () => {
     }
   })
 
+  test('maps semantic success colors to the host-owned variable', async () => {
+    const result = await buildApplet(join(FIXTURES, 'hello.tsx'))
+
+    expect(result.js).toContain('var(--success)')
+    expect(result.js).not.toContain('--success:')
+  })
+
+  test('bundles additive texture effects for widgets and views', async () => {
+    const [widget, view] = await Promise.all([
+      buildApplet(join(FIXTURES, 'texture-effects.tsx')),
+      buildApplet(join(FIXTURES, 'texture-effects.tsx'), undefined, 'view')
+    ])
+
+    for (const result of [widget, view]) {
+      expect(result.js).toContain('.texture-checker')
+      expect(result.js).toContain('.texture-grid')
+      expect(result.js).toContain('.texture-noise')
+      expect(result.js).toContain('.texture-gradient-linear')
+      expect(result.js).toContain('.texture-inset-shadow')
+      expect(result.js).not.toContain('.surface-')
+      expect(result.js).toContain('.bg-muted')
+      expect(result.js).toContain('background-color: var(--muted)')
+      expect(result.js).toContain('.bg-card')
+      expect(result.js).toContain('background-color: var(--card)')
+      expect(result.js).toContain('.bg-background')
+      expect(result.js).toContain('background-color: var(--background)')
+      expect(result.js).toContain('.bg-primary')
+      expect(result.js).toContain('background-color: var(--primary)')
+
+      for (const texture of [
+        'texture-checker',
+        'texture-grid',
+        'texture-noise',
+        'texture-gradient-linear',
+        'texture-inset-shadow'
+      ]) {
+        const declarations = result.js.match(new RegExp(`\\.${texture} \\{([^}]*)\\}`))?.[1]
+        expect(declarations).toBeDefined()
+        expect(declarations).not.toContain('background-color')
+      }
+
+      expect(result.js).toContain('repeating-conic-gradient')
+      expect(result.js).toContain('var(--primary) 1%, var(--foreground) 1%')
+      expect(result.js).toContain('var(--primary) 3%, var(--foreground) 3%')
+      expect(result.js).toContain('background-size: 32px 32px')
+      expect(result.js).toContain('background-size: 48px 48px')
+      expect(result.js).toContain('linear-gradient(to right')
+      expect(result.js).toContain(
+        'linear-gradient(to right, color-mix(in oklch, var(--primary) 3%, var(--foreground) 3%) 1px'
+      )
+      expect(result.js).toContain('background-size: 24px 24px')
+      expect(result.js).toContain('fractalNoise')
+      expect(result.js).toContain('baseFrequency=%22128%22')
+      expect(result.js).toContain('numOctaves=%2210%22')
+      expect(result.js).toContain('slope=%222.4%22 intercept=%22-1.12%22')
+      expect(result.js).toContain('slope=%223.2%22 intercept=%22-1.44%22')
+      expect(result.js).toContain('color=%22black%22')
+      expect(result.js).toContain('color=%22white%22')
+      expect(result.js).toContain(':is(.dark *, [data-widget-chrome] *)')
+      expect(result.js).toContain('flood-color=%22currentColor%22')
+      expect(result.js).toContain('flood-opacity=%220.1%22')
+      expect(result.js).toContain('type=%22luminanceToAlpha%22')
+      expect(result.js).toContain('background-blend-mode: hard-light')
+      expect(result.js).toContain('background-size: 160px 160px')
+      expect(result.js).not.toContain('.texture-noise:before')
+      expect(result.js).not.toContain('mask-image: url(')
+      expect(result.js).not.toContain('pointer-events: none')
+      expect(result.js).toContain('linear-gradient(to bottom')
+      expect(result.js).toContain('var(--primary) 4%, transparent')
+      expect(result.js).toContain('var(--primary) 8%, transparent')
+      expect(result.js).toContain('var(--primary) 10%, transparent')
+      expect(result.js).toContain('var(--primary) 20%, transparent')
+      expect(result.js).not.toContain('linear-gradient(135deg')
+      expect(result.js).toContain('box-shadow: inset 0 0 32px 24px')
+      expect(result.js).toContain('box-shadow: inset 0 0 16px 16px')
+      expect(result.js).toContain(
+        'box-shadow: inset 0 0 32px 24px color-mix(in oklch, var(--primary) 4%, transparent)'
+      )
+      expect(result.js).toContain('var(--primary) 10%, transparent')
+      expect(result.js).not.toContain('radial-gradient(')
+      expect(result.js).toContain('[data-applet=')
+    }
+  })
+
   test('rewrites .server.ts imports to rpc() stubs', async () => {
     const result = await buildApplet(join(FIXTURES, 'with-server.tsx'))
 

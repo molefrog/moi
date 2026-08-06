@@ -29,57 +29,97 @@ spacing, or interaction patterns. They do not need to look identical.
 
 ## Color
 
-### Widget surfaces
+Widgets and views use the same semantic token vocabulary. Use
+`h-full w-full bg-background text-foreground` for most applet roots. Each token keeps the same
+purpose in both applet types; the host changes its value to suit the surrounding surface.
 
-The host applies the `.dark` class around every widget. Semantic tokens inside a widget therefore
-use dark-mode values regardless of the workspace color preset. The host frame stays transparent, so
-every widget root must cover the full frame with an opaque background.
+### How tokens resolve
 
-Choose each widget's background deliberately. Prefer an intentional solid color for most widgets,
-using your design judgment to fit the content, purpose, mood, data, status, and surrounding widgets.
-Pair it with a readable foreground and keep the surface consistent through every state. An image or
-visualization may own the surface when it has an opaque fallback.
+- **Widgets:** The host applies a widget-local semantic theme derived from the selected workspace
+  color. `background` is the workspace `primary`, `foreground` is its paired readable color, and
+  the local `primary` pair becomes the light action surface derived from that color. The host frame
+  stays transparent, so every widget root must cover the full frame with an opaque background. An
+  image or visualization may own the surface when it has an opaque fallback.
+- **Views:** Semantic tokens inherit the workspace page theme. The default root uses the normal
+  workspace page surface and text.
+- **Portalled UI:** Menus, tooltips, and popovers render in workspace scope and keep
+  `bg-popover text-popover-foreground`.
 
-`h-full w-full bg-background text-foreground` is a sensible fallback when no more specific surface
-fits. In the widget scope, it resolves to a dark background with light text.
-
-### View surfaces
-
-Views are separate pages. Their semantic tokens inherit the workspace theme, so
-`h-full w-full bg-background text-foreground` is a sensible default root.
+### Semantic token reference
 
 | Context or intent | Tailwind classes | Use |
 | --- | --- | --- |
-| Widget fallback | `bg-background text-foreground` | Dark semantic surface when no content-led color fits |
-| Default view root | `bg-background text-foreground` | The workspace page surface and text |
-| Primary content | `text-foreground` | Content on the default dark widget surface or normal view surface |
-| Secondary content | `text-muted-foreground` | Supporting content on the default dark widget surface or normal view surface |
-| Inset surface | `bg-card text-card-foreground` | A real contained object or raised region inside the applet |
+| Applet root | `bg-background text-foreground` | The full widget surface or view page |
+| Main content | `text-foreground` | Titles, labels, values, and important icons |
+| Supporting content | `text-muted-foreground` | Descriptions and secondary information |
+| Inset surface | `bg-card text-card-foreground` | A functionally distinct contained region, used sparingly |
 | Floating surface | `bg-popover text-popover-foreground` | Menus, tooltips, and other floating content |
-| Primary action | `bg-primary text-primary-foreground` | The most important action in a local region |
-| Subdued surface | `bg-muted` | Skeletons, quiet fills, and disabled structure |
-| Control state | `bg-accent text-accent-foreground` | Hover, active, and selected states on interactive controls |
-| Error or danger | `text-destructive` / `bg-destructive` | Errors, destructive actions, and invalid states |
-| Structure | `ring-border`, `border-input`, `ring-ring` | Container edges, controls, and visible focus on semantic surfaces |
+| Quiet fill | `bg-muted` | Inset regions, skeletons, and disabled structure |
+| Control state | `bg-accent text-accent-foreground` | Hover, active, and selected controls |
+| Main action | `bg-primary text-primary-foreground hover:bg-primary/90` | The most important action in a local region |
+| Positive or active state | `text-success` / `bg-success/10` | Positive outcomes, healthy states, presence, and progress indicators |
+| Error or danger | `text-destructive` / `bg-destructive/10` | Errors, destructive actions, and invalid states |
+| Object edge | `ring-1 ring-border` | Complete outlines around containers and controls |
+| Focus | `focus-visible:ring-2 focus-visible:ring-ring` | Visible keyboard focus on interactive elements |
+| Separator | `border-b border-border` | A one-sided division between adjacent regions |
 
 Use lower opacity from the surface's foreground only for tertiary metadata that remains readable.
-Avoid weak alpha text for important labels or values. Keep inset surfaces rare so a widget does not
-become a stack of cards.
+Avoid weak alpha text for important labels or values.
 
-Keep container edges subtle. Use `ring-1 ring-border` on semantic surfaces and an equally restrained
-outline suited to a custom light or colored surface. Avoid a bare `border` or raw high-contrast
-colors as custom container chrome.
+Prefer a subtle ring for the complete outline of a container or control. Use `ring-1 ring-border` on
+semantic surfaces. Reserve one-sided borders such as `border-b` for separators between adjacent
+regions. Never use a border and a ring on the same element. Avoid raw high-contrast colors for
+either treatment.
 
-Custom color is welcome when it carries identity, data, status, or useful emphasis. On a saturated
-surface, choose an explicit light or dark foreground with strong contrast. Keep state colors
-consistent and pair them with text, shape, or an icon when they convey meaning.
+Derive extra neutral or tonal colors and custom gradients from the local semantic tokens with
+`color-mix()`. Use Tailwind palette colors only when they have clear content meaning, distinguish
+infographic data, or follow an explicit user request. Keep each mapping consistent and explain it
+with labels, legends, shapes, or direct values. Do not use palette colors for generic decoration or
+unrelated widget backgrounds. Purple, violet, and fuchsia need a content, brand, or user reason;
+never use a purple gradient as a default creativity or technology cue. On a saturated surface,
+choose an explicit light or dark foreground with strong contrast.
 
-Use solid filled surfaces by default. A restrained shadow, glow, texture, image, or visualization
-may add depth when it supports the subject. Do not use gradients as generic visual polish. Use a
-gradient only when it encodes information or is essential to the specific content.
+### Surfaces and grouping
 
-Use purple, violet, and fuchsia only when the content, brand, or user preference calls for them.
-Never use a purple gradient as a default creativity or technology cue.
+Use an open layout by default. Group content with spacing, alignment, type hierarchy, and, when
+needed, a one-sided separator. Add one surface around content that shares a functional boundary: an
+interactive object, an independently scrolling region, a distinct state, or a self-contained work
+region. Page headers, tab rows, summaries, metrics, and ordinary sections stay unboxed by default.
+Standard controls keep their normal component surfaces.
+
+Never use a large rounded surface as a second page frame around the header, navigation, summary,
+primary content, and supporting sections. Avoid adjacent or nested cards and wrappers that only
+repeat the page structure.
+
+Align page-level content to shared edges or grid columns. Apply outer padding once on the root or
+layout grid, then use gaps to group unboxed content. When removing a surface, remove its card-like
+padding and radius and realign its children; do not leave spacing that implies an invisible card.
+
+### Textures
+
+Use one texture on every widget or view root and no more than one per applet. Pair it with an opaque
+semantic base, such as `h-full w-full bg-background text-foreground texture-checker`. The same
+classes resolve through the widget-local theme or view page theme. Skip it only when an opaque
+full-bleed image, map, canvas, or visualization owns the background, the user explicitly asks for a
+plain surface, or preserving readability would require several extra solid wrappers.
+
+| Texture | Tailwind class | Character |
+| --- | --- | --- |
+| Checker | `texture-checker` | Two softly tinted semantic squares with no empty cells |
+| Grid | `texture-grid` | Fine semantic graph-paper lines over the base color |
+| Noise | `texture-noise` | Foreground-tinted fractal grain that lets the base tint show through |
+| Linear gradient | `texture-gradient-linear` | A restrained top-to-bottom wash derived from `primary` |
+| Inset shadow | `texture-inset-shadow` | A soft edge glow derived from `primary` |
+
+Textures add an effect without setting `background-color`; the base color remains visible through
+them. Open content may sit directly on the textured root when contrast stays clear. Add an opaque
+semantic surface above it only when that surface has a functional reason described under Surfaces
+and grouping. Do not apply a texture to a card, panel, control, or text region, and do not stack
+textures or add tuning variables.
+
+Check nearby widgets and views before choosing one. Give unrelated applets different textures so
+they remain distinct at a glance. A widget that opens, summarizes, or represents a view shares that
+view's texture as part of the same visual language.
 
 ## Typography and hierarchy
 
@@ -154,6 +194,8 @@ Data-driven applets need the following when applicable:
 
 Keep state layouts stable so loading, success, empty, and error do not cause avoidable jumps. Errors
 and empty states should still fit the configured widget height or the view's normal content frame.
+When a primary region uses a surface, loading, populated, empty, success, and error states keep that
+surface in the same position and size.
 
 ## Widgets
 
@@ -234,21 +276,16 @@ stretching a widget-like card to fill the page.
 
 ## Final review
 
-After implementation, do a removal pass from top to bottom. For every label, badge, icon, helper
-sentence, container, divider, and decoration, ask which user decision, action, or understanding it
-improves. Remove it when the screen stays equally clear and usable without it.
+After implementation, do a removal pass from top to bottom. For every visible element and wrapper,
+ask what it helps the user understand, do, or recognize as a state. Remove it when the screen stays
+clear without it, then realign the remaining content.
 
 Before finishing an applet, confirm:
 
-- Every visible element has a clear purpose.
-- Its purpose and first reading are clear at the intended size.
-- Semantic colors handle structure and custom color has a reason.
-- Surfaces use solid fills by default; gradients have a content-specific reason.
-- Purple appears only for a content, brand, or user reason and never as a default gradient.
-- Type, spacing, density, and expression support the content.
-- Numeric UI values use the default font, with `tabular-nums` when alignment helps.
-- Custom container outlines suit their surface and stay subtle.
-- The layout handles realistic content and deliberate overflow.
-- Every control is necessary, complete, and accessible.
-- The widget or view follows its frame, sizing, and scrolling rules.
-- It feels related to the workspace without copying the quieter host shell.
+- The first reading and every visible element have a clear purpose.
+- Color, texture, type, spacing, and expression support the content and remain readable.
+- Surfaces mark real boundaries, and unboxed page content shares clear alignment axes.
+- States remain stable, and the layout handles realistic content and deliberate overflow.
+- Controls are necessary, complete, and accessible.
+- The widget or view follows its frame, sizing, and scrolling rules and feels related to the
+  workspace.

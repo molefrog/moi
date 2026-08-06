@@ -1,12 +1,6 @@
 ---
 name: moi-workspace
-description: >-
-  The moi workspace — the web UI the user chats from, extended with agent-authored applets
-  (widgets, views) plus theme & config. Read this FIRST in two cases. (a) A message carries a hidden
-  moi-context envelope: it was fired from a moi workspace, so you are running inside one even if
-  nothing else says so. (b) The user uses moi vocab — workspace, applet, widget, view, scratchpad,
-  dashboard, or a `moi` command — or asks to build, edit, customize, or theme the workspace UI or
-  its layout.
+description: The moi workspace — the web UI the user chats from, extended with agent-authored applets (widgets, views) plus theme & config. Read this FIRST when a message carries a hidden moi-context envelope or the user uses moi vocab such as workspace, applet, widget, view, scratchpad, dashboard, or a `moi` command, or asks to build, edit, customize, or theme the workspace UI or its layout.
 ---
 
 # Workspace
@@ -127,6 +121,7 @@ never from inside `.moi/` itself. You don't pass paths; moi resolves the workspa
 - `moi debug logs` — applet runtime errors on record (experimental)
 - `moi theme --font=<key>` — change font theme (omit `--font` to list options)
 - `moi theme --color=<key>` — change color preset (omit `--color` to list options)
+- `moi theme --radius=<key>` — change corner-radius preset (omit `--radius` to list options)
 - `moi config` — set the workspace name & icon (`moi config --help` for usage)
 - `moi env` — list available env keys and where they come from (never values);
   `moi env exec -- <cmd>` runs a command with the workspace env (see Environment & secrets)
@@ -336,9 +331,12 @@ Render **content only**: a plain `h-full w-full` region with no card chrome (`ro
 own the fill, so the widget must set its own opaque background.
 Changing `colSpan`/`rowSpan` needs `moi bundle --force`. See `DESIGN.md`.
 
-Typical loop: check/`bun install` deps → write `.moi/widgets/<name>.tsx` → `moi bundle` → it appears
-on the dashboard → change it and re-`bundle`, or `moi refresh` after mutating data, or any other `moi`
-command as needed. Views work the same way (`.moi/views/<name>.tsx`, appears as a nav tab).
+Typical loop: check/`bun install` deps → write the applet → `moi bundle` → run any checks.
+After the final successful bundle and any checks, always make tab focus the final workspace action:
+
+- After building or editing a widget, run `moi tab focus widgets`.
+- After building or editing a view, run `moi tab focus view:<view-id>`, using its file name or claimed
+  builder id.
 
 # Debugging applets
 
@@ -381,7 +379,7 @@ moi builder set <view-id> --builder <builder-id> --kind view --title "<title>" -
 Choose the icon id from the available view icons in the hidden context. The id must use lowercase
 letters, numbers, `_`, or `-`. The first call locks the id; running the same command again may update
 its title and icon. After claiming, write `.moi/views/<view-id>.tsx`, use the same icon id in its
-config, and finish with `moi bundle --only views`. The tab uses the claimed title and icon while you
+config, and build it with `moi bundle --only views`. The tab uses the claimed title and icon while you
 work and changes into the built view after a successful bundle. (Bundling marks the view ready; the
 build state is otherwise server-managed, so you never set it to done by hand.)
 
@@ -408,4 +406,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.10.0" />
+<moi-skill version="0.11.0" />

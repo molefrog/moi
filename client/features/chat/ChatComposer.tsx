@@ -1,6 +1,12 @@
 import { type RefObject, useRef, useState } from 'react'
 
-import { IconFile, IconLoader2, IconPaperclip, IconPlayerStop, IconX } from '@tabler/icons-react'
+import {
+  IconFile,
+  IconLoader2,
+  IconPaperclip,
+  IconPlayerStopFilled,
+  IconX
+} from '@tabler/icons-react'
 
 import {
   canSubmitComposerAction,
@@ -10,6 +16,7 @@ import {
   ComposerTextarea
 } from '@/client/components/shared/Composer'
 import { Button } from '@/client/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { cn } from '@/client/lib/cn'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { uploadFiles } from '@/client/features/chat/uploads'
@@ -176,9 +183,16 @@ export function ChatComposer({
         </Button>
         <ModelPicker />
         {processing ? (
-          <Button type="button" size="icon" onClick={onStop} aria-label="Stop agent">
-            <IconPlayerStop stroke={1.5} />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button type="button" size="icon" onClick={onStop} aria-label="Stop agent">
+                  <IconPlayerStopFilled />
+                </Button>
+              }
+            />
+            <TooltipContent>Stop answering</TooltipContent>
+          </Tooltip>
         ) : (
           <ComposerSubmitButton
             label="Send message"

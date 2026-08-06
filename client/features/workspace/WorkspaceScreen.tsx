@@ -534,46 +534,11 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
         {/* Full-screen: whole panel. Split: the left content column. */}
         {(mode === 'fullscreen' || hasWorkspaceContent) && (
           <div
-            className={cn('flex min-h-0 flex-1 flex-col', mode === 'split' && 'min-w-(--column-w)')}
+            className={cn(
+              'flex min-h-0 flex-1 flex-col-reverse',
+              mode === 'split' && 'min-w-(--column-w)'
+            )}
           >
-            <PanelHeader>
-              <div className="flex min-w-0 flex-1 items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <img
-                    src={icon ?? workspaceProviderIcon[provider ?? 'claude-code']}
-                    alt=""
-                    className="size-5 shrink-0 rounded-xs"
-                  />
-                  {name && (
-                    <span className="truncate text-sm font-medium text-foreground">{name}</span>
-                  )}
-                </div>
-                <WorkspaceTabs
-                  tabs={tabItems}
-                  active={activeTab}
-                  createItems={createItems}
-                  onSelect={openTab}
-                  onClose={closeTab}
-                  onReorder={reorderTabs}
-                />
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <WorkspaceCustomizeAction
-                  active={widgetMode === 'customizing'}
-                  onToggle={() =>
-                    setWidgetMode(widgetMode === 'customizing' ? 'idle' : 'customizing')
-                  }
-                />
-                <WorkspaceSettings />
-                {hasWorkspaceContent && canUseSplit && (
-                  <SectionControls
-                    mode={mode}
-                    onToggleMode={() => setMode(mode === 'fullscreen' ? 'split' : 'fullscreen')}
-                  />
-                )}
-              </div>
-            </PanelHeader>
-
             {activeTab === 'agent' ? (
               tabbedChat
             ) : activeTab === 'widgets' ? (
@@ -611,12 +576,51 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
             {/* Views are not part of the chain above: ViewManager keeps them
                 mounted across tab switches (and collapses to nothing while
                 another tab is on screen), which is what makes a switch back
-                instant. */}
+                instant. It stays with the content, so the header below it in
+                the DOM keeps painting over both. */}
             <ViewManager
               views={views}
               activeViewId={activeView?.id ?? null}
               params={appletParams}
             />
+
+            <PanelHeader>
+              <div className="flex min-w-0 flex-1 items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <img
+                    src={icon ?? workspaceProviderIcon[provider ?? 'claude-code']}
+                    alt=""
+                    className="size-5 shrink-0 rounded-xs"
+                  />
+                  {name && (
+                    <span className="truncate text-sm font-medium text-foreground">{name}</span>
+                  )}
+                </div>
+                <WorkspaceTabs
+                  tabs={tabItems}
+                  active={activeTab}
+                  createItems={createItems}
+                  onSelect={openTab}
+                  onClose={closeTab}
+                  onReorder={reorderTabs}
+                />
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <WorkspaceCustomizeAction
+                  active={widgetMode === 'customizing'}
+                  onToggle={() =>
+                    setWidgetMode(widgetMode === 'customizing' ? 'idle' : 'customizing')
+                  }
+                />
+                <WorkspaceSettings />
+                {hasWorkspaceContent && canUseSplit && (
+                  <SectionControls
+                    mode={mode}
+                    onToggleMode={() => setMode(mode === 'fullscreen' ? 'split' : 'fullscreen')}
+                  />
+                )}
+              </div>
+            </PanelHeader>
           </div>
         )}
 

@@ -503,7 +503,7 @@ export type WorkspaceTabsState = {
   active: WorkspaceTabId
 }
 
-export type { FontTheme, ColorTheme } from './themes'
+export type { ColorTheme, FontTheme, RadiusTheme, WorkspaceTheme } from './themes'
 
 export type WorkspaceLayout = {
   version: 1
@@ -533,10 +533,7 @@ export type WorkspaceLayout = {
   selectedEffort?: string
   // Fast-mode default for new sessions. Undefined inherits the provider setting.
   selectedFastMode?: boolean
-  theme?: {
-    font: import('./themes').FontTheme
-    primary?: string
-  }
+  theme?: import('./themes').WorkspaceTheme
   // Widget thumbnails captured client-side from the live grid, used for
   // home-screen previews. Saved through their own endpoint (PUT
   // .../thumbnails), never through the layout PUT.

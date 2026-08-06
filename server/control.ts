@@ -1,6 +1,7 @@
 import { stringify as devalueStringify } from 'devalue'
 import { resolve } from 'path'
 
+import { resolveWorkspaceTheme } from '@/lib/themes'
 import type { WorkspaceEntry } from '@/lib/types'
 import { isParamsRecord } from '@/lib/workspace-tabs'
 
@@ -18,7 +19,7 @@ import { readScratchpadImage, readScratchpadShapes } from './scratchpad'
 import { relayScratchOp } from './scratchpad-relay'
 import { broadcastAll } from './state'
 import { assembleTabRows, resolveFocusTab } from './tabs'
-import { applyThemeUpdate, matchColorTheme } from './theme'
+import { applyThemeUpdate } from './theme'
 import { handleBundle } from './widgets'
 import { getViewList, handleBundleViews, hasViewId } from './views'
 import {
@@ -353,18 +354,24 @@ export const control = Bun.serve({
           const workspacePath = match.path
           const layout = await loadLayout(workspacePath)
 
-          // Listing mode — neither axis requested
-          if (!data.font && !data.color) {
+          // Listing mode — no theme setting requested
+          if (!data.font && !data.color && !data.radius) {
+            const theme = resolveWorkspaceTheme(layout.theme)
             ws.send(
               JSON.stringify({
-                currentFont: layout.theme?.font ?? 'default',
-                currentColor: matchColorTheme(layout.theme?.primary)
+                currentFont: theme.font,
+                currentColor: theme.color,
+                currentRadius: theme.radius
               })
             )
             return
           }
 
-          const result = applyThemeUpdate(layout.theme, { font: data.font, color: data.color })
+          const result = applyThemeUpdate(layout.theme, {
+            font: data.font,
+            color: data.color,
+            radius: data.radius
+          })
           if (!result.ok) {
             ws.send(JSON.stringify({ error: result.error }))
             return

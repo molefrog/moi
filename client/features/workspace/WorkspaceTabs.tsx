@@ -130,7 +130,7 @@ function WorkspaceTab(props: WorkspaceTabProps) {
     >
       <div
         className={cn(
-          'flex items-center gap-1 overflow-hidden',
+          'flex items-center gap-1 overflow-hidden select-none',
           tab.closable && 'group-hover/tab:mr-3'
         )}
       >

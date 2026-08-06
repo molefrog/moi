@@ -12,6 +12,7 @@
 @plugin '@tailwindcss/typography';
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant dark-or-widget (&:is(.dark *, [data-widget-chrome] *));
 
 :root {
   --background: oklch(1 0 0);
@@ -26,6 +27,7 @@
   --muted-foreground: oklch(0.64 0 0);
   --accent: oklch(0 0 0 / 0.07);
   --accent-foreground: var(--foreground);
+  --success: oklch(0.527 0.154 150.069);
   --destructive: oklch(0.58 0.22 27);
   --border: oklch(0 0 0 / 0.07);
   --input: oklch(0.922 0 0);
@@ -71,13 +73,14 @@
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(1 0 0 / 0.1);
   --accent-foreground: var(--foreground);
+  --success: oklch(0.627 0.194 149.214);
   --destructive: oklch(0.58 0.22 27);
   --border: oklch(1 0 0 / 0.1);
   --input: oklch(0.35 0 0);
   --ring: oklch(0.556 0 0);
 }
 
-/* Font/color/radius/shadow tokens — shared with applet bundles via theme.css */
+/* Theme tokens and texture utilities shared with applet bundles. */
 @import './theme.css';
 
 /* Dragged card floats above all others */

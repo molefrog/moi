@@ -1,85 +1,131 @@
-import { colord, extend } from 'colord'
-import a11yPlugin from 'colord/plugins/a11y'
+import { wcagLuminance } from 'culori'
 
-// Registers optional WCAG helpers such as luminance() on Colord.
-extend([a11yPlugin])
-
-export type FontTheme = 'default' | 'serif' | 'mono' | 'blobby' | 'geometric' | 'awkward'
+export type FontTheme =
+  | 'sans'
+  | 'serif'
+  | 'mono'
+  | 'geometric'
+  | 'rounded'
+  | 'blobby'
+  | 'awkward'
+  | 'comic'
 
 export type FontThemeConfig = {
   label: string
-  feel: string
   sans: string
   mono: string
   googleFontsQuery?: string // passed as `family=` param to Google Fonts API
 }
 
 export const FONT_THEMES: Record<FontTheme, FontThemeConfig> = {
-  default: {
-    label: 'Default',
-    feel: 'System font',
+  sans: {
+    label: 'Sans',
     sans: 'system-ui',
     mono: 'Geist Mono',
     googleFontsQuery: 'Geist+Mono:wght@400;500'
   },
   serif: {
     label: 'Serif',
-    feel: 'Literata',
     sans: 'Literata',
     mono: 'Geist Mono',
     googleFontsQuery: 'Literata:wght@400;600;700&family=Geist+Mono:wght@400;500'
   },
   mono: {
     label: 'Mono',
-    feel: 'Geist Mono',
     sans: 'Geist Mono',
     mono: 'Geist Mono',
     googleFontsQuery: 'Geist+Mono:wght@400;500;600'
   },
-  blobby: {
-    label: 'Blobby',
-    feel: 'Sour Gummy',
-    sans: 'Sour Gummy',
-    mono: 'Azeret Mono',
-    googleFontsQuery: 'Sour+Gummy:wght@400;500;600&family=Azeret+Mono:wght@400;500'
-  },
   geometric: {
     label: 'Geometric',
-    feel: 'Manrope',
     sans: 'Manrope',
     mono: 'Geist Mono',
     googleFontsQuery: 'Manrope:wght@400;500;600&family=Geist+Mono:wght@400;500'
   },
+  rounded: {
+    label: 'Rounded',
+    sans: 'SN Pro',
+    mono: 'Geist Mono',
+    googleFontsQuery: 'SN+Pro:wght@400;500;600&family=Geist+Mono:wght@400;500'
+  },
+  blobby: {
+    label: 'Blobby',
+    sans: 'Sour Gummy',
+    mono: 'Azeret Mono',
+    googleFontsQuery: 'Sour+Gummy:wght@400;500;600&family=Azeret+Mono:wght@400;500'
+  },
   awkward: {
     label: 'Awkward',
-    feel: 'Averia Sans Libre',
     sans: 'Averia Sans Libre',
     mono: 'Azeret Mono',
     googleFontsQuery: 'Averia+Sans+Libre:wght@400;500;600&family=Azeret+Mono:wght@400;500'
+  },
+  comic: {
+    label: 'Comic',
+    sans: 'Comic Sans MS, Comic Sans, cursive',
+    mono: 'Geist Mono',
+    googleFontsQuery: 'Geist+Mono:wght@400;500'
   }
 }
 
-export type ColorTheme = 'default' | 'paper' | 'sand' | 'rose' | 'lavender' | 'mint' | 'sky'
+export type RadiusTheme = 'squishy' | 'soft' | 'subtle' | 'square'
+
+export type RadiusThemeConfig = {
+  label: string
+  radius: string
+}
+
+export const RADIUS_THEMES: Record<RadiusTheme, RadiusThemeConfig> = {
+  squishy: { label: 'Squishy', radius: '0.875rem' },
+  soft: { label: 'Soft', radius: '0.625rem' },
+  subtle: { label: 'Subtle', radius: '0.375rem' },
+  square: { label: 'Square', radius: '0' }
+}
+
+export type ColorTheme =
+  | 'default'
+  | 'paper'
+  | 'rose'
+  | 'tangerine'
+  | 'sand'
+  | 'mint'
+  | 'sky'
+  | 'lavender'
+
+export type ThemeColorMode = 'workspace' | 'widget'
+
+export const DEFAULT_PRIMARY_COLOR = 'oklch(0.205 0 0)'
 
 function foregroundForPrimary(primary: string): string {
-  if (!/^#[0-9a-f]{6}$/i.test(primary)) {
-    throw new Error(`Primary theme color must use #rrggbb: ${primary}`)
-  }
-
-  return colord(primary).luminance() > 0.24 ? '#000000' : '#ffffff'
+  return wcagLuminance(primary) > 0.3 ? 'oklch(0 0 0)' : 'oklch(1 0 0)'
 }
 
 const THEME_COLOR_DERIVATIONS = {
-  primary: primary => primary,
-  primaryForeground: primary => foregroundForPrimary(primary),
-  background: () => 'color-mix(in oklch, var(--primary) 3%, white 97%)',
-  foreground: () => 'color-mix(in oklch, var(--primary) 24%, black 76%)',
-  muted: () => 'color-mix(in oklch, var(--background) 95%, var(--foreground) 5%)',
-  mutedForeground: () => 'color-mix(in oklch, var(--background) 58%, var(--foreground) 42%)',
-  accent: () => 'color-mix(in oklch, var(--primary) 4%, var(--foreground) 4%)'
-} satisfies Record<string, (primary: string) => string>
+  workspace: {
+    primary: primary => primary,
+    primaryForeground: primary => foregroundForPrimary(primary),
+    background: () => 'color-mix(var(--primary) 3%, oklch(1 0 0) 97%)',
+    foreground: () => 'color-mix(var(--primary) 20%, oklch(0 0 0) 80%)',
+    muted: () => 'color-mix(var(--background) 95%, var(--foreground) 5%)',
+    mutedForeground: () => 'color-mix(var(--background) 50%, var(--foreground) 50%)',
+    accent: () => 'color-mix(var(--primary) 4%, var(--foreground) 4%)',
+    accentForeground: () => 'var(--foreground)',
+    border: () => 'color-mix(var(--foreground) 7%, transparent)'
+  },
+  widget: {
+    background: primary => primary,
+    foreground: primary => foregroundForPrimary(primary),
+    primary: () => 'color-mix(var(--background) 3%, oklch(1 0 0) 97%)',
+    primaryForeground: () => 'color-mix(var(--background) 20%, oklch(0 0 0) 80%)',
+    muted: () => 'color-mix(var(--background) 95%, var(--foreground) 5%)',
+    mutedForeground: () => 'color-mix(var(--background) 50%, var(--foreground) 50%)',
+    accent: () => 'color-mix(var(--primary) 4%, var(--foreground) 4%)',
+    accentForeground: () => 'var(--foreground)',
+    border: () => 'color-mix(var(--foreground) 15%, transparent)'
+  }
+} satisfies Record<ThemeColorMode, Record<string, (primary: string) => string>>
 
-export type ThemeColorToken = keyof typeof THEME_COLOR_DERIVATIONS
+export type ThemeColorToken = keyof (typeof THEME_COLOR_DERIVATIONS)['workspace']
 export type ThemeColors = Record<ThemeColorToken, string>
 
 export type ColorThemeConfig = {
@@ -88,12 +134,18 @@ export type ColorThemeConfig = {
   primary?: string
 }
 
-export const THEME_COLOR_TOKENS = Object.keys(THEME_COLOR_DERIVATIONS) as ThemeColorToken[]
+export const THEME_COLOR_TOKENS = Object.keys(
+  THEME_COLOR_DERIVATIONS.workspace
+) as ThemeColorToken[]
 
-export function deriveThemeColors(primary: string): ThemeColors {
+export function deriveThemeColors(
+  primary: string,
+  mode: ThemeColorMode = 'workspace'
+): ThemeColors {
   const colors = {} as ThemeColors
+  const derivations = THEME_COLOR_DERIVATIONS[mode]
   for (const token of THEME_COLOR_TOKENS) {
-    colors[token] = THEME_COLOR_DERIVATIONS[token](primary)
+    colors[token] = derivations[token](primary)
   }
   return colors
 }
@@ -102,26 +154,46 @@ export const COLOR_THEMES: Record<ColorTheme, ColorThemeConfig> = {
   default: { label: 'Default' },
   paper: {
     label: 'Paper',
-    primary: '#453521'
-  },
-  sand: {
-    label: 'Sand',
-    primary: '#ff8700'
+    primary: 'oklch(0.4328 0.0351 66.67)'
   },
   rose: {
     label: 'Rose',
-    primary: '#f13c3c'
+    primary: 'oklch(0.6322 0.2171 26.02)'
   },
-  lavender: {
-    label: 'Lavender',
-    primary: '#9051ff'
+  tangerine: {
+    label: 'Tangerine',
+    primary: 'oklch(0.6886 0.22 37.15)'
+  },
+  sand: {
+    label: 'Sand',
+    primary: 'oklch(0.8334 0.1271 67.80)'
   },
   mint: {
     label: 'Tropics',
-    primary: '#009155'
+    primary: 'oklch(0.5774 0.1399 156.06)'
   },
   sky: {
     label: 'Sky',
-    primary: '#007ae3'
+    primary: 'oklch(0.5824 0.1830 253.59)'
+  },
+  lavender: {
+    label: 'Lavender',
+    primary: 'oklch(0.6025 0.2426 294.58)'
   }
+}
+
+export type WorkspaceTheme = {
+  font: FontTheme
+  color: ColorTheme
+  radius: RadiusTheme
+}
+
+export const DEFAULT_WORKSPACE_THEME: WorkspaceTheme = {
+  font: 'sans',
+  color: 'default',
+  radius: 'soft'
+}
+
+export function resolveWorkspaceTheme(theme?: Partial<WorkspaceTheme>): WorkspaceTheme {
+  return { ...DEFAULT_WORKSPACE_THEME, ...theme }
 }

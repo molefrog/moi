@@ -7,6 +7,8 @@ import { IconMinus, IconPlus } from '@tabler/icons-react'
 import { cn } from '@/client/lib/cn'
 
 import { Button } from '@/client/components/ui/button'
+import { useWorkspaceThemeSetting } from '@/client/features/workspace/WorkspaceLayoutContext'
+import { getWorkspaceThemeStyle } from '@/client/runtime/workspace-theme'
 
 type WidgetFrameProps = {
   editing?: boolean
@@ -16,6 +18,8 @@ type WidgetFrameProps = {
 }
 
 export function WidgetFrame({ editing, hidden, onRemove, children }: WidgetFrameProps) {
+  const theme = useWorkspaceThemeSetting()
+
   return (
     <motion.div
       variants={{
@@ -35,8 +39,9 @@ export function WidgetFrame({ editing, hidden, onRemove, children }: WidgetFrame
         // Stable hook for widget snapshots: the capture clone overrides this
         // element's chrome (radius/shadow/stroke) so thumbnails come out square.
         data-widget-chrome
+        style={getWorkspaceThemeStyle(theme, 'widget')}
         className={cn(
-          'dark absolute inset-0 overflow-hidden rounded-2xl [corner-shape:superellipse(1.2)]',
+          'absolute inset-0 overflow-hidden rounded-2xl text-foreground [corner-shape:superellipse(1.2)]',
           // Outer drop shadow on the wrapper itself.
           'shadow-[0_1px_2px_-1px_rgba(0,0,0,0.08),0_2px_4px_0_rgba(0,0,0,0.03)]',
           // 1px inset stroke painted on a pseudo so it lands ON TOP of the
@@ -45,7 +50,6 @@ export function WidgetFrame({ editing, hidden, onRemove, children }: WidgetFrame
           'after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit]',
           "after:content-[''] after:[corner-shape:inherit]",
           'after:shadow-[inset_0_0_0_1px_rgba(0,0,0,0.05)]',
-          'text-foreground',
           editing && 'pointer-events-none'
         )}
       >
