@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { IconAlertCircle, IconLoader2, IconLogin } from '@tabler/icons-react'
+import { IconLoader2, IconLogin } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
 import type { HarnessAvailability, HarnessLogin } from '@/lib/types'
