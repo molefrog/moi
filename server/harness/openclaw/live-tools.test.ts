@@ -14,12 +14,16 @@ import { createOpenClawSessionForTest, handleToolFrame, ingest } from './session
 const SESSION_KEY = 'agent:live-tools:main'
 const TOOL_ID = 'exec-c5dfffcc'
 
+// A codex-backed record: synthesis is gated on `codexBackend`, which the live
+// subscription sets when it sees a `codex_app_server.*` frame.
 function newRec() {
-  return createOpenClawSessionForTest({
+  const rec = createOpenClawSessionForTest({
     workspaceId: 'ws-live-tools',
     sessionId: `s-${Math.random().toString(36).slice(2)}`,
     sessionKey: SESSION_KEY
   })
+  rec.codexBackend = true
+  return rec
 }
 
 // Durable assistant toolCall row as the run-end batch delivers it: content
@@ -140,5 +144,55 @@ describe('live tool card → durable owner rendezvous', () => {
     expect(cards.map(t => t.id).sort()).toEqual(
       ids.map(id => `openclaw:${SESSION_KEY}:livetool:${id}`).sort()
     )
+  })
+})
+
+describe('native backend (no codex signal) — no synthesis, no duplicates', () => {
+  // Regression for the ollama/deepseek duplicate-card bug: a native-loop
+  // provider whose start-frame toolCallId does NOT match the durable row's id.
+  // Without a `codex_app_server.*` frame, codexBackend stays false, so no live
+  // card is synthesized — the tool renders once, from the durable row.
+  function nativeRec() {
+    return createOpenClawSessionForTest({
+      workspaceId: 'ws-native',
+      sessionId: `n-${Math.random().toString(36).slice(2)}`,
+      sessionKey: SESSION_KEY
+    })
+  }
+
+  test('a tool frame with no codex signal synthesizes no live card', () => {
+    const rec = nativeRec()
+    handleToolFrame(rec, {
+      data: { phase: 'start', toolCallId: 'call_live', name: 'exec', args: { command: 'ls -la' } }
+    })
+    handleToolFrame(rec, {
+      data: {
+        phase: 'result',
+        toolCallId: 'call_live',
+        result: { content: [{ type: 'text', text: 'ok' }] }
+      }
+    })
+    expect(rec.view.turns).toHaveLength(0)
+  })
+
+  test('mismatched start-frame id and durable id still yield exactly one card', () => {
+    const rec = nativeRec()
+    // Live frames use a provisional id…
+    handleToolFrame(rec, {
+      data: { phase: 'start', toolCallId: 'call_live', name: 'exec', args: { command: 'ls -la' } }
+    })
+    // …while the durable row commits under a different, final id.
+    ingest(rec, {
+      role: 'assistant',
+      content: [
+        { type: 'toolCall', id: 'toolu_final', name: 'exec', arguments: { command: 'ls -la' } }
+      ],
+      timestamp: 1785861026066,
+      __openclaw: { id: 'dur-1', seq: 10 }
+    } as unknown as OpenClawMessage)
+    const cards = rec.view.turns.filter(t => t.parts.some(p => p.type === 'tool-call'))
+    expect(cards).toHaveLength(1)
+    // The single card is the durable row, not a stranded `livetool:` turn.
+    expect(cards[0].id).toBe(`openclaw:${SESSION_KEY}:dur-1`)
   })
 })

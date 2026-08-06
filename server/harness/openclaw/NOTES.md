@@ -325,6 +325,21 @@ success/error (from `isError`/exitCode) live at the result frame, but the
 a moi gap — `session.tool` (Anthropic) carries output live, which is why the
 two backends feel different.
 
+**Live tool synthesis is codex-only.** Because codex batches its durable rows
+at run end, tools would otherwise pop in all at once after the streamed text,
+so moi synthesizes an ephemeral `livetool:<toolCallId>` turn from the
+`agent`/`tool` `start` frame and merges the durable owner onto it by re-id
+(`session.ts` → `emitLiveToolTurn`/`emitTurn`). This is gated on a
+`codex_app_server.*` frame having been seen this session (`rec.codexBackend`).
+Native-loop providers (Anthropic, **ollama** — e.g. deepseek-v4-flash) are NOT
+gated in: their durable rows arrive during the run, so `session.tool` +
+`reemitToolCallOwners` already render tools live, and their `start`-frame
+`toolCallId` need not match the `result`/durable id (ollama uses a provisional
+start id, a final result id) — synthesizing there stranded the live card as a
+permanent duplicate (`○` stuck running beside the durable `●`), and broadcast
+turns can't be retracted (`applyEvent` only upserts by id). So synthesis stays
+off unless the positive codex signal fires.
+
 **`task`** — subagent runs (2026.7.x; the event family is new there):
 
 ```jsonc

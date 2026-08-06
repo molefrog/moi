@@ -94,11 +94,21 @@ type SessionRecord = {
   // doesn't double-broadcast (see claimPreviewSource).
   previewRunId?: string
   previewSource?: 'chat' | 'agent'
-  // Live tool cards rendered from `agent/tool` / `session.tool` frames before
-  // the durable owner row exists (the codex-app-server backend batches durable
-  // rows at run end). Keyed by toolCallId → the tool name + input captured off
-  // the start frame; the matching durable row merges into the live turn by
-  // re-iding to `livetool:<toolCallId>` (see emitTurn).
+  // True once we've seen a `codex_app_server.*` frame on this session — the
+  // positive signal (only the codex backend emits it, and it precedes the
+  // run's tool frames) that gates live tool synthesis below. Native-loop
+  // providers (Anthropic, ollama, …) never set it, so they keep the plain
+  // durable-row rendering and never grow orphan live cards.
+  codexBackend?: boolean
+  // Live tool cards rendered from `agent/tool` frames before the durable owner
+  // row exists — ONLY on the codex-app-server backend, which batches durable
+  // rows at run end so tools would otherwise appear all at once after the text.
+  // Keyed by toolCallId → the tool name + input captured off the start frame;
+  // the matching durable row merges into the live turn by re-iding to
+  // `livetool:<toolCallId>` (see emitTurn). Populated only when `codexBackend`,
+  // so on other backends it stays empty and neither synthesis nor merge fires
+  // (their start/result/durable toolCallIds don't always correlate, which would
+  // strand the live card as a duplicate — and broadcast turns can't be retracted).
   liveTools: Map<string, { name: string; input: unknown }>
   // Last model/thinking applied via sessions.patch, in `provider/model` form —
   // avoids a patch round-trip per send when nothing changed.
@@ -642,7 +652,12 @@ export function handleToolFrame(rec: SessionRecord, payload: Record<string, unkn
   const name = typeof data.name === 'string' ? data.name : undefined
   const toolName = name ? { toolName: name } : {}
   if (data.phase === 'start' || data.phase === 'update') {
-    if (name && !rec.liveTools.has(id)) rec.liveTools.set(id, { name, input: data.args })
+    // Only the codex backend needs synthetic live cards (see SessionRecord
+    // `liveTools`). Gating the map population here gates both the synthesis
+    // below and the durable-row merge in emitTurn.
+    if (rec.codexBackend && name && !rec.liveTools.has(id)) {
+      rec.liveTools.set(id, { name, input: data.args })
+    }
     const existing = rec.results.get(id)
     if (existing && !existing.running) return // final result already landed
     rec.results.set(id, { output: '', isError: false, running: true, ...toolName })
@@ -855,6 +870,15 @@ async function ensureSubscribed(rec: SessionRecord): Promise<void> {
     } else if (event === 'agent') {
       if (payload.sessionKey !== rec.sessionKey) return
       const stream = payload.stream as string | undefined
+      // `codex*` frames (`codex_app_server.lifecycle|item|hook|usage`, and any
+      // future `codex.*` rename) are emitted only by the codex backend and
+      // precede its tool frames within a run — the positive signal that live
+      // tool synthesis is warranted for this session (see handleToolFrame). No
+      // native stream name starts with `codex`, so this never false-positives.
+      if (typeof stream === 'string' && stream.startsWith('codex')) {
+        rec.codexBackend = true
+        return
+      }
       // Streaming text/reasoning fallback for gateways that don't emit `chat`
       // delta frames (handleAgentStreamFrame no-ops when `chat` already owns
       // the run's preview).
@@ -864,7 +888,8 @@ async function ensureSubscribed(rec: SessionRecord): Promise<void> {
       }
       // The codex-app-server backend (OpenAI models on newer OpenClaw) streams
       // tool activity as `agent`/tool frames instead of `session.tool`; same
-      // `data` shape, so route it through the shared handler for live cards.
+      // `data` shape, so route it through the shared handler. Synthesis of live
+      // cards is gated on `codexBackend` inside the handler.
       if (stream === 'tool') {
         handleToolFrame(rec, payload)
         return
