@@ -45,9 +45,9 @@ export function WorkspaceAgentAvailabilityBanner({
       role="alert"
       className="grid grid-cols-[auto_minmax(0,1fr)] gap-2 @xl:grid-cols-[auto_minmax(0,1fr)_auto] @xl:items-center"
     >
-      <IconAlertCircle size={20} stroke={1.5} />
+      <IconLogin size={20} stroke={1.5} />
       <div className="min-w-0 space-y-1">
-        <div className="wrap-break-word">{availability.reason}</div>
+        <div className="wrap-break-word">Log in to your agent provider to send messages</div>
         {error && <div className="wrap-break-word text-destructive">{error}</div>}
       </div>
 
@@ -59,16 +59,12 @@ export function WorkspaceAgentAvailabilityBanner({
           disabled={state !== 'idle'}
           className="col-span-2 w-fit @xl:col-span-1"
         >
-          {state === 'idle' ? (
-            <IconLogin stroke={1.75} />
-          ) : (
-            <IconLoader2 stroke={1.75} className="animate-spin" />
-          )}
+          {state !== 'idle' && <IconLoader2 stroke={1.75} className="animate-spin" />}
           {state === 'starting'
-            ? 'Starting…'
+            ? 'Opening browser to sign in…'
             : state === 'waiting'
-              ? 'Waiting for sign-in…'
-              : 'Sign in'}
+              ? 'Waiting for log in…'
+              : 'Log in'}
         </Button>
       )}
     </ComposerBannerShell>

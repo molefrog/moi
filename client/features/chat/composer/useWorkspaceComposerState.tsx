@@ -41,7 +41,7 @@ export function useWorkspaceComposerState(
 
   const agentUnavailableBanner: ComposerBanner | undefined = unavailable
     ? {
-        tone: 'destructive',
+        tone: 'muted',
         content: (
           <WorkspaceAgentAvailabilityBanner
             availability={unavailable}
