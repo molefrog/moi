@@ -60,8 +60,10 @@ export const codexHarness: Harness = {
   listModels: ws => getCodexModels(ws.path),
   mcpStatus: ws => getCodexMcpStatus(ws.path),
   discoverWorkspaces: registeredPaths => discoverCodexWorkspaces(registeredPaths),
-  availability: async () => pathHarnessAvailability('codex'),
-  readiness: ws => getCodexAuthReadiness(ws.path),
+  availability: async ws => {
+    const runtime = await pathHarnessAvailability('codex')
+    return runtime.available && ws ? getCodexAuthReadiness(ws.path) : runtime
+  },
   startLogin: ws => startCodexLogin(ws.path),
 
   onEnvChanged: workspacePath => killCodexWorkspace(workspacePath),

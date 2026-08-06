@@ -148,13 +148,12 @@ approval flow (server→client approval requests are auto-accepted
 defensively), and images ride inline as data URLs only (no `localImage` path
 mode).
 
-Provider readiness is workspace-level and separate from runtime availability.
-Claude Code is probed with `claude auth status` under the effective workspace
-env; a signed-out composer shows `claude auth login` as the terminal recovery.
-Codex uses app-server `account/read` and starts browser OAuth through
-`account/login/start`. The composer polls while that flow is pending, while the
-server repeats the readiness check before every send to close stale-client
-races.
+Workspace availability also checks provider authentication when a workspace is
+given. Claude Code is probed with `claude auth status` under the effective
+workspace env; `claude auth login` launches its browser sign-in from the composer. Codex
+uses app-server `account/read` and returns a browser OAuth URL through
+`account/login/start`. The composer polls while it is signed out and keeps each
+provider's terminal command visible as a fallback.
 
 ## What a harness adapter must support
 
@@ -230,7 +229,7 @@ doubles as the evaluation rubric for new harnesses.
 - Compaction trigger/observe.
 - Queued-message semantics: does the backend queue natively or must the
   server?
-- Push health/auth status events (readiness is currently probed on load, focus,
+- Push health/auth status events (availability is currently probed on load, focus,
   a one-minute interval, and before sends).
 
 ## Capability comparison

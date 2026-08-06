@@ -6,11 +6,7 @@ test('requires a Codex login for an unauthenticated OpenAI provider', () => {
   expect(codexAccountReadiness({ account: null, requiresOpenaiAuth: true })).toEqual({
     available: false,
     reason: 'Codex is signed out. Sign in to send messages',
-    recovery: {
-      kind: 'login',
-      command: 'codex login',
-      inApp: true
-    }
+    loginCommand: 'codex login'
   })
 })
 

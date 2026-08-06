@@ -2,7 +2,7 @@
 // rest of the server: web.ts/api.ts/etc. dispatch through harnessFor()
 // instead of branching on workspace.type (documented exceptions: cli.ts
 // provisioning and tests import harness internals directly).
-import type { HarnessAvailability, WorkspaceEntry, WorkspaceType } from '@/lib/types'
+import type { WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
 import { claudeCodeHarness } from './claude-code'
 import { codexHarness } from './codex'
@@ -27,16 +27,6 @@ export function harnessFor(ws: Pick<WorkspaceEntry, 'type'> | WorkspaceType | un
 
 export function allHarnesses(): Harness[] {
   return Object.values(harnesses)
-}
-
-// Runtime presence and workspace-level provider state are deliberately
-// separate: setup flows only need the former, while sends and the workspace
-// composer require both.
-export async function harnessReadiness(ws: WorkspaceEntry): Promise<HarnessAvailability> {
-  const harness = harnessFor(ws)
-  const runtime = (await harness.availability?.()) ?? { available: true as const }
-  if (!runtime.available) return runtime
-  return (await harness.readiness?.(ws)) ?? { available: true }
 }
 
 // Is this string a workspace type moi can actually drive? (Validates the

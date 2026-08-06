@@ -33,7 +33,7 @@ import {
   saveWidgetThumbnails
 } from './layout'
 import { getClientFrameLog, getWireLog } from './harness/debug'
-import { allHarnesses, harnessFor, harnessReadiness, isHarnessType } from './harness/registry'
+import { allHarnesses, harnessFor, isHarnessType } from './harness/registry'
 import { broadcast } from './state'
 import {
   discoverWorkspaces,
@@ -258,7 +258,7 @@ one.post('/view-builders/:builderId/submit', async c => {
   }
   const availableIcons = parseAvailableViewIcons(body.availableIcons)
   if (!availableIcons) return c.text('Available view icons are required', 400)
-  const availability = await harnessReadiness(ws)
+  const availability = await workspaceTypeAvailability(ws.type ?? 'claude-code')
   if (!availability.available) return c.text(availability.reason, 400)
   try {
     const builder = await beginViewBuilder(
@@ -642,17 +642,15 @@ one.put('/env', async c => {
 // presence and provider state such as authentication. The chat surfaces the
 // recovery state before the first send can fail cold.
 one.get('/availability', async c => {
-  const availability = await harnessReadiness(c.get('ws'))
+  const ws = c.get('ws')
+  const availability = (await harnessFor(ws).availability?.(ws)) ?? { available: true as const }
   return c.json(availability satisfies HarnessAvailability)
 })
 
-// Start a provider-owned login ceremony. Codex returns a browser OAuth URL;
-// providers without an in-app flow keep exposing their terminal command in
-// the availability response and do not implement this hook.
+// Start a provider login ceremony. Codex returns a browser OAuth URL for the
+// host to open; Claude launches its browser flow through the CLI itself.
 one.post('/auth/login', async c => {
   const ws = c.get('ws')
-  const runtime = await workspaceTypeAvailability(ws.type ?? 'claude-code')
-  if (!runtime.available) return c.text(runtime.reason, 400)
   const startLogin = harnessFor(ws).startLogin
   if (!startLogin) return c.text('This agent requires terminal sign-in', 409)
   try {

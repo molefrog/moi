@@ -1,30 +1,19 @@
-import type { HarnessAvailability, HarnessLoginFlow } from '@/lib/types'
+import type { HarnessAvailability, HarnessLogin } from '@/lib/types'
 
 import { getCodexClient } from './client'
 
-export const CODEX_LOGIN_COMMAND = 'codex login'
-
-type CodexAccount =
-  | { type: 'apiKey' }
-  | { type: 'chatgpt'; email: string | null; planType: string }
-  | { type: 'amazonBedrock'; usesCodexManagedCredentials: boolean }
-
 export type CodexAccountResponse = {
-  account: CodexAccount | null
+  account: unknown | null
   requiresOpenaiAuth: boolean
 }
 
-type CodexLoginResponse = { type: 'chatgpt'; loginId: string; authUrl: string } | { type: string }
+type CodexLoginResponse = { type: string; authUrl?: string }
 
 function needsCodexLogin(reason: string): HarnessAvailability {
   return {
     available: false,
     reason,
-    recovery: {
-      kind: 'login',
-      command: CODEX_LOGIN_COMMAND,
-      inApp: true
-    }
+    loginCommand: 'codex login'
   }
 }
 
@@ -45,17 +34,17 @@ export async function getCodexAuthReadiness(workspacePath: string): Promise<Harn
   }
 }
 
-export async function startCodexLogin(workspacePath: string): Promise<HarnessLoginFlow> {
+export async function startCodexLogin(workspacePath: string): Promise<HarnessLogin> {
   const client = await getCodexClient(workspacePath)
   const login = await client.rpc<CodexLoginResponse>('account/login/start', {
     type: 'chatgpt',
     useHostedLoginSuccessPage: true,
     appBrand: 'codex'
   })
-  if (login.type !== 'chatgpt' || !('authUrl' in login)) {
+  if (login.type !== 'chatgpt' || !login.authUrl) {
     throw new Error('Codex did not return a browser login URL')
   }
   const url = new URL(login.authUrl)
   if (url.protocol !== 'https:') throw new Error('Codex returned an unsafe login URL')
-  return { type: 'browser', url: url.toString() }
+  return { url: url.toString() }
 }

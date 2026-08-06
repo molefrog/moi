@@ -5,7 +5,7 @@ import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import type {
   HarnessAvailability,
-  HarnessLoginFlow,
+  HarnessLogin,
   ViewInfo,
   WidgetInfo,
   WorkspaceLayout,
@@ -37,15 +37,14 @@ export function useWorkspaceAvailability(workspaceId: string) {
     queryKey: workspaceKeys.availability(workspaceId),
     queryFn: () => requestJson(`/api/workspaces/${workspaceId}/availability`),
     staleTime: 30_000,
-    // Account tokens can expire while the workspace stays open. One active
-    // workspace probe per minute keeps the composer state honest without
-    // turning the provider CLI into a hot polling loop.
-    refetchInterval: 60_000,
+    // Poll only while signed out so a completed browser login unlocks Send.
+    refetchInterval: query =>
+      query.state.data?.available === false && query.state.data.loginCommand ? 2_000 : false,
     refetchOnWindowFocus: true
   })
 }
 
-export function startWorkspaceLogin(workspaceId: string): Promise<HarnessLoginFlow> {
+export function startWorkspaceLogin(workspaceId: string): Promise<HarnessLogin> {
   return requestJson(
     `/api/workspaces/${workspaceId}/auth/login`,
     { method: 'POST' },

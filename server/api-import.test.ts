@@ -13,6 +13,7 @@ import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from './reg
 let tempDir: string
 const originalClaudeAvailability = claudeCodeHarness.availability
 const originalCodexAvailability = codexHarness.availability
+const originalCodexStartLogin = codexHarness.startLogin
 
 beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), 'moi-api-import-'))
@@ -24,6 +25,7 @@ beforeEach(async () => {
 afterEach(async () => {
   claudeCodeHarness.availability = originalClaudeAvailability
   codexHarness.availability = originalCodexAvailability
+  codexHarness.startLogin = originalCodexStartLogin
   setRegistryPath(DEFAULT_REGISTRY_PATH)
   await rm(tempDir, { recursive: true, force: true })
 })
@@ -106,5 +108,28 @@ describe('workspace import provider', () => {
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ available: false, reason })
+  })
+
+  test('reports a signed-out workspace and starts its login', async () => {
+    codexHarness.availability = async ws =>
+      ws
+        ? {
+            available: false,
+            reason: 'Codex is signed out. Sign in to send messages',
+            loginCommand: 'codex login'
+          }
+        : { available: true }
+    codexHarness.startLogin = async () => ({ url: 'https://example.com/login' })
+    const entry = await registerWorkspace(join(tempDir, 'codex-login'), { type: 'codex' })
+
+    const availability = await api.request(`/api/workspaces/${entry.id}/availability`)
+    expect(await availability.json()).toEqual({
+      available: false,
+      reason: 'Codex is signed out. Sign in to send messages',
+      loginCommand: 'codex login'
+    })
+
+    const login = await api.request(`/api/workspaces/${entry.id}/auth/login`, { method: 'POST' })
+    expect(await login.json()).toEqual({ url: 'https://example.com/login' })
   })
 })

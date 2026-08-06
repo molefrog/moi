@@ -392,29 +392,14 @@ export type WorkspaceSkillsUpdateFailure = WorkspaceSkillsStatus & {
   error: string
 }
 
-// A recovery path for an unavailable agent. `command` is always a working
-// terminal fallback; `inApp` tells the host whether it can also start the
-// recovery flow itself.
-export type HarnessRecovery = {
-  kind: 'install' | 'login'
-  command: string
-  inApp: boolean
-}
+// Setup checks only runtime availability. Workspace checks may also attach a
+// login command, which makes the composer show its Sign in action.
+export type HarnessAvailability =
+  | { available: true }
+  | { available: false; reason: string; loginCommand?: string }
 
-export type HarnessUnavailable = {
-  available: false
-  reason: string
-  recovery?: HarnessRecovery
-}
-
-// Whether an agent backend can accept messages right now. Setup endpoints use
-// the runtime-only check, while a workspace also checks provider readiness
-// such as account authentication. `reason` is user-facing recovery copy.
-export type HarnessAvailability = { available: true } | HarnessUnavailable
-
-// A login flow that the host can launch. The terminal command remains on the
-// corresponding HarnessRecovery even when an in-app flow is available.
-export type HarnessLoginFlow = { type: 'browser'; url: string }
+// Codex returns a URL for the browser. Claude opens it from its own CLI.
+export type HarnessLogin = { url?: string }
 
 // One MCP server's connection status, as surfaced by GET /api/workspaces/:id/mcp
 // (a subset of the agent SDK's McpServerStatus — only what the UI renders).
