@@ -562,7 +562,6 @@ export function codexThreadToEvents(
 ): StreamEvent[] {
   const events: StreamEvent[] = []
   for (const turn of thread.turns ?? []) {
-    const firstTurnEvent = events.length
     for (const item of turn.items ?? []) {
       const t = codexItemToTurn(item, thread.id)
       if (t) {
@@ -571,17 +570,14 @@ export function codexThreadToEvents(
           const part = t.parts.find(p => p.type === 'tool-call')
           if (sub && part?.type === 'tool-call') part.call.subagent = sub.record
         }
-        events.push({ kind: 'turn', turn: t })
+        events.push({
+          kind: 'turn',
+          turn: t.role === 'assistant' ? withCodexTurnDuration(t, turn.durationMs) : t
+        })
         continue
       }
       const n = codexItemToNotice(item, thread.id)
       if (n) events.push({ kind: 'notice', notice: n })
-    }
-    for (let i = events.length - 1; i >= firstTurnEvent; i--) {
-      const event = events[i]
-      if (event.kind !== 'turn' || event.turn.role !== 'assistant') continue
-      events[i] = { kind: 'turn', turn: withCodexTurnDuration(event.turn, turn.durationMs) }
-      break
     }
   }
   return events

@@ -10,7 +10,6 @@ import {
   CollapsibleTrigger
 } from '@/client/components/ui/collapsible'
 import { MarkdownContent } from '@/client/features/chat/MarkdownContent'
-import { isVisibleChatTurn } from '@/client/features/chat/group-turns'
 import { ToolCallGroup } from '@/client/features/chat/tool-group/ToolCallGroup'
 import { formatDuration } from '@/client/features/chat/tool-group/format'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
@@ -167,19 +166,13 @@ export function AssistantTurnParts({
   )
 }
 
-type TurnViewProps = { turn: Turn; processing?: boolean; durationMs?: number }
+type TurnViewProps = { turn: Turn; processing?: boolean }
 
 // Memoized: the message list maps over grouped turns (stable identities — see
 // `groupTurns` in ChatPanel), so parent re-renders only update rows whose `turn`
 // or `processing` actually changed.
-export const TurnView = memo(function TurnView({
-  turn,
-  processing = false,
-  durationMs
-}: TurnViewProps) {
+export const TurnView = memo(function TurnView({ turn, processing = false }: TurnViewProps) {
   const cwd = useWorkspaceLayoutCtx().cwd
-
-  if (!isVisibleChatTurn(turn)) return null
 
   if (turn.role === 'user' && turn.origin.kind === 'user-input') {
     // Plain user input — right-aligned. Attachments (images/files) stack above
@@ -216,7 +209,7 @@ export const TurnView = memo(function TurnView({
       parts={turn.parts}
       cwd={cwd}
       processing={processing}
-      durationMs={durationMs}
+      durationMs={turn.meta?.durationMs}
     />
   )
 })

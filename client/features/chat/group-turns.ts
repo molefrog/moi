@@ -4,7 +4,7 @@
 // consecutive assistant turns as one run so both shapes finish the same way.
 import type { Turn } from '@/lib/types'
 
-export function isVisibleChatTurn(turn: Turn): boolean {
+function isVisibleChatTurn(turn: Turn): boolean {
   return (
     turn.origin.kind !== 'replay' &&
     turn.origin.kind !== 'synthetic' &&
@@ -39,33 +39,24 @@ export function groupTurns(turns: Turn[]): Turn[] {
       out.push(t)
     }
   }
-  return out
-}
-
-function timestampMs(timestamp: string | undefined): number | undefined {
-  if (!timestamp) return undefined
-  const value = Date.parse(timestamp)
-  return Number.isFinite(value) ? value : undefined
-}
-
-export function resolveAgentRunDuration(
-  previousTurn: Turn | undefined,
-  turn: Turn
-): number | undefined {
-  if (turn.role !== 'assistant') return undefined
-
-  if (previousTurn?.role === 'user' && previousTurn.origin.kind === 'user-input') {
-    const startedAt = timestampMs(previousTurn.timestamp)
-    const finishedAt = timestampMs(turn.timestamp)
-    if (startedAt !== undefined && finishedAt !== undefined && finishedAt >= startedAt) {
-      return finishedAt - startedAt
+  return out.map((turn, index) => {
+    const previous = out[index - 1]
+    if (
+      turn.role !== 'assistant' ||
+      previous?.role !== 'user' ||
+      previous.origin.kind !== 'user-input' ||
+      !previous.timestamp ||
+      !turn.timestamp
+    ) {
+      return turn
     }
-  }
 
-  const nativeDuration = turn.meta?.durationMs
-  return typeof nativeDuration === 'number' &&
-    Number.isFinite(nativeDuration) &&
-    nativeDuration >= 0
-    ? nativeDuration
-    : undefined
+    const startedAt = Date.parse(previous.timestamp)
+    const finishedAt = Date.parse(turn.timestamp)
+    if (!Number.isFinite(startedAt) || !Number.isFinite(finishedAt) || finishedAt < startedAt) {
+      return turn
+    }
+
+    return { ...turn, meta: { ...turn.meta, durationMs: finishedAt - startedAt } }
+  })
 }

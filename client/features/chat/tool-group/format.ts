@@ -68,14 +68,14 @@ function getInputValue(input: Record<string, unknown>, key: string): string {
   return typeof value === 'string' ? value : ''
 }
 
-// Compact wall-clock duration: sub-second → "850ms", under a minute → "3.2s" /
-// "11s", longer → "1m 5s". Used on the subagent card's duration badge.
+// Compact wall-clock duration: sub-second → "850ms", under a minute → "3s",
+// longer → "1m 5s". Used on agent-run and subagent duration labels.
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${Math.round(ms)}ms`
-  const s = ms / 1000
-  if (s < 60) return `${s < 10 ? s.toFixed(1) : Math.round(s)}s`
+  const s = Math.round(ms / 1000)
+  if (s < 60) return `${s}s`
   const m = Math.floor(s / 60)
-  const rem = Math.round(s % 60)
+  const rem = s % 60
   return rem ? `${m}m ${rem}s` : `${m}m`
 }
 

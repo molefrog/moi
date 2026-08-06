@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { groupTurns, resolveAgentRunDuration } from '@/client/features/chat/group-turns'
+import { groupTurns } from '@/client/features/chat/group-turns'
 import type { Part, Turn } from '@/lib/types'
 
 const userTurn = (id: string, timestamp?: string): Turn => ({
@@ -31,7 +31,7 @@ describe('groupTurns', () => {
     expect(grouped[1].id).toBe('work')
     expect(grouped[1].parts.map(part => part.type)).toEqual(['reasoning', 'text'])
     expect(grouped[1].timestamp).toBe('2026-08-06T10:01:35.000Z')
-    expect(resolveAgentRunDuration(grouped[0], grouped[1])).toBe(95_000)
+    expect(grouped[1].meta?.durationMs).toBe(95_000)
   })
 
   test('hidden turns neither render nor split an assistant run', () => {
@@ -64,21 +64,20 @@ describe('groupTurns', () => {
   })
 })
 
-describe('resolveAgentRunDuration', () => {
+describe('agent run duration', () => {
   test('uses Codex native duration when transcript timestamps are absent', () => {
     const answer: Turn = {
       ...assistantTurn('answer', [{ type: 'text', text: 'Done' }]),
       meta: { durationMs: 12_000 }
     }
-    expect(resolveAgentRunDuration(userTurn('user'), answer)).toBe(12_000)
+    expect(groupTurns([userTurn('user'), answer])[1].meta?.durationMs).toBe(12_000)
   })
 
   test('returns undefined when no valid duration is available', () => {
-    expect(
-      resolveAgentRunDuration(
-        userTurn('user'),
-        assistantTurn('answer', [{ type: 'text', text: 'Done' }])
-      )
-    ).toBeUndefined()
+    const grouped = groupTurns([
+      userTurn('user'),
+      assistantTurn('answer', [{ type: 'text', text: 'Done' }])
+    ])
+    expect(grouped[1].meta?.durationMs).toBeUndefined()
   })
 })
