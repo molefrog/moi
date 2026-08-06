@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence } from 'motion/react'
 
 import {
   IconArticle,
@@ -15,9 +15,7 @@ import { IconGhost } from '@/client/components/shared/IconGhost'
 import { ChatPanel } from '@/client/features/chat/ChatPanel'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { CustomizePanel } from '@/client/features/workspace/CustomizePanel'
-import { AppletMount } from '@/client/features/applets/AppletMount'
 import { useAppletEvent } from '@/client/features/applets/applet-runtime'
-import { WidgetErrorBoundary } from '@/client/features/applets/WidgetErrorBoundary'
 import { Widgets } from '@/client/features/widgets/Widgets'
 import { PanelHeader } from '@/client/components/shared/PanelHeader'
 import { workspaceProviderIcon } from '@/client/features/home/workspace-presentation'
@@ -26,8 +24,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/
 import { WorkspaceSettings } from '@/client/features/settings/WorkspaceSettings'
 import { useAppletChatMessage } from '@/client/features/chat/useAppletChatMessage'
 import { useChat } from '@/client/features/chat/useChat'
-import { useView } from '@/client/features/applets/useApplet'
 import { ViewBuilderTab } from '@/client/features/views/ViewBuilderTab'
+import { ViewManager } from '@/client/features/views/ViewManager'
 import { useViewBuilderActions } from '@/client/features/views/useViewBuilderActions'
 import { useFitsSplitLayout } from '@/client/features/workspace/useFitsSplitLayout'
 import { useWorkspaceAvailability } from '@/client/features/workspace/api'
@@ -39,7 +37,6 @@ import {
   isSessionRunning,
   useLive
 } from '@/client/features/chat/chat-store'
-import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import {
   effectiveOpenTabs,
@@ -97,67 +94,6 @@ function SectionControls({ mode, onToggleMode }: SectionControlsProps) {
     >
       <IconLayoutSidebarRight stroke={1.75} />
     </Button>
-  )
-}
-
-type ViewAppProps = {
-  view: ViewInfo
-  // The view's addressable state, read from navigation state (focusTab /
-  // `moi tab focus`). `{}` on a fresh mount, a new browser tab, or a plain
-  // tab-bar click — the view must render sensibly with that.
-  params: Record<string, unknown>
-}
-
-// A view — an agent-defined app — mounted full-area. The bundle owns its own
-// layout + scroll, so we give it a plain filled box and fade it in (mirroring
-// WidgetShell, but full-area instead of a grid cell).
-function ViewApp({ view, params }: ViewAppProps) {
-  const workspaceId = useWorkspaceId()
-  const bundle = useView(view.id)
-
-  return (
-    <div className="relative min-h-0 flex-1 overflow-hidden">
-      <AnimatePresence mode="wait" initial={false}>
-        {bundle.status === 'ready' && (
-          <AppletMount
-            asChild
-            segment="views"
-            name={view.id}
-            version={bundle.version}
-            key={bundle.version}
-          >
-            <motion.div
-              className="absolute inset-0 overflow-auto"
-              initial={{ opacity: 0, filter: 'blur(4px)' }}
-              animate={{ opacity: 1, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, filter: 'blur(4px)' }}
-              transition={{ duration: 0.3, ease: 'easeInOut' }}
-            >
-              <WidgetErrorBoundary
-                name={view.id}
-                kind="view"
-                workspaceId={workspaceId}
-                resetKey={bundle.version}
-              >
-                <bundle.Component params={params} />
-              </WidgetErrorBoundary>
-            </motion.div>
-          </AppletMount>
-        )}
-        {bundle.status === 'error' && (
-          <motion.p
-            key={`err-${bundle.version}`}
-            className="absolute inset-0 p-4 text-xs text-destructive"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
-          >
-            {bundle.error}
-          </motion.p>
-        )}
-      </AnimatePresence>
-    </div>
   )
 }
 
@@ -670,9 +606,17 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
                 }}
                 onDiscard={() => discardBuilder(activeBuilder)}
               />
-            ) : activeView ? (
-              <ViewApp view={activeView} params={appletParams} />
             ) : null}
+
+            {/* Views are not part of the chain above: ViewManager keeps them
+                mounted across tab switches (and collapses to nothing while
+                another tab is on screen), which is what makes a switch back
+                instant. */}
+            <ViewManager
+              views={views}
+              activeViewId={activeView?.id ?? null}
+              params={appletParams}
+            />
           </div>
         )}
 
