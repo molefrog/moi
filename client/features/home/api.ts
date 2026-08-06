@@ -70,7 +70,6 @@ export type ImportWorkspaceInput = {
 export type WorkspaceSetupInfo = {
   root: string
   displayRoot: string
-  canChooseFolder: boolean
   // Per-backend runtime availability (are the Claude/Codex CLIs installed?),
   // keyed by workspace type. Missing entries mean available.
   availability?: Partial<Record<WorkspaceType, HarnessAvailability>>
@@ -84,15 +83,6 @@ export function useWorkspaceSetupInfo() {
     queryFn: () => requestJson('/api/workspaces/create'),
     staleTime: 30_000,
     refetchOnMount: 'always'
-  })
-}
-
-export type ChooseFolderResult = DiscoveredWorkspace | { canceled: true }
-
-export function useChooseFolder() {
-  return useMutation<ChooseFolderResult, Error, void>({
-    mutationFn: () =>
-      requestJson('/api/workspaces/choose-folder', { method: 'POST' }, 'Failed to choose folder')
   })
 }
 

@@ -36,7 +36,6 @@ import { getClientFrameLog, getWireLog } from './harness/debug'
 import { allHarnesses, harnessFor, isHarnessType } from './harness/registry'
 import { broadcast } from './state'
 import {
-  discoverWorkspace,
   discoverWorkspaces,
   getWorkspace,
   listWorkspaces,
@@ -933,14 +932,12 @@ async function harnessAvailability(): Promise<Record<string, HarnessAvailability
 }
 
 // Where `/workspace/create` places new folders — the client shows the resolved
-// location while the user types a name. `canChooseFolder` tells the UI whether
-// the native folder picker is available (macOS only for now). `availability`
-// lets the dialog disable backends whose runtime is missing.
+// location while the user types a name. `availability` lets the dialog disable
+// backends whose runtime is missing.
 workspaces.get('/create', async c =>
   c.json({
     root: CREATED_WORKSPACES_ROOT,
     displayRoot: tildify(CREATED_WORKSPACES_ROOT),
-    canChooseFolder: process.platform === 'darwin',
     availability: await harnessAvailability()
   })
 )
@@ -974,74 +971,6 @@ workspaces.post('/create', async c => {
   // Nudge every connected client (the sidebar list) to refetch.
   publishEvent({ type: 'workspaces-list:updated' })
   return c.json(entry, 201)
-})
-
-// Guards against opening a second native picker while one is already up — a
-// duplicate request (e.g. a quick re-click) resolves as canceled instead of
-// spawning a second Finder dialog on top of the first.
-let folderPickerOpen = false
-
-export function isSameOriginRequest(req: Request): boolean {
-  const site = req.headers.get('sec-fetch-site')
-  if (site === 'cross-site') return false
-  // Modern browsers state the relationship directly — trust it. Reaching the
-  // Origin fallback below with a full-origin comparison would 403 every request
-  // behind a TLS-terminating proxy (Cloudflare Tunnel, nginx, ngrok — see
-  // client/lib/ws-url.ts): the browser sends `https://…` while `req.url` is
-  // built from the plain-HTTP listener.
-  if (site === 'same-origin') return true
-  const origin = req.headers.get('origin')
-  if (!origin) return true
-  // Older browsers without sec-fetch-site: compare hosts only, since the
-  // scheme the browser saw is unknowable behind TLS termination.
-  try {
-    return new URL(origin).host === new URL(req.url).host
-  } catch {
-    return false
-  }
-}
-
-// Open the OS-native folder picker so the user can choose an existing folder to
-// import (the create dialog's "Use existing folder"). The server runs on the
-// user's machine, so it can drive the real system dialog — the browser can't.
-// Returns the same grouped provider discovery shape as `/discover`, or
-// `{ canceled: true }` if the dialog is dismissed. macOS only for now.
-workspaces.post('/choose-folder', async c => {
-  if (!isSameOriginRequest(c.req.raw)) return c.text('Forbidden', 403)
-  if (process.platform !== 'darwin') {
-    return c.text('Choosing a folder is only supported on macOS for now', 400)
-  }
-  if (folderPickerOpen) return c.json({ canceled: true })
-  folderPickerOpen = true
-  try {
-    // The picker is spawned by osascript, a background helper, so macOS won't
-    // give it focus by default. `tell me to activate` forces the script runner
-    // frontmost, and the short delay lets that settle before the panel opens so
-    // it appears focused rather than behind other windows.
-    const proc = Bun.spawn(
-      [
-        'osascript',
-        '-e',
-        'tell me to activate',
-        '-e',
-        'delay 0.2',
-        '-e',
-        'POSIX path of (choose folder with prompt "Select a project folder")'
-      ],
-      { stdout: 'pipe', stderr: 'pipe' }
-    )
-    const exitCode = await proc.exited
-    // osascript exits non-zero when the user presses Cancel.
-    if (exitCode !== 0) return c.json({ canceled: true })
-    const path = (await new Response(proc.stdout).text()).trim()
-    if (!path) return c.json({ canceled: true })
-    return c.json(await discoverWorkspace(path))
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    return c.text(`Could not open the folder picker: ${message}`, 500)
-  } finally {
-    folderPickerOpen = false
-  }
 })
 
 // `/:id` is registered after the static `/discover` so the literal path wins.
