@@ -86,7 +86,6 @@ export function composerAvailabilityTooltip(
   availability: ComposerAvailability
 ): string | undefined {
   if (availability.status === 'checking') return 'Checking agent status…'
-  if (availability.status === 'unavailable') return 'Agent unavailable'
   return undefined
 }
 

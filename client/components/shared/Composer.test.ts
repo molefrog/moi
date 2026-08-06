@@ -45,9 +45,9 @@ describe('canSubmitComposerAction', () => {
 })
 
 describe('composerAvailabilityTooltip', () => {
-  test('uses composer-owned copy for availability states', () => {
+  test('only shows while agent availability is checking', () => {
     expect(composerAvailabilityTooltip(checking)).toBe('Checking agent status…')
-    expect(composerAvailabilityTooltip(unavailable)).toBe('Agent unavailable')
+    expect(composerAvailabilityTooltip(unavailable)).toBeUndefined()
     expect(composerAvailabilityTooltip(available)).toBeUndefined()
   })
 })
