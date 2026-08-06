@@ -153,7 +153,7 @@ given. Claude Code is probed with `claude auth status` under the effective
 workspace env; `claude auth login` launches its browser sign-in from the composer. Codex
 uses app-server `account/read` and returns a browser OAuth URL through
 `account/login/start`. The composer polls while it is signed out and keeps each
-provider's terminal command visible as a fallback.
+provider's Sign in action available.
 
 ## What a harness adapter must support
 

@@ -8,38 +8,40 @@ import { WorkspaceSkillUpdateBanner } from './WorkspaceSkillUpdateBanner'
 import { useWorkspaceSkillUpdates } from './useWorkspaceSkillUpdates'
 
 type WorkspaceComposerState = {
-  composerBanner: ReactNode
+  composerBanner?: ReactNode
   composerAvailability: ComposerAvailability
 }
 
 export function useWorkspaceComposerState(workspaceId: string): WorkspaceComposerState {
-  const availabilityQuery = useWorkspaceAvailability(workspaceId)
-  const availability = availabilityQuery.error
-    ? {
-        available: false as const,
-        reason: `Could not check agent status: ${availabilityQuery.error.message}`
-      }
-    : availabilityQuery.data
+  const { data: availability, error } = useWorkspaceAvailability(workspaceId)
   const { bannerProps: skillUpdateBanner } = useWorkspaceSkillUpdates(workspaceId)
 
-  return {
-    composerAvailability:
-      availability === undefined
-        ? { status: 'checking' }
-        : availability.available
-          ? { status: 'available' }
-          : { status: 'unavailable', reason: availability.reason },
-    composerBanner:
-      availability?.available === false || skillUpdateBanner ? (
-        <>
-          {availability?.available === false && (
-            <WorkspaceAgentAvailabilityBanner
-              availability={availability}
-              onStartLogin={() => startWorkspaceLogin(workspaceId)}
-            />
-          )}
-          {skillUpdateBanner && <WorkspaceSkillUpdateBanner {...skillUpdateBanner} />}
-        </>
-      ) : undefined
+  let unavailable = availability?.available === false ? availability : undefined
+  if (error) {
+    unavailable = {
+      available: false,
+      reason: `Could not check agent status: ${error.message}`
+    }
   }
+
+  let composerAvailability: ComposerAvailability = { status: 'checking' }
+  if (unavailable) {
+    composerAvailability = { status: 'unavailable', reason: unavailable.reason }
+  } else if (availability) {
+    composerAvailability = { status: 'available' }
+  }
+
+  let composerBanner: ReactNode
+  if (unavailable) {
+    composerBanner = (
+      <WorkspaceAgentAvailabilityBanner
+        availability={unavailable}
+        onStartLogin={() => startWorkspaceLogin(workspaceId)}
+      />
+    )
+  } else if (skillUpdateBanner) {
+    composerBanner = <WorkspaceSkillUpdateBanner {...skillUpdateBanner} />
+  }
+
+  return { composerAvailability, composerBanner }
 }

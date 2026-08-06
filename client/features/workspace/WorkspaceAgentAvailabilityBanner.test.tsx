@@ -20,6 +20,5 @@ test.each([
   )
 
   expect(html).toContain(`${provider} is signed out`)
-  expect(html).toContain(loginCommand)
   expect(html).toContain('Sign in')
 })
