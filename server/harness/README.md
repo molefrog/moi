@@ -118,13 +118,16 @@ Known gaps: runs with `bypassPermissions` only (no interactive approval
 flow), and effort/streaming changes require a teardown-and-resume because the
 SDK has no live setter for them.
 
-**OpenClaw — shipped, experimental.** Chat over the local gateway's WebSocket
-JSON-RPC: sessions seeded cold from `sessions.get` then updated from live
-`session.message` frames, abort via `sessions.abort`, per-turn usage (tokens +
-cost) into `TurnMeta`, optimistic user-echo rendezvous (the gateway echoes
-sends with lag), uploads materialized to file paths. Known gaps: no
-token-delta streaming (durable message rows only — deliberate v2 cut), no
-model/effort selection, and the gateway is the sole source of truth (no local
+**OpenClaw — shipped.** Chat over the local gateway's WebSocket JSON-RPC
+(wire protocol 4 — the 2026.7.x and 2026.6.x lines; protocol-3 gateways are
+detected and surfaced, see `openclaw/compat.ts`): sessions seeded cold from
+`sessions.get` then updated from live `session.message` frames, token-delta
+previews from `chat` frames, live tool state + output from `session.tool`
+frames, model/effort applied per send via `sessions.patch`, abort via
+`sessions.abort`, per-turn usage (tokens + cost) into `TurnMeta`, user-echo
+rendezvous by `<runId>:user` idempotency key (text fallback), uploads
+materialized to file paths. Known gaps: no rich vision blocks (string-only
+`sessions.send`), and the gateway is the sole source of truth (no local
 persistence; cold restarts re-seed).
 
 **Codex — shipped, experimental.** Chat over `codex app-server` (stdio
@@ -234,10 +237,10 @@ Legend: ✅ supported · ⚠️ partial/workaround · ❌ missing.
 | Queue/steer mid-turn     | ⚠️ queued next turn                                 | ⚠️                        | ✅ `turn/steer` into live turn        |
 | Resume                   | ✅                                                  | ✅                        | ✅ + fork                             |
 | Interrupt                | ✅ `interrupt()`                                    | ✅                        | ✅ `turn/interrupt`                   |
-| List models              | ✅ `supportedModels()`                              | ❌                        | ✅ `model/list`                       |
-| Live model switch        | ✅ `setModel()`                                     | ❌                        | ✅ per-turn override                  |
-| Live effort switch       | ❌ rebuild                                          | ❌                        | ✅ per-turn                           |
-| Token deltas             | ✅ opt-in                                           | ❌ (v2)                   | ✅ `item/*/delta`                     |
+| List models              | ✅ `supportedModels()`                              | ✅ `models.list`          | ✅ `model/list`                       |
+| Live model switch        | ✅ `setModel()`                                     | ✅ `sessions.patch`       | ✅ per-turn override                  |
+| Live effort switch       | ❌ rebuild                                          | ✅ `thinkingLevel` patch  | ✅ per-turn                           |
+| Token deltas             | ✅ opt-in                                           | ✅ `chat` frames          | ✅ `item/*/delta`                     |
 | Images in input          | ✅ base64 blocks                                    | ⚠️ materialize to path    | ✅ data URL or path                   |
 | Interactive approvals    | ⚠️ (we bypass)                                      | ✅                        | ✅ server→client requests (we bypass) |
 | Session list/history API | ✅ `listSessions()` + jsonl                         | ✅ `sessions.get`         | ✅ `thread/list`/`read`               |

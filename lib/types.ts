@@ -256,6 +256,12 @@ export type SessionInfo = {
   summary: string
   lastModified: number
   cwd?: string
+  // Where the conversation originates when the backend routes external
+  // channels into it (OpenClaw: telegram/irc/discord/…; absent = app chat).
+  origin?: { provider: string; label?: string }
+  // Session flavor beyond a plain chat: scheduled cron runs and spawned
+  // subagent sessions get a badge in the chat selector.
+  flavor?: 'chat' | 'cron' | 'subagent'
 }
 
 // Per-session agent settings, persisted server-side in one global file in moi's

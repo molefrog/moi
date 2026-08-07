@@ -97,6 +97,11 @@ const OPENCLAW_TOOL_LABELS: Record<string, string> = {
   edit: 'Edit file',
   apply_patch: 'Edit',
   exec: 'Bash',
+  // 2026.7.2+ renamed the shell tool `bash` and split filesystem tools out.
+  bash: 'Bash',
+  ls: 'List files',
+  find: 'Find files',
+  grep: 'Search',
   process: 'Manage process',
   web_search: 'Web search',
   web_fetch: 'Fetch',
@@ -309,7 +314,14 @@ function formatOpenClawBrief(
     const firstLine = patch.split('\n').find(l => l.startsWith('*** ')) ?? patch.split('\n')[0]
     return shorten(firstLine ?? '')
   }
-  if (tool === 'exec') return shorten(`$ ${getInputValue(input, 'command')}`)
+  if (tool === 'exec' || tool === 'bash') {
+    // `command` on 2026.7.1 + the newer `bash` tool; the 2026.7.2 exec sandbox
+    // instead carries a `code` script (JS that shells out) — show whichever.
+    const command = getInputValue(input, 'command') || getInputValue(input, 'code')
+    return command ? shorten(`$ ${command}`) : ''
+  }
+  if (tool === 'ls' || tool === 'find' || tool === 'grep')
+    return shorten(getInputValue(input, 'path') || getInputValue(input, 'pattern'))
   if (tool === 'process') {
     const action = getInputValue(input, 'action')
     const name = getInputValue(input, 'name')

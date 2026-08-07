@@ -516,7 +516,11 @@ one.post('/sessions/:sessionId/archive', async c => {
     return c.body(null, 204)
   } catch (error) {
     console.error(`[api] archive chat failed for ${harness.id}`, error)
-    return c.text('Couldn’t archive chat', 500)
+    // Harnesses translate backend refusals into actionable one-liners (e.g.
+    // OpenClaw: main chat not archivable, gateway too old) — surface them.
+    const message =
+      error instanceof Error && error.message ? error.message : 'Couldn’t archive chat'
+    return c.text(message, 500)
   }
 })
 

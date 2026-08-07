@@ -6,15 +6,34 @@
 // endpoint) or sends a chat into it; thereafter it stays subscribed so the
 // view is up to date for reattach without re-fetching `sessions.get`.
 //
-// What this module does NOT do:
-//   - Token-delta streaming from `agent`/`chat` events (v2 — we use durable
-//     `session.message` rows only, per the design call).
-//   - Disk persistence — the gateway is the source of truth; we re-seed from
-//     `sessions.get` on cold start.
+// Live layers on top of the durable rows (all verified against gateways
+// 2026.7.1 and 2026.6.33 — same wire shapes on both):
+//   - `chat` frames (state delta/final/error, cumulative partial message) →
+//     StreamPreview broadcasts; cleared by the client when the durable turn
+//     lands carrying the matching `meta.apiMessageId`.
+//   - `session.tool` frames (phase start/update/result with full output) →
+//     tool cards flip pending→running→success/error mid-run;
+//     `reconcileAfterRun` remains the safety net for anything missed.
+//   - Disk persistence stays out — the gateway is the source of truth; we
+//     re-seed from `sessions.get` on cold start.
 import { appendAttachmentNote } from '@/lib/attachment-note'
-import { type MoiContext, appendMoiContext, renderMoiContext } from '@/lib/moi-context'
-import { applyEvent, emptyViewState } from '@/lib/format'
+import {
+  type MoiContext,
+  appendMoiContext,
+  renderMoiContext,
+  stripMoiContext
+} from '@/lib/moi-context'
+import {
+  type PreviewBlock,
+  type ToolCall,
+  type ToolState,
+  type Turn,
+  applyEvent,
+  emptyViewState
+} from '@/lib/format'
 import type { SessionActivity, StreamEvent, ViewState } from '@/lib/types'
+
+import { messageIdempotencyKey } from './compat'
 
 import {
   type OpenClawMessage,
@@ -25,10 +44,16 @@ import { renameSelectedSession } from '../../selected-session'
 import {
   type ToolResultInfo,
   findToolCallOwners,
+  flattenToolResultContent,
   messageToTurn,
   toolResultFromMessage
 } from './adapter'
-import { getGateway, onGatewayReconnected } from './gateway'
+import {
+  currentGatewayHandle,
+  getGateway,
+  onGatewayReconnected,
+  releaseSessionSubscriptionRef
+} from './gateway'
 import { broadcast } from '../../state'
 import { materializeToPath, resolveUploads } from '../../uploads'
 import {
@@ -57,14 +82,61 @@ type SessionRecord = {
   seeded: boolean
   pendingFrames: OpenClawMessage[]
   // Optimistic id rendezvous: when the client sends a message we push the
-  // optimistic id + text onto this FIFO. The next matching durable user-row
-  // consumes the head entry and is re-emitted with that id (preventing a
-  // duplicate bubble). A queue rather than a single slot so two rapid sends
-  // don't lose the first rendezvous when the gateway echo lags ~6s behind.
-  pendingUserEchoes: { optimisticId: string; text: string }[]
+  // optimistic id + text onto this FIFO. The durable user-row is matched by
+  // its idempotency key (`<runId>:user`, exact) when the send's runId is
+  // known, else by text. A queue rather than a single slot so two rapid sends
+  // don't lose the first rendezvous when the gateway echo lags behind.
+  pendingUserEchoes: { optimisticId: string; text: string; runId?: string }[]
+  // Whether the client asked for token previews on the latest send.
+  streamEnabled: boolean
+  // Which frame family owns the current run's streaming preview. The first of
+  // `chat` / `agent` to emit a delta claims the run so a gateway emitting both
+  // doesn't double-broadcast (see claimPreviewSource).
+  previewRunId?: string
+  previewSource?: 'chat' | 'agent'
+  // True once we've seen a `codex_app_server.*` frame on this session — the
+  // positive signal (only the codex backend emits it, and it precedes the
+  // run's tool frames) that gates live tool synthesis below. Native-loop
+  // providers (Anthropic, ollama, …) never set it, so they keep the plain
+  // durable-row rendering and never grow orphan live cards.
+  codexBackend?: boolean
+  // Live tool cards rendered from `agent/tool` frames before the durable owner
+  // row exists — ONLY on the codex-app-server backend, which batches durable
+  // rows at run end so tools would otherwise appear all at once after the text.
+  // Keyed by toolCallId → the tool name + input captured off the start frame;
+  // the matching durable row merges into the live turn by re-iding to
+  // `livetool:<toolCallId>` (see emitTurn). Populated only when `codexBackend`,
+  // so on other backends it stays empty and neither synthesis nor merge fires
+  // (their start/result/durable toolCallIds don't always correlate, which would
+  // strand the live card as a duplicate — and broadcast turns can't be retracted).
+  liveTools: Map<string, { name: string; input: unknown }>
+  // Last model/thinking applied via sessions.patch, in `provider/model` form —
+  // avoids a patch round-trip per send when nothing changed.
+  appliedModel?: string
+  appliedThinking?: string
+  // Model of the most recent assistant row seen (seed scan + live ingest). Lets
+  // ingest detect a mid-session model switch without re-scanning the whole
+  // messagesById map each frame; the model-change notice reads its `prev` here.
+  lastAssistantModel?: string
+  // Idle-eviction timer, armed when the session goes idle and cleared when it
+  // goes busy or is torn down. OpenClaw holds only WS listeners (no subprocess),
+  // so eviction just drops the record and releases the subscription.
+  idleTimer?: ReturnType<typeof setTimeout> | null
+  // In-flight reconcile, so the two run-end signals (sessions.changed + agent
+  // lifecycle) coalesce onto one transcript fetch instead of racing two.
+  reconcilePromise?: Promise<void>
 }
 
 const MAX_PENDING_USER_ECHOES = 16
+
+// OpenClaw sessions hold only WebSocket listeners — no subprocess, unlike Claude
+// Code — so eviction is cheap to redo and a looser TTL avoids churning the
+// cold-reopen re-seed. 10 minutes rather than Claude Code's 5.
+const IDLE_TTL_MS = 10 * 60_000
+// Soft cap on concurrently-held live records. Each is just a subscription +
+// in-memory view, so the cap is generous; the oldest idle record is evicted
+// when a new one would exceed it (a busy record is never evicted).
+const MAX_LIVE_SESSIONS = 32
 
 const sessions = new Map<string, SessionRecord>() // key: `${workspaceId}:${sessionId}`
 const openclawAgents = new Map<
@@ -139,6 +211,10 @@ function setProcessing(rec: SessionRecord, processing: boolean, runId: string | 
     sessionKey: rec.sessionKey,
     activeRunId: runId
   })
+  // Idle eviction must never fire mid-run: hold the timer off while busy, and
+  // (re)arm it whenever the session is idle.
+  if (processing) clearIdleTimer(rec)
+  else armIdleTimer(rec)
   if (existing?.processing === processing) return
   broadcast(rec.workspaceId, {
     type: 'status',
@@ -152,12 +228,95 @@ function setProcessing(rec: SessionRecord, processing: boolean, runId: string | 
   }
 }
 
-// On run end the gateway has flushed every durable row — including
-// `toolResult` messages, which the live `session.message` stream does NOT
-// emit (verified empirically). Pull a fresh transcript and merge any new
-// toolResult rows so our tool-call cards flip from `pending` to
+function clearIdleTimer(rec: SessionRecord): void {
+  if (rec.idleTimer) {
+    clearTimeout(rec.idleTimer)
+    rec.idleTimer = null
+  }
+}
+
+function armIdleTimer(rec: SessionRecord): void {
+  clearIdleTimer(rec)
+  rec.idleTimer = setTimeout(() => {
+    rec.idleTimer = null
+    // A run may have started after the timer was armed — re-check and never
+    // evict a busy session.
+    if (isOpenClawProcessing(rec.workspaceId, rec.sessionId)) return
+    teardownOpenClawSession(rec)
+  }, IDLE_TTL_MS)
+}
+
+// Drop a live session: stop consuming its frames, release the gateway
+// subscription, and forget it. Idempotent — a record already removed from the
+// map is a no-op. REST reads (`sessionEvents`/`ensureOpenClawSessionLive`) still
+// work afterward: `getOrCreateOpenClawSession` cold-reopens and re-seeds from
+// `sessions.get` (or synthesizes cron turns), so eviction only costs a re-seed.
+export function teardownOpenClawSession(rec: SessionRecord): void {
+  const k = recKey(rec.workspaceId, rec.sessionId)
+  if (sessions.get(k) !== rec) return
+  clearIdleTimer(rec)
+  rec.ingestUnsubscribe?.()
+  rec.ingestUnsubscribe = undefined
+  // Release the refcounted subscription. When connected, go through the handle
+  // (drops demand + issues the wire unsubscribe on the last holder); never force
+  // a connect from teardown. With no live handle (disconnected, or a test
+  // without a gateway) still drop the demand so a reconnect won't replay a dead
+  // key — the wire is already down.
+  const gw = currentGatewayHandle()
+  if (gw) {
+    void gw
+      .releaseSessionSubscription(rec.sessionKey)
+      .catch(err => console.error('[openclaw-session] releaseSessionSubscription failed', err))
+  } else {
+    releaseSessionSubscriptionRef(rec.sessionKey)
+  }
+  // Clear this workspace's trailing list-refresh timer only when no other live
+  // session remains for it — otherwise a sibling still needs it.
+  const workspaceHasOtherLive = [...sessions.values()].some(
+    r => r !== rec && r.workspaceId === rec.workspaceId
+  )
+  if (!workspaceHasOtherLive) {
+    const entry = lastListRefresh.get(rec.workspaceId)
+    if (entry?.trailing) clearTimeout(entry.trailing)
+    lastListRefresh.delete(rec.workspaceId)
+  }
+  const wasProcessing = isOpenClawProcessing(rec.workspaceId, rec.sessionId)
+  sessions.delete(k)
+  openclawAgents.delete(k)
+  // If it was mid-run, mirror setProcessing(rec, false, null)'s client-visible
+  // effect so no spinner is left hanging.
+  if (wasProcessing) {
+    broadcast(rec.workspaceId, { type: 'status', sessionId: rec.sessionId, activity: 'idle' })
+  }
+}
+
+// Server shutdown: tear down every live record so no session keeps consuming
+// frames. We deliberately do NOT stop the shared gateway client — process exit
+// drops it, and discovery may still need it during the same run. A cold reopen
+// re-seeds from `sessions.get`.
+export function killAllOpenClawSessions(): void {
+  for (const rec of [...sessions.values()]) teardownOpenClawSession(rec)
+}
+
+// Safety net for `toolResult` rows the live stream missed. `toolResult`
+// messages DO stream on `session.message` (and `session.tool` carries the same
+// output inline — NOTES §6), so this is not the only path; it covers gaps from
+// a disconnect, a dropped frame, or a start/result race. On run end the gateway
+// has flushed every durable row, so pulling a fresh transcript and merging any
+// new toolResult rows flips lingering tool-call cards from `pending` to
 // `success`/`error` with output. Idempotent.
-async function reconcileAfterRun(rec: SessionRecord): Promise<void> {
+function reconcileAfterRun(rec: SessionRecord): Promise<void> {
+  // Both sessions.changed and agent lifecycle can end a run; coalesce onto one
+  // in-flight transcript fetch rather than racing two.
+  if (rec.reconcilePromise) return rec.reconcilePromise
+  const p = reconcileAfterRunImpl(rec).finally(() => {
+    if (rec.reconcilePromise === p) rec.reconcilePromise = undefined
+  })
+  rec.reconcilePromise = p
+  return p
+}
+
+async function reconcileAfterRunImpl(rec: SessionRecord): Promise<void> {
   const detail = await getOpenClawSessionMessages(rec.sessionId, rec.workspacePath, rec.agentId)
   if (!detail?.messages) return
   const owners = new Set<OpenClawMessage>()
@@ -167,6 +326,10 @@ async function reconcileAfterRun(rec: SessionRecord): Promise<void> {
       const existing = rec.results.get(result.id)
       if (
         !existing ||
+        // A live `session.tool` start whose result frame was lost (disconnect)
+        // must be finalized even when the durable output is identical-empty —
+        // otherwise the card spins forever.
+        existing.running ||
         existing.output !== result.info.output ||
         existing.isError !== result.info.isError
       ) {
@@ -199,48 +362,368 @@ async function reconcileAfterRun(rec: SessionRecord): Promise<void> {
 function rebuildView(rec: SessionRecord): void {
   let view: ViewState = emptyViewState()
   let i = 0
+  // Mirror the cold path (adapter.toStreamEvents): reconstruct model-change
+  // notices from the durable rows so a seeded live view replays the same
+  // notices the static transcript would show. Same ids as the live emitter,
+  // so a notice seen live upserts instead of duplicating.
+  let prevModel: string | undefined
   for (const msg of rec.messagesById.values()) {
+    if (msg.role === 'assistant') {
+      const model = (msg as { model?: unknown }).model
+      if (typeof model === 'string') {
+        if (prevModel !== undefined && prevModel !== model) {
+          view = applyEvent(view, {
+            kind: 'notice',
+            notice: {
+              id: `openclaw:model-change:${msg.__openclaw?.id ?? i}`,
+              kind: 'model-change',
+              at:
+                typeof msg.timestamp === 'number'
+                  ? new Date(msg.timestamp).toISOString()
+                  : new Date().toISOString(),
+              model,
+              prev: prevModel
+            }
+          })
+        }
+        prevModel = model
+      }
+    }
     const turn = messageToTurn(msg, rec.sessionKey, i++, rec.results)
     if (turn) view = applyEvent(view, { kind: 'turn', turn })
   }
+  // Compaction notices have no durable twin in `sessions.get` — they exist
+  // only while a live record witnesses the compact frame (known gap; the
+  // gateway's `sessions.compaction.list` could backfill them).
   rec.view = view
+  // Seed the model cache so live ingest can detect the next switch off the last
+  // assistant model without re-scanning the transcript.
+  rec.lastAssistantModel = prevModel
+}
+
+// The preview slot for a run. Doubles as `meta.apiMessageId` on the run's
+// committed assistant turns so the client's native preview reconciliation
+// clears the live text the instant the durable turn lands.
+function previewMessageId(sessionKey: string, runId: string): string {
+  return `openclaw:${sessionKey}:${runId}`
+}
+
+// Compare the optimistic send text against the durable user-row text
+// tolerantly: drop any moi-context envelope (defensive — the optimistic side
+// shouldn't carry it) and collapse all whitespace runs so newline/trim drift
+// between what we sent and what the gateway stored can't defeat the match.
+export function normalizeEchoText(text: string | undefined): string {
+  if (typeof text !== 'string') return ''
+  return stripMoiContext(text).replace(/\s+/g, ' ').trim()
 }
 
 function emitTurn(rec: SessionRecord, msg: OpenClawMessage, idx: number): void {
   const turn = messageToTurn(msg, rec.sessionKey, idx, rec.results)
   if (!turn) return
-  // Optimistic-id rendezvous: if this is the first user-text turn that
-  // matches what the client just sent, re-id it to the optimistic id so the
-  // optimistic bubble upserts in place instead of duplicating.
+  // Optimistic-id rendezvous: prefer the exact idempotency-key match
+  // (`<runId>:user`; nested under `__openclaw` on 2026.7.x, message-level on
+  // 2026.6.x), fall back to first-matching-text for old rows and unknown
+  // runIds. Re-id to the optimistic id so the optimistic bubble upserts in
+  // place instead of duplicating.
   if (rec.pendingUserEchoes.length > 0 && turn.role === 'user') {
-    const text = turn.parts.find(p => p.type === 'text')?.text?.trim()
-    if (text !== undefined) {
-      const idx = rec.pendingUserEchoes.findIndex(e => e.text.trim() === text)
-      if (idx >= 0) {
-        turn.id = rec.pendingUserEchoes[idx].optimisticId
-        rec.pendingUserEchoes.splice(idx, 1)
-      }
+    const idem = messageIdempotencyKey(msg)
+    // 1. Exact idempotency-key match (`<runId>:user`) when the send's runId is
+    //    already known. 2. Same key with the runId extracted from the durable
+    //    row itself, covering the race where the echo lands before the
+    //    `sessions.send` response set `echo.runId`. 3. Normalized-text match
+    //    as the version-agnostic fallback: strip the moi-context envelope from
+    //    both sides (the durable row is already stripped for display; the
+    //    optimistic text never carries it) and collapse whitespace, so a
+    //    trailing newline or metadata difference can't split the bubble.
+    const idemRunId = idem?.endsWith(':user') ? idem.slice(0, -':user'.length) : undefined
+    let at = idem
+      ? rec.pendingUserEchoes.findIndex(
+          e => (e.runId && `${e.runId}:user` === idem) || (idemRunId && e.runId === idemRunId)
+        )
+      : -1
+    if (at < 0) {
+      const text = normalizeEchoText(turn.parts.find(p => p.type === 'text')?.text)
+      if (text) at = rec.pendingUserEchoes.findIndex(e => normalizeEchoText(e.text) === text)
+    }
+    if (at >= 0) {
+      turn.id = rec.pendingUserEchoes[at].optimisticId
+      rec.pendingUserEchoes.splice(at, 1)
+    }
+  }
+  // Live-tool rendezvous: a durable assistant row carrying a toolCall we
+  // already rendered as a live tool turn re-ids to that live turn so the card
+  // upserts in place (the codex-app-server backend delivers the durable owner
+  // only in the run-end batch, after the live card is already on screen).
+  if (turn.role === 'assistant' && rec.liveTools.size > 0) {
+    const toolPart = turn.parts.find(p => p.type === 'tool-call')
+    const toolCallId = toolPart?.type === 'tool-call' ? toolPart.call.toolCallId : undefined
+    // Keep the mapping (don't delete): the run-end reconcile re-emits the same
+    // durable row, and it must re-id to the SAME live turn every time or it
+    // lands as a second card.
+    if (toolCallId && rec.liveTools.has(toolCallId)) {
+      turn.id = liveToolTurnId(rec.sessionKey, toolCallId)
+    }
+  }
+  // Stamp the run's preview slot id so the client clears the streaming
+  // preview when this turn upserts (chat deltas can trail the durable row).
+  // Only FRESH turns get the current run's slot — a re-emitted older turn
+  // (tool-result fold-in, reconcile) keeps whatever it was stamped with, so
+  // it can never clear a newer run's live preview.
+  if (turn.role === 'assistant') {
+    const prior = rec.view.turns.find(t => t.id === turn.id)
+    if (prior) {
+      const kept = prior.meta?.apiMessageId
+      if (kept) turn.meta = { ...turn.meta, apiMessageId: kept }
+    } else if (rec.activeRunId) {
+      turn.meta = { ...turn.meta, apiMessageId: previewMessageId(rec.sessionKey, rec.activeRunId) }
     }
   }
   rec.view = applyEvent(rec.view, { kind: 'turn', turn })
   broadcast(rec.workspaceId, { kind: 'turn', turn, sessionId: rec.sessionId })
 }
 
-function ingest(rec: SessionRecord, msg: OpenClawMessage): void {
+// Re-emit every assistant turn that references `toolCallId` so its tool card
+// reflects the latest entry in `rec.results`.
+function reemitToolCallOwners(rec: SessionRecord, toolCallId: string): void {
+  const owners = findToolCallOwners(rec.messagesById.values(), toolCallId)
+  const ownerSet = new Set(owners)
+  let idx = 0
+  for (const m of rec.messagesById.values()) {
+    if (ownerSet.has(m)) emitTurn(rec, m, idx)
+    idx++
+  }
+}
+
+// `chat` delta frames carry the full in-progress assistant message; map its
+// content blocks onto cumulative PreviewBlocks (text + thinking only — tool
+// calls surface through `session.tool`, not the preview). Exported for tests.
+export function chatPreviewBlocks(content: unknown): PreviewBlock[] {
+  if (typeof content === 'string') {
+    return content ? [{ index: 0, kind: 'text', text: content }] : []
+  }
+  if (!Array.isArray(content)) return []
+  const blocks: PreviewBlock[] = []
+  content.forEach((block, index) => {
+    if (!block || typeof block !== 'object') return
+    const b = block as { type?: unknown; text?: unknown; thinking?: unknown; reasoning?: unknown }
+    if (b.type === 'text' && typeof b.text === 'string' && b.text) {
+      blocks.push({ index, kind: 'text', text: b.text })
+    } else if (b.type === 'thinking' || b.type === 'reasoning') {
+      // Same field drift as the durable path (adapter.blockToPart): the text
+      // lives in `thinking`, `reasoning`, or `text` depending on the line.
+      const text =
+        (typeof b.thinking === 'string' && b.thinking) ||
+        (typeof b.reasoning === 'string' && b.reasoning) ||
+        (typeof b.text === 'string' && b.text) ||
+        ''
+      if (text) blocks.push({ index, kind: 'reasoning', text })
+    }
+  })
+  return blocks
+}
+
+// Two frame families carry the streaming assistant text, and which one a
+// gateway emits has drifted: 2026.7.x sends `chat` state=delta frames, while
+// other lines stream via `agent` stream=assistant frames (cumulative `text`).
+// The first source to produce a delta for a run wins it, so a gateway that
+// emits both doesn't double-broadcast (which would flicker as the two
+// cumulative snapshots race), and a gateway that emits only `agent` frames
+// still streams instead of dumping the whole reply at run end.
+type PreviewSource = 'chat' | 'agent'
+// Exported for tests: only reads/writes the two preview-source fields.
+export function claimPreviewSource(
+  rec: Pick<SessionRecord, 'previewRunId' | 'previewSource'>,
+  runId: string,
+  source: PreviewSource
+): boolean {
+  if (rec.previewRunId !== runId) {
+    rec.previewRunId = runId
+    rec.previewSource = source
+    return true
+  }
+  return rec.previewSource === source
+}
+
+function broadcastPreview(rec: SessionRecord, messageId: string, blocks: PreviewBlock[]): void {
+  broadcast(rec.workspaceId, {
+    type: 'preview',
+    sessionId: rec.sessionId,
+    messageId,
+    parentToolUseId: null,
+    blocks
+  })
+}
+
+// `agent` stream=assistant / reasoning frames carry the cumulative in-progress
+// text in `data.text` — the fallback streaming source for gateways that don't
+// emit `chat` delta frames.
+function handleAgentStreamFrame(rec: SessionRecord, payload: Record<string, unknown>): void {
+  if (!rec.streamEnabled) return
+  const stream = payload.stream
+  const kind: PreviewBlock['kind'] | null =
+    stream === 'assistant' ? 'text' : stream === 'reasoning' ? 'reasoning' : null
+  if (!kind) return
+  const runId = typeof payload.runId === 'string' ? payload.runId : rec.activeRunId
+  if (!runId) return
+  const data = payload.data as { text?: unknown } | undefined
+  const text = typeof data?.text === 'string' ? data.text : ''
+  if (!text) return
+  if (!claimPreviewSource(rec, runId, 'agent')) return
+  broadcastPreview(rec, previewMessageId(rec.sessionKey, runId), [{ index: 0, kind, text }])
+}
+
+function handleChatFrame(rec: SessionRecord, payload: Record<string, unknown>): void {
+  if (!rec.streamEnabled) return
+  const runId = typeof payload.runId === 'string' ? payload.runId : rec.activeRunId
+  if (!runId) return
+  const messageId = previewMessageId(rec.sessionKey, runId)
+  const state = payload.state
+  if (state === 'delta') {
+    const message = payload.message as { content?: unknown } | undefined
+    const blocks = chatPreviewBlocks(message?.content)
+    if (blocks.length === 0) return
+    if (!claimPreviewSource(rec, runId, 'chat')) return
+    broadcastPreview(rec, messageId, blocks)
+  } else if (state === 'final' || state === 'error' || state === 'aborted') {
+    // Belt-and-braces clear: the durable turn's apiMessageId already clears
+    // the slot, but a trailing delta after the durable row would repaint it.
+    // 'aborted' arrives when a steer/abort interrupts the run mid-stream —
+    // without the clear the dead preview would linger (verified live).
+    broadcastPreview(rec, messageId, [])
+  }
+}
+
+// The id of the run-scoped live tool turn for a toolCallId. The durable owner
+// row re-ids to this so the live card upserts in place instead of duplicating.
+function liveToolTurnId(sessionKey: string, toolCallId: string): string {
+  return `openclaw:${sessionKey}:livetool:${toolCallId}`
+}
+
+// Build (and broadcast) a synthetic assistant turn holding a single tool card,
+// from the live tool state in `rec.liveTools` + `rec.results`. Used when a
+// tool executes before its durable owner row exists.
+function emitLiveToolTurn(rec: SessionRecord, toolCallId: string): void {
+  const meta = rec.liveTools.get(toolCallId)
+  if (!meta) return
+  const result = rec.results.get(toolCallId)
+  let state: ToolState = 'pending'
+  if (result) state = result.running ? 'running' : result.isError ? 'error' : 'success'
+  const call: ToolCall = {
+    toolCallId,
+    name: meta.name,
+    caller: 'model',
+    provider: 'openclaw',
+    state,
+    input: meta.input
+  }
+  if (result && !result.running) {
+    if (result.isError) call.errorText = result.output
+    else call.output = result.output
+  }
+  const turn: Turn = {
+    id: liveToolTurnId(rec.sessionKey, toolCallId),
+    role: 'assistant',
+    origin: { kind: 'user-input' },
+    parts: [{ type: 'tool-call', call }]
+  }
+  rec.view = applyEvent(rec.view, { kind: 'turn', turn })
+  broadcast(rec.workspaceId, { kind: 'turn', turn, sessionId: rec.sessionId })
+}
+
+// `session.tool` and `agent`/tool frames flip tool cards live: start/update →
+// running, result → success/error with output. When the durable owner row
+// already exists we re-emit it; otherwise (codex-app-server batches durable
+// rows at run end) we render a live tool turn so tools appear during the run,
+// before the streaming text — not all at once after it. `reconcileAfterRun`
+// stays as the safety net. Exported for tests.
+export function handleToolFrame(rec: SessionRecord, payload: Record<string, unknown>): void {
+  const data = payload.data as
+    | {
+        phase?: unknown
+        name?: unknown
+        toolCallId?: unknown
+        isError?: unknown
+        result?: unknown
+        args?: unknown
+      }
+    | undefined
+  if (!data || typeof data.toolCallId !== 'string') return
+  const id = data.toolCallId
+  const name = typeof data.name === 'string' ? data.name : undefined
+  const toolName = name ? { toolName: name } : {}
+  if (data.phase === 'start' || data.phase === 'update') {
+    // Only the codex backend needs synthetic live cards (see SessionRecord
+    // `liveTools`). Gating the map population here gates both the synthesis
+    // below and the durable-row merge in emitTurn.
+    if (rec.codexBackend && name && !rec.liveTools.has(id)) {
+      rec.liveTools.set(id, { name, input: data.args })
+    }
+    const existing = rec.results.get(id)
+    if (existing && !existing.running) return // final result already landed
+    rec.results.set(id, { output: '', isError: false, running: true, ...toolName })
+  } else if (data.phase === 'result') {
+    const result = data.result as { content?: unknown } | undefined
+    rec.results.set(id, {
+      output: flattenToolResultContent((result?.content ?? '') as OpenClawMessage['content']),
+      isError: data.isError === true,
+      ...toolName
+    })
+  } else {
+    return
+  }
+  const owners = findToolCallOwners(rec.messagesById.values(), id)
+  if (owners.length > 0) reemitToolCallOwners(rec, id)
+  else if (rec.liveTools.has(id)) emitLiveToolTurn(rec, id)
+}
+
+// Debounced workspace session-list refresh — `sessions.changed` fires for
+// every session under the agent (cron spawns, subagents, patches), and
+// several records can hold subscriptions for the same workspace. `send` is in
+// the set because 2026.6.x never emits `chat.title` — the post-send refresh
+// is what keeps titles/previews fresh there. A trailing flush covers bursts
+// (create immediately followed by the title patch) that a leading-edge-only
+// throttle would drop.
+const lastListRefresh = new Map<string, { at: number; trailing?: ReturnType<typeof setTimeout> }>()
+const LIST_REFRESH_MIN_MS = 400
+const LIST_REFRESH_REASONS = new Set([
+  'chat.title',
+  'create',
+  'delete',
+  'patch',
+  'label',
+  'compact',
+  'send',
+  'steer',
+  'subagent-status'
+])
+function broadcastSessionsChanged(rec: SessionRecord): void {
+  const now = Date.now()
+  const entry = lastListRefresh.get(rec.workspaceId)
+  if (entry && now - entry.at < LIST_REFRESH_MIN_MS) {
+    if (!entry.trailing) {
+      entry.trailing = setTimeout(
+        () => {
+          lastListRefresh.set(rec.workspaceId, { at: Date.now() })
+          broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+        },
+        LIST_REFRESH_MIN_MS - (now - entry.at)
+      )
+    }
+    return
+  }
+  if (entry?.trailing) clearTimeout(entry.trailing)
+  lastListRefresh.set(rec.workspaceId, { at: now })
+  broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+}
+
+// Exported for tests (the live subscription is the only production caller).
+export function ingest(rec: SessionRecord, msg: OpenClawMessage): void {
   // toolResult: update the results map and re-emit each owner turn so the
   // tool-call card gets `state: 'success'/'error'` + output folded in.
   const result = toolResultFromMessage(msg)
   if (result) {
     rec.results.set(result.id, result.info)
-    const owners = findToolCallOwners(rec.messagesById.values(), result.id)
-    const i = 0
-    const ownerSet = new Set(owners)
-    let idx = 0
-    for (const m of rec.messagesById.values()) {
-      if (ownerSet.has(m)) emitTurn(rec, m, idx)
-      idx++
-    }
-    void i
+    reemitToolCallOwners(rec, result.id)
     return
   }
 
@@ -249,7 +732,37 @@ function ingest(rec: SessionRecord, msg: OpenClawMessage): void {
   // `__openclaw.id`. The durable row arrives ~6s later with id + envelope.
   const id = msg.__openclaw?.id
   if (typeof id !== 'string') return
-  const wasUpdate = rec.messagesById.has(id)
+  // A durable assistant row on a different model than the previous one marks
+  // a mid-session model switch (sessions.patch here or anywhere else) —
+  // surface it as a notice instead of letting it pass silently.
+  if (msg.role === 'assistant') {
+    const model = (msg as { model?: unknown }).model
+    if (typeof model === 'string') {
+      // Compare against the cached last assistant model instead of re-scanning
+      // the whole messagesById map each frame. Same notice id (`__openclaw.id`)
+      // as the cold rebuildView path, so live and cold agree on upsert.
+      const prev = rec.lastAssistantModel
+      if (prev !== undefined && prev !== model) {
+        const notice = {
+          id: `openclaw:model-change:${id}`,
+          kind: 'model-change' as const,
+          // The switching turn's own timestamp, so live and cold placement
+          // agree (the client sorts equal-time notices before the turn).
+          at:
+            typeof msg.timestamp === 'number'
+              ? new Date(msg.timestamp).toISOString()
+              : new Date().toISOString(),
+          model,
+          prev
+        }
+        // Fold into the view too — the REST events replay must agree with
+        // the WS frames the client already saw.
+        rec.view = applyEvent(rec.view, { kind: 'notice', notice })
+        broadcast(rec.workspaceId, { kind: 'notice', sessionId: rec.sessionId, notice })
+      }
+      rec.lastAssistantModel = model
+    }
+  }
   rec.messagesById.set(id, msg)
   // Compute idx as insertion order — for an update use the existing position,
   // for a new message it's the last slot.
@@ -258,7 +771,6 @@ function ingest(rec: SessionRecord, msg: OpenClawMessage): void {
     if (k === id) break
     idx++
   }
-  void wasUpdate
   emitTurn(rec, msg, idx)
 }
 
@@ -311,12 +823,37 @@ async function ensureSubscribed(rec: SessionRecord): Promise<void> {
         return
       }
       ingest(rec, message)
-    } else if (event === 'sessions.changed') {
+    } else if (event === 'chat') {
       if (payload.sessionKey !== rec.sessionKey) return
-      if (payload.reason === 'chat.title') {
-        broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
-        return
+      handleChatFrame(rec, payload)
+    } else if (event === 'session.tool') {
+      if (payload.sessionKey !== rec.sessionKey) return
+      handleToolFrame(rec, payload)
+    } else if (event === 'sessions.changed') {
+      // List refreshes apply to ANY session of the workspace's agent — cron
+      // spawns, subagents, titles, patches. (2026.6.x never emits
+      // `chat.title`; the other reasons cover title refreshes there.)
+      const reason = typeof payload.reason === 'string' ? payload.reason : undefined
+      if (reason && LIST_REFRESH_REASONS.has(reason)) broadcastSessionsChanged(rec)
+      if (payload.sessionKey !== rec.sessionKey) return
+      if (reason === 'compact') {
+        const notice = {
+          id: `openclaw:compact:${typeof payload.ts === 'number' ? payload.ts : Date.now()}`,
+          kind: 'compact' as const,
+          at: new Date().toISOString()
+        }
+        rec.view = applyEvent(rec.view, { kind: 'notice', notice })
+        broadcast(rec.workspaceId, { kind: 'notice', sessionId: rec.sessionId, notice })
       }
+      // Frames embed the fresh session row — keep the applied-model cache
+      // truthful even when the session is patched outside moi.
+      const row = payload.session as
+        | { model?: unknown; modelProvider?: unknown; thinkingLevel?: unknown }
+        | undefined
+      if (row && typeof row.model === 'string' && typeof row.modelProvider === 'string') {
+        rec.appliedModel = `${row.modelProvider}/${row.model}`
+      }
+      if (row && typeof row.thinkingLevel === 'string') rec.appliedThinking = row.thinkingLevel
       const phase = payload.phase as string | undefined
       const runId = payload.runId as string | undefined
       if (phase === 'start' && runId) {
@@ -324,17 +861,41 @@ async function ensureSubscribed(rec: SessionRecord): Promise<void> {
       } else if ((phase === 'end' || phase === 'error') && runId) {
         if (rec.activeRunId === runId) {
           setProcessing(rec, false, null)
-          // Pick up any toolResult rows the live stream did not push.
+          // Safety net: pick up any toolResult rows the live stream missed.
           reconcileAfterRun(rec).catch(err =>
             console.error('[openclaw-session] reconcile failed', err)
           )
         }
       }
     } else if (event === 'agent') {
-      // Backstop for run lifecycle — `sessions.changed` should already cover
-      // this, but `agent` lifecycle frames are the authoritative signal.
       if (payload.sessionKey !== rec.sessionKey) return
       const stream = payload.stream as string | undefined
+      // `codex*` frames (`codex_app_server.lifecycle|item|hook|usage`, and any
+      // future `codex.*` rename) are emitted only by the codex backend and
+      // precede its tool frames within a run — the positive signal that live
+      // tool synthesis is warranted for this session (see handleToolFrame). No
+      // native stream name starts with `codex`, so this never false-positives.
+      if (typeof stream === 'string' && stream.startsWith('codex')) {
+        rec.codexBackend = true
+        return
+      }
+      // Streaming text/reasoning fallback for gateways that don't emit `chat`
+      // delta frames (handleAgentStreamFrame no-ops when `chat` already owns
+      // the run's preview).
+      if (stream === 'assistant' || stream === 'reasoning') {
+        handleAgentStreamFrame(rec, payload)
+        return
+      }
+      // The codex-app-server backend (OpenAI models on newer OpenClaw) streams
+      // tool activity as `agent`/tool frames instead of `session.tool`; same
+      // `data` shape, so route it through the shared handler. Synthesis of live
+      // cards is gated on `codexBackend` inside the handler.
+      if (stream === 'tool') {
+        handleToolFrame(rec, payload)
+        return
+      }
+      // Backstop for run lifecycle — `sessions.changed` should already cover
+      // this, but `agent` lifecycle frames are the authoritative signal.
       if (stream !== 'lifecycle') return
       const runId = payload.runId as string | undefined
       const data = payload.data as { phase?: string } | undefined
@@ -375,6 +936,7 @@ export async function getOrCreateOpenClawSession(input: {
   const sessionKey = resolved?.key
   if (!sessionKey) throw new Error(`unable to resolve session ${input.sessionId}`)
 
+  evictIdleIfNeeded()
   rec = {
     ...input,
     sessionKey,
@@ -383,13 +945,31 @@ export async function getOrCreateOpenClawSession(input: {
     view: emptyViewState(),
     activeRunId: null,
     seeded: false,
+    // Default to whole-block delivery like the other harnesses: a cold-opened
+    // (REST-ensured) live session must not broadcast previews until a send opts
+    // in (send sets `streamEnabled = input.stream === true`).
+    streamEnabled: false,
     pendingFrames: [],
-    pendingUserEchoes: []
+    pendingUserEchoes: [],
+    liveTools: new Map()
   }
   sessions.set(k, rec)
   await ensureSubscribed(rec)
   await seed(rec)
   return rec
+}
+
+// Evict one idle record to stay under the soft cap. A processing session is
+// never evicted; if every record is busy we allow a temporary overflow rather
+// than tearing down a live run.
+function evictIdleIfNeeded(): void {
+  if (sessions.size < MAX_LIVE_SESSIONS) return
+  for (const rec of sessions.values()) {
+    if (!isOpenClawProcessing(rec.workspaceId, rec.sessionId)) {
+      teardownOpenClawSession(rec)
+      return
+    }
+  }
 }
 
 // Cold-load helper for the REST events endpoint. If we already have a live
@@ -420,6 +1000,12 @@ export async function sendOpenClawMessage(input: {
   // (see dev/file-uploads.md).
   attachments?: string[]
   optimisticId?: string
+  // Picker selections, applied to the gateway session via `sessions.patch`
+  // before the send (see applySessionSettings).
+  model?: string
+  effort?: string
+  // Client's live-typing toggle; previews are only broadcast when on.
+  stream?: boolean
   // Structured moi context (lib/moi-context.ts), rendered and appended at
   // the gateway send only — `content` stays clean so the optimistic-id echo
   // rendezvous keeps matching on the user's text.
@@ -444,6 +1030,44 @@ export async function sendOpenClawMessage(input: {
   return sendOpenClawMessageImpl({ ...input, content })
 }
 
+// Apply the picker's model/effort onto the gateway session before the send.
+// `sessions.patch {model, thinkingLevel}` exists on both supported lines
+// (verified live on 2026.7.1 and 2026.6.33); values come from `models.list`
+// ids and the thinking-level menu, so a rejection means the gateway's
+// allowlist disagrees — surfaced to the chat, not swallowed.
+async function applySessionSettings(
+  rec: SessionRecord,
+  model: string | undefined,
+  effort: string | undefined
+): Promise<void> {
+  const patch: Record<string, unknown> = {}
+  if (model && model !== rec.appliedModel) patch.model = model
+  if (effort && effort !== rec.appliedThinking) patch.thinkingLevel = effort
+  if (Object.keys(patch).length === 0) return
+  const gw = await getGateway()
+  try {
+    await gw.rpc('sessions.patch', { key: rec.sessionKey, ...patch })
+  } catch (err) {
+    // The effort menu is a static superset (compat.ts) — a gateway/model can
+    // reject a level. Degrade to the model-only patch instead of blocking the
+    // send; a rejected MODEL still throws (running on the wrong model is
+    // worse than not sending).
+    if (typeof patch.thinkingLevel === 'string' && typeof patch.model === 'string') {
+      console.warn('[openclaw-session] thinkingLevel patch rejected, retrying model-only', err)
+      await gw.rpc('sessions.patch', { key: rec.sessionKey, model: patch.model })
+      rec.appliedModel = patch.model
+      return
+    }
+    if (typeof patch.thinkingLevel === 'string' && !patch.model) {
+      console.warn('[openclaw-session] thinkingLevel patch rejected, sending anyway', err)
+      return
+    }
+    throw err
+  }
+  if (typeof patch.model === 'string') rec.appliedModel = patch.model
+  if (typeof patch.thinkingLevel === 'string') rec.appliedThinking = patch.thinkingLevel
+}
+
 async function sendOpenClawMessageImpl(input: {
   workspaceId: string
   workspacePath: string
@@ -452,6 +1076,9 @@ async function sendOpenClawMessageImpl(input: {
   isNew: boolean
   content: string
   optimisticId?: string
+  model?: string
+  effort?: string
+  stream?: boolean
   context?: MoiContext
 }): Promise<void> {
   // New threads: ask the gateway to create one, then rename the client's
@@ -503,11 +1130,14 @@ async function sendOpenClawMessageImpl(input: {
     throw err
   }
 
-  if (input.optimisticId) {
-    rec.pendingUserEchoes.push({
-      optimisticId: input.optimisticId,
-      text: input.content
-    })
+  // Omitted means whole-block delivery, same as the other harnesses.
+  rec.streamEnabled = input.stream === true
+
+  const echo: { optimisticId: string; text: string; runId?: string } | null = input.optimisticId
+    ? { optimisticId: input.optimisticId, text: input.content }
+    : null
+  if (echo) {
+    rec.pendingUserEchoes.push(echo)
     if (rec.pendingUserEchoes.length > MAX_PENDING_USER_ECHOES) {
       rec.pendingUserEchoes.shift()
     }
@@ -517,6 +1147,7 @@ async function sendOpenClawMessageImpl(input: {
   setProcessing(rec, true, rec.activeRunId)
 
   try {
+    await applySessionSettings(rec, input.model, input.effort)
     const gw = await getGateway()
     const resp = await gw.rpc<{ runId?: string; status?: string }>('sessions.send', {
       key: rec.sessionKey,
@@ -524,7 +1155,11 @@ async function sendOpenClawMessageImpl(input: {
         ? appendMoiContext(input.content, renderMoiContext(input.context))
         : input.content
     })
-    if (resp?.runId) setProcessing(rec, true, resp.runId)
+    if (resp?.runId) {
+      setProcessing(rec, true, resp.runId)
+      // The durable user echo carries `<runId>:user` — arm the exact match.
+      if (echo) echo.runId = resp.runId
+    }
   } catch (err) {
     setProcessing(rec, false, null)
     if (input.optimisticId) {
@@ -596,4 +1231,38 @@ export async function ensureOpenClawSessionLive(input: {
 }): Promise<StreamEvent[]> {
   const rec = await getOrCreateOpenClawSession(input)
   return viewAsEvents(rec)
+}
+
+// Test seam. The README sanctions tests importing harness internals; the live
+// `sessions` map is otherwise private and creating a real record needs a
+// gateway. This seeds a minimal live record so teardown/idle behavior can be
+// exercised in unit tests without a connection.
+export function createOpenClawSessionForTest(input: {
+  workspaceId: string
+  sessionId: string
+  sessionKey: string
+}): SessionRecord {
+  const rec: SessionRecord = {
+    workspaceId: input.workspaceId,
+    workspacePath: '/test-workspace',
+    agentId: 'test-agent',
+    sessionId: input.sessionId,
+    sessionKey: input.sessionKey,
+    messagesById: new Map(),
+    results: new Map(),
+    view: emptyViewState(),
+    activeRunId: null,
+    seeded: true,
+    streamEnabled: false,
+    pendingFrames: [],
+    pendingUserEchoes: [],
+    liveTools: new Map()
+  }
+  sessions.set(recKey(input.workspaceId, input.sessionId), rec)
+  return rec
+}
+
+// Test seam: is a live record held for this (workspaceId, sessionId)?
+export function hasOpenClawLiveSessionForTest(workspaceId: string, sessionId: string): boolean {
+  return sessions.has(recKey(workspaceId, sessionId))
 }
