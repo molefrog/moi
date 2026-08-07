@@ -81,7 +81,7 @@ describe('loadLayout', () => {
     })
   })
 
-  test('defaults invalid tabs to agent and widgets', async () => {
+  test('defaults invalid tabs to the standard set', async () => {
     await withWorkspaceFile(
       { version: 1, widgetGrid: [], tabs: { open: [], active: 'widgets' } },
       async dir => {
