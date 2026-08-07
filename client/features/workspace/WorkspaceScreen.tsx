@@ -517,14 +517,14 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   )
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col bg-background font-sans text-foreground">
+    <div className="relative flex h-full min-h-0 flex-col font-sans text-foreground">
       <div ref={rowRef} className="flex min-h-0 flex-1">
         {/* Full-screen: whole panel. Split: the left content column. */}
         {(mode === 'fullscreen' || hasWorkspaceContent) && (
           <div
             className={cn(
-              'flex min-h-0 flex-1 flex-col-reverse',
-              mode === 'split' && 'min-w-(--column-w)'
+              'flex min-h-0 flex-1 flex-col-reverse overflow-hidden bg-background shadow-xs transition-[border-radius]',
+              mode === 'split' && 'min-w-(--column-w) rounded-xl'
             )}
           >
             {activeTab === 'agent' ? (
@@ -617,7 +617,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
         {mode === 'split' && (
           <div
             className={cn(
-              'flex min-h-0 min-w-(--chat-min) flex-[0_1_var(--chat-max)] flex-col overflow-hidden border-l border-border'
+              'flex min-h-0 min-w-(--chat-min) flex-[0_1_var(--chat-max)] flex-col overflow-hidden'
             )}
           >
             {dockedChat}
