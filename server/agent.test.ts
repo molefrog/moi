@@ -42,6 +42,34 @@ test('serves the cached availability within the TTL and re-probes after invalida
   expect(probes).toBe(2)
 })
 
+test('refresh bypasses the TTL and publishes even when nothing else asked', async () => {
+  const events: AgentUpdatedEvent[] = []
+  let probes = 0
+  let available = true
+  const store = createAgentStore({
+    probe: async () => {
+      probes++
+      return { available }
+    },
+    startLogin: async () => ({}),
+    publish: event => events.push(event),
+    availabilityTtlMs: 60_000
+  })
+
+  expect(await store.getAvailability(ws)).toEqual({ available: true })
+  expect(probes).toBe(1)
+
+  // The provider was signed out from outside moi; the cache doesn't know yet.
+  available = false
+  expect(await store.getAvailability(ws)).toEqual({ available: true })
+  expect(probes).toBe(1)
+
+  expect(await store.refresh(ws)).toEqual({ available: false })
+  expect(probes).toBe(2)
+  expect(events.at(-1)?.availability).toEqual({ available: false })
+  expect(await store.getAvailability(ws)).toEqual({ available: false })
+})
+
 test('concurrent reads share one in-flight probe', async () => {
   let probes = 0
   const store = createAgentStore({

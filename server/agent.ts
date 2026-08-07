@@ -24,9 +24,14 @@ export type AgentUpdatedEvent = {
   login?: AgentLoginState
 }
 
+// Only the fields the probe/login provider calls actually read — lets callers
+// that don't have a full registry entry on hand (e.g. a harness session
+// reacting to a mid-conversation send failure) still trigger a refresh.
+export type AgentWorkspace = Pick<WorkspaceEntry, 'id' | 'path' | 'type'>
+
 export type AgentStoreOptions = {
-  probe: (ws: WorkspaceEntry) => Promise<HarnessAvailability>
-  startLogin: (ws: WorkspaceEntry) => Promise<HarnessLogin>
+  probe: (ws: AgentWorkspace) => Promise<HarnessAvailability>
+  startLogin: (ws: AgentWorkspace) => Promise<HarnessLogin>
   publish: (event: AgentUpdatedEvent) => void
   availabilityTtlMs?: number
   loginPollMs?: number
@@ -73,7 +78,7 @@ export function createAgentStore(options: AgentStoreOptions) {
     })
   }
 
-  async function probeFresh(ws: WorkspaceEntry): Promise<HarnessAvailability> {
+  async function probeFresh(ws: AgentWorkspace): Promise<HarnessAvailability> {
     const entry = entryFor(ws.id)
     if (!entry.probe) {
       entry.probe = options.probe(ws).finally(() => {
@@ -85,12 +90,22 @@ export function createAgentStore(options: AgentStoreOptions) {
     return value
   }
 
-  async function getAvailability(ws: WorkspaceEntry): Promise<HarnessAvailability> {
+  async function getAvailability(ws: AgentWorkspace): Promise<HarnessAvailability> {
     const entry = entryFor(ws.id)
     if (entry.cached && Date.now() - entry.cached.checkedAt < ttlMs) {
       return entry.cached.value
     }
     return probeFresh(ws)
+  }
+
+  // Bypass the TTL and push the result even if it's unchanged. For callers
+  // that suspect the cached snapshot is stale for a reason other than an env
+  // change (e.g. a send just failed, which can mean the provider was signed
+  // out from outside moi — a `codex logout` in a terminal, say).
+  async function refresh(ws: AgentWorkspace): Promise<HarnessAvailability> {
+    const value = await probeFresh(ws)
+    publish(ws.id, value)
+    return value
   }
 
   function getLogin(workspaceId: string): AgentLoginState | undefined {
@@ -99,7 +114,7 @@ export function createAgentStore(options: AgentStoreOptions) {
 
   // Re-probe until the login lands or the deadline passes. One loop per
   // ceremony; a replaced or completed ceremony stops its loop.
-  function watch(ws: WorkspaceEntry, login: LoginCeremony) {
+  function watch(ws: AgentWorkspace, login: LoginCeremony) {
     const deadline = Date.now() + deadlineMs
     let stopped = false
     let timer: ReturnType<typeof setTimeout>
@@ -136,7 +151,7 @@ export function createAgentStore(options: AgentStoreOptions) {
     timer.unref?.()
   }
 
-  async function startLogin(ws: WorkspaceEntry): Promise<HarnessLogin> {
+  async function startLogin(ws: AgentWorkspace): Promise<HarnessLogin> {
     const entry = entryFor(ws.id)
     // Join the in-flight ceremony instead of starting a second provider flow
     // (two tabs, a remount, a double-click — all land here).
@@ -168,7 +183,7 @@ export function createAgentStore(options: AgentStoreOptions) {
     if (entry) entry.cached = undefined
   }
 
-  return { getAvailability, getLogin, startLogin, invalidate }
+  return { getAvailability, refresh, getLogin, startLogin, invalidate }
 }
 
 export type AgentStore = ReturnType<typeof createAgentStore>
