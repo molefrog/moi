@@ -1,7 +1,7 @@
 import type { WorkspaceLayout, WorkspaceTabsState } from './types'
 
 export function createDefaultWorkspaceTabs(): WorkspaceTabsState {
-  return { open: ['agent', 'widgets'], active: 'agent' }
+  return { open: ['agent', 'widgets', 'scratchpad'], active: 'agent' }
 }
 
 export function createDefaultWorkspaceLayout(): WorkspaceLayout {

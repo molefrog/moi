@@ -35,12 +35,15 @@ async function withWorkspaceFile<T>(
 }
 
 describe('loadLayout', () => {
-  test('opens a new workspace in split view with agent and widgets', async () => {
+  test('opens a new workspace in split view with the default tabs', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'moi-layout-'))
     try {
       const loaded = await loadLayout(dir)
       expect(loaded.layoutMode).toBe('split')
-      expect(loaded.tabs).toEqual({ open: ['agent', 'widgets'], active: 'agent' })
+      expect(loaded.tabs).toEqual({
+        open: ['agent', 'widgets', 'scratchpad'],
+        active: 'agent'
+      })
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
@@ -50,7 +53,10 @@ describe('loadLayout', () => {
     await withWorkspaceFile({ version: 1, widgetGrid: [] }, async dir => {
       const loaded = await loadLayout(dir)
       expect(loaded.layoutMode).toBe('split')
-      expect(loaded.tabs).toEqual({ open: ['agent', 'widgets'], active: 'agent' })
+      expect(loaded.tabs).toEqual({
+        open: ['agent', 'widgets', 'scratchpad'],
+        active: 'agent'
+      })
     })
   })
 
@@ -80,7 +86,10 @@ describe('loadLayout', () => {
       { version: 1, widgetGrid: [], tabs: { open: [], active: 'widgets' } },
       async dir => {
         const loaded = await loadLayout(dir)
-        expect(loaded.tabs).toEqual({ open: ['agent', 'widgets'], active: 'agent' })
+        expect(loaded.tabs).toEqual({
+          open: ['agent', 'widgets', 'scratchpad'],
+          active: 'agent'
+        })
       }
     )
   })
