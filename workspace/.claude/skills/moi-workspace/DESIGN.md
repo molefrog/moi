@@ -97,11 +97,10 @@ padding and radius and realign its children; do not leave spacing that implies a
 
 ### Textures
 
-Use one texture on every widget or view root and no more than one per applet. Pair it with an opaque
-semantic base, such as `h-full w-full bg-background text-foreground texture-checker`. The same
-classes resolve through the widget-local theme or view page theme. Skip it only when an opaque
-full-bleed image, map, canvas, or visualization owns the background, the user explicitly asks for a
-plain surface, or preserving readability would require several extra solid wrappers.
+Texture is optional. Choose the root treatment after the content layout is clear, and use no more
+than one texture per applet. Pair a texture with an opaque semantic base, such as
+`h-full w-full bg-background text-foreground texture-checker`. The same classes resolve through the
+widget-local theme or view page theme.
 
 | Texture | Tailwind class | Character |
 | --- | --- | --- |
@@ -112,10 +111,21 @@ plain surface, or preserving readability would require several extra solid wrapp
 | Inset shadow | `texture-inset-shadow` | A soft edge glow derived from `primary` |
 
 Textures add an effect without setting `background-color`; the base color remains visible through
-them. Open content may sit directly on the textured root when contrast stays clear. Add an opaque
-semantic surface above it only when that surface has a functional reason described under Surfaces
-and grouping. Do not apply a texture to a card, panel, control, or text region, and do not stack
-textures or add tuning variables.
+them. Match the frequency of the background to the density of the content:
+
+| Content and layout | Root treatment |
+| --- | --- |
+| Dense content placed directly on the root, such as tables, long lists, forms, detailed charts, or multi-column dashboards | Plain `bg-background`, `texture-gradient-linear`, or `texture-inset-shadow` |
+| Sparse content with large quiet areas | Any texture that preserves contrast |
+| Dense content inside a functionally justified opaque or tonal work surface | A checker, grid, or noise texture may appear on the exposed background |
+| Opaque full-bleed image, map, canvas, or visualization | No texture |
+
+Never place `texture-checker`, `texture-grid`, or `texture-noise` directly behind dense open content.
+Do not add cards or solid wrappers only to make a busy texture readable; choose a quieter root
+treatment instead. A texture should become easy to ignore while reading.
+
+Do not apply a texture to a card, panel, control, or text region, and do not stack textures or add
+tuning variables.
 
 Check nearby widgets and views before choosing one. Give unrelated applets different textures so
 they remain distinct at a glance. A widget that opens, summarizes, or represents a view shares that
