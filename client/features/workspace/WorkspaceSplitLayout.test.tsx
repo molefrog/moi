@@ -31,6 +31,8 @@ describe('WorkspaceSplitLayout', () => {
     expect(html).toContain('role="separator"')
     expect(html).not.toContain('aria-hidden="true"')
     expect(html).not.toContain('aria-disabled="true"')
+    expect(html).not.toContain('transition-[flex-grow]')
+    expect(html).not.toContain('transition-opacity')
     expect(html.indexOf('Workspace content')).toBeLessThan(html.indexOf('role="separator"'))
     expect(html.indexOf('role="separator"')).toBeLessThan(html.indexOf('Chat content'))
   })

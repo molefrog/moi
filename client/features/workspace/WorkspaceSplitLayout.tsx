@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { PanelImperativeHandle } from 'react-resizable-panels'
 
@@ -26,6 +26,8 @@ export function WorkspaceSplitLayout({
   onChatWidthChange
 }: WorkspaceSplitLayoutProps) {
   const chatPanelRef = useRef<PanelImperativeHandle>(null)
+  const transitionFrameRef = useRef<number | null>(null)
+  const [transitionsEnabled, setTransitionsEnabled] = useState(false)
 
   useLayoutEffect(() => {
     const chatPanel = chatPanelRef.current
@@ -42,11 +44,20 @@ export function WorkspaceSplitLayout({
     <ResizablePanelGroup
       orientation="horizontal"
       className={cn(
-        'overflow-visible! [&>#chat]:transition-[flex-grow] [&>#chat]:duration-200 [&>#chat]:ease-in-out motion-reduce:[&>#chat]:transition-none!',
-        open &&
+        'overflow-visible!',
+        transitionsEnabled &&
+          '[&>#chat]:transition-[flex-grow] [&>#chat]:duration-200 [&>#chat]:ease-in-out motion-reduce:[&>#chat]:transition-none!',
+        transitionsEnabled &&
+          open &&
           'has-[[data-separator=active]]:[&>#chat]:transition-none! has-[[data-separator=focus]]:[&>#chat]:transition-none!'
       )}
       onLayoutChanged={(_layout, meta) => {
+        if (!transitionsEnabled && transitionFrameRef.current === null) {
+          transitionFrameRef.current = requestAnimationFrame(() => {
+            setTransitionsEnabled(true)
+          })
+        }
+
         if (meta.isUserInteraction) {
           requestAnimationFrame(() => {
             const size = chatPanelRef.current?.getSize()
@@ -73,7 +84,9 @@ export function WorkspaceSplitLayout({
         groupResizeBehavior="preserve-pixel-size"
         panelRef={chatPanelRef}
         className={cn(
-          'overflow-hidden! transition-opacity duration-200 ease-in-out motion-reduce:transition-none',
+          'overflow-hidden!',
+          transitionsEnabled &&
+            'transition-opacity duration-200 ease-in-out motion-reduce:transition-none',
           open ? 'opacity-100' : 'opacity-0'
         )}
       >
