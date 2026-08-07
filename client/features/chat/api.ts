@@ -4,13 +4,7 @@ import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { applyEvents } from '@/lib/format'
-import type {
-  SessionConfig,
-  SessionInfo,
-  StreamEvent,
-  ViewState,
-  WorkspaceModels
-} from '@/lib/types'
+import type { SessionConfig, SessionInfo, StreamEvent, ViewState } from '@/lib/types'
 
 export function useWorkspaceSessions(workspaceId: string) {
   return useQuery<SessionInfo[]>({
@@ -58,17 +52,6 @@ export function useSessionView(workspaceId: string, sessionId: string | null) {
     enabled: Boolean(sessionId),
     staleTime: Infinity,
     gcTime: 5 * 60_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false
-  })
-}
-
-export function useWorkspaceModels(workspaceId: string) {
-  return useQuery<WorkspaceModels>({
-    queryKey: workspaceKeys.models(workspaceId),
-    queryFn: () => requestJson(`/api/workspaces/${workspaceId}/models`),
-    staleTime: Infinity,
-    gcTime: Infinity,
     refetchOnMount: false,
     refetchOnWindowFocus: false
   })

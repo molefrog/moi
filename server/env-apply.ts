@@ -3,6 +3,7 @@
 // relayed over the control port — the workspace's processes must be reaped and
 // every connected client told to refetch. Both entry points call this so the
 // side effects can never drift apart.
+import { agentStore } from './agent'
 import { publishEvent } from './events'
 import { restartWorker } from './functions'
 import { allHarnesses } from './harness/registry'
@@ -12,5 +13,8 @@ export function applyEnvChanged(workspace: { id: string; path: string }): void {
   // down idle agent sessions (busy ones keep their snapshot until turn end).
   restartWorker(workspace.path)
   for (const h of allHarnesses()) h.onEnvChanged?.(workspace.path)
+  // Env can carry credentials (ANTHROPIC_API_KEY, provider config) — drop the
+  // cached availability so the next agent snapshot re-probes.
+  agentStore.invalidate(workspace.id)
   publishEvent({ type: 'env:updated', workspaceId: workspace.id })
 }

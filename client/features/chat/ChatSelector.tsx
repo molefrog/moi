@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { IconArchive, IconChevronDown, IconEdit } from '@tabler/icons-react'
 
-import { useArchiveWorkspaceSession, useWorkspaceModels, useWorkspaceSessions } from './api'
+import { useArchiveWorkspaceSession, useWorkspaceSessions } from './api'
+import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
 import {
@@ -221,7 +222,7 @@ export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelecto
   const workspaceId = useWorkspaceId()
   const [confirmingSessionId, setConfirmingSessionId] = useState<string | null>(null)
   const { data: sessions = [] } = useWorkspaceSessions(workspaceId)
-  const canArchive = useWorkspaceModels(workspaceId).data?.supportsArchiving === true
+  const canArchive = useWorkspaceAgent(workspaceId).data?.supportsArchiving === true
   const archiveSession = useArchiveWorkspaceSession(workspaceId)
   const hasRunningBackgroundChat = useLive(state =>
     hasRunningBackgroundSession(state.activity, workspaceId, selectedSessionId)

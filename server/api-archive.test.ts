@@ -23,6 +23,8 @@ const originalClaudeInterrupt = claudeCodeHarness.interrupt
 const originalClaudeArchive = claudeCodeHarness.archiveSession
 const originalClaudeListModels = claudeCodeHarness.listModels
 const originalCodexListModels = codexHarness.listModels
+const originalClaudeAvailability = claudeCodeHarness.availability
+const originalCodexAvailability = codexHarness.availability
 
 beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), 'moi-api-archive-'))
@@ -35,6 +37,8 @@ afterEach(async () => {
   claudeCodeHarness.archiveSession = originalClaudeArchive
   claudeCodeHarness.listModels = originalClaudeListModels
   codexHarness.listModels = originalCodexListModels
+  claudeCodeHarness.availability = originalClaudeAvailability
+  codexHarness.availability = originalCodexAvailability
   setRegistryPath(DEFAULT_REGISTRY_PATH)
   setSelectedSessionPath(DEFAULT_SELECTED_SESSION_PATH)
   await rm(tempDir, { recursive: true, force: true })
@@ -113,14 +117,16 @@ test('archive support is provider-specific', async () => {
   const openclaw = await registerWorkspace(join(tempDir, 'openclaw'), { type: 'openclaw' })
   claudeCodeHarness.listModels = async () => []
   codexHarness.listModels = async () => []
+  claudeCodeHarness.availability = async () => ({ available: true })
+  codexHarness.availability = async () => ({ available: true })
 
-  const [claudeModels, codexModels, openclawArchive] = await Promise.all([
-    api.request(`/api/workspaces/${claude.id}/models`),
-    api.request(`/api/workspaces/${codex.id}/models`),
+  const [claudeAgent, codexAgent, openclawArchive] = await Promise.all([
+    api.request(`/api/workspaces/${claude.id}/agent`),
+    api.request(`/api/workspaces/${codex.id}/agent`),
     api.request(`/api/workspaces/${openclaw.id}/sessions/chat/archive`, { method: 'POST' })
   ])
 
-  expect((await claudeModels.json()).supportsArchiving).toBe(true)
-  expect((await codexModels.json()).supportsArchiving).toBe(true)
+  expect((await claudeAgent.json()).supportsArchiving).toBe(true)
+  expect((await codexAgent.json()).supportsArchiving).toBe(true)
   expect(openclawArchive.status).toBe(501)
 })

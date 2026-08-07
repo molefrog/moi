@@ -1,5 +1,5 @@
 import type { ComposerAvailability } from '@/client/components/shared/Composer'
-import { startWorkspaceLogin, useWorkspaceAvailability } from '@/client/features/workspace/api'
+import { startWorkspaceLogin, useWorkspaceAgent } from '@/client/features/workspace/api'
 
 import { ChatErrorBanner } from './banners/ChatErrorBanner'
 import { resolveComposerBanner, type ComposerBanner } from './banners/ComposerBanner'
@@ -21,7 +21,8 @@ export function useWorkspaceComposerState(
   workspaceId: string,
   { chatError, onDismissChatError }: WorkspaceComposerStateOptions
 ): WorkspaceComposerState {
-  const { data: availability, error } = useWorkspaceAvailability(workspaceId)
+  const { data: agent, error } = useWorkspaceAgent(workspaceId)
+  const availability = agent?.availability
   const { bannerProps: skillUpdateBanner } = useWorkspaceSkillUpdates(workspaceId)
 
   let unavailable = availability?.available === false ? availability : undefined
@@ -45,6 +46,7 @@ export function useWorkspaceComposerState(
         content: (
           <WorkspaceAgentAvailabilityBanner
             availability={unavailable}
+            login={agent?.login}
             onStartLogin={() => startWorkspaceLogin(workspaceId)}
           />
         )
