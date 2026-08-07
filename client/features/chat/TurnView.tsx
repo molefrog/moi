@@ -153,15 +153,20 @@ export function AssistantTurnParts({
   processing = false,
   durationMs
 }: AssistantTurnPartsProps) {
-  if (processing) return <TurnParts parts={parts} cwd={cwd} processing />
-
-  const completed = splitCompletedAssistantParts(parts)
-  if (!completed) return <TurnParts parts={parts} cwd={cwd} />
+  const completed = processing ? null : splitCompletedAssistantParts(parts)
 
   return (
-    <div className="flex flex-col gap-3">
-      <AgentWorkDisclosure parts={completed.work} cwd={cwd} durationMs={durationMs} />
-      <TurnParts parts={completed.response} cwd={cwd} />
+    <div className="w-full min-w-0">
+      {processing ? (
+        <TurnParts parts={parts} cwd={cwd} processing />
+      ) : completed ? (
+        <div className="flex flex-col gap-3">
+          <AgentWorkDisclosure parts={completed.work} cwd={cwd} durationMs={durationMs} />
+          <TurnParts parts={completed.response} cwd={cwd} />
+        </div>
+      ) : (
+        <TurnParts parts={parts} cwd={cwd} />
+      )}
     </div>
   )
 }
@@ -186,7 +191,7 @@ export const TurnView = memo(function TurnView({ turn, processing = false }: Tur
       .join('\n')
     if (!text && fileParts.length === 0) return null
     return (
-      <div className="ml-8 flex min-w-0 flex-col items-end gap-1.5">
+      <div className="flex w-full min-w-0 flex-col items-end gap-1.5 pl-8">
         {fileParts.map((p, i) => (
           <FilePart key={i} mediaType={p.mediaType} url={p.url} filename={p.filename} />
         ))}
