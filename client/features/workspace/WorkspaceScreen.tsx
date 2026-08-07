@@ -610,11 +610,12 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   return (
     <div className="relative flex h-full min-h-0 flex-col font-sans text-foreground">
       <div ref={rowRef} className="flex min-h-0 flex-1">
-        {mode === 'split' && splitLayoutConstraints ? (
+        {hasWorkspaceContent && canUseSplit && splitLayoutConstraints ? (
           <WorkspaceSplitLayout
             {...splitLayoutConstraints}
             workspace={workspacePanel}
             chat={dockedChat}
+            open={mode === 'split'}
             chatWidth={dockedChatWidth}
             onChatWidthChange={setDockedChatWidth}
           />
