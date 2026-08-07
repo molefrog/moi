@@ -8,7 +8,7 @@ export function createDefaultWorkspaceLayout(): WorkspaceLayout {
   return {
     version: 1,
     widgetGrid: [],
-    layoutMode: 'fullscreen',
+    layoutMode: 'split',
     tabs: createDefaultWorkspaceTabs()
   }
 }
