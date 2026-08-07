@@ -76,22 +76,22 @@ function viewIcon(view: ViewInfo, builders: ViewBuilder[]) {
 }
 
 type SectionControlsProps = {
-  mode: LayoutMode
   onToggleMode: () => void
 }
 
-// Temporary layout switch: fullscreen tabbed workspace ⇄ legacy split view.
-function SectionControls({ mode, onToggleMode }: SectionControlsProps) {
-  const fullscreen = mode === 'fullscreen'
+// Full-screen workspace action: open the chat as a docked split column.
+function SectionControls({ onToggleMode }: SectionControlsProps) {
   return (
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      onClick={onToggleMode}
-      aria-label={fullscreen ? 'Switch to split view' : 'Switch to full-screen view'}
-    >
-      <IconLayoutSidebarRight stroke={1.75} />
-    </Button>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button variant="ghost" size="icon-sm" onClick={onToggleMode} aria-label="Dock chat">
+            <IconLayoutSidebarRight stroke={1.75} />
+          </Button>
+        }
+      />
+      <TooltipContent>Dock chat</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -496,6 +496,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       send={send}
       stop={stop}
       onSelectSession={selectSession}
+      onClose={() => setMode('fullscreen')}
+      docked
     />
   )
 
@@ -601,11 +603,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
                   }
                 />
                 <WorkspaceSettings />
-                {hasWorkspaceContent && canUseSplit && (
-                  <SectionControls
-                    mode={mode}
-                    onToggleMode={() => setMode(mode === 'fullscreen' ? 'split' : 'fullscreen')}
-                  />
+                {hasWorkspaceContent && canUseSplit && mode === 'fullscreen' && (
+                  <SectionControls onToggleMode={() => setMode('split')} />
                 )}
               </div>
             </PanelHeader>

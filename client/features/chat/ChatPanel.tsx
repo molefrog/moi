@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
-import { IconChevronDown, IconX } from '@tabler/icons-react'
+import { IconChevronDown, IconChevronsRight, IconX } from '@tabler/icons-react'
 
 import {
   canSubmitComposerAction,
@@ -21,12 +21,14 @@ import { ChatEmptyState, resolveChatEmptyState } from './ChatEmptyState'
 import { ChatSelector } from './ChatSelector'
 import { ThinkingIndicator, TurnView } from './TurnView'
 import { Button } from '@/client/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { cn } from '@/client/lib/cn'
 import { useUiStore } from '@/client/store/ui'
 
 type ChatPanelProps = {
   active?: boolean
   focusRequest?: number
+  docked?: boolean
   chatLoaded: boolean
   view: ViewState
   // The live streaming preview as a synthetic assistant turn (or null). Merged
@@ -42,13 +44,14 @@ type ChatPanelProps = {
   send: (text: string, options?: ChatSendOptions) => void
   stop: () => void
   onSelectSession: (sessionId: string | null) => void
-  // Floating popup: render a close (X) button that dismisses the popup.
+  // Chat on a separate tab doesn't have a close button
   onClose?: () => void
 }
 
 export function ChatPanel({
   active = true,
   focusRequest = 0,
+  docked = false,
   chatLoaded,
   view,
   previewTurn,
@@ -126,8 +129,32 @@ export function ChatPanel({
     <div className="flex min-h-0 flex-1 flex-col pt-2 pb-3">
       <header className="mx-auto flex w-full max-w-[calc(var(--chat-max-container)+40px)] items-center justify-between pr-2 pb-2 pl-2">
         <ChatSelector selectedSessionId={sessionId ?? null} onSelectSession={onSelectSession} />
-        {onClose && (
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close chat">
+        {onClose && docked && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  className="text-muted-foreground"
+                  variant="ghost"
+                  size="icon"
+                  onClick={onClose}
+                  aria-label="Undock chat"
+                >
+                  <IconChevronsRight stroke={1.5} />
+                </Button>
+              }
+            />
+            <TooltipContent>Undock chat</TooltipContent>
+          </Tooltip>
+        )}
+        {onClose && !docked && (
+          <Button
+            className="text-muted-foreground"
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            aria-label="Close chat"
+          >
             <IconX stroke={1.5} />
           </Button>
         )}
