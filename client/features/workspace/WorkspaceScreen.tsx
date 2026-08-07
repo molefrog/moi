@@ -59,6 +59,8 @@ import {
   viewTabId
 } from '@/lib/workspace-tabs'
 
+import { WorkspaceSplitLayout } from './WorkspaceSplitLayout'
+
 const Scratchpad = lazy(() =>
   import('@/client/features/scratchpad/Scratchpad').then(module => ({
     default: module.Scratchpad
@@ -198,10 +200,16 @@ function applyVisibleTabOrder(
 export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenProps) {
   const { layout, setLayout, name, icon, provider, workspaceId } = useWorkspaceLayoutCtx()
   const builderActions = useViewBuilderActions()
-  const { ref: rowRef, fits: canUseSplit } = useFitsSplitLayout<HTMLDivElement>()
+  const {
+    ref: rowRef,
+    fits: canUseSplit,
+    constraints: splitLayoutConstraints
+  } = useFitsSplitLayout<HTMLDivElement>()
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
   const [floatingChatOpen, setFloatingChatOpen] = useState(false)
   const [chatFocusRequest, setChatFocusRequest] = useState(0)
+  const dockedChatWidth = useUiStore(state => state.dockedChatWidth)
+  const setDockedChatWidth = useUiStore(state => state.setDockedChatWidth)
   const sessionActivity = useLive(state => state.activity)
   const hasRunningSession = hasRunningWorkspaceActivity(sessionActivity, workspaceId)
 
@@ -518,109 +526,100 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     />
   )
 
+  const workspacePanel = (
+    <div
+      className={cn(
+        'flex h-full min-h-0 min-w-0 flex-1 flex-col-reverse overflow-hidden bg-background shadow-xs transition-[border-radius]',
+        mode === 'split' && 'rounded-xl'
+      )}
+    >
+      {activeTab === 'agent' ? (
+        tabbedChat
+      ) : activeTab === 'widgets' ? (
+        <Widgets
+          editing={widgetMode === 'editing'}
+          onEditingChange={editing => setWidgetMode(editing ? 'editing' : 'idle')}
+          widgets={widgets}
+          onCreateWidget={() => {
+            selectSession(null)
+            openChat('Create widget')
+          }}
+        />
+      ) : activeTab === 'scratchpad' ? (
+        <Suspense fallback={null}>
+          <Scratchpad />
+        </Suspense>
+      ) : activeBuilder ? (
+        <ViewBuilderTab
+          key={activeBuilder.id}
+          builder={activeBuilder}
+          composerAvailability={composerAvailability}
+          onSave={requirements => builderActions.save(activeBuilder.id, requirements)}
+          onSubmit={requirements => {
+            if (mode === 'fullscreen') setFloatingChatOpen(true)
+            return builderActions.submit(activeBuilder, requirements)
+          }}
+          onOpenChat={() => {
+            selectSession(activeBuilder.sessionId)
+            openChat()
+          }}
+          onDiscard={() => discardBuilder(activeBuilder)}
+        />
+      ) : null}
+
+      {/* Views are not part of the chain above: ViewManager keeps them
+          mounted across tab switches (and collapses to nothing while
+          another tab is on screen), which is what makes a switch back
+          instant. It stays with the content, so the header below it in
+          the DOM keeps painting over both. */}
+      <ViewManager views={views} activeViewId={activeView?.id ?? null} params={appletParams} />
+
+      <PanelHeader>
+        <div className="flex min-w-0 flex-1 items-center gap-4">
+          <div className="flex items-center gap-2">
+            <img
+              src={icon ?? workspaceProviderIcon[provider ?? 'claude-code']}
+              alt=""
+              className="size-5 shrink-0 rounded-xs"
+            />
+            {name && <span className="truncate text-sm font-medium text-foreground">{name}</span>}
+          </div>
+          <WorkspaceTabs
+            tabs={tabItems}
+            active={activeTab}
+            createItems={createItems}
+            onSelect={openTab}
+            onClose={closeTab}
+            onReorder={reorderTabs}
+          />
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <WorkspaceCustomizeAction
+            active={widgetMode === 'customizing'}
+            onToggle={() => setWidgetMode(widgetMode === 'customizing' ? 'idle' : 'customizing')}
+          />
+          <WorkspaceSettings />
+          {hasWorkspaceContent && canUseSplit && mode === 'fullscreen' && (
+            <SectionControls onToggleMode={() => setMode('split')} />
+          )}
+        </div>
+      </PanelHeader>
+    </div>
+  )
+
   return (
     <div className="relative flex h-full min-h-0 flex-col font-sans text-foreground">
       <div ref={rowRef} className="flex min-h-0 flex-1">
-        {/* Full-screen: whole panel. Split: the left content column. */}
-        {(mode === 'fullscreen' || hasWorkspaceContent) && (
-          <div
-            className={cn(
-              'flex min-h-0 flex-1 flex-col-reverse overflow-hidden bg-background shadow-xs transition-[border-radius]',
-              mode === 'split' && 'min-w-(--column-w) rounded-xl'
-            )}
-          >
-            {activeTab === 'agent' ? (
-              tabbedChat
-            ) : activeTab === 'widgets' ? (
-              <Widgets
-                editing={widgetMode === 'editing'}
-                onEditingChange={editing => setWidgetMode(editing ? 'editing' : 'idle')}
-                widgets={widgets}
-                onCreateWidget={() => {
-                  selectSession(null)
-                  openChat('Create widget')
-                }}
-              />
-            ) : activeTab === 'scratchpad' ? (
-              <Suspense fallback={null}>
-                <Scratchpad />
-              </Suspense>
-            ) : activeBuilder ? (
-              <ViewBuilderTab
-                key={activeBuilder.id}
-                builder={activeBuilder}
-                composerAvailability={composerAvailability}
-                onSave={requirements => builderActions.save(activeBuilder.id, requirements)}
-                onSubmit={requirements => {
-                  if (mode === 'fullscreen') setFloatingChatOpen(true)
-                  return builderActions.submit(activeBuilder, requirements)
-                }}
-                onOpenChat={() => {
-                  selectSession(activeBuilder.sessionId)
-                  openChat()
-                }}
-                onDiscard={() => discardBuilder(activeBuilder)}
-              />
-            ) : null}
-
-            {/* Views are not part of the chain above: ViewManager keeps them
-                mounted across tab switches (and collapses to nothing while
-                another tab is on screen), which is what makes a switch back
-                instant. It stays with the content, so the header below it in
-                the DOM keeps painting over both. */}
-            <ViewManager
-              views={views}
-              activeViewId={activeView?.id ?? null}
-              params={appletParams}
-            />
-
-            <PanelHeader>
-              <div className="flex min-w-0 flex-1 items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <img
-                    src={icon ?? workspaceProviderIcon[provider ?? 'claude-code']}
-                    alt=""
-                    className="size-5 shrink-0 rounded-xs"
-                  />
-                  {name && (
-                    <span className="truncate text-sm font-medium text-foreground">{name}</span>
-                  )}
-                </div>
-                <WorkspaceTabs
-                  tabs={tabItems}
-                  active={activeTab}
-                  createItems={createItems}
-                  onSelect={openTab}
-                  onClose={closeTab}
-                  onReorder={reorderTabs}
-                />
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <WorkspaceCustomizeAction
-                  active={widgetMode === 'customizing'}
-                  onToggle={() =>
-                    setWidgetMode(widgetMode === 'customizing' ? 'idle' : 'customizing')
-                  }
-                />
-                <WorkspaceSettings />
-                {hasWorkspaceContent && canUseSplit && mode === 'fullscreen' && (
-                  <SectionControls onToggleMode={() => setMode('split')} />
-                )}
-              </div>
-            </PanelHeader>
-          </div>
-        )}
-
-        {/* Split: Agent chat as a bounded right column. Full-screen mode uses the
-            Agent tab instead. */}
-        {mode === 'split' && (
-          <div
-            className={cn(
-              'flex min-h-0 min-w-(--chat-min) flex-[0_1_var(--chat-max)] flex-col overflow-hidden'
-            )}
-          >
-            {dockedChat}
-          </div>
+        {mode === 'split' && splitLayoutConstraints ? (
+          <WorkspaceSplitLayout
+            {...splitLayoutConstraints}
+            workspace={workspacePanel}
+            chat={dockedChat}
+            chatWidth={dockedChatWidth}
+            onChatWidthChange={setDockedChatWidth}
+          />
+        ) : (
+          workspacePanel
         )}
       </div>
 
