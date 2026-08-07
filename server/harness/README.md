@@ -152,8 +152,12 @@ Workspace availability also checks provider authentication when a workspace is
 given. Claude Code is probed with `claude auth status` under the effective
 workspace env; `claude auth login` launches its browser sign-in from the composer. Codex
 uses app-server `account/read` and returns a browser OAuth URL through
-`account/login/start`. The composer polls while it is signed out and keeps each
-provider's Sign in action available.
+`account/login/start`. The server owns the recovery loop (`server/agent.ts`):
+`GET /api/workspaces/:id/agent` serves a cached availability snapshot alongside
+the model catalog, `POST .../auth/login` starts (or joins) the one ceremony per
+workspace, and a server-side watch loop re-probes until the login lands or times
+out, pushing `agent:updated` events to every tab. The composer renders that
+state; it never polls.
 
 ## What a harness adapter must support
 
@@ -229,8 +233,9 @@ doubles as the evaluation rubric for new harnesses.
 - Compaction trigger/observe.
 - Queued-message semantics: does the backend queue natively or must the
   server?
-- Push health/auth status events (availability is currently probed on load, focus,
-  a one-minute interval, and before sends).
+- Push health/auth status events from the backend itself (the server watch
+  loop still discovers login completion by re-probing; a provider callback
+  would let `agent:updated` fire without polling anywhere).
 
 ## Capability comparison
 

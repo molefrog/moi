@@ -11,7 +11,7 @@ import {
   startOptimisticTurn
 } from '@/client/features/chat/chat-send'
 import { attachmentKey, type ChatAttachment, liveStore } from '@/client/features/chat/chat-store'
-import type { SessionInfo, ViewState, WorkspaceModels } from '@/lib/types'
+import type { SessionInfo, ViewState, WorkspaceAgent } from '@/lib/types'
 
 const workspaceId = 'workspace-1'
 const sessionId = 'session-1'
@@ -74,8 +74,9 @@ describe('startOptimisticSession', () => {
 })
 
 describe('resolveChatRunOptions', () => {
-  const models: WorkspaceModels = {
+  const models: WorkspaceAgent = {
     provider: 'claude-code',
+    availability: { available: true },
     supportsStreaming: true,
     models: [
       {
