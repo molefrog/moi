@@ -133,14 +133,8 @@ export function ChatPanel({
           <Tooltip>
             <TooltipTrigger
               render={
-                <Button
-                  className="text-muted-foreground"
-                  variant="ghost"
-                  size="icon"
-                  onClick={onClose}
-                  aria-label="Undock chat"
-                >
-                  <IconChevronsRight stroke={1.5} />
+                <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Undock chat">
+                  <IconChevronsRight className="size-5! text-muted-foreground" stroke={1.5} />
                 </Button>
               }
             />
@@ -148,14 +142,8 @@ export function ChatPanel({
           </Tooltip>
         )}
         {onClose && !docked && (
-          <Button
-            className="text-muted-foreground"
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            aria-label="Close chat"
-          >
-            <IconX stroke={1.5} />
+          <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close chat">
+            <IconX stroke={2} />
           </Button>
         )}
       </header>
