@@ -133,12 +133,12 @@ export function ChatPanel({
           <Tooltip>
             <TooltipTrigger
               render={
-                <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Undock chat">
+                <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Undock agent">
                   <IconChevronsRight className="size-5! text-muted-foreground" stroke={1.5} />
                 </Button>
               }
             />
-            <TooltipContent>Undock chat</TooltipContent>
+            <TooltipContent>Undock agent</TooltipContent>
           </Tooltip>
         )}
         {onClose && !docked && (

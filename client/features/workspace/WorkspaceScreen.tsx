@@ -87,12 +87,12 @@ function SectionControls({ onToggleMode }: SectionControlsProps) {
     <Tooltip>
       <TooltipTrigger
         render={
-          <Button variant="ghost" size="icon-sm" onClick={onToggleMode} aria-label="Dock chat">
+          <Button variant="ghost" size="icon-sm" onClick={onToggleMode} aria-label="Dock agent">
             <IconLayoutSidebarRight stroke={1.75} />
           </Button>
         }
       />
-      <TooltipContent>Dock chat</TooltipContent>
+      <TooltipContent>Dock agent</TooltipContent>
     </Tooltip>
   )
 }
