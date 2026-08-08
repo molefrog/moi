@@ -16,8 +16,11 @@ function normalizeTabs(value: unknown): WorkspaceLayout['tabs'] {
 }
 
 function normalizeLayout(parsed: Record<string, unknown>): WorkspaceLayout {
-  const layout = { ...createDefaultWorkspaceLayout(), ...parsed } as Record<string, unknown>
-  if (layout.layoutMode !== 'split') layout.layoutMode = 'fullscreen'
+  const defaults = createDefaultWorkspaceLayout()
+  const layout = { ...defaults, ...parsed } as Record<string, unknown>
+  if (layout.layoutMode !== 'split' && layout.layoutMode !== 'fullscreen') {
+    layout.layoutMode = defaults.layoutMode
+  }
   layout.tabs = normalizeTabs(layout.tabs)
   delete layout.sectionMode
   delete layout.chatMode

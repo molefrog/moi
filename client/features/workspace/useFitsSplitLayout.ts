@@ -1,5 +1,15 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 
+export type WorkspaceSplitLayoutConstraints = {
+  workspaceMinWidth: number
+  chatMinWidth: number
+  chatMaxWidth: number
+}
+
+type SplitLayoutState = WorkspaceSplitLayoutConstraints & {
+  fits: boolean
+}
+
 function tokenPx(name: string): number {
   const root = document.documentElement
   const raw = getComputedStyle(root).getPropertyValue(name).trim()
@@ -12,16 +22,22 @@ function tokenPx(name: string): number {
 // not oscillate when the chat column appears or disappears.
 export function useFitsSplitLayout<T extends HTMLElement>() {
   const ref = useRef<T>(null)
-  const [fits, setFits] = useState(false)
+  const [state, setState] = useState<SplitLayoutState | null>(null)
 
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
 
     const update = (width: number) => {
-      const columnWidth = tokenPx('--column-w')
-      const chatMin = tokenPx('--chat-min')
-      setFits(width - chatMin >= columnWidth)
+      const workspaceMinWidth = tokenPx('--column-w')
+      const chatMinWidth = tokenPx('--chat-min')
+      const chatMaxWidth = tokenPx('--chat-max')
+      setState({
+        fits: width - chatMinWidth >= workspaceMinWidth,
+        workspaceMinWidth,
+        chatMinWidth,
+        chatMaxWidth
+      })
     }
 
     update(el.getBoundingClientRect().width)
@@ -33,5 +49,15 @@ export function useFitsSplitLayout<T extends HTMLElement>() {
     return () => ro.disconnect()
   }, [])
 
-  return { ref, fits }
+  return {
+    ref,
+    fits: state?.fits ?? false,
+    constraints: state
+      ? {
+          workspaceMinWidth: state.workspaceMinWidth,
+          chatMinWidth: state.chatMinWidth,
+          chatMaxWidth: state.chatMaxWidth
+        }
+      : null
+  }
 }

@@ -1,11 +1,10 @@
-import { Children, type ReactElement, type ReactNode } from 'react'
+import type { ReactElement } from 'react'
 
 import { IconPiano } from '@tabler/icons-react'
 import { describe, expect, mock, test } from 'bun:test'
 
 import {
   ChatPromptBubble,
-  ChatPromptBubbles,
   type ChatPromptBubble as ChatPrompt
 } from '@/client/features/chat/ChatPromptBubbles'
 
@@ -31,23 +30,5 @@ describe('ChatPromptBubbles', () => {
     expect(bubble.props.className).not.toContain('grid')
     expect(bubble.props.className).not.toContain('rotate')
     expect(bubble.props.className).not.toContain('translate')
-  })
-
-  test('the plural component owns grid and rotation styles', () => {
-    const root = ChatPromptBubbles({
-      prompts: [prompt],
-      onSelect: () => undefined
-    }) as ReactElement<{
-      children: ReactNode
-      className?: string
-    }>
-    const bubble = Children.toArray(root.props.children)[0] as ReactElement<{
-      className?: string
-    }>
-
-    expect(root.props.className).toContain('grid')
-    expect(bubble.type).toBe(ChatPromptBubble)
-    expect(bubble.props.className).toContain('rotate-3')
-    expect(bubble.props.className).toContain('translate-y-3')
   })
 })

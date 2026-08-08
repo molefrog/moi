@@ -254,12 +254,15 @@ export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelecto
     <DropdownMenu onOpenChange={handleMenuOpenChange}>
       <DropdownMenuTrigger
         render={
-          <Button variant="ghost">
+          <Button className="group" variant="ghost" size="sm">
             <span className="max-w-64 truncate">{label}</span>
             {hasRunningBackgroundChat ? (
               <Spinner className="size-4!" stroke={2} />
             ) : (
-              <IconChevronDown stroke={1.5} />
+              <IconChevronDown
+                className="text-muted-foreground group-hover:text-foreground"
+                stroke={1.75}
+              />
             )}
           </Button>
         }

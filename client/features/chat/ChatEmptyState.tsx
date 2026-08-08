@@ -120,20 +120,18 @@ type WelcomeProps = {
 
 export function ChatWelcome({ disabled = false, onSelectPrompt }: WelcomeProps) {
   return (
-    <div className={cn(EMPTY_STATE_STYLES, 'max-w-md min-w-0 self-center')}>
+    <div className={cn(EMPTY_STATE_STYLES, '@container w-full max-w-md min-w-0')}>
       <div className="prose prose-sm min-w-0 wrap-anywhere prose-inherit">
-        <p>moi is the visual workspace for you and your agent.</p>
         <p>
-          It can grow and adapt to the work you're doing. Just describe what you want, and the agent
-          will build small apps in the workspace.
+          moi is the visual workspace for you and your agent. It grows and adapts to the work you're
+          doing.
         </p>
         <p>
-          You start chatting with <WelcomeTerm Icon={IconGhost}>Agent</WelcomeTerm>, where you can
-          ask questions and build anything. <WelcomeTerm Icon={IconLayout2}>Widgets</WelcomeTerm>{' '}
-          are small apps that surface information and provide quick actions. For more complex tools,
-          you can build <WelcomeTerm Icon={IconArticle}>Views</WelcomeTerm> that open in their own
-          tabs. <WelcomeTerm Icon={IconSketching}>Scratchpad</WelcomeTerm> is a shared canvas for
-          exploring and shaping ideas with your agent.
+          Ask <WelcomeTerm Icon={IconGhost}>Agent</WelcomeTerm> to build{' '}
+          <WelcomeTerm Icon={IconLayout2}>Widgets</WelcomeTerm> that surface information and quick
+          actions, or entire <WelcomeTerm Icon={IconArticle}>Views</WelcomeTerm> for more complex
+          tools. Use <WelcomeTerm Icon={IconSketching}>Scratchpad</WelcomeTerm> for exploring and
+          shaping ideas with your agent.
         </p>
         <p>Give it a try:</p>
       </div>
@@ -164,7 +162,7 @@ export function ChatWorkspaceWelcome({ disabled = false, onSelectPrompt }: Welco
 function EmptyState() {
   return (
     <div className={cn(EMPTY_STATE_STYLES, 'gap-1 text-center')}>
-      <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+      <p className="mx-auto max-w-sm px-8 text-sm text-muted-foreground">
         Chat with your agent, create widgets and views, and manage your workspace context from here
       </p>
     </div>

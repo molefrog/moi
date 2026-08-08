@@ -35,26 +35,40 @@ async function withWorkspaceFile<T>(
 }
 
 describe('loadLayout', () => {
-  test('opens agent and widgets for a new workspace', async () => {
+  test('opens a new workspace in split view with the default tabs', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'moi-layout-'))
     try {
       const loaded = await loadLayout(dir)
-      expect(loaded.tabs).toEqual({ open: ['agent', 'widgets'], active: 'agent' })
+      expect(loaded.layoutMode).toBe('split')
+      expect(loaded.tabs).toEqual({
+        open: ['agent', 'widgets', 'scratchpad'],
+        active: 'agent'
+      })
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
   })
 
-  test('defaults missing layoutMode to fullscreen', async () => {
+  test('defaults missing layoutMode to split', async () => {
     await withWorkspaceFile({ version: 1, widgetGrid: [] }, async dir => {
       const loaded = await loadLayout(dir)
-      expect(loaded.layoutMode).toBe('fullscreen')
-      expect(loaded.tabs).toEqual({ open: ['agent', 'widgets'], active: 'agent' })
+      expect(loaded.layoutMode).toBe('split')
+      expect(loaded.tabs).toEqual({
+        open: ['agent', 'widgets', 'scratchpad'],
+        active: 'agent'
+      })
     })
   })
 
-  test('defaults invalid layoutMode to fullscreen', async () => {
+  test('defaults invalid layoutMode to split', async () => {
     await withWorkspaceFile({ version: 1, widgetGrid: [], layoutMode: 'collapsed' }, async dir => {
+      const loaded = await loadLayout(dir)
+      expect(loaded.layoutMode).toBe('split')
+    })
+  })
+
+  test('preserves valid fullscreen layoutMode', async () => {
+    await withWorkspaceFile({ version: 1, widgetGrid: [], layoutMode: 'fullscreen' }, async dir => {
       const loaded = await loadLayout(dir)
       expect(loaded.layoutMode).toBe('fullscreen')
     })
@@ -67,12 +81,15 @@ describe('loadLayout', () => {
     })
   })
 
-  test('defaults invalid tabs to agent and widgets', async () => {
+  test('defaults invalid tabs to the standard set', async () => {
     await withWorkspaceFile(
       { version: 1, widgetGrid: [], tabs: { open: [], active: 'widgets' } },
       async dir => {
         const loaded = await loadLayout(dir)
-        expect(loaded.tabs).toEqual({ open: ['agent', 'widgets'], active: 'agent' })
+        expect(loaded.tabs).toEqual({
+          open: ['agent', 'widgets', 'scratchpad'],
+          active: 'agent'
+        })
       }
     )
   })

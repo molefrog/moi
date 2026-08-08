@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 
 import { motion } from 'motion/react'
 
@@ -22,9 +22,23 @@ export function ChatPopup({
   children
 }: ChatPopupProps) {
   const onClose = () => onOpenChange(false)
+  const handleOpenChange: NonNullable<ComponentProps<typeof Popover>['onOpenChange']> = (
+    nextOpen,
+    eventDetails
+  ) => {
+    if (!nextOpen && eventDetails.reason === 'outside-press') {
+      eventDetails.cancel()
+      return
+    }
+    onOpenChange(nextOpen)
+  }
 
   return (
-    <Popover open={open} onOpenChange={onOpenChange} onOpenChangeComplete={onOpenChangeComplete}>
+    <Popover
+      open={open}
+      onOpenChange={handleOpenChange}
+      onOpenChangeComplete={onOpenChangeComplete}
+    >
       <PopoverTrigger
         render={
           <div className="fixed right-4 bottom-4 sm:right-6 sm:bottom-6">

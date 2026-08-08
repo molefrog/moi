@@ -41,31 +41,44 @@ export function TimelineRow({
   isError = false,
   children
 }: TimelineRowProps) {
+  const hasLargeMarker = marker != null || loading
+
   return (
     <div className="relative flex gap-2.5">
       {/* Odd rail width (13px) puts the centerline on a half-pixel, so a crisp
-          1px rule lands on a single pixel column instead of straddling two. */}
+          1px rule lands on a single pixel column instead of straddling two.
+          The split rule leaves a real gap around the node, so it works on any
+          surface without a background-colored halo. */}
       <div className="relative w-[13px] shrink-0">
         {!isFirst && (
-          <span className="absolute top-0 left-1/2 h-3 w-px -translate-x-1/2 bg-border" />
+          <span
+            className={cn(
+              'absolute top-0 left-1/2 w-px -translate-x-1/2 bg-border',
+              hasLargeMarker ? 'h-1' : 'h-2.5'
+            )}
+          />
         )}
         {!isLast && (
-          <span className="absolute top-[18px] bottom-0 left-1/2 w-px -translate-x-1/2 bg-border" />
+          <span
+            className={cn(
+              'absolute bottom-0 left-1/2 w-px -translate-x-1/2 bg-border',
+              hasLargeMarker ? 'top-[26px]' : 'top-5'
+            )}
+          />
         )}
         {marker ? (
           <span className="absolute top-[15px] left-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
             {marker}
           </span>
         ) : loading ? (
-          // A spinner node stands in for the dot; bg-background carves the rule.
-          <span className="absolute top-[15px] left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 rounded-full bg-background p-0.5">
+          // A spinner node stands in for the dot.
+          <span className="absolute top-[15px] left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 p-0.5">
             <IconLoader2 size={12} stroke={1.75} className="animate-spin text-muted-foreground" />
           </span>
         ) : (
-          // Background-colored ring carves a gap in the rule around the dot.
           <span
             className={cn(
-              'absolute top-[15px] left-1/2 z-10 size-[5px] -translate-x-1/2 -translate-y-1/2 rounded-full ring-3 ring-background',
+              'absolute top-[15px] left-1/2 z-10 size-[5px] -translate-x-1/2 -translate-y-1/2 rounded-full',
               isError ? 'bg-destructive' : 'bg-border'
             )}
           />
@@ -95,14 +108,13 @@ export function RowChevron({ open }: { open: boolean }) {
   )
 }
 
-// A rounded node box used as a timeline marker (size-4 by default). The bg-colored
-// ring carves it out of the rule, matching the dot rows. Shared by the MCP logo,
-// the skill node, and the (larger) subagent node; pass `className` to resize.
+// A rounded node box used as a timeline marker (size-4 by default). Shared by the
+// MCP logo, the skill node, and the (larger) subagent node; pass `className` to resize.
 export function NodeBox({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <span
       className={cn(
-        'flex size-4 items-center justify-center overflow-hidden rounded-xs bg-muted ring-2 ring-background',
+        'flex size-4 items-center justify-center overflow-hidden rounded-xs bg-muted',
         className
       )}
     >

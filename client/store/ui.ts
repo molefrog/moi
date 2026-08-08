@@ -9,10 +9,12 @@ type UiStore = {
   hasSentMessageFromMoi: boolean
   workspaceIdsPendingAnalysis: string[]
   composerDrafts: Record<string, string>
+  dockedChatWidth: number
   setDiscoveredWorkspacesOpen: (open: boolean) => void
   markWorkspacePendingAnalysis: (workspaceId: string) => void
   markMessageSentFromMoi: (workspaceId: string) => void
   setComposerDraft: (workspaceId: string, value: string) => void
+  setDockedChatWidth: (width: number) => void
 }
 
 export const createUiStore = (storage?: StateStorage) =>
@@ -23,6 +25,7 @@ export const createUiStore = (storage?: StateStorage) =>
         hasSentMessageFromMoi: false,
         workspaceIdsPendingAnalysis: [],
         composerDrafts: {},
+        dockedChatWidth: 360,
         setDiscoveredWorkspacesOpen: open => set({ discoveredWorkspacesOpen: open }),
         markWorkspacePendingAnalysis: workspaceId =>
           set(state => {
@@ -46,7 +49,8 @@ export const createUiStore = (storage?: StateStorage) =>
             if (value) composerDrafts[workspaceId] = value
             else delete composerDrafts[workspaceId]
             return { composerDrafts }
-          })
+          }),
+        setDockedChatWidth: width => set({ dockedChatWidth: width })
       }),
       storage
         ? {
