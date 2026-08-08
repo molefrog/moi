@@ -59,6 +59,10 @@ Only one server runs at a time — it binds port 13337 (HTTP) and 13059 (control
 
 All three overwrite `~/.bun/bin/moi` — last action wins; `readlink ~/.bun/bin/moi` shows which. Kill the running server before switching (single port 13337).
 
+### Standalone distribution (no Bun required)
+
+`docs/standalone.md` covers the fourth install form: a self-contained runtime tree under `~/.moi` (pinned bun + package + production node_modules), installed by `packaging/install.sh`, updated by `moi update` (`server/standalone.ts`), built per platform by `scripts/build-standalone.ts`, and wrapped by the Tauri desktop shell in `desktop/` (`scripts/build-desktop.ts`). Its `moi` shim lives at `~/.moi/bin/moi`, separate from `~/.bun/bin/moi`.
+
 ## Browser testing in cloud sandboxes
 
 To drive the app in a browser inside Claude Code on the web, use the vendored **agent-browser skill** (`.agents/skills/agent-browser/`). Cloud-specific setup — server startup, `AGENT_BROWSER_EXECUTABLE_PATH`, Playwright alternative, egress-relay caveats — is in `docs/browser-testing-cloud.md`.

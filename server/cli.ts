@@ -41,6 +41,7 @@ import {
 } from './cli-env'
 import { columns } from './cli-ui'
 import { CONTROL_PORT, PORT } from './constants'
+import { isStandaloneInstall, uninstall, updateStandalone } from './standalone'
 import { type OpenClawAgent, discoverOpenClawAgents } from './harness/openclaw/discovery'
 import { liftToWorkspaceRoot, registerWorkspace } from './registry'
 import { serverCwd } from './server-cwd'
@@ -2455,10 +2456,46 @@ const update = defineCommand({
       type: 'boolean',
       default: false,
       description:
-        'Only check the registry, change nothing. Exit 0: up to date (or nothing to update), 1: update available, 2: check failed.'
+        'Only check for a release, change nothing. Exit 0: up to date (or nothing to update), 1: update available, 2: check failed.'
     }
   },
   async run({ args }) {
+    if (isStandaloneInstall()) {
+      console.log('\n' + pc.bold('moi update') + pc.dim(` — standalone v${VERSION}`))
+      try {
+        const result = await updateStandalone({ check: args.check })
+        if (result.status === 'available') {
+          console.log(
+            `  update available: ${pc.bold('v' + result.latest)}` +
+              pc.dim(' — run `moi update` to install\n')
+          )
+          process.exit(1)
+        }
+        if (result.status === 'up-to-date') {
+          const detail =
+            result.current === result.latest
+              ? `latest is v${result.latest}`
+              : `installed v${result.current}; latest published is v${result.latest}`
+          console.log(pc.green('✓') + ` Already up to date (${detail})`)
+          if (!args.check) await reportServerFreshness()
+          process.exit(0)
+        }
+
+        console.log(
+          pc.green('✓') +
+            ` moi updated from ${pc.bold('v' + result.previous)} to ${pc.bold('v' + result.version)}`
+        )
+        await reportServerFreshness(result.version)
+        console.log()
+        process.exit(0)
+      } catch (err) {
+        console.error(
+          '\n' + pc.red('✗') + ' ' + (err instanceof Error ? err.message : String(err)) + '\n'
+        )
+        process.exit(args.check ? 2 : 1)
+      }
+    }
+
     // A checkout has no owning package manager — updating means `git pull`.
     const analysis = analyzeInstall()
     if (analysis.kind === 'checkout') {
@@ -2654,6 +2691,7 @@ const systemCommands = {
   status,
   service,
   update,
+  uninstall,
   openclaw,
   version
 }

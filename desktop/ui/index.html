@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>moi</title>
+    <link rel="stylesheet" href="../../client/index.css" />
+  </head>
+  <body class="bg-background font-sans text-foreground select-none">
+    <main class="grid min-h-dvh place-items-center px-6 py-10">
+      <section
+        class="flex w-full max-w-sm flex-col items-center gap-4 text-center"
+        aria-live="polite"
+      >
+        <img
+          class="size-12 [image-rendering:pixelated]"
+          src="../../client/assets/favicon.png"
+          alt=""
+        />
+        <div class="flex flex-col items-center gap-1.5">
+          <p id="message" class="text-sm text-muted-foreground">Starting moi</p>
+          <p
+            id="detail"
+            class="max-w-sm text-sm whitespace-pre-wrap text-muted-foreground"
+            hidden
+          ></p>
+        </div>
+        <div id="actions" class="flex items-center gap-2" hidden>
+          <button
+            id="retry"
+            type="button"
+            class="h-8 rounded-lg bg-primary px-3 text-sm text-primary-foreground outline-none hover:opacity-90 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
+          >
+            Try again
+          </button>
+          <button
+            id="copy"
+            type="button"
+            class="h-8 rounded-lg bg-background px-3 text-sm text-foreground shadow-xs outline-none hover:shadow-sm focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            Copy diagnostics
+          </button>
+        </div>
+      </section>
+    </main>
+    <script>
+      // Driven from Rust via eval: progress text while the runtime unpacks and
+      // the server boots, or a terminal error if either fails.
+      const message = document.getElementById('message')
+      const detail = document.getElementById('detail')
+      const actions = document.getElementById('actions')
+      const retry = document.getElementById('retry')
+      const copy = document.getElementById('copy')
+      let diagnostic = ''
+
+      window.__moiStatus = text => {
+        message.className = 'text-sm text-muted-foreground'
+        message.textContent = text
+        detail.hidden = true
+        actions.hidden = true
+      }
+
+      window.__moiError = text => {
+        diagnostic = text
+        message.className = 'text-sm font-medium text-foreground'
+        message.textContent = 'moi could not start'
+        detail.textContent = text
+        detail.hidden = false
+        actions.hidden = false
+        retry.disabled = false
+        copy.textContent = 'Copy diagnostics'
+      }
+
+      retry.addEventListener('click', async () => {
+        retry.disabled = true
+        window.__moiStatus('Trying again')
+        try {
+          await window.__TAURI__.core.invoke('retry_boot')
+        } catch (error) {
+          window.__moiError(String(error))
+        }
+      })
+
+      copy.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(diagnostic)
+          copy.textContent = 'Copied'
+        } catch {
+          copy.textContent = 'Copy failed'
+        }
+      })
+    </script>
+  </body>
+</html>
