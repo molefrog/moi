@@ -392,11 +392,22 @@ export type WorkspaceSkillsUpdateFailure = WorkspaceSkillsStatus & {
   error: string
 }
 
-// Whether an agent backend's runtime is installed on this machine. `reason` is
-// user-facing copy explaining what to do next. Surfaced by
-// GET /api/workspaces/create (per-type map, drives setup dialogs) and
-// GET /api/workspaces/:id/availability (disables Send in existing workspaces).
-export type HarnessAvailability = { available: true } | { available: false; reason: string }
+// Setup checks only runtime availability. Workspace checks may also attach a
+// login command, which makes the composer show its Sign in action.
+export type HarnessAvailability =
+  | { available: true }
+  | { available: false; reason: string; loginCommand?: string }
+
+// Codex returns a URL for the browser. Claude opens it from its own CLI.
+export type HarnessLogin = { url?: string }
+
+// The server-owned login ceremony, one per workspace. `pending` means a watch
+// loop is re-probing the provider until the login lands or the deadline
+// passes; transitions arrive as `agent:updated` events, so every tab shows
+// the same ceremony without polling.
+export type AgentLoginState =
+  | { state: 'pending'; url?: string }
+  | { state: 'failed'; reason: string }
 
 // One MCP server's connection status, as surfaced by GET /api/workspaces/:id/mcp
 // (a subset of the agent SDK's McpServerStatus — only what the UI renders).
@@ -620,10 +631,19 @@ export type Model = {
   supportsAutoMode?: boolean
 }
 
-// GET /api/workspaces/:id/models payload.
-export type WorkspaceModels = {
-  // The agent backend that produced this list — matches the workspace provider.
+// GET /api/workspaces/:id/agent payload — everything the client needs to know
+// about the workspace's agent backend in one request at workspace open.
+// `models` and capabilities are stable per process; `availability` and `login`
+// are the volatile part, kept fresh after load by `agent:updated` events
+// instead of refetches.
+export type WorkspaceAgent = {
+  // The agent backend that produced this snapshot — matches the workspace
+  // provider.
   provider: WorkspaceType
+  // Runtime presence and provider auth state, from the server-side cache.
+  availability: HarnessAvailability
+  // Present while a login ceremony is in flight or after one failed.
+  login?: AgentLoginState
   models: Model[]
   // Whether this provider supports live token-by-token streaming (the picker
   // shows the "Live typing" toggle only when true). Provider-wide, not per-model

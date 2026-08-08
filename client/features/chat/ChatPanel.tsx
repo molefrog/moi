@@ -1,8 +1,12 @@
-import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
 import { IconChevronDown, IconX } from '@tabler/icons-react'
 
-import { canSubmitComposerAction, focusComposer } from '@/client/components/shared/Composer'
+import {
+  canSubmitComposerAction,
+  type ComposerAvailability,
+  focusComposer
+} from '@/client/components/shared/Composer'
 import { useStickToBottom } from '@/client/features/chat/useStickToBottom'
 import { groupTurns } from '@/client/features/chat/group-turns'
 import { attachmentKey, useLive } from '@/client/features/chat/chat-store'
@@ -11,7 +15,8 @@ import type { ChatSendOptions } from '@/client/features/chat/chat-send'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import type { Turn, ViewState } from '@/lib/types'
 
-import { ChatComposer } from './ChatComposer'
+import type { ComposerBanner } from './composer/banners/ComposerBanner'
+import { ChatComposer } from './composer/ChatComposer'
 import { ChatEmptyState, resolveChatEmptyState } from './ChatEmptyState'
 import { ChatSelector } from './ChatSelector'
 import { ThinkingIndicator, TurnView } from './TurnView'
@@ -32,10 +37,8 @@ type ChatPanelProps = {
   // session switch).
   sessionId?: string | null
   processing: boolean
-  error?: string | null
-  onDismissError?: () => void
-  composerBanner?: ReactNode
-  unavailableReason: string | null | undefined
+  composerBanner?: ComposerBanner
+  composerAvailability: ComposerAvailability
   send: (text: string, options?: ChatSendOptions) => void
   stop: () => void
   onSelectSession: (sessionId: string | null) => void
@@ -51,10 +54,8 @@ export function ChatPanel({
   previewTurn,
   sessionId,
   processing,
-  error,
-  onDismissError,
   composerBanner,
-  unavailableReason,
+  composerAvailability,
   send,
   stop,
   onSelectSession,
@@ -73,7 +74,7 @@ export function ChatPanel({
       attachment => attachment.status === 'uploading'
     )
   )
-  const promptDisabled = !canSubmitComposerAction(true, attachmentsUploading, unavailableReason)
+  const promptDisabled = !canSubmitComposerAction(true, attachmentsUploading, composerAvailability)
   // Visual grouping: fold consecutive tool-only assistant turns into one
   // synthetic turn so OpenAI Codex–style traces (which serialize one
   // assistant message per agent step) don't render with the wider
@@ -178,36 +179,19 @@ export function ChatPanel({
         <div
           className={cn(
             '@container flex w-full flex-col transition-[padding]',
-            (composerBanner || error) && 'gap-2 rounded-t-xl rounded-b-2xl p-2',
-            composerBanner && 'bg-muted',
-            error && 'bg-destructive/10'
+            composerBanner && 'gap-2 rounded-t-xl rounded-b-2xl p-2',
+            composerBanner?.tone === 'muted' && 'bg-muted',
+            composerBanner?.tone === 'destructive' && 'bg-destructive/10'
           )}
         >
-          {composerBanner}
-          {error && (
-            <div className="flex w-full items-center gap-2 p-1 pl-4 text-sm">
-              <span className="flex-1 wrap-break-word text-destructive">{error}</span>
-              {onDismissError && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={onDismissError}
-                  className="text-destructive hover:text-destructive"
-                  aria-label="Dismiss error"
-                >
-                  <IconX stroke={1.75} />
-                </Button>
-              )}
-            </div>
-          )}
+          {composerBanner?.content}
           <ChatComposer
             composerRef={composerRef}
             onSend={handleSend}
             onStop={stop}
             processing={processing}
             sessionId={sessionId ?? null}
-            unavailableReason={unavailableReason}
+            availability={composerAvailability}
           />
         </div>
       </div>

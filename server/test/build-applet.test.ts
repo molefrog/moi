@@ -466,6 +466,20 @@ describe('moi fileUrl module', () => {
 describe('mixed widget + view build (Tailwind isolation)', () => {
   const ROOT = join(FIXTURES, 'kindmix')
 
+  // Warmup: the top-level `beforeAll` above swallows the first-build-in-the-
+  // process Bun quirk for a single sequential build, but two builds racing
+  // via Promise.all for the first time in the process hit the same "Could
+  // not resolve" quirk on their own — the concurrency itself is a fresh
+  // combo, not just the entrypoint/root/kind options. Swallow one throwaway
+  // concurrent pair so the real assertion below starts from the working state.
+  beforeAll(async () => {
+    await Promise.all([
+      buildApplet(join(ROOT, 'widgets', 'wmix.tsx'), ROOT, 'widget').catch(() => {}),
+      buildApplet(join(ROOT, 'views', 'vmix.tsx'), ROOT, 'view').catch(() => {})
+    ])
+    rmSync(join(ROOT, '.build'), { recursive: true, force: true })
+  })
+
   afterAll(() => {
     rmSync(join(ROOT, '.build'), { recursive: true, force: true })
   })

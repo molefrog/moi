@@ -35,10 +35,12 @@ import {
   codexServiceTierForFastMode,
   codexItemToNotice,
   codexItemToTurn,
-  codexThreadToEvents
+  codexThreadToEvents,
+  withCodexTurnDuration
 } from './adapter'
 import { type CodexClient, getCodexClient, interruptCodexTurn, readSubagentRecords } from './client'
 import { generateCodexSessionTitle, renameCodexSessionIfUnchanged } from './session-title'
+import { agentStore } from '../../agent'
 import { debug } from '../../debug'
 import { broadcast } from '../../state'
 import { renameSelectedSession } from '../../selected-session'
@@ -243,28 +245,41 @@ function forwardPreview(
   })
 }
 
-// Fold the thread's latest per-turn usage into the newest assistant turn so
-// the meta strip can show tokens. Re-emits that turn (upsert-by-id).
-function applyUsage(rec: SessionRecord) {
+// Fold native completion metadata into the newest assistant turn so replay and
+// live rendering use the same display shape. Re-emits that turn (upsert-by-id).
+function applyCompletionMeta(rec: SessionRecord, durationMs: number | null | undefined) {
   const last = rec.lastUsage?.last
-  if (!last) return
   for (let i = rec.view.turns.length - 1; i >= 0; i--) {
     const t = rec.view.turns[i]
+    if (t.role === 'user' && t.origin.kind === 'user-input') return
     if (t.role !== 'assistant') continue
-    const updated = {
-      ...t,
-      meta: {
-        ...t.meta,
-        usage: {
-          inputTokens: last.inputTokens,
-          outputTokens: last.outputTokens,
-          totalTokens: last.totalTokens
+    let updated = withCodexTurnDuration(t, durationMs)
+    if (last) {
+      updated = {
+        ...updated,
+        meta: {
+          ...updated.meta,
+          usage: {
+            inputTokens: last.inputTokens,
+            outputTokens: last.outputTokens,
+            totalTokens: last.totalTokens
+          }
         }
       }
     }
+    if (updated === t) return
     emitTurnEvent(rec, { kind: 'turn', turn: updated })
     return
   }
+}
+
+// A send/turn failure can mean the account was signed out from outside moi —
+// a `codex logout` in a terminal, say — which the cached availability
+// snapshot won't reflect until its TTL expires. Force a fresh probe so the
+// composer's availability banner flips right away instead of the next send
+// failing the same way.
+function refreshAvailability(workspaceId: string, workspacePath: string) {
+  void agentStore.refresh({ id: workspaceId, path: workspacePath, type: 'codex' })
 }
 
 function handleNotification(rec: SessionRecord, method: string, params: Record<string, unknown>) {
@@ -325,7 +340,7 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
     case 'turn/completed': {
       const turn = params.turn as CodexTurn | undefined
       rec.previews.clear()
-      applyUsage(rec)
+      applyCompletionMeta(rec, turn?.durationMs)
       setProcessing(rec, false, null)
       if (rec.refreshSessionsOnTurnComplete) {
         rec.refreshSessionsOnTurnComplete = false
@@ -337,6 +352,7 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
           sessionId: rec.sessionId,
           content: turn.error.message
         })
+        refreshAvailability(rec.workspaceId, rec.workspacePath)
       }
       // An externally-interrupted turn otherwise ends silently, identical to a
       // clean completion — surface the stop so the client can render it.
@@ -350,6 +366,7 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
       const message = err?.message ?? (typeof params.message === 'string' ? params.message : '')
       if (message) {
         broadcast(rec.workspaceId, { kind: 'error', sessionId: rec.sessionId, content: message })
+        refreshAvailability(rec.workspaceId, rec.workspacePath)
       }
       // A top-level error without a following turn/completed would otherwise
       // leave the session busy forever — the error is terminal for the turn.
@@ -642,6 +659,7 @@ export async function sendCodexMessage(input: {
       sessionId: input.sessionId,
       content: err instanceof Error ? err.message : 'failed to start codex session'
     })
+    refreshAvailability(input.workspaceId, input.workspacePath)
     return
   }
 
@@ -723,6 +741,7 @@ export async function sendCodexMessage(input: {
       sessionId: rec.sessionId,
       content: err instanceof Error ? err.message : 'send failed'
     })
+    refreshAvailability(rec.workspaceId, rec.workspacePath)
   }
 }
 

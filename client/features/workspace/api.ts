@@ -3,10 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
+import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import type {
-  HarnessAvailability,
+  HarnessLogin,
   ViewInfo,
   WidgetInfo,
+  WorkspaceAgent,
   WorkspaceLayout,
   WorkspaceSkillsStatus,
   WorkspaceSkillsUpdateFailure,
@@ -28,16 +30,39 @@ export function useWorkspaceLayout(workspaceId: string) {
   })
 }
 
-// Is the workspace's agent executable installed? Drives the Send button's
-// disabled state and tooltip. Refetches on window focus so installing the
-// missing runtime and returning to the tab unlocks the composer.
-export function useWorkspaceAvailability(workspaceId: string) {
-  return useQuery<HarnessAvailability>({
-    queryKey: workspaceKeys.availability(workspaceId),
-    queryFn: () => requestJson(`/api/workspaces/${workspaceId}/availability`),
+// The workspace's agent backend in one snapshot: availability (runtime
+// presence + auth), any in-flight login ceremony, the model catalog, and
+// capabilities. Fetched once at workspace open; afterwards the volatile parts
+// (`availability`, `login`) are patched in place by `agent:updated` events —
+// the server owns the login watch loop, so the client never polls. Focus
+// refetch stays as a cheap safety net (the server serves its cache).
+export function useWorkspaceAgent(workspaceId: string) {
+  const queryClient = useQueryClient()
+  useWorkspaceEvent(event => {
+    if (event.type === 'agent:updated' && event.workspaceId === workspaceId) {
+      queryClient.setQueryData<WorkspaceAgent>(workspaceKeys.agent(workspaceId), prev =>
+        prev ? { ...prev, availability: event.availability, login: event.login } : prev
+      )
+    }
+    // Env can swap credentials; the server dropped its cache — refetch.
+    if (event.type === 'env:updated' && event.workspaceId === workspaceId) {
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.agent(workspaceId) })
+    }
+  })
+  return useQuery<WorkspaceAgent>({
+    queryKey: workspaceKeys.agent(workspaceId),
+    queryFn: () => requestJson(`/api/workspaces/${workspaceId}/agent`),
     staleTime: 30_000,
     refetchOnWindowFocus: true
   })
+}
+
+export function startWorkspaceLogin(workspaceId: string): Promise<HarnessLogin> {
+  return requestJson(
+    `/api/workspaces/${workspaceId}/auth/login`,
+    { method: 'POST' },
+    'Could not start sign-in'
+  )
 }
 
 export function useWorkspaceSkills(workspaceId: string) {

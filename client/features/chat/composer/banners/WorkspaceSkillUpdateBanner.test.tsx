@@ -7,7 +7,7 @@ import { WorkspaceSkillUpdateBanner } from './WorkspaceSkillUpdateBanner'
 import {
   shouldAutomaticallyUpdateWorkspaceSkills,
   shouldShowWorkspaceSkillUpdateBanner
-} from './useWorkspaceSkillUpdates'
+} from '../useWorkspaceSkillUpdates'
 
 function renderBanner(
   props: Partial<Parameters<typeof WorkspaceSkillUpdateBanner>[0]> = {}

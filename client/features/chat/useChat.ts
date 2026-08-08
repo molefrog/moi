@@ -3,12 +3,8 @@ import { useCallback, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import {
-  useSessionConfig,
-  useSessionView,
-  useWorkspaceModels,
-  useWorkspaceSessions
-} from '@/client/features/chat/api'
+import { useSessionConfig, useSessionView, useWorkspaceSessions } from '@/client/features/chat/api'
+import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { useSelectedSession } from '@/client/features/chat/useSelectedSession'
 import {
   type WorkspaceTabAddress,
@@ -51,7 +47,7 @@ export function useChat(address: WorkspaceTabAddress) {
   const { layout } = useWorkspaceLayoutCtx()
   const [selectedSession, selectSession] = useSelectedSession()
   const selectedSessionId = selectedSession ?? null
-  const modelsData = useWorkspaceModels(workspaceId).data
+  const modelsData = useWorkspaceAgent(workspaceId).data
   const sessions = useWorkspaceSessions(workspaceId).data
   // Snapshot of the workspace's ambient UI state + queued one-shot
   // directives, taken when the message actually goes out.

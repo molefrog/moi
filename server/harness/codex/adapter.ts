@@ -118,6 +118,11 @@ export type CodexModel = {
   additionalSpeedTiers?: string[]
 }
 
+export function withCodexTurnDuration(turn: Turn, durationMs: number | null | undefined): Turn {
+  if (typeof durationMs !== 'number' || !Number.isFinite(durationMs) || durationMs < 0) return turn
+  return { ...turn, meta: { ...turn.meta, durationMs } }
+}
+
 // ---- discovery mappings ------------------------------------------------------
 
 const CODEX_FAST_SERVICE_TIER = 'priority'
@@ -565,7 +570,10 @@ export function codexThreadToEvents(
           const part = t.parts.find(p => p.type === 'tool-call')
           if (sub && part?.type === 'tool-call') part.call.subagent = sub.record
         }
-        events.push({ kind: 'turn', turn: t })
+        events.push({
+          kind: 'turn',
+          turn: t.role === 'assistant' ? withCodexTurnDuration(t, turn.durationMs) : t
+        })
         continue
       }
       const n = codexItemToNotice(item, thread.id)

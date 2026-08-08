@@ -1,6 +1,15 @@
 import { describe, expect, test } from 'bun:test'
 
-import { canSubmitComposerAction, focusComposer } from './Composer'
+import {
+  canSubmitComposerAction,
+  type ComposerAvailability,
+  composerAvailabilityTooltip,
+  focusComposer
+} from './Composer'
+
+const available: ComposerAvailability = { status: 'available' }
+const checking: ComposerAvailability = { status: 'checking' }
+const unavailable: ComposerAvailability = { status: 'unavailable' }
 
 test('focuses a composer with the caret after its draft', () => {
   let focused = false
@@ -22,23 +31,23 @@ test('focuses a composer with the caret after its draft', () => {
 
 describe('canSubmitComposerAction', () => {
   test('allows complete input while the provider is available', () => {
-    expect(canSubmitComposerAction(true, false, null)).toBe(true)
+    expect(canSubmitComposerAction(true, false, available)).toBe(true)
   })
 
   test.each([
-    { hasContent: false, busy: false, unavailableReason: null },
-    { hasContent: true, busy: true, unavailableReason: null },
-    { hasContent: true, busy: false, unavailableReason: undefined },
-    {
-      hasContent: true,
-      busy: false,
-      unavailableReason:
-        'Run curl -fsSL https://claude.ai/install.sh | sh in your terminal to install Claude'
-    }
-  ])(
-    'blocks unavailable or incomplete composer actions',
-    ({ hasContent, busy, unavailableReason }) => {
-      expect(canSubmitComposerAction(hasContent, busy, unavailableReason)).toBe(false)
-    }
-  )
+    { hasContent: false, busy: false, availability: available },
+    { hasContent: true, busy: true, availability: available },
+    { hasContent: true, busy: false, availability: checking },
+    { hasContent: true, busy: false, availability: unavailable }
+  ])('blocks unavailable or incomplete composer actions', ({ hasContent, busy, availability }) => {
+    expect(canSubmitComposerAction(hasContent, busy, availability)).toBe(false)
+  })
+})
+
+describe('composerAvailabilityTooltip', () => {
+  test('only shows while agent availability is checking', () => {
+    expect(composerAvailabilityTooltip(checking)).toBe('Checking agent status…')
+    expect(composerAvailabilityTooltip(unavailable)).toBeUndefined()
+    expect(composerAvailabilityTooltip(available)).toBeUndefined()
+  })
 })

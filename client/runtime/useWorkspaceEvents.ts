@@ -1,7 +1,15 @@
 import { useEffect, useRef } from 'react'
 
 import { wsUrl } from '@/client/lib/ws-url'
-import type { AppSettings, ViewBuilder, ViewInfo, WidgetInfo, WorkspaceTabId } from '@/lib/types'
+import type {
+  AgentLoginState,
+  AppSettings,
+  HarnessAvailability,
+  ViewBuilder,
+  ViewInfo,
+  WidgetInfo,
+  WorkspaceTabId
+} from '@/lib/types'
 
 export type WorkspaceEvent =
   | { type: 'widget:updated'; name: string }
@@ -21,6 +29,15 @@ export type WorkspaceEvent =
   | { type: 'workspaces-list:updated' }
   // A workspace's env changed outside the UI — refetch the env view.
   | { type: 'env:updated'; workspaceId: string }
+  // The agent backend's availability or login ceremony changed (login landed,
+  // ceremony timed out, auth probe flipped). Carries the new state so caches
+  // patch without a refetch.
+  | {
+      type: 'agent:updated'
+      workspaceId: string
+      availability: HarnessAvailability
+      login?: AgentLoginState
+    }
   // The Scratchpad canvas for `workspaceId` was saved — open tabs reload from
   // disk. `origin` is the tab that wrote it, so that tab can skip its own echo.
   | { type: 'scratchpad:updated'; workspaceId: string; origin?: string }

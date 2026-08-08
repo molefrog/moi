@@ -1,44 +1,62 @@
-// Visual-grouping pass on top of the raw `view.turns` stream.
-//
-// Background (see `dev/turn-spacing.md`): some providers (OpenAI Codex,
-// notably) serialize one assistant message per agent-loop step. A run that
-// does Read → Write → Bash often arrives as four tool-only assistant turns
-// with no text in between. Each turn renders as its own `<TurnView>` and
-// inherits the wider inter-turn gap, which makes the chat feel sparse.
-//
-// This helper merges consecutive assistant turns into a single synthetic
-// turn whenever they're "tool-only" — i.e. the joining turn has no `text`
-// part. A turn that contains a `text` part *always* starts a new group.
-// User turns, replays, and any non-assistant turn pass through unchanged.
-//
-// Key stability: the merged turn keeps the FIRST member's `id` (and `seq`,
-// `timestamp`, `meta`, etc.). Live-stream upserts that update a member
-// turn's parts (tool-result fold-in, optimistic-id rename) flow through
-// without changing the merged group's key, so React's reconciliation
-// updates in place. New turns appended later either join the same group
-// (same key, more parts) or start a new one (their own id).
-import type { Part, Turn } from '@/lib/types'
+// Visual grouping on top of the raw `view.turns` stream. Providers serialize
+// one agent run differently: Claude can mix several blocks in one assistant
+// message, while Codex emits a separate item for every step. The chat renders
+// consecutive assistant turns as one run so both shapes finish the same way.
+import type { Turn } from '@/lib/types'
 
-function hasText(parts: Part[]): boolean {
-  return parts.some(p => p.type === 'text')
+function isVisibleChatTurn(turn: Turn): boolean {
+  return (
+    turn.origin.kind !== 'replay' &&
+    turn.origin.kind !== 'synthetic' &&
+    turn.origin.kind !== 'subagent-prompt'
+  )
+}
+
+function mergeAssistantTurns(first: Turn, next: Turn): Turn {
+  const meta = first.meta || next.meta ? { ...first.meta, ...next.meta } : undefined
+  return {
+    ...first,
+    parts: [...first.parts, ...next.parts],
+    timestamp: next.timestamp ?? first.timestamp,
+    meta
+  }
 }
 
 export function groupTurns(turns: Turn[]): Turn[] {
   const out: Turn[] = []
   for (const t of turns) {
+    if (!isVisibleChatTurn(t)) continue
     if (t.role !== 'assistant') {
       out.push(t)
       continue
     }
     const last = out.length > 0 ? out[out.length - 1] : null
-    const canJoin = !hasText(t.parts) && last !== null && last.role === 'assistant'
-    if (canJoin) {
-      // Replace the last entry with a merged copy. Spread `last` first so
-      // its id/timestamp/meta/origin/seq survive; only `parts` is rebuilt.
-      out[out.length - 1] = { ...last, parts: [...last.parts, ...t.parts] }
+    if (last?.role === 'assistant') {
+      // Keep the first id as the React key while carrying the latest timestamp
+      // and metadata forward for the completed run.
+      out[out.length - 1] = mergeAssistantTurns(last, t)
     } else {
       out.push(t)
     }
   }
-  return out
+  return out.map((turn, index) => {
+    const previous = out[index - 1]
+    if (
+      turn.role !== 'assistant' ||
+      previous?.role !== 'user' ||
+      previous.origin.kind !== 'user-input' ||
+      !previous.timestamp ||
+      !turn.timestamp
+    ) {
+      return turn
+    }
+
+    const startedAt = Date.parse(previous.timestamp)
+    const finishedAt = Date.parse(turn.timestamp)
+    if (!Number.isFinite(startedAt) || !Number.isFinite(finishedAt) || finishedAt < startedAt) {
+      return turn
+    }
+
+    return { ...turn, meta: { ...turn.meta, durationMs: finishedAt - startedAt } }
+  })
 }

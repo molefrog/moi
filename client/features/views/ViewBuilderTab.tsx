@@ -3,6 +3,7 @@ import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 
 import { Button } from '@/client/components/ui/button'
 import {
   canSubmitComposerAction,
+  type ComposerAvailability,
   Composer,
   ComposerFooter,
   ComposerSubmitButton,
@@ -14,7 +15,7 @@ import { Spinner } from '@/client/components/ui/spinner'
 
 type ViewBuilderTabProps = {
   builder: ViewBuilder
-  unavailableReason: string | null | undefined
+  composerAvailability: ComposerAvailability
   onSave: (requirements: string) => Promise<unknown>
   onSubmit: (requirements: string) => Promise<unknown>
   onOpenChat: () => void
@@ -23,7 +24,7 @@ type ViewBuilderTabProps = {
 
 export function ViewBuilderTab({
   builder,
-  unavailableReason,
+  composerAvailability,
   onSave,
   onSubmit,
   onOpenChat,
@@ -36,7 +37,7 @@ export function ViewBuilderTab({
   const onSaveRef = useRef(onSave)
   onSaveRef.current = onSave
   const hasRequirements = requirements.trim().length > 0
-  const canSubmit = canSubmitComposerAction(hasRequirements, submitting, unavailableReason)
+  const canSubmit = canSubmitComposerAction(hasRequirements, submitting, composerAvailability)
 
   useEffect(() => {
     if (builder.status !== 'draft' || requirements === builder.input.requirements) return
@@ -101,7 +102,7 @@ export function ViewBuilderTab({
                 label="Build view"
                 hasContent={hasRequirements}
                 loading={submitting}
-                unavailableReason={unavailableReason}
+                availability={composerAvailability}
               />
             </ComposerFooter>
           </Composer>

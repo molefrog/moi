@@ -6,7 +6,7 @@ import type { MoiUserMessageOptions } from '@/client/features/workspace/moi-cont
 import { STREAM_RESPONSES } from '@/client/lib/flags'
 import { formatChatTitle } from '@/lib/chat-title'
 import { applyEvent, emptyViewState } from '@/lib/format'
-import type { Part, SessionInfo, ViewState, WorkspaceModels } from '@/lib/types'
+import type { Part, SessionInfo, ViewState, WorkspaceAgent } from '@/lib/types'
 
 // What a caller may attach to one message beyond its text. All of it is
 // envelope material — the agent sees it, the chat bubble does not.
@@ -87,7 +87,7 @@ export function startOptimisticSession({
 }
 
 export function resolveChatRunOptions(
-  modelsData: WorkspaceModels | undefined,
+  modelsData: WorkspaceAgent | undefined,
   pickedModel: string | undefined,
   pickedEffort: string | undefined,
   pickedFastMode?: boolean

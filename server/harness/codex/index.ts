@@ -2,6 +2,7 @@
 // ../types.ts for the contract and ../README.md for the architecture.
 import type { Harness } from '../types'
 import { findHarnessExecutable, pathHarnessAvailability } from '../executable'
+import { getCodexAuthReadiness, startCodexLogin } from './auth'
 import {
   archiveCodexSession,
   getCodexMcpStatus,
@@ -59,7 +60,11 @@ export const codexHarness: Harness = {
   listModels: ws => getCodexModels(ws.path),
   mcpStatus: ws => getCodexMcpStatus(ws.path),
   discoverWorkspaces: registeredPaths => discoverCodexWorkspaces(registeredPaths),
-  availability: async () => pathHarnessAvailability('codex'),
+  availability: async ws => {
+    const runtime = await pathHarnessAvailability('codex')
+    return runtime.available && ws ? getCodexAuthReadiness(ws.path) : runtime
+  },
+  startLogin: ws => startCodexLogin(ws.path),
 
   onEnvChanged: workspacePath => killCodexWorkspace(workspacePath),
   shutdown: () => killAllCodexClients(),

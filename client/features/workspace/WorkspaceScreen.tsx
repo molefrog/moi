@@ -28,9 +28,7 @@ import { ViewBuilderTab } from '@/client/features/views/ViewBuilderTab'
 import { ViewManager } from '@/client/features/views/ViewManager'
 import { useViewBuilderActions } from '@/client/features/views/useViewBuilderActions'
 import { useFitsSplitLayout } from '@/client/features/workspace/useFitsSplitLayout'
-import { useWorkspaceAvailability } from '@/client/features/workspace/api'
-import { WorkspaceSkillUpdateBanner } from '@/client/features/workspace/WorkspaceSkillUpdateBanner'
-import { useWorkspaceSkillUpdates } from '@/client/features/workspace/useWorkspaceSkillUpdates'
+import { useWorkspaceComposerState } from '@/client/features/chat/composer/useWorkspaceComposerState'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
 import {
   hasRunningWorkspaceActivity,
@@ -199,12 +197,6 @@ function applyVisibleTabOrder(
 
 export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenProps) {
   const { layout, setLayout, name, icon, provider, workspaceId } = useWorkspaceLayoutCtx()
-  // Keep the composer read/write, but block sends when its agent executable is
-  // missing. The Send button explains how to install it.
-  const availability = useWorkspaceAvailability(workspaceId).data
-  const { bannerProps: skillUpdateBanner } = useWorkspaceSkillUpdates(workspaceId)
-  const unavailableReason =
-    availability === undefined ? undefined : availability.available ? null : availability.reason
   const builderActions = useViewBuilderActions()
   const { ref: rowRef, fits: canUseSplit } = useFitsSplitLayout<HTMLDivElement>()
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
@@ -251,6 +243,10 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     selectSession,
     dismissError
   } = useChat({ activeTab, appletParams })
+  const { composerBanner, composerAvailability } = useWorkspaceComposerState(workspaceId, {
+    chatError: error,
+    onDismissChatError: dismissError
+  })
 
   const openSet = new Set(tabsState.open)
 
@@ -415,7 +411,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   // Chat messages fired from applet UI. `openChat` is the reveal: on a view tab
   // in full-screen mode the chat is a closed popover, and a run the user can't
   // see is worse than a panel that opens itself.
-  useAppletChatMessage({ send, revealChat: openChat, unavailableReason })
+  useAppletChatMessage({ send, revealChat: openChat, composerAvailability })
 
   const createItems: CreateWorkspaceTabItem[] = [
     ...(!dockedSplit && !openSet.has('agent')
@@ -495,12 +491,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       previewTurn={previewTurn}
       sessionId={sessionId}
       processing={processing}
-      error={error}
-      onDismissError={dismissError}
-      composerBanner={
-        skillUpdateBanner ? <WorkspaceSkillUpdateBanner {...skillUpdateBanner} /> : undefined
-      }
-      unavailableReason={unavailableReason}
+      composerBanner={composerBanner}
+      composerAvailability={composerAvailability}
       send={send}
       stop={stop}
       onSelectSession={selectSession}
@@ -516,12 +508,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       previewTurn={previewTurn}
       sessionId={sessionId}
       processing={processing}
-      error={error}
-      onDismissError={dismissError}
-      composerBanner={
-        skillUpdateBanner ? <WorkspaceSkillUpdateBanner {...skillUpdateBanner} /> : undefined
-      }
-      unavailableReason={unavailableReason}
+      composerBanner={composerBanner}
+      composerAvailability={composerAvailability}
       send={send}
       stop={stop}
       onSelectSession={selectSession}
@@ -559,7 +547,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               <ViewBuilderTab
                 key={activeBuilder.id}
                 builder={activeBuilder}
-                unavailableReason={unavailableReason}
+                composerAvailability={composerAvailability}
                 onSave={requirements => builderActions.save(activeBuilder.id, requirements)}
                 onSubmit={requirements => {
                   if (mode === 'fullscreen') setFloatingChatOpen(true)
@@ -661,14 +649,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               previewTurn={previewTurn}
               sessionId={sessionId}
               processing={processing}
-              error={error}
-              onDismissError={dismissError}
-              composerBanner={
-                skillUpdateBanner ? (
-                  <WorkspaceSkillUpdateBanner {...skillUpdateBanner} />
-                ) : undefined
-              }
-              unavailableReason={unavailableReason}
+              composerBanner={composerBanner}
+              composerAvailability={composerAvailability}
               send={send}
               stop={stop}
               onSelectSession={selectSession}

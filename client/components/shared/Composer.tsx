@@ -77,12 +77,24 @@ export function ComposerFooter({ className, children, ...props }: ComposerFooter
   )
 }
 
+export type ComposerAvailability =
+  | { status: 'checking' }
+  | { status: 'available' }
+  | { status: 'unavailable' }
+
+export function composerAvailabilityTooltip(
+  availability: ComposerAvailability
+): string | undefined {
+  if (availability.status === 'checking') return 'Checking agent status…'
+  return undefined
+}
+
 export function canSubmitComposerAction(
   hasContent: boolean,
   busy: boolean,
-  unavailableReason: string | null | undefined
+  availability: ComposerAvailability
 ): boolean {
-  return hasContent && !busy && unavailableReason === null
+  return hasContent && !busy && availability.status === 'available'
 }
 
 type ComposerSubmitButtonProps = {
@@ -90,7 +102,7 @@ type ComposerSubmitButtonProps = {
   hasContent: boolean
   busy?: boolean
   loading?: boolean
-  unavailableReason: string | null | undefined
+  availability: ComposerAvailability
 }
 
 export function ComposerSubmitButton({
@@ -98,21 +110,22 @@ export function ComposerSubmitButton({
   hasContent,
   busy = false,
   loading = false,
-  unavailableReason
+  availability
 }: ComposerSubmitButtonProps) {
-  const canSubmit = canSubmitComposerAction(hasContent, busy || loading, unavailableReason)
+  const canSubmit = canSubmitComposerAction(hasContent, busy || loading, availability)
+  const availabilityTooltip = composerAvailabilityTooltip(availability)
   const button = (
     <Button type="submit" size="icon" disabled={!canSubmit} aria-label={label}>
       {loading ? <Spinner /> : <IconArrowUp stroke={1.5} />}
     </Button>
   )
 
-  if (loading || !unavailableReason) return button
+  if (loading || !availabilityTooltip) return button
 
   return (
     <Tooltip>
       <TooltipTrigger render={<span className="inline-flex">{button}</span>} />
-      <TooltipContent className="max-w-64 text-center">{unavailableReason}</TooltipContent>
+      <TooltipContent className="max-w-64 text-center">{availabilityTooltip}</TooltipContent>
     </Tooltip>
   )
 }

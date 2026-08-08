@@ -11,13 +11,14 @@ import type {
   SessionInfo,
   UploadInfo,
   ViewBuilderInput,
+  WorkspaceAgent,
   WorkspaceEntry,
-  WorkspaceModels,
   WorkspaceType
 } from '@/lib/types'
 import type { MoiContext } from '@/lib/moi-context'
 import { viewBuilderDirectives } from '@/lib/view-builder-directives'
 
+import { agentStore } from './agent'
 import { getAppSettings, pickAppSettingsPatch, saveAppSettings } from './app-settings'
 import { appletForModule, recordAppletError } from './applet-log'
 import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from './applets'
@@ -638,12 +639,18 @@ one.put('/env', async c => {
   return c.json(await getWorkspaceEnvView(ws.path, requiredEnvFor(ws.path)))
 })
 
-// Is the workspace's agent backend usable right now? (e.g. a codex workspace
-// on a machine without the codex CLI). The chat surfaces the `reason` as a
-// banner instead of letting the first send fail cold.
-one.get('/availability', async c => {
-  const availability = await workspaceTypeAvailability(c.get('ws').type ?? 'claude-code')
-  return c.json(availability satisfies HarnessAvailability)
+// Start a provider login ceremony. Codex returns a browser OAuth URL for the
+// host to open; Claude launches its browser flow through the CLI itself.
+// Idempotent per workspace: a second call joins the pending ceremony instead
+// of starting another provider flow. Completion is pushed as `agent:updated`.
+one.post('/auth/login', async c => {
+  const ws = c.get('ws')
+  if (!harnessFor(ws).startLogin) return c.text('This agent requires terminal sign-in', 409)
+  try {
+    return c.json(await agentStore.startLogin(ws))
+  } catch (err) {
+    return c.text(err instanceof Error ? err.message : 'Could not start sign-in', 500)
+  }
 })
 
 one.get('/skills', async c => {
@@ -657,25 +664,33 @@ one.post('/skills/update', async c => {
   return c.json(result.status)
 })
 
-// Models the workspace's agent backend can run, normalized across providers.
-// OpenClaw queries the gateway catalog; everything else (Claude Code) reads the
-// account-wide Agent SDK model list.
-one.get('/models', async c => {
+// The workspace's agent backend in one snapshot: provider, availability
+// (runtime presence + auth, from the server-side cache), any in-flight login
+// ceremony, the model catalog, and capabilities. One request at workspace
+// open; the volatile parts stay fresh afterwards via `agent:updated` events,
+// not refetches.
+one.get('/agent', async c => {
   const ws = c.get('ws')
   const harness = harnessFor(ws)
   // A backend that can't answer (codex CLI missing, gateway down) degrades to
   // an empty catalog — the picker hides and chat surfaces the real problem via
   // the availability banner, instead of this endpoint 500ing on page load.
-  const models = await harness.listModels(ws).catch(err => {
-    console.error(`[api] listModels failed for ${harness.id}`, err)
-    return []
-  })
+  const [availability, models] = await Promise.all([
+    agentStore.getAvailability(ws),
+    harness.listModels(ws).catch(err => {
+      console.error(`[api] listModels failed for ${harness.id}`, err)
+      return []
+    })
+  ])
+  const login = agentStore.getLogin(ws.id)
   return c.json({
     provider: harness.id,
+    availability,
+    ...(login ? { login } : {}),
     models,
     supportsStreaming: harness.capabilities.supportsStreaming,
     supportsArchiving: Boolean(harness.archiveSession)
-  } satisfies WorkspaceModels)
+  } satisfies WorkspaceAgent)
 })
 
 // Workspace identity (name). GET returns the current {name, icon}; PUT a JSON
