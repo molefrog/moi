@@ -146,6 +146,9 @@ export type SystemNotice =
       error?: string
     }
   | { id: string; kind: 'compact'; at: string; metadata?: unknown }
+  // Mid-session model switch observed on the backend (the model picker here or
+  // any other client patching the session).
+  | { id: string; kind: 'model-change'; at: string; model: string; prev?: string }
   | {
       id: string
       kind: 'hook'
