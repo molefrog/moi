@@ -32,6 +32,7 @@ import {
 } from './TimelineRow'
 import { ToolOutput } from './ToolOutput'
 import {
+  formatDuration,
   formatInputBrief,
   parseCodexMcp,
   formatMcpTool,
@@ -62,7 +63,13 @@ export function ToolCallGroup({ parts, cwd = null, processing = false }: ToolCal
           // A reasoning block reads as live "Thinking" only while it's the last
           // row of an active stream; anything after it makes it a done "Thought".
           return (
-            <ReasoningRow key={i} text={part.text} inProgress={processing && isLast} {...pos} />
+            <ReasoningRow
+              key={i}
+              text={part.text}
+              durationMs={part.durationMs}
+              inProgress={processing && isLast}
+              {...pos}
+            />
           )
         return <ToolCallCard key={part.call.toolCallId || i} call={part.call} cwd={cwd} {...pos} />
       })}
@@ -144,9 +151,37 @@ function ToolRow({ isFirst, isLast, call, leading, marker, name, brief, preview 
 // so the streaming thought is visible; it collapses on its own the moment
 // anything follows it (a text/tool row makes it no longer the last row, so
 // `inProgress` goes false and it reverts to the user's collapsed default).
-type ReasoningRowProps = RowPosition & { text: string; inProgress?: boolean }
-function ReasoningRow({ isFirst, isLast, text, inProgress = false }: ReasoningRowProps) {
+//
+// Some backends report that the model reasoned without handing over the text
+// (Anthropic `redacted_thinking`; the OpenClaw codex app-server, which sends a
+// Reasoning item with timing only). Those rows have nothing to expand, so they
+// render as a bare label — "Thought for 1.2s" — with no chevron.
+type ReasoningRowProps = RowPosition & {
+  text: string
+  inProgress?: boolean
+  durationMs?: number
+}
+function ReasoningRow({
+  isFirst,
+  isLast,
+  text,
+  inProgress = false,
+  durationMs
+}: ReasoningRowProps) {
   const [open, setOpen] = useState(false)
+  if (!text) {
+    const doneLabel =
+      durationMs === undefined ? 'Thought' : `Thought for ${formatDuration(durationMs)}`
+    return (
+      <TimelineRow isFirst={isFirst} isLast={isLast} loading={inProgress}>
+        <div className={cn(HEADER, 'min-w-0 flex-1 cursor-default')}>
+          <span className="text-xs font-medium text-muted-foreground">
+            {inProgress ? 'Thinking' : doneLabel}
+          </span>
+        </div>
+      </TimelineRow>
+    )
+  }
   const label = inProgress ? 'Thinking' : 'Thought'
   const expanded = inProgress || open
   return (

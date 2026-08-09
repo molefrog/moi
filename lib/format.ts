@@ -51,7 +51,17 @@ export type Citation = { url?: string; title?: string; quote?: string }
 
 export type Part =
   | { type: 'text'; text: string; citations?: Citation[] }
-  | { type: 'reasoning'; text: string; redacted?: boolean; signature?: string }
+  // `redacted` marks reasoning the backend acknowledges but won't hand over:
+  // Anthropic's `redacted_thinking`, and the codex app-server's `Reasoning`
+  // item, which reports that the model thought (and for how long) but carries
+  // no text. Such a part has empty `text` and renders as a duration, not a body.
+  | {
+      type: 'reasoning'
+      text: string
+      redacted?: boolean
+      signature?: string
+      durationMs?: number
+    }
   | { type: 'tool-call'; call: ToolCall }
   | { type: 'file'; mediaType: string; url: string; filename?: string }
   | { type: 'source-url'; url: string; title?: string; sourceId: string }

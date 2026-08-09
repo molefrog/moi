@@ -333,7 +333,7 @@ export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: 
   const currentModelValue = persistedModel ?? defaultModel.value
   const model = models.find(item => item.value === currentModelValue) ?? models[0]
   const effortLevels = model.supportsEffort ? (model.supportedEffortLevels ?? []) : []
-  const currentEffort = resolveDisplayedEffort(effortLevels, selectedEffort)
+  const currentEffort = resolveDisplayedEffort(effortLevels, selectedEffort, model.defaultEffort)
   const showEffort = hasEffortChoice(effortLevels) && currentEffort !== undefined
   const fastMode = resolveFastMode(model, selectedFastMode)
 

@@ -630,6 +630,10 @@ export type Model = {
   // the SDK under-types (e.g. 'xhigh'), so it stays string[].
   supportsEffort?: boolean
   supportedEffortLevels?: string[]
+  // Provider-resolved effort default when the user hasn't picked one (OpenClaw
+  // `thinkingDefault`, which differs per model — `low`/`medium`/`off`). Must be
+  // one of `supportedEffortLevels`.
+  defaultEffort?: string
   supportsAdaptiveThinking?: boolean
   supportsFastMode?: boolean
   // Provider-resolved default when moi has no stored Fast-mode preference.

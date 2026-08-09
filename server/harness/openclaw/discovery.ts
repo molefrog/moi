@@ -2,11 +2,16 @@ import { resolve } from 'node:path'
 
 import type { Model } from '@/lib/types'
 
-import { OPENCLAW_THINKING_LEVELS } from './compat'
 import type { OpenClawCronRunEntry } from './cron-view'
 import { getGateway, withOneShotGateway } from './gateway'
 import type { GatewayHandle } from './gateway'
 import { stripUserMessageMetadata } from './strip'
+import {
+  OPENCLAW_FALLBACK_THINKING_LEVELS,
+  hasOpenClawThinkingProfiles,
+  openClawThinkingProfile,
+  recordOpenClawThinkingProfiles
+} from './thinking'
 
 export type OpenClawAgent = {
   path: string
@@ -47,6 +52,11 @@ export type OpenClawSessionRow = {
   kind?: string
   // Parent session key for gateway-spawned subagent sessions.
   spawnedBy?: string
+  // The thinking menu the gateway resolved for this row's model. Per-model, not
+  // global — harvested into `thinking.ts` so the picker offers a valid set.
+  thinkingOptions?: string[]
+  thinkingLevels?: { id: string; label?: string }[]
+  thinkingDefault?: string
 }
 
 // Shape returned by `sessions.get({ key })` — the full transcript, unlike
@@ -175,6 +185,8 @@ export async function getOpenClawSessions(
       includeDerivedTitles: true,
       includeLastMessage: true
     })
+    // Rows are the only carrier of each model's thinking menu (thinking.ts).
+    recordOpenClawThinkingProfiles(res.sessions)
     return res.sessions
   })
   return out ?? []
@@ -402,19 +414,43 @@ type OpenClawModelChoice = {
 export async function getOpenClawModels(): Promise<Model[]> {
   const out = await withGatewayClient(async rpc => {
     const res = await rpc<{ models: OpenClawModelChoice[] }>('models.list')
+    // `models.list` reports only `reasoning: boolean` — never the level menu,
+    // and no RPC exposes it. Session rows do, so prime the profile map from
+    // one aggregate list when it's still cold (first picker open on a fresh
+    // server). Later calls read the map discovery/live ingest keep warm.
+    if (!hasOpenClawThinkingProfiles()) {
+      const sessions = await rpc<{ sessions: OpenClawSessionRow[] }>('sessions.list', {
+        includeGlobal: true
+      }).catch(() => null)
+      if (sessions) recordOpenClawThinkingProfiles(sessions.sessions)
+    }
     return res.models
   })
   // Map the gateway catalog onto the Model shape. The picker value is the
   // full `provider/id` ref — the exact form `sessions.patch {model}` accepts
-  // and the form session rows report back (`modelProvider`/`model`), so the
-  // applied-model cache comparison holds. Thinking levels double as the
-  // picker's effort menu — they are session-level in OpenClaw, so every
-  // reasoning-capable model advertises the same set (see compat.ts).
-  return (out ?? []).map(m => ({
-    value: m.provider && !m.id.includes('/') ? `${m.provider}/${m.id}` : m.id,
-    displayName: m.name,
-    ...(m.reasoning
-      ? { supportsEffort: true, supportedEffortLevels: [...OPENCLAW_THINKING_LEVELS] }
-      : {})
-  }))
+  // and the form session rows report back (`modelProvider`/`model`), so both
+  // the applied-model cache comparison and the thinking-profile lookup hold.
+  return (out ?? []).map(m => {
+    const value = m.provider && !m.id.includes('/') ? `${m.provider}/${m.id}` : m.id
+    const model: Model = { value, displayName: m.name }
+    // Per-model menu (thinking.ts). A learned menu with a real choice in it is
+    // itself proof the model reasons, and it outranks the catalog flag: on
+    // 2026.7.2-beta.7 `models.list` stopped setting `reasoning` for the OpenAI
+    // models (verified live) while their session rows still advertise the full
+    // `off…ultra` menu, so trusting the flag alone silently drops the effort
+    // picker for every GPT model.
+    const profile = openClawThinkingProfile(value)
+    if (!m.reasoning && !(profile && profile.levels.length > 1)) return model
+    // Falling back to the cross-provider intersection offers fewer levels than
+    // the model has rather than levels it would reject — a rejection silently
+    // drops the user's pick.
+    model.supportsEffort = true
+    model.supportedEffortLevels = profile
+      ? [...profile.levels]
+      : [...OPENCLAW_FALLBACK_THINKING_LEVELS]
+    if (profile?.default && profile.levels.includes(profile.default)) {
+      model.defaultEffort = profile.default
+    }
+    return model
+  })
 }

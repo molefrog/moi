@@ -68,11 +68,15 @@ function getInputValue(input: Record<string, unknown>, key: string): string {
   return typeof value === 'string' ? value : ''
 }
 
-// Compact wall-clock duration: sub-second → "850ms", under a minute → "3s",
-// longer → "1m 5s". Used on agent-run and subagent duration labels.
+// Compact wall-clock duration in whole seconds: under a minute → "3s", longer
+// → "1m 5s". Used on agent-run and subagent duration labels.
+//
+// Never milliseconds. A column of "Thought for 514ms" / "Thought for 784ms"
+// rows reads as jitter — the exact figure is noise at this size, and the
+// varying width makes the list look ragged next to a plain "Thought for 1s".
+// Sub-second durations round UP so a real pause never renders as "0s".
 export function formatDuration(ms: number): string {
-  if (ms < 1000) return `${Math.round(ms)}ms`
-  const s = Math.round(ms / 1000)
+  const s = Math.max(1, Math.round(ms / 1000))
   if (s < 60) return `${s}s`
   const m = Math.floor(s / 60)
   const rem = s % 60

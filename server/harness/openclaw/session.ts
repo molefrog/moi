@@ -54,6 +54,11 @@ import {
   onGatewayReconnected,
   releaseSessionSubscriptionRef
 } from './gateway'
+import {
+  openClawModelRefsEquivalent,
+  recordOpenClawThinkingProfile,
+  recordOpenClawThinkingRejection
+} from './thinking'
 import { broadcast } from '../../state'
 import { materializeToPath, resolveUploads } from '../../uploads'
 import {
@@ -110,10 +115,17 @@ type SessionRecord = {
   // (their start/result/durable toolCallIds don't always correlate, which would
   // strand the live card as a duplicate — and broadcast turns can't be retracted).
   liveTools: Map<string, { name: string; input: unknown }>
+  // Live reasoning spans from the codex app-server's `analysis`/`Reasoning`
+  // item frames, keyed by itemId. Timing only — that backend never sends the
+  // reasoning text (see handleReasoningItemFrame).
+  liveThinking: Map<string, { startedAt: number; endedAt?: number }>
   // Last model/thinking applied via sessions.patch, in `provider/model` form —
   // avoids a patch round-trip per send when nothing changed.
   appliedModel?: string
   appliedThinking?: string
+  // Last `reasoningLevel` applied. The gateway defaults this to `off`, which
+  // suppresses reasoning output entirely on providers that would emit it.
+  appliedReasoning?: string
   // Model of the most recent assistant row seen (seed scan + live ingest). Lets
   // ingest detect a mid-session model switch without re-scanning the whole
   // messagesById map each frame; the model-change notice reads its `prev` here.
@@ -630,6 +642,94 @@ function emitLiveToolTurn(rec: SessionRecord, toolCallId: string): void {
   broadcast(rec.workspaceId, { kind: 'turn', turn, sessionId: rec.sessionId })
 }
 
+// A run can die before it ever reports a lifecycle phase. When the gateway
+// terminalizes the admission itself, it announces the death ONLY as
+// `sessions.changed { reason: 'chat.dispatch-error' }` — no runId and no
+// `phase: 'error'`, so the runId-keyed lifecycle clause never fires and the
+// composer spins forever with nothing on screen.
+//
+// Verified live on 2026.7.2-beta.7: `sessions.patch { model }` makes OpenClaw
+// persist the pick into the agent's effective `model.primary`, and that config
+// write bumps the agent's prepared-model-runtime generation while the run is
+// being admitted — the run dies with "prepared model runtime catalog
+// generation was superseded" after `sessions.send` already returned
+// `status: 'started'` and a runId. The frame carries no error text on this
+// path, so the message says what the user can act on instead of inventing a
+// cause. Resending works: the model is already applied, so no second write.
+export function handleDispatchError(rec: SessionRecord): void {
+  setProcessing(rec, false, null)
+  broadcast(rec.workspaceId, {
+    kind: 'error',
+    sessionId: rec.sessionId,
+    content: 'OpenClaw could not start the run. Send the message again.'
+  })
+}
+
+// The id of the run-scoped live thinking turn for a reasoning item.
+function liveThinkingTurnId(sessionKey: string, itemId: string): string {
+  return `openclaw:${sessionKey}:livethink:${itemId}`
+}
+
+// The codex app-server reports reasoning as an `agent`/item frame with
+// `kind:'analysis', title:'Reasoning'` and phases start→end — presence and
+// timing, never text (verified on the wire: the item frames carry no content,
+// and the durable row that follows has only a `text` block; the plugin's one
+// text-bearing reasoning path is channel-progress formatting with no item id).
+// So we render what the backend does give: a "Thinking" row that becomes
+// "Thought for 1.2s". Without this a codex run shows a silent gap between the
+// send and the first token, even though the model is visibly reasoning.
+//
+// Deliberately NOT durable: nothing in the transcript backs it, so a cold
+// reload (re-seed from `sessions.get`) drops the row. Same tradeoff as the live
+// tool cards — `applyEvent` upserts and can never retract.
+export function handleReasoningItemFrame(
+  rec: SessionRecord,
+  payload: Record<string, unknown>
+): void {
+  const data = payload.data as
+    | { itemId?: unknown; phase?: unknown; kind?: unknown; title?: unknown }
+    | undefined
+  if (!data || typeof data.itemId !== 'string') return
+  // Only the analysis/Reasoning item; other item kinds are tool lifecycle.
+  const isReasoning =
+    data.kind === 'analysis' || String(data.title ?? '').toLowerCase() === 'reasoning'
+  if (!isReasoning) return
+  const itemId = data.itemId
+  const at = typeof payload.ts === 'number' ? payload.ts : Date.now()
+
+  if (data.phase === 'start') {
+    rec.liveThinking.set(itemId, { startedAt: at })
+  } else if (data.phase === 'end') {
+    const started = rec.liveThinking.get(itemId)
+    if (!started) return
+    rec.liveThinking.set(itemId, { ...started, endedAt: at })
+  } else {
+    return
+  }
+  emitLiveThinkingTurn(rec, itemId)
+}
+
+function emitLiveThinkingTurn(rec: SessionRecord, itemId: string): void {
+  const span = rec.liveThinking.get(itemId)
+  if (!span) return
+  const duration = span.endedAt !== undefined ? span.endedAt - span.startedAt : undefined
+  const turn: Turn = {
+    id: liveThinkingTurnId(rec.sessionKey, itemId),
+    role: 'assistant',
+    origin: { kind: 'user-input' },
+    parts: [
+      {
+        type: 'reasoning',
+        text: '',
+        redacted: true,
+        ...(duration !== undefined && duration >= 0 ? { durationMs: duration } : {})
+      }
+    ]
+  }
+  rec.view = applyEvent(rec.view, { kind: 'turn', turn })
+  broadcast(rec.workspaceId, { kind: 'turn', turn, sessionId: rec.sessionId })
+}
+
 // `session.tool` and `agent`/tool frames flip tool cards live: start/update →
 // running, result → success/error with output. When the durable owner row
 // already exists we re-emit it; otherwise (codex-app-server batches durable
@@ -846,17 +946,23 @@ async function ensureSubscribed(rec: SessionRecord): Promise<void> {
         broadcast(rec.workspaceId, { kind: 'notice', sessionId: rec.sessionId, notice })
       }
       // Frames embed the fresh session row — keep the applied-model cache
-      // truthful even when the session is patched outside moi.
-      const row = payload.session as
+      // truthful even when the session is patched outside moi. Run-phase frames
+      // nest it under `session`; `reason` frames flatten it onto the payload.
+      const row = (payload.session ?? payload) as
         | { model?: unknown; modelProvider?: unknown; thinkingLevel?: unknown }
         | undefined
       if (row && typeof row.model === 'string' && typeof row.modelProvider === 'string') {
         rec.appliedModel = `${row.modelProvider}/${row.model}`
       }
       if (row && typeof row.thinkingLevel === 'string') rec.appliedThinking = row.thinkingLevel
+      // Every row carries the model's resolved thinking menu — the only source
+      // the effort picker has for it (thinking.ts).
+      if (row) recordOpenClawThinkingProfile(row)
       const phase = payload.phase as string | undefined
       const runId = payload.runId as string | undefined
-      if (phase === 'start' && runId) {
+      if (reason === 'chat.dispatch-error') {
+        handleDispatchError(rec)
+      } else if (phase === 'start' && runId) {
         setProcessing(rec, true, runId)
       } else if ((phase === 'end' || phase === 'error') && runId) {
         if (rec.activeRunId === runId) {
@@ -892,6 +998,11 @@ async function ensureSubscribed(rec: SessionRecord): Promise<void> {
       // cards is gated on `codexBackend` inside the handler.
       if (stream === 'tool') {
         handleToolFrame(rec, payload)
+        return
+      }
+      // Same backend reports reasoning as an `item` frame — timing, no text.
+      if (stream === 'item') {
+        handleReasoningItemFrame(rec, payload)
         return
       }
       // Backstop for run lifecycle — `sessions.changed` should already cover
@@ -951,7 +1062,8 @@ export async function getOrCreateOpenClawSession(input: {
     streamEnabled: false,
     pendingFrames: [],
     pendingUserEchoes: [],
-    liveTools: new Map()
+    liveTools: new Map(),
+    liveThinking: new Map()
   }
   sessions.set(k, rec)
   await ensureSubscribed(rec)
@@ -1032,40 +1144,64 @@ export async function sendOpenClawMessage(input: {
 
 // Apply the picker's model/effort onto the gateway session before the send.
 // `sessions.patch {model, thinkingLevel}` exists on both supported lines
-// (verified live on 2026.7.1 and 2026.6.33); values come from `models.list`
-// ids and the thinking-level menu, so a rejection means the gateway's
-// allowlist disagrees — surfaced to the chat, not swallowed.
+// (verified live on 2026.7.1 and 2026.6.33); the model comes from `models.list`
+// and the effort from that model's own menu (thinking.ts), so a rejection means
+// our learned menu is stale — we relearn it from the error and move on.
+//
+// `reasoningLevel` rides along because it is the gateway's gate on emitting
+// reasoning at all (`reasoningMode = reasoningLevel ?? 'off'`, and
+// `canShowReasoning = thinkingLevel !== 'off'`). Without it a provider that
+// *can* stream thinking never does. It is patched only when the user asked to
+// think, so a session left at `off` keeps the gateway's default behavior.
 async function applySessionSettings(
   rec: SessionRecord,
   model: string | undefined,
   effort: string | undefined
 ): Promise<void> {
   const patch: Record<string, unknown> = {}
-  if (model && model !== rec.appliedModel) patch.model = model
+  // Patch the model only on a real change. `sessions.patch { model }` is not
+  // free: OpenClaw persists the pick into the agent's effective
+  // `model.primary`, and that config write bumps the agent's prepared-model-
+  // runtime generation, which can supersede a run being admitted right then
+  // (see the `chat.dispatch-error` handling in ensureSubscribed). The cache
+  // holds the ref the WIRE reports, which collapses a claude-cli-routed model
+  // onto its runtime provider — comparing raw strings would miss on every
+  // Claude model and re-patch on every single send.
+  if (model && !(rec.appliedModel && openClawModelRefsEquivalent(model, rec.appliedModel))) {
+    patch.model = model
+  }
   if (effort && effort !== rec.appliedThinking) patch.thinkingLevel = effort
+  const reasoning = effort && effort !== 'off' ? 'stream' : undefined
+  if (reasoning && reasoning !== rec.appliedReasoning) patch.reasoningLevel = reasoning
   if (Object.keys(patch).length === 0) return
   const gw = await getGateway()
   try {
     await gw.rpc('sessions.patch', { key: rec.sessionKey, ...patch })
   } catch (err) {
-    // The effort menu is a static superset (compat.ts) — a gateway/model can
-    // reject a level. Degrade to the model-only patch instead of blocking the
-    // send; a rejected MODEL still throws (running on the wrong model is
-    // worse than not sending).
-    if (typeof patch.thinkingLevel === 'string' && typeof patch.model === 'string') {
-      console.warn('[openclaw-session] thinkingLevel patch rejected, retrying model-only', err)
-      await gw.rpc('sessions.patch', { key: rec.sessionKey, model: patch.model })
-      rec.appliedModel = patch.model
-      return
-    }
-    if (typeof patch.thinkingLevel === 'string' && !patch.model) {
-      console.warn('[openclaw-session] thinkingLevel patch rejected, sending anyway', err)
+    // A level outside the model's menu is rejected by name; learn the real menu
+    // from the message so the picker self-corrects, then degrade rather than
+    // block the send. A rejected MODEL still throws — running on the wrong
+    // model is worse than not sending.
+    const relearned = recordOpenClawThinkingRejection(err)
+    if (typeof patch.thinkingLevel === 'string') {
+      console.warn(
+        `[openclaw-session] thinkingLevel "${patch.thinkingLevel}" rejected${
+          relearned ? ' (menu relearned from the gateway)' : ''
+        }; sending at the session's current level`,
+        err
+      )
+      const { thinkingLevel: _dropped, ...rest } = patch
+      if (Object.keys(rest).length === 0) return
+      await gw.rpc('sessions.patch', { key: rec.sessionKey, ...rest })
+      if (typeof rest.model === 'string') rec.appliedModel = rest.model
+      if (typeof rest.reasoningLevel === 'string') rec.appliedReasoning = rest.reasoningLevel
       return
     }
     throw err
   }
   if (typeof patch.model === 'string') rec.appliedModel = patch.model
   if (typeof patch.thinkingLevel === 'string') rec.appliedThinking = patch.thinkingLevel
+  if (typeof patch.reasoningLevel === 'string') rec.appliedReasoning = patch.reasoningLevel
 }
 
 async function sendOpenClawMessageImpl(input: {
@@ -1090,7 +1226,24 @@ async function sendOpenClawMessageImpl(input: {
     if (input.isNew) {
       const gw = await getGateway()
       const created = await gw.rpc<{ key?: string; sessionId?: string }>('sessions.create', {
-        agentId: input.agentId
+        agentId: input.agentId,
+        // Carry the model IN the create — never as a patch issued just before
+        // the send. `sessions.patch { model }` persists the pick into the
+        // agent's effective `model.primary`, and that config write bumps the
+        // prepared-model-runtime generation; a run admitted inside that window
+        // is superseded and dies during admission. Verified on the wire: the
+        // patch resolved and `sessions.send` went out in the SAME millisecond,
+        // `sessions.send` answered `status: 'started'` with a runId, and the
+        // run was dead 2.0s later with `chat.dispatch-error` — which is why the
+        // first message of a new chat failed and the resend always worked.
+        //
+        // Only `model` is safe to pass here: `sessions.create` accepts it on
+        // both supported lines, but `thinkingLevel` exists on the create schema
+        // in 2026.7.x ONLY and both lines validate with
+        // `additionalProperties: false`, so sending it would hard-reject every
+        // new chat on 2026.6.x. Effort stays a patch — it is session-scoped,
+        // writes no config, and so cannot supersede the run.
+        ...(input.model ? { model: input.model } : {})
       })
       if (created?.sessionId && created.sessionId !== input.sessionId) {
         realSessionId = created.sessionId
@@ -1114,6 +1267,13 @@ async function sendOpenClawMessageImpl(input: {
       agentId: input.agentId,
       sessionId: realSessionId
     })
+    // The create already carried the model, so record it as applied — otherwise
+    // `applySessionSettings` sees an empty cache on this brand-new record and
+    // issues exactly the pre-send `sessions.patch { model }` we just avoided.
+    // A fresh session has no wire row to seed the cache from (that path only
+    // fires once a row reports `modelProvider`/`model`), so this is the only
+    // thing standing between the fix and the race coming straight back.
+    if (input.isNew && input.model) rec.appliedModel = input.model
   } catch (err) {
     const message = err instanceof Error ? err.message : 'failed to start session'
     broadcast(input.workspaceId, {
@@ -1256,10 +1416,17 @@ export function createOpenClawSessionForTest(input: {
     streamEnabled: false,
     pendingFrames: [],
     pendingUserEchoes: [],
-    liveTools: new Map()
+    liveTools: new Map(),
+    liveThinking: new Map()
   }
   sessions.set(recKey(input.workspaceId, input.sessionId), rec)
   return rec
+}
+
+// Test seam: put a record into the processing state a send would leave it in,
+// so a test can assert that a terminal frame clears it.
+export function markProcessingForTest(rec: SessionRecord, runId: string): void {
+  setProcessing(rec, true, runId)
 }
 
 // Test seam: is a live record held for this (workspaceId, sessionId)?

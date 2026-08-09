@@ -202,8 +202,103 @@ Params (`additionalProperties: false`): `key` (+`agentId`) plus any of
 (both lines, verified live). The config's `agents.defaults.models` map is a
 **model allowlist**: patching to a model outside it is rejected with
 `INVALID_REQUEST` `model not allowed: <provider>/<model>` (verified live
-against 2026.6.33). Thinking levels are gateway-global and identical on both
-lines: `off minimal low medium adaptive high xhigh max` (`compat.ts`).
+against 2026.6.33).
+
+#### Never patch the model straight into a send
+
+`sessions.patch { model }` is **not** a session-local write: OpenClaw persists
+the pick into the agent's effective `model.primary`, and that config write
+bumps the prepared-model-runtime generation. A run admitted inside that window
+is superseded and dies **during admission** — `sessions.send` still answers
+`status: 'started'` with a runId, and the only thing that follows is
+`sessions.changed { reason: 'chat.dispatch-error' }` (no runId to match on).
+
+Captured on the wire against 2026.7.2-beta.7, first message of a new chat:
+
+```
+14:49:47.901  SEND sessions.patch { model, thinkingLevel, reasoningLevel }
+14:49:47.930  RESP patch ok
+14:49:47.930  SEND sessions.send            ← same millisecond
+14:49:47.946  RESP send  status=started runId=88a7701d
+14:49:49.959  EVT  sessions.changed reason=chat.dispatch-error   ← run dead, 2.0s later
+14:49:58.641  SEND sessions.send (user resent)  → ran fine
+```
+
+The resend works because the model is already applied, so there is no second
+config write. That is the whole shape of the bug: **first message of a new
+chat fails, second always works.**
+
+So moi carries the model **in `sessions.create`** instead (`session.ts →
+sendOpenClawMessageImpl`) and marks it applied on the record so
+`applySessionSettings` skips the model patch. Note the asymmetry that decides
+what may ride along on create:
+
+| create param    | 2026.6.x | 2026.7.x |
+| --------------- | -------- | -------- |
+| `model`         | yes      | yes      |
+| `thinkingLevel` | **no**   | yes      |
+
+Both lines validate create with `additionalProperties: false`, so passing
+`thinkingLevel` there would hard-reject **every new chat** on 2026.6.x. Effort
+stays a patch — it is session-scoped, writes no config, and so cannot supersede
+a run. Only the model ever needed moving.
+
+**Thinking levels are per model, not gateway-global** (an earlier version of
+this doc claimed otherwise and moi shipped one static list because of it).
+The gateway resolves the menu from per-provider policies in the dist
+(`provider-claude-thinking`, `moonshot-thinking`, …) and validates
+`thinkingLevel` against the session's _resolved_ model, rejecting by name:
+
+```
+thinkingLevel "adaptive" is not supported for openai/gpt-5.6-sol
+  (use off|minimal|low|medium|high|xhigh|max|ultra)
+thinkingLevel "minimal" is not supported for ollama/deepseek-v4-flash:cloud
+  (use off|low|medium|high|max)
+```
+
+Menus captured live from `sessions.list` rows on 2026.7.1-2:
+
+| model                          | thinkingOptions                                    | default |
+| ------------------------------ | -------------------------------------------------- | ------- |
+| openai/gpt-5.6-sol             | off minimal low medium high xhigh max **ultra**    | low     |
+| openai/gpt-5.6-terra           | off minimal low medium high xhigh max **ultra**    | medium  |
+| openai/gpt-5.6-luna            | off minimal low medium high xhigh max              | medium  |
+| anthropic/claude-opus-4-8      | off minimal low medium **adaptive** high xhigh max | off     |
+| ollama/kimi-k3:cloud           | off low medium high max                            | off     |
+| ollama/deepseek-v4-flash:cloud | off low medium high max                            | off     |
+| openai/kimi-k3:cloud           | off minimal low medium high                        | off     |
+
+So `adaptive` is Claude-only, `ultra` is OpenAI-only (and absent from luna),
+the ollama models drop `minimal`/`xhigh`, and the same model id under two
+providers gets two different menus. `thinkingDefault` varies too.
+
+`models.list` carries only `reasoning: boolean` — no levels — **and even that
+flag is not dependable**: on 2026.7.2-beta.7 the OpenAI rows come back with
+`reasoning: undefined` while their session rows still advertise the full
+`off…ultra` menu (verified live). Gating the effort picker on the flag alone
+therefore makes it vanish for every GPT model on that line, so
+`getOpenClawModels` also accepts a learned menu with more than one level as
+proof the model reasons. There is no per-model thinking RPC either (`models.get`/`models.capabilities` don't exist;
+`models.list` hard-rejects an `agentId` param). Every **session row** does
+carry the resolved menu, so `thinking.ts` harvests rows (discovery
+`sessions.list` + the row embedded in every live frame) into a per-model map
+that feeds the picker, and relearns a model's menu from a rejection message
+when one slips through. Models with no row yet fall back to the
+cross-provider intersection `off low medium high`.
+
+### reasoningLevel — the gate on reasoning output
+
+`sessions.patch { reasoningLevel: 'off' | 'on' | 'stream' }`, **default
+`off`**. In the dist, `reasoningMode = reasoningLevel ?? 'off'` and then
+`includeReasoning: reasoningMode === 'on'`, `streamReasoning: reasoningMode
+=== 'stream'`, both further gated on `canShowReasoning = thinkingLevel !==
+'off'`. moi patches `reasoningLevel: 'stream'` whenever the picked effort is
+not `off`, so a provider that can surface reasoning does.
+
+Necessary but not sufficient — see §6 for which backends actually carry the
+text. Note the side effect on a session that also serves a channel (a
+Telegram-routed `agent:<a>:main`): reasoning mode is a session property, so
+raising it changes what that channel streams too.
 
 Config edits hot-reload where possible: the gateway watches `openclaw.json`
 and logs `config hot reload applied (…)` vs `requires gateway restart (…)`
@@ -339,6 +434,41 @@ start id, a final result id) — synthesizing there stranded the live card as a
 permanent duplicate (`○` stuck running beside the durable `●`), and broadcast
 turns can't be retracted (`applyEvent` only upserts by id). So synthesis stays
 off unless the positive codex signal fires.
+
+**Thinking blocks: who actually emits them.** The wire shape exists and moi
+renders it — durable rows carry `{ type: 'thinking', thinking,
+thinkingSignature }` and `adapter.ts` maps it to a `reasoning` part. What
+varies is whether a backend ever produces one. Measured live (2026.7.1-2, one
+send per backend, full frame capture):
+
+| backend (`agentRuntime`)           | reasoning on the wire                                                                                     | text? |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------- | ----- |
+| codex app-server (`codex`)         | `agent`/item `kind:'analysis' title:'Reasoning'` start→end, plus `codex_app_server.item type:'reasoning'` | no    |
+| claude CLI (`claude-cli`)          | `agent`/thinking `{ progressTokens: 50 }`                                                                 | no    |
+| native loop (`auto`, ollama)       | nothing — the model writes its reasoning as plain text                                                    | n/a   |
+| `openai-codex` responses transport | durable `thinking` blocks with full text                                                                  | YES   |
+
+Only the last one delivers text, and it is the path the current default config
+no longer takes: OpenAI models resolve to `agentRuntime: codex` (implicitly, or
+pinned per model in `agents.defaults.models`), which routes through the codex
+app-server. Its `appendCodexAcpConfigOverrides` forwards
+`model_reasoning_effort` but never `model_reasoning_summary`, and its item
+frames carry no payload; the plugin's one text-bearing reasoning path
+(`onReasoningStream`) is channel-progress formatting with no item id, so it
+can't attach to a row. Selecting `openai-codex/<model>` directly is blocked by
+the `agents.defaults.models` allowlist unless the user adds that ref.
+
+Setting `reasoningLevel` (§5) does not change any of the three "no" rows —
+verified with `on` and `stream`, each paired with `thinkingLevel: high` so
+`canShowReasoning` held. It is still set, because it is the documented gate and
+the one path that does carry text needs it.
+
+Given that, moi renders what the codex backend _does_ report: `session.ts →
+handleReasoningItemFrame` turns the analysis item into a textless
+`{ type: 'reasoning', text: '', redacted: true, durationMs }` part, so a codex
+run shows "Thinking" → "Thought for 1.1s" instead of a silent gap before the
+first token. Like the live tool cards it is not durable — nothing in the
+transcript backs it, so a cold reload drops the row.
 
 **`task`** — subagent runs (2026.7.x; the event family is new there):
 
@@ -485,9 +615,10 @@ subpath import wins over rolling a minimal client.
   replay, wire tap), config-path resolution, one-shot client for discovery,
   and the last connect outcome for `/status` (`getOpenClawGatewayStatus`).
 - `compat.ts` — protocol-4 tolerance layer: `parseHelloOk`,
-  `advertisesMethod`, `classifyGatewayError`, `messageIdempotencyKey`,
-  `OPENCLAW_THINKING_LEVELS`. Read its header before sending any new param to
-  the gateway.
+  `advertisesMethod`, `classifyGatewayError`, `messageIdempotencyKey`. Read
+  its header before sending any new param to the gateway.
+- `thinking.ts` — per-model thinking menus learned from session rows, plus the
+  relearn-from-rejection path. The effort picker reads it (§5).
 - `discovery.ts` — agents → workspace candidates, models catalog, transcript
   seeds (2 round-trips: `agents.list` + `sessions.list`, then per-agent
   `agents.files.get(IDENTITY.md)`).

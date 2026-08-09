@@ -94,17 +94,6 @@ export function messageIdempotencyKey(msg: unknown): string | undefined {
   return typeof flat === 'string' ? flat : undefined
 }
 
-// Thinking levels are gateway-global and identical on both supported lines
-// (verified in live session rows). Used as the picker's effort menu; the
-// gateway rejects values it doesn't accept, so a drift degrades loudly, not
-// silently.
-export const OPENCLAW_THINKING_LEVELS = [
-  'off',
-  'minimal',
-  'low',
-  'medium',
-  'adaptive',
-  'high',
-  'xhigh',
-  'max'
-]
+// Thinking levels are NOT gateway-global — they resolve per model, and the
+// gateway rejects a level outside the resolved model's set. See `thinking.ts`,
+// which learns each model's menu from the session rows that carry it.

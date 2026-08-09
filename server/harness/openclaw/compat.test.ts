@@ -6,7 +6,6 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   type GatewayInfo,
-  OPENCLAW_THINKING_LEVELS,
   advertisesMethod,
   classifyGatewayError,
   messageIdempotencyKey,
@@ -177,17 +176,5 @@ describe('messageIdempotencyKey', () => {
   })
 })
 
-test('OPENCLAW_THINKING_LEVELS matches the live session-row menu', () => {
-  // `thinkingOptions` as broadcast in every live session row on both
-  // supported lines (2026.7.1 and 2026.6.33 captures agree).
-  expect(OPENCLAW_THINKING_LEVELS).toEqual([
-    'off',
-    'minimal',
-    'low',
-    'medium',
-    'adaptive',
-    'high',
-    'xhigh',
-    'max'
-  ])
-})
+// Thinking levels used to live here as one static list. They are per-model —
+// see thinking.test.ts for the live-captured menus that disproved that.

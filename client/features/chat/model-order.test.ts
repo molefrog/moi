@@ -102,6 +102,21 @@ describe('resolveDisplayedEffort', () => {
   test('uses the highest available level when High is unavailable', () => {
     expect(resolveDisplayedEffort(['low', 'medium', 'max'], undefined)).toBe('max')
   })
+
+  // OpenClaw resolves a per-model `thinkingDefault` — `low` on gpt-5.6-sol,
+  // `medium` on gpt-5.6-luna, `off` on the Claude and ollama models.
+  test("prefers the model's own default over the app-wide High", () => {
+    expect(resolveDisplayedEffort(levels, undefined, 'low')).toBe('low')
+    expect(resolveDisplayedEffort(['off', 'low', 'medium', 'high'], undefined, 'off')).toBe('off')
+  })
+
+  test('an explicit choice still outranks the model default', () => {
+    expect(resolveDisplayedEffort(levels, 'max', 'low')).toBe('max')
+  })
+
+  test('a model default outside the menu is ignored', () => {
+    expect(resolveDisplayedEffort(levels, undefined, 'ultra')).toBe('high')
+  })
 })
 
 describe('resolveEffortIndex', () => {
