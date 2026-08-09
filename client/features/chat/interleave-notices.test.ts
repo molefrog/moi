@@ -102,6 +102,10 @@ describe('interleaveNotices', () => {
     expect(keys(items)).toEqual(['t1', 't2b', 'notice:n1', 't3'])
   })
 
+  // Known limitation, not a desired property: with nothing to compare against
+  // the notice can only go last. Correct while live (compaction happens at the
+  // conversation's current end) but it drifts on replay. Codex transcripts are
+  // entirely undated today — see the note on interleaveNotices.
   test('all turns undated → notices go after the last turn', () => {
     const items = interleaveNotices([turn('a'), turn('b')], [compact('n1', '2026-08-04T10:30:00Z')])
     expect(keys(items)).toEqual(['a', 'b', 'notice:n1'])
