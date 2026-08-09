@@ -63,6 +63,8 @@ All three overwrite `~/.bun/bin/moi` — last action wins; `readlink ~/.bun/bin/
 
 To drive the app in a browser inside Claude Code on the web, use the vendored **agent-browser skill** (`.agents/skills/agent-browser/`). Cloud-specific setup — server startup, `AGENT_BROWSER_EXECUTABLE_PATH`, Playwright alternative, egress-relay caveats — is in `docs/browser-testing-cloud.md`.
 
+To exercise the OpenClaw harness (`server/harness/openclaw/`) in the same sandbox, follow `docs/openclaw-sandbox.md` — Node 24 via nvm, headless gateway bring-up, and the model-auth prerequisite.
+
 ## Session Storage Notes
 
 Claude Code stores sessions as `.jsonl` files under:

@@ -16,8 +16,10 @@ import type {
 } from '@/lib/types'
 
 // The superset of what any backend needs to accept a user message; harnesses
-// ignore fields they don't support (e.g. OpenClaw ignores
-// model/effort/Fast-mode/stream, only OpenClaw reads agentId).
+// ignore fields they don't support. OpenClaw honors model + effort (applied via
+// sessions.patch) and stream (token previews), but has no Fast-mode setting so
+// it ignores fastMode; agentId is OpenClaw-only (the gateway agent that owns
+// the workspace).
 export type SendMessageInput = {
   workspaceId: string
   workspacePath: string
