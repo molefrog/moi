@@ -59,6 +59,12 @@ Only one server runs at a time — it binds port 13337 (HTTP) and 13059 (control
 
 All three overwrite `~/.bun/bin/moi` — last action wins; `readlink ~/.bun/bin/moi` shows which. Kill the running server before switching (single port 13337).
 
+## Browser testing in Codex desktop
+
+When the Browser plugin is available, use it first for local UI testing. Reuse the current in-app browser tab when it already shows the target app.
+
+Use the vendored `agent-browser` skill only when the Browser plugin is unavailable or when running in Claude Code on the web.
+
 ## Browser testing in cloud sandboxes
 
 To drive the app in a browser inside Claude Code on the web, use the vendored **agent-browser skill** (`.agents/skills/agent-browser/`). Cloud-specific setup — server startup, `AGENT_BROWSER_EXECUTABLE_PATH`, Playwright alternative, egress-relay caveats — is in `docs/browser-testing-cloud.md`.

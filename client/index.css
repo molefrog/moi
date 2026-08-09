@@ -43,7 +43,7 @@
      sidebar's own widths live in SidebarLayout.tsx.) */
   --page-pad: 2rem; /* padding around the working area */
   --column-w: 40rem; /* grid content width; also the widget area's min before the chat yields */
-  --chat-min: 380px; /* docked chat min width — narrower than this and it floats */
+  --chat-min: 320px; /* docked chat min width — narrower than this and it floats */
   --chat-max: 460px; /* docked chat max width on wide screens */
   --chat-max-container: 640px; /* contained ChatPanel: max width of the centered history + composer column */
 }

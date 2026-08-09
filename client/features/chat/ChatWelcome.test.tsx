@@ -24,9 +24,8 @@ describe('ChatWelcome', () => {
     )
 
     expect(renderedParagraphs(html)).toEqual([
-      'moi is the visual workspace for you and your agent.',
-      "It can grow and adapt to the work you're doing. Just describe what you want, and the agent will build small apps in the workspace.",
-      'You start chatting with Agent, where you can ask questions and build anything. Widgets are small apps that surface information and provide quick actions. For more complex tools, you can build Views that open in their own tabs. Scratchpad is a shared canvas for exploring and shaping ideas with your agent.',
+      "moi is the visual workspace for you and your agent. It grows and adapts to the work you're doing.",
+      'Ask Agent to build Widgets that surface information and quick actions, or entire Views for more complex tools. Use Scratchpad for exploring and shaping ideas with your agent.',
       'Give it a try:'
     ])
   })
@@ -43,8 +42,6 @@ describe('ChatWelcome', () => {
     expect(welcomeTerms.every(([term]) => term.includes('<svg'))).toBe(true)
     expect(promptButtons).toHaveLength(3)
     expect(promptButtons.every(([button]) => button.includes('<svg'))).toBe(true)
-    expect(html).toContain('rounded-xl')
-    expect(html).toContain('whitespace-normal')
     expect(html).toContain('What&#x27;s the weather?')
     expect(html).toContain('Build a fun synthesizer')
     expect(html).toContain('Make a job tracker')

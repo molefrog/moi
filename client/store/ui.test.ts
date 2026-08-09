@@ -16,7 +16,8 @@ beforeEach(() => {
   useUiStore.setState({
     hasSentMessageFromMoi: false,
     workspaceIdsPendingAnalysis: [],
-    composerDrafts: {}
+    composerDrafts: {},
+    dockedChatWidth: 360
   })
 })
 
@@ -57,6 +58,7 @@ describe('composer drafts', () => {
     const restoredStore = createUiStore(localStorage)
 
     expect(restoredStore.getState().composerDrafts).toEqual({})
+    expect(restoredStore.getState().dockedChatWidth).toBe(360)
   })
 
   test('persists drafts per workspace and restores them in a new store', () => {
@@ -79,6 +81,23 @@ describe('composer drafts', () => {
     expect(useUiStore.getState().composerDrafts).toEqual({ 'ws-1': 'Keep me' })
     expect(JSON.parse(storedValues.get('moi:ui') ?? '{}')).toMatchObject({
       state: { composerDrafts: { 'ws-1': 'Keep me' } }
+    })
+  })
+})
+
+describe('docked chat width', () => {
+  test('defaults to 360px', () => {
+    expect(useUiStore.getState().dockedChatWidth).toBe(360)
+  })
+
+  test('persists one width across stores', () => {
+    useUiStore.getState().setDockedChatWidth(412)
+
+    const restoredStore = createUiStore(localStorage)
+
+    expect(restoredStore.getState().dockedChatWidth).toBe(412)
+    expect(JSON.parse(storedValues.get('moi:ui') ?? '{}')).toMatchObject({
+      state: { dockedChatWidth: 412 }
     })
   })
 })
