@@ -3,7 +3,7 @@ import { describe, expect, test } from 'bun:test'
 import type { SessionInfo } from '@/lib/types'
 
 import { removeArchivedSession } from './api'
-import { groupSessionsByDate } from './ChatSelector'
+import { groupSessionsByDate, sessionBadge } from './ChatSelector'
 
 function session(sessionId: string, summary: string, lastModified: string): SessionInfo {
   return {
@@ -68,6 +68,32 @@ describe('groupSessionsByDate', () => {
       '5 days ago',
       new Date(2026, 6, 24).toLocaleDateString([], { month: 'short', day: 'numeric' })
     ])
+  })
+})
+
+describe('sessionBadge', () => {
+  const base = session('s1', 'A chat', new Date(2026, 6, 30, 8).toISOString())
+
+  test('cron and subagent flavors badge as themselves', () => {
+    expect(sessionBadge({ ...base, flavor: 'cron' })).toBe('cron')
+    expect(sessionBadge({ ...base, flavor: 'subagent' })).toBe('subagent')
+  })
+
+  test('flavor wins over origin', () => {
+    expect(sessionBadge({ ...base, flavor: 'cron', origin: { provider: 'telegram' } })).toBe('cron')
+  })
+
+  test('origin badges as the provider name lowercase', () => {
+    expect(sessionBadge({ ...base, origin: { provider: 'IRC' } })).toBe('irc')
+    expect(
+      sessionBadge({ ...base, flavor: 'chat', origin: { provider: 'telegram', label: '#moi' } })
+    ).toBe('telegram')
+  })
+
+  test('plain app chats get no badge', () => {
+    expect(sessionBadge(base)).toBe(null)
+    expect(sessionBadge({ ...base, flavor: 'chat' })).toBe(null)
+    expect(sessionBadge({ ...base, origin: { provider: '  ' } })).toBe(null)
   })
 })
 

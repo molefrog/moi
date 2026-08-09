@@ -37,20 +37,26 @@ function stableSortModels(models: Model[], compare: ModelComparator): Model[] {
     .map(({ model }) => model)
 }
 
+// `modelDefault` is the provider's own resolved default for this model
+// (OpenClaw `thinkingDefault`, which is `low` on one model and `off` on the
+// next). It outranks the app-wide DEFAULT_EFFORT but never the user's pick.
 export function resolveDisplayedEffort(
   levels: readonly string[],
-  selectedEffort: string | undefined
+  selectedEffort: string | undefined,
+  modelDefault?: string
 ): string | undefined {
   if (selectedEffort && levels.includes(selectedEffort)) return selectedEffort
+  if (modelDefault && levels.includes(modelDefault)) return modelDefault
   if (levels.includes(DEFAULT_EFFORT)) return DEFAULT_EFFORT
   return levels[levels.length - 1]
 }
 
 export function resolveEffortIndex(
   levels: readonly string[],
-  selectedEffort: string | undefined
+  selectedEffort: string | undefined,
+  modelDefault?: string
 ): number {
-  const displayedEffort = resolveDisplayedEffort(levels, selectedEffort)
+  const displayedEffort = resolveDisplayedEffort(levels, selectedEffort, modelDefault)
   return displayedEffort ? levels.indexOf(displayedEffort) : -1
 }
 

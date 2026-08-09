@@ -68,11 +68,15 @@ function getInputValue(input: Record<string, unknown>, key: string): string {
   return typeof value === 'string' ? value : ''
 }
 
-// Compact wall-clock duration: sub-second → "850ms", under a minute → "3s",
-// longer → "1m 5s". Used on agent-run and subagent duration labels.
+// Compact wall-clock duration in whole seconds: under a minute → "3s", longer
+// → "1m 5s". Used on agent-run and subagent duration labels.
+//
+// Never milliseconds. A column of "Thought for 514ms" / "Thought for 784ms"
+// rows reads as jitter — the exact figure is noise at this size, and the
+// varying width makes the list look ragged next to a plain "Thought for 1s".
+// Sub-second durations round UP so a real pause never renders as "0s".
 export function formatDuration(ms: number): string {
-  if (ms < 1000) return `${Math.round(ms)}ms`
-  const s = Math.round(ms / 1000)
+  const s = Math.max(1, Math.round(ms / 1000))
   if (s < 60) return `${s}s`
   const m = Math.floor(s / 60)
   const rem = s % 60
@@ -97,6 +101,11 @@ const OPENCLAW_TOOL_LABELS: Record<string, string> = {
   edit: 'Edit file',
   apply_patch: 'Edit',
   exec: 'Bash',
+  // 2026.7.2+ renamed the shell tool `bash` and split filesystem tools out.
+  bash: 'Bash',
+  ls: 'List files',
+  find: 'Find files',
+  grep: 'Search',
   process: 'Manage process',
   web_search: 'Web search',
   web_fetch: 'Fetch',
@@ -309,7 +318,14 @@ function formatOpenClawBrief(
     const firstLine = patch.split('\n').find(l => l.startsWith('*** ')) ?? patch.split('\n')[0]
     return shorten(firstLine ?? '')
   }
-  if (tool === 'exec') return shorten(`$ ${getInputValue(input, 'command')}`)
+  if (tool === 'exec' || tool === 'bash') {
+    // `command` on 2026.7.1 + the newer `bash` tool; the 2026.7.2 exec sandbox
+    // instead carries a `code` script (JS that shells out) — show whichever.
+    const command = getInputValue(input, 'command') || getInputValue(input, 'code')
+    return command ? shorten(`$ ${command}`) : ''
+  }
+  if (tool === 'ls' || tool === 'find' || tool === 'grep')
+    return shorten(getInputValue(input, 'path') || getInputValue(input, 'pattern'))
   if (tool === 'process') {
     const action = getInputValue(input, 'action')
     const name = getInputValue(input, 'name')

@@ -3,8 +3,11 @@ import { describe, expect, test } from 'bun:test'
 import { formatDuration } from './format'
 
 describe('formatDuration', () => {
-  test('keeps sub-second durations in milliseconds', () => {
-    expect(formatDuration(850)).toBe('850ms')
+  test('rounds sub-second durations up to a whole second', () => {
+    expect(formatDuration(850)).toBe('1s')
+    expect(formatDuration(514)).toBe('1s')
+    // Never "0s": anything the backend bothered to report is at least a second.
+    expect(formatDuration(12)).toBe('1s')
   })
 
   test('rounds seconds to an integer', () => {
