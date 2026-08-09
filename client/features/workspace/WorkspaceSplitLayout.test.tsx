@@ -16,6 +16,7 @@ describe('WorkspaceSplitLayout', () => {
         chatMinWidth: 320,
         chatMaxWidth: 460,
         chatWidth: 360,
+        onCollapse: () => undefined,
         onChatWidthChange: () => undefined
       })
     )
@@ -47,6 +48,7 @@ describe('WorkspaceSplitLayout', () => {
         chatMinWidth: 320,
         chatMaxWidth: 460,
         chatWidth: 360,
+        onCollapse: () => undefined,
         onChatWidthChange: () => undefined
       })
     )

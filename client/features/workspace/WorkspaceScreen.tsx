@@ -617,6 +617,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
             chat={dockedChat}
             open={mode === 'split'}
             chatWidth={dockedChatWidth}
+            onCollapse={() => setMode('fullscreen')}
             onChatWidthChange={setDockedChatWidth}
           />
         ) : (

@@ -12,6 +12,7 @@ type WorkspaceSplitLayoutProps = WorkspaceSplitLayoutConstraints & {
   chat: ReactNode
   open: boolean
   chatWidth: number
+  onCollapse: () => void
   onChatWidthChange: (width: number) => void
 }
 
@@ -23,22 +24,25 @@ export function WorkspaceSplitLayout({
   chatMinWidth,
   chatMaxWidth,
   chatWidth,
+  onCollapse,
   onChatWidthChange
 }: WorkspaceSplitLayoutProps) {
   const chatPanelRef = useRef<PanelImperativeHandle>(null)
   const transitionFrameRef = useRef<number | null>(null)
   const [transitionsEnabled, setTransitionsEnabled] = useState(false)
+  const openChatWidth = Math.min(Math.max(chatWidth, chatMinWidth), chatMaxWidth)
+  const defaultChatSize = useRef(open ? openChatWidth : 0).current
 
   useLayoutEffect(() => {
     const chatPanel = chatPanelRef.current
     if (!chatPanel) return
 
     if (open) {
-      chatPanel.resize(chatWidth)
+      chatPanel.resize(openChatWidth)
     } else {
       chatPanel.collapse()
     }
-  }, [chatWidth, open])
+  }, [openChatWidth, open])
 
   return (
     <ResizablePanelGroup
@@ -47,9 +51,7 @@ export function WorkspaceSplitLayout({
         'overflow-visible!',
         transitionsEnabled &&
           '[&>#chat]:transition-[flex-grow] [&>#chat]:duration-200 [&>#chat]:ease-in-out motion-reduce:[&>#chat]:transition-none!',
-        transitionsEnabled &&
-          open &&
-          'has-[[data-separator=active]]:[&>#chat]:transition-none! has-[[data-separator=focus]]:[&>#chat]:transition-none!'
+        transitionsEnabled && 'has-[[data-separator=active]]:[&>#chat]:transition-none!'
       )}
       onLayoutChanged={(_layout, meta) => {
         if (!transitionsEnabled && transitionFrameRef.current === null) {
@@ -60,8 +62,10 @@ export function WorkspaceSplitLayout({
 
         if (meta.isUserInteraction) {
           requestAnimationFrame(() => {
-            const size = chatPanelRef.current?.getSize()
-            if (size) onChatWidthChange(Math.round(size.inPixels))
+            const chatPanel = chatPanelRef.current
+            if (!chatPanel) return
+            const size = chatPanel.getSize()
+            if (size.inPixels > 0) onChatWidthChange(Math.round(size.inPixels))
           })
         }
       }}
@@ -78,11 +82,16 @@ export function WorkspaceSplitLayout({
         inert={!open}
         collapsible
         collapsedSize={0}
-        defaultSize={open ? chatWidth : 0}
+        defaultSize={defaultChatSize}
         minSize={chatMinWidth}
         maxSize={chatMaxWidth}
         groupResizeBehavior="preserve-pixel-size"
         panelRef={chatPanelRef}
+        onResize={(size, _id, previousSize) => {
+          if (open && size.inPixels === 0 && previousSize && previousSize.inPixels > 0) {
+            onCollapse()
+          }
+        }}
         className={cn(
           'overflow-hidden!',
           transitionsEnabled &&
