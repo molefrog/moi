@@ -715,16 +715,25 @@ export const selectorSessions: SessionInfo[] = [
     cwd: DEV_CWD
   },
   {
-    sessionId: 'agent:main:webchat-77bd',
-    summary: 'Rewrite the onboarding copy',
+    sessionId: 'agent:main:cron:moi-cron-probe',
+    summary: 'Cron: moi-cron-probe',
     lastModified: SELECTOR_T0 - 2 * 3_600_000,
-    cwd: DEV_CWD
+    cwd: DEV_CWD,
+    flavor: 'cron'
   },
   {
-    sessionId: 'agent:main:webchat-1c08',
-    summary: 'Trim the widget grid gutters',
+    sessionId: 'agent:main:subagent:9d2c41',
+    summary: 'Subagent task',
     lastModified: SELECTOR_T0 - 3 * 3_600_000,
-    cwd: DEV_CWD
+    cwd: DEV_CWD,
+    flavor: 'subagent'
+  },
+  {
+    sessionId: 'agent:main',
+    summary: 'mole!mole@127.0.0.1',
+    lastModified: SELECTOR_T0 - 5 * 3_600_000,
+    cwd: DEV_CWD,
+    origin: { provider: 'irc', label: 'mole!mole@127.0.0.1' }
   },
   {
     sessionId: RUNNING_SELECTOR_SESSION_ID,
