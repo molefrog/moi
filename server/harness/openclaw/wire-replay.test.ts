@@ -2,10 +2,9 @@
 // session code.
 //
 // Each scenario below is transcribed from a capture off OpenClaw 2026.7.1
-// (`scripts/openclaw-capture.ts` records more, including the observer variant).
-// Only the fields the harness reads are kept — the captures also carry a fat
-// session row on every frame, timing details, and model prose that no assertion
-// depends on.
+// (`docs/openclaw-sandbox.md` shows how to record one). Only the fields the
+// harness reads are kept — a capture also carries a fat session row on every
+// frame, timing details, and model prose that no assertion depends on.
 //
 // The point of these is that unit tests state what we believe the wire does,
 // and every ordering/duplication bug this harness has shipped came from a

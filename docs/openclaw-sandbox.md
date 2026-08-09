@@ -87,31 +87,36 @@ verified.
 
 ## Recording a run
 
-`scripts/openclaw-capture.ts` records one chat turn off the running gateway in
-the format `server/harness/openclaw/wire-replay.test.ts` replays. Use it before
-changing how frames are interpreted — the recorded traffic is what caught the
-duplicate-tool-card bug that a hand-written unit test had been asserting was
-correct behavior.
+Record real traffic before changing how frames are interpreted — the recorded
+orders are what caught the duplicate-tool-card bug that a hand-written unit test
+had been asserting was correct.
 
-```sh
-bun scripts/openclaw-capture.ts ollama-cloud/glm-5.2:cloud \
-  "Run 'echo hi' and say what it printed." \
-  /tmp/single-tool.jsonl
+There is no checked-in tool for this; a throwaway script is a dozen lines.
+Connect with the harness's own options so the connection is identical to moi's:
 
-# the same run seen by a connection that subscribes but does not send —
-# that audience gets `session.tool` where the sender gets `agent`/tool
-bun scripts/openclaw-capture.ts ollama-cloud/glm-5.2:cloud "…" \
-  /tmp/observed-tool.jsonl --observe
+```ts
+import { gatewayClientBaseOptions } from '@/server/harness/openclaw/gateway'
+
+const { GatewayClient } = await import('openclaw/plugin-sdk/gateway-runtime')
+const client = new GatewayClient({
+  ...gatewayClientBaseOptions(`ws://127.0.0.1:${port}`, token),
+  onHelloOk: () => {},
+  onEvent: evt => appendFileSync(out, `${JSON.stringify(evt)}\n`)
+})
 ```
 
-It connects with the harness's own options (`gatewayClientBaseOptions`), so
-`caps: ['tool-events']` is advertised — without it the gateway sends no tool
-frames at all and the capture looks like a backend that has none.
+`caps: ['tool-events']` (which `gatewayClientBaseOptions` sets) is load-bearing:
+without it the gateway sends no tool frames at all and the capture looks like a
+backend that has none. Then `sessions.create` → `sessions.subscribe` →
+`sessions.messages.subscribe` → `sessions.send`, wait for the `agent`/lifecycle
+`end` frame, and finish with `sessions.get` for the durable transcript.
+
+Two audiences are worth recording separately: the connection that sends gets
+`agent`/tool frames, while a second connection that only subscribes gets the
+same payloads as `session.tool` (NOTES.md §6).
 
 Prompts worth capturing: one tool call (the owner row and the tool frame race,
-~4ms apart), several calls fanned out of one row (the owner row streams as text
-and grows its blocks silently), and a run that fails (the reason arrives on
-three different frames).
+~4ms apart), several calls fanned out of one row, and a run that fails.
 
 ## Multi-version test rig
 

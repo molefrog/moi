@@ -688,12 +688,10 @@ subpath import wins over rolling a minimal client.
   upstream `strip-inbound-meta` (re-diff on every bump, see its header).
 - `wire-replay.test.ts` — the frame orders a live gateway produces, replayed
   through the real session code. **Record a run before changing how frames are
-  interpreted** (`scripts/openclaw-capture.ts`, see
-  `docs/openclaw-sandbox.md`), then transcribe what it shows into a scenario
-  there. Every ordering and duplication bug this harness has shipped came from
-  reasoning about frame order in the abstract; a recording is the only thing
-  that argues back. The raw dumps are not checked in — they are megabytes of
-  session rows around a handful of load-bearing frames.
+  interpreted** (`docs/openclaw-sandbox.md` shows how), then transcribe what it
+  shows into a scenario there. Every ordering and duplication bug this harness
+  has shipped came from reasoning about frame order in the abstract; a
+  recording is the only thing that argues back.
 
 Two rules the modules above depend on, both learned the hard way:
 
