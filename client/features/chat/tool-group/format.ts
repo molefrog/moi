@@ -192,7 +192,12 @@ const CODEX_SUBAGENT_ACTION_LABELS: Record<string, string> = {
 }
 
 export function getToolDisplayName(call: ToolCall): string {
-  if (call.provider === 'openclaw') return OPENCLAW_TOOL_LABELS[call.name] ?? call.name
+  // An OpenClaw agent pinned to the `claude-cli` runtime reports Claude Code's
+  // own tool names (`Read`, `Bash`, `Edit`, …) rather than OpenClaw's, so the
+  // Claude vocabulary is the fallback before giving up and showing the raw name.
+  if (call.provider === 'openclaw') {
+    return OPENCLAW_TOOL_LABELS[call.name] ?? CLAUDE_TOOL_LABELS[call.name] ?? call.name
+  }
   if (call.provider === 'codex') {
     if (call.name === 'exec') {
       const action = codexExecAction(call.input)
@@ -221,7 +226,13 @@ function shortToolName(name: string): string {
 export function formatInputBrief(call: ToolCall, cwd: string | null): string {
   const input = (call.input as Record<string, unknown>) ?? {}
   const shorten = makeShortenPaths(cwd)
-  if (call.provider === 'openclaw') return formatOpenClawBrief(call.name, input, shorten)
+  if (call.provider === 'openclaw') {
+    // Same fallback as the label: a claude-cli-backed run carries Claude Code's
+    // tool names and argument keys (`file_path`, not `path`).
+    return (
+      formatOpenClawBrief(call.name, input, shorten) || formatClaudeBrief(call.name, input, shorten)
+    )
+  }
   if (call.provider === 'codex') return formatCodexBrief(call.name, input, shorten)
   return formatClaudeBrief(call.name, input, shorten)
 }
@@ -314,7 +325,21 @@ function formatOpenClawBrief(
   if (tool === 'read' || tool === 'write' || tool === 'edit')
     return shorten(getInputValue(input, 'path'))
   if (tool === 'apply_patch') {
-    const patch = getInputValue(input, 'patch')
+    // The codex runtime describes an edit structurally: `{ changes: [{ path,
+    // kind }] }` (captured live on 2026.7.1). Name the file, or count them when
+    // one patch touches several.
+    const changes = input.changes
+    if (Array.isArray(changes) && changes.length > 0) {
+      const paths = changes
+        .map(c =>
+          c && typeof c === 'object' ? getInputValue(c as Record<string, unknown>, 'path') : ''
+        )
+        .filter(Boolean)
+      if (paths.length === 1) return shorten(paths[0])
+      if (paths.length > 1) return `${paths.length} files`
+    }
+    // Older shape: the raw patch text, whose `*** ` header names the file.
+    const patch = getInputValue(input, 'patch') || getInputValue(input, 'input')
     const firstLine = patch.split('\n').find(l => l.startsWith('*** ')) ?? patch.split('\n')[0]
     return shorten(firstLine ?? '')
   }

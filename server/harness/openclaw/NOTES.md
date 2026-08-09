@@ -553,6 +553,34 @@ completed?, ts }`.
 health blob (`eventLoop`, `plugins`, `channels`, `sessions`); useful for
 liveness, ignored otherwise. `tick` is the heartbeat.
 
+### Tool vocabulary is per runtime
+
+One agent's tools change name and argument shape depending on which runtime
+serves the model, and all of them arrive as `provider: 'openclaw'`. Captured on
+2026.7.1:
+
+| runtime                    | shell                         | edit                                          | read                       |
+| -------------------------- | ----------------------------- | --------------------------------------------- | -------------------------- |
+| built-in loop              | `exec` / `bash` `{ command }` | `edit` `{ path }`                             | `read` `{ path }`          |
+| codex (`extensions/codex`) | `bash` `{ command, cwd }`     | `apply_patch` `{ changes: [{ path, kind }] }` | none — reads run as `bash` |
+| `claude-cli`               | `Bash` `{ command }`          | `Edit` `{ file_path }`                        | `Read` `{ file_path }`     |
+
+So there is no Read card on a codex-backed run: the model reads by shelling out
+(`bash -lc "sed -n '1,120p' notes.txt"`), and that is what the transcript
+records. Nothing is being dropped.
+
+The client's tool-card labels and briefs live in
+`client/features/chat/tool-group/format.ts`; the OpenClaw path falls back to the
+Claude Code vocabulary for the `claude-cli` case.
+
+**`agent`/`item` frames are not a second source of tool cards.** They carry
+`itemId`, `kind`, `title`, `status`, `summary`, `meta` — and **no `toolCallId`
+and no `args`** (`AgentItemEventData` in `src/infra/agent-activity-events.ts`,
+confirmed on the wire: every `command`/`patch` item frame arrives with
+`toolCallId` absent). Every one of them is paired with a `tool` frame that has
+both, a few milliseconds apart. moi renders from the `tool` frames and reads
+item frames only for the textless `analysis` reasoning span.
+
 ### `sessions.changed`
 
 Two flavors share the event name (both lines, verified live):
