@@ -12,12 +12,11 @@ gateways. Protocol-3 gateways (≤ 2026.5.x) reject the handshake with
 are detect-and-surface only (`compat.ts` → `classifyGatewayError`), never
 silently degraded into empty lists.
 
-Claims here are only as good as their last capture. §6 was rewritten in full
-against live 2026.7.1 traffic from `ollama-cloud/glm-5.2:cloud`,
-`openai/gpt-5.5` and `claude-cli/claude-sonnet-5`; the recordings behind it are
-transcribed into `wire-replay.test.ts`, which replays them. Several
-things this file previously asserted about backend-specific frame behavior
-turned out to be artifacts of one capture on one config — see §6 and §11.
+Claims here are only as good as their last capture. §6 was rewritten against
+live 2026.7.1 traffic (`ollama-cloud/glm-5.2:cloud`, `openai/gpt-5.5`,
+`claude-cli/claude-sonnet-5`), transcribed into `wire-replay.test.ts`. Much of
+what this file used to say about "backend-specific" frame behavior was one
+capture on one config generalized too far — record a run before trusting it.
 
 ## 1. What OpenClaw is
 
@@ -478,28 +477,24 @@ and the same run with three calls fanned out of one row:
 So the rule is a question about the run, not about the backend: **does a
 durable row own this call yet?** If yes, that row renders the card and the
 frames only fill in its state. If no, the frame gets a card of its own
-(`livetool:<toolCallId>`), placed just past the last durable row we ingested,
-and it keeps that call for the rest of the session — durable rows that later
-grow the same `toolCall` block suppress it (adapter `omitToolCallIds`).
-Ownership is decided once, when the card is created: `applyEvent` upserts by id
-and can never retract, so a card that changes identity mid-run is a duplicate
-on screen forever. That is exactly the bug the old "is this the codex backend?"
-sniffing produced — the owner row arrived 4ms first, the start frame then
-re-ided the already-broadcast turn onto a `livetool:` id, and every single-tool
-run rendered the call twice, once stuck pending.
+(`livetool:<toolCallId>`), placed just past the last durable row ingested, and
+it keeps that call for the rest of the session — durable rows that later grow
+the same block suppress it (adapter `omitToolCallIds`).
+
+Ownership is decided once, at creation: `applyEvent` upserts by id and can never
+retract, so a card that changes identity mid-run is a duplicate on screen
+forever. Getting this wrong is what made every single-tool run render twice.
 
 Tool ids were stable across `start`/`update`/`result`/durable in every capture,
 on both providers.
 
-**Run failures are reported on three frames and moi must show them.** A dying
-run says why on `chat` `state:'error'` (`errorMessage`), on `agent`/`lifecycle`
-`phase:'error'` (`data.error`), and as a bare `sessions.changed phase:'error'`
-with no text at all. The wordings differ (the raw reason, then a wrapped
-"⚠️ Agent failed before reply: … Logs: openclaw logs --follow"), so
-`reportRunError` reports the first that carries text and drops the rest for
-that run. Note the error frames arrive on `chat`, which moi otherwise ignores
-when token streaming is off — failures are surfaced regardless of that toggle,
-or a run that dies with streaming off looks like nothing happened.
+**Run failures are reported on three frames.** A dying run says why on `chat`
+`state:'error'` (`errorMessage`), on `agent`/`lifecycle` `phase:'error'`
+(`data.error`), and as a bare `sessions.changed phase:'error'` with no text at
+all — with three wordings (the raw reason, then a wrapped "⚠️ Agent failed
+before reply: … Logs: openclaw logs --follow"). `reportRunError` takes the
+first with text. The error rides on `chat`, which moi otherwise ignores when
+token streaming is off, so failures are surfaced regardless of that toggle.
 
 **Thinking blocks: who actually emits them.** The wire shape exists and moi
 renders it — durable rows carry `{ type: 'thinking', thinking,

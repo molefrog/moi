@@ -19,14 +19,6 @@ import { stripMoiContext } from '@/lib/moi-context'
 // upstream moved and this file needs to follow. (It also compares clean against
 // the 2026.6.33 copy — identical except the chat-window block pass, which is
 // 2026.7.x-only but harmless on 6.x rows.)
-//
-// The bootstrap-preamble pass is ours, and it is the one thing here with no
-// counterpart in the pinned source: a `[Bootstrap pending]` prefix on user text
-// appears nowhere in 2026.7.1 or 2026.8.x (the surviving upstream string is an
-// `introLine` in `system-prompt.ts`, not a bracketed prefix). It is kept for
-// transcripts written by pre-2026.6 installs — a state dir survives upgrades,
-// and moi reads those rows back through a current gateway — and is a cheap
-// no-op for everything else. Delete it if old transcripts stop mattering.
 
 const LEADING_TIMESTAMP_PREFIX_RE = /^\[[A-Za-z]{3} \d{4}-\d{2}-\d{2} \d{2}:\d{2}[^\]]*\] */
 
@@ -36,10 +28,7 @@ const INBOUND_META_SENTINELS = [
   'Conversation info (untrusted metadata):',
   'Sender (untrusted metadata):',
   'Thread starter (untrusted, for context):',
-  // 2026.6.x+ wording, and the ≤2026.5.x one it replaced — old transcripts
-  // replay through `sessions.get`, so both must keep stripping.
   'Reply target of current user message (untrusted, for context):',
-  'Replied message (untrusted, for context):',
   'Forwarded message context (untrusted metadata):',
   CHAT_HISTORY_SENTINEL
 ]
@@ -181,25 +170,6 @@ export function stripInboundMetadata(text: string): string {
     .replace(LEADING_TIMESTAMP_PREFIX_RE, '')
 }
 
-// Removes a leading `[Bootstrap pending]` header plus every following
-// non-empty line up to the first blank line. Upstream produced a fixed 6-line
-// preamble on ≤2026.4.x (see `buildFullBootstrapPromptLines`), but we key off
-// structure rather than exact text so minor wording changes don't leak through.
-export function stripBootstrapPreamble(text: string): string {
-  if (!text || !text.startsWith('[Bootstrap pending]')) return text
-  const lines = text.split('\n')
-  let i = 0
-  while (i < lines.length && lines[i] !== '') i += 1
-  while (i < lines.length && lines[i] === '') i += 1
-  return lines.slice(i).join('\n')
-}
-
-// moi-side (not part of the upstream mirror above): the spawn tool wraps a
-// subagent's first user message as
-//   "[Subagent Context] <paragraph>\n\n[Subagent Task]\n\n<task>\n\nBegin. …"
-// — surface the task itself in titles/previews/transcripts. Truncated
-// previews/derived titles can cut before the task marker; fall back to a
-// plain label rather than leaking the envelope.
 export function stripSubagentEnvelope(text: string): string {
   if (!text.startsWith('[Subagent Context]')) return text
   const taskAt = text.indexOf('[Subagent Task]')
@@ -210,5 +180,5 @@ export function stripSubagentEnvelope(text: string): string {
 }
 
 export function stripUserMessageMetadata(text: string): string {
-  return stripSubagentEnvelope(stripMoiContext(stripInboundMetadata(stripBootstrapPreamble(text))))
+  return stripSubagentEnvelope(stripMoiContext(stripInboundMetadata(text)))
 }

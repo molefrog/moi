@@ -95,60 +95,12 @@ export function recordOpenClawThinkingProfiles(rows: OpenClawThinkingRow[]): voi
   for (const row of rows) recordOpenClawThinkingProfile(row)
 }
 
-// The last segment of a ref — the model id without its provider.
-function openClawModelId(ref: string): string {
-  const slash = ref.lastIndexOf('/')
-  return slash === -1 ? ref : ref.slice(slash + 1)
-}
-
-// Providers that are agent RUNTIMES rather than model catalogs. A session
-// configured with `agentRuntime: { id: 'claude-cli' }` reports the runtime here,
-// so `anthropic/claude-opus-5` (the catalog ref, and what the picker sends)
-// and `claude-cli/claude-opus-5` (what the row reports back) name one model.
-const OPENCLAW_RUNTIME_PROVIDERS = new Set(['claude-cli'])
-
-function openClawModelProvider(ref: string): string {
-  const slash = ref.lastIndexOf('/')
-  return slash === -1 ? '' : ref.slice(0, slash)
-}
-
-// Do two refs name the same model? Used by the applied-model cache, which
-// compares the picker's catalog ref against the ref the wire reports. Only a
-// runtime alias collapses the provider — `ollama/kimi-k3:cloud` and
-// `openai/kimi-k3:cloud` are genuinely different models and stay unequal, so a
-// switch between them still patches.
-export function openClawModelRefsEquivalent(a: string, b: string): boolean {
-  if (a === b) return true
-  if (openClawModelId(a) !== openClawModelId(b)) return false
-  const [pa, pb] = [openClawModelProvider(a), openClawModelProvider(b)]
-  return OPENCLAW_RUNTIME_PROVIDERS.has(pa) || OPENCLAW_RUNTIME_PROVIDERS.has(pb)
-}
-
-// A model served by a CLI backend reports the RUNTIME as its provider, not the
-// catalog one. A session started on `anthropic/claude-opus-5` (its
-// `models.list` ref, and what `sessions.patch {model}` takes) comes back on the
-// wire as `claude-cli/claude-opus-5` — verified live on 2026.7.2-beta.7, where
-// every model configured with `agentRuntime: { id: 'claude-cli' }` does this.
-// Keying only on the exact ref drops those menus on the floor and the picker
-// falls back to the four-level intersection, costing Opus 5 `minimal`,
-// `adaptive`, `xhigh` and `max`.
-//
-// So a miss retries on the bare model id — but only when exactly one recorded
-// provider carries it. `kimi-k3:cloud` genuinely exists under both `ollama` and
-// `openai` with different menus, and guessing between them would offer a level
-// the gateway rejects, which is the failure this module exists to prevent.
+// A model's menu, or null when no session row has reported one yet (the picker
+// then falls back to OPENCLAW_FALLBACK_THINKING_LEVELS). Keyed by the exact
+// `provider/model` ref: `sessions.list` echoes back the provider of the ref
+// that was patched, so what the picker sends is what the rows come back under.
 export function openClawThinkingProfile(modelRef: string): OpenClawThinkingProfile | null {
-  const exact = profiles.get(modelRef)
-  if (exact) return exact
-
-  const id = openClawModelId(modelRef)
-  let match: OpenClawThinkingProfile | null = null
-  for (const [ref, profile] of profiles) {
-    if (openClawModelId(ref) !== id) continue
-    if (match) return null
-    match = profile
-  }
-  return match
+  return profiles.get(modelRef) ?? null
 }
 
 export function hasOpenClawThinkingProfiles(): boolean {

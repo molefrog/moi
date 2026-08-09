@@ -1,21 +1,13 @@
 // Map OpenClaw gateway shapes into our agent-agnostic display format.
 //
-// OpenClaw stores one `OpenClawMessage` per role-turn: `user` (the prompt,
-// with AI-facing envelopes prepended — see `openclaw-strip.ts`), `assistant`
-// (text/reasoning/toolCall blocks + model metadata), and `toolResult` (one
-// per executed tool call, keyed by `toolCallId`). We turn that into:
-//   - one Turn per user/assistant message, with tool-call parts rendered
-//     inline on the assistant turn,
-//   - no separate turn for toolResult rows — results are folded into the
-//     assistant's matching tool-call part so the UI shows them as expandable
-//     output under the call.
+// OpenClaw stores one message per role-turn: `user` (the prompt, with AI-facing
+// envelopes prepended — see `strip.ts`), `assistant` (text/thinking/toolCall
+// blocks plus model metadata), and `toolResult` (one per executed call, keyed
+// by `toolCallId`). Each user/assistant message becomes one Turn; toolResult
+// rows get no turn of their own — they fold into the matching tool-call part.
 //
-// Two callers:
-//   - `toStreamEvents(detail)` — static path used for cold-load (REST endpoint)
-//     and tests.
-//   - `messageToTurnLive(msg, sessionKey, idx, results)` — incremental path used
-//     by the live session adapter (`openclaw-session.ts`) when a single
-//     `session.message` frame arrives.
+// `toStreamEvents` is the cold path (REST replay); `messageToTurn` is the
+// per-frame path the live session uses.
 import type { Part, StreamEvent, ToolCall, ToolState, Turn, TurnMeta } from '@/lib/format'
 import type { SessionInfo } from '@/lib/types'
 
@@ -79,13 +71,12 @@ export type ToolResultInfo = {
   running?: boolean
 }
 
-// Pull a readable `output` string out of a `toolResult` message. Every row
-// observed on 2026.7.1 is flat — `content: [{ type: 'text', text: 'hello' }]`.
-// The recursion below is for blocks that carry their own `content` array or a
-// `text`/`output` string; it costs nothing and it is the difference between a
-// tool card showing its output and showing a bare `[toolResult]` placeholder,
-// which is what an unrecognized wrapper renders as. Only a truly opaque block
-// falls back to `[type]`.
+// Pull a readable `output` string out of a `toolResult` message. Rows are flat
+// in practice (`content: [{ type: 'text', text: 'hello' }]`), but upstream
+// types these blocks as an open `Record<string, unknown>` and says outright
+// that provider SDKs spell them differently (`src/chat/tool-content.ts`), so a
+// block carrying its own `content`/`text`/`output` is unwrapped one level
+// rather than rendered as a bare `[toolResult]` placeholder.
 export function flattenToolResultContent(content: OpenClawMessage['content'], depth = 0): string {
   if (typeof content === 'string') return content
   if (!Array.isArray(content)) return ''
@@ -157,37 +148,11 @@ function blockToPart(
       if (!text) return null
       return { type: 'text', text }
     }
-    case 'thinking':
-    case 'reasoning': {
-      // The vocabulary in the pinned source is `{ type: 'thinking', thinking,
-      // thinkingSignature }` and that is what every capture carries — no
-      // `reasoning` content block exists in 2026.7.1 or 2026.8.x (the one
-      // `type: "reasoning"` upstream is inside a serialized `thinkingSignature`,
-      // not a block). The extra field names below are unverified tolerance,
-      // kept because a silently vanishing Thought row is worse than a dead
-      // branch; they are not evidence that any line emits them.
-      const b = block as {
-        thinking?: unknown
-        reasoning?: unknown
-        text?: unknown
-        thinkingSignature?: unknown
-        signature?: unknown
-      }
-      const text =
-        (typeof b.thinking === 'string' && b.thinking) ||
-        (typeof b.reasoning === 'string' && b.reasoning) ||
-        (typeof b.text === 'string' && b.text) ||
-        ''
-      if (!text) return null
-      const sig =
-        (typeof b.thinkingSignature === 'string' && b.thinkingSignature) ||
-        (typeof b.signature === 'string' && b.signature) ||
-        undefined
-      return {
-        type: 'reasoning',
-        text,
-        ...(sig ? { signature: sig } : {})
-      }
+    case 'thinking': {
+      const b = block as { thinking?: unknown; thinkingSignature?: unknown }
+      if (typeof b.thinking !== 'string' || !b.thinking) return null
+      const sig = typeof b.thinkingSignature === 'string' ? b.thinkingSignature : undefined
+      return { type: 'reasoning', text: b.thinking, ...(sig ? { signature: sig } : {}) }
     }
     case 'toolCall': {
       const id = (block as { id?: unknown }).id

@@ -1,21 +1,15 @@
-// Per-(workspaceId, sessionId) live OpenClaw session adapter.
+// Per-(workspaceId, sessionId) live OpenClaw session.
 //
-// Owns the durable in-memory view for a session and converts each
-// `session.message` frame into our `StreamEvent`s. One instance is created
-// the first time the workspace's UI asks for its events (via the REST
-// endpoint) or sends a chat into it; thereafter it stays subscribed so the
-// view is up to date for reattach without re-fetching `sessions.get`.
+// Holds the in-memory view for one session and keeps it current from the
+// gateway's event stream: `session.message` rows build the turns, `chat` frames
+// drive the streaming preview, tool frames drive the tool cards, and the
+// run-end reconcile against `sessions.get` catches anything the wire dropped.
+// The gateway is the source of truth — nothing is persisted here, so a cold
+// open just re-seeds.
 //
-// Live layers on top of the durable rows (all verified against gateways
-// 2026.7.1 and 2026.6.33 — same wire shapes on both):
-//   - `chat` frames (state delta/final/error, cumulative partial message) →
-//     StreamPreview broadcasts; cleared by the client when the durable turn
-//     lands carrying the matching `meta.apiMessageId`.
-//   - `session.tool` frames (phase start/update/result with full output) →
-//     tool cards flip pending→running→success/error mid-run;
-//     `reconcileAfterRun` remains the safety net for anything missed.
-//   - Disk persistence stays out — the gateway is the source of truth; we
-//     re-seed from `sessions.get` on cold start.
+// The frame families and the order they arrive in are documented in NOTES.md
+// §6; the rules that follow from it (who owns a tool card, why identity is
+// decided once) are worth reading before changing anything here.
 import { appendAttachmentNote } from '@/lib/attachment-note'
 import {
   type MoiContext,
@@ -54,11 +48,7 @@ import {
   onGatewayReconnected,
   releaseSessionSubscriptionRef
 } from './gateway'
-import {
-  openClawModelRefsEquivalent,
-  recordOpenClawThinkingProfile,
-  recordOpenClawThinkingRejection
-} from './thinking'
+import { recordOpenClawThinkingProfile, recordOpenClawThinkingRejection } from './thinking'
 import { broadcast } from '../../state'
 import { materializeToPath, resolveUploads } from '../../uploads'
 import {
@@ -107,14 +97,11 @@ type SessionRecord = {
   // per-run and cleared when the run terminalizes.
   previewReasoning?: { runId: string; text: string }
   previewTextBlocks?: { runId: string; blocks: PreviewBlock[] }
-  // Tool calls we render as their own turn because no durable row owned them
-  // when the tool started. Keyed by toolCallId → the name/input from the start
-  // frame plus the `seq` that places the card in the transcript. The entry is
-  // permanent for the session: once a call is on screen as a live card, every
-  // durable row suppresses that id (adapter `omitToolCallIds`), so a row that
-  // later grows the matching `toolCall` block can't render the same call twice.
-  // A broadcast turn can never be retracted, so ownership has to be decided
-  // once — at the moment the card is created — and then respected.
+  // Calls rendered as their own turn because no durable row owned them when the
+  // tool started, keyed by toolCallId. Permanent for the session: durable rows
+  // suppress these ids (adapter `omitToolCallIds`) so a row that later grows the
+  // matching block can't render the call twice. A broadcast turn can never be
+  // retracted, so ownership is decided once and then respected.
   liveTools: Map<string, { name: string; input: unknown; seq: number }>
   // Live reasoning spans from `agent`/item frames of kind `analysis`, keyed by
   // itemId. Timing only — those frames carry no reasoning text (see
@@ -125,11 +112,9 @@ type SessionRecord = {
   // durable row that preceded it and the one that follows (see liveTurnSeq).
   lastDurableSeq: number
   liveTurnTick: number
-  // The model ref we last asked the gateway for (exactly as the picker sends
-  // it), and the `provider/model` the gateway last reported back. They are not
-  // always the same string — a session pinned to a CLI runtime echoes the
-  // runtime as its provider — so they are kept apart and compared differently
-  // (applySessionSettings).
+  // The model ref we last asked the gateway for, and the `provider/model` the
+  // last row reported. They differ only when something outside moi moved the
+  // session, which is the whole point of keeping both.
   requestedModel?: string
   wireModel?: string
   appliedThinking?: string
@@ -324,13 +309,9 @@ export function killAllOpenClawSessions(): void {
   for (const rec of [...sessions.values()]) teardownOpenClawSession(rec)
 }
 
-// Safety net for `toolResult` rows the live stream missed. `toolResult`
-// messages DO stream on `session.message` (and `session.tool` carries the same
-// output inline — NOTES §6), so this is not the only path; it covers gaps from
-// a disconnect, a dropped frame, or a start/result race. On run end the gateway
-// has flushed every durable row, so pulling a fresh transcript and merging any
-// new toolResult rows flips lingering tool-call cards from `pending` to
-// `success`/`error` with output. Idempotent.
+// Run-end reconcile against the canonical transcript. `toolResult` rows never
+// stream (NOTES.md §6) and a row can grow content after it streams, so this is
+// how the view catches up. Idempotent.
 function reconcileAfterRun(rec: SessionRecord): Promise<void> {
   // Both sessions.changed and agent lifecycle can end a run; coalesce onto one
   // in-flight transcript fetch rather than racing two.
@@ -496,21 +477,14 @@ function liveToolIds(rec: SessionRecord): ReadonlySet<string> | undefined {
 function emitTurn(rec: SessionRecord, msg: OpenClawMessage, idx: number): void {
   const turn = messageToTurn(msg, rec.sessionKey, idx, rec.results, liveToolIds(rec))
   if (!turn) return
-  // Optimistic-id rendezvous: prefer the exact idempotency-key match
-  // (`<runId>:user`; nested under `__openclaw` on 2026.7.x, message-level on
-  // 2026.6.x), fall back to first-matching-text for old rows and unknown
-  // runIds. Re-id to the optimistic id so the optimistic bubble upserts in
-  // place instead of duplicating.
+  // Optimistic-id rendezvous: re-id the durable user row to the bubble the
+  // client already drew, so it upserts in place instead of duplicating.
   if (rec.pendingUserEchoes.length > 0 && turn.role === 'user') {
     const idem = messageIdempotencyKey(msg)
-    // 1. Exact idempotency-key match (`<runId>:user`) when the send's runId is
-    //    already known. 2. Same key with the runId extracted from the durable
-    //    row itself, covering the race where the echo lands before the
-    //    `sessions.send` response set `echo.runId`. 3. Normalized-text match
-    //    as the version-agnostic fallback: strip the moi-context envelope from
-    //    both sides (the durable row is already stripped for display; the
-    //    optimistic text never carries it) and collapse whitespace, so a
-    //    trailing newline or metadata difference can't split the bubble.
+    // Three ways in, cheapest first: the send's own `<runId>:user` key; the
+    // same key with the runId read off the row (the echo can beat the
+    // `sessions.send` response); and normalized text, for rows carrying
+    // neither.
     const idemRunId = idem?.endsWith(':user') ? idem.slice(0, -':user'.length) : undefined
     let at = idem
       ? rec.pendingUserEchoes.findIndex(
@@ -556,9 +530,9 @@ function reemitToolCallOwners(rec: SessionRecord, toolCallId: string): void {
   }
 }
 
-// `chat` delta frames carry the full in-progress assistant message; map its
-// content blocks onto cumulative PreviewBlocks (text + thinking only — tool
-// calls surface through `session.tool`, not the preview). Exported for tests.
+// A `chat` delta frame carries the whole in-progress message; map its blocks to
+// cumulative PreviewBlocks. Text and thinking only — tool calls have their own
+// cards. Exported for tests.
 export function chatPreviewBlocks(content: unknown): PreviewBlock[] {
   if (typeof content === 'string') {
     return content ? [{ index: 0, kind: 'text', text: content }] : []
@@ -567,30 +541,20 @@ export function chatPreviewBlocks(content: unknown): PreviewBlock[] {
   const blocks: PreviewBlock[] = []
   content.forEach((block, index) => {
     if (!block || typeof block !== 'object') return
-    const b = block as { type?: unknown; text?: unknown; thinking?: unknown; reasoning?: unknown }
+    const b = block as { type?: unknown; text?: unknown; thinking?: unknown }
     if (b.type === 'text' && typeof b.text === 'string' && b.text) {
       blocks.push({ index, kind: 'text', text: b.text })
-    } else if (b.type === 'thinking' || b.type === 'reasoning') {
-      // Same unverified tolerance as the durable path (adapter.blockToPart):
-      // every observed block is `{ type: 'thinking', thinking }`.
-      const text =
-        (typeof b.thinking === 'string' && b.thinking) ||
-        (typeof b.reasoning === 'string' && b.reasoning) ||
-        (typeof b.text === 'string' && b.text) ||
-        ''
-      if (text) blocks.push({ index, kind: 'reasoning', text })
+    } else if (b.type === 'thinking' && typeof b.thinking === 'string' && b.thinking) {
+      blocks.push({ index, kind: 'reasoning', text: b.thinking })
     }
   })
   return blocks
 }
 
-// Two frame families carry the streaming assistant text, and a gateway sends
-// BOTH: `chat` state=delta (cumulative content blocks) and `agent`
-// stream=assistant (cumulative `text`) arrive for the same run, in the same
-// millisecond, on every capture taken so far. Whichever produces the first
-// delta claims the run, so the two cumulative snapshots can't race each other
-// into a flicker — and a gateway that happens to send only one of them still
-// streams instead of dumping the whole reply at run end.
+// A gateway streams the assistant text on BOTH `chat` state=delta and `agent`
+// stream=assistant, for the same run, in the same millisecond. Whichever emits
+// first claims the run so the two cumulative snapshots can't race into a
+// flicker; a gateway sending only one of them still streams.
 type PreviewSource = 'chat' | 'agent'
 // Exported for tests: only reads/writes the two preview-source fields.
 export function claimPreviewSource(
@@ -616,14 +580,11 @@ function broadcastPreview(rec: SessionRecord, messageId: string, blocks: Preview
   })
 }
 
-// Repaint the run's preview from the two independent streams: reasoning first
-// (it precedes the answer), then whichever source owns the text. A preview
-// replaces all blocks for its messageId, so the two can't be broadcast
-// separately without erasing each other — they must be emitted together.
-// Indices are renumbered sequentially because the reasoning block is prepended.
-// Both halves are keyed by runId rather than pinned on `previewRunId`, so
-// reasoning can never consume the text source's claim (that would lock `chat`
-// out of its own run and stop the answer from streaming at all).
+// Repaint the preview from both streams at once: reasoning first (it precedes
+// the answer), then the text. A preview replaces every block for its messageId,
+// so broadcasting the two separately would erase one with the other. Keyed by
+// runId rather than by the claim, so reasoning can never lock the text source
+// out of its own run.
 function emitMergedPreview(rec: SessionRecord, runId: string, messageId: string): void {
   const blocks: PreviewBlock[] = []
   const reasoning = rec.previewReasoning?.runId === runId ? rec.previewReasoning.text : ''
@@ -678,13 +639,10 @@ function handleAgentStreamFrame(rec: SessionRecord, payload: Record<string, unkn
   emitMergedPreview(rec, runId, previewMessageId(rec.sessionKey, runId))
 }
 
-// A run that dies mid-flight says why, and the user is the one who can act on
-// it ("--dangerously-skip-permissions cannot be used with root/sudo
-// privileges", "model not allowed: …"). The reason rides on three frames —
-// `chat` state=error (`errorMessage`), `agent`/lifecycle phase=error
-// (`data.error`), and a bare `sessions.changed phase=error` — so report the
-// first one that carries text and ignore the rest of that run's echoes.
-// Without this the chat just stops: spinner off, nothing said.
+// A dying run says why on three different frames with three different wordings
+// (NOTES.md §6), and the reason is something the user can act on. Report the
+// first that carries text; the rest are echoes. Without this the chat just
+// stops — spinner off, nothing said.
 export function reportRunError(rec: SessionRecord, runId: string, message: unknown): void {
   if (rec.reportedErrorRunId === runId) return
   const text = typeof message === 'string' ? message.trim() : ''
@@ -759,20 +717,11 @@ function emitLiveToolTurn(rec: SessionRecord, toolCallId: string): void {
   broadcast(rec.workspaceId, { kind: 'turn', turn, sessionId: rec.sessionId })
 }
 
-// A run can die before it ever reports a lifecycle phase. When the gateway
-// terminalizes the admission itself, it announces the death ONLY as
-// `sessions.changed { reason: 'chat.dispatch-error' }` — no runId and no
-// `phase: 'error'`, so the runId-keyed lifecycle clause never fires and the
-// composer spins forever with nothing on screen.
-//
-// Verified live on 2026.7.2-beta.7: `sessions.patch { model }` makes OpenClaw
-// persist the pick into the agent's effective `model.primary`, and that config
-// write bumps the agent's prepared-model-runtime generation while the run is
-// being admitted — the run dies with "prepared model runtime catalog
-// generation was superseded" after `sessions.send` already returned
-// `status: 'started'` and a runId. The frame carries no error text on this
-// path, so the message says what the user can act on instead of inventing a
-// cause. Resending works: the model is already applied, so no second write.
+// A run can die during admission, before it reports any lifecycle phase. The
+// gateway announces that only as `sessions.changed { reason:
+// 'chat.dispatch-error' }` — no runId, no error text — so the runId-keyed
+// clauses never fire and the composer would spin forever. With no cause on the
+// wire, say the one thing the user can act on.
 export function handleDispatchError(rec: SessionRecord): void {
   setProcessing(rec, false, null)
   broadcast(rec.workspaceId, {
@@ -787,18 +736,11 @@ function liveThinkingTurnId(sessionKey: string, itemId: string): string {
   return `openclaw:${sessionKey}:livethink:${itemId}`
 }
 
-// The codex app-server reports reasoning as an `agent`/item frame with
-// `kind:'analysis', title:'Reasoning'` and phases start→end — presence and
-// timing, never text (verified on the wire: the item frames carry no content,
-// and the durable row that follows has only a `text` block; the plugin's one
-// text-bearing reasoning path is channel-progress formatting with no item id).
-// So we render what the backend does give: a "Thinking" row that becomes
-// "Thought for 1.2s". Without this a codex run shows a silent gap between the
-// send and the first token, even though the model is visibly reasoning.
-//
-// Deliberately NOT durable: nothing in the transcript backs it, so a cold
-// reload (re-seed from `sessions.get`) drops the row. Same tradeoff as the live
-// tool cards — `applyEvent` upserts and can never retract.
+// Some runtimes report reasoning as an `agent`/item frame of `kind: 'analysis'`
+// (emitted by `extensions/codex`) — presence and timing, never text. Render
+// what they do give: a "Thinking" row that becomes "Thought for 1.2s", instead
+// of a silent gap before the first token. Not durable — nothing in the
+// transcript backs it, so a cold reload drops the row.
 export function handleReasoningItemFrame(
   rec: SessionRecord,
   payload: Record<string, unknown>
@@ -850,21 +792,10 @@ function emitLiveThinkingTurn(rec: SessionRecord, itemId: string): void {
   broadcast(rec.workspaceId, { kind: 'turn', turn, sessionId: rec.sessionId })
 }
 
-// Live tool state. `session.tool` and `agent`/tool carry the SAME payload to
-// disjoint audiences — the gateway sends `agent`/tool to connections
-// registered as run-scoped tool recipients (the connection that issued
-// `sessions.send`) and mirrors it as `session.tool` to every other session
-// subscriber (`server-chat.ts`: `excludeConnIds(sessionEventSubscribers,
-// runToolRecipients)`). moi sees `agent`/tool for runs it starts and
-// `session.tool` for runs started elsewhere — a channel message, cron, the
-// Control UI, or any run already in flight when we attached. Same data, so
-// one handler.
-//
-// start/update → running, result → success/error with output. If a durable row
-// already owns the call we just re-emit it; if none does, we render the call as
-// its own turn so it appears while it runs, and that card keeps ownership for
-// good (see `liveTools`). `reconcileAfterRun` stays the safety net.
-// Exported for tests.
+// Live tool state, from either frame family: `session.tool` and `agent`/tool
+// are the same payload sent to disjoint audiences (NOTES.md §6), so one
+// handler serves both. start/update → running, result → success/error with
+// output. Exported for tests.
 export function handleToolFrame(rec: SessionRecord, payload: Record<string, unknown>): void {
   const data = payload.data as
     | {
@@ -881,17 +812,10 @@ export function handleToolFrame(rec: SessionRecord, payload: Record<string, unkn
   const name = typeof data.name === 'string' ? data.name : undefined
   const toolName = name ? { toolName: name } : {}
   if (data.phase === 'start' || data.phase === 'update') {
-    // Does a durable row already own this call? If so it renders the card and
-    // nothing synthetic is needed. If not, this frame is the only evidence the
-    // call exists, so give it its own turn.
-    //
-    // Which case applies is a property of the RUN, not of the backend: on both
-    // providers verified live (2026.7.1, ollama-cloud and openai) a single tool
-    // call commits its durable owner row ~4ms BEFORE the start frame, while a
-    // row that fans out several calls at once streams as text first and grows
-    // its `toolCall` blocks silently afterwards — those calls never arrive on
-    // `session.message` at all. Asking the messages map is exact and needs no
-    // guess about which backend is on the other end.
+    // Does a durable row already own this call? If so it renders the card. If
+    // not, this frame is the only evidence the call exists, so give it a turn of
+    // its own. Which case applies is a property of the run, not of the backend
+    // (NOTES.md §6) — asking the messages map is exact and needs no guess.
     if (
       name &&
       !rec.liveTools.has(id) &&
@@ -922,13 +846,10 @@ export function handleToolFrame(rec: SessionRecord, payload: Record<string, unkn
   else if (rec.liveTools.has(id)) emitLiveToolTurn(rec, id)
 }
 
-// Debounced workspace session-list refresh — `sessions.changed` fires for
-// every session under the agent (cron spawns, subagents, patches), and
-// several records can hold subscriptions for the same workspace. `send` is in
-// the set because 2026.6.x never emits `chat.title` — the post-send refresh
-// is what keeps titles/previews fresh there. A trailing flush covers bursts
-// (create immediately followed by the title patch) that a leading-edge-only
-// throttle would drop.
+// Debounced session-list refresh. `sessions.changed` fires for every session
+// under the agent and several records can hold subscriptions for one workspace,
+// so bursts are the norm; the trailing flush catches the tail of one (a create
+// followed straight away by the title patch).
 const lastListRefresh = new Map<string, { at: number; trailing?: ReturnType<typeof setTimeout> }>()
 const LIST_REFRESH_MIN_MS = 400
 const LIST_REFRESH_REASONS = new Set([
@@ -1293,25 +1214,12 @@ export async function sendOpenClawMessage(input: {
   return sendOpenClawMessageImpl({ ...input, content })
 }
 
-// Apply the picker's model/effort onto the gateway session before the send.
-// `sessions.patch {model, thinkingLevel}` exists on both supported lines
-// (verified live on 2026.7.1 and 2026.6.33); the model comes from `models.list`
-// and the effort from that model's own menu (thinking.ts), so a rejection means
-// our learned menu is stale — we relearn it from the error and move on.
-//
+// Apply the picker's model/effort to the gateway session before the send. The
+// effort comes from that model's own learned menu (thinking.ts), so a rejection
+// means the menu is stale — relearn from the error rather than failing the send.
 // `reasoningLevel` rides along because it is the gateway's gate on emitting
-// reasoning at all (`reasoningMode = reasoningLevel ?? 'off'`, and
-// `canShowReasoning = thinkingLevel !== 'off'`). Without it a provider that
-// *can* stream thinking never does. It is patched only when the user asked to
-// think, so a session left at `off` keeps the gateway's default behavior.
-// Has anything other than us moved this session's model? Compared tolerantly:
-// a gateway that resolves a model through a CLI runtime reports that runtime as
-// the provider, which names the same model and must not read as drift.
-function wireModelDrifted(rec: SessionRecord): boolean {
-  if (!rec.wireModel || !rec.requestedModel) return false
-  return !openClawModelRefsEquivalent(rec.wireModel, rec.requestedModel)
-}
-
+// reasoning at all; it is only set when the user asked to think, so a session
+// left at `off` keeps the gateway's default.
 async function applySessionSettings(
   rec: SessionRecord,
   model: string | undefined,
@@ -1321,17 +1229,12 @@ async function applySessionSettings(
   // Patch the model only on a real change — `sessions.patch { model }` writes
   // agent config, so it is not free.
   //
-  // Two different questions, and conflating them used to lose a switch: "is
-  // this the ref we last asked for?" is answered by an EXACT compare, because
-  // `anthropic/claude-sonnet-5` and `claude-cli/claude-sonnet-5` are separate
-  // catalog entries a user can pick between and switching must patch. "Has
-  // something moved the session since?" is answered against what the wire
-  // reports, tolerantly — on a config that pins a CLI runtime the row echoes
-  // the runtime as the provider, and treating that as a change would re-patch
-  // on every single send.
-  if (model && (model !== rec.requestedModel || wireModelDrifted(rec))) {
-    patch.model = model
-  }
+  // Both comparisons are exact: rows echo back the provider of the ref that was
+  // patched, and `anthropic/claude-sonnet-5` and `claude-cli/claude-sonnet-5`
+  // are separate catalog entries a user can pick between, so a switch between
+  // them has to reach the gateway.
+  const moved = rec.wireModel !== undefined && rec.wireModel !== rec.requestedModel
+  if (model && (model !== rec.requestedModel || moved)) patch.model = model
   if (effort && effort !== rec.appliedThinking) patch.thinkingLevel = effort
   const reasoning = effort && effort !== 'off' ? 'stream' : undefined
   if (reasoning && reasoning !== rec.appliedReasoning) patch.reasoningLevel = reasoning
