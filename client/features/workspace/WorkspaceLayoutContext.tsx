@@ -11,7 +11,7 @@ import { workspaceKeys } from '@/client/api/workspace-keys'
 import type { WorkspaceLayout, WorkspaceType } from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 
-type WorkspaceLayoutContextValue = {
+export type WorkspaceLayoutContextValue = {
   // The persisted layout (widget grid, layout mode, theme). Falls back to an
   // empty default while the query is still loading.
   layout: WorkspaceLayout
@@ -33,7 +33,9 @@ type WorkspaceLayoutContextValue = {
   isLoading: boolean
 }
 
-const WorkspaceLayoutContext = createContext<WorkspaceLayoutContextValue | null>(null)
+// Exported (with its value type) so fixture surfaces like /dev/chat-states can
+// provide a static value without mounting the query-backed provider.
+export const WorkspaceLayoutContext = createContext<WorkspaceLayoutContextValue | null>(null)
 
 export function useWorkspaceLayoutCtx(): WorkspaceLayoutContextValue {
   const ctx = useContext(WorkspaceLayoutContext)
