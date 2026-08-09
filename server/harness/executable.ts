@@ -4,7 +4,7 @@ import type { HarnessAvailability, WorkspaceType } from '@/lib/types'
 
 import { cachedLoginShellPath, loginShellPath, mergeSearchPaths } from './shell-path'
 
-type PathWorkspaceType = Extract<WorkspaceType, 'claude-code' | 'codex'>
+type PathWorkspaceType = Extract<WorkspaceType, 'claude-code' | 'codex' | 'hermes'>
 
 type ExecutableConfig = {
   command: string
@@ -31,6 +31,20 @@ const executableConfig: Record<PathWorkspaceType, ExecutableConfig> = {
     ],
     unavailableReason:
       'Run curl -fsSL https://chatgpt.com/codex/install.sh | sh in your terminal to install Codex'
+  },
+  hermes: {
+    command: 'hermes',
+    // The installer symlinks `hermes` into ~/.local/bin (per-user) or
+    // /usr/local/bin (root), neither of which is guaranteed to be on a GUI
+    // app's PATH; the venv entry point is the last resort.
+    fallbackPaths: [
+      `${process.env.HOME ?? ''}/.local/bin/hermes`,
+      '/usr/local/bin/hermes',
+      `${process.env.HOME ?? ''}/.hermes/hermes-agent/venv/bin/hermes`,
+      '/usr/local/lib/hermes-agent/venv/bin/hermes'
+    ],
+    unavailableReason:
+      'Run curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash in your terminal to install Hermes'
   }
 }
 

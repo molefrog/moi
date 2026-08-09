@@ -191,7 +191,34 @@ const CODEX_SUBAGENT_ACTION_LABELS: Record<string, string> = {
   close_agent: 'Stopping the agent'
 }
 
+// ACP backends (Hermes) send display-ready titles rather than raw function
+// names: "terminal: echo hi", "write: a.txt", "read: src/app.ts". Split the
+// action from its detail so the label/brief split matches every other provider.
+function splitAcpToolTitle(name: string): { action: string; detail: string } {
+  const idx = name.indexOf(':')
+  if (idx <= 0) return { action: name.trim(), detail: '' }
+  return { action: name.slice(0, idx).trim(), detail: name.slice(idx + 1).trim() }
+}
+
+const HERMES_TOOL_LABELS: Record<string, string> = {
+  terminal: 'Run command',
+  read: 'Read',
+  write: 'Write',
+  edit: 'Edit',
+  patch: 'Edit',
+  search: 'Search',
+  fetch: 'Fetch',
+  delegate: 'Delegate task',
+  todo: 'Update plan',
+  memory: 'Memory',
+  skill_manage: 'Manage skills'
+}
+
 export function getToolDisplayName(call: ToolCall): string {
+  if (call.provider === 'hermes') {
+    const { action } = splitAcpToolTitle(call.name)
+    return HERMES_TOOL_LABELS[action] ?? action
+  }
   // An OpenClaw agent pinned to the `claude-cli` runtime reports Claude Code's
   // own tool names (`Read`, `Bash`, `Edit`, …) rather than OpenClaw's, so the
   // Claude vocabulary is the fallback before giving up and showing the raw name.
@@ -226,6 +253,13 @@ function shortToolName(name: string): string {
 export function formatInputBrief(call: ToolCall, cwd: string | null): string {
   const input = (call.input as Record<string, unknown>) ?? {}
   const shorten = makeShortenPaths(cwd)
+  if (call.provider === 'hermes') {
+    // Paths in the detail shorten against the cwd like every other provider;
+    // shell commands pass through with the familiar `$` prefix.
+    const { action, detail } = splitAcpToolTitle(call.name)
+    if (!detail) return ''
+    return action === 'terminal' ? `$ ${detail}` : shorten(detail)
+  }
   if (call.provider === 'openclaw') {
     // Same fallback as the label: a claude-cli-backed run carries Claude Code's
     // tool names and argument keys (`file_path`, not `path`).

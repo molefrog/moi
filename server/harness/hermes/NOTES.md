@@ -1,11 +1,12 @@
 # Hermes Agent — integration research
 
-Research notes on driving [Hermes Agent](https://github.com/NousResearch/hermes-agent)
-(Nous Research, MIT) as a moi harness. **Nothing is implemented** — this folder
-holds notes only. Everything below was probed empirically against Hermes
+Protocol notes behind moi's Hermes harness. The adapter **shipped** on the ACP
+path recommended below: the protocol lives in `../acp/` (provider-agnostic) and
+this folder holds only Hermes specifics — see §11 for what the implementation
+confirmed and corrected. Everything here was probed empirically against Hermes
 **v0.20.0 (2026.8.3)** on Linux, driving real models (Ollama Cloud
 `kimi-k2.7-code`, OpenAI `gpt-5.4-mini`). Reproduce with
-`bun scripts/probe-hermes-acp.ts` (see §7).
+`bun scripts/probe-hermes-acp.ts` (see §10).
 
 **Verdict up front:** Hermes speaks **ACP** (Agent Client Protocol) over
 stdio JSON-RPC, and ACP maps onto moi's `Harness` contract more cleanly than
@@ -43,12 +44,12 @@ ACP surface, not the gateway.
 
 Entry points sharing one `AIAgent` core:
 
-| Surface | Command | Shape | Fit for moi |
-| --- | --- | --- | --- |
-| CLI | `hermes`, `hermes -z` | interactive TUI / one-shot | one-shot is scriptable, but no event stream |
-| **ACP** | **`hermes acp`** | **stdio JSON-RPC, one process, N sessions** | **✅ this is the one** |
-| Backend server | `hermes serve` | HTTP + WebSocket JSON-RPC, port 9119 | ❌ machine-level singleton (§4) |
-| Gateway | `hermes gateway run` | long-running messaging daemon | ❌ not moi's model |
+| Surface        | Command               | Shape                                       | Fit for moi                                 |
+| -------------- | --------------------- | ------------------------------------------- | ------------------------------------------- |
+| CLI            | `hermes`, `hermes -z` | interactive TUI / one-shot                  | one-shot is scriptable, but no event stream |
+| **ACP**        | **`hermes acp`**      | **stdio JSON-RPC, one process, N sessions** | **✅ this is the one**                      |
+| Backend server | `hermes serve`        | HTTP + WebSocket JSON-RPC, port 9119        | ❌ machine-level singleton (§4)             |
+| Gateway        | `hermes gateway run`  | long-running messaging daemon               | ❌ not moi's model                          |
 
 ## 2. Provider configuration (and two traps)
 
@@ -60,7 +61,7 @@ live in `$HERMES_HOME/.env`, everything else in `config.yaml`.
 Two traps cost real time when wiring up a provider:
 
 1. **Provider ids are not the obvious names.** Ollama Cloud is `ollama-cloud`,
-   not `ollama` (`ollama` means a *local* Ollama). There is no `openai`
+   not `ollama` (`ollama` means a _local_ Ollama). There is no `openai`
    provider id at all — `resolve_runtime_provider(requested='openai')` raises
    `Unknown provider`. OpenAI arrives as `openai-api` in the ACP model list.
 2. **`provider: ollama-cloud` resolves to the wrong base URL.** It picks up
@@ -80,7 +81,7 @@ Two traps cost real time when wiring up a provider:
    ```
 
 Credential host-gating is otherwise good and deliberate: keys are matched to
-the resolved *host*, not by substring (a hardening for GHSA-76xc-57q6-vm5m),
+the resolved _host_, not by substring (a hardening for GHSA-76xc-57q6-vm5m),
 so an unrelated custom endpoint never receives your OpenAI/OpenRouter key.
 
 ## 3. The ACP surface (`hermes acp`)
@@ -144,16 +145,16 @@ what moi's current backends expose — it already carries `cwd`, `git_branch`,
 `session/prompt` streams `session/update` notifications and resolves with
 `{ stopReason, usage }`. Observed update kinds:
 
-| `sessionUpdate` | Carries | moi display mapping |
-| --- | --- | --- |
-| `agent_message_chunk` | token deltas | `preview` frames + assistant text |
-| `agent_thought_chunk` | token deltas | thinking parts |
-| `tool_call` | `toolCallId`, `title`, `kind`, `locations`, `content` | `ToolCall` start |
-| `tool_call_update` | `status: completed\|failed`, `content` | `ToolCall` result |
-| `session_info_update` | generated `title`, `updatedAt` | `sessions_changed` |
-| `available_commands_update` | slash commands | init metadata |
-| `usage_update` | context `size` / `used` | context meter |
-| `user_message_chunk` | replayed user turns | history only (§3.6) |
+| `sessionUpdate`             | Carries                                               | moi display mapping               |
+| --------------------------- | ----------------------------------------------------- | --------------------------------- |
+| `agent_message_chunk`       | token deltas                                          | `preview` frames + assistant text |
+| `agent_thought_chunk`       | token deltas                                          | thinking parts                    |
+| `tool_call`                 | `toolCallId`, `title`, `kind`, `locations`, `content` | `ToolCall` start                  |
+| `tool_call_update`          | `status: completed\|failed`, `content`                | `ToolCall` result                 |
+| `session_info_update`       | generated `title`, `updatedAt`                        | `sessions_changed`                |
+| `available_commands_update` | slash commands                                        | init metadata                     |
+| `usage_update`              | context `size` / `used`                               | context meter                     |
+| `user_message_chunk`        | replayed user turns                                   | history only (§3.6)               |
 
 `kind` is semantic (`execute`, `edit`, `read`) with `locations: [{path}]`, so
 moi gets Codex-style semantic tool labels rather than Claude Code's raw
@@ -162,9 +163,16 @@ moi gets Codex-style semantic tool labels rather than Claude Code's raw
 Final result:
 
 ```json
-{ "stopReason": "end_turn",
-  "usage": { "inputTokens": 34750, "outputTokens": 157,
-             "cachedReadTokens": 0, "thoughtTokens": 0, "totalTokens": 34907 } }
+{
+  "stopReason": "end_turn",
+  "usage": {
+    "inputTokens": 34750,
+    "outputTokens": 157,
+    "cachedReadTokens": 0,
+    "thoughtTokens": 0,
+    "totalTokens": 34907
+  }
+}
 ```
 
 Token streaming is **always on** — there is no opt-in flag, so moi gates
@@ -180,7 +188,7 @@ In moi's UI those tool cards would hang in `pending` forever.
 Cause is the pairing strategy: live completions are matched by **tool name**
 through a FIFO queue (`acp_adapter/events.py`, `make_tool_progress_cb` /
 `make_step_cb`), driven by a `step_callback(api_call_count, prev_tools)` that
-reports the *previous* step's tools. The file-tool path doesn't round-trip
+reports the _previous_ step's tools. The file-tool path doesn't round-trip
 through that queue.
 
 The same session replayed through `session/load` is **complete and correct** —
@@ -188,6 +196,7 @@ The same session replayed through `session/load` is **complete and correct** —
 (`server.py`) pairs by real `tool_call_id` from message history instead.
 
 Consequences for a moi adapter:
+
 - Tool-call ids are **not stable** between live and replay: live emits
   `tc-<hash>`, replay emits `functions.<tool>:<index>`. Never key persisted
   state on them across a reload.
@@ -204,10 +213,10 @@ request with a proper diff payload and options
 
 A/B probe, denying every prompt:
 
-| mode | prompts fired | `gated.txt` written |
-| --- | --- | --- |
-| `dont_ask` | 0 | ✅ yes |
-| `default` | 1 | ❌ no |
+| mode       | prompts fired | `gated.txt` written |
+| ---------- | ------------- | ------------------- |
+| `dont_ask` | 0             | ✅ yes              |
+| `default`  | 1             | ❌ no               |
 
 So `session/set_mode { modeId: 'dont_ask' }` reproduces moi's
 bypass-permissions trust model in one call — that is the shipping path. But
@@ -233,10 +242,10 @@ provider.
 
 Measured cadence on a 12.5s turn (`probe … timing`):
 
-| stream | frames | first frame | median gap | avg gap |
-| --- | --- | --- | --- | --- |
-| `agent_thought_chunk` | 378 | 7704ms | 1ms | 7.7ms |
-| `agent_message_chunk` | 299 | 10613ms | 1ms | 6.2ms |
+| stream                | frames | first frame | median gap | avg gap |
+| --------------------- | ------ | ----------- | ---------- | ------- |
+| `agent_thought_chunk` | 378    | 7704ms      | 1ms        | 7.7ms   |
+| `agent_message_chunk` | 299    | 10613ms     | 1ms        | 6.2ms   |
 
 Both thinking **and** answer text stream token-by-token — this is not batched
 delivery. The two are sequential, not interleaved: thinking runs to completion
@@ -259,7 +268,7 @@ background, circle on the left". So moi's `imagesInline: 'base64'` capability
 applies; no path-note fallback needed. Vision needs a vision-capable model —
 `kimi-k2.7-code` is not one, so this is a per-model capability the picker
 should reflect. Hermes also has an `auxiliary.vision` model slot that can
-route image understanding to a *different* model than the chat model.
+route image understanding to a _different_ model than the chat model.
 
 ### 3.9 Env injection works
 
@@ -279,10 +288,10 @@ moi needs to give each workspace its own connectors.
 
 **But `session/set_model` destroys them.** Isolated A/B on the same MCP server:
 
-| | model switch | MCP tool result |
-| --- | --- | --- |
-| `research` profile | none | ✅ returned `4173` |
-| `default` profile | → `openai-api:gpt-5.4-mini` | ❌ `NO_TOOL` |
+|                    | model switch                | MCP tool result    |
+| ------------------ | --------------------------- | ------------------ |
+| `research` profile | none                        | ✅ returned `4173` |
+| `default` profile  | → `openai-api:gpt-5.4-mini` | ❌ `NO_TOOL`       |
 
 Cause: `set_session_model` rebuilds the agent with
 `session_manager._make_agent(...)` but never re-runs
@@ -411,21 +420,21 @@ share the name "gateway":
 `tui_gateway` methods that ACP has **no equivalent for** — this is the real
 answer to "what do we lose by choosing ACP":
 
-| Area | Gateway methods | ACP |
-| --- | --- | --- |
-| Steering | `session.steer`, `subagent.steer`, `subagent.interrupt` | ❌ (only `session/cancel`) |
-| Compaction | `session.compress`, `session.context_breakdown` | ❌ (opaque) |
-| History editing | `session.undo`, `session.branch`, `session.seed` | ⚠️ `fork` only |
-| Subagents | `delegation.status`, `delegation.pause` | ❌ not modelled |
-| Attachments | `image.attach_bytes`, `pdf.attach`, `file.attach`, `image.detach` | ⚠️ images inline only |
-| Tool policy | `tools.list/show/configure`, `toolsets.list` | ❌ |
-| Skills | `skills.manage`, `skills.reload`, `learning.*`, `insights.get` | ❌ |
-| Agents | `agents.list` (profiles) | ❌ (spawn-level only) |
-| Scheduling | `cron.manage` | ❌ |
-| Terminal | `terminal.read/resize`, `process.list/kill`, `shell.exec` | ❌ |
-| Approvals | `approval.respond`, `clarify.respond`, `sudo.respond` | ⚠️ `request_permission` only |
-| Autocomplete | `complete.path`, `complete.slash`, `commands.catalog` | ⚠️ `available_commands_update` |
-| Billing | `billing.*`, `subscription.*` (Nous portal) | ❌ |
+| Area            | Gateway methods                                                   | ACP                            |
+| --------------- | ----------------------------------------------------------------- | ------------------------------ |
+| Steering        | `session.steer`, `subagent.steer`, `subagent.interrupt`           | ❌ (only `session/cancel`)     |
+| Compaction      | `session.compress`, `session.context_breakdown`                   | ❌ (opaque)                    |
+| History editing | `session.undo`, `session.branch`, `session.seed`                  | ⚠️ `fork` only                 |
+| Subagents       | `delegation.status`, `delegation.pause`                           | ❌ not modelled                |
+| Attachments     | `image.attach_bytes`, `pdf.attach`, `file.attach`, `image.detach` | ⚠️ images inline only          |
+| Tool policy     | `tools.list/show/configure`, `toolsets.list`                      | ❌                             |
+| Skills          | `skills.manage`, `skills.reload`, `learning.*`, `insights.get`    | ❌                             |
+| Agents          | `agents.list` (profiles)                                          | ❌ (spawn-level only)          |
+| Scheduling      | `cron.manage`                                                     | ❌                             |
+| Terminal        | `terminal.read/resize`, `process.list/kill`, `shell.exec`         | ❌                             |
+| Approvals       | `approval.respond`, `clarify.respond`, `sudo.respond`             | ⚠️ `request_permission` only   |
+| Autocomplete    | `complete.path`, `complete.slash`, `commands.catalog`             | ⚠️ `available_commands_update` |
+| Billing         | `billing.*`, `subscription.*` (Nous portal)                       | ❌                             |
 
 Plus REST: `/api/env` (GET/PUT/DELETE/reveal), `/api/memory/*`,
 `/api/messaging/*` (per-platform config and Telegram/WhatsApp pairing
@@ -444,7 +453,7 @@ gateway-only things moi would genuinely miss are **mid-turn steering**,
 **subagent lanes**, and **compaction visibility** — all of which moi renders
 today for Codex/Claude Code, so expect a slightly flatter experience on
 Hermes. If those become blocking, the escape hatch is to run `hermes serve`
-alongside ACP and use it as a *control plane only*, keeping chat on ACP.
+alongside ACP and use it as a _control plane only_, keeping chat on ACP.
 
 ## 7. What Hermes has that moi has no concept of
 
@@ -473,28 +482,28 @@ moi chooses to surface them.
 
 Against the checklist in `../README.md`:
 
-| Feature | Hermes via ACP |
-| --- | --- |
-| Long-lived session | ✅ one process, N sessions |
-| Resume | ✅ `session/load` (+ `fork`, `resume`) |
-| Interrupt | ✅ `session/cancel` → `stopReason: cancelled` |
-| List models | ✅ inline on `session/new`, all providers merged |
-| Live model switch | ⚠️ `session/set_model` works but drops MCP tools (§3.10) |
-| Live effort switch | ❌ no reasoning-effort concept in ACP (gateway has it) |
-| Token deltas | ✅ real streaming, thinking + text (§3.7) |
-| Images in input | ✅ base64 blocks, verified end to end (§3.8) |
-| Interactive approvals | ✅ real, with diffs — best of any backend |
-| Session list/history | ✅ `session/list` (cwd filter + cursor) + `session/load` |
-| Home card preview | ✅ `session/list` has `title` + `updatedAt` + `cwd` |
-| MCP | ✅ per-session via `session/new` (§3.10); no status RPC |
-| Env injection | ✅ spawn env reaches agent shell (§3.9) |
-| Multiple agents | ✅ profiles, importable *and* creatable (§4) |
-| Usage reporting | ✅ per-turn tokens + `usage_update` context meter; cost in `state.db` |
-| Queue/steer mid-turn | ❌ ACP has no steer (gateway does) |
-| Subagent lanes | ❌ `delegate_task` renders as a plain tool call |
-| Native user echo | ❌ no optimistic-id echo — server synthesizes, like Claude Code |
-| Tool results (live) | ⚠️ file tools drop completions (§3.4) |
-| Channel sessions | ❌ invisible to ACP by design (§3.11) |
+| Feature               | Hermes via ACP                                                        |
+| --------------------- | --------------------------------------------------------------------- |
+| Long-lived session    | ✅ one process, N sessions                                            |
+| Resume                | ✅ `session/load` (+ `fork`, `resume`)                                |
+| Interrupt             | ✅ `session/cancel` → `stopReason: cancelled`                         |
+| List models           | ✅ inline on `session/new`, all providers merged                      |
+| Live model switch     | ⚠️ `session/set_model` works but drops MCP tools (§3.10)              |
+| Live effort switch    | ❌ no reasoning-effort concept in ACP (gateway has it)                |
+| Token deltas          | ✅ real streaming, thinking + text (§3.7)                             |
+| Images in input       | ✅ base64 blocks, verified end to end (§3.8)                          |
+| Interactive approvals | ✅ real, with diffs — best of any backend                             |
+| Session list/history  | ✅ `session/list` (cwd filter + cursor) + `session/load`              |
+| Home card preview     | ✅ `session/list` has `title` + `updatedAt` + `cwd`                   |
+| MCP                   | ✅ per-session via `session/new` (§3.10); no status RPC               |
+| Env injection         | ✅ spawn env reaches agent shell (§3.9)                               |
+| Multiple agents       | ✅ profiles, importable _and_ creatable (§4)                          |
+| Usage reporting       | ✅ per-turn tokens + `usage_update` context meter; cost in `state.db` |
+| Queue/steer mid-turn  | ❌ ACP has no steer (gateway does)                                    |
+| Subagent lanes        | ❌ `delegate_task` renders as a plain tool call                       |
+| Native user echo      | ❌ no optimistic-id echo — server synthesizes, like Claude Code       |
+| Tool results (live)   | ⚠️ file tools drop completions (§3.4)                                 |
+| Channel sessions      | ❌ invisible to ACP by design (§3.11)                                 |
 
 Folder would follow the existing convention:
 
@@ -590,3 +599,42 @@ PROBE_PROFILE=research PROBE_MODEL=openai-api:gpt-5.4-mini \
 `mcp`/`e2e` need a stdio MCP server exposing a `moi_secret_number` tool
 returning `4173`; any 40-line script works (`PROBE_MCP_CMD` sets the
 interpreter).
+
+## 11. Implementation notes (shipped)
+
+What driving the protocol through moi confirmed, beyond the probes:
+
+- **The `acp/` split is the deliverable.** `acp/{wire,client,adapter,session,discovery}.ts`
+  is provider-agnostic; `hermes/` supplies an `AcpProviderConfig` (spawn spec,
+  no-prompt mode id, image support) plus profile discovery. A second ACP agent
+  should be a folder next to `hermes/`, not a fork of the protocol.
+- **Chunks are not messages.** ACP streams text and thinking token-by-token
+  with no message boundary, so `acp/adapter.ts` owns the accumulation rule:
+  consecutive chunks build one assistant turn, and a tool call both closes the
+  open run and becomes its own turn. This is what makes the transcript read in
+  execution order instead of collapsing into one blob.
+- **A completing `tool_call_update` carries no `title`** — only the opening
+  `tool_call` does. Naively re-deriving the name from each frame degrades the
+  card from `terminal: echo hi` to the bare kind `execute` the moment the call
+  finishes. The established name has to outrank the update's `kind`.
+- **The §3.4 file-tool gap is real in practice**, and the fix is cheap: any
+  tool call still unsettled when `session/prompt` resolves is closed as
+  successful. The turn ending is proof the call finished.
+- **`session/prompt`'s promise IS the turn.** It resolves at end of turn with
+  `{ stopReason, usage }`, so activity is mirrored from it rather than derived
+  by counting frames, and `cancelled` arrives on the same promise — the
+  interrupt path needs no separate signal.
+- **No steer.** A send that lands mid-turn is queued in `acp/session.ts` and
+  flushed when the running turn resolves; an interrupt drops the queue.
+- **Model catalog caching.** `listModels()` has no session to read from, so the
+  catalog is cached per workspace off a throwaway `session/new`. Zero-history
+  sessions are invisible to `session/list`, so this leaves no debris.
+- **MCP is not wired yet.** moi passes `mcpServers: []`, which sidesteps the
+  §3.10 `set_model` regression. Per-workspace connectors are the next step and
+  will need the re-register workaround.
+
+Verified live against the running server: session rename, 130+ preview frames
+per turn, tool cards settling to success (including the file write Hermes never
+completes), `stopped` on interrupt with the partial answer preserved, cold
+`session/load` replay after a server restart, per-chat model switching, and
+image attachments through moi's upload pipeline.

@@ -4,9 +4,14 @@ import { getWorkspaceAgentOptions, resolveWorkspaceAgentSelection } from './Work
 
 describe('getWorkspaceAgentOptions', () => {
   test('returns every agent in canonical order', () => {
-    const options = getWorkspaceAgentOptions({ detectedTypes: ['openclaw'] })
+    const options = getWorkspaceAgentOptions({ detectedTypes: ['openclaw', 'hermes'] })
 
-    expect(options.map(option => option.type)).toEqual(['claude-code', 'codex', 'openclaw'])
+    expect(options.map(option => option.type)).toEqual([
+      'claude-code',
+      'codex',
+      'openclaw',
+      'hermes'
+    ])
     expect(options.every(option => !option.disabled)).toBe(true)
   })
 
@@ -50,6 +55,25 @@ describe('getWorkspaceAgentOptions', () => {
     expect(options.find(option => option.type === 'openclaw')).toEqual({
       type: 'openclaw',
       description: 'Open-source',
+      disabled: false
+    })
+  })
+
+  test('locks Hermes when it was not detected', () => {
+    const options = getWorkspaceAgentOptions({})
+
+    expect(options.find(option => option.type === 'hermes')).toMatchObject({
+      disabled: true,
+      disabledReason: 'Create a Hermes profile with\nhermes profile create, then import it'
+    })
+  })
+
+  test('enables Hermes when it was detected', () => {
+    const options = getWorkspaceAgentOptions({ detectedTypes: ['hermes'] })
+
+    expect(options.find(option => option.type === 'hermes')).toEqual({
+      type: 'hermes',
+      description: 'Nous Research',
       disabled: false
     })
   })

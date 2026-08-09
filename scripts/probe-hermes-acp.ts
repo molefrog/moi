@@ -186,7 +186,8 @@ function print(label: string, value: unknown, max = 1800) {
   console.log(JSON.stringify(value, null, 2).slice(0, max))
 }
 
-const extraEnv = mode === 'env' || mode === 'e2e' ? { MOI_TEST_ENV: 'moi-env-works-7391' } : {}
+const extraEnv: Record<string, string> =
+  mode === 'env' || mode === 'e2e' ? { MOI_TEST_ENV: 'moi-env-works-7391' } : {}
 const probe = new AcpProbe(extraEnv)
 const timeout = setTimeout(
   () => {

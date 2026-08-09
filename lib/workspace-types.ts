@@ -3,7 +3,8 @@ import type { WorkspaceType } from './types'
 export const WORKSPACE_TYPE_ORDER = [
   'claude-code',
   'codex',
-  'openclaw'
+  'openclaw',
+  'hermes'
 ] as const satisfies readonly WorkspaceType[]
 
 export function orderWorkspaceTypes(types: Iterable<WorkspaceType>): WorkspaceType[] {

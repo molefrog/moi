@@ -1,4 +1,5 @@
 import claudeIcon from '@/client/assets/claude.svg'
+import hermesIcon from '@/client/assets/hermes.svg'
 import openaiIcon from '@/client/assets/openai.svg'
 import openclawIcon from '@/client/assets/openclaw.svg'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
@@ -6,13 +7,15 @@ import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/t
 export const workspaceProviderIcon: Record<WorkspaceType, string> = {
   'claude-code': claudeIcon,
   openclaw: openclawIcon,
-  codex: openaiIcon
+  codex: openaiIcon,
+  hermes: hermesIcon
 }
 
 export const workspaceTypeLabel: Record<WorkspaceType, string> = {
   'claude-code': 'Claude Code',
   openclaw: 'OpenClaw',
-  codex: 'Codex'
+  codex: 'Codex',
+  hermes: 'Hermes'
 }
 
 type WorkspaceAgentIconsProps = {
@@ -42,5 +45,6 @@ export function workspaceDisplayName(workspace: WorkspaceDisplaySource): string 
   if ('types' in workspace) return workspace.path.split('/').pop() || workspace.path
   if (workspace.name) return workspace.name
   if (workspace.type === 'openclaw') return workspace.agentId ?? 'OpenClaw agent'
+  if (workspace.type === 'hermes') return workspace.agentId ?? 'Hermes agent'
   return workspace.path.split('/').pop() || workspace.path
 }
