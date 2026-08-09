@@ -12,6 +12,59 @@ describe('resolveWorkspaceImportMetadata', () => {
     expect(await resolveWorkspaceImportMetadata('/workspace', 'codex', discover)).toEqual({})
   })
 
+  // A UI import must capture what `moi hermes init` does, or the entry has no
+  // agentId and every profile renders as a generic "Hermes agent".
+  test('resolves Hermes profile metadata by normalized path', async () => {
+    const metadata = await resolveWorkspaceImportMetadata(
+      '/home/u/.hermes/profiles/research/workspace',
+      'hermes',
+      async () => {
+        throw new Error('OpenClaw discovery should not be called')
+      },
+      async () => [
+        {
+          agentId: 'research',
+          home: '/home/u/.hermes/profiles/research',
+          path: '/home/u/.hermes/profiles/research/nested/../workspace',
+          name: 'Research agent',
+          isDefault: false,
+          model: 'kimi-k2.7-code'
+        }
+      ]
+    )
+
+    expect(metadata).toEqual({ agentId: 'research', name: 'Research agent' })
+  })
+
+  test('marks the default Hermes profile', async () => {
+    const metadata = await resolveWorkspaceImportMetadata(
+      '/home/u/.hermes/workspace',
+      'hermes',
+      async () => [],
+      async () => [
+        {
+          agentId: 'default',
+          home: '/home/u/.hermes',
+          path: '/home/u/.hermes/workspace',
+          isDefault: true
+        }
+      ]
+    )
+
+    expect(metadata).toEqual({ agentId: 'default', isDefault: true })
+  })
+
+  test('rejects a Hermes import for a folder no profile owns', async () => {
+    await expect(
+      resolveWorkspaceImportMetadata(
+        '/somewhere/else',
+        'hermes',
+        async () => [],
+        async () => []
+      )
+    ).rejects.toThrow('No Hermes profile owns this folder')
+  })
+
   test('resolves OpenClaw metadata by normalized path', async () => {
     const metadata = await resolveWorkspaceImportMetadata('/workspace', 'openclaw', async () => [
       {

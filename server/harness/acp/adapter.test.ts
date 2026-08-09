@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { Turn } from '@/lib/format'
 
+import { rpcTimeoutMs } from './client'
 import type { AcpSessionListEntry } from './wire'
 
 import {
@@ -223,5 +224,20 @@ describe('acpSessionToSessionInfo', () => {
       summary: 'Untitled session',
       lastModified: 0
     })
+  })
+})
+
+describe('rpcTimeoutMs', () => {
+  // `session/prompt` stays pending for the whole agent turn. Timing it out
+  // would reject while the backend keeps running, letting the next send start
+  // a second turn against the same session.
+  test('never times out the prompt call', () => {
+    expect(rpcTimeoutMs('session/prompt')).toBeNull()
+  })
+
+  test('bounds every other call', () => {
+    for (const method of ['initialize', 'session/new', 'session/load', 'session/list']) {
+      expect(rpcTimeoutMs(method)).toBeGreaterThan(0)
+    }
   })
 })

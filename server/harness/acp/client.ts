@@ -16,6 +16,19 @@ import { resolveWorkspaceEnv } from '../../workspace-env'
 
 const REQUEST_TIMEOUT_MS = 120_000
 
+// `session/prompt` stays pending for the whole agent turn by design — a turn
+// can legitimately run for many minutes. Timing it out would reject the call
+// while the backend keeps going, then let the next send start a second turn
+// against the same session (overlapping runs, corrupted transcript). A dead
+// agent still settles these: readLoop rejects everything pending on exit, and
+// `session/cancel` resolves the turn with stopReason `cancelled`.
+const UNBOUNDED_METHODS = new Set(['session/prompt'])
+
+// null = never time this call out.
+export function rpcTimeoutMs(method: string): number | null {
+  return UNBOUNDED_METHODS.has(method) ? null : REQUEST_TIMEOUT_MS
+}
+
 type Json = Record<string, unknown>
 type NotificationListener = (method: string, params: Json) => void
 
@@ -77,7 +90,7 @@ async function startClient(spec: AcpSpawnSpec): Promise<ClientRecord> {
   let nextId = 1
   const pending = new Map<
     number,
-    { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: Timer }
+    { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: Timer | null }
   >()
   const listeners = new Set<NotificationListener>()
 
@@ -92,10 +105,14 @@ async function startClient(spec: AcpSpawnSpec): Promise<ClientRecord> {
     const id = nextId++
     send({ jsonrpc: '2.0', id, method, params })
     return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        pending.delete(id)
-        reject(new Error(`${provider} rpc timeout: ${method}`))
-      }, REQUEST_TIMEOUT_MS)
+      const timeoutMs = rpcTimeoutMs(method)
+      const timer =
+        timeoutMs === null
+          ? null
+          : setTimeout(() => {
+              pending.delete(id)
+              reject(new Error(`${provider} rpc timeout: ${method}`))
+            }, timeoutMs)
       pending.set(id, { resolve: resolve as (v: unknown) => void, reject, timer })
     })
   }
@@ -153,7 +170,7 @@ async function startClient(spec: AcpSpawnSpec): Promise<ClientRecord> {
       const p = pending.get(msg.id as number)
       if (!p) return
       pending.delete(msg.id as number)
-      clearTimeout(p.timer)
+      if (p.timer) clearTimeout(p.timer)
       if ('error' in msg) {
         const e = msg.error as { message?: string } | undefined
         p.reject(new Error(e?.message ?? JSON.stringify(msg.error)))
@@ -184,7 +201,7 @@ async function startClient(spec: AcpSpawnSpec): Promise<ClientRecord> {
       alive = false
       if (clients.get(workspacePath) === recordPromise) clients.delete(workspacePath)
       for (const [, p] of pending) {
-        clearTimeout(p.timer)
+        if (p.timer) clearTimeout(p.timer)
         p.reject(new Error(`${provider} agent exited`))
       }
       pending.clear()
@@ -223,10 +240,18 @@ async function startClient(spec: AcpSpawnSpec): Promise<ClientRecord> {
   void readLoop()
   void drainStderr()
 
-  client.initializeResult = await rpc<InitializeResponse>('initialize', {
-    protocolVersion: 1,
-    clientCapabilities: CLIENT_CAPABILITIES
-  })
+  // A failed handshake leaves a live subprocess behind unless we kill it: the
+  // caller only drops the registry entry, so the next request would spawn a
+  // second agent while this one keeps running.
+  try {
+    client.initializeResult = await rpc<InitializeResponse>('initialize', {
+      protocolVersion: 1,
+      clientCapabilities: CLIENT_CAPABILITIES
+    })
+  } catch (err) {
+    proc.kill()
+    throw err
+  }
   const info = client.initializeResult?.agentInfo
   debug(
     `${provider} acp started ws=${workspacePath} bin=${command} agent=${info?.name ?? '?'}/${info?.version ?? '?'}`

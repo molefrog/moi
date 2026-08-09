@@ -358,6 +358,13 @@ async function resumeSession(
       cwd: input.workspacePath,
       mcpServers: []
     })
+  } catch (err) {
+    // The record is already registered, and a live record makes every later
+    // send skip `session/load` and prompt a session this process never
+    // resumed. Drop it so the next send retries the replay.
+    rec.unsubscribe?.()
+    sessions.delete(recKey(rec.workspaceId, rec.sessionId))
+    throw err
   } finally {
     flushAssistant(rec)
     flushUserChunk(rec)
