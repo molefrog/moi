@@ -99,6 +99,14 @@ type SessionRecord = {
   // doesn't double-broadcast (see claimPreviewSource).
   previewRunId?: string
   previewSource?: 'chat' | 'agent'
+  // Streaming reasoning for the current run, and the last text blocks painted
+  // with it. The `chat`/`agent` arbitration above decides who owns the TEXT,
+  // but reasoning is not a duplicate of that text — on claude-cli it arrives on
+  // its own `agent`/thinking stream while `chat` owns the text — so it bypasses
+  // the claim and is merged into the same preview here instead. Both are
+  // per-run and cleared when the run terminalizes.
+  previewReasoning?: { runId: string; text: string }
+  previewTextBlocks?: { runId: string; blocks: PreviewBlock[] }
   // True once we've seen a `codex_app_server.*` frame on this session — the
   // positive signal (only the codex backend emits it, and it precedes the
   // run's tool frames) that gates live tool synthesis below. Native-loop
@@ -566,22 +574,66 @@ function broadcastPreview(rec: SessionRecord, messageId: string, blocks: Preview
   })
 }
 
+// Repaint the run's preview from the two independent streams: reasoning first
+// (it precedes the answer), then whichever source owns the text. A preview
+// replaces all blocks for its messageId, so the two can't be broadcast
+// separately without erasing each other — they must be emitted together.
+// Indices are renumbered sequentially because the reasoning block is prepended.
+// Both halves are keyed by runId rather than pinned on `previewRunId`, so
+// reasoning can never consume the text source's claim (that would lock `chat`
+// out of its own run and stop the answer from streaming at all).
+function emitMergedPreview(rec: SessionRecord, runId: string, messageId: string): void {
+  const blocks: PreviewBlock[] = []
+  const reasoning = rec.previewReasoning?.runId === runId ? rec.previewReasoning.text : ''
+  if (reasoning) blocks.push({ index: 0, kind: 'reasoning', text: reasoning })
+  if (rec.previewTextBlocks?.runId === runId) {
+    for (const block of rec.previewTextBlocks.blocks)
+      blocks.push({ ...block, index: blocks.length })
+  }
+  broadcastPreview(rec, messageId, blocks)
+}
+
+// Drop the per-run preview state once the run terminalizes, so the next run
+// starts clean instead of inheriting the previous run's reasoning.
+function clearPreviewState(rec: SessionRecord): void {
+  rec.previewReasoning = undefined
+  rec.previewTextBlocks = undefined
+}
+
 // `agent` stream=assistant / reasoning frames carry the cumulative in-progress
 // text in `data.text` — the fallback streaming source for gateways that don't
 // emit `chat` delta frames.
 function handleAgentStreamFrame(rec: SessionRecord, payload: Record<string, unknown>): void {
   if (!rec.streamEnabled) return
   const stream = payload.stream
+  // `thinking` is a second wire name for the reasoning stream, carrying the
+  // same `{ text, delta }` shape as `assistant`. Matching only `reasoning`
+  // dropped it on the floor. Verified on the wire from the `openai-codex`
+  // responses transport (`…:skill-workshop-review:*` sessions stream real
+  // reasoning text under `stream: 'thinking'`). Note this does NOT light up
+  // the claude-cli backend: its `thinking` frames are bare
+  // `{ progressTokens }` heartbeats with no text at all, so they fall out on
+  // the empty-text check below — that backend simply never ships the words.
   const kind: PreviewBlock['kind'] | null =
-    stream === 'assistant' ? 'text' : stream === 'reasoning' ? 'reasoning' : null
+    stream === 'assistant'
+      ? 'text'
+      : stream === 'reasoning' || stream === 'thinking'
+        ? 'reasoning'
+        : null
   if (!kind) return
   const runId = typeof payload.runId === 'string' ? payload.runId : rec.activeRunId
   if (!runId) return
   const data = payload.data as { text?: unknown } | undefined
   const text = typeof data?.text === 'string' ? data.text : ''
   if (!text) return
-  if (!claimPreviewSource(rec, runId, 'agent')) return
-  broadcastPreview(rec, previewMessageId(rec.sessionKey, runId), [{ index: 0, kind, text }])
+  if (kind === 'reasoning') {
+    // Reasoning bypasses the text claim entirely — see `previewReasoning`.
+    rec.previewReasoning = { runId, text }
+  } else {
+    if (!claimPreviewSource(rec, runId, 'agent')) return
+    rec.previewTextBlocks = { runId, blocks: [{ index: 0, kind, text }] }
+  }
+  emitMergedPreview(rec, runId, previewMessageId(rec.sessionKey, runId))
 }
 
 function handleChatFrame(rec: SessionRecord, payload: Record<string, unknown>): void {
@@ -595,8 +647,12 @@ function handleChatFrame(rec: SessionRecord, payload: Record<string, unknown>): 
     const blocks = chatPreviewBlocks(message?.content)
     if (blocks.length === 0) return
     if (!claimPreviewSource(rec, runId, 'chat')) return
-    broadcastPreview(rec, messageId, blocks)
+    rec.previewTextBlocks = { runId, blocks }
+    // Merged, not raw: on claude-cli the reasoning arrives on a separate
+    // stream, and a bare broadcast here would wipe it off the preview.
+    emitMergedPreview(rec, runId, messageId)
   } else if (state === 'final' || state === 'error' || state === 'aborted') {
+    clearPreviewState(rec)
     // Belt-and-braces clear: the durable turn's apiMessageId already clears
     // the slot, but a trailing delta after the durable row would repaint it.
     // 'aborted' arrives when a steer/abort interrupts the run mid-stream —
@@ -736,7 +792,11 @@ function emitLiveThinkingTurn(rec: SessionRecord, itemId: string): void {
 // rows at run end) we render a live tool turn so tools appear during the run,
 // before the streaming text — not all at once after it. `reconcileAfterRun`
 // stays as the safety net. Exported for tests.
-export function handleToolFrame(rec: SessionRecord, payload: Record<string, unknown>): void {
+export function handleToolFrame(
+  rec: SessionRecord,
+  payload: Record<string, unknown>,
+  opts?: { fromAgentStream?: boolean }
+): void {
   const data = payload.data as
     | {
         phase?: unknown
@@ -752,19 +812,34 @@ export function handleToolFrame(rec: SessionRecord, payload: Record<string, unkn
   const name = typeof data.name === 'string' ? data.name : undefined
   const toolName = name ? { toolName: name } : {}
   if (data.phase === 'start' || data.phase === 'update') {
-    // Only the codex backend needs synthetic live cards (see SessionRecord
-    // `liveTools`). Gating the map population here gates both the synthesis
-    // below and the durable-row merge in emitTurn.
-    if (rec.codexBackend && name && !rec.liveTools.has(id)) {
+    // Synthetic live cards are for backends that don't commit durable tool
+    // rows during the run — exactly the ones that report tools on the `agent`
+    // /tool stream (codex, and claude-cli). Backends that use `session.tool`
+    // (Anthropic native loop, ollama) already have durable rows arriving live,
+    // and synthesizing there stranded a duplicate card that can never be
+    // retracted — hence the stream, not the model, is the signal.
+    //
+    // claude-cli is the harder case: its tool calls are never persisted AT ALL
+    // (verified live — the run's durable transcript is user + assistant[text],
+    // with no toolCall/toolResult row ever committing), so without this the
+    // chat just sits frozen for the whole tool call. These cards are therefore
+    // live-only by nature and drop on a cold re-seed, same as the codex ones.
+    if ((rec.codexBackend || opts?.fromAgentStream) && name && !rec.liveTools.has(id)) {
       rec.liveTools.set(id, { name, input: data.args })
     }
     const existing = rec.results.get(id)
     if (existing && !existing.running) return // final result already landed
     rec.results.set(id, { output: '', isError: false, running: true, ...toolName })
   } else if (data.phase === 'result') {
-    const result = data.result as { content?: unknown } | undefined
+    // Two result shapes on the wire: `session.tool` and codex send
+    // `{ content: [...] }`, claude-cli sends `result` as a bare string. Reading
+    // `.content` off a string yields undefined, which rendered every claude-cli
+    // tool card with an empty body.
+    const raw = data.result
+    const content =
+      typeof raw === 'string' ? raw : ((raw as { content?: unknown } | undefined)?.content ?? '')
     rec.results.set(id, {
-      output: flattenToolResultContent((result?.content ?? '') as OpenClawMessage['content']),
+      output: flattenToolResultContent(content as OpenClawMessage['content']),
       isError: data.isError === true,
       ...toolName
     })
@@ -987,17 +1062,22 @@ async function ensureSubscribed(rec: SessionRecord): Promise<void> {
       }
       // Streaming text/reasoning fallback for gateways that don't emit `chat`
       // delta frames (handleAgentStreamFrame no-ops when `chat` already owns
-      // the run's preview).
-      if (stream === 'assistant' || stream === 'reasoning') {
+      // the run's TEXT; reasoning is merged in alongside it). `thinking` is a
+      // second wire name for the reasoning stream — text-bearing on the
+      // `openai-codex` responses transport, text-free (`{ progressTokens }`)
+      // on claude-cli.
+      if (stream === 'assistant' || stream === 'reasoning' || stream === 'thinking') {
         handleAgentStreamFrame(rec, payload)
         return
       }
-      // The codex-app-server backend (OpenAI models on newer OpenClaw) streams
-      // tool activity as `agent`/tool frames instead of `session.tool`; same
-      // `data` shape, so route it through the shared handler. Synthesis of live
-      // cards is gated on `codexBackend` inside the handler.
+      // The codex-app-server backend (OpenAI models) and claude-cli (Claude
+      // models) both stream tool activity as `agent`/tool frames instead of
+      // `session.tool`, so route them through the shared handler. Neither
+      // commits durable tool rows mid-run, which is what `fromAgentStream`
+      // tells the handler: synthesize a live card, because nothing else will
+      // render this tool.
       if (stream === 'tool') {
-        handleToolFrame(rec, payload)
+        handleToolFrame(rec, payload, { fromAgentStream: true })
         return
       }
       // Same backend reports reasoning as an `item` frame — timing, no text.
