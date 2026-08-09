@@ -324,20 +324,45 @@ function reconcileAfterRun(rec: SessionRecord): Promise<void> {
 }
 
 async function reconcileAfterRunImpl(rec: SessionRecord): Promise<void> {
+  // Snapshot the unfinished cards BEFORE the fetch: `rec.liveTools` is
+  // session-wide, and a follow-up run starting during the round-trip would
+  // otherwise have its fresh cards swept by this run's reconcile.
+  const stale = unfinishedLiveTools(rec)
   const detail = await getOpenClawSessionMessages(rec.sessionId, rec.workspacePath, rec.agentId)
   if (!detail?.messages) return
-  mergeTranscript(rec, detail.messages)
+  mergeTranscript(rec, detail.messages, stale)
+}
+
+// Tool calls with a live card that has not reported a result yet.
+function unfinishedLiveTools(rec: SessionRecord): string[] {
+  return [...rec.liveTools.keys()].filter(id => rec.results.get(id)?.running)
 }
 
 // Test seam: the merge half of the reconcile, against a transcript the caller
 // supplies instead of one fetched over the gateway.
 export function reconcileForTest(rec: SessionRecord, messages: OpenClawMessage[]): void {
-  mergeTranscript(rec, messages)
+  mergeTranscript(rec, messages, unfinishedLiveTools(rec))
+}
+
+// Test seam: the two halves of the reconcile split, so a test can interleave a
+// follow-up run's frames between the snapshot and the merge the way the real
+// transcript round-trip does.
+export function reconcileSnapshotForTest(rec: SessionRecord): string[] {
+  return unfinishedLiveTools(rec)
+}
+
+export function reconcileWithStaleForTest(
+  rec: SessionRecord,
+  messages: OpenClawMessage[],
+  stale: string[]
+): void {
+  mergeTranscript(rec, messages, stale)
 }
 
 // Fold a canonical transcript into the live view: adopt rows we're missing or
-// behind on, refresh tool results, and end any live card the run left running.
-function mergeTranscript(rec: SessionRecord, messages: OpenClawMessage[]): void {
+// behind on, refresh tool results, and end the cards in `stale` that the run
+// left running.
+function mergeTranscript(rec: SessionRecord, messages: OpenClawMessage[], stale: string[]): void {
   const owners = new Set<OpenClawMessage>()
   for (const msg of messages) {
     const result = toolResultFromMessage(msg)
@@ -373,14 +398,23 @@ function mergeTranscript(rec: SessionRecord, messages: OpenClawMessage[]): void 
       owners.add(msg)
     }
   }
-  // A live card whose result frame never arrived would otherwise spin for the
-  // rest of the session: the run is over, so nothing more is coming. Some
-  // runtimes never persist tool rows at all, so the transcript can't answer
-  // for these — end them here rather than leaving a permanent spinner.
-  for (const toolCallId of rec.liveTools.keys()) {
+  // Cards still running when this run ended: nothing more is coming for them, so
+  // end them rather than leaving a permanent spinner. `stale` is captured before
+  // the transcript fetch — a follow-up run can start during it and add its own
+  // live cards, and finalizing those would strand the NEW run's tools.
+  //
+  // They end as errors, not successes. All we know is that no result arrived;
+  // reading that as "succeeded, with no output" would show a command that may
+  // well have failed as if it had worked.
+  for (const toolCallId of stale) {
     const result = rec.results.get(toolCallId)
     if (!result?.running) continue
-    rec.results.set(toolCallId, { ...result, running: false })
+    rec.results.set(toolCallId, {
+      ...result,
+      running: false,
+      isError: true,
+      output: result.output || 'No result was reported before the run ended.'
+    })
     emitLiveToolTurn(rec, toolCallId)
   }
   if (owners.size === 0) return

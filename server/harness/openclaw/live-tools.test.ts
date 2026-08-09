@@ -19,7 +19,14 @@
 import { describe, expect, test } from 'bun:test'
 
 import type { OpenClawMessage } from './discovery'
-import { createOpenClawSessionForTest, handleToolFrame, ingest, reconcileForTest } from './session'
+import {
+  createOpenClawSessionForTest,
+  handleToolFrame,
+  ingest,
+  reconcileForTest,
+  reconcileSnapshotForTest,
+  reconcileWithStaleForTest
+} from './session'
 
 const SESSION_KEY = 'agent:live-tools:main'
 const TOOL_ID = 'exec-c5dfffcc'
@@ -142,14 +149,31 @@ describe('no durable row owns the call yet', () => {
     expect(found.every(c => c.call.state === 'success')).toBe(true)
   })
 
-  test('a card still running when the run ends is finalized, not left spinning', () => {
+  test('a card still running when the run ends fails rather than spinning', () => {
     const rec = newRec()
     handleToolFrame(rec, startFrame())
     expect(cards(rec)[0].call.state).toBe('running')
 
     // The result frame never arrives — a dropped frame, or a runtime that
-    // persists no tool rows at all. The run-end reconcile has to end it.
+    // persists no tool rows at all. All we know is that nothing came back, so
+    // the card must not claim the command succeeded.
     reconcileForTest(rec, [])
-    expect(cards(rec)[0].call.state).toBe('success')
+    expect(cards(rec)[0].call.state).toBe('error')
+    expect(cards(rec)[0].call.errorText).toContain('No result')
+  })
+
+  test('a reconcile does not finalize cards belonging to a later run', () => {
+    const rec = newRec()
+    handleToolFrame(rec, startFrame('exec-first'))
+    // The first run ends; its reconcile snapshots the unfinished cards…
+    const stale = reconcileSnapshotForTest(rec)
+    // …and while the transcript is in flight, a follow-up run starts a tool.
+    handleToolFrame(rec, startFrame('exec-second'))
+    reconcileWithStaleForTest(rec, [], stale)
+
+    const byId = new Map(cards(rec).map(c => [c.call.toolCallId, c.call]))
+    expect(byId.get('exec-first')?.state).toBe('error')
+    // The new run's card is untouched — its result is still coming.
+    expect(byId.get('exec-second')?.state).toBe('running')
   })
 })
