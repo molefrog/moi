@@ -1,21 +1,13 @@
 // Map OpenClaw gateway shapes into our agent-agnostic display format.
 //
-// OpenClaw stores one `OpenClawMessage` per role-turn: `user` (the prompt,
-// with AI-facing envelopes prepended — see `openclaw-strip.ts`), `assistant`
-// (text/reasoning/toolCall blocks + model metadata), and `toolResult` (one
-// per executed tool call, keyed by `toolCallId`). We turn that into:
-//   - one Turn per user/assistant message, with tool-call parts rendered
-//     inline on the assistant turn,
-//   - no separate turn for toolResult rows — results are folded into the
-//     assistant's matching tool-call part so the UI shows them as expandable
-//     output under the call.
+// OpenClaw stores one message per role-turn: `user` (the prompt, with AI-facing
+// envelopes prepended — see `strip.ts`), `assistant` (text/thinking/toolCall
+// blocks plus model metadata), and `toolResult` (one per executed call, keyed
+// by `toolCallId`). Each user/assistant message becomes one Turn; toolResult
+// rows get no turn of their own — they fold into the matching tool-call part.
 //
-// Two callers:
-//   - `toStreamEvents(detail)` — static path used for cold-load (REST endpoint)
-//     and tests.
-//   - `messageToTurnLive(msg, sessionKey, idx, results)` — incremental path used
-//     by the live session adapter (`openclaw-session.ts`) when a single
-//     `session.message` frame arrives.
+// `toStreamEvents` is the cold path (REST replay); `messageToTurn` is the
+// per-frame path the live session uses.
 import type { Part, StreamEvent, ToolCall, ToolState, Turn, TurnMeta } from '@/lib/format'
 import type { SessionInfo } from '@/lib/types'
 
@@ -79,15 +71,12 @@ export type ToolResultInfo = {
   running?: boolean
 }
 
-// Pull a readable `output` string out of a `toolResult` message. The tool
-// result wire shape has drifted across OpenClaw lines (verified live):
-//   - 2026.7.1  — `content: [{ type: 'text', text: 'hello' }]` (flat text)
-//   - 2026.7.2+ — the exec sandbox nests the result as `[{ type: 'text',
-//     text: '<json>' }]` or wraps it in a `{ type: 'toolResult', content: […] }`
-//     block (which rendered as a bare `[toolResult]` placeholder before this).
-// So recurse: text/image blocks resolve directly, any other block that
-// carries its own `content` array or `text`/`output` string is unwrapped one
-// level, and only a truly opaque block falls back to `[type]`.
+// Pull a readable `output` string out of a `toolResult` message. Rows are flat
+// in practice (`content: [{ type: 'text', text: 'hello' }]`), but upstream
+// types these blocks as an open `Record<string, unknown>` and says outright
+// that provider SDKs spell them differently (`src/chat/tool-content.ts`), so a
+// block carrying its own `content`/`text`/`output` is unwrapped one level
+// rather than rendered as a bare `[toolResult]` placeholder.
 export function flattenToolResultContent(content: OpenClawMessage['content'], depth = 0): string {
   if (typeof content === 'string') return content
   if (!Array.isArray(content)) return ''
@@ -146,7 +135,8 @@ function collectToolResults(messages: OpenClawMessage[]): Map<string, ToolResult
 function blockToPart(
   block: OpenClawContentBlock,
   role: OpenClawMessage['role'],
-  results: Map<string, ToolResultInfo>
+  results: Map<string, ToolResultInfo>,
+  omitToolCallIds?: ReadonlySet<string>
 ): Part | null {
   switch (block.type) {
     case 'text': {
@@ -158,39 +148,21 @@ function blockToPart(
       if (!text) return null
       return { type: 'text', text }
     }
-    case 'thinking':
-    case 'reasoning': {
-      // Field drift across OpenClaw lines: 2026.7.1 ships `{ type: 'thinking',
-      // thinking, thinkingSignature }`; newer lines emit `reasoning` and/or
-      // carry the text in `text`. Read whichever is present so the Thought row
-      // never silently vanishes.
-      const b = block as {
-        thinking?: unknown
-        reasoning?: unknown
-        text?: unknown
-        thinkingSignature?: unknown
-        signature?: unknown
-      }
-      const text =
-        (typeof b.thinking === 'string' && b.thinking) ||
-        (typeof b.reasoning === 'string' && b.reasoning) ||
-        (typeof b.text === 'string' && b.text) ||
-        ''
-      if (!text) return null
-      const sig =
-        (typeof b.thinkingSignature === 'string' && b.thinkingSignature) ||
-        (typeof b.signature === 'string' && b.signature) ||
-        undefined
-      return {
-        type: 'reasoning',
-        text,
-        ...(sig ? { signature: sig } : {})
-      }
+    case 'thinking': {
+      const b = block as { thinking?: unknown; thinkingSignature?: unknown }
+      if (typeof b.thinking !== 'string' || !b.thinking) return null
+      const sig = typeof b.thinkingSignature === 'string' ? b.thinkingSignature : undefined
+      return { type: 'reasoning', text: b.thinking, ...(sig ? { signature: sig } : {}) }
     }
     case 'toolCall': {
       const id = (block as { id?: unknown }).id
       const name = (block as { name?: unknown }).name
       if (typeof id !== 'string' || typeof name !== 'string') return null
+      // This call is already on screen as its own live card (the live session
+      // rendered it before this row carried the block). Rendering it here too
+      // would show the same call twice, and a broadcast card can't be
+      // retracted — so the live card keeps ownership for the session's life.
+      if (omitToolCallIds?.has(id)) return null
       const result = results.get(id)
       let state: ToolState = 'pending'
       if (result) state = result.running ? 'running' : result.isError ? 'error' : 'success'
@@ -243,7 +215,8 @@ export function messageToTurn(
   msg: OpenClawMessage,
   sessionKey: string,
   idx: number,
-  results: Map<string, ToolResultInfo>
+  results: Map<string, ToolResultInfo>,
+  omitToolCallIds?: ReadonlySet<string>
 ): Turn | null {
   if (msg.role !== 'user' && msg.role !== 'assistant') return null
   const blocks: OpenClawContentBlock[] = Array.isArray(msg.content)
@@ -252,7 +225,7 @@ export function messageToTurn(
       ? [{ type: 'text', text: msg.content }]
       : []
   const parts = blocks
-    .map(b => blockToPart(b, msg.role, results))
+    .map(b => blockToPart(b, msg.role, results, omitToolCallIds))
     .filter((p): p is Part => p !== null)
   if (parts.length === 0) return null
   const ocId = msg.__openclaw?.id

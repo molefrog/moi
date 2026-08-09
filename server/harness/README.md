@@ -121,12 +121,16 @@ SDK has no live setter for them.
 **OpenClaw — shipped.** Chat over the local gateway's WebSocket JSON-RPC
 (wire protocol 4 — the 2026.7.x and 2026.6.x lines; protocol-3 gateways are
 detected and surfaced, see `openclaw/compat.ts`): sessions seeded cold from
-`sessions.get` then updated from live `session.message` frames, token-delta
-previews from `chat` frames, live tool state + output from `session.tool`
-frames, model/effort applied per send via `sessions.patch`, abort via
-`sessions.abort`, per-turn usage (tokens + cost) into `TurnMeta`, user-echo
-rendezvous by `<runId>:user` idempotency key (text fallback), uploads
-materialized to file paths. Known gaps: no rich vision blocks (string-only
+`sessions.get` then updated from live `session.message` frames (placed by the
+transcript `seq` they carry, so a late row still renders in order), token-delta
+previews from `chat` frames, live tool state + output from the tool stream
+(`session.tool` and `agent`/tool are one payload split by audience — see
+`openclaw/NOTES.md` §6 — and share one handler), run failures surfaced from the
+frames that carry them, model/effort applied per send via `sessions.patch`,
+abort via `sessions.abort`, per-turn usage (tokens + cost) into `TurnMeta`,
+user-echo rendezvous by `<runId>:user` idempotency key (text fallback), uploads
+materialized to file paths. The frame orders a live gateway produces are
+replayed against the real session code by `openclaw/wire-replay.test.ts`. Known gaps: no rich vision blocks (string-only
 `sessions.send`), and the gateway is the sole source of truth (no local
 persistence; cold restarts re-seed).
 

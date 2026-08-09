@@ -12,6 +12,12 @@ gateways. Protocol-3 gateways (≤ 2026.5.x) reject the handshake with
 are detect-and-surface only (`compat.ts` → `classifyGatewayError`), never
 silently degraded into empty lists.
 
+Claims here are only as good as their last capture. §6 was rewritten against
+live 2026.7.1 traffic (`ollama-cloud/glm-5.2:cloud`, `openai/gpt-5.5`,
+`claude-cli/claude-sonnet-5`), transcribed into `wire-replay.test.ts`. Much of
+what this file used to say about "backend-specific" frame behavior was one
+capture on one config generalized too far — record a run before trusting it.
+
 ## 1. What OpenClaw is
 
 A personal multi-channel AI assistant that runs on your own machine. The
@@ -148,8 +154,8 @@ first frame must be a `connect` request. On success the response payload is
 `advertise:false` (`sessions.get`, `sessions.resolve`, `sessions.usage*`) are
 omitted yet fully callable — both live gateways omit `sessions.get` from
 `features.methods` and still answer it (verified live against 2026.7.1 /
-2026.6.33). Treat the list as advisory: gate optional niceties on it, never an
-essential call (`compat.ts → advertisesMethod`).
+2026.6.33). Absence proves nothing, so nothing in moi gates on the list; it is
+carried for `/status` and for diagnosing a version mismatch.
 
 Rule for params in the other direction: gateways validate with
 `additionalProperties: false` and hard-reject unknown fields, so never send a
@@ -233,15 +239,21 @@ sendOpenClawMessageImpl`) and marks it applied on the record so
 `applySessionSettings` skips the model patch. Note the asymmetry that decides
 what may ride along on create:
 
-| create param    | 2026.6.x | 2026.7.x |
-| --------------- | -------- | -------- |
-| `model`         | yes      | yes      |
-| `thinkingLevel` | **no**   | yes      |
+`sessions.create` takes `model` on both lines. It does **not** take
+`thinkingLevel` on either — re-checked live on 2026.7.1, which answers
+`invalid sessions.create params: at root: unexpected property 'thinkingLevel'`
+(an earlier revision of this file recorded it as 2026.7-only, which was wrong).
+Create validates with `additionalProperties: false`, so passing it would
+hard-reject every new chat. Effort stays a patch — it is session-scoped, writes
+no config, and so cannot supersede a run.
 
-Both lines validate create with `additionalProperties: false`, so passing
-`thinkingLevel` there would hard-reject **every new chat** on 2026.6.x. Effort
-stays a patch — it is session-scoped, writes no config, and so cannot supersede
-a run. Only the model ever needed moving.
+**Scope of the race.** Re-tested on the pinned 2026.7.1: `sessions.patch
+{ model }` immediately followed by `sessions.send` completed normally, no
+`chat.dispatch-error`. So this is a 2026.7.2-beta.x regression, not a property
+of every line. moi keeps carrying the model in `sessions.create` anyway — it
+costs nothing, the model belongs to the session from the start, and it is one
+round-trip fewer on a new chat — but the workaround is for the NEXT line, not
+this one.
 
 **Thinking levels are per model, not gateway-global** (an earlier version of
 this doc claimed otherwise and moi shipped one static list because of it).
@@ -361,15 +373,55 @@ content blocks), `deltaText` just the increment:
 ```
 
 **`session.message`** — durable transcript rows, pushed as they commit. The
-`message` carries `__openclaw` meta (see §7). Rows without `__openclaw.id`
-are transient pre-envelope echoes — skip them; the durable row follows
-seconds later. **`toolResult` rows DO stream here** on both lines (an earlier
-version of this doc claimed they didn't); `session.tool` additionally carries
-the same output live, and the run-end `sessions.get` reconcile is now just
-the safety net.
+`message` carries `__openclaw` meta (see §7), including **`seq` — the row's
+position in the transcript**, mirrored as a top-level `messageSeq`. That number
+is the only ordering authority: the gateway serializes its broadcasts behind a
+promise queue (`server-session-events.ts` → `createTranscriptUpdateBroadcastHandler`,
+"Preserve transcript update order even when counting messages requires an async
+read"), but a frame can still be lost to a dropped socket and arrive later via
+the reconcile. moi carries `seq` onto `Turn.seq`, and `lib/format.ts`
+`applyEvent` places a new turn by it, so a late row lands where it belongs
+rather than after the reply it preceded.
 
-**`session.tool`** — live tool state, `data.phase` `start`/`update`/`result`,
-with the **full output inline on both lines**:
+Rows without `__openclaw.id` are transient pre-envelope echoes — skip them; the
+durable row follows.
+
+Two things about this stream are easy to get wrong, and both were (verified
+live on 2026.7.1 against `ollama-cloud/glm-5.2:cloud` and `openai/gpt-5.5`,
+frame orders transcribed into `wire-replay.test.ts`):
+
+- **`toolResult` rows do NOT stream.** In every capture the transcript ends up
+  with `user(1) · assistant(2) · toolResult(3) · assistant(4)` and the frames
+  delivered are seq 1, 2 and 4 — never 3. A tool's output reaches us live only
+  on the tool stream below; the run-end `sessions.get` reconcile is the
+  backstop, not a nicety.
+- **A row can grow after it streams.** When a model fans out several calls at
+  once, the assistant row is pushed as text and its `toolCall` blocks are
+  attached afterwards, with no second frame. The live view therefore has a row
+  the transcript disagrees with, which is why the reconcile refreshes rows whose
+  content changed instead of only adopting ids it has never seen.
+
+**`session.tool` and `agent`/`tool` are the same payload, split by audience —
+not by backend.** This is the single most important fact about this stream, and
+believing otherwise is what produced every duplicate-card bug this harness has
+shipped. From `server-chat.ts`: the gateway sends `agent`/`tool` to the
+connections registered as run-scoped tool recipients — the connection that
+issued `sessions.send` — and mirrors the identical payload as `session.tool` to
+every _other_ session subscriber, `excludeConnIds(sessionEventSubscribers,
+runToolRecipients)`. The two audiences are disjoint by construction.
+
+Demonstrated directly: two connections, same gateway, same run, one sends and
+one only subscribes.
+
+```
+sender  : agent/tool:start, agent/tool:update, agent/tool:result
+observer: session.tool:start, session.tool:update, session.tool:result
+```
+
+So moi sees `agent`/`tool` for runs it starts and `session.tool` for everything
+else — a channel message, a cron firing, another client, or a run already in
+flight when it attached. `session.ts` routes both into one `handleToolFrame`.
+Frame shape (`data.phase` `start`/`update`/`result`, full output inline):
 
 ```jsonc
 {
@@ -379,11 +431,11 @@ with the **full output inline on both lines**:
   "data": {
     "phase": "result", // start: name/toolCallId/args · update: +partialResult
     "name": "exec",
-    "toolCallId": "toolu_01…",
+    "toolCallId": "call_y42lj8xv",
     "isError": false,
     "result": {
-      "content": [{ "type": "text", "text": "8" }],
-      "details": { "status": "completed", "exitCode": 0, "durationMs": 255, "cwd": "/…" }
+      "content": [{ "type": "text", "text": "hello" }],
+      "details": { "status": "completed", "exitCode": 0, "durationMs": 228, "cwd": "/…" }
     }
   },
   "session": {
@@ -398,77 +450,84 @@ with the **full output inline on both lines**:
 start|update|end, kind, status, name, toolCallId }`), `command_output`
 (`{ output, phase: delta|end, exitCode?, durationMs?, cwd? }`), `lifecycle`
 (phases `start` → `finishing` `{ stopReason, aborted }` → `end`, or `error`
-`{ error }`).
+`{ error }`, plus `fallback_step` when a model chain retries).
 
-**codex-app-server tool output is run-end only.** On the codex backend
-(OpenAI models — the `agent`/`tool` + `codex_app_server.*` streams, not
-`session.tool`; `codex_app_server.item` frames are present and no
-`command_output` frames are), the live `agent`/`tool` `phase:'result'` frame
-carries only `{ status, exitCode, durationMs }` — **never the stdout**.
-Verified on the wire (result frame at t≈16.2s has no `content`; the command's
-output first appears in the run-end `session.message` `toolResult` at t≈20.0s)
-and in the plugin: `@openclaw/codex` `itemToolResult(commandExecution)`
-returns exactly those three fields. A turn's assistant/`toolCall`/`toolResult`
-rows all commit together when the turn ends, so the durable `toolResult` (the
-only frame that carries stdout **with** a `toolCallId`) is run-end-gated. The
-one live-stdout path — the plugin's `handleOutputDelta`/`emitToolResultOutput`
-→ `onToolResult` — is gated behind the agent's `verboseLevel:'full'` and
-arrives as formatted channel-progress text with no `toolCallId`, so it can't
-attach to a card. Net: moi renders a codex tool running and flips it to
-success/error (from `isError`/exitCode) live at the result frame, but the
-**output body only fills when the run ends**. This is a backend property, not
-a moi gap — `session.tool` (Anthropic) carries output live, which is why the
-two backends feel different.
+### Who owns a tool card
 
-**Live tool synthesis is codex-only.** Because codex batches its durable rows
-at run end, tools would otherwise pop in all at once after the streamed text,
-so moi synthesizes an ephemeral `livetool:<toolCallId>` turn from the
-`agent`/`tool` `start` frame and merges the durable owner onto it by re-id
-(`session.ts` → `emitLiveToolTurn`/`emitTurn`). This is gated on a
-`codex_app_server.*` frame having been seen this session (`rec.codexBackend`).
-Native-loop providers (Anthropic, **ollama** — e.g. deepseek-v4-flash) are NOT
-gated in: their durable rows arrive during the run, so `session.tool` +
-`reemitToolCallOwners` already render tools live, and their `start`-frame
-`toolCallId` need not match the `result`/durable id (ollama uses a provisional
-start id, a final result id) — synthesizing there stranded the live card as a
-permanent duplicate (`○` stuck running beside the durable `●`), and broadcast
-turns can't be retracted (`applyEvent` only upserts by id). So synthesis stays
-off unless the positive codex signal fires.
+The durable owner row and the tool `start` frame race, and which wins decides
+what renders. Measured on both providers, single call:
+
+```
+11891  session.message  assistant seq=2  blocks=toolCall   ← owner commits first
+11895  agent/tool       phase=start      call_y42lj8xv     ← 4ms later
+11936  agent/tool       phase=result     call_y42lj8xv
+13638  session.message  assistant seq=4  blocks=text
+```
+
+and the same run with three calls fanned out of one row:
+
+```
+30822  session.message  assistant seq=2  blocks=text       ← no toolCall blocks
+30827  agent/tool       phase=start      call_d88i21w1     ← the only evidence
+30831  agent/tool       phase=start      call_0f2nwkab        these calls exist
+30835  agent/tool       phase=start      call_p7i1myi5
+34796  session.message  assistant seq=6  blocks=text
+```
+
+So the rule is a question about the run, not about the backend: **does a
+durable row own this call yet?** If yes, that row renders the card and the
+frames only fill in its state. If no, the frame gets a card of its own
+(`livetool:<toolCallId>`), placed just past the last durable row ingested, and
+it keeps that call for the rest of the session — durable rows that later grow
+the same block suppress it (adapter `omitToolCallIds`).
+
+Ownership is decided once, at creation: `applyEvent` upserts by id and can never
+retract, so a card that changes identity mid-run is a duplicate on screen
+forever. Getting this wrong is what made every single-tool run render twice.
+
+Tool ids were stable across `start`/`update`/`result`/durable in every capture,
+on both providers.
+
+**Run failures are reported on three frames.** A dying run says why on `chat`
+`state:'error'` (`errorMessage`), on `agent`/`lifecycle` `phase:'error'`
+(`data.error`), and as a bare `sessions.changed phase:'error'` with no text at
+all — with three wordings (the raw reason, then a wrapped "⚠️ Agent failed
+before reply: … Logs: openclaw logs --follow"). `reportRunError` takes the
+first with text. The error rides on `chat`, which moi otherwise ignores when
+token streaming is off, so failures are surfaced regardless of that toggle.
 
 **Thinking blocks: who actually emits them.** The wire shape exists and moi
 renders it — durable rows carry `{ type: 'thinking', thinking,
-thinkingSignature }` and `adapter.ts` maps it to a `reasoning` part. What
-varies is whether a backend ever produces one. Measured live (2026.7.1-2, one
-send per backend, full frame capture):
+thinkingSignature }` and `adapter.ts` maps it to a `reasoning` part. What varies
+is whether a model produces one at all, and this varies by MODEL and by the
+config it runs under, not by a fixed backend taxonomy. Measured on 2026.7.1
+with the default config:
 
-| backend (`agentRuntime`)           | reasoning on the wire                                                                                     | text? |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------- | ----- |
-| codex app-server (`codex`)         | `agent`/item `kind:'analysis' title:'Reasoning'` start→end, plus `codex_app_server.item type:'reasoning'` | no    |
-| claude CLI (`claude-cli`)          | `agent`/thinking `{ progressTokens: 50 }`                                                                 | no    |
-| native loop (`auto`, ollama)       | nothing — the model writes its reasoning as plain text                                                    | n/a   |
-| `openai-codex` responses transport | durable `thinking` blocks with full text                                                                  | YES   |
+| model                        | reasoning on the wire                                      | text? |
+| ---------------------------- | ---------------------------------------------------------- | ----- |
+| `openai/gpt-5.5`             | `agent`/`thinking` deltas, then a durable `thinking` block | YES   |
+| `ollama-cloud/glm-5.2:cloud` | nothing — the model writes its reasoning as plain text     | n/a   |
 
-Only the last one delivers text, and it is the path the current default config
-no longer takes: OpenAI models resolve to `agentRuntime: codex` (implicitly, or
-pinned per model in `agents.defaults.models`), which routes through the codex
-app-server. Its `appendCodexAcpConfigOverrides` forwards
-`model_reasoning_effort` but never `model_reasoning_summary`, and its item
-frames carry no payload; the plugin's one text-bearing reasoning path
-(`onReasoningStream`) is channel-progress formatting with no item id, so it
-can't attach to a row. Selecting `openai-codex/<model>` directly is blocked by
-the `agents.defaults.models` allowlist unless the user adds that ref.
+An earlier revision of this file claimed OpenAI models route through a codex
+app-server that never carries reasoning text. That is not what the default
+config does on 2026.7.1: `openai/gpt-5.5` streams the words on `agent`/`thinking`
+and commits them durably, and no `codex_app_server.*` frame appears anywhere in
+the capture. (`models status` reporting "openai via codex" is about which auth
+store the credential comes from, not which runtime serves the turn.) Treat
+"which runtime is behind this model" as a config question, not something to
+infer from frames — and never gate rendering on the answer.
 
-Setting `reasoningLevel` (§5) does not change any of the three "no" rows —
-verified with `on` and `stream`, each paired with `thinkingLevel: high` so
-`canShowReasoning` held. It is still set, because it is the documented gate and
-the one path that does carry text needs it.
+`reasoningLevel` (§5) stays set whenever the picked effort is not `off`: it is
+the gateway's documented gate (`reasoningMode = reasoningLevel ?? 'off'`,
+further gated on `canShowReasoning = thinkingLevel !== 'off'`), and a model that
+can surface reasoning needs it.
 
-Given that, moi renders what the codex backend _does_ report: `session.ts →
-handleReasoningItemFrame` turns the analysis item into a textless
-`{ type: 'reasoning', text: '', redacted: true, durationMs }` part, so a codex
-run shows "Thinking" → "Thought for 1.1s" instead of a silent gap before the
-first token. Like the live tool cards it is not durable — nothing in the
-transcript backs it, so a cold reload drops the row.
+Some runtimes report reasoning only as an `agent`/`item` frame of
+`kind:'analysis'` — presence and timing, no text. `session.ts →
+handleReasoningItemFrame` turns that into a textless `{ type: 'reasoning',
+text: '', redacted: true, durationMs }` part, so such a run shows "Thinking" →
+"Thought for 1.1s" instead of a silent gap. Like the live tool cards it is not
+durable — nothing in the transcript backs it, so a cold reload drops the row.
 
 **`task`** — subagent runs (2026.7.x; the event family is new there):
 
@@ -493,6 +552,34 @@ completed?, ts }`.
 **`presence` / `health`** — connected-device roster and a rich gateway
 health blob (`eventLoop`, `plugins`, `channels`, `sessions`); useful for
 liveness, ignored otherwise. `tick` is the heartbeat.
+
+### Tool vocabulary is per runtime
+
+One agent's tools change name and argument shape depending on which runtime
+serves the model, and all of them arrive as `provider: 'openclaw'`. Captured on
+2026.7.1:
+
+| runtime                    | shell                         | edit                                          | read                       |
+| -------------------------- | ----------------------------- | --------------------------------------------- | -------------------------- |
+| built-in loop              | `exec` / `bash` `{ command }` | `edit` `{ path }`                             | `read` `{ path }`          |
+| codex (`extensions/codex`) | `bash` `{ command, cwd }`     | `apply_patch` `{ changes: [{ path, kind }] }` | none — reads run as `bash` |
+| `claude-cli`               | `Bash` `{ command }`          | `Edit` `{ file_path }`                        | `Read` `{ file_path }`     |
+
+So there is no Read card on a codex-backed run: the model reads by shelling out
+(`bash -lc "sed -n '1,120p' notes.txt"`), and that is what the transcript
+records. Nothing is being dropped.
+
+The client's tool-card labels and briefs live in
+`client/features/chat/tool-group/format.ts`; the OpenClaw path falls back to the
+Claude Code vocabulary for the `claude-cli` case.
+
+**`agent`/`item` frames are not a second source of tool cards.** They carry
+`itemId`, `kind`, `title`, `status`, `summary`, `meta` — and **no `toolCallId`
+and no `args`** (`AgentItemEventData` in `src/infra/agent-activity-events.ts`,
+confirmed on the wire: every `command`/`patch` item frame arrives with
+`toolCallId` absent). Every one of them is paired with a `tool` frame that has
+both, a few milliseconds apart. moi renders from the `tool` frames and reads
+item frames only for the textless `analysis` reasoning span.
 
 ### `sessions.changed`
 
@@ -615,18 +702,33 @@ subpath import wins over rolling a minimal client.
   replay, wire tap), config-path resolution, one-shot client for discovery,
   and the last connect outcome for `/status` (`getOpenClawGatewayStatus`).
 - `compat.ts` — protocol-4 tolerance layer: `parseHelloOk`,
-  `advertisesMethod`, `classifyGatewayError`, `messageIdempotencyKey`. Read
-  its header before sending any new param to the gateway.
+  `classifyGatewayError`, `messageIdempotencyKey`. Read its header before
+  sending any new param to the gateway.
 - `thinking.ts` — per-model thinking menus learned from session rows, plus the
   relearn-from-rejection path. The effort picker reads it (§5).
 - `discovery.ts` — agents → workspace candidates, models catalog, transcript
   seeds (2 round-trips: `agents.list` + `sessions.list`, then per-agent
   `agents.files.get(IDENTITY.md)`).
 - `session.ts` — live session records: `sessions.get` seed, `session.message`
-  ingest, `chat` → StreamPreview, `session.tool` → live tool cards,
-  `sessions.patch` before sends, echo rendezvous, run-end reconcile.
+  ingest, `chat` → StreamPreview, tool frames → tool cards, `sessions.patch`
+  before sends, echo rendezvous, run-end reconcile, run-error reporting.
 - `adapter.ts` — gateway rows/messages → moi turns; `strip.ts` — mirror of
   upstream `strip-inbound-meta` (re-diff on every bump, see its header).
+- `wire-replay.test.ts` — the frame orders a live gateway produces, replayed
+  through the real session code. **Record a run before changing how frames are
+  interpreted** (`docs/openclaw-sandbox.md` shows how), then transcribe what it
+  shows into a scenario there. Every ordering and duplication bug this harness
+  has shipped came from reasoning about frame order in the abstract; a
+  recording is the only thing that argues back.
+
+Two rules the modules above depend on, both learned the hard way:
+
+1. **Never branch on "which backend is this".** The frame families that look
+   backend-specific are audience-specific (§6), and which runtime serves a
+   model is a config choice. Ask about the state you actually have — does a
+   durable row own this call? — not about who is on the other end.
+2. **A broadcast turn can be upserted but never retracted.** Any id a turn is
+   published under is permanent. Decide identity once, at creation.
 
 ## 12. Commands worth knowing
 

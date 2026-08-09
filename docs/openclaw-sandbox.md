@@ -60,6 +60,17 @@ default model is resolved at startup.
 `openclaw models auth login --provider <p>` is the interactive OAuth
 alternative; in a headless sandbox an API key is simpler.
 
+Provider ids come from `openclaw models list --all | awk '{print $1}' | cut -d/ -f1 | sort -u`
+— they are not always what you'd guess (Ollama's cloud models sit under
+`ollama-cloud`, not `ollama`). Two providers are enough to cover the
+interesting differences: one that streams reasoning text and one that doesn't.
+
+`claude-cli/*` models shell out to the `claude` binary, which refuses
+`--dangerously-skip-permissions` when running as root — so those runs fail in
+this sandbox with `chain_exhausted` no matter how the model is authenticated.
+That failure is still useful: it is how the run-error reporting path was
+verified.
+
 ## Gotchas
 
 - Restart the gateway after any `openclaw config` write — config is read at
@@ -73,6 +84,39 @@ alternative; in a headless sandbox an API key is simpler.
 - `registry.npmjs.org`, `nodejs.org`, and `api.anthropic.com` are all
   reachable through the egress relay; `github.com` browsing is not (git goes
   through the git proxy).
+
+## Recording a run
+
+Record real traffic before changing how frames are interpreted — the recorded
+orders are what caught the duplicate-tool-card bug that a hand-written unit test
+had been asserting was correct.
+
+There is no checked-in tool for this; a throwaway script is a dozen lines.
+Connect with the harness's own options so the connection is identical to moi's:
+
+```ts
+import { gatewayClientBaseOptions } from '@/server/harness/openclaw/gateway'
+
+const { GatewayClient } = await import('openclaw/plugin-sdk/gateway-runtime')
+const client = new GatewayClient({
+  ...gatewayClientBaseOptions(`ws://127.0.0.1:${port}`, token),
+  onHelloOk: () => {},
+  onEvent: evt => appendFileSync(out, `${JSON.stringify(evt)}\n`)
+})
+```
+
+`caps: ['tool-events']` (which `gatewayClientBaseOptions` sets) is load-bearing:
+without it the gateway sends no tool frames at all and the capture looks like a
+backend that has none. Then `sessions.create` → `sessions.subscribe` →
+`sessions.messages.subscribe` → `sessions.send`, wait for the `agent`/lifecycle
+`end` frame, and finish with `sessions.get` for the durable transcript.
+
+Two audiences are worth recording separately: the connection that sends gets
+`agent`/tool frames, while a second connection that only subscribes gets the
+same payloads as `session.tool` (NOTES.md §6).
+
+Prompts worth capturing: one tool call (the owner row and the tool frame race,
+~4ms apart), several calls fanned out of one row, and a run that fails.
 
 ## Multi-version test rig
 

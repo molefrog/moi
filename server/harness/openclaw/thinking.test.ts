@@ -8,7 +8,6 @@ import {
   OPENCLAW_FALLBACK_THINKING_LEVELS,
   hasOpenClawThinkingProfiles,
   openClawModelRef,
-  openClawModelRefsEquivalent,
   openClawThinkingProfile,
   parseOpenClawThinkingRejection,
   recordOpenClawThinkingProfile,
@@ -154,65 +153,26 @@ describe('harvesting rows', () => {
     expect(openClawThinkingProfile('ollama/kimi-k3:cloud')?.levels).toContain('max')
   })
 
-  // Live on 2026.7.2-beta.7: a session picked as `anthropic/claude-opus-5`
-  // reports back `modelProvider: 'claude-cli'` (its configured agentRuntime),
-  // so the catalog ref and the row's ref never meet.
-  test('a CLI-runtime row still answers a lookup by the catalog ref', () => {
+  // Rows come back under the provider of the ref that was patched (verified
+  // live on 2026.7.1 for `anthropic/`, `claude-cli/` and `ollama-cloud/`), so a
+  // lookup is an exact match on the ref and nothing else.
+  test('a ref nobody has a row for answers null, not a guess', () => {
     recordOpenClawThinkingProfile({
       modelProvider: 'claude-cli',
       model: 'claude-opus-5',
       thinkingOptions: ['off', 'minimal', 'low', 'medium', 'adaptive', 'high', 'xhigh', 'max'],
       thinkingDefault: 'high'
     })
-    const profile = openClawThinkingProfile('anthropic/claude-opus-5')
-    expect(profile?.levels).toContain('adaptive')
-    expect(profile?.default).toBe('high')
-  })
-
-  test('an ambiguous model id across providers resolves to nothing, not a guess', () => {
-    // Both menus are real (live rows). Answering `anthropic/kimi-k3:cloud`
-    // with either one risks offering a level the gateway rejects.
-    recordOpenClawThinkingProfile({
-      modelProvider: 'openai',
-      model: 'kimi-k3:cloud',
-      thinkingOptions: ['off', 'minimal', 'low', 'medium', 'high']
-    })
-    recordOpenClawThinkingProfile({
-      modelProvider: 'ollama',
-      model: 'kimi-k3:cloud',
-      thinkingOptions: ['off', 'low', 'medium', 'high', 'max']
-    })
-    expect(openClawThinkingProfile('anthropic/kimi-k3:cloud')).toBeNull()
+    expect(openClawThinkingProfile('claude-cli/claude-opus-5')?.levels).toContain('adaptive')
+    // A different provider is a different catalog entry — the picker falls back
+    // to the safe intersection rather than borrowing this menu.
+    expect(openClawThinkingProfile('anthropic/claude-opus-5')).toBeNull()
   })
 
   // The applied-model cache compares the picker's catalog ref against the ref
   // the wire reports back. Getting this wrong costs a redundant
   // `sessions.patch { model }` on every send, and each one is a config write
   // that can supersede the run being admitted.
-  describe('openClawModelRefsEquivalent', () => {
-    test('collapses a runtime provider onto the catalog ref', () => {
-      expect(
-        openClawModelRefsEquivalent('anthropic/claude-opus-5', 'claude-cli/claude-opus-5')
-      ).toBe(true)
-      expect(
-        openClawModelRefsEquivalent('claude-cli/claude-opus-5', 'anthropic/claude-opus-5')
-      ).toBe(true)
-    })
-
-    test('keeps genuinely different providers apart', () => {
-      // Two real models that share an id — switching between them must patch.
-      expect(openClawModelRefsEquivalent('ollama/kimi-k3:cloud', 'openai/kimi-k3:cloud')).toBe(
-        false
-      )
-      expect(
-        openClawModelRefsEquivalent('anthropic/claude-opus-5', 'anthropic/claude-sonnet-5')
-      ).toBe(false)
-    })
-
-    test('an identical ref is equivalent to itself', () => {
-      expect(openClawModelRefsEquivalent('openai/gpt-5.6-sol', 'openai/gpt-5.6-sol')).toBe(true)
-    })
-  })
 
   test('openClawModelRef joins provider and model, passing through a qualified id', () => {
     expect(openClawModelRef({ modelProvider: 'openai', model: 'gpt-5.6-sol' })).toBe(

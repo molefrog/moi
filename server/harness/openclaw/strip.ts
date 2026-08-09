@@ -5,22 +5,20 @@ import { stripMoiContext } from '@/lib/moi-context'
 // The gateway prepends AI-facing envelopes to every user message before storing
 // it: a leading timestamp (`[Fri 2026-04-24 18:12 GMT+2] `), sentinel JSON
 // blocks like `Sender (untrusted metadata):`, delivery hints for the `message`
-// tool, chat-window context blocks, and (on ≤2026.4.x) a `[Bootstrap pending]`
-// preamble. These are useful for the model but must never surface in chat
-// bubbles.
+// tool, and chat-window context blocks. These are useful for the model but must
+// never surface in chat bubbles.
 //
 // Canonical source: `src/auto-reply/reply/strip-inbound-meta.ts` in the
 // `openclaw` npm package (bundled as `dist/strip-inbound-meta-*.js`; hint
 // strings in `dist/message-tool-delivery-hints-*.js`). Not re-exported on a
-// stable subpath, so we mirror it here. If you bump `openclaw`, diff those
-// files and keep this in sync. Last synced against 2026.7.1 (also compared to
-// the 2026.6.33 copy — identical except the chat-window block pass, which is
-// 2026.7.x-only but harmless on 6.x rows).
+// stable subpath, so we mirror it here.
 //
-// The bootstrap-preamble pass is ours — it was injected by the ≤2026.4.x
-// system-prompt builder, not the inbound-meta path, so upstream's stripper
-// deliberately leaves it alone. 2026.6.x+ no longer emits the marker; the pass
-// stays for transcripts written by old gateways and is a no-op otherwise.
+// You don't have to diff it by hand on a bump: `strip-parity.test.ts` loads the
+// real implementation out of the pinned bundle and asserts this mirror agrees
+// with it case for case. If that test starts failing after `bun install`,
+// upstream moved and this file needs to follow. (It also compares clean against
+// the 2026.6.33 copy — identical except the chat-window block pass, which is
+// 2026.7.x-only but harmless on 6.x rows.)
 
 const LEADING_TIMESTAMP_PREFIX_RE = /^\[[A-Za-z]{3} \d{4}-\d{2}-\d{2} \d{2}:\d{2}[^\]]*\] */
 
@@ -30,10 +28,7 @@ const INBOUND_META_SENTINELS = [
   'Conversation info (untrusted metadata):',
   'Sender (untrusted metadata):',
   'Thread starter (untrusted, for context):',
-  // 2026.6.x+ wording, and the ≤2026.5.x one it replaced — old transcripts
-  // replay through `sessions.get`, so both must keep stripping.
   'Reply target of current user message (untrusted, for context):',
-  'Replied message (untrusted, for context):',
   'Forwarded message context (untrusted metadata):',
   CHAT_HISTORY_SENTINEL
 ]
@@ -175,25 +170,6 @@ export function stripInboundMetadata(text: string): string {
     .replace(LEADING_TIMESTAMP_PREFIX_RE, '')
 }
 
-// Removes a leading `[Bootstrap pending]` header plus every following
-// non-empty line up to the first blank line. Upstream produced a fixed 6-line
-// preamble on ≤2026.4.x (see `buildFullBootstrapPromptLines`), but we key off
-// structure rather than exact text so minor wording changes don't leak through.
-export function stripBootstrapPreamble(text: string): string {
-  if (!text || !text.startsWith('[Bootstrap pending]')) return text
-  const lines = text.split('\n')
-  let i = 0
-  while (i < lines.length && lines[i] !== '') i += 1
-  while (i < lines.length && lines[i] === '') i += 1
-  return lines.slice(i).join('\n')
-}
-
-// moi-side (not part of the upstream mirror above): the spawn tool wraps a
-// subagent's first user message as
-//   "[Subagent Context] <paragraph>\n\n[Subagent Task]\n\n<task>\n\nBegin. …"
-// — surface the task itself in titles/previews/transcripts. Truncated
-// previews/derived titles can cut before the task marker; fall back to a
-// plain label rather than leaking the envelope.
 export function stripSubagentEnvelope(text: string): string {
   if (!text.startsWith('[Subagent Context]')) return text
   const taskAt = text.indexOf('[Subagent Task]')
@@ -204,5 +180,5 @@ export function stripSubagentEnvelope(text: string): string {
 }
 
 export function stripUserMessageMetadata(text: string): string {
-  return stripSubagentEnvelope(stripMoiContext(stripInboundMetadata(stripBootstrapPreamble(text))))
+  return stripSubagentEnvelope(stripMoiContext(stripInboundMetadata(text)))
 }

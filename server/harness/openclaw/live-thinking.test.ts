@@ -1,11 +1,14 @@
-// The codex-app-server reasoning indicator.
+// The textless reasoning indicator.
 //
-// That backend reports reasoning as an `agent`/item frame — `kind:'analysis'`,
-// `title:'Reasoning'`, phases start→end — and never sends the text: the frames
+// Some runtimes report reasoning as an `agent`/item frame — `kind:'analysis'`,
+// `title:'Reasoning'`, phases start→end — and never send the text: the frames
 // below are verbatim from a live 2026.7.1-2 capture, and the run's durable
 // assistant row that followed them carried a `text` block only. So the run has
 // a visible ~1.1s gap between the send and the first token with nothing on
-// screen. We render the one thing the backend does report: how long it thought.
+// screen. We render the one thing that path does report: how long it thought.
+// (Where a runtime DOES carry the words — `openai/gpt-5.5` streams them on
+// `agent`/thinking and commits a durable `thinking` block — the real text wins
+// and this indicator never appears.)
 import { describe, expect, test } from 'bun:test'
 
 import type { Part } from '@/lib/format'
@@ -16,13 +19,11 @@ const SESSION_KEY = 'agent:live-think:main'
 const ITEM_ID = 'rs_0c6646726346115f016a785c9c65b48191820511665f7db7d8'
 
 function newRec() {
-  const rec = createOpenClawSessionForTest({
+  return createOpenClawSessionForTest({
     workspaceId: 'ws-live-think',
     sessionId: `s-${Math.random().toString(36).slice(2)}`,
     sessionKey: SESSION_KEY
   })
-  rec.codexBackend = true
-  return rec
 }
 
 function reasoningParts(rec: ReturnType<typeof newRec>): Part[] {

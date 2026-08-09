@@ -11,10 +11,10 @@
 // `additionalProperties: false` and reject unknown fields outright — never
 // send a param that only newer schemas know without gating on `GatewayInfo`.
 
-// What the gateway announced in `hello-ok`. `methods`/`events` are advisory:
-// 2026.6.33 answers `sessions.get` while omitting it from `features.methods`,
-// so absence must never disable an essential call — use `advertisesMethod`
-// only to unlock optional niceties.
+// What the gateway announced in `hello-ok`. `methods`/`events` are advisory
+// and UNDER-REPORT: 2026.6.33 answers `sessions.get` while omitting it from
+// `features.methods`. Absence proves nothing, so nothing gates on this — the
+// sets are carried for `/status` and for debugging a version mismatch.
 export type GatewayInfo = {
   protocol?: number
   serverVersion?: string
@@ -38,10 +38,6 @@ export function parseHelloOk(hello: unknown): GatewayInfo {
     methods: new Set(strings(h?.features?.methods)),
     events: new Set(strings(h?.features?.events))
   }
-}
-
-export function advertisesMethod(info: GatewayInfo | null, method: string): boolean {
-  return info?.methods.has(method) ?? false
 }
 
 export type GatewayFailureKind = 'protocol-mismatch' | 'auth' | 'unreachable' | 'unknown'
