@@ -85,7 +85,7 @@ verified.
   reachable through the egress relay; `github.com` browsing is not (git goes
   through the git proxy).
 
-## Recording wire fixtures
+## Recording a run
 
 `scripts/openclaw-capture.ts` records one chat turn off the running gateway in
 the format `server/harness/openclaw/wire-replay.test.ts` replays. Use it before
@@ -96,12 +96,12 @@ correct behavior.
 ```sh
 bun scripts/openclaw-capture.ts ollama-cloud/glm-5.2:cloud \
   "Run 'echo hi' and say what it printed." \
-  server/harness/openclaw/fixtures/ollama-single-tool.jsonl
+  /tmp/single-tool.jsonl
 
 # the same run seen by a connection that subscribes but does not send —
 # that audience gets `session.tool` where the sender gets `agent`/tool
 bun scripts/openclaw-capture.ts ollama-cloud/glm-5.2:cloud "…" \
-  server/harness/openclaw/fixtures/ollama-observed-tool.jsonl --observe
+  /tmp/observed-tool.jsonl --observe
 ```
 
 It connects with the harness's own options (`gatewayClientBaseOptions`), so

@@ -129,9 +129,8 @@ previews from `chat` frames, live tool state + output from the tool stream
 frames that carry them, model/effort applied per send via `sessions.patch`,
 abort via `sessions.abort`, per-turn usage (tokens + cost) into `TurnMeta`,
 user-echo rendezvous by `<runId>:user` idempotency key (text fallback), uploads
-materialized to file paths. Recorded gateway traffic in
-`openclaw/fixtures/*.jsonl` is replayed against the real session code by
-`openclaw/wire-replay.test.ts`. Known gaps: no rich vision blocks (string-only
+materialized to file paths. The frame orders a live gateway produces are
+replayed against the real session code by `openclaw/wire-replay.test.ts`. Known gaps: no rich vision blocks (string-only
 `sessions.send`), and the gateway is the sole source of truth (no local
 persistence; cold restarts re-seed).
 

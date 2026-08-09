@@ -1,75 +1,90 @@
-// Replay of real gateway traffic.
+// The frame orders a live gateway actually produces, replayed through the real
+// session code.
 //
-// The fixtures in `fixtures/` are verbatim frame logs captured from a live
-// OpenClaw 2026.7.1 gateway (see NOTES.md §6 for how). Each one is one chat
-// turn: the frames the gateway pushed, in the order it pushed them, plus the
-// durable transcript `sessions.get` returned at the end.
+// Each scenario below is transcribed from a capture off OpenClaw 2026.7.1
+// (`scripts/openclaw-capture.ts` records more, including the observer variant).
+// Only the fields the harness reads are kept — the captures also carry a fat
+// session row on every frame, timing details, and model prose that no assertion
+// depends on.
 //
-// Unit tests state what we believe the wire does; these state what it did.
-// Every ordering/duplication bug this harness has shipped came from a belief
-// about frame order that the wire didn't share, so the guard has to be the
-// recording, not the belief.
+// The point of these is that unit tests state what we believe the wire does,
+// and every ordering/duplication bug this harness has shipped came from a
+// belief the wire didn't share. The ORDER of the frames in each array is the
+// fact being pinned; it is not editable to taste.
 import { describe, expect, test } from 'bun:test'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+
+import type { ToolCall, Turn } from '@/lib/format'
 
 import type { OpenClawMessage } from './discovery'
 import { createOpenClawSessionForTest, handleToolFrame, ingest, reconcileForTest } from './session'
-import type { ToolCall, Turn } from '@/lib/format'
 
-type Frame = {
-  kind: 'meta' | 'event' | 'durable'
+const KEY = 'agent:main:dashboard:replay'
+
+type Frame =
+  | { kind: 'message'; message: OpenClawMessage }
+  // `tool` is the sender's `agent`/tool frame; `observed` is the identical
+  // payload as `session.tool`, which is what a connection that did not start
+  // the run receives instead (NOTES.md §6).
+  | { kind: 'tool' | 'observed'; data: Record<string, unknown> }
+
+function msg(
+  role: 'user' | 'assistant',
+  id: string,
+  seq: number,
+  content: OpenClawMessage['content']
+): Frame {
+  return {
+    kind: 'message',
+    message: { role, content, timestamp: 1786296100000 + seq, __openclaw: { id, seq } }
+  } as Frame
+}
+
+function toolResultRow(id: string, seq: number, toolCallId: string, text: string): OpenClawMessage {
+  return {
+    role: 'toolResult',
+    toolCallId,
+    content: [{ type: 'text', text }],
+    timestamp: 1786296100000 + seq,
+    __openclaw: { id, seq }
+  } as unknown as OpenClawMessage
+}
+
+const start = (toolCallId: string, command: string): Frame => ({
+  kind: 'tool',
+  data: { phase: 'start', name: 'exec', toolCallId, args: { command } }
+})
+
+const result = (toolCallId: string, text: string): Frame => ({
+  kind: 'tool',
   data: {
-    label?: string
-    sessionKey?: string
-    event?: string
-    payload?: Record<string, unknown>
-    messages?: OpenClawMessage[]
+    phase: 'result',
+    name: 'exec',
+    toolCallId,
+    isError: false,
+    result: { content: [{ type: 'text', text }], details: { status: 'completed', exitCode: 0 } }
   }
-}
+})
 
-function load(name: string): { sessionKey: string; frames: Frame[] } {
-  const frames = readFileSync(join(import.meta.dir, 'fixtures', `${name}.jsonl`), 'utf8')
-    .trim()
-    .split('\n')
-    .map(l => JSON.parse(l) as Frame)
-  const meta = frames.find(f => f.kind === 'meta')
-  return { sessionKey: meta?.data.sessionKey ?? '', frames }
-}
+const observed = (frame: Frame): Frame =>
+  frame.kind === 'tool' ? { kind: 'observed', data: frame.data } : frame
 
-// Drive a record through a capture exactly the way the live subscription does
-// (`ensureSubscribed`), then run the run-end reconcile against the captured
-// transcript. Returns the view the client would hold.
-function replay(name: string) {
-  const { sessionKey, frames } = load(name)
-  const rec = createOpenClawSessionForTest({
-    workspaceId: 'ws-replay',
-    sessionId: 'replay',
-    sessionKey
-  })
+function play(frames: Frame[], workspaceId = 'ws-replay') {
+  const rec = createOpenClawSessionForTest({ workspaceId, sessionId: 'replay', sessionKey: KEY })
   for (const frame of frames) {
-    if (frame.kind !== 'event') continue
-    const { event, payload = {} } = frame.data
-    if (payload.sessionKey !== sessionKey) continue
-    if (event === 'session.message') ingest(rec, payload.message as OpenClawMessage)
-    else if (event === 'session.tool') handleToolFrame(rec, payload)
-    else if (event === 'agent' && payload.stream === 'tool') handleToolFrame(rec, payload)
+    if (frame.kind === 'message') ingest(rec, frame.message)
+    // Both frame families go through the one handler; `session.tool` and
+    // `agent`/tool differ only in which connection the gateway sends them to.
+    else handleToolFrame(rec, { sessionKey: KEY, data: frame.data })
   }
-  const durable = frames.find(f => f.kind === 'durable')
-  return { rec, durable: durable?.data.messages ?? [] }
+  return rec
 }
 
-// One line per rendered turn: role, then each part reduced to a shape we can
-// assert on without pinning model prose.
 function shape(turns: Turn[]): string[] {
   return turns.map(t => {
     const parts = t.parts
-      .map(p => {
-        if (p.type === 'text') return 'text'
-        if (p.type === 'reasoning') return 'reasoning'
-        if (p.type === 'tool-call') return `tool:${p.call.name}:${p.call.state}`
-        return p.type
-      })
+      .map(p =>
+        p.type === 'tool-call' ? `tool:${p.call.name}:${p.call.state}` : (p.type as string)
+      )
       .join('+')
     return `${t.role}:${parts}`
   })
@@ -79,99 +94,174 @@ function toolCards(turns: Turn[]): ToolCall[] {
   return turns.flatMap(t => t.parts.flatMap(p => (p.type === 'tool-call' ? [p.call] : [])))
 }
 
-describe('replaying real gateway captures', () => {
-  // The single-tool shape, identical on both providers: the durable assistant
-  // row carrying the `toolCall` block commits ~4ms BEFORE the tool start frame.
-  // The card therefore belongs to that row, and the tool frames only fill in
-  // its state — synthesizing a second card here is what produced the
-  // permanently-pending duplicate this test now pins down.
-  for (const name of ['ollama-single-tool', 'openai-single-tool']) {
-    test(`${name}: one tool call renders exactly one card`, () => {
-      const { rec } = replay(name)
+const output = (call: ToolCall) => String(call.output ?? '').trim()
+
+// ── One tool call ────────────────────────────────────────────────────────────
+// Identical on `ollama-cloud/glm-5.2:cloud` and `openai/gpt-5.5`. The durable
+// row that owns the call commits ~4ms BEFORE the tool start frame — that race,
+// in that direction, is what made the old code re-id an already-broadcast turn
+// and render every single-tool run twice. Note also what never arrives live:
+// the `toolResult` row (seq 3) is in the transcript and not on the wire.
+const CALL_ID = 'call_y42lj8xv'
+const SINGLE_TOOL: Frame[] = [
+  msg('user', '9e1e6099', 1, 'Run the shell command: echo hello-from-ollama.'),
+  msg('assistant', '3ba0cc35', 2, [
+    {
+      type: 'toolCall',
+      id: CALL_ID,
+      name: 'exec',
+      arguments: { command: 'echo hello-from-ollama' }
+    }
+  ]),
+  start(CALL_ID, 'echo hello-from-ollama'),
+  result(CALL_ID, 'hello-from-ollama'),
+  msg('assistant', 'dbd9c0bc', 4, [
+    { type: 'text', text: 'The command printed: `hello-from-ollama`.' }
+  ])
+]
+
+// The GPT run adds a durable `thinking` block on the owner row — the same
+// re-id bug duplicated that too.
+const GPT_CALL_ID = 'call_VED4G03AgeTwaLYlVE3hMit1|fc_01da275f01aaf4c6006a78b75bee9881'
+const SINGLE_TOOL_WITH_REASONING: Frame[] = [
+  msg('user', 'c01cc62a', 1, 'Run the shell command: echo hello-from-gpt.'),
+  msg('assistant', '80068381', 2, [
+    { type: 'thinking', thinking: 'The user wants a shell command run. Straightforward.' },
+    {
+      type: 'toolCall',
+      id: GPT_CALL_ID,
+      name: 'exec',
+      arguments: { command: 'echo hello-from-gpt' }
+    }
+  ]),
+  start(GPT_CALL_ID, 'echo hello-from-gpt'),
+  result(GPT_CALL_ID, 'hello-from-gpt'),
+  msg('assistant', 'bb21cc02', 4, [{ type: 'text', text: 'It printed: `hello-from-gpt`.' }])
+]
+
+// ── Calls fanned out of one row ──────────────────────────────────────────────
+// The owner row streams as TEXT ONLY and grows its three `toolCall` blocks
+// afterwards with no second frame, so the calls reach us only as tool frames.
+// The transcript at the end disagrees with what was streamed — which is why the
+// reconcile has to refresh rows whose content changed, and why the refreshed row
+// must not re-render calls that already have cards.
+const FAN_IDS = ['call_d88i21w1', 'call_0f2nwkab', 'call_p7i1myi5']
+const FAN_WORDS = ['one', 'two', 'three']
+const PARALLEL_TOOLS: Frame[] = [
+  msg('user', '327e80c4', 1, "Run 'echo one', 'echo two' and 'echo three'."),
+  msg('assistant', 'a927f29c', 2, [
+    { type: 'text', text: "I'll run all three commands since they're independent of each other." }
+  ]),
+  ...FAN_IDS.map((id, i) => start(id, `echo ${FAN_WORDS[i]}`)),
+  ...FAN_IDS.map((id, i) => result(id, FAN_WORDS[i])),
+  msg('assistant', 'a7097f68', 6, [{ type: 'text', text: "Here's the summary: one, two, three." }])
+]
+
+// What `sessions.get` returns for that run once it ends — note the owner row
+// now carries the blocks it never streamed.
+const PARALLEL_TRANSCRIPT: OpenClawMessage[] = [
+  {
+    role: 'user',
+    content: "Run 'echo one', 'echo two' and 'echo three'.",
+    __openclaw: { id: '327e80c4', seq: 1 }
+  },
+  {
+    role: 'assistant',
+    content: [
+      {
+        type: 'text',
+        text: "I'll run all three commands since they're independent of each other."
+      },
+      ...FAN_IDS.map((id, i) => ({
+        type: 'toolCall',
+        id,
+        name: 'exec',
+        arguments: { command: `echo ${FAN_WORDS[i]}` }
+      }))
+    ],
+    __openclaw: { id: 'a927f29c', seq: 2 }
+  },
+  ...FAN_IDS.map((id, i) => toolResultRow(`res-${i}`, 3 + i, id, FAN_WORDS[i])),
+  {
+    role: 'assistant',
+    content: [{ type: 'text', text: "Here's the summary: one, two, three." }],
+    __openclaw: { id: 'a7097f68', seq: 6 }
+  }
+] as unknown as OpenClawMessage[]
+
+describe('one tool call, owner row first (both providers)', () => {
+  const cases: [name: string, frames: Frame[], out: string][] = [
+    ['ollama', SINGLE_TOOL, 'hello-from-ollama'],
+    ['openai', SINGLE_TOOL_WITH_REASONING, 'hello-from-gpt'],
+    // The same run seen by a connection that only subscribed: tool activity
+    // arrives as `session.tool`. It must render identically.
+    ['observed from another connection', SINGLE_TOOL.map(observed), 'hello-from-ollama']
+  ]
+
+  for (const [name, frames, out] of cases) {
+    test(`${name}: renders exactly one card, on the durable row`, () => {
+      const rec = play(frames)
       const cards = toolCards(rec.view.turns)
       expect(cards).toHaveLength(1)
       expect(cards[0]).toMatchObject({ name: 'exec', state: 'success' })
-      expect(String(cards[0].output ?? '').trim()).toBeTruthy()
-      // No `livetool:` turn: the durable row owned the call from the start.
+      expect(output(cards[0])).toBe(out)
       expect(rec.view.turns.filter(t => t.id.includes(':livetool:'))).toHaveLength(0)
     })
 
     test(`${name}: the answer comes after the tool that produced it`, () => {
-      const { rec } = replay(name)
-      const shapes = shape(rec.view.turns)
-      const toolAt = shapes.findIndex(s => s.includes('tool:exec'))
-      const answerAt = shapes.lastIndexOf('assistant:text')
-      expect(toolAt).toBeGreaterThan(-1)
-      expect(answerAt).toBeGreaterThan(toolAt)
+      const shapes = shape(play(frames).view.turns)
+      expect(shapes.findIndex(s => s.includes('tool:exec'))).toBeLessThan(
+        shapes.lastIndexOf('assistant:text')
+      )
     })
   }
 
-  // Same gateway, same run shape, but captured from a connection that only
-  // subscribed — so the tool activity arrives as `session.tool` rather than
-  // `agent`/tool. This is what moi sees for a run it did not start. The two
-  // must render identically; that they do is the point of routing both frame
-  // families into one handler.
-  test('ollama-observed-tool: a watched run renders like one we started', () => {
-    const { rec } = replay('ollama-observed-tool')
-    const cards = toolCards(rec.view.turns)
-    expect(cards).toHaveLength(1)
-    expect(cards[0]).toMatchObject({ name: 'exec', state: 'success' })
-    expect(String(cards[0].output ?? '').trim()).toBe('hello-from-observer')
-    expect(rec.view.turns.filter(t => t.id.includes(':livetool:'))).toHaveLength(0)
+  test('openai: the reasoning block renders once, not once per emit', () => {
+    const shapes = shape(play(SINGLE_TOOL_WITH_REASONING).view.turns)
+    expect(shapes.filter(s => s.includes('reasoning'))).toHaveLength(1)
   })
+})
 
-  test('openai-single-tool: reasoning renders once, not once per emit', () => {
-    const { rec } = replay('openai-single-tool')
-    expect(shape(rec.view.turns).filter(s => s.includes('reasoning'))).toHaveLength(1)
-  })
-
-  // The fan-out shape: the assistant row streams as text and grows its three
-  // `toolCall` blocks silently afterwards, so those calls reach us ONLY as tool
-  // frames. Each needs its own card, and the durable row must not re-render
-  // them when the reconcile finally sees the grown row.
-  test('ollama-parallel-tools: three fanned-out calls render three cards', () => {
-    const { rec } = replay('ollama-parallel-tools')
-    const cards = toolCards(rec.view.turns)
+describe('calls fanned out of one row', () => {
+  test('each renders as its own card, in call order', () => {
+    const cards = toolCards(play(PARALLEL_TOOLS).view.turns)
     expect(cards).toHaveLength(3)
-    expect(cards.every(c => c.state === 'success')).toBe(true)
-    expect(cards.map(c => String(c.output ?? '').trim())).toEqual(['one', 'two', 'three'])
+    expect(cards.map(c => c.toolCallId)).toEqual(FAN_IDS)
+    expect(cards.map(output)).toEqual(FAN_WORDS)
   })
 
-  test('ollama-parallel-tools: the run-end reconcile adds no duplicates', () => {
-    const { rec, durable } = replay('ollama-parallel-tools')
+  test('the cards sit between the plan and the summary', () => {
+    const shapes = shape(play(PARALLEL_TOOLS).view.turns)
+    const first = shapes.findIndex(s => s.includes('tool:exec'))
+    const last = shapes.map(s => s.includes('tool:exec')).lastIndexOf(true)
+    expect(shapes.slice(0, first)).toContain('assistant:text')
+    expect(shapes.slice(last + 1)).toContain('assistant:text')
+  })
+
+  test('the run-end reconcile adds no duplicates when the owner row catches up', () => {
+    const rec = play(PARALLEL_TOOLS)
     const before = shape(rec.view.turns)
-    reconcileForTest(rec, durable)
+    reconcileForTest(rec, PARALLEL_TRANSCRIPT)
     expect(shape(rec.view.turns)).toEqual(before)
     expect(toolCards(rec.view.turns)).toHaveLength(3)
   })
+})
 
-  test('ollama-parallel-tools: tools sit between the plan and the summary', () => {
-    const { rec } = replay('ollama-parallel-tools')
-    const shapes = shape(rec.view.turns)
-    const firstTool = shapes.findIndex(s => s.includes('tool:exec'))
-    const lastTool = shapes.map(s => s.includes('tool:exec')).lastIndexOf(true)
-    // The row that announced the plan precedes every card…
-    expect(shapes.slice(0, firstTool)).toContain('assistant:text')
-    // …and the summary follows every card.
-    expect(shapes.slice(lastTool + 1)).toContain('assistant:text')
-  })
-
-  // A durable row that reaches us late (dropped frame, reconnect) must land
-  // where the transcript says it belongs, not at the end of the chat.
-  test('a row that arrives out of order is placed by its transcript seq', () => {
-    const { sessionKey, frames } = load('ollama-single-tool')
+describe('transcript order survives out-of-order delivery', () => {
+  test('a row that arrives late is placed by its seq, not by arrival', () => {
+    const messages = SINGLE_TOOL.filter(f => f.kind === 'message').map(f =>
+      f.kind === 'message' ? f.message : null
+    )
     const rec = createOpenClawSessionForTest({
       workspaceId: 'ws-order',
       sessionId: 'order',
-      sessionKey
+      sessionKey: KEY
     })
-    const messages = frames
-      .filter(f => f.kind === 'event' && f.data.event === 'session.message')
-      .map(f => f.data.payload?.message as OpenClawMessage)
-    expect(messages.length).toBeGreaterThan(1)
-    // Deliver the last row first, then the rest in order.
-    ingest(rec, messages[messages.length - 1])
-    for (const m of messages.slice(0, -1)) ingest(rec, m)
+    // Deliver the final answer first — what a dropped frame plus a reconcile
+    // looks like from here.
+    ingest(rec, messages[messages.length - 1]!)
+    for (const m of messages.slice(0, -1)) ingest(rec, m!)
+
     const seqs = rec.view.turns.map(t => t.seq)
     expect(seqs).toEqual([...seqs].sort((a, b) => (a ?? 0) - (b ?? 0)))
     expect(rec.view.turns[0].role).toBe('user')

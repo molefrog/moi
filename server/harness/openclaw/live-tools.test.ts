@@ -14,8 +14,8 @@
 //
 // Ownership is decided once, when the card is created, and never revisited: a
 // broadcast turn can be upserted but never retracted, so a card that changes
-// identity mid-run is a duplicate on screen forever. `fixtures/` +
-// `wire-replay.test.ts` hold the recorded traffic these rules come from.
+// identity mid-run is a duplicate on screen forever. `wire-replay.test.ts`
+// holds the recorded frame orders these rules come from.
 import { describe, expect, test } from 'bun:test'
 
 import type { OpenClawMessage } from './discovery'

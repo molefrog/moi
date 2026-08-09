@@ -15,7 +15,7 @@ silently degraded into empty lists.
 Claims here are only as good as their last capture. §6 was rewritten in full
 against live 2026.7.1 traffic from `ollama-cloud/glm-5.2:cloud`,
 `openai/gpt-5.5` and `claude-cli/claude-sonnet-5`; the recordings behind it are
-checked in under `fixtures/` and replayed by `wire-replay.test.ts`. Several
+transcribed into `wire-replay.test.ts`, which replays them. Several
 things this file previously asserted about backend-specific frame behavior
 turned out to be artifacts of one capture on one config — see §6 and §11.
 
@@ -155,8 +155,8 @@ first frame must be a `connect` request. On success the response payload is
 `advertise:false` (`sessions.get`, `sessions.resolve`, `sessions.usage*`) are
 omitted yet fully callable — both live gateways omit `sessions.get` from
 `features.methods` and still answer it (verified live against 2026.7.1 /
-2026.6.33). Treat the list as advisory: gate optional niceties on it, never an
-essential call (`compat.ts → advertisesMethod`).
+2026.6.33). Absence proves nothing, so nothing in moi gates on the list; it is
+carried for `/status` and for diagnosing a version mismatch.
 
 Rule for params in the other direction: gateways validate with
 `additionalProperties: false` and hard-reject unknown fields, so never send a
@@ -240,15 +240,21 @@ sendOpenClawMessageImpl`) and marks it applied on the record so
 `applySessionSettings` skips the model patch. Note the asymmetry that decides
 what may ride along on create:
 
-| create param    | 2026.6.x | 2026.7.x |
-| --------------- | -------- | -------- |
-| `model`         | yes      | yes      |
-| `thinkingLevel` | **no**   | yes      |
+`sessions.create` takes `model` on both lines. It does **not** take
+`thinkingLevel` on either — re-checked live on 2026.7.1, which answers
+`invalid sessions.create params: at root: unexpected property 'thinkingLevel'`
+(an earlier revision of this file recorded it as 2026.7-only, which was wrong).
+Create validates with `additionalProperties: false`, so passing it would
+hard-reject every new chat. Effort stays a patch — it is session-scoped, writes
+no config, and so cannot supersede a run.
 
-Both lines validate create with `additionalProperties: false`, so passing
-`thinkingLevel` there would hard-reject **every new chat** on 2026.6.x. Effort
-stays a patch — it is session-scoped, writes no config, and so cannot supersede
-a run. Only the model ever needed moving.
+**Scope of the race.** Re-tested on the pinned 2026.7.1: `sessions.patch
+{ model }` immediately followed by `sessions.send` completed normally, no
+`chat.dispatch-error`. So this is a 2026.7.2-beta.x regression, not a property
+of every line. moi keeps carrying the model in `sessions.create` anyway — it
+costs nothing, the model belongs to the session from the start, and it is one
+round-trip fewer on a new chat — but the workaround is for the NEXT line, not
+this one.
 
 **Thinking levels are per model, not gateway-global** (an earlier version of
 this doc claimed otherwise and moi shipped one static list because of it).
@@ -383,7 +389,7 @@ durable row follows.
 
 Two things about this stream are easy to get wrong, and both were (verified
 live on 2026.7.1 against `ollama-cloud/glm-5.2:cloud` and `openai/gpt-5.5`,
-captures checked in under `fixtures/`):
+frame orders transcribed into `wire-replay.test.ts`):
 
 - **`toolResult` rows do NOT stream.** In every capture the transcript ends up
   with `user(1) · assistant(2) · toolResult(3) · assistant(4)` and the frames
@@ -500,7 +506,7 @@ renders it — durable rows carry `{ type: 'thinking', thinking,
 thinkingSignature }` and `adapter.ts` maps it to a `reasoning` part. What varies
 is whether a model produces one at all, and this varies by MODEL and by the
 config it runs under, not by a fixed backend taxonomy. Measured on 2026.7.1
-with the default config (`fixtures/`):
+with the default config:
 
 | model                        | reasoning on the wire                                      | text? |
 | ---------------------------- | ---------------------------------------------------------- | ----- |
@@ -673,8 +679,8 @@ subpath import wins over rolling a minimal client.
   replay, wire tap), config-path resolution, one-shot client for discovery,
   and the last connect outcome for `/status` (`getOpenClawGatewayStatus`).
 - `compat.ts` — protocol-4 tolerance layer: `parseHelloOk`,
-  `advertisesMethod`, `classifyGatewayError`, `messageIdempotencyKey`. Read
-  its header before sending any new param to the gateway.
+  `classifyGatewayError`, `messageIdempotencyKey`. Read its header before
+  sending any new param to the gateway.
 - `thinking.ts` — per-model thinking menus learned from session rows, plus the
   relearn-from-rejection path. The effort picker reads it (§5).
 - `discovery.ts` — agents → workspace candidates, models catalog, transcript
@@ -685,12 +691,14 @@ subpath import wins over rolling a minimal client.
   before sends, echo rendezvous, run-end reconcile, run-error reporting.
 - `adapter.ts` — gateway rows/messages → moi turns; `strip.ts` — mirror of
   upstream `strip-inbound-meta` (re-diff on every bump, see its header).
-- `fixtures/*.jsonl` + `wire-replay.test.ts` — recorded gateway traffic, one
-  chat turn per file, replayed through the real session code. **Add a capture
-  before changing how frames are interpreted.** Every ordering and duplication
-  bug this harness has shipped came from reasoning about frame order in the
-  abstract; a recording is the only thing that argues back. The capture script
-  is in `docs/openclaw-sandbox.md`.
+- `wire-replay.test.ts` — the frame orders a live gateway produces, replayed
+  through the real session code. **Record a run before changing how frames are
+  interpreted** (`scripts/openclaw-capture.ts`, see
+  `docs/openclaw-sandbox.md`), then transcribe what it shows into a scenario
+  there. Every ordering and duplication bug this harness has shipped came from
+  reasoning about frame order in the abstract; a recording is the only thing
+  that argues back. The raw dumps are not checked in — they are megabytes of
+  session rows around a handful of load-bearing frames.
 
 Two rules the modules above depend on, both learned the hard way:
 

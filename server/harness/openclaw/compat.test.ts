@@ -6,7 +6,6 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   type GatewayInfo,
-  advertisesMethod,
   classifyGatewayError,
   messageIdempotencyKey,
   parseHelloOk
@@ -83,19 +82,6 @@ describe('parseHelloOk', () => {
     })
     expect(info.methods).toEqual(new Set(['sessions.send', 'models.list']))
     expect(info.events.size).toBe(0)
-  })
-})
-
-describe('advertisesMethod', () => {
-  const info = parseHelloOk(helloV633)
-
-  test('true for an advertised method, false otherwise', () => {
-    expect(advertisesMethod(info, 'models.list')).toBe(true)
-    expect(advertisesMethod(info, 'sessions.compaction.branch')).toBe(false)
-  })
-
-  test('false before any hello (null info)', () => {
-    expect(advertisesMethod(null, 'models.list')).toBe(false)
   })
 })
 

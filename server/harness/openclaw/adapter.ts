@@ -79,15 +79,13 @@ export type ToolResultInfo = {
   running?: boolean
 }
 
-// Pull a readable `output` string out of a `toolResult` message. The tool
-// result wire shape has drifted across OpenClaw lines (verified live):
-//   - 2026.7.1  — `content: [{ type: 'text', text: 'hello' }]` (flat text)
-//   - 2026.7.2+ — the exec sandbox nests the result as `[{ type: 'text',
-//     text: '<json>' }]` or wraps it in a `{ type: 'toolResult', content: […] }`
-//     block (which rendered as a bare `[toolResult]` placeholder before this).
-// So recurse: text/image blocks resolve directly, any other block that
-// carries its own `content` array or `text`/`output` string is unwrapped one
-// level, and only a truly opaque block falls back to `[type]`.
+// Pull a readable `output` string out of a `toolResult` message. Every row
+// observed on 2026.7.1 is flat — `content: [{ type: 'text', text: 'hello' }]`.
+// The recursion below is for blocks that carry their own `content` array or a
+// `text`/`output` string; it costs nothing and it is the difference between a
+// tool card showing its output and showing a bare `[toolResult]` placeholder,
+// which is what an unrecognized wrapper renders as. Only a truly opaque block
+// falls back to `[type]`.
 export function flattenToolResultContent(content: OpenClawMessage['content'], depth = 0): string {
   if (typeof content === 'string') return content
   if (!Array.isArray(content)) return ''
@@ -161,10 +159,13 @@ function blockToPart(
     }
     case 'thinking':
     case 'reasoning': {
-      // Field drift across OpenClaw lines: 2026.7.1 ships `{ type: 'thinking',
-      // thinking, thinkingSignature }`; newer lines emit `reasoning` and/or
-      // carry the text in `text`. Read whichever is present so the Thought row
-      // never silently vanishes.
+      // The vocabulary in the pinned source is `{ type: 'thinking', thinking,
+      // thinkingSignature }` and that is what every capture carries — no
+      // `reasoning` content block exists in 2026.7.1 or 2026.8.x (the one
+      // `type: "reasoning"` upstream is inside a serialized `thinkingSignature`,
+      // not a block). The extra field names below are unverified tolerance,
+      // kept because a silently vanishing Thought row is worse than a dead
+      // branch; they are not evidence that any line emits them.
       const b = block as {
         thinking?: unknown
         reasoning?: unknown

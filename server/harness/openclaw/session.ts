@@ -125,9 +125,13 @@ type SessionRecord = {
   // durable row that preceded it and the one that follows (see liveTurnSeq).
   lastDurableSeq: number
   liveTurnTick: number
-  // Last model/thinking applied via sessions.patch, in `provider/model` form —
-  // avoids a patch round-trip per send when nothing changed.
-  appliedModel?: string
+  // The model ref we last asked the gateway for (exactly as the picker sends
+  // it), and the `provider/model` the gateway last reported back. They are not
+  // always the same string — a session pinned to a CLI runtime echoes the
+  // runtime as its provider — so they are kept apart and compared differently
+  // (applySessionSettings).
+  requestedModel?: string
+  wireModel?: string
   appliedThinking?: string
   // Last `reasoningLevel` applied. The gateway defaults this to `off`, which
   // suppresses reasoning output entirely on providers that would emit it.
@@ -567,8 +571,8 @@ export function chatPreviewBlocks(content: unknown): PreviewBlock[] {
     if (b.type === 'text' && typeof b.text === 'string' && b.text) {
       blocks.push({ index, kind: 'text', text: b.text })
     } else if (b.type === 'thinking' || b.type === 'reasoning') {
-      // Same field drift as the durable path (adapter.blockToPart): the text
-      // lives in `thinking`, `reasoning`, or `text` depending on the line.
+      // Same unverified tolerance as the durable path (adapter.blockToPart):
+      // every observed block is `{ type: 'thinking', thinking }`.
       const text =
         (typeof b.thinking === 'string' && b.thinking) ||
         (typeof b.reasoning === 'string' && b.reasoning) ||
@@ -583,7 +587,7 @@ export function chatPreviewBlocks(content: unknown): PreviewBlock[] {
 // Two frame families carry the streaming assistant text, and a gateway sends
 // BOTH: `chat` state=delta (cumulative content blocks) and `agent`
 // stream=assistant (cumulative `text`) arrive for the same run, in the same
-// millisecond, on every capture in `fixtures/`. Whichever produces the first
+// millisecond, on every capture taken so far. Whichever produces the first
 // delta claims the run, so the two cumulative snapshots can't race each other
 // into a flicker — and a gateway that happens to send only one of them still
 // streams instead of dumping the whole reply at run end.
@@ -1103,7 +1107,7 @@ async function ensureSubscribed(rec: SessionRecord): Promise<void> {
         | { model?: unknown; modelProvider?: unknown; thinkingLevel?: unknown }
         | undefined
       if (row && typeof row.model === 'string' && typeof row.modelProvider === 'string') {
-        rec.appliedModel = `${row.modelProvider}/${row.model}`
+        rec.wireModel = `${row.modelProvider}/${row.model}`
       }
       if (row && typeof row.thinkingLevel === 'string') rec.appliedThinking = row.thinkingLevel
       // Every row carries the model's resolved thinking menu — the only source
@@ -1300,21 +1304,32 @@ export async function sendOpenClawMessage(input: {
 // `canShowReasoning = thinkingLevel !== 'off'`). Without it a provider that
 // *can* stream thinking never does. It is patched only when the user asked to
 // think, so a session left at `off` keeps the gateway's default behavior.
+// Has anything other than us moved this session's model? Compared tolerantly:
+// a gateway that resolves a model through a CLI runtime reports that runtime as
+// the provider, which names the same model and must not read as drift.
+function wireModelDrifted(rec: SessionRecord): boolean {
+  if (!rec.wireModel || !rec.requestedModel) return false
+  return !openClawModelRefsEquivalent(rec.wireModel, rec.requestedModel)
+}
+
 async function applySessionSettings(
   rec: SessionRecord,
   model: string | undefined,
   effort: string | undefined
 ): Promise<void> {
   const patch: Record<string, unknown> = {}
-  // Patch the model only on a real change. `sessions.patch { model }` is not
-  // free: OpenClaw persists the pick into the agent's effective
-  // `model.primary`, and that config write bumps the agent's prepared-model-
-  // runtime generation, which can supersede a run being admitted right then
-  // (see the `chat.dispatch-error` handling in ensureSubscribed). The cache
-  // holds the ref the WIRE reports, which collapses a claude-cli-routed model
-  // onto its runtime provider — comparing raw strings would miss on every
-  // Claude model and re-patch on every single send.
-  if (model && !(rec.appliedModel && openClawModelRefsEquivalent(model, rec.appliedModel))) {
+  // Patch the model only on a real change — `sessions.patch { model }` writes
+  // agent config, so it is not free.
+  //
+  // Two different questions, and conflating them used to lose a switch: "is
+  // this the ref we last asked for?" is answered by an EXACT compare, because
+  // `anthropic/claude-sonnet-5` and `claude-cli/claude-sonnet-5` are separate
+  // catalog entries a user can pick between and switching must patch. "Has
+  // something moved the session since?" is answered against what the wire
+  // reports, tolerantly — on a config that pins a CLI runtime the row echoes
+  // the runtime as the provider, and treating that as a change would re-patch
+  // on every single send.
+  if (model && (model !== rec.requestedModel || wireModelDrifted(rec))) {
     patch.model = model
   }
   if (effort && effort !== rec.appliedThinking) patch.thinkingLevel = effort
@@ -1340,13 +1355,13 @@ async function applySessionSettings(
       const { thinkingLevel: _dropped, ...rest } = patch
       if (Object.keys(rest).length === 0) return
       await gw.rpc('sessions.patch', { key: rec.sessionKey, ...rest })
-      if (typeof rest.model === 'string') rec.appliedModel = rest.model
+      if (typeof rest.model === 'string') rec.requestedModel = rest.model
       if (typeof rest.reasoningLevel === 'string') rec.appliedReasoning = rest.reasoningLevel
       return
     }
     throw err
   }
-  if (typeof patch.model === 'string') rec.appliedModel = patch.model
+  if (typeof patch.model === 'string') rec.requestedModel = patch.model
   if (typeof patch.thinkingLevel === 'string') rec.appliedThinking = patch.thinkingLevel
   if (typeof patch.reasoningLevel === 'string') rec.appliedReasoning = patch.reasoningLevel
 }
@@ -1374,22 +1389,20 @@ async function sendOpenClawMessageImpl(input: {
       const gw = await getGateway()
       const created = await gw.rpc<{ key?: string; sessionId?: string }>('sessions.create', {
         agentId: input.agentId,
-        // Carry the model IN the create — never as a patch issued just before
+        // Carry the model IN the create rather than patching it just before
         // the send. `sessions.patch { model }` persists the pick into the
-        // agent's effective `model.primary`, and that config write bumps the
-        // prepared-model-runtime generation; a run admitted inside that window
-        // is superseded and dies during admission. Verified on the wire: the
-        // patch resolved and `sessions.send` went out in the SAME millisecond,
-        // `sessions.send` answered `status: 'started'` with a runId, and the
-        // run was dead 2.0s later with `chat.dispatch-error` — which is why the
-        // first message of a new chat failed and the resend always worked.
+        // agent's effective `model.primary`, and on 2026.7.2-beta.x that config
+        // write bumps the prepared-model-runtime generation and supersedes a run
+        // being admitted right then: `sessions.send` answers `status: 'started'`
+        // with a runId and the run is dead 2s later with `chat.dispatch-error`,
+        // so the first message of a new chat fails and the resend works.
         //
-        // Only `model` is safe to pass here: `sessions.create` accepts it on
-        // both supported lines, but `thinkingLevel` exists on the create schema
-        // in 2026.7.x ONLY and both lines validate with
-        // `additionalProperties: false`, so sending it would hard-reject every
-        // new chat on 2026.6.x. Effort stays a patch — it is session-scoped,
-        // writes no config, and so cannot supersede the run.
+        // Re-tested on the pinned 2026.7.1 and the race does NOT reproduce
+        // there. Kept regardless: it is a round-trip fewer, the model belongs to
+        // the session from the start, and it keeps new chats working on the beta
+        // line. Only `model` may ride along — `sessions.create` rejects
+        // `thinkingLevel` (`unexpected property`, verified live), and effort is
+        // session-scoped anyway, so it stays a patch.
         ...(input.model ? { model: input.model } : {})
       })
       if (created?.sessionId && created.sessionId !== input.sessionId) {
@@ -1420,7 +1433,7 @@ async function sendOpenClawMessageImpl(input: {
     // A fresh session has no wire row to seed the cache from (that path only
     // fires once a row reports `modelProvider`/`model`), so this is the only
     // thing standing between the fix and the race coming straight back.
-    if (input.isNew && input.model) rec.appliedModel = input.model
+    if (input.isNew && input.model) rec.requestedModel = input.model
   } catch (err) {
     const message = err instanceof Error ? err.message : 'failed to start session'
     broadcast(input.workspaceId, {

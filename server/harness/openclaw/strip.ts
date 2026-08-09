@@ -5,9 +5,8 @@ import { stripMoiContext } from '@/lib/moi-context'
 // The gateway prepends AI-facing envelopes to every user message before storing
 // it: a leading timestamp (`[Fri 2026-04-24 18:12 GMT+2] `), sentinel JSON
 // blocks like `Sender (untrusted metadata):`, delivery hints for the `message`
-// tool, chat-window context blocks, and (on ≤2026.4.x) a `[Bootstrap pending]`
-// preamble. These are useful for the model but must never surface in chat
-// bubbles.
+// tool, and chat-window context blocks. These are useful for the model but must
+// never surface in chat bubbles.
 //
 // Canonical source: `src/auto-reply/reply/strip-inbound-meta.ts` in the
 // `openclaw` npm package (bundled as `dist/strip-inbound-meta-*.js`; hint
@@ -21,10 +20,13 @@ import { stripMoiContext } from '@/lib/moi-context'
 // the 2026.6.33 copy — identical except the chat-window block pass, which is
 // 2026.7.x-only but harmless on 6.x rows.)
 //
-// The bootstrap-preamble pass is ours — it was injected by the ≤2026.4.x
-// system-prompt builder, not the inbound-meta path, so upstream's stripper
-// deliberately leaves it alone. 2026.6.x+ no longer emits the marker; the pass
-// stays for transcripts written by old gateways and is a no-op otherwise.
+// The bootstrap-preamble pass is ours, and it is the one thing here with no
+// counterpart in the pinned source: a `[Bootstrap pending]` prefix on user text
+// appears nowhere in 2026.7.1 or 2026.8.x (the surviving upstream string is an
+// `introLine` in `system-prompt.ts`, not a bracketed prefix). It is kept for
+// transcripts written by pre-2026.6 installs — a state dir survives upgrades,
+// and moi reads those rows back through a current gateway — and is a cheap
+// no-op for everything else. Delete it if old transcripts stop mattering.
 
 const LEADING_TIMESTAMP_PREFIX_RE = /^\[[A-Za-z]{3} \d{4}-\d{2}-\d{2} \d{2}:\d{2}[^\]]*\] */
 
