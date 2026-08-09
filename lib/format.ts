@@ -115,9 +115,11 @@ export type Turn = {
   parentTaskId?: string
   parts: Part[]
   timestamp?: string
-  // Stable monotonic ordering hint when the source provides one (OpenClaw's
-  // `__openclaw.seq`). Used as a tiebreaker when timestamps collide; the UI
-  // is free to ignore it.
+  // The backend's own transcript position, when it reports one (OpenClaw's
+  // `__openclaw.seq`). `applyEvent` places a new seq-bearing turn by this
+  // value rather than by arrival, so a row that reaches us late still renders
+  // in transcript order. Backends that don't report a position omit it and
+  // keep plain append semantics.
   seq?: number
   meta?: TurnMeta
 }
@@ -251,9 +253,21 @@ export function applyEvent(state: ViewState, ev: StreamEvent): ViewState {
       return { ...state, snapshot: ev.snapshot }
     case 'turn': {
       const idx = state.turns.findIndex(t => t.id === ev.turn.id)
-      const turns =
-        idx >= 0 ? state.turns.map((t, i) => (i === idx ? ev.turn : t)) : [...state.turns, ev.turn]
-      return { ...state, turns }
+      // Known turn: replace in place. Its position was decided when it first
+      // landed and must not move under the reader mid-run.
+      if (idx >= 0) {
+        return { ...state, turns: state.turns.map((t, i) => (i === idx ? ev.turn : t)) }
+      }
+      // New turn: arrival order is the default, but a backend that reports a
+      // transcript position (`seq`) gets placed by it, so a row that arrives
+      // late — reconciled after a dropped frame, or replayed after a
+      // reconnect — lands where the transcript says it belongs instead of at
+      // the end. Only seq-bearing turns are reordered against each other;
+      // turns without one keep pure append semantics.
+      if (ev.turn.seq === undefined) return { ...state, turns: [...state.turns, ev.turn] }
+      const at = state.turns.findIndex(t => t.seq !== undefined && t.seq > ev.turn.seq!)
+      if (at < 0) return { ...state, turns: [...state.turns, ev.turn] }
+      return { ...state, turns: [...state.turns.slice(0, at), ev.turn, ...state.turns.slice(at)] }
     }
     case 'notice': {
       if (state.notices.some(n => n.id === ev.notice.id)) {

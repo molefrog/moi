@@ -1,198 +1,155 @@
-// Live tool cards on the codex-app-server backend (OpenAI models on newer
-// OpenClaw): tools stream as `agent`/tool frames DURING the run, but the
-// durable owner rows arrive only in the run-end batch, after the assistant
-// text has streamed. We render a synthetic "live tool" turn off the frame so
-// the card shows up in order; the durable owner then merges onto it by re-iding
-// to `livetool:<toolCallId>`. Regression guard for the duplicate-card bug: the
-// run-end reconcile re-emits that durable row, and every emit must collapse
-// onto the one live turn instead of dropping a second card.
+// Who owns a tool card.
+//
+// Tool activity reaches us as `session.tool` or as `agent`/tool — the same
+// payload, split by audience rather than by backend (see handleToolFrame). The
+// only question that matters for rendering is whether a durable row owns the
+// call yet:
+//
+//   - it does (the common single-call shape on every provider verified: the
+//     row commits ~4ms BEFORE the start frame) → the row renders the card and
+//     the frames only fill in its state;
+//   - it doesn't (calls fanned out from one row, which streams as text and
+//     grows its `toolCall` blocks silently) → the frame is the only evidence
+//     the call exists, so it gets its own card.
+//
+// Ownership is decided once, when the card is created, and never revisited: a
+// broadcast turn can be upserted but never retracted, so a card that changes
+// identity mid-run is a duplicate on screen forever. `fixtures/` +
+// `wire-replay.test.ts` hold the recorded traffic these rules come from.
 import { describe, expect, test } from 'bun:test'
 
 import type { OpenClawMessage } from './discovery'
-import { createOpenClawSessionForTest, handleToolFrame, ingest } from './session'
+import { createOpenClawSessionForTest, handleToolFrame, ingest, reconcileForTest } from './session'
 
 const SESSION_KEY = 'agent:live-tools:main'
 const TOOL_ID = 'exec-c5dfffcc'
 
-// A codex-backed record: synthesis is gated on `codexBackend`, which the live
-// subscription sets when it sees a `codex_app_server.*` frame.
 function newRec() {
-  const rec = createOpenClawSessionForTest({
+  return createOpenClawSessionForTest({
     workspaceId: 'ws-live-tools',
     sessionId: `s-${Math.random().toString(36).slice(2)}`,
     sessionKey: SESSION_KEY
   })
-  rec.codexBackend = true
-  return rec
 }
 
-// Durable assistant toolCall row as the run-end batch delivers it: content
-// carries the toolCall block whose `id` matches the frame's `toolCallId`.
-function durableToolRow(command: string): OpenClawMessage {
+// The durable assistant row that owns TOOL_ID.
+function durableToolRow(command: string, extra: OpenClawMessage['content'] = []): OpenClawMessage {
   return {
     role: 'assistant',
-    content: [{ type: 'toolCall', id: TOOL_ID, name: 'exec', arguments: { command } }],
+    content: [
+      ...(extra as object[]),
+      { type: 'toolCall', id: TOOL_ID, name: 'exec', arguments: { command } }
+    ],
     timestamp: 1785861026066,
     __openclaw: { id: 'd303c332', seq: 10 }
   } as unknown as OpenClawMessage
 }
 
-function toolTurns(rec: ReturnType<typeof newRec>) {
-  return rec.view.turns.filter(t =>
-    t.parts.some(p => p.type === 'tool-call' && p.call.toolCallId === TOOL_ID)
+function startFrame(id = TOOL_ID, command = 'echo red') {
+  return { data: { phase: 'start', toolCallId: id, name: 'exec', args: { command } } }
+}
+
+function resultFrame(id = TOOL_ID, text = 'red') {
+  return {
+    data: { phase: 'result', toolCallId: id, result: { content: [{ type: 'text', text }] } }
+  }
+}
+
+function cards(rec: ReturnType<typeof newRec>) {
+  return rec.view.turns.flatMap(t =>
+    t.parts.flatMap(p => (p.type === 'tool-call' ? [{ turnId: t.id, call: p.call }] : []))
   )
 }
 
-describe('live tool card → durable owner rendezvous', () => {
-  test('an agent/tool frame renders a card before any durable row exists', () => {
+describe('a durable row already owns the call', () => {
+  test('the row renders the only card and the frames fill it in', () => {
     const rec = newRec()
-    handleToolFrame(rec, {
-      data: { phase: 'start', toolCallId: TOOL_ID, name: 'exec', args: { command: 'echo red' } }
-    })
-    const turns = toolTurns(rec)
-    expect(turns).toHaveLength(1)
-    const part = turns[0].parts.find(p => p.type === 'tool-call')
-    if (part?.type !== 'tool-call') throw new Error('expected a tool-call part')
-    expect(part.call).toMatchObject({
+    ingest(rec, durableToolRow('echo red'))
+    handleToolFrame(rec, startFrame())
+    handleToolFrame(rec, resultFrame())
+
+    const found = cards(rec)
+    expect(found).toHaveLength(1)
+    expect(found[0].turnId).toBe(`openclaw:${SESSION_KEY}:d303c332`)
+    expect(found[0].call).toMatchObject({ name: 'exec', state: 'success', output: 'red' })
+  })
+
+  test('re-emitting the row (reconcile) keeps it at one card', () => {
+    const rec = newRec()
+    ingest(rec, durableToolRow('echo red'))
+    handleToolFrame(rec, startFrame())
+    handleToolFrame(rec, resultFrame())
+    reconcileForTest(rec, [durableToolRow('echo red')])
+
+    expect(cards(rec)).toHaveLength(1)
+  })
+})
+
+describe('no durable row owns the call yet', () => {
+  test('the start frame renders a card of its own', () => {
+    const rec = newRec()
+    handleToolFrame(rec, startFrame())
+
+    const found = cards(rec)
+    expect(found).toHaveLength(1)
+    expect(found[0].turnId).toBe(`openclaw:${SESSION_KEY}:livetool:${TOOL_ID}`)
+    expect(found[0].call).toMatchObject({
       name: 'exec',
       state: 'running',
       input: { command: 'echo red' }
     })
-    // The card is the run-scoped live turn, not a durable-row id.
-    expect(turns[0].id).toBe(`openclaw:${SESSION_KEY}:livetool:${TOOL_ID}`)
   })
 
-  test('the result frame flips the live card to success with output folded in', () => {
+  test('the result frame flips that card to success with its output', () => {
     const rec = newRec()
-    handleToolFrame(rec, {
-      data: { phase: 'start', toolCallId: TOOL_ID, name: 'exec', args: { command: 'echo red' } }
-    })
-    handleToolFrame(rec, {
-      data: {
-        phase: 'result',
-        toolCallId: TOOL_ID,
-        result: { content: [{ type: 'text', text: 'red' }] }
-      }
-    })
-    const turns = toolTurns(rec)
-    expect(turns).toHaveLength(1)
-    const part = turns[0].parts.find(p => p.type === 'tool-call')
-    if (part?.type !== 'tool-call') throw new Error('expected a tool-call part')
-    expect(part.call).toMatchObject({ state: 'success', output: 'red' })
+    handleToolFrame(rec, startFrame())
+    handleToolFrame(rec, resultFrame())
+
+    const found = cards(rec)
+    expect(found).toHaveLength(1)
+    expect(found[0].call).toMatchObject({ state: 'success', output: 'red' })
   })
 
-  test('the durable owner merges onto the live card, and a reconcile re-emit stays one turn', () => {
+  test('a row that later grows the same toolCall block does not render it again', () => {
     const rec = newRec()
-    // Live frames during the run.
-    handleToolFrame(rec, {
-      data: { phase: 'start', toolCallId: TOOL_ID, name: 'exec', args: { command: 'echo red' } }
-    })
-    handleToolFrame(rec, {
-      data: {
-        phase: 'result',
-        toolCallId: TOOL_ID,
-        result: { content: [{ type: 'text', text: 'red' }] }
-      }
-    })
-    expect(toolTurns(rec)).toHaveLength(1)
-
-    // Run-end batch: the durable owner row lands — it must re-id onto the live
-    // turn, not add a second card.
-    ingest(rec, durableToolRow('echo red'))
-    let turns = toolTurns(rec)
-    expect(turns).toHaveLength(1)
-    expect(turns[0].id).toBe(`openclaw:${SESSION_KEY}:livetool:${TOOL_ID}`)
-    const part = turns[0].parts.find(p => p.type === 'tool-call')
-    if (part?.type !== 'tool-call') throw new Error('expected a tool-call part')
-    expect(part.call).toMatchObject({ state: 'success', output: 'red' })
-
-    // reconcileAfterRun re-emits the same durable row. The bug deleted the
-    // liveTools mapping on first merge, so this second emit kept its own id and
-    // duplicated the card. Keeping the mapping means it collapses again.
-    ingest(rec, durableToolRow('echo red'))
-    turns = toolTurns(rec)
-    expect(turns).toHaveLength(1)
-    expect(turns[0].id).toBe(`openclaw:${SESSION_KEY}:livetool:${TOOL_ID}`)
-  })
-
-  test('two tool calls in one run each land as exactly one card', () => {
-    const rec = newRec()
-    const ids = ['exec-aaa', 'exec-bbb']
-    for (const [i, id] of ids.entries()) {
-      handleToolFrame(rec, {
-        data: { phase: 'start', toolCallId: id, name: 'exec', args: { command: `echo ${i}` } }
-      })
-      handleToolFrame(rec, {
-        data: {
-          phase: 'result',
-          toolCallId: id,
-          result: { content: [{ type: 'text', text: String(i) }] }
-        }
-      })
-    }
-    // Durable owners arrive as two separate rows in the run-end batch.
-    for (const [i, id] of ids.entries()) {
-      ingest(rec, {
-        role: 'assistant',
-        content: [{ type: 'toolCall', id, name: 'exec', arguments: { command: `echo ${i}` } }],
-        timestamp: 1785861026066 + i,
-        __openclaw: { id: `dur-${id}`, seq: 10 + i }
-      } as unknown as OpenClawMessage)
-    }
-    const cards = rec.view.turns.filter(t => t.parts.some(p => p.type === 'tool-call'))
-    expect(cards).toHaveLength(2)
-    expect(cards.map(t => t.id).sort()).toEqual(
-      ids.map(id => `openclaw:${SESSION_KEY}:livetool:${id}`).sort()
-    )
-  })
-})
-
-describe('native backend (no codex signal) — no synthesis, no duplicates', () => {
-  // Regression for the ollama/deepseek duplicate-card bug: a native-loop
-  // provider whose start-frame toolCallId does NOT match the durable row's id.
-  // Without a `codex_app_server.*` frame, codexBackend stays false, so no live
-  // card is synthesized — the tool renders once, from the durable row.
-  function nativeRec() {
-    return createOpenClawSessionForTest({
-      workspaceId: 'ws-native',
-      sessionId: `n-${Math.random().toString(36).slice(2)}`,
-      sessionKey: SESSION_KEY
-    })
-  }
-
-  test('a tool frame with no codex signal synthesizes no live card', () => {
-    const rec = nativeRec()
-    handleToolFrame(rec, {
-      data: { phase: 'start', toolCallId: 'call_live', name: 'exec', args: { command: 'ls -la' } }
-    })
-    handleToolFrame(rec, {
-      data: {
-        phase: 'result',
-        toolCallId: 'call_live',
-        result: { content: [{ type: 'text', text: 'ok' }] }
-      }
-    })
-    expect(rec.view.turns).toHaveLength(0)
-  })
-
-  test('mismatched start-frame id and durable id still yield exactly one card', () => {
-    const rec = nativeRec()
-    // Live frames use a provisional id…
-    handleToolFrame(rec, {
-      data: { phase: 'start', toolCallId: 'call_live', name: 'exec', args: { command: 'ls -la' } }
-    })
-    // …while the durable row commits under a different, final id.
+    handleToolFrame(rec, startFrame())
+    handleToolFrame(rec, resultFrame())
+    // The row streamed as text first; the reconcile sees it with the block.
     ingest(rec, {
       role: 'assistant',
-      content: [
-        { type: 'toolCall', id: 'toolu_final', name: 'exec', arguments: { command: 'ls -la' } }
-      ],
-      timestamp: 1785861026066,
-      __openclaw: { id: 'dur-1', seq: 10 }
+      content: [{ type: 'text', text: "I'll run that." }],
+      timestamp: 1785861026000,
+      __openclaw: { id: 'd303c332', seq: 10 }
     } as unknown as OpenClawMessage)
-    const cards = rec.view.turns.filter(t => t.parts.some(p => p.type === 'tool-call'))
-    expect(cards).toHaveLength(1)
-    // The single card is the durable row, not a stranded `livetool:` turn.
-    expect(cards[0].id).toBe(`openclaw:${SESSION_KEY}:dur-1`)
+    reconcileForTest(rec, [durableToolRow('echo red', [{ type: 'text', text: "I'll run that." }])])
+
+    const found = cards(rec)
+    expect(found).toHaveLength(1)
+    expect(found[0].turnId).toBe(`openclaw:${SESSION_KEY}:livetool:${TOOL_ID}`)
+    // The row still renders its text, just not a second copy of the call.
+    expect(rec.view.turns.some(t => t.parts.some(p => p.type === 'text'))).toBe(true)
+  })
+
+  test('calls fanned out from one row each land as exactly one card, in order', () => {
+    const rec = newRec()
+    const ids = ['exec-aaa', 'exec-bbb', 'exec-ccc']
+    for (const id of ids) handleToolFrame(rec, startFrame(id, `echo ${id}`))
+    for (const id of ids) handleToolFrame(rec, resultFrame(id, id))
+
+    const found = cards(rec)
+    expect(found).toHaveLength(3)
+    expect(found.map(c => c.call.toolCallId)).toEqual(ids)
+    expect(found.every(c => c.call.state === 'success')).toBe(true)
+  })
+
+  test('a card still running when the run ends is finalized, not left spinning', () => {
+    const rec = newRec()
+    handleToolFrame(rec, startFrame())
+    expect(cards(rec)[0].call.state).toBe('running')
+
+    // The result frame never arrives — a dropped frame, or a runtime that
+    // persists no tool rows at all. The run-end reconcile has to end it.
+    reconcileForTest(rec, [])
+    expect(cards(rec)[0].call.state).toBe('success')
   })
 })

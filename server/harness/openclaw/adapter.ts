@@ -146,7 +146,8 @@ function collectToolResults(messages: OpenClawMessage[]): Map<string, ToolResult
 function blockToPart(
   block: OpenClawContentBlock,
   role: OpenClawMessage['role'],
-  results: Map<string, ToolResultInfo>
+  results: Map<string, ToolResultInfo>,
+  omitToolCallIds?: ReadonlySet<string>
 ): Part | null {
   switch (block.type) {
     case 'text': {
@@ -191,6 +192,11 @@ function blockToPart(
       const id = (block as { id?: unknown }).id
       const name = (block as { name?: unknown }).name
       if (typeof id !== 'string' || typeof name !== 'string') return null
+      // This call is already on screen as its own live card (the live session
+      // rendered it before this row carried the block). Rendering it here too
+      // would show the same call twice, and a broadcast card can't be
+      // retracted — so the live card keeps ownership for the session's life.
+      if (omitToolCallIds?.has(id)) return null
       const result = results.get(id)
       let state: ToolState = 'pending'
       if (result) state = result.running ? 'running' : result.isError ? 'error' : 'success'
@@ -243,7 +249,8 @@ export function messageToTurn(
   msg: OpenClawMessage,
   sessionKey: string,
   idx: number,
-  results: Map<string, ToolResultInfo>
+  results: Map<string, ToolResultInfo>,
+  omitToolCallIds?: ReadonlySet<string>
 ): Turn | null {
   if (msg.role !== 'user' && msg.role !== 'assistant') return null
   const blocks: OpenClawContentBlock[] = Array.isArray(msg.content)
@@ -252,7 +259,7 @@ export function messageToTurn(
       ? [{ type: 'text', text: msg.content }]
       : []
   const parts = blocks
-    .map(b => blockToPart(b, msg.role, results))
+    .map(b => blockToPart(b, msg.role, results, omitToolCallIds))
     .filter((p): p is Part => p !== null)
   if (parts.length === 0) return null
   const ocId = msg.__openclaw?.id

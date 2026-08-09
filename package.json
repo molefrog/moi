@@ -39,6 +39,7 @@
     "!**/*.test.ts",
     "!**/*.test.tsx",
     "!server/test",
+    "!server/harness/*/fixtures",
     "!workspace/.env",
     "!workspace/.claude/settings.local.json",
     "!workspace/.moi"

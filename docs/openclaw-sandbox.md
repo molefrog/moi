@@ -60,6 +60,17 @@ default model is resolved at startup.
 `openclaw models auth login --provider <p>` is the interactive OAuth
 alternative; in a headless sandbox an API key is simpler.
 
+Provider ids come from `openclaw models list --all | awk '{print $1}' | cut -d/ -f1 | sort -u`
+— they are not always what you'd guess (Ollama's cloud models sit under
+`ollama-cloud`, not `ollama`). Two providers are enough to cover the
+interesting differences: one that streams reasoning text and one that doesn't.
+
+`claude-cli/*` models shell out to the `claude` binary, which refuses
+`--dangerously-skip-permissions` when running as root — so those runs fail in
+this sandbox with `chain_exhausted` no matter how the model is authenticated.
+That failure is still useful: it is how the run-error reporting path was
+verified.
+
 ## Gotchas
 
 - Restart the gateway after any `openclaw config` write — config is read at
@@ -73,6 +84,34 @@ alternative; in a headless sandbox an API key is simpler.
 - `registry.npmjs.org`, `nodejs.org`, and `api.anthropic.com` are all
   reachable through the egress relay; `github.com` browsing is not (git goes
   through the git proxy).
+
+## Recording wire fixtures
+
+`scripts/openclaw-capture.ts` records one chat turn off the running gateway in
+the format `server/harness/openclaw/wire-replay.test.ts` replays. Use it before
+changing how frames are interpreted — the recorded traffic is what caught the
+duplicate-tool-card bug that a hand-written unit test had been asserting was
+correct behavior.
+
+```sh
+bun scripts/openclaw-capture.ts ollama-cloud/glm-5.2:cloud \
+  "Run 'echo hi' and say what it printed." \
+  server/harness/openclaw/fixtures/ollama-single-tool.jsonl
+
+# the same run seen by a connection that subscribes but does not send —
+# that audience gets `session.tool` where the sender gets `agent`/tool
+bun scripts/openclaw-capture.ts ollama-cloud/glm-5.2:cloud "…" \
+  server/harness/openclaw/fixtures/ollama-observed-tool.jsonl --observe
+```
+
+It connects with the harness's own options (`gatewayClientBaseOptions`), so
+`caps: ['tool-events']` is advertised — without it the gateway sends no tool
+frames at all and the capture looks like a backend that has none.
+
+Prompts worth capturing: one tool call (the owner row and the tool frame race,
+~4ms apart), several calls fanned out of one row (the owner row streams as text
+and grows its blocks silently), and a run that fails (the reason arrives on
+three different frames).
 
 ## Multi-version test rig
 

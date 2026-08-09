@@ -107,26 +107,24 @@ type SessionRecord = {
   // per-run and cleared when the run terminalizes.
   previewReasoning?: { runId: string; text: string }
   previewTextBlocks?: { runId: string; blocks: PreviewBlock[] }
-  // True once we've seen a `codex_app_server.*` frame on this session — the
-  // positive signal (only the codex backend emits it, and it precedes the
-  // run's tool frames) that gates live tool synthesis below. Native-loop
-  // providers (Anthropic, ollama, …) never set it, so they keep the plain
-  // durable-row rendering and never grow orphan live cards.
-  codexBackend?: boolean
-  // Live tool cards rendered from `agent/tool` frames before the durable owner
-  // row exists — ONLY on the codex-app-server backend, which batches durable
-  // rows at run end so tools would otherwise appear all at once after the text.
-  // Keyed by toolCallId → the tool name + input captured off the start frame;
-  // the matching durable row merges into the live turn by re-iding to
-  // `livetool:<toolCallId>` (see emitTurn). Populated only when `codexBackend`,
-  // so on other backends it stays empty and neither synthesis nor merge fires
-  // (their start/result/durable toolCallIds don't always correlate, which would
-  // strand the live card as a duplicate — and broadcast turns can't be retracted).
-  liveTools: Map<string, { name: string; input: unknown }>
-  // Live reasoning spans from the codex app-server's `analysis`/`Reasoning`
-  // item frames, keyed by itemId. Timing only — that backend never sends the
-  // reasoning text (see handleReasoningItemFrame).
-  liveThinking: Map<string, { startedAt: number; endedAt?: number }>
+  // Tool calls we render as their own turn because no durable row owned them
+  // when the tool started. Keyed by toolCallId → the name/input from the start
+  // frame plus the `seq` that places the card in the transcript. The entry is
+  // permanent for the session: once a call is on screen as a live card, every
+  // durable row suppresses that id (adapter `omitToolCallIds`), so a row that
+  // later grows the matching `toolCall` block can't render the same call twice.
+  // A broadcast turn can never be retracted, so ownership has to be decided
+  // once — at the moment the card is created — and then respected.
+  liveTools: Map<string, { name: string; input: unknown; seq: number }>
+  // Live reasoning spans from `agent`/item frames of kind `analysis`, keyed by
+  // itemId. Timing only — those frames carry no reasoning text (see
+  // handleReasoningItemFrame).
+  liveThinking: Map<string, { startedAt: number; endedAt?: number; seq?: number }>
+  // Highest `__openclaw.seq` ingested, and a monotonic tick for the synthetic
+  // turns that hang off it. Together they place a live card between the
+  // durable row that preceded it and the one that follows (see liveTurnSeq).
+  lastDurableSeq: number
+  liveTurnTick: number
   // Last model/thinking applied via sessions.patch, in `provider/model` form —
   // avoids a patch round-trip per send when nothing changed.
   appliedModel?: string
@@ -145,6 +143,10 @@ type SessionRecord = {
   // In-flight reconcile, so the two run-end signals (sessions.changed + agent
   // lifecycle) coalesce onto one transcript fetch instead of racing two.
   reconcilePromise?: Promise<void>
+  // The run whose failure we already told the user about. A dying run reports
+  // itself on several frames with several wordings; the first with text wins
+  // and the rest are echoes (see reportRunError).
+  reportedErrorRunId?: string
 }
 
 const MAX_PENDING_USER_ECHOES = 16
@@ -339,8 +341,20 @@ function reconcileAfterRun(rec: SessionRecord): Promise<void> {
 async function reconcileAfterRunImpl(rec: SessionRecord): Promise<void> {
   const detail = await getOpenClawSessionMessages(rec.sessionId, rec.workspacePath, rec.agentId)
   if (!detail?.messages) return
+  mergeTranscript(rec, detail.messages)
+}
+
+// Test seam: the merge half of the reconcile, against a transcript the caller
+// supplies instead of one fetched over the gateway.
+export function reconcileForTest(rec: SessionRecord, messages: OpenClawMessage[]): void {
+  mergeTranscript(rec, messages)
+}
+
+// Fold a canonical transcript into the live view: adopt rows we're missing or
+// behind on, refresh tool results, and end any live card the run left running.
+function mergeTranscript(rec: SessionRecord, messages: OpenClawMessage[]): void {
   const owners = new Set<OpenClawMessage>()
-  for (const msg of detail.messages) {
+  for (const msg of messages) {
     const result = toolResultFromMessage(msg)
     if (result) {
       const existing = rec.results.get(result.id)
@@ -363,10 +377,26 @@ async function reconcileAfterRunImpl(rec: SessionRecord): Promise<void> {
     if (msg.role !== 'user' && msg.role !== 'assistant') continue
     const id = msg.__openclaw?.id
     if (typeof id !== 'string') continue
-    if (!rec.messagesById.has(id)) {
+    // Adopt rows we never saw AND rows whose content grew after they streamed.
+    // Both happen on the live wire: a row that fans out several tool calls is
+    // pushed as text and gains its `toolCall` blocks silently afterwards, so a
+    // has-the-id check alone leaves the view permanently behind the transcript.
+    const known = rec.messagesById.get(id)
+    if (!known || !sameContent(known, msg)) {
       rec.messagesById.set(id, msg)
+      rememberSeq(rec, msg)
       owners.add(msg)
     }
+  }
+  // A live card whose result frame never arrived would otherwise spin for the
+  // rest of the session: the run is over, so nothing more is coming. Some
+  // runtimes never persist tool rows at all, so the transcript can't answer
+  // for these — end them here rather than leaving a permanent spinner.
+  for (const toolCallId of rec.liveTools.keys()) {
+    const result = rec.results.get(toolCallId)
+    if (!result?.running) continue
+    rec.results.set(toolCallId, { ...result, running: false })
+    emitLiveToolTurn(rec, toolCallId)
   }
   if (owners.size === 0) return
   let idx = 0
@@ -374,6 +404,13 @@ async function reconcileAfterRunImpl(rec: SessionRecord): Promise<void> {
     if (owners.has(m)) emitTurn(rec, m, idx)
     idx++
   }
+}
+
+// Do two versions of the same durable row carry the same content? Structural
+// compare on the blocks only — the fields around them (usage, stopReason) can
+// be filled in later without changing what the turn renders.
+function sameContent(a: OpenClawMessage, b: OpenClawMessage): boolean {
+  return JSON.stringify(a.content) === JSON.stringify(b.content)
 }
 
 // Re-derive the view from the current messages + results map. Cheaper than
@@ -409,7 +446,7 @@ function rebuildView(rec: SessionRecord): void {
         prevModel = model
       }
     }
-    const turn = messageToTurn(msg, rec.sessionKey, i++, rec.results)
+    const turn = messageToTurn(msg, rec.sessionKey, i++, rec.results, liveToolIds(rec))
     if (turn) view = applyEvent(view, { kind: 'turn', turn })
   }
   // Compaction notices have no durable twin in `sessions.get` — they exist
@@ -437,8 +474,23 @@ export function normalizeEchoText(text: string | undefined): string {
   return stripMoiContext(text).replace(/\s+/g, ' ').trim()
 }
 
+// Synthetic turns (live tool cards, live thinking spans) have no transcript
+// row, so they get a fractional position just past the last durable row we
+// ingested. That keeps them after the text that introduced them and before
+// whatever the backend commits next, without ever colliding with a real seq.
+function liveTurnSeq(rec: SessionRecord): number {
+  rec.liveTurnTick += 1
+  return rec.lastDurableSeq + rec.liveTurnTick / 1000
+}
+
+// Tool calls owned by a live card, for the adapter to leave out of durable
+// rows. `undefined` when there are none, so the common path allocates nothing.
+function liveToolIds(rec: SessionRecord): ReadonlySet<string> | undefined {
+  return rec.liveTools.size > 0 ? new Set(rec.liveTools.keys()) : undefined
+}
+
 function emitTurn(rec: SessionRecord, msg: OpenClawMessage, idx: number): void {
-  const turn = messageToTurn(msg, rec.sessionKey, idx, rec.results)
+  const turn = messageToTurn(msg, rec.sessionKey, idx, rec.results, liveToolIds(rec))
   if (!turn) return
   // Optimistic-id rendezvous: prefer the exact idempotency-key match
   // (`<runId>:user`; nested under `__openclaw` on 2026.7.x, message-level on
@@ -468,20 +520,6 @@ function emitTurn(rec: SessionRecord, msg: OpenClawMessage, idx: number): void {
     if (at >= 0) {
       turn.id = rec.pendingUserEchoes[at].optimisticId
       rec.pendingUserEchoes.splice(at, 1)
-    }
-  }
-  // Live-tool rendezvous: a durable assistant row carrying a toolCall we
-  // already rendered as a live tool turn re-ids to that live turn so the card
-  // upserts in place (the codex-app-server backend delivers the durable owner
-  // only in the run-end batch, after the live card is already on screen).
-  if (turn.role === 'assistant' && rec.liveTools.size > 0) {
-    const toolPart = turn.parts.find(p => p.type === 'tool-call')
-    const toolCallId = toolPart?.type === 'tool-call' ? toolPart.call.toolCallId : undefined
-    // Keep the mapping (don't delete): the run-end reconcile re-emits the same
-    // durable row, and it must re-id to the SAME live turn every time or it
-    // lands as a second card.
-    if (toolCallId && rec.liveTools.has(toolCallId)) {
-      turn.id = liveToolTurnId(rec.sessionKey, toolCallId)
     }
   }
   // Stamp the run's preview slot id so the client clears the streaming
@@ -636,10 +674,28 @@ function handleAgentStreamFrame(rec: SessionRecord, payload: Record<string, unkn
   emitMergedPreview(rec, runId, previewMessageId(rec.sessionKey, runId))
 }
 
+// A run that dies mid-flight says why, and the user is the one who can act on
+// it ("--dangerously-skip-permissions cannot be used with root/sudo
+// privileges", "model not allowed: …"). The reason rides on three frames —
+// `chat` state=error (`errorMessage`), `agent`/lifecycle phase=error
+// (`data.error`), and a bare `sessions.changed phase=error` — so report the
+// first one that carries text and ignore the rest of that run's echoes.
+// Without this the chat just stops: spinner off, nothing said.
+export function reportRunError(rec: SessionRecord, runId: string, message: unknown): void {
+  if (rec.reportedErrorRunId === runId) return
+  const text = typeof message === 'string' ? message.trim() : ''
+  if (!text) return
+  rec.reportedErrorRunId = runId
+  broadcast(rec.workspaceId, { kind: 'error', sessionId: rec.sessionId, content: text })
+}
+
 function handleChatFrame(rec: SessionRecord, payload: Record<string, unknown>): void {
-  if (!rec.streamEnabled) return
   const runId = typeof payload.runId === 'string' ? payload.runId : rec.activeRunId
   if (!runId) return
+  // Errors are reported whether or not the client asked for token streaming —
+  // the toggle governs previews, not whether failures are visible.
+  if (payload.state === 'error') reportRunError(rec, runId, payload.errorMessage)
+  if (!rec.streamEnabled) return
   const messageId = previewMessageId(rec.sessionKey, runId)
   const state = payload.state
   if (state === 'delta') {
@@ -661,8 +717,8 @@ function handleChatFrame(rec: SessionRecord, payload: Record<string, unknown>): 
   }
 }
 
-// The id of the run-scoped live tool turn for a toolCallId. The durable owner
-// row re-ids to this so the live card upserts in place instead of duplicating.
+// The id of the live tool turn for a toolCallId. Stable for the session, so
+// every later frame for that call upserts the same card.
 function liveToolTurnId(sessionKey: string, toolCallId: string): string {
   return `openclaw:${sessionKey}:livetool:${toolCallId}`
 }
@@ -692,7 +748,8 @@ function emitLiveToolTurn(rec: SessionRecord, toolCallId: string): void {
     id: liveToolTurnId(rec.sessionKey, toolCallId),
     role: 'assistant',
     origin: { kind: 'user-input' },
-    parts: [{ type: 'tool-call', call }]
+    parts: [{ type: 'tool-call', call }],
+    seq: meta.seq
   }
   rec.view = applyEvent(rec.view, { kind: 'turn', turn })
   broadcast(rec.workspaceId, { kind: 'turn', turn, sessionId: rec.sessionId })
@@ -773,6 +830,9 @@ function emitLiveThinkingTurn(rec: SessionRecord, itemId: string): void {
     id: liveThinkingTurnId(rec.sessionKey, itemId),
     role: 'assistant',
     origin: { kind: 'user-input' },
+    // Placed once, on the `start` frame — the `end` frame upserts the same
+    // turn, so the row must not hop to a new position when it finishes.
+    seq: (span.seq ??= liveTurnSeq(rec)),
     parts: [
       {
         type: 'reasoning',
@@ -786,17 +846,22 @@ function emitLiveThinkingTurn(rec: SessionRecord, itemId: string): void {
   broadcast(rec.workspaceId, { kind: 'turn', turn, sessionId: rec.sessionId })
 }
 
-// `session.tool` and `agent`/tool frames flip tool cards live: start/update →
-// running, result → success/error with output. When the durable owner row
-// already exists we re-emit it; otherwise (codex-app-server batches durable
-// rows at run end) we render a live tool turn so tools appear during the run,
-// before the streaming text — not all at once after it. `reconcileAfterRun`
-// stays as the safety net. Exported for tests.
-export function handleToolFrame(
-  rec: SessionRecord,
-  payload: Record<string, unknown>,
-  opts?: { fromAgentStream?: boolean }
-): void {
+// Live tool state. `session.tool` and `agent`/tool carry the SAME payload to
+// disjoint audiences — the gateway sends `agent`/tool to connections
+// registered as run-scoped tool recipients (the connection that issued
+// `sessions.send`) and mirrors it as `session.tool` to every other session
+// subscriber (`server-chat.ts`: `excludeConnIds(sessionEventSubscribers,
+// runToolRecipients)`). moi sees `agent`/tool for runs it starts and
+// `session.tool` for runs started elsewhere — a channel message, cron, the
+// Control UI, or any run already in flight when we attached. Same data, so
+// one handler.
+//
+// start/update → running, result → success/error with output. If a durable row
+// already owns the call we just re-emit it; if none does, we render the call as
+// its own turn so it appears while it runs, and that card keeps ownership for
+// good (see `liveTools`). `reconcileAfterRun` stays the safety net.
+// Exported for tests.
+export function handleToolFrame(rec: SessionRecord, payload: Record<string, unknown>): void {
   const data = payload.data as
     | {
         phase?: unknown
@@ -812,29 +877,31 @@ export function handleToolFrame(
   const name = typeof data.name === 'string' ? data.name : undefined
   const toolName = name ? { toolName: name } : {}
   if (data.phase === 'start' || data.phase === 'update') {
-    // Synthetic live cards are for backends that don't commit durable tool
-    // rows during the run — exactly the ones that report tools on the `agent`
-    // /tool stream (codex, and claude-cli). Backends that use `session.tool`
-    // (Anthropic native loop, ollama) already have durable rows arriving live,
-    // and synthesizing there stranded a duplicate card that can never be
-    // retracted — hence the stream, not the model, is the signal.
+    // Does a durable row already own this call? If so it renders the card and
+    // nothing synthetic is needed. If not, this frame is the only evidence the
+    // call exists, so give it its own turn.
     //
-    // claude-cli is the harder case: its tool calls are never persisted AT ALL
-    // (verified live — the run's durable transcript is user + assistant[text],
-    // with no toolCall/toolResult row ever committing), so without this the
-    // chat just sits frozen for the whole tool call. These cards are therefore
-    // live-only by nature and drop on a cold re-seed, same as the codex ones.
-    if ((rec.codexBackend || opts?.fromAgentStream) && name && !rec.liveTools.has(id)) {
-      rec.liveTools.set(id, { name, input: data.args })
+    // Which case applies is a property of the RUN, not of the backend: on both
+    // providers verified live (2026.7.1, ollama-cloud and openai) a single tool
+    // call commits its durable owner row ~4ms BEFORE the start frame, while a
+    // row that fans out several calls at once streams as text first and grows
+    // its `toolCall` blocks silently afterwards — those calls never arrive on
+    // `session.message` at all. Asking the messages map is exact and needs no
+    // guess about which backend is on the other end.
+    if (
+      name &&
+      !rec.liveTools.has(id) &&
+      findToolCallOwners(rec.messagesById.values(), id).length === 0
+    ) {
+      rec.liveTools.set(id, { name, input: data.args, seq: liveTurnSeq(rec) })
     }
     const existing = rec.results.get(id)
     if (existing && !existing.running) return // final result already landed
     rec.results.set(id, { output: '', isError: false, running: true, ...toolName })
   } else if (data.phase === 'result') {
-    // Two result shapes on the wire: `session.tool` and codex send
-    // `{ content: [...] }`, claude-cli sends `result` as a bare string. Reading
-    // `.content` off a string yields undefined, which rendered every claude-cli
-    // tool card with an empty body.
+    // Two result shapes on the wire: `{ content: [...] }` from the exec-style
+    // tools, and a bare string from CLI-backed runtimes. Reading `.content` off
+    // a string yields undefined, which rendered those cards with an empty body.
     const raw = data.result
     const content =
       typeof raw === 'string' ? raw : ((raw as { content?: unknown } | undefined)?.content ?? '')
@@ -939,6 +1006,7 @@ export function ingest(rec: SessionRecord, msg: OpenClawMessage): void {
     }
   }
   rec.messagesById.set(id, msg)
+  rememberSeq(rec, msg)
   // Compute idx as insertion order — for an update use the existing position,
   // for a new message it's the last slot.
   let idx = 0
@@ -947,6 +1015,13 @@ export function ingest(rec: SessionRecord, msg: OpenClawMessage): void {
     idx++
   }
   emitTurn(rec, msg, idx)
+}
+
+// Track the furthest transcript position we've ingested, so synthetic turns
+// can be placed just past it (liveTurnSeq).
+function rememberSeq(rec: SessionRecord, msg: OpenClawMessage): void {
+  const seq = msg.__openclaw?.seq
+  if (typeof seq === 'number' && seq > rec.lastDurableSeq) rec.lastDurableSeq = seq
 }
 
 async function seed(rec: SessionRecord): Promise<void> {
@@ -967,6 +1042,7 @@ async function seed(rec: SessionRecord): Promise<void> {
       const id = msg.__openclaw?.id
       if (typeof id !== 'string') continue
       rec.messagesById.set(id, msg)
+      rememberSeq(rec, msg)
     }
     rebuildView(rec)
   }
@@ -1051,36 +1127,24 @@ async function ensureSubscribed(rec: SessionRecord): Promise<void> {
     } else if (event === 'agent') {
       if (payload.sessionKey !== rec.sessionKey) return
       const stream = payload.stream as string | undefined
-      // `codex*` frames (`codex_app_server.lifecycle|item|hook|usage`, and any
-      // future `codex.*` rename) are emitted only by the codex backend and
-      // precede its tool frames within a run — the positive signal that live
-      // tool synthesis is warranted for this session (see handleToolFrame). No
-      // native stream name starts with `codex`, so this never false-positives.
-      if (typeof stream === 'string' && stream.startsWith('codex')) {
-        rec.codexBackend = true
-        return
-      }
       // Streaming text/reasoning fallback for gateways that don't emit `chat`
       // delta frames (handleAgentStreamFrame no-ops when `chat` already owns
       // the run's TEXT; reasoning is merged in alongside it). `thinking` is a
-      // second wire name for the reasoning stream — text-bearing on the
-      // `openai-codex` responses transport, text-free (`{ progressTokens }`)
-      // on claude-cli.
+      // second wire name for the reasoning stream — text-bearing on some
+      // runtimes, a bare `{ progressTokens }` heartbeat on others, which the
+      // empty-text check drops.
       if (stream === 'assistant' || stream === 'reasoning' || stream === 'thinking') {
         handleAgentStreamFrame(rec, payload)
         return
       }
-      // The codex-app-server backend (OpenAI models) and claude-cli (Claude
-      // models) both stream tool activity as `agent`/tool frames instead of
-      // `session.tool`, so route them through the shared handler. Neither
-      // commits durable tool rows mid-run, which is what `fromAgentStream`
-      // tells the handler: synthesize a live card, because nothing else will
-      // render this tool.
+      // Tool activity for runs WE started (see handleToolFrame for why the
+      // same payload also arrives as `session.tool` for runs we only watch).
       if (stream === 'tool') {
-        handleToolFrame(rec, payload, { fromAgentStream: true })
+        handleToolFrame(rec, payload)
         return
       }
-      // Same backend reports reasoning as an `item` frame — timing, no text.
+      // Reasoning also surfaces as an `item` frame of kind `analysis` —
+      // timing, no text.
       if (stream === 'item') {
         handleReasoningItemFrame(rec, payload)
         return
@@ -1089,8 +1153,9 @@ async function ensureSubscribed(rec: SessionRecord): Promise<void> {
       // this, but `agent` lifecycle frames are the authoritative signal.
       if (stream !== 'lifecycle') return
       const runId = payload.runId as string | undefined
-      const data = payload.data as { phase?: string } | undefined
+      const data = payload.data as { phase?: string; error?: unknown } | undefined
       const phase = data?.phase
+      if (phase === 'error' && runId) reportRunError(rec, runId, data?.error)
       if (phase === 'start' && runId) setProcessing(rec, true, runId)
       else if ((phase === 'end' || phase === 'error') && runId) {
         if (rec.activeRunId === runId) {
@@ -1143,7 +1208,9 @@ export async function getOrCreateOpenClawSession(input: {
     pendingFrames: [],
     pendingUserEchoes: [],
     liveTools: new Map(),
-    liveThinking: new Map()
+    liveThinking: new Map(),
+    lastDurableSeq: 0,
+    liveTurnTick: 0
   }
   sessions.set(k, rec)
   await ensureSubscribed(rec)
@@ -1497,7 +1564,9 @@ export function createOpenClawSessionForTest(input: {
     pendingFrames: [],
     pendingUserEchoes: [],
     liveTools: new Map(),
-    liveThinking: new Map()
+    liveThinking: new Map(),
+    lastDurableSeq: 0,
+    liveTurnTick: 0
   }
   sessions.set(recKey(input.workspaceId, input.sessionId), rec)
   return rec
