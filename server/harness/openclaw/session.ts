@@ -580,13 +580,13 @@ export function chatPreviewBlocks(content: unknown): PreviewBlock[] {
   return blocks
 }
 
-// Two frame families carry the streaming assistant text, and which one a
-// gateway emits has drifted: 2026.7.x sends `chat` state=delta frames, while
-// other lines stream via `agent` stream=assistant frames (cumulative `text`).
-// The first source to produce a delta for a run wins it, so a gateway that
-// emits both doesn't double-broadcast (which would flicker as the two
-// cumulative snapshots race), and a gateway that emits only `agent` frames
-// still streams instead of dumping the whole reply at run end.
+// Two frame families carry the streaming assistant text, and a gateway sends
+// BOTH: `chat` state=delta (cumulative content blocks) and `agent`
+// stream=assistant (cumulative `text`) arrive for the same run, in the same
+// millisecond, on every capture in `fixtures/`. Whichever produces the first
+// delta claims the run, so the two cumulative snapshots can't race each other
+// into a flicker — and a gateway that happens to send only one of them still
+// streams instead of dumping the whole reply at run end.
 type PreviewSource = 'chat' | 'agent'
 // Exported for tests: only reads/writes the two preview-source fields.
 export function claimPreviewSource(

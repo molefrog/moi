@@ -12,10 +12,14 @@ import { stripMoiContext } from '@/lib/moi-context'
 // Canonical source: `src/auto-reply/reply/strip-inbound-meta.ts` in the
 // `openclaw` npm package (bundled as `dist/strip-inbound-meta-*.js`; hint
 // strings in `dist/message-tool-delivery-hints-*.js`). Not re-exported on a
-// stable subpath, so we mirror it here. If you bump `openclaw`, diff those
-// files and keep this in sync. Last synced against 2026.7.1 (also compared to
+// stable subpath, so we mirror it here.
+//
+// You don't have to diff it by hand on a bump: `strip-parity.test.ts` loads the
+// real implementation out of the pinned bundle and asserts this mirror agrees
+// with it case for case. If that test starts failing after `bun install`,
+// upstream moved and this file needs to follow. (It also compares clean against
 // the 2026.6.33 copy — identical except the chat-window block pass, which is
-// 2026.7.x-only but harmless on 6.x rows).
+// 2026.7.x-only but harmless on 6.x rows.)
 //
 // The bootstrap-preamble pass is ours — it was injected by the ≤2026.4.x
 // system-prompt builder, not the inbound-meta path, so upstream's stripper
