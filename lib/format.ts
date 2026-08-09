@@ -146,8 +146,8 @@ export type SystemNotice =
       error?: string
     }
   | { id: string; kind: 'compact'; at: string; metadata?: unknown }
-  // Mid-session model switch observed on the backend (the model picker here or
-  // any other client patching the session).
+  // Mid-session model switch observed on the backend (e.g. OpenClaw
+  // `sessions.patch { model }` — from moi's picker or any other client).
   | { id: string; kind: 'model-change'; at: string; model: string; prev?: string }
   | {
       id: string

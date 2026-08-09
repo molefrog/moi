@@ -1,10 +1,10 @@
-import { readFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { resolve } from 'node:path'
 
 import type { Model } from '@/lib/types'
 
-import { getGateway } from './gateway'
+import { OPENCLAW_THINKING_LEVELS } from './compat'
+import type { OpenClawCronRunEntry } from './cron-view'
+import { getGateway, withOneShotGateway } from './gateway'
 import type { GatewayHandle } from './gateway'
 import { stripUserMessageMetadata } from './strip'
 
@@ -14,6 +14,20 @@ export type OpenClawAgent = {
   name?: string
   isDefault: boolean
   lastRunAt?: string
+}
+
+// Channel-routing metadata on a session row. Deliberately loose: the gateway
+// ships more fields than these (chatType, accountId, …) and the exact set
+// varies by channel plugin — we read only what we surface. `provider` is the
+// channel id ('telegram', 'irc', 'discord', …); moi's own chats come back as
+// 'webchat'.
+export type OpenClawSessionOrigin = {
+  provider?: string
+  surface?: string
+  label?: string
+  from?: string
+  to?: string
+  [k: string]: unknown
 }
 
 // Subset of the session row returned by `sessions.list`. The gateway ships
@@ -29,6 +43,10 @@ export type OpenClawSessionRow = {
   model?: string
   modelProvider?: string
   status?: string
+  origin?: OpenClawSessionOrigin
+  kind?: string
+  // Parent session key for gateway-spawned subagent sessions.
+  spawnedBy?: string
 }
 
 // Shape returned by `sessions.get({ key })` — the full transcript, unlike
@@ -97,53 +115,10 @@ function parseIdentityName(md: string | undefined): string | undefined {
 type Rpc = <T>(method: string, params?: Record<string, unknown>) => Promise<T>
 
 // Connect, hand the scoped `rpc(method, params)` to `fn`, then stop the client.
-// Any connect/auth/timeout failure → returns `null` silently (caller's choice).
+// Any connect/auth/timeout failure → returns `null` silently (caller's choice);
+// the failure category still lands in gateway.ts's status for /status lines.
 async function withGatewayClient<T>(fn: (rpc: Rpc) => Promise<T>): Promise<T | null> {
-  let cfg: { gateway?: { port?: number; auth?: { token?: string } } }
-  try {
-    const raw = await readFile(join(homedir(), '.openclaw/openclaw.json'), 'utf8')
-    cfg = JSON.parse(raw)
-  } catch {
-    return null
-  }
-  const port = cfg.gateway?.port
-  const token = cfg.gateway?.auth?.token
-  if (!port || !token) return null
-
-  let GatewayClient: typeof import('openclaw/plugin-sdk/gateway-runtime').GatewayClient
-  try {
-    ;({ GatewayClient } = await import('openclaw/plugin-sdk/gateway-runtime'))
-  } catch {
-    return null
-  }
-
-  // The SDK's `opts` is private since 2026.7.x — connect callbacks must be
-  // handed to the constructor, so wire them to a deferred promise up front.
-  let settleConnect!: { res: () => void; rej: (err: Error) => void }
-  const connect = new Promise<void>((res, rej) => {
-    settleConnect = { res, rej }
-  })
-  const client = new GatewayClient({
-    url: `ws://127.0.0.1:${port}`,
-    token,
-    role: 'operator',
-    scopes: ['operator.admin', 'operator.read', 'operator.write'],
-    requestTimeoutMs: TIMEOUT_MS,
-    onHelloOk: () => settleConnect.res(),
-    onConnectError: err => settleConnect.rej(err)
-  })
-
-  try {
-    client.start()
-    await withTimeout(connect, TIMEOUT_MS, 'connect')
-    const rpc: Rpc = (method, params = {}) =>
-      withTimeout(client.request(method, params), TIMEOUT_MS, method)
-    return await fn(rpc)
-  } catch {
-    return null
-  } finally {
-    client.stop()
-  }
+  return withOneShotGateway(fn)
 }
 
 export async function discoverOpenClawAgents(): Promise<OpenClawAgent[]> {
@@ -225,6 +200,77 @@ export async function getOpenClawSessionMessages(
     return await rpc<OpenClawSessionDetail>('sessions.get', { key })
   })
   return out ?? null
+}
+
+// sessionId → gateway session key, or null when the gateway is down or the
+// session is unknown. Used to recognize cron bucket keys (`…:cron:<jobId>`)
+// when the transcript comes back empty.
+export async function resolveOpenClawSessionKey(
+  sessionId: string,
+  workspacePath: string,
+  agentId?: string
+): Promise<string | null> {
+  const out = await withGatewayClient(async rpc => {
+    const id = agentId ?? (await resolveAgentIdForPath(rpc, workspacePath))
+    if (!id) return null
+    const resolved = await rpc<{ key?: string }>('sessions.resolve', {
+      sessionId,
+      agentId: id
+    }).catch(() => null)
+    return resolved?.key ?? null
+  })
+  return out ?? null
+}
+
+// Recorded run history for one cron job (`cron.runs`, identical params and
+// page shape on both supported lines — verified live on 2026.7.1 and
+// 2026.6.33). Default sort is newest-first, so a limit keeps the most recent
+// runs; cron-view.ts re-sorts ascending for display.
+export async function getOpenClawCronRuns(
+  jobId: string,
+  limit = 50
+): Promise<OpenClawCronRunEntry[]> {
+  const out = await withGatewayClient(async rpc => {
+    const res = await rpc<{ entries?: OpenClawCronRunEntry[] }>('cron.runs', { jobId, limit })
+    return res.entries ?? []
+  })
+  return out ?? []
+}
+
+// Archive a session: resolve to its key, then `sessions.patch
+// { archived: true }`. Rides the persistent gateway handle so failures THROW
+// (unlike the silent one-shot helpers) — the API layer maps them to a failed
+// archive. Version note: `archived` exists on SessionsPatchParamsSchema only
+// on 2026.7.x; 2026.6.x validates patch params with `additionalProperties:
+// false` and rejects the field, so archiving against a 6.x gateway fails
+// loudly instead of silently doing nothing.
+export async function archiveOpenClawSession(
+  sessionId: string,
+  workspacePath: string,
+  agentId?: string
+): Promise<void> {
+  const gateway = await getGateway()
+  const rpc: Rpc = (method, params = {}) =>
+    withTimeout(gateway.rpc(method, params), TIMEOUT_MS, method)
+  const id = agentId ?? (await resolveAgentIdForPath(rpc, workspacePath))
+  if (!id) throw new Error('openclaw agent not found for workspace')
+  const resolved = await rpc<{ key?: string }>('sessions.resolve', { sessionId, agentId: id })
+  if (!resolved?.key) throw new Error(`openclaw session not found: ${sessionId}`)
+  try {
+    await rpc('sessions.patch', { key: resolved.key, archived: true })
+  } catch (err) {
+    const raw = err instanceof Error ? err.message : String(err)
+    // 2026.6.x has no `archived` patch field (additionalProperties: false →
+    // "unexpected property"); the gateway also refuses archiving the agent's
+    // main session on every line. Translate both to actionable messages.
+    if (raw.includes("unexpected property 'archived'")) {
+      throw new Error('Archiving chats needs OpenClaw 2026.7 or newer')
+    }
+    if (raw.toLowerCase().includes('main session')) {
+      throw new Error("The agent's main chat can't be archived")
+    }
+    throw err
+  }
 }
 
 function firstUserMessageText(detail: OpenClawSessionDetail | null): string | undefined {
@@ -358,6 +404,17 @@ export async function getOpenClawModels(): Promise<Model[]> {
     const res = await rpc<{ models: OpenClawModelChoice[] }>('models.list')
     return res.models
   })
-  // Map the gateway catalog onto the raw Model shape (value/displayName).
-  return (out ?? []).map(m => ({ value: m.id, displayName: m.name }))
+  // Map the gateway catalog onto the Model shape. The picker value is the
+  // full `provider/id` ref — the exact form `sessions.patch {model}` accepts
+  // and the form session rows report back (`modelProvider`/`model`), so the
+  // applied-model cache comparison holds. Thinking levels double as the
+  // picker's effort menu — they are session-level in OpenClaw, so every
+  // reasoning-capable model advertises the same set (see compat.ts).
+  return (out ?? []).map(m => ({
+    value: m.provider && !m.id.includes('/') ? `${m.provider}/${m.id}` : m.id,
+    displayName: m.name,
+    ...(m.reasoning
+      ? { supportsEffort: true, supportedEffortLevels: [...OPENCLAW_THINKING_LEVELS] }
+      : {})
+  }))
 }

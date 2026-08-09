@@ -27,43 +27,91 @@ import type {
 } from './discovery'
 import { formatChatTitle } from '@/lib/chat-title'
 import { stripMoiContextLoose } from '@/lib/moi-context'
-import { stripUserMessageMetadata } from './strip'
+import { stripSubagentEnvelope, stripUserMessageMetadata } from './strip'
+
+// moi appends the `<moi-context>` envelope to the user's message text because
+// `sessions.send` has no separate system channel — so the gateway derives
+// `displayName`/`derivedTitle`/`lastMessagePreview` from a message that
+// carries the envelope. Strip it (loose: truncation can cut it open) from
+// every title source, not just the preview, so no title shows the envelope.
+// A no-op on channel/cron labels that never contain it.
+function cleanTitle(text: string | undefined): string {
+  return stripSubagentEnvelope(stripMoiContextLoose(text?.trim() ?? '')).trim()
+}
 
 export function toSessionInfo(row: OpenClawSessionRow, cwd: string): SessionInfo {
-  // Gateway previews carry the raw stored message — for a user send that
-  // includes the appended context envelope, and truncation can cut it open,
-  // so clean with the loose strip like the Codex previews do.
   const summary =
-    row.label?.trim() ||
-    row.displayName?.trim() ||
-    row.derivedTitle?.trim() ||
-    formatChatTitle(stripMoiContextLoose(row.lastMessagePreview ?? '')) ||
+    cleanTitle(row.label) ||
+    cleanTitle(row.displayName) ||
+    cleanTitle(row.derivedTitle) ||
+    formatChatTitle(cleanTitle(row.lastMessagePreview)) ||
     ''
+  // External channel provenance. 'webchat' is moi's own chat surface — only
+  // real external channels (telegram/irc/discord/…) get an origin badge.
+  const provider = row.origin?.provider
+  const label = row.origin?.label
+  const origin =
+    provider && provider !== 'webchat' ? { provider, ...(label ? { label } : {}) } : undefined
+  // Flavor from the gateway key layout: cron buckets are `…:cron:<jobId>`,
+  // spawned subagents carry `spawnedBy` (and live under `…:subagent:<uuid>`).
+  const flavor: SessionInfo['flavor'] = row.key.includes(':cron:')
+    ? 'cron'
+    : row.spawnedBy || row.key.includes(':subagent:')
+      ? 'subagent'
+      : undefined
   return {
     sessionId: row.sessionId,
     summary,
     lastModified: row.updatedAt,
-    cwd
+    cwd,
+    ...(origin ? { origin } : {}),
+    ...(flavor ? { flavor } : {})
   }
 }
 
-export type ToolResultInfo = { output: string; isError: boolean; toolName?: string }
+// `running` marks a live `session.tool` start/update frame — the call is
+// executing and has no output yet. A final result (stream or durable row)
+// overwrites the entry.
+export type ToolResultInfo = {
+  output: string
+  isError: boolean
+  toolName?: string
+  running?: boolean
+}
 
-// Pull a readable `output` string out of a `toolResult` message. OpenClaw
-// ships content as blocks; in practice tool output is one or more text
-// blocks, so we concatenate them. Non-text blocks (images, etc.) are
-// represented as a `[type]` placeholder so we don't silently drop them.
-function flattenToolResultContent(content: OpenClawMessage['content']): string {
+// Pull a readable `output` string out of a `toolResult` message. The tool
+// result wire shape has drifted across OpenClaw lines (verified live):
+//   - 2026.7.1  — `content: [{ type: 'text', text: 'hello' }]` (flat text)
+//   - 2026.7.2+ — the exec sandbox nests the result as `[{ type: 'text',
+//     text: '<json>' }]` or wraps it in a `{ type: 'toolResult', content: […] }`
+//     block (which rendered as a bare `[toolResult]` placeholder before this).
+// So recurse: text/image blocks resolve directly, any other block that
+// carries its own `content` array or `text`/`output` string is unwrapped one
+// level, and only a truly opaque block falls back to `[type]`.
+export function flattenToolResultContent(content: OpenClawMessage['content'], depth = 0): string {
   if (typeof content === 'string') return content
   if (!Array.isArray(content)) return ''
   return content
     .map(block => {
       if (!block || typeof block !== 'object') return ''
-      if (block.type === 'text') {
-        const v = (block as { text?: unknown }).text
-        return typeof v === 'string' ? v : ''
+      const b = block as {
+        type?: unknown
+        text?: unknown
+        content?: unknown
+        output?: unknown
       }
-      return `[${block.type}]`
+      if (b.type === 'text') return typeof b.text === 'string' ? b.text : ''
+      if (b.type === 'image') return '[image]'
+      // Nested wrapper (e.g. a `toolResult` block): unwrap one level.
+      if (depth < 3) {
+        if (Array.isArray(b.content)) {
+          const inner = flattenToolResultContent(b.content as OpenClawMessage['content'], depth + 1)
+          if (inner) return inner
+        }
+        if (typeof b.text === 'string' && b.text) return b.text
+        if (typeof b.output === 'string' && b.output) return b.output
+      }
+      return typeof b.type === 'string' ? `[${b.type}]` : ''
     })
     .filter(Boolean)
     .join('\n')
@@ -110,17 +158,33 @@ function blockToPart(
       if (!text) return null
       return { type: 'text', text }
     }
-    case 'thinking': {
+    case 'thinking':
+    case 'reasoning': {
+      // Field drift across OpenClaw lines: 2026.7.1 ships `{ type: 'thinking',
+      // thinking, thinkingSignature }`; newer lines emit `reasoning` and/or
+      // carry the text in `text`. Read whichever is present so the Thought row
+      // never silently vanishes.
+      const b = block as {
+        thinking?: unknown
+        reasoning?: unknown
+        text?: unknown
+        thinkingSignature?: unknown
+        signature?: unknown
+      }
       const text =
-        typeof (block as { thinking?: unknown }).thinking === 'string'
-          ? (block as { thinking: string }).thinking
-          : ''
+        (typeof b.thinking === 'string' && b.thinking) ||
+        (typeof b.reasoning === 'string' && b.reasoning) ||
+        (typeof b.text === 'string' && b.text) ||
+        ''
       if (!text) return null
-      const sig = (block as { thinkingSignature?: unknown }).thinkingSignature
+      const sig =
+        (typeof b.thinkingSignature === 'string' && b.thinkingSignature) ||
+        (typeof b.signature === 'string' && b.signature) ||
+        undefined
       return {
         type: 'reasoning',
         text,
-        ...(typeof sig === 'string' ? { signature: sig } : {})
+        ...(sig ? { signature: sig } : {})
       }
     }
     case 'toolCall': {
@@ -129,7 +193,7 @@ function blockToPart(
       if (typeof id !== 'string' || typeof name !== 'string') return null
       const result = results.get(id)
       let state: ToolState = 'pending'
-      if (result) state = result.isError ? 'error' : 'success'
+      if (result) state = result.running ? 'running' : result.isError ? 'error' : 'success'
       const call: ToolCall = {
         toolCallId: id,
         name,
@@ -138,7 +202,7 @@ function blockToPart(
         state,
         input: (block as { arguments?: unknown }).arguments
       }
-      if (result) {
+      if (result && !result.running) {
         if (result.isError) call.errorText = result.output
         else call.output = result.output
       }
@@ -219,10 +283,40 @@ export function toStreamEvents(
 ): StreamEvent[] {
   if (!detail?.messages) return []
   const results = collectToolResults(detail.messages)
-  const turns = detail.messages
-    .map((m, i) => messageToTurn(m, sessionKey, i, results))
-    .filter((t): t is Turn => t !== null)
-  return turns.map(turn => ({ kind: 'turn', turn }))
+  const events: StreamEvent[] = []
+  // Cold-path twin of the live model-change notice in session.ts: an
+  // assistant row on a different model than the previous assistant row marks
+  // a mid-session switch (sessions.patch from moi's picker or any other
+  // client) — interleave a notice before that turn instead of letting the
+  // switch pass silently. `prev` tracks every assistant row's model, even
+  // ones that render no turn.
+  let prevModel: string | undefined
+  detail.messages.forEach((msg, i) => {
+    if (msg.role === 'assistant') {
+      const model = (msg as { model?: unknown }).model
+      if (typeof model === 'string') {
+        if (prevModel !== undefined && prevModel !== model) {
+          events.push({
+            kind: 'notice',
+            notice: {
+              id: `openclaw:model-change:${msg.__openclaw?.id ?? i}`,
+              kind: 'model-change',
+              at:
+                typeof msg.timestamp === 'number'
+                  ? new Date(msg.timestamp).toISOString()
+                  : new Date().toISOString(),
+              model,
+              prev: prevModel
+            }
+          })
+        }
+        prevModel = model
+      }
+    }
+    const turn = messageToTurn(msg, sessionKey, i, results)
+    if (turn) events.push({ kind: 'turn', turn })
+  })
+  return events
 }
 
 // Find every assistant message that has a `toolCall` block with `toolCallId`.
