@@ -33,9 +33,10 @@ import {
 import { type AcpClient, type AcpSpawnSpec, getAcpClient } from './client'
 import type {
   AcpNewSessionResult,
-  AcpPromptResult,
-  AcpSessionUpdate,
-  AcpToolCallUpdate
+  AcpPromptBlock,
+  PromptResponse,
+  SessionUpdate,
+  ToolCallUpdate
 } from './wire'
 import { agentStore } from '../../agent'
 import { debug } from '../../debug'
@@ -66,10 +67,6 @@ export type AcpProviderConfig = {
   // Does the backend send images as base64 content blocks?
   supportsImages?: boolean
 }
-
-type AcpPromptBlock =
-  | { type: 'text'; text: string }
-  | { type: 'image'; mimeType: string; data: string }
 
 type QueuedSend = { blocks: AcpPromptBlock[]; turnId: string }
 
@@ -179,7 +176,7 @@ function flushUserChunk(rec: SessionRecord) {
   })
 }
 
-function ingestToolCall(rec: SessionRecord, update: AcpToolCallUpdate, provider: AcpProviderId) {
+function ingestToolCall(rec: SessionRecord, update: ToolCallUpdate, provider: AcpProviderId) {
   // A tool call closes the open assistant run: text before it and text after
   // it are separate turns, so the transcript reads in execution order.
   flushAssistant(rec)
@@ -224,11 +221,7 @@ function closeOpenToolCalls(rec: SessionRecord) {
   rec.openToolCalls.clear()
 }
 
-function handleSessionUpdate(
-  rec: SessionRecord,
-  update: AcpSessionUpdate,
-  provider: AcpProviderId
-) {
+function handleSessionUpdate(rec: SessionRecord, update: SessionUpdate, provider: AcpProviderId) {
   switch (update.sessionUpdate) {
     case 'agent_message_chunk': {
       flushUserChunk(rec)
@@ -253,7 +246,7 @@ function handleSessionUpdate(
     }
     case 'tool_call':
     case 'tool_call_update': {
-      ingestToolCall(rec, update as unknown as AcpToolCallUpdate, provider)
+      ingestToolCall(rec, update as unknown as ToolCallUpdate, provider)
       return
     }
     case 'session_info_update': {
@@ -289,7 +282,7 @@ function handleNotification(
   }
   if (method !== 'session/update') return
   if (params.sessionId !== rec.sessionId) return
-  const update = params.update as AcpSessionUpdate | undefined
+  const update = params.update as SessionUpdate | undefined
   if (!update || typeof update.sessionUpdate !== 'string') return
   handleSessionUpdate(rec, update, config.provider)
 }
@@ -419,7 +412,7 @@ async function runPrompt(
         agentId: rec.agentId
       })
     )
-    const res = await client.rpc<AcpPromptResult>('session/prompt', {
+    const res = await client.rpc<PromptResponse>('session/prompt', {
       sessionId: rec.sessionId,
       prompt: blocks
     })

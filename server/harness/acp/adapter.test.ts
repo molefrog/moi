@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test'
 
 import type { Turn } from '@/lib/format'
 
+import type { AcpSessionListEntry } from './wire'
+
 import {
   AssistantTurnAccumulator,
   acpSessionToSessionInfo,
@@ -201,8 +203,23 @@ describe('acpSessionToSessionInfo', () => {
   })
 
   test('tolerates a missing title and an unparsable timestamp', () => {
-    expect(acpSessionToSessionInfo({ sessionId: 's2', updatedAt: 'not-a-date' })).toEqual({
+    expect(
+      acpSessionToSessionInfo({ sessionId: 's2', cwd: '/ws', updatedAt: 'not-a-date' })
+    ).toEqual({
       sessionId: 's2',
+      summary: 'Untitled session',
+      lastModified: 0,
+      cwd: '/ws'
+    })
+  })
+
+  // The schema marks `cwd` required, but agents in the wild trail the spec —
+  // Hermes runs a pre-1.0 revision — so the mapping stays defensive. Cast
+  // because a valid row cannot express the violation being guarded against.
+  test('survives an agent that omits the required cwd', () => {
+    const row = { sessionId: 's3' } as unknown as AcpSessionListEntry
+    expect(acpSessionToSessionInfo(row)).toEqual({
+      sessionId: 's3',
       summary: 'Untitled session',
       lastModified: 0
     })

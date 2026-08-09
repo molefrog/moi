@@ -4,7 +4,7 @@ import type { Model, SessionInfo } from '@/lib/types'
 import { type AcpProviderConfig, type AcpSpawnContext } from './session'
 import { acpSessionToSessionInfo } from './adapter'
 import { getAcpClient, peekAcpClient } from './client'
-import type { AcpListSessionsResult, AcpModelState, AcpNewSessionResult } from './wire'
+import type { ListSessionsResponse, AcpModelState, AcpNewSessionResult } from './wire'
 import type { WorkspaceActivityPreview } from '../types'
 import { debug } from '../../debug'
 
@@ -21,7 +21,7 @@ export async function listAcpSessions(
     const out: SessionInfo[] = []
     let cursor: string | undefined
     for (let page = 0; page < PAGE_LIMIT; page++) {
-      const res: AcpListSessionsResult = await client.rpc('session/list', {
+      const res: ListSessionsResponse = await client.rpc('session/list', {
         cwd: ctx.workspacePath,
         ...(cursor ? { cursor } : {})
       })
@@ -49,7 +49,7 @@ export async function acpWorkspacePreview(
   const client = await peekAcpClient(ctx.workspacePath)
   if (!client) return {}
   try {
-    const res: AcpListSessionsResult = await client.rpc('session/list', { cwd: ctx.workspacePath })
+    const res: ListSessionsResponse = await client.rpc('session/list', { cwd: ctx.workspacePath })
     const rows = (res.sessions ?? []).filter(s => s.sessionId)
     if (rows.length === 0) return {}
     const newest = rows.reduce((a, b) =>
@@ -90,7 +90,7 @@ export async function listAcpModels(
   config: AcpProviderConfig,
   ctx: AcpSpawnContext
 ): Promise<Model[]> {
-  let cached = modelCatalogs.get(ctx.workspacePath)
+  let cached: Promise<AcpModelState | undefined> | undefined = modelCatalogs.get(ctx.workspacePath)
   if (!cached) {
     cached = (async () => {
       const client = await getAcpClient(await config.spawn(ctx))
@@ -98,7 +98,7 @@ export async function listAcpModels(
         cwd: ctx.workspacePath,
         mcpServers: []
       })
-      return created.models
+      return created.models ?? undefined
     })().catch(err => {
       modelCatalogs.delete(ctx.workspacePath)
       throw err

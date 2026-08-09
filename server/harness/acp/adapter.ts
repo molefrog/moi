@@ -11,16 +11,16 @@ import type { Part, ToolCall, ToolState, Turn, TurnMeta } from '@/lib/format'
 
 import {
   type AcpSessionListEntry,
-  type AcpToolCallStatus,
-  type AcpToolCallUpdate,
-  type AcpUsage,
+  type ToolCallStatus,
+  type ToolCallUpdate,
+  type Usage,
   toolContentToText
 } from './wire'
 import type { SessionInfo } from '@/lib/types'
 
 export type AcpProviderId = NonNullable<ToolCall['provider']>
 
-export function toolStatusToState(status: AcpToolCallStatus | undefined): ToolState {
+export function toolStatusToState(status: ToolCallStatus | undefined): ToolState {
   switch (status) {
     case 'completed':
       return 'success'
@@ -52,12 +52,12 @@ export function assistantTurnId(sessionId: string, runIndex: number): string {
 // already on the card outranks the bare `kind` a `tool_call_update` falls back
 // to — otherwise the label degrades from "terminal: echo hi" to "execute"
 // the moment the call completes.
-export function toolCallName(update: AcpToolCallUpdate, previousName?: string): string {
+export function toolCallName(update: ToolCallUpdate, previousName?: string): string {
   return update.title?.trim() || previousName || update.kind || 'tool'
 }
 
 export function acpToolCallToTurn(input: {
-  update: AcpToolCallUpdate
+  update: ToolCallUpdate
   sessionId: string
   provider: AcpProviderId
   previous?: Turn
@@ -98,7 +98,7 @@ export function acpToolCallToTurn(input: {
   }
 }
 
-export function acpUsageToTurnMeta(usage: AcpUsage | undefined): TurnMeta['usage'] | undefined {
+export function acpUsageToTurnMeta(usage: Usage | null | undefined): TurnMeta['usage'] | undefined {
   if (!usage) return undefined
   const { inputTokens, outputTokens, totalTokens } = usage
   if (inputTokens === undefined && outputTokens === undefined && totalTokens === undefined) {

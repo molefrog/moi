@@ -638,3 +638,59 @@ per turn, tool cards settling to success (including the file write Hermes never
 completes), `stopped` on interrupt with the partial answer preserved, cold
 `session/load` replay after a server restart, per-chat model switching, and
 image attachments through moi's upload pipeline.
+
+## 12. The official SDK, and the version skew it exposed
+
+The wire types are no longer hand-written. `../acp/wire.ts` re-exports
+[`@agentclientprotocol/sdk`](https://www.npmjs.com/package/@agentclientprotocol/sdk),
+whose types are generated from the protocol's JSON Schema (262 definitions).
+
+**Which package.** The one most search results point at,
+`@zed-industries/agent-client-protocol`, is formally deprecated —
+`"This package has been renamed to @agentclientprotocol/sdk"` — and froze at
+0.4.5 in Oct 2025. The live package is `@agentclientprotocol/sdk`
+(Apache-2.0, 1.3.0, ~5.2M weekly downloads vs ~20k for the deprecated one).
+The protocol now lives in a vendor-neutral org; JetBrains maintains a repo too.
+
+**Types only, dev-only.** `dist/schema/types.gen.js` has no runtime code, so
+`import type` costs nothing and ships nothing. Importing _values_ instead
+(`AGENT_METHODS`, `ClientSideConnection`, `ndJsonStream`) would pull zod in as
+a real dependency for the sake of a few string constants, so moi keeps its own
+method strings — verified against the SDK's `AGENT_METHODS` at 1.3.0 — and its
+own transport, which already carries the `/dev/harness` wire tap, per-workspace
+process lifecycle and env injection at spawn.
+
+**⚠️ Hermes trails the spec.** This is the substantive finding. Hermes pins
+Python `agent-client-protocol==0.9.0` (PyPI is at 0.12.0), a revision where
+_models_ are first-class. The current spec has **no model concept at all**:
+
+|                                               | `session/set_model` |
+| --------------------------------------------- | ------------------- |
+| `@zed-industries/agent-client-protocol@0.4.5` | 8 occurrences       |
+| `@agentclientprotocol/sdk@1.0.0` … `1.3.0`    | **0**               |
+
+`session/set_model` and `models.availableModels` were replaced by
+`session/set_config_option` + `SessionConfigOption` (a select/boolean option
+list on `NewSessionResponse`). moi's per-chat model picker rides on the old
+shape, so `wire.ts` keeps a small, clearly-labelled "pre-1.0 additions" block
+(`AcpModelInfo`, `AcpModelState`, `AcpNewSessionResult`). **Delete it when
+Hermes moves to config options** — that is the whole migration.
+
+Everything else moi consumes is current: `session_info_update` and
+`usage_update` are both in the spec (`usage_update` requires `size`, which was
+optional in the hand-written version).
+
+**What the official types caught.** The spec models `tool_call` as `ToolCall`
+(`title: string`, required) and `tool_call_update` as `ToolCallUpdate`
+(`title?: string | null`) — independent confirmation of the §11 title-carryover
+bug, now enforced by the compiler rather than by a comment. They also tightened
+three things the hand-written types were sloppy about: `StopReason` is a closed
+union (`end_turn | max_tokens | max_turn_requests | refusal | cancelled`),
+`ToolKind` has ten members (not seven), and optional fields are `T | null`
+rather than merely absent.
+
+**Not adopted yet:** `ContentChunk.messageId`. The spec gives chunks an
+explicit message boundary — "a change in `messageId` indicates a new message"
+— which is the principled version of `AssistantTurnAccumulator`'s heuristic.
+Hermes 0.20.0 does not send it, so the accumulator stays; prefer `messageId`
+when an agent provides it.

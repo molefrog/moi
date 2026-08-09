@@ -107,7 +107,7 @@ rather than a copy of the protocol. The split is:
 
 ```
 acp/                  provider-agnostic protocol
-  wire.ts             ACP message types
+  wire.ts             ACP message types (re-exported from the official SDK)
   client.ts           spawn + stdio JSON-RPC framing, one process per workspace
   adapter.ts          session/update → Turn/ToolCall (+ chunk accumulation)
   session.ts          per-session state machine, driven by AcpProviderConfig
@@ -120,6 +120,13 @@ hermes/               provider specifics only
 
 A new ACP provider supplies an `AcpProviderConfig`: an id, the spawn spec
 (binary + args), the no-prompt mode id, and whether images ride inline.
+
+`wire.ts` re-exports the schema-generated types from
+`@agentclientprotocol/sdk` — a **types-only, dev-only** dependency, since
+importing values from it would pull zod in at runtime. It adds one labelled
+"pre-1.0 additions" block for the model-selection surface the spec dropped and
+Hermes still implements; delete that block when agents move to
+`session/set_config_option`. See `hermes/NOTES.md` §12.
 
 Dev tooling: `/dev/harness` (live wire log + client frames + trigger
 scenarios for any workspace, backed by `GET /api/workspaces/:id/harness/debug`

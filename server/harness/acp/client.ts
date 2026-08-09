@@ -8,7 +8,7 @@
 //
 // Provider-agnostic: `AcpSpawnSpec` says what to spawn, everything else here
 // is protocol. See ./wire.ts for the message shapes.
-import type { AcpInitializeResult, AcpRequestPermissionParams } from './wire'
+import type { InitializeResponse, RequestPermissionRequest } from './wire'
 
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
@@ -36,7 +36,8 @@ export type AcpClient = {
   onNotification: (l: NotificationListener) => () => void
   isAlive: () => boolean
   workspacePath: string
-  initializeResult: AcpInitializeResult
+  // Null until the initialize handshake resolves.
+  initializeResult: InitializeResponse | null
 }
 
 export type AcpProcessInfo = {
@@ -116,7 +117,7 @@ async function startClient(spec: AcpSpawnSpec): Promise<ClientRecord> {
   function answerServerRequest(msg: Json) {
     const method = msg.method as string
     if (method === 'session/request_permission') {
-      const params = (msg.params ?? {}) as AcpRequestPermissionParams
+      const params = (msg.params ?? {}) as RequestPermissionRequest
       const options = params.options ?? []
       const allow = options.find(o => o.kind?.startsWith('allow')) ?? options[0]
       send({
@@ -214,7 +215,7 @@ async function startClient(spec: AcpSpawnSpec): Promise<ClientRecord> {
     },
     isAlive: () => alive,
     workspacePath,
-    initializeResult: {}
+    initializeResult: null
   }
   const record: ClientRecord = { client, proc }
   const recordPromise = Promise.resolve(record)
@@ -222,11 +223,11 @@ async function startClient(spec: AcpSpawnSpec): Promise<ClientRecord> {
   void readLoop()
   void drainStderr()
 
-  client.initializeResult = await rpc<AcpInitializeResult>('initialize', {
+  client.initializeResult = await rpc<InitializeResponse>('initialize', {
     protocolVersion: 1,
     clientCapabilities: CLIENT_CAPABILITIES
   })
-  const info = client.initializeResult.agentInfo
+  const info = client.initializeResult?.agentInfo
   debug(
     `${provider} acp started ws=${workspacePath} bin=${command} agent=${info?.name ?? '?'}/${info?.version ?? '?'}`
   )
@@ -272,7 +273,7 @@ export async function getAcpProcessInfo(
   if (!rec) return { running: false, binary }
   try {
     const r = await rec
-    const info = r.client.initializeResult.agentInfo
+    const info = r.client.initializeResult?.agentInfo
     return {
       running: r.client.isAlive(),
       pid: r.proc.pid,
