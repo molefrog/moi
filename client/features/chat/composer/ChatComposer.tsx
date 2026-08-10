@@ -174,9 +174,9 @@ export function ChatComposer({
                     type="button"
                     variant={annotation.active ? 'default' : 'ghost'}
                     size="icon"
-                    onClick={annotation.onStart}
-                    disabled={annotation.active || annotation.starting}
-                    aria-label="Draw annotation"
+                    onClick={annotation.onToggle}
+                    disabled={annotation.starting}
+                    aria-label={annotation.active ? 'Finish annotation' : 'Draw annotation'}
                     aria-pressed={annotation.active}
                   >
                     {annotation.starting ? (
@@ -187,7 +187,9 @@ export function ChatComposer({
                   </Button>
                 }
               />
-              <TooltipContent>Draw annotation</TooltipContent>
+              <TooltipContent>
+                {annotation.active ? 'Finish annotation' : 'Draw annotation'}
+              </TooltipContent>
             </Tooltip>
           )}
         </div>
@@ -293,6 +295,7 @@ function AnnotationAttachmentChip({ attachment, onRemove }: AnnotationAttachment
               variant={status === 'error' ? 'destructive' : 'secondary'}
               size="sm"
               title={error ?? 'Annotation'}
+              className="pr-8"
             />
           }
         >
@@ -302,15 +305,6 @@ function AnnotationAttachmentChip({ attachment, onRemove }: AnnotationAttachment
             <IconScribble stroke={1.75} />
           )}
           <span>{status === 'error' ? 'Annotation failed' : 'Annotation'}</span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={onRemove}
-            aria-label="Remove annotation"
-          >
-            <IconX stroke={1.75} />
-          </Button>
         </HoverCardTrigger>
         {previewUrl && (
           <HoverCardContent side="top" align="start" className="w-80 max-w-[calc(100vw-2rem)]">
@@ -322,6 +316,16 @@ function AnnotationAttachmentChip({ attachment, onRemove }: AnnotationAttachment
           </HoverCardContent>
         )}
       </HoverCard>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={onRemove}
+        aria-label="Remove annotation"
+        className="absolute top-1/2 right-1 size-6 -translate-y-1/2 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
+      >
+        <IconX stroke={1.75} />
+      </Button>
     </div>
   )
 }

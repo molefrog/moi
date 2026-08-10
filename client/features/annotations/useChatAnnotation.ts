@@ -1,4 +1,4 @@
-import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { toast } from '@/client/components/ui/toast'
 import { stageAnnotation } from '@/client/features/chat/attachment-staging'
@@ -6,24 +6,14 @@ import { liveStore } from '@/client/features/chat/chat-store'
 import type { LayoutMode, WorkspaceTabId } from '@/lib/types'
 
 import { captureElement } from './capture-element'
-
-type AnnotationOrigin = 'docked' | 'popup'
-
-export type ChatAnnotationSession = {
-  id: string
-  attachmentId: string
-  sourceTab: WorkspaceTabId
-  sourceSessionId: string | null
-  origin: AnnotationOrigin
-  snapshot: HTMLCanvasElement
-  strokeColor: string
-  haloColor: string
-  targetWidth: number
-  targetHeight: number
-}
+import type {
+  AnnotationOrigin,
+  AnnotationOverlayHandle,
+  ChatAnnotationController,
+  ChatAnnotationSession
+} from './types'
 
 type UseChatAnnotationOptions = {
-  targetRef: RefObject<HTMLElement | null>
   workspaceId: string
   sessionId: string | null
   activeTab: WorkspaceTabId
@@ -34,7 +24,6 @@ type UseChatAnnotationOptions = {
 }
 
 export function useChatAnnotation({
-  targetRef,
   workspaceId,
   sessionId,
   activeTab,
@@ -42,9 +31,11 @@ export function useChatAnnotation({
   available,
   closePopup,
   openPopup
-}: UseChatAnnotationOptions) {
+}: UseChatAnnotationOptions): ChatAnnotationController {
   const [session, setSession] = useState<ChatAnnotationSession | null>(null)
   const [starting, setStarting] = useState(false)
+  const targetRef = useRef<HTMLDivElement>(null)
+  const overlayRef = useRef<AnnotationOverlayHandle>(null)
   const sessionRef = useRef(session)
   const startRevisionRef = useRef(0)
   const uploadRevisionsRef = useRef(new Map<string, number>())
@@ -62,55 +53,52 @@ export function useChatAnnotation({
     if (reopenPopup && current?.origin === 'popup') openPopupRef.current()
   }, [])
 
-  const start = useCallback(
-    async (origin: AnnotationOrigin) => {
-      const target = targetRef.current
-      if (!target || !liveContextRef.current.available) return
+  const start = useCallback(async (origin: AnnotationOrigin) => {
+    const target = targetRef.current
+    if (!target || !liveContextRef.current.available) return
 
-      const revision = ++startRevisionRef.current
-      const startContext = liveContextRef.current
-      setStarting(true)
-      try {
-        const snapshot = await captureElement(target)
-        const current = liveContextRef.current
-        if (
-          revision !== startRevisionRef.current ||
-          current.workspaceId !== startContext.workspaceId ||
-          current.sessionId !== startContext.sessionId ||
-          current.activeTab !== startContext.activeTab ||
-          current.mode !== startContext.mode ||
-          !current.available
-        ) {
-          return
-        }
-
-        const bounds = target.getBoundingClientRect()
-        const styles = getComputedStyle(target)
-        const next: ChatAnnotationSession = {
-          id: crypto.randomUUID(),
-          attachmentId: crypto.randomUUID(),
-          sourceTab: startContext.activeTab,
-          sourceSessionId: startContext.sessionId,
-          origin,
-          snapshot,
-          strokeColor: styles.getPropertyValue('--primary').trim() || '#2563eb',
-          haloColor: styles.getPropertyValue('--background').trim() || '#ffffff',
-          targetWidth: bounds.width,
-          targetHeight: bounds.height
-        }
-        sessionRef.current = next
-        setSession(next)
-        if (origin === 'popup') closePopupRef.current()
-      } catch {
-        if (revision === startRevisionRef.current) {
-          toast.add({ title: 'Couldn’t capture this page', type: 'error' })
-        }
-      } finally {
-        if (revision === startRevisionRef.current) setStarting(false)
+    const revision = ++startRevisionRef.current
+    const startContext = liveContextRef.current
+    setStarting(true)
+    try {
+      const snapshot = await captureElement(target)
+      const current = liveContextRef.current
+      if (
+        revision !== startRevisionRef.current ||
+        current.workspaceId !== startContext.workspaceId ||
+        current.sessionId !== startContext.sessionId ||
+        current.activeTab !== startContext.activeTab ||
+        current.mode !== startContext.mode ||
+        !current.available
+      ) {
+        return
       }
-    },
-    [targetRef]
-  )
+
+      const bounds = target.getBoundingClientRect()
+      const styles = getComputedStyle(target)
+      const next: ChatAnnotationSession = {
+        id: crypto.randomUUID(),
+        attachmentId: crypto.randomUUID(),
+        sourceTab: startContext.activeTab,
+        sourceSessionId: startContext.sessionId,
+        origin,
+        snapshot,
+        strokeColor: styles.getPropertyValue('--primary').trim() || '#2563eb',
+        haloColor: styles.getPropertyValue('--background').trim() || '#ffffff',
+        targetWidth: bounds.width,
+        targetHeight: bounds.height
+      }
+      sessionRef.current = next
+      setSession(next)
+      if (origin === 'popup') closePopupRef.current()
+    } catch {
+      if (revision === startRevisionRef.current) {
+        toast.add({ title: 'Couldn’t capture this page', type: 'error' })
+      }
+    } finally {
+      if (revision === startRevisionRef.current) setStarting(false)
+    }
+  }, [])
 
   const change = useCallback(
     (editingSession: ChatAnnotationSession, blob: Blob | null) => {
@@ -145,6 +133,11 @@ export function useChatAnnotation({
     },
     [closeSession]
   )
+
+  const finish = useCallback(() => overlayRef.current?.finish(), [])
+  const complete = useCallback(() => closeSession(true), [closeSession])
+  const startDocked = useCallback(() => void start('docked'), [start])
+  const startPopup = useCallback(() => void start('popup'), [start])
 
   useEffect(() => {
     startRevisionRef.current += 1
@@ -191,13 +184,31 @@ export function useChatAnnotation({
     []
   )
 
-  return {
-    session,
+  const commonControls = {
+    active: session !== null,
     starting,
-    startDocked: () => void start('docked'),
-    startPopup: () => void start('popup'),
-    change,
-    finish: () => closeSession(true),
-    remove
+    onRemove: remove
+  }
+
+  return {
+    docked: available
+      ? {
+          ...commonControls,
+          onToggle: session ? finish : startDocked
+        }
+      : undefined,
+    popup: available
+      ? {
+          ...commonControls,
+          onToggle: session ? finish : startPopup
+        }
+      : undefined,
+    surface: {
+      targetRef,
+      overlayRef,
+      session,
+      change,
+      complete
+    }
   }
 }
