@@ -5,6 +5,7 @@ import {
   IconLoader2,
   IconPaperclip,
   IconPlayerStopFilled,
+  IconScribble,
   IconX
 } from '@tabler/icons-react'
 
@@ -17,10 +18,12 @@ import {
   ComposerTextarea
 } from '@/client/components/shared/Composer'
 import { Button } from '@/client/components/ui/button'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/client/components/ui/hover-card'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
+import type { ChatAnnotationControls } from '@/client/features/annotations/types'
+import { stageComposerFiles } from '@/client/features/chat/attachment-staging'
 import { cn } from '@/client/lib/cn'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
-import { uploadFiles } from '@/client/features/chat/uploads'
 import {
   type ChatAttachment,
   attachmentKey,
@@ -38,6 +41,7 @@ type ChatComposerProps = {
   processing: boolean
   sessionId: string | null
   availability: ComposerAvailability
+  annotation?: ChatAnnotationControls
 }
 
 // Draft text is persisted per workspace, while attachments remain ephemeral and
@@ -49,7 +53,8 @@ export function ChatComposer({
   onStop,
   processing,
   sessionId,
-  availability
+  availability,
+  annotation
 }: ChatComposerProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const workspaceId = useWorkspaceId()
@@ -64,36 +69,7 @@ export function ChatComposer({
 
   const onChange = (next: string) => useUiStore.getState().setComposerDraft(workspaceId, next)
 
-  // Upload each picked file immediately, tracking its in-flight status so the
-  // thumbnail row can show a spinner / error per file.
-  const addFiles = (files: File[]) => {
-    if (files.length === 0) return
-    const store = liveStore.getState()
-    const items: ChatAttachment[] = files.map(f => ({
-      localId: crypto.randomUUID(),
-      name: f.name || 'file',
-      mediaType: f.type || 'application/octet-stream',
-      previewUrl: f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined,
-      status: 'uploading'
-    }))
-    store.addAttachments(workspaceId, sessionId, items)
-    items.forEach((item, i) => {
-      uploadFiles(workspaceId, [files[i]])
-        .then(([info]) =>
-          liveStore.getState().updateAttachment(workspaceId, sessionId, item.localId, {
-            status: 'ready',
-            upload: info,
-            mediaType: info.mediaType
-          })
-        )
-        .catch((err: unknown) =>
-          liveStore.getState().updateAttachment(workspaceId, sessionId, item.localId, {
-            status: 'error',
-            error: err instanceof Error ? err.message : 'Upload failed'
-          })
-        )
-    })
-  }
+  const addFiles = (files: File[]) => stageComposerFiles({ workspaceId, sessionId }, files)
 
   const send = () => {
     if (!canSend) return
@@ -132,9 +108,10 @@ export function ChatComposer({
             <AttachmentChip
               key={a.localId}
               attachment={a}
-              onRemove={() =>
+              onRemove={() => {
+                if (a.kind === 'annotation') annotation?.onRemove(a.localId)
                 liveStore.getState().removeAttachment(workspaceId, sessionId, a.localId)
-              }
+              }}
             />
           ))}
         </div>
@@ -172,16 +149,48 @@ export function ChatComposer({
             e.target.value = ''
           }}
         />
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="mr-auto"
-          onClick={() => fileRef.current?.click()}
-          aria-label="Attach files"
-        >
-          <IconPaperclip stroke={1.5} />
-        </Button>
+        <div className="mr-auto flex items-center gap-0.5">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => fileRef.current?.click()}
+                  aria-label="Attach files"
+                >
+                  <IconPaperclip stroke={1.5} />
+                </Button>
+              }
+            />
+            <TooltipContent>Attach files</TooltipContent>
+          </Tooltip>
+          {annotation && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant={annotation.active ? 'default' : 'ghost'}
+                    size="icon"
+                    onClick={annotation.onStart}
+                    disabled={annotation.active || annotation.starting}
+                    aria-label="Draw annotation"
+                    aria-pressed={annotation.active}
+                  >
+                    {annotation.starting ? (
+                      <IconLoader2 className="animate-spin" stroke={1.5} />
+                    ) : (
+                      <IconScribble stroke={1.5} />
+                    )}
+                  </Button>
+                }
+              />
+              <TooltipContent>Draw annotation</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
         <ModelPicker />
         {processing ? (
           <Tooltip>
@@ -217,6 +226,10 @@ type AttachmentChipProps = {
 // A composer attachment preview: an image thumbnail or a labelled file chip,
 // with an upload spinner / error overlay and a remove button.
 function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
+  if (attachment.kind === 'annotation') {
+    return <AnnotationAttachmentChip attachment={attachment} onRemove={onRemove} />
+  }
+
   const { name, previewUrl, status, error } = attachment
   const isImage = !!previewUrl
 
@@ -259,6 +272,56 @@ function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
       >
         <IconX stroke={1.75} />
       </Button>
+    </div>
+  )
+}
+
+type AnnotationAttachmentChipProps = {
+  attachment: Extract<ChatAttachment, { kind: 'annotation' }>
+  onRemove: () => void
+}
+
+function AnnotationAttachmentChip({ attachment, onRemove }: AnnotationAttachmentChipProps) {
+  const { previewUrl, status, error } = attachment
+  return (
+    <div className="group relative">
+      <HoverCard>
+        <HoverCardTrigger
+          render={
+            <Button
+              type="button"
+              variant={status === 'error' ? 'destructive' : 'secondary'}
+              size="sm"
+              title={error ?? 'Annotation'}
+            />
+          }
+        >
+          {status === 'uploading' ? (
+            <IconLoader2 className="animate-spin" stroke={1.75} />
+          ) : (
+            <IconScribble stroke={1.75} />
+          )}
+          <span>{status === 'error' ? 'Annotation failed' : 'Annotation'}</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={onRemove}
+            aria-label="Remove annotation"
+          >
+            <IconX stroke={1.75} />
+          </Button>
+        </HoverCardTrigger>
+        {previewUrl && (
+          <HoverCardContent side="top" align="start" className="w-80 max-w-[calc(100vw-2rem)]">
+            <img
+              src={previewUrl}
+              alt="Annotation preview"
+              className="max-h-72 w-full rounded-lg object-contain"
+            />
+          </HoverCardContent>
+        )}
+      </HoverCard>
     </div>
   )
 }

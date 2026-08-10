@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 
 import { AnimatePresence } from 'motion/react'
 
@@ -12,6 +12,12 @@ import {
 } from '@tabler/icons-react'
 
 import { IconGhost } from '@/client/components/shared/IconGhost'
+import {
+  canAnnotateWorkspaceContent,
+  type WorkspaceAnnotationMode
+} from '@/client/features/annotations/annotation-availability'
+import { AnnotationOverlay } from '@/client/features/annotations/AnnotationOverlay'
+import { useChatAnnotation } from '@/client/features/annotations/useChatAnnotation'
 import { ChatPanel } from '@/client/features/chat/ChatPanel'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { CustomizePanel } from '@/client/features/workspace/CustomizePanel'
@@ -129,8 +135,6 @@ type WorkspaceScreenProps = {
   builders: ViewBuilder[]
 }
 
-type WidgetMode = 'idle' | 'editing' | 'customizing'
-
 function tabItemFor(
   tab: WorkspaceTabId,
   views: ViewInfo[],
@@ -205,9 +209,10 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     fits: canUseSplit,
     constraints: splitLayoutConstraints
   } = useFitsSplitLayout<HTMLDivElement>()
-  const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
+  const [widgetMode, setWidgetMode] = useState<WorkspaceAnnotationMode>('idle')
   const [floatingChatOpen, setFloatingChatOpen] = useState(false)
   const [chatFocusRequest, setChatFocusRequest] = useState(0)
+  const annotationTargetRef = useRef<HTMLDivElement>(null)
   const dockedChatWidth = useUiStore(state => state.dockedChatWidth)
   const setDockedChatWidth = useUiStore(state => state.setDockedChatWidth)
   const sessionActivity = useLive(state => state.activity)
@@ -285,6 +290,17 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const activeBuilder = activeBuilderId
     ? builders.find(builder => builder.id === activeBuilderId)
     : undefined
+  const canAnnotate = canAnnotateWorkspaceContent(activeTab, widgetMode, activeView !== undefined)
+  const annotation = useChatAnnotation({
+    targetRef: annotationTargetRef,
+    workspaceId,
+    sessionId,
+    activeTab,
+    mode,
+    available: canAnnotate,
+    closePopup: () => setFloatingChatOpen(false),
+    openPopup: () => setFloatingChatOpen(true)
+  })
 
   useEffect(() => {
     const open = tabsState.open.filter(tab => tabAvailable(tab, views, builders))
@@ -505,6 +521,16 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       stop={stop}
       onSelectSession={selectSession}
       onClose={() => setMode('fullscreen')}
+      annotation={
+        canAnnotate
+          ? {
+              active: annotation.session !== null,
+              starting: annotation.starting,
+              onStart: annotation.startDocked,
+              onRemove: annotation.remove
+            }
+          : undefined
+      }
       docked
     />
   )
@@ -525,6 +551,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       onSelectSession={selectSession}
     />
   )
+  const activeAnnotation = annotation.session
 
   const workspacePanel = (
     <div
@@ -533,46 +560,65 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
         mode === 'split' && 'rounded-xl'
       )}
     >
-      {activeTab === 'agent' ? (
-        tabbedChat
-      ) : activeTab === 'widgets' ? (
-        <Widgets
-          editing={widgetMode === 'editing'}
-          onEditingChange={editing => setWidgetMode(editing ? 'editing' : 'idle')}
-          widgets={widgets}
-          onCreateWidget={() => {
-            selectSession(null)
-            openChat('Create widget')
-          }}
-        />
-      ) : activeTab === 'scratchpad' ? (
-        <Suspense fallback={null}>
-          <Scratchpad />
-        </Suspense>
-      ) : activeBuilder ? (
-        <ViewBuilderTab
-          key={activeBuilder.id}
-          builder={activeBuilder}
-          composerAvailability={composerAvailability}
-          onSave={requirements => builderActions.save(activeBuilder.id, requirements)}
-          onSubmit={requirements => {
-            if (mode === 'fullscreen') setFloatingChatOpen(true)
-            return builderActions.submit(activeBuilder, requirements)
-          }}
-          onOpenChat={() => {
-            selectSession(activeBuilder.sessionId)
-            openChat()
-          }}
-          onDiscard={() => discardBuilder(activeBuilder)}
-        />
-      ) : null}
+      <div className="relative flex min-h-0 flex-1">
+        <div
+          ref={annotationTargetRef}
+          inert={activeAnnotation ? true : undefined}
+          aria-hidden={activeAnnotation ? true : undefined}
+          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background"
+        >
+          {activeTab === 'agent' ? (
+            tabbedChat
+          ) : activeTab === 'widgets' ? (
+            <Widgets
+              editing={widgetMode === 'editing'}
+              onEditingChange={editing => setWidgetMode(editing ? 'editing' : 'idle')}
+              widgets={widgets}
+              onCreateWidget={() => {
+                selectSession(null)
+                openChat('Create widget')
+              }}
+            />
+          ) : activeTab === 'scratchpad' ? (
+            <Suspense fallback={null}>
+              <Scratchpad />
+            </Suspense>
+          ) : activeBuilder ? (
+            <ViewBuilderTab
+              key={activeBuilder.id}
+              builder={activeBuilder}
+              composerAvailability={composerAvailability}
+              onSave={requirements => builderActions.save(activeBuilder.id, requirements)}
+              onSubmit={requirements => {
+                if (mode === 'fullscreen') setFloatingChatOpen(true)
+                return builderActions.submit(activeBuilder, requirements)
+              }}
+              onOpenChat={() => {
+                selectSession(activeBuilder.sessionId)
+                openChat()
+              }}
+              onDiscard={() => discardBuilder(activeBuilder)}
+            />
+          ) : null}
 
-      {/* Views are not part of the chain above: ViewManager keeps them
-          mounted across tab switches (and collapses to nothing while
-          another tab is on screen), which is what makes a switch back
-          instant. It stays with the content, so the header below it in
-          the DOM keeps painting over both. */}
-      <ViewManager views={views} activeViewId={activeView?.id ?? null} params={appletParams} />
+          {/* Views are not part of the chain above: ViewManager keeps them
+              mounted across tab switches (and collapses to nothing while
+              another tab is on screen), which is what makes a switch back
+              instant. */}
+          <ViewManager views={views} activeViewId={activeView?.id ?? null} params={appletParams} />
+        </div>
+
+        {activeAnnotation && (
+          <AnnotationOverlay
+            key={activeAnnotation.id}
+            snapshot={activeAnnotation.snapshot}
+            strokeColor={activeAnnotation.strokeColor}
+            haloColor={activeAnnotation.haloColor}
+            onChange={blob => annotation.change(activeAnnotation, blob)}
+            onDone={annotation.finish}
+          />
+        )}
+      </div>
 
       <PanelHeader>
         <div className="flex min-w-0 flex-1 items-center gap-4">
@@ -655,6 +701,16 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               stop={stop}
               onSelectSession={selectSession}
               onClose={onClose}
+              annotation={
+                canAnnotate
+                  ? {
+                      active: annotation.session !== null,
+                      starting: annotation.starting,
+                      onStart: annotation.startPopup,
+                      onRemove: annotation.remove
+                    }
+                  : undefined
+              }
             />
           )}
         </ChatPopup>

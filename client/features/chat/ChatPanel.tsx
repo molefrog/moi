@@ -13,6 +13,7 @@ import { chatNoticeLabel, interleaveNotices } from '@/client/features/chat/inter
 import { attachmentKey, useLive } from '@/client/features/chat/chat-store'
 import type { ChatPromptBubble } from '@/client/features/chat/ChatPromptBubbles'
 import type { ChatSendOptions } from '@/client/features/chat/chat-send'
+import type { ChatAnnotationControls } from '@/client/features/annotations/types'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import type { SystemNotice, Turn, ViewState } from '@/lib/types'
 
@@ -42,6 +43,7 @@ type ChatPanelProps = {
   processing: boolean
   composerBanner?: ComposerBanner
   composerAvailability: ComposerAvailability
+  annotation?: ChatAnnotationControls
   send: (text: string, options?: ChatSendOptions) => void
   stop: () => void
   onSelectSession: (sessionId: string | null) => void
@@ -60,6 +62,7 @@ export function ChatPanel({
   processing,
   composerBanner,
   composerAvailability,
+  annotation,
   send,
   stop,
   onSelectSession,
@@ -220,6 +223,7 @@ export function ChatPanel({
             processing={processing}
             sessionId={sessionId ?? null}
             availability={composerAvailability}
+            annotation={annotation}
           />
         </div>
       </div>

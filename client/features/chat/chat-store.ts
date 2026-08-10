@@ -1,13 +1,19 @@
 import { useStore } from 'zustand'
 import { createStore } from 'zustand/vanilla'
 
-import type { PreviewBlock, PreviewFrame, SessionActivity, UploadInfo } from '@/lib/types'
+import type {
+  PreviewBlock,
+  PreviewFrame,
+  SessionActivity,
+  UploadInfo,
+  WorkspaceTabId
+} from '@/lib/types'
 
 // One composer attachment, tracked per session until the message is sent. It is
 // uploaded as soon as it's added (drop/paste/pick); `status` reflects that
 // in-flight upload, and `upload` holds the server handle once ready. `previewUrl`
 // is a local object URL for image thumbnails (revoked on remove/clear).
-export type ChatAttachment = {
+type ChatAttachmentBase = {
   localId: string
   name: string
   mediaType: string
@@ -16,6 +22,13 @@ export type ChatAttachment = {
   upload?: UploadInfo
   error?: string
 }
+
+export type ChatAttachment = ChatAttachmentBase &
+  ({ kind: 'file'; sourceTab?: never } | { kind: 'annotation'; sourceTab: WorkspaceTabId })
+
+type ChatAttachmentPatch = Partial<
+  Pick<ChatAttachmentBase, 'name' | 'mediaType' | 'previewUrl' | 'status' | 'upload' | 'error'>
+>
 
 // App-level ephemeral chat state — the bits that are *pushed* from the server
 // over the WebSocket and can't be re-fetched as request/response data:
@@ -114,7 +127,7 @@ export type LiveStore = {
     workspaceId: string,
     sessionId: string | null,
     localId: string,
-    patch: Partial<ChatAttachment>
+    patch: ChatAttachmentPatch
   ) => void
   removeAttachment: (workspaceId: string, sessionId: string | null, localId: string) => void
   clearAttachments: (workspaceId: string, sessionId: string | null) => void
@@ -207,6 +220,10 @@ export const liveStore = createStore<LiveStore>()(set => ({
       const k = attachmentKey(workspaceId, sessionId)
       const list = s.attachments[k]
       if (!list) return {}
+      const target = list.find(attachment => attachment.localId === localId)
+      if (target?.previewUrl && 'previewUrl' in patch && patch.previewUrl !== target.previewUrl) {
+        URL.revokeObjectURL(target.previewUrl)
+      }
       return {
         attachments: {
           ...s.attachments,
