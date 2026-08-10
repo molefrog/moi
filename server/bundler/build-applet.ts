@@ -1,8 +1,5 @@
-import type {
-  ExportNamedDeclaration,
-  VariableDeclarator
-} from '@typescript-eslint/types/dist/generated/ast-spec'
-import { parse } from '@typescript-eslint/typescript-estree'
+import { parse } from '@babel/parser'
+import type { ObjectProperty, StringLiteral } from '@babel/types'
 import type { BunPlugin } from 'bun'
 import tailwind from 'bun-plugin-tailwind'
 import { realpathSync } from 'node:fs'
@@ -74,43 +71,37 @@ const VALID_SPANS = [1, 2, 3, 4] as const
 // The properties of an exported `const config = { … }` object literal, or null
 // when the file declares no such export. Shared by the widget and view config
 // extractors — they each interpret the properties under their own schema.
+// Parsed with @babel/parser: it handles TS + JSX with no peer dependencies, so
+// it always resolves from moi's own tree. A parser that peer-depends on
+// `typescript` breaks under bun's shared global tree, where another globally
+// installed package controls which `typescript` sits at the hoisted root.
 function findConfigProperties(source: string) {
-  const ast = parse(source, { jsx: true, errorOnUnknownASTType: false })
+  const ast = parse(source, { sourceType: 'module', plugins: ['typescript', 'jsx'] })
 
-  const exportDecl = ast.body.find(
-    node =>
-      node.type === 'ExportNamedDeclaration' &&
-      node.declaration?.type === 'VariableDeclaration' &&
-      node.declaration.declarations.some(d => d.id.type === 'Identifier' && d.id.name === 'config')
-  ) as ExportNamedDeclaration | undefined
-  if (!exportDecl) return null
+  for (const node of ast.program.body) {
+    if (node.type !== 'ExportNamedDeclaration') continue
+    if (node.declaration?.type !== 'VariableDeclaration') continue
+    const decl = node.declaration.declarations.find(
+      d => d.id.type === 'Identifier' && d.id.name === 'config'
+    )
+    if (!decl) continue
 
-  const varDecl = exportDecl.declaration
-  if (varDecl?.type !== 'VariableDeclaration') return null
+    const rawInit = decl.init
+    // Unwrap `as const` — AST wraps the object in TSAsExpression
+    const init = rawInit?.type === 'TSAsExpression' ? rawInit.expression : rawInit
+    if (init?.type !== 'ObjectExpression') return null
+    return init.properties
+  }
 
-  const decl = varDecl.declarations.find(
-    (d): d is VariableDeclarator & { id: { type: 'Identifier'; name: string } } =>
-      d.id.type === 'Identifier' && d.id.name === 'config'
-  )
-  const rawInit = decl?.init
-  // Unwrap `as const` — AST wraps the object in TSAsExpression
-  const init = rawInit?.type === 'TSAsExpression' ? rawInit.expression : rawInit
-  if (init?.type !== 'ObjectExpression') return null
-
-  return init.properties
+  return null
 }
 
 // `requiredEnv`: an array of string literals naming env vars the bundle needs.
 // Advisory only — surfaced in the env UI, never enforced at build/load.
-function readRequiredEnv(propValue: unknown): string[] | undefined {
-  const value = propValue as { type?: string; elements?: unknown[] }
-  if (value?.type !== 'ArrayExpression') return undefined
-  const names = (value.elements ?? [])
-    .filter(
-      (el): el is { type: 'Literal'; value: string } =>
-        (el as { type?: string })?.type === 'Literal' &&
-        typeof (el as { value?: unknown }).value === 'string'
-    )
+function readRequiredEnv(propValue: ObjectProperty['value']): string[] | undefined {
+  if (propValue.type !== 'ArrayExpression') return undefined
+  const names = propValue.elements
+    .filter((el): el is StringLiteral => el?.type === 'StringLiteral')
     .map(el => el.value)
   return names.length ? names : undefined
 }
@@ -125,8 +116,8 @@ export async function extractWidgetConfig(srcPath: string): Promise<WidgetConfig
   const result: Partial<WidgetConfig> = {}
 
   for (const prop of properties) {
-    if (prop.type !== 'Property' || prop.key?.type !== 'Identifier') continue
-    const key = prop.key.name as string
+    if (prop.type !== 'ObjectProperty' || prop.key.type !== 'Identifier') continue
+    const key = prop.key.name
 
     if (key === 'requiredEnv') {
       const names = readRequiredEnv(prop.value)
@@ -135,7 +126,7 @@ export async function extractWidgetConfig(srcPath: string): Promise<WidgetConfig
     }
 
     if (key !== 'rowSpan' && key !== 'colSpan') continue
-    if (prop.value?.type !== 'Literal' || typeof prop.value.value !== 'number') continue
+    if (prop.value.type !== 'NumericLiteral') continue
 
     const val = prop.value.value
     if (!(VALID_SPANS as readonly number[]).includes(val)) {
@@ -159,17 +150,17 @@ export async function extractViewConfig(srcPath: string): Promise<ViewConfig | n
   const result: ViewConfig = {}
 
   for (const prop of properties) {
-    if (prop.type !== 'Property' || prop.key?.type !== 'Identifier') continue
-    const key = prop.key.name as string
+    if (prop.type !== 'ObjectProperty' || prop.key.type !== 'Identifier') continue
+    const key = prop.key.name
 
     if (key === 'title') {
-      if (prop.value?.type === 'Literal' && typeof prop.value.value === 'string') {
+      if (prop.value.type === 'StringLiteral') {
         result.title = prop.value.value
       }
       continue
     }
     if (key === 'icon') {
-      if (prop.value?.type === 'Literal' && typeof prop.value.value === 'string') {
+      if (prop.value.type === 'StringLiteral') {
         const icon = prop.value.value
         if (!isAppIconId(icon)) {
           throw new Error(`Unknown view icon id "${icon}". Use one of: ${APP_ICON_IDS.join(', ')}`)
