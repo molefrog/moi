@@ -172,7 +172,7 @@ export function ChatComposer({
                 render={
                   <Button
                     type="button"
-                    variant={annotation.active ? 'default' : 'ghost'}
+                    variant={annotation.active ? 'secondary' : 'ghost'}
                     size="icon"
                     onClick={annotation.onToggle}
                     disabled={annotation.starting}

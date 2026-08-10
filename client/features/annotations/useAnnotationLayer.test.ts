@@ -5,7 +5,7 @@ import {
   EMPTY_ANNOTATION_HISTORY,
   pointOnCanvas,
   type AnnotationStroke
-} from './useAnnotationEditor'
+} from './useAnnotationLayer'
 
 const firstStroke: AnnotationStroke = {
   points: [
