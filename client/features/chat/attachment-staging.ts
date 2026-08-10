@@ -95,12 +95,8 @@ export async function stageAnnotation({
       mediaType: upload.mediaType,
       error: undefined
     })
-  } catch (error) {
+  } catch {
     if (!isCurrent()) return
-    liveStore.getState().updateAttachment(workspaceId, sessionId, localId, {
-      status: 'error',
-      upload: undefined,
-      error: error instanceof Error ? error.message : 'Upload failed'
-    })
+    liveStore.getState().removeAttachment(workspaceId, sessionId, localId)
   }
 }
