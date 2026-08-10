@@ -2,10 +2,15 @@ import { useCallback, useEffect, useRef } from 'react'
 
 import { toast } from '@/client/components/ui/toast'
 import { stageAnnotation } from '@/client/features/chat/attachment-staging'
-import { liveStore } from '@/client/features/chat/chat-store'
+import {
+  attachmentKey,
+  type ChatAttachment,
+  liveStore,
+  useLive
+} from '@/client/features/chat/chat-store'
 import type { LayoutMode, WorkspaceTabId } from '@/lib/types'
 
-import type { ChatAnnotationControls } from './types'
+import type { AnnotationDocument, ChatAnnotationControls } from './types'
 import { type AnnotationController, useAnnotationLayer } from './useAnnotationLayer'
 
 type AnnotationOrigin = 'docked' | 'popup'
@@ -33,6 +38,16 @@ export type ChatAnnotationController = AnnotationController & {
   popup: ChatAnnotationControls | undefined
 }
 
+type AnnotationAttachment = Extract<ChatAttachment, { kind: 'annotation' }>
+
+export function findComposerAnnotation(
+  attachments: readonly ChatAttachment[]
+): AnnotationAttachment | undefined {
+  return attachments.find(
+    (attachment): attachment is AnnotationAttachment => attachment.kind === 'annotation'
+  )
+}
+
 export function useChatAnnotation({
   workspaceId,
   sessionId,
@@ -43,13 +58,18 @@ export function useChatAnnotation({
   openPopup
 }: UseChatAnnotationOptions): ChatAnnotationController {
   const draftRef = useRef<ChatAnnotationDraft | null>(null)
+  const attachedAnnotation = useLive(state =>
+    findComposerAnnotation(state.attachments[attachmentKey(workspaceId, sessionId)] ?? [])
+  )
+  const attachedAnnotationRef = useRef(attachedAnnotation)
   const uploadRevisionsRef = useRef(new Map<string, number>())
   const closePopupRef = useRef(closePopup)
   const openPopupRef = useRef(openPopup)
   closePopupRef.current = closePopup
   openPopupRef.current = openPopup
+  attachedAnnotationRef.current = attachedAnnotation
 
-  const change = useCallback((blob: Blob | null) => {
+  const change = useCallback((blob: Blob | null, document: AnnotationDocument) => {
     const draft = draftRef.current
     if (!draft) return
 
@@ -67,6 +87,7 @@ export function useChatAnnotation({
       sessionId: draft.sourceSessionId,
       localId: draft.attachmentId,
       sourceTab: draft.sourceTab,
+      document,
       blob,
       isCurrent: () => uploadRevisionsRef.current.get(draft.attachmentId) === revision
     })
@@ -74,28 +95,36 @@ export function useChatAnnotation({
 
   const complete = useCallback(() => {
     const draft = draftRef.current
-    draftRef.current = null
     if (draft?.origin === 'popup') openPopupRef.current()
   }, [])
 
   const annotation = useAnnotationLayer({ onChange: change, onFinish: complete })
   const { controls } = annotation
-  const { active, starting, open, finish, cancel: cancelLayer } = controls
+  const { active, starting, open, finish, reset } = controls
 
   const start = useCallback(
     async (origin: AnnotationOrigin) => {
       if (!available || active || starting) return
+
+      const existing = attachedAnnotationRef.current
+      if (existing && existing.sourceTab !== activeTab) {
+        toast.add({
+          title: 'Open the annotation’s original tab to keep drawing',
+          type: 'error'
+        })
+        return
+      }
 
       const draft: ChatAnnotationDraft = {
         workspaceId,
         sourceSessionId: sessionId,
         sourceTab: activeTab,
         origin,
-        attachmentId: crypto.randomUUID()
+        attachmentId: existing?.localId ?? crypto.randomUUID()
       }
       draftRef.current = draft
       try {
-        const opened = await open()
+        const opened = await open(existing?.document ?? null)
         if (!opened) {
           if (draftRef.current === draft) draftRef.current = null
           return
@@ -109,18 +138,18 @@ export function useChatAnnotation({
     [active, activeTab, available, open, sessionId, starting, workspaceId]
   )
 
-  const cancel = useCallback(() => {
-    cancelLayer()
+  const discard = useCallback(() => {
+    reset()
     draftRef.current = null
-  }, [cancelLayer])
+  }, [reset])
 
   const remove = useCallback(
     (localId: string) => {
       const revision = (uploadRevisionsRef.current.get(localId) ?? 0) + 1
       uploadRevisionsRef.current.set(localId, revision)
-      if (draftRef.current?.attachmentId === localId) cancel()
+      if (draftRef.current?.attachmentId === localId) discard()
     },
-    [cancel]
+    [discard]
   )
 
   const toggleDocked = useCallback(() => {
@@ -143,9 +172,15 @@ export function useChatAnnotation({
       mode !== expectedMode ||
       !available
     ) {
-      cancel()
+      discard()
     }
-  }, [activeTab, available, cancel, mode, sessionId, workspaceId])
+  }, [activeTab, available, discard, mode, sessionId, workspaceId])
+
+  useEffect(() => {
+    const draft = draftRef.current
+    if (!draft || active || starting || attachedAnnotation?.localId === draft.attachmentId) return
+    discard()
+  }, [active, attachedAnnotation?.localId, discard, starting])
 
   const commonControls = {
     active,

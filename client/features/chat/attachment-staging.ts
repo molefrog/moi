@@ -1,4 +1,5 @@
 import type { WorkspaceTabId } from '@/lib/types'
+import type { AnnotationDocument } from '@/client/features/annotations/types'
 
 import { attachmentKey, type ChatAttachment, liveStore } from './chat-store'
 import { uploadFiles } from './uploads'
@@ -45,6 +46,7 @@ export function stageComposerFiles(
 type StageAnnotationInput = ComposerTarget & {
   localId: string
   sourceTab: WorkspaceTabId
+  document: AnnotationDocument
   blob: Blob
   isCurrent: () => boolean
 }
@@ -54,6 +56,7 @@ export async function stageAnnotation({
   sessionId,
   localId,
   sourceTab,
+  document,
   blob,
   isCurrent
 }: StageAnnotationInput): Promise<void> {
@@ -68,7 +71,8 @@ export async function stageAnnotation({
       previewUrl,
       status: 'uploading',
       upload: undefined,
-      error: undefined
+      error: undefined,
+      document
     })
   } else {
     store.addAttachments(workspaceId, sessionId, [
@@ -76,6 +80,7 @@ export async function stageAnnotation({
         kind: 'annotation',
         localId,
         sourceTab,
+        document,
         name: 'Annotation.png',
         mediaType: 'image/png',
         previewUrl,
