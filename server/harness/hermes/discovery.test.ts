@@ -3,7 +3,13 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { discoverHermesProfiles, findHermesProfile, resolveHermesProfile } from './discovery'
+import {
+  discoverHermesProfiles,
+  findHermesProfile,
+  profileHomeFromWorkspace,
+  profileWorkspace,
+  resolveHermesProfile
+} from './discovery'
 
 let home: string // fake $HERMES_HOME
 let previousHome: string | undefined
@@ -127,5 +133,25 @@ describe('resolveHermesProfile', () => {
 
   test('returns null when nothing matches', async () => {
     expect(await resolveHermesProfile('/unknown', 'ghost')).toBeNull()
+  })
+})
+
+describe('profileHomeFromWorkspace', () => {
+  // Hermes reads skills from the profile home, so a workspace path has to be
+  // able to climb back to it. This is the exact inverse of profileWorkspace.
+  test('inverts profileWorkspace', () => {
+    const home = '/home/u/.hermes/profiles/research'
+    expect(profileHomeFromWorkspace(profileWorkspace(home))).toBe(home)
+  })
+
+  test('inverts the default profile too', () => {
+    expect(profileHomeFromWorkspace(profileWorkspace('/home/u/.hermes'))).toBe('/home/u/.hermes')
+  })
+
+  // A path moi did not lay out must not be climbed — callers fall back to the
+  // workspace rather than writing into an unrelated parent directory.
+  test('returns null for a path that is not a moi-laid-out workspace', () => {
+    expect(profileHomeFromWorkspace('/home/u/projects/app')).toBeNull()
+    expect(profileHomeFromWorkspace('/home/u/.hermes/profiles/research')).toBeNull()
   })
 })

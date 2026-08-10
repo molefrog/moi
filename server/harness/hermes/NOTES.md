@@ -694,3 +694,47 @@ explicit message boundary — "a change in `messageId` indicates a new message"
 — which is the principled version of `AssistantTurnAccumulator`'s heuristic.
 Hermes 0.20.0 does not send it, so the accumulator stays; prefer `messageId`
 when an agent provides it.
+
+## 13. Skills are profile-global, not workspace-local
+
+Hermes resolves skills from exactly two places — `$HERMES_HOME/skills`
+(`hermes_constants.get_skills_dir`) and the explicit `skills.external_dirs`
+list in `config.yaml`. **There is no cwd-relative skill path.** Under
+`hermes -p <name>`, `$HERMES_HOME` is `<root>/profiles/<name>`, so the scanned
+directory is `<profile>/skills`.
+
+moi therefore installs its skills into the **profile home**, not the
+workspace, even though the workspace is `<profile>/workspace`. Installing into
+the workspace (the OpenClaw shape, where the workspace _is_ the agent root)
+leaves them invisible: `skills list` omits them and `skill view moi-workspace`
+fails outright. The agent can still stumble on the files by shell-searching the
+cwd, which is what made the bug look like it worked.
+
+`skillsDir` climbs back with `profileHomeFromWorkspace()` — the exact inverse
+of `profileWorkspace()`, kept beside it in `discovery.ts`, returning null for
+any path moi did not lay out so callers fall back instead of writing into an
+unrelated parent. `skillsDirFor` is the single resolver, so install, update and
+version-check all follow.
+
+Verified against Hermes 0.20.0:
+
+- a flat `<skills>/<name>/SKILL.md` is discovered — the bundled tree is
+  `<skills>/<category>/<name>/`, but the scanner accepts both
+- `skills list` reports it as `local` / `enabled`, and `skill view` returns
+  its body
+- `hermes update` will not delete it: `tools/skills_sync.sync_skills` iterates
+  the _bundled_ list only and never scans the destination for unknown entries;
+  its one `rmtree` is gated on the directory hashing identical to a bundled
+  skill
+
+**Consequences, accepted deliberately.** The skills are profile-global: every
+session on that profile sees them, including plain `hermes` runs and gateway
+(Telegram/Discord) chats — not just moi. Importing the _default_ profile puts
+them in `~/.hermes/skills`, the root install's own directory. They also outlive
+the workspace: removing the moi workspace leaves the skill in the profile's
+list. Nothing writes to `config.yaml`, `.env` or `SOUL.md` — this is the same
+directory `hermes skills install` targets.
+
+Workspaces imported before this landed keep a stale copy under
+`<workspace>/skills/`. It is inert (Hermes never scans there) and is left
+alone rather than deleted.

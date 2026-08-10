@@ -10,9 +10,11 @@
 // that command prints an ASCII table with no --json mode.
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 
 export const DEFAULT_PROFILE = 'default'
+
+const WORKSPACE_DIR = 'workspace'
 
 export type HermesProfile = {
   // Profile id, as passed to `hermes -p <id>`. 'default' is the unnamed one.
@@ -34,7 +36,16 @@ export function hermesHome(): string {
 // `hermes profile create`; the default profile has no such directory, so moi
 // uses the same convention under $HERMES_HOME and creates it on init.
 export function profileWorkspace(home: string): string {
-  return join(home, 'workspace')
+  return join(home, WORKSPACE_DIR)
+}
+
+// Exact inverse of `profileWorkspace` — keep the pair together. Hermes reads
+// skills from `$HERMES_HOME/skills` (the profile home), never from the session
+// cwd, so anything scoped to a workspace has to climb back to its profile.
+// Returns null for a path moi did not lay out, so callers can fall back rather
+// than write into a surprising directory.
+export function profileHomeFromWorkspace(workspacePath: string): string | null {
+  return basename(workspacePath) === WORKSPACE_DIR ? dirname(workspacePath) : null
 }
 
 async function isDir(path: string): Promise<boolean> {

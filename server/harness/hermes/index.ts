@@ -5,6 +5,8 @@
 // See ./NOTES.md for the protocol research and the two backend quirks the ACP
 // layer works around.
 import type { DiscoveredWorkspaceCandidate, Harness } from '../types'
+import { join } from 'node:path'
+
 import type { HarnessAvailability } from '@/lib/types'
 
 import { acpWorkspacePreview, listAcpModels, listAcpSessions } from '../acp/discovery'
@@ -19,7 +21,12 @@ import {
   sendAcpMessage
 } from '../acp/session'
 import { getAcpProcessInfo, killAcpWorkspace, killAllAcpClients } from '../acp/client'
-import { DEFAULT_PROFILE, discoverHermesProfiles, resolveHermesProfile } from './discovery'
+import {
+  DEFAULT_PROFILE,
+  discoverHermesProfiles,
+  profileHomeFromWorkspace,
+  resolveHermesProfile
+} from './discovery'
 import { findHarnessExecutable, pathHarnessAvailability } from '../executable'
 
 // Hermes ships three session modes; `dont_ask` is the one that auto-allows
@@ -116,9 +123,13 @@ export const hermesHarness: Harness = {
     forgetAllAcpSessions()
     killAllAcpClients()
   },
-  // Hermes resolves <profile>/skills with the highest precedence, so moi's
-  // skills land there and win over bundled ones.
-  skillsDir: workspaceRoot => `${workspaceRoot}/skills`,
+  // Hermes reads skills from the PROFILE home (`$HERMES_HOME/skills`) and has
+  // no cwd-relative skill path, so installing into the workspace would leave
+  // them invisible to `skill view` / `skills list` — see NOTES.md §13. That
+  // makes moi's skills profile-global: every session on this profile sees
+  // them, including plain `hermes` runs and gateway chats.
+  skillsDir: workspaceRoot =>
+    join(profileHomeFromWorkspace(workspaceRoot) ?? workspaceRoot, 'skills'),
   debugInfo: ws => getAcpProcessInfo(ws.path, findHarnessExecutable('hermes')),
   wireScope: ws => ws.path,
 
