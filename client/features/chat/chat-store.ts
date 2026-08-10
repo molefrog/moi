@@ -1,7 +1,6 @@
 import { useStore } from 'zustand'
 import { createStore } from 'zustand/vanilla'
 
-import type { AnnotationDocument } from '@/client/features/annotations/types'
 import type {
   PreviewBlock,
   PreviewFrame,
@@ -25,14 +24,11 @@ type ChatAttachmentBase = {
 }
 
 export type ChatAttachment = ChatAttachmentBase &
-  (
-    | { kind: 'file'; sourceTab?: never; document?: never }
-    | { kind: 'annotation'; sourceTab: WorkspaceTabId; document: AnnotationDocument }
-  )
+  ({ kind: 'file'; sourceTab?: never } | { kind: 'annotation'; sourceTab: WorkspaceTabId })
 
 type ChatAttachmentPatch = Partial<
   Pick<ChatAttachmentBase, 'name' | 'mediaType' | 'previewUrl' | 'status' | 'upload' | 'error'>
-> & { document?: AnnotationDocument }
+>
 
 // App-level ephemeral chat state — the bits that are *pushed* from the server
 // over the WebSocket and can't be re-fetched as request/response data:
@@ -228,21 +224,10 @@ export const liveStore = createStore<LiveStore>()(set => ({
       if (target?.previewUrl && 'previewUrl' in patch && patch.previewUrl !== target.previewUrl) {
         URL.revokeObjectURL(target.previewUrl)
       }
-      const { document, ...basePatch } = patch
       return {
         attachments: {
           ...s.attachments,
-          [k]: list.map(attachment => {
-            if (attachment.localId !== localId) return attachment
-            if (attachment.kind === 'annotation') {
-              return {
-                ...attachment,
-                ...basePatch,
-                document: document ?? attachment.document
-              }
-            }
-            return { ...attachment, ...basePatch }
-          })
+          [k]: list.map(a => (a.localId === localId ? { ...a, ...patch } : a))
         }
       }
     }),

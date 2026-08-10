@@ -3,7 +3,6 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { QueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import type { AnnotationDocument } from '@/client/features/annotations/types'
 import {
   attachmentsForSend,
   ownsComposerAttachments,
@@ -17,11 +16,6 @@ import type { SessionInfo, ViewState, WorkspaceAgent } from '@/lib/types'
 
 const workspaceId = 'workspace-1'
 const sessionId = 'session-1'
-const annotationDocument: AnnotationDocument = {
-  width: 100,
-  height: 100,
-  history: { past: [], present: [], future: [] }
-}
 
 afterEach(() => {
   liveStore.setState({ activity: {}, errors: {}, attachments: {} })
@@ -224,7 +218,6 @@ describe('composer attachments', () => {
         name: 'Annotation.png',
         mediaType: 'image/png',
         sourceTab: 'widgets',
-        document: annotationDocument,
         status: 'ready',
         upload: { id: 'up-annotation', kind: 'image' } as ChatAttachment['upload']
       },
@@ -234,7 +227,6 @@ describe('composer attachments', () => {
         name: 'Annotation.png',
         mediaType: 'image/png',
         sourceTab: 'view:roadmap',
-        document: annotationDocument,
         status: 'ready',
         upload: { id: 'up-annotation-2', kind: 'image' } as ChatAttachment['upload']
       }
@@ -255,7 +247,6 @@ describe('composer attachments', () => {
       name: 'Annotation.png',
       mediaType: 'image/png',
       sourceTab: 'widgets',
-      document: annotationDocument,
       status: 'ready',
       upload: { id: 'up-annotation', kind: 'image' } as ChatAttachment['upload']
     }
