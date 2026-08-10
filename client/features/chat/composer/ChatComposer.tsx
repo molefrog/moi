@@ -104,7 +104,7 @@ export function ChatComposer({
       className={cn(dragOver && 'ring-2 ring-ring/60')}
     >
       {attachments.length > 0 && (
-        <div className="flex flex-wrap gap-2 px-1 pt-1 pb-0.5">
+        <div className="flex flex-wrap gap-2 px-1 pt-1 pb-1">
           {attachments.map(a => (
             <AttachmentChip
               key={a.localId}
@@ -233,7 +233,7 @@ function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
   return (
     <div
       className={cn(
-        'group relative flex items-center gap-2 overflow-hidden rounded-lg border border-border bg-accent text-accent-foreground',
+        'group relative flex items-center gap-2 overflow-hidden rounded-lg bg-accent text-accent-foreground ring-1 ring-border',
         isImage ? 'size-14' : 'h-10 max-w-52 pr-2 pl-2',
         status === 'error' && 'border-destructive/50'
       )}
@@ -280,13 +280,14 @@ type AnnotationAttachmentChipProps = {
 
 function AnnotationAttachmentChip({ attachment, onRemove }: AnnotationAttachmentChipProps) {
   const { previewUrl } = attachment
+
   return (
     <HoverCard>
       <HoverCardTrigger
         render={
           <div
             tabIndex={0}
-            className="group flex h-7 cursor-default items-center rounded-md bg-accent pr-2 pl-0.5 text-sm whitespace-nowrap text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="group flex h-7 cursor-default items-center rounded-md bg-background pr-2 pl-0.5 text-sm whitespace-nowrap text-foreground ring-1 ring-border outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
           />
         }
       >
