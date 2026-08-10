@@ -160,6 +160,9 @@ export function useChatAnnotation({
     if (active) void finish()
     else void start('popup')
   }, [active, finish, start])
+  const finishDrawing = useCallback(() => {
+    void finish()
+  }, [finish])
 
   useEffect(() => {
     const draft = draftRef.current
@@ -185,6 +188,7 @@ export function useChatAnnotation({
   const commonControls = {
     active,
     starting,
+    finish: finishDrawing,
     onRemove: remove
   }
 

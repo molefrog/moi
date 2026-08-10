@@ -24,6 +24,7 @@ export type AnnotationDocument = {
 export type ChatAnnotationControls = {
   active: boolean
   starting: boolean
+  finish: () => void
   onToggle: () => void
   onRemove: (localId: string) => void
 }

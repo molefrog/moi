@@ -73,6 +73,7 @@ export function ChatComposer({
 
   const send = () => {
     if (!canSend) return
+    if (annotation?.active) annotation.finish()
     onSend(value)
     useUiStore.getState().setComposerDraft(workspaceId, '')
   }
