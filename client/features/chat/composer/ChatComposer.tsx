@@ -161,7 +161,8 @@ export function ChatComposer({
                   onClick={() => fileRef.current?.click()}
                   aria-label="Attach files"
                 >
-                  <IconPaperclip stroke={1.5} />
+                  {/* Paperclip is too heavy compared to the nearby scribble icon */}
+                  <IconPaperclip stroke={1.5} className="size-4.75!" />
                 </Button>
               }
             />

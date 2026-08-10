@@ -61,14 +61,14 @@ export function AnnotationToolbar({ controls }: AnnotationToolbarProps) {
       </div>
       <Button
         type="button"
-        variant={controls.canUndo ? 'default' : 'ghost'}
+        variant={controls.hasStrokes ? 'default' : 'ghost'}
         size="icon-sm"
         onClick={() => void controls.finish()}
         disabled={controls.finishing}
         aria-label="Finish annotation"
-        className={cn(!controls.canUndo && 'text-muted-foreground')}
+        className={cn(!controls.hasStrokes && 'text-muted-foreground')}
       >
-        {controls.canUndo ? <IconCheck stroke={1.75} /> : <IconX stroke={1.75} />}
+        {controls.hasStrokes ? <IconCheck stroke={1.75} /> : <IconX stroke={1.75} />}
       </Button>
     </div>
   )
