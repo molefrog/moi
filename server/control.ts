@@ -7,7 +7,7 @@ import { isParamsRecord } from '@/lib/workspace-tabs'
 
 import { clearAppletLog, getAppletLog, getAppletLogCount } from './applet-log'
 import { serializeWorkspaceBundle } from './bundle-queue'
-import { CONTROL_PORT, PORT } from './constants'
+import { CONTROL_HOST, CONTROL_PORT, PORT } from './constants'
 import { applyEnvChanged } from './env-apply'
 import { callFunctionEphemeral, parseFunctionPath } from './functions'
 import { processIcon } from './icon'
@@ -63,7 +63,7 @@ async function resolveWorkspace(
 
 export const control = Bun.serve({
   port: CONTROL_PORT,
-  hostname: '127.0.0.1',
+  hostname: CONTROL_HOST,
   fetch(req, server) {
     return server.upgrade(req)
       ? new Response(null, { status: 101 })

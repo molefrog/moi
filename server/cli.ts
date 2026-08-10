@@ -40,7 +40,8 @@ import {
   resolveCwdWorkspace
 } from './cli-env'
 import { columns } from './cli-ui'
-import { CONTROL_PORT, PORT } from './constants'
+import { CONTROL_HOST, CONTROL_PORT, CONTROL_URL, PORT } from './constants'
+import { type ControlProbe, controlFailureMessage, probeControlServer } from './control-client'
 import { type OpenClawAgent, discoverOpenClawAgents } from './harness/openclaw/discovery'
 import { liftToWorkspaceRoot, registerWorkspace } from './registry'
 import { serverCwd } from './server-cwd'
@@ -83,22 +84,15 @@ import { provisionWorkspace } from './workspace-init'
 // ---- helpers ----------------------------------------------------------------
 
 async function isServerRunning(): Promise<boolean> {
-  return new Promise(resolve => {
-    const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
-    const timer = setTimeout(() => {
-      ws.close()
-      resolve(false)
-    }, 600)
-    ws.onopen = () => {
-      clearTimeout(timer)
-      ws.close()
-      resolve(true)
-    }
-    ws.onerror = () => {
-      clearTimeout(timer)
-      resolve(false)
-    }
-  })
+  return (await probeControlServer()).status === 'running'
+}
+
+// Print why the control socket could not be opened, then exit. Classifies the
+// failure first, so "no server is listening" and "the server is up but the
+// address is unreachable" no longer read as the same problem.
+async function exitControlUnreachable(): Promise<never> {
+  console.error(controlFailureMessage(await probeControlServer()))
+  process.exit(1)
 }
 
 async function waitForServer(timeoutMs = 10_000): Promise<boolean> {
@@ -112,7 +106,7 @@ async function waitForServer(timeoutMs = 10_000): Promise<boolean> {
 
 async function registerViaControl(absPath: string): Promise<string> {
   return new Promise((res, rej) => {
-    const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
+    const ws = new WebSocket(CONTROL_URL)
     ws.onopen = () => ws.send(JSON.stringify({ type: 'workspace:register', path: absPath }))
     ws.onmessage = event => {
       const data = JSON.parse(String(event.data))
@@ -121,7 +115,7 @@ async function registerViaControl(absPath: string): Promise<string> {
         res(data.id)
       }
     }
-    ws.onerror = () => rej(new Error('Could not connect to control server'))
+    ws.onerror = () => void probeControlServer().then(p => rej(new Error(controlFailureMessage(p))))
   })
 }
 
@@ -486,7 +480,7 @@ const bundle = defineCommand({
     // Computed locally up front so it can ride along in the success output; the
     // agent reads this and knows to run `moi skill update`.
     const notice = await staleSkillNotice(path)
-    const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
+    const ws = new WebSocket(CONTROL_URL)
 
     ws.onopen = () =>
       ws.send(
@@ -567,10 +561,7 @@ const bundle = defineCommand({
       process.exit(failed.length > 0 ? 1 : 0)
     }
 
-    ws.onerror = () => {
-      console.error('Could not connect to control server. Is the main process running?')
-      process.exit(1)
-    }
+    ws.onerror = () => void exitControlUnreachable()
   }
 })
 
@@ -594,7 +585,7 @@ const builderSet = defineCommand({
   },
   run({ args }) {
     const path = resolve(args.dir)
-    const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
+    const ws = new WebSocket(CONTROL_URL)
     ws.onopen = () =>
       ws.send(
         JSON.stringify({
@@ -625,10 +616,7 @@ const builderSet = defineCommand({
       ws.close()
       process.exit(0)
     }
-    ws.onerror = () => {
-      console.error('Could not connect to control server. Is the main process running?')
-      process.exit(1)
-    }
+    ws.onerror = () => void exitControlUnreachable()
   }
 })
 
@@ -659,7 +647,7 @@ const refresh = defineCommand({
       process.exit(1)
     }
     const notice = await staleSkillNotice(process.cwd())
-    const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
+    const ws = new WebSocket(CONTROL_URL)
 
     ws.onopen = () => ws.send(JSON.stringify({ type: 'applets:refresh', only: args.only }))
 
@@ -678,10 +666,7 @@ const refresh = defineCommand({
       process.exit(0)
     }
 
-    ws.onerror = () => {
-      console.error('Could not connect to control server. Is the main process running?')
-      process.exit(1)
-    }
+    ws.onerror = () => void exitControlUnreachable()
   }
 })
 
@@ -720,7 +705,7 @@ const theme = defineCommand({
   async run({ args }) {
     const path = resolve(args.dir)
     const notice = await staleSkillNotice(path)
-    const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
+    const ws = new WebSocket(CONTROL_URL)
 
     ws.onopen = () =>
       ws.send(
@@ -834,10 +819,7 @@ const theme = defineCommand({
       process.exit(0)
     }
 
-    ws.onerror = () => {
-      console.error('Could not connect to control server. Is the main process running?')
-      process.exit(1)
-    }
+    ws.onerror = () => void exitControlUnreachable()
   }
 })
 
@@ -858,13 +840,22 @@ function versionMismatchNotice(serverVersion: string): string | null {
 const status = defineCommand({
   meta: { name: 'status', description: 'Show server status and registered workspaces' },
   async run() {
-    const running = await isServerRunning()
+    const probe: ControlProbe = await probeControlServer()
     const notice = await staleSkillNotice(process.cwd())
 
-    if (!running) {
+    if (probe.status === 'not-running') {
       console.log('\n' + pc.dim('○') + ' Server is ' + pc.bold('not running'))
       console.log(pc.dim(`  cli version ${VERSION}`) + '\n')
       process.exit(0)
+    }
+
+    // The dial failed for a reason other than an empty port, so the server may
+    // be up and healthy. Name the real obstacle instead of blaming the process.
+    if (probe.status === 'unreachable') {
+      console.log('\n' + pc.yellow('◆') + ' Server is ' + pc.bold('unreachable'))
+      console.log(pc.dim(`  control port ${CONTROL_HOST}:${CONTROL_PORT} — ${probe.reason}`))
+      console.log(pc.dim(`  cli version ${VERSION}`) + '\n')
+      process.exit(1)
     }
 
     const info = await queryServerInfo()
@@ -890,7 +881,7 @@ const status = defineCommand({
     if (mismatch) console.log('\n' + mismatch)
 
     await new Promise<void>((resolve, reject) => {
-      const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
+      const ws = new WebSocket(CONTROL_URL)
 
       ws.onopen = () => ws.send(JSON.stringify({ type: 'workspace:list' }))
 
@@ -904,7 +895,8 @@ const status = defineCommand({
         resolve()
       }
 
-      ws.onerror = () => reject(new Error('Could not connect to control server'))
+      ws.onerror = () =>
+        void probeControlServer().then(p => reject(new Error(controlFailureMessage(p))))
     })
 
     if (notice) console.log(pc.yellow(notice) + '\n')
@@ -1207,7 +1199,7 @@ async function sendConfig(payload: {
   clearIcon?: boolean
 }) {
   const notice = await staleSkillNotice(payload.path)
-  const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
+  const ws = new WebSocket(CONTROL_URL)
   ws.onopen = () => ws.send(JSON.stringify({ type: 'config', ...payload }))
   ws.onmessage = event => {
     const res = JSON.parse(String(event.data))
@@ -1240,10 +1232,7 @@ async function sendConfig(payload: {
     ws.close()
     process.exit(0)
   }
-  ws.onerror = () => {
-    console.error('Could not connect to control server. Is the main process running?')
-    process.exit(1)
-  }
+  ws.onerror = () => void exitControlUnreachable()
 }
 
 // A terse cheat sheet — one line per command — so an agent can grasp the
@@ -1482,7 +1471,7 @@ function sendControl(
   payload: Record<string, unknown>,
   onResult: (res: Record<string, unknown>) => void | Promise<void>
 ) {
-  const ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
+  const ws = new WebSocket(CONTROL_URL)
   ws.onopen = () => ws.send(JSON.stringify(payload))
   ws.onmessage = async event => {
     const res = JSON.parse(String(event.data))
@@ -1499,10 +1488,7 @@ function sendControl(
     ws.close()
     process.exit(0)
   }
-  ws.onerror = () => {
-    console.error('Could not connect to control server. Is the main process running?')
-    process.exit(1)
-  }
+  ws.onerror = () => void exitControlUnreachable()
 }
 
 function sendScratch(
