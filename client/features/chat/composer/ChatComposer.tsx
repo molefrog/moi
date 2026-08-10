@@ -173,19 +173,18 @@ export function ChatComposer({
                 render={
                   <Button
                     type="button"
-                    variant={annotation.active ? 'secondary' : 'ghost'}
+                    variant="ghost"
                     size="icon"
                     onClick={annotation.onToggle}
-                    aria-label={annotation.active ? 'Finish annotation' : 'Draw annotation'}
+                    className={cn(annotation.active && 'bg-accent')}
+                    aria-label="Draw annotation"
                     aria-pressed={annotation.active}
                   >
                     <IconScribble stroke={1.5} />
                   </Button>
                 }
               />
-              <TooltipContent>
-                {annotation.active ? 'Finish annotation' : 'Draw annotation'}
-              </TooltipContent>
+              <TooltipContent>Draw annotation</TooltipContent>
             </Tooltip>
           )}
         </div>
@@ -282,46 +281,43 @@ type AnnotationAttachmentChipProps = {
 function AnnotationAttachmentChip({ attachment, onRemove }: AnnotationAttachmentChipProps) {
   const { previewUrl, status, error } = attachment
   return (
-    <div className="group relative">
-      <HoverCard>
-        <HoverCardTrigger
-          render={
-            <Button
-              type="button"
-              variant={status === 'error' ? 'destructive' : 'secondary'}
-              size="sm"
-              title={error ?? 'Annotation'}
-              className="pr-8"
-            />
-          }
-        >
-          {status === 'uploading' ? (
-            <IconLoader2 className="animate-spin" stroke={1.75} />
-          ) : (
-            <IconScribble stroke={1.75} />
-          )}
-          <span>{status === 'error' ? 'Annotation failed' : 'Annotation'}</span>
-        </HoverCardTrigger>
-        {previewUrl && (
-          <HoverCardContent side="top" align="start" className="w-80 max-w-[calc(100vw-2rem)]">
-            <img
-              src={previewUrl}
-              alt="Annotation preview"
-              className="max-h-72 w-full rounded-lg object-contain"
-            />
-          </HoverCardContent>
-        )}
-      </HoverCard>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        onClick={onRemove}
-        aria-label="Remove annotation"
-        className="absolute top-1/2 right-1 size-6 -translate-y-1/2 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
+    <HoverCard>
+      <HoverCardTrigger
+        render={
+          <div
+            tabIndex={0}
+            title={error ?? 'Annotation'}
+            className={cn(
+              'group flex h-7 cursor-default items-center rounded-md bg-accent pr-2 pl-0.5 text-sm whitespace-nowrap text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+              status === 'error' &&
+                'bg-destructive/10 text-destructive focus-visible:ring-destructive/20'
+            )}
+          />
+        }
       >
-        <IconX stroke={1.75} />
-      </Button>
-    </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          onClick={onRemove}
+          aria-label="Remove annotation"
+          className="size-6 shrink-0 hover:bg-transparent hover:text-current"
+        >
+          <IconScribble stroke={1.75} className="group-focus-within:hidden group-hover:hidden" />
+          <IconX stroke={1.75} className="hidden group-focus-within:block group-hover:block" />
+        </Button>
+        <span>{status === 'error' ? 'Annotation failed' : 'Annotation'}</span>
+        {status === 'uploading' && <IconLoader2 size={16} className="animate-spin" stroke={1.75} />}
+      </HoverCardTrigger>
+      {previewUrl && (
+        <HoverCardContent side="top" align="start" className="w-80 max-w-[calc(100vw-2rem)]">
+          <img
+            src={previewUrl}
+            alt="Annotation preview"
+            className="max-h-72 w-full rounded-lg object-contain"
+          />
+        </HoverCardContent>
+      )}
+    </HoverCard>
   )
 }
