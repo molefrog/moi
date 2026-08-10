@@ -87,6 +87,15 @@ export function pointOnCanvas(
   }
 }
 
+function coalescedPointsOnCanvas(
+  canvas: HTMLCanvasElement,
+  event: PointerEvent
+): AnnotationPoint[] {
+  const coalesced = event.getCoalescedEvents?.() ?? []
+  const samples = coalesced.length > 0 ? coalesced : [event]
+  return samples.map(sample => pointOnCanvas(canvas, sample.clientX, sample.clientY))
+}
+
 type AnnotationLayerSession = {
   id: number
   snapshot: HTMLCanvasElement
@@ -426,7 +435,7 @@ export function useAnnotationLayer({
       draftRef.current = {
         points: [
           ...draftRef.current.points,
-          pointOnCanvas(event.currentTarget, event.clientX, event.clientY)
+          ...coalescedPointsOnCanvas(event.currentTarget, event.nativeEvent)
         ]
       }
       redraw(historyRef.current.present, draftRef.current)
@@ -436,7 +445,7 @@ export function useAnnotationLayer({
       const stroke = {
         points: [
           ...draftRef.current.points,
-          pointOnCanvas(event.currentTarget, event.clientX, event.clientY)
+          ...coalescedPointsOnCanvas(event.currentTarget, event.nativeEvent)
         ]
       }
       draftRef.current = null
