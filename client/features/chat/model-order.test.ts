@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
 import {
+  groupModels,
   hasEffortChoice,
   resolveDisplayedEffort,
   resolveEffortIndex,
@@ -166,5 +167,31 @@ describe('resolveFastMode', () => {
 
   test('stays disabled for an unsupported model', () => {
     expect(resolveFastMode(model('unsupported'), true)).toBe(false)
+  })
+})
+
+describe('groupModels', () => {
+  test('sections a grouped catalog in first-appearance order', () => {
+    const models = [
+      { ...model('nous:opus'), group: 'Nous Portal' },
+      { ...model('ollama:llama4'), group: 'Ollama' },
+      { ...model('nous:sonnet'), group: 'Nous Portal' }
+    ]
+
+    expect(
+      groupModels(models, 'Models').map(group => [group.label, group.models.map(m => m.value)])
+    ).toEqual([
+      ['Nous Portal', ['nous:opus', 'nous:sonnet']],
+      ['Ollama', ['ollama:llama4']]
+    ])
+  })
+
+  test('keeps an ungrouped catalog in one fallback section', () => {
+    const models = [model('opus'), model('sonnet')]
+    const groups = groupModels(models, 'Models')
+
+    expect(groups).toHaveLength(1)
+    expect(groups[0]?.label).toBe('Models')
+    expect(groups[0]?.models).toEqual(models)
   })
 })

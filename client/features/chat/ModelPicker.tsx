@@ -7,6 +7,7 @@ import { IconBolt, IconBoltFilled } from '@tabler/icons-react'
 import { useSaveSessionConfig, useSessionConfig } from './api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import {
+  groupModels,
   hasEffortChoice,
   resolveDisplayedEffort,
   resolveEffortIndex,
@@ -40,6 +41,13 @@ import type { Model } from '@/lib/types'
 // headline (e.g. "Opus 4.8 with 1M context · Most capable…" → "Opus 4.8 with 1M context").
 function headline(description?: string): string {
   return description?.split(/\s*·\s*/)[0] ?? ''
+}
+
+// Row and trigger label. Claude's description headline names the model better
+// than its `displayName` ("Sonnet 4.6 with 1M context" vs "Sonnet"); backends
+// without one fall back to the name.
+function modelLabel(model: Model): string {
+  return headline(model.description) || model.displayName
 }
 
 function capitalize(s: string): string {
@@ -92,7 +100,8 @@ type ModelDropdownProps = {
 }
 
 function ModelDropdown({ current, model, models, onValueChange }: ModelDropdownProps) {
-  const label = headline(model.description) || model.displayName
+  const label = modelLabel(model)
+  const groups = groupModels(models, 'Models')
 
   return (
     <DropdownMenu>
@@ -100,16 +109,18 @@ function ModelDropdown({ current, model, models, onValueChange }: ModelDropdownP
         render={<PickerTrigger label={label} aria-label={`Model: ${label}`} />}
       />
       <DropdownMenuContent align="end" side="top" className="w-max max-w-64 min-w-40">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>Models</DropdownMenuLabel>
-          <DropdownMenuRadioGroup value={current} onValueChange={onValueChange}>
-            {models.map(item => (
-              <DropdownMenuRadioItem key={item.value} value={item.value} closeOnClick>
-                {headline(item.description) || item.displayName}
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuGroup>
+        <DropdownMenuRadioGroup value={current} onValueChange={onValueChange}>
+          {groups.map(group => (
+            <DropdownMenuGroup key={group.label}>
+              <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+              {group.models.map(item => (
+                <DropdownMenuRadioItem key={item.value} value={item.value} closeOnClick>
+                  {modelLabel(item)}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuGroup>
+          ))}
+        </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   )

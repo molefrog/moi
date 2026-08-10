@@ -1,5 +1,5 @@
 import claudeIcon from '@/client/assets/claude.svg'
-import hermesIcon from '@/client/assets/hermes.svg'
+import hermesIcon from '@/client/assets/hermes.png'
 import openaiIcon from '@/client/assets/openai.svg'
 import openclawIcon from '@/client/assets/openclaw.svg'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'

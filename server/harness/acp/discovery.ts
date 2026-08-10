@@ -4,7 +4,7 @@ import type { Model, SessionInfo } from '@/lib/types'
 import { type AcpProviderConfig, type AcpSpawnContext } from './session'
 import { acpSessionToSessionInfo } from './adapter'
 import { getAcpClient, peekAcpClient } from './client'
-import type { ListSessionsResponse, AcpModelState, AcpNewSessionResult } from './wire'
+import type { ListSessionsResponse, AcpModelInfo, AcpModelState, AcpNewSessionResult } from './wire'
 import type { WorkspaceActivityPreview } from '../types'
 import { debug } from '../../debug'
 
@@ -105,15 +105,17 @@ export async function listAcpModels(
     })
     modelCatalogs.set(ctx.workspacePath, cached)
   }
-  try {
-    const state = await cached
-    return (state?.availableModels ?? []).map(
-      (m): Model => ({
+  const mapModels =
+    config.mapModels ??
+    ((infos: AcpModelInfo[]): Model[] =>
+      infos.map(m => ({
         value: m.modelId,
         displayName: m.name ?? m.modelId,
         ...(m.description ? { description: m.description } : {})
-      })
-    )
+      })))
+  try {
+    const state = await cached
+    return mapModels(state?.availableModels ?? [])
   } catch (err) {
     debug(`${config.id} model catalog failed: ${err instanceof Error ? err.message : String(err)}`)
     return []

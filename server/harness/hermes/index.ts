@@ -27,6 +27,7 @@ import {
   profileHomeFromWorkspace,
   resolveHermesProfile
 } from './discovery'
+import { hermesModels } from './models'
 import { findHarnessExecutable, pathHarnessAvailability } from '../executable'
 
 // Hermes ships three session modes; `dont_ask` is the one that auto-allows
@@ -38,6 +39,7 @@ const config: AcpProviderConfig = {
   id: 'hermes',
   provider: 'hermes',
   noPromptModeId: NO_PROMPT_MODE,
+  mapModels: hermesModels,
   supportsImages: true,
   async spawn(ctx) {
     const bin = findHarnessExecutable('hermes')

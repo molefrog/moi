@@ -21,7 +21,7 @@
 import { appendAttachmentNote } from '@/lib/attachment-note'
 import { type MoiContext, appendMoiContext, renderMoiContext } from '@/lib/moi-context'
 import { type Part, applyEvent, emptyViewState } from '@/lib/format'
-import type { SessionActivity, StreamEvent, ViewState, WorkspaceType } from '@/lib/types'
+import type { Model, SessionActivity, StreamEvent, ViewState, WorkspaceType } from '@/lib/types'
 
 import {
   type AcpProviderId,
@@ -32,6 +32,7 @@ import {
 } from './adapter'
 import { type AcpClient, type AcpSpawnSpec, getAcpClient } from './client'
 import type {
+  AcpModelInfo,
   AcpNewSessionResult,
   AcpPromptBlock,
   PromptResponse,
@@ -66,6 +67,11 @@ export type AcpProviderConfig = {
   noPromptModeId?: string
   // Does the backend send images as base64 content blocks?
   supportsImages?: boolean
+  // How the backend's model catalog becomes picker rows. ACP says nothing
+  // about how `name`/`description` are formatted, so a backend that packs
+  // extra structure into them (Hermes: the provider) unpacks it here.
+  // Defaults to a straight passthrough.
+  mapModels?: (models: AcpModelInfo[]) => Model[]
 }
 
 type QueuedSend = { blocks: AcpPromptBlock[]; turnId: string }

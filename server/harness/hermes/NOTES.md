@@ -120,9 +120,51 @@ Two things moi's other backends make you fetch separately arrive **inline**:
 
 - `models.availableModels` — 52 entries in the probe, merged across every
   configured provider (`openai-api:gpt-5.4-mini`, `custom:kimi-k2.7-code`, …),
-  plus `models.currentModelId`. This is `listModels()` for free.
+  plus `models.currentModelId`. This is `listModels()` for free. See §3.2.1 for
+  the entry shape, which needs normalizing before it reaches a picker.
 - `modes.availableModes` — `default` (ask before edits) / `accept_edits` /
   `dont_ask`, plus `currentModeId`. This is the permission policy (§3.5).
+
+#### 3.2.1 The model catalog is three strings, and one of them repeats
+
+Probed against a live install (59 entries): every `availableModels` row has
+exactly `modelId`, `name`, `description` — no context window, pricing,
+modality or reasoning metadata. Hermes owns all of that (`cache/model_catalog.json`,
+`models_dev_cache.json`, `context_length_cache.yaml` under `$HERMES_HOME`) but
+does not put any of it on the wire; reading those files means reading Hermes'
+private cache format, keyed by ids that do not match ACP's `<provider>:<model>`
+namespace. Not worth it.
+
+```json
+{
+  "modelId": "nous:anthropic/claude-opus-5",
+  "name": "Nous Portal · anthropic/claude-opus-5",
+  "description": "Provider: Nous Portal"
+}
+```
+
+Three consequences, all handled in `./models.ts`:
+
+- **`description` is the provider, not a blurb** — the same string for all 34
+  models behind it, with a ` • current` suffix on `currentModelId`'s row. moi's
+  picker labels rows from the description headline, so passed through as-is it
+  renders dozens of identical rows. It becomes the group heading instead.
+- **`name` repeats the provider — but not always.** Most rows are
+  `"<provider> · <model>"`; the rows from a `providers:` block in `config.yaml`
+  carry a bare `"gpt-oss:20b"`. That is why the group is taken from
+  `description` and only stripped off `name` when it is actually there.
+- **Configured providers are listed twice**, under `<provider>:<model>` and
+  again `custom:<provider>:<model>`, same endpoint and model. Both ids work;
+  moi keeps the first and drops the duplicate label.
+
+moi also records `providerId` (`nous`, `xai-oauth`, `ollama-launch`) alongside
+the display heading, because the heading is Hermes-authored prose and the id is
+not — anything that needs to pin, order or persist a provider should key on the
+id. It is recovered by peeling the model label off the end of `modelId`, not by
+splitting on the first colon: model ids carry their own colons (`gpt-oss:20b`)
+and `custom:` occupies the first slot as a namespace (`custom:ollama-launch:…`
+→ `ollama-launch`) except when it is itself the provider (`custom:kimi-k2.7-code`
+→ `custom`, the base_url escape hatch from §2).
 
 `_meta.hermes.sessionProvenance` carries `rootHermesSessionId`,
 `parentHermesSessionId`, `sessionKind` and `compressionDepth` — session

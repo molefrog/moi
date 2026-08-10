@@ -626,6 +626,13 @@ export type Model = {
   displayName: string
   // " · "-joined blurb (Claude): "<headline> · <tagline> · …". Absent for OpenClaw.
   description?: string
+  // Heading this model sits under in the picker (Hermes: the upstream provider,
+  // e.g. 'Ollama'). Absent when the backend serves one flat catalog.
+  group?: string
+  // Machine id of that group (Hermes: 'ollama-launch' for the 'Ollama' heading).
+  // Unlike `group`, the backend does not reword it — use it as the key whenever
+  // a provider needs pinning, ordering or storing.
+  providerId?: string
   // Effort/reasoning support (Claude). `supportedEffortLevels` can include values
   // the SDK under-types (e.g. 'xhigh'), so it stays string[].
   supportsEffort?: boolean
