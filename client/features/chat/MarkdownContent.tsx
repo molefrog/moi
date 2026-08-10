@@ -25,7 +25,7 @@ const components = {
   },
   pre({ children }: ComponentProps<'pre'>) {
     return (
-      <div className="not-prose my-2 rounded-lg border border-border bg-muted px-3 py-2.5">
+      <div className="not-prose my-2 rounded-lg border border-border bg-[color-mix(var(--foreground)_5%,transparent)] px-3 py-2.5">
         <pre className="overflow-auto font-mono text-xs leading-relaxed whitespace-pre text-foreground [&>code]:rounded-none [&>code]:bg-transparent [&>code]:p-0">
           {children}
         </pre>
