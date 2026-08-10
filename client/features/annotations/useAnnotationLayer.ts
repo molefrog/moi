@@ -7,21 +7,14 @@ import type {
 
 import type { AnnotationCanvasPointerProps, AnnotationLayerProps } from './AnnotationLayer'
 import { captureElement } from './capture-element'
+import type {
+  AnnotationDocument,
+  AnnotationHistory,
+  AnnotationPoint,
+  AnnotationStroke
+} from './types'
 
-export type AnnotationPoint = {
-  x: number
-  y: number
-}
-
-export type AnnotationStroke = {
-  points: AnnotationPoint[]
-}
-
-export type AnnotationHistory = {
-  past: AnnotationStroke[][]
-  present: AnnotationStroke[]
-  future: AnnotationStroke[][]
-}
+export type { AnnotationDocument, AnnotationHistory, AnnotationPoint, AnnotationStroke }
 
 export type AnnotationHistoryAction =
   | { type: 'commit'; stroke: AnnotationStroke }
@@ -107,7 +100,7 @@ type PendingAnnotationExport = Omit<AnnotationExport, 'blob'> & {
 }
 
 type UseAnnotationLayerOptions = {
-  onChange?: (blob: Blob | null) => void
+  onChange?: (blob: Blob | null, document: AnnotationDocument) => void
   onFinish?: (blob: Blob | null) => void | Promise<void>
 }
 
@@ -118,12 +111,13 @@ export type AnnotationControls = {
   canUndo: boolean
   canRedo: boolean
   hasStrokes: boolean
-  open: () => Promise<boolean>
+  open: (document?: AnnotationDocument | null) => Promise<boolean>
   undo: () => void
   redo: () => void
   clear: () => void
   finish: () => Promise<Blob | null>
   cancel: () => void
+  reset: () => void
 }
 
 export type AnnotationController = {
@@ -210,6 +204,51 @@ function isEditableTarget(target: EventTarget | null): boolean {
   )
 }
 
+function scaleStroke(stroke: AnnotationStroke, scaleX: number, scaleY: number): AnnotationStroke {
+  return {
+    points: stroke.points.map(point => ({ x: point.x * scaleX, y: point.y * scaleY }))
+  }
+}
+
+function scaleStrokes(
+  strokes: AnnotationStroke[],
+  scaleX: number,
+  scaleY: number
+): AnnotationStroke[] {
+  return strokes.map(stroke => scaleStroke(stroke, scaleX, scaleY))
+}
+
+export function scaleAnnotationDocument(
+  document: AnnotationDocument,
+  width: number,
+  height: number
+): AnnotationDocument {
+  if (document.width === width && document.height === height) return document
+
+  const scaleX = document.width > 0 ? width / document.width : 1
+  const scaleY = document.height > 0 ? height / document.height : 1
+  return {
+    width,
+    height,
+    history: {
+      past: document.history.past.map(strokes => scaleStrokes(strokes, scaleX, scaleY)),
+      present: scaleStrokes(document.history.present, scaleX, scaleY),
+      future: document.history.future.map(strokes => scaleStrokes(strokes, scaleX, scaleY))
+    }
+  }
+}
+
+function annotationDocument(
+  session: AnnotationLayerSession,
+  history: AnnotationHistory
+): AnnotationDocument {
+  return {
+    width: session.snapshot.width,
+    height: session.snapshot.height,
+    history
+  }
+}
+
 export function useAnnotationLayer({
   onChange,
   onFinish
@@ -220,7 +259,9 @@ export function useAnnotationLayer({
   const sessionRef = useRef(session)
   const [history, setHistory] = useState<AnnotationHistory>(EMPTY_ANNOTATION_HISTORY)
   const historyRef = useRef<AnnotationHistory>(EMPTY_ANNOTATION_HISTORY)
+  const documentRef = useRef<AnnotationDocument | null>(null)
   const historyVersionRef = useRef(0)
+  const changedSinceOpenRef = useRef(false)
   const draftRef = useRef<AnnotationStroke | null>(null)
   const pointerIdRef = useRef<number | null>(null)
   const lifecycleRevisionRef = useRef(0)
@@ -248,7 +289,9 @@ export function useAnnotationLayer({
     (
       current: AnnotationLayerSession,
       strokes: AnnotationStroke[],
-      historyVersion: number
+      historyVersion: number,
+      annotationDoc: AnnotationDocument,
+      notify = true
     ): Promise<Blob | null> => {
       const cached = latestExportRef.current
       if (cached?.sessionId === current.id && cached.historyVersion === historyVersion) {
@@ -262,7 +305,7 @@ export function useAnnotationLayer({
 
       if (strokes.length === 0) {
         latestExportRef.current = { sessionId: current.id, historyVersion, blob: null }
-        onChangeRef.current?.(null)
+        if (notify) onChangeRef.current?.(null, annotationDoc)
         return Promise.resolve(null)
       }
 
@@ -274,13 +317,13 @@ export function useAnnotationLayer({
       const promise = canvasBlob(exportCanvas)
         .then(blob => {
           if (
-            sessionRef.current?.id !== current.id ||
+            lifecycleRevisionRef.current !== current.id ||
             historyVersionRef.current !== historyVersion
           ) {
             return blob
           }
           latestExportRef.current = { sessionId: current.id, historyVersion, blob }
-          onChangeRef.current?.(blob)
+          if (notify) onChangeRef.current?.(blob, annotationDoc)
           return blob
         })
         .catch(() => latestExportRef.current?.blob ?? null)
@@ -313,16 +356,19 @@ export function useAnnotationLayer({
       const next = annotationHistoryReducer(historyRef.current, action)
       if (next === historyRef.current) return
       historyRef.current = next
+      const document = annotationDocument(current, next)
+      documentRef.current = document
       setHistory(next)
       draftRef.current = null
+      changedSinceOpenRef.current = true
       const historyVersion = ++historyVersionRef.current
       redraw(next.present)
-      void exportCommitted(current, next.present, historyVersion)
+      void exportCommitted(current, next.present, historyVersion, document)
     },
     [exportCommitted, redraw]
   )
 
-  const open = useCallback(async (): Promise<boolean> => {
+  const open = useCallback(async (document?: AnnotationDocument | null): Promise<boolean> => {
     const target = targetRef.current
     if (!target || sessionRef.current || startingRef.current) return false
 
@@ -343,13 +389,20 @@ export function useAnnotationLayer({
         targetWidth: bounds.width,
         targetHeight: bounds.height
       }
-      historyRef.current = EMPTY_ANNOTATION_HISTORY
+      const sourceDocument = document === undefined ? documentRef.current : document
+      const restoredDocument = sourceDocument
+        ? scaleAnnotationDocument(sourceDocument, snapshot.width, snapshot.height)
+        : null
+      const nextHistory = restoredDocument?.history ?? EMPTY_ANNOTATION_HISTORY
+      historyRef.current = nextHistory
+      documentRef.current = restoredDocument ?? annotationDocument(next, nextHistory)
       historyVersionRef.current = 0
+      changedSinceOpenRef.current = false
       latestExportRef.current = null
       pendingExportRef.current = null
       draftRef.current = null
       pointerIdRef.current = null
-      setHistory(EMPTY_ANNOTATION_HISTORY)
+      setHistory(nextHistory)
       sessionRef.current = next
       setSession(next)
       return true
@@ -362,6 +415,17 @@ export function useAnnotationLayer({
   }, [])
 
   const cancel = useCallback(() => {
+    if (startingRef.current) lifecycleRevisionRef.current += 1
+    startingRef.current = false
+    finishingRef.current = false
+    setStarting(false)
+    setFinishing(false)
+    cancelStroke()
+    sessionRef.current = null
+    setSession(null)
+  }, [cancelStroke])
+
+  const reset = useCallback(() => {
     lifecycleRevisionRef.current += 1
     startingRef.current = false
     finishingRef.current = false
@@ -370,6 +434,13 @@ export function useAnnotationLayer({
     cancelStroke()
     sessionRef.current = null
     setSession(null)
+    historyRef.current = EMPTY_ANNOTATION_HISTORY
+    documentRef.current = null
+    historyVersionRef.current = 0
+    changedSinceOpenRef.current = false
+    latestExportRef.current = null
+    pendingExportRef.current = null
+    setHistory(EMPTY_ANNOTATION_HISTORY)
   }, [cancelStroke])
 
   const finish = useCallback(async (): Promise<Blob | null> => {
@@ -382,8 +453,15 @@ export function useAnnotationLayer({
     const historyVersion = historyVersionRef.current
     const strokes = historyRef.current.present
     let blob: Blob | null = null
-    if (strokes.length > 0 || historyVersion > 0) {
-      blob = await exportCommitted(current, strokes, historyVersion)
+    const document = documentRef.current ?? annotationDocument(current, historyRef.current)
+    if (changedSinceOpenRef.current || strokes.length > 0) {
+      blob = await exportCommitted(
+        current,
+        strokes,
+        historyVersion,
+        document,
+        changedSinceOpenRef.current
+      )
     }
 
     if (sessionRef.current?.id !== current.id) return blob
@@ -391,9 +469,9 @@ export function useAnnotationLayer({
       await onFinishRef.current?.(blob)
     } finally {
       if (sessionRef.current?.id === current.id) {
-        lifecycleRevisionRef.current += 1
         sessionRef.current = null
         setSession(null)
+        changedSinceOpenRef.current = false
         finishingRef.current = false
         setFinishing(false)
       }
@@ -515,7 +593,8 @@ export function useAnnotationLayer({
     redo,
     clear,
     finish,
-    cancel
+    cancel,
+    reset
   }
 
   return {

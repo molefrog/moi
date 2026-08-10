@@ -4,6 +4,8 @@ import {
   annotationHistoryReducer,
   EMPTY_ANNOTATION_HISTORY,
   pointOnCanvas,
+  scaleAnnotationDocument,
+  type AnnotationDocument,
   type AnnotationStroke
 } from './useAnnotationLayer'
 
@@ -73,4 +75,57 @@ test('maps viewport pointer coordinates into screenshot canvas coordinates', () 
   } as unknown as HTMLCanvasElement
 
   expect(pointOnCanvas(canvas, 300, 150)).toEqual({ x: 400, y: 200 })
+})
+
+test('scales the full editable document to a recaptured canvas', () => {
+  const document: AnnotationDocument = {
+    width: 100,
+    height: 200,
+    history: {
+      past: [[firstStroke]],
+      present: [secondStroke],
+      future: [[firstStroke, secondStroke]]
+    }
+  }
+
+  expect(scaleAnnotationDocument(document, 200, 100)).toEqual({
+    width: 200,
+    height: 100,
+    history: {
+      past: [
+        [
+          {
+            points: [
+              { x: 20, y: 10 },
+              { x: 60, y: 20 }
+            ]
+          }
+        ]
+      ],
+      present: [
+        {
+          points: [
+            { x: 100, y: 30 },
+            { x: 140, y: 40 }
+          ]
+        }
+      ],
+      future: [
+        [
+          {
+            points: [
+              { x: 20, y: 10 },
+              { x: 60, y: 20 }
+            ]
+          },
+          {
+            points: [
+              { x: 100, y: 30 },
+              { x: 140, y: 40 }
+            ]
+          }
+        ]
+      ]
+    }
+  })
 })

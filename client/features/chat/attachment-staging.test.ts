@@ -2,10 +2,16 @@ import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test'
 
 import { stageAnnotation } from './attachment-staging'
 import { attachmentKey, liveStore } from './chat-store'
+import type { AnnotationDocument } from '@/client/features/annotations/types'
 
 const workspaceId = 'workspace-1'
 const sessionId = 'session-1'
 const originalFetch = globalThis.fetch
+const document: AnnotationDocument = {
+  width: 100,
+  height: 100,
+  history: { past: [], present: [{ points: [{ x: 10, y: 10 }] }], future: [] }
+}
 
 afterEach(() => {
   globalThis.fetch = originalFetch
@@ -27,6 +33,7 @@ describe('annotation attachment staging', () => {
       sessionId,
       localId: 'annotation-1',
       sourceTab: 'widgets',
+      document,
       blob: new Blob(['first'], { type: 'image/png' }),
       isCurrent: () => revision === 1
     })
@@ -39,6 +46,7 @@ describe('annotation attachment staging', () => {
       sessionId,
       localId: 'annotation-1',
       sourceTab: 'widgets',
+      document,
       blob: new Blob(['second'], { type: 'image/png' }),
       isCurrent: () => revision === 2
     })
@@ -63,6 +71,7 @@ describe('annotation attachment staging', () => {
     const attachment = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)][0]
     expect(attachment.status).toBe('ready')
     expect(attachment.upload?.id).toBe('upload-2')
+    expect(attachment.document).toBe(document)
     revokeSpy.mockRestore()
   })
 
@@ -76,6 +85,7 @@ describe('annotation attachment staging', () => {
       sessionId,
       localId: 'annotation-1',
       sourceTab: 'view:roadmap',
+      document,
       blob: new Blob(['drawing'], { type: 'image/png' }),
       isCurrent: () => true
     })
