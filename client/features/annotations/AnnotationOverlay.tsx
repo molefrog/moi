@@ -1,13 +1,23 @@
-import { useCallback, useEffect, useState } from 'react'
+import {
+  type ReactNode,
+  type Ref,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useState
+} from 'react'
 
 import { IconArrowBackUp, IconArrowForwardUp, IconX } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
+import { cn } from '@/client/lib/cn'
 
 import { useAnnotationEditor } from './useAnnotationEditor'
+import type { AnnotationOverlayHandle, ChatAnnotationController } from './types'
 
 type AnnotationOverlayProps = {
+  ref?: Ref<AnnotationOverlayHandle>
   snapshot: HTMLCanvasElement
   strokeColor: string
   haloColor: string
@@ -16,6 +26,7 @@ type AnnotationOverlayProps = {
 }
 
 export function AnnotationOverlay({
+  ref,
   snapshot,
   strokeColor,
   haloColor,
@@ -31,6 +42,8 @@ export function AnnotationOverlay({
     editor.cancelStroke()
     void editor.flush().then(onDone)
   }, [editor, finishing, onDone])
+
+  useImperativeHandle(ref, () => ({ finish }), [finish])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -59,7 +72,7 @@ export function AnnotationOverlay({
       />
 
       <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-popover p-1.5 shadow-md">
-        <span className="mr-2 ml-2 text-sm font-medium">Annotate</span>
+        <span className="mr-2 ml-2 text-sm font-medium">Draw annotation</span>
         <div className="flex gap-1">
           <Tooltip>
             <TooltipTrigger
@@ -116,6 +129,48 @@ export function AnnotationOverlay({
           <IconX stroke={1.75} />
         </Button>
       </div>
+    </div>
+  )
+}
+
+// The chat-facing surface keeps capture and overlay wiring out of workspace composition.
+type ChatAnnotationSurfaceProps = {
+  controller: ChatAnnotationController
+  children: ReactNode
+  className?: string
+  contentClassName?: string
+}
+
+export function ChatAnnotationSurface({
+  controller,
+  children,
+  className,
+  contentClassName
+}: ChatAnnotationSurfaceProps) {
+  const { targetRef, overlayRef, session, change, complete } = controller.surface
+
+  return (
+    <div className={cn('relative', className)}>
+      <div
+        ref={targetRef}
+        inert={session ? true : undefined}
+        aria-hidden={session ? true : undefined}
+        className={contentClassName}
+      >
+        {children}
+      </div>
+
+      {session && (
+        <AnnotationOverlay
+          ref={overlayRef}
+          key={session.id}
+          snapshot={session.snapshot}
+          strokeColor={session.strokeColor}
+          haloColor={session.haloColor}
+          onChange={blob => change(session, blob)}
+          onDone={complete}
+        />
+      )}
     </div>
   )
 }
