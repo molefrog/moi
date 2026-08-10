@@ -279,18 +279,14 @@ type AnnotationAttachmentChipProps = {
 }
 
 function AnnotationAttachmentChip({ attachment, onRemove }: AnnotationAttachmentChipProps) {
-  const { previewUrl, status, error } = attachment
+  const { previewUrl } = attachment
   return (
     <HoverCard>
       <HoverCardTrigger
         render={
           <div
             tabIndex={0}
-            className={cn(
-              'group flex h-7 cursor-default items-center rounded-md bg-accent pr-2 pl-0.5 text-sm whitespace-nowrap text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-              status === 'error' &&
-                'bg-destructive/10 text-destructive focus-visible:ring-destructive/20'
-            )}
+            className="group flex h-7 cursor-default items-center rounded-md bg-accent pr-2 pl-0.5 text-sm whitespace-nowrap text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
           />
         }
       >
@@ -302,17 +298,10 @@ function AnnotationAttachmentChip({ attachment, onRemove }: AnnotationAttachment
           aria-label="Remove annotation"
           className="size-6 shrink-0 hover:bg-transparent hover:text-current"
         >
-          {status === 'uploading' ? (
-            <IconLoader2
-              stroke={1.75}
-              className="animate-spin group-focus-within:hidden group-hover:hidden"
-            />
-          ) : (
-            <IconScribble stroke={1.75} className="group-focus-within:hidden group-hover:hidden" />
-          )}
+          <IconScribble stroke={1.75} className="group-focus-within:hidden group-hover:hidden" />
           <IconX stroke={1.75} className="hidden group-focus-within:block group-hover:block" />
         </Button>
-        <span>{status === 'error' ? 'Annotation failed' : 'Annotation'}</span>
+        <span>Annotation</span>
       </HoverCardTrigger>
       {previewUrl && (
         <HoverCardContent side="top" align="start" className="w-60 max-w-[calc(100vw-2rem)]">

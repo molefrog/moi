@@ -1,7 +1,8 @@
-import { IconArrowBackUp, IconArrowForwardUp, IconX } from '@tabler/icons-react'
+import { IconArrowBackUp, IconArrowForwardUp, IconCheck, IconX } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
+import { cn } from '@/client/lib/cn'
 
 import type { AnnotationControls } from './useAnnotationLayer'
 
@@ -60,14 +61,14 @@ export function AnnotationToolbar({ controls }: AnnotationToolbarProps) {
       </div>
       <Button
         type="button"
-        variant="ghost"
+        variant={controls.canUndo ? 'default' : 'ghost'}
         size="icon-sm"
         onClick={() => void controls.finish()}
         disabled={controls.finishing}
         aria-label="Finish annotation"
-        className="text-muted-foreground"
+        className={cn(!controls.canUndo && 'text-muted-foreground')}
       >
-        <IconX stroke={1.75} />
+        {controls.canUndo ? <IconCheck stroke={1.75} /> : <IconX stroke={1.75} />}
       </Button>
     </div>
   )

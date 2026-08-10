@@ -66,12 +66,13 @@ describe('annotation attachment staging', () => {
     revokeSpy.mockRestore()
   })
 
-  test('keeps the latest preview in an error state after an upload failure', async () => {
+  test('shows the annotation optimistically and removes it after an upload failure', async () => {
+    const revokeSpy = spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
     globalThis.fetch = mock(() =>
       Promise.resolve(new Response('Storage unavailable', { status: 503 }))
     ) as unknown as typeof fetch
 
-    await stageAnnotation({
+    const upload = stageAnnotation({
       workspaceId,
       sessionId,
       localId: 'annotation-1',
@@ -80,9 +81,16 @@ describe('annotation attachment staging', () => {
       isCurrent: () => true
     })
 
+    const optimisticAttachment =
+      liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)][0]
+    expect(optimisticAttachment.status).toBe('uploading')
+    expect(optimisticAttachment.previewUrl).toStartWith('blob:')
+
+    await upload
+
     const attachment = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)][0]
-    expect(attachment.status).toBe('error')
-    expect(attachment.previewUrl).toStartWith('blob:')
-    expect(attachment.error).toBe('Storage unavailable')
+    expect(attachment).toBeUndefined()
+    expect(revokeSpy).toHaveBeenCalledWith(optimisticAttachment.previewUrl)
+    revokeSpy.mockRestore()
   })
 })
