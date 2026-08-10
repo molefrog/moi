@@ -113,13 +113,20 @@ export async function discoverHermesProfiles(): Promise<HermesProfile[]> {
   return out
 }
 
-export async function findHermesProfile(query: string): Promise<HermesProfile | null> {
-  const profiles = await discoverHermesProfiles()
+// Match a query against `agentId` (exact) or `name` (case-insensitive).
+export function matchHermesProfile(
+  profiles: readonly HermesProfile[],
+  query: string
+): HermesProfile | null {
   return (
     profiles.find(p => p.agentId === query) ??
     profiles.find(p => p.name?.toLowerCase() === query.toLowerCase()) ??
     null
   )
+}
+
+export async function findHermesProfile(query: string): Promise<HermesProfile | null> {
+  return matchHermesProfile(await discoverHermesProfiles(), query)
 }
 
 // Which profile owns a registered workspace. Falls back to matching the

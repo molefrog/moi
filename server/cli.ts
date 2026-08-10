@@ -39,13 +39,13 @@ import {
   renderEnvView,
   resolveCwdWorkspace
 } from './cli-env'
-import { columns } from './cli-ui'
+import { columns, keyValue } from './cli-ui'
 import { CONTROL_HOST, CONTROL_PORT, CONTROL_URL, PORT } from './constants'
 import { type ControlProbe, controlFailureMessage, probeControlServer } from './control-client'
 import {
   type HermesProfile,
   discoverHermesProfiles,
-  findHermesProfile
+  matchHermesProfile
 } from './harness/hermes/discovery'
 import { type OpenClawAgent, discoverOpenClawAgents } from './harness/openclaw/discovery'
 import { liftToWorkspaceRoot, registerWorkspace } from './registry'
@@ -1067,6 +1067,31 @@ const env = defineCommand({
   }
 })
 
+// ---- provider commands (openclaw / hermes) ----------------------------------
+
+// `moi <provider>` on its own lists the commands AND what they can be run
+// against, so discovering the installable agents never requires `init`.
+function printProviderCommands(provider: string, argHint: string) {
+  console.log('\n' + pc.bold('  Commands'))
+  console.log(
+    keyValue(
+      [
+        [
+          pc.bold(`moi ${provider} init`) + ' ' + pc.dim(argHint),
+          'Install moi skills and register the workspace'
+        ]
+      ],
+      '    '
+    )
+  )
+}
+
+// The argument is optional when there is exactly one candidate, so the hint
+// should not demand one that isn't needed.
+function initHint(provider: string, count: number, label: string): string {
+  return count === 1 ? `moi ${provider} init` : `moi ${provider} init <${label}>`
+}
+
 // ---- openclaw subcommands ---------------------------------------------------
 
 // Match an `agent` argument against `agentId` (exact) or `name`
@@ -1119,7 +1144,9 @@ const openclawInit = defineCommand({
       process.exit(1)
     }
 
-    if (!args.agent) {
+    // No argument: with a single agent there is nothing to choose, so install
+    // into it. Only an ambiguous choice needs the list.
+    if (!args.agent && agents.length > 1) {
       console.log('\n' + pc.bold('OpenClaw agents'))
       console.log(
         pc.dim('  Run ' + pc.bold('moi openclaw init <agentId>') + ' to install skills.\n')
@@ -1129,7 +1156,7 @@ const openclawInit = defineCommand({
       process.exit(0)
     }
 
-    const target = findAgent(agents, args.agent)
+    const target = args.agent ? findAgent(agents, args.agent) : agents[0]
     if (!target) {
       console.error('\n' + pc.red('✗') + ' Agent not found: ' + pc.bold(args.agent) + '\n')
       console.log('  Available:\n')
@@ -1193,6 +1220,26 @@ const openclawInit = defineCommand({
 
 const openclaw = defineCommand({
   meta: { name: 'openclaw', description: 'OpenClaw integration commands' },
+  async run({ rawArgs }) {
+    // citty runs the parent even after dispatching a subcommand — the bare
+    // form is the only one this handles.
+    if (rawArgs.some(arg => !arg.startsWith('-'))) return
+    console.log('\n' + pc.bold('OpenClaw'))
+    printProviderCommands('openclaw', '[agent]')
+    const agents = await discoverOpenClawAgents().catch(() => [])
+    if (agents.length === 0) {
+      console.log(
+        '\n  ' +
+          pc.dim('No agents discovered — start the OpenClaw gateway and check ') +
+          pc.dim('~/.openclaw/openclaw.json') +
+          '\n'
+      )
+      return
+    }
+    console.log('\n' + pc.bold('  Agents'))
+    printAgentTable(agents)
+    console.log(pc.dim('\n  Run ') + pc.bold(initHint('openclaw', agents.length, 'agentId')) + '\n')
+  },
   subCommands: { init: openclawInit }
 })
 
@@ -1237,7 +1284,9 @@ const hermesInit = defineCommand({
       process.exit(1)
     }
 
-    if (!args.profile) {
+    // No argument: with a single profile there is nothing to choose, so
+    // install into it. Only an ambiguous choice needs the list.
+    if (!args.profile && profiles.length > 1) {
       console.log('\n' + pc.bold('Hermes profiles'))
       console.log(pc.dim('  Run ' + pc.bold('moi hermes init <profile>') + ' to install skills.\n'))
       printProfileTable(profiles)
@@ -1245,7 +1294,7 @@ const hermesInit = defineCommand({
       process.exit(0)
     }
 
-    const target = await findHermesProfile(args.profile)
+    const target = args.profile ? matchHermesProfile(profiles, args.profile) : profiles[0]
     if (!target) {
       console.error('\n' + pc.red('✗') + ' Profile not found: ' + pc.bold(args.profile) + '\n')
       console.log('  Available:\n')
@@ -1303,6 +1352,26 @@ const hermesInit = defineCommand({
 
 const hermes = defineCommand({
   meta: { name: 'hermes', description: 'Hermes Agent integration commands' },
+  async run({ rawArgs }) {
+    // citty runs the parent even after dispatching a subcommand — the bare
+    // form is the only one this handles.
+    if (rawArgs.some(arg => !arg.startsWith('-'))) return
+    console.log('\n' + pc.bold('Hermes'))
+    printProviderCommands('hermes', '[profile]')
+    const profiles = await discoverHermesProfiles().catch(() => [])
+    if (profiles.length === 0) {
+      console.log(
+        '\n  ' +
+          pc.dim('No profiles discovered — install Hermes and run ') +
+          pc.dim('hermes setup') +
+          '\n'
+      )
+      return
+    }
+    console.log('\n' + pc.bold('  Profiles'))
+    printProfileTable(profiles)
+    console.log(pc.dim('\n  Run ') + pc.bold(initHint('hermes', profiles.length, 'profile')) + '\n')
+  },
   subCommands: { init: hermesInit }
 })
 
