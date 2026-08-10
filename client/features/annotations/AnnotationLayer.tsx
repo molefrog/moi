@@ -31,7 +31,7 @@ export function AnnotationLayer({
   if (!active) return null
 
   return (
-    <div className="absolute inset-0 z-20 animate-in duration-100 fade-in" onKeyDown={onKeyDown}>
+    <div className="absolute inset-0 animate-in duration-100 fade-in" onKeyDown={onKeyDown}>
       <canvas
         ref={canvasRef}
         {...pointerProps}
@@ -39,7 +39,7 @@ export function AnnotationLayer({
         height={height}
         aria-label="Annotation drawing area"
         tabIndex={0}
-        className="absolute inset-0 size-full cursor-crosshair touch-none outline-none"
+        className="absolute inset-0 size-full cursor-pencil touch-none outline-none"
       />
       {children}
     </div>
