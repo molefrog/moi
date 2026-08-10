@@ -176,15 +176,10 @@ export function ChatComposer({
                     variant={annotation.active ? 'secondary' : 'ghost'}
                     size="icon"
                     onClick={annotation.onToggle}
-                    disabled={annotation.starting}
                     aria-label={annotation.active ? 'Finish annotation' : 'Draw annotation'}
                     aria-pressed={annotation.active}
                   >
-                    {annotation.starting ? (
-                      <IconLoader2 className="animate-spin" stroke={1.5} />
-                    ) : (
-                      <IconScribble stroke={1.5} />
-                    )}
+                    <IconScribble stroke={1.5} />
                   </Button>
                 }
               />

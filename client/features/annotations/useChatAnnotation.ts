@@ -131,7 +131,8 @@ export function useChatAnnotation({
         }
         if (origin === 'popup') closePopupRef.current()
       } catch {
-        if (draftRef.current === draft) draftRef.current = null
+        if (draftRef.current !== draft) return
+        draftRef.current = null
         toast.add({ title: 'Couldn’t capture this page', type: 'error' })
       }
     },
@@ -152,17 +153,21 @@ export function useChatAnnotation({
     [discard]
   )
 
-  const toggleDocked = useCallback(() => {
-    if (active) void finish()
-    else void start('docked')
-  }, [active, finish, start])
-  const togglePopup = useCallback(() => {
-    if (active) void finish()
-    else void start('popup')
-  }, [active, finish, start])
   const finishDrawing = useCallback(() => {
+    if (starting) {
+      discard()
+      return
+    }
     void finish()
-  }, [finish])
+  }, [discard, finish, starting])
+  const toggleDocked = useCallback(() => {
+    if (active || starting) finishDrawing()
+    else void start('docked')
+  }, [active, finishDrawing, start, starting])
+  const togglePopup = useCallback(() => {
+    if (active || starting) finishDrawing()
+    else void start('popup')
+  }, [active, finishDrawing, start, starting])
 
   useEffect(() => {
     const draft = draftRef.current
@@ -186,8 +191,7 @@ export function useChatAnnotation({
   }, [active, attachedAnnotation?.localId, discard, starting])
 
   const commonControls = {
-    active,
-    starting,
+    active: active || starting,
     finish: finishDrawing,
     onRemove: remove
   }
