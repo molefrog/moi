@@ -162,7 +162,7 @@ export function ChatComposer({
                   aria-label="Attach files"
                 >
                   {/* Paperclip is too heavy compared to the nearby scribble icon */}
-                  <IconPaperclip stroke={1.5} className="size-4.75!" />
+                  <IconPaperclip stroke={1.6} className="size-4.5!" />
                 </Button>
               }
             />
