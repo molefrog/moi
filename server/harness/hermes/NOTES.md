@@ -780,3 +780,36 @@ directory `hermes skills install` targets.
 Workspaces imported before this landed keep a stale copy under
 `<workspace>/skills/`. It is inert (Hermes never scans there) and is left
 alone rather than deleted.
+
+## 14. Archiving a chat is moi-side
+
+ACP specifies `session/delete`, but Hermes does not implement it — probed
+directly, it answers JSON-RPC **-32601 "Method not found"**. `session/close`
+returns `{}` but only drops the live session; the chat still lists. There is no
+`session/archive` at all.
+
+Hermes _does_ have the right primitive internally —
+`hermes_state.SessionDB.set_session_archived(session_id, archived)`, a soft hide
+that keeps every message and walks the whole compression chain (archiving only
+the visible tip lets the still-unarchived root resurrect it). Its `sessions`
+table has an `archived` column, and `list_sessions_rich` takes
+`include_archived: bool = False`, which the ACP adapter never overrides — so an
+archived session would drop out of `session/list` for free.
+
+The problem is reach: the only callers of `set_session_archived` are HTTP routes
+on `hermes serve` and the gateway API server, daemons moi deliberately does not
+run (§6). The `hermes sessions archive` CLI is filter-based (age, source, title,
+cwd — no session id), and `hermes sessions delete <id>` is a real delete.
+
+So moi hides the chat on its own side, which is what the **Claude Code harness
+already does** — it tags a session `moi:archived` and filters the list rather
+than deleting anything. `../acp/archived.ts` keeps a per-workspace id list in
+moi's data dir; `listAcpSessions` and the home-card preview filter against it,
+and `forgetAcpSession` drops the live record. Because it lives in the ACP layer,
+any future ACP provider inherits archiving without implementing anything.
+
+Consequence, and the correct boundary: the chat stays in Hermes's own store and
+is still visible to `hermes sessions list` and the gateway. moi hides a chat
+from moi, not from the user's agent. Nothing is destroyed, and the store is a
+plain id list, so unarchiving is a one-liner (`unarchiveAcpSession`) if a route
+ever wants it.

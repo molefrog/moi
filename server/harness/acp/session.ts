@@ -653,6 +653,16 @@ export async function ensureAcpSessionLive(
   return viewAsEvents(rec)
 }
 
+// Drop one live session record — used when a chat is archived, so its view and
+// notification subscription go away instead of lingering for the process's life.
+export function forgetAcpSession(workspaceId: string, sessionId: string): void {
+  const key = liveKey(workspaceId, sessionId)
+  const rec = sessions.get(key)
+  if (!rec) return
+  rec.unsubscribe?.()
+  sessions.delete(key)
+}
+
 // Drop every in-memory session for a workspace (its process is going away).
 export function forgetAcpWorkspaceSessions(workspacePath: string): void {
   for (const [key, rec] of sessions) {

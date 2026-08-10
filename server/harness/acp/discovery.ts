@@ -3,6 +3,7 @@ import type { Model, SessionInfo } from '@/lib/types'
 
 import { type AcpProviderConfig, type AcpSpawnContext } from './session'
 import { acpSessionToSessionInfo } from './adapter'
+import { archivedAcpSessions } from './archived'
 import { getAcpClient, peekAcpClient } from './client'
 import type { ListSessionsResponse, AcpModelInfo, AcpModelState, AcpNewSessionResult } from './wire'
 import type { WorkspaceActivityPreview } from '../types'
@@ -18,6 +19,9 @@ export async function listAcpSessions(
 ): Promise<SessionInfo[]> {
   try {
     const client = await getAcpClient(await config.spawn(ctx))
+    // Archiving is moi-side (see ./archived.ts) — the backend still lists the
+    // chat, so it is filtered here rather than by the agent.
+    const archived = await archivedAcpSessions(ctx.workspacePath)
     const out: SessionInfo[] = []
     let cursor: string | undefined
     for (let page = 0; page < PAGE_LIMIT; page++) {
@@ -26,7 +30,9 @@ export async function listAcpSessions(
         ...(cursor ? { cursor } : {})
       })
       for (const entry of res.sessions ?? []) {
-        if (entry.sessionId) out.push(acpSessionToSessionInfo(entry))
+        if (entry.sessionId && !archived.has(entry.sessionId)) {
+          out.push(acpSessionToSessionInfo(entry))
+        }
       }
       if (!res.nextCursor) break
       cursor = res.nextCursor
@@ -50,7 +56,8 @@ export async function acpWorkspacePreview(
   if (!client) return {}
   try {
     const res: ListSessionsResponse = await client.rpc('session/list', { cwd: ctx.workspacePath })
-    const rows = (res.sessions ?? []).filter(s => s.sessionId)
+    const archived = await archivedAcpSessions(ctx.workspacePath)
+    const rows = (res.sessions ?? []).filter(s => s.sessionId && !archived.has(s.sessionId))
     if (rows.length === 0) return {}
     const newest = rows.reduce((a, b) =>
       Date.parse(b.updatedAt ?? '') > Date.parse(a.updatedAt ?? '') ? b : a

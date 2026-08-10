@@ -14,12 +14,14 @@ import {
   type AcpProviderConfig,
   ensureAcpSessionLive,
   forgetAcpWorkspaceSessions,
+  forgetAcpSession,
   forgetAllAcpSessions,
   getAcpActiveSessions,
   getLiveAcpEvents,
   interruptAcpRun,
   sendAcpMessage
 } from '../acp/session'
+import { archiveAcpSession } from '../acp/archived'
 import { getAcpProcessInfo, killAcpWorkspace, killAllAcpClients } from '../acp/client'
 import {
   DEFAULT_PROFILE,
@@ -76,6 +78,13 @@ export const hermesHarness: Harness = {
 
   sendMessage: input => sendAcpMessage(config, input),
   interrupt: (workspaceId, sessionId) => interruptAcpRun(config, { workspaceId, sessionId }),
+  // Hermes answers ACP's `session/delete` with "Method not found" and exposes
+  // its own archive flag only over `hermes serve`, so moi hides the chat on its
+  // side — see ../acp/archived.ts.
+  archiveSession: async (ws, sessionId) => {
+    await archiveAcpSession(ws.path, sessionId)
+    forgetAcpSession(ws.id, sessionId)
+  },
   activeSessions: () => getAcpActiveSessions(),
 
   listSessions: ws => listAcpSessions(config, ctxOf(ws)),
