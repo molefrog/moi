@@ -286,7 +286,6 @@ function AnnotationAttachmentChip({ attachment, onRemove }: AnnotationAttachment
         render={
           <div
             tabIndex={0}
-            title={error ?? 'Annotation'}
             className={cn(
               'group flex h-7 cursor-default items-center rounded-md bg-accent pr-2 pl-0.5 text-sm whitespace-nowrap text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
               status === 'error' &&
@@ -303,18 +302,24 @@ function AnnotationAttachmentChip({ attachment, onRemove }: AnnotationAttachment
           aria-label="Remove annotation"
           className="size-6 shrink-0 hover:bg-transparent hover:text-current"
         >
-          <IconScribble stroke={1.75} className="group-focus-within:hidden group-hover:hidden" />
+          {status === 'uploading' ? (
+            <IconLoader2
+              stroke={1.75}
+              className="animate-spin group-focus-within:hidden group-hover:hidden"
+            />
+          ) : (
+            <IconScribble stroke={1.75} className="group-focus-within:hidden group-hover:hidden" />
+          )}
           <IconX stroke={1.75} className="hidden group-focus-within:block group-hover:block" />
         </Button>
         <span>{status === 'error' ? 'Annotation failed' : 'Annotation'}</span>
-        {status === 'uploading' && <IconLoader2 size={16} className="animate-spin" stroke={1.75} />}
       </HoverCardTrigger>
       {previewUrl && (
-        <HoverCardContent side="top" align="start" className="w-80 max-w-[calc(100vw-2rem)]">
+        <HoverCardContent side="top" align="start" className="w-60 max-w-[calc(100vw-2rem)]">
           <img
             src={previewUrl}
             alt="Annotation preview"
-            className="max-h-72 w-full rounded-lg object-contain"
+            className="max-h-72 w-full rounded-md object-contain"
           />
         </HoverCardContent>
       )}
