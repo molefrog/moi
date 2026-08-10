@@ -21,7 +21,7 @@ import { copyFile, mkdir, readFile, rm, stat, truncate, writeFile } from 'node:f
 import { homedir, userInfo } from 'node:os'
 import { dirname, join } from 'node:path'
 
-import { CONTROL_PORT } from './constants'
+import { CONTROL_URL } from './constants'
 import { DATA_DIR } from './data-dir'
 import { mergeSearchPaths } from './harness/shell-path'
 import { PACKAGE_ROOT } from './version'
@@ -357,7 +357,7 @@ export function queryServerInfo(timeoutMs = 1500): Promise<ServerInfo | null> {
     }
     let ws: WebSocket
     try {
-      ws = new WebSocket(`ws://localhost:${CONTROL_PORT}`)
+      ws = new WebSocket(CONTROL_URL)
     } catch {
       settle(null)
       return
