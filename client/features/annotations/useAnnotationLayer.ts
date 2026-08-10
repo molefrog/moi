@@ -152,7 +152,22 @@ function drawPath(
   context.stroke()
 }
 
-function renderAnnotation(
+function drawAnnotationStrokes(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  session: AnnotationLayerSession,
+  strokes: AnnotationStroke[],
+  draft: AnnotationStroke | null = null
+): void {
+  const innerWidth = Math.max(3, Math.min(width, height) * 0.005)
+  const outerWidth = innerWidth + Math.max(2, innerWidth * 0.75)
+  const visible = draft ? [...strokes, draft] : strokes
+  for (const stroke of visible) drawPath(context, stroke, session.haloColor, outerWidth)
+  for (const stroke of visible) drawPath(context, stroke, session.strokeColor, innerWidth)
+}
+
+function renderDrawingLayer(
   canvas: HTMLCanvasElement,
   session: AnnotationLayerSession,
   strokes: AnnotationStroke[],
@@ -162,13 +177,20 @@ function renderAnnotation(
   if (!context) return
 
   context.clearRect(0, 0, canvas.width, canvas.height)
-  context.drawImage(session.snapshot, 0, 0, canvas.width, canvas.height)
+  drawAnnotationStrokes(context, canvas.width, canvas.height, session, strokes, draft)
+}
 
-  const innerWidth = Math.max(3, Math.min(canvas.width, canvas.height) * 0.005)
-  const outerWidth = innerWidth + Math.max(2, innerWidth * 0.75)
-  const visible = draft ? [...strokes, draft] : strokes
-  for (const stroke of visible) drawPath(context, stroke, session.haloColor, outerWidth)
-  for (const stroke of visible) drawPath(context, stroke, session.strokeColor, innerWidth)
+function renderAnnotationExport(
+  canvas: HTMLCanvasElement,
+  session: AnnotationLayerSession,
+  strokes: AnnotationStroke[]
+): void {
+  const context = canvas.getContext('2d')
+  if (!context) return
+
+  context.clearRect(0, 0, canvas.width, canvas.height)
+  context.drawImage(session.snapshot, 0, 0, canvas.width, canvas.height)
+  drawAnnotationStrokes(context, canvas.width, canvas.height, session, strokes)
 }
 
 function canvasBlob(canvas: HTMLCanvasElement): Promise<Blob> {
@@ -217,7 +239,7 @@ export function useAnnotationLayer({
     (strokes: AnnotationStroke[], draft: AnnotationStroke | null = null) => {
       const canvas = canvasRef.current
       const current = sessionRef.current
-      if (canvas && current) renderAnnotation(canvas, current, strokes, draft)
+      if (canvas && current) renderDrawingLayer(canvas, current, strokes, draft)
     },
     []
   )
@@ -247,7 +269,7 @@ export function useAnnotationLayer({
       const exportCanvas = document.createElement('canvas')
       exportCanvas.width = current.snapshot.width
       exportCanvas.height = current.snapshot.height
-      renderAnnotation(exportCanvas, current, strokes)
+      renderAnnotationExport(exportCanvas, current, strokes)
 
       const promise = canvasBlob(exportCanvas)
         .then(blob => {
