@@ -1,4 +1,4 @@
-import { IconPlus, IconX, type TablerIcon } from '@tabler/icons-react'
+import { IconPlus, IconX, type Icon as TabIcon } from '@tabler/icons-react'
 import { cva } from 'class-variance-authority'
 
 import { IconGhost } from '@/client/components/shared/IconGhost'
@@ -18,7 +18,7 @@ import type { WorkspaceTabId } from '@/lib/types'
 
 export type WorkspaceTabItem = {
   key: WorkspaceTabId
-  Icon: TablerIcon
+  Icon: TabIcon
   label: string
   closable?: boolean
   loading?: boolean
@@ -26,7 +26,7 @@ export type WorkspaceTabItem = {
 
 export type CreateWorkspaceTabItem = {
   key: string
-  Icon: TablerIcon
+  Icon: TabIcon
   label: string
   onClick: () => void
 }
