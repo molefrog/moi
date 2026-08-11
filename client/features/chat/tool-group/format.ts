@@ -192,14 +192,22 @@ const CODEX_SUBAGENT_ACTION_LABELS: Record<string, string> = {
 }
 
 // ACP backends (Hermes) send display-ready titles rather than raw function
-// names: "terminal: echo hi", "write: a.txt", "read: src/app.ts". Split the
-// action from its detail so the label/brief split matches every other provider.
-function splitAcpToolTitle(name: string): { action: string; detail: string } {
+// names, in three shapes (`acp_adapter/tools.py` build_tool_title):
+// "terminal: echo hi", "todo (4 items)", "patch (replace): a.txt". Split the
+// action from its parenthesized qualifier and colon detail so the label/brief
+// split matches every other provider.
+function splitAcpToolTitle(name: string): { action: string; qualifier: string; detail: string } {
   const idx = name.indexOf(':')
-  if (idx <= 0) return { action: name.trim(), detail: '' }
-  return { action: name.slice(0, idx).trim(), detail: name.slice(idx + 1).trim() }
+  const head = (idx > 0 ? name.slice(0, idx) : name).trim()
+  const detail = idx > 0 ? name.slice(idx + 1).trim() : ''
+  const m = head.match(/^(.*?)\s*\(([^)]*)\)$/)
+  if (!m) return { action: head, qualifier: '', detail }
+  return { action: m[1].trim(), qualifier: m[2].trim(), detail }
 }
 
+// Keyed by the title's action part — multi-word for tools whose title embeds
+// the sub-action ("process wait", "skills list"). Unmatched actions fall back
+// to sentence-cased raw text, so new tools still render presentably.
 const HERMES_TOOL_LABELS: Record<string, string> = {
   terminal: 'Run command',
   read: 'Read',
@@ -207,17 +215,28 @@ const HERMES_TOOL_LABELS: Record<string, string> = {
   edit: 'Edit',
   patch: 'Edit',
   search: 'Search',
-  fetch: 'Fetch',
+  extract: 'Fetch webpage',
+  'web extract': 'Fetch webpage',
+  'web search': 'Web search',
   delegate: 'Delegate task',
-  todo: 'Update plan',
-  memory: 'Memory',
-  skill_manage: 'Manage skills'
+  'delegate batch': 'Delegate tasks',
+  todo: 'Update TODO',
+  python: 'Run Python',
+  'process wait': 'Wait for process',
+  'session search': 'Search sessions',
+  'skills list': 'List skills',
+  'skill view': 'View skill'
 }
 
 export function getToolDisplayName(call: ToolCall): string {
   if (call.provider === 'hermes') {
     const { action } = splitAcpToolTitle(call.name)
-    return HERMES_TOOL_LABELS[action] ?? action
+    const label = HERMES_TOOL_LABELS[action]
+    if (label) return label
+    // Fallback-titled tools arrive as raw names ("send_message") or lowercase
+    // phrases ("browser snapshot") — sentence-case them.
+    const plain = action.replace(/_/g, ' ')
+    return plain.charAt(0).toUpperCase() + plain.slice(1)
   }
   // An OpenClaw agent pinned to the `claude-cli` runtime reports Claude Code's
   // own tool names (`Read`, `Bash`, `Edit`, …) rather than OpenClaw's, so the
@@ -255,10 +274,15 @@ export function formatInputBrief(call: ToolCall, cwd: string | null): string {
   const shorten = makeShortenPaths(cwd)
   if (call.provider === 'hermes') {
     // Paths in the detail shorten against the cwd like every other provider;
-    // shell commands pass through with the familiar `$` prefix.
-    const { action, detail } = splitAcpToolTitle(call.name)
-    if (!detail) return ''
-    return action === 'terminal' ? `$ ${detail}` : shorten(detail)
+    // shell commands pass through with the familiar `$` prefix. Titles without
+    // a colon detail surface the qualifier instead ("todo (4 items)" → "4
+    // items", "skill view (moi-workspace)" → "moi-workspace"); when both are
+    // present the qualifier is a mode ("patch (replace): a.txt") the Edit
+    // label already implies, so the detail wins.
+    const { action, qualifier, detail } = splitAcpToolTitle(call.name)
+    const brief = detail || qualifier
+    if (!brief) return ''
+    return action === 'terminal' ? `$ ${brief}` : shorten(brief)
   }
   if (call.provider === 'openclaw') {
     // Same fallback as the label: a claude-cli-backed run carries Claude Code's
