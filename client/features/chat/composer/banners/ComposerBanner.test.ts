@@ -4,15 +4,15 @@ import type { ComposerBanner } from './ComposerBanner'
 import { resolveComposerBanner } from './ComposerBanner'
 
 const agentUnavailable: ComposerBanner = {
-  tone: 'muted',
+  tone: 'default',
   content: 'Agent unavailable'
 }
 const chatError: ComposerBanner = {
-  tone: 'destructive',
+  tone: 'error',
   content: 'Chat error'
 }
 const skillUpdate: ComposerBanner = {
-  tone: 'muted',
+  tone: 'default',
   content: 'Skill update'
 }
 

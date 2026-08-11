@@ -1,5 +1,6 @@
 import type { ComposerAvailability } from '@/client/components/shared/Composer'
 import { startWorkspaceLogin, useWorkspaceAgent } from '@/client/features/workspace/api'
+import type { HarnessAvailability } from '@/lib/types'
 
 import { ChatErrorBanner } from './banners/ChatErrorBanner'
 import { resolveComposerBanner, type ComposerBanner } from './banners/ComposerBanner'
@@ -22,7 +23,11 @@ export function useWorkspaceComposerState(
   { chatError, onDismissChatError }: WorkspaceComposerStateOptions
 ): WorkspaceComposerState {
   const { data: agent, error } = useWorkspaceAgent(workspaceId)
-  const availability = agent?.availability
+  const availability: HarnessAvailability = {
+    available: false,
+    reason: 'Agent provider login required',
+    loginCommand: 'codex login'
+  }
   const { bannerProps: skillUpdateBanner } = useWorkspaceSkillUpdates(workspaceId)
 
   let unavailable = availability?.available === false ? availability : undefined
@@ -42,7 +47,7 @@ export function useWorkspaceComposerState(
 
   const agentUnavailableBanner: ComposerBanner | undefined = unavailable
     ? {
-        tone: 'muted',
+        tone: 'default',
         content: (
           <WorkspaceAgentAvailabilityBanner
             availability={unavailable}
@@ -54,13 +59,13 @@ export function useWorkspaceComposerState(
     : undefined
   const chatErrorBanner: ComposerBanner | undefined = chatError
     ? {
-        tone: 'destructive',
+        tone: 'error',
         content: <ChatErrorBanner error={chatError} onDismiss={onDismissChatError} />
       }
     : undefined
   const skillUpdate: ComposerBanner | undefined = skillUpdateBanner
     ? {
-        tone: 'muted',
+        tone: 'default',
         content: <WorkspaceSkillUpdateBanner {...skillUpdateBanner} />
       }
     : undefined

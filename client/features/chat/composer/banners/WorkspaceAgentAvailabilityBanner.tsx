@@ -58,26 +58,17 @@ export function WorkspaceAgentAvailabilityBanner({
   }
 
   return (
-    <ComposerBannerShell
-      role="alert"
-      className="grid grid-cols-[auto_minmax(0,1fr)] gap-2 @xl:grid-cols-[auto_minmax(0,1fr)_auto] @xl:items-center"
-    >
+    <ComposerBannerShell role="alert" className="flex items-center gap-2">
       <IconLogin size={20} stroke={1.5} />
-      <div className="min-w-0 space-y-1">
-        <div className="wrap-break-word">Log in to your agent provider to send messages</div>
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="wrap-break-word">Log in to your agent to send messages</div>
         {(error ?? failure) && (
           <div className="wrap-break-word text-destructive">{error ?? failure}</div>
         )}
       </div>
 
       {availability.loginCommand && (
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => void startLogin()}
-          disabled={busy}
-          className="col-span-2 w-fit @xl:col-span-1"
-        >
+        <Button type="button" size="sm" onClick={() => void startLogin()} disabled={busy}>
           {busy && <IconLoader2 stroke={1.75} className="animate-spin" />}
           {phase === 'starting'
             ? 'Opening browser to sign in…'

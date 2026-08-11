@@ -210,9 +210,9 @@ export function ChatPanel({
         <div
           className={cn(
             '@container flex w-full flex-col transition-[padding]',
-            composerBanner && 'gap-2 rounded-t-xl rounded-b-2xl p-2',
-            composerBanner?.tone === 'muted' && 'bg-muted',
-            composerBanner?.tone === 'destructive' && 'bg-destructive/10'
+            composerBanner && 'gap-2 rounded-t-lg rounded-b-2xl p-2',
+            composerBanner?.tone === 'default' && 'bg-accent',
+            composerBanner?.tone === 'error' && 'bg-destructive/10'
           )}
         >
           {composerBanner?.content}
