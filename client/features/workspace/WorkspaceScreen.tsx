@@ -28,7 +28,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/
 import { WorkspaceSettings } from '@/client/features/settings/WorkspaceSettings'
 import { useAppletChatMessage } from '@/client/features/chat/useAppletChatMessage'
 import { useChat } from '@/client/features/chat/useChat'
-import { ViewBuilderTab, type ViewBuilderTabHandle } from '@/client/features/views/ViewBuilderTab'
+import { ViewBuilder, type ViewBuilderHandle } from '@/client/features/views/ViewBuilder'
 import { ViewManager } from '@/client/features/views/ViewManager'
 import { useViewBuilderActions } from '@/client/features/views/useViewBuilderActions'
 import { useViewBuilderDrafts } from '@/client/features/views/useViewBuilderDrafts'
@@ -56,7 +56,13 @@ import {
   type WorkspaceTabItem,
   WorkspaceTabs
 } from '@/client/features/workspace/WorkspaceTabs'
-import type { LayoutMode, ViewBuilder, ViewInfo, WidgetInfo, WorkspaceTabId } from '@/lib/types'
+import type {
+  LayoutMode,
+  ViewBuilder as ViewBuilderData,
+  ViewInfo,
+  WidgetInfo,
+  WorkspaceTabId
+} from '@/lib/types'
 import {
   viewBuilderIdFromTab,
   viewBuilderTabId,
@@ -75,9 +81,9 @@ const Scratchpad = lazy(() =>
 // Tab label for a view: its configured title, or the file-name id as fallback.
 const viewLabel = (v: ViewInfo) => v.config.title || v.id
 
-const viewBuilderIcon = (builder: ViewBuilder) => resolveAppIcon(builder.icon) ?? IconArticle
+const viewBuilderIcon = (builder: ViewBuilderData) => resolveAppIcon(builder.icon) ?? IconArticle
 
-function viewIcon(view: ViewInfo, builders: ViewBuilder[]) {
+function viewIcon(view: ViewInfo, builders: ViewBuilderData[]) {
   const builder = builders.find(candidate => candidate.viewId === view.id)
   return resolveAppIcon(view.config.icon) ?? resolveAppIcon(builder?.icon) ?? IconArticle
 }
@@ -131,7 +137,7 @@ function WorkspaceCustomizeAction({ active, onToggle }: WorkspaceCustomizeAction
 type WorkspaceScreenProps = {
   widgets: WidgetInfo[]
   views: ViewInfo[]
-  builders: ViewBuilder[]
+  builders: ViewBuilderData[]
 }
 
 type WidgetMode = 'idle' | 'editing' | 'customizing'
@@ -139,7 +145,7 @@ type WidgetMode = 'idle' | 'editing' | 'customizing'
 function tabItemFor(
   tab: WorkspaceTabId,
   views: ViewInfo[],
-  builders: ViewBuilder[],
+  builders: ViewBuilderData[],
   closable: boolean,
   agentRunning: boolean,
   builderRunning: (sessionId: string) => boolean
@@ -213,7 +219,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
   const [floatingChatOpen, setFloatingChatOpen] = useState(false)
   const [chatFocusRequest, setChatFocusRequest] = useState(0)
-  const builderTabRefs = useRef(new Map<string, ViewBuilderTabHandle>())
+  const builderRefs = useRef(new Map<string, ViewBuilderHandle>())
   const dockedChatWidth = useUiStore(state => state.dockedChatWidth)
   const setDockedChatWidth = useUiStore(state => state.setDockedChatWidth)
   const sessionActivity = useLive(state => state.activity)
@@ -422,13 +428,13 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     setTabs({ open, active })
     if (activeTab === tab) navigateToTab(nextTab)
     if (builder?.status === 'draft') {
-      void builderTabRefs.current.get(builder.id)?.resetSketch()
+      void builderRefs.current.get(builder.id)?.resetSketch()
       builderDrafts.clear(builder.id)
       void builderActions.discard(builder.id)
     }
   }
 
-  const discardBuilder = (builder: ViewBuilder) => {
+  const discardBuilder = (builder: ViewBuilderData) => {
     const tab = viewBuilderTabId(builder.id)
     if (openSet.has(tab)) {
       let open = tabsState.open.filter(item => item !== tab)
@@ -436,7 +442,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       setTabs({ open, active: tabsState.active === tab ? open[0] : tabsState.active })
       if (activeTab === tab) navigateToTab(open[0])
     }
-    void builderTabRefs.current.get(builder.id)?.resetSketch()
+    void builderRefs.current.get(builder.id)?.resetSketch()
     builderDrafts.clear(builder.id)
     void builderActions.discard(builder.id)
   }
@@ -540,11 +546,11 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
         value: builderDrafts.valueFor(activeDraftBuilder),
         onChange: (value: string) => builderDrafts.change(activeDraftBuilder.id, value),
         onRemoveDrawing: () => {
-          void builderTabRefs.current.get(activeDraftBuilder.id)?.resetSketch()
+          void builderRefs.current.get(activeDraftBuilder.id)?.resetSketch()
         },
         onSubmit: async (value: string) => {
-          const builderTab = builderTabRefs.current.get(activeDraftBuilder.id)
-          await builderTab?.prepareSketchForSend()
+          const builderView = builderRefs.current.get(activeDraftBuilder.id)
+          await builderView?.prepareSketchForSend()
           await builderActions.submit(activeDraftBuilder, value)
           // Submit clears the sent attachment. Keep the canvas until the built view replaces it.
           builderDrafts.clear(activeDraftBuilder.id)
@@ -625,11 +631,11 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
           {builders
             .filter(builder => builder.status !== 'ready')
             .map(builder => (
-              <ViewBuilderTab
+              <ViewBuilder
                 key={builder.id}
                 ref={handle => {
-                  if (handle) builderTabRefs.current.set(builder.id, handle)
-                  else builderTabRefs.current.delete(builder.id)
+                  if (handle) builderRefs.current.set(builder.id, handle)
+                  else builderRefs.current.delete(builder.id)
                 }}
                 active={activeBuilder?.id === builder.id}
                 builder={builder}

@@ -11,18 +11,18 @@ import {
   useViewBuilderSketch
 } from '@/client/features/drawings/useViewBuilderSketch'
 import { cn } from '@/client/lib/cn'
-import type { ViewBuilder } from '@/lib/types'
+import type { ViewBuilder as ViewBuilderData } from '@/lib/types'
 import { viewBuilderTabId } from '@/lib/workspace-tabs'
 
-export type ViewBuilderTabHandle = {
+export type ViewBuilderHandle = {
   prepareSketchForSend: () => Promise<void>
   resetSketch: () => Promise<void>
 }
 
-type ViewBuilderTabProps = {
-  ref?: Ref<ViewBuilderTabHandle>
+type ViewBuilderProps = {
+  ref?: Ref<ViewBuilderHandle>
   active: boolean
-  builder: ViewBuilder
+  builder: ViewBuilderData
   chatDocked: boolean
   workspaceId: string
   onEditingStart: () => void
@@ -31,7 +31,7 @@ type ViewBuilderTabProps = {
   onDiscard: () => void
 }
 
-export function ViewBuilderTab({
+export function ViewBuilder({
   ref,
   active,
   builder,
@@ -41,7 +41,7 @@ export function ViewBuilderTab({
   onContinueInChat,
   onOpenChat,
   onDiscard
-}: ViewBuilderTabProps) {
+}: ViewBuilderProps) {
   const sketch = useViewBuilderSketch({
     active: active && builder.status === 'draft',
     builderId: builder.id,
@@ -86,7 +86,7 @@ type ViewBuilderSketchSurfaceProps = {
   chatDocked: boolean
   error?: string
   sketch: ViewBuilderSketchController
-  status: Exclude<ViewBuilder['status'], 'ready'>
+  status: Exclude<ViewBuilderData['status'], 'ready'>
   onDiscard: () => void
   onOpenChat: () => void
 }
