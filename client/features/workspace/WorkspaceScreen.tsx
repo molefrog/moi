@@ -13,8 +13,8 @@ import {
 
 import { IconGhost } from '@/client/components/shared/IconGhost'
 import { canAnnotateWorkspaceContent } from '@/client/features/drawings/annotation-availability'
-import { AnnotationToolbar } from '@/client/features/drawings/AnnotationToolbar'
 import { DrawingLayer } from '@/client/features/drawings/DrawingLayer'
+import { DrawingToolbar } from '@/client/features/drawings/DrawingToolbar'
 import { useChatAnnotation } from '@/client/features/drawings/useChatAnnotation'
 import { ChatPanel } from '@/client/features/chat/ChatPanel'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
@@ -655,7 +655,12 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
         </div>
 
         <DrawingLayer {...annotation.layerProps}>
-          <AnnotationToolbar controls={annotation.controls} />
+          <DrawingToolbar
+            controls={annotation.controls}
+            title="Draw annotation"
+            busy={annotation.controls.finishing}
+            onComplete={() => void annotation.controls.finish()}
+          />
         </DrawingLayer>
       </div>
 
