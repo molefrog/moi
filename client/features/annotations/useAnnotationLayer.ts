@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore
+} from 'react'
 import type {
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
@@ -120,19 +128,40 @@ type UseAnnotationLayerOptions = {
   onFinish?: (blob: Blob | null) => void | Promise<void>
 }
 
+// Undo/redo/clear availability. Deliberately NOT part of the controls object:
+// it changes on every stroke commit, so components that need it subscribe via
+// useAnnotationHistoryState and re-render alone — a pen-up must not re-render
+// the whole screen that hosts the hook.
+export type AnnotationHistoryState = {
+  canUndo: boolean
+  canRedo: boolean
+  hasStrokes: boolean
+}
+
+const EMPTY_HISTORY_STATE: AnnotationHistoryState = {
+  canUndo: false,
+  canRedo: false,
+  hasStrokes: false
+}
+
 export type AnnotationControls = {
   active: boolean
   starting: boolean
   finishing: boolean
-  canUndo: boolean
-  canRedo: boolean
-  hasStrokes: boolean
   open: () => Promise<boolean>
   undo: () => void
   redo: () => void
   clear: () => void
   finish: () => Promise<Blob | null>
   cancel: () => Promise<void>
+  subscribeHistory: (listener: () => void) => () => void
+  getHistoryState: () => AnnotationHistoryState
+}
+
+// Subscribe to the per-stroke history flags from the component that renders
+// them (the toolbar), keeping stroke commits out of the host screen's renders.
+export function useAnnotationHistoryState(controls: AnnotationControls): AnnotationHistoryState {
+  return useSyncExternalStore(controls.subscribeHistory, controls.getHistoryState)
 }
 
 export type AnnotationController = {
@@ -227,8 +256,9 @@ export function useAnnotationLayer({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [session, setSession] = useState<AnnotationLayerSession | null>(null)
   const sessionRef = useRef(session)
-  const [history, setHistory] = useState<AnnotationHistory>(EMPTY_ANNOTATION_HISTORY)
   const historyRef = useRef<AnnotationHistory>(EMPTY_ANNOTATION_HISTORY)
+  const historyStateRef = useRef<AnnotationHistoryState>(EMPTY_HISTORY_STATE)
+  const historyListenersRef = useRef(new Set<() => void>())
   const historyVersionRef = useRef(0)
   const draftRef = useRef<AnnotationStroke | null>(null)
   const pointerIdRef = useRef<number | null>(null)
@@ -243,6 +273,36 @@ export function useAnnotationLayer({
   const onFinishRef = useRef(onFinish)
   onChangeRef.current = onChange
   onFinishRef.current = onFinish
+
+  // History flags live outside React state (see AnnotationHistoryState): only
+  // subscribed components re-render on a stroke commit, not the host screen.
+  const publishHistory = useCallback(() => {
+    const history = historyRef.current
+    const previous = historyStateRef.current
+    const next: AnnotationHistoryState = {
+      canUndo: history.past.length > 0,
+      canRedo: history.future.length > 0,
+      hasStrokes: history.present.length > 0
+    }
+    if (
+      next.canUndo === previous.canUndo &&
+      next.canRedo === previous.canRedo &&
+      next.hasStrokes === previous.hasStrokes
+    ) {
+      return
+    }
+    historyStateRef.current = next
+    for (const listener of historyListenersRef.current) listener()
+  }, [])
+
+  const subscribeHistory = useCallback((listener: () => void) => {
+    historyListenersRef.current.add(listener)
+    return () => {
+      historyListenersRef.current.delete(listener)
+    }
+  }, [])
+
+  const getHistoryState = useCallback(() => historyStateRef.current, [])
 
   const redraw = useCallback(
     (strokes: AnnotationStroke[], draft: AnnotationStroke | null = null) => {
@@ -322,13 +382,13 @@ export function useAnnotationLayer({
       const next = annotationHistoryReducer(historyRef.current, action)
       if (next === historyRef.current) return
       historyRef.current = next
-      setHistory(next)
+      publishHistory()
       draftRef.current = null
       const historyVersion = ++historyVersionRef.current
       redraw(next.present)
       void exportCommitted(current, next.present, historyVersion)
     },
-    [exportCommitted, redraw]
+    [exportCommitted, publishHistory, redraw]
   )
 
   const open = useCallback(async (): Promise<boolean> => {
@@ -358,7 +418,7 @@ export function useAnnotationLayer({
       pendingExportRef.current = null
       draftRef.current = null
       pointerIdRef.current = null
-      setHistory(EMPTY_ANNOTATION_HISTORY)
+      publishHistory()
       sessionRef.current = next
       setSession(next)
       return true
@@ -368,7 +428,7 @@ export function useAnnotationLayer({
         setStarting(false)
       }
     }
-  }, [])
+  }, [publishHistory])
 
   const cancel = useCallback((): Promise<void> => {
     const current = sessionRef.current
@@ -422,51 +482,57 @@ export function useAnnotationLayer({
   const redo = useCallback(() => apply({ type: 'redo' }), [apply])
   const clear = useCallback(() => apply({ type: 'clear' }), [apply])
 
-  const pointerProps: AnnotationCanvasPointerProps = {
-    onPointerDown: (event: ReactPointerEvent<HTMLCanvasElement>) => {
-      if (
-        finishingRef.current ||
-        !event.isPrimary ||
-        (event.pointerType === 'mouse' && event.button !== 0)
-      ) {
-        return
+  // Everything returned from here down is identity-stable across renders
+  // (callbacks hold state in refs), so hosts can memoize children that take
+  // these objects as props. Identities change only with the session lifecycle.
+  const pointerProps: AnnotationCanvasPointerProps = useMemo(
+    () => ({
+      onPointerDown: (event: ReactPointerEvent<HTMLCanvasElement>) => {
+        if (
+          finishingRef.current ||
+          !event.isPrimary ||
+          (event.pointerType === 'mouse' && event.button !== 0)
+        ) {
+          return
+        }
+        pointerIdRef.current = event.pointerId
+        event.currentTarget.setPointerCapture(event.pointerId)
+        draftRef.current = {
+          points: [pointOnCanvas(event.currentTarget, event.clientX, event.clientY)]
+        }
+        redraw(historyRef.current.present, draftRef.current)
+      },
+      onPointerMove: (event: ReactPointerEvent<HTMLCanvasElement>) => {
+        if (event.pointerId !== pointerIdRef.current || !draftRef.current) return
+        draftRef.current = {
+          points: [
+            ...draftRef.current.points,
+            ...coalescedPointsOnCanvas(event.currentTarget, event.nativeEvent)
+          ]
+        }
+        redraw(historyRef.current.present, draftRef.current)
+      },
+      onPointerUp: (event: ReactPointerEvent<HTMLCanvasElement>) => {
+        if (event.pointerId !== pointerIdRef.current || !draftRef.current) return
+        const stroke = {
+          points: [
+            ...draftRef.current.points,
+            ...coalescedPointsOnCanvas(event.currentTarget, event.nativeEvent)
+          ]
+        }
+        draftRef.current = null
+        pointerIdRef.current = null
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId)
+        }
+        apply({ type: 'commit', stroke })
+      },
+      onPointerCancel: (event: ReactPointerEvent<HTMLCanvasElement>) => {
+        if (event.pointerId === pointerIdRef.current) cancelStroke()
       }
-      pointerIdRef.current = event.pointerId
-      event.currentTarget.setPointerCapture(event.pointerId)
-      draftRef.current = {
-        points: [pointOnCanvas(event.currentTarget, event.clientX, event.clientY)]
-      }
-      redraw(historyRef.current.present, draftRef.current)
-    },
-    onPointerMove: (event: ReactPointerEvent<HTMLCanvasElement>) => {
-      if (event.pointerId !== pointerIdRef.current || !draftRef.current) return
-      draftRef.current = {
-        points: [
-          ...draftRef.current.points,
-          ...coalescedPointsOnCanvas(event.currentTarget, event.nativeEvent)
-        ]
-      }
-      redraw(historyRef.current.present, draftRef.current)
-    },
-    onPointerUp: (event: ReactPointerEvent<HTMLCanvasElement>) => {
-      if (event.pointerId !== pointerIdRef.current || !draftRef.current) return
-      const stroke = {
-        points: [
-          ...draftRef.current.points,
-          ...coalescedPointsOnCanvas(event.currentTarget, event.nativeEvent)
-        ]
-      }
-      draftRef.current = null
-      pointerIdRef.current = null
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId)
-      }
-      apply({ type: 'commit', stroke })
-    },
-    onPointerCancel: (event: ReactPointerEvent<HTMLCanvasElement>) => {
-      if (event.pointerId === pointerIdRef.current) cancelStroke()
-    }
-  }
+    }),
+    [apply, cancelStroke, redraw]
+  )
 
   const onKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -520,31 +586,46 @@ export function useAnnotationLayer({
     []
   )
 
-  const controls: AnnotationControls = {
-    active: session !== null,
-    starting,
-    finishing,
-    canUndo: history.past.length > 0,
-    canRedo: history.future.length > 0,
-    hasStrokes: history.present.length > 0,
-    open,
-    undo,
-    redo,
-    clear,
-    finish,
-    cancel
-  }
+  const controls: AnnotationControls = useMemo(
+    () => ({
+      active: session !== null,
+      starting,
+      finishing,
+      open,
+      undo,
+      redo,
+      clear,
+      finish,
+      cancel,
+      subscribeHistory,
+      getHistoryState
+    }),
+    [
+      session,
+      starting,
+      finishing,
+      open,
+      undo,
+      redo,
+      clear,
+      finish,
+      cancel,
+      subscribeHistory,
+      getHistoryState
+    ]
+  )
 
-  return {
-    targetRef,
-    controls,
-    layerProps: {
-      active: controls.active,
+  const layerProps: AnnotationLayerProps = useMemo(
+    () => ({
+      active: session !== null,
       canvasRef,
       width: session?.snapshot.width ?? 0,
       height: session?.snapshot.height ?? 0,
       pointerProps,
       onKeyDown
-    }
-  }
+    }),
+    [session, pointerProps, onKeyDown]
+  )
+
+  return useMemo(() => ({ targetRef, controls, layerProps }), [controls, layerProps])
 }

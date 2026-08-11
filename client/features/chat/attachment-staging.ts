@@ -42,13 +42,57 @@ export function stageComposerFiles(
   })
 }
 
-type StageAnnotationInput = ComposerTarget & {
+type StageAnnotationDraftInput = ComposerTarget & {
   localId: string
   sourceTab: WorkspaceTabId
   blob: Blob
+}
+
+// Local-only staging while the user is still drawing: the chip shows the
+// latest composite as its preview, but nothing is uploaded until the drawing
+// session ends (stageAnnotation).
+export function stageAnnotationDraft({
+  workspaceId,
+  sessionId,
+  localId,
+  sourceTab,
+  blob
+}: StageAnnotationDraftInput): void {
+  const previewUrl = URL.createObjectURL(blob)
+  const store = liveStore.getState()
+  const existing = store.attachments[attachmentKey(workspaceId, sessionId)]?.some(
+    attachment => attachment.localId === localId
+  )
+
+  if (existing) {
+    store.updateAttachment(workspaceId, sessionId, localId, {
+      previewUrl,
+      status: 'draft',
+      upload: undefined,
+      error: undefined
+    })
+  } else {
+    store.addAttachments(workspaceId, sessionId, [
+      {
+        kind: 'annotation',
+        localId,
+        sourceTab,
+        name: 'Annotation.png',
+        mediaType: 'image/png',
+        previewUrl,
+        status: 'draft'
+      }
+    ])
+  }
+}
+
+type StageAnnotationInput = StageAnnotationDraftInput & {
   isCurrent: () => boolean
 }
 
+// Upload an annotation once its drawing session ends (finish, send, or an
+// implicit cancel that keeps the attachment). `isCurrent` guards the result:
+// a stale upload must not resurrect an attachment the user has removed.
 export async function stageAnnotation({
   workspaceId,
   sessionId,

@@ -9,16 +9,18 @@ import type {
   WorkspaceTabId
 } from '@/lib/types'
 
-// One composer attachment, tracked per session until the message is sent. It is
-// uploaded as soon as it's added (drop/paste/pick); `status` reflects that
-// in-flight upload, and `upload` holds the server handle once ready. `previewUrl`
-// is a local object URL for image thumbnails (revoked on remove/clear).
+// One composer attachment, tracked per session until the message is sent. A
+// file uploads as soon as it's added (drop/paste/pick); an annotation stays a
+// local `draft` while it's being drawn and uploads once when the drawing
+// session ends. `status` reflects that lifecycle, and `upload` holds the server
+// handle once ready. `previewUrl` is a local object URL for image thumbnails
+// (revoked on remove/clear).
 type ChatAttachmentBase = {
   localId: string
   name: string
   mediaType: string
   previewUrl?: string
-  status: 'uploading' | 'ready' | 'error'
+  status: 'draft' | 'uploading' | 'ready' | 'error'
   upload?: UploadInfo
   error?: string
 }

@@ -183,13 +183,21 @@ describe('composer attachments', () => {
       name: 'big.mov',
       mediaType: 'video/quicktime',
       status: 'uploading'
+    },
+    {
+      kind: 'annotation',
+      localId: 'a3',
+      name: 'Annotation.png',
+      mediaType: 'image/png',
+      sourceTab: 'widgets',
+      status: 'draft'
     }
   ]
 
   const stage = () =>
     liveStore.setState({ attachments: { [attachmentKey(workspaceId, sessionId)]: staged } })
 
-  test('a composer send carries the uploaded ones and skips those still uploading', () => {
+  test('a composer send carries the uploaded ones and skips uploading and draft ones', () => {
     stage()
     expect(attachmentsForSend(workspaceId, sessionId, undefined).map(a => a.localId)).toEqual([
       'a1'
