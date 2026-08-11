@@ -231,4 +231,26 @@ describe('ACP session replay', () => {
     const turns = events.flatMap(e => (e.kind === 'turn' ? [e.turn] : []))
     expect(turns.map(t => t.role)).toEqual(['assistant'])
   })
+
+  test('an image-only send keeps its user turn on replay', async () => {
+    // An image-only send stores an image block plus an envelope-only text
+    // block (sendAcpMessage unshifts the envelope when no text block exists).
+    // Stripping the envelope must not drop the turn — the image survives as a
+    // data-URL file part, the same cold-reload fallback other adapters use.
+    const envelope = renderMoiContext({ activeTab: 'agent' })
+    const events = await replayThroughMockAgent([
+      { sessionUpdate: 'user_message_chunk', content: { type: 'text', text: envelope } },
+      {
+        sessionUpdate: 'user_message_chunk',
+        content: { type: 'image', mimeType: 'image/png', data: 'aGVsbG8=' }
+      },
+      { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'a red circle' } }
+    ])
+
+    const turns = events.flatMap(e => (e.kind === 'turn' ? [e.turn] : []))
+    expect(turns.map(t => t.role)).toEqual(['user', 'assistant'])
+    expect(turns[0].parts).toEqual([
+      { type: 'file', mediaType: 'image/png', url: 'data:image/png;base64,aGVsbG8=' }
+    ])
+  })
 })

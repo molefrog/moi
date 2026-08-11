@@ -33,13 +33,15 @@ import {
 } from './adapter'
 import { type AcpClient, type AcpSpawnSpec, getAcpClient } from './client'
 import { appendRunDuration, runDurations } from './run-durations'
-import type {
-  AcpModelInfo,
-  AcpNewSessionResult,
-  AcpPromptBlock,
-  PromptResponse,
-  SessionUpdate,
-  ToolCallUpdate
+import {
+  type AcpModelInfo,
+  type AcpNewSessionResult,
+  type AcpPromptBlock,
+  type ContentChunk,
+  type PromptResponse,
+  type SessionUpdate,
+  type ToolCallUpdate,
+  isTextBlock
 } from './wire'
 import { agentStore } from '../../agent'
 import { debug } from '../../debug'
@@ -95,6 +97,10 @@ type SessionRecord = {
   // Open user-message run, only ever populated during replay (ACP does not
   // echo live sends).
   userChunk: string
+  // Image blocks of the open replayed user message. An image-only send has no
+  // user text besides the envelope, so these are what keep its replayed turn
+  // alive once the envelope strips away.
+  userImageParts: Part[]
   // Tool calls seen this turn that never reached a terminal status — closed
   // at turn end so their cards don't hang (see ../hermes/NOTES.md §3.4).
   // Holds aliased ids (see toolCallSeq).
@@ -189,12 +195,14 @@ function flushAssistant(
 }
 
 function flushUserChunk(rec: SessionRecord) {
-  if (!rec.userChunk) return
+  if (!rec.userChunk && rec.userImageParts.length === 0) return
   // The chunk is the persisted prompt verbatim; fold the appended machinery
   // (moi-context envelope, attachment note) back out before the text becomes
-  // a bubble, and drop the turn when nothing typed remains.
-  const parts = replayedUserParts(rec.userChunk)
+  // a bubble. Replayed images render above the text like the live bubble, and
+  // a turn with nothing left (no typed text, no images) drops entirely.
+  const parts = [...rec.userImageParts, ...replayedUserParts(rec.userChunk)]
   rec.userChunk = ''
+  rec.userImageParts = []
   if (parts.length === 0) return
   emitTurnEvent(rec, {
     kind: 'turn',
@@ -285,8 +293,18 @@ function handleSessionUpdate(rec: SessionRecord, update: SessionUpdate, provider
     case 'user_message_chunk': {
       // Replay only — live sends are echoed by moi itself.
       flushAssistant(rec)
-      const block = (update as { content?: { text?: string } }).content
-      rec.userChunk += block?.text ?? ''
+      const content = (update as Partial<ContentChunk>).content
+      if (isTextBlock(content)) {
+        rec.userChunk += content.text
+      } else if (content?.type === 'image' && content.data) {
+        // Rebuilt as a data URL — the cold-reload fallback (live bubbles point
+        // at moi's served upload URL, but that store is gone after a restart).
+        rec.userImageParts.push({
+          type: 'file',
+          mediaType: content.mimeType,
+          url: `data:${content.mimeType};base64,${content.data}`
+        })
+      }
       return
     }
     case 'tool_call':
@@ -367,6 +385,7 @@ function createRecord(input: {
     replaying: false,
     acc: new AssistantTurnAccumulator(input.sessionId, input.model, input.config.id),
     userChunk: '',
+    userImageParts: [],
     openToolCalls: new Set(),
     toolCallSeq: new Map(),
     model: input.model,
