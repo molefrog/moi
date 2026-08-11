@@ -17,7 +17,7 @@ Workspace features/pages:
 - "Widgets" - small reusable full-stack components displayed on the widgets page (dashboard). For
   overview, quick info, status or quick actions.
 - "Scratchpad" - a shared low-fi canvas for prototyping, working on ideas together, visualising
-  concepts. Read `SCRATCHPAD.md` before building on or modifying it.
+  concepts. Read `references/SCRATCHPAD.md` before building on or modifying it.
 - "Views" - full-stack embedded apps for bigger work, consume more space, live in their own tab.
 
 User can switch between these, but can access the chat (this conversation and other chats) from
@@ -139,7 +139,7 @@ For more options, commands, use `moi help`.
 
 Every applet — a **Widget** or a **View** — is a default-exported React component in
 `.moi/<type>/<name>.tsx`, optionally paired with a `<name>.server.ts`. `moi bundle` compiles each
-into a live module the browser loads (edits hot-reload). Read `DESIGN.md` first.
+into a live module the browser loads (edits hot-reload). Read `references/DESIGN.md` first.
 Write normal React + Tailwind — below is only what's **moi-specific**.
 
 ## Anatomy
@@ -329,7 +329,7 @@ export const config = {
 Render **content only**: a plain `h-full w-full` region with no card chrome (`rounded-*`,
 `shadow-*`, or outer `border`) — the dashboard owns the shell, spacing, and elevation. It does not
 own the fill, so the widget must set its own opaque background.
-Changing `colSpan`/`rowSpan` needs `moi bundle --force`. See `DESIGN.md`.
+Changing `colSpan`/`rowSpan` needs `moi bundle --force`. See `references/DESIGN.md`.
 
 Typical loop: check/`bun install` deps → write the applet → `moi bundle` → run any checks.
 After the final successful bundle and any checks, always make tab focus the final workspace action:
@@ -392,7 +392,7 @@ export const config = {
 ```
 
 The inverse of a widget: a view **owns its whole page** — its own `h-full w-full` layout, scrolling
-(`overflow-auto`), padding, and chrome. Build it to read like an app screen. See `DESIGN.md`.
+(`overflow-auto`), padding, and chrome. Build it to read like an app screen. See `references/DESIGN.md`.
 
 # Keeping this skill current
 
@@ -401,9 +401,9 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **You'll know** — `moi` commands warn you when this skill is behind.
 - **To update** — run `moi skill update`. Never mid-task: finish first, or do it at the end.
 - **Re-read after updating** — `moi skill update` rewrites `SKILL.md` and its companion docs
-  (`DESIGN.md` and `SCRATCHPAD.md`) on disk, so the copy already in your context is stale. Re-read
+  (`references/DESIGN.md` and `references/SCRATCHPAD.md`) on disk, so the copy already in your context is stale. Re-read
   this `SKILL.md` before you rely on it again — don't act on the old version.
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.11.0" />
+<moi-skill version="0.12.0" />
