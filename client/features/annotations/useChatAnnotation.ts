@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { toast } from '@/client/components/ui/toast'
 import { stageAnnotation, stageAnnotationDraft } from '@/client/features/chat/attachment-staging'
@@ -188,25 +188,32 @@ export function useChatAnnotation({
     }
   }, [activeTab, available, cancel, mode, sessionId, workspaceId])
 
-  const commonControls = {
-    active: active || starting,
-    finish: finishDrawing,
-    onRemove: remove
-  }
+  // Identity-stable (all callbacks hold state in refs) so ChatPanel and
+  // ChatComposer can be memoized against the `annotation` prop.
+  const docked = useMemo<ChatAnnotationControls | undefined>(
+    () =>
+      available
+        ? {
+            active: active || starting,
+            finish: finishDrawing,
+            onRemove: remove,
+            onToggle: toggleDocked
+          }
+        : undefined,
+    [available, active, starting, finishDrawing, remove, toggleDocked]
+  )
+  const popup = useMemo<ChatAnnotationControls | undefined>(
+    () =>
+      available
+        ? {
+            active: active || starting,
+            finish: finishDrawing,
+            onRemove: remove,
+            onToggle: togglePopup
+          }
+        : undefined,
+    [available, active, starting, finishDrawing, remove, togglePopup]
+  )
 
-  return {
-    ...annotation,
-    docked: available
-      ? {
-          ...commonControls,
-          onToggle: toggleDocked
-        }
-      : undefined,
-    popup: available
-      ? {
-          ...commonControls,
-          onToggle: togglePopup
-        }
-      : undefined
-  }
+  return useMemo(() => ({ ...annotation, docked, popup }), [annotation, docked, popup])
 }
