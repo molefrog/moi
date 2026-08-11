@@ -8,7 +8,8 @@ import {
   ownsComposerAttachments,
   resolveChatRunOptions,
   startOptimisticSession,
-  startOptimisticTurn
+  startOptimisticTurn,
+  withAttachmentDirectives
 } from '@/client/features/chat/chat-send'
 import { attachmentKey, type ChatAttachment, liveStore } from '@/client/features/chat/chat-store'
 import type { SessionInfo, ViewState, WorkspaceAgent } from '@/lib/types'
@@ -169,19 +170,34 @@ describe('resolveChatRunOptions', () => {
 describe('composer attachments', () => {
   const staged: ChatAttachment[] = [
     {
+      kind: 'file',
       localId: 'a1',
       name: 'report.pdf',
       mediaType: 'application/pdf',
       status: 'ready',
       upload: { id: 'up-1', kind: 'file' } as ChatAttachment['upload']
     },
-    { localId: 'a2', name: 'big.mov', mediaType: 'video/quicktime', status: 'uploading' }
+    {
+      kind: 'file',
+      localId: 'a2',
+      name: 'big.mov',
+      mediaType: 'video/quicktime',
+      status: 'uploading'
+    },
+    {
+      kind: 'annotation',
+      localId: 'a3',
+      name: 'Annotation.png',
+      mediaType: 'image/png',
+      sourceTab: 'widgets',
+      status: 'draft'
+    }
   ]
 
   const stage = () =>
     liveStore.setState({ attachments: { [attachmentKey(workspaceId, sessionId)]: staged } })
 
-  test('a composer send carries the uploaded ones and skips those still uploading', () => {
+  test('a composer send carries the uploaded ones and skips uploading and draft ones', () => {
     stage()
     expect(attachmentsForSend(workspaceId, sessionId, undefined).map(a => a.localId)).toEqual([
       'a1'
@@ -200,6 +216,58 @@ describe('composer attachments', () => {
     expect(attachmentsForSend(workspaceId, sessionId, withDirectives).map(a => a.localId)).toEqual([
       'a1'
     ])
+  })
+
+  test('adds annotation source tabs at their image positions', () => {
+    const annotations: ChatAttachment[] = [
+      {
+        kind: 'file',
+        localId: 'image-1',
+        name: 'Reference.png',
+        mediaType: 'image/png',
+        status: 'ready',
+        upload: { id: 'up-image', kind: 'image' } as ChatAttachment['upload']
+      },
+      {
+        kind: 'annotation',
+        localId: 'annotation-1',
+        name: 'Annotation.png',
+        mediaType: 'image/png',
+        sourceTab: 'widgets',
+        status: 'ready',
+        upload: { id: 'up-annotation', kind: 'image' } as ChatAttachment['upload']
+      },
+      {
+        kind: 'annotation',
+        localId: 'annotation-2',
+        name: 'Annotation.png',
+        mediaType: 'image/png',
+        sourceTab: 'view:roadmap',
+        status: 'ready',
+        upload: { id: 'up-annotation-2', kind: 'image' } as ChatAttachment['upload']
+      }
+    ]
+
+    expect(withAttachmentDirectives({ directives: ['Keep this concise.'] }, annotations)).toEqual({
+      directives: [
+        'Keep this concise.',
+        'Annotation attachment sources in attachment order: 2. "widgets"; 3. "view:roadmap".'
+      ]
+    })
+  })
+
+  test('does not add composer annotation directives to applet sends', () => {
+    const annotation: ChatAttachment = {
+      kind: 'annotation',
+      localId: 'annotation-1',
+      name: 'Annotation.png',
+      mediaType: 'image/png',
+      sourceTab: 'widgets',
+      status: 'ready',
+      upload: { id: 'up-annotation', kind: 'image' } as ChatAttachment['upload']
+    }
+    const options = { applet: { source: 'widget:late-orders' } }
+    expect(withAttachmentDirectives(options, [annotation])).toBe(options)
   })
 
   test('only a composer send may clear the staged list', () => {

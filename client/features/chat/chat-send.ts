@@ -32,6 +32,31 @@ export function attachmentsForSend(
   return pending.filter(a => a.status === 'ready' && a.upload)
 }
 
+export function withAttachmentDirectives(
+  options: ChatSendOptions | undefined,
+  attachments: readonly ChatAttachment[]
+): ChatSendOptions | undefined {
+  if (!ownsComposerAttachments(options)) return options
+  const sources: string[] = []
+  let imagePosition = 0
+  for (const attachment of attachments) {
+    if (attachment.upload?.kind !== 'image') continue
+    imagePosition += 1
+    if (attachment.kind === 'annotation') {
+      sources.push(`${imagePosition}. ${JSON.stringify(attachment.sourceTab)}`)
+    }
+  }
+  if (sources.length === 0) return options
+
+  return {
+    ...options,
+    directives: [
+      ...(options?.directives ?? []),
+      `Annotation attachment sources in attachment order: ${sources.join('; ')}.`
+    ]
+  }
+}
+
 type StartOptimisticTurnInput = {
   queryClient: QueryClient
   workspaceId: string

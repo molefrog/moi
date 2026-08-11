@@ -7,6 +7,8 @@ import type { WorkspaceSkillsStatus } from '@/lib/types'
 
 import { api } from './api'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from './registry'
+import { readSkillVersion } from './skill-version'
+import { BUNDLED_SKILLS_DIR } from './skills-template'
 import { skillsDirFor } from './workspace-init'
 
 let tempRoot = ''
@@ -41,7 +43,7 @@ describe('workspace skills API', () => {
     expect(status.updateAvailable).toBe(true)
     expect(status.skills.find(skill => skill.name === 'moi-workspace')).toMatchObject({
       installed: '0.7.1',
-      bundled: '0.12.0'
+      bundled: await readSkillVersion(join(BUNDLED_SKILLS_DIR, 'moi-workspace', 'SKILL.md'))
     })
   })
 
