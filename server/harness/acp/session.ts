@@ -28,16 +28,20 @@ import {
   AssistantTurnAccumulator,
   acpToolCallToTurn,
   acpUsageToTurnMeta,
+  replayedUserParts,
   toolTurnId
 } from './adapter'
 import { type AcpClient, type AcpSpawnSpec, getAcpClient } from './client'
-import type {
-  AcpModelInfo,
-  AcpNewSessionResult,
-  AcpPromptBlock,
-  PromptResponse,
-  SessionUpdate,
-  ToolCallUpdate
+import { appendRunDuration, runDurations } from './run-durations'
+import {
+  type AcpModelInfo,
+  type AcpNewSessionResult,
+  type AcpPromptBlock,
+  type ContentChunk,
+  type PromptResponse,
+  type SessionUpdate,
+  type ToolCallUpdate,
+  isTextBlock
 } from './wire'
 import { agentStore } from '../../agent'
 import { debug } from '../../debug'
@@ -93,9 +97,22 @@ type SessionRecord = {
   // Open user-message run, only ever populated during replay (ACP does not
   // echo live sends).
   userChunk: string
+  // Image blocks of the open replayed user message. An image-only send has no
+  // user text besides the envelope, so these are what keep its replayed turn
+  // alive once the envelope strips away.
+  userImageParts: Part[]
   // Tool calls seen this turn that never reached a terminal status — closed
   // at turn end so their cards don't hang (see ../hermes/NOTES.md §3.4).
+  // Holds aliased ids (see toolCallSeq).
   openToolCalls: Set<string>
+  // How many times each wire toolCallId has STARTED. Hermes replay ids are
+  // `functions.<tool>:<index>` with the index scoped to one assistant message
+  // (NOTES.md §3.4), so a session calling the same tool from several messages
+  // repeats the id — upsert-by-id would collapse every occurrence into the
+  // first turn. Each start past the first gets an aliased id; updates attach
+  // to the latest start. Live `tc-<hash>` ids are unique, so the alias is a
+  // no-op there.
+  toolCallSeq: Map<string, number>
   model?: string
   queue: QueuedSend[]
   unsubscribe?: () => void
@@ -143,6 +160,17 @@ function setProcessing(rec: SessionRecord, processing: boolean) {
 }
 
 function emitTurnEvent(rec: SessionRecord, ev: StreamEvent) {
+  // ACP replay updates carry no timestamps, so replayed turns would get
+  // stamped with replay-time `new Date()`s — and the client's duration label
+  // (groupTurns: assistant timestamp minus the preceding user turn's) would
+  // report how long the REPLAY took, "Worked for 1s" on every reloaded run.
+  // The real duration is unrecoverable, so drop the timestamp instead; the
+  // client falls back to a plain "Worked" label.
+  if (ev.kind === 'turn' && rec.replaying && ev.turn.timestamp !== undefined) {
+    const turn = { ...ev.turn }
+    delete turn.timestamp
+    ev = { kind: 'turn', turn }
+  }
   rec.view = applyEvent(rec.view, ev)
   broadcast(rec.workspaceId, { ...ev, sessionId: rec.sessionId })
 }
@@ -167,34 +195,53 @@ function flushAssistant(
 }
 
 function flushUserChunk(rec: SessionRecord) {
-  if (!rec.userChunk) return
-  const text = rec.userChunk
+  if (!rec.userChunk && rec.userImageParts.length === 0) return
+  // The chunk is the persisted prompt verbatim; fold the appended machinery
+  // (moi-context envelope, attachment note) back out before the text becomes
+  // a bubble. Replayed images render above the text like the live bubble, and
+  // a turn with nothing left (no typed text, no images) drops entirely.
+  const parts = [...rec.userImageParts, ...replayedUserParts(rec.userChunk)]
   rec.userChunk = ''
+  rec.userImageParts = []
+  if (parts.length === 0) return
   emitTurnEvent(rec, {
     kind: 'turn',
     turn: {
       id: `${rec.sessionId}:user:${rec.view.turns.length}`,
       role: 'user',
       origin: { kind: 'user-input' },
-      parts: [{ type: 'text', text }],
+      parts,
       timestamp: new Date().toISOString()
     }
   })
 }
 
-function ingestToolCall(rec: SessionRecord, update: ToolCallUpdate, provider: AcpProviderId) {
+function ingestToolCall(
+  rec: SessionRecord,
+  update: ToolCallUpdate,
+  provider: AcpProviderId,
+  isStart: boolean
+) {
   // A tool call closes the open assistant run: text before it and text after
   // it are separate turns, so the transcript reads in execution order.
   flushAssistant(rec)
   flushUserChunk(rec)
-  const id = toolTurnId(rec.sessionId, update.toolCallId)
+  // Repeated wire ids (see toolCallSeq) get a per-occurrence alias so each
+  // start is its own turn; a `tool_call_update` reuses the latest one.
+  if (isStart) {
+    rec.toolCallSeq.set(update.toolCallId, (rec.toolCallSeq.get(update.toolCallId) ?? 0) + 1)
+  }
+  const seen = rec.toolCallSeq.get(update.toolCallId) ?? 1
+  const aliasedId = seen > 1 ? `${update.toolCallId}#${seen}` : update.toolCallId
+  const aliased = aliasedId === update.toolCallId ? update : { ...update, toolCallId: aliasedId }
+  const id = toolTurnId(rec.sessionId, aliasedId)
   const previous = rec.view.turns.find(t => t.id === id)
-  const turn = acpToolCallToTurn({ update, sessionId: rec.sessionId, provider, previous })
+  const turn = acpToolCallToTurn({ update: aliased, sessionId: rec.sessionId, provider, previous })
   const state = turn.parts.find(p => p.type === 'tool-call')
   const settled =
     state?.type === 'tool-call' && (state.call.state === 'success' || state.call.state === 'error')
-  if (settled) rec.openToolCalls.delete(update.toolCallId)
-  else rec.openToolCalls.add(update.toolCallId)
+  if (settled) rec.openToolCalls.delete(aliasedId)
+  else rec.openToolCalls.add(aliasedId)
   emitTurnEvent(rec, { kind: 'turn', turn })
 }
 
@@ -246,13 +293,28 @@ function handleSessionUpdate(rec: SessionRecord, update: SessionUpdate, provider
     case 'user_message_chunk': {
       // Replay only — live sends are echoed by moi itself.
       flushAssistant(rec)
-      const block = (update as { content?: { text?: string } }).content
-      rec.userChunk += block?.text ?? ''
+      const content = (update as Partial<ContentChunk>).content
+      if (isTextBlock(content)) {
+        rec.userChunk += content.text
+      } else if (content?.type === 'image' && content.data) {
+        // Rebuilt as a data URL — the cold-reload fallback (live bubbles point
+        // at moi's served upload URL, but that store is gone after a restart).
+        rec.userImageParts.push({
+          type: 'file',
+          mediaType: content.mimeType,
+          url: `data:${content.mimeType};base64,${content.data}`
+        })
+      }
       return
     }
     case 'tool_call':
     case 'tool_call_update': {
-      ingestToolCall(rec, update as unknown as ToolCallUpdate, provider)
+      ingestToolCall(
+        rec,
+        update as unknown as ToolCallUpdate,
+        provider,
+        update.sessionUpdate === 'tool_call'
+      )
       return
     }
     case 'session_info_update': {
@@ -323,7 +385,9 @@ function createRecord(input: {
     replaying: false,
     acc: new AssistantTurnAccumulator(input.sessionId, input.model, input.config.id),
     userChunk: '',
+    userImageParts: [],
     openToolCalls: new Set(),
+    toolCallSeq: new Map(),
     model: input.model,
     queue: []
   }
@@ -376,8 +440,45 @@ async function resumeSession(
     flushUserChunk(rec)
     rec.replaying = false
   }
+  await attachReplayDurations(rec)
   await applyNoPromptMode(client, config, input.sessionId)
   return rec
+}
+
+// Re-attach the live-recorded run durations to a replayed transcript: split
+// it into runs at user turns and stamp each run's FINAL turn — groupTurns'
+// meta merge carries the last turn's `durationMs` onto the merged run, which
+// is where the "Worked for Xs" label reads it. Only applied when the replayed
+// run count matches the recording exactly: a session also driven outside moi,
+// or a replayed user turn that folded to nothing, would misalign every later
+// run — and a missing label beats a wrong one.
+async function attachReplayDurations(rec: SessionRecord): Promise<void> {
+  const durations = await runDurations(rec.workspacePath, rec.sessionId)
+  if (durations.length === 0) return
+  const runEnds: number[] = []
+  let openRun = false
+  rec.view.turns.forEach((turn, i) => {
+    if (turn.role === 'user') {
+      openRun = true
+      return
+    }
+    // Every non-user turn (text, reasoning, tool call) extends the run that
+    // the last user turn opened; turns before any user turn belong to none.
+    if (openRun) {
+      runEnds.push(i)
+      openRun = false
+    } else if (runEnds.length > 0) {
+      runEnds[runEnds.length - 1] = i
+    }
+  })
+  if (runEnds.length !== durations.length) return
+  runEnds.forEach((endIndex, run) => {
+    const turn = rec.view.turns[endIndex]
+    emitTurnEvent(rec, {
+      kind: 'turn',
+      turn: { ...turn, meta: { ...turn.meta, durationMs: durations[run] } }
+    })
+  })
 }
 
 // Turn typed text + resolved uploads into ACP prompt blocks and the display
@@ -417,6 +518,10 @@ async function runPrompt(
   blocks: AcpPromptBlock[]
 ): Promise<void> {
   setProcessing(rec, true)
+  // The prompt promise IS the run, so its wall time is the "Worked for Xs"
+  // duration — recorded (settled or errored) for replay, which has no
+  // timestamps of its own (see ./run-durations.ts).
+  const startedAt = Date.now()
   try {
     const client = await getAcpClient(
       await config.spawn({
@@ -450,6 +555,7 @@ async function runPrompt(
     })
     refreshAvailability(rec, config.id)
   } finally {
+    void appendRunDuration(rec.workspacePath, rec.sessionId, Date.now() - startedAt)
     const next = rec.queue.shift()
     if (next) {
       void runPrompt(config, rec, next.blocks)
@@ -487,7 +593,9 @@ export async function sendAcpMessage(
   if (blocks.length === 0) return
 
   // ACP has no native ambient-context channel, so the envelope rides in the
-  // text block (stripped from display by lib/system-messages.ts rules).
+  // text block. The backend persists that text verbatim and echoes it on
+  // `session/load`, so the replay side strips it back out (replayedUserParts
+  // via flushUserChunk) before the text reaches a bubble.
   if (input.context) {
     const envelope = renderMoiContext(input.context)
     const first = blocks[0]

@@ -7,7 +7,9 @@
 // call both closes the open assistant turn and becomes a turn of its own —
 // the same item-per-turn model the Codex adapter produces.
 
+import { splitAttachmentNote } from '@/lib/attachment-note'
 import type { Part, ToolCall, ToolState, Turn, TurnMeta } from '@/lib/format'
+import { stripMoiContext } from '@/lib/moi-context'
 
 import {
   type AcpSessionListEntry,
@@ -105,6 +107,26 @@ export function acpUsageToTurnMeta(usage: Usage | null | undefined): TurnMeta['u
     return undefined
   }
   return { inputTokens, outputTokens, totalTokens }
+}
+
+// Replayed `user_message_chunk` text is the persisted prompt verbatim: the
+// typed text plus everything the sender appended to it — the attachment note
+// and the `<moi-context>` envelope (see sendAcpMessage in ./session.ts). Fold
+// that machinery back out so a reloaded bubble matches the live one. Envelope
+// first: it is appended after the note, and `splitAttachmentNote` parses the
+// note as the text's tail. An envelope-only block (an attachment-only send
+// carries the envelope as its lone text) folds to no parts — the caller skips
+// the bubble entirely.
+export function replayedUserParts(raw: string): Part[] {
+  const split = splitAttachmentNote(stripMoiContext(raw))
+  const parts: Part[] = split.files.map(f => ({
+    type: 'file',
+    mediaType: 'application/octet-stream',
+    url: f.path,
+    filename: f.filename
+  }))
+  if (split.text.trim()) parts.push({ type: 'text', text: split.text })
+  return parts
 }
 
 export function acpSessionToSessionInfo(entry: AcpSessionListEntry): SessionInfo {

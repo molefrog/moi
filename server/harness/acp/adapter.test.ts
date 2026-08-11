@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 
+import { appendAttachmentNote } from '@/lib/attachment-note'
 import type { Turn } from '@/lib/format'
+import { appendMoiContext, renderMoiContext } from '@/lib/moi-context'
 
 import { rpcTimeoutMs } from './client'
 import type { AcpSessionListEntry } from './wire'
@@ -9,6 +11,7 @@ import {
   AssistantTurnAccumulator,
   acpSessionToSessionInfo,
   acpToolCallToTurn,
+  replayedUserParts,
   toolStatusToState
 } from './adapter'
 
@@ -239,5 +242,44 @@ describe('rpcTimeoutMs', () => {
     for (const method of ['initialize', 'session/new', 'session/load', 'session/list']) {
       expect(rpcTimeoutMs(method)).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('replayedUserParts', () => {
+  const envelope = renderMoiContext({ activeTab: 'agent' })
+
+  test('strips the appended moi-context envelope from replayed text', () => {
+    const stored = appendMoiContext('fix the login bug', envelope)
+    expect(replayedUserParts(stored)).toEqual([{ type: 'text', text: 'fix the login bug' }])
+  })
+
+  // An attachment-only send carries the envelope as its lone text block
+  // (sendAcpMessage unshifts it); the replay must not render an all-envelope
+  // bubble.
+  test('an envelope-only block folds to no parts', () => {
+    expect(replayedUserParts(envelope)).toEqual([])
+  })
+
+  test('folds the attachment note into file parts, envelope and all', () => {
+    const noted = appendAttachmentNote('see the report', [
+      { filename: 'report.pdf', path: '/tmp/up/report.pdf' }
+    ])
+    const stored = appendMoiContext(noted, envelope)
+    expect(replayedUserParts(stored)).toEqual([
+      {
+        type: 'file',
+        mediaType: 'application/octet-stream',
+        url: '/tmp/up/report.pdf',
+        filename: 'report.pdf'
+      },
+      { type: 'text', text: 'see the report' }
+    ])
+  })
+
+  // stripMoiContext is marker-guarded: quoting the bare tag without the
+  // envelope's marker sentence keeps the user's text intact.
+  test('keeps user text that merely quotes the tag', () => {
+    const typed = 'what does <moi-context> mean in this codebase?'
+    expect(replayedUserParts(typed)).toEqual([{ type: 'text', text: typed }])
   })
 })
