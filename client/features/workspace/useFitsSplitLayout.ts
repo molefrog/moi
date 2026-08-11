@@ -28,25 +28,48 @@ export function useFitsSplitLayout<T extends HTMLElement>() {
     const el = ref.current
     if (!el) return
 
+    let updateFrame: number | null = null
+    let pendingWidth = 0
+
     const update = (width: number) => {
       const workspaceMinWidth = tokenPx('--column-w')
       const chatMinWidth = tokenPx('--chat-min')
       const chatMaxWidth = tokenPx('--chat-max')
-      setState({
+      const next = {
         fits: width - chatMinWidth >= workspaceMinWidth,
         workspaceMinWidth,
         chatMinWidth,
         chatMaxWidth
+      }
+      setState(current =>
+        current?.fits === next.fits &&
+        current.workspaceMinWidth === next.workspaceMinWidth &&
+        current.chatMinWidth === next.chatMinWidth &&
+        current.chatMaxWidth === next.chatMaxWidth
+          ? current
+          : next
+      )
+    }
+
+    const scheduleUpdate = (width: number) => {
+      pendingWidth = width
+      if (updateFrame !== null) return
+      updateFrame = requestAnimationFrame(() => {
+        updateFrame = null
+        update(pendingWidth)
       })
     }
 
     update(el.getBoundingClientRect().width)
 
     const ro = new ResizeObserver(([entry]) => {
-      if (entry) update(entry.contentRect.width)
+      if (entry) scheduleUpdate(entry.contentRect.width)
     })
     ro.observe(el)
-    return () => ro.disconnect()
+    return () => {
+      ro.disconnect()
+      if (updateFrame !== null) cancelAnimationFrame(updateFrame)
+    }
   }, [])
 
   return {
