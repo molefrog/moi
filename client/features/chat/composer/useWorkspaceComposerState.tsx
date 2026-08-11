@@ -1,6 +1,5 @@
 import type { ComposerAvailability } from '@/client/components/shared/Composer'
 import { startWorkspaceLogin, useWorkspaceAgent } from '@/client/features/workspace/api'
-import type { HarnessAvailability } from '@/lib/types'
 
 import { ChatErrorBanner } from './banners/ChatErrorBanner'
 import { resolveComposerBanner, type ComposerBanner } from './banners/ComposerBanner'
@@ -23,11 +22,7 @@ export function useWorkspaceComposerState(
   { chatError, onDismissChatError }: WorkspaceComposerStateOptions
 ): WorkspaceComposerState {
   const { data: agent, error } = useWorkspaceAgent(workspaceId)
-  const availability: HarnessAvailability = {
-    available: false,
-    reason: 'Agent provider login required',
-    loginCommand: 'codex login'
-  }
+  const availability = agent?.availability
   const { bannerProps: skillUpdateBanner } = useWorkspaceSkillUpdates(workspaceId)
 
   let unavailable = availability?.available === false ? availability : undefined

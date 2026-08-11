@@ -32,7 +32,7 @@ import {
 } from '@/client/features/chat/chat-store'
 import { useUiStore } from '@/client/store/ui'
 
-import { ModelPicker } from '../ModelPicker'
+import { ModelPicker } from './ModelPicker'
 
 type ChatComposerProps = {
   composerRef: RefObject<HTMLTextAreaElement | null>
