@@ -85,46 +85,30 @@ function WidgetActions({ editing, onCreateWidget, onEditingChange }: WidgetActio
         </Button>
       )}
       <AnimatePresence mode="popLayout" initial={false}>
-        {editing ? (
-          <motion.div
-            key="done"
-            variants={{
-              from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
-              to: { opacity: 1, scale: 1, filter: 'blur(0px)' }
-            }}
-            initial="from"
-            animate="to"
-            exit="from"
-            transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+        <motion.div
+          key={editing ? 'done' : 'edit'}
+          variants={{
+            from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
+            to: { opacity: 1, scale: 1, filter: 'blur(0px)' }
+          }}
+          initial="from"
+          animate="to"
+          exit="from"
+          transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+        >
+          <Button
+            type="button"
+            variant={editing ? 'default' : 'ghost'}
+            size="sm"
+            className={cn(
+              !editing &&
+                'text-muted-foreground group-hover/widgets:opacity-100 [@media(hover:hover)]:opacity-0'
+            )}
+            onClick={() => onEditingChange(!editing)}
           >
-            <Button type="button" size="sm" onClick={() => onEditingChange(false)}>
-              Done
-            </Button>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="actions"
-            className="flex items-center gap-1"
-            variants={{
-              from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
-              to: { opacity: 1, scale: 1, filter: 'blur(0px)' }
-            }}
-            initial="from"
-            animate="to"
-            exit="from"
-            transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
-          >
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground group-hover/widgets:opacity-100 [@media(hover:hover)]:opacity-0"
-              onClick={() => onEditingChange(true)}
-            >
-              Edit widgets
-            </Button>
-          </motion.div>
-        )}
+            {editing ? 'Done' : 'Edit widgets'}
+          </Button>
+        </motion.div>
       </AnimatePresence>
     </div>
   )

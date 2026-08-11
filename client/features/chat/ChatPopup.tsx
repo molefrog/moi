@@ -39,6 +39,8 @@ export function ChatPopup({
       onOpenChange={handleOpenChange}
       onOpenChangeComplete={onOpenChangeComplete}
     >
+      {/* Floating over a themed workspace — use the card pair so it stays
+          legible regardless of the active theme background. */}
       <PopoverTrigger
         render={
           <div className="fixed right-4 bottom-4 sm:right-6 sm:bottom-6">
@@ -52,8 +54,6 @@ export function ChatPopup({
               animate={open ? 'invisible' : 'to'}
               transition={{ type: 'spring', duration: 0.3, delay: 0.2, bounce: 0 }}
             >
-              {/* Floating over a themed workspace — use the card pair so it
-                  stays legible regardless of the active theme background. */}
               <Button
                 variant="outline"
                 size="icon-lg"
