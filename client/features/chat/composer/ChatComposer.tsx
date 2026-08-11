@@ -51,6 +51,7 @@ type ChatComposerProps = {
   onStop: () => void
   processing: boolean
   sessionId: string | null
+  modelSessionId: string | null
   availability: ComposerAvailability
   annotation?: ComposerAnnotationControls
   onRemoveDrawing?: (localId: string) => void
@@ -68,6 +69,7 @@ export function ChatComposer({
   onStop,
   processing,
   sessionId,
+  modelSessionId,
   availability,
   annotation,
   onRemoveDrawing,
@@ -238,7 +240,7 @@ export function ChatComposer({
             </Tooltip>
           )}
         </div>
-        <ModelPicker scope={draft ? 'workspace' : 'active-chat'} />
+        <ModelPicker sessionId={modelSessionId} />
         {processing ? (
           <Tooltip>
             <TooltipTrigger

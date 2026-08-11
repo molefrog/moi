@@ -84,6 +84,7 @@ export function ChatPanel({
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const effectiveSessionId = builderDraft?.sessionId ?? sessionId ?? null
+  const modelSessionId = builderDraft ? null : (sessionId ?? null)
   const turns = builderDraft ? EMPTY_TURNS : view.turns
   const hasSentMessageFromMoi = useUiStore(state => state.hasSentMessageFromMoi)
   const isWorkspacePendingAnalysis = useUiStore(state =>
@@ -242,6 +243,7 @@ export function ChatPanel({
             onStop={stop}
             processing={effectiveProcessing}
             sessionId={effectiveSessionId}
+            modelSessionId={modelSessionId}
             availability={composerAvailability}
             annotation={builderDraft ? undefined : annotation}
             onRemoveDrawing={builderDraft?.onRemoveDrawing ?? annotation?.onRemove}

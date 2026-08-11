@@ -32,7 +32,6 @@ import {
 } from '@/client/components/ui/popover'
 import { Slider } from '@/client/components/ui/slider'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
-import { useSelectedSession } from '@/client/features/chat/useSelectedSession'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
 import type { Model } from '@/lib/types'
@@ -279,18 +278,15 @@ function EffortPicker({
 }
 
 type ModelPickerProps = {
-  scope?: 'active-chat' | 'workspace'
+  sessionId: string | null
 }
 
 // Model selector for composer surfaces. The workspace's available models come
 // from `/api/workspaces/:id/agent`; effort options follow the selected model.
-// Model, effort, and Fast mode persist per chat once one exists. A new chat
-// edits the workspace defaults that seed it. All values are sent with each chat
-// frame. The workspace scope gives new-chat surfaces such as the view builder
-// the same defaults that their submit path reads.
-export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: ModelPickerProps) {
+// A session id targets that chat's stored config. Null targets the workspace
+// defaults that seed new chats such as the view builder.
+export const ModelPicker = memo(function ModelPicker({ sessionId }: ModelPickerProps) {
   const { workspaceId, layout, setLayout } = useWorkspaceLayoutCtx()
-  const [selectedSessionId] = useSelectedSession()
   const { data } = useWorkspaceAgent(workspaceId)
 
   // The SDK prepends a synthetic "default" entry ("Use the default model
@@ -304,9 +300,6 @@ export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: 
       )
     : []
 
-  // The selected chat's stored config is the source of truth. With New chat,
-  // the picker reads and edits workspace defaults.
-  const sessionId = scope === 'active-chat' ? (selectedSessionId ?? null) : null
   const sessionConfig = useSessionConfig(workspaceId, sessionId).data
   const saveSessionConfig = useSaveSessionConfig(workspaceId)
 
