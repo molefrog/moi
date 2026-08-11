@@ -20,7 +20,6 @@ import {
 import { Button } from '@/client/components/ui/button'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/client/components/ui/hover-card'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
-import type { ChatAnnotationControls } from '@/client/features/drawings/types'
 import { stageComposerFiles } from '@/client/features/chat/attachment-staging'
 import { cn } from '@/client/lib/cn'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
@@ -34,6 +33,13 @@ import { useUiStore } from '@/client/store/ui'
 
 import { ModelPicker } from '../ModelPicker'
 
+export type ComposerAnnotationControls = {
+  active: boolean
+  finish: () => Promise<void>
+  onToggle: () => void
+  onRemove: (localId: string) => void
+}
+
 type ChatComposerProps = {
   composerRef: RefObject<HTMLTextAreaElement | null>
   onSend: (text: string) => void | Promise<void>
@@ -41,7 +47,7 @@ type ChatComposerProps = {
   processing: boolean
   sessionId: string | null
   availability: ComposerAvailability
-  annotation?: ChatAnnotationControls
+  annotation?: ComposerAnnotationControls
   onRemoveDrawing?: (localId: string) => void
   allowFiles?: boolean
   draft?: {
