@@ -31,6 +31,7 @@ export type ViewBuilderChatDraft = {
   sessionId: string
   value: string
   onChange: (value: string) => void
+  onRemoveDrawing: (localId: string) => void
   onSubmit: (value: string) => Promise<void>
 }
 
@@ -243,6 +244,7 @@ export function ChatPanel({
             sessionId={effectiveSessionId}
             availability={composerAvailability}
             annotation={builderDraft ? undefined : annotation}
+            onRemoveDrawing={builderDraft?.onRemoveDrawing ?? annotation?.onRemove}
             allowFiles={!builderDraft}
             draft={
               builderDraft
