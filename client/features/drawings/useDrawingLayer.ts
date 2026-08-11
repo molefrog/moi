@@ -164,7 +164,11 @@ export type DrawingControls = {
 // Subscribe to the per-stroke history flags from the component that renders
 // them (the toolbar), keeping stroke commits out of the host screen's renders.
 export function useDrawingHistoryState(controls: DrawingControls): DrawingHistoryState {
-  return useSyncExternalStore(controls.subscribeHistory, controls.getHistoryState)
+  return useSyncExternalStore(
+    controls.subscribeHistory,
+    controls.getHistoryState,
+    controls.getHistoryState
+  )
 }
 
 export type DrawingController = {
