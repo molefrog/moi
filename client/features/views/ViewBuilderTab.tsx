@@ -103,13 +103,13 @@ export const ViewBuilderTab = forwardRef<ViewBuilderTabHandle, ViewBuilderTabPro
             <div className="flex flex-col gap-1">
               <h1 className="font-medium">The view needs your attention</h1>
               <p className="text-sm text-muted-foreground">
-                {builder.error ?? 'Open its chat to answer or ask the agent to continue.'}
+                {builder.error ?? 'Open the chat to answer or ask the agent to continue'}
               </p>
             </div>
             <div className="flex gap-2">
               <Button onClick={onOpenChat}>Open chat</Button>
               <Button variant="secondary" onClick={onDiscard}>
-                Discard
+                Discard view
               </Button>
             </div>
           </div>
