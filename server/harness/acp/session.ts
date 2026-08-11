@@ -28,6 +28,7 @@ import {
   AssistantTurnAccumulator,
   acpToolCallToTurn,
   acpUsageToTurnMeta,
+  replayedUserParts,
   toolTurnId
 } from './adapter'
 import { type AcpClient, type AcpSpawnSpec, getAcpClient } from './client'
@@ -168,15 +169,19 @@ function flushAssistant(
 
 function flushUserChunk(rec: SessionRecord) {
   if (!rec.userChunk) return
-  const text = rec.userChunk
+  // The chunk is the persisted prompt verbatim; fold the appended machinery
+  // (moi-context envelope, attachment note) back out before the text becomes
+  // a bubble, and drop the turn when nothing typed remains.
+  const parts = replayedUserParts(rec.userChunk)
   rec.userChunk = ''
+  if (parts.length === 0) return
   emitTurnEvent(rec, {
     kind: 'turn',
     turn: {
       id: `${rec.sessionId}:user:${rec.view.turns.length}`,
       role: 'user',
       origin: { kind: 'user-input' },
-      parts: [{ type: 'text', text }],
+      parts,
       timestamp: new Date().toISOString()
     }
   })
@@ -487,7 +492,9 @@ export async function sendAcpMessage(
   if (blocks.length === 0) return
 
   // ACP has no native ambient-context channel, so the envelope rides in the
-  // text block (stripped from display by lib/system-messages.ts rules).
+  // text block. The backend persists that text verbatim and echoes it on
+  // `session/load`, so the replay side strips it back out (replayedUserParts
+  // via flushUserChunk) before the text reaches a bubble.
   if (input.context) {
     const envelope = renderMoiContext(input.context)
     const first = blocks[0]
