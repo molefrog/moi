@@ -119,11 +119,12 @@ function WorkspaceCustomizeAction({ active, onToggle }: WorkspaceCustomizeAction
       <TooltipTrigger
         render={
           <Button
-            variant={active ? 'secondary' : 'ghost'}
+            variant="ghost"
             size="icon-sm"
             aria-label="Customize"
             aria-pressed={active}
             onClick={onToggle}
+            className={cn(active && 'bg-accent')}
           >
             <IconLetterCase stroke={1.75} />
           </Button>
