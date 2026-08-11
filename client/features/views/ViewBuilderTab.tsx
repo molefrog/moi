@@ -9,7 +9,7 @@ import {
   ComposerSubmitButton,
   ComposerTextarea
 } from '@/client/components/shared/Composer'
-import { ModelPicker } from '@/client/features/chat/ModelPicker'
+import { ModelPicker } from '@/client/features/chat/composer/ModelPicker'
 import type { ViewBuilder } from '@/lib/types'
 import { Spinner } from '@/client/components/ui/spinner'
 
