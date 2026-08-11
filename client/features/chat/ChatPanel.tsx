@@ -13,12 +13,11 @@ import { chatNoticeLabel, interleaveNotices } from '@/client/features/chat/inter
 import { attachmentKey, useLive } from '@/client/features/chat/chat-store'
 import type { ChatPromptBubble } from '@/client/features/chat/ChatPromptBubbles'
 import type { ChatSendOptions } from '@/client/features/chat/chat-send'
-import type { ChatAnnotationControls } from '@/client/features/drawings/types'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import type { SystemNotice, Turn, ViewState } from '@/lib/types'
 
 import type { ComposerBanner } from './composer/banners/ComposerBanner'
-import { ChatComposer } from './composer/ChatComposer'
+import { ChatComposer, type ComposerAnnotationControls } from './composer/ChatComposer'
 import { ChatEmptyState, resolveChatEmptyState, ViewBuilderChatEmptyState } from './ChatEmptyState'
 import { ChatSelector } from './ChatSelector'
 import { ThinkingIndicator, TurnView } from './TurnView'
@@ -51,7 +50,7 @@ type ChatPanelProps = {
   processing: boolean
   composerBanner?: ComposerBanner
   composerAvailability: ComposerAvailability
-  annotation?: ChatAnnotationControls
+  annotation?: ComposerAnnotationControls
   send: (text: string, options?: ChatSendOptions) => void
   stop: () => void
   onSelectSession: (sessionId: string | null) => void

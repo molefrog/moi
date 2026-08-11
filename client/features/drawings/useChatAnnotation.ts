@@ -3,9 +3,9 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { toast } from '@/client/components/ui/toast'
 import { stageDrawing, stageDrawingDraft } from '@/client/features/chat/attachment-staging'
 import { liveStore } from '@/client/features/chat/chat-store'
+import type { ComposerAnnotationControls } from '@/client/features/chat/composer/ChatComposer'
 import type { LayoutMode, WorkspaceTabId } from '@/lib/types'
 
-import type { ChatAnnotationControls } from './types'
 import { type DrawingController, useDrawingLayer } from './useDrawingLayer'
 
 type AnnotationOrigin = 'docked' | 'popup'
@@ -29,8 +29,8 @@ type UseChatAnnotationOptions = {
 }
 
 export type ChatAnnotationController = DrawingController & {
-  docked: ChatAnnotationControls | undefined
-  popup: ChatAnnotationControls | undefined
+  docked: ComposerAnnotationControls | undefined
+  popup: ComposerAnnotationControls | undefined
 }
 
 export function useChatAnnotation({
@@ -193,7 +193,7 @@ export function useChatAnnotation({
 
   // Identity-stable (all callbacks hold state in refs) so ChatPanel and
   // ChatComposer can be memoized against the `annotation` prop.
-  const docked = useMemo<ChatAnnotationControls | undefined>(
+  const docked = useMemo<ComposerAnnotationControls | undefined>(
     () =>
       available
         ? {
@@ -205,7 +205,7 @@ export function useChatAnnotation({
         : undefined,
     [available, active, starting, finishDrawing, remove, toggleDocked]
   )
-  const popup = useMemo<ChatAnnotationControls | undefined>(
+  const popup = useMemo<ComposerAnnotationControls | undefined>(
     () =>
       available
         ? {
