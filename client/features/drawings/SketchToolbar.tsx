@@ -1,4 +1,4 @@
-import { IconArrowBackUp, IconArrowForwardUp, IconX } from '@tabler/icons-react'
+import { IconArrowBackUp, IconArrowForwardUp, IconCheck, IconX } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
@@ -16,7 +16,7 @@ export function SketchToolbar({ controls, continuing, onContinue }: SketchToolba
 
   return (
     <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-popover p-1.5 shadow-md">
-      <span className="mr-2 ml-2 text-sm font-medium">Sketch view layout</span>
+      <span className="mr-2 ml-2 text-sm font-medium">Sketch the view</span>
       <div className="flex gap-1">
         <Tooltip>
           <TooltipTrigger
@@ -63,8 +63,14 @@ export function SketchToolbar({ controls, continuing, onContinue }: SketchToolba
         </Button>
       </div>
       {hasStrokes ? (
-        <Button type="button" size="sm" onClick={onContinue} disabled={continuing}>
-          Continue in chat
+        <Button
+          type="button"
+          size="icon-sm"
+          onClick={onContinue}
+          disabled={continuing}
+          aria-label="Continue in chat"
+        >
+          <IconCheck stroke={1.75} />
         </Button>
       ) : (
         <Button
