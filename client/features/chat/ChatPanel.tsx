@@ -249,7 +249,7 @@ export function ChatPanel({
                 ? {
                     value: builderDraft.value,
                     onChange: builderDraft.onChange,
-                    placeholder: 'Build a dashboard with...'
+                    placeholder: 'Describe this view'
                   }
                 : undefined
             }

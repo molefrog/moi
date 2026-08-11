@@ -56,7 +56,16 @@ export const ViewBuilderTab = forwardRef<ViewBuilderTabHandle, ViewBuilderTabPro
             active ? 'flex' : 'hidden'
           )}
         >
-          <div ref={sketch.targetRef} className="absolute inset-0 bg-background" />
+          <div
+            ref={sketch.targetRef}
+            className="absolute inset-0 flex items-center justify-center bg-background texture-grid"
+          >
+            {!sketch.controls.active && !sketch.controls.hasStrokes && (
+              <span className="flex h-full w-full items-center justify-center bg-radial from-background from-20% to-transparent to-75% p-4 text-center text-sm text-muted-foreground">
+                Sketch how this view should look
+              </span>
+            )}
+          </div>
           <DrawingLayer {...sketch.layerProps}>
             <SketchToolbar
               controls={sketch.controls}

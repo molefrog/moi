@@ -6,6 +6,7 @@ import {
   IconLayout2,
   IconPiano,
   IconSketching,
+  IconTableSpark,
   IconUmbrella2,
   type TablerIcon
 } from '@tabler/icons-react'
@@ -115,10 +116,10 @@ export function ChatEmptyState({ kind, disabled = false, onSelectPrompt }: ChatE
 
 export function ViewBuilderChatEmptyState() {
   return (
-    <div className={cn(EMPTY_STATE_STYLES, 'gap-1 text-center')}>
-      <h1 className="text-sm font-medium">What should this view do?</h1>
-      <p className="mx-auto max-w-sm px-8 text-sm text-muted-foreground">
-        Describe the content, data, and actions you need.
+    <div className={cn(EMPTY_STATE_STYLES, 'gap-2 text-center text-muted-foreground')}>
+      <IconTableSpark size={40} stroke={0.75} />
+      <p className="mx-auto max-w-sm px-8 text-sm">
+        Describe what content and data you need, plus the key actions this view should support
       </p>
     </div>
   )
