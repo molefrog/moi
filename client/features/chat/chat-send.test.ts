@@ -210,8 +210,16 @@ describe('composer attachments', () => {
     ])
   })
 
-  test('adds annotation source tabs to this message only', () => {
+  test('adds annotation source tabs at their image positions', () => {
     const annotations: ChatAttachment[] = [
+      {
+        kind: 'file',
+        localId: 'image-1',
+        name: 'Reference.png',
+        mediaType: 'image/png',
+        status: 'ready',
+        upload: { id: 'up-image', kind: 'image' } as ChatAttachment['upload']
+      },
       {
         kind: 'annotation',
         localId: 'annotation-1',
@@ -235,7 +243,7 @@ describe('composer attachments', () => {
     expect(withAttachmentDirectives({ directives: ['Keep this concise.'] }, annotations)).toEqual({
       directives: [
         'Keep this concise.',
-        'Annotation attachment sources in attachment order: 1. "widgets"; 2. "view:roadmap".'
+        'Annotation attachment sources in attachment order: 2. "widgets"; 3. "view:roadmap".'
       ]
     })
   })

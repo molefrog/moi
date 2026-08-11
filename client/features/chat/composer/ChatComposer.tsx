@@ -71,9 +71,9 @@ export function ChatComposer({
 
   const addFiles = (files: File[]) => stageComposerFiles({ workspaceId, sessionId }, files)
 
-  const send = () => {
+  const send = async () => {
     if (!canSend) return
-    if (annotation?.active) annotation.finish()
+    await annotation?.finish()
     onSend(value)
     useUiStore.getState().setComposerDraft(workspaceId, '')
   }
@@ -83,7 +83,7 @@ export function ChatComposer({
       composerRef={composerRef}
       onSubmit={e => {
         e.preventDefault()
-        send()
+        void send()
       }}
       onDragOver={e => {
         if (!e.dataTransfer.types.includes('Files')) return
@@ -127,7 +127,7 @@ export function ChatComposer({
         onKeyDown={e => {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
-            send()
+            void send()
           }
         }}
         onPaste={e => {
