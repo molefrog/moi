@@ -546,7 +546,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
           const builderTab = builderTabRefs.current.get(activeDraftBuilder.id)
           await builderTab?.prepareSketchForSend()
           await builderActions.submit(activeDraftBuilder, value)
-          await builderTab?.resetSketch()
+          // Submit clears the sent attachment. Keep the canvas until the built view replaces it.
           builderDrafts.clear(activeDraftBuilder.id)
         }
       }
