@@ -13,6 +13,7 @@ import {
 import { cn } from '@/client/lib/cn'
 import type { ViewBuilder as ViewBuilderData } from '@/lib/types'
 import { viewBuilderTabId } from '@/lib/workspace-tabs'
+import { IconScribble } from '@tabler/icons-react'
 
 export type ViewBuilderHandle = {
   prepareSketchForSend: () => Promise<void>
@@ -154,13 +155,12 @@ function ViewBuilderDraftState({ chatDocked, sketch }: ViewBuilderDraftStateProp
       {!sketch.controls.active && !hasStrokes && (
         <div
           className={cn(
-            'flex h-full items-center from-background to-transparent p-16 text-sm text-muted-foreground',
-            chatDocked
-              ? 'w-full justify-center bg-radial from-20% to-75% text-center'
-              : 'mr-auto w-[50%] bg-radial-[at_0%_50%] text-left'
+            'flex h-full flex-col items-center justify-center gap-2 bg-radial from-background from-20% to-transparent to-75% p-12 text-center text-sm',
+            chatDocked ? 'mb-28 w-full' : 'mr-auto mb-4 w-[calc(100%-var(--chat-max))]'
           )}
         >
-          <span className="max-w-32">Sketch how the view should look</span>
+          <IconScribble size={40} stroke={0.75} className="text-muted-foreground" />
+          <span className="max-w-32 text-muted-foreground">Sketch how the view should look</span>
         </div>
       )}
     </div>
