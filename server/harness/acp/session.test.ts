@@ -121,6 +121,11 @@ describe('ACP session replay', () => {
       output: '12 pass',
       provider: 'hermes'
     })
+
+    // Replay carries no timestamps, and stamping turns with replay-time dates
+    // would make the client report the replay's own duration ("Worked for
+    // 1s"). Replayed turns must omit the timestamp entirely.
+    expect(turns.every(t => t.timestamp === undefined)).toBe(true)
   })
 
   test('repeated replay tool-call ids stay separate turns', async () => {

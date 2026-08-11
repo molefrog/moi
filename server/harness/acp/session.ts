@@ -153,6 +153,17 @@ function setProcessing(rec: SessionRecord, processing: boolean) {
 }
 
 function emitTurnEvent(rec: SessionRecord, ev: StreamEvent) {
+  // ACP replay updates carry no timestamps, so replayed turns would get
+  // stamped with replay-time `new Date()`s — and the client's duration label
+  // (groupTurns: assistant timestamp minus the preceding user turn's) would
+  // report how long the REPLAY took, "Worked for 1s" on every reloaded run.
+  // The real duration is unrecoverable, so drop the timestamp instead; the
+  // client falls back to a plain "Worked" label.
+  if (ev.kind === 'turn' && rec.replaying && ev.turn.timestamp !== undefined) {
+    const turn = { ...ev.turn }
+    delete turn.timestamp
+    ev = { kind: 'turn', turn }
+  }
   rec.view = applyEvent(rec.view, ev)
   broadcast(rec.workspaceId, { ...ev, sessionId: rec.sessionId })
 }
