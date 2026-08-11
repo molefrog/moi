@@ -46,10 +46,8 @@ type ChatComposerProps = {
   draft?: {
     value: string
     onChange: (value: string) => void
-    clearOnSend?: boolean
     placeholder?: string
   }
-  modelPickerScope?: 'active-chat' | 'workspace'
 }
 
 // Draft text is persisted per workspace, while attachments remain ephemeral and
@@ -64,8 +62,7 @@ export function ChatComposer({
   availability,
   annotation,
   allowFiles = true,
-  draft,
-  modelPickerScope = 'active-chat'
+  draft
 }: ChatComposerProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const workspaceId = useWorkspaceId()
@@ -103,12 +100,7 @@ export function ChatComposer({
     try {
       await annotation?.finish()
       await onSend(valueRef.current)
-      if (draft) {
-        if (draft.clearOnSend !== false) {
-          valueRef.current = ''
-          draft.onChange('')
-        }
-      } else {
+      if (!draft) {
         valueRef.current = ''
         useUiStore.getState().setComposerDraft(workspaceId, '')
       }
@@ -237,7 +229,7 @@ export function ChatComposer({
             </Tooltip>
           )}
         </div>
-        <ModelPicker scope={modelPickerScope} />
+        <ModelPicker scope={draft ? 'workspace' : 'active-chat'} />
         {processing ? (
           <Tooltip>
             <TooltipTrigger
