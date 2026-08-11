@@ -32,6 +32,7 @@ import {
   toolTurnId
 } from './adapter'
 import { type AcpClient, type AcpSpawnSpec, getAcpClient } from './client'
+import { appendRunDuration, runDurations } from './run-durations'
 import type {
   AcpModelInfo,
   AcpNewSessionResult,
@@ -420,8 +421,45 @@ async function resumeSession(
     flushUserChunk(rec)
     rec.replaying = false
   }
+  await attachReplayDurations(rec)
   await applyNoPromptMode(client, config, input.sessionId)
   return rec
+}
+
+// Re-attach the live-recorded run durations to a replayed transcript: split
+// it into runs at user turns and stamp each run's FINAL turn — groupTurns'
+// meta merge carries the last turn's `durationMs` onto the merged run, which
+// is where the "Worked for Xs" label reads it. Only applied when the replayed
+// run count matches the recording exactly: a session also driven outside moi,
+// or a replayed user turn that folded to nothing, would misalign every later
+// run — and a missing label beats a wrong one.
+async function attachReplayDurations(rec: SessionRecord): Promise<void> {
+  const durations = await runDurations(rec.workspacePath, rec.sessionId)
+  if (durations.length === 0) return
+  const runEnds: number[] = []
+  let openRun = false
+  rec.view.turns.forEach((turn, i) => {
+    if (turn.role === 'user') {
+      openRun = true
+      return
+    }
+    // Every non-user turn (text, reasoning, tool call) extends the run that
+    // the last user turn opened; turns before any user turn belong to none.
+    if (openRun) {
+      runEnds.push(i)
+      openRun = false
+    } else if (runEnds.length > 0) {
+      runEnds[runEnds.length - 1] = i
+    }
+  })
+  if (runEnds.length !== durations.length) return
+  runEnds.forEach((endIndex, run) => {
+    const turn = rec.view.turns[endIndex]
+    emitTurnEvent(rec, {
+      kind: 'turn',
+      turn: { ...turn, meta: { ...turn.meta, durationMs: durations[run] } }
+    })
+  })
 }
 
 // Turn typed text + resolved uploads into ACP prompt blocks and the display
@@ -461,6 +499,10 @@ async function runPrompt(
   blocks: AcpPromptBlock[]
 ): Promise<void> {
   setProcessing(rec, true)
+  // The prompt promise IS the run, so its wall time is the "Worked for Xs"
+  // duration — recorded (settled or errored) for replay, which has no
+  // timestamps of its own (see ./run-durations.ts).
+  const startedAt = Date.now()
   try {
     const client = await getAcpClient(
       await config.spawn({
@@ -494,6 +536,7 @@ async function runPrompt(
     })
     refreshAvailability(rec, config.id)
   } finally {
+    void appendRunDuration(rec.workspacePath, rec.sessionId, Date.now() - startedAt)
     const next = rec.queue.shift()
     if (next) {
       void runPrompt(config, rec, next.blocks)

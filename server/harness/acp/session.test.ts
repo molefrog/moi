@@ -12,6 +12,7 @@ import { join } from 'node:path'
 import { appendMoiContext, renderMoiContext } from '@/lib/moi-context'
 
 import { killAllAcpClients } from './client'
+import { appendRunDuration, setRunDurationsPath } from './run-durations'
 import { type AcpProviderConfig, ensureAcpSessionLive, forgetAllAcpSessions } from './session'
 
 let seq = 0
@@ -49,10 +50,11 @@ process.stdin.on('data', chunk => {
 })
 `
 
-async function replayThroughMockAgent(updates: unknown[]) {
+async function replayThroughMockAgent(updates: unknown[], seedDurations: number[] = []) {
   const dir = await mkdtemp(join(tmpdir(), 'acp-session-test-'))
   const agentPath = join(dir, 'mock-acp-agent.js')
   await Bun.write(agentPath, AGENT_SOURCE)
+  setRunDurationsPath(join(dir, 'run-durations.json'))
   const config: AcpProviderConfig = {
     id: 'hermes',
     provider: 'hermes',
@@ -67,10 +69,12 @@ async function replayThroughMockAgent(updates: unknown[]) {
   // Session records key on (workspaceId, sessionId) in module state, so each
   // call gets fresh ids or the second test would reuse the first's record.
   seq++
+  const sessionId = `sess-replay-${seq}`
+  for (const ms of seedDurations) await appendRunDuration(dir, sessionId, ms)
   return ensureAcpSessionLive(config, {
     workspaceId: `ws-test-${seq}`,
     workspacePath: dir,
-    sessionId: `sess-replay-${seq}`
+    sessionId
   })
 }
 
@@ -172,6 +176,49 @@ describe('ACP session replay', () => {
       e.kind === 'turn' ? [e.turn.parts[0]?.type === 'tool-call' ? 'tool' : e.turn.role] : []
     )
     expect(roles).toEqual(['user', 'tool', 'assistant', 'user', 'tool', 'assistant'])
+  })
+
+  test('re-attaches recorded run durations to each run-final turn', async () => {
+    const events = await replayThroughMockAgent(
+      [
+        { sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'build it' } },
+        {
+          sessionUpdate: 'tool_call',
+          toolCallId: 'functions.terminal:0',
+          title: 'terminal: bun build',
+          kind: 'execute',
+          status: 'completed'
+        },
+        { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'built' } },
+        { sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'thanks' } },
+        { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'anytime' } }
+      ],
+      [5000, 250]
+    )
+
+    const turns = events.flatMap(e => (e.kind === 'turn' ? [e.turn] : []))
+    expect(turns.map(t => t.meta?.durationMs)).toEqual([
+      undefined, // user
+      undefined, // tool call
+      5000, // run 1 final turn
+      undefined, // user
+      250 // run 2 final turn
+    ])
+  })
+
+  test('skips duration re-attach when the recording does not match the replay', async () => {
+    const events = await replayThroughMockAgent(
+      [
+        { sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'one message' } },
+        { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'one reply' } }
+      ],
+      // Two recorded runs against one replayed run — a wrong label is worse
+      // than none, so nothing attaches.
+      [5000, 250]
+    )
+
+    const turns = events.flatMap(e => (e.kind === 'turn' ? [e.turn] : []))
+    expect(turns.every(t => t.meta?.durationMs === undefined)).toBe(true)
   })
 
   test('an envelope-only user block replays as no turn at all', async () => {
