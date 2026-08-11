@@ -150,7 +150,7 @@ export function ChatComposer({
             e.target.value = ''
           }}
         />
-        <div className="mr-auto flex items-center gap-0.5">
+        <div className="mr-auto flex shrink-0 items-center gap-0.5">
           <Tooltip>
             <TooltipTrigger
               render={
