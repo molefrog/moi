@@ -539,6 +539,9 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
         sessionId: activeDraftBuilder.sessionId,
         value: builderDrafts.valueFor(activeDraftBuilder),
         onChange: (value: string) => builderDrafts.change(activeDraftBuilder.id, value),
+        onRemoveDrawing: () => {
+          void builderTabRefs.current.get(activeDraftBuilder.id)?.resetSketch()
+        },
         onSubmit: async (value: string) => {
           const builderTab = builderTabRefs.current.get(activeDraftBuilder.id)
           await builderTab?.prepareSketchForSend()

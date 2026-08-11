@@ -150,13 +150,14 @@ export function useChatAnnotation({
     (localId: string) => {
       const revision = (uploadRevisionsRef.current.get(localId) ?? 0) + 1
       uploadRevisionsRef.current.set(localId, revision)
+      liveStore.getState().removeAttachment(workspaceId, sessionId, localId)
       if (draftRef.current?.attachmentId === localId) {
         draftRef.current = null
         latestBlobRef.current = null
         void cancelLayer()
       }
     },
-    [cancelLayer]
+    [cancelLayer, sessionId, workspaceId]
   )
 
   const finishDrawing = useCallback(async () => {

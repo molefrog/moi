@@ -42,6 +42,7 @@ type ChatComposerProps = {
   sessionId: string | null
   availability: ComposerAvailability
   annotation?: ChatAnnotationControls
+  onRemoveDrawing?: (localId: string) => void
   allowFiles?: boolean
   draft?: {
     value: string
@@ -61,6 +62,7 @@ export function ChatComposer({
   sessionId,
   availability,
   annotation,
+  onRemoveDrawing,
   allowFiles = true,
   draft
 }: ChatComposerProps) {
@@ -94,6 +96,15 @@ export function ChatComposer({
   // second Enter, and the draft is re-read afterwards so text typed during the
   // upload isn't lost.
   const sendingRef = useRef(false)
+
+  const removeAttachment = (attachment: ChatAttachment) => {
+    if (attachment.kind === 'drawing' && onRemoveDrawing) {
+      onRemoveDrawing(attachment.localId)
+      return
+    }
+    liveStore.getState().removeAttachment(workspaceId, sessionId, attachment.localId)
+  }
+
   const send = async () => {
     if (!canSend || sendingRef.current) return
     sendingRef.current = true
@@ -138,18 +149,7 @@ export function ChatComposer({
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 px-1 pt-1 pb-1">
           {attachments.map(a => (
-            <AttachmentChip
-              key={a.localId}
-              attachment={a}
-              onRemove={
-                a.kind === 'drawing' && a.purpose === 'sketch'
-                  ? undefined
-                  : () => {
-                      if (a.kind === 'drawing') annotation?.onRemove(a.localId)
-                      liveStore.getState().removeAttachment(workspaceId, sessionId, a.localId)
-                    }
-              }
-            />
+            <AttachmentChip key={a.localId} attachment={a} onRemove={() => removeAttachment(a)} />
           ))}
         </div>
       )}
