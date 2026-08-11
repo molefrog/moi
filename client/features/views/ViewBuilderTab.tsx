@@ -17,6 +17,7 @@ export type ViewBuilderTabHandle = {
 type ViewBuilderTabProps = {
   active: boolean
   builder: ViewBuilder
+  chatDocked: boolean
   workspaceId: string
   onEditingStart: () => void
   onContinueInChat: () => void
@@ -26,7 +27,16 @@ type ViewBuilderTabProps = {
 
 export const ViewBuilderTab = forwardRef<ViewBuilderTabHandle, ViewBuilderTabProps>(
   function ViewBuilderTab(
-    { active, builder, workspaceId, onEditingStart, onContinueInChat, onOpenChat, onDiscard },
+    {
+      active,
+      builder,
+      chatDocked,
+      workspaceId,
+      onEditingStart,
+      onContinueInChat,
+      onOpenChat,
+      onDiscard
+    },
     ref
   ) {
     const sketch = useViewBuilderSketch({
@@ -61,9 +71,16 @@ export const ViewBuilderTab = forwardRef<ViewBuilderTabHandle, ViewBuilderTabPro
             className="absolute inset-0 flex items-center justify-center bg-background texture-grid"
           >
             {!sketch.controls.active && !sketch.controls.hasStrokes && (
-              <span className="flex h-full w-full items-center justify-center bg-radial from-background from-20% to-transparent to-75% p-4 text-center text-sm text-muted-foreground">
-                Sketch how this view should look
-              </span>
+              <div
+                className={cn(
+                  'flex h-full items-center from-background to-transparent p-16 text-sm text-muted-foreground',
+                  chatDocked
+                    ? 'w-full justify-center bg-radial from-20% to-75% text-center'
+                    : 'mr-auto w-[50%] bg-radial-[at_0%_50%] text-left'
+                )}
+              >
+                <span className="max-w-32">Sketch how the view should look</span>
+              </div>
             )}
           </div>
           <DrawingLayer {...sketch.layerProps}>
@@ -84,7 +101,7 @@ export const ViewBuilderTab = forwardRef<ViewBuilderTabHandle, ViewBuilderTabPro
         <div className="flex min-h-0 flex-1 items-center justify-center p-6">
           <div className="flex max-w-md flex-col items-center gap-4 text-center">
             <div className="flex flex-col gap-1">
-              <h1 className="text-lg font-medium">The view needs your attention</h1>
+              <h1 className="font-medium">The view needs your attention</h1>
               <p className="text-sm text-muted-foreground">
                 {builder.error ?? 'Open its chat to answer or ask the agent to continue.'}
               </p>

@@ -630,6 +630,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
                 }}
                 active={activeBuilder?.id === builder.id}
                 builder={builder}
+                chatDocked={mode === 'split'}
                 workspaceId={workspaceId}
                 onEditingStart={() => {
                   if (mode === 'fullscreen') setFloatingChatOpen(false)
