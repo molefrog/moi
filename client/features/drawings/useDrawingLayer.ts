@@ -152,7 +152,6 @@ export type DrawingControls = {
   undo: () => void
   redo: () => void
   clear: () => void
-  reset: () => void
   flush: () => Promise<Blob | null>
   deactivate: () => Promise<Blob | null>
   finish: () => Promise<Blob | null>
@@ -559,18 +558,6 @@ export function useDrawingLayer({
   const undo = useCallback(() => apply({ type: 'undo' }), [apply])
   const redo = useCallback(() => apply({ type: 'redo' }), [apply])
   const clear = useCallback(() => apply({ type: 'clear' }), [apply])
-  const reset = useCallback(() => {
-    const current = sessionRef.current
-    if (!current || finishingRef.current) return
-    historyRef.current = EMPTY_DRAWING_HISTORY
-    publishHistory()
-    draftRef.current = null
-    pointerIdRef.current = null
-    const historyVersion = ++historyVersionRef.current
-    latestExportRef.current = null
-    redraw([])
-    void exportCommitted(current, [], historyVersion)
-  }, [exportCommitted, publishHistory, redraw])
 
   // Everything returned from here down is identity-stable across renders
   // (callbacks hold state in refs), so hosts can memoize children that take
@@ -700,7 +687,6 @@ export function useDrawingLayer({
       undo,
       redo,
       clear,
-      reset,
       flush,
       deactivate,
       finish,
@@ -718,7 +704,6 @@ export function useDrawingLayer({
       undo,
       redo,
       clear,
-      reset,
       flush,
       deactivate,
       finish,

@@ -1,4 +1,5 @@
 import { IconArrowBackUp, IconArrowForwardUp, IconCheck, IconX } from '@tabler/icons-react'
+import { AnimatePresence, motion } from 'motion/react'
 
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
@@ -6,18 +7,19 @@ import { cn } from '@/client/lib/cn'
 
 import { type DrawingControls, useDrawingHistoryState } from './useDrawingLayer'
 
-type AnnotationToolbarProps = {
+type DrawingToolbarProps = {
   controls: DrawingControls
+  title: string
+  busy: boolean
+  onComplete: () => void
 }
 
-export function AnnotationToolbar({ controls }: AnnotationToolbarProps) {
-  // Subscribed here so a stroke commit re-renders only this toolbar, not the
-  // screen that owns the annotation hook.
+export function DrawingToolbar({ controls, title, busy, onComplete }: DrawingToolbarProps) {
   const { canUndo, canRedo, hasStrokes } = useDrawingHistoryState(controls)
 
   return (
     <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-popover p-1.5 shadow-md">
-      <span className="mr-2 ml-2 text-sm font-medium">Draw annotation</span>
+      <span className="mr-2 ml-2 text-sm font-medium">{title}</span>
       <div className="flex gap-1">
         <Tooltip>
           <TooltipTrigger
@@ -27,8 +29,8 @@ export function AnnotationToolbar({ controls }: AnnotationToolbarProps) {
                 variant="outline"
                 size="icon-sm"
                 onClick={controls.undo}
-                disabled={controls.finishing || !canUndo}
-                aria-label="Undo annotation"
+                disabled={busy || !canUndo}
+                aria-label="Undo"
               >
                 <IconArrowBackUp stroke={1.75} />
               </Button>
@@ -44,8 +46,8 @@ export function AnnotationToolbar({ controls }: AnnotationToolbarProps) {
                 variant="outline"
                 size="icon-sm"
                 onClick={controls.redo}
-                disabled={controls.finishing || !canRedo}
-                aria-label="Redo annotation"
+                disabled={busy || !canRedo}
+                aria-label="Redo"
               >
                 <IconArrowForwardUp stroke={1.75} />
               </Button>
@@ -58,22 +60,36 @@ export function AnnotationToolbar({ controls }: AnnotationToolbarProps) {
           variant="outline"
           size="sm"
           onClick={controls.clear}
-          disabled={controls.finishing || !hasStrokes}
+          disabled={busy || !hasStrokes}
         >
           Clear
         </Button>
       </div>
-      <Button
-        type="button"
-        variant={hasStrokes ? 'default' : 'ghost'}
-        size="icon-sm"
-        onClick={() => void controls.finish()}
-        disabled={controls.finishing}
-        aria-label="Finish annotation"
-        className={cn(!hasStrokes && 'text-muted-foreground')}
-      >
-        {hasStrokes ? <IconCheck stroke={1.75} /> : <IconX stroke={1.75} />}
-      </Button>
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.div
+          key={hasStrokes ? 'complete' : 'cancel'}
+          variants={{
+            from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
+            to: { opacity: 1, scale: 1, filter: 'blur(0px)' }
+          }}
+          initial="from"
+          animate="to"
+          exit="from"
+          transition={{ type: 'spring', duration: 0.1, bounce: 0 }}
+        >
+          <Button
+            type="button"
+            variant={hasStrokes ? 'default' : 'ghost'}
+            size="icon-sm"
+            onClick={onComplete}
+            disabled={busy}
+            aria-label="Complete"
+            className={cn(!hasStrokes && 'text-muted-foreground')}
+          >
+            {hasStrokes ? <IconCheck stroke={1.75} /> : <IconX stroke={1.75} />}
+          </Button>
+        </motion.div>
+      </AnimatePresence>
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { useImperativeHandle } from 'react'
 import { Button } from '@/client/components/ui/button'
 import { Spinner } from '@/client/components/ui/spinner'
 import { DrawingLayer } from '@/client/features/drawings/DrawingLayer'
-import { SketchToolbar } from '@/client/features/drawings/SketchToolbar'
+import { DrawingToolbar } from '@/client/features/drawings/DrawingToolbar'
 import { useDrawingHistoryState } from '@/client/features/drawings/useDrawingLayer'
 import {
   type ViewBuilderSketchController,
@@ -121,10 +121,11 @@ function ViewBuilderSketchSurface({
       >
         <DrawingLayer {...sketch.layerProps}>
           {draft && (
-            <SketchToolbar
+            <DrawingToolbar
               controls={sketch.controls}
-              continuing={sketch.continuing}
-              onContinue={() => void sketch.continueInChat()}
+              title="Sketch the view"
+              busy={sketch.continuing}
+              onComplete={() => void sketch.continueInChat()}
             />
           )}
         </DrawingLayer>
