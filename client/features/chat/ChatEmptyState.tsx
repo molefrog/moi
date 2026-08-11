@@ -80,17 +80,20 @@ export const WORKSPACE_ANALYSIS_PROMPT = {
   icon: IconFileSearch
 } satisfies ChatPrompt
 
-export type ChatEmptyStateKind = 'chat-welcome' | 'workspace-welcome' | 'empty'
+export type ChatEmptyStateKind = 'view-builder' | 'chat-welcome' | 'workspace-welcome' | 'empty'
 
 type ResolveChatEmptyStateOptions = {
+  isViewBuilderDraft: boolean
   hasSentMessageFromMoi: boolean
   isWorkspacePendingAnalysis: boolean
 }
 
 export function resolveChatEmptyState({
+  isViewBuilderDraft,
   hasSentMessageFromMoi,
   isWorkspacePendingAnalysis
 }: ResolveChatEmptyStateOptions): ChatEmptyStateKind {
+  if (isViewBuilderDraft) return 'view-builder'
   if (!hasSentMessageFromMoi) return 'chat-welcome'
   if (isWorkspacePendingAnalysis) return 'workspace-welcome'
   return 'empty'
@@ -105,16 +108,19 @@ type ChatEmptyStateProps = {
 }
 
 export function ChatEmptyState({ kind, disabled = false, onSelectPrompt }: ChatEmptyStateProps) {
-  if (kind === 'chat-welcome') {
-    return <ChatWelcome disabled={disabled} onSelectPrompt={onSelectPrompt} />
+  switch (kind) {
+    case 'view-builder':
+      return <ViewBuilderChatEmptyState />
+    case 'chat-welcome':
+      return <ChatWelcome disabled={disabled} onSelectPrompt={onSelectPrompt} />
+    case 'workspace-welcome':
+      return <ChatWorkspaceWelcome disabled={disabled} onSelectPrompt={onSelectPrompt} />
+    case 'empty':
+      return <EmptyState />
   }
-  if (kind === 'workspace-welcome') {
-    return <ChatWorkspaceWelcome disabled={disabled} onSelectPrompt={onSelectPrompt} />
-  }
-  return <EmptyState />
 }
 
-export function ViewBuilderChatEmptyState() {
+function ViewBuilderChatEmptyState() {
   return (
     <div className={cn(EMPTY_STATE_STYLES, 'gap-2 text-center text-muted-foreground')}>
       <IconTableSpark size={40} stroke={0.75} />
