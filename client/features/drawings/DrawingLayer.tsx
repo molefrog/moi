@@ -1,7 +1,5 @@
 import type { KeyboardEventHandler, PointerEventHandler, ReactNode, RefObject } from 'react'
 
-import { cn } from '@/client/lib/cn'
-
 export type DrawingCanvasPointerProps = {
   onPointerDown: PointerEventHandler<HTMLCanvasElement>
   onPointerMove: PointerEventHandler<HTMLCanvasElement>
@@ -43,10 +41,7 @@ export function DrawingLayer({
         height={height}
         aria-label="Drawing area"
         tabIndex={0}
-        className={cn(
-          'absolute inset-0 size-full touch-none outline-none',
-          editing ? 'cursor-pencil' : 'cursor-default'
-        )}
+        className="absolute inset-0 size-full cursor-pencil touch-none outline-none"
       />
       {editing && children}
     </div>
