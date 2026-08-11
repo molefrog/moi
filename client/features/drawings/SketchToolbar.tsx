@@ -1,4 +1,4 @@
-import { IconArrowBackUp, IconArrowForwardUp } from '@tabler/icons-react'
+import { IconArrowBackUp, IconArrowForwardUp, IconX } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
@@ -62,9 +62,23 @@ export function SketchToolbar({ controls, continuing, onContinue }: SketchToolba
           Clear
         </Button>
       </div>
-      <Button type="button" size="sm" onClick={onContinue} disabled={continuing}>
-        Continue in chat
-      </Button>
+      {hasStrokes ? (
+        <Button type="button" size="sm" onClick={onContinue} disabled={continuing}>
+          Continue in chat
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          onClick={onContinue}
+          disabled={continuing}
+          aria-label="Continue in chat"
+          className="text-muted-foreground"
+        >
+          <IconX stroke={1.75} />
+        </Button>
+      )}
     </div>
   )
 }
