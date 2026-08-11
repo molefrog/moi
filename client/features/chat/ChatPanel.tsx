@@ -18,7 +18,7 @@ import type { SystemNotice, Turn, ViewState } from '@/lib/types'
 
 import type { ComposerBanner } from './composer/banners/ComposerBanner'
 import { ChatComposer, type ComposerAnnotationControls } from './composer/ChatComposer'
-import { ChatEmptyState, resolveChatEmptyState, ViewBuilderChatEmptyState } from './ChatEmptyState'
+import { ChatEmptyState, resolveChatEmptyState } from './ChatEmptyState'
 import { ChatSelector } from './ChatSelector'
 import { ThinkingIndicator, TurnView } from './TurnView'
 import { Button } from '@/client/components/ui/button'
@@ -113,8 +113,10 @@ export function ChatPanel({
   const timeline = useMemo(() => interleaveNotices(groupedTurns, notices), [groupedTurns, notices])
   const lastTurnId = groupedTurns.length > 0 ? groupedTurns[groupedTurns.length - 1].id : null
   const effectiveProcessing = builderDraft ? false : processing
-  const showEmptyChat = !builderDraft && chatLoaded && timeline.length === 0 && !effectiveProcessing
+  const showEmptyState =
+    !!builderDraft || (chatLoaded && timeline.length === 0 && !effectiveProcessing)
   const emptyStateKind = resolveChatEmptyState({
+    isViewBuilderDraft: !!builderDraft,
     hasSentMessageFromMoi,
     isWorkspacePendingAnalysis
   })
@@ -123,8 +125,8 @@ export function ChatPanel({
   const { atBottom, scrollToBottom, scrollToTop } = useStickToBottom(scrollRef, effectiveSessionId)
 
   useLayoutEffect(() => {
-    if (showEmptyChat && emptyStateKind !== 'empty') scrollToTop()
-  }, [showEmptyChat, emptyStateKind, scrollToTop])
+    if (showEmptyState && emptyStateKind !== 'empty') scrollToTop()
+  }, [showEmptyState, emptyStateKind, scrollToTop])
 
   // The active chat surface owns initial focus. A monotonically increasing
   // request also refocuses an already-visible composer after intent actions.
@@ -184,8 +186,7 @@ export function ChatPanel({
           className="flex scrollbar-thin flex-1 scroll-fade flex-col overflow-y-auto overscroll-contain px-5 pt-4 pb-12 [--scroll-fade-reveal:8px]"
         >
           <div className="mx-auto flex w-full max-w-(--chat-max-container) flex-1 flex-col items-center gap-6">
-            {builderDraft && <ViewBuilderChatEmptyState />}
-            {showEmptyChat && (
+            {showEmptyState && (
               <ChatEmptyState
                 kind={emptyStateKind}
                 disabled={promptDisabled}

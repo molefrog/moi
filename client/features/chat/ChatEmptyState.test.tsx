@@ -6,8 +6,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   ChatEmptyState,
   type ChatEmptyStateKind,
-  resolveChatEmptyState,
-  ViewBuilderChatEmptyState
+  resolveChatEmptyState
 } from '@/client/features/chat/ChatEmptyState'
 
 function renderState(kind: ChatEmptyStateKind): string {
@@ -23,6 +22,7 @@ describe('resolveChatEmptyState', () => {
   test('gives the global chat welcome first priority', () => {
     expect(
       resolveChatEmptyState({
+        isViewBuilderDraft: false,
         hasSentMessageFromMoi: false,
         isWorkspacePendingAnalysis: true
       })
@@ -32,6 +32,7 @@ describe('resolveChatEmptyState', () => {
   test('shows the workspace welcome for a pending imported workspace', () => {
     expect(
       resolveChatEmptyState({
+        isViewBuilderDraft: false,
         hasSentMessageFromMoi: true,
         isWorkspacePendingAnalysis: true
       })
@@ -41,10 +42,21 @@ describe('resolveChatEmptyState', () => {
   test('uses the simple empty state without pending analysis', () => {
     expect(
       resolveChatEmptyState({
+        isViewBuilderDraft: false,
         hasSentMessageFromMoi: true,
         isWorkspacePendingAnalysis: false
       })
     ).toBe('empty')
+  })
+
+  test('gives the view builder priority', () => {
+    expect(
+      resolveChatEmptyState({
+        isViewBuilderDraft: true,
+        hasSentMessageFromMoi: false,
+        isWorkspacePendingAnalysis: true
+      })
+    ).toBe('view-builder')
   })
 })
 
@@ -56,7 +68,8 @@ describe('ChatEmptyState', () => {
   })
 
   test('renders the focused new-view prompt', () => {
-    const html = renderToStaticMarkup(createElement(ViewBuilderChatEmptyState))
-    expect(html).toContain('Describe the content, data, and key actions you need in this view')
+    expect(renderState('view-builder')).toContain(
+      'Describe the content, data, and key actions you need in this view'
+    )
   })
 })
