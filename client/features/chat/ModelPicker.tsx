@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 
 import { IconBolt, IconBoltFilled } from '@tabler/icons-react'
 
-import { useSaveSessionConfig, useSessionConfig } from '../api'
+import { useSaveSessionConfig, useSessionConfig } from './api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import {
   hasEffortChoice,
