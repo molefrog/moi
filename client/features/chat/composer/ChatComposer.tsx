@@ -264,7 +264,7 @@ const EMPTY: ChatAttachment[] = []
 
 type AttachmentChipProps = {
   attachment: ChatAttachment
-  onRemove?: () => void
+  onRemove: () => void
 }
 
 // A composer attachment preview: an image thumbnail or a labelled file chip,
@@ -306,25 +306,23 @@ function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
         </div>
       )}
 
-      {onRemove && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={onRemove}
-          aria-label={`Remove ${name}`}
-          className="absolute top-0.5 right-0.5 size-4 rounded-full bg-primary/70 text-primary-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-primary/80 [&_svg]:size-3"
-        >
-          <IconX stroke={1.75} />
-        </Button>
-      )}
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={onRemove}
+        aria-label={`Remove ${name}`}
+        className="absolute top-0.5 right-0.5 size-4 rounded-full bg-primary/70 text-primary-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-primary/80 [&_svg]:size-3"
+      >
+        <IconX stroke={1.75} />
+      </Button>
     </div>
   )
 }
 
 type DrawingAttachmentChipProps = {
   attachment: Extract<ChatAttachment, { kind: 'drawing' }>
-  onRemove?: () => void
+  onRemove: () => void
 }
 
 function DrawingAttachmentChip({ attachment, onRemove }: DrawingAttachmentChipProps) {
@@ -341,21 +339,17 @@ function DrawingAttachmentChip({ attachment, onRemove }: DrawingAttachmentChipPr
           />
         }
       >
-        {onRemove ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={onRemove}
-            aria-label={`Remove ${label.toLowerCase()}`}
-            className="size-6 shrink-0 hover:bg-transparent hover:text-current"
-          >
-            <IconScribble stroke={1.75} className="group-focus-within:hidden group-hover:hidden" />
-            <IconX stroke={1.75} className="hidden group-focus-within:block group-hover:block" />
-          </Button>
-        ) : (
-          <IconScribble size={16} stroke={1.75} className="mx-1.5 shrink-0" />
-        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          onClick={onRemove}
+          aria-label={`Remove ${label.toLowerCase()}`}
+          className="size-6 shrink-0 hover:bg-transparent hover:text-current"
+        >
+          <IconScribble stroke={1.75} className="group-focus-within:hidden group-hover:hidden" />
+          <IconX stroke={1.75} className="hidden group-focus-within:block group-hover:block" />
+        </Button>
         <span>{label}</span>
       </HoverCardTrigger>
       {previewUrl && (
