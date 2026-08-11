@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 
 import { toast } from '@/client/components/ui/toast'
-import { stageAnnotation } from '@/client/features/chat/attachment-staging'
+import { stageAnnotation, stageAnnotationDraft } from '@/client/features/chat/attachment-staging'
 import { liveStore } from '@/client/features/chat/chat-store'
 import type { LayoutMode, WorkspaceTabId } from '@/lib/types'
 
@@ -43,28 +43,41 @@ export function useChatAnnotation({
   openPopup
 }: UseChatAnnotationOptions): ChatAnnotationController {
   const draftRef = useRef<ChatAnnotationDraft | null>(null)
+  const latestBlobRef = useRef<Blob | null>(null)
   const uploadRevisionsRef = useRef(new Map<string, number>())
-  const pendingStageRef = useRef<Promise<void> | null>(null)
   const closePopupRef = useRef(closePopup)
   const openPopupRef = useRef(openPopup)
   closePopupRef.current = closePopup
   openPopupRef.current = openPopup
 
+  // While drawing, every commit only refreshes the chip's local preview. The
+  // single upload happens when the session ends: finish/send (complete) or an
+  // implicit cancel that keeps the attachment.
   const change = useCallback((blob: Blob | null) => {
     const draft = draftRef.current
     if (!draft) return
 
-    const revision = (uploadRevisionsRef.current.get(draft.attachmentId) ?? 0) + 1
-    uploadRevisionsRef.current.set(draft.attachmentId, revision)
+    latestBlobRef.current = blob
     if (!blob) {
-      pendingStageRef.current = null
       liveStore
         .getState()
         .removeAttachment(draft.workspaceId, draft.sourceSessionId, draft.attachmentId)
       return
     }
 
-    pendingStageRef.current = stageAnnotation({
+    stageAnnotationDraft({
+      workspaceId: draft.workspaceId,
+      sessionId: draft.sourceSessionId,
+      localId: draft.attachmentId,
+      sourceTab: draft.sourceTab,
+      blob
+    })
+  }, [])
+
+  const upload = useCallback((draft: ChatAnnotationDraft, blob: Blob): Promise<void> => {
+    const revision = (uploadRevisionsRef.current.get(draft.attachmentId) ?? 0) + 1
+    uploadRevisionsRef.current.set(draft.attachmentId, revision)
+    return stageAnnotation({
       workspaceId: draft.workspaceId,
       sessionId: draft.sourceSessionId,
       localId: draft.attachmentId,
@@ -74,12 +87,18 @@ export function useChatAnnotation({
     })
   }, [])
 
-  const complete = useCallback(async () => {
-    const draft = draftRef.current
-    await pendingStageRef.current
-    if (draftRef.current === draft) draftRef.current = null
-    if (draft?.origin === 'popup') openPopupRef.current()
-  }, [])
+  const complete = useCallback(
+    async (blob: Blob | null) => {
+      const draft = draftRef.current
+      draftRef.current = null
+      latestBlobRef.current = null
+      // Awaited so a send that finishes the drawing only dispatches once the
+      // attachment is uploaded and ready.
+      if (draft && blob) await upload(draft, blob)
+      if (draft?.origin === 'popup') openPopupRef.current()
+    },
+    [upload]
+  )
 
   const annotation = useAnnotationLayer({ onChange: change, onFinish: complete })
   const { controls } = annotation
@@ -116,8 +135,14 @@ export function useChatAnnotation({
   const cancel = useCallback(async () => {
     const draft = draftRef.current
     await cancelLayer()
-    if (draftRef.current === draft) draftRef.current = null
-  }, [cancelLayer])
+    if (draftRef.current !== draft) return
+    draftRef.current = null
+    const blob = latestBlobRef.current
+    latestBlobRef.current = null
+    // An implicit cancel (tab/session switch) keeps the drawn-so-far
+    // annotation as an attachment, so it gets its one deferred upload here.
+    if (draft && blob) void upload(draft, blob)
+  }, [cancelLayer, upload])
 
   const remove = useCallback(
     (localId: string) => {
@@ -125,6 +150,7 @@ export function useChatAnnotation({
       uploadRevisionsRef.current.set(localId, revision)
       if (draftRef.current?.attachmentId === localId) {
         draftRef.current = null
+        latestBlobRef.current = null
         void cancelLayer()
       }
     },

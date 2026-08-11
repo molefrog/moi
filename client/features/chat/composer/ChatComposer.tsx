@@ -63,19 +63,31 @@ export function ChatComposer({
   const [dragOver, setDragOver] = useState(false)
 
   const uploading = attachments.some(a => a.status === 'uploading')
-  const hasReady = attachments.some(a => a.status === 'ready')
-  const hasContent = value.trim().length > 0 || hasReady
+  // A draft annotation counts as sendable content: send() finishes the drawing
+  // first, which uploads it before the message goes out.
+  const hasSendable = attachments.some(a => a.status === 'ready' || a.status === 'draft')
+  const hasContent = value.trim().length > 0 || hasSendable
   const canSend = canSubmitComposerAction(hasContent, uploading, availability)
 
   const onChange = (next: string) => useUiStore.getState().setComposerDraft(workspaceId, next)
 
   const addFiles = (files: File[]) => stageComposerFiles({ workspaceId, sessionId }, files)
 
+  // Guards the await window while an annotation finishes: no re-entry from a
+  // second Enter, and the draft is re-read afterwards so text typed during the
+  // upload isn't lost.
+  const sendingRef = useRef(false)
   const send = async () => {
-    if (!canSend) return
-    await annotation?.finish()
-    onSend(value)
-    useUiStore.getState().setComposerDraft(workspaceId, '')
+    if (!canSend || sendingRef.current) return
+    sendingRef.current = true
+    try {
+      await annotation?.finish()
+      const text = useUiStore.getState().composerDrafts[workspaceId] ?? ''
+      onSend(text)
+      useUiStore.getState().setComposerDraft(workspaceId, '')
+    } finally {
+      sendingRef.current = false
+    }
   }
 
   return (

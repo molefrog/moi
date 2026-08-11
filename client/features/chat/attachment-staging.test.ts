@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test'
 
-import { stageAnnotation } from './attachment-staging'
+import { stageAnnotation, stageAnnotationDraft } from './attachment-staging'
 import { attachmentKey, liveStore } from './chat-store'
 
 const workspaceId = 'workspace-1'
@@ -11,6 +11,68 @@ afterEach(() => {
   globalThis.fetch = originalFetch
   liveStore.getState().clearAttachments(workspaceId, sessionId)
   liveStore.setState({ attachments: {} })
+})
+
+describe('annotation draft staging', () => {
+  test('stages locally without uploading and refreshes the preview per commit', () => {
+    const revokeSpy = spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const fetchSpy = mock(() => Promise.reject(new Error('no network expected')))
+    globalThis.fetch = fetchSpy as unknown as typeof fetch
+
+    stageAnnotationDraft({
+      workspaceId,
+      sessionId,
+      localId: 'annotation-1',
+      sourceTab: 'widgets',
+      blob: new Blob(['first'], { type: 'image/png' })
+    })
+    const first = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)][0]
+    expect(first.status).toBe('draft')
+    expect(first.previewUrl).toStartWith('blob:')
+
+    stageAnnotationDraft({
+      workspaceId,
+      sessionId,
+      localId: 'annotation-1',
+      sourceTab: 'widgets',
+      blob: new Blob(['second'], { type: 'image/png' })
+    })
+    const list = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)]
+    expect(list).toHaveLength(1)
+    expect(list[0].previewUrl).not.toBe(first.previewUrl)
+    expect(revokeSpy).toHaveBeenCalledWith(first.previewUrl)
+    expect(fetchSpy).not.toHaveBeenCalled()
+    revokeSpy.mockRestore()
+  })
+
+  test('upload on finish reuses the draft attachment and marks it ready', async () => {
+    globalThis.fetch = mock(() =>
+      Promise.resolve(
+        Response.json([{ id: 'upload-1', kind: 'image', mediaType: 'image/png' }], { status: 200 })
+      )
+    ) as unknown as typeof fetch
+
+    stageAnnotationDraft({
+      workspaceId,
+      sessionId,
+      localId: 'annotation-1',
+      sourceTab: 'widgets',
+      blob: new Blob(['drawing'], { type: 'image/png' })
+    })
+    await stageAnnotation({
+      workspaceId,
+      sessionId,
+      localId: 'annotation-1',
+      sourceTab: 'widgets',
+      blob: new Blob(['drawing'], { type: 'image/png' }),
+      isCurrent: () => true
+    })
+
+    const list = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)]
+    expect(list).toHaveLength(1)
+    expect(list[0].status).toBe('ready')
+    expect(list[0].upload?.id).toBe('upload-1')
+  })
 })
 
 describe('annotation attachment staging', () => {
