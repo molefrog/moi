@@ -4,6 +4,7 @@ import { Button } from '@/client/components/ui/button'
 import { Spinner } from '@/client/components/ui/spinner'
 import { DrawingLayer } from '@/client/features/drawings/DrawingLayer'
 import { SketchToolbar } from '@/client/features/drawings/SketchToolbar'
+import { useDrawingHistoryState } from '@/client/features/drawings/useDrawingLayer'
 import { useViewBuilderSketch } from '@/client/features/drawings/useViewBuilderSketch'
 import { cn } from '@/client/lib/cn'
 import type { ViewBuilder } from '@/lib/types'
@@ -48,6 +49,7 @@ export const ViewBuilderTab = forwardRef<ViewBuilderTabHandle, ViewBuilderTabPro
       onEditingStart,
       onContinueInChat
     })
+    const { hasStrokes } = useDrawingHistoryState(sketch.controls)
 
     useImperativeHandle(
       ref,
@@ -70,7 +72,7 @@ export const ViewBuilderTab = forwardRef<ViewBuilderTabHandle, ViewBuilderTabPro
             ref={sketch.targetRef}
             className="absolute inset-0 flex items-center justify-center bg-background texture-grid"
           >
-            {!sketch.controls.active && !sketch.controls.hasStrokes && (
+            {!sketch.controls.active && !hasStrokes && (
               <div
                 className={cn(
                   'flex h-full items-center from-background to-transparent p-16 text-sm text-muted-foreground',
