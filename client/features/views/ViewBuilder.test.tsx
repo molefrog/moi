@@ -2,11 +2,11 @@ import { describe, expect, test } from 'bun:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-import type { ViewBuilder } from '@/lib/types'
+import type { ViewBuilder as ViewBuilderData } from '@/lib/types'
 
-import { ViewBuilderTab } from './ViewBuilderTab'
+import { ViewBuilder } from './ViewBuilder'
 
-const builder: ViewBuilder = {
+const builder: ViewBuilderData = {
   id: 'builder-1',
   status: 'draft',
   input: { requirements: '' },
@@ -15,9 +15,9 @@ const builder: ViewBuilder = {
   updatedAt: 1
 }
 
-function renderBuilder(status: ViewBuilder['status'], active = true): string {
+function renderBuilder(status: ViewBuilderData['status'], active = true): string {
   return renderToStaticMarkup(
-    createElement(ViewBuilderTab, {
+    createElement(ViewBuilder, {
       active,
       builder: { ...builder, status },
       chatDocked: false,
@@ -30,7 +30,7 @@ function renderBuilder(status: ViewBuilder['status'], active = true): string {
   )
 }
 
-describe('ViewBuilderTab', () => {
+describe('ViewBuilder', () => {
   test('keeps an inactive draft mounted and hidden', () => {
     const active = renderBuilder('draft')
     const inactive = renderBuilder('draft', false)
