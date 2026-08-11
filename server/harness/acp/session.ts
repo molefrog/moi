@@ -96,7 +96,16 @@ type SessionRecord = {
   userChunk: string
   // Tool calls seen this turn that never reached a terminal status — closed
   // at turn end so their cards don't hang (see ../hermes/NOTES.md §3.4).
+  // Holds aliased ids (see toolCallSeq).
   openToolCalls: Set<string>
+  // How many times each wire toolCallId has STARTED. Hermes replay ids are
+  // `functions.<tool>:<index>` with the index scoped to one assistant message
+  // (NOTES.md §3.4), so a session calling the same tool from several messages
+  // repeats the id — upsert-by-id would collapse every occurrence into the
+  // first turn. Each start past the first gets an aliased id; updates attach
+  // to the latest start. Live `tc-<hash>` ids are unique, so the alias is a
+  // no-op there.
+  toolCallSeq: Map<string, number>
   model?: string
   queue: QueuedSend[]
   unsubscribe?: () => void
@@ -187,19 +196,32 @@ function flushUserChunk(rec: SessionRecord) {
   })
 }
 
-function ingestToolCall(rec: SessionRecord, update: ToolCallUpdate, provider: AcpProviderId) {
+function ingestToolCall(
+  rec: SessionRecord,
+  update: ToolCallUpdate,
+  provider: AcpProviderId,
+  isStart: boolean
+) {
   // A tool call closes the open assistant run: text before it and text after
   // it are separate turns, so the transcript reads in execution order.
   flushAssistant(rec)
   flushUserChunk(rec)
-  const id = toolTurnId(rec.sessionId, update.toolCallId)
+  // Repeated wire ids (see toolCallSeq) get a per-occurrence alias so each
+  // start is its own turn; a `tool_call_update` reuses the latest one.
+  if (isStart) {
+    rec.toolCallSeq.set(update.toolCallId, (rec.toolCallSeq.get(update.toolCallId) ?? 0) + 1)
+  }
+  const seen = rec.toolCallSeq.get(update.toolCallId) ?? 1
+  const aliasedId = seen > 1 ? `${update.toolCallId}#${seen}` : update.toolCallId
+  const aliased = aliasedId === update.toolCallId ? update : { ...update, toolCallId: aliasedId }
+  const id = toolTurnId(rec.sessionId, aliasedId)
   const previous = rec.view.turns.find(t => t.id === id)
-  const turn = acpToolCallToTurn({ update, sessionId: rec.sessionId, provider, previous })
+  const turn = acpToolCallToTurn({ update: aliased, sessionId: rec.sessionId, provider, previous })
   const state = turn.parts.find(p => p.type === 'tool-call')
   const settled =
     state?.type === 'tool-call' && (state.call.state === 'success' || state.call.state === 'error')
-  if (settled) rec.openToolCalls.delete(update.toolCallId)
-  else rec.openToolCalls.add(update.toolCallId)
+  if (settled) rec.openToolCalls.delete(aliasedId)
+  else rec.openToolCalls.add(aliasedId)
   emitTurnEvent(rec, { kind: 'turn', turn })
 }
 
@@ -257,7 +279,12 @@ function handleSessionUpdate(rec: SessionRecord, update: SessionUpdate, provider
     }
     case 'tool_call':
     case 'tool_call_update': {
-      ingestToolCall(rec, update as unknown as ToolCallUpdate, provider)
+      ingestToolCall(
+        rec,
+        update as unknown as ToolCallUpdate,
+        provider,
+        update.sessionUpdate === 'tool_call'
+      )
       return
     }
     case 'session_info_update': {
@@ -329,6 +356,7 @@ function createRecord(input: {
     acc: new AssistantTurnAccumulator(input.sessionId, input.model, input.config.id),
     userChunk: '',
     openToolCalls: new Set(),
+    toolCallSeq: new Map(),
     model: input.model,
     queue: []
   }
