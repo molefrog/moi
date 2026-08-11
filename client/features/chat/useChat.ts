@@ -15,6 +15,7 @@ import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayo
 import { sendMessage } from '@/client/features/chat/chat-connection'
 import {
   type ChatSendOptions,
+  attachmentPartsForOptimisticTurn,
   attachmentsForSend,
   ownsComposerAttachments,
   resolveChatRunOptions,
@@ -118,14 +119,7 @@ export function useChat(address: WorkspaceTabAddress) {
       // upserts in place rather than duplicating. Image attachments render from
       // their local object URL until the server's broadcast (with a data URL)
       // upserts in place.
-      const parts: Part[] = []
-      for (const a of ready) {
-        if (a.upload?.kind === 'image' && a.previewUrl) {
-          parts.push({ type: 'file', mediaType: a.mediaType, url: a.previewUrl, filename: a.name })
-        } else {
-          parts.push({ type: 'file', mediaType: a.mediaType, url: '', filename: a.name })
-        }
-      }
+      const parts: Part[] = attachmentPartsForOptimisticTurn(ready)
       if (text) parts.push({ type: 'text', text })
       const optimisticId = startOptimisticTurn({
         queryClient: qc,

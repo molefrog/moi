@@ -13,19 +13,26 @@ import { chatNoticeLabel, interleaveNotices } from '@/client/features/chat/inter
 import { attachmentKey, useLive } from '@/client/features/chat/chat-store'
 import type { ChatPromptBubble } from '@/client/features/chat/ChatPromptBubbles'
 import type { ChatSendOptions } from '@/client/features/chat/chat-send'
-import type { ChatAnnotationControls } from '@/client/features/annotations/types'
+import type { ChatAnnotationControls } from '@/client/features/drawings/types'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import type { SystemNotice, Turn, ViewState } from '@/lib/types'
 
 import type { ComposerBanner } from './composer/banners/ComposerBanner'
 import { ChatComposer } from './composer/ChatComposer'
-import { ChatEmptyState, resolveChatEmptyState } from './ChatEmptyState'
+import { ChatEmptyState, resolveChatEmptyState, ViewBuilderChatEmptyState } from './ChatEmptyState'
 import { ChatSelector } from './ChatSelector'
 import { ThinkingIndicator, TurnView } from './TurnView'
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { cn } from '@/client/lib/cn'
 import { useUiStore } from '@/client/store/ui'
+
+export type ViewBuilderChatDraft = {
+  sessionId: string
+  value: string
+  onChange: (value: string) => void
+  onSubmit: (value: string) => Promise<void>
+}
 
 type ChatPanelProps = {
   active?: boolean
@@ -49,7 +56,11 @@ type ChatPanelProps = {
   onSelectSession: (sessionId: string | null) => void
   // Chat on a separate tab doesn't have a close button
   onClose?: () => void
+  builderDraft?: ViewBuilderChatDraft
 }
+
+const EMPTY_TURNS: Turn[] = []
+const EMPTY_NOTICES: SystemNotice[] = []
 
 export function ChatPanel({
   active = true,
@@ -66,18 +77,20 @@ export function ChatPanel({
   send,
   stop,
   onSelectSession,
-  onClose
+  onClose,
+  builderDraft
 }: ChatPanelProps) {
   const workspaceId = useWorkspaceId()
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const turns = view.turns
+  const effectiveSessionId = builderDraft?.sessionId ?? sessionId ?? null
+  const turns = builderDraft ? EMPTY_TURNS : view.turns
   const hasSentMessageFromMoi = useUiStore(state => state.hasSentMessageFromMoi)
   const isWorkspacePendingAnalysis = useUiStore(state =>
     (state.workspaceIdsPendingAnalysis ?? []).includes(workspaceId)
   )
   const attachmentsUploading = useLive(state =>
-    (state.attachments[attachmentKey(workspaceId, sessionId ?? null)] ?? []).some(
+    (state.attachments[attachmentKey(workspaceId, effectiveSessionId)] ?? []).some(
       attachment => attachment.status === 'uploading'
     )
   )
@@ -88,26 +101,26 @@ export function ChatPanel({
   // inter-turn gap between every tool call. See `dev/turn-spacing.md`.
   // The live preview turn is appended before grouping, so a thinking-only
   // preview merges into the trailing tool group exactly like its finalized form.
+  const effectivePreviewTurn = builderDraft ? null : previewTurn
+  const notices = builderDraft ? EMPTY_NOTICES : view.notices
   const groupedTurns = useMemo(
-    () => groupTurns(previewTurn ? [...turns, previewTurn] : turns),
-    [turns, previewTurn]
+    () => groupTurns(effectivePreviewTurn ? [...turns, effectivePreviewTurn] : turns),
+    [turns, effectivePreviewTurn]
   )
   // Grouped turns plus the renderable notices (compaction, model changes)
   // woven in at the moment they happened. Interleaving runs AFTER grouping so
   // a notice never splits a tool-only run apart.
-  const timeline = useMemo(
-    () => interleaveNotices(groupedTurns, view.notices),
-    [groupedTurns, view.notices]
-  )
+  const timeline = useMemo(() => interleaveNotices(groupedTurns, notices), [groupedTurns, notices])
   const lastTurnId = groupedTurns.length > 0 ? groupedTurns[groupedTurns.length - 1].id : null
-  const showEmptyChat = chatLoaded && timeline.length === 0 && !processing
+  const effectiveProcessing = builderDraft ? false : processing
+  const showEmptyChat = !builderDraft && chatLoaded && timeline.length === 0 && !effectiveProcessing
   const emptyStateKind = resolveChatEmptyState({
     hasSentMessageFromMoi,
     isWorkspacePendingAnalysis
   })
 
   // Stick to the bottom while pinned; respect scroll-up; jump on session switch.
-  const { atBottom, scrollToBottom, scrollToTop } = useStickToBottom(scrollRef, sessionId)
+  const { atBottom, scrollToBottom, scrollToTop } = useStickToBottom(scrollRef, effectiveSessionId)
 
   useLayoutEffect(() => {
     if (showEmptyChat && emptyStateKind !== 'empty') scrollToTop()
@@ -122,11 +135,12 @@ export function ChatPanel({
   // Sending always returns the user to the bottom, even if they'd scrolled up —
   // they expect to see their message and the reply.
   const handleSend = useCallback(
-    (text: string, options?: ChatSendOptions) => {
-      send(text, options)
+    async (text: string, options?: ChatSendOptions) => {
+      if (builderDraft) await builderDraft.onSubmit(text)
+      else send(text, options)
       scrollToBottom()
     },
-    [send, scrollToBottom]
+    [builderDraft, send, scrollToBottom]
   )
 
   const handlePromptSelect = useCallback(
@@ -140,8 +154,12 @@ export function ChatPanel({
   return (
     <div className="flex min-h-0 flex-1 flex-col pt-2 pb-3">
       <header className="mx-auto flex w-full max-w-[calc(var(--chat-max-container)+40px)] items-center justify-between pr-2 pb-2 pl-2">
-        <ChatSelector selectedSessionId={sessionId ?? null} onSelectSession={onSelectSession} />
-        {onClose && docked && (
+        {builderDraft ? (
+          <div className="flex h-8 items-center px-3 text-sm font-medium">Build a view</div>
+        ) : (
+          <ChatSelector selectedSessionId={sessionId ?? null} onSelectSession={onSelectSession} />
+        )}
+        {!builderDraft && onClose && docked && (
           <Tooltip>
             <TooltipTrigger
               render={
@@ -153,7 +171,7 @@ export function ChatPanel({
             <TooltipContent>Undock agent</TooltipContent>
           </Tooltip>
         )}
-        {onClose && !docked && (
+        {!builderDraft && onClose && !docked && (
           <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close chat">
             <IconX stroke={2} />
           </Button>
@@ -166,6 +184,7 @@ export function ChatPanel({
           className="flex scrollbar-thin flex-1 scroll-fade flex-col overflow-y-auto overscroll-contain px-5 pt-4 pb-12 [--scroll-fade-reveal:8px]"
         >
           <div className="mx-auto flex w-full max-w-(--chat-max-container) flex-1 flex-col items-center gap-6">
+            {builderDraft && <ViewBuilderChatEmptyState />}
             {showEmptyChat && (
               <ChatEmptyState
                 kind={emptyStateKind}
@@ -180,13 +199,13 @@ export function ChatPanel({
                 <TurnView
                   key={item.turn.id}
                   turn={item.turn}
-                  processing={processing && item.turn.id === lastTurnId}
+                  processing={effectiveProcessing && item.turn.id === lastTurnId}
                 />
               )
             )}
             {/* Pulsing dots only before the first token — once the preview has
                 visible content it renders as a (possibly merged) grouped turn. */}
-            {processing && !previewTurn && <ThinkingIndicator />}
+            {effectiveProcessing && !effectivePreviewTurn && <ThinkingIndicator />}
           </div>
         </div>
 
@@ -220,10 +239,22 @@ export function ChatPanel({
             composerRef={composerRef}
             onSend={handleSend}
             onStop={stop}
-            processing={processing}
-            sessionId={sessionId ?? null}
+            processing={effectiveProcessing}
+            sessionId={effectiveSessionId}
             availability={composerAvailability}
-            annotation={annotation}
+            annotation={builderDraft ? undefined : annotation}
+            allowFiles={!builderDraft}
+            draft={
+              builderDraft
+                ? {
+                    value: builderDraft.value,
+                    onChange: builderDraft.onChange,
+                    clearOnSend: false,
+                    placeholder: 'Describe the view'
+                  }
+                : undefined
+            }
+            modelPickerScope={builderDraft ? 'workspace' : 'active-chat'}
           />
         </div>
       </div>

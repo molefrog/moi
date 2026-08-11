@@ -2,7 +2,7 @@ const MAX_CAPTURE_EDGE = 1568
 const ASSET_TIMEOUT_MS = 1_000
 const CAPTURE_TIMEOUT_MS = 10_000
 
-export function annotationCaptureScale(width: number, height: number, pixelRatio: number): number {
+export function drawingCaptureScale(width: number, height: number, pixelRatio: number): number {
   const longEdge = Math.max(width, height)
   if (longEdge <= 0) return 1
   return Math.min(Math.max(pixelRatio, 1), MAX_CAPTURE_EDGE / longEdge)
@@ -27,7 +27,7 @@ export async function captureElement(element: HTMLElement): Promise<HTMLCanvasEl
     const context = await createContext(element, {
       width: Math.round(bounds.width),
       height: Math.round(bounds.height),
-      scale: annotationCaptureScale(bounds.width, bounds.height, window.devicePixelRatio),
+      scale: drawingCaptureScale(bounds.width, bounds.height, window.devicePixelRatio),
       type: 'image/png',
       backgroundColor: getComputedStyle(element).backgroundColor,
       timeout: ASSET_TIMEOUT_MS,

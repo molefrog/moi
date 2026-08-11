@@ -6,7 +6,8 @@ import { describe, expect, test } from 'bun:test'
 import {
   ChatEmptyState,
   type ChatEmptyStateKind,
-  resolveChatEmptyState
+  resolveChatEmptyState,
+  ViewBuilderChatEmptyState
 } from '@/client/features/chat/ChatEmptyState'
 
 function renderState(kind: ChatEmptyStateKind): string {
@@ -52,5 +53,11 @@ describe('ChatEmptyState', () => {
     expect(renderState('chat-welcome')).toContain('moi is the visual workspace')
     expect(renderState('workspace-welcome')).toContain('Explore the workspace')
     expect(renderState('empty')).toContain('Chat with your agent')
+  })
+
+  test('renders the focused new-view prompt', () => {
+    const html = renderToStaticMarkup(createElement(ViewBuilderChatEmptyState))
+    expect(html).toContain('What should this view do?')
+    expect(html).toContain('Describe the content, data, and actions you need.')
   })
 })

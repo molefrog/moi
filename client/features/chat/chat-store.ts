@@ -25,8 +25,13 @@ type ChatAttachmentBase = {
   error?: string
 }
 
+export type DrawingPurpose = 'annotation' | 'sketch'
+
 export type ChatAttachment = ChatAttachmentBase &
-  ({ kind: 'file'; sourceTab?: never } | { kind: 'annotation'; sourceTab: WorkspaceTabId })
+  (
+    | { kind: 'file'; purpose?: never; sourceTab?: never }
+    | { kind: 'drawing'; purpose: DrawingPurpose; sourceTab: WorkspaceTabId }
+  )
 
 type ChatAttachmentPatch = Partial<
   Pick<ChatAttachmentBase, 'name' | 'mediaType' | 'previewUrl' | 'status' | 'upload' | 'error'>

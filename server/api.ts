@@ -250,6 +250,7 @@ one.post('/view-builders/:builderId/submit', async c => {
     fastMode?: boolean
     stream?: boolean
     availableIcons?: unknown
+    attachments?: unknown
   }>()
   if (typeof body?.input?.requirements !== 'string') {
     return c.text('Expected { input: { requirements: string } }', 400)
@@ -259,6 +260,17 @@ one.post('/view-builders/:builderId/submit', async c => {
   }
   const availableIcons = parseAvailableViewIcons(body.availableIcons)
   if (!availableIcons) return c.text('Available view icons are required', 400)
+  const attachments = body.attachments ?? []
+  if (
+    !Array.isArray(attachments) ||
+    attachments.length > 1 ||
+    !attachments.every(id => typeof id === 'string' && /^[a-f0-9]{64}$/.test(id))
+  ) {
+    return c.text('Invalid sketch attachment', 400)
+  }
+  if (attachments.some(id => getUpload(ws.id, id)?.kind !== 'image')) {
+    return c.text('Sketch attachment not found or expired', 400)
+  }
   const availability = await workspaceTypeAvailability(ws.type ?? 'claude-code')
   if (!availability.available) return c.text(availability.reason, 400)
   try {
@@ -266,14 +278,20 @@ one.post('/view-builders/:builderId/submit', async c => {
       ws.id,
       ws.path,
       c.req.param('builderId'),
-      body.input.requirements
+      body.input.requirements,
+      attachments.length > 0
     )
     // The bootstrap instructions ride the moi-context envelope, injected by
     // the harness like any other ambient context; the user text stays bare.
     // The user submits from the builder's own tab, so that's the active tab.
     const context: MoiContext = {
       activeTab: `view-builder:${builder.id}`,
-      directives: viewBuilderDirectives(builder.id, availableIcons)
+      directives: [
+        ...viewBuilderDirectives(builder.id, availableIcons),
+        ...(attachments.length > 0
+          ? ["The attached image is the user's sketch of the intended view layout."]
+          : [])
+      ]
     }
     try {
       publishSelectedSession(ws.id, await saveSelectedSession(ws.path, builder.sessionId))
@@ -283,6 +301,7 @@ one.post('/view-builders/:builderId/submit', async c => {
         sessionId: builder.sessionId,
         isNew: true,
         content: builder.input.requirements,
+        attachments,
         context,
         optimisticId: body.optimisticId,
         model: typeof body.model === 'string' ? body.model : undefined,

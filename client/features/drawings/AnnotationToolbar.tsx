@@ -4,16 +4,16 @@ import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { cn } from '@/client/lib/cn'
 
-import { type AnnotationControls, useAnnotationHistoryState } from './useAnnotationLayer'
+import { type DrawingControls, useDrawingHistoryState } from './useDrawingLayer'
 
 type AnnotationToolbarProps = {
-  controls: AnnotationControls
+  controls: DrawingControls
 }
 
 export function AnnotationToolbar({ controls }: AnnotationToolbarProps) {
   // Subscribed here so a stroke commit re-renders only this toolbar, not the
   // screen that owns the annotation hook.
-  const { canUndo, canRedo, hasStrokes } = useAnnotationHistoryState(controls)
+  const { canUndo, canRedo, hasStrokes } = useDrawingHistoryState(controls)
 
   return (
     <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-popover p-1.5 shadow-md">
