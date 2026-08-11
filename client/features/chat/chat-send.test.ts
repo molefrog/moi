@@ -185,7 +185,8 @@ describe('composer attachments', () => {
       status: 'uploading'
     },
     {
-      kind: 'annotation',
+      kind: 'drawing',
+      purpose: 'annotation',
       localId: 'a3',
       name: 'Annotation.png',
       mediaType: 'image/png',
@@ -229,7 +230,8 @@ describe('composer attachments', () => {
         upload: { id: 'up-image', kind: 'image' } as ChatAttachment['upload']
       },
       {
-        kind: 'annotation',
+        kind: 'drawing',
+        purpose: 'annotation',
         localId: 'annotation-1',
         name: 'Annotation.png',
         mediaType: 'image/png',
@@ -238,7 +240,8 @@ describe('composer attachments', () => {
         upload: { id: 'up-annotation', kind: 'image' } as ChatAttachment['upload']
       },
       {
-        kind: 'annotation',
+        kind: 'drawing',
+        purpose: 'annotation',
         localId: 'annotation-2',
         name: 'Annotation.png',
         mediaType: 'image/png',
@@ -258,7 +261,8 @@ describe('composer attachments', () => {
 
   test('does not add composer annotation directives to applet sends', () => {
     const annotation: ChatAttachment = {
-      kind: 'annotation',
+      kind: 'drawing',
+      purpose: 'annotation',
       localId: 'annotation-1',
       name: 'Annotation.png',
       mediaType: 'image/png',
@@ -268,6 +272,25 @@ describe('composer attachments', () => {
     }
     const options = { applet: { source: 'widget:late-orders' } }
     expect(withAttachmentDirectives(options, [annotation])).toBe(options)
+  })
+
+  test('describes a new-view sketch at its image position', () => {
+    const sketch: ChatAttachment = {
+      kind: 'drawing',
+      purpose: 'sketch',
+      localId: 'sketch-1',
+      name: 'Sketch.png',
+      mediaType: 'image/png',
+      sourceTab: 'view-builder:draft-1',
+      status: 'ready',
+      upload: { id: 'up-sketch', kind: 'image' } as ChatAttachment['upload']
+    }
+
+    expect(withAttachmentDirectives(undefined, [sketch])).toEqual({
+      directives: [
+        'Sketch attachment sources in attachment order: 1. "view-builder:draft-1". Each sketch shows the intended layout of a new view.'
+      ]
+    })
   })
 
   test('only a composer send may clear the staged list', () => {

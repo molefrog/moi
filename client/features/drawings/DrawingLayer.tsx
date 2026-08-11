@@ -1,34 +1,38 @@
 import type { KeyboardEventHandler, PointerEventHandler, ReactNode, RefObject } from 'react'
 
-export type AnnotationCanvasPointerProps = {
+import { cn } from '@/client/lib/cn'
+
+export type DrawingCanvasPointerProps = {
   onPointerDown: PointerEventHandler<HTMLCanvasElement>
   onPointerMove: PointerEventHandler<HTMLCanvasElement>
   onPointerUp: PointerEventHandler<HTMLCanvasElement>
   onPointerCancel: PointerEventHandler<HTMLCanvasElement>
 }
 
-export type AnnotationLayerProps = {
-  active: boolean
+export type DrawingLayerProps = {
+  visible: boolean
+  editing: boolean
   canvasRef: RefObject<HTMLCanvasElement | null>
   width: number
   height: number
-  pointerProps: AnnotationCanvasPointerProps
+  pointerProps: DrawingCanvasPointerProps
   onKeyDown: KeyboardEventHandler<HTMLDivElement>
   children?: ReactNode
 }
 
 // The layer only renders the drawing canvas and an optional controls slot. All
-// capture, history, and export behavior belongs to useAnnotationLayer.
-export function AnnotationLayer({
-  active,
+// capture, history, and export behavior belongs to useDrawingLayer.
+export function DrawingLayer({
+  visible,
+  editing,
   canvasRef,
   width,
   height,
   pointerProps,
   onKeyDown,
   children
-}: AnnotationLayerProps) {
-  if (!active) return null
+}: DrawingLayerProps) {
+  if (!visible) return null
 
   return (
     <div className="absolute inset-0 animate-in duration-100 fade-in" onKeyDown={onKeyDown}>
@@ -37,11 +41,14 @@ export function AnnotationLayer({
         {...pointerProps}
         width={width}
         height={height}
-        aria-label="Annotation drawing area"
+        aria-label="Drawing area"
         tabIndex={0}
-        className="absolute inset-0 size-full cursor-pencil touch-none outline-none"
+        className={cn(
+          'absolute inset-0 size-full touch-none outline-none',
+          editing ? 'cursor-pencil' : 'cursor-default'
+        )}
       />
-      {children}
+      {editing && children}
     </div>
   )
 }

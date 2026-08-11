@@ -80,6 +80,7 @@ export type SubmitViewBuilderInput = {
   builderId: string
   requirements: string
   optimisticId: string
+  attachments?: string[]
   model?: string
   effort?: string
   fastMode?: boolean

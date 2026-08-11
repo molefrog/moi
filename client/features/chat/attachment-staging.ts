@@ -1,6 +1,6 @@
 import type { WorkspaceTabId } from '@/lib/types'
 
-import { attachmentKey, type ChatAttachment, liveStore } from './chat-store'
+import { attachmentKey, type ChatAttachment, type DrawingPurpose, liveStore } from './chat-store'
 import { uploadFiles } from './uploads'
 
 type ComposerTarget = {
@@ -42,22 +42,25 @@ export function stageComposerFiles(
   })
 }
 
-type StageAnnotationDraftInput = ComposerTarget & {
+type StageDrawingDraftInput = ComposerTarget & {
   localId: string
+  purpose: DrawingPurpose
   sourceTab: WorkspaceTabId
   blob: Blob
 }
 
 // Local-only staging while the user is still drawing: the chip shows the
 // latest composite as its preview, but nothing is uploaded until the drawing
-// session ends (stageAnnotation).
-export function stageAnnotationDraft({
+// session ends (stageDrawing).
+export function stageDrawingDraft({
   workspaceId,
   sessionId,
   localId,
+  purpose,
   sourceTab,
   blob
-}: StageAnnotationDraftInput): void {
+}: StageDrawingDraftInput): void {
+  const label = purpose === 'sketch' ? 'Sketch' : 'Annotation'
   const previewUrl = URL.createObjectURL(blob)
   const store = liveStore.getState()
   const existing = store.attachments[attachmentKey(workspaceId, sessionId)]?.some(
@@ -74,10 +77,11 @@ export function stageAnnotationDraft({
   } else {
     store.addAttachments(workspaceId, sessionId, [
       {
-        kind: 'annotation',
+        kind: 'drawing',
+        purpose,
         localId,
         sourceTab,
-        name: 'Annotation.png',
+        name: `${label}.png`,
         mediaType: 'image/png',
         previewUrl,
         status: 'draft'
@@ -86,21 +90,23 @@ export function stageAnnotationDraft({
   }
 }
 
-type StageAnnotationInput = StageAnnotationDraftInput & {
+type StageDrawingInput = StageDrawingDraftInput & {
   isCurrent: () => boolean
 }
 
-// Upload an annotation once its drawing session ends (finish, send, or an
+// Upload a drawing once its editing session ends (finish, send, or an
 // implicit cancel that keeps the attachment). `isCurrent` guards the result:
 // a stale upload must not resurrect an attachment the user has removed.
-export async function stageAnnotation({
+export async function stageDrawing({
   workspaceId,
   sessionId,
   localId,
+  purpose,
   sourceTab,
   blob,
   isCurrent
-}: StageAnnotationInput): Promise<void> {
+}: StageDrawingInput): Promise<void> {
+  const label = purpose === 'sketch' ? 'Sketch' : 'Annotation'
   const previewUrl = URL.createObjectURL(blob)
   const store = liveStore.getState()
   const existing = store.attachments[attachmentKey(workspaceId, sessionId)]?.some(
@@ -117,10 +123,11 @@ export async function stageAnnotation({
   } else {
     store.addAttachments(workspaceId, sessionId, [
       {
-        kind: 'annotation',
+        kind: 'drawing',
+        purpose,
         localId,
         sourceTab,
-        name: 'Annotation.png',
+        name: `${label}.png`,
         mediaType: 'image/png',
         previewUrl,
         status: 'uploading'
@@ -130,7 +137,7 @@ export async function stageAnnotation({
 
   try {
     const [upload] = await uploadFiles(workspaceId, [
-      new File([blob], 'Annotation.png', { type: 'image/png' })
+      new File([blob], `${label}.png`, { type: 'image/png' })
     ])
     if (!isCurrent()) return
     liveStore.getState().updateAttachment(workspaceId, sessionId, localId, {

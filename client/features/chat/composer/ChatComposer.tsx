@@ -20,7 +20,7 @@ import {
 import { Button } from '@/client/components/ui/button'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/client/components/ui/hover-card'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
-import type { ChatAnnotationControls } from '@/client/features/annotations/types'
+import type { ChatAnnotationControls } from '@/client/features/drawings/types'
 import { stageComposerFiles } from '@/client/features/chat/attachment-staging'
 import { cn } from '@/client/lib/cn'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
@@ -36,12 +36,20 @@ import { ModelPicker } from '../ModelPicker'
 
 type ChatComposerProps = {
   composerRef: RefObject<HTMLTextAreaElement | null>
-  onSend: (text: string) => void
+  onSend: (text: string) => void | Promise<void>
   onStop: () => void
   processing: boolean
   sessionId: string | null
   availability: ComposerAvailability
   annotation?: ChatAnnotationControls
+  allowFiles?: boolean
+  draft?: {
+    value: string
+    onChange: (value: string) => void
+    clearOnSend?: boolean
+    placeholder?: string
+  }
+  modelPickerScope?: 'active-chat' | 'workspace'
 }
 
 // Draft text is persisted per workspace, while attachments remain ephemeral and
@@ -54,11 +62,17 @@ export function ChatComposer({
   processing,
   sessionId,
   availability,
-  annotation
+  annotation,
+  allowFiles = true,
+  draft,
+  modelPickerScope = 'active-chat'
 }: ChatComposerProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const workspaceId = useWorkspaceId()
-  const value = useUiStore(s => s.composerDrafts[workspaceId] ?? '')
+  const workspaceDraft = useUiStore(s => s.composerDrafts[workspaceId] ?? '')
+  const value = draft?.value ?? workspaceDraft
+  const valueRef = useRef(value)
+  valueRef.current = value
   const attachments = useLive(s => s.attachments[attachmentKey(workspaceId, sessionId)] ?? EMPTY)
   const [dragOver, setDragOver] = useState(false)
 
@@ -69,9 +83,15 @@ export function ChatComposer({
   const hasContent = value.trim().length > 0 || hasSendable
   const canSend = canSubmitComposerAction(hasContent, uploading, availability)
 
-  const onChange = (next: string) => useUiStore.getState().setComposerDraft(workspaceId, next)
+  const onChange = (next: string) => {
+    valueRef.current = next
+    if (draft) draft.onChange(next)
+    else useUiStore.getState().setComposerDraft(workspaceId, next)
+  }
 
-  const addFiles = (files: File[]) => stageComposerFiles({ workspaceId, sessionId }, files)
+  const addFiles = (files: File[]) => {
+    if (allowFiles) stageComposerFiles({ workspaceId, sessionId }, files)
+  }
 
   // Guards the await window while an annotation finishes: no re-entry from a
   // second Enter, and the draft is re-read afterwards so text typed during the
@@ -82,9 +102,16 @@ export function ChatComposer({
     sendingRef.current = true
     try {
       await annotation?.finish()
-      const text = useUiStore.getState().composerDrafts[workspaceId] ?? ''
-      onSend(text)
-      useUiStore.getState().setComposerDraft(workspaceId, '')
+      await onSend(valueRef.current)
+      if (draft) {
+        if (draft.clearOnSend !== false) {
+          valueRef.current = ''
+          draft.onChange('')
+        }
+      } else {
+        valueRef.current = ''
+        useUiStore.getState().setComposerDraft(workspaceId, '')
+      }
     } finally {
       sendingRef.current = false
     }
@@ -100,9 +127,10 @@ export function ChatComposer({
       onDragOver={e => {
         if (!e.dataTransfer.types.includes('Files')) return
         e.preventDefault()
-        setDragOver(true)
+        if (allowFiles) setDragOver(true)
       }}
       onDragLeave={e => {
+        if (!allowFiles) return
         // Ignore leaves into child elements — only reset when leaving the form.
         if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
         setDragOver(false)
@@ -121,10 +149,14 @@ export function ChatComposer({
             <AttachmentChip
               key={a.localId}
               attachment={a}
-              onRemove={() => {
-                if (a.kind === 'annotation') annotation?.onRemove(a.localId)
-                liveStore.getState().removeAttachment(workspaceId, sessionId, a.localId)
-              }}
+              onRemove={
+                a.kind === 'drawing' && a.purpose === 'sketch'
+                  ? undefined
+                  : () => {
+                      if (a.kind === 'drawing') annotation?.onRemove(a.localId)
+                      liveStore.getState().removeAttachment(workspaceId, sessionId, a.localId)
+                    }
+              }
             />
           ))}
         </div>
@@ -148,38 +180,42 @@ export function ChatComposer({
           e.preventDefault()
           addFiles(files)
         }}
-        placeholder={processing ? 'Queue a follow-up' : 'Do anything'}
+        placeholder={processing ? 'Queue a follow-up' : (draft?.placeholder ?? 'Do anything')}
         rows={1}
       />
       <ComposerFooter>
-        <input
-          ref={fileRef}
-          type="file"
-          multiple
-          hidden
-          onChange={e => {
-            addFiles(Array.from(e.target.files ?? []))
-            e.target.value = ''
-          }}
-        />
+        {allowFiles && (
+          <input
+            ref={fileRef}
+            type="file"
+            multiple
+            hidden
+            onChange={e => {
+              addFiles(Array.from(e.target.files ?? []))
+              e.target.value = ''
+            }}
+          />
+        )}
         <div className="mr-auto flex shrink-0 items-center gap-0.5">
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => fileRef.current?.click()}
-                  aria-label="Attach files"
-                >
-                  {/* Paperclip is too heavy compared to the nearby scribble icon */}
-                  <IconPaperclip stroke={1.6} className="size-4.5!" />
-                </Button>
-              }
-            />
-            <TooltipContent>Attach files</TooltipContent>
-          </Tooltip>
+          {allowFiles && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => fileRef.current?.click()}
+                    aria-label="Attach files"
+                  >
+                    {/* Paperclip is too heavy compared to the nearby scribble icon */}
+                    <IconPaperclip stroke={1.6} className="size-4.5!" />
+                  </Button>
+                }
+              />
+              <TooltipContent>Attach files</TooltipContent>
+            </Tooltip>
+          )}
           {annotation && (
             <Tooltip>
               <TooltipTrigger
@@ -201,7 +237,7 @@ export function ChatComposer({
             </Tooltip>
           )}
         </div>
-        <ModelPicker />
+        <ModelPicker scope={modelPickerScope} />
         {processing ? (
           <Tooltip>
             <TooltipTrigger
@@ -230,14 +266,14 @@ const EMPTY: ChatAttachment[] = []
 
 type AttachmentChipProps = {
   attachment: ChatAttachment
-  onRemove: () => void
+  onRemove?: () => void
 }
 
 // A composer attachment preview: an image thumbnail or a labelled file chip,
 // with an upload spinner / error overlay and a remove button.
 function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
-  if (attachment.kind === 'annotation') {
-    return <AnnotationAttachmentChip attachment={attachment} onRemove={onRemove} />
+  if (attachment.kind === 'drawing') {
+    return <DrawingAttachmentChip attachment={attachment} onRemove={onRemove} />
   }
 
   const { name, previewUrl, status, error } = attachment
@@ -272,27 +308,30 @@ function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
         </div>
       )}
 
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        onClick={onRemove}
-        aria-label={`Remove ${name}`}
-        className="absolute top-0.5 right-0.5 size-4 rounded-full bg-primary/70 text-primary-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-primary/80 [&_svg]:size-3"
-      >
-        <IconX stroke={1.75} />
-      </Button>
+      {onRemove && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          onClick={onRemove}
+          aria-label={`Remove ${name}`}
+          className="absolute top-0.5 right-0.5 size-4 rounded-full bg-primary/70 text-primary-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-primary/80 [&_svg]:size-3"
+        >
+          <IconX stroke={1.75} />
+        </Button>
+      )}
     </div>
   )
 }
 
-type AnnotationAttachmentChipProps = {
-  attachment: Extract<ChatAttachment, { kind: 'annotation' }>
-  onRemove: () => void
+type DrawingAttachmentChipProps = {
+  attachment: Extract<ChatAttachment, { kind: 'drawing' }>
+  onRemove?: () => void
 }
 
-function AnnotationAttachmentChip({ attachment, onRemove }: AnnotationAttachmentChipProps) {
-  const { previewUrl } = attachment
+function DrawingAttachmentChip({ attachment, onRemove }: DrawingAttachmentChipProps) {
+  const { previewUrl, purpose } = attachment
+  const label = purpose === 'sketch' ? 'Sketch' : 'Annotation'
 
   return (
     <HoverCard>
@@ -304,24 +343,28 @@ function AnnotationAttachmentChip({ attachment, onRemove }: AnnotationAttachment
           />
         }
       >
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={onRemove}
-          aria-label="Remove annotation"
-          className="size-6 shrink-0 hover:bg-transparent hover:text-current"
-        >
-          <IconScribble stroke={1.75} className="group-focus-within:hidden group-hover:hidden" />
-          <IconX stroke={1.75} className="hidden group-focus-within:block group-hover:block" />
-        </Button>
-        <span>Annotation</span>
+        {onRemove ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={onRemove}
+            aria-label={`Remove ${label.toLowerCase()}`}
+            className="size-6 shrink-0 hover:bg-transparent hover:text-current"
+          >
+            <IconScribble stroke={1.75} className="group-focus-within:hidden group-hover:hidden" />
+            <IconX stroke={1.75} className="hidden group-focus-within:block group-hover:block" />
+          </Button>
+        ) : (
+          <IconScribble size={16} stroke={1.75} className="mx-1.5 shrink-0" />
+        )}
+        <span>{label}</span>
       </HoverCardTrigger>
       {previewUrl && (
         <HoverCardContent side="top" align="start" className="w-60 max-w-[calc(100vw-2rem)]">
           <img
             src={previewUrl}
-            alt="Annotation preview"
+            alt={`${label} preview`}
             className="max-h-72 w-full rounded-md object-contain"
           />
         </HoverCardContent>

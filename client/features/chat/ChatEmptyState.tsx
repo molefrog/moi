@@ -113,6 +113,17 @@ export function ChatEmptyState({ kind, disabled = false, onSelectPrompt }: ChatE
   return <EmptyState />
 }
 
+export function ViewBuilderChatEmptyState() {
+  return (
+    <div className={cn(EMPTY_STATE_STYLES, 'gap-1 text-center')}>
+      <h1 className="text-sm font-medium">What should this view do?</h1>
+      <p className="mx-auto max-w-sm px-8 text-sm text-muted-foreground">
+        Describe the content, data, and actions you need.
+      </p>
+    </div>
+  )
+}
+
 type WelcomeProps = {
   disabled?: boolean
   onSelectPrompt: (prompt: ChatPrompt) => void

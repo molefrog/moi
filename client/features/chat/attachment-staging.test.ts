@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test'
 
-import { stageAnnotation, stageAnnotationDraft } from './attachment-staging'
+import { stageDrawing, stageDrawingDraft } from './attachment-staging'
 import { attachmentKey, liveStore } from './chat-store'
 
 const workspaceId = 'workspace-1'
@@ -13,16 +13,17 @@ afterEach(() => {
   liveStore.setState({ attachments: {} })
 })
 
-describe('annotation draft staging', () => {
+describe('drawing draft staging', () => {
   test('stages locally without uploading and refreshes the preview per commit', () => {
     const revokeSpy = spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
     const fetchSpy = mock(() => Promise.reject(new Error('no network expected')))
     globalThis.fetch = fetchSpy as unknown as typeof fetch
 
-    stageAnnotationDraft({
+    stageDrawingDraft({
       workspaceId,
       sessionId,
       localId: 'annotation-1',
+      purpose: 'annotation',
       sourceTab: 'widgets',
       blob: new Blob(['first'], { type: 'image/png' })
     })
@@ -30,10 +31,11 @@ describe('annotation draft staging', () => {
     expect(first.status).toBe('draft')
     expect(first.previewUrl).toStartWith('blob:')
 
-    stageAnnotationDraft({
+    stageDrawingDraft({
       workspaceId,
       sessionId,
       localId: 'annotation-1',
+      purpose: 'annotation',
       sourceTab: 'widgets',
       blob: new Blob(['second'], { type: 'image/png' })
     })
@@ -52,17 +54,19 @@ describe('annotation draft staging', () => {
       )
     ) as unknown as typeof fetch
 
-    stageAnnotationDraft({
+    stageDrawingDraft({
       workspaceId,
       sessionId,
       localId: 'annotation-1',
+      purpose: 'annotation',
       sourceTab: 'widgets',
       blob: new Blob(['drawing'], { type: 'image/png' })
     })
-    await stageAnnotation({
+    await stageDrawing({
       workspaceId,
       sessionId,
       localId: 'annotation-1',
+      purpose: 'annotation',
       sourceTab: 'widgets',
       blob: new Blob(['drawing'], { type: 'image/png' }),
       isCurrent: () => true
@@ -75,7 +79,7 @@ describe('annotation draft staging', () => {
   })
 })
 
-describe('annotation attachment staging', () => {
+describe('drawing attachment staging', () => {
   test('replaces the preview and only applies the latest upload result', async () => {
     const requests: Array<(response: Response) => void> = []
     const revokeSpy = spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
@@ -84,10 +88,11 @@ describe('annotation attachment staging', () => {
     ) as unknown as typeof fetch
     let revision = 1
 
-    const first = stageAnnotation({
+    const first = stageDrawing({
       workspaceId,
       sessionId,
       localId: 'annotation-1',
+      purpose: 'annotation',
       sourceTab: 'widgets',
       blob: new Blob(['first'], { type: 'image/png' }),
       isCurrent: () => revision === 1
@@ -96,10 +101,11 @@ describe('annotation attachment staging', () => {
       liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)][0].previewUrl
 
     revision = 2
-    const second = stageAnnotation({
+    const second = stageDrawing({
       workspaceId,
       sessionId,
       localId: 'annotation-1',
+      purpose: 'annotation',
       sourceTab: 'widgets',
       blob: new Blob(['second'], { type: 'image/png' }),
       isCurrent: () => revision === 2
@@ -134,10 +140,11 @@ describe('annotation attachment staging', () => {
       Promise.resolve(new Response('Storage unavailable', { status: 503 }))
     ) as unknown as typeof fetch
 
-    const upload = stageAnnotation({
+    const upload = stageDrawing({
       workspaceId,
       sessionId,
       localId: 'annotation-1',
+      purpose: 'annotation',
       sourceTab: 'view:roadmap',
       blob: new Blob(['drawing'], { type: 'image/png' }),
       isCurrent: () => true
@@ -154,5 +161,28 @@ describe('annotation attachment staging', () => {
     expect(attachment).toBeUndefined()
     expect(revokeSpy).toHaveBeenCalledWith(optimisticAttachment.previewUrl)
     revokeSpy.mockRestore()
+  })
+
+  test('uses sketch copy and purpose for a builder drawing', async () => {
+    globalThis.fetch = mock(() =>
+      Promise.resolve(
+        Response.json([{ id: 'upload-sketch', kind: 'image', mediaType: 'image/png' }])
+      )
+    ) as unknown as typeof fetch
+
+    await stageDrawing({
+      workspaceId,
+      sessionId,
+      localId: 'sketch-1',
+      purpose: 'sketch',
+      sourceTab: 'view-builder:draft-1',
+      blob: new Blob(['drawing'], { type: 'image/png' }),
+      isCurrent: () => true
+    })
+
+    const attachment = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)][0]
+    expect(attachment.kind).toBe('drawing')
+    expect(attachment.name).toBe('Sketch.png')
+    expect(attachment.kind === 'drawing' ? attachment.purpose : null).toBe('sketch')
   })
 })

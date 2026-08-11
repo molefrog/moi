@@ -32,28 +32,58 @@ export function attachmentsForSend(
   return pending.filter(a => a.status === 'ready' && a.upload)
 }
 
+export function attachmentPartsForOptimisticTurn(attachments: readonly ChatAttachment[]): Part[] {
+  return attachments.map(attachment => {
+    if (attachment.upload?.kind === 'image' && attachment.previewUrl) {
+      return {
+        type: 'file',
+        mediaType: attachment.mediaType,
+        url: attachment.previewUrl,
+        filename: attachment.name
+      }
+    }
+    return {
+      type: 'file',
+      mediaType: attachment.mediaType,
+      url: '',
+      filename: attachment.name
+    }
+  })
+}
+
 export function withAttachmentDirectives(
   options: ChatSendOptions | undefined,
   attachments: readonly ChatAttachment[]
 ): ChatSendOptions | undefined {
   if (!ownsComposerAttachments(options)) return options
-  const sources: string[] = []
+  const annotations: string[] = []
+  const sketches: string[] = []
   let imagePosition = 0
   for (const attachment of attachments) {
     if (attachment.upload?.kind !== 'image') continue
     imagePosition += 1
-    if (attachment.kind === 'annotation') {
-      sources.push(`${imagePosition}. ${JSON.stringify(attachment.sourceTab)}`)
+    if (attachment.kind === 'drawing' && attachment.purpose === 'annotation') {
+      annotations.push(`${imagePosition}. ${JSON.stringify(attachment.sourceTab)}`)
+    }
+    if (attachment.kind === 'drawing' && attachment.purpose === 'sketch') {
+      sketches.push(`${imagePosition}. ${JSON.stringify(attachment.sourceTab)}`)
     }
   }
-  if (sources.length === 0) return options
+  if (annotations.length === 0 && sketches.length === 0) return options
+
+  const directives = [...(options?.directives ?? [])]
+  if (annotations.length > 0) {
+    directives.push(`Annotation attachment sources in attachment order: ${annotations.join('; ')}.`)
+  }
+  if (sketches.length > 0) {
+    directives.push(
+      `Sketch attachment sources in attachment order: ${sketches.join('; ')}. Each sketch shows the intended layout of a new view.`
+    )
+  }
 
   return {
     ...options,
-    directives: [
-      ...(options?.directives ?? []),
-      `Annotation attachment sources in attachment order: ${sources.join('; ')}.`
-    ]
+    directives
   }
 }
 
