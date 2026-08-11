@@ -155,7 +155,7 @@ export function ChatPanel({
     <div className="flex min-h-0 flex-1 flex-col pt-2 pb-3">
       <header className="mx-auto flex w-full max-w-[calc(var(--chat-max-container)+40px)] items-center justify-between pr-2 pb-2 pl-2">
         {builderDraft ? (
-          <div className="flex h-7 items-center px-2.5 text-sm font-medium">Build a view</div>
+          <div className="flex h-7 items-center px-2.5 text-sm font-medium">Build a new view</div>
         ) : (
           <ChatSelector selectedSessionId={sessionId ?? null} onSelectSession={onSelectSession} />
         )}
@@ -249,7 +249,7 @@ export function ChatPanel({
                 ? {
                     value: builderDraft.value,
                     onChange: builderDraft.onChange,
-                    placeholder: 'Describe this view'
+                    placeholder: 'Drop in the details'
                   }
                 : undefined
             }

@@ -119,7 +119,7 @@ export function ViewBuilderChatEmptyState() {
     <div className={cn(EMPTY_STATE_STYLES, 'gap-2 text-center text-muted-foreground')}>
       <IconTableSpark size={40} stroke={0.75} />
       <p className="mx-auto max-w-sm px-8 text-sm">
-        Describe what content and data you need, plus the key actions this view should support
+        Describe the content, data, and key actions you need in this view
       </p>
     </div>
   )
