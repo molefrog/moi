@@ -40,6 +40,11 @@ export type ComposerAnnotationControls = {
   onRemove: (localId: string) => void
 }
 
+type ChatComposerDraft = {
+  value: string
+  onChange: (value: string) => void
+}
+
 type ChatComposerProps = {
   composerRef: RefObject<HTMLTextAreaElement | null>
   onSend: (text: string) => void | Promise<void>
@@ -50,11 +55,8 @@ type ChatComposerProps = {
   annotation?: ComposerAnnotationControls
   onRemoveDrawing?: (localId: string) => void
   allowFiles?: boolean
-  draft?: {
-    value: string
-    onChange: (value: string) => void
-    placeholder?: string
-  }
+  placeholder?: string
+  draft?: ChatComposerDraft
 }
 
 // Draft text is persisted per workspace, while attachments remain ephemeral and
@@ -70,6 +72,7 @@ export function ChatComposer({
   annotation,
   onRemoveDrawing,
   allowFiles = true,
+  placeholder,
   draft
 }: ChatComposerProps) {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -178,7 +181,7 @@ export function ChatComposer({
           e.preventDefault()
           addFiles(files)
         }}
-        placeholder={processing ? 'Queue a follow-up' : (draft?.placeholder ?? 'Do anything')}
+        placeholder={processing ? 'Queue a follow-up' : (placeholder ?? 'Do anything')}
         rows={1}
       />
       <ComposerFooter>

@@ -246,12 +246,12 @@ export function ChatPanel({
             annotation={builderDraft ? undefined : annotation}
             onRemoveDrawing={builderDraft?.onRemoveDrawing ?? annotation?.onRemove}
             allowFiles={!builderDraft}
+            placeholder={builderDraft ? 'Drop in the details' : undefined}
             draft={
               builderDraft
                 ? {
                     value: builderDraft.value,
-                    onChange: builderDraft.onChange,
-                    placeholder: 'Drop in the details'
+                    onChange: builderDraft.onChange
                   }
                 : undefined
             }
