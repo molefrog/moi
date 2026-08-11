@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 
 import { IconBolt, IconBoltFilled } from '@tabler/icons-react'
 
-import { useSaveSessionConfig, useSessionConfig } from './api'
+import { useSaveSessionConfig, useSessionConfig } from '../api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import {
   groupModels,
@@ -106,7 +106,7 @@ function ModelDropdown({ current, model, models, onValueChange }: ModelDropdownP
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        render={<PickerTrigger label={label} aria-label={`Model: ${label}`} />}
+        render={<PickerTrigger label={label} className="shrink" aria-label={`Model: ${label}`} />}
       />
       <DropdownMenuContent align="end" side="top" className="w-max max-w-64 min-w-40">
         <DropdownMenuRadioGroup value={current} onValueChange={onValueChange}>
@@ -349,7 +349,7 @@ export const ModelPicker = memo(function ModelPicker({ scope = 'active-chat' }: 
   const fastMode = resolveFastMode(model, selectedFastMode)
 
   return (
-    <div className="flex shrink-0 items-center gap-1">
+    <div className="flex min-w-0 items-center gap-1">
       <ModelDropdown
         current={currentModelValue}
         model={model}

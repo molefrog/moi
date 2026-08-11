@@ -19,7 +19,8 @@ import {
   ownsComposerAttachments,
   resolveChatRunOptions,
   startOptimisticSession,
-  startOptimisticTurn
+  startOptimisticTurn,
+  withAttachmentDirectives
 } from '@/client/features/chat/chat-send'
 import { buildPreviewTurn } from '@/client/features/chat/preview-turn'
 import {
@@ -159,7 +160,7 @@ export function useChat(address: WorkspaceTabAddress) {
         effort,
         fastMode,
         stream,
-        context: buildMoiContext(options),
+        context: buildMoiContext(withAttachmentDirectives(options, ready)),
         ...(ready.length > 0 ? { attachments: ready.map(a => a.upload!.id) } : {})
       })
       useUiStore.getState().markMessageSentFromMoi(workspaceId)

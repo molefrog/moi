@@ -16,7 +16,7 @@ test('offers login when the agent supports it', () => {
     })
   )
 
-  expect(html).toContain('Log in to your agent provider to send messages')
+  expect(html).toContain('Log in to your agent to send messages')
   expect(html).toContain('>Log in</button>')
 })
 

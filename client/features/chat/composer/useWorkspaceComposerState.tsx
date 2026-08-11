@@ -42,7 +42,7 @@ export function useWorkspaceComposerState(
 
   const agentUnavailableBanner: ComposerBanner | undefined = unavailable
     ? {
-        tone: 'muted',
+        tone: 'default',
         content: (
           <WorkspaceAgentAvailabilityBanner
             availability={unavailable}
@@ -54,13 +54,13 @@ export function useWorkspaceComposerState(
     : undefined
   const chatErrorBanner: ComposerBanner | undefined = chatError
     ? {
-        tone: 'destructive',
+        tone: 'error',
         content: <ChatErrorBanner error={chatError} onDismiss={onDismissChatError} />
       }
     : undefined
   const skillUpdate: ComposerBanner | undefined = skillUpdateBanner
     ? {
-        tone: 'muted',
+        tone: 'default',
         content: <WorkspaceSkillUpdateBanner {...skillUpdateBanner} />
       }
     : undefined

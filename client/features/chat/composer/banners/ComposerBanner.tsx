@@ -2,7 +2,7 @@ import type { ComponentProps, ReactNode } from 'react'
 
 import { cn } from '@/client/lib/cn'
 
-export type ComposerBannerTone = 'muted' | 'destructive'
+export type ComposerBannerTone = 'default' | 'error'
 
 export type ComposerBanner = {
   tone: ComposerBannerTone

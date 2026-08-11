@@ -42,13 +42,13 @@ describe('color themes', () => {
     expect(deriveThemeColors(primary)).toEqual({
       primary,
       primaryForeground: 'oklch(0 0 0)',
-      background: 'color-mix(var(--primary) 3%, oklch(1 0 0) 97%)',
+      background: 'color-mix(in oklch, var(--primary) 3%, oklch(1 0 0) 97%)',
       foreground: 'color-mix(var(--primary) 20%, oklch(0 0 0) 80%)',
-      muted: 'color-mix(var(--background) 96%, var(--foreground) 4%)',
+      muted: 'color-mix(in oklch, var(--background) 97%, var(--foreground) 3%)',
       mutedForeground: 'color-mix(var(--background) 50%, var(--foreground) 50%)',
-      accent: 'color-mix(var(--primary) 4%, var(--foreground) 4%)',
+      accent: 'color-mix(in oklch, var(--primary) 4%, var(--foreground) 4%)',
       accentForeground: 'var(--foreground)',
-      border: 'color-mix(var(--foreground) 7%, transparent)'
+      border: 'color-mix(in oklch, var(--foreground) 7%, transparent)'
     })
   })
 
@@ -57,15 +57,15 @@ describe('color themes', () => {
     const colors = deriveThemeColors(primary, 'widget')
 
     expect(colors).toEqual({
-      primary: 'color-mix(var(--background) 3%, oklch(1 0 0) 97%)',
+      primary: 'color-mix(in oklch, var(--background) 3%, oklch(1 0 0) 97%)',
       primaryForeground: 'color-mix(var(--background) 20%, oklch(0 0 0) 80%)',
       background: primary,
       foreground: 'oklch(0 0 0)',
-      muted: 'color-mix(var(--background) 97%, var(--foreground) 3%)',
+      muted: 'color-mix(in oklch, var(--background) 97%, var(--foreground) 3%)',
       mutedForeground: 'color-mix(var(--background) 50%, var(--foreground) 50%)',
-      accent: 'color-mix(var(--primary) 4%, var(--foreground) 4%)',
+      accent: 'color-mix(in oklch, var(--primary) 4%, var(--foreground) 4%)',
       accentForeground: 'var(--foreground)',
-      border: 'color-mix(var(--foreground) 15%, transparent)'
+      border: 'color-mix(in oklch, var(--foreground) 15%, transparent)'
     })
     expect(colors.primary).not.toContain('var(--primary)')
     expect(deriveThemeColors(DEFAULT_PRIMARY_COLOR, 'widget').background).toBe(

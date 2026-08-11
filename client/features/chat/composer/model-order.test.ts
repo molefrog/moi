@@ -7,7 +7,7 @@ import {
   resolveEffortIndex,
   resolveFastMode,
   sortModelsByProviderOrder
-} from '@/client/features/chat/model-order'
+} from '@/client/features/chat/composer/model-order'
 import type { Model } from '@/lib/types'
 
 function model(value: string, resolvedModel?: string): Model {

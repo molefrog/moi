@@ -1,13 +1,14 @@
-import { forwardRef } from 'react'
+import type { Ref } from 'react'
 
 import { motion, useReducedMotion } from 'motion/react'
 
-import { IconGhost as TablerIconGhost, type IconProps } from '@tabler/icons-react'
+import type { IconProps } from '@tabler/icons-react'
 
 import { cn } from '@/client/lib/cn'
 
 type IconGhostProps = IconProps & {
   animated?: boolean
+  ref?: Ref<SVGSVGElement>
 }
 
 type Point = {
@@ -76,19 +77,17 @@ function bodyPathAt(progress: number): string {
 
 const animatedBodyPaths = Array.from({ length: 17 }, (_, index) => bodyPathAt(index / 16))
 
-const IconGhost = forwardRef<SVGSVGElement, IconGhostProps>(function IconGhost(
-  {
-    animated = false,
-    color = 'currentColor',
-    size = 24,
-    stroke = 2,
-    title,
-    className,
-    children,
-    ...props
-  },
-  ref
-) {
+function IconGhost({
+  animated = false,
+  color = 'currentColor',
+  size = 24,
+  stroke = 2,
+  title,
+  className,
+  children,
+  ref,
+  ...props
+}: IconGhostProps) {
   const prefersReducedMotion = useReducedMotion()
   const shouldAnimate = animated && !prefersReducedMotion
 
@@ -123,8 +122,6 @@ const IconGhost = forwardRef<SVGSVGElement, IconGhostProps>(function IconGhost(
       {children}
     </svg>
   )
-})
-
-IconGhost.displayName = TablerIconGhost.displayName
+}
 
 export { IconGhost }
