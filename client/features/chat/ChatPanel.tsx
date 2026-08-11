@@ -249,12 +249,10 @@ export function ChatPanel({
                 ? {
                     value: builderDraft.value,
                     onChange: builderDraft.onChange,
-                    clearOnSend: false,
                     placeholder: 'Build a dashboard with...'
                   }
                 : undefined
             }
-            modelPickerScope={builderDraft ? 'workspace' : 'active-chat'}
           />
         </div>
       </div>
