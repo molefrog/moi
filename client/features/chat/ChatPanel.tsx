@@ -155,11 +155,11 @@ export function ChatPanel({
     <div className="flex min-h-0 flex-1 flex-col pt-2 pb-3">
       <header className="mx-auto flex w-full max-w-[calc(var(--chat-max-container)+40px)] items-center justify-between pr-2 pb-2 pl-2">
         {builderDraft ? (
-          <div className="flex h-8 items-center px-3 text-sm font-medium">Build a view</div>
+          <div className="flex h-7 items-center px-2.5 text-sm font-medium">Build a view</div>
         ) : (
           <ChatSelector selectedSessionId={sessionId ?? null} onSelectSession={onSelectSession} />
         )}
-        {!builderDraft && onClose && docked && (
+        {onClose && docked && (
           <Tooltip>
             <TooltipTrigger
               render={
@@ -250,7 +250,7 @@ export function ChatPanel({
                     value: builderDraft.value,
                     onChange: builderDraft.onChange,
                     clearOnSend: false,
-                    placeholder: 'Describe the view'
+                    placeholder: 'Build a dashboard with...'
                   }
                 : undefined
             }
