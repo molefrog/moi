@@ -44,6 +44,7 @@ export function useChatAnnotation({
 }: UseChatAnnotationOptions): ChatAnnotationController {
   const draftRef = useRef<ChatAnnotationDraft | null>(null)
   const uploadRevisionsRef = useRef(new Map<string, number>())
+  const pendingStageRef = useRef<Promise<void> | null>(null)
   const closePopupRef = useRef(closePopup)
   const openPopupRef = useRef(openPopup)
   closePopupRef.current = closePopup
@@ -56,13 +57,14 @@ export function useChatAnnotation({
     const revision = (uploadRevisionsRef.current.get(draft.attachmentId) ?? 0) + 1
     uploadRevisionsRef.current.set(draft.attachmentId, revision)
     if (!blob) {
+      pendingStageRef.current = null
       liveStore
         .getState()
         .removeAttachment(draft.workspaceId, draft.sourceSessionId, draft.attachmentId)
       return
     }
 
-    void stageAnnotation({
+    pendingStageRef.current = stageAnnotation({
       workspaceId: draft.workspaceId,
       sessionId: draft.sourceSessionId,
       localId: draft.attachmentId,
@@ -72,9 +74,10 @@ export function useChatAnnotation({
     })
   }, [])
 
-  const complete = useCallback(() => {
+  const complete = useCallback(async () => {
     const draft = draftRef.current
-    draftRef.current = null
+    await pendingStageRef.current
+    if (draftRef.current === draft) draftRef.current = null
     if (draft?.origin === 'popup') openPopupRef.current()
   }, [])
 
@@ -110,33 +113,37 @@ export function useChatAnnotation({
     [active, activeTab, available, open, sessionId, starting, workspaceId]
   )
 
-  const cancel = useCallback(() => {
-    cancelLayer()
-    draftRef.current = null
+  const cancel = useCallback(async () => {
+    const draft = draftRef.current
+    await cancelLayer()
+    if (draftRef.current === draft) draftRef.current = null
   }, [cancelLayer])
 
   const remove = useCallback(
     (localId: string) => {
       const revision = (uploadRevisionsRef.current.get(localId) ?? 0) + 1
       uploadRevisionsRef.current.set(localId, revision)
-      if (draftRef.current?.attachmentId === localId) cancel()
+      if (draftRef.current?.attachmentId === localId) {
+        draftRef.current = null
+        void cancelLayer()
+      }
     },
-    [cancel]
+    [cancelLayer]
   )
 
-  const finishDrawing = useCallback(() => {
+  const finishDrawing = useCallback(async () => {
     if (starting) {
-      cancel()
+      await cancel()
       return
     }
-    void finish()
+    await finish()
   }, [cancel, finish, starting])
   const toggleDocked = useCallback(() => {
-    if (active || starting) finishDrawing()
+    if (active || starting) void finishDrawing()
     else void start('docked')
   }, [active, finishDrawing, start, starting])
   const togglePopup = useCallback(() => {
-    if (active || starting) finishDrawing()
+    if (active || starting) void finishDrawing()
     else void start('popup')
   }, [active, finishDrawing, start, starting])
 
@@ -151,7 +158,7 @@ export function useChatAnnotation({
       mode !== expectedMode ||
       !available
     ) {
-      cancel()
+      void cancel()
     }
   }, [activeTab, available, cancel, mode, sessionId, workspaceId])
 

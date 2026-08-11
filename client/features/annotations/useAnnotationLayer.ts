@@ -132,7 +132,7 @@ export type AnnotationControls = {
   redo: () => void
   clear: () => void
   finish: () => Promise<Blob | null>
-  cancel: () => void
+  cancel: () => Promise<void>
 }
 
 export type AnnotationController = {
@@ -370,15 +370,23 @@ export function useAnnotationLayer({
     }
   }, [])
 
-  const cancel = useCallback(() => {
+  const cancel = useCallback((): Promise<void> => {
+    const current = sessionRef.current
     lifecycleRevisionRef.current += 1
     startingRef.current = false
     finishingRef.current = false
     setStarting(false)
     setFinishing(false)
     cancelStroke()
-    sessionRef.current = null
     setSession(null)
+    const pending = pendingExportRef.current
+    if (!current || pending?.sessionId !== current.id) {
+      sessionRef.current = null
+      return Promise.resolve()
+    }
+    return pending.promise.then(() => {
+      if (sessionRef.current?.id === current.id) sessionRef.current = null
+    })
   }, [cancelStroke])
 
   const finish = useCallback(async (): Promise<Blob | null> => {
@@ -486,7 +494,7 @@ export function useAnnotationLayer({
     if (!session) return
     const target = targetRef.current
     if (!target) {
-      cancel()
+      void cancel()
       return
     }
 
@@ -497,7 +505,7 @@ export function useAnnotationLayer({
         Math.abs(bounds.width - session.targetWidth) > 1 ||
         Math.abs(bounds.height - session.targetHeight) > 1
       ) {
-        cancel()
+        void cancel()
       }
     })
     observer.observe(target)

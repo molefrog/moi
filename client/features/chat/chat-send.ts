@@ -37,12 +37,15 @@ export function withAttachmentDirectives(
   attachments: readonly ChatAttachment[]
 ): ChatSendOptions | undefined {
   if (!ownsComposerAttachments(options)) return options
-  const sources = attachments
-    .filter(
-      (attachment): attachment is Extract<ChatAttachment, { kind: 'annotation' }> =>
-        attachment.kind === 'annotation'
-    )
-    .map((attachment, index) => `${index + 1}. ${JSON.stringify(attachment.sourceTab)}`)
+  const sources: string[] = []
+  let imagePosition = 0
+  for (const attachment of attachments) {
+    if (attachment.upload?.kind !== 'image') continue
+    imagePosition += 1
+    if (attachment.kind === 'annotation') {
+      sources.push(`${imagePosition}. ${JSON.stringify(attachment.sourceTab)}`)
+    }
+  }
   if (sources.length === 0) return options
 
   return {
