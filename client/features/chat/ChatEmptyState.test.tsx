@@ -57,7 +57,8 @@ describe('ChatEmptyState', () => {
 
   test('renders the focused new-view prompt', () => {
     const html = renderToStaticMarkup(createElement(ViewBuilderChatEmptyState))
-    expect(html).toContain('What should this view do?')
-    expect(html).toContain('Describe the content, data, and actions you need.')
+    expect(html).toContain(
+      'Describe what content and data you need, plus the key actions this view should support'
+    )
   })
 })
