@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
 import { toast } from '@/client/components/ui/toast'
+import { useUiStore } from '@/client/store/ui'
 import type { ViewBuilder } from '@/lib/types'
 
 type UseViewBuilderDraftsOptions = {
@@ -8,8 +9,12 @@ type UseViewBuilderDraftsOptions = {
   onSave: (builderId: string, requirements: string) => Promise<unknown>
 }
 
+// Builder draft text lives in the UI store and is subscribed from the
+// composer, so a keystroke re-renders only the composer — never the workspace
+// screen with its tab bar, widgets, mounted views, and builder canvases. This
+// hook owns the writes: the store update, the debounced server save, and the
+// cleanup when a builder leaves its draft state.
 export function useViewBuilderDrafts({ builders, onSave }: UseViewBuilderDraftsOptions) {
-  const [drafts, setDrafts] = useState<Record<string, string>>({})
   const timersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>())
   const buildersRef = useRef(builders)
   const onSaveRef = useRef(onSave)
@@ -20,16 +25,11 @@ export function useViewBuilderDrafts({ builders, onSave }: UseViewBuilderDraftsO
     const timer = timersRef.current.get(builderId)
     if (timer) clearTimeout(timer)
     timersRef.current.delete(builderId)
-    setDrafts(current => {
-      if (!(builderId in current)) return current
-      const next = { ...current }
-      delete next[builderId]
-      return next
-    })
+    useUiStore.getState().setViewBuilderDraft(builderId, null)
   }, [])
 
   const change = useCallback((builderId: string, value: string) => {
-    setDrafts(current => ({ ...current, [builderId]: value }))
+    useUiStore.getState().setViewBuilderDraft(builderId, value)
     const existing = timersRef.current.get(builderId)
     if (existing) clearTimeout(existing)
     timersRef.current.set(
@@ -45,14 +45,15 @@ export function useViewBuilderDrafts({ builders, onSave }: UseViewBuilderDraftsO
     )
   }, [])
 
+  // Drop drafts for builders that left draft status through any path (submit
+  // from another surface, server-side transition). Builders absent from the
+  // list are cleared by the explicit discard/close paths, not here — the
+  // store outlives this screen and may hold other workspaces' drafts.
   useEffect(() => {
-    const draftIds = new Set(
-      builders.filter(builder => builder.status === 'draft').map(builder => builder.id)
-    )
-    for (const builderId of Object.keys(drafts)) {
-      if (!draftIds.has(builderId)) clear(builderId)
+    for (const builder of builders) {
+      if (builder.status !== 'draft') clear(builder.id)
     }
-  }, [builders, clear, drafts])
+  }, [builders, clear])
 
   useEffect(
     () => () => {
@@ -61,9 +62,5 @@ export function useViewBuilderDrafts({ builders, onSave }: UseViewBuilderDraftsO
     []
   )
 
-  return {
-    valueFor: (builder: ViewBuilder) => drafts[builder.id] ?? builder.input.requirements,
-    change,
-    clear
-  }
+  return { change, clear }
 }

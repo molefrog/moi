@@ -544,7 +544,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const builderChatDraft = activeDraftBuilder
     ? {
         sessionId: activeDraftBuilder.sessionId,
-        value: builderDrafts.valueFor(activeDraftBuilder),
+        builderId: activeDraftBuilder.id,
+        initialValue: activeDraftBuilder.input.requirements,
         onChange: (value: string) => builderDrafts.change(activeDraftBuilder.id, value),
         onRemoveDrawing: () => {
           void builderRefs.current.get(activeDraftBuilder.id)?.resetSketch()
