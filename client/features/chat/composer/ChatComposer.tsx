@@ -41,7 +41,11 @@ export type ComposerAnnotationControls = {
 }
 
 type ChatComposerDraft = {
-  value: string
+  // The UI-store key the composer subscribes to for live text; `initialValue`
+  // is the builder's server-saved requirements, used until a local draft
+  // exists.
+  id: string
+  initialValue: string
   onChange: (value: string) => void
 }
 
@@ -60,9 +64,10 @@ type ChatComposerProps = {
   draft?: ChatComposerDraft
 }
 
-// Draft text is persisted per workspace, while attachments remain ephemeral and
-// follow the selected chat. Both stores are subscribed here so a keystroke or
-// upload re-renders only the composer.
+// Draft text is persisted per workspace (or per view builder, when the
+// composer is fronting one), while attachments remain ephemeral and follow the
+// selected chat. Both stores are subscribed here so a keystroke or upload
+// re-renders only the composer.
 export function ChatComposer({
   composerRef,
   onSend,
@@ -80,7 +85,8 @@ export function ChatComposer({
   const fileRef = useRef<HTMLInputElement>(null)
   const workspaceId = useWorkspaceId()
   const workspaceDraft = useUiStore(s => s.composerDrafts[workspaceId] ?? '')
-  const value = draft?.value ?? workspaceDraft
+  const builderDraft = useUiStore(s => (draft ? (s.viewBuilderDrafts ?? {})[draft.id] : undefined))
+  const value = draft ? (builderDraft ?? draft.initialValue) : workspaceDraft
   const valueRef = useRef(value)
   valueRef.current = value
   const attachments = useLive(s => s.attachments[attachmentKey(workspaceId, sessionId)] ?? EMPTY)

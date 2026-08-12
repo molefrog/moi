@@ -28,7 +28,11 @@ import { useUiStore } from '@/client/store/ui'
 
 export type ViewBuilderChatDraft = {
   sessionId: string
-  value: string
+  builderId: string
+  // Server-saved requirements the composer falls back to; the live draft text
+  // is subscribed from the UI store by builder id inside ChatComposer, so
+  // typing never re-renders this panel or the screen hosting it.
+  initialValue: string
   onChange: (value: string) => void
   onRemoveDrawing: (localId: string) => void
   onSubmit: (value: string) => Promise<void>
@@ -252,7 +256,8 @@ export function ChatPanel({
             draft={
               builderDraft
                 ? {
-                    value: builderDraft.value,
+                    id: builderDraft.builderId,
+                    initialValue: builderDraft.initialValue,
                     onChange: builderDraft.onChange
                   }
                 : undefined

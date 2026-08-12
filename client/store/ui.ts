@@ -9,11 +9,13 @@ type UiStore = {
   hasSentMessageFromMoi: boolean
   workspaceIdsPendingAnalysis: string[]
   composerDrafts: Record<string, string>
+  viewBuilderDrafts: Record<string, string>
   dockedChatWidth: number
   setDiscoveredWorkspacesOpen: (open: boolean) => void
   markWorkspacePendingAnalysis: (workspaceId: string) => void
   markMessageSentFromMoi: (workspaceId: string) => void
   setComposerDraft: (workspaceId: string, value: string) => void
+  setViewBuilderDraft: (builderId: string, value: string | null) => void
   setDockedChatWidth: (width: number) => void
 }
 
@@ -25,6 +27,7 @@ export const createUiStore = (storage?: StateStorage) =>
         hasSentMessageFromMoi: false,
         workspaceIdsPendingAnalysis: [],
         composerDrafts: {},
+        viewBuilderDrafts: {},
         dockedChatWidth: 360,
         setDiscoveredWorkspacesOpen: open => set({ discoveredWorkspacesOpen: open }),
         markWorkspacePendingAnalysis: workspaceId =>
@@ -49,6 +52,22 @@ export const createUiStore = (storage?: StateStorage) =>
             if (value) composerDrafts[workspaceId] = value
             else delete composerDrafts[workspaceId]
             return { composerDrafts }
+          }),
+        // Unlike composer drafts, an empty string stays stored: the composer
+        // falls back to the builder's server-saved requirements when no draft
+        // exists, and deleting all text must not resurrect them. Pass null to
+        // drop the draft (submit, discard).
+        setViewBuilderDraft: (builderId, value) =>
+          set(state => {
+            const current = state.viewBuilderDrafts ?? {}
+            if (value === null) {
+              if (!(builderId in current)) return state
+              const viewBuilderDrafts = { ...current }
+              delete viewBuilderDrafts[builderId]
+              return { viewBuilderDrafts }
+            }
+            if (current[builderId] === value) return state
+            return { viewBuilderDrafts: { ...current, [builderId]: value } }
           }),
         setDockedChatWidth: width => set({ dockedChatWidth: width })
       }),
