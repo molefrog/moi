@@ -14,10 +14,6 @@
 @custom-variant dark (&:is(.dark *));
 @custom-variant dark-or-widget (&:is(.dark *, [data-widget-chrome] *));
 
-@utility cursor-pencil {
-  cursor: var(--cursor-pencil);
-}
-
 :root {
   --cursor-pencil:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='white' stroke='%23171717' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cdefs%3E%3Cfilter id='s' x='-20%25' y='-20%25' width='140%25' height='150%25'%3E%3CfeDropShadow dx='0' dy='1' stdDeviation='.65' flood-color='%23000' flood-opacity='.14'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url(%23s)'%3E%3Cpath d='M4 20h4l10.5-10.5a2.828 2.828 0 1 0-4-4L4 16v4'/%3E%3Cpath d='m13.5 6.5 4 4'/%3E%3C/g%3E%3C/svg%3E")
@@ -178,6 +174,10 @@
   &::-webkit-scrollbar-thumb:hover {
     background-color: rgb(0 0 0 / 0.32);
   }
+}
+
+@utility cursor-pencil {
+  cursor: var(--cursor-pencil);
 }
 
 /* Tool details toggle */
