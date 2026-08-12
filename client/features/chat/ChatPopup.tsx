@@ -67,6 +67,7 @@ export function ChatPopup({
         }
       />
       <PopoverContent
+        positionMethod="fixed"
         side="top"
         sideOffset={-48}
         align="end"
