@@ -6,6 +6,12 @@ import { join } from 'node:path'
 import { api } from './api'
 import { claudeCodeHarness } from './harness/claude-code'
 import { codexHarness } from './harness/codex'
+import { hermesHarness } from './harness/hermes'
+import {
+  DEFAULT_ARCHIVED_SESSIONS_PATH,
+  archivedAcpSessions,
+  setArchivedSessionsPath
+} from './harness/acp/archived'
 import { openclawHarness } from './harness/openclaw'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from './registry'
 import {
@@ -28,11 +34,13 @@ const originalClaudeAvailability = claudeCodeHarness.availability
 const originalCodexAvailability = codexHarness.availability
 const originalOpenclawInterrupt = openclawHarness.interrupt
 const originalOpenclawArchive = openclawHarness.archiveSession
+const originalHermesInterrupt = hermesHarness.interrupt
 
 beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), 'moi-api-archive-'))
   setRegistryPath(join(tempDir, 'workspaces.json'))
   setSelectedSessionPath(join(tempDir, 'selected-sessions.json'))
+  setArchivedSessionsPath(join(tempDir, 'acp-archived-sessions.json'))
 })
 
 afterEach(async () => {
@@ -44,8 +52,10 @@ afterEach(async () => {
   codexHarness.availability = originalCodexAvailability
   openclawHarness.interrupt = originalOpenclawInterrupt
   openclawHarness.archiveSession = originalOpenclawArchive
+  hermesHarness.interrupt = originalHermesInterrupt
   setRegistryPath(DEFAULT_REGISTRY_PATH)
   setSelectedSessionPath(DEFAULT_SELECTED_SESSION_PATH)
+  setArchivedSessionsPath(DEFAULT_ARCHIVED_SESSIONS_PATH)
   await rm(tempDir, { recursive: true, force: true })
 })
 
@@ -141,4 +151,19 @@ test('every provider supports archiving, openclaw via gateway patch', async () =
   expect((await codexAgent.json()).supportsArchiving).toBe(true)
   expect(openclawArchive.status).toBe(204)
   expect(archived).toEqual(['chat'])
+})
+
+// Hermes has no usable archive RPC — ACP's `session/delete` comes back
+// "Method not found" — so the route has to work off moi's own store.
+test('archiving a hermes chat records it in the acp store', async () => {
+  const hermes = await registerWorkspace(join(tempDir, 'hermes'), { type: 'hermes' })
+  // The real interrupt would spawn an agent process; the route calls it first.
+  hermesHarness.interrupt = async () => {}
+
+  const response = await api.request(`/api/workspaces/${hermes.id}/sessions/sess-1/archive`, {
+    method: 'POST'
+  })
+
+  expect(response.status).toBe(204)
+  expect(await archivedAcpSessions(join(tempDir, 'hermes'))).toEqual(new Set(['sess-1']))
 })

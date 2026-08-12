@@ -97,6 +97,36 @@ Current harnesses:
 | Claude Code (Agent SDK) | `claude-code/session.ts` | `claude-code/adapter.ts` | shipped, primary      |
 | OpenClaw (gateway)      | `openclaw/session.ts`    | `openclaw/adapter.ts`    | shipped, experimental |
 | Codex (app-server)      | `codex/session.ts`       | `codex/adapter.ts`       | shipped, experimental |
+| Hermes (ACP)            | `acp/session.ts`         | `acp/adapter.ts`         | shipped, experimental |
+
+`acp/` is the odd one out: it is **not** a harness, it is the shared
+implementation of the Agent Client Protocol (stdio JSON-RPC), and `hermes/`
+is the first provider built on it. Any other ACP-speaking agent (Gemini CLI,
+opencode, Zed's agents) should become another thin folder next to `hermes/`
+rather than a copy of the protocol. The split is:
+
+```
+acp/                  provider-agnostic protocol
+  wire.ts             ACP message types (re-exported from the official SDK)
+  client.ts           spawn + stdio JSON-RPC framing, one process per workspace
+  adapter.ts          session/update → Turn/ToolCall (+ chunk accumulation)
+  session.ts          per-session state machine, driven by AcpProviderConfig
+  discovery.ts        session/list, model catalog, home-card preview
+hermes/               provider specifics only
+  discovery.ts        profile discovery (the importable "agents")
+  index.ts            the Harness object + AcpProviderConfig
+  NOTES.md            protocol research + backend quirks
+```
+
+A new ACP provider supplies an `AcpProviderConfig`: an id, the spawn spec
+(binary + args), the no-prompt mode id, and whether images ride inline.
+
+`wire.ts` re-exports the schema-generated types from
+`@agentclientprotocol/sdk` — a **types-only, dev-only** dependency, since
+importing values from it would pull zod in at runtime. It adds one labelled
+"pre-1.0 additions" block for the model-selection surface the spec dropped and
+Hermes still implements; delete that block when agents move to
+`session/set_config_option`. See `hermes/NOTES.md` §12.
 
 Dev tooling: `/dev/harness` (live wire log + client frames + trigger
 scenarios for any workspace, backed by `GET /api/workspaces/:id/harness/debug`
@@ -133,6 +163,23 @@ materialized to file paths. The frame orders a live gateway produces are
 replayed against the real session code by `openclaw/wire-replay.test.ts`. Known gaps: no rich vision blocks (string-only
 `sessions.send`), and the gateway is the sole source of truth (no local
 persistence; cold restarts re-seed).
+
+**Hermes — shipped, experimental.** Chat over `hermes acp` (stdio JSON-RPC,
+one process per workspace so `workspaceEnv` injects at spawn — `acp/client.ts`),
+built on the provider-agnostic `acp/` layer. Session create/resume with temp-id
+rename, `session/load` history replay, interrupt via `session/cancel`, per-turn
+token usage, token streaming for thinking _and_ text, inline base64 images,
+per-chat model switching from the catalog `session/new` returns inline, and
+backend-generated session titles surfaced through `sessions_changed`. Agents are
+Hermes **profiles** — discovered from `$HERMES_HOME`, imported with
+`moi hermes init <profile>`, never created from the UI (OpenClaw's model).
+Sessions run in Hermes's `dont_ask` mode to match moi's bypass-permissions trust
+model. Known gaps: no mid-turn steering (moi queues instead), no subagent lanes,
+no reasoning-effort control, and `session/set_model` drops session-scoped MCP
+servers upstream. Two backend quirks are worked around in `acp/session.ts`:
+tool calls left unsettled at turn end are closed (Hermes never completes file
+read/write calls live), and a completing `tool_call_update` carries no title, so
+the established name is kept. See `hermes/NOTES.md`.
 
 **Codex — shipped, experimental.** Chat over `codex app-server` (stdio
 JSON-RPC, one process per workspace so `workspaceEnv` injects at spawn —
@@ -248,23 +295,23 @@ doubles as the evaluation rubric for new harnesses.
 
 Legend: ✅ supported · ⚠️ partial/workaround · ❌ missing.
 
-| Feature                  | Claude Agent SDK                                    | OpenClaw gateway          | Codex app-server                      |
-| ------------------------ | --------------------------------------------------- | ------------------------- | ------------------------------------- |
-| Long-lived session       | ✅ subprocess per session                           | ✅ gateway-side           | ✅ server-side, N threads/process     |
-| Queue/steer mid-turn     | ⚠️ queued next turn                                 | ⚠️                        | ✅ `turn/steer` into live turn        |
-| Resume                   | ✅                                                  | ✅                        | ✅ + fork                             |
-| Interrupt                | ✅ `interrupt()`                                    | ✅                        | ✅ `turn/interrupt`                   |
-| List models              | ✅ `supportedModels()`                              | ✅ `models.list`          | ✅ `model/list`                       |
-| Live model switch        | ✅ `setModel()`                                     | ✅ `sessions.patch`       | ✅ per-turn override                  |
-| Live effort switch       | ❌ rebuild                                          | ✅ `thinkingLevel` patch  | ✅ per-turn                           |
-| Token deltas             | ✅ opt-in                                           | ✅ `chat` frames          | ✅ `item/*/delta`                     |
-| Images in input          | ✅ base64 blocks                                    | ⚠️ materialize to path    | ✅ data URL or path                   |
-| Interactive approvals    | ⚠️ (we bypass)                                      | ✅                        | ✅ server→client requests (we bypass) |
-| Session list/history API | ✅ `listSessions()` + jsonl                         | ✅ `sessions.get`         | ✅ `thread/list`/`read`               |
-| Home card preview        | ✅ session file scan                                | ✅ cached first message   | ⚠️ live app-server only               |
-| MCP status               | ✅ `mcpServerStatus()`                              | n/a                       | ✅ `mcpServerStatus/list`             |
-| Usage reporting          | ⚠️ cost/duration on `result` (adapter drops tokens) | ✅ tokens + cost per turn | ✅ live + rate limits                 |
-| Structured output        | ❌                                                  | ❌                        | ✅ per turn                           |
+| Feature                  | Claude Agent SDK                                    | OpenClaw gateway          | Codex app-server                      | Hermes (ACP)                         |
+| ------------------------ | --------------------------------------------------- | ------------------------- | ------------------------------------- | ------------------------------------ |
+| Long-lived session       | ✅ subprocess per session                           | ✅ gateway-side           | ✅ server-side, N threads/process     | ✅ process per workspace, N sessions |
+| Queue/steer mid-turn     | ⚠️ queued next turn                                 | ⚠️                        | ✅ `turn/steer` into live turn        | ⚠️ queued (ACP has no steer)         |
+| Resume                   | ✅                                                  | ✅                        | ✅ + fork                             | ✅ `session/load` (+ fork)           |
+| Interrupt                | ✅ `interrupt()`                                    | ✅                        | ✅ `turn/interrupt`                   | ✅ `session/cancel` → `cancelled`    |
+| List models              | ✅ `supportedModels()`                              | ✅ `models.list`          | ✅ `model/list`                       | ✅ inline on `session/new`           |
+| Live model switch        | ✅ `setModel()`                                     | ✅ `sessions.patch`       | ✅ per-turn override                  | ⚠️ drops session MCP servers         |
+| Live effort switch       | ❌ rebuild                                          | ✅ `thinkingLevel` patch  | ✅ per-turn                           | ❌ no effort concept in ACP          |
+| Token deltas             | ✅ opt-in                                           | ✅ `chat` frames          | ✅ `item/*/delta`                     | ✅ always on, thinking + text        |
+| Images in input          | ✅ base64 blocks                                    | ⚠️ materialize to path    | ✅ data URL or path                   | ✅ base64 blocks                     |
+| Interactive approvals    | ⚠️ (we bypass)                                      | ✅                        | ✅ server→client requests (we bypass) | ✅ real, with diffs (we bypass)      |
+| Session list/history API | ✅ `listSessions()` + jsonl                         | ✅ `sessions.get`         | ✅ `thread/list`/`read`               | ✅ `session/list` (cwd + cursor)     |
+| Home card preview        | ✅ session file scan                                | ✅ cached first message   | ⚠️ live app-server only               | ⚠️ live process only                 |
+| MCP status               | ✅ `mcpServerStatus()`                              | n/a                       | ✅ `mcpServerStatus/list`             | ⚠️ per-session config, no status RPC |
+| Usage reporting          | ⚠️ cost/duration on `result` (adapter drops tokens) | ✅ tokens + cost per turn | ✅ live + rate limits                 | ✅ tokens per turn                   |
+| Structured output        | ❌                                                  | ❌                        | ✅ per turn                           | ❌                                   |
 
 ## Design lessons so far
 

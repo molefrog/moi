@@ -39,11 +39,17 @@ describe('workspace skills API', () => {
     const response = await api.request(`/api/workspaces/${workspace.id}/skills`)
     const status = (await response.json()) as WorkspaceSkillsStatus
 
+    // Read the shipped version rather than pinning it — the assertion is that
+    // an outdated install reports an update, not what today's version happens
+    // to be. Pinning it means every skill bump breaks this test.
+    const bundled = await readSkillVersion(join(BUNDLED_SKILLS_DIR, 'moi-workspace', 'SKILL.md'))
+
     expect(response.status).toBe(200)
     expect(status.updateAvailable).toBe(true)
+    expect(bundled).not.toBeNull()
     expect(status.skills.find(skill => skill.name === 'moi-workspace')).toMatchObject({
       installed: '0.7.1',
-      bundled: await readSkillVersion(join(BUNDLED_SKILLS_DIR, 'moi-workspace', 'SKILL.md'))
+      bundled
     })
   })
 

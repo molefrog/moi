@@ -36,7 +36,7 @@ export type ToolCall = {
   // for the same canonical action (`read` vs `Read`, `exec` vs `Bash`).
   // Adapters are responsible for setting it; UI defaults to a generic
   // rendering when absent.
-  provider?: 'claude-code' | 'openclaw' | 'codex'
+  provider?: 'claude-code' | 'openclaw' | 'codex' | 'hermes'
   mcpServer?: string
   state: ToolState
   input: unknown

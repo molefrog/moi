@@ -15,13 +15,18 @@ import { WORKSPACE_TYPE_ORDER } from '@/lib/workspace-types'
 import type { HarnessAvailability, WorkspaceType } from '@/lib/types'
 
 const WORKSPACE_AGENT_DESCRIPTION = 'Choose which agent moi will use to build your workspace'
-const OPENCLAW_LOCKED_DESCRIPTION =
-  'Initialize OpenClaw in the folder\nmanually, then import it to moi'
+// Backends whose workspaces belong to an agent installed on the machine: moi
+// imports them (via discovery or `moi <provider> init`) and never creates one.
+const IMPORT_ONLY_DESCRIPTION: Partial<Record<WorkspaceType, string>> = {
+  openclaw: 'Initialize OpenClaw in the folder\nmanually, then import it to moi',
+  hermes: 'Create a Hermes profile with\nhermes profile create, then import it'
+}
 
 const workspaceAgentDescription: Record<WorkspaceType, string> = {
   'claude-code': 'Anthropic',
   codex: 'OpenAI',
-  openclaw: 'Open-source'
+  openclaw: 'Open-source',
+  hermes: 'Nous Research'
 }
 
 export type WorkspaceAgentOption = {
@@ -43,9 +48,10 @@ export function getWorkspaceAgentOptions({
   return WORKSPACE_TYPE_ORDER.map(type => {
     const state = availability?.[type]
     const unavailableReason = state?.available === false ? state.reason : undefined
-    const openClawReason =
-      type === 'openclaw' && !detectedTypes.includes(type) ? OPENCLAW_LOCKED_DESCRIPTION : undefined
-    const disabledReason = unavailableReason ?? openClawReason
+    const importOnlyReason = !detectedTypes.includes(type)
+      ? IMPORT_ONLY_DESCRIPTION[type]
+      : undefined
+    const disabledReason = unavailableReason ?? importOnlyReason
 
     return {
       type,
