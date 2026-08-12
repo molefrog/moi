@@ -69,6 +69,21 @@
     0px 24px 48px -8px rgba(0, 0, 0, 0.12);
 }
 
+@theme {
+  --animate-glow: glow 5s ease-in-out infinite;
+
+  @keyframes glow {
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.85;
+    }
+  }
+}
+
 /* Texture utilities leave background-color untouched so components keep an
  * opaque semantic base underneath them. */
 
@@ -155,5 +170,15 @@
     @variant dark-or-widget {
       box-shadow: inset 0 0 16px 16px color-mix(in oklch, var(--primary) 10%, transparent);
     }
+  }
+}
+
+@utility texture-inset-shadow-* {
+  box-shadow: inset 0 0 32px 24px
+    color-mix(in oklch, var(--primary) --value(percentage), transparent);
+
+  @media (width < 48rem) {
+    box-shadow: inset 0 0 16px 16px
+      color-mix(in oklch, var(--primary) --value(percentage), transparent);
   }
 }

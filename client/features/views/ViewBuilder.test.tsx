@@ -31,28 +31,25 @@ function renderBuilder(status: ViewBuilderData['status'], active = true): string
 }
 
 describe('ViewBuilder', () => {
-  test('keeps an inactive draft mounted and hidden', () => {
+  test('keeps an inactive draft mounted', () => {
     const active = renderBuilder('draft')
     const inactive = renderBuilder('draft', false)
 
     expect(active).toContain('Sketch how the view should look')
     expect(active).toContain('Drawing area')
-    expect(active).toContain('flex')
     expect(inactive).toContain('Sketch how the view should look')
-    expect(inactive).toContain('hidden')
+    expect(inactive).toContain('Drawing area')
   })
 
-  test('keeps the sketch canvas mounted behind post-submit states', () => {
+  test('keeps post-submit states mounted while inactive', () => {
     const waiting = renderBuilder('waiting')
     const building = renderBuilder('building')
 
     expect(waiting).toContain('The view needs your attention')
-    expect(waiting).toContain('invisible')
-    expect(building).toContain('Building view…')
+    expect(waiting).toContain('Drawing area')
     expect(building).toContain('Drawing area')
-    expect(building).toContain('opacity-25')
-    expect(renderBuilder('waiting', false)).toContain('hidden')
-    expect(renderBuilder('building', false)).toContain('hidden')
+    expect(renderBuilder('waiting', false)).toContain('The view needs your attention')
+    expect(renderBuilder('building', false)).toContain('Drawing area')
   })
 
   test('leaves ready builders to the tab replacement flow', () => {

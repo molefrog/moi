@@ -115,8 +115,7 @@ function ViewBuilderSketchSurface({
         inert={draft ? undefined : true}
         className={cn(
           'absolute inset-0',
-          status === 'building' &&
-            'pointer-events-none animate-pulse opacity-25 animation-duration-[3s]',
+          status === 'building' && 'pointer-events-none opacity-50',
           status === 'waiting' && 'invisible'
         )}
       >
@@ -131,6 +130,14 @@ function ViewBuilderSketchSurface({
           )}
         </DrawingLayer>
       </div>
+      <div
+        aria-hidden
+        className={cn(
+          'pointer-events-none absolute inset-0 transition-shadow duration-500 ease-in-out',
+          status === 'building' &&
+            'animate-glow texture-inset-shadow-50% motion-reduce:animate-none'
+        )}
+      />
       {status === 'building' && <ViewBuilderBuildingState />}
       {status === 'waiting' && (
         <ViewBuilderWaitingState error={error} onDiscard={onDiscard} onOpenChat={onOpenChat} />
@@ -195,18 +202,11 @@ function ViewBuilderWaitingState({ error, onDiscard, onOpenChat }: ViewBuilderWa
 }
 
 function ViewBuilderBuildingState() {
-  return (
-    <ViewBuilderStatusLayout className="p-6">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Spinner />
-        Building view…
-      </div>
-    </ViewBuilderStatusLayout>
-  )
+  return <ViewBuilderStatusLayout />
 }
 
 type ViewBuilderStatusLayoutProps = {
-  children: ReactNode
+  children?: ReactNode
   className?: string
 }
 
