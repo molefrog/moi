@@ -69,7 +69,7 @@ describe('ChatEmptyState', () => {
 
   test('renders the focused new-view prompt', () => {
     expect(renderState('view-builder')).toContain(
-      'Describe the content, data, and key actions you need in this view'
+      'Describe the content, data, and key actions you need in the view'
     )
   })
 })

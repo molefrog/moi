@@ -89,22 +89,22 @@
 
 @utility texture-checker {
   background-image: repeating-conic-gradient(
-    color-mix(in oklch, var(--primary) 1%, var(--foreground) 1%) 0 25%,
-    color-mix(in oklch, var(--primary) 3%, var(--foreground) 3%) 0 50%
+    var(--background) 0 25%,
+    color-mix(in oklch, var(--primary) 2%, var(--foreground) 4%) 0 50%
   );
-  background-position: 0 0;
+  background-position: 50% 50%;
   background-repeat: repeat;
   background-size: 32px 32px;
 }
 
 @utility texture-checker-* {
   background-image: repeating-conic-gradient(
-    color-mix(in oklch, var(--primary) 1%, var(--foreground) 1%) 0 25%,
-    color-mix(in oklch, var(--primary) 3%, var(--foreground) 3%) 0 50%
+    var(--background) 0 25%,
+    color-mix(in oklch, var(--primary) 2%, var(--foreground) 4%) 0 50%
   );
-  background-position: 0 0;
+  background-position: 50% 50%;
   background-repeat: repeat;
-  background-size: --value([length]) --value([length]);
+  background-size: calc(--value(number) * var(--spacing)) calc(--value(number) * var(--spacing));
 }
 
 @utility texture-grid {
@@ -119,7 +119,7 @@
       color-mix(in oklch, var(--primary) 3%, var(--foreground) 3%) 1px,
       transparent 1px
     );
-  background-position: -12px -12px;
+  background-position: 50% 50%;
   background-repeat: repeat;
   background-size: 24px 24px;
 }

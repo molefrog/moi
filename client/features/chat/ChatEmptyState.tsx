@@ -122,10 +122,10 @@ export function ChatEmptyState({ kind, disabled = false, onSelectPrompt }: ChatE
 
 function ViewBuilderChatEmptyState() {
   return (
-    <div className={cn(EMPTY_STATE_STYLES, 'gap-3 text-center text-muted-foreground')}>
+    <div className={cn(EMPTY_STATE_STYLES, 'gap-2 text-center text-muted-foreground')}>
       <IconTableSpark size={56} stroke={0.5} />
       <p className="mx-auto max-w-xs px-8 text-sm">
-        Describe the content, data, and key actions you need in this view
+        Describe the content, data, and key actions you need in the view
       </p>
     </div>
   )

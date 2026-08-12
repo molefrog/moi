@@ -601,7 +601,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const workspacePanel = (
     <div
       className={cn(
-        'flex h-full min-h-0 min-w-0 flex-1 flex-col-reverse overflow-hidden bg-background shadow-xs transition-[border-radius]',
+        'flex h-full min-h-0 min-w-0 flex-1 flex-col-reverse overflow-hidden bg-background shadow-md transition-[border-radius]',
         mode === 'split' && 'rounded-xl'
       )}
     >

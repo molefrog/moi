@@ -2,7 +2,6 @@ import type { ReactNode, Ref } from 'react'
 import { useImperativeHandle } from 'react'
 
 import { Button } from '@/client/components/ui/button'
-import { Spinner } from '@/client/components/ui/spinner'
 import { DrawingLayer } from '@/client/features/drawings/DrawingLayer'
 import { DrawingToolbar } from '@/client/features/drawings/DrawingToolbar'
 import { useDrawingHistoryState } from '@/client/features/drawings/useDrawingLayer'
@@ -157,13 +156,14 @@ function ViewBuilderDraftState({ chatDocked, sketch }: ViewBuilderDraftStateProp
   return (
     <div
       ref={sketch.targetRef}
-      className="absolute inset-0 flex items-center justify-center texture-grid"
+      className="absolute inset-0 flex items-center justify-center texture-checker-20"
     >
       {!sketch.controls.active && !hasStrokes && (
         <div
           className={cn(
-            'flex h-full flex-col items-center justify-center gap-3 bg-radial from-background from-20% to-transparent to-75% p-12 text-center text-sm text-muted-foreground',
-            chatDocked ? 'mb-28 w-full' : 'mr-auto mb-4 w-[calc(100%-var(--chat-max))]'
+            'mb-4 flex h-full flex-col items-center justify-center gap-2 p-12 text-center text-sm text-muted-foreground',
+            'bg-radial from-background from-20% to-transparent to-75%',
+            chatDocked ? 'w-full' : 'mr-auto w-[calc(100%-var(--chat-max))]'
           )}
         >
           <IconScribble size={56} stroke={0.5} />
@@ -214,7 +214,7 @@ function ViewBuilderStatusLayout({ children, className }: ViewBuilderStatusLayou
   return (
     <div
       className={cn(
-        'relative flex min-h-0 flex-1 items-center justify-center texture-grid',
+        'relative flex min-h-0 flex-1 items-center justify-center texture-checker-20',
         className
       )}
     >

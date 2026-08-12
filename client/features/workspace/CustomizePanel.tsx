@@ -132,7 +132,7 @@ export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
             >
               <div className="flex items-center gap-2">
                 <span
-                  className="size-5 shrink-0 rounded-sm bg-card texture-checker-[10px] shadow-xs"
+                  className="size-5 shrink-0 rounded-sm bg-card texture-checker-2.5 shadow-xs"
                   aria-hidden="true"
                 />
                 <span className="text-sm font-medium">{preset.label}</span>

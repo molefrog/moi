@@ -111,10 +111,15 @@ describe('buildApplet', () => {
       }
 
       expect(result.js).toContain('repeating-conic-gradient')
-      expect(result.js).toContain('var(--primary) 1%, var(--foreground) 1%')
+      expect(result.js).toContain('var(--primary) 2%, var(--foreground) 4%')
       expect(result.js).toContain('var(--primary) 3%, var(--foreground) 3%')
       expect(result.js).toContain('background-size: 32px 32px')
-      expect(result.js).toContain('background-size: 48px 48px')
+      expect(result.js).toContain(
+        'background-size: calc(2.5 * var(--spacing)) calc(2.5 * var(--spacing))'
+      )
+      expect(result.js).toContain(
+        'background-size: calc(12 * var(--spacing)) calc(12 * var(--spacing))'
+      )
       expect(result.js).toContain('linear-gradient(to right')
       expect(result.js).toContain(
         'linear-gradient(to right, color-mix(in oklch, var(--primary) 3%, var(--foreground) 3%) 1px'
