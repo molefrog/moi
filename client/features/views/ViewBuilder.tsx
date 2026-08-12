@@ -155,12 +155,12 @@ function ViewBuilderDraftState({ chatDocked, sketch }: ViewBuilderDraftStateProp
       {!sketch.controls.active && !hasStrokes && (
         <div
           className={cn(
-            'flex h-full flex-col items-center justify-center gap-2 bg-radial from-background from-20% to-transparent to-75% p-12 text-center text-sm',
+            'flex h-full flex-col items-center justify-center gap-3 bg-radial from-background from-20% to-transparent to-75% p-12 text-center text-sm text-muted-foreground',
             chatDocked ? 'mb-28 w-full' : 'mr-auto mb-4 w-[calc(100%-var(--chat-max))]'
           )}
         >
-          <IconScribble size={40} stroke={0.75} className="text-muted-foreground" />
-          <span className="max-w-32 text-muted-foreground">Sketch how the view should look</span>
+          <IconScribble size={56} stroke={0.5} />
+          <span className="max-w-32">Sketch how the view should look</span>
         </div>
       )}
     </div>
