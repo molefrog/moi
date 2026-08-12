@@ -24,6 +24,7 @@ import {
   IconHandStop,
   IconHighlight,
   IconLine,
+  IconPencil,
   IconPointer2,
   IconSketching,
   IconSquare,
@@ -49,7 +50,7 @@ const TOOL_ENTRIES: ToolEntry[] = [
   { kind: 'tool', id: 'select', label: 'Select', Icon: IconPointer2 },
   { kind: 'tool', id: 'hand', label: 'Hand', Icon: IconHandStop },
   { kind: 'sep' },
-  { kind: 'tool', id: 'draw', label: 'Pencil', Icon: IconSketching },
+  { kind: 'tool', id: 'draw', label: 'Pencil', Icon: IconPencil },
   { kind: 'geo', label: 'Rectangle', Icon: IconSquare },
   { kind: 'tool', id: 'note', label: 'Sticker', Icon: IconSticker2 },
   { kind: 'tool', id: 'text', label: 'Text', Icon: IconTypography },
@@ -123,13 +124,26 @@ function applyToolLocks(editor: Editor, toolId: string) {
 }
 
 // Custom vertical tool bar, rendered as an overlay over the canvas (outside
-// tldraw's own UI layout). Tracks the current tool reactively via `react`.
+// tldraw's own UI layout). Tracks the current tool and applies the pencil cursor
+// to tldraw's own container so both affordances change together.
+const pencilCursorClass = '[&_.tl-canvas]:cursor-pencil'
+
 export function ScratchToolbar({ editor }: ScratchToolbarProps) {
   const [toolId, setToolId] = useState(() => editor.getCurrentToolId())
 
   useEffect(() => {
-    setToolId(editor.getCurrentToolId())
-    return react('scratch current tool', () => setToolId(editor.getCurrentToolId()))
+    const container = editor.getContainer()
+    const updateTool = () => {
+      const currentToolId = editor.getCurrentToolId()
+      setToolId(currentToolId)
+      container.classList.toggle(pencilCursorClass, currentToolId === 'draw')
+    }
+    updateTool()
+    const stopTracking = react('scratch current tool', updateTool)
+    return () => {
+      stopTracking()
+      container.classList.remove(pencilCursorClass)
+    }
   }, [editor])
 
   const activate = (toolId: string) => {
@@ -442,7 +456,7 @@ export function ScratchStyleBar({ editor }: ScratchStyleBarProps) {
             )}
           >
             {state.sizeGlyph === 'pen' ? (
-              <IconSketching size={20} stroke={1.5} />
+              <IconSketching size={20} stroke={s.value === 'm' ? 1.25 : 2} />
             ) : state.sizeGlyph === 'letter' ? (
               <IconTypography size={s.glyph} stroke={s.glyph === 16 ? 1.75 : 1.5} />
             ) : (

@@ -17,6 +17,7 @@ beforeEach(() => {
     hasSentMessageFromMoi: false,
     workspaceIdsPendingAnalysis: [],
     composerDrafts: {},
+    viewBuilderDrafts: {},
     dockedChatWidth: 360
   })
 })
@@ -81,6 +82,39 @@ describe('composer drafts', () => {
     expect(useUiStore.getState().composerDrafts).toEqual({ 'ws-1': 'Keep me' })
     expect(JSON.parse(storedValues.get('moi:ui') ?? '{}')).toMatchObject({
       state: { composerDrafts: { 'ws-1': 'Keep me' } }
+    })
+  })
+})
+
+describe('view builder drafts', () => {
+  test('keeps an empty draft distinct from no draft', () => {
+    useUiStore.getState().setViewBuilderDraft('builder-1', 'Chart of expenses')
+    useUiStore.getState().setViewBuilderDraft('builder-1', '')
+
+    // Deleted text must stay deleted — a missing entry falls back to the
+    // builder's server-saved requirements in the composer.
+    expect(useUiStore.getState().viewBuilderDrafts).toEqual({ 'builder-1': '' })
+
+    useUiStore.getState().setViewBuilderDraft('builder-1', null)
+
+    expect(useUiStore.getState().viewBuilderDrafts).toEqual({})
+  })
+
+  test('clearing a missing draft leaves state untouched', () => {
+    const before = useUiStore.getState()
+
+    useUiStore.getState().setViewBuilderDraft('builder-x', null)
+
+    expect(useUiStore.getState()).toBe(before)
+  })
+
+  test('restores drafts in a new store', () => {
+    useUiStore.getState().setViewBuilderDraft('builder-1', 'Weekly report view')
+
+    const restoredStore = createUiStore(localStorage)
+
+    expect(restoredStore.getState().viewBuilderDrafts).toEqual({
+      'builder-1': 'Weekly report view'
     })
   })
 })

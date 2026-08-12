@@ -18,7 +18,7 @@ function tokenPx(name: string): number {
   return raw.endsWith('rem') ? value * Number.parseFloat(getComputedStyle(root).fontSize) : value
 }
 
-// Observe the full workspace row, not either pane, so split-fit measurement does
+// Measure the full workspace row, not either pane, so split-fit measurement does
 // not oscillate when the chat column appears or disappears.
 export function useFitsSplitLayout<T extends HTMLElement>() {
   const ref = useRef<T>(null)
@@ -32,21 +32,27 @@ export function useFitsSplitLayout<T extends HTMLElement>() {
       const workspaceMinWidth = tokenPx('--column-w')
       const chatMinWidth = tokenPx('--chat-min')
       const chatMaxWidth = tokenPx('--chat-max')
-      setState({
+      const next = {
         fits: width - chatMinWidth >= workspaceMinWidth,
         workspaceMinWidth,
         chatMinWidth,
         chatMaxWidth
-      })
+      }
+      setState(current =>
+        current?.fits === next.fits &&
+        current.workspaceMinWidth === next.workspaceMinWidth &&
+        current.chatMinWidth === next.chatMinWidth &&
+        current.chatMaxWidth === next.chatMaxWidth
+          ? current
+          : next
+      )
     }
 
     update(el.getBoundingClientRect().width)
 
-    const ro = new ResizeObserver(([entry]) => {
-      if (entry) update(entry.contentRect.width)
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
+    const onResize = () => update(el.getBoundingClientRect().width)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
   }, [])
 
   return {

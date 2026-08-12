@@ -1,62 +1,62 @@
 import { describe, expect, test } from 'bun:test'
 
 import {
-  annotationHistoryReducer,
-  EMPTY_ANNOTATION_HISTORY,
+  drawingHistoryReducer,
+  EMPTY_DRAWING_HISTORY,
   pointOnCanvas,
-  type AnnotationStroke
-} from './useAnnotationLayer'
+  type DrawingStroke
+} from './useDrawingLayer'
 
-const firstStroke: AnnotationStroke = {
+const firstStroke: DrawingStroke = {
   points: [
     { x: 10, y: 20 },
     { x: 30, y: 40 }
   ]
 }
-const secondStroke: AnnotationStroke = {
+const secondStroke: DrawingStroke = {
   points: [
     { x: 50, y: 60 },
     { x: 70, y: 80 }
   ]
 }
 
-describe('annotation history', () => {
+describe('drawing history', () => {
   test('commits immutable strokes and supports undo and redo', () => {
-    const one = annotationHistoryReducer(EMPTY_ANNOTATION_HISTORY, {
+    const one = drawingHistoryReducer(EMPTY_DRAWING_HISTORY, {
       type: 'commit',
       stroke: firstStroke
     })
-    const two = annotationHistoryReducer(one, { type: 'commit', stroke: secondStroke })
-    const undone = annotationHistoryReducer(two, { type: 'undo' })
-    const redone = annotationHistoryReducer(undone, { type: 'redo' })
+    const two = drawingHistoryReducer(one, { type: 'commit', stroke: secondStroke })
+    const undone = drawingHistoryReducer(two, { type: 'undo' })
+    const redone = drawingHistoryReducer(undone, { type: 'redo' })
 
     expect(one.present).toEqual([firstStroke])
     expect(two.present).toEqual([firstStroke, secondStroke])
     expect(undone.present).toEqual([firstStroke])
     expect(redone.present).toEqual(two.present)
-    expect(EMPTY_ANNOTATION_HISTORY.present).toEqual([])
+    expect(EMPTY_DRAWING_HISTORY.present).toEqual([])
   })
 
   test('treats clear as an undoable history entry', () => {
-    const drawn = annotationHistoryReducer(EMPTY_ANNOTATION_HISTORY, {
+    const drawn = drawingHistoryReducer(EMPTY_DRAWING_HISTORY, {
       type: 'commit',
       stroke: firstStroke
     })
-    const cleared = annotationHistoryReducer(drawn, { type: 'clear' })
-    const restored = annotationHistoryReducer(cleared, { type: 'undo' })
+    const cleared = drawingHistoryReducer(drawn, { type: 'clear' })
+    const restored = drawingHistoryReducer(cleared, { type: 'undo' })
 
     expect(cleared.present).toEqual([])
     expect(restored.present).toEqual([firstStroke])
   })
 
   test('a new stroke drops redo history', () => {
-    const one = annotationHistoryReducer(EMPTY_ANNOTATION_HISTORY, {
+    const one = drawingHistoryReducer(EMPTY_DRAWING_HISTORY, {
       type: 'commit',
       stroke: firstStroke
     })
-    const two = annotationHistoryReducer(one, { type: 'commit', stroke: secondStroke })
-    const undone = annotationHistoryReducer(two, { type: 'undo' })
-    const branched = annotationHistoryReducer(undone, {
+    const two = drawingHistoryReducer(one, { type: 'commit', stroke: secondStroke })
+    const undone = drawingHistoryReducer(two, { type: 'undo' })
+    const branched = drawingHistoryReducer(undone, {
       type: 'commit',
       stroke: secondStroke
     })

@@ -145,10 +145,12 @@ export async function beginViewBuilder(
   workspaceId: string,
   workspacePath: string,
   builderId: string,
-  requirements: string
+  requirements: string,
+  hasSketch = false
 ): Promise<ViewBuilder> {
   const text = requirements.trim()
-  if (!text) throw new ViewBuilderError('View requirements are required', 400)
+  if (!text && !hasSketch)
+    throw new ViewBuilderError('View requirements or a sketch are required', 400)
   const builder = await mutateBuilders(workspacePath, builders => {
     const [current, index] = findBuilder(builders, builderId)
     if (current.status !== 'draft') {

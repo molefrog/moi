@@ -1,6 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query'
 
-import { resolveChatRunOptions, startOptimisticTurn } from '@/client/features/chat/chat-send'
+import {
+  attachmentPartsForOptimisticTurn,
+  attachmentsForSend,
+  resolveChatRunOptions,
+  startOptimisticSession,
+  startOptimisticTurn
+} from '@/client/features/chat/chat-send'
 import { liveStore } from '@/client/features/chat/chat-store'
 import { useSelectedSession } from '@/client/features/chat/useSelectedSession'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
@@ -30,13 +36,24 @@ export function useViewBuilderActions() {
 
   const submit = async (builder: ViewBuilder, requirements: string) => {
     const text = requirements.trim()
-    if (!text) return
+    const attachments = attachmentsForSend(workspaceId, builder.sessionId)
+    if (!text && attachments.length === 0) return
+
+    startOptimisticSession({
+      queryClient,
+      workspaceId,
+      sessionId: builder.sessionId,
+      text,
+      filenames: attachments.map(attachment => attachment.name)
+    })
+    const parts = attachmentPartsForOptimisticTurn(attachments)
+    if (text) parts.push({ type: 'text', text })
 
     const optimisticId = startOptimisticTurn({
       queryClient,
       workspaceId,
       sessionId: builder.sessionId,
-      parts: [{ type: 'text', text }]
+      parts
     })
     selectSession(builder.sessionId)
 
@@ -52,11 +69,15 @@ export function useViewBuilderActions() {
         builderId: builder.id,
         requirements: text,
         optimisticId,
+        ...(attachments.length > 0
+          ? { attachments: attachments.map(attachment => attachment.upload!.id) }
+          : {}),
         model,
         effort,
         fastMode,
         stream
       })
+      liveStore.getState().clearAttachments(workspaceId, builder.sessionId)
     } catch (error) {
       liveStore.getState().setActivity(workspaceId, builder.sessionId, 'idle')
       liveStore

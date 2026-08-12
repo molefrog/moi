@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { toast } from '@/client/components/ui/toast'
-import { stageAnnotation, stageAnnotationDraft } from '@/client/features/chat/attachment-staging'
+import { stageDrawing, stageDrawingDraft } from '@/client/features/chat/attachment-staging'
 import { liveStore } from '@/client/features/chat/chat-store'
+import type { ComposerAnnotationControls } from '@/client/features/chat/composer/ChatComposer'
 import type { LayoutMode, WorkspaceTabId } from '@/lib/types'
 
-import type { ChatAnnotationControls } from './types'
-import { type AnnotationController, useAnnotationLayer } from './useAnnotationLayer'
+import { type DrawingController, useDrawingLayer } from './useDrawingLayer'
 
 type AnnotationOrigin = 'docked' | 'popup'
 
@@ -28,9 +28,9 @@ type UseChatAnnotationOptions = {
   openPopup: () => void
 }
 
-export type ChatAnnotationController = AnnotationController & {
-  docked: ChatAnnotationControls | undefined
-  popup: ChatAnnotationControls | undefined
+export type ChatAnnotationController = DrawingController & {
+  docked: ComposerAnnotationControls | undefined
+  popup: ComposerAnnotationControls | undefined
 }
 
 export function useChatAnnotation({
@@ -65,10 +65,11 @@ export function useChatAnnotation({
       return
     }
 
-    stageAnnotationDraft({
+    stageDrawingDraft({
       workspaceId: draft.workspaceId,
       sessionId: draft.sourceSessionId,
       localId: draft.attachmentId,
+      purpose: 'annotation',
       sourceTab: draft.sourceTab,
       blob
     })
@@ -77,10 +78,11 @@ export function useChatAnnotation({
   const upload = useCallback((draft: ChatAnnotationDraft, blob: Blob): Promise<void> => {
     const revision = (uploadRevisionsRef.current.get(draft.attachmentId) ?? 0) + 1
     uploadRevisionsRef.current.set(draft.attachmentId, revision)
-    return stageAnnotation({
+    return stageDrawing({
       workspaceId: draft.workspaceId,
       sessionId: draft.sourceSessionId,
       localId: draft.attachmentId,
+      purpose: 'annotation',
       sourceTab: draft.sourceTab,
       blob,
       isCurrent: () => uploadRevisionsRef.current.get(draft.attachmentId) === revision
@@ -100,7 +102,7 @@ export function useChatAnnotation({
     [upload]
   )
 
-  const annotation = useAnnotationLayer({ onChange: change, onFinish: complete })
+  const annotation = useDrawingLayer({ onChange: change, onFinish: complete })
   const { controls } = annotation
   const { active, starting, open, finish, cancel: cancelLayer } = controls
 
@@ -148,13 +150,14 @@ export function useChatAnnotation({
     (localId: string) => {
       const revision = (uploadRevisionsRef.current.get(localId) ?? 0) + 1
       uploadRevisionsRef.current.set(localId, revision)
+      liveStore.getState().removeAttachment(workspaceId, sessionId, localId)
       if (draftRef.current?.attachmentId === localId) {
         draftRef.current = null
         latestBlobRef.current = null
         void cancelLayer()
       }
     },
-    [cancelLayer]
+    [cancelLayer, sessionId, workspaceId]
   )
 
   const finishDrawing = useCallback(async () => {
@@ -190,7 +193,7 @@ export function useChatAnnotation({
 
   // Identity-stable (all callbacks hold state in refs) so ChatPanel and
   // ChatComposer can be memoized against the `annotation` prop.
-  const docked = useMemo<ChatAnnotationControls | undefined>(
+  const docked = useMemo<ComposerAnnotationControls | undefined>(
     () =>
       available
         ? {
@@ -202,7 +205,7 @@ export function useChatAnnotation({
         : undefined,
     [available, active, starting, finishDrawing, remove, toggleDocked]
   )
-  const popup = useMemo<ChatAnnotationControls | undefined>(
+  const popup = useMemo<ComposerAnnotationControls | undefined>(
     () =>
       available
         ? {

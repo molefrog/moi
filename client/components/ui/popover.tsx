@@ -15,7 +15,7 @@ function PopoverTrigger({ ...props }: PopoverPrimitive.Trigger.Props) {
 type PopoverContentProps = PopoverPrimitive.Popup.Props &
   Pick<
     PopoverPrimitive.Positioner.Props,
-    'align' | 'alignOffset' | 'disableAnchorTracking' | 'side' | 'sideOffset'
+    'align' | 'alignOffset' | 'disableAnchorTracking' | 'positionMethod' | 'side' | 'sideOffset'
   > &
   Pick<PopoverPrimitive.Portal.Props, 'keepMounted' | 'container'>
 
@@ -24,6 +24,7 @@ function PopoverContent({
   align = 'center',
   alignOffset = 0,
   disableAnchorTracking = false,
+  positionMethod = 'absolute',
   side = 'bottom',
   sideOffset = 4,
   keepMounted = false,
@@ -36,6 +37,7 @@ function PopoverContent({
         align={align}
         alignOffset={alignOffset}
         disableAnchorTracking={disableAnchorTracking}
+        positionMethod={positionMethod}
         side={side}
         sideOffset={sideOffset}
         className="isolate z-50"

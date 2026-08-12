@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 
 import { AnimatePresence } from 'motion/react'
 
@@ -12,10 +12,10 @@ import {
 } from '@tabler/icons-react'
 
 import { IconGhost } from '@/client/components/shared/IconGhost'
-import { canAnnotateWorkspaceContent } from '@/client/features/annotations/annotation-availability'
-import { AnnotationLayer } from '@/client/features/annotations/AnnotationLayer'
-import { AnnotationToolbar } from '@/client/features/annotations/AnnotationToolbar'
-import { useChatAnnotation } from '@/client/features/annotations/useChatAnnotation'
+import { canAnnotateWorkspaceContent } from '@/client/features/drawings/annotation-availability'
+import { DrawingLayer } from '@/client/features/drawings/DrawingLayer'
+import { DrawingToolbar } from '@/client/features/drawings/DrawingToolbar'
+import { useChatAnnotation } from '@/client/features/drawings/useChatAnnotation'
 import { ChatPanel } from '@/client/features/chat/ChatPanel'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { CustomizePanel } from '@/client/features/workspace/CustomizePanel'
@@ -28,9 +28,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/
 import { WorkspaceSettings } from '@/client/features/settings/WorkspaceSettings'
 import { useAppletChatMessage } from '@/client/features/chat/useAppletChatMessage'
 import { useChat } from '@/client/features/chat/useChat'
-import { ViewBuilderTab } from '@/client/features/views/ViewBuilderTab'
+import { ViewBuilder, type ViewBuilderHandle } from '@/client/features/views/ViewBuilder'
 import { ViewManager } from '@/client/features/views/ViewManager'
 import { useViewBuilderActions } from '@/client/features/views/useViewBuilderActions'
+import { useViewBuilderDrafts } from '@/client/features/views/useViewBuilderDrafts'
 import { useFitsSplitLayout } from '@/client/features/workspace/useFitsSplitLayout'
 import { useWorkspaceComposerState } from '@/client/features/chat/composer/useWorkspaceComposerState'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
@@ -55,7 +56,13 @@ import {
   type WorkspaceTabItem,
   WorkspaceTabs
 } from '@/client/features/workspace/WorkspaceTabs'
-import type { LayoutMode, ViewBuilder, ViewInfo, WidgetInfo, WorkspaceTabId } from '@/lib/types'
+import type {
+  LayoutMode,
+  ViewBuilder as ViewBuilderData,
+  ViewInfo,
+  WidgetInfo,
+  WorkspaceTabId
+} from '@/lib/types'
 import {
   viewBuilderIdFromTab,
   viewBuilderTabId,
@@ -74,9 +81,9 @@ const Scratchpad = lazy(() =>
 // Tab label for a view: its configured title, or the file-name id as fallback.
 const viewLabel = (v: ViewInfo) => v.config.title || v.id
 
-const viewBuilderIcon = (builder: ViewBuilder) => resolveAppIcon(builder.icon) ?? IconArticle
+const viewBuilderIcon = (builder: ViewBuilderData) => resolveAppIcon(builder.icon) ?? IconArticle
 
-function viewIcon(view: ViewInfo, builders: ViewBuilder[]) {
+function viewIcon(view: ViewInfo, builders: ViewBuilderData[]) {
   const builder = builders.find(candidate => candidate.viewId === view.id)
   return resolveAppIcon(view.config.icon) ?? resolveAppIcon(builder?.icon) ?? IconArticle
 }
@@ -112,11 +119,12 @@ function WorkspaceCustomizeAction({ active, onToggle }: WorkspaceCustomizeAction
       <TooltipTrigger
         render={
           <Button
-            variant={active ? 'secondary' : 'ghost'}
+            variant="ghost"
             size="icon-sm"
             aria-label="Customize"
             aria-pressed={active}
             onClick={onToggle}
+            className={cn(active && 'bg-accent')}
           >
             <IconLetterCase stroke={1.75} />
           </Button>
@@ -130,7 +138,7 @@ function WorkspaceCustomizeAction({ active, onToggle }: WorkspaceCustomizeAction
 type WorkspaceScreenProps = {
   widgets: WidgetInfo[]
   views: ViewInfo[]
-  builders: ViewBuilder[]
+  builders: ViewBuilderData[]
 }
 
 type WidgetMode = 'idle' | 'editing' | 'customizing'
@@ -138,7 +146,7 @@ type WidgetMode = 'idle' | 'editing' | 'customizing'
 function tabItemFor(
   tab: WorkspaceTabId,
   views: ViewInfo[],
-  builders: ViewBuilder[],
+  builders: ViewBuilderData[],
   closable: boolean,
   agentRunning: boolean,
   builderRunning: (sessionId: string) => boolean
@@ -212,10 +220,15 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
   const [floatingChatOpen, setFloatingChatOpen] = useState(false)
   const [chatFocusRequest, setChatFocusRequest] = useState(0)
+  const builderRefs = useRef(new Map<string, ViewBuilderHandle>())
   const dockedChatWidth = useUiStore(state => state.dockedChatWidth)
   const setDockedChatWidth = useUiStore(state => state.setDockedChatWidth)
   const sessionActivity = useLive(state => state.activity)
   const hasRunningSession = hasRunningWorkspaceActivity(sessionActivity, workspaceId)
+  const builderDrafts = useViewBuilderDrafts({
+    builders,
+    onSave: (builderId, requirements) => builderActions.save(builderId, requirements)
+  })
 
   useWorkspaceTheme(layout.theme)
 
@@ -255,10 +268,13 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     selectSession,
     dismissError
   } = useChat({ activeTab, appletParams })
-  const { composerBanner, composerAvailability } = useWorkspaceComposerState(workspaceId, {
-    chatError: error,
-    onDismissChatError: dismissError
-  })
+  const { composerBanner, builderComposerBanner, composerAvailability } = useWorkspaceComposerState(
+    workspaceId,
+    {
+      chatError: error,
+      onDismissChatError: dismissError
+    }
+  )
 
   const openSet = new Set(tabsState.open)
 
@@ -289,6 +305,12 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const activeBuilder = activeBuilderId
     ? builders.find(builder => builder.id === activeBuilderId)
     : undefined
+  const activeDraftBuilder =
+    activeBuilder?.status === 'draft' &&
+    !isSessionRunning(sessionActivity, workspaceId, activeBuilder.sessionId)
+      ? activeBuilder
+      : undefined
+  const activeDraftBuilderId = activeDraftBuilder?.id
   const canAnnotate = canAnnotateWorkspaceContent(
     activeTab,
     widgetMode === 'idle',
@@ -357,6 +379,12 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     }
   }, [activeTab, mode])
 
+  useEffect(() => {
+    if (!activeDraftBuilderId) return
+    if (mode === 'fullscreen') setFloatingChatOpen(true)
+    setChatFocusRequest(request => request + 1)
+  }, [activeDraftBuilderId, mode])
+
   // Tab switching is navigation; the saved default and the open set follow via
   // the navigation hook. Only the chat side effects belong to the screen.
   const openTab = (tab: WorkspaceTabId, params?: Record<string, unknown>) => {
@@ -400,10 +428,14 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     // tabsStateRef) can't resurrect the closed tab.
     setTabs({ open, active })
     if (activeTab === tab) navigateToTab(nextTab)
-    if (builder?.status === 'draft') void builderActions.discard(builder.id)
+    if (builder?.status === 'draft') {
+      void builderRefs.current.get(builder.id)?.resetSketch()
+      builderDrafts.clear(builder.id)
+      void builderActions.discard(builder.id)
+    }
   }
 
-  const discardBuilder = (builder: ViewBuilder) => {
+  const discardBuilder = (builder: ViewBuilderData) => {
     const tab = viewBuilderTabId(builder.id)
     if (openSet.has(tab)) {
       let open = tabsState.open.filter(item => item !== tab)
@@ -411,6 +443,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       setTabs({ open, active: tabsState.active === tab ? open[0] : tabsState.active })
       if (activeTab === tab) navigateToTab(open[0])
     }
+    void builderRefs.current.get(builder.id)?.resetSketch()
+    builderDrafts.clear(builder.id)
     void builderActions.discard(builder.id)
   }
 
@@ -507,6 +541,25 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     }
   ]
 
+  const builderChatDraft = activeDraftBuilder
+    ? {
+        sessionId: activeDraftBuilder.sessionId,
+        builderId: activeDraftBuilder.id,
+        initialValue: activeDraftBuilder.input.requirements,
+        onChange: (value: string) => builderDrafts.change(activeDraftBuilder.id, value),
+        onRemoveDrawing: () => {
+          void builderRefs.current.get(activeDraftBuilder.id)?.resetSketch()
+        },
+        onSubmit: async (value: string) => {
+          const builderView = builderRefs.current.get(activeDraftBuilder.id)
+          await builderView?.prepareSketchForSend()
+          await builderActions.submit(activeDraftBuilder, value)
+          // Submit clears the sent attachment. Keep the canvas until the built view replaces it.
+          builderDrafts.clear(activeDraftBuilder.id)
+        }
+      }
+    : undefined
+
   // The docked split chat. Full-screen Agent uses the tabbed chat below.
   const dockedChat = (
     <ChatPanel
@@ -517,13 +570,14 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       previewTurn={previewTurn}
       sessionId={sessionId}
       processing={processing}
-      composerBanner={composerBanner}
+      composerBanner={builderChatDraft ? builderComposerBanner : composerBanner}
       composerAvailability={composerAvailability}
       send={send}
       stop={stop}
       onSelectSession={selectSession}
       onClose={() => setMode('fullscreen')}
       annotation={annotation.docked}
+      builderDraft={builderChatDraft}
       docked
     />
   )
@@ -547,7 +601,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const workspacePanel = (
     <div
       className={cn(
-        'flex h-full min-h-0 min-w-0 flex-1 flex-col-reverse overflow-hidden bg-background shadow-xs transition-[border-radius]',
+        'flex h-full min-h-0 min-w-0 flex-1 flex-col-reverse overflow-hidden bg-background shadow-md transition-[border-radius]',
         mode === 'split' && 'rounded-xl'
       )}
     >
@@ -574,23 +628,32 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
             <Suspense fallback={null}>
               <Scratchpad />
             </Suspense>
-          ) : activeBuilder ? (
-            <ViewBuilderTab
-              key={activeBuilder.id}
-              builder={activeBuilder}
-              composerAvailability={composerAvailability}
-              onSave={requirements => builderActions.save(activeBuilder.id, requirements)}
-              onSubmit={requirements => {
-                if (mode === 'fullscreen') setFloatingChatOpen(true)
-                return builderActions.submit(activeBuilder, requirements)
-              }}
-              onOpenChat={() => {
-                selectSession(activeBuilder.sessionId)
-                openChat()
-              }}
-              onDiscard={() => discardBuilder(activeBuilder)}
-            />
           ) : null}
+
+          {builders
+            .filter(builder => builder.status !== 'ready')
+            .map(builder => (
+              <ViewBuilder
+                key={builder.id}
+                ref={handle => {
+                  if (handle) builderRefs.current.set(builder.id, handle)
+                  else builderRefs.current.delete(builder.id)
+                }}
+                active={activeBuilder?.id === builder.id}
+                builder={builder}
+                chatDocked={mode === 'split'}
+                workspaceId={workspaceId}
+                onEditingStart={() => {
+                  if (mode === 'fullscreen') setFloatingChatOpen(false)
+                }}
+                onContinueInChat={openChat}
+                onOpenChat={() => {
+                  selectSession(builder.sessionId)
+                  openChat()
+                }}
+                onDiscard={() => discardBuilder(builder)}
+              />
+            ))}
 
           {/* Views are not part of the chain above: ViewManager keeps them
                 mounted across tab switches (and collapses to nothing while
@@ -599,9 +662,14 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
           <ViewManager views={views} activeViewId={activeView?.id ?? null} params={appletParams} />
         </div>
 
-        <AnnotationLayer {...annotation.layerProps}>
-          <AnnotationToolbar controls={annotation.controls} />
-        </AnnotationLayer>
+        <DrawingLayer {...annotation.layerProps}>
+          <DrawingToolbar
+            controls={annotation.controls}
+            title="Draw annotation"
+            busy={annotation.controls.finishing}
+            onComplete={() => void annotation.controls.finish()}
+          />
+        </DrawingLayer>
       </div>
 
       <PanelHeader>
@@ -679,13 +747,14 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               previewTurn={previewTurn}
               sessionId={sessionId}
               processing={processing}
-              composerBanner={composerBanner}
+              composerBanner={builderChatDraft ? builderComposerBanner : composerBanner}
               composerAvailability={composerAvailability}
               send={send}
               stop={stop}
               onSelectSession={selectSession}
               onClose={onClose}
               annotation={annotation.popup}
+              builderDraft={builderChatDraft}
             />
           )}
         </ChatPopup>
