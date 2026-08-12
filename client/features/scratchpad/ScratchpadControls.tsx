@@ -126,6 +126,8 @@ function applyToolLocks(editor: Editor, toolId: string) {
 // Custom vertical tool bar, rendered as an overlay over the canvas (outside
 // tldraw's own UI layout). Tracks the current tool and applies the pencil cursor
 // to tldraw's own container so both affordances change together.
+const pencilCursorClass = '[&_.tl-canvas]:cursor-pencil'
+
 export function ScratchToolbar({ editor }: ScratchToolbarProps) {
   const [toolId, setToolId] = useState(() => editor.getCurrentToolId())
 
@@ -134,13 +136,13 @@ export function ScratchToolbar({ editor }: ScratchToolbarProps) {
     const updateTool = () => {
       const currentToolId = editor.getCurrentToolId()
       setToolId(currentToolId)
-      container.classList.toggle('scratchpad-pencil', currentToolId === 'draw')
+      container.classList.toggle(pencilCursorClass, currentToolId === 'draw')
     }
     updateTool()
     const stopTracking = react('scratch current tool', updateTool)
     return () => {
       stopTracking()
-      container.classList.remove('scratchpad-pencil')
+      container.classList.remove(pencilCursorClass)
     }
   }, [editor])
 
