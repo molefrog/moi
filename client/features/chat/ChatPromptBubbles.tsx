@@ -36,7 +36,7 @@ export function ChatPromptBubble({
         className
       )}
     >
-      <Icon stroke={2} aria-hidden className="mt-0.5 text-muted-foreground" />
+      <Icon stroke={2} aria-hidden className="mt-0.5" />
       <span>{prompt.label}</span>
     </Button>
   )

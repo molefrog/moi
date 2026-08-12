@@ -162,7 +162,7 @@ function ViewBuilderDraftState({ chatDocked, sketch }: ViewBuilderDraftStateProp
         <div
           className={cn(
             'mb-4 flex h-full flex-col items-center justify-center gap-2 p-12 text-center text-sm text-muted-foreground',
-            'bg-radial from-background from-20% to-transparent to-75%',
+            'bg-radial from-background from-10% to-transparent',
             chatDocked ? 'w-full' : 'mr-auto w-[calc(100%-var(--chat-max))]'
           )}
         >

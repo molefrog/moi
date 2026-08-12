@@ -89,7 +89,7 @@
 
 @utility texture-checker {
   background-image: repeating-conic-gradient(
-    var(--background) 0 25%,
+    transparent 0 25%,
     color-mix(in oklch, var(--primary) 2%, var(--foreground) 4%) 0 50%
   );
   background-position: 50% 50%;
@@ -99,7 +99,7 @@
 
 @utility texture-checker-* {
   background-image: repeating-conic-gradient(
-    var(--background) 0 25%,
+    transparent 0 25%,
     color-mix(in oklch, var(--primary) 2%, var(--foreground) 4%) 0 50%
   );
   background-position: 50% 50%;
