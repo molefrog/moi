@@ -13,6 +13,8 @@ import type {
   RefObject
 } from 'react'
 
+import { toast } from '@/client/components/ui/toast'
+
 import type { DrawingCanvasPointerProps, DrawingLayerProps } from './DrawingLayer'
 import { captureElement, drawingCaptureScale } from './capture-element'
 
@@ -191,7 +193,10 @@ function drawPath(
   context.lineWidth = width
   context.strokeStyle = color
   context.moveTo(first.x, first.y)
-  for (const point of stroke.points.slice(1)) context.lineTo(point.x, point.y)
+  for (let index = 1; index < stroke.points.length; index++) {
+    const point = stroke.points[index]
+    context.lineTo(point.x, point.y)
+  }
   if (stroke.points.length === 1) context.lineTo(first.x + 0.01, first.y + 0.01)
   context.stroke()
 }
@@ -306,6 +311,7 @@ export function useDrawingLayer({
   const historyVersionRef = useRef(0)
   const draftRef = useRef<DrawingStroke | null>(null)
   const pointerIdRef = useRef<number | null>(null)
+  const frameRef = useRef(0)
   const lifecycleRevisionRef = useRef(0)
   const latestExportRef = useRef<DrawingExport | null>(null)
   const pendingExportRef = useRef<PendingDrawingExport | null>(null)
@@ -351,10 +357,25 @@ export function useDrawingLayer({
   const getHistoryState = useCallback(() => historyStateRef.current, [])
 
   const redraw = useCallback((strokes: DrawingStroke[], draft: DrawingStroke | null = null) => {
+    if (frameRef.current) {
+      cancelAnimationFrame(frameRef.current)
+      frameRef.current = 0
+    }
     const canvas = canvasRef.current
     const current = sessionRef.current
     if (canvas && current) renderDrawingLayer(canvas, current, strokes, draft)
   }, [])
+
+  // Pointer moves arrive faster than frames paint. Batching their redraws to
+  // one per frame keeps the cost of a move at "append points", so the surface
+  // stays smooth as strokes accumulate.
+  const scheduleRedraw = useCallback(() => {
+    if (frameRef.current) return
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = 0
+      redraw(historyRef.current.present, draftRef.current)
+    })
+  }, [redraw])
 
   const exportCommitted = useCallback(
     (
@@ -395,7 +416,18 @@ export function useDrawingLayer({
           onChangeRef.current?.(blob)
           return blob
         })
-        .catch(() => latestExportRef.current?.blob ?? null)
+        .catch(() => {
+          // Never fall back to an earlier export: a stale image that doesn't
+          // match the canvas is worse than no image. Surface the failure only
+          // if this export is still the current one.
+          if (
+            sessionRef.current?.id === current.id &&
+            historyVersionRef.current === historyVersion
+          ) {
+            toast.add({ title: 'Couldn’t export the drawing', type: 'error' })
+          }
+          return null
+        })
         .finally(() => {
           if (pendingExportRef.current?.promise === promise) pendingExportRef.current = null
         })
@@ -594,22 +626,17 @@ export function useDrawingLayer({
       },
       onPointerMove: (event: ReactPointerEvent<HTMLCanvasElement>) => {
         if (event.pointerId !== pointerIdRef.current || !draftRef.current) return
-        draftRef.current = {
-          points: [
-            ...draftRef.current.points,
-            ...coalescedPointsOnCanvas(event.currentTarget, event.nativeEvent)
-          ]
-        }
-        redraw(historyRef.current.present, draftRef.current)
+        // Appended in place: rebuilding the array here made a long stroke
+        // quadratic in its own point count.
+        draftRef.current.points.push(
+          ...coalescedPointsOnCanvas(event.currentTarget, event.nativeEvent)
+        )
+        scheduleRedraw()
       },
       onPointerUp: (event: ReactPointerEvent<HTMLCanvasElement>) => {
         if (event.pointerId !== pointerIdRef.current || !draftRef.current) return
-        const stroke = {
-          points: [
-            ...draftRef.current.points,
-            ...coalescedPointsOnCanvas(event.currentTarget, event.nativeEvent)
-          ]
-        }
+        const stroke = draftRef.current
+        stroke.points.push(...coalescedPointsOnCanvas(event.currentTarget, event.nativeEvent))
         draftRef.current = null
         pointerIdRef.current = null
         if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -621,7 +648,7 @@ export function useDrawingLayer({
         if (event.pointerId === pointerIdRef.current) cancelStroke()
       }
     }),
-    [apply, beginEditing, cancelStroke, installSession, mode, redraw]
+    [apply, beginEditing, cancelStroke, installSession, mode, redraw, scheduleRedraw]
   )
 
   const onKeyDown = useCallback(
@@ -673,6 +700,7 @@ export function useDrawingLayer({
       lifecycleRevisionRef.current += 1
       editingRef.current = false
       sessionRef.current = null
+      if (frameRef.current) cancelAnimationFrame(frameRef.current)
     },
     []
   )
