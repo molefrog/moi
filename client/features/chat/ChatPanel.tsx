@@ -19,7 +19,6 @@ import type { SystemNotice, Turn, ViewState } from '@/lib/types'
 import type { ComposerBanner } from './composer/banners/ComposerBanner'
 import { ChatComposer, type ComposerAnnotationControls } from './composer/ChatComposer'
 import { ChatEmptyState, resolveChatEmptyState } from './ChatEmptyState'
-import { ChatHeaderLabel } from './ChatHeaderLabel'
 import { ChatSelector } from './ChatSelector'
 import { ThinkingIndicator, TurnView } from './TurnView'
 import { Button } from '@/client/components/ui/button'
@@ -58,7 +57,6 @@ type ChatPanelProps = {
   annotation?: ComposerAnnotationControls
   send: (text: string, options?: ChatSendOptions) => void
   stop: () => void
-  onSelectSession: (sessionId: string | null) => void
   // Chat on a separate tab doesn't have a close button
   onClose?: () => void
   builderDraft?: ViewBuilderChatDraft
@@ -81,7 +79,6 @@ export function ChatPanel({
   annotation,
   send,
   stop,
-  onSelectSession,
   onClose,
   builderDraft
 }: ChatPanelProps) {
@@ -162,11 +159,7 @@ export function ChatPanel({
   return (
     <div className="flex min-h-0 flex-1 flex-col pt-2 pb-3">
       <header className="mx-auto flex w-full max-w-[calc(var(--chat-max-container)+40px)] items-center justify-between pr-2 pb-2 pl-2">
-        {builderDraft ? (
-          <ChatHeaderLabel>Build a new view</ChatHeaderLabel>
-        ) : (
-          <ChatSelector selectedSessionId={sessionId ?? null} onSelectSession={onSelectSession} />
-        )}
+        <ChatSelector isViewBuilder={!!builderDraft} />
         {onClose && docked && (
           <Tooltip>
             <TooltipTrigger

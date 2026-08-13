@@ -574,7 +574,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       composerAvailability={composerAvailability}
       send={send}
       stop={stop}
-      onSelectSession={selectSession}
       onClose={() => setMode('fullscreen')}
       annotation={annotation.docked}
       builderDraft={builderChatDraft}
@@ -595,7 +594,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       composerAvailability={composerAvailability}
       send={send}
       stop={stop}
-      onSelectSession={selectSession}
     />
   )
   const workspacePanel = (
@@ -751,7 +749,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               composerAvailability={composerAvailability}
               send={send}
               stop={stop}
-              onSelectSession={selectSession}
               onClose={onClose}
               annotation={annotation.popup}
               builderDraft={builderChatDraft}
