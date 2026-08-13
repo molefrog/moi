@@ -338,6 +338,9 @@ After the final successful bundle and any checks, always make tab focus the fina
 - After building or editing a view, run `moi tab focus view:<view-id>`, using its file name or claimed
   builder id.
 
+The focused applet is the handoff. Keep the final reply brief and user-facing. Do not include file
+or storage links, file paths, or bundle, test, and runtime-log summaries.
+
 # Debugging applets
 
 `moi bundle` only proves an applet compiles — it can still fail to load in the browser, crash on
@@ -406,4 +409,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.13.0" />
+<moi-skill version="0.14.0" />
