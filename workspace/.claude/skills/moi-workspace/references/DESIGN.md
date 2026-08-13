@@ -95,6 +95,18 @@ Align page-level content to shared edges or grid columns. Apply outer padding on
 layout grid, then use gaps to group unboxed content. When removing a surface, remove its card-like
 padding and radius and realign its children; do not leave spacing that implies an invisible card.
 
+### Stacking and overlays
+
+Rely on DOM order for normal stacking: place an element later in the markup when it should appear
+above an earlier sibling. Avoid z-index utilities for ordinary layout. For dialogs, menus,
+popovers, and tooltips that must escape a local stacking context or clipping ancestor, portal into
+the closest `[data-applet]` root so the overlay stays inside the applet and keeps its scoped styles
+and theme tokens. Do not portal applet UI to `document.body`.
+
+Add z-index only when DOM order and a scoped portal cannot provide the required stacking. Keep it
+local and minimal. Several z-index layers or escalating values mean the layout structure should be
+reconsidered.
+
 ### Textures
 
 Texture is optional. Choose the root treatment after the content layout is clear, and use no more
