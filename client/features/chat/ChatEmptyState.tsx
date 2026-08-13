@@ -4,6 +4,7 @@ import {
   IconFileSearch,
   IconGhost,
   IconLayout2,
+  IconMessages,
   IconPiano,
   IconSketching,
   IconTableSpark,
@@ -16,6 +17,7 @@ import {
   ChatPromptBubbles,
   type ChatPromptBubble as ChatPrompt
 } from '@/client/features/chat/ChatPromptBubbles'
+import { IconGhost as AnimatedGhostIcon } from '@/client/components/shared/IconGhost'
 import { cn } from '@/client/lib/cn'
 
 const ONBOARDING_HANDOFF_DIRECTIVE =
@@ -179,8 +181,9 @@ export function ChatWorkspaceWelcome({ disabled = false, onSelectPrompt }: Welco
 
 function EmptyState() {
   return (
-    <div className={cn(EMPTY_STATE_STYLES, 'gap-1 text-center')}>
-      <p className="mx-auto max-w-sm px-8 text-sm text-muted-foreground">
+    <div className={cn(EMPTY_STATE_STYLES, 'gap-2 text-center text-muted-foreground')}>
+      <IconMessages size={56} stroke={0.5} aria-hidden />
+      <p className="mx-auto max-w-sm px-8 text-sm">
         Chat with your agent, create widgets and views, and manage your workspace context from here
       </p>
     </div>
