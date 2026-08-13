@@ -12,7 +12,6 @@ import {
 } from '@tabler/icons-react'
 
 import { IconGhost } from '@/client/components/shared/IconGhost'
-import { canAnnotateWorkspaceContent } from '@/client/features/drawings/annotation-availability'
 import { DrawingLayer } from '@/client/features/drawings/DrawingLayer'
 import { DrawingToolbar } from '@/client/features/drawings/DrawingToolbar'
 import { useChatAnnotation } from '@/client/features/drawings/useChatAnnotation'
@@ -311,11 +310,9 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       ? activeBuilder
       : undefined
   const activeDraftBuilderId = activeDraftBuilder?.id
-  const canAnnotate = canAnnotateWorkspaceContent(
-    activeTab,
-    widgetMode === 'idle',
-    activeView !== undefined
-  )
+  const canAnnotate =
+    widgetMode === 'idle' &&
+    ((activeTab === 'widgets' && widgets.length > 0) || activeView !== undefined)
   const annotation = useChatAnnotation({
     workspaceId,
     sessionId,
