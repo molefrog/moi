@@ -40,6 +40,20 @@ export function getAppletPaths(workspacePath: string, kind: AppletKind): AppletP
   return { moiRoot, sourceDir, buildDir, manifestPath }
 }
 
+export function getAppletRevision(
+  workspacePath: string,
+  kind: AppletKind,
+  id: string
+): string | undefined {
+  try {
+    const { buildDir } = getAppletPaths(workspacePath, kind)
+    const stat = statSync(join(buildDir, id, 'index.js'))
+    return `${stat.size}-${Math.trunc(stat.mtimeMs)}`
+  } catch {
+    return undefined
+  }
+}
+
 // Source module names in a kind's directory: `*.tsx`/`*.ts` minus `.server.ts`
 // and minus `_`-prefixed files (`_utils.tsx`) — those are shared modules for
 // entries to import, never entry points themselves.

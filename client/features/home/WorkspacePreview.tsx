@@ -85,7 +85,7 @@ function useFolderRadiusScale() {
   return { ref, horizontalRadiusScale }
 }
 
-// Bottom-to-top placement for up to three widget screenshots. Each card peeks
+// Bottom-to-top placement for up to three applet thumbnails. Each card peeks
 // out of the folder at a slightly different angle and lifts on card hover.
 const STACK = [
   cn(

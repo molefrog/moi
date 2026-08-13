@@ -36,7 +36,7 @@ export function WidgetFrame({ editing, hidden, onRemove, children }: WidgetFrame
       className="group/widget relative size-full"
     >
       <div
-        // Stable hook for widget snapshots: the capture clone overrides this
+        // Stable hook for widget thumbnails: the capture clone overrides this
         // element's chrome (radius/shadow/stroke) so thumbnails come out square.
         data-widget-chrome
         style={getWorkspaceThemeStyle(theme, 'widget')}

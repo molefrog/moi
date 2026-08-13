@@ -3,7 +3,14 @@ import { existsSync } from 'node:fs'
 import type { ViewConfig, ViewInfo } from '@/lib/types'
 
 import { syncAppletLogAfterBuild } from './applet-log'
-import { buildApplets, getAppletPaths, listBuilt, scanSources, serveApplet } from './applets'
+import {
+  buildApplets,
+  getAppletPaths,
+  getAppletRevision,
+  listBuilt,
+  scanSources,
+  serveApplet
+} from './applets'
 import { reloadModules } from './functions'
 import { markViewBuilderReady } from './view-builders'
 
@@ -106,8 +113,10 @@ export async function getViewList(workspacePath: string): Promise<ViewInfo[]> {
     const raw = manifest.config[id] ?? {}
     const icon = typeof raw.icon === 'string' && raw.icon ? raw.icon : undefined
     const requiredEnv = Array.isArray(raw.requiredEnv) ? raw.requiredEnv : undefined
+    const revision = getAppletRevision(workspacePath, 'view', id)
     return {
       id,
+      ...(revision ? { revision } : {}),
       config: {
         title: raw.title || id,
         ...(icon ? { icon } : {}),

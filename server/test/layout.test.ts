@@ -3,9 +3,15 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-import type { WorkspaceLayout } from '@/lib/types'
+import type { AppletKind, AppletThumbnail, WorkspaceLayout } from '@/lib/types'
 
-import { getLayoutPath, getWorkspacePreview, loadLayout, mergeLayoutForSave } from '../layout'
+import {
+  getLayoutPath,
+  getWorkspacePreview,
+  loadLayout,
+  mergeLayoutForSave,
+  saveAppletThumbnails
+} from '../layout'
 
 // The grid editor and `moi config` write the same `.workspace.json`. A layout
 // PUT is authoritative for the editor fields but must NOT touch identity
@@ -17,6 +23,22 @@ const base: WorkspaceLayout = {
   widgetGrid: [],
   layoutMode: 'fullscreen',
   tabs: { open: ['agent', 'widgets'], active: 'agent' }
+}
+
+function thumbnail(
+  kind: AppletKind,
+  id: string,
+  image: string,
+  viewedAt = '2026-01-01T00:00:00.000Z'
+): AppletThumbnail {
+  return {
+    kind,
+    id,
+    revision: 'revision',
+    capturedAt: '2026-01-01T00:00:00.000Z',
+    viewedAt,
+    image
+  }
 }
 
 async function withWorkspaceFile<T>(
@@ -120,6 +142,22 @@ describe('loadLayout', () => {
       }
     )
   })
+
+  test('drops legacy thumbnail caches without migrating them', async () => {
+    await withWorkspaceFile(
+      {
+        ...base,
+        widgetThumbnails: { key: 'old', images: { widget: 'image' } },
+        viewThumbnails: [{ viewId: 'view', image: 'image' }]
+      },
+      async dir => {
+        const loaded = await loadLayout(dir)
+        expect('widgetThumbnails' in loaded).toBe(false)
+        expect('viewThumbnails' in loaded).toBe(false)
+        expect(loaded.appletThumbnails).toBeUndefined()
+      }
+    )
+  })
 })
 
 describe('mergeLayoutForSave', () => {
@@ -177,6 +215,77 @@ describe('mergeLayoutForSave', () => {
     expect(merged.theme).toEqual({ font: 'sans', color: 'rose', radius: 'square' })
     expect(merged.name).toBe('Keep')
   })
+
+  test('preserves applet thumbnails outside the normal layout write', () => {
+    const existing: WorkspaceLayout = {
+      ...base,
+      appletThumbnails: [thumbnail('widget', 'w', 'widget-image')]
+    }
+    const body = {
+      ...base,
+      appletThumbnails: [thumbnail('view', 'stale', 'stale-image')]
+    }
+    const merged = mergeLayoutForSave(existing, body)
+    expect(merged.appletThumbnails).toEqual(existing.appletThumbnails)
+  })
+})
+
+describe('applet thumbnail persistence', () => {
+  test('stores every widget and view record through one merge path', async () => {
+    await withWorkspaceFile(base, async dir => {
+      await saveAppletThumbnails(dir, 'widget', [
+        { id: 'one', revision: 'w1', image: 'one-image' },
+        { id: 'two', revision: 'w2', image: 'two-image' },
+        { id: 'three', revision: 'w3', image: 'three-image' },
+        { id: 'four', revision: 'w4', image: 'four-image' }
+      ])
+      await saveAppletThumbnails(dir, 'view', [
+        { id: 'dashboard', revision: 'v1', image: 'view-image' }
+      ])
+
+      const records = (await loadLayout(dir)).appletThumbnails ?? []
+      expect(records).toHaveLength(5)
+      expect(records.map(record => `${record.kind}:${record.id}`)).toEqual([
+        'widget:one',
+        'widget:two',
+        'widget:three',
+        'widget:four',
+        'view:dashboard'
+      ])
+    })
+  })
+
+  test('replaces captures, preserves images on failure, and only touches fresh visits', async () => {
+    await withWorkspaceFile(
+      {
+        ...base,
+        appletThumbnails: [thumbnail('view', 'dashboard', 'old-image')]
+      },
+      async dir => {
+        await saveAppletThumbnails(dir, 'view', [
+          { id: 'dashboard', revision: 'new-revision', image: 'new-image' }
+        ])
+        const captured = (await loadLayout(dir)).appletThumbnails?.[0]
+        expect(captured?.revision).toBe('new-revision')
+        expect(captured?.image).toBe('new-image')
+        expect(captured?.capturedAt).not.toBe('2026-01-01T00:00:00.000Z')
+
+        const capturedAt = captured?.capturedAt
+        await saveAppletThumbnails(dir, 'view', [{ id: 'dashboard', revision: 'ignored-on-touch' }])
+        const touched = (await loadLayout(dir)).appletThumbnails?.[0]
+        expect(touched?.revision).toBe('new-revision')
+        expect(touched?.capturedAt).toBe(capturedAt)
+        expect(touched?.image).toBe('new-image')
+
+        await saveAppletThumbnails(dir, 'view', [
+          { id: 'dashboard', revision: 'failed-revision', image: null }
+        ])
+        const failed = (await loadLayout(dir)).appletThumbnails?.[0]
+        expect(failed?.revision).toBe('failed-revision')
+        expect(failed?.image).toBe('new-image')
+      }
+    )
+  })
 })
 
 describe('getWorkspacePreview', () => {
@@ -210,19 +319,55 @@ describe('getWorkspacePreview', () => {
           { i: 'right', x: 2, y: 0 },
           { i: 'left', x: 0, y: 0 }
         ],
-        widgetThumbnails: {
-          images: {
-            stale: 'stale-image',
-            right: 'right-image',
-            bottom: 'bottom-image',
-            fourth: 'fourth-image',
-            left: 'left-image'
-          }
-        }
+        appletThumbnails: [
+          thumbnail('widget', 'stale', 'stale-image'),
+          thumbnail('widget', 'right', 'right-image'),
+          thumbnail('widget', 'bottom', 'bottom-image'),
+          thumbnail('widget', 'fourth', 'fourth-image'),
+          thumbnail('widget', 'left', 'left-image')
+        ]
       },
       async dir => {
         expect(await getWorkspacePreview(dir)).toEqual({
           thumbnails: ['left-image', 'right-image', 'bottom-image']
+        })
+      }
+    )
+  })
+
+  test('puts widgets first and fills remaining slots with recent views', async () => {
+    await withWorkspaceFile(
+      {
+        ...base,
+        widgetGrid: [{ i: 'widget', x: 0, y: 0 }],
+        appletThumbnails: [
+          thumbnail('widget', 'widget', 'widget-image'),
+          thumbnail('view', 'deleted', 'deleted-view', '2026-01-04T00:00:00.000Z'),
+          thumbnail('view', 'recent', 'recent-view', '2026-01-03T00:00:00.000Z'),
+          thumbnail('view', 'older', 'older-view', '2026-01-02T00:00:00.000Z')
+        ]
+      },
+      async dir => {
+        expect(await getWorkspacePreview(dir, undefined, ['older', 'recent'])).toEqual({
+          thumbnails: ['widget-image', 'recent-view', 'older-view']
+        })
+      }
+    )
+  })
+
+  test('uses widgets when stored view thumbnails belong to deleted views', async () => {
+    await withWorkspaceFile(
+      {
+        ...base,
+        widgetGrid: [{ i: 'widget', x: 0, y: 0 }],
+        appletThumbnails: [
+          thumbnail('widget', 'widget', 'widget-image'),
+          thumbnail('view', 'deleted', 'deleted')
+        ]
+      },
+      async dir => {
+        expect(await getWorkspacePreview(dir, undefined, [])).toEqual({
+          thumbnails: ['widget-image']
         })
       }
     )
@@ -244,7 +389,7 @@ describe('getWorkspacePreview', () => {
     })
   })
 
-  test('loads the message fallback when widgets exist without screenshots', async () => {
+  test('loads the message fallback when widgets exist without thumbnails', async () => {
     await withWorkspaceFile(
       {
         ...base,
@@ -268,12 +413,12 @@ describe('getWorkspacePreview', () => {
     )
   })
 
-  test('does not load the message fallback when screenshots exist', async () => {
+  test('does not load the message fallback when thumbnails exist', async () => {
     await withWorkspaceFile(
       {
         ...base,
         widgetGrid: [{ i: 'captured', x: 0, y: 0 }],
-        widgetThumbnails: { images: { captured: 'captured-image' } }
+        appletThumbnails: [thumbnail('widget', 'captured', 'captured-image')]
       },
       async dir => {
         const preview = await getWorkspacePreview(dir, async includeFirstUserMessage => {

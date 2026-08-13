@@ -39,7 +39,11 @@ function seed(jsNames: string[], manifest: object) {
 }
 
 async function views(): Promise<
-  { id: string; config: { title?: string; icon?: string; requiredEnv?: string[] } }[]
+  {
+    id: string
+    revision?: string
+    config: { title?: string; icon?: string; requiredEnv?: string[] }
+  }[]
 > {
   const res = await listViews(WS)
   return (await res.json()).views
@@ -77,9 +81,16 @@ describe('listViews', () => {
       order: ['tasks', 'crm']
     })
     expect(await views()).toEqual([
-      { id: 'tasks', config: { title: 'tasks' } },
-      { id: 'crm', config: { title: 'CRM' } }
+      { id: 'tasks', revision: expect.any(String), config: { title: 'tasks' } },
+      { id: 'crm', revision: expect.any(String), config: { title: 'CRM' } }
     ])
+  })
+
+  test('updates the bundle revision when the built entry changes', async () => {
+    seed(['crm'], { config: { crm: {} }, order: ['crm'] })
+    const before = (await views())[0].revision
+    writeFileSync(join(buildDir(), 'crm', 'index.js'), '// crm changed and longer')
+    expect((await views())[0].revision).not.toBe(before)
   })
 
   test('passes through requiredEnv', async () => {

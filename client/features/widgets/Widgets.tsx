@@ -1,9 +1,10 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 
 import { IconPlus } from '@tabler/icons-react'
 
+import { useAppletThumbnails } from '@/client/features/applets/applet-thumbnail'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { findFreePosition } from '@/client/features/widgets/grid'
 import type { GridItem } from '@/client/features/widgets/grid'
@@ -15,7 +16,6 @@ import type { WidgetInfo } from '@/lib/types'
 
 import { HiddenPanel } from './HiddenPanel'
 import { WidgetGrid, WidgetGridLayout } from './WidgetGrid'
-import { useWidgetThumbnails } from './useWidgetThumbnails'
 
 function renderItem(id: string) {
   return <WidgetShell name={id} />
@@ -166,12 +166,13 @@ export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: W
   const [panelRef, panelHeight] = usePanelHeight()
   const panelOpen = editing && hiddenItems.length > 0
 
-  const containerRef = useRef<HTMLDivElement>(null)
-  useWidgetThumbnails({
-    containerRef,
-    widgets,
-    visibleIds: visibleItems.map(item => item.id),
-    editing
+  useAppletThumbnails({
+    kind: 'widget',
+    enabled: !editing,
+    targets: visibleItems.map(item => ({
+      id: item.id,
+      revision: widgets.find(widget => widget.id === item.id)?.revision
+    }))
   })
 
   function hide(id: string) {
@@ -193,7 +194,7 @@ export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: W
     // Shared working area below the header and positioning context for the
     // bottom panel. Created-widget states scroll; the initial empty state clips
     // its fixed-height skeleton grid.
-    <div ref={containerRef} className="group/widgets relative min-h-0 flex-1">
+    <div className="group/widgets relative min-h-0 flex-1">
       <LayoutGroup>
         <div
           className={cn(

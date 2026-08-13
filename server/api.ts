@@ -6,6 +6,7 @@ import { basename, join, resolve } from 'node:path'
 
 import type {
   AppletKind,
+  AppletThumbnailBatch,
   AppSettings,
   HarnessAvailability,
   SessionInfo,
@@ -30,8 +31,8 @@ import {
   getWorkspacePreview,
   loadLayout,
   mergeLayoutForSave,
-  saveLayout,
-  saveWidgetThumbnails
+  saveAppletThumbnails,
+  saveLayout
 } from './layout'
 import { getClientFrameLog, getWireLog } from './harness/debug'
 import { allHarnesses, harnessFor, isHarnessType } from './harness/registry'
@@ -150,9 +151,12 @@ one.use('*', withWorkspace)
 
 one.get('/preview', async c => {
   const ws = c.get('ws')
+  const views = await getViewList(ws.path)
   return c.json(
-    await getWorkspacePreview(ws.path, includeFirstUserMessage =>
-      harnessFor(ws).workspacePreview(ws, includeFirstUserMessage)
+    await getWorkspacePreview(
+      ws.path,
+      includeFirstUserMessage => harnessFor(ws).workspacePreview(ws, includeFirstUserMessage),
+      views.map(view => view.id)
     )
   )
 })
@@ -827,15 +831,13 @@ one.delete('/icon', async c => {
 // DELETE unregisters.
 one.get('/', async c => {
   const ws = c.get('ws')
-  // The thumbnail images are heavy (base64 WebPs) and have their own write
-  // path (PUT .../thumbnails); the layout ships `widgetThumbnails` without
-  // them — just `key`/`at`, which clients compare against the live grid to
-  // decide when to re-capture.
-  const { widgetThumbnails, ...layout } = await loadLayout(ws.path)
+  // The client needs thumbnail freshness metadata, while image bytes only
+  // travel through the preview endpoint.
+  const layout = await loadLayout(ws.path)
   return c.json({
     ...layout,
-    ...(widgetThumbnails && {
-      widgetThumbnails: { key: widgetThumbnails.key, at: widgetThumbnails.at }
+    ...(layout.appletThumbnails && {
+      appletThumbnails: layout.appletThumbnails.map(({ image: _image, ...thumbnail }) => thumbnail)
     }),
     // Resolved display name: the settings override, or the folder name.
     name: layout.name || basename(ws.path),
@@ -845,21 +847,27 @@ one.get('/', async c => {
   })
 })
 
-// Widget thumbnails: a separate write path from the layout PUT below, so grid
-// and theme saves never round-trip the base64 map (and this save can't touch
-// the grid). Still lands in `.workspace.json` under the hood. Entries merge
-// over the stored map; `key` fingerprints the grid state they were captured
-// from (see widgetThumbnailsKey() on the client).
-one.put('/thumbnails', async c => {
+// Settled widget and view visits share one batch endpoint and storage path.
+one.put('/applet-thumbnails', async c => {
   const body: unknown = await c.req.json().catch(() => null)
-  if (!body || typeof body !== 'object') return c.text('Bad request', 400)
-  const { key, thumbnails } = body as { key?: unknown; thumbnails?: unknown }
-  const validMap =
-    thumbnails !== null &&
-    typeof thumbnails === 'object' &&
-    Object.values(thumbnails as Record<string, unknown>).every(v => typeof v === 'string')
-  if (typeof key !== 'string' || !validMap) return c.text('Bad request', 400)
-  await saveWidgetThumbnails(c.get('ws').path, key, thumbnails as Record<string, string>)
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return c.text('Bad request', 400)
+  const input = body as AppletThumbnailBatch
+  const valid =
+    (input.kind === 'widget' || input.kind === 'view') &&
+    Array.isArray(input.thumbnails) &&
+    input.thumbnails.every(
+      thumbnail =>
+        thumbnail &&
+        typeof thumbnail === 'object' &&
+        !Array.isArray(thumbnail) &&
+        typeof thumbnail.id === 'string' &&
+        typeof thumbnail.revision === 'string' &&
+        (thumbnail.image === undefined ||
+          thumbnail.image === null ||
+          typeof thumbnail.image === 'string')
+    )
+  if (!valid) return c.text('Bad request', 400)
+  await saveAppletThumbnails(c.get('ws').path, input.kind, input.thumbnails)
   return c.body(null, 204)
 })
 
