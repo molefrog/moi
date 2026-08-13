@@ -158,7 +158,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
           alt=""
           loading="lazy"
           className={cn(
-            'absolute top-[12%] left-[14%] aspect-4/3 w-[72%] rounded-lg object-cover object-top shadow-xs',
+            'absolute top-[12%] left-[14%] h-auto max-h-[72%] w-auto max-w-[72%] rounded-[calc(var(--radius-2xl)*0.4)] object-contain shadow-xs [corner-shape:superellipse(1.2)]',
             'animate-in transition-transform duration-300 ease-out fade-in',
             slots[index]
           )}
