@@ -19,6 +19,7 @@ import type { SystemNotice, Turn, ViewState } from '@/lib/types'
 import type { ComposerBanner } from './composer/banners/ComposerBanner'
 import { ChatComposer, type ComposerAnnotationControls } from './composer/ChatComposer'
 import { ChatEmptyState, resolveChatEmptyState } from './ChatEmptyState'
+import { ChatHeaderLabel } from './ChatHeaderLabel'
 import { ChatSelector } from './ChatSelector'
 import { ThinkingIndicator, TurnView } from './TurnView'
 import { Button } from '@/client/components/ui/button'
@@ -162,7 +163,7 @@ export function ChatPanel({
     <div className="flex min-h-0 flex-1 flex-col pt-2 pb-3">
       <header className="mx-auto flex w-full max-w-[calc(var(--chat-max-container)+40px)] items-center justify-between pr-2 pb-2 pl-2">
         {builderDraft ? (
-          <div className="flex h-7 items-center px-2.5 text-sm font-medium">Build a new view</div>
+          <ChatHeaderLabel>Build a new view</ChatHeaderLabel>
         ) : (
           <ChatSelector selectedSessionId={sessionId ?? null} onSelectSession={onSelectSession} />
         )}

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { IconArchive, IconChevronDown, IconEdit } from '@tabler/icons-react'
 
 import { useArchiveWorkspaceSession, useWorkspaceSessions } from './api'
+import { ChatHeaderLabel } from './ChatHeaderLabel'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
@@ -240,6 +241,11 @@ export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelecto
   const hasRunningBackgroundChat = useLive(state =>
     hasRunningBackgroundSession(state.activity, workspaceId, selectedSessionId)
   )
+
+  if (sessions.length === 0) {
+    return <ChatHeaderLabel>New chat</ChatHeaderLabel>
+  }
+
   const active = sessions.find(s => s.sessionId === selectedSessionId)
   const label = active?.summary ?? 'New chat'
   const sessionGroups = groupSessionsByDate(sessions)
