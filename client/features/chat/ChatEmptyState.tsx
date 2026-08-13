@@ -100,7 +100,7 @@ export function resolveChatEmptyState({
   return 'empty'
 }
 
-const EMPTY_STATE_STYLES = cn('flex flex-1 flex-col items-center justify-center')
+const EMPTY_STATE_STYLES = cn('flex flex-1 flex-col items-center justify-center self-center')
 
 type ChatEmptyStateProps = {
   kind: ChatEmptyStateKind

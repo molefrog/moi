@@ -2,9 +2,13 @@ import type { ReactNode, Ref } from 'react'
 import { useImperativeHandle } from 'react'
 
 import { Button } from '@/client/components/ui/button'
+import { Spinner } from '@/client/components/ui/spinner'
 import { DrawingLayer } from '@/client/features/drawings/DrawingLayer'
 import { DrawingToolbar } from '@/client/features/drawings/DrawingToolbar'
-import { useDrawingHistoryState } from '@/client/features/drawings/useDrawingLayer'
+import {
+  type DrawingControls,
+  useDrawingHistoryState
+} from '@/client/features/drawings/useDrawingLayer'
 import {
   type ViewBuilderSketchController,
   useViewBuilderSketch
@@ -137,7 +141,7 @@ function ViewBuilderSketchSurface({
             'animate-glow texture-inset-shadow-50% motion-reduce:animate-none'
         )}
       />
-      {status === 'building' && <ViewBuilderBuildingState />}
+      {status === 'building' && <ViewBuilderBuildingState controls={sketch.controls} />}
       {status === 'waiting' && (
         <ViewBuilderWaitingState error={error} onDiscard={onDiscard} onOpenChat={onOpenChat} />
       )}
@@ -201,8 +205,18 @@ function ViewBuilderWaitingState({ error, onDiscard, onOpenChat }: ViewBuilderWa
   )
 }
 
-function ViewBuilderBuildingState() {
-  return <ViewBuilderStatusLayout />
+type ViewBuilderBuildingStateProps = {
+  controls: DrawingControls
+}
+
+function ViewBuilderBuildingState({ controls }: ViewBuilderBuildingStateProps) {
+  const { hasStrokes } = useDrawingHistoryState(controls)
+
+  return (
+    <ViewBuilderStatusLayout>
+      {!hasStrokes && <Spinner className="size-6 text-muted-foreground" />}
+    </ViewBuilderStatusLayout>
+  )
 }
 
 type ViewBuilderStatusLayoutProps = {
