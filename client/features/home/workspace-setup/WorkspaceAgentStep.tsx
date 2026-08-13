@@ -162,7 +162,7 @@ function WorkspaceAgentSelector({
     <div
       role="group"
       aria-label="Agent"
-      className={cn('grid gap-2', options.length > 2 ? 'grid-cols-3' : 'grid-cols-2')}
+      className={cn('grid gap-2', options.length > 2 ? 'grid-cols-4' : 'grid-cols-2')}
     >
       {options.map(option => (
         <WorkspaceAgentOptionButton
