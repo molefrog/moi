@@ -92,16 +92,11 @@ export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
   }
 
   return (
-    <BottomPanel
-      ref={ref}
-      title="Customize"
-      onClose={onClose}
-      className="@4xl/workspace:max-w-4xl"
-    >
+    <BottomPanel ref={ref} title="Customize" onClose={onClose} className="@4xl/workspace:max-w-4xl">
       <div className="grid grid-cols-1 gap-4 @4xl/workspace:grid-cols-[repeat(2,minmax(0,1fr))_0.5rem_repeat(2,minmax(0,1fr))_0.5rem_minmax(0,1fr)] @4xl/workspace:gap-x-2">
         <CustomizeOptionGroup
           label="Font"
-          className="@4xl/workspace:col-start-1 @4xl/workspace:col-span-2"
+          className="@4xl/workspace:col-span-2 @4xl/workspace:col-start-1"
         >
           {FONT_OPTIONS.map(([key, config]) => (
             <CustomizeOption
@@ -117,7 +112,7 @@ export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
 
         <CustomizeOptionGroup
           label="Colors"
-          className="@4xl/workspace:col-start-4 @4xl/workspace:col-span-2"
+          className="@4xl/workspace:col-span-2 @4xl/workspace:col-start-4"
         >
           {COLOR_OPTIONS.map(([key, preset]) => (
             <CustomizeOption

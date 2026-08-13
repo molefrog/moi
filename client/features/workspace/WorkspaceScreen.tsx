@@ -673,9 +673,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       </div>
 
       <AnimatePresence>
-        {widgetMode === 'customizing' && (
-          <CustomizePanel onClose={() => setWidgetMode('idle')} />
-        )}
+        {widgetMode === 'customizing' && <CustomizePanel onClose={() => setWidgetMode('idle')} />}
       </AnimatePresence>
 
       <PanelHeader>
