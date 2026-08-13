@@ -1,312 +1,201 @@
 # moi applet design
 
-This is the visual contract for widgets and views inside a moi workspace. The host app stays calm,
-precise, and quiet. Applets may be more expressive and information-rich while still feeling related
-to the workspace around them.
+This visual contract covers widgets and views inside a moi workspace. Applets may be expressive
+while staying related to the calm host. This guide owns design decisions, `SKILL.md` owns
+implementation, and the host owns fonts and semantic color values.
 
-This file owns visual direction, layout, states, and interaction design. `SKILL.md` owns file layout,
-imports, styling syntax, and build instructions. The host owns fonts and semantic color values.
-Widgets and views resolve color tokens in different scopes, described below.
+## Core principles and visual hierarchy
 
-## Visual direction
+Design around the content and task. Give every applet one clear first reading, then add detail in
+proportion to its purpose and space. Dense information needs hierarchy, alignment, and stable lanes.
 
-Design around the content and the task. Give every applet a clear first reading, then add detail in
-proportion to its size and purpose. Dense information is welcome when hierarchy and alignment keep
-it easy to scan.
+An applet may have one expressive focal point, such as a visualization, image, strong surface, or
+state change. Keep the rest restrained. Avoid decorative clutter and competing effects.
 
-An applet may have one expressive focal point: a visualization, strong surface, image, or satisfying
-state change. It is optional. Use it when it helps the content and keep the rest restrained so it
-remains meaningful. Avoid decorative clutter, competing effects, and a different visual system for
-every section.
+Every visible element must explain content, show a real state, or enable an action. Remove repeated
+labels, obvious readiness badges, redundant helper copy, decorative status pills, and meaningless
+icons. Relate a workspace's applets through typography, palette, spacing, or interaction patterns.
 
-Every visible element must help the user understand useful content, see a real state, or take an
-action. Do not add category eyebrows that repeat the title, readiness badges for an obvious default
-state, helper copy that repeats nearby text, decorative status pills, or icons with no useful
-meaning. Clear and simple applets contain fewer elements, and each one earns its place.
+Lead with the main value, message, or task. Quiet supporting content and make tertiary metadata easy
+to ignore. A widget may use one large hero value when its footprint supports it. When two elements
+compete, reduce one.
 
-Widgets and views in one workspace should feel like a family through shared typography, palette,
-spacing, or interaction patterns. They do not need to look identical.
+## Shared system
 
-## Color
+### Color and surfaces
 
-Widgets and views use the same semantic token vocabulary. Use
-`h-full w-full bg-background text-foreground` for most applet roots. Each token keeps the same
-purpose in both applet types; the host changes its value to suit the surrounding surface.
+Use `h-full w-full bg-background text-foreground` for most roots. Widgets and views share token
+meaning while the host resolves their values differently:
 
-### How tokens resolve
+- **Widgets:** `background` is the workspace `primary`, `foreground` is its readable pair, and the
+  local `primary` pair becomes a derived light action surface. The transparent host frame requires
+  an opaque root or an opaque fallback behind a full-bleed image or visualization.
+- **Views:** tokens inherit the workspace page theme, so the default root matches the page.
+- **Floating UI:** menus, tooltips, and popovers use `bg-popover text-popover-foreground` inside
+  the applet scope.
 
-- **Widgets:** The host applies a widget-local semantic theme derived from the selected workspace
-  color. `background` is the workspace `primary`, `foreground` is its paired readable color, and
-  the local `primary` pair becomes the light action surface derived from that color. The host frame
-  stays transparent, so every widget root must cover the full frame with an opaque background. An
-  image or visualization may own the surface when it has an opaque fallback.
-- **Views:** Semantic tokens inherit the workspace page theme. The default root uses the normal
-  workspace page surface and text.
-- **Portalled UI:** Menus, tooltips, and popovers render in workspace scope and keep
-  `bg-popover text-popover-foreground`.
+| Intent | Classes and guidance |
+| --- | --- |
+| Main content | `text-foreground` for titles, labels, values, and important icons |
+| Supporting content | `text-muted-foreground` for descriptions and secondary information |
+| Inset surface | `bg-card text-card-foreground`, used only for a distinct functional region |
+| Quiet fill | `bg-muted` for inset regions, skeletons, and disabled structure |
+| Control state | `bg-accent text-accent-foreground` for hover, active, and selected controls |
+| Main action | `bg-primary text-primary-foreground hover:bg-primary/90` |
+| State | Views may use `text-success`, `bg-success/10`, `text-destructive`, or `bg-destructive/10`; widgets use `text-foreground`. Add clear wording and, when useful, an icon or shape. |
+| Object edge | `ring-1 ring-border` for complete container and control outlines |
+| Focus | `focus-visible:ring-2 focus-visible:ring-ring` |
+| Separator | A one-sided border such as `border-b border-border` between adjacent regions |
 
-### Semantic token reference
+Use lower foreground opacity only for readable tertiary metadata. Important text needs full
+contrast. Saturated surfaces need an explicit readable light or dark foreground. Never rely on
+color alone.
 
-| Context or intent | Tailwind classes | Use |
-| --- | --- | --- |
-| Applet root | `bg-background text-foreground` | The full widget surface or view page |
-| Main content | `text-foreground` | Titles, labels, values, and important icons |
-| Supporting content | `text-muted-foreground` | Descriptions and secondary information |
-| Inset surface | `bg-card text-card-foreground` | A functionally distinct contained region, used sparingly |
-| Floating surface | `bg-popover text-popover-foreground` | Menus, tooltips, and other floating content |
-| Quiet fill | `bg-muted` | Inset regions, skeletons, and disabled structure |
-| Control state | `bg-accent text-accent-foreground` | Hover, active, and selected controls |
-| Main action | `bg-primary text-primary-foreground hover:bg-primary/90` | The most important action in a local region |
-| State | Views: `text-success` / `bg-success/10` or `text-destructive` / `bg-destructive/10`; widgets: `text-foreground` | Use clear wording and an optional icon or shape. Never rely on color alone. |
-| Object edge | `ring-1 ring-border` | Complete outlines around containers and controls |
-| Focus | `focus-visible:ring-2 focus-visible:ring-ring` | Visible keyboard focus on interactive elements |
-| Separator | `border-b border-border` | A one-sided division between adjacent regions |
+Use rings for complete outlines and one-sided borders for separators; never combine both. Keep
+edges subtle and avoid raw high-contrast colors. Derive tonal colors and custom gradients from
+local tokens with `color-mix()`. Tailwind palette colors need a content, data, brand, or user reason.
+Explain consistent data mappings with labels, legends, shapes, or values. Never use palette colors
+for generic decoration or unrelated widget backgrounds. Purple, violet, and fuchsia also need a
+reason and never act as a default creativity or technology cue.
 
-Use lower opacity from the surface's foreground only for tertiary metadata that remains readable.
-Avoid weak alpha text for important labels or values.
+Use an open layout. Group with spacing, alignment, type, and occasional separators. Add a surface
+only around an interactive object, independent scroller, distinct state, or self-contained work
+area. Standard controls keep their surfaces; headers, tabs, summaries, metrics, and ordinary
+sections stay unboxed.
 
-Prefer a subtle ring for the complete outline of a container or control. Use `ring-1 ring-border` on
-semantic surfaces. Reserve one-sided borders such as `border-b` for separators between adjacent
-regions. Never use a border and a ring on the same element. Avoid raw high-contrast colors for
-either treatment.
-
-Derive extra neutral or tonal colors and custom gradients from the local semantic tokens with
-`color-mix()`. Use Tailwind palette colors only when they have clear content meaning, distinguish
-infographic data, or follow an explicit user request. Keep each mapping consistent and explain it
-with labels, legends, shapes, or direct values. Do not use palette colors for generic decoration or
-unrelated widget backgrounds. Purple, violet, and fuchsia need a content, brand, or user reason;
-never use a purple gradient as a default creativity or technology cue. On a saturated surface,
-choose an explicit light or dark foreground with strong contrast.
-
-### Surfaces and grouping
-
-Use an open layout by default. Group content with spacing, alignment, type hierarchy, and, when
-needed, a one-sided separator. Add one surface around content that shares a functional boundary: an
-interactive object, an independently scrolling region, a distinct state, or a self-contained work
-region. Page headers, tab rows, summaries, metrics, and ordinary sections stay unboxed by default.
-Standard controls keep their normal component surfaces.
-
-Never use a large rounded surface as a second page frame around the header, navigation, summary,
-primary content, and supporting sections. Avoid adjacent or nested cards and wrappers that only
-repeat the page structure.
-
-Align page-level content to shared edges or grid columns. Apply outer padding once on the root or
-layout grid, then use gaps to group unboxed content. When removing a surface, remove its card-like
-padding and radius and realign its children; do not leave spacing that implies an invisible card.
+Avoid large rounded page frames, adjacent or nested cards, and structural wrappers. Align content
+to shared edges or grid columns. Apply outer padding once, then use gaps. Removing a surface also
+means removing its card-like padding and radius and realigning its children.
 
 ### Stacking and overlays
 
-Rely on DOM order for normal stacking: place an element later in the markup when it should appear
-above an earlier sibling. Avoid z-index utilities for ordinary layout. For dialogs, menus,
-popovers, and tooltips that must escape a local stacking context or clipping ancestor, portal into
-the closest `[data-applet]` root so the overlay stays inside the applet and keeps its scoped styles
-and theme tokens. Do not portal applet UI to `document.body`.
+Use DOM order for normal stacking: later siblings appear above earlier ones. Avoid z-index for
+ordinary layout. When floating UI must escape clipping or a local stacking context, portal it into
+the closest `[data-applet]` root to preserve applet scope and theme tokens. Never portal applet UI
+to `document.body`.
 
-Add z-index only when DOM order and a scoped portal cannot provide the required stacking. Keep it
-local and minimal. Several z-index layers or escalating values mean the layout structure should be
-reconsidered.
+Add a local, minimal z-index only when DOM order and a scoped portal cannot solve the stacking need.
+Several layers or escalating values mean the layout structure needs reconsideration.
 
 ### Textures
 
-Texture is optional. Choose the root treatment after the content layout is clear, and use no more
-than one texture per applet. Pair a texture with an opaque semantic base, such as
-`h-full w-full bg-background text-foreground texture-checker`. The same classes resolve through the
-widget-local theme or view page theme.
+Texture is optional and belongs only on the applet root. Choose it after the content layout is
+clear, use at most one, and pair it with an opaque semantic base such as
+`bg-background text-foreground texture-checker`.
 
-| Texture | Tailwind class | Character |
-| --- | --- | --- |
-| Checker | `texture-checker` | Two softly tinted semantic squares with no empty cells |
-| Grid | `texture-grid` | Fine semantic graph-paper lines over the base color |
-| Noise | `texture-noise` | Foreground-tinted fractal grain that lets the base tint show through |
-| Linear gradient | `texture-gradient-linear` | A restrained top-to-bottom wash derived from `primary` |
-| Inset shadow | `texture-inset-shadow` | A soft edge glow derived from `primary` |
+Available treatments are `texture-checker`, `texture-grid`, `texture-noise`,
+`texture-gradient-linear`, and `texture-inset-shadow`. They use semantic colors without replacing
+the base background color.
 
-Textures add an effect without setting `background-color`; the base color remains visible through
-them. Match the frequency of the background to the density of the content:
+Match treatment to density. Dense root content uses plain `bg-background`,
+`texture-gradient-linear`, or `texture-inset-shadow`; sparse content may use any readable texture.
+Checker, grid, or noise may surround dense content only when it already needs an opaque or tonal
+work surface. Full-bleed images, maps, canvases, and visualizations use no texture.
 
-| Content and layout | Root treatment |
-| --- | --- |
-| Dense content placed directly on the root, such as tables, long lists, forms, detailed charts, or multi-column dashboards | Plain `bg-background`, `texture-gradient-linear`, or `texture-inset-shadow` |
-| Sparse content with large quiet areas | Any texture that preserves contrast |
-| Dense content inside a functionally justified opaque or tonal work surface | A checker, grid, or noise texture may appear on the exposed background |
-| Opaque full-bleed image, map, canvas, or visualization | No texture |
+Never add wrappers to rescue a busy texture; choose a quieter root. Do not texture cards, panels,
+controls, or text regions, stack textures, or add tuning variables. Check nearby applets: unrelated
+applets use different textures, while a widget representing a view shares its texture. Any texture
+should become easy to ignore while reading.
 
-Never place `texture-checker`, `texture-grid`, or `texture-noise` directly behind dense open content.
-Do not add cards or solid wrappers only to make a busy texture readable; choose a quieter root
-treatment instead. A texture should become easy to ignore while reading.
+### Type, spacing, and shape
 
-Do not apply a texture to a card, panel, control, or text region, and do not stack textures or add
-tuning variables.
+Inherit the workspace font and use sentence case. Use regular weight for most text and medium for
+emphasis; other weights are reserved for owner hand-tuning. `text-sm` (14 px) is the UI default.
+Use smaller text for compact metadata and larger text for headings or one display value. Keep at
+most two clear type roles and avoid near-identical label styles.
 
-Check nearby widgets and views before choosing one. Give unrelated applets different textures so
-they remain distinct at a glance. A widget that opens, summarizes, or represents a view shares that
-view's texture as part of the same visual language.
+Reserve `font-mono` for code, commands, and code-like identifiers. Numeric values, measurements,
+percentages, timers, timestamps, prices, counts, and labels use the workspace font. Add
+`tabular-nums` when stable widths or alignment help.
 
-## Typography and hierarchy
+Follow a 4 px spacing rhythm: 4–8 px within a tight group, 12–16 px between groups in a region, and
+24 px or more at section changes in larger applets. Prefer spacing over dividers. Keep repeated
+rows, chart labels, status markers, counters, and trailing actions in stable lanes so changing
+values do not shift the layout.
 
-Inherit the workspace font. Use sentence case for headings, labels, actions, and navigation. Use
-regular weight for most text and medium for emphasis. Other weights are reserved for owner
-hand-tuning.
+Use the shared shadcn radius scale and default control radii. Use `rounded-lg` or `rounded-xl` for
+ordinary regions, `rounded-2xl` or `rounded-3xl` for one focal surface, and `rounded-full` only for
+real pills, circles, avatars, and status dots. Rectangular controls must not become capsules.
 
-Use a small, consistent type scale. `text-sm` (14 px) is the default for UI text. Use smaller text
-only for genuinely compact metadata and larger text only for clear headings or one meaningful
-display value. Do not create many label styles with slightly different sizes.
+### Interaction, motion, and states
 
-Keep text contrast clear and follow the foreground pairing for the chosen surface. Avoid several
-near-identical text styles that make hierarchy hard to read.
+Controls must be obvious, keyboard-operable, comfortably sized, visibly focused, and accessibly
+named. Use Tabler icons with consistent visual weight. Keep charts understandable through labels,
+legends, patterns, or direct values as needed.
 
-Reserve `font-mono` for code, command text, and truly code-like identifiers. Do not use monospace for
-numeric UI values, measurements, percentages, timers, timestamps, prices, counts, or labels. Numbers
-inherit the workspace's default font; add `tabular-nums` when stable digit widths or alignment help.
-A stronger display treatment may lead a widget or view when it serves the content, but it should not
-become a separate type system. Keep no more than two clear type roles in one applet.
+Use short, interruptible motion for meaningful state changes and control feedback. Respect reduced
+motion and prefer transform and opacity. Avoid looping decoration and animation on frequently
+updating numbers. Audio and video must be user-initiated.
 
-Build hierarchy with a visible size gap. Give the main value, message, or task the strongest
-emphasis, keep supporting content quieter, and make tertiary metadata easy to ignore. A widget may
-use a large hero value when its footprint supports it. If two elements compete for attention, reduce
-one.
+Design only states the applet can reach. For data-driven applets, handle these when applicable:
 
-Use a 4 px spacing rhythm. As a guide:
+- **Loading:** preserve the final layout and surface with a matching skeleton. Use a spinner only
+  for compact inline work or work without a meaningful content shape.
+- **Error:** explain the problem in one human sentence and offer retry or a clear recovery action.
+- **Empty:** explain the absence briefly and provide a useful next step; never leave a data region
+  blank.
+- **Refreshing:** keep current data visible and show progress on the refresh control.
+- **Stale:** show a quiet, current timestamp or status near the affected data.
+- **Disabled:** preserve the label and structure while making unavailability clear without color
+  alone.
 
-- 4–8 px keeps tightly related items together.
-- 12–16 px separates groups within a region.
-- 24 px or more marks a section change in larger widgets and views.
-
-Prefer spacing over dividers. Keep repeated rows, chart labels, status markers, counters, and
-trailing actions in stable lanes so changing values do not shift the layout.
-
-## Shape and radius
-
-Use the shared shadcn radius scale and keep its default radius on standard controls. Ordinary cards,
-fields, list rows, and repeated sections should use `rounded-lg` or `rounded-xl`. Reserve
-`rounded-2xl` and `rounded-3xl` for one expressive focal surface, and use `rounded-full` only for
-real pills, circular buttons, avatars, and status dots. Controls and rectangular content regions
-must not look capsule-shaped.
-
-## Interaction and motion
-
-Widgets may include compact controls such as filters, toggles, refresh actions, and links. Keep
-interaction feedback on the control that performs the action. The widget surface stays unchanged on
-hover. Multi-step workflows and deep navigation belong in a view.
-
-Controls must be obvious, keyboard-operable, and large enough to use comfortably. Give them a
-visible focus state and an accessible name. Use Tabler icons with consistent visual weight. Do not
-rely on color alone, and keep charts understandable with labels, legends, patterns, or direct values
-where needed.
-
-Use short, interruptible motion for meaningful state changes and control feedback. Respect
-reduced-motion preferences and animate transform and opacity where possible. Do not loop decorative
-motion or animate frequently updating numbers. Audio and video must be user-initiated.
-
-## States
-
-Design every state the applet can actually reach. Static applets do not need invented async states.
-Data-driven applets need the following when applicable:
-
-- **Loading:** show a skeleton that mirrors the final layout and preserves its surface. Use a spinner
-  only for a compact inline action or work with no meaningful content shape.
-- **Error:** explain the problem in one human sentence and provide a retry or clear recovery action.
-- **Empty:** show a short explanation and a useful next step. Never leave a data region blank.
-- **Refreshing:** keep current data visible and show progress on the refresh action. Do not replace
-  useful content with the initial loading state.
-- **Stale:** show a quiet timestamp or status near the affected data and keep it current.
-- **Disabled:** preserve the label and structure while making the unavailable state clear without
-  relying on color alone.
-
-Keep state layouts stable so loading, success, empty, and error do not cause avoidable jumps. Errors
-and empty states should still fit the configured widget height or the view's normal content frame.
-When a primary region uses a surface, loading, populated, empty, success, and error states keep that
-surface in the same position and size.
+Keep loading, populated, empty, success, and error layouts stable. A primary surface remains in the
+same position and size through those states. Errors and empty states must fit the configured Widget
+height or the View's normal content frame.
 
 ## Widgets
 
-Widgets are compact dashboard surfaces seen alongside other widgets. They should reveal their main
-meaning within a quick scan. Larger widgets may add supporting charts, lists, metadata, filters, and
-direct actions while keeping one clear first reading.
+Widgets are compact dashboard surfaces seen beside other widgets. Their main meaning should be
+clear in a quick scan. Larger footprints may add charts, lists, metadata, filters, and direct
+actions while preserving one first reading.
 
-### Frame
+The host card owns outer radius, border, shadow, clipping, and elevation. Its interior is
+transparent. Fill it with an opaque `h-full w-full` root and add no outer card chrome. Use `p-4` as
+the compact padding default or `p-5` for larger footprints when content still fits. Use a column
+layout when content needs a footer or timestamp and keep lower-priority information at the bottom.
 
-The host card owns the outer radius, border, shadow, clipping, and elevation. It leaves the inside
-transparent. The widget root fills that rectangle and adds no outer card chrome. Its surface follows
-the color guidance above.
-
-Use a column layout when content needs a footer or timestamp, and keep lower-priority information at
-the bottom. Important content needs safe padding from every edge. Use `p-4` as the compact default;
-`p-5` suits larger footprints when the content still fits.
-
-### Grid and sizing
-
-The dashboard grid has four columns, 160 px rows, 8 px gaps, and a maximum width of 640 px. A widget
-may span one to four rows and columns. Width shrinks with the workspace; height stays fixed by the
-selected row span.
-
-The exact height is:
+The grid has four columns, 160 px rows, 8 px gaps, and a maximum width of 640 px. A Widget may span
+one to four rows and columns. Width shrinks with the workspace; height remains fixed by row span:
 
 `rowSpan × 160 + (rowSpan − 1) × 8`
 
-Common maximum sizes are:
-
-| Footprint | Maximum outer size | Approximate content after `p-4` |
-| --- | --- | --- |
-| 1 × 1 | 154 × 160 px | 122 × 128 px |
-| 2 × 1 | 316 × 160 px | 284 × 128 px |
-| 2 × 2 | 316 × 328 px | 284 × 296 px |
-| 4 × 2 | 640 × 328 px | 608 × 296 px |
-| 4 × 3 | 640 × 496 px | 608 × 464 px |
-| 4 × 4 | 640 × 664 px | 608 × 632 px |
-
 Treat width as flexible and height as the hard constraint. Start with the smallest footprint that
-presents the content clearly. Test the narrowest realistic width and the longest realistic values.
-Clip decorative overflow deliberately, clamp supporting prose, and keep the widget itself from
-creating horizontal page scroll or an accidental inner page scroller.
+presents the content clearly. Test the narrowest realistic width and longest realistic values.
+Clip decorative overflow deliberately, clamp supporting prose, and prevent horizontal page scroll
+and accidental inner page scrolling.
 
-### Composition
-
-Give the eye one primary element and no more than two supporting groups in a small widget. Larger
-footprints may carry more information when spacing and alignment preserve the first reading. Prefer
-live information over labels that repeat obvious context.
-
-Keep controls limited to the immediate task. A compact mode switch can work; tabs, wizards, and
-multi-step flows usually indicate that the content should become a view.
+A small Widget has one primary element and at most two supporting groups. Larger footprints may
+carry more when hierarchy remains clear. Prefer live information over labels that repeat context.
+Limit controls to the immediate task: filters, toggles, refresh actions, and links are appropriate.
+Keep feedback on the control and leave the Widget surface unchanged on hover. Tabs, wizards,
+multi-step workflows, and deep navigation belong in a View.
 
 ## Views
 
-Views are full app screens for denser information and sustained work. They own their page hierarchy,
-content layout, spacing, chrome, and scrolling. A view should feel complete at the available size and
-remain usable when the chat shares the workspace.
+Views are full app screens for denser information and sustained work. They own page hierarchy,
+layout, spacing, chrome, and scrolling. A View must remain complete and usable at the available
+width, including when chat shares the workspace.
 
-One view represents one screen. Cross-screen navigation belongs to the workspace. Internal tabs,
-filters, or a master-detail split may organize the current task without introducing a separate
-client-side routing system.
+One View represents one screen. Cross-screen navigation belongs to the workspace. Internal tabs,
+filters, and master-detail layouts may organize the current task without adding a client-side
+router.
 
-Let the content choose the frame. Most views need clear page context, a primary work area, and an
-obvious place for the main action. A header with a title and optional subtitle or action is a useful
-default. A canvas, map, or immersive data surface may establish context another way.
+Let content choose the frame. Most Views need clear page context, a primary work area, and an
+obvious place for the main action. A title with an optional subtitle or action is a useful default;
+a canvas, map, or immersive visualization may establish context another way.
 
-Use generous, consistent page padding such as 24 or 32 px for normal views. Constrain prose, forms,
-and narrow task flows to a readable maximum width. Let tables, boards, maps, and visual workspaces use
-more of the frame when that improves the task.
+Use consistent page padding such as 24 or 32 px. Constrain prose, forms, and narrow task flows to a
+readable maximum width. Let tables, boards, maps, and visual workspaces use more of the frame when
+the task benefits.
 
-Prefer one main page scroller. Use bounded internal scrolling only for regions that benefit from
-independent position, such as a sticky table body, timeline, or board. The page itself must not
-create horizontal scroll.
-
-Views and widgets share the same color, type, motion, and state vocabulary. Views may use more
-sections, controls, and information layers while preserving a clear primary work area. Avoid
-stretching a widget-like card to fill the page.
+Prefer one main page scroller. Use bounded internal scrolling only where independent position helps,
+such as a sticky table body, timeline, or board. Never create horizontal page scroll. Views may use
+more sections, controls, and information layers than Widgets while keeping one primary work area;
+do not stretch a Widget-like card to fill the page.
 
 ## Final review
 
-After implementation, do a removal pass from top to bottom. For every visible element and wrapper,
-ask what it helps the user understand, do, or recognize as a state. Remove it when the screen stays
-clear without it, then realign the remaining content.
-
-Before finishing an applet, confirm:
-
-- The first reading and every visible element have a clear purpose.
-- Color, texture, type, spacing, and expression support the content and remain readable.
-- Surfaces mark real boundaries, and unboxed page content shares clear alignment axes.
-- States remain stable, and the layout handles realistic content and deliberate overflow.
-- Controls are necessary, complete, and accessible.
-- The widget or view follows its frame, sizing, and scrolling rules and feels related to the
-  workspace.
+Remove elements and wrappers that do not improve understanding, action, or state recognition, then
+realign what remains. Confirm the first reading is clear; the visual system stays readable and
+purposeful; realistic content and reachable states fit without overflow or jumps; controls are
+necessary and accessible; and the applet follows its Widget or View contract.
