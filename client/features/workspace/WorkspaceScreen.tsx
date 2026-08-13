@@ -601,7 +601,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const workspacePanel = (
     <div
       className={cn(
-        'flex h-full min-h-0 min-w-0 flex-1 flex-col-reverse overflow-hidden bg-background shadow-md transition-[border-radius]',
+        '@container/workspace relative flex h-full min-h-0 min-w-0 flex-1 flex-col-reverse overflow-hidden bg-background shadow-md transition-[border-radius]',
         mode === 'split' && 'rounded-xl'
       )}
     >
@@ -672,6 +672,12 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
         </DrawingLayer>
       </div>
 
+      <AnimatePresence>
+        {widgetMode === 'customizing' && (
+          <CustomizePanel onClose={() => setWidgetMode('idle')} />
+        )}
+      </AnimatePresence>
+
       <PanelHeader>
         <div className="flex min-w-0 flex-1 items-center gap-4">
           <div className="flex items-center gap-2">
@@ -722,10 +728,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
           workspacePanel
         )}
       </div>
-
-      <AnimatePresence>
-        {widgetMode === 'customizing' && <CustomizePanel onClose={() => setWidgetMode('idle')} />}
-      </AnimatePresence>
 
       {mode === 'fullscreen' && activeTab !== 'agent' && hasWorkspaceContent && (
         <ChatPopup
