@@ -57,8 +57,7 @@ purpose in both applet types; the host changes its value to suit the surrounding
 | Quiet fill | `bg-muted` | Inset regions, skeletons, and disabled structure |
 | Control state | `bg-accent text-accent-foreground` | Hover, active, and selected controls |
 | Main action | `bg-primary text-primary-foreground hover:bg-primary/90` | The most important action in a local region |
-| Positive or active state | `text-success` / `bg-success/10` | Positive outcomes, healthy states, presence, and progress indicators |
-| Error or danger | `text-destructive` / `bg-destructive/10` | Errors, destructive actions, and invalid states |
+| State | Views: `text-success` / `bg-success/10` or `text-destructive` / `bg-destructive/10`; widgets: `text-foreground` | Use clear wording and an optional icon or shape. Never rely on color alone. |
 | Object edge | `ring-1 ring-border` | Complete outlines around containers and controls |
 | Focus | `focus-visible:ring-2 focus-visible:ring-ring` | Visible keyboard focus on interactive elements |
 | Separator | `border-b border-border` | A one-sided division between adjacent regions |
