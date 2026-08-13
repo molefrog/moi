@@ -29,7 +29,7 @@ const EMPTY_WIDGET_ITEMS: GridItem[] = Array.from({ length: 10 }, (_, index) => 
 
 function renderEmptyWidget() {
   return (
-    <Skeleton className="size-full animate-none rounded-2xl [corner-shape:superellipse(1.2)]" />
+    <Skeleton className="size-full animate-none rounded-2xl texture-checker [corner-shape:superellipse(1.2)]" />
   )
 }
 
@@ -45,15 +45,15 @@ function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
       </div>
 
       <div className="absolute inset-0 flex items-center justify-center p-6">
-        <div className="flex h-full w-full max-w-(--column-w) flex-col items-center justify-center gap-4 bg-radial from-background from-50% to-transparent to-75% text-center">
+        <div className="flex h-full w-full max-w-(--column-w) flex-col items-center justify-center gap-4 bg-radial from-background from-30% to-transparent to-80% text-center">
           <div className="flex flex-col gap-1.5">
             <h2 className="font-medium">A little empty here</h2>
-            <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-              Widgets are small apps that can read data, perform tasks, and show a compact view of
-              the information that matters.
+            <p className="mx-auto max-w-xs text-sm text-muted-foreground">
+              Widgets are small apps that can read data, perform tasks, and surface important
+              information
             </p>
           </div>
-          <Button type="button" variant="secondary" size="sm" onClick={onCreateWidget}>
+          <Button type="button" variant="secondary" onClick={onCreateWidget}>
             <IconPlus data-icon="inline-start" stroke={1.5} />
             Create widget
           </Button>
