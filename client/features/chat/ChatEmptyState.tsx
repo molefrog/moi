@@ -17,7 +17,6 @@ import {
   ChatPromptBubbles,
   type ChatPromptBubble as ChatPrompt
 } from '@/client/features/chat/ChatPromptBubbles'
-import { IconGhost as AnimatedGhostIcon } from '@/client/components/shared/IconGhost'
 import { cn } from '@/client/lib/cn'
 
 const ONBOARDING_HANDOFF_DIRECTIVE =
