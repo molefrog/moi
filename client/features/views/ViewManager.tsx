@@ -186,7 +186,9 @@ function ViewFrame({ view, build, params, entering }: ViewFrameProps) {
     <div
       data-applet={appletScope('views', view.id)}
       className={cn(
-        'absolute inset-0 overflow-auto',
+        // Keep applet z-indexes inside the view. Host overlays render after this
+        // frame and should always stack above the view as a single unit.
+        'absolute inset-0 isolate overflow-auto',
         entering && 'animate-in duration-200 ease-out blur-in-4 fade-in'
       )}
     >
