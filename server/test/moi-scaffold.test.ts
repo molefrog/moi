@@ -45,6 +45,11 @@ describe('scaffoldMoiDir install', () => {
     expect(existsSync(join(moiDir, 'package.json'))).toBe(true)
     expect(existsSync(join(moiDir, 'widgets'))).toBe(true)
     expect(await Bun.file(join(moiDir, 'applet-env.d.ts')).text()).toContain('icon?: string')
+    // Machine-local state must never end up committed in a workspace repo.
+    const gitignore = await Bun.file(join(moiDir, '.gitignore')).text()
+    for (const entry of ['.build/', '.cache/', 'node_modules/']) {
+      expect(gitignore).toContain(entry)
+    }
   })
 
   test('returns "installing" when the install outlives the wait', async () => {

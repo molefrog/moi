@@ -49,6 +49,16 @@ async function runBunInstall(moiDir: string): Promise<number> {
   return install.exited
 }
 
+// Keep machine-local state out of workspaces that are git repos: build output,
+// derived caches (applet thumbnails), and installed dependencies are all
+// re-creatable and would otherwise churn or bloat the repo. The applet sources,
+// package.json, and lockfile stay committable — they ARE the workspace.
+export const MOI_GITIGNORE = `# moi internals — machine-local, re-creatable state
+.build/
+.cache/
+node_modules/
+`
+
 // Ambient types for applets (widgets & views). Editor DX only — the moi
 // bundler resolves the `moi` module and asset imports at build time without any
 // declarations. Lives at `.moi/` root, NOT inside widgets/views, so it isn't
@@ -140,6 +150,7 @@ export async function scaffoldMoiDir(
 
   await mkdir(join(moiDir, 'widgets'), { recursive: true })
   await Bun.write(packagePath, JSON.stringify(MOI_PACKAGE_JSON, null, 2) + '\n')
+  await Bun.write(join(moiDir, '.gitignore'), MOI_GITIGNORE)
   await writeAppletEnvDts(workspacePath)
 
   const exited = installDependencies(moiDir)

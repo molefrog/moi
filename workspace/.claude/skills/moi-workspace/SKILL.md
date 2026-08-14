@@ -90,6 +90,12 @@ my-agent-folder/
     .scratchpad/              <- Scratchpad image files. Internal — pull pixels via `moi scratch read-image`, never open it.
 ```
 
+Every dot-prefixed file or folder inside `.moi/` (`.build/`, `.cache/`, `.workspace.json`,
+`.scratchpad*`, `.gitignore`, …) is a moi internal: auto-generated, machine-local, and liable to
+change format without notice. Avoid them as much as possible — do not read, edit, delete, or commit
+them, and never point tooling at them. Go through the `moi` CLI instead; your surface is the
+non-dot files: `widgets/`, `views/`, `package.json`, and code you place under `.moi/` yourself.
+
 # Build environment
 
 - Bun is the required dependency of moi, so it must be installed
