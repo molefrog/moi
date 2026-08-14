@@ -23,6 +23,7 @@ import {
   buildApplet,
   scanRelativeImports
 } from './bundler/build-applet'
+import { pruneAppletThumbnails } from './thumbnails'
 
 export type AppletPaths = {
   moiRoot: string
@@ -594,6 +595,8 @@ export async function buildApplets<C>(
     await mkdir(buildDir, { recursive: true })
   }
   await pruneStaleBuilds(buildDir, new Set(names))
+  // A deleted applet's thumbnail dies with its bundle.
+  await pruneAppletThumbnails(workspacePath, kind, names)
 
   const jobs = await Promise.all(
     names.map(async name => {

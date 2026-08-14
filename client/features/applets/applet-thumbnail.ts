@@ -1,12 +1,16 @@
 import { useEffect, useRef } from 'react'
 
-import { useSaveAppletThumbnails } from '@/client/features/applets/api'
-import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
+import { useAppletThumbnailRecords, useSaveAppletThumbnails } from '@/client/features/applets/api'
+import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import type { AppletKind, AppletThumbnail, AppletThumbnailUpdate } from '@/lib/types'
 
 export const THUMBNAIL_MAX_EDGE = 1_000
 export const THUMBNAIL_PIXEL_RATIO = 3
 export const THUMBNAIL_FRESH_MS = 3 * 60 * 60 * 1_000
+// A capture that took this long janked the main thread (the DOM clone +
+// style-inline walk is synchronous). Routine age-based re-captures of such a
+// target are skipped; only a rebuilt bundle earns another attempt.
+export const SLOW_CAPTURE_MS = 1_000
 
 const THUMBNAIL_FORMAT_REVISION = '1000px-3x-webp-q80-v1'
 const SETTLE_MS = 5_000
@@ -49,6 +53,21 @@ export function isAppletThumbnailStale(
   if (!record || record.revision !== revision) return true
   const capturedAt = Date.parse(record.capturedAt)
   return !Number.isFinite(capturedAt) || now - capturedAt >= THUMBNAIL_FRESH_MS
+}
+
+// A slow target is only worth re-capturing when its bundle changed: the new
+// code deserves one measured attempt. A routine age-based refresh of the same
+// bundle is not worth a >1s main-thread stall for a slightly fresher image.
+export function shouldSkipSlowCapture(
+  record: AppletThumbnail | undefined,
+  revision: string
+): boolean {
+  return (
+    record !== undefined &&
+    record.revision === revision &&
+    record.captureMs !== undefined &&
+    record.captureMs >= SLOW_CAPTURE_MS
+  )
 }
 
 const timeoutNull = (ms: number) =>
@@ -108,12 +127,20 @@ export async function collectAppletThumbnailUpdates(
       updates.push({ id: target.id, revision })
       continue
     }
+    if (shouldSkipSlowCapture(record, revision)) {
+      updates.push({ id: target.id, revision })
+      continue
+    }
 
-    const image = target.element
-      ? await capture(target.element, kind === 'widget').catch(() => null)
-      : null
+    if (!target.element) {
+      updates.push({ id: target.id, revision, image: null })
+      continue
+    }
+    const started = performance.now()
+    const image = await capture(target.element, kind === 'widget').catch(() => null)
+    const captureMs = Math.round(performance.now() - started)
     if (isCancelled()) return null
-    updates.push({ id: target.id, revision, image })
+    updates.push({ id: target.id, revision, image, captureMs })
   }
 
   return updates
@@ -122,18 +149,22 @@ export async function collectAppletThumbnailUpdates(
 // Widgets provide every visible grid cell; a view provides only its active
 // frame. The lifecycle and persistence stay identical for both kinds.
 export function useAppletThumbnails({ kind, enabled, targets }: UseAppletThumbnailsArgs): void {
-  const { layout, workspaceId } = useWorkspaceLayoutCtx()
+  const workspaceId = useWorkspaceId()
+  const records = useAppletThumbnailRecords(workspaceId).data
   const save = useSaveAppletThumbnails(workspaceId)
   const targetsRef = useRef(targets)
   targetsRef.current = targets
-  const recordsRef = useRef(layout.appletThumbnails ?? [])
-  recordsRef.current = layout.appletThumbnails ?? []
+  const recordsRef = useRef(records ?? [])
+  recordsRef.current = records ?? []
   const saveRef = useRef(save.mutate)
   saveRef.current = save.mutate
   const targetKey = targets.map(target => `${target.id}@${target.revision ?? ''}`).join('\n')
+  // Hold the first pass until the stored records arrive — capturing against an
+  // unloaded store would re-screenshot everything on every page load.
+  const ready = records !== undefined
 
   useEffect(() => {
-    if (!enabled || targetKey === '') return
+    if (!enabled || !ready || targetKey === '') return
 
     let cancelled = false
     let generation = 0
@@ -173,5 +204,5 @@ export function useAppletThumbnails({ kind, enabled, targets }: UseAppletThumbna
       if (timer !== undefined) clearTimeout(timer)
       document.removeEventListener('visibilitychange', schedule)
     }
-  }, [enabled, kind, targetKey])
+  }, [enabled, kind, ready, targetKey])
 }

@@ -3,12 +3,14 @@ import { describe, expect, test } from 'bun:test'
 import type { AppletThumbnail } from '@/lib/types'
 
 import {
+  SLOW_CAPTURE_MS,
   THUMBNAIL_FRESH_MS,
   THUMBNAIL_MAX_EDGE,
   THUMBNAIL_PIXEL_RATIO,
   appletThumbnailRevision,
   collectAppletThumbnailUpdates,
   isAppletThumbnailStale,
+  shouldSkipSlowCapture,
   thumbnailScale
 } from './applet-thumbnail'
 
@@ -23,7 +25,6 @@ function record(overrides: Partial<AppletThumbnail> = {}): AppletThumbnail {
     revision: appletThumbnailRevision('bundle-1'),
     capturedAt: new Date(10_000).toISOString(),
     viewedAt: new Date(10_000).toISOString(),
-    image: 'old-image',
     ...overrides
   }
 }
@@ -55,32 +56,66 @@ describe('applet thumbnails', () => {
     expect(isAppletThumbnailStale(record(), revision, 10_000 + THUMBNAIL_FRESH_MS)).toBe(true)
   })
 
+  test('skips slow re-captures of an unchanged bundle but retries a rebuilt one', () => {
+    const revision = appletThumbnailRevision('bundle-1')
+    const slow = record({ captureMs: SLOW_CAPTURE_MS })
+    expect(shouldSkipSlowCapture(slow, revision)).toBe(true)
+    expect(shouldSkipSlowCapture(record({ captureMs: SLOW_CAPTURE_MS - 1 }), revision)).toBe(false)
+    expect(shouldSkipSlowCapture(record({ captureMs: undefined }), revision)).toBe(false)
+    // A rebuilt bundle earns one measured attempt even on a slow target.
+    expect(shouldSkipSlowCapture(slow, appletThumbnailRevision('bundle-2'))).toBe(false)
+    expect(shouldSkipSlowCapture(undefined, revision)).toBe(false)
+  })
+
   test('touches fresh targets and captures stale targets sequentially', async () => {
-    const captures: string[] = []
+    let captures = 0
     const updates = await collectAppletThumbnailUpdates(
       'widget',
       [record()],
       [
         { id: 'one', revision: 'bundle-1', element: element() },
-        {
-          id: 'two',
-          revision: 'bundle-2',
-          element: element()
-        }
+        { id: 'two', revision: 'bundle-2', element: element() }
       ],
       () => false,
-      async (_element, stripHostChrome) => {
-        captures.push(stripHostChrome ? 'two' : 'one')
+      async () => {
+        captures += 1
         return 'new-image'
       },
       10_000
     )
 
-    expect(captures).toEqual(['two'])
+    expect(captures).toBe(1)
     expect(updates).toEqual([
       { id: 'one', revision: appletThumbnailRevision('bundle-1') },
-      { id: 'two', revision: appletThumbnailRevision('bundle-2'), image: 'new-image' }
+      {
+        id: 'two',
+        revision: appletThumbnailRevision('bundle-2'),
+        image: 'new-image',
+        captureMs: expect.any(Number)
+      }
     ])
+  })
+
+  test('sends a touch instead of re-capturing a slow target whose bundle is unchanged', async () => {
+    let captures = 0
+    const slow = record({
+      captureMs: SLOW_CAPTURE_MS,
+      capturedAt: new Date(0).toISOString()
+    })
+    const updates = await collectAppletThumbnailUpdates(
+      'widget',
+      [slow],
+      [{ id: 'one', revision: 'bundle-1', element: element() }],
+      () => false,
+      async () => {
+        captures += 1
+        return 'image'
+      },
+      THUMBNAIL_FRESH_MS + 1
+    )
+
+    expect(captures).toBe(0)
+    expect(updates).toEqual([{ id: 'one', revision: appletThumbnailRevision('bundle-1') }])
   })
 
   test('captures one active view target and stops a cancelled batch', async () => {
@@ -92,7 +127,12 @@ describe('applet thumbnails', () => {
       async () => 'view-image'
     )
     expect(viewUpdates).toEqual([
-      { id: 'dashboard', revision: appletThumbnailRevision('r1'), image: 'view-image' }
+      {
+        id: 'dashboard',
+        revision: appletThumbnailRevision('r1'),
+        image: 'view-image',
+        captureMs: expect.any(Number)
+      }
     ])
 
     let cancelled = false

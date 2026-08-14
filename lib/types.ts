@@ -548,24 +548,30 @@ export type WorkspaceLayout = {
   // Fast-mode default for new sessions. Undefined inherits the provider setting.
   selectedFastMode?: boolean
   theme?: import('./themes').WorkspaceTheme
-  // Client-captured applet previews. The normal layout GET strips image bytes;
-  // the dedicated endpoint is the only writer for these records.
-  appletThumbnails?: AppletThumbnail[]
 }
 
+// One applet's thumbnail freshness record. Image bytes live as files in the
+// workspace's `.moi/.cache/thumbnails/` (server/thumbnails.ts), never in
+// `.workspace.json` — the layout file stays small and commit-safe.
 export type AppletThumbnail = {
   kind: AppletKind
   id: string
   revision: string
   capturedAt: string
   viewedAt: string
-  image?: string
+  // How long the last successful capture took on this client, in ms. Lets the
+  // capture hook skip routine re-captures of applets that are slow to
+  // screenshot (see SLOW_CAPTURE_MS) instead of janking the main thread.
+  captureMs?: number
 }
 
 export type AppletThumbnailUpdate = {
   id: string
   revision: string
+  // A string replaces the stored image, null records a failed or skipped
+  // attempt (the previous image survives), undefined only touches recency.
   image?: string | null
+  captureMs?: number
 }
 
 export type AppletThumbnailBatch = {

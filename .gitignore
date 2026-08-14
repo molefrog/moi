@@ -38,6 +38,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # workspace template — ignore build artifacts and local state
 workspace/.moi/.build
+workspace/.moi/.cache
 workspace/.moi/.workspace.json
 workspace/.moi/node_modules
 workspace/.env

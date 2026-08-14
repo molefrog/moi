@@ -26,7 +26,7 @@ Claude-only config (`.claude/settings.json` hooks, `.claude/launch.json`) stays 
 ## Data flow
 
 - Each workspace added/imported to moi stores its settings in a `.moi/.workspace.json` file in the workspace folder (hidden filename; `server/layout.ts` is its sole reader/writer).
-- Everything inside `.moi/` is safe to commit, so the same workspace can be shared with others.
+- Everything inside `.moi/` is safe to commit, so the same workspace can be shared with others — except the machine-local dot-dirs: `.build/` (bundler output), `.cache/` (derived artifacts such as applet thumbnails, see `server/thumbnails.ts`), and `.scratchpad/`. All are re-creatable and safe to delete or gitignore.
 - Prefer `.moi/.workspace.json` for state that describes the workspace itself rather than the person or device using it — e.g. chat/thread settings, widget layout, connectors. Litmus test: anyone who clones the workspace should get the same value.
 - Store per-user app state that should follow the local moi installation in the server-side `DATA_DIR`. Expose it through the API and use React Query for client caching and optimistic updates.
 - Store per-browser or per-device UI preferences in `client/store/ui.ts`.

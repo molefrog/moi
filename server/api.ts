@@ -27,13 +27,8 @@ import { applyEnvChanged } from './env-apply'
 import { publishEvent } from './events'
 import { callFunction, parseFunctionPath } from './functions'
 import { processIcon } from './icon'
-import {
-  getWorkspacePreview,
-  loadLayout,
-  mergeLayoutForSave,
-  saveAppletThumbnails,
-  saveLayout
-} from './layout'
+import { getWorkspacePreview, loadLayout, mergeLayoutForSave, saveLayout } from './layout'
+import { getAppletThumbnailRecords, saveAppletThumbnails, serveAppletThumbnail } from './thumbnails'
 import { getClientFrameLog, getWireLog } from './harness/debug'
 import { allHarnesses, harnessFor, isHarnessType } from './harness/registry'
 import { broadcast } from './state'
@@ -151,13 +146,16 @@ one.use('*', withWorkspace)
 
 one.get('/preview', async c => {
   const ws = c.get('ws')
+  const wsId = c.req.param('id')
   const views = await getViewList(ws.path)
   return c.json(
-    await getWorkspacePreview(
-      ws.path,
-      includeFirstUserMessage => harnessFor(ws).workspacePreview(ws, includeFirstUserMessage),
-      views.map(view => view.id)
-    )
+    await getWorkspacePreview(ws.path, {
+      getProviderPreview: includeFirstUserMessage =>
+        harnessFor(ws).workspacePreview(ws, includeFirstUserMessage),
+      viewIds: views.map(view => view.id),
+      thumbnailUrl: (kind, id) =>
+        `/api/workspaces/${wsId}/applet-thumbnails/${kind}/${encodeURIComponent(id)}`
+    })
   )
 })
 
@@ -831,20 +829,32 @@ one.delete('/icon', async c => {
 // DELETE unregisters.
 one.get('/', async c => {
   const ws = c.get('ws')
-  // The client needs thumbnail freshness metadata, while image bytes only
-  // travel through the preview endpoint.
   const layout = await loadLayout(ws.path)
   return c.json({
     ...layout,
-    ...(layout.appletThumbnails && {
-      appletThumbnails: layout.appletThumbnails.map(({ image: _image, ...thumbnail }) => thumbnail)
-    }),
     // Resolved display name: the settings override, or the folder name.
     name: layout.name || basename(ws.path),
     cwd: ws.path,
     provider: ws.type,
     agentId: ws.agentId
   })
+})
+
+// Thumbnail freshness records, without image bytes — the capture hook compares
+// these against live bundle revisions. Images are served per-applet below.
+one.get('/applet-thumbnails', async c =>
+  c.json({ thumbnails: await getAppletThumbnailRecords(c.get('ws').path) })
+)
+
+one.get('/applet-thumbnails/:kind/:name', c => {
+  const kind = c.req.param('kind')
+  if (kind !== 'widget' && kind !== 'view') return c.text('Not found', 404)
+  return serveAppletThumbnail(
+    c.get('ws').path,
+    kind,
+    c.req.param('name'),
+    c.req.header('if-none-match')
+  )
 })
 
 // Settled widget and view visits share one batch endpoint and storage path.
@@ -864,7 +874,8 @@ one.put('/applet-thumbnails', async c => {
         typeof thumbnail.revision === 'string' &&
         (thumbnail.image === undefined ||
           thumbnail.image === null ||
-          typeof thumbnail.image === 'string')
+          typeof thumbnail.image === 'string') &&
+        (thumbnail.captureMs === undefined || typeof thumbnail.captureMs === 'number')
     )
   if (!valid) return c.text('Bad request', 400)
   await saveAppletThumbnails(c.get('ws').path, input.kind, input.thumbnails)
