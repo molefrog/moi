@@ -5,7 +5,7 @@ import { formatHex } from 'culori'
 import { parse as devalueParse } from 'devalue'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'path'
+import { dirname, join, resolve } from 'path'
 import pc from './cli-pc'
 
 import { isAgentCaller } from './agent-caller'
@@ -61,6 +61,7 @@ import { updateWorkspaceSkills } from './skill-update'
 import {
   ServiceError,
   analyzeInstall,
+  captureServiceEnv,
   installService,
   queryServerInfo,
   restartService,
@@ -2393,6 +2394,25 @@ const serviceInstall = defineCommand({
         serviceFail(err)
       }
     }
+    const port = args.port ? Number(args.port) : undefined
+    if (port !== undefined && (!Number.isInteger(port) || port < 1 || port > 65535)) {
+      serviceFail(new ServiceError(`Invalid --port value "${args.port}" — use a port number.`))
+    }
+    // citty hands back an array when the flag repeats — accept both shapes.
+    const envArg = Array.isArray(args.env) ? args.env.join(',') : args.env
+    const extraEnv = (envArg ?? '')
+      .split(',')
+      .map(k => k.trim())
+      .filter(Boolean)
+    const serviceEnv = captureServiceEnv(process.env, dirname(process.execPath), extraEnv)
+    const missingEnv = extraEnv.filter(key => !(key in serviceEnv))
+    if (missingEnv.length > 0) {
+      serviceFail(
+        new ServiceError(
+          `--env ${missingEnv.join(', ')}: not set in this shell (or the value is not capturable).`
+        )
+      )
+    }
     // A foreground `moi start` holds the same ports the service needs. Refuse
     // rather than install a unit that instantly fails on bind.
     const runningInfo = await queryServerInfo()
@@ -2406,16 +2426,6 @@ const serviceInstall = defineCommand({
         )
       )
     }
-    const port = args.port ? Number(args.port) : undefined
-    if (port !== undefined && (!Number.isInteger(port) || port < 1 || port > 65535)) {
-      serviceFail(new ServiceError(`Invalid --port value "${args.port}" — use a port number.`))
-    }
-    // citty hands back an array when the flag repeats — accept both shapes.
-    const envArg = Array.isArray(args.env) ? args.env.join(',') : args.env
-    const extraEnv = (envArg ?? '')
-      .split(',')
-      .map(k => k.trim())
-      .filter(Boolean)
     try {
       const result = await installService({ port, extraEnv })
       console.log(
