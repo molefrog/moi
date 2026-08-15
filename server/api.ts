@@ -28,7 +28,12 @@ import { publishEvent } from './events'
 import { callFunction, parseFunctionPath } from './functions'
 import { processIcon } from './icon'
 import { getWorkspacePreview, loadLayout, mergeLayoutForSave, saveLayout } from './layout'
-import { getAppletThumbnailRecords, saveAppletThumbnails, serveAppletThumbnail } from './thumbnails'
+import {
+  getAppletThumbnailRecords,
+  isValidAppletId,
+  saveAppletThumbnails,
+  serveAppletThumbnail
+} from './thumbnails'
 import { getClientFrameLog, getWireLog } from './harness/debug'
 import { allHarnesses, harnessFor, isHarnessType } from './harness/registry'
 import { broadcast } from './state'
@@ -871,6 +876,7 @@ one.put('/applet-thumbnails', async c => {
         typeof thumbnail === 'object' &&
         !Array.isArray(thumbnail) &&
         typeof thumbnail.id === 'string' &&
+        isValidAppletId(thumbnail.id) &&
         typeof thumbnail.revision === 'string' &&
         (thumbnail.image === undefined ||
           thumbnail.image === null ||

@@ -53,11 +53,31 @@ async function runBunInstall(moiDir: string): Promise<number> {
 // derived caches (applet thumbnails), and installed dependencies are all
 // re-creatable and would otherwise churn or bloat the repo. The applet sources,
 // package.json, and lockfile stay committable — they ARE the workspace.
+const REQUIRED_IGNORES = ['.build/', '.cache/', 'node_modules/'] as const
+
 export const MOI_GITIGNORE = `# moi internals — machine-local, re-creatable state
-.build/
-.cache/
-node_modules/
+${REQUIRED_IGNORES.join('\n')}
 `
+
+// Create `.moi/.gitignore` when missing, or append required entries a
+// pre-gitignore or hand-edited file lacks. Never rewrites existing content —
+// user additions survive. Safe to call often; no-ops once the file is right.
+export async function ensureMoiGitignore(workspacePath: string): Promise<void> {
+  const moiDir = join(workspacePath, '.moi')
+  if (!(await isDirectory(moiDir))) return
+  const path = join(moiDir, '.gitignore')
+  const file = Bun.file(path)
+  if (!(await file.exists())) {
+    await Bun.write(path, MOI_GITIGNORE)
+    return
+  }
+  const text = await file.text()
+  // Match entries with or without the trailing slash or a leading slash.
+  const present = new Set(text.split('\n').map(line => line.trim().replace(/^\/|\/$/g, '')))
+  const missing = REQUIRED_IGNORES.filter(entry => !present.has(entry.replace(/\/$/, '')))
+  if (missing.length === 0) return
+  await Bun.write(path, `${text.replace(/\n*$/, '\n')}${missing.join('\n')}\n`)
+}
 
 // Ambient types for applets (widgets & views). Editor DX only — the moi
 // bundler resolves the `moi` module and asset imports at build time without any
@@ -144,13 +164,18 @@ export async function scaffoldMoiDir(
   }
   const moiDir = join(workspacePath, '.moi')
   const packagePath = join(moiDir, 'package.json')
-  if (await Bun.file(packagePath).exists()) return 'exists'
+  if (await Bun.file(packagePath).exists()) {
+    // Repair path: workspaces scaffolded before `.moi/.gitignore` existed pick
+    // it up on the next `moi init` instead of leaking cache files into git.
+    await ensureMoiGitignore(workspacePath)
+    return 'exists'
+  }
   // A bare `.moi/` dir without package.json counts as not-bootstrapped —
   // fill in the missing pieces.
 
   await mkdir(join(moiDir, 'widgets'), { recursive: true })
   await Bun.write(packagePath, JSON.stringify(MOI_PACKAGE_JSON, null, 2) + '\n')
-  await Bun.write(join(moiDir, '.gitignore'), MOI_GITIGNORE)
+  await ensureMoiGitignore(workspacePath)
   await writeAppletEnvDts(workspacePath)
 
   const exited = installDependencies(moiDir)

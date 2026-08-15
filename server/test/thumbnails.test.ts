@@ -87,6 +87,17 @@ describe('saveAppletThumbnails', () => {
     ])
     expect(await getAppletThumbnailRecords(dir)).toEqual([])
   })
+
+  test('drops ids that would escape the cache directory', async () => {
+    await saveAppletThumbnails(dir, 'widget', [
+      { id: '../../escape', revision: 'r', image: image('escape') },
+      { id: 'safe', revision: 'r', image: image('safe') }
+    ])
+    const records = await getAppletThumbnailRecords(dir)
+    expect(records.map(record => record.id)).toEqual(['safe'])
+    // `widget-../../escape.webp` would have landed one level above the cache.
+    expect(await Bun.file(join(getThumbnailsDir(dir), '..', 'escape.webp')).exists()).toBe(false)
+  })
 })
 
 describe('pruneAppletThumbnails', () => {

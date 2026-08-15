@@ -9,11 +9,22 @@ import { join } from 'node:path'
 
 import type { AppletKind, AppletThumbnail, AppletThumbnailBatch } from '@/lib/types'
 
+import { ensureMoiGitignore } from './moi-scaffold'
+
 // Index records carry the image file name (`widget-clock.webp`) so existence
 // and content type never need an fs probe. Server-internal — the API strips it.
 type StoredAppletThumbnail = AppletThumbnail & { file?: string }
 
 const INDEX_FILE = 'index.json'
+
+// Applet ids become file names under the cache dir, so anything outside this
+// set (`../`, separators) is a path-traversal attempt. Enforced on every
+// entry point that derives a path — the PUT batch, prune, and serve.
+const APPLET_ID_RE = /^[a-zA-Z0-9_-]+$/
+
+export function isValidAppletId(id: string): boolean {
+  return APPLET_ID_RE.test(id)
+}
 
 const DATA_URL_RE = /^data:(image\/(?:webp|png|jpeg));base64,([A-Za-z0-9+/=]+)$/
 
@@ -79,10 +90,14 @@ export function saveAppletThumbnails(
   return enqueue(workspacePath, async () => {
     const dir = getThumbnailsDir(workspacePath)
     await mkdir(dir, { recursive: true })
+    // The cache must be ignored the moment it can hold data — this is also the
+    // backfill path for workspaces scaffolded before `.moi/.gitignore` existed.
+    await ensureMoiGitignore(workspacePath)
     const now = new Date().toISOString()
     const records = await loadIndex(dir)
 
     for (const update of updates) {
+      if (!isValidAppletId(update.id)) continue
       const index = records.findIndex(record => record.kind === kind && record.id === update.id)
       const previous = index >= 0 ? records[index] : undefined
 
@@ -163,7 +178,7 @@ export async function serveAppletThumbnail(
   id: string,
   ifNoneMatch?: string | null
 ): Promise<Response> {
-  if (!/^[a-zA-Z0-9_-]+$/.test(id)) return new Response('Invalid id', { status: 400 })
+  if (!isValidAppletId(id)) return new Response('Invalid id', { status: 400 })
   const dir = getThumbnailsDir(workspacePath)
   const records = await loadIndex(dir)
   const record = records.find(item => item.kind === kind && item.id === id)
