@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'path'
 
-import { scaffoldMoiDir } from '../moi-scaffold'
+import { ensureMoiGitignore, scaffoldMoiDir } from '../moi-scaffold'
 import { silenceConsole } from './quiet'
 
 // The scaffold backstop: `scaffoldMoiDir` must refuse to create a `.moi/` inside
@@ -45,6 +45,11 @@ describe('scaffoldMoiDir install', () => {
     expect(existsSync(join(moiDir, 'package.json'))).toBe(true)
     expect(existsSync(join(moiDir, 'widgets'))).toBe(true)
     expect(await Bun.file(join(moiDir, 'applet-env.d.ts')).text()).toContain('icon?: string')
+    // Machine-local state must never end up committed in a workspace repo.
+    const gitignore = await Bun.file(join(moiDir, '.gitignore')).text()
+    for (const entry of ['.build/', '.cache/', 'node_modules/']) {
+      expect(gitignore).toContain(entry)
+    }
   })
 
   test('returns "installing" when the install outlives the wait', async () => {
@@ -71,5 +76,31 @@ describe('scaffoldMoiDir install', () => {
 
     expect(result).toBe('exists')
     expect(installs).toBe(0)
+    // The repair path: pre-gitignore workspaces pick the file up on re-init.
+    expect(existsSync(join(moiDir, '.gitignore'))).toBe(true)
+  })
+})
+
+describe('ensureMoiGitignore', () => {
+  test('appends missing entries without touching user content', async () => {
+    const moiDir = join(WS, '.moi')
+    mkdirSync(moiDir, { recursive: true })
+    writeFileSync(join(moiDir, '.gitignore'), '# mine\nsecrets.txt\n.build/\n')
+
+    await ensureMoiGitignore(WS)
+
+    const text = await Bun.file(join(moiDir, '.gitignore')).text()
+    expect(text).toContain('# mine\nsecrets.txt\n.build/\n')
+    expect(text).toContain('.cache/')
+    expect(text).toContain('node_modules/')
+
+    // A complete file is left byte-identical.
+    await ensureMoiGitignore(WS)
+    expect(await Bun.file(join(moiDir, '.gitignore')).text()).toBe(text)
+  })
+
+  test('does nothing when the workspace has no .moi directory', async () => {
+    await ensureMoiGitignore(WS)
+    expect(existsSync(join(WS, '.moi'))).toBe(false)
   })
 })
