@@ -12,7 +12,6 @@ import {
 } from '@tabler/icons-react'
 
 import { IconGhost } from '@/client/components/shared/IconGhost'
-import { canAnnotateWorkspaceContent } from '@/client/features/drawings/annotation-availability'
 import { DrawingLayer } from '@/client/features/drawings/DrawingLayer'
 import { DrawingToolbar } from '@/client/features/drawings/DrawingToolbar'
 import { useChatAnnotation } from '@/client/features/drawings/useChatAnnotation'
@@ -311,11 +310,9 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       ? activeBuilder
       : undefined
   const activeDraftBuilderId = activeDraftBuilder?.id
-  const canAnnotate = canAnnotateWorkspaceContent(
-    activeTab,
-    widgetMode === 'idle',
-    activeView !== undefined
-  )
+  const canAnnotate =
+    widgetMode === 'idle' &&
+    ((activeTab === 'widgets' && widgets.length > 0) || activeView !== undefined)
   const annotation = useChatAnnotation({
     workspaceId,
     sessionId,
@@ -574,7 +571,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       composerAvailability={composerAvailability}
       send={send}
       stop={stop}
-      onSelectSession={selectSession}
       onClose={() => setMode('fullscreen')}
       annotation={annotation.docked}
       builderDraft={builderChatDraft}
@@ -595,13 +591,12 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       composerAvailability={composerAvailability}
       send={send}
       stop={stop}
-      onSelectSession={selectSession}
     />
   )
   const workspacePanel = (
     <div
       className={cn(
-        'flex h-full min-h-0 min-w-0 flex-1 flex-col-reverse overflow-hidden bg-background shadow-md transition-[border-radius]',
+        '@container/workspace relative flex h-full min-h-0 min-w-0 flex-1 flex-col-reverse overflow-hidden bg-background shadow-md transition-[border-radius]',
         mode === 'split' && 'rounded-xl'
       )}
     >
@@ -672,6 +667,10 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
         </DrawingLayer>
       </div>
 
+      <AnimatePresence>
+        {widgetMode === 'customizing' && <CustomizePanel onClose={() => setWidgetMode('idle')} />}
+      </AnimatePresence>
+
       <PanelHeader>
         <div className="flex min-w-0 flex-1 items-center gap-4">
           <div className="flex items-center gap-2">
@@ -723,10 +722,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
         )}
       </div>
 
-      <AnimatePresence>
-        {widgetMode === 'customizing' && <CustomizePanel onClose={() => setWidgetMode('idle')} />}
-      </AnimatePresence>
-
       {mode === 'fullscreen' && activeTab !== 'agent' && hasWorkspaceContent && (
         <ChatPopup
           loading={hasRunningSession}
@@ -751,7 +746,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               composerAvailability={composerAvailability}
               send={send}
               stop={stop}
-              onSelectSession={selectSession}
               onClose={onClose}
               annotation={annotation.popup}
               builderDraft={builderChatDraft}

@@ -48,6 +48,7 @@ describe('ViewBuilder', () => {
     expect(waiting).toContain('The view needs your attention')
     expect(waiting).toContain('Drawing area')
     expect(building).toContain('Drawing area')
+    expect(building).toContain('data-slot="spinner"')
     expect(renderBuilder('waiting', false)).toContain('The view needs your attention')
     expect(renderBuilder('building', false)).toContain('Drawing area')
   })

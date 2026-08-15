@@ -24,14 +24,25 @@ const RADIUS_OPTIONS = Object.entries(RADIUS_THEMES) as [RadiusTheme, RadiusThem
 
 type CustomizeOptionGroupProps = {
   children: ReactNode
+  className?: string
+  gridClassName?: string
   label: string
 }
 
-function CustomizeOptionGroup({ children, label }: CustomizeOptionGroupProps) {
+function CustomizeOptionGroup({
+  children,
+  className,
+  gridClassName,
+  label
+}: CustomizeOptionGroupProps) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className={cn('flex flex-col gap-2', className)}>
       <p className="text-xs font-medium">{label}</p>
-      <div role="group" aria-label={label} className="grid grid-cols-4 gap-2">
+      <div
+        role="group"
+        aria-label={label}
+        className={cn('grid grid-cols-4 gap-2 @4xl/workspace:grid-cols-2', gridClassName)}
+      >
         {children}
       </div>
     </div>
@@ -81,9 +92,12 @@ export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
   }
 
   return (
-    <BottomPanel ref={ref} title="Customize" onClose={onClose}>
-      <div className="flex flex-col gap-4">
-        <CustomizeOptionGroup label="Font">
+    <BottomPanel ref={ref} title="Customize" onClose={onClose} className="@4xl/workspace:max-w-4xl">
+      <div className="grid grid-cols-1 gap-4 @4xl/workspace:grid-cols-[repeat(2,minmax(0,1fr))_0.5rem_repeat(2,minmax(0,1fr))_0.5rem_minmax(0,1fr)] @4xl/workspace:gap-x-2">
+        <CustomizeOptionGroup
+          label="Font"
+          className="@4xl/workspace:col-span-2 @4xl/workspace:col-start-1"
+        >
           {FONT_OPTIONS.map(([key, config]) => (
             <CustomizeOption
               key={key}
@@ -96,7 +110,10 @@ export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
           ))}
         </CustomizeOptionGroup>
 
-        <CustomizeOptionGroup label="Colors">
+        <CustomizeOptionGroup
+          label="Colors"
+          className="@4xl/workspace:col-span-2 @4xl/workspace:col-start-4"
+        >
           {COLOR_OPTIONS.map(([key, preset]) => (
             <CustomizeOption
               key={key}
@@ -122,7 +139,11 @@ export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
           ))}
         </CustomizeOptionGroup>
 
-        <CustomizeOptionGroup label="Radius">
+        <CustomizeOptionGroup
+          label="Radius"
+          className="@4xl/workspace:col-start-7"
+          gridClassName="@4xl/workspace:grid-cols-1"
+        >
           {RADIUS_OPTIONS.map(([key, preset]) => (
             <CustomizeOption
               key={key}

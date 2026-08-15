@@ -1,5 +1,15 @@
 import type { PreviewBlock, StreamEvent } from './format'
 
+// A custom UI unit embedded in a workspace.
+export type AppletKind = 'view' | 'widget'
+
+export type AppletInfo = {
+  id: string
+  // Content revision of the built bundle (`<size>-<mtime>` of index.js).
+  // Absent when the build output cannot be statted.
+  revision?: string
+}
+
 export type WidgetConfig = {
   rowSpan: 1 | 2 | 3 | 4
   colSpan: 1 | 2 | 3 | 4
@@ -9,14 +19,8 @@ export type WidgetConfig = {
   requiredEnv?: string[]
 }
 
-export type WidgetInfo = {
-  id: string
+export type WidgetInfo = AppletInfo & {
   config: WidgetConfig
-  // Content tag of the built bundle (`<size>-<mtime>` of its index.js) —
-  // changes whenever the widget is rebundled. Clients compare it against
-  // `WidgetThumbnail.tag` to decide which thumbnails are stale. Absent when
-  // the build output can't be statted.
-  tag?: string
 }
 
 // A view is a full-screen, agent-authored "app" (`.moi/views/<name>.tsx`),
@@ -31,18 +35,11 @@ export type ViewConfig = {
   requiredEnv?: string[]
 }
 
-export type ViewInfo = {
-  id: string
+export type ViewInfo = AppletInfo & {
   config: ViewConfig
 }
 
 export type ViewBuilderStatus = 'draft' | 'building' | 'waiting' | 'ready'
-
-// The kind of an applet — a custom UI unit embedded in a workspace. Shared by
-// the bundler pipeline and the build-status records. On a builder record the
-// field is absent for rows written before it existed; treat a missing kind as
-// 'view' (only views surface in the UI — the view builder page is view-only).
-export type AppletKind = 'view' | 'widget'
 
 export type ViewBuilderInput = {
   requirements: string
@@ -551,32 +548,40 @@ export type WorkspaceLayout = {
   // Fast-mode default for new sessions. Undefined inherits the provider setting.
   selectedFastMode?: boolean
   theme?: import('./themes').WorkspaceTheme
-  // Widget thumbnails captured client-side from the live grid, used for
-  // home-screen previews. Saved through their own endpoint (PUT
-  // .../thumbnails), never through the layout PUT.
-  widgetThumbnails?: WidgetThumbnails
 }
 
-export type WidgetThumbnails = {
-  // Fingerprint of the grid state the set was captured from (visible widget
-  // ids + their bundle tags — see widgetThumbnailsKey()). A mismatch with the
-  // live grid re-captures the whole set.
-  key?: string
-  // Server-stamped ISO time of the last save. Widget DATA drifts even when
-  // bundles don't (a dashboard captured in January still shows January), so
-  // an old-enough set re-captures despite a matching key.
-  at?: string
-  // Widget id → WebP data URL (white background, the widget's own aspect
-  // ratio). Entries merge, never prune: a removed widget keeps its last image
-  // in case it comes back. Heavy — the layout GET strips this field; images
-  // reach the home screen via the preview endpoint.
-  images?: Record<string, string>
+// One applet's thumbnail freshness record. Image bytes live as files in the
+// workspace's `.moi/.cache/thumbnails/` (server/thumbnails.ts), never in
+// `.workspace.json` — the layout file stays small and commit-safe.
+export type AppletThumbnail = {
+  kind: AppletKind
+  id: string
+  revision: string
+  capturedAt: string
+  viewedAt: string
+  // How long the last successful capture took on this client, in ms. Lets the
+  // capture hook skip routine re-captures of applets that are slow to
+  // screenshot (see SLOW_CAPTURE_MS) instead of janking the main thread.
+  captureMs?: number
 }
 
-// Home-screen workspace card preview: a few captured widget thumbnails (WebP
-// data URLs) from the stored layout, rendered as a loose stack, plus the latest
-// provider session activity. A workspace with no widgets may instead carry its
-// oldest session's first user message.
+export type AppletThumbnailUpdate = {
+  id: string
+  revision: string
+  // A string replaces the stored image, null records a failed or skipped
+  // attempt (the previous image survives), undefined only touches recency.
+  image?: string | null
+  captureMs?: number
+}
+
+export type AppletThumbnailBatch = {
+  kind: AppletKind
+  thumbnails: AppletThumbnailUpdate[]
+}
+
+// Home-screen workspace card preview: widgets in grid order, then recent views,
+// capped to the loose stack's visible depth. A workspace with no captured
+// applets may instead carry its oldest session's first message.
 export type WorkspacePreview = {
   thumbnails: string[]
   firstUserMessage?: string

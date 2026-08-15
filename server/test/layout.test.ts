@@ -3,9 +3,10 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-import type { WorkspaceLayout } from '@/lib/types'
+import type { AppletKind, WorkspaceLayout } from '@/lib/types'
 
 import { getLayoutPath, getWorkspacePreview, loadLayout, mergeLayoutForSave } from '../layout'
+import { getThumbnailsDir } from '../thumbnails'
 
 // The grid editor and `moi config` write the same `.workspace.json`. A layout
 // PUT is authoritative for the editor fields but must NOT touch identity
@@ -33,6 +34,33 @@ async function withWorkspaceFile<T>(
     await rm(dir, { recursive: true, force: true })
   }
 }
+
+// Seed the `.moi/.cache/thumbnails` store the preview reads from. Writing the
+// index directly keeps `viewedAt` controllable (saves stamp the server clock).
+async function seedThumbnails(
+  dir: string,
+  records: { kind: AppletKind; id: string; viewedAt?: string }[]
+) {
+  const cacheDir = getThumbnailsDir(dir)
+  await mkdir(cacheDir, { recursive: true })
+  const index = []
+  for (const record of records) {
+    const file = `${record.kind}-${record.id}.webp`
+    await Bun.write(join(cacheDir, file), 'bytes')
+    index.push({
+      kind: record.kind,
+      id: record.id,
+      revision: 'revision',
+      capturedAt: '2026-01-01T00:00:00.000Z',
+      viewedAt: record.viewedAt ?? '2026-01-01T00:00:00.000Z',
+      file
+    })
+  }
+  await Bun.write(join(cacheDir, 'index.json'), JSON.stringify(index))
+}
+
+// Deterministic URL shape for assertions; the real one is the API route.
+const thumbnailUrl = (kind: AppletKind, id: string) => `${kind}:${id}`
 
 describe('loadLayout', () => {
   test('opens a new workspace in split view with the default tabs', async () => {
@@ -120,6 +148,23 @@ describe('loadLayout', () => {
       }
     )
   })
+
+  test('drops legacy thumbnail caches without migrating them', async () => {
+    await withWorkspaceFile(
+      {
+        ...base,
+        widgetThumbnails: { key: 'old', images: { widget: 'image' } },
+        viewThumbnails: [{ viewId: 'view', image: 'image' }],
+        appletThumbnails: [{ kind: 'widget', id: 'w', revision: 'r', image: 'inline-image' }]
+      },
+      async dir => {
+        const loaded = await loadLayout(dir)
+        expect('widgetThumbnails' in loaded).toBe(false)
+        expect('viewThumbnails' in loaded).toBe(false)
+        expect('appletThumbnails' in loaded).toBe(false)
+      }
+    )
+  })
 })
 
 describe('mergeLayoutForSave', () => {
@@ -177,6 +222,14 @@ describe('mergeLayoutForSave', () => {
     expect(merged.theme).toEqual({ font: 'sans', color: 'rose', radius: 'square' })
     expect(merged.name).toBe('Keep')
   })
+
+  test('never lets a stale client write thumbnail records back into the layout', () => {
+    const body = {
+      ...base,
+      appletThumbnails: [{ kind: 'widget', id: 'w', image: 'inline-image' }]
+    } as unknown as WorkspaceLayout
+    expect('appletThumbnails' in mergeLayoutForSave(base, body)).toBe(false)
+  })
 })
 
 describe('getWorkspacePreview', () => {
@@ -192,7 +245,7 @@ describe('getWorkspacePreview', () => {
         theme
       },
       async dir => {
-        expect(await getWorkspacePreview(dir)).toEqual({
+        expect(await getWorkspacePreview(dir, { thumbnailUrl })).toEqual({
           thumbnails: [],
           theme
         })
@@ -209,20 +262,58 @@ describe('getWorkspacePreview', () => {
           { i: 'fourth', x: 0, y: 3 },
           { i: 'right', x: 2, y: 0 },
           { i: 'left', x: 0, y: 0 }
-        ],
-        widgetThumbnails: {
-          images: {
-            stale: 'stale-image',
-            right: 'right-image',
-            bottom: 'bottom-image',
-            fourth: 'fourth-image',
-            left: 'left-image'
-          }
-        }
+        ]
       },
       async dir => {
-        expect(await getWorkspacePreview(dir)).toEqual({
-          thumbnails: ['left-image', 'right-image', 'bottom-image']
+        await seedThumbnails(dir, [
+          { kind: 'widget', id: 'stale' },
+          { kind: 'widget', id: 'right' },
+          { kind: 'widget', id: 'bottom' },
+          { kind: 'widget', id: 'fourth' },
+          { kind: 'widget', id: 'left' }
+        ])
+        expect(await getWorkspacePreview(dir, { thumbnailUrl })).toEqual({
+          thumbnails: ['widget:left', 'widget:right', 'widget:bottom']
+        })
+      }
+    )
+  })
+
+  test('puts widgets first and fills remaining slots with recent views', async () => {
+    await withWorkspaceFile(
+      {
+        ...base,
+        widgetGrid: [{ i: 'widget', x: 0, y: 0 }]
+      },
+      async dir => {
+        await seedThumbnails(dir, [
+          { kind: 'widget', id: 'widget' },
+          { kind: 'view', id: 'deleted', viewedAt: '2026-01-04T00:00:00.000Z' },
+          { kind: 'view', id: 'recent', viewedAt: '2026-01-03T00:00:00.000Z' },
+          { kind: 'view', id: 'older', viewedAt: '2026-01-02T00:00:00.000Z' }
+        ])
+        expect(
+          await getWorkspacePreview(dir, { viewIds: ['older', 'recent'], thumbnailUrl })
+        ).toEqual({
+          thumbnails: ['widget:widget', 'view:recent', 'view:older']
+        })
+      }
+    )
+  })
+
+  test('uses widgets when stored view thumbnails belong to deleted views', async () => {
+    await withWorkspaceFile(
+      {
+        ...base,
+        widgetGrid: [{ i: 'widget', x: 0, y: 0 }]
+      },
+      async dir => {
+        await seedThumbnails(dir, [
+          { kind: 'widget', id: 'widget' },
+          { kind: 'view', id: 'deleted' }
+        ])
+        expect(await getWorkspacePreview(dir, { viewIds: [], thumbnailUrl })).toEqual({
+          thumbnails: ['widget:widget']
         })
       }
     )
@@ -231,10 +322,13 @@ describe('getWorkspacePreview', () => {
   test('loads and normalizes the first user message when the grid is empty', async () => {
     await withWorkspaceFile(base, async dir => {
       const message = `  ${'A'.repeat(260)}\nsecond line  `
-      const preview = await getWorkspacePreview(dir, async includeFirstUserMessage => ({
-        firstUserMessage: includeFirstUserMessage ? message : undefined,
-        updatedAt: 900
-      }))
+      const preview = await getWorkspacePreview(dir, {
+        getProviderPreview: async includeFirstUserMessage => ({
+          firstUserMessage: includeFirstUserMessage ? message : undefined,
+          updatedAt: 900
+        }),
+        thumbnailUrl
+      })
 
       expect(preview.thumbnails).toEqual([])
       expect(preview.updatedAt).toBe(900)
@@ -244,19 +338,22 @@ describe('getWorkspacePreview', () => {
     })
   })
 
-  test('loads the message fallback when widgets exist without screenshots', async () => {
+  test('loads the message fallback when widgets exist without thumbnails', async () => {
     await withWorkspaceFile(
       {
         ...base,
         widgetGrid: [{ i: 'waiting-for-thumbnail', x: 0, y: 0 }]
       },
       async dir => {
-        const preview = await getWorkspacePreview(dir, async includeFirstUserMessage => {
-          expect(includeFirstUserMessage).toBe(true)
-          return {
-            firstUserMessage: 'Shown until a capture lands',
-            updatedAt: 900
-          }
+        const preview = await getWorkspacePreview(dir, {
+          getProviderPreview: async includeFirstUserMessage => {
+            expect(includeFirstUserMessage).toBe(true)
+            return {
+              firstUserMessage: 'Shown until a capture lands',
+              updatedAt: 900
+            }
+          },
+          thumbnailUrl
         })
 
         expect(preview).toEqual({
@@ -268,35 +365,46 @@ describe('getWorkspacePreview', () => {
     )
   })
 
-  test('does not load the message fallback when screenshots exist', async () => {
+  test('does not load the message fallback when thumbnails exist', async () => {
     await withWorkspaceFile(
       {
         ...base,
-        widgetGrid: [{ i: 'captured', x: 0, y: 0 }],
-        widgetThumbnails: { images: { captured: 'captured-image' } }
+        widgetGrid: [{ i: 'captured', x: 0, y: 0 }]
       },
       async dir => {
-        const preview = await getWorkspacePreview(dir, async includeFirstUserMessage => {
-          expect(includeFirstUserMessage).toBe(false)
-          return {
-            firstUserMessage: 'Should stay hidden',
-            updatedAt: 900
-          }
+        await seedThumbnails(dir, [{ kind: 'widget', id: 'captured' }])
+        const preview = await getWorkspacePreview(dir, {
+          getProviderPreview: async includeFirstUserMessage => {
+            expect(includeFirstUserMessage).toBe(false)
+            return {
+              firstUserMessage: 'Should stay hidden',
+              updatedAt: 900
+            }
+          },
+          thumbnailUrl
         })
 
-        expect(preview).toEqual({ thumbnails: ['captured-image'], updatedAt: 900 })
+        expect(preview).toEqual({ thumbnails: ['widget:captured'], updatedAt: 900 })
       }
     )
   })
 
   test('keeps an empty folder when the fallback is empty or unreadable', async () => {
     await withWorkspaceFile(base, async dir => {
-      expect(await getWorkspacePreview(dir, async () => ({ firstUserMessage: ' \n ' }))).toEqual({
+      expect(
+        await getWorkspacePreview(dir, {
+          getProviderPreview: async () => ({ firstUserMessage: ' \n ' }),
+          thumbnailUrl
+        })
+      ).toEqual({
         thumbnails: []
       })
       expect(
-        await getWorkspacePreview(dir, async () => {
-          throw new Error('unreadable session')
+        await getWorkspacePreview(dir, {
+          getProviderPreview: async () => {
+            throw new Error('unreadable session')
+          },
+          thumbnailUrl
         })
       ).toEqual({ thumbnails: [] })
     })

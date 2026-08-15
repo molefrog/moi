@@ -43,25 +43,48 @@ function themeColorProperty(token: ThemeColorToken): `--${string}` {
   return `--${name}`
 }
 
-export function getWorkspaceThemeStyle(
+export function getWorkspaceThemeFontStyle(theme: WorkspaceLayout['theme']): WorkspaceThemeStyle {
+  const style: WorkspaceThemeStyle = {}
+  const resolved = resolveWorkspaceTheme(theme)
+  const font = FONT_THEMES[resolved.font] ?? FONT_THEMES[DEFAULT_WORKSPACE_THEME.font]
+  for (const [token, property] of WORKSPACE_FONT_PROPERTIES) {
+    style[property] = font[token]
+  }
+  return style
+}
+
+export function getWorkspaceThemeColorStyle(
   theme: WorkspaceLayout['theme'],
   colorMode: ThemeColorMode = 'workspace'
 ): WorkspaceThemeStyle {
   const style: WorkspaceThemeStyle = {}
   const resolved = resolveWorkspaceTheme(theme)
-  const font = FONT_THEMES[resolved.font] ?? FONT_THEMES[DEFAULT_WORKSPACE_THEME.font]
   const color = COLOR_THEMES[resolved.color] ?? COLOR_THEMES[DEFAULT_WORKSPACE_THEME.color]
   const primary = color.primary ?? (colorMode === 'widget' ? DEFAULT_PRIMARY_COLOR : undefined)
   const colors = primary ? deriveThemeColors(primary, colorMode) : undefined
-  const radius = RADIUS_THEMES[resolved.radius] ?? RADIUS_THEMES[DEFAULT_WORKSPACE_THEME.radius]
-  for (const [token, property] of WORKSPACE_FONT_PROPERTIES) {
-    style[property] = font[token]
-  }
   for (const [token, property] of WORKSPACE_COLOR_PROPERTIES) {
     style[property] = colors?.[token]
   }
+  return style
+}
+
+export function getWorkspaceThemeRadiusStyle(theme: WorkspaceLayout['theme']): WorkspaceThemeStyle {
+  const style: WorkspaceThemeStyle = {}
+  const resolved = resolveWorkspaceTheme(theme)
+  const radius = RADIUS_THEMES[resolved.radius] ?? RADIUS_THEMES[DEFAULT_WORKSPACE_THEME.radius]
   style[WORKSPACE_RADIUS_PROPERTY] = radius.radius
   return style
+}
+
+export function getWorkspaceThemeStyle(
+  theme: WorkspaceLayout['theme'],
+  colorMode: ThemeColorMode = 'workspace'
+): WorkspaceThemeStyle {
+  return {
+    ...getWorkspaceThemeFontStyle(theme),
+    ...getWorkspaceThemeColorStyle(theme, colorMode),
+    ...getWorkspaceThemeRadiusStyle(theme)
+  }
 }
 
 export function usePreloadWorkspaceFonts() {

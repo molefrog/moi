@@ -23,6 +23,7 @@ import {
   buildApplet,
   scanRelativeImports
 } from './bundler/build-applet'
+import { pruneAppletThumbnails } from './thumbnails'
 
 export type AppletPaths = {
   moiRoot: string
@@ -38,6 +39,20 @@ export function getAppletPaths(workspacePath: string, kind: AppletKind): AppletP
   const buildDir = join(moiRoot, '.build', dir)
   const manifestPath = join(buildDir, 'manifest.json')
   return { moiRoot, sourceDir, buildDir, manifestPath }
+}
+
+export function getAppletRevision(
+  workspacePath: string,
+  kind: AppletKind,
+  id: string
+): string | undefined {
+  try {
+    const { buildDir } = getAppletPaths(workspacePath, kind)
+    const stat = statSync(join(buildDir, id, 'index.js'))
+    return `${stat.size}-${Math.trunc(stat.mtimeMs)}`
+  } catch {
+    return undefined
+  }
 }
 
 // Source module names in a kind's directory: `*.tsx`/`*.ts` minus `.server.ts`
@@ -580,6 +595,8 @@ export async function buildApplets<C>(
     await mkdir(buildDir, { recursive: true })
   }
   await pruneStaleBuilds(buildDir, new Set(names))
+  // A deleted applet's thumbnail dies with its bundle.
+  await pruneAppletThumbnails(workspacePath, kind, names)
 
   const jobs = await Promise.all(
     names.map(async name => {

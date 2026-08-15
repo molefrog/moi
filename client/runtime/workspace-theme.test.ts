@@ -8,7 +8,12 @@ import {
   deriveThemeColors
 } from '@/lib/themes'
 
-import { getWorkspaceThemeStyle } from './workspace-theme'
+import {
+  getWorkspaceThemeColorStyle,
+  getWorkspaceThemeFontStyle,
+  getWorkspaceThemeRadiusStyle,
+  getWorkspaceThemeStyle
+} from './workspace-theme'
 
 describe('getWorkspaceThemeStyle', () => {
   test('uses the default workspace theme variables', () => {
@@ -42,6 +47,28 @@ describe('getWorkspaceThemeStyle', () => {
       '--accent': colors.accent,
       '--accent-foreground': colors.accentForeground,
       '--border': colors.border,
+      '--radius': RADIUS_THEMES.squishy.radius
+    })
+  })
+
+  test('builds font, color, and radius styles independently', () => {
+    const theme = { font: 'blobby', color: 'paper', radius: 'squishy' } as const
+    const primary = COLOR_THEMES.paper.primary
+    if (!primary) throw new Error('expected paper primary')
+    const colors = deriveThemeColors(primary)
+
+    expect(getWorkspaceThemeFontStyle(theme)).toEqual({
+      '--sans': FONT_THEMES.blobby.sans,
+      '--mono': FONT_THEMES.blobby.mono
+    })
+    expect(getWorkspaceThemeColorStyle(theme)).toMatchObject({
+      '--primary': colors.primary,
+      '--background': colors.background,
+      '--foreground': colors.foreground,
+      '--accent': colors.accent
+    })
+    expect(getWorkspaceThemeColorStyle(theme)['--radius']).toBeUndefined()
+    expect(getWorkspaceThemeRadiusStyle(theme)).toEqual({
       '--radius': RADIUS_THEMES.squishy.radius
     })
   })

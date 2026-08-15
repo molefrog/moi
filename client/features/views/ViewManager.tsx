@@ -18,6 +18,7 @@ import { Activity, type ComponentType, useCallback, useEffect, useRef, useState 
 import { Spinner } from '@/client/components/ui/spinner'
 import { appletScope, appletStyleKey } from '@/client/features/applets/applet-cache'
 import { useAppletStyle } from '@/client/features/applets/applet-styles'
+import { useAppletThumbnails } from '@/client/features/applets/applet-thumbnail'
 import {
   type AppletComponentProps,
   type AppletState,
@@ -140,6 +141,16 @@ function ViewSlot({ view, active, params }: ViewSlotProps) {
   )
 
   const failed = bundle.status === 'error'
+  useAppletThumbnails({
+    kind: 'view',
+    enabled: active && Boolean(current) && !failed,
+    targets: [
+      {
+        id: view.id,
+        revision: view.revision
+      }
+    ]
+  })
 
   return (
     <>
@@ -161,6 +172,7 @@ function ViewSlot({ view, active, params }: ViewSlotProps) {
               build={current}
               params={shownParams}
               entering={outgoing !== null}
+              thumbnailTarget
             />
           </Activity>
         )}
@@ -175,18 +187,22 @@ type ViewFrameProps = {
   // Play the rebuild dissolve. Set on the incoming build only, and only while
   // the build it replaced is still rendered underneath it.
   entering?: boolean
+  thumbnailTarget?: boolean
 }
 
 // One build of one view, in its style scope. Frames stack absolutely, so during
 // a rebuild the incoming one dissolves in over the outgoing one still on screen.
-function ViewFrame({ view, build, params, entering }: ViewFrameProps) {
+function ViewFrame({ view, build, params, entering, thumbnailTarget }: ViewFrameProps) {
   const workspaceId = useWorkspaceId()
 
   return (
     <div
+      data-applet-thumbnail={thumbnailTarget ? `view:${view.id}` : undefined}
       data-applet={appletScope('views', view.id)}
       className={cn(
-        'absolute inset-0 overflow-auto',
+        // Keep applet z-indexes inside the view. Host overlays render after this
+        // frame and should always stack above the view as a single unit.
+        'absolute inset-0 isolate overflow-auto',
         entering && 'animate-in duration-200 ease-out blur-in-4 fade-in'
       )}
     >

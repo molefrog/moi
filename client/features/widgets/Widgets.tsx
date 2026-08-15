@@ -1,9 +1,10 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 
 import { IconPlus } from '@tabler/icons-react'
 
+import { useAppletThumbnails } from '@/client/features/applets/applet-thumbnail'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { findFreePosition } from '@/client/features/widgets/grid'
 import type { GridItem } from '@/client/features/widgets/grid'
@@ -15,7 +16,6 @@ import type { WidgetInfo } from '@/lib/types'
 
 import { HiddenPanel } from './HiddenPanel'
 import { WidgetGrid, WidgetGridLayout } from './WidgetGrid'
-import { useWidgetThumbnails } from './useWidgetThumbnails'
 
 function renderItem(id: string) {
   return <WidgetShell name={id} />
@@ -29,7 +29,7 @@ const EMPTY_WIDGET_ITEMS: GridItem[] = Array.from({ length: 10 }, (_, index) => 
 
 function renderEmptyWidget() {
   return (
-    <Skeleton className="size-full animate-none rounded-2xl [corner-shape:superellipse(1.2)]" />
+    <Skeleton className="size-full animate-none rounded-2xl texture-checker [corner-shape:superellipse(1.2)]" />
   )
 }
 
@@ -45,15 +45,15 @@ function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
       </div>
 
       <div className="absolute inset-0 flex items-center justify-center p-6">
-        <div className="flex h-full w-full max-w-(--column-w) flex-col items-center justify-center gap-4 bg-radial from-background from-50% to-transparent to-75% text-center">
+        <div className="flex h-full w-full max-w-(--column-w) flex-col items-center justify-center gap-4 bg-radial from-background from-30% to-transparent to-80% text-center">
           <div className="flex flex-col gap-1.5">
             <h2 className="font-medium">A little empty here</h2>
-            <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-              Widgets are small apps that can read data, perform tasks, and show a compact view of
-              the information that matters.
+            <p className="mx-auto max-w-xs text-sm text-muted-foreground">
+              Widgets are small apps that can read data, perform tasks, and surface important
+              information
             </p>
           </div>
-          <Button type="button" variant="secondary" size="sm" onClick={onCreateWidget}>
+          <Button type="button" variant="secondary" onClick={onCreateWidget}>
             <IconPlus data-icon="inline-start" stroke={1.5} />
             Create widget
           </Button>
@@ -166,12 +166,13 @@ export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: W
   const [panelRef, panelHeight] = usePanelHeight()
   const panelOpen = editing && hiddenItems.length > 0
 
-  const containerRef = useRef<HTMLDivElement>(null)
-  useWidgetThumbnails({
-    containerRef,
-    widgets,
-    visibleIds: visibleItems.map(item => item.id),
-    editing
+  useAppletThumbnails({
+    kind: 'widget',
+    enabled: !editing,
+    targets: visibleItems.map(item => ({
+      id: item.id,
+      revision: widgets.find(widget => widget.id === item.id)?.revision
+    }))
   })
 
   function hide(id: string) {
@@ -193,7 +194,7 @@ export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: W
     // Shared working area below the header and positioning context for the
     // bottom panel. Created-widget states scroll; the initial empty state clips
     // its fixed-height skeleton grid.
-    <div ref={containerRef} className="group/widgets relative min-h-0 flex-1">
+    <div className="group/widgets relative min-h-0 flex-1">
       <LayoutGroup>
         <div
           className={cn(

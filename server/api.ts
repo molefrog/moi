@@ -6,6 +6,7 @@ import { basename, join, resolve } from 'node:path'
 
 import type {
   AppletKind,
+  AppletThumbnailBatch,
   AppSettings,
   HarnessAvailability,
   SessionInfo,
@@ -26,13 +27,13 @@ import { applyEnvChanged } from './env-apply'
 import { publishEvent } from './events'
 import { callFunction, parseFunctionPath } from './functions'
 import { processIcon } from './icon'
+import { getWorkspacePreview, loadLayout, mergeLayoutForSave, saveLayout } from './layout'
 import {
-  getWorkspacePreview,
-  loadLayout,
-  mergeLayoutForSave,
-  saveLayout,
-  saveWidgetThumbnails
-} from './layout'
+  getAppletThumbnailRecords,
+  isValidAppletId,
+  saveAppletThumbnails,
+  serveAppletThumbnail
+} from './thumbnails'
 import { getClientFrameLog, getWireLog } from './harness/debug'
 import { allHarnesses, harnessFor, isHarnessType } from './harness/registry'
 import { broadcast } from './state'
@@ -150,10 +151,16 @@ one.use('*', withWorkspace)
 
 one.get('/preview', async c => {
   const ws = c.get('ws')
+  const wsId = c.req.param('id')
+  const views = await getViewList(ws.path)
   return c.json(
-    await getWorkspacePreview(ws.path, includeFirstUserMessage =>
-      harnessFor(ws).workspacePreview(ws, includeFirstUserMessage)
-    )
+    await getWorkspacePreview(ws.path, {
+      getProviderPreview: includeFirstUserMessage =>
+        harnessFor(ws).workspacePreview(ws, includeFirstUserMessage),
+      viewIds: views.map(view => view.id),
+      thumbnailUrl: (kind, id) =>
+        `/api/workspaces/${wsId}/applet-thumbnails/${kind}/${encodeURIComponent(id)}`
+    })
   )
 })
 
@@ -827,16 +834,9 @@ one.delete('/icon', async c => {
 // DELETE unregisters.
 one.get('/', async c => {
   const ws = c.get('ws')
-  // The thumbnail images are heavy (base64 WebPs) and have their own write
-  // path (PUT .../thumbnails); the layout ships `widgetThumbnails` without
-  // them — just `key`/`at`, which clients compare against the live grid to
-  // decide when to re-capture.
-  const { widgetThumbnails, ...layout } = await loadLayout(ws.path)
+  const layout = await loadLayout(ws.path)
   return c.json({
     ...layout,
-    ...(widgetThumbnails && {
-      widgetThumbnails: { key: widgetThumbnails.key, at: widgetThumbnails.at }
-    }),
     // Resolved display name: the settings override, or the folder name.
     name: layout.name || basename(ws.path),
     cwd: ws.path,
@@ -845,21 +845,46 @@ one.get('/', async c => {
   })
 })
 
-// Widget thumbnails: a separate write path from the layout PUT below, so grid
-// and theme saves never round-trip the base64 map (and this save can't touch
-// the grid). Still lands in `.workspace.json` under the hood. Entries merge
-// over the stored map; `key` fingerprints the grid state they were captured
-// from (see widgetThumbnailsKey() on the client).
-one.put('/thumbnails', async c => {
+// Thumbnail freshness records, without image bytes — the capture hook compares
+// these against live bundle revisions. Images are served per-applet below.
+one.get('/applet-thumbnails', async c =>
+  c.json({ thumbnails: await getAppletThumbnailRecords(c.get('ws').path) })
+)
+
+one.get('/applet-thumbnails/:kind/:name', c => {
+  const kind = c.req.param('kind')
+  if (kind !== 'widget' && kind !== 'view') return c.text('Not found', 404)
+  return serveAppletThumbnail(
+    c.get('ws').path,
+    kind,
+    c.req.param('name'),
+    c.req.header('if-none-match')
+  )
+})
+
+// Settled widget and view visits share one batch endpoint and storage path.
+one.put('/applet-thumbnails', async c => {
   const body: unknown = await c.req.json().catch(() => null)
-  if (!body || typeof body !== 'object') return c.text('Bad request', 400)
-  const { key, thumbnails } = body as { key?: unknown; thumbnails?: unknown }
-  const validMap =
-    thumbnails !== null &&
-    typeof thumbnails === 'object' &&
-    Object.values(thumbnails as Record<string, unknown>).every(v => typeof v === 'string')
-  if (typeof key !== 'string' || !validMap) return c.text('Bad request', 400)
-  await saveWidgetThumbnails(c.get('ws').path, key, thumbnails as Record<string, string>)
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return c.text('Bad request', 400)
+  const input = body as AppletThumbnailBatch
+  const valid =
+    (input.kind === 'widget' || input.kind === 'view') &&
+    Array.isArray(input.thumbnails) &&
+    input.thumbnails.every(
+      thumbnail =>
+        thumbnail &&
+        typeof thumbnail === 'object' &&
+        !Array.isArray(thumbnail) &&
+        typeof thumbnail.id === 'string' &&
+        isValidAppletId(thumbnail.id) &&
+        typeof thumbnail.revision === 'string' &&
+        (thumbnail.image === undefined ||
+          thumbnail.image === null ||
+          typeof thumbnail.image === 'string') &&
+        (thumbnail.captureMs === undefined || typeof thumbnail.captureMs === 'number')
+    )
+  if (!valid) return c.text('Bad request', 400)
+  await saveAppletThumbnails(c.get('ws').path, input.kind, input.thumbnails)
   return c.body(null, 204)
 })
 

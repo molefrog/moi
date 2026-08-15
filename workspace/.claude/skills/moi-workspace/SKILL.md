@@ -90,6 +90,15 @@ my-agent-folder/
     .scratchpad/              <- Scratchpad image files. Internal — pull pixels via `moi scratch read-image`, never open it.
 ```
 
+Every dot-prefixed file or folder inside `.moi/` (`.build/`, `.cache/`, `.workspace.json`,
+`.scratchpad*`, `.gitignore`, …) is a moi internal: auto-generated and liable to change format
+without notice. Avoid them as much as possible — do not read, edit, or delete them, and never point
+tooling at them; go through the `moi` CLI instead. Version control needs no special handling: the
+scaffolded `.moi/.gitignore` already excludes the machine-local entries (`.build/`, `.cache/`,
+`node_modules/`), while `.workspace.json` and `.scratchpad.json` are workspace state that ships
+with the repo — commit them as-is, just never hand-edit them. Your surface is the non-dot files:
+`widgets/`, `views/`, `package.json`, and code you place under `.moi/` yourself.
+
 # Build environment
 
 - Bun is the required dependency of moi, so it must be installed
@@ -338,6 +347,9 @@ After the final successful bundle and any checks, always make tab focus the fina
 - After building or editing a view, run `moi tab focus view:<view-id>`, using its file name or claimed
   builder id.
 
+The focused applet is the handoff. Keep the final reply brief and user-facing. Do not include file
+or storage links, file paths, or bundle, test, and runtime-log summaries.
+
 # Debugging applets
 
 `moi bundle` only proves an applet compiles — it can still fail to load in the browser, crash on
@@ -406,4 +418,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.12.0" />
+<moi-skill version="0.13.0" />

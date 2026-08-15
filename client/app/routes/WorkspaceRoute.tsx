@@ -46,10 +46,12 @@ function WorkspaceLoader({ id }: WorkspaceRouteProps) {
     if (event.type === 'theme:updated' || event.type === 'workspace:updated') {
       queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(id) })
     } else if (event.type === 'widget-layout:updated' || event.type === 'widget:updated') {
-      // widget:updated too: a rebundle bumps the widget's content `tag`, and
+      // widget:updated too: a rebundle bumps the widget's content revision, and
       // the thumbnail invalidation hook reads it off this query.
       queryClient.invalidateQueries({ queryKey: workspaceKeys.widgets(id) })
-    } else if (event.type === 'view-layout:updated') {
+    } else if (event.type === 'view-layout:updated' || event.type === 'view:updated') {
+      // view:updated also bumps the built bundle revision used by thumbnail
+      // freshness checks.
       queryClient.invalidateQueries({ queryKey: workspaceKeys.views(id) })
     }
   })

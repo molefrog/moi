@@ -4,6 +4,7 @@ import { IconArchive, IconChevronDown, IconEdit } from '@tabler/icons-react'
 import { useArchiveWorkspaceSession, useWorkspaceSessions } from './api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
+import { useSelectedSession } from '@/client/features/chat/useSelectedSession'
 import { cn } from '@/client/lib/cn'
 import {
   hasRunningBackgroundSession,
@@ -28,14 +29,21 @@ import {
 import { Spinner } from '@/client/components/ui/spinner'
 
 type ChatSelectorProps = {
-  onSelectSession: (sessionId: string | null) => void
-  selectedSessionId: string | null
+  isViewBuilder?: boolean
+}
+
+type ChatHeaderLabelProps = {
+  label: string
 }
 
 type ChatSessionGroup = {
   key: string
   label: string
   sessions: SessionInfo[]
+}
+
+function ChatHeaderLabel({ label }: ChatHeaderLabelProps) {
+  return <div className="flex h-7 items-center px-2.5 text-sm font-medium">{label}</div>
 }
 
 // One tiny text badge per row at most: a cron/subagent flavor wins; otherwise
@@ -231,8 +239,18 @@ export function groupSessionsByDate(sessions: SessionInfo[], now = new Date()): 
   return [...groups.values()]
 }
 
-export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelectorProps) {
+export function ChatSelector({ isViewBuilder = false }: ChatSelectorProps) {
+  if (isViewBuilder) {
+    return <ChatHeaderLabel label="Build a new view" />
+  }
+
+  return <SessionSelector />
+}
+
+function SessionSelector() {
   const workspaceId = useWorkspaceId()
+  const [selectedSession, selectSession] = useSelectedSession()
+  const selectedSessionId = selectedSession ?? null
   const [confirmingSessionId, setConfirmingSessionId] = useState<string | null>(null)
   const { data: sessions = [] } = useWorkspaceSessions(workspaceId)
   const canArchive = useWorkspaceAgent(workspaceId).data?.supportsArchiving === true
@@ -240,13 +258,14 @@ export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelecto
   const hasRunningBackgroundChat = useLive(state =>
     hasRunningBackgroundSession(state.activity, workspaceId, selectedSessionId)
   )
+
+  if (sessions.length === 0) {
+    return <ChatHeaderLabel label="New chat" />
+  }
+
   const active = sessions.find(s => s.sessionId === selectedSessionId)
   const label = active?.summary ?? 'New chat'
   const sessionGroups = groupSessionsByDate(sessions)
-
-  function handleSelect(sessionId: string | null) {
-    onSelectSession(sessionId)
-  }
 
   function handleMenuOpenChange(open: boolean) {
     if (!open) setConfirmingSessionId(null)
@@ -259,7 +278,7 @@ export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelecto
     store.clearAttachments(workspaceId, sessionId)
     store.clearPreviewsForSession(workspaceId, sessionId)
     if (selectedSessionId === sessionId) {
-      onSelectSession(null)
+      selectSession(null)
     }
   }
 
@@ -286,7 +305,7 @@ export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelecto
       >
         <DropdownMenuItem
           className="shrink-0 gap-1 font-medium text-muted-foreground! **:text-muted-foreground!"
-          onClick={() => handleSelect(null)}
+          onClick={() => selectSession(null)}
         >
           <IconEdit size={16} stroke={1.75} />
           New chat
@@ -305,7 +324,7 @@ export function ChatSelector({ onSelectSession, selectedSessionId }: ChatSelecto
                       active={selectedSessionId === session.sessionId}
                       canArchive={canArchive}
                       confirmingArchive={confirmingSessionId === session.sessionId}
-                      onSelect={handleSelect}
+                      onSelect={selectSession}
                       onArchive={handleArchive}
                       onRequestArchive={setConfirmingSessionId}
                       workspaceId={workspaceId}

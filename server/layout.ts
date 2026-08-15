@@ -1,8 +1,10 @@
 import { join } from 'path'
 
-import type { WorkspaceLayout, WorkspacePreview } from '@/lib/types'
+import type { AppletKind, WorkspaceLayout, WorkspacePreview } from '@/lib/types'
 import { createDefaultWorkspaceLayout, createDefaultWorkspaceTabs } from '@/lib/workspace-layout'
 import { isWorkspaceTabId } from '@/lib/workspace-tabs'
+
+import { getCapturedThumbnails } from './thumbnails'
 
 function normalizeTabs(value: unknown): WorkspaceLayout['tabs'] {
   if (!value || typeof value !== 'object') return createDefaultWorkspaceTabs()
@@ -22,6 +24,12 @@ function normalizeLayout(parsed: Record<string, unknown>): WorkspaceLayout {
     layout.layoutMode = defaults.layoutMode
   }
   layout.tabs = normalizeTabs(layout.tabs)
+  // Legacy thumbnail caches are intentionally dropped, not migrated — images
+  // now live as files under `.moi/.cache/thumbnails` (server/thumbnails.ts)
+  // and applets are simply captured again there.
+  delete layout.widgetThumbnails
+  delete layout.viewThumbnails
+  delete layout.appletThumbnails
   delete layout.sectionMode
   delete layout.chatMode
   return layout as unknown as WorkspaceLayout
@@ -54,53 +62,24 @@ export async function saveLayout(layout: WorkspaceLayout, workspacePath: string)
 // A blind overwrite therefore erases a `moi config`-set name (and could revert an
 // icon). So drop whatever identity the body carries and re-apply the server-owned
 // fields from `existing` — conditionally, so an absent field never serializes
-// as `name: undefined`. Widget thumbnails are likewise not the layout PUT's to
-// write: they have their own endpoint (saveWidgetThumbnails), and the layout
-// GET doesn't even ship the map — a round-trip would erase it.
+// as `name: undefined`.
 export function mergeLayoutForSave(
   existing: WorkspaceLayout,
   body: WorkspaceLayout
 ): WorkspaceLayout {
-  const { name: _name, icon: _icon, widgetThumbnails: _thumbnails, ...editor } = body
+  const { name: _name, icon: _icon, ...editor } = body
+  // Stale clients may still round-trip the pre-`.cache` thumbnail records;
+  // never let a layout PUT resurrect them in `.workspace.json`.
+  delete (editor as Record<string, unknown>).appletThumbnails
   return {
     ...editor,
     ...(existing.name !== undefined && { name: existing.name }),
-    ...(existing.icon !== undefined && { icon: existing.icon }),
-    ...(existing.widgetThumbnails !== undefined && {
-      widgetThumbnails: existing.widgetThumbnails
-    })
+    ...(existing.icon !== undefined && { icon: existing.icon })
   }
 }
 
-// Merge a captured thumbnail set into the stored layout. Lives beside
-// mergeLayoutForSave but on its own write path (PUT .../thumbnails): grid and
-// theme saves never carry the base64 map, and a thumbnail save can't touch
-// the grid. Entries merge over the existing map — removed widgets keep their
-// last image.
-export async function saveWidgetThumbnails(
-  workspacePath: string,
-  key: string,
-  images: Record<string, string>
-): Promise<void> {
-  const existing = await loadLayout(workspacePath)
-  await saveLayout(
-    {
-      ...existing,
-      widgetThumbnails: {
-        key,
-        // Server clock, so age-based invalidation doesn't trust client time.
-        at: new Date().toISOString(),
-        images: { ...existing.widgetThumbnails?.images, ...images }
-      }
-    },
-    workspacePath
-  )
-}
-
-// Thumbnails for the home screen's workspace card: a few captured widget
-// images from the stored layout (see saveWidgetThumbnails). The card renders
-// them as a loose stack, so the cap just keeps the payload small — anything
-// past it would hide under the pile anyway.
+// Thumbnails for the home screen's workspace card. Widgets take the front
+// slots in grid order, then recent views fill what remains.
 const PREVIEW_LIMIT = 3
 const PREVIEW_MESSAGE_LIMIT = 240
 
@@ -111,21 +90,37 @@ function normalizePreviewMessage(message: string | undefined): string | undefine
   return `${normalized.slice(0, PREVIEW_MESSAGE_LIMIT - 1).trimEnd()}…`
 }
 
-export async function getWorkspacePreview(
-  workspacePath: string,
+export type WorkspacePreviewOptions = {
   getProviderPreview?: (includeFirstUserMessage: boolean) => Promise<{
     firstUserMessage?: string
     updatedAt?: number
   }>
+  viewIds?: readonly string[]
+  // Maps a captured applet to the image URL the home card should render —
+  // the API layer owns the route shape (GET .../applet-thumbnails/:kind/:id).
+  thumbnailUrl: (kind: AppletKind, id: string) => string
+}
+
+export async function getWorkspacePreview(
+  workspacePath: string,
+  { getProviderPreview, viewIds = [], thumbnailUrl }: WorkspacePreviewOptions
 ): Promise<WorkspacePreview> {
   try {
     const layout = await loadLayout(workspacePath)
-    const images = layout.widgetThumbnails?.images ?? {}
-    const thumbnails = [...layout.widgetGrid]
+    const captured = await getCapturedThumbnails(workspacePath)
+    const validViewIds = new Set(viewIds)
+    const capturedWidgets = new Set(
+      captured.filter(record => record.kind === 'widget').map(record => record.id)
+    )
+    const widgetImages = [...layout.widgetGrid]
       .sort((a, b) => a.y - b.y || a.x - b.x)
-      .map(item => images[item.i])
-      .filter((image): image is string => typeof image === 'string')
-      .slice(0, PREVIEW_LIMIT)
+      .filter(item => capturedWidgets.has(item.i))
+      .map(item => thumbnailUrl('widget', item.i))
+    const viewImages = captured
+      .filter(record => record.kind === 'view' && validViewIds.has(record.id))
+      .sort((a, b) => Date.parse(b.viewedAt) - Date.parse(a.viewedAt))
+      .map(record => thumbnailUrl('view', record.id))
+    const thumbnails = [...widgetImages, ...viewImages].slice(0, PREVIEW_LIMIT)
     // The message bubble is the card's fallback for "nothing to show": gate on
     // captured thumbnails, not grid emptiness — a workspace with widgets that
     // were never captured (never opened in a browser) still renders an empty

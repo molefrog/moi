@@ -1,7 +1,10 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 
 import { cn } from '@/client/lib/cn'
-import { getWorkspaceThemeStyle } from '@/client/runtime/workspace-theme'
+import {
+  getWorkspaceThemeColorStyle,
+  getWorkspaceThemeStyle
+} from '@/client/runtime/workspace-theme'
 
 import { useWorkspacePreview } from './api'
 
@@ -85,7 +88,7 @@ function useFolderRadiusScale() {
   return { ref, horizontalRadiusScale }
 }
 
-// Bottom-to-top placement for up to three widget screenshots. Each card peeks
+// Bottom-to-top placement for up to three applet thumbnails. Each card peeks
 // out of the folder at a slightly different angle and lifts on card hover.
 const STACK = [
   cn(
@@ -115,9 +118,10 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
   const backdropPath = folderBackdropPath(horizontalRadiusScale)
   const noiseFilterId = `folder-noise-${workspaceId}`
   const themeStyle = getWorkspaceThemeStyle(theme)
+  const folderThemeStyle = getWorkspaceThemeColorStyle(theme)
 
   return (
-    <div ref={ref} style={themeStyle} className="relative h-45 w-full font-sans">
+    <div ref={ref} style={folderThemeStyle} className="relative h-45 w-full">
       <svg
         viewBox={`0 0 ${FOLDER.width} ${FOLDER.height}`}
         preserveAspectRatio="none"
@@ -158,7 +162,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
           alt=""
           loading="lazy"
           className={cn(
-            'absolute top-[12%] left-[14%] aspect-4/3 w-[72%] rounded-lg object-cover object-top shadow-xs',
+            'absolute top-[12%] left-[14%] h-auto max-h-[72%] w-auto max-w-[72%] rounded-[calc(var(--radius-2xl)*0.4)] bg-background object-contain shadow-xs [corner-shape:superellipse(1.2)]',
             'animate-in transition-transform duration-300 ease-out fade-in',
             slots[index]
           )}
@@ -169,8 +173,9 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
         <div className="absolute inset-x-[12%] top-[22%] flex justify-end">
           <div
             aria-hidden="true"
+            style={themeStyle}
             className={cn(
-              'w-max max-w-40 origin-center rounded-lg bg-card px-3 py-2 shadow-xs',
+              'w-max max-w-40 origin-center rounded-lg bg-card px-3 py-2 font-sans shadow-xs',
               'animate-in transition-transform duration-300 ease-out fade-in',
               STACK[STACK.length - 1],
               'group-hover:translate-y-0.5 group-focus-visible:translate-y-0.5'
