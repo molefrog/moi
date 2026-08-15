@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react'
 
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { type ExtraProps } from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 
@@ -10,7 +10,7 @@ const remarkPlugins = [remarkGfm]
 const rehypePlugins = [rehypeHighlight]
 
 const components = {
-  code({ className, children, ...props }: ComponentProps<'code'>) {
+  code({ node: _node, className, children, ...props }: ComponentProps<'code'> & ExtraProps) {
     return (
       <code
         className={cn(
