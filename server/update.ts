@@ -1,12 +1,17 @@
-// `moi update` mechanics: check the npm registry for the latest published
-// version, find the package manager that owns the current global install, and
-// update through it — never around it, so no second shadowing install appears.
-// Manual command only; nothing here runs in the background.
+// Shared `moi update` mechanics for the CLI and the local web UI: check the npm
+// registry, find the package manager that owns the current global install, and
+// update through it so no second shadowing install appears. Checks may run in
+// the background; installing always requires an explicit user action.
 import { realpathSync } from 'node:fs'
 
-import { PACKAGE_ROOT } from './version'
+import type { SessionActivity, UpdateResult, UpdateStatus } from '@/lib/types'
+
+import { analyzeInstall } from './service'
+import type { InstallAnalysis } from './service'
+import { PACKAGE_ROOT, VERSION, isPrerelease } from './version'
 
 export const PACKAGE_NAME = 'moi-computer'
+export const UPDATE_RESTART_EXIT_CODE = 75
 
 // Test seam: point at a local mock registry (`MOI_NPM_REGISTRY`).
 function registryBase(): string {
@@ -138,4 +143,107 @@ export async function installedBinVersion(bin: string): Promise<string | null> {
   } catch {
     return null
   }
+}
+
+type ServerProcess = {
+  exited: Promise<number>
+}
+
+// A service manager already respawns failed exits. Foreground launchers use
+// the same exit code to replace their server child with the updated install.
+export async function superviseServerUpdates(
+  child: ServerProcess,
+  respawn: () => ServerProcess
+): Promise<number> {
+  let exitCode = await child.exited
+  while (exitCode === UPDATE_RESTART_EXIT_CODE) {
+    child = respawn()
+    exitCode = await child.exited
+  }
+  return exitCode
+}
+
+type UpdateOptions = {
+  runningVersion?: string
+  analysis?: InstallAnalysis
+  fetchLatest?: () => Promise<string>
+  detectManager?: () => Promise<PackageManager | null>
+  runManager?: (argv: string[]) => Promise<number>
+  readInstalledVersion?: (bin: string) => Promise<string | null>
+}
+
+type AvailableUpdate = {
+  version: string
+  packageManager: PackageManager
+  bin: string
+}
+
+export function hasRunningAgentSessions(sessions: { activity: SessionActivity }[]): boolean {
+  return sessions.some(session => session.activity === 'running')
+}
+
+async function findAvailableUpdate(options: UpdateOptions): Promise<AvailableUpdate | null> {
+  const runningVersion = options.runningVersion ?? VERSION
+  const analysis = options.analysis ?? analyzeInstall()
+  if (analysis.kind !== 'global' || isPrerelease(runningVersion)) return null
+  const version = await (options.fetchLatest ?? fetchLatestVersion)()
+  if (!isNewer(version, runningVersion)) return null
+  const packageManager = await (options.detectManager ?? detectPackageManager)()
+  return packageManager ? { version, packageManager, bin: analysis.bin } : null
+}
+
+// Background checks stay quiet. The UI only needs the running version and an
+// actionable newer version, if one can be installed safely.
+export async function getUpdateStatus(options: UpdateOptions = {}): Promise<UpdateStatus> {
+  const runningVersion = options.runningVersion ?? VERSION
+  try {
+    const update = await findAvailableUpdate(options)
+    return { runningVersion, availableVersion: update?.version ?? null }
+  } catch {
+    return { runningVersion, availableVersion: null }
+  }
+}
+
+async function performUpdate(options: UpdateOptions): Promise<UpdateResult | null> {
+  const update = await findAvailableUpdate(options)
+  if (!update) return null
+
+  const argv = updateArgv(update.packageManager, update.version)
+  const exitCode = await (options.runManager ?? runPackageManager)(argv)
+  if (exitCode !== 0) {
+    throw new Error(
+      `${update.packageManager} exited with code ${exitCode}. Run \`moi update\` in a terminal for details.`
+    )
+  }
+  const installedVersion = await (options.readInstalledVersion ?? installedBinVersion)(update.bin)
+  if (installedVersion !== update.version) {
+    const detail = installedVersion
+      ? `The moi command reports v${installedVersion} instead of v${update.version}.`
+      : 'Could not verify the updated moi command.'
+    throw new Error(`${detail} Run \`moi update\` in a terminal for details.`)
+  }
+  return { installedVersion }
+}
+
+// Multiple open browser tabs share one install. They also share this promise,
+// so two clicks never launch two global package-manager processes. A successful
+// result stays cached for the few milliseconds until the server restarts.
+let installInFlight: Promise<UpdateResult | null> | null = null
+
+export function installUpdate(options: UpdateOptions = {}): Promise<UpdateResult | null> {
+  installInFlight ??= performUpdate(options).then(
+    result => {
+      if (!result) installInFlight = null
+      return result
+    },
+    error => {
+      installInFlight = null
+      throw error
+    }
+  )
+  return installInFlight
+}
+
+export function __resetUpdateStateForTests(): void {
+  installInFlight = null
 }

@@ -225,7 +225,7 @@ function shutdown() {
   } catch {}
   for (const h of allHarnesses()) h.shutdown?.()
   killAllWorkers()
-  process.exit(0)
+  process.exit()
 }
 process.on('SIGTERM', shutdown)
 process.on('SIGINT', shutdown)

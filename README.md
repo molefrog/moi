@@ -106,6 +106,10 @@ alone. `--check` changes nothing and is made for scripts and agents.
 `moi status` shows when the running server and CLI versions differ, however
 the update happened.
 
+The Update button in the app completes the whole flow itself. It installs the
+new version, restarts either a foreground or service-managed server, and reloads
+the browser when the new server is ready.
+
 # Connect an agent
 
 A workspace is the folder where your agent runs and stores its data. moi adds

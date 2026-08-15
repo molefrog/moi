@@ -4,8 +4,9 @@ import { IconAlertSquareRoundedFilled, IconPlus, IconSmartHome } from '@tabler/i
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'wouter'
 
-import { useReorderWorkspaces, useWorkspaces } from '@/client/features/home/api'
 import { useAppConfig } from '@/client/api/app-config'
+import { useReorderWorkspaces, useWorkspaces } from '@/client/features/home/api'
+import { Update } from '@/client/features/update/Update'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import { CreateWorkspaceDialog } from '@/client/features/home/workspace-setup/CreateWorkspaceDialog'
@@ -109,17 +110,25 @@ function Sidebar({ workspaces }: SidebarProps) {
         )}
       </nav>
 
-      {cloudDemo ? (
-        <DemoDialog
-          trigger={
-            <Button size="icon" aria-label="Unlock all features" title="Unlock all features">
-              <IconAlertSquareRoundedFilled stroke={1.5} />
-            </Button>
+      <div className="size-8 shrink-0">
+        <Update
+          fallback={
+            cloudDemo ? (
+              <DemoDialog
+                trigger={
+                  <Button
+                    size="icon"
+                    aria-label="Unlock all features"
+                    title="Unlock all features"
+                  >
+                    <IconAlertSquareRoundedFilled stroke={1.5} />
+                  </Button>
+                }
+              />
+            ) : null
           }
         />
-      ) : (
-        <div aria-hidden="true" className="size-8 shrink-0" />
-      )}
+      </div>
     </aside>
   )
 }

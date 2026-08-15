@@ -91,6 +91,7 @@ import {
   isNewer,
   manualUpdateLines,
   runPackageManager,
+  superviseServerUpdates,
   updateArgv
 } from './update'
 import { VERSION, isPrerelease, versionWithCommit } from './version'
@@ -430,7 +431,8 @@ const init = defineCommand({
 
     if (!running && args.web) {
       console.log(pc.dim('  Starting server…'))
-      const proc = spawnServer(serverCwd(projectRoot, false))
+      const cwd = serverCwd(projectRoot, false)
+      const proc = spawnServer(cwd)
       running = await waitForServer()
       if (!running) {
         console.error(pc.red('  Server failed to start\n'))
@@ -442,8 +444,7 @@ const init = defineCommand({
       if (isInteractive) console.log('  Opening ' + pc.bold(url))
       console.log(pc.dim('  Press Ctrl+C to stop\n'))
       if (isInteractive) await openBrowser(url)
-      await proc.exited
-      process.exit(proc.exitCode ?? 0)
+      process.exit(await superviseServerUpdates(proc, () => spawnServer(cwd)))
     }
 
     if (running) {
@@ -528,9 +529,9 @@ const start = defineCommand({
         await runDevSupervisor(projectRoot, env)
         return
       }
-      const proc = spawnServer(serverCwd(projectRoot, dev), env)
-      await proc.exited
-      process.exit(proc.exitCode ?? 0)
+      const cwd = serverCwd(projectRoot, dev)
+      const proc = spawnServer(cwd, env)
+      process.exit(await superviseServerUpdates(proc, () => spawnServer(cwd, env)))
     }
 
     // This IS the server process (MOI_SERVER=1). cwd is the package root when the
