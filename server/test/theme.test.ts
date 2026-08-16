@@ -43,9 +43,9 @@ describe('color themes', () => {
       primary,
       primaryForeground: 'oklch(0 0 0)',
       background: 'color-mix(in oklch, var(--primary) 3%, oklch(1 0 0) 97%)',
-      foreground: 'color-mix(var(--primary) 20%, oklch(0 0 0) 80%)',
+      foreground: 'color-mix(in oklch, var(--primary) 20%, oklch(0 0 0) 80%)',
       muted: 'color-mix(in oklch, var(--background) 97%, var(--foreground) 3%)',
-      mutedForeground: 'color-mix(var(--background) 50%, var(--foreground) 50%)',
+      mutedForeground: 'color-mix(in oklch, var(--background) 50%, var(--foreground) 50%)',
       accent: 'color-mix(in oklch, var(--primary) 4%, var(--foreground) 4%)',
       accentForeground: 'var(--foreground)',
       border: 'color-mix(in oklch, var(--foreground) 7%, transparent)'
@@ -58,11 +58,11 @@ describe('color themes', () => {
 
     expect(colors).toEqual({
       primary: 'color-mix(in oklch, var(--background) 3%, oklch(1 0 0) 97%)',
-      primaryForeground: 'color-mix(var(--background) 20%, oklch(0 0 0) 80%)',
+      primaryForeground: 'color-mix(in oklch, var(--background) 20%, oklch(0 0 0) 80%)',
       background: primary,
       foreground: 'oklch(0 0 0)',
       muted: 'color-mix(in oklch, var(--background) 97%, var(--foreground) 3%)',
-      mutedForeground: 'color-mix(var(--background) 50%, var(--foreground) 50%)',
+      mutedForeground: 'color-mix(in oklch, var(--background) 50%, var(--foreground) 50%)',
       accent: 'color-mix(in oklch, var(--primary) 4%, var(--foreground) 4%)',
       accentForeground: 'var(--foreground)',
       border: 'color-mix(in oklch, var(--foreground) 15%, transparent)'
