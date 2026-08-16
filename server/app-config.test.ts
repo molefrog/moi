@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test'
+import { expect, spyOn, test } from 'bun:test'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'path'
@@ -65,6 +65,23 @@ test('invalid JSON falls back to defaults without throwing', async () => {
   const file = await configFile('{ not json')
   const config = loadAppConfig(file, NO_ENV)
   expect(config.cloudDemo).toBe(false)
+})
+
+test('a read failure other than a missing file warns instead of staying silent', async () => {
+  const errors: string[] = []
+  const spy = spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+    errors.push(args.map(String).join(' '))
+  })
+  try {
+    // A directory as the config path throws EISDIR — a stand-in for any
+    // non-ENOENT failure (permissions, mount errors).
+    const dir = await mkdtemp(join(tmpdir(), 'moi-app-config-'))
+    const config = loadAppConfig(dir, NO_ENV)
+    expect(config.cloudDemo).toBe(false)
+    expect(errors.join('\n')).toContain('could not read')
+  } finally {
+    spy.mockRestore()
+  }
 })
 
 test('wrong-typed keys are dropped individually, valid keys survive', async () => {

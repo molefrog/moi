@@ -65,8 +65,16 @@ function fileValues(file: string): Partial<AppConfig> {
   let text: string
   try {
     text = readFileSync(file, 'utf8')
-  } catch {
-    return {} // no config file — the normal local case
+  } catch (err) {
+    // Only a missing file is silent (the normal local case). Anything else —
+    // permissions, mount errors — is loud: a deployment relying on config.json
+    // must not boot un-gated without a diagnostic. Deployments that need the
+    // demo gate guaranteed should pin MOI_CLOUD_DEMO=1 in the environment,
+    // which has no read-failure mode.
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      warn(`could not read ${file}: ${err instanceof Error ? err.message : String(err)}`)
+    }
+    return {}
   }
   let parsed: unknown
   try {

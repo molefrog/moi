@@ -56,6 +56,11 @@ export type WorkspaceEvent =
 type WorkspaceEventHandler = (event: WorkspaceEvent) => void
 
 const listeners = new Set<WorkspaceEventHandler>()
+// Fired when the socket comes back after a drop — for the SPA that means the
+// server restarted (it holds the connection for its whole lifetime), so
+// restart-scoped state such as the startup config can refetch.
+const reconnectListeners = new Set<() => void>()
+let everConnected = false
 let ws: WebSocket | null = null
 let connecting = false
 
@@ -68,6 +73,8 @@ function ensureConnection() {
   socket.onopen = () => {
     ws = socket
     connecting = false
+    if (everConnected) for (const handler of reconnectListeners) handler()
+    everConnected = true
   }
 
   socket.onmessage = event => {
@@ -88,6 +95,16 @@ function ensureConnection() {
 
   socket.onerror = () => {
     socket.close()
+  }
+}
+
+// Subscribe to reconnects; returns the unsubscribe. Only fires while some
+// component holds the events socket open via useWorkspaceEvent (the app shell
+// always does).
+export function onWorkspaceEventsReconnect(handler: () => void): () => void {
+  reconnectListeners.add(handler)
+  return () => {
+    reconnectListeners.delete(handler)
   }
 }
 
