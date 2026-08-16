@@ -21,7 +21,12 @@ if (import.meta.hot) {
 }
 
 export async function init(el: HTMLElement) {
-  const { mount } = await import('./main')
+  // Startup config loads in parallel with the main chunk, so it is available
+  // synchronously to every component from the first render.
+  const [{ mount }] = await Promise.all([
+    import('./main'),
+    import('./api/app-config').then(m => m.loadAppConfig())
+  ])
   mount(el)
 }
 

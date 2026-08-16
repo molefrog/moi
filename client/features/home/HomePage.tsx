@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import { IconChevronRight, IconEggCracked, IconLoader2, IconPlus } from '@tabler/icons-react'
 import { Link, useLocation } from 'wouter'
 
@@ -9,8 +11,10 @@ import {
 } from './api'
 import { CreateWorkspaceDialog } from './workspace-setup/CreateWorkspaceDialog'
 import { ImportWorkspaceDialog } from './workspace-setup/ImportWorkspaceDialog'
+import { InstallMoiDialog } from './workspace-setup/InstallMoiDialog'
 import { useWorkspaceImport } from './workspace-setup/useWorkspaceImport'
 import { HomeLogo } from './HomeLogo'
+import { useAppConfig } from '@/client/api/app-config'
 import { Button } from '@/client/components/ui/button'
 import {
   Collapsible,
@@ -38,6 +42,8 @@ export function HomePage() {
   const importFlow = useWorkspaceImport({
     onSuccess: entry => navigate(`/workspace/${entry.id}`)
   })
+  const appConfig = useAppConfig()
+  const [installDialogOpen, setInstallDialogOpen] = useState(false)
   const discoveredWorkspacesOpen = useUiStore(state => state.discoveredWorkspacesOpen)
   const setDiscoveredWorkspacesOpen = useUiStore(state => state.setDiscoveredWorkspacesOpen)
 
@@ -62,6 +68,11 @@ export function HomePage() {
   const count = workspaces.length
 
   function handleAdd(suggestion: DiscoveredWorkspace) {
+    // Cloud demo: adding workspaces is off — offer the install dialog instead.
+    if (appConfig.cloudDemo) {
+      setInstallDialogOpen(true)
+      return
+    }
     importFlow.startImport(suggestion)
   }
 
@@ -149,6 +160,8 @@ export function HomePage() {
           onReset={importFlow.reset}
         />
       )}
+
+      <InstallMoiDialog open={installDialogOpen} onOpenChange={setInstallDialogOpen} />
     </div>
   )
 }
