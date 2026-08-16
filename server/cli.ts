@@ -2851,15 +2851,16 @@ const main = defineCommand({
   subCommands: { ...workspaceCommands, ...systemCommands }
 })
 
-// Cloud demo: system commands manage moi itself (server, service, updates) —
-// in a demo container the instance is provisioned, not managed, so they print
-// a pointer to the real thing instead of running. `version` stays. The server
-// process itself (MOI_SERVER=1 — how launchd/systemd units and the demo
-// container entrypoint run `moi start`) is exempt, or the demo could not boot.
+// Cloud demo: system commands manage moi itself (service, updates, agent
+// runtimes) — in a demo container the instance is provisioned, not managed,
+// so they print a pointer to the real thing instead of running. Two stay:
+// `start`, because it is how the demo (container or a local test run) boots
+// at all — against an already-running server it just reports and exits — and
+// `version`, which is harmless and useful in bug reports.
 function exitIfDemoBlocked(): void {
   const invoked = process.argv[2]
-  if (!invoked || invoked === 'version' || !(invoked in systemCommands)) return
-  if (process.env.MOI_SERVER) return
+  if (!invoked || invoked === 'version' || invoked === 'start') return
+  if (!(invoked in systemCommands)) return
   const config = getAppConfig()
   if (!config.cloudDemo) return
   console.log(

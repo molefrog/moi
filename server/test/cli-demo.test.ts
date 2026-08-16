@@ -61,15 +61,12 @@ test(
 )
 
 test(
-  'the server process (MOI_SERVER=1) is exempt from the gate',
+  '`moi start` is exempt so the demo can boot',
   async () => {
-    // `update` against an unreachable registry: with the exemption the command
-    // really runs (and fails on the network), instead of printing the demo note.
-    const result = await runCli(['update'], {
-      ...DEMO,
-      MOI_SERVER: '1',
-      MOI_NPM_REGISTRY: 'http://127.0.0.1:1'
-    })
+    // --help renders usage without binding ports; reaching citty at all
+    // proves the gate let `start` through.
+    const result = await runCli(['start', '--help'], DEMO)
+    expect(result.code).toBe(0)
     expect(result.stdout + result.stderr).not.toContain('not available in the demo')
   },
   SPAWN_TIMEOUT
