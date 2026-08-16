@@ -6,14 +6,20 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 
 import { api } from './api'
 import { resetAppConfig } from './app-config'
+import { claudeCodeHarness } from './harness/claude-code'
+
+const originalClaudeAvailability = claudeCodeHarness.availability
 
 // All three env vars pinned so a real config.json on the machine running the
-// tests (env wins over file) can never change the assertions.
+// tests (env wins over file) can never change the assertions. Availability is
+// mocked because with the gate off the create route checks the harness before
+// validating the name — on a runner without the Claude CLI that 400s first.
 beforeEach(() => {
   process.env.MOI_CLOUD_DEMO = '1'
   process.env.MOI_EXPERIMENTS = ''
   process.env.MOI_DEMO_INSTALL_URL = 'https://moi.computer'
   resetAppConfig()
+  claudeCodeHarness.availability = async () => ({ available: true })
 })
 
 afterEach(() => {
@@ -21,6 +27,7 @@ afterEach(() => {
   delete process.env.MOI_EXPERIMENTS
   delete process.env.MOI_DEMO_INSTALL_URL
   resetAppConfig()
+  claudeCodeHarness.availability = originalClaudeAvailability
 })
 
 test('cloud demo blocks creating a workspace', async () => {
