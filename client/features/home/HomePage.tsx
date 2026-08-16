@@ -69,7 +69,7 @@ export function HomePage() {
 
   function handleAdd(suggestion: DiscoveredWorkspace) {
     // Cloud demo: adding workspaces is off — offer the install dialog instead.
-    if (appConfig.data?.cloudDemo) {
+    if (appConfig.cloudDemo) {
       setInstallDialogOpen(true)
       return
     }

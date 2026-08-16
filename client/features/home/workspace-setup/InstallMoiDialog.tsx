@@ -159,9 +159,8 @@ function useCopyCommand() {
 }
 
 function InstallMoiDialogContent() {
-  const config = useAppConfig()
+  const { demoInstallUrl } = useAppConfig()
   const { copied, copy } = useCopyCommand()
-  const installUrl = config.data?.demoInstallUrl ?? 'https://moi.computer'
 
   return (
     <DialogContent className="w-[calc(100%-2rem)] max-w-md">
@@ -223,7 +222,7 @@ function InstallMoiDialogContent() {
         <div className="flex items-center justify-end gap-2">
           <Button
             variant="secondary"
-            render={<a href={installUrl} target="_blank" rel="noreferrer" />}
+            render={<a href={demoInstallUrl} target="_blank" rel="noreferrer" />}
           >
             moi.computer
             <IconArrowUpRight data-icon="inline-end" stroke={1.5} />

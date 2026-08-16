@@ -46,7 +46,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
 
   // Cloud demo: creating workspaces is off — the same trigger opens the
   // install-moi dialog instead. After every hook so the hook order is stable.
-  if (appConfig.data?.cloudDemo) {
+  if (appConfig.cloudDemo) {
     return <InstallMoiDialog trigger={trigger} />
   }
 
