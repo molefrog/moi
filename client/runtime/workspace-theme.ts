@@ -94,6 +94,10 @@ export function usePreloadWorkspaceFonts() {
     const link = document.createElement('link')
     link.id = FONT_PREVIEW_LINK_ID
     link.rel = 'stylesheet'
+    // CORS mode makes the sheet's cssRules readable, so thumbnail capture
+    // (modern-screenshot) can inline the @font-face rules into its SVG —
+    // an SVG rasterized in <img> can't use the page's webfonts otherwise.
+    link.crossOrigin = 'anonymous'
     link.href = `https://fonts.googleapis.com/css2?family=${ALL_FONTS_QUERY}&display=swap`
     document.head.appendChild(link)
 
@@ -145,6 +149,9 @@ export function useWorkspaceTheme(theme: WorkspaceLayout['theme']) {
         const link = document.createElement('link')
         link.id = FONT_LINK_ID
         link.rel = 'stylesheet'
+        // Same CORS requirement as the preview link above: thumbnail capture
+        // can only embed @font-face rules from origin-clean stylesheets.
+        link.crossOrigin = 'anonymous'
         link.href = url
         document.head.appendChild(link)
       }
