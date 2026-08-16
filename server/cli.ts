@@ -9,6 +9,7 @@ import { dirname, join, resolve } from 'path'
 import pc from './cli-pc'
 
 import { isAgentCaller } from './agent-caller'
+import { getAppConfig } from './app-config'
 
 import {
   COLOR_THEMES,
@@ -2849,6 +2850,30 @@ const main = defineCommand({
   }),
   subCommands: { ...workspaceCommands, ...systemCommands }
 })
+
+// Cloud demo: system commands manage moi itself (server, service, updates) —
+// in a demo container the instance is provisioned, not managed, so they print
+// a pointer to the real thing instead of running. `version` stays. The server
+// process itself (MOI_SERVER=1 — how launchd/systemd units and the demo
+// container entrypoint run `moi start`) is exempt, or the demo could not boot.
+function exitIfDemoBlocked(): void {
+  const invoked = process.argv[2]
+  if (!invoked || invoked === 'version' || !(invoked in systemCommands)) return
+  if (process.env.MOI_SERVER) return
+  const config = getAppConfig()
+  if (!config.cloudDemo) return
+  console.log(
+    '\n' +
+      pc.yellow('◆') +
+      ` moi ${invoked} is not available in the cloud demo.\n` +
+      pc.dim('  Get moi on your computer: ') +
+      pc.bold(config.demoInstallUrl) +
+      '\n'
+  )
+  process.exit(1)
+}
+
+exitIfDemoBlocked()
 
 type HelpCommand = { meta?: unknown }
 

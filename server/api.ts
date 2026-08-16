@@ -20,6 +20,7 @@ import type { MoiContext } from '@/lib/moi-context'
 import { viewBuilderDirectives } from '@/lib/view-builder-directives'
 
 import { agentStore } from './agent'
+import { clientAppConfig, getAppConfig } from './app-config'
 import { getAppSettings, pickAppSettingsPatch, saveAppSettings } from './app-settings'
 import { appletForModule, recordAppletError } from './applet-log'
 import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from './applets'
@@ -942,7 +943,14 @@ workspaces.put('/order', async c => {
   }
 })
 
+// One message for both creation routes: in the cloud demo the instance is
+// provisioned with its workspaces; the UI never sends these requests (it opens
+// the install-moi dialog instead), so a 403 here means the API was called
+// directly.
+const DEMO_CREATE_BLOCKED = 'Workspace creation is not available in the moi cloud demo'
+
 workspaces.post('/', async c => {
+  if (getAppConfig().cloudDemo) return c.text(DEMO_CREATE_BLOCKED, 403)
   const body = await c.req.json()
   if (!body?.path) return c.text('Missing path', 400)
   const requestedType: unknown = body?.type ?? 'claude-code'
@@ -1008,6 +1016,7 @@ workspaces.get('/create', async c =>
 // Create a brand-new workspace: a fresh folder under CREATED_WORKSPACES_ROOT,
 // provisioned (skills + `.moi/` scaffold) and registered.
 workspaces.post('/create', async c => {
+  if (getAppConfig().cloudDemo) return c.text(DEMO_CREATE_BLOCKED, 403)
   const body = await c.req.json()
   const requestedType: unknown = body?.type ?? 'claude-code'
   if (!isHarnessType(requestedType)) {
@@ -1045,6 +1054,10 @@ workspaces.route('/:id', one)
 export const api = new Hono()
 
 api.route('/api/workspaces', workspaces)
+
+// Startup config (config.json in the data dir + MOI_* env), client-safe
+// subset. Immutable for the process lifetime — clients cache it forever.
+api.get('/api/config', c => c.json(clientAppConfig()))
 
 // App-wide settings (settings.json in the data dir). GET returns every key
 // with defaults applied; PATCH merges a partial body and returns the result.

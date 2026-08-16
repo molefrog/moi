@@ -3,6 +3,7 @@ import { type FormEvent, type ReactElement, useState } from 'react'
 import { useLocation } from 'wouter'
 
 import { useCreateWorkspace, useWorkspaceSetupInfo } from '../api'
+import { useAppConfig } from '@/client/api/app-config'
 import { Button } from '@/client/components/ui/button'
 import {
   Dialog,
@@ -16,6 +17,7 @@ import { validateWorkspaceFolderName } from '@/lib/workspace-name'
 import { WORKSPACE_TYPE_ORDER } from '@/lib/workspace-types'
 import type { WorkspaceType } from '@/lib/types'
 
+import { InstallMoiDialog } from './InstallMoiDialog'
 import { WorkspaceAgentStep } from './WorkspaceAgentStep'
 import { WorkspaceDialogContent } from './WorkspaceDialogContent'
 
@@ -29,6 +31,7 @@ const DEFAULT_WORKSPACE_TYPE = WORKSPACE_TYPE_ORDER[0]
 
 export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   const [, navigate] = useLocation()
+  const appConfig = useAppConfig()
   const info = useWorkspaceSetupInfo()
   const createMutation = useCreateWorkspace()
 
@@ -40,6 +43,12 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   const trimmedName = name.trim()
   const nameError = trimmedName ? validateWorkspaceFolderName(trimmedName) : null
   const isCreating = createMutation.isPending
+
+  // Cloud demo: creating workspaces is off — the same trigger opens the
+  // install-moi dialog instead. After every hook so the hook order is stable.
+  if (appConfig.data?.cloudDemo) {
+    return <InstallMoiDialog trigger={trigger} />
+  }
 
   function finish(workspaceId: string) {
     setOpen(false)

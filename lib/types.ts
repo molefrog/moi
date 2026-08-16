@@ -285,6 +285,20 @@ export type AppSettings = {
   autoUpdateSkills: boolean
 }
 
+// Client-safe subset of the startup config (`config.json` in the data dir +
+// `MOI_*` env overrides), served by GET /api/config. Frozen for the process
+// lifetime — changing it requires a server restart, so clients may cache it
+// forever. See server/app-config.ts.
+export type ClientAppConfig = {
+  // Cloud demo deployment: workspace creation is blocked; the UI offers the
+  // install-moi dialog instead.
+  cloudDemo: boolean
+  // Enabled experimental features, checked by slug.
+  experiments: string[]
+  // Link target for the install-moi dialog in the cloud demo.
+  demoInstallUrl: string
+}
+
 // Re-export the display format
 export type {
   Citation,
