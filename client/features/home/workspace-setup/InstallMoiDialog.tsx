@@ -5,11 +5,14 @@ import {
   IconCheck,
   IconCopy,
   IconFolders,
-  IconLock,
   IconTerminal2,
   IconX
 } from '@tabler/icons-react'
 
+import claudeIcon from '@/client/assets/claude.svg'
+import hermesIcon from '@/client/assets/hermes.png'
+import openaiIcon from '@/client/assets/openai.svg'
+import openclawIcon from '@/client/assets/openclaw.svg'
 import { Button } from '@/client/components/ui/button'
 import {
   Dialog,
@@ -24,22 +27,7 @@ import { useAppConfig } from '@/client/api/app-config'
 // The canonical setup prompt from moi.computer — pasted into any agent, it
 // fetches INSTALL.md and walks itself through the install.
 const AGENT_COMMAND =
-  'Set up the MOI workspace for this project. Fetch https://moi.computer/INSTALL.md, and follow the steps.'
-
-const FEATURES = [
-  {
-    icon: IconFolders,
-    text: 'Create workspaces for your own projects and folders'
-  },
-  {
-    icon: IconTerminal2,
-    text: 'Use your own agent and subscription — Claude Code, Codex, or OpenClaw'
-  },
-  {
-    icon: IconLock,
-    text: 'Everything runs and stays on your computer'
-  }
-] as const
+  'Set up the moi workspace for this project. Fetch https://moi.computer/INSTALL.md, and follow the steps.'
 
 type InstallMoiDialogProps = {
   // Trigger-owned (uncontrolled) or controlled via open/onOpenChange — the
@@ -182,59 +170,74 @@ function InstallMoiDialogContent() {
 
       <div className="flex flex-col gap-5 p-6 pt-3">
         <div className="flex flex-col gap-0.5">
-          <DialogTitle>Get moi on your computer</DialogTitle>
+          <DialogTitle>Use moi with your projects</DialogTitle>
           <DialogDescription>
-            This demo is limited to its built-in workspaces. The full moi runs locally with your own
-            agent.
+            This demo comes with sample workspaces. Connect moi to your agent to unlock all
+            features.
           </DialogDescription>
         </div>
 
         <ul className="flex flex-col gap-3">
-          {FEATURES.map(({ icon: Icon, text }) => (
-            <li key={text} className="flex items-center gap-3">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                <Icon size={16} stroke={1.75} />
+          <li className="flex items-center gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <IconFolders size={20} stroke={1.5} />
+            </span>
+            <span className="text-sm text-foreground">
+              Connect your own data and import existing projects
+            </span>
+          </li>
+          <li className="flex items-center gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <IconTerminal2 size={20} stroke={1.5} />
+            </span>
+            <span className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm text-foreground">
+              <span>Works with</span>
+              <span className="inline-flex items-center gap-1 font-medium">
+                <img src={claudeIcon} alt="" className="size-4 object-contain" />
+                Claude Code,
               </span>
-              <span className="text-sm text-foreground">{text}</span>
-            </li>
-          ))}
+              <span className="inline-flex items-center gap-1 font-medium">
+                <img src={openaiIcon} alt="" className="size-4 object-contain" />
+                Codex,
+              </span>
+              <span className="inline-flex items-center gap-1 font-medium">
+                <img src={hermesIcon} alt="" className="size-4 object-contain" />
+                Hermes,
+              </span>
+              <span className="inline-flex items-center gap-1 font-medium">
+                <img src={openclawIcon} alt="" className="size-4 object-contain" />
+                OpenClaw,
+              </span>
+              <span>and more.</span>
+            </span>
+          </li>
         </ul>
 
         <div className="flex flex-col gap-2">
-          <p className="text-sm text-muted-foreground">To install, paste this to your agent:</p>
-          <div className="relative rounded-lg bg-muted p-3 pr-11">
-            <code className="block font-mono text-xs leading-relaxed text-foreground">
+          <p className="text-sm text-muted-foreground">Paste this prompt into your agent:</p>
+          <div className="rounded-lg bg-muted p-3">
+            <code className="block font-mono text-sm leading-relaxed text-foreground">
               {AGENT_COMMAND}
             </code>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onClick={copy}
-              aria-label={copied ? 'Copied' : 'Copy command'}
-              className="absolute top-1.5 right-1.5"
-            >
-              {copied ? <IconCheck stroke={1.75} /> : <IconCopy stroke={1.75} />}
-            </Button>
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <Button type="button" onClick={copy}>
+                {copied ? (
+                  <IconCheck data-icon="inline-start" stroke={1.5} />
+                ) : (
+                  <IconCopy data-icon="inline-start" stroke={1.5} />
+                )}
+                {copied ? 'Copied' : 'Copy installation prompt'}
+              </Button>
+              <Button
+                variant="secondary"
+                nativeButton={false}
+                render={<a href={demoInstallUrl} target="_blank" rel="noreferrer" />}
+              >
+                Learn more
+                <IconArrowUpRight data-icon="inline-end" stroke={1.5} />
+              </Button>
+            </div>
           </div>
-        </div>
-
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            variant="secondary"
-            render={<a href={demoInstallUrl} target="_blank" rel="noreferrer" />}
-          >
-            moi.computer
-            <IconArrowUpRight data-icon="inline-end" stroke={1.5} />
-          </Button>
-          <Button type="button" onClick={copy}>
-            {copied ? (
-              <IconCheck data-icon="inline-start" stroke={1.5} />
-            ) : (
-              <IconCopy data-icon="inline-start" stroke={1.5} />
-            )}
-            {copied ? 'Copied' : 'Copy command'}
-          </Button>
         </div>
       </div>
     </DialogContent>
