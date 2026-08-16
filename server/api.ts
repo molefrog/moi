@@ -947,7 +947,7 @@ workspaces.put('/order', async c => {
 // provisioned with its workspaces; the UI never sends these requests (it opens
 // the install-moi dialog instead), so a 403 here means the API was called
 // directly.
-const DEMO_CREATE_BLOCKED = 'Workspace creation is not available in the moi cloud demo'
+const DEMO_CREATE_BLOCKED = 'Workspace creation is not available in the moi demo'
 
 workspaces.post('/', async c => {
   if (getAppConfig().cloudDemo) return c.text(DEMO_CREATE_BLOCKED, 403)

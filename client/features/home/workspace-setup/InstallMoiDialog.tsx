@@ -184,8 +184,8 @@ function InstallMoiDialogContent() {
         <div className="flex flex-col gap-0.5">
           <DialogTitle>Get moi on your computer</DialogTitle>
           <DialogDescription>
-            This cloud demo is limited to its built-in workspaces. The full moi runs locally with
-            your own agent.
+            This demo is limited to its built-in workspaces. The full moi runs locally with your own
+            agent.
           </DialogDescription>
         </div>
 

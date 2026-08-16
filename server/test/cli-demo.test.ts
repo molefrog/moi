@@ -43,7 +43,7 @@ test(
   async () => {
     const result = await runCli(['update'], DEMO)
     expect(result.code).toBe(1)
-    expect(result.stdout).toContain('moi update is not available in the cloud demo')
+    expect(result.stdout).toContain('moi update is not available in the demo')
     expect(result.stdout).toContain('https://moi.computer')
   },
   SPAWN_TIMEOUT
@@ -55,7 +55,7 @@ test(
     const result = await runCli(['version'], DEMO)
     expect(result.code).toBe(0)
     expect(result.stdout).toMatch(/\d+\.\d+\.\d+/)
-    expect(result.stdout).not.toContain('not available in the cloud demo')
+    expect(result.stdout).not.toContain('not available in the demo')
   },
   SPAWN_TIMEOUT
 )
@@ -70,7 +70,7 @@ test(
       MOI_SERVER: '1',
       MOI_NPM_REGISTRY: 'http://127.0.0.1:1'
     })
-    expect(result.stdout + result.stderr).not.toContain('not available in the cloud demo')
+    expect(result.stdout + result.stderr).not.toContain('not available in the demo')
   },
   SPAWN_TIMEOUT
 )
@@ -80,7 +80,7 @@ test(
   async () => {
     const result = await runCli(['version'])
     expect(result.code).toBe(0)
-    expect(result.stdout).not.toContain('not available in the cloud demo')
+    expect(result.stdout).not.toContain('not available in the demo')
   },
   SPAWN_TIMEOUT
 )

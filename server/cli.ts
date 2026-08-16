@@ -2865,7 +2865,7 @@ function exitIfDemoBlocked(): void {
   console.log(
     '\n' +
       pc.yellow('◆') +
-      ` moi ${invoked} is not available in the cloud demo.\n` +
+      ` moi ${invoked} is not available in the demo.\n` +
       pc.dim('  Get moi on your computer: ') +
       pc.bold(config.demoInstallUrl) +
       '\n'
