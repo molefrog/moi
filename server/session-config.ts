@@ -1,4 +1,4 @@
-import { mkdir, rename, rm } from 'node:fs/promises'
+import { mkdir, rename } from 'node:fs/promises'
 import { join } from 'path'
 
 import type { SessionConfig } from '@/lib/types'
@@ -22,15 +22,12 @@ export type SessionConfigPatch = {
 type Store = Record<string, Record<string, SessionConfig>>
 
 export const DEFAULT_SESSION_CONFIG_PATH = join(DATA_DIR, 'session-config.json')
-export const LEGACY_SESSION_CONFIG_PATH = join(DATA_DIR, 'thread-config.json')
 
 let storePath = DEFAULT_SESSION_CONFIG_PATH
-let legacyStorePath = LEGACY_SESSION_CONFIG_PATH
 
 // Test seam: point the store at a scratch file (mirrors registry.setRegistryPath).
-export function setSessionConfigPath(path: string, legacyPath?: string): void {
+export function setSessionConfigPath(path: string): void {
   storePath = path
-  legacyStorePath = legacyPath ?? join(path, '..', 'thread-config.json')
 }
 
 function clean(cfg: SessionConfig | undefined): SessionConfig {
@@ -62,14 +59,7 @@ async function writeStore(store: Store): Promise<void> {
 }
 
 async function readStore(): Promise<Store> {
-  const current = await readStoreFile(storePath)
-  if (current) return current
-
-  const legacy = await readStoreFile(legacyStorePath)
-  if (!legacy) return {}
-  await writeStore(legacy)
-  await rm(legacyStorePath, { force: true })
-  return legacy
+  return (await readStoreFile(storePath)) ?? {}
 }
 
 // Serialize read-modify-write so concurrent save/rename calls can't clobber the

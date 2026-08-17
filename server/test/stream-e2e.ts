@@ -39,7 +39,7 @@ import { setSelectedSessionPath } from '../selected-session'
 // ---------------------------------------------------------------------------
 const tmp = mkdtempSync(join(tmpdir(), 'moi-e2e-'))
 setRegistryPath(join(tmp, 'workspaces.json'))
-setSessionConfigPath(join(tmp, 'session-config.json'), join(tmp, 'thread-config.json'))
+setSessionConfigPath(join(tmp, 'session-config.json'))
 setSelectedSessionPath(join(tmp, 'selected-sessions.json'))
 const wsDir = mkdtempSync(join(tmpdir(), 'moi-ws-'))
 const workspace = await registerWorkspace(wsDir, { type: 'claude-code' })

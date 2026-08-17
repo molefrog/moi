@@ -5,7 +5,6 @@ import { join } from 'node:path'
 
 import {
   DEFAULT_SESSION_CONFIG_PATH,
-  LEGACY_SESSION_CONFIG_PATH,
   getSessionConfig,
   renameSessionConfig,
   saveSessionConfig,
@@ -15,17 +14,15 @@ import {
 let scratchDir = ''
 const workspacePath = '/workspace'
 let storePath = ''
-let legacyStorePath = ''
 
 beforeEach(async () => {
   scratchDir = await mkdtemp(join(tmpdir(), 'moi-session-config-'))
   storePath = join(scratchDir, 'session-config.json')
-  legacyStorePath = join(scratchDir, 'thread-config.json')
-  setSessionConfigPath(storePath, legacyStorePath)
+  setSessionConfigPath(storePath)
 })
 
 afterEach(async () => {
-  setSessionConfigPath(DEFAULT_SESSION_CONFIG_PATH, LEGACY_SESSION_CONFIG_PATH)
+  setSessionConfigPath(DEFAULT_SESSION_CONFIG_PATH)
   await rm(scratchDir, { recursive: true, force: true })
 })
 
@@ -50,24 +47,5 @@ describe('session Fast mode config', () => {
 
     expect(await getSessionConfig(workspacePath, 'temporary')).toEqual({})
     expect(await getSessionConfig(workspacePath, 'real')).toEqual({ fastMode: false })
-  })
-
-  test('migrates the legacy config and removes it after writing the new file', async () => {
-    await Bun.write(
-      legacyStorePath,
-      JSON.stringify({
-        [workspacePath]: {
-          'session-1': { model: 'sonnet', effort: 'high', fastMode: false }
-        }
-      })
-    )
-
-    expect(await getSessionConfig(workspacePath, 'session-1')).toEqual({
-      model: 'sonnet',
-      effort: 'high',
-      fastMode: false
-    })
-    expect(await Bun.file(storePath).exists()).toBe(true)
-    expect(await Bun.file(legacyStorePath).exists()).toBe(false)
   })
 })
