@@ -3,6 +3,7 @@
 import type { ToolCall } from '@/lib/types'
 
 import { CODEX_TOOL_LABELS } from './codex'
+import { prettifyShellCommand } from './shell'
 
 export type McpRef = { server: string; tool: string; rest: string }
 
@@ -11,11 +12,14 @@ export type McpRef = { server: string; tool: string; rest: string }
 // stops at the first command separator so a chained command doesn't bleed into
 // `rest`. Returns null for non-`call` invocations.
 export function parseMcporterCall(call: ToolCall): McpRef | null {
-  const isShell = call.name === 'Bash' || call.name === 'exec'
+  const isShell = call.name === 'Bash' || call.name === 'exec' || call.name === 'bash'
   if (!isShell) return null
   const input = (call.input as Record<string, unknown>) ?? {}
-  const command = typeof input.command === 'string' ? input.command : ''
-  if (!command) return null
+  const raw = typeof input.command === 'string' ? input.command : ''
+  if (!raw) return null
+  // Match against the unwrapped command: providers that hand the script to
+  // `/bin/bash -lc "…"` would otherwise leave escaped quotes inside `rest`.
+  const command = prettifyShellCommand(raw)
   const m = command.match(
     /(?:^|\s|\$\()mcporter(?:\)?)\s+call\s+([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)((?:\s+(?!&&|\|\||;|\|)\S+)*)/
   )

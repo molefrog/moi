@@ -72,6 +72,45 @@ describe('hermes tool titles', () => {
   })
 })
 
+describe('shell briefs across providers', () => {
+  function shellCall(provider: ToolCall['provider'], name: string, input: unknown): ToolCall {
+    return { toolCallId: 'tc-1', name, caller: 'model', provider, state: 'success', input }
+  }
+
+  test('strips the wrapper and shortens paths against the cwd', () => {
+    // Codex hands the script to the login shell; the row should read as what
+    // the model wrote, with workspace paths relative.
+    const codex = shellCall('codex', 'exec', {
+      command: `/bin/zsh -lc "sed -n '1,240p' /repo/.agents/skills/moi-workspace/SKILL.md && cat .moi/FIRMA.md"`
+    })
+    expect(formatInputBrief(codex, '/repo')).toBe(
+      "$ sed -n '1,240p' .agents/skills/moi-workspace/SKILL.md && cat .moi/FIRMA.md"
+    )
+  })
+
+  test('collapses a multi-line Claude Bash command to one line', () => {
+    const claude = shellCall('claude-code', 'Bash', {
+      command: 'git add -A &&\n  git commit -m "wip"'
+    })
+    expect(formatInputBrief(claude, null)).toBe('$ git add -A && git commit -m "wip"')
+  })
+
+  test('leaves an unwrapped command untouched', () => {
+    const claude = shellCall('claude-code', 'Bash', { command: 'bun test --coverage' })
+    expect(formatInputBrief(claude, null)).toBe('$ bun test --coverage')
+  })
+
+  test('drops the brief entirely when there is no command', () => {
+    const claude = shellCall('claude-code', 'Bash', {})
+    expect(formatInputBrief(claude, null)).toBe('')
+  })
+
+  test('reads a Hermes terminal title through the same normalization', () => {
+    const hermes = shellCall('hermes', `terminal: /bin/bash -lc "echo hi"`, {})
+    expect(formatInputBrief(hermes, null)).toBe('$ echo hi')
+  })
+})
+
 describe('formatDuration', () => {
   test('rounds sub-second durations up to a whole second', () => {
     expect(formatDuration(850)).toBe('1s')

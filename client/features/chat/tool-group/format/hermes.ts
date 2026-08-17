@@ -6,6 +6,7 @@
 // the brief.
 import type { ToolCall } from '@/lib/types'
 
+import { prettifyShellCommand } from './shell'
 import type { Shorten, ToolFormatter } from './shared'
 
 // Split the action from its parenthesized qualifier and colon detail so the
@@ -62,7 +63,7 @@ function brief(call: ToolCall, shorten: Shorten): string {
   const { action, qualifier, detail } = splitTitle(call.name)
   const text = detail || qualifier
   if (!text) return ''
-  return action === 'terminal' ? `$ ${text}` : shorten(text)
+  return action === 'terminal' ? `$ ${prettifyShellCommand(text)}` : shorten(text)
 }
 
 export const hermesFormatter: ToolFormatter = { displayName, brief }

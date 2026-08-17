@@ -5,6 +5,7 @@
 import type { ToolCall } from '@/lib/types'
 
 import { claudeFormatter } from './claude'
+import { prettifyShellCommand, shellBrief } from './shell'
 import { getInputValue, toolInput, type Shorten, type ToolFormatter } from './shared'
 
 const LABELS: Record<string, string> = {
@@ -74,14 +75,17 @@ function openclawBrief(call: ToolCall, shorten: Shorten): string {
     // `command` on 2026.7.1 + the newer `bash` tool; the 2026.7.2 exec sandbox
     // instead carries a `code` script (JS that shells out) — show whichever.
     const command = getInputValue(input, 'command') || getInputValue(input, 'code')
-    return command ? shorten(`$ ${command}`) : ''
+    return shellBrief(command, shorten)
   }
   if (tool === 'ls' || tool === 'find' || tool === 'grep')
     return shorten(getInputValue(input, 'path') || getInputValue(input, 'pattern'))
   if (tool === 'process') {
     const action = getInputValue(input, 'action')
     const name = getInputValue(input, 'name')
-    return [action, name].filter(Boolean).join(' ') || shorten(getInputValue(input, 'command'))
+    return (
+      [action, name].filter(Boolean).join(' ') ||
+      shorten(prettifyShellCommand(getInputValue(input, 'command')))
+    )
   }
   if (tool === 'web_search' || tool === 'x_search') return getInputValue(input, 'query')
   if (tool === 'web_fetch') return getInputValue(input, 'url')
