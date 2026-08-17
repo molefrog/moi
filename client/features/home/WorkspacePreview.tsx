@@ -88,30 +88,36 @@ function useFolderRadiusScale() {
   return { ref, horizontalRadiusScale }
 }
 
-// Bottom-to-top placement for up to three applet thumbnails. Each card peeks
-// out of the folder at a slightly different angle and lifts on card hover.
-const STACK = [
-  cn(
-    'opacity-40',
-    '-translate-x-3 translate-y-3 -rotate-6',
-    'group-hover:translate-y-2 group-focus-visible:translate-y-2'
-  ),
-  cn(
-    'opacity-50',
-    'translate-x-3 translate-y-2 rotate-5',
-    'group-hover:translate-y-1 group-focus-visible:translate-y-1'
-  ),
-  cn(
-    'opacity-100',
-    '-translate-x-1 translate-y-1 -rotate-2',
-    'group-hover:-translate-y-2 group-focus-visible:-translate-y-2'
-  )
-]
+// Bottom-to-top treatment for up to three applet thumbnails. The frame stays
+// opaque while only the image fades.
+const THUMBNAIL_STYLES = [
+  {
+    frame: cn(
+      '-translate-x-3 translate-y-3 -rotate-6',
+      'group-hover:translate-y-2 group-focus-visible:translate-y-2'
+    ),
+    img: 'opacity-40'
+  },
+  {
+    frame: cn(
+      'translate-x-3 translate-y-2 rotate-5',
+      'group-hover:translate-y-1 group-focus-visible:translate-y-1'
+    ),
+    img: 'opacity-50'
+  },
+  {
+    frame: cn(
+      '-translate-x-1 translate-y-1 -rotate-2',
+      'group-hover:-translate-y-2 group-focus-visible:-translate-y-2'
+    ),
+    img: 'opacity-100'
+  }
+] as const
 
 export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
   const query = useWorkspacePreview(workspaceId)
   const thumbnails = query.data ? [...query.data.thumbnails].reverse() : []
-  const slots = STACK.slice(STACK.length - thumbnails.length)
+  const slots = THUMBNAIL_STYLES.slice(THUMBNAIL_STYLES.length - thumbnails.length)
   const firstUserMessage = query.data?.firstUserMessage
   const theme = query.data?.theme
   const { ref, horizontalRadiusScale } = useFolderRadiusScale()
@@ -156,17 +162,24 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
       </svg>
 
       {thumbnails.map((src, index) => (
-        <img
-          key={index}
-          src={src}
-          alt=""
-          loading="lazy"
+        <div
+          key={src}
           className={cn(
-            'absolute top-[12%] left-[14%] h-auto max-h-[72%] w-auto max-w-[72%] rounded-[calc(var(--radius-2xl)*0.4)] bg-background object-contain shadow-xs [corner-shape:superellipse(1.2)]',
-            'animate-in transition-transform duration-300 ease-out fade-in',
-            slots[index]
+            'absolute top-[12%] left-[14%] w-fit max-w-[72%] overflow-hidden rounded-[calc(var(--radius-2xl)*0.4)] bg-background shadow-xs [corner-shape:superellipse(1.2)]',
+            'animate-in duration-300 ease-out fade-in',
+            slots[index].frame
           )}
-        />
+        >
+          <img
+            src={src}
+            alt=""
+            loading="lazy"
+            className={cn(
+              'block h-auto max-h-32 w-auto max-w-full object-contain',
+              slots[index].img
+            )}
+          />
+        </div>
       ))}
 
       {thumbnails.length === 0 && firstUserMessage && (
@@ -177,7 +190,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
             className={cn(
               'w-max max-w-40 origin-center rounded-lg bg-card px-3 py-2 font-sans shadow-xs',
               'animate-in transition-transform duration-300 ease-out fade-in',
-              STACK[STACK.length - 1],
+              '-translate-x-1 translate-y-1 -rotate-2',
               'group-hover:translate-y-0.5 group-focus-visible:translate-y-0.5'
             )}
           >
