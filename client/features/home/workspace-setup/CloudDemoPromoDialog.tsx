@@ -173,7 +173,7 @@ function CloudDemoPromoDialogContent() {
             </li>
           </ul>
 
-          <div className="mt-8 flex flex-col gap-2 pb-4">
+          <div className="mt-8 flex flex-col gap-3 pb-4">
             <p className="text-sm text-muted-foreground">Give this prompt to your agent</p>
             <div className="relative rounded-lg bg-muted p-4 pb-8">
               <code className="block font-mono text-sm leading-relaxed text-foreground">
