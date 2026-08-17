@@ -63,14 +63,13 @@ function FloppyArtwork({ demoInstallUrl }: FloppyArtworkProps) {
         href={demoInstallUrl}
         target="_blank"
         rel="noreferrer"
-        className="group absolute top-1/2 left-1/2 w-44 -translate-x-1/2 -translate-y-1/2 rotate-3 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:w-40"
+        className="group absolute top-1/2 left-1/2 w-44 -translate-x-1/2 -translate-y-1/2 rotate-4 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:w-40"
       >
         <img src={floppyDisk} alt="" className="w-full drop-shadow-xl" />
         <div
           className={buttonVariants({
             variant: 'outline',
-            className:
-              'pointer-events-none absolute -right-3 -bottom-2 -rotate-6 group-hover:shadow-sm'
+            className: 'absolute -right-3 -bottom-2 -rotate-8'
           })}
         >
           About moi
