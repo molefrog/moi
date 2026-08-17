@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { IconLoader2 } from '@tabler/icons-react'
 import { useLocation } from 'wouter'
 
+import { useAppConfig } from '@/client/api/app-config'
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
@@ -13,6 +14,7 @@ import { IconPicker } from './IconPicker'
 import { SettingsPage, SettingsRow, SettingsSection } from './SettingsLayout'
 
 export function GeneralSettings() {
+  const { cloudDemo } = useAppConfig()
   const { name, icon, cwd, workspaceId } = useWorkspaceLayoutCtx()
   const [, navigate] = useLocation()
   const saveName = useSaveWorkspaceName(workspaceId)
@@ -74,29 +76,31 @@ export function GeneralSettings() {
         </div>
       </SettingsSection>
 
-      <SettingsSection label="Danger zone">
-        <SettingsRow
-          title="Remove space"
-          description="Remove this space from moi. Its folder and sessions stay on disk."
-          control={
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              onClick={remove}
-              disabled={removeWorkspace.isPending}
-            >
-              {removeWorkspace.isPending && (
-                <IconLoader2 data-icon="inline-start" stroke={1.75} className="animate-spin" />
-              )}
-              Remove
-            </Button>
-          }
-        />
-        {removeWorkspace.isError && (
-          <p className="px-3.5 py-3 text-xs text-destructive">{removeWorkspace.error.message}</p>
-        )}
-      </SettingsSection>
+      {!cloudDemo && (
+        <SettingsSection label="Danger zone">
+          <SettingsRow
+            title="Remove space"
+            description="Remove this space from moi. Its folder and sessions stay on disk."
+            control={
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={remove}
+                disabled={removeWorkspace.isPending}
+              >
+                {removeWorkspace.isPending && (
+                  <IconLoader2 data-icon="inline-start" stroke={1.75} className="animate-spin" />
+                )}
+                Remove
+              </Button>
+            }
+          />
+          {removeWorkspace.isError && (
+            <p className="px-3.5 py-3 text-xs text-destructive">{removeWorkspace.error.message}</p>
+          )}
+        </SettingsSection>
+      )}
     </SettingsPage>
   )
 }
