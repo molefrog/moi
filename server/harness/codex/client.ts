@@ -44,6 +44,12 @@ export type CodexProcessInfo = {
   binary: string | null
 }
 
+export type CodexProcessSnapshot = {
+  workspacePath: string
+  pid: number
+  startedAt: number
+}
+
 export function getCodexProcessInfo(workspacePath: string): Promise<CodexProcessInfo> {
   const rec = clients.get(workspacePath)
   const binary = findHarnessExecutable('codex')
@@ -87,11 +93,26 @@ type ClientRecord = {
 }
 
 const clients = new Map<string, Promise<ClientRecord>>() // key: workspacePath
+const liveProcesses = new Map<
+  string,
+  { proc: ReturnType<typeof Bun.spawn>; startedAt: number; isAlive: () => boolean }
+>()
+
+export function getCodexProcessSnapshot(): CodexProcessSnapshot[] {
+  return [...liveProcesses.entries()]
+    .filter(([, process]) => process.isAlive())
+    .map(([workspacePath, process]) => ({
+      workspacePath,
+      pid: process.proc.pid,
+      startedAt: process.startedAt
+    }))
+}
 
 async function startClient(workspacePath: string): Promise<ClientRecord> {
   const bin = requireHarnessExecutable('codex')
 
   const workspaceEnv = await resolveWorkspaceEnv(workspacePath)
+  const startedAt = Date.now()
   const proc = Bun.spawn([bin, 'app-server'], {
     cwd: workspacePath,
     stdin: 'pipe',
@@ -202,6 +223,7 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
     } finally {
       alive = false
       if (clients.get(workspacePath) === recordPromise) clients.delete(workspacePath)
+      if (liveProcesses.get(workspacePath)?.proc === proc) liveProcesses.delete(workspacePath)
       for (const [, p] of pending) {
         clearTimeout(p.timer)
         p.reject(new Error('codex app-server exited'))
@@ -237,6 +259,7 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
   }
   const record: ClientRecord = { client, proc }
   const recordPromise = Promise.resolve(record)
+  liveProcesses.set(workspacePath, { proc, startedAt, isAlive: client.isAlive })
 
   void readLoop()
   void drainStderr()

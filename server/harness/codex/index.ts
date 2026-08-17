@@ -8,6 +8,7 @@ import {
   getCodexMcpStatus,
   getCodexModels,
   getCodexProcessInfo,
+  getCodexProcessSnapshot,
   getCodexSessions,
   getCodexThreadEvents,
   getCodexWorkspacePreview,
@@ -22,6 +23,7 @@ import {
   interruptCodexRun,
   sendCodexMessage
 } from './session'
+import { formatCodexStatusLines } from './status'
 
 export const codexHarness: Harness = {
   id: 'codex',
@@ -72,12 +74,10 @@ export const codexHarness: Harness = {
   debugInfo: ws => getCodexProcessInfo(ws.path),
   wireScope: ws => ws.path,
 
-  statusLines: () => {
-    const active = getCodexActiveSessions()
-    return [
-      `codex executable  ${findHarnessExecutable('codex') ?? '(not found)'}`,
-      `live Codex runs  ${active.length}`,
-      ...active.map(r => `  ▶ busy  ws=${r.workspaceId}  session=${r.sessionId}`)
-    ]
-  }
+  statusLines: () =>
+    formatCodexStatusLines({
+      executable: findHarnessExecutable('codex'),
+      processes: getCodexProcessSnapshot(),
+      active: getCodexActiveSessions()
+    })
 }
