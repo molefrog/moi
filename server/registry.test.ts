@@ -105,6 +105,17 @@ describe('registerWorkspace with a chosen id', () => {
     expect(await listWorkspaces()).toEqual([])
   })
 
+  test('rejects an id that a collection route would shadow', async () => {
+    await expect(registerWorkspace('/Users/foo/project', { id: 'create' })).rejects.toThrow(
+      'Workspace id create is reserved'
+    )
+    // Case-insensitive, so the rule cannot be sidestepped by spelling.
+    await expect(registerWorkspace('/Users/foo/project', { id: 'WS' })).rejects.toThrow(
+      'is reserved'
+    )
+    expect(await listWorkspaces()).toEqual([])
+  })
+
   test('assertWorkspaceIdAvailable mirrors the registration checks', async () => {
     await expect(assertWorkspaceIdAvailable('/Users/foo/project', 'free')).resolves.toBeUndefined()
 
