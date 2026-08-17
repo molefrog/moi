@@ -39,6 +39,7 @@ export function WidgetFrame({ editing, hidden, onRemove, children }: WidgetFrame
         // Stable hook for widget thumbnails: the capture clone overrides this
         // element's chrome (radius/shadow/stroke) so thumbnails come out square.
         data-widget-chrome
+        data-vivid
         style={getWorkspaceThemeStyle(theme, 'widget')}
         className={cn(
           'absolute inset-0 overflow-hidden rounded-2xl text-foreground [corner-shape:superellipse(1.2)]',

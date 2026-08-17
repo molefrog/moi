@@ -452,9 +452,8 @@ async function writeSyntheticTailwindCss(
     // back to `@media (prefers-color-scheme: dark)`, which diverges from the
     // host and injects OS-preference media queries into the page.
     `@custom-variant dark (&:is(.dark *));`,
-    // Textures use their light-on-dark treatment in every widget, regardless
-    // of the widget's selected workspace color.
-    `@custom-variant dark-or-widget (&:is(.dark *, [data-widget-chrome] *));`,
+    // Dark themes and vivid surfaces use the stronger texture treatment.
+    `@custom-variant dark-or-vivid (&:is(.dark *, [data-vivid], [data-vivid] *));`,
     `@source "${sourceDir}";`
   ].join('\n')
   await Bun.write(cssPath, contents)

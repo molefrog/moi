@@ -120,9 +120,15 @@ describe('buildApplet', () => {
       expect(result.js).toContain(
         'background-size: calc(12 * var(--spacing)) calc(12 * var(--spacing))'
       )
+      expect(result.js).toContain(
+        '--texture-checker-fill: color-mix(in oklch, currentColor 8%, transparent)'
+      )
       expect(result.js).toContain('linear-gradient(to right')
       expect(result.js).toContain(
-        'linear-gradient(to right, color-mix(in oklch, var(--primary) 3%, var(--foreground) 3%) 1px'
+        '--texture-grid-line: color-mix(in oklch, var(--primary) 3%, var(--foreground) 3%)'
+      )
+      expect(result.js).toContain(
+        '--texture-grid-line: color-mix(in oklch, currentColor 10%, transparent)'
       )
       expect(result.js).toContain('background-size: 24px 24px')
       expect(result.js).toContain('fractalNoise')
@@ -132,7 +138,8 @@ describe('buildApplet', () => {
       expect(result.js).toContain('slope=%223.2%22 intercept=%22-1.44%22')
       expect(result.js).toContain('color=%22black%22')
       expect(result.js).toContain('color=%22white%22')
-      expect(result.js).toContain(':is(.dark *, [data-widget-chrome] *)')
+      expect(result.js).toContain(':is(.dark *, [data-vivid], [data-vivid] *)')
+      expect(result.js).not.toContain('[data-widget-chrome]')
       expect(result.js).toContain('flood-color=%22currentColor%22')
       expect(result.js).toContain('flood-opacity=%220.1%22')
       expect(result.js).toContain('type=%22luminanceToAlpha%22')

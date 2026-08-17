@@ -4,8 +4,11 @@ import {
   IconArrowUpRight,
   IconCheck,
   IconCopy,
+  IconFolderOpen,
   IconFolders,
-  IconTerminal2,
+  IconMessage,
+  IconMessageChatbot,
+  IconMessages,
   IconX
 } from '@tabler/icons-react'
 
@@ -14,7 +17,7 @@ import floppyDisk from '@/client/assets/floppy-disk.png'
 import hermesIcon from '@/client/assets/hermes.png'
 import openaiIcon from '@/client/assets/openai.svg'
 import openclawIcon from '@/client/assets/openclaw.svg'
-import { Button } from '@/client/components/ui/button'
+import { Button, buttonVariants } from '@/client/components/ui/button'
 import {
   Dialog,
   DialogClose,
@@ -49,14 +52,31 @@ export function CloudDemoPromoDialog({ trigger, open, onOpenChange }: CloudDemoP
   )
 }
 
-function FloppyArtwork() {
+type FloppyArtworkProps = {
+  demoInstallUrl: string
+}
+
+function FloppyArtwork({ demoInstallUrl }: FloppyArtworkProps) {
   return (
     <div className="relative min-h-56 overflow-hidden md:min-h-full">
-      <img
-        src={floppyDisk}
-        alt=""
-        className="absolute top-1/2 left-1/2 w-44 -translate-x-1/2 -translate-y-1/2 -rotate-6 drop-shadow-xl md:w-40"
-      />
+      <a
+        href={demoInstallUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="group absolute top-1/2 left-1/2 w-44 -translate-x-1/2 -translate-y-1/2 rotate-3 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:w-40"
+      >
+        <img src={floppyDisk} alt="" className="w-full drop-shadow-xl" />
+        <div
+          className={buttonVariants({
+            variant: 'outline',
+            className:
+              'pointer-events-none absolute -right-3 -bottom-2 -rotate-6 group-hover:shadow-sm'
+          })}
+        >
+          About moi
+          <IconArrowUpRight data-icon="inline-end" stroke={1.5} />
+        </div>
+      </a>
     </div>
   )
 }
@@ -85,8 +105,11 @@ function CloudDemoPromoDialogContent() {
   const { copied, copy } = useCopyCommand()
 
   return (
-    // The fixed raw colors belong to the illustration and stay consistent across themes.
-    <DialogContent className="w-[calc(100%-2rem)] max-w-md rounded-2xl bg-[#e6dcc4] bg-[image:radial-gradient(75%_110%_at_0%_0%,#e0742f_0%,rgba(224,116,47,0)_48%),radial-gradient(110%_160%_at_100%_0%,#16352a_0%,rgba(22,53,42,0)_60%),radial-gradient(70%_90%_at_90%_100%,#8fb492_0%,rgba(143,180,146,0)_55%),radial-gradient(60%_80%_at_8%_100%,#dcc294_0%,rgba(220,194,148,0)_52%)] p-2 md:max-w-2xl">
+    <DialogContent
+      data-vivid
+      className="w-full max-w-md rounded-2xl bg-primary texture-checker-20 p-2 text-primary-foreground md:max-w-2xl"
+    >
+      <div className="absolute inset-0 bg-[image:linear-gradient(to_right,color-mix(in_oklch,var(--background)_14%,transparent),color-mix(in_oklch,var(--background)_6%,transparent))]" />
       {/* Film grain keeps the illustration gradient from banding. */}
       <svg
         className="pointer-events-none absolute inset-0 size-full opacity-30 mix-blend-soft-light"
@@ -104,80 +127,72 @@ function CloudDemoPromoDialogContent() {
       </svg>
 
       <div className="relative grid max-h-[calc(100dvh-2rem)] overflow-y-auto md:grid-cols-[3fr_2fr] md:overflow-visible">
-        <div className="flex flex-col gap-5 rounded-xl bg-card p-6 shadow-sm md:p-8">
+        <div className="rounded-xl bg-card p-6 text-card-foreground shadow-sm md:p-8">
           <div className="flex flex-col gap-0.5">
-            <DialogTitle className="pr-8 md:pr-0">Use moi with your projects</DialogTitle>
-            <DialogDescription>
-              This demo comes with sample workspaces. Connect moi to your agent to unlock all
-              features.
+            <DialogTitle>Unlock all features</DialogTitle>
+            <DialogDescription className="mt-1">
+              This is a demo version with sample workspaces. Install moi locally and connect to your
+              agent.
             </DialogDescription>
           </div>
 
-          <ul className="flex flex-col gap-3">
+          <ul className="mt-4 flex flex-col gap-3">
             <li className="flex items-center gap-3">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                <IconFolders size={20} stroke={1.5} />
-              </span>
+              <IconFolderOpen
+                stroke={0.75}
+                className="mt-0.5 size-8 shrink-0 text-muted-foreground"
+              />
               <span className="text-sm text-foreground">
-                Connect your own data and import existing projects
+                Connect your own data sources and work on existing projects
               </span>
             </li>
             <li className="flex items-center gap-3">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                <IconTerminal2 size={20} stroke={1.5} />
-              </span>
+              <IconMessageChatbot
+                stroke={0.75}
+                className="mt-0.5 size-8 shrink-0 text-muted-foreground"
+              />
               <span className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm text-foreground">
-                <span>Works with</span>
+                <span>Build with</span>
                 <span className="inline-flex items-center gap-1 font-medium">
-                  <img src={claudeIcon} alt="" className="size-4 object-contain" />
+                  <img src={claudeIcon} alt="" className="size-3.5 object-contain" />
                   Claude Code,
                 </span>
                 <span className="inline-flex items-center gap-1 font-medium">
-                  <img src={openaiIcon} alt="" className="size-4 object-contain" />
+                  <img src={openaiIcon} alt="" className="size-3.5 object-contain" />
                   Codex,
                 </span>
                 <span className="inline-flex items-center gap-1 font-medium">
-                  <img src={hermesIcon} alt="" className="size-4 object-contain" />
+                  <img src={hermesIcon} alt="" className="size-3.5 object-contain" />
                   Hermes,
                 </span>
                 <span className="inline-flex items-center gap-1 font-medium">
-                  <img src={openclawIcon} alt="" className="size-4 object-contain" />
+                  <img src={openclawIcon} alt="" className="size-3.5 object-contain" />
                   OpenClaw,
                 </span>
-                <span>and more.</span>
+                <span>and more</span>
               </span>
             </li>
           </ul>
 
-          <div className="flex flex-col gap-2">
-            <p className="text-sm text-muted-foreground">Paste this prompt into your agent:</p>
-            <div className="rounded-lg bg-muted p-3">
+          <div className="mt-6 flex flex-col gap-3">
+            <p className="text-sm text-muted-foreground">Give this prompt to your agent</p>
+            <div className="flex flex-col items-start gap-4 rounded-xl bg-muted p-4">
               <code className="block font-mono text-sm leading-relaxed text-foreground">
                 {AGENT_COMMAND}
               </code>
-              <div className="mt-5 flex flex-wrap items-center gap-2">
-                <Button type="button" onClick={copy}>
-                  {copied ? (
-                    <IconCheck data-icon="inline-start" stroke={1.5} />
-                  ) : (
-                    <IconCopy data-icon="inline-start" stroke={1.5} />
-                  )}
-                  {copied ? 'Copied' : 'Copy prompt'}
-                </Button>
-                <Button
-                  variant="secondary"
-                  nativeButton={false}
-                  render={<a href={demoInstallUrl} target="_blank" rel="noreferrer" />}
-                >
-                  Learn more
-                  <IconArrowUpRight data-icon="inline-end" stroke={1.5} />
-                </Button>
-              </div>
+              <Button type="button" onClick={copy}>
+                {copied ? (
+                  <IconCheck data-icon="inline-start" stroke={1.5} />
+                ) : (
+                  <IconCopy data-icon="inline-start" stroke={1.5} />
+                )}
+                {copied ? 'Copied' : 'Copy prompt'}
+              </Button>
             </div>
           </div>
         </div>
 
-        <FloppyArtwork />
+        <FloppyArtwork demoInstallUrl={demoInstallUrl} />
       </div>
 
       <DialogClose
@@ -186,7 +201,7 @@ function CloudDemoPromoDialogContent() {
             variant="outline"
             size="icon"
             aria-label="Close"
-            className="absolute top-5 right-5"
+            className="absolute top-4 right-4"
           >
             <IconX stroke={1.5} />
           </Button>
