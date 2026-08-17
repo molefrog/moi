@@ -173,13 +173,13 @@ function CloudDemoPromoDialogContent() {
             </li>
           </ul>
 
-          <div className="mt-6 flex flex-col gap-3">
+          <div className="mt-8 flex flex-col gap-2 pb-4">
             <p className="text-sm text-muted-foreground">Give this prompt to your agent</p>
-            <div className="flex flex-col items-start gap-4 rounded-xl bg-muted p-4">
+            <div className="relative rounded-lg bg-muted p-4 pb-8">
               <code className="block font-mono text-sm leading-relaxed text-foreground">
                 {AGENT_COMMAND}
               </code>
-              <Button type="button" onClick={copy}>
+              <Button type="button" onClick={copy} className="absolute right-4 -bottom-4">
                 {copied ? (
                   <IconCheck data-icon="inline-start" stroke={1.5} />
                 ) : (
