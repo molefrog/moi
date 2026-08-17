@@ -17,7 +17,7 @@ import { validateWorkspaceFolderName } from '@/lib/workspace-name'
 import { WORKSPACE_TYPE_ORDER } from '@/lib/workspace-types'
 import type { WorkspaceType } from '@/lib/types'
 
-import { CloudDemoPromoDialog } from './CloudDemoPromoDialog'
+import { DemoDialog } from './DemoDialog'
 import { WorkspaceAgentStep } from './WorkspaceAgentStep'
 import { WorkspaceDialogContent } from './WorkspaceDialogContent'
 
@@ -47,7 +47,7 @@ export function CreateWorkspaceDialog({ trigger }: CreateWorkspaceDialogProps) {
   // Cloud demo: creating workspaces is off — the same trigger opens the
   // cloud-demo promo dialog instead. After every hook so the hook order is stable.
   if (appConfig.cloudDemo) {
-    return <CloudDemoPromoDialog trigger={trigger} />
+    return <DemoDialog trigger={trigger} />
   }
 
   function finish(workspaceId: string) {

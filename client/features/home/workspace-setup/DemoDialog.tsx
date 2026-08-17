@@ -36,7 +36,7 @@ import { useAppConfig } from '@/client/api/app-config'
 const AGENT_COMMAND =
   'Set up the moi workspace for this project. Fetch https://moi.computer/INSTALL.md, and follow the steps.'
 
-type CloudDemoPromoDialogProps = {
+type DemoDialogProps = {
   // Trigger-owned (uncontrolled) or controlled via open/onOpenChange — the
   // create-workspace buttons use the former, programmatic opens the latter.
   trigger?: ReactElement
@@ -46,11 +46,11 @@ type CloudDemoPromoDialogProps = {
 
 // Shown in the cloud demo wherever a workspace would be created: the demo is
 // limited to its built-in workspaces, and the way out is installing moi.
-export function CloudDemoPromoDialog({ trigger, open, onOpenChange }: CloudDemoPromoDialogProps) {
+export function DemoDialog({ trigger, open, onOpenChange }: DemoDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger && <DialogTrigger render={trigger} />}
-      <CloudDemoPromoDialogContent />
+      <DemoDialogContent />
     </Dialog>
   )
 }
@@ -127,7 +127,7 @@ function useCopyCommand() {
   return { copied, copy }
 }
 
-function CloudDemoPromoDialogContent() {
+function DemoDialogContent() {
   const { demoInstallUrl } = useAppConfig()
   const { copied, copy } = useCopyCommand()
 

@@ -11,7 +11,7 @@ import {
 } from './api'
 import { CreateWorkspaceDialog } from './workspace-setup/CreateWorkspaceDialog'
 import { ImportWorkspaceDialog } from './workspace-setup/ImportWorkspaceDialog'
-import { CloudDemoPromoDialog } from './workspace-setup/CloudDemoPromoDialog'
+import { DemoDialog } from './workspace-setup/DemoDialog'
 import { useWorkspaceImport } from './workspace-setup/useWorkspaceImport'
 import { HomeLogo } from './HomeLogo'
 import { useAppConfig } from '@/client/api/app-config'
@@ -161,7 +161,7 @@ export function HomePage() {
         />
       )}
 
-      <CloudDemoPromoDialog open={promoDialogOpen} onOpenChange={setPromoDialogOpen} />
+      <DemoDialog open={promoDialogOpen} onOpenChange={setPromoDialogOpen} />
     </div>
   )
 }
