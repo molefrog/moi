@@ -1,4 +1,10 @@
-import { type ReactElement, useEffect, useState } from 'react'
+import {
+  type MouseEvent as ReactMouseEvent,
+  type ReactElement,
+  useEffect,
+  useRef,
+  useState
+} from 'react'
 
 import {
   IconArrowUpRight,
@@ -56,14 +62,39 @@ type FloppyArtworkProps = {
   demoInstallUrl: string
 }
 
+const FLOPPY_POINTER_TRAVEL = 4
+
 function FloppyArtwork({ demoInstallUrl }: FloppyArtworkProps) {
+  const floppyRef = useRef<HTMLAnchorElement>(null)
+
+  const moveFloppyOppositePointer = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (!floppyRef.current) return
+
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const x = (event.clientX - bounds.left) / bounds.width - 0.5
+    const y = (event.clientY - bounds.top) / bounds.height - 0.5
+
+    floppyRef.current.style.setProperty('--floppy-x', `${x * -2 * FLOPPY_POINTER_TRAVEL}px`)
+    floppyRef.current.style.setProperty('--floppy-y', `${y * -2 * FLOPPY_POINTER_TRAVEL}px`)
+  }
+
+  const resetFloppyPosition = () => {
+    floppyRef.current?.style.removeProperty('--floppy-x')
+    floppyRef.current?.style.removeProperty('--floppy-y')
+  }
+
   return (
-    <div className="relative min-h-56 overflow-hidden md:min-h-full">
+    <div
+      className="relative min-h-56 overflow-hidden md:min-h-full"
+      onMouseMove={moveFloppyOppositePointer}
+      onMouseLeave={resetFloppyPosition}
+    >
       <a
+        ref={floppyRef}
         href={demoInstallUrl}
         target="_blank"
         rel="noreferrer"
-        className="group absolute top-1/2 left-1/2 w-44 -translate-x-1/2 -translate-y-1/2 rotate-4 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:w-40"
+        className="group absolute top-1/2 left-1/2 w-44 -translate-x-1/2 -translate-y-1/2 rotate-4 [transform:translate3d(var(--floppy-x,0px),var(--floppy-y,0px),0)] rounded-lg transition-transform duration-150 ease-out will-change-transform outline-none focus-visible:ring-3 focus-visible:ring-ring/50 motion-reduce:transform-none motion-reduce:transition-none md:w-40"
       >
         <img src={floppyDisk} alt="" className="w-full drop-shadow-xl" />
         <div
@@ -106,7 +137,7 @@ function CloudDemoPromoDialogContent() {
   return (
     <DialogContent
       data-vivid
-      className="w-full max-w-md rounded-2xl bg-primary texture-checker-20 p-2 text-primary-foreground md:max-w-2xl"
+      className="w-full max-w-md rounded-2xl bg-primary texture-checker-16 p-2 text-primary-foreground md:max-w-2xl"
     >
       <div className="absolute inset-0 bg-[image:linear-gradient(to_right,color-mix(in_oklch,var(--background)_14%,transparent),color-mix(in_oklch,var(--background)_6%,transparent))]" />
       {/* Film grain keeps the illustration gradient from banding. */}
