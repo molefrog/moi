@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'path'
 
 import {
+  assertWorkspaceIdAvailable,
   findWorkspaceForPath,
   getWorkspace,
   groupDiscoveredWorkspaces,
@@ -59,6 +60,62 @@ describe('registerWorkspace', () => {
     const a = await registerWorkspace('/Users/foo/project-a')
     const b = await registerWorkspace('/Users/foo/project-b')
     expect(a.id).not.toBe(b.id)
+  })
+})
+
+describe('registerWorkspace with a chosen id', () => {
+  test('registers under the given id', async () => {
+    const entry = await registerWorkspace('/Users/foo/project', { id: 'my-workspace' })
+    expect(entry.id).toBe('my-workspace')
+    expect((await getWorkspace('my-workspace'))!.path).toBe('/Users/foo/project')
+  })
+
+  test('rejects an id the workspace cannot take because it already has one', async () => {
+    const existing = await registerWorkspace('/Users/foo/project')
+
+    await expect(registerWorkspace('/Users/foo/project', { id: 'my-workspace' })).rejects.toThrow(
+      `/Users/foo/project is already registered with id ${existing.id}`
+    )
+    expect((await listWorkspaces()).map(e => e.id)).toEqual([existing.id])
+  })
+
+  test('re-registering with the same id is a no-op', async () => {
+    const first = await registerWorkspace('/Users/foo/project', { id: 'my-workspace' })
+    const again = await registerWorkspace('/Users/foo/project', { id: 'my-workspace' })
+    expect(again.id).toBe(first.id)
+    expect(await listWorkspaces()).toHaveLength(1)
+  })
+
+  test('rejects an id already taken by another workspace', async () => {
+    await registerWorkspace('/Users/foo/project-a', { id: 'shared' })
+
+    await expect(registerWorkspace('/Users/foo/project-b', { id: 'shared' })).rejects.toThrow(
+      'Workspace id shared is already taken'
+    )
+    expect(await listWorkspaces()).toHaveLength(1)
+  })
+
+  test('rejects a malformed id', async () => {
+    await expect(registerWorkspace('/Users/foo/project', { id: '-dashed' })).rejects.toThrow(
+      'Use letters, numbers, dashes and underscores'
+    )
+    await expect(registerWorkspace('/Users/foo/project', { id: 'has space' })).rejects.toThrow(
+      'Use letters, numbers, dashes and underscores'
+    )
+    expect(await listWorkspaces()).toEqual([])
+  })
+
+  test('assertWorkspaceIdAvailable mirrors the registration checks', async () => {
+    await expect(assertWorkspaceIdAvailable('/Users/foo/project', 'free')).resolves.toBeUndefined()
+
+    const existing = await registerWorkspace('/Users/foo/project')
+    await expect(assertWorkspaceIdAvailable('/Users/foo/project', 'free')).rejects.toThrow(
+      `already registered with id ${existing.id}`
+    )
+    // Relative paths resolve the same way registration does.
+    await expect(assertWorkspaceIdAvailable('.', existing.id)).rejects.toThrow(
+      `Workspace id ${existing.id} is already taken`
+    )
   })
 })
 

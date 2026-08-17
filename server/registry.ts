@@ -2,7 +2,7 @@ import { mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'path'
 
-import { newWorkspaceId } from '@/lib/ids'
+import { newWorkspaceId, validateWorkspaceId } from '@/lib/ids'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 import { orderWorkspaceTypes } from '@/lib/workspace-types'
 
@@ -48,11 +48,42 @@ async function writeRegistry(entries: WorkspaceEntry[]): Promise<void> {
 }
 
 export type RegisterOptions = {
+  // Register under this id instead of a generated one. Only accepted while the
+  // workspace is unregistered — see `workspaceIdError`.
+  id?: string
   type?: WorkspaceType
   name?: string
   agentId?: string
   isDefault?: boolean
   lastRunAt?: string
+}
+
+// Why a chosen id can be refused. An id is baked into `/workspace/<id>` URLs
+// and outlives the registration, so it is assigned once: a workspace that
+// already carries an id keeps it, and no two workspaces may share one.
+function workspaceIdError(
+  entries: WorkspaceEntry[],
+  normalPath: string,
+  id: string
+): string | null {
+  const invalid = validateWorkspaceId(id)
+  if (invalid) return invalid
+  const existing = entries.find(e => e.path === normalPath)
+  if (existing && existing.id !== id) {
+    return `${normalPath} is already registered with id ${existing.id}`
+  }
+  if (entries.some(e => e.id === id && e.path !== normalPath)) {
+    return `Workspace id ${id} is already taken`
+  }
+  return null
+}
+
+// Check a chosen id against the registry without registering anything, so a
+// caller can fail before doing expensive setup work. `registerWorkspace`
+// re-checks, so this is a courtesy, not the enforcement point.
+export async function assertWorkspaceIdAvailable(absPath: string, id: string): Promise<void> {
+  const error = workspaceIdError(await readRegistry(), resolve(absPath), id)
+  if (error) throw new Error(error)
 }
 
 export async function registerWorkspace(
@@ -61,10 +92,14 @@ export async function registerWorkspace(
 ): Promise<WorkspaceEntry> {
   const normalPath = resolve(absPath)
   const entries = await readRegistry()
+  if (opts.id) {
+    const error = workspaceIdError(entries, normalPath, opts.id)
+    if (error) throw new Error(error)
+  }
   const existing = entries.find(e => e.path === normalPath)
   if (existing) return existing
   const entry: WorkspaceEntry = {
-    id: newWorkspaceId(),
+    id: opts.id ?? newWorkspaceId(),
     path: normalPath,
     addedAt: new Date().toISOString(),
     ...(opts.type ? { type: opts.type } : {}),
