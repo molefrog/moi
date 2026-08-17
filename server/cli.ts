@@ -58,7 +58,12 @@ import {
   matchHermesProfile
 } from './harness/hermes/discovery'
 import { type OpenClawAgent, discoverOpenClawAgents } from './harness/openclaw/discovery'
-import { liftToWorkspaceRoot, listWorkspaces, registerWorkspace } from './registry'
+import {
+  assertWorkspaceIdAvailable,
+  liftToWorkspaceRoot,
+  listWorkspaces,
+  registerWorkspace
+} from './registry'
 import { serverCwd } from './server-cwd'
 import {
   isBehind,
@@ -324,6 +329,11 @@ const init = defineCommand({
       type: 'boolean',
       default: false,
       description: 'Start the web server if not already running'
+    },
+    id: {
+      type: 'string',
+      description:
+        'Register under this id instead of a generated one — fails if the workspace is already registered'
     }
   },
   async run({ args }) {
@@ -358,6 +368,17 @@ const init = defineCommand({
       )
     }
 
+    // A chosen id is only assignable at first registration, so refuse it here —
+    // before any skills are copied or `.moi/` is scaffolded.
+    if (args.id) {
+      try {
+        await assertWorkspaceIdAvailable(target, args.id)
+      } catch (err) {
+        console.error('\n' + pc.red('✗') + ' ' + (err as Error).message + '\n')
+        process.exit(1)
+      }
+    }
+
     const projectRoot = join(import.meta.dir, '..')
     const isInteractive = process.stdout.isTTY
 
@@ -383,6 +404,7 @@ const init = defineCommand({
 
     // Always register the workspace in the persistent registry
     const entry = await registerWorkspace(target, {
+      ...(args.id ? { id: args.id } : {}),
       type,
       ...(agent
         ? {
