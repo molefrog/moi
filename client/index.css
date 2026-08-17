@@ -39,7 +39,7 @@
   --radius: 0.625rem;
   --default-sans: ui-sans-serif, system-ui, sans-serif;
   --sans: var(--default-sans);
-  --default-mono: ui-monospace, monospace;
+  --default-mono: 'Geist Mono', ui-monospace, monospace;
   --mono: var(--default-mono);
 
   /* Workspace page layout — single source of truth for the widget/chat panel.

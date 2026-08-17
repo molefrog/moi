@@ -46,9 +46,12 @@ function themeColorProperty(token: ThemeColorToken): `--${string}` {
 export function getWorkspaceThemeFontStyle(theme: WorkspaceLayout['theme']): WorkspaceThemeStyle {
   const style: WorkspaceThemeStyle = {}
   const resolved = resolveWorkspaceTheme(theme)
-  const font = FONT_THEMES[resolved.font] ?? FONT_THEMES[DEFAULT_WORKSPACE_THEME.font]
+
+  const font =
+    resolved.font === DEFAULT_WORKSPACE_THEME.font ? undefined : FONT_THEMES[resolved.font]
+
   for (const [token, property] of WORKSPACE_FONT_PROPERTIES) {
-    style[property] = font[token]
+    style[property] = font?.[token]
   }
   return style
 }
@@ -59,9 +62,11 @@ export function getWorkspaceThemeColorStyle(
 ): WorkspaceThemeStyle {
   const style: WorkspaceThemeStyle = {}
   const resolved = resolveWorkspaceTheme(theme)
+
   const color = COLOR_THEMES[resolved.color] ?? COLOR_THEMES[DEFAULT_WORKSPACE_THEME.color]
   const primary = color.primary ?? (colorMode === 'widget' ? DEFAULT_PRIMARY_COLOR : undefined)
   const colors = primary ? deriveThemeColors(primary, colorMode) : undefined
+
   for (const [token, property] of WORKSPACE_COLOR_PROPERTIES) {
     style[property] = colors?.[token]
   }
@@ -71,8 +76,11 @@ export function getWorkspaceThemeColorStyle(
 export function getWorkspaceThemeRadiusStyle(theme: WorkspaceLayout['theme']): WorkspaceThemeStyle {
   const style: WorkspaceThemeStyle = {}
   const resolved = resolveWorkspaceTheme(theme)
-  const radius = RADIUS_THEMES[resolved.radius] ?? RADIUS_THEMES[DEFAULT_WORKSPACE_THEME.radius]
-  style[WORKSPACE_RADIUS_PROPERTY] = radius.radius
+
+  const radius =
+    resolved.radius === DEFAULT_WORKSPACE_THEME.radius ? undefined : RADIUS_THEMES[resolved.radius]
+
+  style[WORKSPACE_RADIUS_PROPERTY] = radius?.radius
   return style
 }
 
