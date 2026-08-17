@@ -1,6 +1,7 @@
 // Claude Code vocabulary — also the default when a call carries no provider.
 import type { ToolCall } from '@/lib/types'
 
+import { shellBrief } from './shell'
 import { getInputValue, toolInput, type Shorten, type ToolFormatter } from './shared'
 
 // Claude tool names are mostly already presentable (Read, Bash, …); only a few
@@ -24,7 +25,7 @@ function shortToolName(name: string): string {
 function brief(call: ToolCall, shorten: Shorten): string {
   const tool = call.name
   const input = toolInput(call)
-  if (tool === 'Bash') return shorten(`$ ${getInputValue(input, 'command')}`)
+  if (tool === 'Bash') return shellBrief(getInputValue(input, 'command'), shorten)
   if (tool === 'Read' || tool === 'Write' || tool === 'Edit')
     return shorten(getInputValue(input, 'file_path'))
   if (tool === 'Glob') return shorten(getInputValue(input, 'pattern'))

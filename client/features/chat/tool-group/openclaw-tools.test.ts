@@ -45,13 +45,13 @@ describe('the codex runtime', () => {
     expect(formatInputBrief(c, null)).toBe('*** Update File: src/app.ts')
   })
 
-  test('shows the command for its shell tool', () => {
+  test('shows the command for its shell tool, without the login-shell wrapper', () => {
     const c = call('bash', {
       command: '/bin/bash -lc "sed -n \'1,120p\' notes.txt"',
       cwd: '/root/.openclaw/workspace'
     })
     expect(getToolDisplayName(c)).toBe('Bash')
-    expect(formatInputBrief(c, null)).toContain('sed -n')
+    expect(formatInputBrief(c, null)).toBe("$ sed -n '1,120p' notes.txt")
   })
 })
 

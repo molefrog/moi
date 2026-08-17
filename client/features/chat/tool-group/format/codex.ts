@@ -3,6 +3,7 @@
 // unchanged).
 import type { ToolCall } from '@/lib/types'
 
+import { shellBrief } from './shell'
 import { getInputValue, toolInput, type Shorten, type ToolFormatter } from './shared'
 
 // Exported for mcp.ts: these management pseudo-tools stay plain rows, never
@@ -81,7 +82,7 @@ function brief(call: ToolCall, shorten: Shorten): string {
         .filter(Boolean)
         .join(' ')
     if (action?.type === 'listFiles') return action.path ? shorten(action.path) : ''
-    return shorten(`$ ${getInputValue(input, 'command')}`)
+    return shellBrief(getInputValue(input, 'command'), shorten)
   }
   if (tool === 'apply_patch') {
     // The adapter sends structured per-file changes: [{ path, kind, diff }].
