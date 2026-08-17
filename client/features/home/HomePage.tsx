@@ -11,7 +11,7 @@ import {
 } from './api'
 import { CreateWorkspaceDialog } from './workspace-setup/CreateWorkspaceDialog'
 import { ImportWorkspaceDialog } from './workspace-setup/ImportWorkspaceDialog'
-import { InstallMoiDialog } from './workspace-setup/InstallMoiDialog'
+import { CloudDemoPromoDialog } from './workspace-setup/CloudDemoPromoDialog'
 import { useWorkspaceImport } from './workspace-setup/useWorkspaceImport'
 import { HomeLogo } from './HomeLogo'
 import { useAppConfig } from '@/client/api/app-config'
@@ -43,7 +43,7 @@ export function HomePage() {
     onSuccess: entry => navigate(`/workspace/${entry.id}`)
   })
   const appConfig = useAppConfig()
-  const [installDialogOpen, setInstallDialogOpen] = useState(false)
+  const [promoDialogOpen, setPromoDialogOpen] = useState(false)
   const discoveredWorkspacesOpen = useUiStore(state => state.discoveredWorkspacesOpen)
   const setDiscoveredWorkspacesOpen = useUiStore(state => state.setDiscoveredWorkspacesOpen)
 
@@ -68,9 +68,9 @@ export function HomePage() {
   const count = workspaces.length
 
   function handleAdd(suggestion: DiscoveredWorkspace) {
-    // Cloud demo: adding workspaces is off — offer the install dialog instead.
+    // Cloud demo: adding workspaces is off — offer the promo dialog instead.
     if (appConfig.cloudDemo) {
-      setInstallDialogOpen(true)
+      setPromoDialogOpen(true)
       return
     }
     importFlow.startImport(suggestion)
@@ -161,7 +161,7 @@ export function HomePage() {
         />
       )}
 
-      <InstallMoiDialog open={installDialogOpen} onOpenChange={setInstallDialogOpen} />
+      <CloudDemoPromoDialog open={promoDialogOpen} onOpenChange={setPromoDialogOpen} />
     </div>
   )
 }
