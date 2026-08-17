@@ -108,19 +108,27 @@ function liveKey(workspaceId: string, sessionId: string): string {
   return real ? recKey(workspaceId, real) : direct
 }
 
-export function getCodexActiveSessions(): {
+export type CodexActiveSession = {
   workspaceId: string
+  workspacePath: string
   sessionId: string
   activity: SessionActivity
-}[] {
-  const out: { workspaceId: string; sessionId: string; activity: SessionActivity }[] = []
+}
+
+export function getCodexActiveSessions(): CodexActiveSession[] {
+  const out: CodexActiveSession[] = []
   for (const s of sessions.values()) {
     // Codex never surfaces `requires-action`: approvals are designed out
     // (APPROVAL_POLICY 'never' + transport auto-accept in client.ts). If that
     // policy is ever relaxed, `*requestApproval` / `elicitation` server
     // requests are the signals to map to it.
     if (s.processing) {
-      out.push({ workspaceId: s.workspaceId, sessionId: s.sessionId, activity: 'running' })
+      out.push({
+        workspaceId: s.workspaceId,
+        workspacePath: s.workspacePath,
+        sessionId: s.sessionId,
+        activity: 'running'
+      })
     }
   }
   return out

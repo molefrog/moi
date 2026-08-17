@@ -68,6 +68,8 @@ Socket-protocol notes the layers rely on (all defined in `lib/types.ts`):
 server/harness/
   README.md          this file
   debug.ts           shared debug taps (wire + client-frame rings) for /dev/harness
+  detect.ts          which harness owns a directory — `moi init`'s auto-detection
+                     (Hermes profile → OpenClaw agent → Codex → Claude Code)
   <name>/
     adapter.ts       pure wire → display mapping (layer 1 → 2); owns the
                      hand-written wire types it consumes

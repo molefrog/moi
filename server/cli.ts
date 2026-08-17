@@ -30,7 +30,8 @@ import type {
   ScratchSize,
   ScratchStyle,
   WorkspaceEntry,
-  WorkspaceSkillStatus
+  WorkspaceSkillStatus,
+  WorkspaceType
 } from '@/lib/types'
 
 import {
@@ -44,12 +45,25 @@ import { columns, keyValue } from './cli-ui'
 import { CONTROL_HOST, CONTROL_PORT, CONTROL_URL, PORT } from './constants'
 import { type ControlProbe, controlFailureMessage, probeControlServer } from './control-client'
 import {
+  HARNESS_TYPES,
+  type DetectedAgent,
+  agentBindingFor,
+  detectHarness,
+  harnessLabel,
+  isHarnessName
+} from './harness/detect'
+import {
   type HermesProfile,
   discoverHermesProfiles,
   matchHermesProfile
 } from './harness/hermes/discovery'
 import { type OpenClawAgent, discoverOpenClawAgents } from './harness/openclaw/discovery'
-import { assertWorkspaceIdAvailable, liftToWorkspaceRoot, registerWorkspace } from './registry'
+import {
+  assertWorkspaceIdAvailable,
+  liftToWorkspaceRoot,
+  listWorkspaces,
+  registerWorkspace
+} from './registry'
 import { serverCwd } from './server-cwd'
 import {
   isBehind,
@@ -207,6 +221,95 @@ async function runDevSupervisor(
 
 // ---- commands ---------------------------------------------------------------
 
+// `moi init`'s harness decision: an explicit `--harness` wins, otherwise
+// auto-detection (harness/detect.ts). Exits when neither settles it — silently
+// defaulting to Claude Code would install skills into `.claude/skills/` for an
+// agent that reads from somewhere else entirely, which fails later and quietly.
+async function resolveInitHarness(
+  target: string,
+  requested: string | undefined
+): Promise<{ type: WorkspaceType; agent: DetectedAgent | null }> {
+  if (requested !== undefined) {
+    const value = requested.trim()
+    if (!isHarnessName(value)) {
+      console.error('\n' + pc.red('✗') + ' Unknown harness: ' + pc.bold(requested))
+      console.error(pc.dim('  Valid values: ' + HARNESS_TYPES.join(', ')) + '\n')
+      process.exit(1)
+    }
+    // An explicit choice still picks up the agent binding when the provider
+    // can confirm it. It often can't — OpenClaw needs a running gateway — so a
+    // miss warns rather than blocking a deliberate override.
+    const agent = await agentBindingFor(value, target)
+    if (!agent && (value === 'openclaw' || value === 'hermes')) {
+      const noun = value === 'hermes' ? 'profile' : 'agent'
+      console.log(
+        '\n' +
+          pc.yellow('⚠') +
+          ' No ' +
+          harnessLabel[value] +
+          ' ' +
+          noun +
+          ' found at this path — registering without one.\n' +
+          pc.dim('  Run ') +
+          pc.bold('moi ' + value + ' init') +
+          pc.dim(' to bind it once ' + harnessLabel[value] + ' can see the workspace.')
+      )
+    }
+    return { type: value, agent }
+  }
+
+  // A registered workspace has already answered this question, and may carry no
+  // on-disk signal at all (a folder created from the UI whose agent has never
+  // run in it), so the registry outranks detection when re-running `moi init`
+  // to refresh skills.
+  const known = (await listWorkspaces()).find(e => e.path === target)
+  if (known) {
+    const type = known.type ?? 'claude-code'
+    console.log(
+      '\n' + pc.dim('  Already registered — initializing for ') + pc.bold(harnessLabel[type])
+    )
+    return {
+      type,
+      agent: known.agentId
+        ? {
+            agentId: known.agentId,
+            ...(known.name ? { name: known.name } : {}),
+            isDefault: known.isDefault ?? false,
+            ...(known.lastRunAt ? { lastRunAt: known.lastRunAt } : {})
+          }
+        : null
+    }
+  }
+
+  const detected = await detectHarness(target)
+  if (detected) {
+    console.log(
+      '\n' +
+        pc.yellow('◆') +
+        ' Detected ' +
+        detected.reason +
+        ' — initializing for ' +
+        pc.bold(harnessLabel[detected.type]) +
+        '.'
+    )
+    return { type: detected.type, agent: detected.agent ?? null }
+  }
+
+  console.error('\n' + pc.red('✗') + ' No agent harness detected in ' + pc.bold(target))
+  console.error(
+    pc.dim('  Looked for a Hermes profile, an OpenClaw agent, and Codex or Claude Code history.\n')
+  )
+  console.error('  Pick one:\n')
+  console.error(
+    keyValue(
+      HARNESS_TYPES.map(t => [pc.bold('moi init --harness=' + t), harnessLabel[t]]),
+      '    '
+    )
+  )
+  console.error()
+  process.exit(1)
+}
+
 const init = defineCommand({
   meta: {
     name: 'init',
@@ -217,6 +320,10 @@ const init = defineCommand({
       type: 'positional',
       default: '.',
       description: 'Target directory (default: current)'
+    },
+    harness: {
+      type: 'string',
+      description: 'Agent harness: ' + HARNESS_TYPES.join(', ') + ' (default: auto-detect)'
     },
     web: {
       type: 'boolean',
@@ -275,28 +382,16 @@ const init = defineCommand({
     const projectRoot = join(import.meta.dir, '..')
     const isInteractive = process.stdout.isTTY
 
-    // Detect an OpenClaw agent workspace before provisioning: skills must land
-    // in `skills/` (not `.claude/skills/`) and the registry entry must carry
-    // the agent metadata — same as `moi openclaw init <agent>`. Discovery
-    // returns [] when the gateway is down, so this never blocks a plain init.
-    const agent = (await discoverOpenClawAgents()).find(a => a.path === target) ?? null
-    if (agent) {
-      console.log(
-        '\n' +
-          pc.yellow('◆') +
-          ' Detected an OpenClaw agent workspace ' +
-          pc.dim('(' + agent.agentId + (agent.name ? ', ' + agent.name : '') + ')') +
-          ' — initializing for OpenClaw.'
-      )
-    }
+    // Which backend this workspace is for has to be settled before
+    // provisioning: each harness reads skills from a different directory, and
+    // agent-owned ones (OpenClaw, Hermes) need their agent metadata on the
+    // registry entry — same as `moi <provider> init`.
+    const { type, agent } = await resolveInitHarness(target, args.harness)
 
     // Provision: bundled skills + the `.moi/` bootstrap (widgets dir +
     // package.json + bun install). An existing `.moi/` is left untouched.
     console.log()
-    const { scaffold, skillsDir } = await provisionWorkspace(
-      target,
-      agent ? 'openclaw' : 'claude-code'
-    )
+    const { scaffold, skillsDir } = await provisionWorkspace(target, type)
     if (scaffold !== 'exists') {
       if (scaffold === 'installing') {
         console.log(pc.dim('  Widget dependencies still installing in .moi/ (background)'))
@@ -310,23 +405,23 @@ const init = defineCommand({
     // Always register the workspace in the persistent registry
     const entry = await registerWorkspace(target, {
       ...(args.id ? { id: args.id } : {}),
+      type,
       ...(agent
         ? {
-            type: 'openclaw' as const,
             name: agent.name,
             agentId: agent.agentId,
             isDefault: agent.isDefault,
             lastRunAt: agent.lastRunAt
           }
-        : { type: 'claude-code' as const })
+        : {})
     })
 
-    console.log(pc.green('✓') + ' Initialized ' + pc.bold(target))
+    console.log(pc.green('✓') + ' Initialized ' + pc.bold(target) + pc.dim(' (' + type + ')'))
     console.log(
       '  Skills installed to ' +
         pc.dim(skillsDir) +
         ' — ask ' +
-        (agent ? 'your agent' : 'Claude') +
+        (type === 'claude-code' ? 'Claude' : 'your agent') +
         ' to build a widget to get started\n'
     )
 

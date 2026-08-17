@@ -77,7 +77,10 @@ Then bring in your project, either way works:
 
 - open [http://localhost:13337](http://localhost:13337) and create a workspace
   (or import one moi found on this computer) right from the web UI;
-- or run `moi init` inside a folder to turn it into a workspace.
+- or run `moi init` inside a folder to turn it into a workspace. It picks the
+  agent backend up from the folder itself — a Hermes profile, an OpenClaw
+  agent, or Codex/Claude Code history — and asks for
+  `--harness=claude-code|codex|hermes|openclaw` when it can't tell.
 
 ## Run as a service
 
