@@ -105,6 +105,7 @@ const EMPTY_STATE_STYLES = cn('flex flex-1 flex-col items-center justify-center 
 
 type ChatEmptyStateProps = {
   kind: ChatEmptyStateKind
+  hasWorkspaceApplets: boolean
   disabled?: boolean
   onSelectPrompt: (prompt: ChatPrompt) => void
   onNavigate: (destination: ChatWelcomeDestination) => void
@@ -112,6 +113,7 @@ type ChatEmptyStateProps = {
 
 export function ChatEmptyState({
   kind,
+  hasWorkspaceApplets,
   disabled = false,
   onSelectPrompt,
   onNavigate
@@ -121,7 +123,12 @@ export function ChatEmptyState({
       return <ViewBuilderChatEmptyState />
     case 'chat-welcome':
       return (
-        <ChatWelcome disabled={disabled} onSelectPrompt={onSelectPrompt} onNavigate={onNavigate} />
+        <ChatWelcome
+          disabled={disabled}
+          showExamples={!hasWorkspaceApplets}
+          onSelectPrompt={onSelectPrompt}
+          onNavigate={onNavigate}
+        />
       )
     case 'workspace-welcome':
       return <ChatWorkspaceWelcome disabled={disabled} onSelectPrompt={onSelectPrompt} />
@@ -147,10 +154,16 @@ type WelcomeProps = {
 }
 
 type ChatWelcomeProps = WelcomeProps & {
+  showExamples?: boolean
   onNavigate: (destination: ChatWelcomeDestination) => void
 }
 
-export function ChatWelcome({ disabled = false, onSelectPrompt, onNavigate }: ChatWelcomeProps) {
+export function ChatWelcome({
+  disabled = false,
+  showExamples = true,
+  onSelectPrompt,
+  onNavigate
+}: ChatWelcomeProps) {
   return (
     <div className={cn(EMPTY_STATE_STYLES, '@container w-full max-w-md min-w-0')}>
       <div className="prose prose-sm min-w-0 wrap-anywhere prose-inherit">
@@ -177,13 +190,15 @@ export function ChatWelcome({ disabled = false, onSelectPrompt, onNavigate }: Ch
           </WelcomeTerm>{' '}
           for exploring and shaping ideas with your agent.
         </p>
-        <p>Try an example:</p>
+        {showExamples && <p>Try an example:</p>}
       </div>
-      <ChatPromptBubbles
-        prompts={CHAT_WELCOME_PROMPTS}
-        disabled={disabled}
-        onSelect={onSelectPrompt}
-      />
+      {showExamples && (
+        <ChatPromptBubbles
+          prompts={CHAT_WELCOME_PROMPTS}
+          disabled={disabled}
+          onSelect={onSelectPrompt}
+        />
+      )}
     </div>
   )
 }

@@ -47,6 +47,7 @@ type ChatPanelProps = {
   focusRequest?: number
   docked?: boolean
   chatLoaded: boolean
+  hasWorkspaceApplets: boolean
   view: ViewState
   // The live streaming preview as a synthetic assistant turn (or null). Merged
   // into the transcript through the same groupTurns pipeline so a thinking-only
@@ -75,6 +76,7 @@ export function ChatPanel({
   focusRequest = 0,
   docked = false,
   chatLoaded,
+  hasWorkspaceApplets,
   view,
   previewTurn,
   sessionId,
@@ -194,6 +196,7 @@ export function ChatPanel({
             {showEmptyState && (
               <ChatEmptyState
                 kind={emptyStateKind}
+                hasWorkspaceApplets={hasWorkspaceApplets}
                 disabled={promptDisabled}
                 onSelectPrompt={handlePromptSelect}
                 onNavigate={onNavigateFromWelcome}

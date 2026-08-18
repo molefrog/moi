@@ -9,10 +9,11 @@ import {
   resolveChatEmptyState
 } from '@/client/features/chat/ChatEmptyState'
 
-function renderState(kind: ChatEmptyStateKind): string {
+function renderState(kind: ChatEmptyStateKind, hasWorkspaceApplets = false): string {
   return renderToStaticMarkup(
     createElement(ChatEmptyState, {
       kind,
+      hasWorkspaceApplets,
       onSelectPrompt: () => undefined,
       onNavigate: () => undefined
     })
@@ -77,5 +78,15 @@ describe('ChatEmptyState', () => {
     expect(renderState('view-builder')).toContain(
       'Describe the content, data, and key actions you need in the view'
     )
+  })
+
+  test('hides examples when the workspace already has applets', () => {
+    const html = renderState('chat-welcome', true)
+
+    expect(html).toContain('moi is the visual workspace')
+    expect(html).not.toContain('Try an example:')
+    expect(html).not.toContain('Check the weather')
+    expect(html).not.toContain('Track my finances')
+    expect(html).not.toContain('Build a playful synthesizer')
   })
 })

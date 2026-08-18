@@ -238,6 +238,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const openTabIds = effectiveOpenTabs(normalizeTabsState(layout.tabs), views, builders)
   const nonAgentOpenTabs = openTabIds.filter(tab => tab !== 'agent')
   const hasWorkspaceContent = nonAgentOpenTabs.length > 0
+  const hasWorkspaceApplets = widgets.length > 0 || views.length > 0
 
   // Effective layout mode. Split is only visible with workspace content and
   // enough row width; the saved mode remains the user's intent.
@@ -575,6 +576,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       active={mode === 'split'}
       focusRequest={chatFocusRequest}
       chatLoaded={chatLoaded}
+      hasWorkspaceApplets={hasWorkspaceApplets}
       view={view}
       previewTurn={previewTurn}
       sessionId={sessionId}
@@ -596,6 +598,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       active={mode === 'fullscreen' && activeTab === 'agent'}
       focusRequest={chatFocusRequest}
       chatLoaded={chatLoaded}
+      hasWorkspaceApplets={hasWorkspaceApplets}
       view={view}
       previewTurn={previewTurn}
       sessionId={sessionId}
@@ -752,6 +755,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               active={floatingChatOpen}
               focusRequest={chatFocusRequest}
               chatLoaded={chatLoaded}
+              hasWorkspaceApplets={hasWorkspaceApplets}
               view={view}
               previewTurn={previewTurn}
               sessionId={sessionId}
