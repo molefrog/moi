@@ -15,8 +15,12 @@ wired to real data: APIs, local files and commands, MCP servers.
 
 Works with the harness you already use:
 
-| <img src="assets/harnesses/claude.svg" width="16" /> [Claude Code](#claude-code-and-codex) | <img src="assets/harnesses/codex.png" width="16" /> [Codex](#claude-code-and-codex) | <img src="assets/harnesses/openclaw.svg" width="16" /> [OpenClaw](#openclaw) | <img src="assets/harnesses/hermes.png" width="16" /> [Hermes](#hermes) |
-| :----------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------- | :--------------------------------------------------------------------------- | :--------------------------------------------------------------------- |
+<p align="center">
+  <a href="#claude-code-and-codex"><img src="assets/harnesses/claude.svg" width="16" alt="" /> <strong>Claude Code</strong></a>&nbsp;&nbsp;&nbsp;&nbsp;
+  <a href="#claude-code-and-codex"><img src="assets/harnesses/codex.png" width="16" alt="" /> <strong>Codex</strong></a>&nbsp;&nbsp;&nbsp;&nbsp;
+  <a href="#openclaw"><img src="assets/harnesses/openclaw.svg" width="16" alt="" /> <strong>OpenClaw</strong></a>&nbsp;&nbsp;&nbsp;&nbsp;
+  <a href="#hermes"><img src="assets/harnesses/hermes.png" width="16" alt="" /> <strong>Hermes</strong></a>
+</p>
 
 # Features
 
