@@ -4,8 +4,9 @@ import { IconAlertSquareRoundedFilled, IconPlus, IconSmartHome } from '@tabler/i
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'wouter'
 
-import { useReorderWorkspaces, useWorkspaces } from '@/client/features/home/api'
 import { useAppConfig } from '@/client/api/app-config'
+import { useReorderWorkspaces, useWorkspaces } from '@/client/features/home/api'
+import { Update } from '@/client/features/update/Update'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import { CreateWorkspaceDialog } from '@/client/features/home/workspace-setup/CreateWorkspaceDialog'
@@ -13,6 +14,12 @@ import { DemoDialog } from '@/client/features/home/workspace-setup/DemoDialog'
 import { ReorderableList } from '@/client/components/shared/ReorderableList'
 import type { ReorderableRenderState } from '@/client/components/shared/ReorderableList'
 import { Button, buttonVariants } from '@/client/components/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from '@/client/components/ui/tooltip'
 import {
   workspaceDisplayName,
   workspaceProviderIcon
@@ -68,59 +75,76 @@ function Sidebar({ workspaces }: SidebarProps) {
   const { cloudDemo } = useAppConfig()
 
   return (
-    <aside className="flex h-full shrink-0 flex-col items-center gap-4 px-2 py-5 [font-family:var(--default-sans)]">
-      <Link href="/" aria-label="Home" title="Home" className={sidebarNavButtonClass}>
-        <IconSmartHome stroke={1.5} />
-      </Link>
+    <TooltipProvider delay={500}>
+      <aside className="flex h-full shrink-0 flex-col items-center gap-4 px-2 py-5 [font-family:var(--default-sans)]">
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Link href="/" aria-label="Home" className={sidebarNavButtonClass}>
+                <IconSmartHome stroke={1.5} />
+              </Link>
+            }
+          />
+          <TooltipContent side="right">Home</TooltipContent>
+        </Tooltip>
 
-      <nav className="flex max-h-full min-h-0 w-14 flex-1 flex-col items-center justify-center gap-4">
-        {workspaces.length > 0 && (
-          <>
-            <div className="no-scrollbar min-h-0 scroll-fade overflow-y-auto [--scroll-fade-reveal:16px]">
-              <ReorderableList
-                items={workspaces}
-                getId={ws => ws.id}
-                className="flex flex-col gap-4"
-                onReorder={ids => reorder.mutate(ids)}
-                renderPlaceholder={() => (
-                  <div className="pointer-events-none absolute top-0 left-1 size-10 rounded-xl bg-accent" />
-                )}
-                renderOverlay={ws => <WorkspaceButton workspace={ws} dragOverlay />}
-                renderItem={(ws, state) => <WorkspaceButton workspace={ws} dragState={state} />}
-              />
-            </div>
-            <div className="shrink-0">
-              <CreateWorkspaceDialog
-                trigger={
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-lg"
-                    aria-label="Create new workspace"
-                    title="Create new workspace"
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <IconPlus data-icon="inline-start" stroke={1.5} />
-                  </Button>
-                }
-              />
-            </div>
-          </>
-        )}
-      </nav>
+        <nav className="flex max-h-full min-h-0 w-14 flex-1 flex-col items-center justify-center gap-4">
+          {workspaces.length > 0 && (
+            <>
+              <div className="no-scrollbar min-h-0 scroll-fade overflow-y-auto [--scroll-fade-reveal:16px]">
+                <ReorderableList
+                  items={workspaces}
+                  getId={ws => ws.id}
+                  className="flex flex-col gap-4"
+                  onReorder={ids => reorder.mutate(ids)}
+                  renderPlaceholder={() => (
+                    <div className="pointer-events-none absolute top-0 left-1 size-10 rounded-xl bg-accent" />
+                  )}
+                  renderOverlay={ws => <WorkspaceButton workspace={ws} dragOverlay />}
+                  renderItem={(ws, state) => <WorkspaceButton workspace={ws} dragState={state} />}
+                />
+              </div>
+              <div className="shrink-0">
+                <Tooltip>
+                  <CreateWorkspaceDialog
+                    trigger={
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-lg"
+                            aria-label="Create new workspace"
+                            className="text-muted-foreground hover:text-foreground"
+                          >
+                            <IconPlus data-icon="inline-start" stroke={1.5} />
+                          </Button>
+                        }
+                      />
+                    }
+                  />
+                  <TooltipContent side="right">Create new workspace</TooltipContent>
+                </Tooltip>
+              </div>
+            </>
+          )}
+        </nav>
 
-      {cloudDemo ? (
-        <DemoDialog
-          trigger={
-            <Button size="icon" aria-label="Unlock all features" title="Unlock all features">
-              <IconAlertSquareRoundedFilled stroke={1.5} />
-            </Button>
-          }
-        />
-      ) : (
-        <div aria-hidden="true" className="size-8 shrink-0" />
-      )}
-    </aside>
+        <div className="size-8 shrink-0">
+          {cloudDemo ? (
+            <DemoDialog
+              trigger={
+                <Button size="icon" aria-label="Unlock all features" title="Unlock all features">
+                  <IconAlertSquareRoundedFilled stroke={1.5} />
+                </Button>
+              }
+            />
+          ) : (
+            <Update />
+          )}
+        </div>
+      </aside>
+    </TooltipProvider>
   )
 }
 
@@ -138,39 +162,43 @@ function WorkspaceButton({ workspace, dragOverlay = false, dragState }: Workspac
   // rail matches the workspace segment, not the whole path. The trailing slash
   // keeps `/workspace/ws1` from lighting up a sibling `/workspace/ws1-other`.
   const active = location === href || location.startsWith(`${href}/`)
-  const content = (
-    <>
-      <div
-        className={cn(
-          buttonVariants({ variant: 'ghost', size: 'icon-lg' }),
-          'pointer-events-none size-12',
-          dragOverlay
-            ? 'bg-background shadow-lg'
-            : 'group-hover:bg-accent group-hover:text-accent-foreground group-focus-visible:ring-3 group-focus-visible:ring-ring/50',
-          active && !dragOverlay && 'bg-accent text-accent-foreground'
-        )}
-      >
-        <img
-          src={workspace.icon ?? workspaceProviderIcon[workspace.type ?? 'claude-code']}
-          alt=""
-          className="size-7 shrink-0 rounded-xs"
-        />
-      </div>
-      <span className="mt-0.5 line-clamp-2 w-full text-center text-[11px] leading-snug font-medium text-ellipsis text-foreground">
-        {label}
-      </span>
-    </>
+  const icon = (
+    <div
+      className={cn(
+        buttonVariants({ variant: 'ghost', size: 'icon-lg' }),
+        'pointer-events-none size-12',
+        dragOverlay
+          ? 'bg-background shadow-lg'
+          : 'group-hover:bg-accent group-hover:text-accent-foreground group-focus-visible:ring-3 group-focus-visible:ring-ring/50',
+        active && !dragOverlay && 'bg-accent text-accent-foreground'
+      )}
+    >
+      <img
+        src={workspace.icon ?? workspaceProviderIcon[workspace.type ?? 'claude-code']}
+        alt=""
+        className="size-7 shrink-0 rounded-xs"
+      />
+    </div>
+  )
+  const labelElement = (
+    <span className="mt-0.5 line-clamp-2 w-full text-center text-[11px] leading-snug font-medium text-ellipsis text-foreground">
+      {label}
+    </span>
   )
 
   if (dragOverlay) {
-    return <span className="flex w-14 flex-col items-center">{content}</span>
+    return (
+      <span className="flex w-14 flex-col items-center">
+        {icon}
+        {labelElement}
+      </span>
+    )
   }
 
   return (
     <Link
       href={href}
       aria-label={label}
-      title={label}
       onClick={event => {
         if (dragState?.isDragging) event.preventDefault()
       }}
@@ -180,7 +208,11 @@ function WorkspaceButton({ workspace, dragOverlay = false, dragState }: Workspac
       )}
       {...dragState?.dragHandleProps}
     >
-      {content}
+      {icon}
+      <Tooltip>
+        <TooltipTrigger render={labelElement} />
+        <TooltipContent side="right">{label}</TooltipContent>
+      </Tooltip>
     </Link>
   )
 }

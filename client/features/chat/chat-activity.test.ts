@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, test } from 'bun:test'
 import { appUiKeys } from '@/client/api/app-ui-keys'
 import { __setQueryClientForTests, handleFrame } from '@/client/features/chat/chat-connection'
 import {
+  hasRunningActivity,
   hasRunningBackgroundSession,
   hasRunningWorkspaceActivity,
   isRunningActivity,
@@ -52,6 +53,11 @@ test('workspace activity includes every session and excludes other workspaces', 
       'ws1'
     )
   ).toBe(false)
+})
+
+test('app activity includes running sessions from any workspace', () => {
+  expect(hasRunningActivity({ 'ws1:idle': 'idle', 'ws2:running': 'running' })).toBe(true)
+  expect(hasRunningActivity({ 'ws1:idle': 'idle', 'ws2:blocked': 'requires-action' })).toBe(false)
 })
 
 test('background activity excludes the selected session', () => {

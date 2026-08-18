@@ -57,6 +57,10 @@ export function isRunningActivity(activity: SessionActivity | undefined): boolea
   return activity === 'running'
 }
 
+export function hasRunningActivity(activity: Record<string, SessionActivity>): boolean {
+  return Object.values(activity).some(isRunningActivity)
+}
+
 export function isSessionRunning(
   activity: Record<string, SessionActivity>,
   workspaceId: string,

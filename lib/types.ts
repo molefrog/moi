@@ -299,6 +299,15 @@ export type ClientAppConfig = {
   demoInstallUrl: string
 }
 
+export type UpdateStatus = {
+  runningVersion: string
+  availableVersion: string | null
+}
+
+export type UpdateResult = {
+  installedVersion: string
+}
+
 // Re-export the display format
 export type {
   Citation,
