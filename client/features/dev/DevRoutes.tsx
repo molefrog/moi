@@ -3,6 +3,7 @@ import { Route, Switch } from 'wouter'
 import { ChatStatesPage } from './ChatStatesPage'
 import { DevIndexPage } from './DevIndexPage'
 import { HarnessDebugPage } from './HarnessDebugPage'
+import { TextureLabPage } from './TextureLabPage'
 import { ToolCallsPage } from './ToolCallsPage'
 
 // All /dev/* routes, colocated with their pages so the whole dev playground
@@ -15,6 +16,7 @@ export default function DevRoutes() {
       <Route path="/dev/harness" component={HarnessDebugPage} />
       <Route path="/dev/chat-states" component={ChatStatesPage} />
       <Route path="/dev/tool-calls" component={ToolCallsPage} />
+      <Route path="/dev/textures" component={TextureLabPage} />
       <Route path="/dev" component={DevIndexPage} />
     </Switch>
   )

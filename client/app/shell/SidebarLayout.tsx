@@ -1,13 +1,15 @@
 import { type ReactNode } from 'react'
 
-import { IconPlus, IconSmartHome } from '@tabler/icons-react'
+import { IconAlertSquareRoundedFilled, IconPlus, IconSmartHome } from '@tabler/icons-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'wouter'
 
 import { useReorderWorkspaces, useWorkspaces } from '@/client/features/home/api'
+import { useAppConfig } from '@/client/api/app-config'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import { CreateWorkspaceDialog } from '@/client/features/home/workspace-setup/CreateWorkspaceDialog'
+import { DemoDialog } from '@/client/features/home/workspace-setup/DemoDialog'
 import { ReorderableList } from '@/client/components/shared/ReorderableList'
 import type { ReorderableRenderState } from '@/client/components/shared/ReorderableList'
 import { Button, buttonVariants } from '@/client/components/ui/button'
@@ -63,6 +65,7 @@ type SidebarProps = {
 
 function Sidebar({ workspaces }: SidebarProps) {
   const reorder = useReorderWorkspaces()
+  const { cloudDemo } = useAppConfig()
 
   return (
     <aside className="flex h-full shrink-0 flex-col items-center gap-4 px-2 py-5 [font-family:var(--default-sans)]">
@@ -106,7 +109,17 @@ function Sidebar({ workspaces }: SidebarProps) {
         )}
       </nav>
 
-      <div aria-hidden="true" className="size-8 shrink-0" />
+      {cloudDemo ? (
+        <DemoDialog
+          trigger={
+            <Button size="icon" aria-label="Unlock all features" title="Unlock all features">
+              <IconAlertSquareRoundedFilled stroke={1.5} />
+            </Button>
+          }
+        />
+      ) : (
+        <div aria-hidden="true" className="size-8 shrink-0" />
+      )}
     </aside>
   )
 }

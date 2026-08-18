@@ -16,11 +16,11 @@ import { DATA_DIR } from './data-dir'
 // per-key, so a broken config never takes the CLI or server down with it.
 export type AppConfig = {
   // Cloud demo deployment: workspace creation is blocked (UI shows the
-  // install-moi dialog instead) and `moi` system commands are disabled.
+  // cloud-demo promo dialog instead) and `moi` system commands are disabled.
   cloudDemo: boolean
   // Gated experimental features, checked by slug.
   experiments: string[]
-  // Link target for the install-moi dialog in the cloud demo.
+  // Link target for the cloud-demo promo dialog.
   demoInstallUrl: string
 }
 

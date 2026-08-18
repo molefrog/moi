@@ -3,9 +3,12 @@ import { describe, expect, test } from 'bun:test'
 import {
   COLOR_THEMES,
   DEFAULT_PRIMARY_COLOR,
+  DEFAULT_WORKSPACE_THEME,
   FONT_THEMES,
   RADIUS_THEMES,
-  deriveThemeColors
+  deriveThemeColors,
+  type FontTheme,
+  type RadiusTheme
 } from '@/lib/themes'
 
 import {
@@ -16,15 +19,28 @@ import {
 } from './workspace-theme'
 
 describe('getWorkspaceThemeStyle', () => {
-  test('uses the default workspace theme variables', () => {
+  test('inherits stylesheet fonts for the default workspace theme', () => {
     const style = getWorkspaceThemeStyle(undefined)
 
-    expect(style).toMatchObject({
-      '--sans': FONT_THEMES.sans.sans,
-      '--mono': FONT_THEMES.sans.mono,
-      '--radius': RADIUS_THEMES.soft.radius
-    })
+    expect(style['--sans']).toBeUndefined()
+    expect(style['--mono']).toBeUndefined()
     expect(style['--primary']).toBeUndefined()
+    expect(style['--radius']).toBeUndefined()
+  })
+
+  test('inherits stylesheet fonts for an invalid font preset', () => {
+    expect(
+      getWorkspaceThemeFontStyle({ ...DEFAULT_WORKSPACE_THEME, font: 'missing' as FontTheme })
+    ).toEqual({ '--sans': undefined, '--mono': undefined })
+  })
+
+  test('inherits the stylesheet radius for an invalid radius preset', () => {
+    expect(
+      getWorkspaceThemeRadiusStyle({
+        ...DEFAULT_WORKSPACE_THEME,
+        radius: 'missing' as RadiusTheme
+      })
+    ).toEqual({ '--radius': undefined })
   })
 
   test('combines selected font and color variables', () => {

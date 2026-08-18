@@ -104,24 +104,24 @@ const THEME_COLOR_DERIVATIONS = {
   workspace: {
     primary: primary => primary,
     primaryForeground: primary => foregroundForPrimary(primary),
-    background: () => 'color-mix(in oklch, var(--primary) 3%, oklch(1 0 0) 97%)',
-    foreground: () => 'color-mix(in oklch, var(--primary) 20%, oklch(0 0 0) 80%)',
-    muted: () => 'color-mix(in oklch, var(--background) 97%, var(--foreground) 3%)',
-    mutedForeground: () => 'color-mix(in oklch, var(--background) 50%, var(--foreground) 50%)',
-    accent: () => 'color-mix(in oklch, var(--primary) 4%, var(--foreground) 4%)',
+    background: () => 'color-mix(in srgb, var(--primary) 3%, oklch(1 0 0) 97%)',
+    foreground: () => 'color-mix(in srgb, var(--primary) 20%, oklch(0 0 0) 80%)',
+    muted: () => 'color-mix(in srgb, var(--background) 97%, var(--foreground) 3%)',
+    mutedForeground: () => 'color-mix(in srgb, var(--background) 50%, var(--foreground) 50%)',
+    accent: () => 'color-mix(in srgb, var(--primary) 4%, var(--foreground) 4%)',
     accentForeground: () => 'var(--foreground)',
-    border: () => 'color-mix(in oklch, var(--foreground) 7%, transparent)'
+    border: () => 'color-mix(in srgb, var(--foreground) 7%, transparent)'
   },
   widget: {
     background: primary => primary,
     foreground: primary => foregroundForPrimary(primary),
-    primary: () => 'color-mix(in oklch, var(--background) 3%, oklch(1 0 0) 97%)',
-    primaryForeground: () => 'color-mix(in oklch, var(--background) 20%, oklch(0 0 0) 80%)',
-    muted: () => 'color-mix(in oklch, var(--background) 97%, var(--foreground) 3%)',
-    mutedForeground: () => 'color-mix(in oklch, var(--background) 50%, var(--foreground) 50%)',
-    accent: () => 'color-mix(in oklch, var(--primary) 4%, var(--foreground) 4%)',
+    primary: () => 'color-mix(in srgb, var(--background) 3%, oklch(1 0 0) 97%)',
+    primaryForeground: () => 'color-mix(in srgb, var(--background) 20%, oklch(0 0 0) 80%)',
+    muted: () => 'color-mix(in srgb, var(--background) 97%, var(--foreground) 3%)',
+    mutedForeground: () => 'color-mix(in srgb, var(--background) 50%, var(--foreground) 50%)',
+    accent: () => 'color-mix(in srgb, var(--primary) 4%, var(--foreground) 4%)',
     accentForeground: () => 'var(--foreground)',
-    border: () => 'color-mix(in oklch, var(--foreground) 15%, transparent)'
+    border: () => 'color-mix(in srgb, var(--foreground) 15%, transparent)'
   }
 } satisfies Record<ThemeColorMode, Record<string, (primary: string) => string>>
 

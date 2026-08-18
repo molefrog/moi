@@ -19,6 +19,11 @@ const DEV_ROUTES: DevRouteEntry[] = [
     description: 'Tool-call group fixtures: single and merged runs, live states, subagent traces.'
   },
   {
+    path: '/dev/textures',
+    title: 'Texture lab',
+    description: 'Every texture across color presets, dark mode, widget tokens, and vivid surfaces.'
+  },
+  {
     path: '/dev/harness',
     title: 'Harness debug',
     description:

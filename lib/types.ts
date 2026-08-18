@@ -291,11 +291,11 @@ export type AppSettings = {
 // forever. See server/app-config.ts.
 export type ClientAppConfig = {
   // Cloud demo deployment: workspace creation is blocked; the UI offers the
-  // install-moi dialog instead.
+  // cloud-demo promo dialog instead.
   cloudDemo: boolean
   // Enabled experimental features, checked by slug.
   experiments: string[]
-  // Link target for the install-moi dialog in the cloud demo.
+  // Link target for the cloud-demo promo dialog.
   demoInstallUrl: string
 }
 

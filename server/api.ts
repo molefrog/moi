@@ -945,7 +945,7 @@ workspaces.put('/order', async c => {
 
 // One message for both creation routes: in the cloud demo the instance is
 // provisioned with its workspaces; the UI never sends these requests (it opens
-// the install-moi dialog instead), so a 403 here means the API was called
+// the cloud demo promo dialog instead), so a 403 here means the API was called
 // directly.
 const DEMO_CREATE_BLOCKED = 'Workspace creation is not available in the moi demo'
 
