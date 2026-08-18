@@ -16,7 +16,7 @@ import {
 } from '@tabler/icons-react'
 
 import claudeIcon from '@/client/assets/claude.svg'
-import floppyDisk from '@/client/assets/floppy-disk.png'
+import floppyDisk from '@/client/assets/floppy-disk.webp'
 import hermesIcon from '@/client/assets/hermes.png'
 import openaiIcon from '@/client/assets/openai.svg'
 import openclawIcon from '@/client/assets/openclaw.svg'
