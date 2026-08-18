@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect } from 'react'
 
 import { IconDownload } from '@tabler/icons-react'
 
@@ -10,10 +10,6 @@ import { UPDATE_ACTIVE_AGENT_MESSAGE } from '@/lib/update'
 import type { UpdateStatus } from '@/lib/types'
 
 import { useUpdate, useUpdateStatus } from './api'
-
-type UpdateProps = {
-  fallback?: ReactNode
-}
 
 export function shouldReloadAfterUpdate(
   status: UpdateStatus | undefined,
@@ -39,7 +35,7 @@ export function getUpdateButtonState(
   return { busy, blocked, label }
 }
 
-export function Update({ fallback = null }: UpdateProps) {
+export function Update() {
   const update = useUpdate()
   const statusQuery = useUpdateStatus(update.isSuccess)
   const agentRunning = useLive(state => hasRunningActivity(state.activity))
@@ -50,7 +46,7 @@ export function Update({ fallback = null }: UpdateProps) {
     if (shouldReloadAfterUpdate(status, restartTarget)) window.location.reload()
   }, [restartTarget, status])
 
-  if (!status?.availableVersion) return fallback
+  if (!status?.availableVersion) return null
 
   const restarting = update.isSuccess
   const button = getUpdateButtonState(agentRunning, update.isPending, restarting)

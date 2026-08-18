@@ -1,4 +1,4 @@
-import { createElement, type ReactNode } from 'react'
+import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -16,7 +16,7 @@ const available: UpdateStatus = {
   availableVersion: '0.6.0'
 }
 
-function renderControl(status: UpdateStatus, fallback?: ReactNode): string {
+function renderControl(status: UpdateStatus): string {
   const queryClient = new QueryClient()
   queryClient.setQueryData(updateKey, status)
 
@@ -24,7 +24,7 @@ function renderControl(status: UpdateStatus, fallback?: ReactNode): string {
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(TooltipProvider, null, createElement(Update, { fallback }))
+      createElement(TooltipProvider, null, createElement(Update))
     )
   )
 }
@@ -46,21 +46,6 @@ describe('Update', () => {
     expect(html).toContain('aria-label="Update"')
     expect(html).not.toContain('data-slot="popover-trigger"')
     expect(html).not.toContain('disabled=""')
-  })
-
-  test('renders the fallback only when no update is available', () => {
-    const fallback = createElement('span', null, 'Fallback action')
-
-    expect(
-      renderControl(
-        {
-          runningVersion: '0.6.0',
-          availableVersion: null
-        },
-        fallback
-      )
-    ).toContain('Fallback action')
-    expect(renderControl(available, fallback)).not.toContain('Fallback action')
   })
 })
 

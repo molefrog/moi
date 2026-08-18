@@ -131,26 +131,17 @@ function Sidebar({ workspaces }: SidebarProps) {
         </nav>
 
         <div className="size-8 shrink-0">
-          <Update
-            fallback={
-              cloudDemo ? (
-                <Tooltip>
-                  <DemoDialog
-                    trigger={
-                      <TooltipTrigger
-                        render={
-                          <Button size="icon" aria-label="Unlock all features">
-                            <IconAlertSquareRoundedFilled stroke={1.5} />
-                          </Button>
-                        }
-                      />
-                    }
-                  />
-                  <TooltipContent side="right">Unlock all features</TooltipContent>
-                </Tooltip>
-              ) : null
-            }
-          />
+          {cloudDemo ? (
+            <DemoDialog
+              trigger={
+                <Button size="icon" aria-label="Unlock all features" title="Unlock all features">
+                  <IconAlertSquareRoundedFilled stroke={1.5} />
+                </Button>
+              }
+            />
+          ) : (
+            <Update />
+          )}
         </div>
       </aside>
     </TooltipProvider>
