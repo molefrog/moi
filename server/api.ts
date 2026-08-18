@@ -4,6 +4,7 @@ import { createMiddleware } from 'hono/factory'
 import { existsSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 
+import { UPDATE_ACTIVE_AGENT_MESSAGE } from '@/lib/update'
 import type {
   AppletKind,
   AppletThumbnailBatch,
@@ -84,6 +85,14 @@ import { resolveWorkspaceImportMetadata } from './workspace-import'
 import type { WorkspaceImportMetadata } from './workspace-import'
 import { getWorkspaceEnvView, isValidEnvKey, updateWorkspaceEnv } from './workspace-env'
 import type { EnvUpdate } from './workspace-env'
+import {
+  getCachedUpdateStatus,
+  hasRunningAgentSessions,
+  installUpdate,
+  restartPendingForUpdate,
+  scheduleRestartForUpdate,
+  updateInProgress
+} from './update'
 
 // The resolved workspace is stashed on the context by `withWorkspace`, so every
 // `/api/workspaces/:id/*` handler can read it without re-querying the registry.
@@ -1058,6 +1067,43 @@ api.route('/api/workspaces', workspaces)
 // Startup config (config.json in the data dir + MOI_* env), client-safe
 // subset. Immutable for the process lifetime — clients cache it forever.
 api.get('/api/config', c => c.json(clientAppConfig()))
+
+// Served from a lazily-refreshed cache: this handler is a memory read, and the
+// registry is consulted on the schedule `getCachedUpdateStatus` owns rather
+// than once per request. `no-store` keeps the browser from adding a second,
+// unrelated cache on top of it.
+api.get('/api/update', async c => {
+  c.header('Cache-Control', 'no-store')
+  return c.json(await getCachedUpdateStatus())
+})
+
+api.post('/api/update', async c => {
+  if (updateInProgress()) {
+    return c.text(
+      restartPendingForUpdate()
+        ? 'An update is installed — moi is restarting.'
+        : 'An update is already in progress.',
+      409
+    )
+  }
+
+  const agentRunning = hasRunningAgentSessions(
+    allHarnesses().flatMap(harness => harness.activeSessions())
+  )
+  if (agentRunning) {
+    return c.text(UPDATE_ACTIVE_AGENT_MESSAGE, 409)
+  }
+
+  try {
+    const result = await installUpdate()
+    if (!result) return c.text('This moi install cannot be updated from the app.', 409)
+    const response = c.json(result)
+    scheduleRestartForUpdate()
+    return response
+  } catch (error) {
+    return c.text(error instanceof Error ? error.message : 'Could not update moi.', 500)
+  }
+})
 
 // App-wide settings (settings.json in the data dir). GET returns every key
 // with defaults applied; PATCH merges a partial body and returns the result.

@@ -93,6 +93,11 @@ flowchart LR
 Moi also stores the all widgets and views as code to keep the workspace filesystem
 as a source of truth.
 
+Updates installed from the UI restart moi and reload the browser automatically.
+The app checks npm at most once an hour while it is open, retrying in five
+minutes if the registry could not be reached; a closed app makes no network
+calls of its own.
+
 # Connect an agent
 
 A workspace is the folder where your agent runs and stores its data. moi adds
