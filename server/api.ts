@@ -86,10 +86,12 @@ import type { WorkspaceImportMetadata } from './workspace-import'
 import { getWorkspaceEnvView, isValidEnvKey, updateWorkspaceEnv } from './workspace-env'
 import type { EnvUpdate } from './workspace-env'
 import {
-  UPDATE_RESTART_EXIT_CODE,
-  getUpdateStatus,
+  getCachedUpdateStatus,
   hasRunningAgentSessions,
-  installUpdate
+  installUpdate,
+  restartPendingForUpdate,
+  scheduleRestartForUpdate,
+  updateInProgress
 } from './update'
 
 // The resolved workspace is stashed on the context by `withWorkspace`, so every
@@ -1066,12 +1068,25 @@ api.route('/api/workspaces', workspaces)
 // subset. Immutable for the process lifetime — clients cache it forever.
 api.get('/api/config', c => c.json(clientAppConfig()))
 
+// Served from a lazily-refreshed cache: this handler is a memory read, and the
+// registry is consulted on the schedule `getCachedUpdateStatus` owns rather
+// than once per request. `no-store` keeps the browser from adding a second,
+// unrelated cache on top of it.
 api.get('/api/update', async c => {
   c.header('Cache-Control', 'no-store')
-  return c.json(await getUpdateStatus())
+  return c.json(await getCachedUpdateStatus())
 })
 
 api.post('/api/update', async c => {
+  if (updateInProgress()) {
+    return c.text(
+      restartPendingForUpdate()
+        ? 'An update is installed — moi is restarting.'
+        : 'An update is already in progress.',
+      409
+    )
+  }
+
   const agentRunning = hasRunningAgentSessions(
     allHarnesses().flatMap(harness => harness.activeSessions())
   )
@@ -1083,11 +1098,7 @@ api.post('/api/update', async c => {
     const result = await installUpdate()
     if (!result) return c.text('This moi install cannot be updated from the app.', 409)
     const response = c.json(result)
-    const restart = setTimeout(() => {
-      process.exitCode = UPDATE_RESTART_EXIT_CODE
-      process.kill(process.pid, 'SIGTERM')
-    }, 500)
-    restart.unref()
+    scheduleRestartForUpdate()
     return response
   } catch (error) {
     return c.text(error instanceof Error ? error.message : 'Could not update moi.', 500)

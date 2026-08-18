@@ -133,9 +133,10 @@ Recovery, if `verify` fails or the run is rejected:
    `latest` did **not**.
 2. `npm view moi-computer@<version> dist.attestations` — trusted publishing attaches provenance
    automatically; its absence means the publish did not go through OIDC.
-3. **Smoke the published package.** This needs the moi ports to itself: `CONTROL_PORT` is a
-   hardcoded `13059` (`server/constants.ts`) that `server/control.ts` binds unconditionally, so
-   `--port` does not let a second instance coexist. Before installing:
+3. **Smoke the published package.** This needs the moi ports to itself: `CONTROL_PORT` defaults to
+   `13059` (`server/constants.ts`) and `server/control.ts` binds it unconditionally, so `--port`
+   does not let a second instance coexist. (`MOI_CONTROL_PORT` overrides it, but that is a test
+   seam — smoke the real defaults.) Before installing:
    - `lsof -ti:13059 -ti:13337` — if anything is running, it is almost certainly the user's own
      `bun run dev` in their terminal. Stop it, and **tell the user you stopped it**. Do not
      silently respawn it in §8; a detached agent-owned supervisor is not the same thing and its

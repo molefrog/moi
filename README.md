@@ -107,6 +107,9 @@ alone. `--check` changes nothing and is made for scripts and agents.
 the update happened.
 
 Updates installed from the UI restart moi and reload the browser automatically.
+The app checks npm at most once an hour while it is open, retrying in five
+minutes if the registry could not be reached; a closed app makes no network
+calls of its own.
 
 # Connect an agent
 
