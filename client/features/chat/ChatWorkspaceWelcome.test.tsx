@@ -16,7 +16,10 @@ describe('ChatWorkspaceWelcome', () => {
     )
     const promptButtons = [...html.matchAll(/<button.*?<\/button>/gs)]
 
-    expect(html).toContain('See what moi can build for you')
+    expect(html).toContain('Start with what’s already here')
+    expect(html).toContain(
+      'Your agent can explore this workspace and suggest useful widgets and views based on its contents.'
+    )
     expect(html).toContain('Explore the workspace')
     expect(promptButtons).toHaveLength(1)
     expect(promptButtons[0]?.[0]).toContain('<svg')

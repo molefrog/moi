@@ -13,7 +13,8 @@ function renderState(kind: ChatEmptyStateKind): string {
   return renderToStaticMarkup(
     createElement(ChatEmptyState, {
       kind,
-      onSelectPrompt: () => undefined
+      onSelectPrompt: () => undefined,
+      onNavigate: () => undefined
     })
   )
 }
@@ -63,6 +64,11 @@ describe('resolveChatEmptyState', () => {
 describe('ChatEmptyState', () => {
   test('renders the selected empty state', () => {
     expect(renderState('chat-welcome')).toContain('moi is the visual workspace')
+    expect(renderState('chat-welcome')).toContain('Try an example:')
+    expect(renderState('workspace-welcome')).toContain('Start with what’s already here')
+    expect(renderState('workspace-welcome')).toContain(
+      'Your agent can explore this workspace and suggest useful widgets and views based on its contents.'
+    )
     expect(renderState('workspace-welcome')).toContain('Explore the workspace')
     expect(renderState('empty')).toContain('Chat with your agent')
   })

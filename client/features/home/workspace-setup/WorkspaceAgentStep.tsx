@@ -18,8 +18,12 @@ const WORKSPACE_AGENT_DESCRIPTION = 'Choose which agent moi will use to build yo
 // Backends whose workspaces belong to an agent installed on the machine: moi
 // imports them (via discovery or `moi <provider> init`) and never creates one.
 const IMPORT_ONLY_DESCRIPTION: Partial<Record<WorkspaceType, string>> = {
-  openclaw: 'Initialize OpenClaw in the folder\nmanually, then import it to moi',
-  hermes: 'Create a Hermes profile with\nhermes profile create, then import it'
+  openclaw: 'To connect an OpenClaw agent, run',
+  hermes: 'To connect a Hermes agent, run'
+}
+const IMPORT_ONLY_COMMAND: Partial<Record<WorkspaceType, string>> = {
+  openclaw: 'moi openclaw init',
+  hermes: 'moi hermes init'
 }
 
 const workspaceAgentDescription: Record<WorkspaceType, string> = {
@@ -34,6 +38,7 @@ export type WorkspaceAgentOption = {
   description: string
   disabled: boolean
   disabledReason?: string
+  disabledCommand?: string
 }
 
 type WorkspaceAgentOptionsInput = {
@@ -51,13 +56,15 @@ export function getWorkspaceAgentOptions({
     const importOnlyReason = !detectedTypes.includes(type)
       ? IMPORT_ONLY_DESCRIPTION[type]
       : undefined
+    const importOnlyCommand = !detectedTypes.includes(type) ? IMPORT_ONLY_COMMAND[type] : undefined
     const disabledReason = unavailableReason ?? importOnlyReason
 
     return {
       type,
       description: workspaceAgentDescription[type],
       disabled: Boolean(disabledReason),
-      ...(disabledReason ? { disabledReason } : {})
+      ...(disabledReason ? { disabledReason } : {}),
+      ...(!unavailableReason && importOnlyCommand ? { disabledCommand: importOnlyCommand } : {})
     }
   })
 }
@@ -233,8 +240,18 @@ function WorkspaceAgentOptionButton({
   return (
     <Tooltip>
       <TooltipTrigger render={button} />
-      <TooltipContent className="max-w-64 text-center whitespace-pre-line">
-        {option.disabledReason}
+      <TooltipContent className={cn('max-w-64', option.disabledCommand && 'max-w-none leading-5')}>
+        <span className="text-center">
+          {option.disabledReason}
+          {option.disabledCommand && (
+            <>
+              <br />
+              <code className="rounded-xs bg-accent px-1 py-0.5 font-mono whitespace-nowrap">
+                {option.disabledCommand}
+              </code>
+            </>
+          )}
+        </span>
       </TooltipContent>
     </Tooltip>
   )

@@ -18,7 +18,11 @@ import type { SystemNotice, Turn, ViewState } from '@/lib/types'
 
 import type { ComposerBanner } from './composer/banners/ComposerBanner'
 import { ChatComposer, type ComposerAnnotationControls } from './composer/ChatComposer'
-import { ChatEmptyState, resolveChatEmptyState } from './ChatEmptyState'
+import {
+  ChatEmptyState,
+  type ChatWelcomeDestination,
+  resolveChatEmptyState
+} from './ChatEmptyState'
 import { ChatSelector } from './ChatSelector'
 import { ThinkingIndicator, TurnView } from './TurnView'
 import { Button } from '@/client/components/ui/button'
@@ -57,6 +61,7 @@ type ChatPanelProps = {
   annotation?: ComposerAnnotationControls
   send: (text: string, options?: ChatSendOptions) => void
   stop: () => void
+  onNavigateFromWelcome: (destination: ChatWelcomeDestination) => void
   // Chat on a separate tab doesn't have a close button
   onClose?: () => void
   builderDraft?: ViewBuilderChatDraft
@@ -79,6 +84,7 @@ export function ChatPanel({
   annotation,
   send,
   stop,
+  onNavigateFromWelcome,
   onClose,
   builderDraft
 }: ChatPanelProps) {
@@ -190,6 +196,7 @@ export function ChatPanel({
                 kind={emptyStateKind}
                 disabled={promptDisabled}
                 onSelectPrompt={handlePromptSelect}
+                onNavigate={onNavigateFromWelcome}
               />
             )}
             {timeline.map(item =>

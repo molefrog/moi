@@ -45,7 +45,8 @@ describe('getWorkspaceAgentOptions', () => {
 
     expect(options.find(option => option.type === 'openclaw')).toMatchObject({
       disabled: true,
-      disabledReason: 'Initialize OpenClaw in the folder\nmanually, then import it to moi'
+      disabledReason: 'To connect an OpenClaw agent, run',
+      disabledCommand: 'moi openclaw init'
     })
   })
 
@@ -64,7 +65,8 @@ describe('getWorkspaceAgentOptions', () => {
 
     expect(options.find(option => option.type === 'hermes')).toMatchObject({
       disabled: true,
-      disabledReason: 'Create a Hermes profile with\nhermes profile create, then import it'
+      disabledReason: 'To connect a Hermes agent, run',
+      disabledCommand: 'moi hermes init'
     })
   })
 

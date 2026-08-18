@@ -1,6 +1,5 @@
 import {
   IconArticle,
-  IconBriefcase,
   IconFileSearch,
   IconGhost,
   IconLayout2,
@@ -9,6 +8,7 @@ import {
   IconSketching,
   IconTableSpark,
   IconUmbrella2,
+  IconWallet,
   type TablerIcon
 } from '@tabler/icons-react'
 
@@ -24,7 +24,7 @@ const ONBOARDING_HANDOFF_DIRECTIVE =
 
 export const CHAT_WELCOME_PROMPTS = [
   {
-    label: "What's the weather?",
+    label: 'Check the weather',
     prompt:
       "Build me a set of weather widgets that surface current conditions, today's hourly forecast, and a simple weekly outlook at a glance",
     context: [
@@ -38,7 +38,23 @@ export const CHAT_WELCOME_PROMPTS = [
     icon: IconUmbrella2
   },
   {
-    label: 'Build a fun synthesizer',
+    label: 'Track my finances',
+    prompt:
+      'Build me a personal finance view for tracking income, expenses, monthly budgets, spending trends, and savings, with an agent action that can add sample transactions',
+    context: [
+      "Build this onboarding example immediately without asking follow-up questions, and don't use external services or bank connections.",
+      'Create a responsive View with a month selector, income, spending, and savings summaries, an income-versus-spending trend, category breakdowns, budget progress, and recent transactions.',
+      'Support adding, editing, and deleting income and expense transactions, categories, and monthly category budgets.',
+      'Persist transactions, categories, and budgets in a workspace-local SQLite database accessed through server functions. Store monetary amounts as integer cents and seed realistic sample data only when the database is empty.',
+      'Add an “Add with agent” action that imports `sendChatMessage` from `moi` and sends a concise request for the agent to generate and insert a realistic batch of sample transactions into the same database.',
+      'Provide a small documented workspace script the agent can use to validate and append transactions safely, then refresh the View data after the agent updates the database.',
+      'Include loading, empty, and error states, then bundle the View and smoke-test its SQLite persistence and transaction mutations before finishing.',
+      ONBOARDING_HANDOFF_DIRECTIVE
+    ],
+    icon: IconWallet
+  },
+  {
+    label: 'Build a playful synthesizer',
     prompt:
       'Build me a view with a simple, playful synthesizer featuring a keyboard, five sound controls, and the ability to record, save, and load music files from the workspace',
     context: [
@@ -50,22 +66,6 @@ export const CHAT_WELCOME_PROMPTS = [
       ONBOARDING_HANDOFF_DIRECTIVE
     ],
     icon: IconPiano
-  },
-  {
-    label: 'Make a job tracker',
-    prompt:
-      'Build me a view with a visual job search board where I can add opportunities by pasting a job link, automatically extract the details, move opportunities through stages, and keep notes and related files in the workspace',
-    context: [
-      'Build this onboarding example immediately without asking follow-up questions.',
-      'Create a visual View with Saved, Applied, Interviewing, Offer, and Closed stages.',
-      'Let the user add a job by pasting its URL, and use a server function to parse public metadata for the title, company, and location.',
-      'When a page blocks parsing or lacks metadata, keep the URL and provide editable manual fields.',
-      'Support moving opportunities between stages, editing their details and notes, and referencing related workspace files.',
-      'Persist the board in a workspace-local JSON file and include loading, empty, and error states.',
-      'Bundle the View and smoke-test its persistence and parsing functions before finishing.',
-      ONBOARDING_HANDOFF_DIRECTIVE
-    ],
-    icon: IconBriefcase
   }
 ] satisfies ChatPrompt[]
 
@@ -82,6 +82,7 @@ export const WORKSPACE_ANALYSIS_PROMPT = {
 } satisfies ChatPrompt
 
 export type ChatEmptyStateKind = 'view-builder' | 'chat-welcome' | 'workspace-welcome' | 'empty'
+export type ChatWelcomeDestination = 'agent' | 'widgets' | 'views' | 'scratchpad'
 
 type ResolveChatEmptyStateOptions = {
   isViewBuilderDraft: boolean
@@ -106,14 +107,22 @@ type ChatEmptyStateProps = {
   kind: ChatEmptyStateKind
   disabled?: boolean
   onSelectPrompt: (prompt: ChatPrompt) => void
+  onNavigate: (destination: ChatWelcomeDestination) => void
 }
 
-export function ChatEmptyState({ kind, disabled = false, onSelectPrompt }: ChatEmptyStateProps) {
+export function ChatEmptyState({
+  kind,
+  disabled = false,
+  onSelectPrompt,
+  onNavigate
+}: ChatEmptyStateProps) {
   switch (kind) {
     case 'view-builder':
       return <ViewBuilderChatEmptyState />
     case 'chat-welcome':
-      return <ChatWelcome disabled={disabled} onSelectPrompt={onSelectPrompt} />
+      return (
+        <ChatWelcome disabled={disabled} onSelectPrompt={onSelectPrompt} onNavigate={onNavigate} />
+      )
     case 'workspace-welcome':
       return <ChatWorkspaceWelcome disabled={disabled} onSelectPrompt={onSelectPrompt} />
     case 'empty':
@@ -137,7 +146,11 @@ type WelcomeProps = {
   onSelectPrompt: (prompt: ChatPrompt) => void
 }
 
-export function ChatWelcome({ disabled = false, onSelectPrompt }: WelcomeProps) {
+type ChatWelcomeProps = WelcomeProps & {
+  onNavigate: (destination: ChatWelcomeDestination) => void
+}
+
+export function ChatWelcome({ disabled = false, onSelectPrompt, onNavigate }: ChatWelcomeProps) {
   return (
     <div className={cn(EMPTY_STATE_STYLES, '@container w-full max-w-md min-w-0')}>
       <div className="prose prose-sm min-w-0 wrap-anywhere prose-inherit">
@@ -146,13 +159,25 @@ export function ChatWelcome({ disabled = false, onSelectPrompt }: WelcomeProps) 
           doing.
         </p>
         <p>
-          Ask <WelcomeTerm Icon={IconGhost}>Agent</WelcomeTerm> to build{' '}
-          <WelcomeTerm Icon={IconLayout2}>Widgets</WelcomeTerm> that surface information and quick
-          actions, or entire <WelcomeTerm Icon={IconArticle}>Views</WelcomeTerm> for more complex
-          tools. Use <WelcomeTerm Icon={IconSketching}>Scratchpad</WelcomeTerm> for exploring and
-          shaping ideas with your agent.
+          Ask{' '}
+          <WelcomeTerm Icon={IconGhost} destination="agent" onNavigate={onNavigate}>
+            Agent
+          </WelcomeTerm>{' '}
+          to build{' '}
+          <WelcomeTerm Icon={IconLayout2} destination="widgets" onNavigate={onNavigate}>
+            Widgets
+          </WelcomeTerm>{' '}
+          that surface information and quick actions, or entire{' '}
+          <WelcomeTerm Icon={IconArticle} destination="views" onNavigate={onNavigate}>
+            Views
+          </WelcomeTerm>{' '}
+          for more complex tools. Use{' '}
+          <WelcomeTerm Icon={IconSketching} destination="scratchpad" onNavigate={onNavigate}>
+            Scratchpad
+          </WelcomeTerm>{' '}
+          for exploring and shaping ideas with your agent.
         </p>
-        <p>Give it a try:</p>
+        <p>Try an example:</p>
       </div>
       <ChatPromptBubbles
         prompts={CHAT_WELCOME_PROMPTS}
@@ -166,8 +191,12 @@ export function ChatWelcome({ disabled = false, onSelectPrompt }: WelcomeProps) 
 export function ChatWorkspaceWelcome({ disabled = false, onSelectPrompt }: WelcomeProps) {
   return (
     <div className={cn(EMPTY_STATE_STYLES, 'gap-2')}>
-      <div className="prose prose-sm max-w-60 min-w-0 text-center wrap-anywhere text-muted-foreground prose-inherit">
-        <p>See what moi can build for you</p>
+      <div className="prose prose-sm max-w-xs min-w-0 text-center wrap-anywhere prose-inherit">
+        <p className="font-medium text-foreground">Start with what’s already here</p>
+        <p className="text-muted-foreground">
+          Your agent can explore this workspace and suggest useful widgets and views based on its
+          contents.
+        </p>
       </div>
       <ChatPromptBubble
         prompt={WORKSPACE_ANALYSIS_PROMPT}
@@ -192,13 +221,20 @@ function EmptyState() {
 type WelcomeTermProps = {
   Icon: TablerIcon
   children: string
+  destination: ChatWelcomeDestination
+  onNavigate: (destination: ChatWelcomeDestination) => void
 }
 
-function WelcomeTerm({ Icon, children }: WelcomeTermProps) {
+function WelcomeTerm({ Icon, children, destination, onNavigate }: WelcomeTermProps) {
   return (
-    <strong className="inline-flex items-center gap-0.5 align-bottom font-medium">
-      <Icon size={16} stroke={2} aria-hidden />
+    <button
+      type="button"
+      data-welcome-destination={destination}
+      onClick={() => onNavigate(destination)}
+      className="-mx-0.5 inline-flex cursor-pointer items-center gap-0.5 rounded-xs px-0.5 align-bottom font-medium text-foreground hover:bg-accent focus-visible:bg-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+    >
+      <Icon size={16} stroke={1.75} aria-hidden />
       {children}
-    </strong>
+    </button>
   )
 }
