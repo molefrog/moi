@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -48,9 +48,17 @@ export function useChat(address: WorkspaceTabAddress) {
   const qc = useQueryClient()
   const { layout } = useWorkspaceLayoutCtx()
   const [selectedSession, selectSession] = useSelectedSession()
-  const selectedSessionId = selectedSession ?? null
   const modelsData = useWorkspaceAgent(workspaceId).data
   const sessions = useWorkspaceSessions(workspaceId).data
+  const selectedSessionMissing =
+    Boolean(selectedSession) &&
+    sessions !== undefined &&
+    !sessions.some(session => session.sessionId === selectedSession)
+  const selectedSessionId = selectedSessionMissing ? null : (selectedSession ?? null)
+
+  useEffect(() => {
+    if (selectedSessionMissing) selectSession(null)
+  }, [selectSession, selectedSessionMissing])
   // Snapshot of the workspace's ambient UI state + queued one-shot
   // directives, taken when the message actually goes out.
   const buildMoiContext = useMoiUserMessageContext(address)
