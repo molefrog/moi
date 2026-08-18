@@ -613,7 +613,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const workspacePanel = (
     <div
       className={cn(
-        '@container/workspace relative flex h-full min-h-0 min-w-0 flex-1 flex-col-reverse overflow-hidden bg-background shadow-md transition-[border-radius]',
+        '@container/workspace relative flex h-full min-h-0 min-w-0 flex-1 flex-col-reverse overflow-hidden bg-background shadow-md transition-[border-radius,background-color] duration-100 ease-out motion-reduce:transition-none',
         mode === 'split' && 'rounded-xl'
       )}
     >
@@ -622,7 +622,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
           ref={annotation.targetRef}
           inert={annotation.controls.active || undefined}
           aria-hidden={annotation.controls.active || undefined}
-          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background"
+          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background transition-colors duration-100 ease-out motion-reduce:transition-none"
         >
           {activeTab === 'agent' ? (
             tabbedChat

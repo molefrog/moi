@@ -59,7 +59,7 @@ export function SidebarLayout({ children, showWorkspaces = true }: SidebarLayout
   })
 
   return (
-    <div className={cn('flex h-dvh bg-muted')}>
+    <div className="flex h-dvh bg-muted transition-colors duration-100 ease-out motion-reduce:transition-none">
       <Sidebar workspaces={showWorkspaces ? (workspaces ?? []) : []} />
       <main className="flex min-w-0 flex-1 flex-col">{children}</main>
     </div>
@@ -166,7 +166,7 @@ function WorkspaceButton({ workspace, dragOverlay = false, dragState }: Workspac
     <div
       className={cn(
         buttonVariants({ variant: 'ghost', size: 'icon-lg' }),
-        'pointer-events-none size-12',
+        'pointer-events-none size-12 transition-[border-radius,background-color,color] duration-100 ease-out motion-reduce:transition-none',
         dragOverlay
           ? 'bg-background shadow-lg'
           : 'group-hover:bg-accent group-hover:text-accent-foreground group-focus-visible:ring-3 group-focus-visible:ring-ring/50',
@@ -176,7 +176,7 @@ function WorkspaceButton({ workspace, dragOverlay = false, dragState }: Workspac
       <img
         src={workspace.icon ?? workspaceProviderIcon[workspace.type ?? 'claude-code']}
         alt=""
-        className="size-7 shrink-0 rounded-xs"
+        className="size-7 shrink-0 rounded-xs transition-[border-radius] duration-100 ease-out motion-reduce:transition-none"
       />
     </div>
   )
