@@ -69,42 +69,29 @@ moi start        # http://localhost:13337
 Then connect your agent: [Claude Code and Codex](#claude-code-and-codex),
 [OpenClaw](#openclaw), or [Hermes](#hermes).
 
-## Run as a service
+Learn how to:
 
-Instead of keeping `moi start` in a terminal, install moi as a user-level
-service. It starts on login, restarts on crash, and survives reboots
-(launchd on macOS, a systemd user unit on Linux; no root needed):
+- [Run moi as a service](#run-moi-as-a-service)
+- [Update moi](#update-moi)
 
-```sh
-moi service install     # install and start
-moi service             # state, unit path, server version
-moi service logs -f     # follow server logs
-moi service restart
-moi service uninstall
+# How it works
+
+moi runs locally as a CLI and web UI connected to your agent. The workspace
+skill teaches the agent how to call the CLI, which updates the UI using your
+files, commands, APIs, and MCP servers.
+
+The core is `moi` command that both agent and you can use to modify the workspace.
+Everything gets propagated to the UI instantly.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#111111", "primaryBorderColor": "#111111", "lineColor": "#737373", "edgeLabelBackground": "#ffffff"}}}%%
+flowchart LR
+  Agent["Your agent, e.g. Claude Code"] -->|"uses moi skill"| CLI["moi CLI"]
+  CLI -->|"updates"| UI["UI"]
 ```
 
-Anything your agents need belongs in the workspace env (`moi env set` or
-`.env`). To capture shell variables instead, run
-`moi service install --env MY_TOKEN,OTHER`.
-Rerun `moi service install` after changing captured vars (or moving bun). On
-macOS the first install may show a "background item added" notification for
-"moi"; that is the moi service. On headless Linux, lingering is enabled
-automatically when possible so the service outlives your SSH session.
-
-## Updating
-
-```sh
-moi update            # update to the latest release
-moi update --check    # only check; exit 0 up to date, 1 update available, 2 check failed
-```
-
-`moi update` checks npm for the latest release and updates through whichever
-package manager owns the install (bun, npm, pnpm, or yarn). A service-managed
-server is restarted onto the new version; a foreground `moi start` only gets
-a warning, so restart it yourself. Prerelease installs (`…-next.N`) are left
-alone. `--check` changes nothing and is made for scripts and agents.
-`moi status` shows when the running server and CLI versions differ, however
-the update happened.
+Moi also stores the all widgets and views as code to keep the workspace filesystem
+as a source of truth.
 
 # Connect an agent
 
@@ -182,6 +169,45 @@ moi connects to Hermes through its built-in
 [Agent Client Protocol](https://agentclientprotocol.com/) server. It starts a
 `hermes -p <profile> acp` process and communicates over stdio, so there is no
 gateway, port, or additional API key to configure.
+
+# Manage moi
+
+## Run moi as a service
+
+Instead of keeping `moi start` in a terminal, install moi as a user-level
+service. It starts on login, restarts on crash, and survives reboots
+(launchd on macOS, a systemd user unit on Linux; no root needed):
+
+```sh
+moi service install     # install and start
+moi service             # state, unit path, server version
+moi service logs -f     # follow server logs
+moi service restart
+moi service uninstall
+```
+
+Anything your agents need belongs in the workspace env (`moi env set` or
+`.env`). To capture shell variables instead, run
+`moi service install --env MY_TOKEN,OTHER`.
+Rerun `moi service install` after changing captured vars (or moving bun). On
+macOS the first install may show a "background item added" notification for
+"moi"; that is the moi service. On headless Linux, lingering is enabled
+automatically when possible so the service outlives your SSH session.
+
+## Update moi
+
+```sh
+moi update            # update to the latest release
+moi update --check    # only check; exit 0 up to date, 1 update available, 2 check failed
+```
+
+`moi update` checks npm for the latest release and updates through whichever
+package manager owns the install (bun, npm, pnpm, or yarn). A service-managed
+server is restarted onto the new version; a foreground `moi start` only gets
+a warning, so restart it yourself. Prerelease installs (`…-next.N`) are left
+alone. `--check` changes nothing and is made for scripts and agents.
+`moi status` shows when the running server and CLI versions differ, however
+the update happened.
 
 # No crypto token
 
