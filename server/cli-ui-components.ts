@@ -11,7 +11,7 @@
 import { defineCommand } from 'citty'
 import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
-import { join } from 'path'
+import { join, relative } from 'path'
 
 import pc from './cli-pc'
 import { resolveCwdWorkspace } from './cli-env'
@@ -137,8 +137,14 @@ const add = defineCommand({
     }
     console.log('\nNext steps (yours):')
     if (deps.length > 0) {
+      // The command runs from anywhere inside the workspace (resolveCwdWorkspace),
+      // so point the install at the real `.moi/` relative to the caller's cwd —
+      // a literal `cd .moi` is wrong from `.moi/` itself or a widgets/ subdir.
+      const moiDir = join(entry.path, '.moi')
+      const rel = relative(process.cwd(), moiDir)
+      const cdPrefix = rel === '' ? '' : `cd ${/\s/.test(rel) ? JSON.stringify(rel) : rel} && `
       console.log(
-        '  1. Install dependencies: ' + pc.bold(`cd .moi && bun install ${deps.join(' ')}`)
+        '  1. Install dependencies: ' + pc.bold(`${cdPrefix}bun install ${deps.join(' ')}`)
       )
       console.log('  2. Import relatively — ' + pc.bold(`import { … } from '../ui/<name>'`))
       console.log('  3. Rebuild: ' + pc.bold('moi bundle'))

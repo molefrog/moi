@@ -6,6 +6,15 @@ import { buildApplet, extractViewConfig, extractWidgetConfig } from '../bundler/
 
 const FIXTURES = join(import.meta.dir, '__fixtures__')
 
+// The scoped stylesheet a bundle registers via its injectCss prologue —
+// `(css => { … })("…")` at the top of index.js. Style assertions must run
+// against this, not the whole js: raw class strings also appear in the
+// bundled JSX source, which would mask CSS that Tailwind dropped.
+function injectedCss(js: string): string {
+  const match = js.match(/^\(css => \{[\s\S]*?\}\)\((".*")\);/m)
+  return match ? (JSON.parse(match[1]) as string) : ''
+}
+
 // Warmup: under `bun test` (and only there) the very FIRST Bun.build in the
 // process with this exact option combo (virtual entry + tailwind plugin +
 // root + inline sourcemap + esm) fails to resolve the entry's import with
@@ -302,19 +311,42 @@ describe('buildApplet', () => {
     // Installed ui components (.moi/ui/) use animation utilities and data-*
     // variants defined outside the plain tailwindcss import. The synthetic
     // entry inlines both vocabulary files from moi's node_modules; without
-    // them Tailwind silently drops every one of these classes.
-    const result = await buildApplet(join(FIXTURES, 'shadcn-vocab.tsx'))
+    // them Tailwind silently drops every one of these classes. Assert on the
+    // extracted stylesheet, NOT result.js — the raw class strings also sit in
+    // the bundled JSX source, which would mask dropped CSS.
+    const css = injectedCss((await buildApplet(join(FIXTURES, 'shadcn-vocab.tsx'))).js)
 
     for (const marker of [
       '.animate-in', // tw-animate-css utility
       '@keyframes enter', // its keyframes (unscoped — see applet-css.ts)
       'data-open', // shadcn/tailwind.css custom variant
       '.scroll-fade', // shadcn/tailwind.css utility
-      'accordion-down', // shadcn/tailwind.css keyframes
+      '@keyframes accordion-down', // shadcn/tailwind.css keyframes
       'slide-in-from-top-2'
     ]) {
-      expect(result.js).toContain(marker)
+      expect(css).toContain(marker)
     }
+  })
+
+  test('emits classes used only by imported modules outside the applet dir (.moi/ui/ layout)', async () => {
+    // `moi ui-components` installs components in `.moi/ui/`, a SIBLING of the
+    // applet source dir — outside the synthetic entry's `@source` and the
+    // Tailwind auto-detect root. Their classes still compile because
+    // bun-plugin-tailwind scans the bundle's module graph, so every imported
+    // file contributes candidates. This is the contract the ui/ layout leans
+    // on (and what keeps emission usage-driven: only IMPORTED components add
+    // CSS); lock it against plugin upgrades.
+    const result = await buildApplet(
+      join(FIXTURES, 'ui-dep', 'widgets', 'consumer.tsx'),
+      join(FIXTURES, 'ui-dep')
+    )
+    const css = injectedCss(result.js)
+
+    for (const marker of ['bg-popover', 'zoom-in-95', 'tracking-', 'slide-in-from-top-2']) {
+      expect(css).toContain(marker)
+    }
+    // Usage-driven: a vocabulary class nothing in the graph uses must stay out.
+    expect(css).not.toContain('slide-in-from-bottom-2')
   })
 
   test('rejects a server import that escapes the moi root', async () => {
