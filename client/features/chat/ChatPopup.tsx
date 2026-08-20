@@ -65,7 +65,7 @@ export function ChatPopup({
                   color="primary"
                   size={56}
                   animate={loading ? 'always' : 'hover'}
-                  className="drop-shadow-md transition-[filter] duration-100 group-hover:drop-shadow-lg motion-reduce:transition-none"
+                  className="drop-shadow-md transition-[filter] duration-50 group-hover:drop-shadow-lg motion-reduce:transition-none"
                 />
               </button>
             </motion.div>
