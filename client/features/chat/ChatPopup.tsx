@@ -3,7 +3,6 @@ import type { ComponentProps, ReactNode } from 'react'
 import { motion } from 'motion/react'
 
 import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
-import { Button } from '@/client/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/client/components/ui/popover'
 
 type ChatPopupProps = {
@@ -45,7 +44,7 @@ export function ChatPopup({
           legible regardless of the active theme background. */}
       <PopoverTrigger
         render={
-          <div className="fixed right-4 bottom-4 sm:right-6 sm:bottom-6">
+          <div className="fixed right-4 bottom-4 sm:right-4 sm:bottom-4">
             <motion.div
               variants={{
                 from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
@@ -56,19 +55,19 @@ export function ChatPopup({
               animate={open ? 'invisible' : 'to'}
               transition={{ type: 'spring', duration: 0.3, delay: 0.2, bounce: 0 }}
             >
-              <Button
-                variant="outline"
-                size="icon-lg"
-                className="bg-card shadow-md hover:shadow-lg"
+              <button
+                type="button"
+                className="group block cursor-pointer rounded-xl p-0 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
                 aria-label="Agent"
               >
                 <AgentBlobatar
                   name={agentName}
                   color="primary"
-                  size={20}
+                  size={56}
                   animate={loading ? 'always' : 'hover'}
+                  className="drop-shadow-md transition-[filter] duration-100 group-hover:drop-shadow-lg motion-reduce:transition-none"
                 />
-              </Button>
+              </button>
             </motion.div>
           </div>
         }
@@ -76,9 +75,8 @@ export function ChatPopup({
       <PopoverContent
         positionMethod="fixed"
         side="top"
-        sideOffset={-48}
+        sideOffset={-56}
         align="end"
-        alignOffset={-8}
         className="flex h-[calc(100vh-2rem)] w-[min(440px,calc(100vw-1rem))] flex-col gap-0 rounded-3xl p-0 sm:h-[calc(100vh-8rem)] sm:w-[min(440px,calc(100vw-2rem))] sm:p-1"
         keepMounted
       >
