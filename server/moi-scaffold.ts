@@ -15,7 +15,15 @@ export const MOI_PACKAGE_JSON = {
     '@tabler/icons-react': '^3.40.0',
     tailwindcss: '^4.3.3',
     react: '^19.0.0',
-    'react-dom': '^19.0.0'
+    'react-dom': '^19.0.0',
+    // The `moi ui-components` baseline: every installed component leans on
+    // Base UI primitives and the cn() stack, so one install at workspace
+    // creation covers the common path. Component-specific deps (recharts,
+    // embla, …) stay agent-installed on demand — `add` prints them.
+    '@base-ui/react': '^1.2.0',
+    'class-variance-authority': '^0.7.1',
+    clsx: '^2.1.1',
+    'tailwind-merge': '^3.3.1'
   },
   devDependencies: {
     '@types/react': '^19.0.0',

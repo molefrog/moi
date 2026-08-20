@@ -41,6 +41,7 @@ import {
   renderEnvView,
   resolveCwdWorkspace
 } from './cli-env'
+import { uiComponents } from './cli-ui-components'
 import { columns, keyValue } from './cli-ui'
 import { CONTROL_HOST, CONTROL_PORT, CONTROL_URL, PORT } from './constants'
 import { type ControlProbe, controlFailureMessage, probeControlServer } from './control-client'
@@ -2938,7 +2939,8 @@ const workspaceCommands = {
   scratch,
   skill,
   tab,
-  tabs
+  tabs,
+  'ui-components': uiComponents
 }
 
 const systemCommands = {

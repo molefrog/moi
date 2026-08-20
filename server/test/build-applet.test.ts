@@ -298,6 +298,25 @@ describe('buildApplet', () => {
     expect(result.js).toContain('rpc("with-server", "getWeather")')
   })
 
+  test('compiles the shadcn styling vocabulary (tw-animate-css + shadcn/tailwind.css)', async () => {
+    // Installed ui components (.moi/ui/) use animation utilities and data-*
+    // variants defined outside the plain tailwindcss import. The synthetic
+    // entry inlines both vocabulary files from moi's node_modules; without
+    // them Tailwind silently drops every one of these classes.
+    const result = await buildApplet(join(FIXTURES, 'shadcn-vocab.tsx'))
+
+    for (const marker of [
+      '.animate-in', // tw-animate-css utility
+      '@keyframes enter', // its keyframes (unscoped — see applet-css.ts)
+      'data-open', // shadcn/tailwind.css custom variant
+      '.scroll-fade', // shadcn/tailwind.css utility
+      'accordion-down', // shadcn/tailwind.css keyframes
+      'slide-in-from-top-2'
+    ]) {
+      expect(result.js).toContain(marker)
+    }
+  })
+
   test('rejects a server import that escapes the moi root', async () => {
     await expect(
       buildApplet(join(FIXTURES, 'nested', 'escape.tsx'), join(FIXTURES, 'nested'))
