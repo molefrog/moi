@@ -7,6 +7,7 @@ import {
   type ComposerAvailability,
   focusComposer
 } from '@/client/components/shared/Composer'
+import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
 import { useStickToBottom } from '@/client/features/chat/useStickToBottom'
 import { groupTurns } from '@/client/features/chat/group-turns'
 import { chatNoticeLabel, interleaveNotices } from '@/client/features/chat/interleave-notices'
@@ -43,6 +44,7 @@ export type ViewBuilderChatDraft = {
 }
 
 type ChatPanelProps = {
+  agentName: string
   active?: boolean
   focusRequest?: number
   docked?: boolean
@@ -72,6 +74,7 @@ const EMPTY_TURNS: Turn[] = []
 const EMPTY_NOTICES: SystemNotice[] = []
 
 export function ChatPanel({
+  agentName,
   active = true,
   focusRequest = 0,
   docked = false,
@@ -216,6 +219,7 @@ export function ChatPanel({
             {/* Pulsing dots only before the first token — once the preview has
                 visible content it renders as a (possibly merged) grouped turn. */}
             {effectiveProcessing && !effectivePreviewTurn && <ThinkingIndicator />}
+            <AgentBlobatar name={agentName} color="primary" size={56} className="mt-auto" />
           </div>
         </div>
 

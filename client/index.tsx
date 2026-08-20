@@ -1,6 +1,7 @@
 // Must run before any tldraw module loads — see the file for why.
 import './structured-clone-shim'
 
+import 'blobatar/motion.css'
 import './index.css'
 
 import { startHmrWatchdog } from './runtime/hmr-watchdog'

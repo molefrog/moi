@@ -1,7 +1,6 @@
 import {
   IconArticle,
   IconFileSearch,
-  IconGhost,
   IconLayout2,
   IconMessages,
   IconPiano,
@@ -173,7 +172,7 @@ export function ChatWelcome({
         </p>
         <p>
           Ask{' '}
-          <WelcomeTerm Icon={IconGhost} destination="agent" onNavigate={onNavigate}>
+          <WelcomeTerm Icon={IconMessages} destination="agent" onNavigate={onNavigate}>
             Agent
           </WelcomeTerm>{' '}
           to build{' '}
@@ -234,9 +233,9 @@ function EmptyState() {
 }
 
 type WelcomeTermProps = {
-  Icon: TablerIcon
   children: string
   destination: ChatWelcomeDestination
+  Icon: TablerIcon
   onNavigate: (destination: ChatWelcomeDestination) => void
 }
 

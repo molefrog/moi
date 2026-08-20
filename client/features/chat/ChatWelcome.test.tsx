@@ -42,15 +42,25 @@ describe('ChatWelcome', () => {
     )
 
     const welcomeTerms = [...html.matchAll(/<button[^>]+data-welcome-destination.*?<\/button>/gs)]
-    const promptButtons = [...html.matchAll(/<button.*?<\/button>/gs)]
+    const promptButtons = [
+      ...html.matchAll(/<button(?![^>]+data-welcome-destination).*?<\/button>/gs)
+    ]
+    const agentTerm = welcomeTerms.find(([term]) =>
+      term.includes('data-welcome-destination="agent"')
+    )
+    const nonAgentTerms = welcomeTerms.filter(
+      ([term]) => !term.includes('data-welcome-destination="agent"')
+    )
 
     expect(welcomeTerms).toHaveLength(4)
-    expect(welcomeTerms.every(([term]) => term.includes('<svg'))).toBe(true)
+    expect(agentTerm?.[0]).toContain('<svg')
+    expect(agentTerm?.[0]).toContain('tabler-icon-messages')
+    expect(nonAgentTerms.every(([term]) => term.includes('<svg'))).toBe(true)
     expect(html).toContain('data-welcome-destination="agent"')
     expect(html).toContain('data-welcome-destination="widgets"')
     expect(html).toContain('data-welcome-destination="views"')
     expect(html).toContain('data-welcome-destination="scratchpad"')
-    expect(promptButtons).toHaveLength(7)
+    expect(promptButtons).toHaveLength(3)
     expect(promptButtons.every(([button]) => button.includes('<svg'))).toBe(true)
     expect(html).toContain('Check the weather')
     expect(html).toContain('Build a playful synthesizer')

@@ -8,10 +8,10 @@ import {
   IconLayout2,
   IconLayoutSidebarRight,
   IconLetterCase,
+  IconMessages,
   IconSketching
 } from '@tabler/icons-react'
 
-import { IconGhost } from '@/client/components/shared/IconGhost'
 import { DrawingLayer } from '@/client/features/drawings/DrawingLayer'
 import { DrawingToolbar } from '@/client/features/drawings/DrawingToolbar'
 import { useChatAnnotation } from '@/client/features/drawings/useChatAnnotation'
@@ -154,7 +154,7 @@ function tabItemFor(
   if (tab === 'agent') {
     return {
       key: tab,
-      Icon: IconGhost,
+      Icon: IconMessages,
       label: 'Agent',
       closable,
       loading: agentRunning
@@ -211,6 +211,7 @@ function applyVisibleTabOrder(
 
 export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenProps) {
   const { layout, setLayout, name, icon, provider, workspaceId } = useWorkspaceLayoutCtx()
+  const agentName = name?.trim() || workspaceId
   const builderActions = useViewBuilderActions()
   const {
     ref: rowRef,
@@ -488,7 +489,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       ? ([
           {
             key: 'agent',
-            Icon: IconGhost,
+            Icon: IconMessages,
             label: 'Agent',
             onClick: () => openTab('agent')
           }
@@ -573,6 +574,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   // The docked split chat. Full-screen Agent uses the tabbed chat below.
   const dockedChat = (
     <ChatPanel
+      agentName={agentName}
       active={mode === 'split'}
       focusRequest={chatFocusRequest}
       chatLoaded={chatLoaded}
@@ -595,6 +597,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
 
   const tabbedChat = (
     <ChatPanel
+      agentName={agentName}
       active={mode === 'fullscreen' && activeTab === 'agent'}
       focusRequest={chatFocusRequest}
       chatLoaded={chatLoaded}
@@ -741,6 +744,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
 
       {mode === 'fullscreen' && activeTab !== 'agent' && hasWorkspaceContent && (
         <ChatPopup
+          agentName={agentName}
           loading={hasRunningSession}
           open={floatingChatOpen}
           onOpenChange={setFloatingChatOpen}
@@ -752,6 +756,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
         >
           {onClose => (
             <ChatPanel
+              agentName={agentName}
               active={floatingChatOpen}
               focusRequest={chatFocusRequest}
               chatLoaded={chatLoaded}

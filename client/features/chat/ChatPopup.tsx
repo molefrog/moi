@@ -2,11 +2,12 @@ import type { ComponentProps, ReactNode } from 'react'
 
 import { motion } from 'motion/react'
 
-import { IconGhost } from '@/client/components/shared/IconGhost'
+import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
 import { Button } from '@/client/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/client/components/ui/popover'
 
 type ChatPopupProps = {
+  agentName: string
   loading: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -15,6 +16,7 @@ type ChatPopupProps = {
 }
 
 export function ChatPopup({
+  agentName,
   loading,
   open,
   onOpenChange,
@@ -60,7 +62,12 @@ export function ChatPopup({
                 className="bg-card shadow-md hover:shadow-lg"
                 aria-label="Agent"
               >
-                <IconGhost animated={loading} stroke={1.75} />
+                <AgentBlobatar
+                  name={agentName}
+                  color="primary"
+                  size={20}
+                  animate={loading ? 'always' : 'hover'}
+                />
               </Button>
             </motion.div>
           </div>
