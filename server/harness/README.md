@@ -203,7 +203,7 @@ workspace composer. Sessions use `workspace-write` with network disabled by
 default, `approvalPolicy: on-request`, and Codex's `auto_review` reviewer. The
 same policy is reapplied on thread start, resume, and every turn. Known gaps:
 no interactive approval flow (unreviewed server→client approval requests fail
-closed). A per-session application context tells Codex to request reviewed
+closed). Per-turn application context tells Codex to request reviewed
 localhost access before control-server commands. Images ride inline as data
 URLs only (no `localImage` path mode).
 

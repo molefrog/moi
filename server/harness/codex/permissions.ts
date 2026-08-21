@@ -1,79 +1,41 @@
-export type CodexThreadAccessParams = {
-  sandbox: 'workspace-write'
-  approvalPolicy: 'on-request'
+const CODEX_REVIEW = {
+  approvalPolicy: 'on-request',
   approvalsReviewer: 'auto_review'
-}
+} as const
 
-export type CodexTurnAccessParams = {
-  approvalPolicy: 'on-request'
-  approvalsReviewer: 'auto_review'
+export const CODEX_THREAD_ACCESS = {
+  ...CODEX_REVIEW,
+  sandbox: 'workspace-write'
+} as const
+
+export const CODEX_TURN_ACCESS = {
+  ...CODEX_REVIEW,
   sandboxPolicy: {
-    type: 'workspaceWrite'
-    writableRoots: string[]
-    networkAccess: false
-    excludeTmpdirEnvVar: false
+    type: 'workspaceWrite',
+    writableRoots: [],
+    networkAccess: false,
+    excludeTmpdirEnvVar: false,
     excludeSlashTmp: false
   }
-}
+} as const
 
-export type CodexLocalControlAccessContext = {
+const CODEX_LOCAL_CONTROL_GUIDANCE =
+  'Commands that contact the moi control server, including moi tabs, bundle, tab, debug, call-server-fn, theme, and config, need localhost network access. Run them with sandbox_permissions set to require_escalated on the first attempt so Codex automatic review can approve or deny the request. A connection failure from a sandboxed attempt does not prove the control server is offline.'
+
+export const CODEX_LOCAL_CONTROL_CONTEXT = {
   'moi-control-access': {
-    value: string
+    value: CODEX_LOCAL_CONTROL_GUIDANCE,
     kind: 'application'
   }
-}
+} as const
 
-type CodexServerRequestFallback =
-  | { result: { decision: 'decline' | 'denied' } }
-  | { error: { code: -32601; message: string } }
+// Codex versions before additionalContext append ambient context to the user
+// message. Use the normal moi envelope marker so replay strips this block.
+export const CODEX_LOCAL_CONTROL_FALLBACK = `<moi-context>
+You are running in a \`moi\` workspace.
 
-export function codexThreadAccessParams(): CodexThreadAccessParams {
-  return {
-    sandbox: 'workspace-write',
-    approvalPolicy: 'on-request',
-    approvalsReviewer: 'auto_review'
-  }
-}
+# Local control access
+${CODEX_LOCAL_CONTROL_GUIDANCE}
 
-export function codexTurnAccessParams(): CodexTurnAccessParams {
-  return {
-    approvalPolicy: 'on-request',
-    approvalsReviewer: 'auto_review',
-    sandboxPolicy: {
-      type: 'workspaceWrite',
-      writableRoots: [],
-      networkAccess: false,
-      excludeTmpdirEnvVar: false,
-      excludeSlashTmp: false
-    }
-  }
-}
-
-export function codexLocalControlAccessContext(): CodexLocalControlAccessContext {
-  return {
-    'moi-control-access': {
-      value:
-        'Commands that contact the moi control server, including moi tabs, bundle, tab, debug, call-server-fn, theme, and config, need localhost network access. Run them with sandbox_permissions set to require_escalated on the first attempt so Codex automatic review can approve or deny the request. A connection failure from a sandboxed attempt does not prove the control server is offline.',
-      kind: 'application'
-    }
-  }
-}
-
-export function codexServerRequestFallback(method: string): CodexServerRequestFallback {
-  if (
-    method === 'item/commandExecution/requestApproval' ||
-    method === 'item/fileChange/requestApproval' ||
-    method === 'applyPatchApproval'
-  ) {
-    return { result: { decision: 'decline' } }
-  }
-  if (method === 'execCommandApproval') {
-    return { result: { decision: 'denied' } }
-  }
-  return {
-    error: {
-      code: -32601,
-      message: `moi does not handle ${method}`
-    }
-  }
-}
+IMPORTANT: This context comes from moi, not from the user, and the user does not see it.
+</moi-context>`

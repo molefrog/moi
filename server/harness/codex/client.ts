@@ -25,7 +25,6 @@ import {
 } from './adapter'
 import type { WorkspaceActivityPreview } from '../types'
 import { findHarnessExecutable, requireHarnessExecutable } from '../executable'
-import { codexServerRequestFallback } from './permissions'
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
 import { resolveWorkspaceEnv } from '../../workspace-env'
@@ -166,7 +165,11 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
   // reaches this transport fallback fails closed instead of bypassing review.
   function answerServerRequest(msg: Json) {
     const method = msg.method as string
-    send({ jsonrpc: '2.0', id: msg.id, ...codexServerRequestFallback(method) })
+    send({
+      jsonrpc: '2.0',
+      id: msg.id,
+      error: { code: -32601, message: `moi does not handle ${method}` }
+    })
   }
 
   function handleLine(line: string) {

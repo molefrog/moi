@@ -437,7 +437,7 @@ export function ChatStatesPage() {
                   <code>SessionSnapshot</code> —{' '}
                   <code>
                     {
-                      "{ sessionId, model: 'claude-sonnet-4-6', cwd, permissionMode: 'bypassPermissions', tools: ['Bash', 'Read', …], mcpServers: [{ name: 'github', status: 'connected' }], skills: ['moi-workspace'], … }"
+                      "{ sessionId, model: 'claude-sonnet-4-6', cwd, permissionMode: 'auto', tools: ['Bash', 'Read', …], mcpServers: [{ name: 'github', status: 'connected' }], skills: ['moi-workspace'], … }"
                     }
                   </code>
                 </li>

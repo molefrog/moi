@@ -6,4 +6,4 @@ Bun server on port 13337. Serves the client at `/`, upgrades `/ws` to WebSocket.
 - `state.ts` holds the connected chat clients and `broadcast()` (which also feeds the harness debug tap).
 - `harness/` holds every agent backend (Claude Code, OpenClaw, Codex): per-harness adapter + session + transport + protocol NOTES, colocated. Read `harness/README.md` for the message-type layers, the adapter contract, and the folder conventions before touching agent-backend code.
 - WebSocket protocol: server sends `ServerMessage`, client sends `ClientMessage` — both defined in `lib/types.ts`.
-- Agents run in the workspace directory with bypass permissions; each backend persists its own session history (see `harness/README.md`).
+- Agents run in the workspace directory; Claude Code and Codex use provider-native reviewed access. Each backend persists its own session history (see `harness/README.md`).

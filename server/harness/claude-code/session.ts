@@ -21,7 +21,6 @@ import {
 import { appendAttachmentNote, attachmentOnlyPlaceholder } from '@/lib/attachment-note'
 import { buildSessionTitleSource } from '../session-title'
 import { ClaudeAdapter } from './adapter'
-import { claudeSessionAccessOptions } from './permissions'
 import { claudeSessionExists } from './sessions'
 import { generateClaudeSessionTitle, renameClaudeSessionIfUnchanged } from './session-title'
 import type { Part } from '@/lib/format'
@@ -103,18 +102,6 @@ const IDLE_TTL_MS = 5 * 60_000
 // workflow runs). Subagent Tasks complete within their turn, so they are
 // deliberately excluded — a leaked entry would keep the session alive forever.
 const BG_TASK_TYPES = new Set(['local_bash', 'local_workflow'])
-
-const ALLOWED_TOOLS = [
-  'Bash',
-  'Read',
-  'Write',
-  'Edit',
-  'MultiEdit',
-  'Glob',
-  'Grep',
-  'WebSearch',
-  'WebFetch'
-]
 
 type InputQueue = {
   iterator: AsyncGenerator<SDKUserMessage>
@@ -622,8 +609,7 @@ function createLiveSession(input: {
     // Emit `stream_event` partial-message frames so the adapter can surface a
     // live token-by-token preview. Off = unchanged behavior (whole blocks only).
     includePartialMessages: input.stream,
-    allowedTools: ALLOWED_TOOLS,
-    ...claudeSessionAccessOptions(),
+    permissionMode: 'auto',
     settingSources: ['user', 'project'],
     // MOI_AGENT marks every shell this session spawns as agent-driven (the
     // moi CLI reads it — see agent-caller.ts), surviving the CLAUDECODE strip.

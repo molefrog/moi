@@ -1,27 +1,24 @@
 import { describe, expect, test } from 'bun:test'
 
 import {
-  type CodexThreadAccessParams,
-  codexLocalControlAccessContext,
-  codexServerRequestFallback,
-  codexThreadAccessParams,
-  codexTurnAccessParams
+  CODEX_LOCAL_CONTROL_CONTEXT,
+  CODEX_LOCAL_CONTROL_FALLBACK,
+  CODEX_THREAD_ACCESS,
+  CODEX_TURN_ACCESS
 } from './permissions'
+import { stripMoiContext } from '@/lib/moi-context'
 
 describe('Codex reviewed access', () => {
-  test('uses the same reviewed workspace access for thread start and resume', () => {
-    const expected: CodexThreadAccessParams = {
+  test('defines reviewed workspace access for threads', () => {
+    expect(CODEX_THREAD_ACCESS).toEqual({
       sandbox: 'workspace-write',
       approvalPolicy: 'on-request',
       approvalsReviewer: 'auto_review'
-    }
-
-    expect(codexThreadAccessParams()).toEqual(expected)
-    expect(codexThreadAccessParams()).toEqual(expected)
+    })
   })
 
-  test('keeps network access reviewed on every turn', () => {
-    expect(codexTurnAccessParams()).toEqual({
+  test('defines reviewed network access for turns', () => {
+    expect(CODEX_TURN_ACCESS).toEqual({
       approvalPolicy: 'on-request',
       approvalsReviewer: 'auto_review',
       sandboxPolicy: {
@@ -34,38 +31,13 @@ describe('Codex reviewed access', () => {
     })
   })
 
-  test('tells Codex to request reviewed access before contacting the local control server', () => {
-    expect(codexLocalControlAccessContext()).toEqual({
+  test('explains reviewed local control access without leaking into replay', () => {
+    expect(CODEX_LOCAL_CONTROL_CONTEXT).toEqual({
       'moi-control-access': {
         value: expect.stringContaining('sandbox_permissions set to require_escalated'),
         kind: 'application'
       }
     })
-  })
-})
-
-describe('Codex unreviewed server requests', () => {
-  test('declines modern and legacy command or file approvals', () => {
-    expect(codexServerRequestFallback('item/commandExecution/requestApproval')).toEqual({
-      result: { decision: 'decline' }
-    })
-    expect(codexServerRequestFallback('item/fileChange/requestApproval')).toEqual({
-      result: { decision: 'decline' }
-    })
-    expect(codexServerRequestFallback('applyPatchApproval')).toEqual({
-      result: { decision: 'decline' }
-    })
-    expect(codexServerRequestFallback('execCommandApproval')).toEqual({
-      result: { decision: 'denied' }
-    })
-  })
-
-  test('rejects requests that the automatic reviewer did not handle', () => {
-    expect(codexServerRequestFallback('item/permissions/requestApproval')).toEqual({
-      error: {
-        code: -32601,
-        message: 'moi does not handle item/permissions/requestApproval'
-      }
-    })
+    expect(stripMoiContext(CODEX_LOCAL_CONTROL_FALLBACK)).toBe('')
   })
 })
