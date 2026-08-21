@@ -3,12 +3,8 @@ import type { Expression, Palette } from 'blobatar'
 import {
   happy,
   idle,
-  love,
-  mad,
   sad,
-  scared,
   shy,
-  sick,
   sleepy,
   smug,
   surprised,
@@ -28,16 +24,12 @@ export type AgentBlobatarExpression =
   | 'idle'
   | 'happy'
   | 'sad'
-  | 'mad'
   | 'surprised'
   | 'wink'
   | 'sleepy'
   | 'smug'
   | 'unsure'
-  | 'scared'
-  | 'love'
   | 'shy'
-  | 'sick'
   | 'thinking'
 
 const AGENT_PALETTES = {
@@ -59,16 +51,12 @@ const AGENT_EXPRESSIONS = {
   idle,
   happy,
   sad,
-  mad,
   surprised,
   wink,
   sleepy,
   smug,
   unsure,
-  scared,
-  love,
   shy,
-  sick,
   thinking
 } satisfies Record<AgentBlobatarExpression, Expression>
 
