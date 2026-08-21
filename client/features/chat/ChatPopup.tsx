@@ -67,6 +67,7 @@ export function ChatPopup({
                   color="primary"
                   size={56}
                   animated={loading}
+                  expression={loading ? 'thinking' : undefined}
                   className={cn(
                     'drop-shadow-md drop-shadow-primary/30',
                     'group-hover:drop-shadow-lg group-hover:drop-shadow-primary/40',

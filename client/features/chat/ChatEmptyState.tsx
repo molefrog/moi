@@ -4,7 +4,6 @@ import {
   IconArticle,
   IconFileSearch,
   IconLayout2,
-  IconMessages,
   IconPiano,
   IconSketching,
   IconUmbrella2,
@@ -206,11 +205,7 @@ function WelcomeState({
             you're doing.
           </p>
           <p>
-            Ask{' '}
-            <WelcomeTerm Icon={IconMessages} destination="agent" onNavigate={onNavigate}>
-              Agent
-            </WelcomeTerm>{' '}
-            to build{' '}
+            Ask your agent to build{' '}
             <WelcomeTerm Icon={IconLayout2} destination="widgets" onNavigate={onNavigate}>
               Widgets
             </WelcomeTerm>{' '}
