@@ -1,45 +1,93 @@
-import { afterEach, describe, expect, test } from 'bun:test'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { describe, expect, test } from 'bun:test'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { BUNDLED_SKILLS_DIR, installBundledSkills } from '../skills-template'
+import {
+  hasExperimentalShadcn,
+  installBundledSkills,
+  stripExperimentalShadcn
+} from '../skills-template'
+import { updateWorkspaceSkills } from '../skill-update'
 
-let targetSkillsDir = ''
+const SKILL_MD = join('moi-workspace', 'SKILL.md')
+const CHEAT_SHEET = join('moi-workspace', 'references', 'UI-COMPONENTS.md')
 
-afterEach(async () => {
-  if (!targetSkillsDir) return
-  await rm(targetSkillsDir, { recursive: true, force: true })
-  targetSkillsDir = ''
+async function withTempDir(run: (dir: string) => Promise<void>): Promise<void> {
+  const dir = mkdtempSync(join(tmpdir(), 'moi-skills-'))
+  try {
+    await run(dir)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
+describe('stripExperimentalShadcn', () => {
+  test('removes marked blocks and collapses blank lines', () => {
+    const text =
+      'before\n\n<!-- moi:experimental-shadcn -->\ngated\n<!-- /moi:experimental-shadcn -->\n\nafter\n'
+    expect(stripExperimentalShadcn(text)).toBe('before\n\nafter\n')
+  })
+
+  test('leaves unmarked text untouched', () => {
+    const text = 'plain\n\ncontent\n'
+    expect(stripExperimentalShadcn(text)).toBe(text)
+  })
 })
 
-describe('installBundledSkills', () => {
-  test('overwrites bundled skill files while preserving unrelated workspace files', async () => {
-    targetSkillsDir = await mkdtemp(join(tmpdir(), 'moi-skills-'))
-    const workspaceSkillDir = join(targetSkillsDir, 'moi-workspace')
-    const customSkillDir = join(targetSkillsDir, 'custom-skill')
-    const installedSkill = join(workspaceSkillDir, 'SKILL.md')
-    const workspaceNote = join(workspaceSkillDir, 'NOTES.md')
-    const customSkill = join(customSkillDir, 'SKILL.md')
+describe('installBundledSkills experimental-shadcn gate', () => {
+  test('strips the section and the cheat sheet by default', async () => {
+    await withTempDir(async dir => {
+      await installBundledSkills(dir)
 
-    await mkdir(workspaceSkillDir, { recursive: true })
-    await mkdir(customSkillDir, { recursive: true })
-    await Promise.all([
-      Bun.write(installedSkill, 'Stale skill from an older moi\n'),
-      Bun.write(workspaceNote, 'Keep this note\n'),
-      Bun.write(customSkill, 'Keep this skill\n')
-    ])
+      const skillMd = await Bun.file(join(dir, SKILL_MD)).text()
+      expect(skillMd).not.toContain('moi:experimental-shadcn')
+      expect(skillMd).not.toContain('Standard UI components')
+      expect(await Bun.file(join(dir, CHEAT_SHEET)).exists()).toBe(false)
+      // The rest of the skill installs normally.
+      expect(skillMd).toContain('# Workspace')
+      expect(await hasExperimentalShadcn(dir)).toBe(false)
+    })
+  })
 
-    await installBundledSkills(targetSkillsDir)
+  test('keeps the section, markers, and cheat sheet when opted in', async () => {
+    await withTempDir(async dir => {
+      await installBundledSkills(dir, { experimentalShadcn: true })
 
-    // Bundled files land verbatim, replacing a stale copy. What they say is the
-    // source tree's business, not this test's.
-    expect(await Bun.file(installedSkill).text()).toBe(
-      await Bun.file(join(BUNDLED_SKILLS_DIR, 'moi-workspace', 'SKILL.md')).text()
-    )
+      const skillMd = await Bun.file(join(dir, SKILL_MD)).text()
+      expect(skillMd).toContain('Standard UI components')
+      expect(skillMd).toContain('moi ui-components add')
+      expect(await Bun.file(join(dir, CHEAT_SHEET)).exists()).toBe(true)
+      expect(await hasExperimentalShadcn(dir)).toBe(true)
+    })
+  })
 
-    // Unrelated files survive, both inside a bundled skill folder and beside it.
-    expect(await Bun.file(workspaceNote).text()).toBe('Keep this note\n')
-    expect(await Bun.file(customSkill).text()).toBe('Keep this skill\n')
+  test('an unflagged re-install preserves a prior opt-in', async () => {
+    await withTempDir(async dir => {
+      await installBundledSkills(dir, { experimentalShadcn: true })
+      await installBundledSkills(dir)
+
+      expect(await Bun.file(join(dir, SKILL_MD)).text()).toContain('Standard UI components')
+      expect(await Bun.file(join(dir, CHEAT_SHEET)).exists()).toBe(true)
+    })
+  })
+
+  test('moi skill update preserves the choice in both directions', async () => {
+    // Skills live under <workspace>/.claude/skills for the default backend —
+    // updateWorkspaceSkills re-derives that from the workspace root.
+    await withTempDir(async workspace => {
+      const skillsDir = join(workspace, '.claude', 'skills')
+
+      await installBundledSkills(skillsDir)
+      await updateWorkspaceSkills(workspace)
+      expect(await Bun.file(join(skillsDir, SKILL_MD)).text()).not.toContain(
+        'Standard UI components'
+      )
+
+      await installBundledSkills(skillsDir, { experimentalShadcn: true })
+      await updateWorkspaceSkills(workspace)
+      expect(await Bun.file(join(skillsDir, SKILL_MD)).text()).toContain('Standard UI components')
+      expect(await Bun.file(join(skillsDir, CHEAT_SHEET)).exists()).toBe(true)
+    })
   })
 })

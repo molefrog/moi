@@ -182,15 +182,17 @@ from `.moi/package.json` deps — no `@/` aliases. Files starting with `_` (e.g.
   per-frame transforms.
 - Use icons from `@tabler/icons-react`. Do not add raw SVG icons or another icon pack. When the
   project provides `.agents/rules/icons.md`, follow its size and stroke policy.
-- Applets cannot import the host project's `cn`. With ui components installed (below), import
-  `cn` from `../ui/utils`; otherwise use a local `cx()` when classes are conditional. Never build
-  class names with template-literal ternaries.
+- Applets cannot import the host project's `cn`. If `.moi/ui/utils.ts` exists, import `cn` from
+  `../ui/utils`; otherwise use a local `cx()` when classes are conditional. Never build class
+  names with template-literal ternaries.
 
 ```tsx
 function cx(...classes: (string | false | undefined | null)[]) {
   return classes.filter(Boolean).join(' ')
 }
 ```
+
+<!-- moi:experimental-shadcn -->
 
 ## Standard UI components
 
@@ -209,6 +211,8 @@ relatively: `import { Button } from '../ui/button'`.
   `.moi/` and run `moi bundle` yourself.
 - Files in `.moi/ui/` are yours to customize (edits propagate to every applet using them);
   re-running `add` refuses to overwrite them without `--force`.
+
+<!-- /moi:experimental-shadcn -->
 
 ## Server functions — `<name>.server.ts`
 
