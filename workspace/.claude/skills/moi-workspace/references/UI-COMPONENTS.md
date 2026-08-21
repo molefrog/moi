@@ -170,6 +170,10 @@ The biggest source of bugs when you know Radix-era shadcn. When unsure, `moi ui-
   `chart-1…5`, and `--radius`. Status colors come from `Badge` variants or `text-destructive`.
 - **Built-in variants before custom classes**: `variant="outline"`, `size="sm"` — not
   hand-rolled border/bg utilities on `Button`.
+- **Prefer each component's default size.** Use smaller variants such as `sm` or `xs` only when a
+  real density constraint calls for them and the reduced control remains comfortable to use. When
+  using a non-default size, compare it with neighboring controls. Controls in the same group must
+  have matching heights and compatible visual weight.
 - **`className` is for layout** (`max-w-md`, `mt-4`, `w-full`) — never for overriding a
   component's colors or typography.
 - **`gap-*`, not `space-x-*`/`space-y-*`** (`flex flex-col gap-4`). **`size-10`, not
@@ -201,9 +205,10 @@ Cheapest first — stop at the first level that works:
 
 ## Fit within applets
 
-- **Widgets** are small: prefer compact sizes (`size="sm"`), tooltips over labels, popovers over
-  dialogs. Page-scale chrome (sidebars, nav menus, sheets, toasts) is deliberately not in the
-  set — widgets don't need it, and a view's chrome should be custom (see
+- **Widgets** are small: keep the composition compact, the number of controls low, and enough room
+  around each action. Keep interactions inline and self-contained; avoid layered UI such as
+  popovers and tooltips. Page-scale chrome (sidebars, nav menus, sheets, toasts) is deliberately not
+  in the set — widgets don't need it, and a view's chrome should be custom (see
   `references/DESIGN.md`).
 - **Views** can use the full set, including `resizable` layouts and `data-table`.
 - Overlays portal to `document.body` on purpose (they escape the widget frame's clipping); the
