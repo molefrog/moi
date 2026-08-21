@@ -49,9 +49,7 @@ describe('color themes', () => {
     expect(darkTheme).toContain('--secondary: var(--accent);')
     expect(darkTheme).toContain('--secondary-foreground: var(--accent-foreground);')
     expect(themeCss).toContain('--color-secondary: var(--secondary);')
-    expect(themeCss).toContain(
-      '--color-secondary-foreground: var(--secondary-foreground);'
-    )
+    expect(themeCss).toContain('--color-secondary-foreground: var(--secondary-foreground);')
 
     for (const [index, color] of light.entries()) {
       const token = index + 1
