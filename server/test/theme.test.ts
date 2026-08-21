@@ -24,7 +24,7 @@ describe('color themes', () => {
     expect(css).toContain(`--primary: ${DEFAULT_PRIMARY_COLOR};`)
   })
 
-  test('defines and exposes the default shadcn chart palette', async () => {
+  test('defines and exposes the default shadcn compatibility tokens', async () => {
     const indexCss = await Bun.file(join(import.meta.dir, '../../client/index.css')).text()
     const themeCss = await Bun.file(join(import.meta.dir, '../../client/theme.css')).text()
     const root = indexCss.match(/:root \{([\s\S]*?)\n\}/)?.[1]
@@ -43,6 +43,15 @@ describe('color themes', () => {
       'oklch(0.627 0.265 303.9)',
       'oklch(0.645 0.246 16.439)'
     ]
+
+    expect(root).toContain('--secondary: var(--accent);')
+    expect(root).toContain('--secondary-foreground: var(--accent-foreground);')
+    expect(darkTheme).toContain('--secondary: var(--accent);')
+    expect(darkTheme).toContain('--secondary-foreground: var(--accent-foreground);')
+    expect(themeCss).toContain('--color-secondary: var(--secondary);')
+    expect(themeCss).toContain(
+      '--color-secondary-foreground: var(--secondary-foreground);'
+    )
 
     for (const [index, color] of light.entries()) {
       const token = index + 1

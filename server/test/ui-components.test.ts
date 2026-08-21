@@ -189,9 +189,9 @@ describe('catalog', () => {
     }
   })
 
-  test('the agreed subset is present', () => {
+  test('exposes exactly the agreed subset', () => {
     // The final component list from the review (Aug 2026).
-    for (const name of [
+    expect(UI_COMPONENT_NAMES).toEqual([
       'accordion',
       'alert',
       'alert-dialog',
@@ -232,12 +232,6 @@ describe('catalog', () => {
       'textarea',
       'toggle-group',
       'tooltip'
-    ]) {
-      expect(UI_COMPONENTS[name]).toBeDefined()
-    }
-    // …and out-of-subset upstream items are NOT exposed.
-    for (const name of ['sidebar', 'menubar', 'navigation-menu', 'sheet', 'sonner', 'command']) {
-      expect(UI_COMPONENTS[name]).toBeUndefined()
-    }
+    ])
   })
 })
