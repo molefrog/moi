@@ -4,9 +4,10 @@ import { motion } from 'motion/react'
 
 import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/client/components/ui/popover'
+import type { AgentTheme } from '@/lib/types'
 
 type ChatPopupProps = {
-  agentName: string
+  agent: AgentTheme
   loading: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -15,7 +16,7 @@ type ChatPopupProps = {
 }
 
 export function ChatPopup({
-  agentName,
+  agent,
   loading,
   open,
   onOpenChange,
@@ -61,7 +62,7 @@ export function ChatPopup({
                 aria-label="Agent"
               >
                 <AgentBlobatar
-                  name={agentName}
+                  preset={agent}
                   color="primary"
                   size={56}
                   animate={loading ? 'always' : 'hover'}

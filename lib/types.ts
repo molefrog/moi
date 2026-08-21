@@ -540,7 +540,7 @@ export type WorkspaceTabsState = {
   active: WorkspaceTabId
 }
 
-export type { ColorTheme, FontTheme, RadiusTheme, WorkspaceTheme } from './themes'
+export type { AgentTheme, ColorTheme, FontTheme, RadiusTheme, WorkspaceTheme } from './themes'
 
 export type WorkspaceLayout = {
   version: 1

@@ -355,13 +355,14 @@ export const control = Bun.serve({
           const layout = await loadLayout(workspacePath)
 
           // Listing mode — no theme setting requested
-          if (!data.font && !data.color && !data.radius) {
+          if (!data.font && !data.color && !data.radius && !data.agent) {
             const theme = resolveWorkspaceTheme(layout.theme)
             ws.send(
               JSON.stringify({
                 currentFont: theme.font,
                 currentColor: theme.color,
-                currentRadius: theme.radius
+                currentRadius: theme.radius,
+                currentAgent: theme.agent
               })
             )
             return
@@ -370,7 +371,8 @@ export const control = Bun.serve({
           const result = applyThemeUpdate(layout.theme, {
             font: data.font,
             color: data.color,
-            radius: data.radius
+            radius: data.radius,
+            agent: data.agent
           })
           if (!result.ok) {
             ws.send(JSON.stringify({ error: result.error }))

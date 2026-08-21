@@ -15,7 +15,7 @@ import { attachmentKey, useLive } from '@/client/features/chat/chat-store'
 import type { ChatPromptBubble } from '@/client/features/chat/ChatPromptBubbles'
 import type { ChatSendOptions } from '@/client/features/chat/chat-send'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
-import type { SystemNotice, Turn, ViewState } from '@/lib/types'
+import type { AgentTheme, SystemNotice, Turn, ViewState } from '@/lib/types'
 
 import type { ComposerBanner } from './composer/banners/ComposerBanner'
 import { ChatComposer, type ComposerAnnotationControls } from './composer/ChatComposer'
@@ -44,7 +44,7 @@ export type ViewBuilderChatDraft = {
 }
 
 type ChatPanelProps = {
-  agentName: string
+  agent: AgentTheme
   active?: boolean
   focusRequest?: number
   docked?: boolean
@@ -74,7 +74,7 @@ const EMPTY_TURNS: Turn[] = []
 const EMPTY_NOTICES: SystemNotice[] = []
 
 export function ChatPanel({
-  agentName,
+  agent,
   active = true,
   focusRequest = 0,
   docked = false,
@@ -219,7 +219,7 @@ export function ChatPanel({
             {/* Pulsing dots only before the first token — once the preview has
                 visible content it renders as a (possibly merged) grouped turn. */}
             {effectiveProcessing && !effectivePreviewTurn && <ThinkingIndicator />}
-            <AgentBlobatar name={agentName} color="primary" size={56} className="mt-auto" />
+            <AgentBlobatar preset={agent} color="primary" size={56} className="mt-auto" />
           </div>
         </div>
 

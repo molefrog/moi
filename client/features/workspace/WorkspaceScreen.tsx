@@ -35,6 +35,7 @@ import { useViewBuilderDrafts } from '@/client/features/views/useViewBuilderDraf
 import { useFitsSplitLayout } from '@/client/features/workspace/useFitsSplitLayout'
 import { useWorkspaceComposerState } from '@/client/features/chat/composer/useWorkspaceComposerState'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
+import { resolveWorkspaceTheme } from '@/lib/themes'
 import {
   hasRunningWorkspaceActivity,
   isSessionRunning,
@@ -211,7 +212,7 @@ function applyVisibleTabOrder(
 
 export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenProps) {
   const { layout, setLayout, name, icon, provider, workspaceId } = useWorkspaceLayoutCtx()
-  const agentName = name?.trim() || workspaceId
+  const theme = resolveWorkspaceTheme(layout.theme)
   const builderActions = useViewBuilderActions()
   const {
     ref: rowRef,
@@ -574,7 +575,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   // The docked split chat. Full-screen Agent uses the tabbed chat below.
   const dockedChat = (
     <ChatPanel
-      agentName={agentName}
+      agent={theme.agent}
       active={mode === 'split'}
       focusRequest={chatFocusRequest}
       chatLoaded={chatLoaded}
@@ -597,7 +598,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
 
   const tabbedChat = (
     <ChatPanel
-      agentName={agentName}
+      agent={theme.agent}
       active={mode === 'fullscreen' && activeTab === 'agent'}
       focusRequest={chatFocusRequest}
       chatLoaded={chatLoaded}
@@ -744,7 +745,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
 
       {mode === 'fullscreen' && activeTab !== 'agent' && hasWorkspaceContent && (
         <ChatPopup
-          agentName={agentName}
+          agent={theme.agent}
           loading={hasRunningSession}
           open={floatingChatOpen}
           onOpenChange={setFloatingChatOpen}
@@ -756,7 +757,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
         >
           {onClose => (
             <ChatPanel
-              agentName={agentName}
+              agent={theme.agent}
               active={floatingChatOpen}
               focusRequest={chatFocusRequest}
               chatLoaded={chatLoaded}

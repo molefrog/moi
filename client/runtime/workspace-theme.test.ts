@@ -50,7 +50,8 @@ describe('getWorkspaceThemeStyle', () => {
     const style = getWorkspaceThemeStyle({
       font: 'blobby',
       color: 'paper',
-      radius: 'squishy'
+      radius: 'squishy',
+      agent: 'round'
     })
 
     expect(style).toMatchObject({
@@ -69,7 +70,12 @@ describe('getWorkspaceThemeStyle', () => {
   })
 
   test('builds font, color, and radius styles independently', () => {
-    const theme = { font: 'blobby', color: 'paper', radius: 'squishy' } as const
+    const theme = {
+      font: 'blobby',
+      color: 'paper',
+      radius: 'squishy',
+      agent: 'boxy'
+    } as const
     const primary = COLOR_THEMES.paper.primary
     if (!primary) throw new Error('expected paper primary')
     const colors = deriveThemeColors(primary)
@@ -96,7 +102,10 @@ describe('getWorkspaceThemeStyle', () => {
     const colors = deriveThemeColors(primary, 'widget')
 
     expect(
-      getWorkspaceThemeStyle({ font: 'sans', color: 'paper', radius: 'soft' }, 'widget')
+      getWorkspaceThemeStyle(
+        { font: 'sans', color: 'paper', radius: 'soft', agent: 'capsule' },
+        'widget'
+      )
     ).toMatchObject({
       '--background': colors.background,
       '--foreground': colors.foreground,

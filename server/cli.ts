@@ -12,13 +12,14 @@ import { isAgentCaller } from './agent-caller'
 import { getAppConfig } from './app-config'
 
 import {
+  AGENT_THEMES,
   COLOR_THEMES,
   DEFAULT_WORKSPACE_THEME,
   FONT_THEMES,
   RADIUS_THEMES,
   deriveThemeColors
 } from '@/lib/themes'
-import type { ColorTheme, FontTheme, RadiusTheme } from '@/lib/themes'
+import type { AgentTheme, ColorTheme, FontTheme, RadiusTheme } from '@/lib/themes'
 import { isParamsRecord } from '@/lib/workspace-tabs'
 import type {
   AppletLogEntry,
@@ -828,7 +829,8 @@ const theme = defineCommand({
     },
     font: { type: 'string', description: 'Font theme key to apply' },
     color: { type: 'string', description: 'Color preset key to apply' },
-    radius: { type: 'string', description: 'Radius preset key to apply' }
+    radius: { type: 'string', description: 'Radius preset key to apply' },
+    agent: { type: 'string', description: 'Agent preset key to apply' }
   },
   async run({ args }) {
     const path = resolve(args.dir)
@@ -842,7 +844,8 @@ const theme = defineCommand({
           path,
           font: args.font ?? null,
           color: args.color ?? null,
-          radius: args.radius ?? null
+          radius: args.radius ?? null,
+          agent: args.agent ?? null
         })
       )
 
@@ -875,6 +878,10 @@ const theme = defineCommand({
           const preset = RADIUS_THEMES[res.radius as RadiusTheme]
           console.log(pc.green('✓') + ' Radius set to ' + pc.bold(preset.label))
         }
+        if (res.agent) {
+          const preset = AGENT_THEMES[res.agent as AgentTheme]
+          console.log(pc.green('✓') + ' Agent set to ' + pc.bold(preset.label))
+        }
         console.log()
         if (notice) console.log(pc.yellow(notice) + '\n')
         ws.close()
@@ -884,8 +891,11 @@ const theme = defineCommand({
       const currentFont: FontTheme = res.currentFont ?? DEFAULT_WORKSPACE_THEME.font
       const currentColor: ColorTheme = res.currentColor ?? DEFAULT_WORKSPACE_THEME.color
       const currentRadius: RadiusTheme = res.currentRadius ?? DEFAULT_WORKSPACE_THEME.radius
+      const currentAgent: AgentTheme = res.currentAgent ?? DEFAULT_WORKSPACE_THEME.agent
       console.log('\n' + pc.bold('moi theme') + ' — workspace appearance')
-      console.log(pc.dim('  Usage: moi theme --font=<key> --color=<key> --radius=<key>') + '\n')
+      console.log(
+        pc.dim('  Usage: moi theme --font=<key> --color=<key> --radius=<key> --agent=<key>') + '\n'
+      )
 
       const fontRows = (Object.keys(FONT_THEMES) as FontTheme[]).map(key => {
         const f = FONT_THEMES[key]
@@ -939,6 +949,19 @@ const theme = defineCommand({
         columns(
           ['', 'key', 'label', 'value'].map(h => pc.dim(h)),
           radiusRows
+        ) + '\n'
+      )
+
+      const agentRows = (Object.keys(AGENT_THEMES) as AgentTheme[]).map(key => {
+        const agent = AGENT_THEMES[key]
+        const selected = key === currentAgent
+        return [selected ? pc.green('→') : ' ', selected ? pc.bold(key) : key, agent.label]
+      })
+      console.log(pc.dim('  Agent'))
+      console.log(
+        columns(
+          ['', 'key', 'label'].map(h => pc.dim(h)),
+          agentRows
         ) + '\n'
       )
 
