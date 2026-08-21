@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 
 import { IconChevronDown, IconEdit } from '@tabler/icons-react'
 
+import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
 import { Button } from '@/client/components/ui/button'
 import {
   DropdownMenu,
@@ -24,7 +25,7 @@ import { Switch } from '@/client/components/ui/switch'
 import { ChatNoticeRow } from '@/client/features/chat/ChatPanel'
 import { ChatErrorBanner } from '@/client/features/chat/composer/banners/ChatErrorBanner'
 import { ChatSessionItem } from '@/client/features/chat/ChatSelector'
-import { ThinkingIndicator, TurnView } from '@/client/features/chat/TurnView'
+import { TurnView } from '@/client/features/chat/TurnView'
 import { isSessionRunning, liveStore } from '@/client/features/chat/chat-store'
 import { groupTurns } from '@/client/features/chat/group-turns'
 import { interleaveNotices } from '@/client/features/chat/interleave-notices'
@@ -70,12 +71,12 @@ const ANCHOR_BY_ITEM_ID: Record<string, string> = Object.fromEntries(
   conversationAnchors.map(a => [a.itemId, a.anchor])
 )
 
-type TailState = 'none' | 'dots' | 'thinking' | 'text'
+type TailState = 'none' | 'waiting' | 'thinking' | 'text'
 type BackgroundState = 'default' | 'muted'
 
 const TAIL_OPTIONS: { value: TailState; label: string }[] = [
   { value: 'none', label: 'None' },
-  { value: 'dots', label: 'Dots' },
+  { value: 'waiting', label: 'Waiting' },
   { value: 'thinking', label: 'Thinking' },
   { value: 'text', label: 'Text' }
 ]
@@ -102,9 +103,9 @@ type TranscriptProps = {
 
 // Mirrors ChatPanel's timeline: append the preview turn, fold tool-only turns
 // (groupTurns), weave notices in, then map to the real row components. The
-// pulsing dots appear exactly when ChatPanel shows them — processing with no
-// preview content yet. Anchors render as zero-size absolute spans so the
-// gap-6 rhythm between items stays untouched.
+// transcript avatar holds its thinking expression for the complete active run.
+// Anchors render as zero-size absolute spans so the gap-6 rhythm between items
+// stays untouched.
 function Transcript({
   turns,
   notices = [],
@@ -131,7 +132,14 @@ function Transcript({
           </div>
         )
       })}
-      {processing && !previewTurn && <ThinkingIndicator />}
+      <div className="-ml-3 pt-2">
+        <AgentBlobatar
+          color="primary"
+          size={64}
+          animated={processing}
+          expression={processing ? 'thinking' : undefined}
+        />
+      </div>
     </div>
   )
 }
@@ -357,8 +365,8 @@ export function ChatStatesPage() {
                   is skipped, and the final answer shows in the summary segment.
                 </li>
                 <li>
-                  The busy dots follow ChatPanel's rule — they show whenever the agent is processing
-                  and no preview content is visible yet, including under running tool rows.
+                  The transcript avatar keeps its thinking expression for the full active run,
+                  including while reasoning, text, or tool output is visible.
                 </li>
                 <li>
                   Empty-chat states (<code>ChatEmptyState</code>: placeholder and first-run welcome)

@@ -6,7 +6,7 @@ import { describe, expect, test } from 'bun:test'
 import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
 
 type AgentBlobatarOverrides = Partial<
-  Pick<ComponentProps<typeof AgentBlobatar>, 'animate' | 'color' | 'preset'>
+  Pick<ComponentProps<typeof AgentBlobatar>, 'animated' | 'color' | 'expression' | 'preset'>
 >
 
 function renderAgentBlobatar(overrides: AgentBlobatarOverrides = {}): string {
@@ -24,6 +24,7 @@ describe('AgentBlobatar', () => {
     expect(first).toContain('height="20"')
     expect(first).toContain('mo-root')
     expect(first).not.toContain('mo-always')
+    expect(first).not.toContain('mo-expr')
     expect(first).toContain('--mo-head:var(--foreground)')
     expect(first).toContain('--mo-eye:var(--background)')
     expect(first).toBe(repeat)
@@ -38,13 +39,20 @@ describe('AgentBlobatar', () => {
   })
 
   test('uses the same palette with always-on animation while active', () => {
-    const html = renderAgentBlobatar({ animate: 'always' })
+    const html = renderAgentBlobatar({ animated: true })
 
     expect(html).toStartWith('<svg')
     expect(html).toContain('aria-hidden="true"')
     expect(html).toContain('mo-root mo-always')
     expect(html).toContain('--mo-head:var(--foreground)')
     expect(html).toContain('--mo-eye:var(--background)')
+  })
+
+  test('supports the thinking expression with always-on animation', () => {
+    const html = renderAgentBlobatar({ animated: true, expression: 'thinking' })
+
+    expect(html).toContain('mo-root mo-always mo-expr')
+    expect(html).toContain('--mo-rock:0.8')
   })
 
   test('supports the primary palette', () => {

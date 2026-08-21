@@ -1,5 +1,6 @@
 import { Blobatar } from '@blobatar/react'
-import type { Animate, Palette } from 'blobatar'
+import type { Expression, Palette } from 'blobatar'
+import { thinking } from 'blobatar/expression'
 
 import { cn } from '@/client/lib/cn'
 import { AGENT_THEMES, DEFAULT_WORKSPACE_THEME } from '@/lib/themes'
@@ -8,6 +9,7 @@ import type { AgentTheme } from '@/lib/types'
 const AGENT_BLOBATAR_SEED = 'moi-agent'
 
 type AgentBlobatarColor = 'primary' | 'default'
+type AgentBlobatarExpression = 'thinking'
 
 const AGENT_PALETTES = {
   default: {
@@ -20,11 +22,16 @@ const AGENT_PALETTES = {
   }
 } satisfies Record<AgentBlobatarColor, Palette>
 
+const AGENT_EXPRESSIONS = {
+  thinking
+} satisfies Record<AgentBlobatarExpression, Expression>
+
 type AgentBlobatarProps = {
   size: number
   preset?: AgentTheme
-  animate?: Animate
+  animated?: boolean
   color?: AgentBlobatarColor
+  expression?: AgentBlobatarExpression
   className?: string
   'data-icon'?: 'inline-start' | 'inline-end'
 }
@@ -32,8 +39,9 @@ type AgentBlobatarProps = {
 function AgentBlobatar({
   size,
   preset = DEFAULT_WORKSPACE_THEME.agent,
-  animate = 'hover',
+  animated = false,
   color = 'default',
+  expression,
   className,
   ...props
 }: AgentBlobatarProps) {
@@ -41,8 +49,9 @@ function AgentBlobatar({
     <Blobatar
       name={AGENT_BLOBATAR_SEED}
       size={size}
-      animate={animate}
+      animate={animated ? 'always' : 'hover'}
       palette={AGENT_PALETTES[color]}
+      expression={expression ? AGENT_EXPRESSIONS[expression] : undefined}
       className={cn('shrink-0', className)}
       traits={{ shape: AGENT_THEMES[preset].shape }}
       {...props}

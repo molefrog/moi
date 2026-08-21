@@ -25,7 +25,7 @@ import {
   resolveChatEmptyState
 } from './ChatEmptyState'
 import { ChatSelector } from './ChatSelector'
-import { ThinkingIndicator, TurnView } from './TurnView'
+import { TurnView } from './TurnView'
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { cn } from '@/client/lib/cn'
@@ -216,11 +216,14 @@ export function ChatPanel({
                 />
               )
             )}
-            {/* Pulsing dots only before the first token — once the preview has
-                visible content it renders as a (possibly merged) grouped turn. */}
-            {effectiveProcessing && !effectivePreviewTurn && <ThinkingIndicator />}
             <div className="mt-auto -ml-3 pt-2">
-              <AgentBlobatar preset={agent} color="primary" size={64} />
+              <AgentBlobatar
+                preset={agent}
+                color="primary"
+                size={64}
+                animated={effectiveProcessing}
+                expression={effectiveProcessing ? 'thinking' : undefined}
+              />
             </div>
           </div>
         </div>

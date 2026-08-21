@@ -65,7 +65,7 @@ export function ChatPopup({
                   preset={agent}
                   color="primary"
                   size={56}
-                  animate={loading ? 'always' : 'hover'}
+                  animated={loading}
                   className="drop-shadow-md transition-[filter] duration-50 group-hover:drop-shadow-lg motion-reduce:transition-none"
                 />
               </button>

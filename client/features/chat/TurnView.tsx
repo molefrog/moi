@@ -15,23 +15,6 @@ import { formatDuration } from '@/client/features/chat/tool-group/format'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
 
-export function ThinkingIndicator() {
-  return (
-    <div className="flex items-center gap-1 px-1 py-3">
-      {[0, 1, 2].map(i => (
-        <span
-          key={i}
-          className="block h-1 w-1 rounded-full bg-ring"
-          style={{
-            animation: 'pulse-dot 1.4s ease-in-out infinite',
-            animationDelay: `${i * 0.2}s`
-          }}
-        />
-      ))}
-    </div>
-  )
-}
-
 // A part either folds into a tool-group "run" (reasoning + tool calls — including
 // subagents and skills, which render as their own timeline rows) or stands alone
 // (text, files, sources, data).
