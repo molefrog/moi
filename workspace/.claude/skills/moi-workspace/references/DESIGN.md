@@ -97,7 +97,7 @@ controls, or text regions, stack textures, or add tuning variables. Check nearby
 applets use different textures, while a widget representing a view shares its texture. Any texture
 should become easy to ignore while reading.
 
-### Type, spacing, and shape
+### Type
 
 Inherit the workspace font and use sentence case. Use regular weight for most text and medium for
 emphasis; other weights are reserved for owner hand-tuning. `text-sm` (14 px) is the UI default.
@@ -108,12 +108,20 @@ Reserve `font-mono` for code, commands, and code-like identifiers. Numeric value
 percentages, timers, timestamps, prices, counts, and labels use the workspace font. Add
 `tabular-nums` when stable widths or alignment help.
 
+### Icons
+
+Set `stroke` explicitly on every Tabler icon; the package default of `2` is heavier than the
+workspace chrome. Use `1.75` for 12–16 px icons and `1.5` for 20–24 px icons. When a component sets
+the icon size, omit `size` and use the stroke that matches its rendered size.
+
+### Spacing and shape
+
 Follow a 4 px spacing rhythm: 4–8 px within a tight group, 12–16 px between groups in a region, and
 24 px or more at section changes in larger applets. Prefer spacing over dividers. Keep repeated
 rows, chart labels, status markers, counters, and trailing actions in stable lanes so changing
 values do not shift the layout.
 
-Use the shared shadcn radius scale and default control radii. Use `rounded-lg` or `rounded-xl` for
+Use the shared radius scale and default control radii. Use `rounded-lg` or `rounded-xl` for
 ordinary regions, `rounded-2xl` or `rounded-3xl` for one focal surface, and `rounded-full` only for
 real pills, circles, avatars, and status dots. Rectangular controls must not become capsules.
 
