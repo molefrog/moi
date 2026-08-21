@@ -27,9 +27,18 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 ```
 
 - `add` writes source files and nothing else — installing the deps it prints and rebuilding is
-  your job. The baseline (`@base-ui/react`, `class-variance-authority`, `clsx`,
-  `tailwind-merge`) is pre-seeded at workspace init; if a build fails on a missing baseline dep
-  (older workspace), install those too.
+  your job.
+- **If the build fails on a missing package** (happens in workspaces scaffolded before this
+  feature — `.moi/package.json` may lack the deps ui components need): check
+  `.moi/package.json` and install what's missing. Every ui component needs the baseline
+
+  ```sh
+  bun install @base-ui/react class-variance-authority clsx tailwind-merge
+  ```
+
+  (run in `.moi/`), plus whatever `add` printed for the specific component (`recharts`,
+  `embla-carousel-react`, `react-day-picker` + `date-fns`, `react-resizable-panels`,
+  `@tanstack/react-table`).
 - Files in `.moi/ui/` are yours to customize; `add` refuses to overwrite them without `--force`.
 - Support files appear without being asked for (`utils.ts` with `cn`, `applet-portal.tsx`, and
   registry dependencies like `separator`, `card`, `toggle`) — normal; use them if handy.
