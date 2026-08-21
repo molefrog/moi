@@ -1,14 +1,19 @@
-# moi shadcn — spec
+# moi ui-components — spec
 
-`moi shadcn` is an opinionated shadcn-lite proxy: one command driven by the
-`shadcn` package's own programmatic engine, wrapped in moi's conventions.
-Upstream registry as the source of truth, zero config files in the
-workspace, Base UI only. The command writes source files; the agent owns
-everything else.
+`moi ui-components` (né `moi shadcn`) is an opinionated shadcn-lite proxy:
+one command driven by the `shadcn` package's own programmatic engine,
+wrapped in moi's conventions. Upstream registry as the source of truth,
+zero config files in the workspace, Base UI only. The command writes source
+files; the agent owns everything else.
 
-Status: decided (Aug 2026). Every empirical claim below (build behavior,
-registry mechanics, theming cascade) was verified by experiment; the full
-research trail lives in PR #78.
+Status: shipped (Aug 2026) — `server/ui-components.ts` (engine),
+`server/cli-ui-components.ts` (CLI), the synthetic-Tailwind vocabulary
+inline in `server/bundler/build-applet.ts`, and the
+`references/UI-COMPONENTS.md` cheat sheet in the moi-workspace skill.
+Every empirical claim below (build behavior, registry mechanics, theming
+cascade) was verified by experiment; the research trail lives in PR #78,
+with two revisions from the component review (Aug 20): the command name,
+and a curated subset instead of the full upstream catalog.
 
 ## Opinions (non-negotiable)
 
@@ -17,6 +22,14 @@ research trail lives in PR #78.
   config as an in-memory object that lives inside moi.
 - Always and only Base UI primitives. Tabler icons. Workspace tokens —
   never hardcoded colors.
+- **A curated subset, not the catalog** (component review, Aug 2026): 40
+  entries — the everyday controls plus `attachment`, `bubble`, `chart`,
+  `data-table` and `date-picker` as patterns — and deliberately no
+  page-scale chrome (`sidebar`, `navigation-menu`, `sheet`, `menubar`,
+  `sonner`, `command`) and no `breadcrumb`/`input-otp` (cut in review).
+  The list is `UI_COMPONENTS` in `server/ui-components.ts`; registry
+  dependencies of a curated item (`separator`, `card`, `toggle`) install
+  implicitly as support files.
 - Components live in `.moi/ui/`, one fixed place, created on first use.
 - Applets import them relatively: `../ui/button`. Never `@/` aliases (the
   skill states this; unresolved imports already fail loudly at build).
@@ -27,18 +40,20 @@ research trail lives in PR #78.
 
 ## Command surface
 
-V1:
+V1 (shipped):
 
-- `moi shadcn add <name…>` — fetches items, applies moi transforms, writes
-  files to `.moi/ui/`. If a target file exists, **fails** with a message
-  naming the `--force` flag; hand-customized components are never silently
-  overwritten. Ends by printing next steps, not performing them:
-  "Component added. Make sure dependencies are installed, then rebuild."
-- `moi shadcn docs <name>` — official docs fetched as markdown
+- `moi ui-components add <name…> [--force]` — fetches items, applies moi
+  transforms, writes files to `.moi/ui/`. If a **requested** file exists,
+  **fails** with a message naming the `--force` flag; hand-customized
+  components are never silently overwritten (existing support files —
+  utils, applet-portal, riding-along registry deps — are kept, never
+  overwritten, even under `--force`). Ends by printing next steps, not
+  performing them: install these deps, import relatively, `moi bundle`.
+- `moi ui-components docs <name…>` — official docs fetched as markdown
   (`ui.shadcn.com/docs/components/base/<name>.md` serves raw markdown;
-  Base UI API references likewise) for the agent to read.
-- `moi shadcn list [-q term]` — installed components + the upstream
-  catalog, fuzzy search over the registry index.
+  works for the `data-table`/`date-picker` pattern pages too).
+- `moi ui-components` / `list [-q term]` — the curated catalog with
+  installed state; `-q` filters by name/description.
 
 Later: `example <name>` (registry usage-source items, ~32 KB of real
 composition code — for an agent about to build UI, higher value than
@@ -51,27 +66,36 @@ config management.
 
 ## What `add` does, exactly
 
-1. `getRegistryItems(names, { config })` via the pinned `shadcn` package —
+1. Validates names against the curated catalog (typos get suggestions),
+   expands patterns (`date-picker` → `calendar` + `popover` + `button`,
+   `data-table` → `table` + a note about `@tanstack/react-table`).
+2. `getRegistryItems(names, { config })` via the pinned `shadcn` package —
    the config is a ~10-line object literal inside moi (style `base-nova`,
-   `iconLibrary: 'tabler'`); `registryDependencies` resolve recursively.
-2. `transformIcons` (shadcn's own, ts-morph): registry content ships
+   `iconLibrary: 'tabler'`); `registryDependencies` are closed
+   transitively by the engine (`fetchUiComponents`), `utils` always rides
+   along.
+3. `transformIcons` (shadcn's own, ts-morph): registry content ships
    `<IconPlaceholder lucide="…" tabler="…"/>`; the transform picks the
    tabler attribute and writes the `@tabler/icons-react` import. lucide
-   never enters the workspace.
-3. Import rewrite to relative paths (two string maps:
-   `@/registry/<style>/lib/utils` → `./utils`, `…/ui/<x>` → `./<x>`).
-   There is no config knob for this: raw registry content hardcodes
-   `@/registry/<style>/…` paths, the CLI's alias rewrite is internal (not
-   exported), and aliases are validated against tsconfig paths or
-   `package.json` `imports` — a relative value like `./utils` is rejected
-   outright (verified). Implementation: rewrite on the same ts-morph
+   never enters the workspace. `transformMenu` (also shadcn's own) settles
+   the `cn-menu-*` classes for the default menu color.
+4. Import rewrite to relative paths (`@/registry/<style>/{lib,ui,hooks}/<x>`
+   → `./<x>`). There is no config knob for this: raw registry content
+   hardcodes `@/registry/<style>/…` paths, the CLI's alias rewrite is
+   internal (not exported), and aliases are validated against tsconfig
+   paths or `package.json` `imports` — a relative value like `./utils` is
+   rejected outright (verified). Implemented on the same ts-morph
    `SourceFile` already built for `transformIcons` (walk import and
    export declarations, `setModuleSpecifier`) — AST-accurate, catches
    re-exports, and adds no dependency since ts-morph ships with the
    pinned `shadcn` package.
-4. Write files to `.moi/ui/`. On first add, also install `ui/utils.ts`
-   (`cn` — itself a registry item; declares `clsx` + `tailwind-merge`).
-5. Print next steps. Nothing else — no install, no rebuild.
+5. **The portal codemod** (see Portals below): every `<X.Portal …>` JSX
+   element becomes `<AppletPortal portal={X.Portal} …>`, importing the
+   wrapper from `./applet-portal`.
+6. Write files to `.moi/ui/` — requested components, their support files
+   (`utils.ts` with `cn`, riding-along registry deps), and
+   `applet-portal.tsx`.
+7. Print next steps. Nothing else — no install, no rebuild.
 
 ## Dependencies
 
@@ -90,25 +114,26 @@ config management.
 
 ```
 .moi/
-  ui/                     ← created on first add, never before
+  ui/                        ← created on first add, never before
     button.tsx
-    utils.ts              ← cn; auto-installed on first add
-  widgets/tracker.tsx     ← import { Button } from '../ui/button'
-  package.json            ← base deps pre-seeded at init
+    utils.ts                 ← cn; auto-installed on first add
+    applet-portal.tsx        ← portal scope wrapper; auto-installed
+  widgets/tracker.tsx        ← import { Button } from '../ui/button'
+  package.json               ← base deps pre-seeded at init
 
 <skills dir>/moi-workspace/
-  SKILL.md                ← two lines: "need a standard control?
-                            moi shadcn add <name>, import from ../ui/"
-  references/shadcn.md    ← one-file essentials
+  SKILL.md                   ← short section: "need a standard control?
+                               moi ui-components add <name>, import ../ui/"
+  references/UI-COMPONENTS.md ← the cheat sheet
 ```
 
-`references/shadcn.md` is a one-file compilation condensed from the
-official shadcn skill (`bunx --bun skills add shadcn/ui`): usage,
-composition, customization, per-kind rules. Stripped: MCP, init, package
-runners, Vite/Router, project introspection — extraction is mandatory,
-not cosmetic (the official skill's first move, `shadcn info`, requires
-`components.json`). Updated manually when the pinned shadcn version
-bumps; a scripted re-derivation remains an option if that gets tiresome.
+`references/UI-COMPONENTS.md` is the "agent sees all options at once"
+artifact from the review: the whole catalog with a one-line use-case and
+import per component, the workflow, the customization order, and per-kind
+fit (widgets compact, views full-set). Per-component depth deliberately
+lives behind `moi ui-components docs <name>` — the agent reads the list
+once, then fetches detail on demand. Updated manually when the pinned
+shadcn version bumps.
 
 ## Build integration: the synthetic Tailwind patch (prerequisite)
 
@@ -179,28 +204,61 @@ promise for them, and registry content can run ahead of the published
 package (live components already use a `cn-rtl-flip` utility no
 published `tailwind.css` defines — cosmetic, RTL-only). Upgrades are
 deliberate: bump, run smoke tests (fetch → transform → write a known
-item), refresh `references/shadcn.md`, ship.
+item), refresh `references/UI-COMPONENTS.md`, ship.
+
+## Portals (decided: codemod, keep the body portal)
+
+Overlay components portal to `document.body`, escape the applet's scoped
+CSS (`[data-applet="…"]` prefixes, `server/bundler/applet-css.ts`), and
+half-work on accidentally borrowed host styles. The review considered
+re-containering them (Base UI's `container` prop → applet scope — proven
+in PR #78) but overlays portal to body _for a reason_: they must escape
+the widget frame's `overflow-hidden` and stacking. Decision: **keep the
+body portal, put the scope back inside it.**
+
+`add` rewrites every `<X.Portal …>` to `<AppletPortal portal={X.Portal} …>`
+(the codemod handles both upstream shapes: self-closing pass-through
+wrappers with spread props, and inline `Portal > Positioner > Popup`;
+type positions like `X.Portal.Props` are untouched). `AppletPortal`
+(installed as `ui/applet-portal.tsx`) renders a hidden marker where the
+overlay is _used_ — inside the applet's DOM — reads the nearest
+`data-applet` scope from it, and wraps the portalled children in a
+`display: contents` element carrying the same attribute. Scoped selectors
+match again; root-mapped preflight (fonts, line-height) lands on the
+wrapper and inherits down. Verified live: popover, dropdown menu, dialog
+(+ backdrop) fully styled while portalled to body.
+
+Known limitation: portalled content resolves theme variables from the
+host `:root`, not the widget frame's inline per-widget derivations
+(`data-vivid`, dark-surface tokens) — with the default theme they match;
+a heavily themed workspace can show slightly off-theme popups. Copying
+frame tokens onto the wrapper is a possible follow-up.
 
 ## Open items
 
-- **Portals/overlays — parked for a dedicated review.** Overlay
-  components portal to `document.body`, escape the applet's scoped CSS,
-  and half-work on accidentally borrowed host styles (verified: light
-  popup over a force-dark widget). Proven fix exists (Base UI's public
-  `container` prop → applet scope). Options: codemod inside `add`,
-  pre-patched copies of the overlay trio, or a portal host exposed by
-  the applet runtime.
-- Per-kind component rules for `references/shadcn.md` (`sheet`,
-  `navigation-menu`, page chrome: views yes, widgets no) — list TBD.
-- `docs` output shape: links vs. fetched markdown (recommendation:
-  markdown).
+- Per-kind component rules refinement in `references/UI-COMPONENTS.md`
+  (widgets prefer compact/overlay-light patterns; page chrome stays out
+  of the set by design).
+- Theming foundation (below) — the token-vocabulary work is still open.
+- Portal wrapper theme-token copying (see Portals above).
 
 ## Ship plan
 
-1. **Foundation** — synthetic-Tailwind inline, token vocabulary
-   (`secondary`, `chart-*`, stuck-neutral derivations, dark set),
-   scaffold dep pre-seed. Decision-independent; patches tested.
-2. **`moi shadcn` v1** — `add` / `docs` / `list` over the pinned engine;
-   prints next steps, does nothing else; smoke tests.
-3. **Skill** — SKILL.md pointer + `references/shadcn.md`, including the
-   install/rebuild responsibility and the relative-import rule.
+1. **Foundation** — ✅ synthetic-Tailwind vocabulary inline
+   (`build-applet.ts`, covered by a build test), ✅ scaffold dep pre-seed
+   (`@base-ui/react`, `class-variance-authority`, `clsx`,
+   `tailwind-merge` in `MOI_PACKAGE_JSON`). Still open: token vocabulary
+   (`secondary`, `chart-*`, stuck-neutral derivations, dark set) — a
+   theming change, tracked separately.
+2. **`moi ui-components` v1** — ✅ `add` / `docs` / `list` over the pinned
+   engine + the portal codemod; prints next steps, does nothing else;
+   offline transform tests in `server/test/ui-components.test.ts`.
+3. **Skill** — ✅ SKILL.md pointer + `references/UI-COMPONENTS.md` cheat
+   sheet (catalog at a glance, install/rebuild responsibility, the
+   relative-import rule, per-kind fit). TEMPORARILY gated: the section and
+   cheat sheet install only for workspaces created with
+   `moi init --experimental-shadcn` (marker-stripped otherwise; the
+   installed SKILL.md carries the choice across `moi skill update` — see
+   `server/skills-template.ts`). The command itself is always available;
+   the gate only controls whether the skill advertises it. Remove when the
+   feature graduates.

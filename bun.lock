@@ -41,7 +41,7 @@
         "react-resizable-panels": "^4.12.2",
         "rehype-highlight": "^7.0.2",
         "remark-gfm": "^4.0.1",
-        "shadcn": "^4.13.0",
+        "shadcn": "4.13.0",
         "sharp": "^0.35.1",
         "shell-quote": "^1.10.0",
         "sugar-high": "^1.2.1",

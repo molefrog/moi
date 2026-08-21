@@ -41,6 +41,7 @@ import {
   renderEnvView,
   resolveCwdWorkspace
 } from './cli-env'
+import { uiComponents } from './cli-ui-components'
 import { columns, keyValue } from './cli-ui'
 import { CONTROL_HOST, CONTROL_PORT, CONTROL_URL, PORT } from './constants'
 import { type ControlProbe, controlFailureMessage, probeControlServer } from './control-client'
@@ -335,6 +336,12 @@ const init = defineCommand({
       type: 'string',
       description:
         'Register under this id instead of a generated one — fails if the workspace is already registered'
+    },
+    'experimental-shadcn': {
+      type: 'boolean',
+      default: false,
+      description:
+        'Include the experimental ui-components section in the workspace skill (temporary)'
     }
   },
   async run({ args }) {
@@ -392,7 +399,9 @@ const init = defineCommand({
     // Provision: bundled skills + the `.moi/` bootstrap (widgets dir +
     // package.json + bun install). An existing `.moi/` is left untouched.
     console.log()
-    const { scaffold, skillsDir } = await provisionWorkspace(target, type)
+    const { scaffold, skillsDir } = await provisionWorkspace(target, type, {
+      experimentalShadcn: args['experimental-shadcn']
+    })
     if (scaffold !== 'exists') {
       if (scaffold === 'installing') {
         console.log(pc.dim('  Widget dependencies still installing in .moi/ (background)'))
@@ -2938,7 +2947,8 @@ const workspaceCommands = {
   scratch,
   skill,
   tab,
-  tabs
+  tabs,
+  'ui-components': uiComponents
 }
 
 const systemCommands = {

@@ -182,14 +182,37 @@ from `.moi/package.json` deps — no `@/` aliases. Files starting with `_` (e.g.
   per-frame transforms.
 - Use icons from `@tabler/icons-react`. Do not add raw SVG icons or another icon pack. When the
   project provides `.agents/rules/icons.md`, follow its size and stroke policy.
-- Applets cannot import the host project's `cn`. Use a local `cx()` when classes are conditional;
-  do not build class names with template-literal ternaries.
+- Applets cannot import the host project's `cn`. If `.moi/ui/utils.ts` exists, import `cn` from
+  `../ui/utils`; otherwise use a local `cx()` when classes are conditional. Never build class
+  names with template-literal ternaries.
 
 ```tsx
 function cx(...classes: (string | false | undefined | null)[]) {
   return classes.filter(Boolean).join(' ')
 }
 ```
+
+<!-- moi:experimental-shadcn -->
+
+## Standard UI components
+
+Need a standard control (button, dialog, select, table, chart…)? Don't hand-roll it —
+`moi ui-components add <name>` installs a moi-tuned shadcn component (Base UI + Tabler icons,
+workspace theme tokens, overlays patched to keep applet styling) into `.moi/ui/`. Import
+relatively: `import { Button } from '../ui/button'`.
+
+- `moi ui-components` — the catalog with installed state. Read
+  `references/UI-COMPONENTS.md` first: the full catalog plus the essential usage rules
+  (Base UI composition, forms, styling, icons — condensed from the official shadcn skill).
+- `moi ui-components docs <name>` — full official docs (markdown: anatomy, props, examples) on
+  demand. Read them before composing an unfamiliar component; the parts API (Base UI) differs
+  from Radix-era shadcn.
+- `add` never installs npm packages or rebuilds — it prints the deps it needs; install them in
+  `.moi/` and run `moi bundle` yourself.
+- Files in `.moi/ui/` are yours to customize (edits propagate to every applet using them);
+  re-running `add` refuses to overwrite them without `--force`.
+
+<!-- /moi:experimental-shadcn -->
 
 ## Server functions — `<name>.server.ts`
 
@@ -412,10 +435,10 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 
 - **You'll know** — `moi` commands warn you when this skill is behind.
 - **To update** — run `moi skill update`. Never mid-task: finish first, or do it at the end.
-- **Re-read after updating** — `moi skill update` rewrites `SKILL.md` and its companion docs
-  (`references/DESIGN.md` and `references/SCRATCHPAD.md`) on disk, so the copy already in your context is stale. Re-read
-  this `SKILL.md` before you rely on it again — don't act on the old version.
+- **Re-read after updating** — `moi skill update` rewrites `SKILL.md` and everything in
+  `references/` on disk, so the copy already in your context is stale. Re-read this `SKILL.md`
+  before you rely on it again — don't act on the old version.
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.13.0" />
+<moi-skill version="0.14.0" />

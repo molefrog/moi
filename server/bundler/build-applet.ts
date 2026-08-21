@@ -410,6 +410,26 @@ function appletRuntimePlugin(
 // provides the same texture utilities available to host components.
 const HOST_THEME_PATH = join(import.meta.dir, '..', '..', 'client', 'theme.css')
 
+// The shadcn styling vocabulary, text-inlined from moi's OWN node_modules the
+// same way theme.css is. Tailwind v4 only emits utilities it can resolve:
+// installed ui components lean on `tw-animate-css` (animate-in/out, fade,
+// zoom, slide) and `shadcn/tailwind.css` (data-open/data-closed variants,
+// accordion keyframes, scroll-fade, cn-* helpers) — both imported by the host
+// stylesheet but invisible to an applet's synthetic entry, so those classes
+// were silently dropped and components rendered half-styled. Inlining keeps
+// the workspace dependency-free; emission stays usage-driven, so applets that
+// use none of the vocabulary pay nothing.
+// (`tw-animate-css` exposes its css only under the `style` export condition,
+// which Bun.resolveSync doesn't match — locate it via its package.json.)
+const SHADCN_VOCABULARY_PATHS = [
+  join(
+    dirname(Bun.resolveSync('tw-animate-css/package.json', import.meta.dir)),
+    'dist',
+    'tw-animate.css'
+  ),
+  Bun.resolveSync('shadcn/tailwind.css', import.meta.dir)
+]
+
 // Three things matter for applet styling:
 //   1. The umbrella `@import 'tailwindcss'` brings in @layer theme + base +
 //      utilities — which is what spacing/color utilities like `left-2.5`,
@@ -444,9 +464,19 @@ async function writeSyntheticTailwindCss(
   // (`@source .moi/views`) build concurrently in one `moi bundle`; a shared
   // file would race and point Tailwind at the wrong source dir.
   const cssPath = join(buildDir, `${kind}-tailwind.css`)
+  const vocabulary = await Promise.all(SHADCN_VOCABULARY_PATHS.map(path => Bun.file(path).text()))
   const contents = [
     `@import 'tailwindcss';`,
     await Bun.file(HOST_THEME_PATH).text(),
+    ...vocabulary,
+    // Mirror the host's shadcn base-layer default (client/index.css): token
+    // border and outline colors on every element. Tailwind v4's preflight sets
+    // `border-color: currentColor`, so without this an applet's bare `border`
+    // (no explicit color — how installed ui components and shadcn idioms write
+    // it) renders black instead of the `border` token. The host applies it
+    // page-wide but the applet's scoped sheet must bring its own copy; it gets
+    // scoped to the applet subtree like every other rule (applet-css.ts).
+    `@layer base { * { @apply border-border outline-ring/50; } }`,
     // Mirror the host's class-based dark mode (client/index.css) so an applet's
     // `dark:` variants flip with the app theme. Without this Tailwind falls
     // back to `@media (prefers-color-scheme: dark)`, which diverges from the
