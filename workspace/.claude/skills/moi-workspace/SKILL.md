@@ -200,8 +200,8 @@ workspace theme tokens, overlays patched to keep applet styling) into `.moi/ui/`
 relatively: `import { Button } from '../ui/button'`.
 
 - `moi ui-components` — the catalog with installed state. Read
-  `references/UI-COMPONENTS.md` first: the cheat sheet of every component with import lines and
-  when to reach for each.
+  `references/UI-COMPONENTS.md` first: the full catalog plus the essential usage rules
+  (Base UI composition, forms, styling, icons — condensed from the official shadcn skill).
 - `moi ui-components docs <name>` — full official docs (markdown: anatomy, props, examples) on
   demand. Read them before composing an unfamiliar component; the parts API (Base UI) differs
   from Radix-era shadcn.
