@@ -431,9 +431,9 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 
 - **You'll know** — `moi` commands warn you when this skill is behind.
 - **To update** — run `moi skill update`. Never mid-task: finish first, or do it at the end.
-- **Re-read after updating** — `moi skill update` rewrites `SKILL.md` and its companion docs
-  (`references/DESIGN.md`, `references/SCRATCHPAD.md`, and `references/UI-COMPONENTS.md`) on disk, so the copy already
-  in your context is stale. Re-read this `SKILL.md` before you rely on it again — don't act on the old version.
+- **Re-read after updating** — `moi skill update` rewrites `SKILL.md` and everything in
+  `references/` on disk, so the copy already in your context is stale. Re-read this `SKILL.md`
+  before you rely on it again — don't act on the old version.
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
