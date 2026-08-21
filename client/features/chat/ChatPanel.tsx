@@ -219,7 +219,9 @@ export function ChatPanel({
             {/* Pulsing dots only before the first token — once the preview has
                 visible content it renders as a (possibly merged) grouped turn. */}
             {effectiveProcessing && !effectivePreviewTurn && <ThinkingIndicator />}
-            <AgentBlobatar preset={agent} color="primary" size={56} className="mt-auto" />
+            <div className="mt-auto -ml-3 pt-2">
+              <AgentBlobatar preset={agent} color="primary" size={64} />
+            </div>
           </div>
         </div>
 
