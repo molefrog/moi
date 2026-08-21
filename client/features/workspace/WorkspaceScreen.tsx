@@ -16,7 +16,7 @@ import { DrawingLayer } from '@/client/features/drawings/DrawingLayer'
 import { DrawingToolbar } from '@/client/features/drawings/DrawingToolbar'
 import { useChatAnnotation } from '@/client/features/drawings/useChatAnnotation'
 import { ChatPanel } from '@/client/features/chat/ChatPanel'
-import type { ChatWelcomeDestination } from '@/client/features/chat/ChatEmptyState'
+import type { WelcomeDestination } from '@/client/features/chat/ChatEmptyState'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { CustomizePanel } from '@/client/features/workspace/CustomizePanel'
 import { useAppletEvent } from '@/client/features/applets/applet-runtime'
@@ -396,7 +396,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     }
   }
 
-  const navigateFromWelcome = (destination: ChatWelcomeDestination) => {
+  const navigateFromWelcome = (destination: WelcomeDestination) => {
     if (destination === 'views') {
       const firstView = views[0]
       if (firstView) openTab(viewTabId(firstView.id))

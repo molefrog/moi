@@ -22,24 +22,24 @@ function renderState(kind: ChatEmptyStateKind, hasWorkspaceApplets = false): str
 }
 
 describe('resolveChatEmptyState', () => {
-  test('gives the global chat welcome first priority', () => {
+  test('gives the welcome state first priority', () => {
     expect(
       resolveChatEmptyState({
         isViewBuilderDraft: false,
         hasSentMessageFromMoi: false,
         isWorkspacePendingAnalysis: true
       })
-    ).toBe('chat-welcome')
+    ).toBe('welcome')
   })
 
-  test('shows the workspace welcome for a pending imported workspace', () => {
+  test('shows the workspace exploration state for a pending imported workspace', () => {
     expect(
       resolveChatEmptyState({
         isViewBuilderDraft: false,
         hasSentMessageFromMoi: true,
         isWorkspacePendingAnalysis: true
       })
-    ).toBe('workspace-welcome')
+    ).toBe('explore-workspace')
   })
 
   test('uses the simple empty state without pending analysis', () => {
@@ -65,15 +65,15 @@ describe('resolveChatEmptyState', () => {
 
 describe('ChatEmptyState', () => {
   test('renders the selected empty state', () => {
-    expect(renderState('chat-welcome')).toContain('moi is the visual workspace')
-    expect(renderState('chat-welcome')).toContain('Try an example:')
-    expect(renderState('workspace-welcome')).toContain('Start with what’s already here')
-    expect(renderState('workspace-welcome')).toContain(
+    expect(renderState('welcome')).toContain('moi is the visual workspace')
+    expect(renderState('welcome')).toContain('Try an example:')
+    expect(renderState('explore-workspace')).toContain('Start with what’s already here')
+    expect(renderState('explore-workspace')).toContain(
       'Your agent can explore this workspace and suggest useful widgets and views based on its contents.'
     )
-    expect(renderState('workspace-welcome')).toContain('Explore the workspace')
+    expect(renderState('explore-workspace')).toContain('Explore the workspace')
     expect(renderState('empty')).toContain('Chat with your agent')
-    for (const kind of ['chat-welcome', 'workspace-welcome', 'empty'] as const) {
+    for (const kind of ['welcome', 'explore-workspace', 'empty'] as const) {
       const html = renderState(kind)
       expect(html).toContain('mo-root')
       expect(html).toContain('--mo-head:var(--accent)')
@@ -99,7 +99,7 @@ describe('ChatEmptyState', () => {
   })
 
   test('hides examples when the workspace already has applets', () => {
-    const html = renderState('chat-welcome', true)
+    const html = renderState('welcome', true)
 
     expect(html).toContain('moi is the visual workspace')
     expect(html).not.toContain('Try an example:')

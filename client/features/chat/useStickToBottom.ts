@@ -22,7 +22,7 @@ type StickToBottom = {
   atBottom: boolean
   // Scroll to the bottom and re-pin. `smooth` for user-initiated jumps.
   scrollToBottom: (behavior?: ScrollBehavior) => void
-  // Show top-anchored content such as the initial Chat welcome without the
+  // Show top-anchored content such as the initial welcome state without the
   // resize observer pulling it back to the bottom.
   scrollToTop: () => void
 }

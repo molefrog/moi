@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+
 import {
   IconArticle,
   IconFileSearch,
@@ -81,8 +83,8 @@ export const WORKSPACE_ANALYSIS_PROMPT = {
   icon: IconFileSearch
 } satisfies ChatPrompt
 
-export type ChatEmptyStateKind = 'view-builder' | 'chat-welcome' | 'workspace-welcome' | 'empty'
-export type ChatWelcomeDestination = 'agent' | 'widgets' | 'views' | 'scratchpad'
+export type ChatEmptyStateKind = 'view-builder' | 'welcome' | 'explore-workspace' | 'empty'
+export type WelcomeDestination = 'agent' | 'widgets' | 'views' | 'scratchpad'
 
 type ResolveChatEmptyStateOptions = {
   isViewBuilderDraft: boolean
@@ -96,12 +98,10 @@ export function resolveChatEmptyState({
   isWorkspacePendingAnalysis
 }: ResolveChatEmptyStateOptions): ChatEmptyStateKind {
   if (isViewBuilderDraft) return 'view-builder'
-  if (!hasSentMessageFromMoi) return 'chat-welcome'
-  if (isWorkspacePendingAnalysis) return 'workspace-welcome'
+  if (!hasSentMessageFromMoi) return 'welcome'
+  if (isWorkspacePendingAnalysis) return 'explore-workspace'
   return 'empty'
 }
-
-const EMPTY_STATE_STYLES = cn('flex flex-1 flex-col items-center justify-center self-center')
 
 type ChatEmptyStateProps = {
   agent: AgentTheme
@@ -109,7 +109,7 @@ type ChatEmptyStateProps = {
   hasWorkspaceApplets: boolean
   disabled?: boolean
   onSelectPrompt: (prompt: ChatPrompt) => void
-  onNavigate: (destination: ChatWelcomeDestination) => void
+  onNavigate: (destination: WelcomeDestination) => void
 }
 
 export function ChatEmptyState({
@@ -122,10 +122,10 @@ export function ChatEmptyState({
 }: ChatEmptyStateProps) {
   switch (kind) {
     case 'view-builder':
-      return <ViewBuilderChatEmptyState agent={agent} />
-    case 'chat-welcome':
+      return <ViewBuilderState agent={agent} />
+    case 'welcome':
       return (
-        <ChatWelcome
+        <WelcomeState
           agent={agent}
           disabled={disabled}
           showExamples={!hasWorkspaceApplets}
@@ -133,128 +133,138 @@ export function ChatEmptyState({
           onNavigate={onNavigate}
         />
       )
-    case 'workspace-welcome':
+    case 'explore-workspace':
       return (
-        <ChatWorkspaceWelcome agent={agent} disabled={disabled} onSelectPrompt={onSelectPrompt} />
+        <ExploreWorkspaceState agent={agent} disabled={disabled} onSelectPrompt={onSelectPrompt} />
       )
     case 'empty':
       return <EmptyState agent={agent} />
   }
 }
 
-type EmptyStateAgentProps = {
+type EmptyStateFrameProps = {
   agent: AgentTheme
+  children: ReactNode
+  className?: string
 }
 
-function EmptyStateAgent({ agent }: EmptyStateAgentProps) {
-  return <AgentBlobatar preset={agent} color="secondary" size={64} />
-}
-
-function ViewBuilderChatEmptyState({ agent }: EmptyStateAgentProps) {
+function EmptyStateFrame({ agent, children, className }: EmptyStateFrameProps) {
   return (
-    <div className={cn(EMPTY_STATE_STYLES, 'gap-2 text-center text-muted-foreground')}>
-      <EmptyStateAgent agent={agent} />
-      <p className="mx-auto max-w-xs px-8 text-sm">
-        Describe the content, data, and key actions you need in the view
-      </p>
+    <div className={cn('flex flex-1 flex-col items-center justify-center self-center', className)}>
+      <AgentBlobatar preset={agent} color="secondary" size={64} className="mb-2" />
+      {children}
     </div>
   )
 }
 
-type WelcomeProps = {
+type AgentStateProps = {
+  agent: AgentTheme
+}
+
+function ViewBuilderState({ agent }: AgentStateProps) {
+  return (
+    <EmptyStateFrame agent={agent} className="text-center text-muted-foreground">
+      <p className="mx-auto max-w-xs px-8 text-sm">
+        Describe the content, data, and key actions you need in the view
+      </p>
+    </EmptyStateFrame>
+  )
+}
+
+type PromptStateProps = {
   agent: AgentTheme
   disabled?: boolean
   onSelectPrompt: (prompt: ChatPrompt) => void
 }
 
-type ChatWelcomeProps = WelcomeProps & {
+type WelcomeStateProps = PromptStateProps & {
   showExamples?: boolean
-  onNavigate: (destination: ChatWelcomeDestination) => void
+  onNavigate: (destination: WelcomeDestination) => void
 }
 
-export function ChatWelcome({
+function WelcomeState({
   agent,
   disabled = false,
   showExamples = true,
   onSelectPrompt,
   onNavigate
-}: ChatWelcomeProps) {
+}: WelcomeStateProps) {
   return (
-    <div className={cn(EMPTY_STATE_STYLES, '@container w-full max-w-md min-w-0 gap-4')}>
-      <EmptyStateAgent agent={agent} />
-      <div className="prose prose-sm min-w-0 wrap-anywhere prose-inherit">
-        <p>
-          moi is the visual workspace for you and your agent. It grows and adapts to the work you're
-          doing.
-        </p>
-        <p>
-          Ask{' '}
-          <WelcomeTerm Icon={IconMessages} destination="agent" onNavigate={onNavigate}>
-            Agent
-          </WelcomeTerm>{' '}
-          to build{' '}
-          <WelcomeTerm Icon={IconLayout2} destination="widgets" onNavigate={onNavigate}>
-            Widgets
-          </WelcomeTerm>{' '}
-          that surface information and quick actions, or entire{' '}
-          <WelcomeTerm Icon={IconArticle} destination="views" onNavigate={onNavigate}>
-            Views
-          </WelcomeTerm>{' '}
-          for more complex tools. Use{' '}
-          <WelcomeTerm Icon={IconSketching} destination="scratchpad" onNavigate={onNavigate}>
-            Scratchpad
-          </WelcomeTerm>{' '}
-          for exploring and shaping ideas with your agent.
-        </p>
-        {showExamples && <p>Try an example:</p>}
+    <EmptyStateFrame agent={agent} className="@container w-full max-w-md min-w-0">
+      <div className="mt-2 flex flex-col items-center gap-2">
+        <div className="prose prose-sm min-w-0 wrap-anywhere prose-inherit">
+          <p>
+            moi is the visual workspace for you and your agent. It grows and adapts to the work
+            you're doing.
+          </p>
+          <p>
+            Ask{' '}
+            <WelcomeTerm Icon={IconMessages} destination="agent" onNavigate={onNavigate}>
+              Agent
+            </WelcomeTerm>{' '}
+            to build{' '}
+            <WelcomeTerm Icon={IconLayout2} destination="widgets" onNavigate={onNavigate}>
+              Widgets
+            </WelcomeTerm>{' '}
+            that surface information and quick actions, or entire{' '}
+            <WelcomeTerm Icon={IconArticle} destination="views" onNavigate={onNavigate}>
+              Views
+            </WelcomeTerm>{' '}
+            for more complex tools. Use{' '}
+            <WelcomeTerm Icon={IconSketching} destination="scratchpad" onNavigate={onNavigate}>
+              Scratchpad
+            </WelcomeTerm>{' '}
+            for exploring and shaping ideas with your agent.
+          </p>
+          {showExamples && <p>Try an example:</p>}
+        </div>
+        {showExamples && (
+          <ChatPromptBubbles
+            prompts={CHAT_WELCOME_PROMPTS}
+            disabled={disabled}
+            onSelect={onSelectPrompt}
+          />
+        )}
       </div>
-      {showExamples && (
-        <ChatPromptBubbles
-          prompts={CHAT_WELCOME_PROMPTS}
+    </EmptyStateFrame>
+  )
+}
+
+function ExploreWorkspaceState({ agent, disabled = false, onSelectPrompt }: PromptStateProps) {
+  return (
+    <EmptyStateFrame agent={agent}>
+      <div className="mt-2 flex flex-col gap-2">
+        <div className="prose prose-sm max-w-xs min-w-0 text-center wrap-anywhere prose-inherit">
+          <p>
+            Your agent can explore this workspace and suggest useful widgets and views based on
+            what’s already here.
+          </p>
+        </div>
+        <ChatPromptBubble
+          prompt={WORKSPACE_ANALYSIS_PROMPT}
           disabled={disabled}
           onSelect={onSelectPrompt}
         />
-      )}
-    </div>
-  )
-}
-
-export function ChatWorkspaceWelcome({ agent, disabled = false, onSelectPrompt }: WelcomeProps) {
-  return (
-    <div className={cn(EMPTY_STATE_STYLES, 'gap-2')}>
-      <EmptyStateAgent agent={agent} />
-      <div className="prose prose-sm max-w-xs min-w-0 text-center wrap-anywhere prose-inherit">
-        <p className="font-medium text-foreground">Start with what’s already here</p>
-        <p className="text-muted-foreground">
-          Your agent can explore this workspace and suggest useful widgets and views based on its
-          contents.
-        </p>
       </div>
-      <ChatPromptBubble
-        prompt={WORKSPACE_ANALYSIS_PROMPT}
-        disabled={disabled}
-        onSelect={onSelectPrompt}
-      />
-    </div>
+    </EmptyStateFrame>
   )
 }
 
-function EmptyState({ agent }: EmptyStateAgentProps) {
+function EmptyState({ agent }: AgentStateProps) {
   return (
-    <div className={cn(EMPTY_STATE_STYLES, 'gap-2 text-center text-muted-foreground')}>
-      <EmptyStateAgent agent={agent} />
+    <EmptyStateFrame agent={agent} className="text-center text-muted-foreground">
       <p className="mx-auto max-w-sm px-8 text-sm">
         Chat with your agent, create widgets and views, and manage your workspace context from here
       </p>
-    </div>
+    </EmptyStateFrame>
   )
 }
 
 type WelcomeTermProps = {
   children: string
-  destination: ChatWelcomeDestination
+  destination: WelcomeDestination
   Icon: TablerIcon
-  onNavigate: (destination: ChatWelcomeDestination) => void
+  onNavigate: (destination: WelcomeDestination) => void
 }
 
 function WelcomeTerm({ Icon, children, destination, onNavigate }: WelcomeTermProps) {

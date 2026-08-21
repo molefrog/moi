@@ -37,7 +37,6 @@ type AgentBlobatarProps = {
   color?: AgentBlobatarColor
   expression?: AgentBlobatarExpression
   className?: string
-  'data-icon'?: 'inline-start' | 'inline-end'
 }
 
 function AgentBlobatar({
@@ -46,8 +45,7 @@ function AgentBlobatar({
   animated = false,
   color = 'default',
   expression,
-  className,
-  ...props
+  className
 }: AgentBlobatarProps) {
   return (
     <Blobatar
@@ -58,7 +56,6 @@ function AgentBlobatar({
       expression={expression ? AGENT_EXPRESSIONS[expression] : undefined}
       className={cn('shrink-0', className)}
       traits={{ shape: AGENT_THEMES[preset].shape }}
-      {...props}
     />
   )
 }
