@@ -1,6 +1,21 @@
 import { Blobatar } from '@blobatar/react'
 import type { Expression, Palette } from 'blobatar'
-import { thinking } from 'blobatar/expression'
+import {
+  happy,
+  idle,
+  love,
+  mad,
+  sad,
+  scared,
+  shy,
+  sick,
+  sleepy,
+  smug,
+  surprised,
+  thinking,
+  unsure,
+  wink
+} from 'blobatar/expression'
 
 import { cn } from '@/client/lib/cn'
 import { AGENT_THEMES, DEFAULT_WORKSPACE_THEME } from '@/lib/themes'
@@ -9,7 +24,21 @@ import type { AgentTheme } from '@/lib/types'
 const AGENT_BLOBATAR_SEED = 'moi-agent'
 
 type AgentBlobatarColor = 'primary' | 'secondary' | 'default'
-type AgentBlobatarExpression = 'thinking'
+export type AgentBlobatarExpression =
+  | 'idle'
+  | 'happy'
+  | 'sad'
+  | 'mad'
+  | 'surprised'
+  | 'wink'
+  | 'sleepy'
+  | 'smug'
+  | 'unsure'
+  | 'scared'
+  | 'love'
+  | 'shy'
+  | 'sick'
+  | 'thinking'
 
 const AGENT_PALETTES = {
   default: {
@@ -27,6 +56,19 @@ const AGENT_PALETTES = {
 } satisfies Record<AgentBlobatarColor, Palette>
 
 const AGENT_EXPRESSIONS = {
+  idle,
+  happy,
+  sad,
+  mad,
+  surprised,
+  wink,
+  sleepy,
+  smug,
+  unsure,
+  scared,
+  love,
+  shy,
+  sick,
   thinking
 } satisfies Record<AgentBlobatarExpression, Expression>
 
@@ -44,7 +86,7 @@ function AgentBlobatar({
   preset = DEFAULT_WORKSPACE_THEME.agent,
   animated = false,
   color = 'default',
-  expression,
+  expression = 'idle',
   className
 }: AgentBlobatarProps) {
   return (

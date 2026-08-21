@@ -3,7 +3,27 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, test } from 'bun:test'
 
-import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
+import {
+  AgentBlobatar,
+  type AgentBlobatarExpression
+} from '@/client/components/shared/AgentBlobatar'
+
+const EXPRESSIONS = [
+  'idle',
+  'happy',
+  'sad',
+  'mad',
+  'surprised',
+  'wink',
+  'sleepy',
+  'smug',
+  'unsure',
+  'scared',
+  'love',
+  'shy',
+  'sick',
+  'thinking'
+] satisfies AgentBlobatarExpression[]
 
 type AgentBlobatarOverrides = Partial<
   Pick<ComponentProps<typeof AgentBlobatar>, 'animated' | 'color' | 'expression' | 'preset'>
@@ -53,6 +73,15 @@ describe('AgentBlobatar', () => {
 
     expect(html).toContain('mo-root mo-always mo-expr')
     expect(html).toContain('--mo-rock:0.8')
+  })
+
+  test('supports every named expression', () => {
+    const avatars = EXPRESSIONS.map(expression => renderAgentBlobatar({ expression }))
+    const [idleAvatar, ...expressiveAvatars] = avatars
+
+    expect(idleAvatar).toBe(renderAgentBlobatar())
+    for (const avatar of expressiveAvatars) expect(avatar).toContain('mo-expr')
+    expect(new Set(avatars).size).toBe(EXPRESSIONS.length)
   })
 
   test('supports the primary palette', () => {
