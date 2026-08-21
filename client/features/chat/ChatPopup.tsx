@@ -4,6 +4,7 @@ import { motion } from 'motion/react'
 
 import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/client/components/ui/popover'
+import { cn } from '@/client/lib/cn'
 import type { AgentTheme } from '@/lib/types'
 
 type ChatPopupProps = {
@@ -66,7 +67,11 @@ export function ChatPopup({
                   color="primary"
                   size={56}
                   animated={loading}
-                  className="drop-shadow-md transition-[filter] duration-50 group-hover:drop-shadow-lg motion-reduce:transition-none"
+                  className={cn(
+                    'drop-shadow-md drop-shadow-primary/30',
+                    'group-hover:drop-shadow-lg group-hover:drop-shadow-primary/40',
+                    'transition-[filter] duration-400 ease-in-out motion-reduce:transition-none'
+                  )}
                 />
               </button>
             </motion.div>
