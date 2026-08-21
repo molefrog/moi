@@ -146,9 +146,10 @@ SDK's `.jsonl` files, with per-turn token usage folded into the final
 assistant turn. The Agent SDK remains the transport, while every query is
 forced through the `claude` executable resolved via `executable.ts` (server
 PATH merged with the login-shell PATH).
-Known gaps: runs with `bypassPermissions` only (no interactive approval
-flow), and effort/streaming changes require a teardown-and-resume because the
-SDK has no live setter for them.
+Sessions use Claude Code's `auto` permission mode so its model classifier
+reviews permission prompts. Known gaps: moi has no interactive approval flow,
+and effort/streaming changes require a teardown-and-resume because the SDK has
+no live setter for them.
 
 **OpenClaw — shipped.** Chat over the local gateway's WebSocket JSON-RPC
 (wire protocol 4 — the 2026.7.x and 2026.6.x lines; protocol-3 gateways are
@@ -198,11 +199,13 @@ MCP-startup notices. Workspace discovery scans `~/.codex/sessions` rollout
 heads for cwds (`codex/discovery.ts` — no binary needed), and `availability()`
 reports a missing `codex` executable (PATH + login-shell PATH lookup, with a
 Codex Desktop app-bundle fallback — `executable.ts`) to setup flows and the
-workspace composer. Runs `danger-full-access` + `approvalPolicy: never`
-to match moi's bypass-permissions trust model. Known gaps: no interactive
-approval flow (server→client approval requests are auto-accepted
-defensively), and images ride inline as data URLs only (no `localImage` path
-mode).
+workspace composer. Sessions use `workspace-write` with network disabled by
+default, `approvalPolicy: on-request`, and Codex's `auto_review` reviewer. The
+same policy is reapplied on thread start, resume, and every turn. Known gaps:
+no interactive approval flow (unreviewed server→client approval requests fail
+closed). A per-session application context tells Codex to request reviewed
+localhost access before control-server commands. Images ride inline as data
+URLs only (no `localImage` path mode).
 
 Workspace availability also checks provider authentication when a workspace is
 given. Claude Code is probed with `claude auth status` under the effective

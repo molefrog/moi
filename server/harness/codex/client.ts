@@ -25,6 +25,7 @@ import {
 } from './adapter'
 import type { WorkspaceActivityPreview } from '../types'
 import { findHarnessExecutable, requireHarnessExecutable } from '../executable'
+import { codexServerRequestFallback } from './permissions'
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
 import { resolveWorkspaceEnv } from '../../workspace-env'
@@ -160,22 +161,12 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
     }
   }
 
-  // Server→client requests MUST be answered or the turn hangs. We run threads
-  // with `approvalPolicy: 'never'`, so approval requests should not occur —
-  // accept defensively if one does; reject anything else as unsupported.
+  // Server→client requests MUST be answered or the turn hangs. Permission
+  // requests normally stay inside Codex's automatic reviewer. Anything that
+  // reaches this transport fallback fails closed instead of bypassing review.
   function answerServerRequest(msg: Json) {
     const method = msg.method as string
-    if (method.endsWith('requestApproval') || method === 'applyPatchApproval') {
-      send({ jsonrpc: '2.0', id: msg.id, result: { decision: 'accept' } })
-    } else if (method === 'execCommandApproval') {
-      send({ jsonrpc: '2.0', id: msg.id, result: { decision: 'approved' } })
-    } else {
-      send({
-        jsonrpc: '2.0',
-        id: msg.id,
-        error: { code: -32601, message: `moi does not handle ${method}` }
-      })
-    }
+    send({ jsonrpc: '2.0', id: msg.id, ...codexServerRequestFallback(method) })
   }
 
   function handleLine(line: string) {
