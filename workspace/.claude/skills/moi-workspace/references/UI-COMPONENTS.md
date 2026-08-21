@@ -39,8 +39,9 @@ Rules of the road:
 - Don't add `dark:` overrides — semantic tokens handle themes. Installed files may contain them
   (upstream design); leave those as they are.
 - Overlay components (dialog, dropdown, select, tooltip…) render through
-  `../ui/applet-portal.tsx` — an installed support file that keeps applet styles working for
-  content portalled to `document.body`. Don't remove it or unwire it from components.
+  `../ui/applet-portal.tsx` — an auto-generated support file that keeps applet styles working
+  for content portalled to `document.body`. Never edit or remove it, and don't unwire it from
+  components.
 
 ## Catalog
 
