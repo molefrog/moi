@@ -191,7 +191,7 @@ function WelcomeState({
 }: WelcomeStateProps) {
   return (
     <EmptyStateFrame agent={agent} className="@container w-full max-w-md min-w-0">
-      <div className="mt-2 flex flex-col items-center gap-2">
+      <div className="mt-2 flex flex-col gap-4">
         <div className="prose prose-sm min-w-0 wrap-anywhere prose-inherit">
           <p>
             moi is the visual workspace for you and your agent. It grows and adapts to the work
@@ -233,11 +233,11 @@ function WelcomeState({
 function ExploreWorkspaceState({ agent, disabled = false, onSelectPrompt }: PromptStateProps) {
   return (
     <EmptyStateFrame agent={agent}>
-      <div className="mt-2 flex flex-col gap-2">
+      <div className="flex flex-col items-center gap-4">
         <div className="prose prose-sm max-w-xs min-w-0 text-center wrap-anywhere prose-inherit">
           <p>
             Your agent can explore this workspace and suggest useful widgets and views based on
-            what’s already here.
+            what’s already here
           </p>
         </div>
         <ChatPromptBubble

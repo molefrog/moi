@@ -50,7 +50,7 @@ type ChatPromptBubblesProps = {
 
 export function ChatPromptBubbles({ prompts, disabled = false, onSelect }: ChatPromptBubblesProps) {
   return (
-    <div className="row-gap-2 grid w-full grid-cols-1 gap-x-3 gap-y-2 py-2 @md:grid-cols-3">
+    <div className="row-gap-2 grid w-full grid-cols-1 gap-x-3 gap-y-2 @md:grid-cols-3">
       {prompts.map((prompt, index) => {
         return (
           <ChatPromptBubble
