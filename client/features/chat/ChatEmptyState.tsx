@@ -118,18 +118,18 @@ export function ChatEmptyState({
   onSelectPrompt,
   onNavigate
 }: ChatEmptyStateProps) {
-  return (
-    <ChatWelcome
-      disabled={disabled}
-      showExamples={!hasWorkspaceApplets}
-      onSelectPrompt={onSelectPrompt}
-      onNavigate={onNavigate}
-    />
-  )
   switch (kind) {
     case 'view-builder':
       return <ViewBuilderChatEmptyState />
     case 'chat-welcome':
+      return (
+        <ChatWelcome
+          disabled={disabled}
+          showExamples={!hasWorkspaceApplets}
+          onSelectPrompt={onSelectPrompt}
+          onNavigate={onNavigate}
+        />
+      )
     case 'workspace-welcome':
       return <ChatWorkspaceWelcome disabled={disabled} onSelectPrompt={onSelectPrompt} />
     case 'empty':
