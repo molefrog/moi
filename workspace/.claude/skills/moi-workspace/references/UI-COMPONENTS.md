@@ -178,8 +178,6 @@ The biggest source of bugs when you know Radix-era shadcn. When unsure, `moi ui-
   component's colors or typography.
 - **`gap-*`, not `space-x-*`/`space-y-*`** (`flex flex-col gap-4`). **`size-10`, not
   `w-10 h-10`.** **`truncate`**, not the three-class spell.
-- **No `dark:` color overrides** — tokens handle themes. (Installed files may contain them;
-  that's upstream design, leave them.)
 - **`cn()` from `../ui/utils` for conditional classes** — no template-literal ternaries.
 - **No manual `z-index` on overlays** — dialog/popover/menu/tooltip handle their own stacking.
 
