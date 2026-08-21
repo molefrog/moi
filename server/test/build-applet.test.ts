@@ -328,6 +328,17 @@ describe('buildApplet', () => {
     }
   })
 
+  test('carries the shadcn base-layer border/outline defaults, scoped', async () => {
+    // Mirrored from client/index.css into the synthetic entry: Tailwind v4
+    // preflight sets border-color to currentColor, so without this rule a bare
+    // `border` in an applet renders black instead of the `border` token.
+    const css = injectedCss((await buildApplet(join(FIXTURES, 'hello.tsx'))).js)
+
+    expect(css).toMatch(
+      /\[data-applet="widget:hello"\] \* \{\s*border-color: var\(--border\);\s*outline-color: var\(--ring\)/
+    )
+  })
+
   test('emits classes used only by imported modules outside the applet dir (.moi/ui/ layout)', async () => {
     // `moi ui-components` installs components in `.moi/ui/`, a SIBLING of the
     // applet source dir — outside the synthetic entry's `@source` and the

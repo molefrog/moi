@@ -469,6 +469,14 @@ async function writeSyntheticTailwindCss(
     `@import 'tailwindcss';`,
     await Bun.file(HOST_THEME_PATH).text(),
     ...vocabulary,
+    // Mirror the host's shadcn base-layer default (client/index.css): token
+    // border and outline colors on every element. Tailwind v4's preflight sets
+    // `border-color: currentColor`, so without this an applet's bare `border`
+    // (no explicit color — how installed ui components and shadcn idioms write
+    // it) renders black instead of the `border` token. The host applies it
+    // page-wide but the applet's scoped sheet must bring its own copy; it gets
+    // scoped to the applet subtree like every other rule (applet-css.ts).
+    `@layer base { * { @apply border-border outline-ring/50; } }`,
     // Mirror the host's class-based dark mode (client/index.css) so an applet's
     // `dark:` variants flip with the app theme. Without this Tailwind falls
     // back to `@media (prefers-color-scheme: dark)`, which diverges from the
