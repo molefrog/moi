@@ -110,7 +110,8 @@ const THEME_COLOR_DERIVATIONS = {
     mutedForeground: () => 'color-mix(in srgb, var(--background) 50%, var(--foreground) 50%)',
     accent: () => 'color-mix(in srgb, var(--primary) 4%, var(--foreground) 4%)',
     accentForeground: () => 'var(--foreground)',
-    border: () => 'color-mix(in srgb, var(--foreground) 7%, transparent)'
+    border: () => 'color-mix(in srgb, var(--foreground) 7%, transparent)',
+    ring: () => 'color-mix(in srgb, var(--background) 50%, var(--primary) 50%)'
   },
   widget: {
     background: primary => primary,
@@ -121,7 +122,8 @@ const THEME_COLOR_DERIVATIONS = {
     mutedForeground: () => 'color-mix(in srgb, var(--background) 50%, var(--foreground) 50%)',
     accent: () => 'color-mix(in srgb, var(--primary) 4%, var(--foreground) 4%)',
     accentForeground: () => 'var(--foreground)',
-    border: () => 'color-mix(in srgb, var(--foreground) 15%, transparent)'
+    border: () => 'color-mix(in srgb, var(--foreground) 15%, transparent)',
+    ring: () => 'color-mix(in srgb, var(--background) 50%, var(--primary) 50%)'
   }
 } satisfies Record<ThemeColorMode, Record<string, (primary: string) => string>>
 

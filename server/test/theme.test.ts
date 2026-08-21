@@ -85,7 +85,8 @@ describe('color themes', () => {
       mutedForeground: 'color-mix(in srgb, var(--background) 50%, var(--foreground) 50%)',
       accent: 'color-mix(in srgb, var(--primary) 4%, var(--foreground) 4%)',
       accentForeground: 'var(--foreground)',
-      border: 'color-mix(in srgb, var(--foreground) 7%, transparent)'
+      border: 'color-mix(in srgb, var(--foreground) 7%, transparent)',
+      ring: 'color-mix(in srgb, var(--background) 50%, var(--primary) 50%)'
     })
   })
 
@@ -102,7 +103,8 @@ describe('color themes', () => {
       mutedForeground: 'color-mix(in srgb, var(--background) 50%, var(--foreground) 50%)',
       accent: 'color-mix(in srgb, var(--primary) 4%, var(--foreground) 4%)',
       accentForeground: 'var(--foreground)',
-      border: 'color-mix(in srgb, var(--foreground) 15%, transparent)'
+      border: 'color-mix(in srgb, var(--foreground) 15%, transparent)',
+      ring: 'color-mix(in srgb, var(--background) 50%, var(--primary) 50%)'
     })
     expect(colors.primary).not.toContain('var(--primary)')
     expect(deriveThemeColors(DEFAULT_PRIMARY_COLOR, 'widget').background).toBe(
