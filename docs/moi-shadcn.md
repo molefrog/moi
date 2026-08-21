@@ -170,9 +170,10 @@ derived from one primary). Against the shadcn vocabulary this splits
 into tiers: 7 directly themed, 3 following indirectly via
 `var(--foreground)` chains (`card/popover/accent-foreground`), and the
 rest stuck at neutral `:root` defaults (`card`, `popover`, `border`,
-`input`, `ring`, `destructive`, `--radius`, shadows). `secondary` and
-`chart-1…5` are missing entirely — `secondary` is a live host bug
-(secondary buttons render with no fill today).
+`input`, `ring`, `destructive`, `--radius`, shadows). `chart-1…5` use
+shadcn's default neutral light/dark palettes and stay fixed across
+workspace color presets. `secondary` is still missing — secondary
+buttons render with no fill today.
 
 Verified live: **workspace color themes never reach widgets** — the
 frame's forced `.dark` class redefines every color token with neutral
@@ -184,8 +185,7 @@ Foundation work implied (hue vs. mode separation):
 
 - Extend derivations to the stuck-neutral tier (`card`, `popover`,
   `border`, `input`, `ring` derive from primary like `muted` does).
-- Add `secondary` + `chart-1…5` to `theme.css`, `:root`/`.dark`, and the
-  derivations.
+- Add `secondary` to `theme.css`, `:root`/`.dark`, and the derivations.
 - Derive a **dark value set** from the same primary, applied under
   `.dark` (injected rule or `light-dark()` + `color-scheme`) — widgets
   keep the dark-surface signature but adopt the workspace hue.
@@ -247,9 +247,9 @@ frame tokens onto the wrapper is a possible follow-up.
 1. **Foundation** — ✅ synthetic-Tailwind vocabulary inline
    (`build-applet.ts`, covered by a build test), ✅ scaffold dep pre-seed
    (`@base-ui/react`, `class-variance-authority`, `clsx`,
-   `tailwind-merge` in `MOI_PACKAGE_JSON`). Still open: token vocabulary
-   (`secondary`, `chart-*`, stuck-neutral derivations, dark set) — a
-   theming change, tracked separately.
+   `tailwind-merge` in `MOI_PACKAGE_JSON`), ✅ default `chart-1…5` palette.
+   Still open: token vocabulary (`secondary`, stuck-neutral derivations,
+   dark set) — a theming change, tracked separately.
 2. **`moi ui-components` v1** — ✅ `add` / `docs` / `list` over the pinned
    engine + the portal codemod; prints next steps, does nothing else;
    offline transform tests in `server/test/ui-components.test.ts`.

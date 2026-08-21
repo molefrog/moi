@@ -322,7 +322,9 @@ describe('buildApplet', () => {
       'data-open', // shadcn/tailwind.css custom variant
       '.scroll-fade', // shadcn/tailwind.css utility
       '@keyframes accordion-down', // shadcn/tailwind.css keyframes
-      'slide-in-from-top-2'
+      'slide-in-from-top-2',
+      '.bg-chart-1',
+      'background-color: var(--chart-1)'
     ]) {
       expect(css).toContain(marker)
     }

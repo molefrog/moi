@@ -13,6 +13,7 @@ export default function ShadcnVocab() {
         enter
       </div>
       <div className="animate-accordion-down">accordion</div>
+      <div className="bg-chart-1">chart</div>
     </div>
   )
 }

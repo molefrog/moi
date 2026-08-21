@@ -24,6 +24,36 @@ describe('color themes', () => {
     expect(css).toContain(`--primary: ${DEFAULT_PRIMARY_COLOR};`)
   })
 
+  test('defines and exposes the default shadcn chart palette', async () => {
+    const indexCss = await Bun.file(join(import.meta.dir, '../../client/index.css')).text()
+    const themeCss = await Bun.file(join(import.meta.dir, '../../client/theme.css')).text()
+    const root = indexCss.match(/:root \{([\s\S]*?)\n\}/)?.[1]
+    const darkTheme = indexCss.match(/\.dark \{([\s\S]*?)\n\}/)?.[1]
+    const light = [
+      'oklch(0.646 0.222 41.116)',
+      'oklch(0.6 0.118 184.704)',
+      'oklch(0.398 0.07 227.392)',
+      'oklch(0.828 0.189 84.429)',
+      'oklch(0.769 0.188 70.08)'
+    ]
+    const dark = [
+      'oklch(0.488 0.243 264.376)',
+      'oklch(0.696 0.17 162.48)',
+      'oklch(0.769 0.188 70.08)',
+      'oklch(0.627 0.265 303.9)',
+      'oklch(0.645 0.246 16.439)'
+    ]
+
+    for (const [index, color] of light.entries()) {
+      const token = index + 1
+      expect(root).toContain(`--chart-${token}: ${color};`)
+      expect(themeCss).toContain(`--color-chart-${token}: var(--chart-${token});`)
+    }
+    for (const [index, color] of dark.entries()) {
+      expect(darkTheme).toContain(`--chart-${index + 1}: ${color};`)
+    }
+  })
+
   test('keeps the picker order', () => {
     expect(Object.keys(COLOR_THEMES)).toEqual([
       'default',
