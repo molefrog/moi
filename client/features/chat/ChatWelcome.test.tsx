@@ -21,6 +21,7 @@ describe('ChatWelcome', () => {
   test('keeps the canonical welcome copy exact', () => {
     const html = renderToStaticMarkup(
       createElement(ChatWelcome, {
+        agent: 'boxy',
         onSelectPrompt: () => undefined,
         onNavigate: () => undefined
       })
@@ -36,6 +37,7 @@ describe('ChatWelcome', () => {
   test('renders four inline tab actions and three prompt bubbles with icons', () => {
     const html = renderToStaticMarkup(
       createElement(ChatWelcome, {
+        agent: 'boxy',
         onSelectPrompt: () => undefined,
         onNavigate: () => undefined
       })
@@ -70,6 +72,7 @@ describe('ChatWelcome', () => {
   test('disables every prompt when sending is unavailable', () => {
     const html = renderToStaticMarkup(
       createElement(ChatWelcome, {
+        agent: 'boxy',
         disabled: true,
         onSelectPrompt: () => undefined,
         onNavigate: () => undefined
@@ -120,6 +123,7 @@ describe('ChatWelcome', () => {
 
     const html = renderToStaticMarkup(
       createElement(ChatWelcome, {
+        agent: 'boxy',
         onSelectPrompt: () => undefined,
         onNavigate: () => undefined
       })

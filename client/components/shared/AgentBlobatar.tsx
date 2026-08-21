@@ -8,7 +8,7 @@ import type { AgentTheme } from '@/lib/types'
 
 const AGENT_BLOBATAR_SEED = 'moi-agent'
 
-type AgentBlobatarColor = 'primary' | 'default'
+type AgentBlobatarColor = 'primary' | 'secondary' | 'default'
 type AgentBlobatarExpression = 'thinking'
 
 const AGENT_PALETTES = {
@@ -19,6 +19,10 @@ const AGENT_PALETTES = {
   primary: {
     head: 'var(--primary)',
     eye: 'var(--primary-foreground)'
+  },
+  secondary: {
+    head: 'var(--accent)',
+    eye: 'var(--accent-foreground)'
   }
 } satisfies Record<AgentBlobatarColor, Palette>
 

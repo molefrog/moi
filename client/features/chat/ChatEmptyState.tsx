@@ -5,18 +5,19 @@ import {
   IconMessages,
   IconPiano,
   IconSketching,
-  IconTableSpark,
   IconUmbrella2,
   IconWallet,
   type TablerIcon
 } from '@tabler/icons-react'
 
+import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
 import {
   ChatPromptBubble,
   ChatPromptBubbles,
   type ChatPromptBubble as ChatPrompt
 } from '@/client/features/chat/ChatPromptBubbles'
 import { cn } from '@/client/lib/cn'
+import type { AgentTheme } from '@/lib/types'
 
 const ONBOARDING_HANDOFF_DIRECTIVE =
   'Keep the final reply brief and user-facing. Do not include file or storage links, file paths, or bundle, test, and runtime-log summaries.'
@@ -103,6 +104,7 @@ export function resolveChatEmptyState({
 const EMPTY_STATE_STYLES = cn('flex flex-1 flex-col items-center justify-center self-center')
 
 type ChatEmptyStateProps = {
+  agent: AgentTheme
   kind: ChatEmptyStateKind
   hasWorkspaceApplets: boolean
   disabled?: boolean
@@ -111,6 +113,7 @@ type ChatEmptyStateProps = {
 }
 
 export function ChatEmptyState({
+  agent,
   kind,
   hasWorkspaceApplets,
   disabled = false,
@@ -119,10 +122,11 @@ export function ChatEmptyState({
 }: ChatEmptyStateProps) {
   switch (kind) {
     case 'view-builder':
-      return <ViewBuilderChatEmptyState />
+      return <ViewBuilderChatEmptyState agent={agent} />
     case 'chat-welcome':
       return (
         <ChatWelcome
+          agent={agent}
           disabled={disabled}
           showExamples={!hasWorkspaceApplets}
           onSelectPrompt={onSelectPrompt}
@@ -130,16 +134,26 @@ export function ChatEmptyState({
         />
       )
     case 'workspace-welcome':
-      return <ChatWorkspaceWelcome disabled={disabled} onSelectPrompt={onSelectPrompt} />
+      return (
+        <ChatWorkspaceWelcome agent={agent} disabled={disabled} onSelectPrompt={onSelectPrompt} />
+      )
     case 'empty':
-      return <EmptyState />
+      return <EmptyState agent={agent} />
   }
 }
 
-function ViewBuilderChatEmptyState() {
+type EmptyStateAgentProps = {
+  agent: AgentTheme
+}
+
+function EmptyStateAgent({ agent }: EmptyStateAgentProps) {
+  return <AgentBlobatar preset={agent} color="secondary" size={64} />
+}
+
+function ViewBuilderChatEmptyState({ agent }: EmptyStateAgentProps) {
   return (
     <div className={cn(EMPTY_STATE_STYLES, 'gap-2 text-center text-muted-foreground')}>
-      <IconTableSpark size={56} stroke={0.5} />
+      <EmptyStateAgent agent={agent} />
       <p className="mx-auto max-w-xs px-8 text-sm">
         Describe the content, data, and key actions you need in the view
       </p>
@@ -148,6 +162,7 @@ function ViewBuilderChatEmptyState() {
 }
 
 type WelcomeProps = {
+  agent: AgentTheme
   disabled?: boolean
   onSelectPrompt: (prompt: ChatPrompt) => void
 }
@@ -158,13 +173,15 @@ type ChatWelcomeProps = WelcomeProps & {
 }
 
 export function ChatWelcome({
+  agent,
   disabled = false,
   showExamples = true,
   onSelectPrompt,
   onNavigate
 }: ChatWelcomeProps) {
   return (
-    <div className={cn(EMPTY_STATE_STYLES, '@container w-full max-w-md min-w-0')}>
+    <div className={cn(EMPTY_STATE_STYLES, '@container w-full max-w-md min-w-0 gap-4')}>
+      <EmptyStateAgent agent={agent} />
       <div className="prose prose-sm min-w-0 wrap-anywhere prose-inherit">
         <p>
           moi is the visual workspace for you and your agent. It grows and adapts to the work you're
@@ -202,9 +219,10 @@ export function ChatWelcome({
   )
 }
 
-export function ChatWorkspaceWelcome({ disabled = false, onSelectPrompt }: WelcomeProps) {
+export function ChatWorkspaceWelcome({ agent, disabled = false, onSelectPrompt }: WelcomeProps) {
   return (
     <div className={cn(EMPTY_STATE_STYLES, 'gap-2')}>
+      <EmptyStateAgent agent={agent} />
       <div className="prose prose-sm max-w-xs min-w-0 text-center wrap-anywhere prose-inherit">
         <p className="font-medium text-foreground">Start with what’s already here</p>
         <p className="text-muted-foreground">
@@ -221,10 +239,10 @@ export function ChatWorkspaceWelcome({ disabled = false, onSelectPrompt }: Welco
   )
 }
 
-function EmptyState() {
+function EmptyState({ agent }: EmptyStateAgentProps) {
   return (
     <div className={cn(EMPTY_STATE_STYLES, 'gap-2 text-center text-muted-foreground')}>
-      <IconMessages size={56} stroke={0.5} aria-hidden />
+      <EmptyStateAgent agent={agent} />
       <p className="mx-auto max-w-sm px-8 text-sm">
         Chat with your agent, create widgets and views, and manage your workspace context from here
       </p>

@@ -12,6 +12,7 @@ import {
 function renderState(kind: ChatEmptyStateKind, hasWorkspaceApplets = false): string {
   return renderToStaticMarkup(
     createElement(ChatEmptyState, {
+      agent: 'boxy',
       kind,
       hasWorkspaceApplets,
       onSelectPrompt: () => undefined,
@@ -72,12 +73,29 @@ describe('ChatEmptyState', () => {
     )
     expect(renderState('workspace-welcome')).toContain('Explore the workspace')
     expect(renderState('empty')).toContain('Chat with your agent')
+    for (const kind of ['chat-welcome', 'workspace-welcome', 'empty'] as const) {
+      const html = renderState(kind)
+      expect(html).toContain('mo-root')
+      expect(html).toContain('--mo-head:var(--accent)')
+      expect(html).toContain('--mo-eye:var(--accent-foreground)')
+    }
   })
 
   test('renders the focused new-view prompt', () => {
-    expect(renderState('view-builder')).toContain(
-      'Describe the content, data, and key actions you need in the view'
-    )
+    const html = renderState('view-builder')
+
+    expect(html).toContain('mo-root')
+    expect(html).toContain('--mo-head:var(--accent)')
+    expect(html).toContain('--mo-eye:var(--accent-foreground)')
+    expect(html).not.toContain('tabler-icon-table-spark')
+    expect(html).toContain('Describe the content, data, and key actions you need in the view')
+  })
+
+  test('replaces the plain empty-state icon with the agent Blobatar', () => {
+    const html = renderState('empty')
+
+    expect(html).toContain('mo-root')
+    expect(html).not.toContain('tabler-icon-messages')
   })
 
   test('hides examples when the workspace already has applets', () => {

@@ -12,7 +12,10 @@ import { renderMoiContext } from '@/lib/moi-context'
 describe('ChatWorkspaceWelcome', () => {
   test('renders the workspace analysis copy and one plain prompt', () => {
     const html = renderToStaticMarkup(
-      createElement(ChatWorkspaceWelcome, { onSelectPrompt: () => undefined })
+      createElement(ChatWorkspaceWelcome, {
+        agent: 'boxy',
+        onSelectPrompt: () => undefined
+      })
     )
     const promptButtons = [...html.matchAll(/<button.*?<\/button>/gs)]
 
@@ -30,6 +33,7 @@ describe('ChatWorkspaceWelcome', () => {
   test('disables the analysis prompt when sending is unavailable', () => {
     const html = renderToStaticMarkup(
       createElement(ChatWorkspaceWelcome, {
+        agent: 'boxy',
         disabled: true,
         onSelectPrompt: () => undefined
       })
@@ -45,7 +49,10 @@ describe('ChatWorkspaceWelcome', () => {
     })
 
     const html = renderToStaticMarkup(
-      createElement(ChatWorkspaceWelcome, { onSelectPrompt: () => undefined })
+      createElement(ChatWorkspaceWelcome, {
+        agent: 'boxy',
+        onSelectPrompt: () => undefined
+      })
     )
     expect(html).not.toContain('Wait for me to choose')
 

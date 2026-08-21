@@ -198,6 +198,7 @@ export function ChatPanel({
           <div className="mx-auto flex w-full max-w-(--chat-max-container) flex-1 flex-col gap-6">
             {showEmptyState && (
               <ChatEmptyState
+                agent={agent}
                 kind={emptyStateKind}
                 hasWorkspaceApplets={hasWorkspaceApplets}
                 disabled={promptDisabled}
@@ -216,15 +217,17 @@ export function ChatPanel({
                 />
               )
             )}
-            <div className="mt-auto -ml-3 pt-2">
-              <AgentBlobatar
-                preset={agent}
-                color="primary"
-                size={64}
-                animated={effectiveProcessing}
-                expression={effectiveProcessing ? 'thinking' : undefined}
-              />
-            </div>
+            {!showEmptyState && (
+              <div className="mt-auto -ml-3 pt-2">
+                <AgentBlobatar
+                  preset={agent}
+                  color="primary"
+                  size={64}
+                  animated={effectiveProcessing}
+                  expression={effectiveProcessing ? 'thinking' : undefined}
+                />
+              </div>
+            )}
           </div>
         </div>
 

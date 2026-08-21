@@ -61,4 +61,11 @@ describe('AgentBlobatar', () => {
     expect(html).toContain('--mo-head:var(--primary)')
     expect(html).toContain('--mo-eye:var(--primary-foreground)')
   })
+
+  test('supports the secondary palette', () => {
+    const html = renderAgentBlobatar({ color: 'secondary' })
+
+    expect(html).toContain('--mo-head:var(--accent)')
+    expect(html).toContain('--mo-eye:var(--accent-foreground)')
+  })
 })
