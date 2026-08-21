@@ -209,7 +209,3 @@ Cheapest first — stop at the first level that works:
   in the set — widgets don't need it, and a view's chrome should be custom (see
   `references/DESIGN.md`).
 - **Views** can use the full set, including `resizable` layouts and `data-table`.
-- Overlays portal to `document.body` on purpose (they escape the widget frame's clipping); the
-  installed portal patch keeps your applet's styling working inside them. Theme note: portalled
-  content reads theme tokens from the app root, not the widget frame — with the default theme
-  they match; if a popup looks off-theme in a heavily themed workspace, that's why.
