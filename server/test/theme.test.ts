@@ -193,10 +193,10 @@ describe('radius themes', () => {
 describe('agent themes', () => {
   test('defines the four fixed Blobatar presets', () => {
     expect(AGENT_THEMES).toEqual({
-      round: { label: 'Blob', shape: 0.11 },
+      blob: { label: 'Blob', shape: 0.11 },
       boxy: { label: 'Boxy', shape: 0.54 },
-      capsule: { label: 'Pill', shape: 0.65 },
-      triangle: { label: 'Dorito', shape: 0.99 }
+      pill: { label: 'Pill', shape: 0.65 },
+      dorito: { label: 'Dorito', shape: 0.99 }
     })
   })
 })
@@ -207,7 +207,7 @@ describe('applyThemeUpdate', () => {
       font: 'sans' as const,
       color: 'paper' as const,
       radius: 'squishy' as const,
-      agent: 'triangle' as const
+      agent: 'dorito' as const
     }
     const result = applyThemeUpdate(current, { font: 'serif' })
     if (!result.ok) throw new Error('expected ok')
@@ -215,7 +215,7 @@ describe('applyThemeUpdate', () => {
       font: 'serif',
       color: 'paper',
       radius: 'squishy',
-      agent: 'triangle'
+      agent: 'dorito'
     })
     expect(result.applied).toEqual({ font: 'serif' })
   })
@@ -225,7 +225,7 @@ describe('applyThemeUpdate', () => {
       font: 'mono' as const,
       color: 'default' as const,
       radius: 'subtle' as const,
-      agent: 'round' as const
+      agent: 'blob' as const
     }
     const result = applyThemeUpdate(current, { color: 'paper' })
     if (!result.ok) throw new Error('expected ok')
@@ -233,7 +233,7 @@ describe('applyThemeUpdate', () => {
       font: 'mono',
       color: 'paper',
       radius: 'subtle',
-      agent: 'round'
+      agent: 'blob'
     })
     expect(result.applied).toEqual({ color: 'paper' })
   })
@@ -260,20 +260,20 @@ describe('applyThemeUpdate', () => {
       font: 'serif',
       color: 'mint',
       radius: 'square',
-      agent: 'capsule'
+      agent: 'pill'
     })
     if (!result.ok) throw new Error('expected ok')
     expect(result.theme).toEqual({
       font: 'serif',
       color: 'mint',
       radius: 'square',
-      agent: 'capsule'
+      agent: 'pill'
     })
     expect(result.applied).toEqual({
       font: 'serif',
       color: 'mint',
       radius: 'square',
-      agent: 'capsule'
+      agent: 'pill'
     })
   })
 
@@ -302,7 +302,7 @@ describe('applyThemeUpdate', () => {
       font: 'serif' as const,
       color: 'rose' as const,
       radius: 'squishy' as const,
-      agent: 'triangle' as const
+      agent: 'dorito' as const
     }
     const result = applyThemeUpdate(current, { radius: 'soft' })
     if (!result.ok) throw new Error('expected ok')
@@ -310,7 +310,7 @@ describe('applyThemeUpdate', () => {
       font: 'serif',
       color: 'rose',
       radius: 'soft',
-      agent: 'triangle'
+      agent: 'dorito'
     })
     expect(result.applied).toEqual({ radius: 'soft' })
   })
@@ -323,10 +323,10 @@ describe('applyThemeUpdate', () => {
   })
 
   test('setting agent uses its preset key', () => {
-    const result = applyThemeUpdate(undefined, { agent: 'triangle' })
+    const result = applyThemeUpdate(undefined, { agent: 'dorito' })
     if (!result.ok) throw new Error('expected ok')
-    expect(result.theme).toEqual({ ...DEFAULT_WORKSPACE_THEME, agent: 'triangle' })
-    expect(result.applied).toEqual({ agent: 'triangle' })
+    expect(result.theme).toEqual({ ...DEFAULT_WORKSPACE_THEME, agent: 'dorito' })
+    expect(result.applied).toEqual({ agent: 'dorito' })
   })
 
   test('rejects unknown agent key', () => {
@@ -373,7 +373,7 @@ describe('loadLayout/saveLayout round-trip with theme', () => {
         font: 'serif',
         color: 'paper',
         radius: 'subtle',
-        agent: 'triangle'
+        agent: 'dorito'
       }
     }
     await saveLayout(layout, tmpDir)

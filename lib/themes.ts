@@ -82,7 +82,7 @@ export const RADIUS_THEMES: Record<RadiusTheme, RadiusThemeConfig> = {
   square: { label: 'Square', radius: '0' }
 }
 
-export type AgentTheme = 'round' | 'boxy' | 'capsule' | 'triangle'
+export type AgentTheme = 'blob' | 'boxy' | 'pill' | 'dorito'
 
 export type AgentThemeConfig = {
   label: string
@@ -90,10 +90,10 @@ export type AgentThemeConfig = {
 }
 
 export const AGENT_THEMES: Record<AgentTheme, AgentThemeConfig> = {
-  round: { label: 'Blob', shape: 0.11 },
+  blob: { label: 'Blob', shape: 0.11 },
   boxy: { label: 'Boxy', shape: 0.54 },
-  capsule: { label: 'Pill', shape: 0.65 },
-  triangle: { label: 'Dorito', shape: 0.99 }
+  pill: { label: 'Pill', shape: 0.65 },
+  dorito: { label: 'Dorito', shape: 0.99 }
 }
 
 export type ColorTheme =

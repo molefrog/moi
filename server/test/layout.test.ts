@@ -212,7 +212,7 @@ describe('mergeLayoutForSave', () => {
       tabs: { open: ['agent', 'widgets'], active: 'widgets' },
       selectedModel: 'sonnet',
       selectedFastMode: false,
-      theme: { font: 'sans', color: 'rose', radius: 'square', agent: 'triangle' }
+      theme: { font: 'sans', color: 'rose', radius: 'square', agent: 'dorito' }
     }
     const merged = mergeLayoutForSave(existing, body)
     expect(merged.layoutMode).toBe('split')
@@ -223,7 +223,7 @@ describe('mergeLayoutForSave', () => {
       font: 'sans',
       color: 'rose',
       radius: 'square',
-      agent: 'triangle'
+      agent: 'dorito'
     })
     expect(merged.name).toBe('Keep')
   })
@@ -243,7 +243,7 @@ describe('getWorkspacePreview', () => {
       font: 'sans' as const,
       color: 'rose' as const,
       radius: 'squishy' as const,
-      agent: 'capsule' as const
+      agent: 'pill' as const
     }
     await withWorkspaceFile(
       {
