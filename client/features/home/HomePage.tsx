@@ -15,12 +15,14 @@ import { DemoDialog } from './workspace-setup/DemoDialog'
 import { useWorkspaceImport } from './workspace-setup/useWorkspaceImport'
 import { HomeLogo } from './HomeLogo'
 import { useAppConfig } from '@/client/api/app-config'
+import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
 import { Button } from '@/client/components/ui/button'
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger
 } from '@/client/components/ui/collapsible'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { cn } from '@/client/lib/cn'
 import { getWorkspaceThemeStyle, usePreloadWorkspaceFonts } from '@/client/runtime/workspace-theme'
 import { useUiStore } from '@/client/store/ui'
@@ -29,7 +31,9 @@ import {
   workspaceDisplayName,
   workspaceProviderIcon
 } from '@/client/features/home/workspace-presentation'
+import { resolveWorkspaceTheme } from '@/lib/themes'
 import type { DiscoveredWorkspace, WorkspaceEntry } from '@/lib/types'
+import { workspaceTabPath } from '@/lib/workspace-tabs'
 
 import { WorkspacePreview } from './WorkspacePreview'
 
@@ -174,12 +178,46 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
   const name = workspaceDisplayName(workspace)
   const previewQuery = useWorkspacePreview(workspace.id)
   const theme = previewQuery.data?.theme
+  const agent = resolveWorkspaceTheme(theme).agent
   const updatedAt = previewQuery.data?.updatedAt ?? new Date(workspace.addedAt).getTime()
+  const workspaceHref = `/workspace/${workspace.id}`
 
   return (
-    <Link href={`/workspace/${workspace.id}`} className="group flex min-w-0 flex-col gap-3">
-      <WorkspacePreview workspaceId={workspace.id} />
-      <div className="flex min-w-0 flex-col gap-2 px-2">
+    <div className="group flex min-w-0 flex-col gap-3">
+      <div className="relative">
+        <WorkspacePreview workspaceId={workspace.id} />
+        <Link
+          href={workspaceHref}
+          aria-label={`Open ${name}`}
+          className="absolute inset-0 rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        />
+        {previewQuery.data && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Link
+                  href={workspaceTabPath(workspace.id, 'agent')}
+                  aria-label={`Chat in ${name}`}
+                  style={getWorkspaceThemeStyle(theme)}
+                  className="absolute right-3 bottom-3 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  <AgentBlobatar
+                    preset={agent}
+                    color="primary"
+                    size={48}
+                    className="drop-shadow-sm drop-shadow-primary/20"
+                  />
+                </Link>
+              }
+            />
+            <TooltipContent>Chat</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+      <Link
+        href={workspaceHref}
+        className="flex min-w-0 flex-col gap-2 rounded-lg px-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
         <div
           className="flex min-w-0 items-center gap-1.5 font-sans"
           style={getWorkspaceThemeStyle(theme)}
@@ -192,8 +230,8 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
           <span className="truncate text-sm font-medium text-foreground">{name}</span>
         </div>
         <span className="text-xs text-muted-foreground">{formatUpdatedAt(updatedAt)}</span>
-      </div>
-    </Link>
+      </Link>
+    </div>
   )
 }
 
