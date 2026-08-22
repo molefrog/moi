@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'path'
 
 import {
-  AGENT_THEMES,
   COLOR_THEMES,
   DEFAULT_PRIMARY_COLOR,
   DEFAULT_WORKSPACE_THEME,
@@ -186,23 +185,6 @@ describe('radius themes', () => {
       soft: { label: 'Soft', radius: '0.625rem' },
       subtle: { label: 'Subtle', radius: '0.375rem' },
       square: { label: 'Square', radius: '0' }
-    })
-  })
-})
-
-describe('agent themes', () => {
-  test('defines the four fixed Blobatar presets', () => {
-    expect(AGENT_THEMES).toEqual({
-      blob: {
-        label: 'Blob',
-        traits: { shape: 0.11, 'body.r': 0.25, 'body.ratio': 0, 'body.n': 0.5 }
-      },
-      boxy: { label: 'Boxy', traits: { shape: 0.54, 'body.r': 1, 'body.ratio': 0 } },
-      pill: { label: 'Pill', traits: { shape: 0.65, 'body.r': 1 } },
-      dorito: {
-        label: 'Dorito',
-        traits: { shape: 0.99, 'body.r': 1, 'body.ratio': 0, 'body.rot': 0 }
-      }
     })
   })
 })
