@@ -168,6 +168,10 @@ export const UI_COMPONENTS: Record<string, UiComponentEntry> = {
     description: 'Native-feeling select with a styled popup',
     registryItems: ['select']
   },
+  separator: {
+    description: 'Horizontal or vertical dividing line',
+    registryItems: ['separator']
+  },
   skeleton: {
     description: 'Loading placeholder block',
     registryItems: ['skeleton']

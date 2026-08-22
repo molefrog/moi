@@ -282,6 +282,7 @@ describe('catalog', () => {
       'radio-group',
       'resizable',
       'select',
+      'separator',
       'skeleton',
       'slider',
       'spinner',

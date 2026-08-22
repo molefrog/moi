@@ -15,10 +15,10 @@ Radix-era shadcn you may know.
 ```sh
 moi ui-components                     # catalog + what's installed
 moi ui-components add select          # → .moi/ui/select.tsx (+ any support files)
-moi ui-components add table badge tabs  # any number of names, one call — always
-                                      # prefer this over one `add` per component
+moi ui-components add table badge tabs --install   # any number of names, one call —
+                                      # always prefer this over one `add` per
+                                      # component; --install runs the bun install too
 moi ui-components docs select table   # official docs as markdown
-bun install <deps>                    # in .moi/ — only when `add` prints extra deps
 moi bundle                            # rebuild applets
 ```
 
@@ -28,8 +28,9 @@ import { Button } from '../ui/button'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 ```
 
-- `add` writes source files and nothing else — installing the deps it prints and rebuilding is
-  your job.
+- `add` writes source files and nothing else by default — installing the deps it prints and
+  rebuilding is your job. Pass `--install` to have it run the `bun install` in `.moi/` for you;
+  rebuilding (`moi bundle`) stays yours either way.
 - **If the build fails on a missing package** (happens in workspaces scaffolded before this
   feature — `.moi/package.json` may lack the deps ui components need): check
   `.moi/package.json` and install what's missing. Every ui component needs the baseline
@@ -45,7 +46,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
   in a multi-name add, already-installed components are skipped (reported as kept) and the new
   ones still install.
 - Support files appear without being asked for (`utils.ts` with `cn`, `applet-portal.tsx`, and
-  registry dependencies like `separator`, `card`, `toggle`) — normal; use them if handy.
+  registry dependencies like `card` or `toggle`) — normal; use them if handy.
   `applet-portal.tsx` is auto-generated machinery: never edit or remove it.
 
 ## Catalog
@@ -68,7 +69,7 @@ docs) · `chart` (Recharts wired to theme tokens) · `attachment` (file/image ti
 (chat message)
 
 **Structure & navigation:** `accordion` · `collapsible` · `tabs` · `carousel` · `pagination` ·
-`resizable` (split panels)
+`resizable` (split panels) · `separator` (divider line)
 
 Picking one: quick info on hover → `hover-card` or `tooltip` · contextual panel on click →
 `popover` · focused task needing input → `dialog` · destructive confirmation → `alert-dialog` ·
@@ -138,6 +139,21 @@ The biggest source of bugs when you know Radix-era shadcn. When unsure, `moi ui-
 - **Slider**: plain number for one thumb (`defaultValue={50}`), array only for ranges.
 - **Accordion**: no `type`/`collapsible` props — `defaultValue` is **always an array**
   (`defaultValue={["item-1"]}`), `multiple` to allow several open.
+- **Progress renders its own bar** — `<Progress value={60} />` is complete. The wrapper
+  auto-appends `Track` + `Indicator` after its children, so composing
+  `<ProgressTrack><ProgressIndicator /></ProgressTrack>` yourself (the Radix-era shape) silently
+  draws **two** bars. Children are only for `ProgressLabel` / `ProgressValue`:
+
+  ```tsx
+  <Progress value={60}>
+    <ProgressLabel>Uploading</ProgressLabel>
+    <ProgressValue />
+  </Progress>
+  ```
+
+- **`AlertAction` is absolutely positioned** in the alert's top-right corner, and the alert
+  reserves only ~4.5rem of right padding for it. Keep it to one small control (`size="sm"`
+  button or icon button); anything wider overlaps the title and description text.
 
 ## Forms
 
@@ -172,6 +188,9 @@ The biggest source of bugs when you know Radix-era shadcn. When unsure, `moi ui-
   `name`/`name-foreground` (background / text-on-it): `background`, `card`, `popover`,
   `primary`, `secondary`, `muted`, `accent`, `destructive`, plus `border`, `input`, `ring`,
   `chart-1…5`, and `--radius`. Status colors come from `Badge` variants or `text-destructive`.
+- **`moi theme --tokens` prints what every token resolves to** (hex, light and dark) for the
+  current workspace theme — use it to pick between `chart-1…5` or check contrast deliberately
+  instead of guessing what a token looks like.
 - **Built-in variants before custom classes**: `variant="outline"`, `size="sm"` — not
   hand-rolled border/bg utilities on `Button`.
 - **Prefer each component's default size.** Use smaller variants such as `sm` or `xs` only when a
@@ -182,7 +201,10 @@ The biggest source of bugs when you know Radix-era shadcn. When unsure, `moi ui-
   component's colors or typography.
 - **`gap-*`, not `space-x-*`/`space-y-*`** (`flex flex-col gap-4`). **`size-10`, not
   `w-10 h-10`.** **`truncate`**, not the three-class spell.
-- **`cn()` from `../ui/utils` for conditional classes** — no template-literal ternaries.
+- **`cn()` from `../ui/utils` for conditional classes** — no template-literal ternaries. The
+  same import works from shared helper files next to your applets (a
+  `.moi/widgets/_shared.tsx` importing `cn` uses `../ui/utils` too) — no need to re-implement
+  it.
 - **No manual `z-index` on overlays** — dialog/popover/menu/tooltip handle their own stacking.
 
 ## Icons

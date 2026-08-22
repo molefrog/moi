@@ -5,9 +5,9 @@
 //   moi ui-components add <name…>    → fetch, transform, write to .moi/ui/
 //   moi ui-components docs <name…>   → official docs as markdown, on stdout
 //
-// The command is deliberately not smart: add never installs dependencies,
-// never rebuilds, never edits existing files — it prints next steps and the
-// agent owns them.
+// The command is deliberately not smart: add never rebuilds and never edits
+// existing files, and installs dependencies only when asked to (--install) —
+// otherwise it prints next steps and the agent owns them.
 import { defineCommand } from 'citty'
 import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
@@ -60,6 +60,11 @@ const add = defineCommand({
       type: 'boolean',
       default: false,
       description: 'Overwrite existing files of the requested components'
+    },
+    install: {
+      type: 'boolean',
+      default: false,
+      description: 'Run `bun install` in .moi/ for the printed dependencies'
     }
   },
   async run({ args }) {
@@ -142,16 +147,45 @@ const add = defineCommand({
         )
       )
     }
+    const moiDir = join(entry.path, '.moi')
+    let installNeeded = deps.length > 0
+    if (args.install) {
+      // `bun install` with no extra deps still materializes the pre-seeded
+      // baseline, which older workspaces may be missing — always run it.
+      const proc = Bun.spawnSync(['bun', 'install', ...deps], {
+        cwd: moiDir,
+        stdout: 'inherit',
+        stderr: 'inherit'
+      })
+      if (proc.exitCode !== 0) {
+        console.error(
+          '\n' +
+            pc.red('✗') +
+            ` bun install failed in ${pc.bold('.moi/')} — install the dependencies yourself:\n` +
+            pc.dim(`  bun install ${deps.join(' ')}\n`)
+        )
+        process.exit(1)
+      }
+      console.log(
+        pc.green('✓') +
+          ' Installed dependencies in ' +
+          pc.bold('.moi/') +
+          (deps.length > 0 ? pc.dim(` (${deps.join(', ')})`) : '')
+      )
+      installNeeded = false
+    }
+
     console.log('\nNext steps (yours):')
-    if (deps.length > 0) {
+    if (installNeeded) {
       // The command runs from anywhere inside the workspace (resolveCwdWorkspace),
       // so point the install at the real `.moi/` relative to the caller's cwd —
       // a literal `cd .moi` is wrong from `.moi/` itself or a widgets/ subdir.
-      const moiDir = join(entry.path, '.moi')
       const rel = relative(process.cwd(), moiDir)
       const cdPrefix = rel === '' ? '' : `cd ${/\s/.test(rel) ? JSON.stringify(rel) : rel} && `
       console.log(
-        '  1. Install dependencies: ' + pc.bold(`${cdPrefix}bun install ${deps.join(' ')}`)
+        '  1. Install dependencies: ' +
+          pc.bold(`${cdPrefix}bun install ${deps.join(' ')}`) +
+          pc.dim(' (or re-run add with --install)')
       )
       console.log('  2. Import relatively — ' + pc.bold(`import { … } from '../ui/<name>'`))
       console.log('  3. Rebuild: ' + pc.bold('moi bundle'))

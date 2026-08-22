@@ -131,6 +131,8 @@ never from inside `.moi/` itself. You don't pass paths; moi resolves the workspa
 - `moi theme --font=<key>` — change font theme (omit `--font` to list options)
 - `moi theme --color=<key>` — change color preset (omit `--color` to list options)
 - `moi theme --radius=<key>` — change corner-radius preset (omit `--radius` to list options)
+- `moi theme --tokens` — print what every semantic color token resolves to (hex, light and
+  dark) under the current theme — check before picking `chart-*` or contrast-sensitive colors
 - `moi config` — set the workspace name & icon (`moi config --help` for usage)
 - `moi env` — list available env keys and where they come from (never values);
   `moi env exec -- <cmd>` runs a command with the workspace env (see Environment & secrets)
@@ -206,8 +208,8 @@ Import relatively: `import { Button } from '../ui/button'`.
 - `moi ui-components docs <name…>` — full official docs (markdown: anatomy, props, examples) on
   demand. Read them before composing an unfamiliar component; the parts API (Base UI) differs
   from Radix-era shadcn.
-- `add` never installs npm packages or rebuilds — it prints the deps it needs; install them in
-  `.moi/` and run `moi bundle` yourself.
+- `add` never rebuilds, and installs npm packages only with `--install` (pass it unless you
+  want to run the printed `bun install` yourself); run `moi bundle` yourself either way.
 - Files in `.moi/ui/` are yours to customize (edits propagate to every applet using them);
   `add` skips already-installed components (reported as kept) and overwrites only with
   `--force`.
