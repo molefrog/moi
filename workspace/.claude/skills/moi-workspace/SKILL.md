@@ -209,6 +209,8 @@ relatively: `import { Button } from '../ui/button'`.
   `.moi/` and run `moi bundle` yourself.
 - Files in `.moi/ui/` are yours to customize (edits propagate to every applet using them);
   re-running `add` refuses to overwrite them without `--force`.
+- Component names, their API, and the CLI are very close to a selected subset of shadcn, but the
+  actual implementation might differ.
 
 ## Server functions — `<name>.server.ts`
 

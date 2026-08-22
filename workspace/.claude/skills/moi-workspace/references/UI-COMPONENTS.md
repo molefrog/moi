@@ -1,9 +1,9 @@
 # UI components cheat sheet
 
-`moi ui-components` installs standard controls from the shadcn registry, pre-tuned for moi
-applets: **Base UI** primitives, **Tabler** icons, workspace theme tokens, relative imports, and
-overlays patched so applet styling survives portalling. Components land in `.moi/ui/` as plain
-source files you own.
+`moi ui-components` installs standard controls from a selected subset of the shadcn registry,
+pre-tuned for moi applets: **Base UI** primitives, **Tabler** icons, workspace theme tokens,
+relative imports, and overlays patched so applet styling survives portalling. Components land
+in `.moi/ui/` as plain source files you own.
 
 This file is the catalog plus the essential usage rules (condensed from the official shadcn
 skill). Read it once; fetch full per-component docs with `moi ui-components docs <name>` **before
