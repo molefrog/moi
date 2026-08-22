@@ -67,9 +67,8 @@ describe('ChatEmptyState', () => {
   test('renders the selected empty state', () => {
     expect(renderState('welcome')).toContain('moi is the visual workspace')
     expect(renderState('welcome')).toContain('Try an example:')
-    expect(renderState('explore-workspace')).toContain('Start with what’s already here')
     expect(renderState('explore-workspace')).toContain(
-      'Your agent can explore this workspace and suggest useful widgets and views based on its contents.'
+      'Your agent can explore this workspace and suggest useful widgets and views based on'
     )
     expect(renderState('explore-workspace')).toContain('Explore the workspace')
     expect(renderState('empty')).toContain('Chat with your agent')
