@@ -68,7 +68,7 @@ export function ChatPopup({
                   animated={loading}
                   expression={loading ? 'thinking' : undefined}
                   className={cn(
-                    'drop-shadow-md drop-shadow-primary/30',
+                    'drop-shadow-md drop-shadow-primary/25',
                     'group-hover:drop-shadow-lg group-hover:drop-shadow-primary/40',
                     'transition-[filter] duration-400 ease-in-out motion-reduce:transition-none'
                   )}
