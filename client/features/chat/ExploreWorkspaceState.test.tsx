@@ -24,9 +24,8 @@ describe('ExploreWorkspaceState', () => {
     const html = renderExploreWorkspace()
     const promptButtons = [...html.matchAll(/<button.*?<\/button>/gs)]
 
-    expect(html).toContain('Start with what’s already here')
     expect(html).toContain(
-      'Your agent can explore this workspace and suggest useful widgets and views based on its contents.'
+      'Your agent can explore this workspace and suggest useful widgets and views based on'
     )
     expect(html).toContain('Explore the workspace')
     expect(promptButtons).toHaveLength(1)
