@@ -202,8 +202,8 @@ The biggest source of bugs when you know Radix-era shadcn. When unsure, `moi ui-
 - **`gap-*`, not `space-x-*`/`space-y-*`** (`flex flex-col gap-4`). **`size-10`, not
   `w-10 h-10`.** **`truncate`**, not the three-class spell.
 - **`cn()` from `../ui/utils` for conditional classes** — no template-literal ternaries. The
-  same import works from shared helper files next to your applets (a
-  `.moi/widgets/_shared.tsx` importing `cn` uses `../ui/utils` too) — no need to re-implement
+  same import works from `_`-prefixed shared modules next to your applets (a
+  `.moi/widgets/_utils.tsx` importing `cn` uses `../ui/utils` too) — no need to re-implement
   it.
 - **No manual `z-index` on overlays** — dialog/popover/menu/tooltip handle their own stacking.
 
@@ -225,7 +225,8 @@ Cheapest first — stop at the first level that works:
 3. **Edit the file in `.moi/ui/`** — e.g. add a `cva` variant to `button.tsx`; propagates to
    every applet using it, and `add` won't overwrite it without `--force`.
 4. **Wrapper components** — compose primitives into app-level pieces (a `ConfirmDialog` wrapping
-   `AlertDialog` parts) in `.moi/widgets/_shared.tsx`-style files.
+   `AlertDialog` parts) in a `_`-prefixed shared module (`.moi/widgets/_utils.tsx` — see the
+   workspace layout in the skill).
 
 ## Fit within applets
 
