@@ -212,6 +212,19 @@ export const DEFAULT_WORKSPACE_THEME: WorkspaceTheme = {
   agent: 'boxy'
 }
 
+function resolveThemePreset<T extends string>(
+  value: unknown,
+  presets: Record<T, unknown>,
+  fallback: T
+): T {
+  return typeof value === 'string' && Object.hasOwn(presets, value) ? (value as T) : fallback
+}
+
 export function resolveWorkspaceTheme(theme?: Partial<WorkspaceTheme>): WorkspaceTheme {
-  return { ...DEFAULT_WORKSPACE_THEME, ...theme }
+  return {
+    font: resolveThemePreset(theme?.font, FONT_THEMES, DEFAULT_WORKSPACE_THEME.font),
+    color: resolveThemePreset(theme?.color, COLOR_THEMES, DEFAULT_WORKSPACE_THEME.color),
+    radius: resolveThemePreset(theme?.radius, RADIUS_THEMES, DEFAULT_WORKSPACE_THEME.radius),
+    agent: resolveThemePreset(theme?.agent, AGENT_THEMES, DEFAULT_WORKSPACE_THEME.agent)
+  }
 }

@@ -13,7 +13,7 @@ import {
   deriveThemeColors,
   resolveWorkspaceTheme
 } from '@/lib/themes'
-import type { WorkspaceLayout } from '@/lib/types'
+import type { WorkspaceLayout, WorkspaceTheme } from '@/lib/types'
 
 import { loadLayout, saveLayout } from '../layout'
 import { applyThemeUpdate } from '../theme'
@@ -349,6 +349,17 @@ describe('resolveWorkspaceTheme', () => {
       radius: 'soft',
       agent: 'boxy'
     })
+  })
+
+  test('falls back from unknown saved preset keys', () => {
+    const unknownTheme = {
+      font: 'legacy',
+      color: 'legacy',
+      radius: 'legacy',
+      agent: 'legacy'
+    } as unknown as WorkspaceTheme
+
+    expect(resolveWorkspaceTheme(unknownTheme)).toEqual(DEFAULT_WORKSPACE_THEME)
   })
 })
 
