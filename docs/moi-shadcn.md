@@ -42,13 +42,16 @@ and a curated subset instead of the full upstream catalog.
 
 V1 (shipped):
 
-- `moi ui-components add <name…> [--force]` — fetches items, applies moi
-  transforms, writes files to `.moi/ui/`. If a **requested** file exists,
-  **fails** with a message naming the `--force` flag; hand-customized
-  components are never silently overwritten (existing support files —
-  utils, applet-portal, riding-along registry deps — are kept, never
-  overwritten, even under `--force`). Ends by printing next steps, not
-  performing them: install these deps, import relatively, `moi bundle`.
+- `moi ui-components add <name…> [--force]` — fetches items (any number
+  of names in one call), applies moi transforms, writes files to
+  `.moi/ui/`. A **requested** file that exists is **skipped and
+  reported** with a hint naming the `--force` flag, so a bulk add still
+  installs everything new; only when _every_ requested component already
+  exists does the add fail. Hand-customized components are never
+  silently overwritten (existing support files — utils, applet-portal,
+  riding-along registry deps — are kept, never overwritten, even under
+  `--force`). Ends by printing next steps, not performing them: install
+  these deps, import relatively, `moi bundle`.
 - `moi ui-components docs <name…>` — official docs fetched as markdown
   (`ui.shadcn.com/docs/components/base/<name>.md` serves raw markdown;
   works for the `data-table`/`date-picker` pattern pages too).
@@ -94,7 +97,9 @@ config management.
    wrapper from `./applet-portal`.
 6. Write files to `.moi/ui/` — requested components, their support files
    (`utils.ts` with `cn`, riding-along registry deps), and
-   `applet-portal.tsx`.
+   `applet-portal.tsx`. Requested files that already exist are skipped
+   (reported, overwritten only under `--force`); existing support files
+   are always kept.
 7. Print next steps. Nothing else — no install, no rebuild.
 
 ## Dependencies

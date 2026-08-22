@@ -13,11 +13,13 @@ Radix-era shadcn you may know.
 ## Workflow
 
 ```sh
-moi ui-components                  # catalog + what's installed
-moi ui-components add select      # → .moi/ui/select.tsx (+ any support files)
-moi ui-components docs select     # official docs as markdown
-bun install <deps>                # in .moi/ — only when `add` prints extra deps
-moi bundle                        # rebuild applets
+moi ui-components                     # catalog + what's installed
+moi ui-components add select          # → .moi/ui/select.tsx (+ any support files)
+moi ui-components add table badge tabs  # any number of names, one call — always
+                                      # prefer this over one `add` per component
+moi ui-components docs select table   # official docs as markdown
+bun install <deps>                    # in .moi/ — only when `add` prints extra deps
+moi bundle                            # rebuild applets
 ```
 
 ```tsx
@@ -39,7 +41,9 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
   (run in `.moi/`), plus whatever `add` printed for the specific component (`recharts`,
   `embla-carousel-react`, `react-day-picker` + `date-fns`, `react-resizable-panels`,
   `@tanstack/react-table`).
-- Files in `.moi/ui/` are yours to customize; `add` refuses to overwrite them without `--force`.
+- Files in `.moi/ui/` are yours to customize; `add` never overwrites them without `--force` —
+  in a multi-name add, already-installed components are skipped (reported as kept) and the new
+  ones still install.
 - Support files appear without being asked for (`utils.ts` with `cn`, `applet-portal.tsx`, and
   registry dependencies like `separator`, `card`, `toggle`) — normal; use them if handy.
   `applet-portal.tsx` is auto-generated machinery: never edit or remove it.

@@ -21,6 +21,7 @@ import {
   UI_COMPONENT_NAMES,
   UI_DOCS_BASE,
   fetchUiComponents,
+  partitionUiWrites,
   planUiWrites,
   resolveUiComponentRequest,
   suggestUiComponents,
@@ -89,17 +90,19 @@ const add = defineCommand({
       exists: existsSync
     })
 
-    // Hand-customized components are never silently overwritten: any requested
-    // file that already exists fails the whole add unless --force. Existing
-    // support files (utils, applet-portal, registry deps that rode along) are
-    // kept as-is either way.
-    const conflicts = plans.filter(plan => plan.exists && !plan.support)
-    if (conflicts.length > 0 && !args.force) {
+    // Hand-customized components are never silently overwritten: without
+    // --force a requested file that already exists is skipped and reported, so
+    // a bulk add still installs everything new. Only when every requested
+    // component already exists does the add fail. Existing support files
+    // (utils, applet-portal, registry deps that rode along) are kept as-is
+    // either way, even under --force.
+    const partition = partitionUiWrites(plans, args.force)
+    if (partition.allInstalled) {
       console.error(
         '\n' +
           pc.red('✗') +
           ' Already installed: ' +
-          conflicts.map(plan => pc.bold(plan.name)).join(', ') +
+          partition.skipInstalled.map(plan => pc.bold(plan.name)).join(', ') +
           '\n' +
           pc.dim('  Files in .moi/ui/ may carry your customizations.\n') +
           pc.dim('  Re-run with --force to overwrite them.\n')
@@ -109,18 +112,15 @@ const add = defineCommand({
 
     await mkdir(uiDir, { recursive: true })
     const written: string[] = []
-    const kept: string[] = []
-    for (const plan of plans) {
-      if (plan.exists && plan.support) {
-        kept.push(plan.name)
-        continue
-      }
+    for (const plan of partition.write) {
       const content = plan.name.endsWith('.tsx')
         ? await transformUiComponentSource(plan.name, plan.content)
         : plan.content
       await Bun.write(plan.path, content)
       written.push(plan.name)
     }
+    const kept = partition.keepSupport.map(plan => plan.name)
+    const skipped = partition.skipInstalled.map(plan => plan.name)
 
     // Deps the `moi init` scaffold already pre-seeds never need a mention;
     // registry specifiers may be versioned (`recharts@3.8.0`), so compare by
@@ -134,6 +134,13 @@ const add = defineCommand({
     console.log(pc.dim('  ' + written.join(', ')))
     if (kept.length > 0) {
       console.log(pc.dim(`  kept existing: ${kept.join(', ')}`))
+    }
+    if (skipped.length > 0) {
+      console.log(
+        pc.dim(
+          `  already installed, kept: ${skipped.join(', ')} — re-run with --force to overwrite`
+        )
+      )
     }
     console.log('\nNext steps (yours):')
     if (deps.length > 0) {
@@ -152,7 +159,7 @@ const add = defineCommand({
       console.log('  1. Import relatively — ' + pc.bold(`import { … } from '../ui/<name>'`))
       console.log('  2. Rebuild: ' + pc.bold('moi bundle'))
     }
-    console.log(pc.dim(`\n  Component docs: moi ui-components docs ${request.entries[0]}\n`))
+    console.log(pc.dim(`\n  Component docs: moi ui-components docs ${request.entries.join(' ')}\n`))
   }
 })
 
@@ -216,9 +223,9 @@ function renderCatalog(uiDir: string, query?: string): void {
   console.log(
     '\n' +
       pc.dim('  ✓ installed in .moi/ui/ · add: ') +
-      pc.bold('moi ui-components add <name>') +
+      pc.bold('moi ui-components add <name…>') +
       pc.dim(' · docs: ') +
-      pc.bold('moi ui-components docs <name>') +
+      pc.bold('moi ui-components docs <name…>') +
       '\n'
   )
 }

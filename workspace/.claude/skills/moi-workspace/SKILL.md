@@ -195,20 +195,22 @@ function cx(...classes: (string | false | undefined | null)[]) {
 ## Standard UI components
 
 Need a standard control (button, dialog, select, table, chart…)? Don't hand-roll it —
-`moi ui-components add <name>` installs a moi-tuned shadcn component (Base UI + Tabler icons,
-workspace theme tokens, overlays patched to keep applet styling) into `.moi/ui/`. Import
-relatively: `import { Button } from '../ui/button'`.
+`moi ui-components add <name…>` installs moi-tuned shadcn components (Base UI + Tabler icons,
+workspace theme tokens, overlays patched to keep applet styling) into `.moi/ui/`. Pass every
+component you need in one call (`add table badge tabs`) instead of one `add` per component.
+Import relatively: `import { Button } from '../ui/button'`.
 
 - `moi ui-components` — the catalog with installed state. Read
   `references/UI-COMPONENTS.md` first: the full catalog plus the essential usage rules
   (Base UI composition, forms, styling, icons — condensed from the official shadcn skill).
-- `moi ui-components docs <name>` — full official docs (markdown: anatomy, props, examples) on
+- `moi ui-components docs <name…>` — full official docs (markdown: anatomy, props, examples) on
   demand. Read them before composing an unfamiliar component; the parts API (Base UI) differs
   from Radix-era shadcn.
 - `add` never installs npm packages or rebuilds — it prints the deps it needs; install them in
   `.moi/` and run `moi bundle` yourself.
 - Files in `.moi/ui/` are yours to customize (edits propagate to every applet using them);
-  re-running `add` refuses to overwrite them without `--force`.
+  `add` skips already-installed components (reported as kept) and overwrites only with
+  `--force`.
 - Component names, their API, and the CLI are very close to a selected subset of shadcn, but the
   actual implementation might differ.
 
