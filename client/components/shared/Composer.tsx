@@ -78,9 +78,7 @@ export function ComposerFooter({ className, children, ...props }: ComposerFooter
   )
 }
 
-export function composerAvailabilityTooltip(
-  availability: AgentAvailability
-): string | undefined {
+export function composerAvailabilityTooltip(availability: AgentAvailability): string | undefined {
   if (availability.status === 'checking') return 'Checking agent status…'
   return undefined
 }

@@ -1,8 +1,5 @@
 import { startWorkspaceLogin, useWorkspaceAgent } from '@/client/features/workspace/api'
-import {
-  resolveAgentAvailability,
-  type AgentAvailability
-} from '@/client/lib/agent-availability'
+import { resolveAgentAvailability, type AgentAvailability } from '@/client/lib/agent-availability'
 
 import { ChatErrorBanner } from './banners/ChatErrorBanner'
 import { resolveComposerBanner, type ComposerBanner } from './banners/ComposerBanner'

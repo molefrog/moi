@@ -40,10 +40,7 @@ export function AgentAvailabilityBanner({
   }
 }
 
-type LoginRequiredBannerProps = Pick<
-  AgentAvailabilityBannerProps,
-  'login' | 'onStartLogin'
->
+type LoginRequiredBannerProps = Pick<AgentAvailabilityBannerProps, 'login' | 'onStartLogin'>
 
 type LoginPhase = 'idle' | 'starting' | 'waiting'
 
