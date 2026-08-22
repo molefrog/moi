@@ -125,6 +125,7 @@ export function ChatPanel({
   const effectiveProcessing = builderDraft ? false : processing
   const showEmptyState =
     !!builderDraft || (chatLoaded && timeline.length === 0 && !effectiveProcessing)
+  const showTranscript = chatLoaded && !showEmptyState
   const emptyStateKind = resolveChatEmptyState({
     isViewBuilderDraft: !!builderDraft,
     hasSentMessageFromMoi,
@@ -202,23 +203,24 @@ export function ChatPanel({
                 onNavigate={onNavigateFromWelcome}
               />
             )}
-            {timeline.map(item =>
-              item.kind === 'notice' ? (
-                <ChatNoticeRow key={`notice:${item.notice.id}`} notice={item.notice} />
-              ) : (
-                <TurnView
-                  key={item.turn.id}
-                  turn={item.turn}
-                  processing={effectiveProcessing && item.turn.id === lastTurnId}
-                />
-              )
-            )}
-            {!showEmptyState && (
+            {showTranscript &&
+              timeline.map(item =>
+                item.kind === 'notice' ? (
+                  <ChatNoticeRow key={`notice:${item.notice.id}`} notice={item.notice} />
+                ) : (
+                  <TurnView
+                    key={item.turn.id}
+                    turn={item.turn}
+                    processing={effectiveProcessing && item.turn.id === lastTurnId}
+                  />
+                )
+              )}
+            {showTranscript && (
               <div className="mt-auto -ml-3 pt-2">
                 <AgentBlobatar
                   preset={agent}
                   color="primary"
-                  size={64}
+                  size={72}
                   animated={effectiveProcessing}
                   expression={effectiveProcessing ? 'thinking' : undefined}
                 />
@@ -229,7 +231,7 @@ export function ChatPanel({
 
         {/* Jump to latest — shown only when scrolled up, so following the tail
             never yanks the user while they read history. */}
-        {!atBottom && turns.length > 0 && (
+        {showTranscript && !atBottom && turns.length > 0 && (
           <Button
             type="button"
             variant="outline"
