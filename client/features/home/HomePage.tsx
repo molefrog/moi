@@ -23,6 +23,7 @@ import {
   CollapsibleTrigger
 } from '@/client/components/ui/collapsible'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
+import { hasRunningWorkspaceActivity, useLive } from '@/client/features/chat/chat-store'
 import { cn } from '@/client/lib/cn'
 import { getWorkspaceThemeStyle, usePreloadWorkspaceFonts } from '@/client/runtime/workspace-theme'
 import { useUiStore } from '@/client/store/ui'
@@ -179,6 +180,7 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
   const previewQuery = useWorkspacePreview(workspace.id)
   const theme = previewQuery.data?.theme
   const agent = resolveWorkspaceTheme(theme).agent
+  const running = useLive(state => hasRunningWorkspaceActivity(state.activity, workspace.id))
   const updatedAt = previewQuery.data?.updatedAt ?? new Date(workspace.addedAt).getTime()
   const workspaceHref = `/workspace/${workspace.id}`
 
@@ -204,6 +206,8 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
                   <AgentBlobatar
                     preset={agent}
                     color="primary"
+                    animated={running}
+                    expression={running ? 'thinking' : undefined}
                     size={48}
                     className="drop-shadow-sm drop-shadow-primary/20"
                   />

@@ -91,7 +91,7 @@ export type AgentThemeConfig = {
 }
 
 export const AGENT_THEMES: Record<AgentTheme, AgentThemeConfig> = {
-  blob: { label: 'Blob', traits: { shape: 0.11, 'body.r': 0.25, 'body.ratio': 0, 'body.n': 0.5 } },
+  blob: { label: 'Blob', traits: { shape: 0.11, 'body.r': 0.5, 'body.ratio': 0, 'body.n': 0.5 } },
   boxy: { label: 'Boxy', traits: { shape: 0.54, 'body.r': 1, 'body.ratio': 0 } },
   pill: { label: 'Pill', traits: { shape: 0.65, 'body.r': 1 } },
   dorito: { label: 'Dorito', traits: { shape: 0.99, 'body.r': 1, 'body.ratio': 0, 'body.rot': 0 } }
