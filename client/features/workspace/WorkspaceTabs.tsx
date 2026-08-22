@@ -1,7 +1,6 @@
 import { IconPlus, IconX, type Icon as TabIcon } from '@tabler/icons-react'
 import { cva } from 'class-variance-authority'
 
-import { IconGhost } from '@/client/components/shared/IconGhost'
 import { ReorderableList } from '@/client/components/shared/ReorderableList'
 import type { ReorderableRenderState } from '@/client/components/shared/ReorderableList'
 import { Button, buttonVariants } from '@/client/components/ui/button'
@@ -76,10 +75,10 @@ function CreateTabMenu({ items }: { items: CreateWorkspaceTabItem[] }) {
       />
       <DropdownMenuContent align="start" className="min-w-48">
         <DropdownMenuGroup>
-          {items.map(({ key, Icon, label, onClick }) => (
-            <DropdownMenuItem key={key} onClick={onClick} className="font-medium">
-              <Icon stroke={2} />
-              {label}
+          {items.map(item => (
+            <DropdownMenuItem key={item.key} onClick={item.onClick} className="font-medium">
+              <item.Icon stroke={2} />
+              {item.label}
             </DropdownMenuItem>
           ))}
         </DropdownMenuGroup>
@@ -134,9 +133,7 @@ function WorkspaceTab(props: WorkspaceTabProps) {
           tab.closable && 'group-hover/tab:mr-3'
         )}
       >
-        {tab.Icon === IconGhost ? (
-          <IconGhost data-icon="inline-start" stroke={2} animated={tab.loading} />
-        ) : tab.loading ? (
+        {tab.loading ? (
           <Spinner data-icon="inline-start" />
         ) : (
           <tab.Icon data-icon="inline-start" stroke={2} />

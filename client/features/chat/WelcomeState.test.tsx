@@ -3,8 +3,21 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, test } from 'bun:test'
 
-import { CHAT_WELCOME_PROMPTS, ChatWelcome } from '@/client/features/chat/ChatEmptyState'
+import { CHAT_WELCOME_PROMPTS, ChatEmptyState } from '@/client/features/chat/ChatEmptyState'
 import { renderMoiContext } from '@/lib/moi-context'
+
+function renderWelcome(disabled = false): string {
+  return renderToStaticMarkup(
+    createElement(ChatEmptyState, {
+      agent: 'boxy',
+      kind: 'welcome',
+      hasWorkspaceApplets: false,
+      disabled,
+      onSelectPrompt: () => undefined,
+      onNavigate: () => undefined
+    })
+  )
+}
 
 function renderedParagraphs(html: string): string[] {
   return [...html.matchAll(/<p(?: [^>]*)?>(.*?)<\/p>/gs)].map(match =>
@@ -17,40 +30,31 @@ function renderedParagraphs(html: string): string[] {
   )
 }
 
-describe('ChatWelcome', () => {
+describe('WelcomeState', () => {
   test('keeps the canonical welcome copy exact', () => {
-    const html = renderToStaticMarkup(
-      createElement(ChatWelcome, {
-        onSelectPrompt: () => undefined,
-        onNavigate: () => undefined
-      })
-    )
+    const html = renderWelcome()
 
     expect(renderedParagraphs(html)).toEqual([
       "moi is the visual workspace for you and your agent. It grows and adapts to the work you're doing.",
-      'Ask Agent to build Widgets that surface information and quick actions, or entire Views for more complex tools. Use Scratchpad for exploring and shaping ideas with your agent.',
+      'Ask your agent to build Widgets that surface information and quick actions, or entire Views for more complex tools. Use Scratchpad for exploring and shaping ideas with your agent.',
       'Try an example:'
     ])
   })
 
-  test('renders four inline tab actions and three prompt bubbles with icons', () => {
-    const html = renderToStaticMarkup(
-      createElement(ChatWelcome, {
-        onSelectPrompt: () => undefined,
-        onNavigate: () => undefined
-      })
-    )
+  test('renders three inline tab actions and three prompt bubbles with icons', () => {
+    const html = renderWelcome()
 
     const welcomeTerms = [...html.matchAll(/<button[^>]+data-welcome-destination.*?<\/button>/gs)]
-    const promptButtons = [...html.matchAll(/<button.*?<\/button>/gs)]
+    const promptButtons = [
+      ...html.matchAll(/<button(?![^>]+data-welcome-destination).*?<\/button>/gs)
+    ]
 
-    expect(welcomeTerms).toHaveLength(4)
+    expect(welcomeTerms).toHaveLength(3)
     expect(welcomeTerms.every(([term]) => term.includes('<svg'))).toBe(true)
-    expect(html).toContain('data-welcome-destination="agent"')
     expect(html).toContain('data-welcome-destination="widgets"')
     expect(html).toContain('data-welcome-destination="views"')
     expect(html).toContain('data-welcome-destination="scratchpad"')
-    expect(promptButtons).toHaveLength(7)
+    expect(promptButtons).toHaveLength(3)
     expect(promptButtons.every(([button]) => button.includes('<svg'))).toBe(true)
     expect(html).toContain('Check the weather')
     expect(html).toContain('Build a playful synthesizer')
@@ -58,13 +62,7 @@ describe('ChatWelcome', () => {
   })
 
   test('disables every prompt when sending is unavailable', () => {
-    const html = renderToStaticMarkup(
-      createElement(ChatWelcome, {
-        disabled: true,
-        onSelectPrompt: () => undefined,
-        onNavigate: () => undefined
-      })
-    )
+    const html = renderWelcome(true)
     const promptButtons = [
       ...html.matchAll(/<button(?![^>]+data-welcome-destination).*?<\/button>/gs)
     ]
@@ -108,12 +106,7 @@ describe('ChatWelcome', () => {
       )
     }
 
-    const html = renderToStaticMarkup(
-      createElement(ChatWelcome, {
-        onSelectPrompt: () => undefined,
-        onNavigate: () => undefined
-      })
-    )
+    const html = renderWelcome()
     expect(html).not.toContain('Open-Meteo')
     expect(html).not.toContain('workspace-local SQLite database')
 

@@ -7,6 +7,7 @@ import {
   type ComposerAvailability,
   focusComposer
 } from '@/client/components/shared/Composer'
+import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
 import { useStickToBottom } from '@/client/features/chat/useStickToBottom'
 import { groupTurns } from '@/client/features/chat/group-turns'
 import { chatNoticeLabel, interleaveNotices } from '@/client/features/chat/interleave-notices'
@@ -14,17 +15,13 @@ import { attachmentKey, useLive } from '@/client/features/chat/chat-store'
 import type { ChatPromptBubble } from '@/client/features/chat/ChatPromptBubbles'
 import type { ChatSendOptions } from '@/client/features/chat/chat-send'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
-import type { SystemNotice, Turn, ViewState } from '@/lib/types'
+import type { AgentTheme, SystemNotice, Turn, ViewState } from '@/lib/types'
 
 import type { ComposerBanner } from './composer/banners/ComposerBanner'
 import { ChatComposer, type ComposerAnnotationControls } from './composer/ChatComposer'
-import {
-  ChatEmptyState,
-  type ChatWelcomeDestination,
-  resolveChatEmptyState
-} from './ChatEmptyState'
+import { ChatEmptyState, type WelcomeDestination, resolveChatEmptyState } from './ChatEmptyState'
 import { ChatSelector } from './ChatSelector'
-import { ThinkingIndicator, TurnView } from './TurnView'
+import { TurnView } from './TurnView'
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { cn } from '@/client/lib/cn'
@@ -43,6 +40,7 @@ export type ViewBuilderChatDraft = {
 }
 
 type ChatPanelProps = {
+  agent: AgentTheme
   active?: boolean
   focusRequest?: number
   docked?: boolean
@@ -62,7 +60,7 @@ type ChatPanelProps = {
   annotation?: ComposerAnnotationControls
   send: (text: string, options?: ChatSendOptions) => void
   stop: () => void
-  onNavigateFromWelcome: (destination: ChatWelcomeDestination) => void
+  onNavigateFromWelcome: (destination: WelcomeDestination) => void
   // Chat on a separate tab doesn't have a close button
   onClose?: () => void
   builderDraft?: ViewBuilderChatDraft
@@ -72,6 +70,7 @@ const EMPTY_TURNS: Turn[] = []
 const EMPTY_NOTICES: SystemNotice[] = []
 
 export function ChatPanel({
+  agent,
   active = true,
   focusRequest = 0,
   docked = false,
@@ -195,6 +194,7 @@ export function ChatPanel({
           <div className="mx-auto flex w-full max-w-(--chat-max-container) flex-1 flex-col gap-6">
             {showEmptyState && (
               <ChatEmptyState
+                agent={agent}
                 kind={emptyStateKind}
                 hasWorkspaceApplets={hasWorkspaceApplets}
                 disabled={promptDisabled}
@@ -213,9 +213,17 @@ export function ChatPanel({
                 />
               )
             )}
-            {/* Pulsing dots only before the first token — once the preview has
-                visible content it renders as a (possibly merged) grouped turn. */}
-            {effectiveProcessing && !effectivePreviewTurn && <ThinkingIndicator />}
+            {!showEmptyState && (
+              <div className="mt-auto -ml-3 pt-2">
+                <AgentBlobatar
+                  preset={agent}
+                  color="primary"
+                  size={64}
+                  animated={effectiveProcessing}
+                  expression={effectiveProcessing ? 'thinking' : undefined}
+                />
+              </div>
+            )}
           </div>
         </div>
 

@@ -8,15 +8,15 @@ import {
   IconLayout2,
   IconLayoutSidebarRight,
   IconLetterCase,
+  IconMessages,
   IconSketching
 } from '@tabler/icons-react'
 
-import { IconGhost } from '@/client/components/shared/IconGhost'
 import { DrawingLayer } from '@/client/features/drawings/DrawingLayer'
 import { DrawingToolbar } from '@/client/features/drawings/DrawingToolbar'
 import { useChatAnnotation } from '@/client/features/drawings/useChatAnnotation'
 import { ChatPanel } from '@/client/features/chat/ChatPanel'
-import type { ChatWelcomeDestination } from '@/client/features/chat/ChatEmptyState'
+import type { WelcomeDestination } from '@/client/features/chat/ChatEmptyState'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { CustomizePanel } from '@/client/features/workspace/CustomizePanel'
 import { useAppletEvent } from '@/client/features/applets/applet-runtime'
@@ -35,6 +35,7 @@ import { useViewBuilderDrafts } from '@/client/features/views/useViewBuilderDraf
 import { useFitsSplitLayout } from '@/client/features/workspace/useFitsSplitLayout'
 import { useWorkspaceComposerState } from '@/client/features/chat/composer/useWorkspaceComposerState'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
+import { resolveWorkspaceTheme } from '@/lib/themes'
 import {
   hasRunningWorkspaceActivity,
   isSessionRunning,
@@ -154,7 +155,7 @@ function tabItemFor(
   if (tab === 'agent') {
     return {
       key: tab,
-      Icon: IconGhost,
+      Icon: IconMessages,
       label: 'Agent',
       closable,
       loading: agentRunning
@@ -211,6 +212,7 @@ function applyVisibleTabOrder(
 
 export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenProps) {
   const { layout, setLayout, name, icon, provider, workspaceId } = useWorkspaceLayoutCtx()
+  const theme = resolveWorkspaceTheme(layout.theme)
   const builderActions = useViewBuilderActions()
   const {
     ref: rowRef,
@@ -394,7 +396,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     }
   }
 
-  const navigateFromWelcome = (destination: ChatWelcomeDestination) => {
+  const navigateFromWelcome = (destination: WelcomeDestination) => {
     if (destination === 'views') {
       const firstView = views[0]
       if (firstView) openTab(viewTabId(firstView.id))
@@ -488,7 +490,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       ? ([
           {
             key: 'agent',
-            Icon: IconGhost,
+            Icon: IconMessages,
             label: 'Agent',
             onClick: () => openTab('agent')
           }
@@ -573,6 +575,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   // The docked split chat. Full-screen Agent uses the tabbed chat below.
   const dockedChat = (
     <ChatPanel
+      agent={theme.agent}
       active={mode === 'split'}
       focusRequest={chatFocusRequest}
       chatLoaded={chatLoaded}
@@ -595,6 +598,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
 
   const tabbedChat = (
     <ChatPanel
+      agent={theme.agent}
       active={mode === 'fullscreen' && activeTab === 'agent'}
       focusRequest={chatFocusRequest}
       chatLoaded={chatLoaded}
@@ -741,6 +745,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
 
       {mode === 'fullscreen' && activeTab !== 'agent' && hasWorkspaceContent && (
         <ChatPopup
+          agent={theme.agent}
           loading={hasRunningSession}
           open={floatingChatOpen}
           onOpenChange={setFloatingChatOpen}
@@ -752,6 +757,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
         >
           {onClose => (
             <ChatPanel
+              agent={theme.agent}
               active={floatingChatOpen}
               focusRequest={chatFocusRequest}
               chatLoaded={chatLoaded}

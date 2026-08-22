@@ -2,11 +2,14 @@ import type { CSSProperties, ReactNode, Ref } from 'react'
 
 import { IconCircleCheckFilled } from '@tabler/icons-react'
 
+import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { BottomPanel } from '@/client/components/shared/BottomPanel'
 import { cn } from '@/client/lib/cn'
 import { getWorkspaceThemeStyle, usePreloadWorkspaceFonts } from '@/client/runtime/workspace-theme'
 import {
+  AGENT_THEMES,
+  type AgentThemeConfig,
   COLOR_THEMES,
   type ColorThemeConfig,
   FONT_THEMES,
@@ -14,13 +17,18 @@ import {
   type RadiusThemeConfig,
   resolveWorkspaceTheme
 } from '@/lib/themes'
-import type { ColorTheme, FontTheme, RadiusTheme, WorkspaceTheme } from '@/lib/types'
+import type { AgentTheme, ColorTheme, FontTheme, RadiusTheme, WorkspaceTheme } from '@/lib/types'
 
 const FONT_OPTIONS = Object.entries(FONT_THEMES) as [FontTheme, (typeof FONT_THEMES)[FontTheme]][]
 
 const COLOR_OPTIONS = Object.entries(COLOR_THEMES) as [ColorTheme, ColorThemeConfig][]
 
 const RADIUS_OPTIONS = Object.entries(RADIUS_THEMES) as [RadiusTheme, RadiusThemeConfig][]
+
+const AGENT_OPTIONS = Object.entries(AGENT_THEMES) as [AgentTheme, AgentThemeConfig][]
+
+const CUSTOMIZE_OPTION_CLASS =
+  'relative w-full rounded-lg bg-card text-left ring-1 ring-border transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
 
 type CustomizeOptionGroupProps = {
   children: ReactNode
@@ -64,7 +72,7 @@ function CustomizeOption({ active, children, className, onSelect, style }: Custo
       aria-pressed={active}
       onClick={onSelect}
       className={cn(
-        'relative w-full rounded-lg bg-card text-left ring-1 ring-border transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+        CUSTOMIZE_OPTION_CLASS,
         'flex items-center gap-2 p-3',
         className,
         !active && 'cursor-pointer pr-9 opacity-70 hover:opacity-100'
@@ -92,8 +100,8 @@ export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
   }
 
   return (
-    <BottomPanel ref={ref} title="Customize" onClose={onClose} className="@4xl/workspace:max-w-4xl">
-      <div className="grid grid-cols-1 gap-4 @4xl/workspace:grid-cols-[repeat(2,minmax(0,1fr))_0.5rem_repeat(2,minmax(0,1fr))_0.5rem_minmax(0,1fr)] @4xl/workspace:gap-x-2">
+    <BottomPanel ref={ref} title="Customize" onClose={onClose} className="@4xl/workspace:max-w-5xl">
+      <div className="grid grid-cols-1 gap-4 @4xl/workspace:grid-cols-[repeat(2,minmax(0,1fr))_0.5rem_repeat(2,minmax(0,1fr))_0.5rem_minmax(0,1fr)_0.5rem_minmax(0,1fr)] @4xl/workspace:gap-x-2">
         <CustomizeOptionGroup
           label="Font"
           className="@4xl/workspace:col-span-2 @4xl/workspace:col-start-1"
@@ -156,6 +164,27 @@ export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
                   className="size-5 shrink-0 rounded-sm bg-card texture-checker-2.5 shadow-xs"
                   aria-hidden="true"
                 />
+                <span className="text-sm font-medium">{preset.label}</span>
+              </div>
+            </CustomizeOption>
+          ))}
+        </CustomizeOptionGroup>
+
+        <CustomizeOptionGroup
+          label="Agent"
+          className="@4xl/workspace:col-start-9"
+          gridClassName="@4xl/workspace:grid-cols-1"
+        >
+          {AGENT_OPTIONS.map(([key, preset]) => (
+            <CustomizeOption
+              key={key}
+              active={key === theme.agent}
+              onSelect={() => setTheme({ agent: key })}
+            >
+              <div className="flex items-center gap-2">
+                <span className="flex size-5 shrink-0 items-center justify-center">
+                  <AgentBlobatar preset={key} color="primary" size={32} />
+                </span>
                 <span className="text-sm font-medium">{preset.label}</span>
               </div>
             </CustomizeOption>

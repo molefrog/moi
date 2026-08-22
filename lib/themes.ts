@@ -82,6 +82,20 @@ export const RADIUS_THEMES: Record<RadiusTheme, RadiusThemeConfig> = {
   square: { label: 'Square', radius: '0' }
 }
 
+export type AgentTheme = 'round' | 'boxy' | 'capsule' | 'triangle'
+
+export type AgentThemeConfig = {
+  label: string
+  shape: number
+}
+
+export const AGENT_THEMES: Record<AgentTheme, AgentThemeConfig> = {
+  round: { label: 'Round', shape: 0.11 },
+  boxy: { label: 'Boxy', shape: 0.54 },
+  capsule: { label: 'Capsule', shape: 0.65 },
+  triangle: { label: 'Triangle', shape: 0.99 }
+}
+
 export type ColorTheme =
   | 'default'
   | 'paper'
@@ -188,12 +202,14 @@ export type WorkspaceTheme = {
   font: FontTheme
   color: ColorTheme
   radius: RadiusTheme
+  agent: AgentTheme
 }
 
 export const DEFAULT_WORKSPACE_THEME: WorkspaceTheme = {
   font: 'sans',
   color: 'default',
-  radius: 'soft'
+  radius: 'soft',
+  agent: 'boxy'
 }
 
 export function resolveWorkspaceTheme(theme?: Partial<WorkspaceTheme>): WorkspaceTheme {

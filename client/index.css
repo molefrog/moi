@@ -140,18 +140,6 @@
   }
 }
 
-@keyframes pulse-dot {
-  0%,
-  100% {
-    opacity: 0.2;
-    transform: scale(0.85);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
 /* Text shimmer — a brighter band sweeps left→right across muted text to signal
    activity. Pair with `bg-clip-text text-transparent` and a 200%-wide gradient
    whose highlight sits in the middle (see <ShimmerText>). */

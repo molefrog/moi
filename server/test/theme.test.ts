@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'path'
 
 import {
+  AGENT_THEMES,
   COLOR_THEMES,
   DEFAULT_PRIMARY_COLOR,
   DEFAULT_WORKSPACE_THEME,
@@ -170,43 +171,91 @@ describe('radius themes', () => {
   })
 })
 
+describe('agent themes', () => {
+  test('defines the four fixed Blobatar presets', () => {
+    expect(AGENT_THEMES).toEqual({
+      round: { label: 'Round', shape: 0.11 },
+      boxy: { label: 'Boxy', shape: 0.54 },
+      capsule: { label: 'Capsule', shape: 0.65 },
+      triangle: { label: 'Triangle', shape: 0.99 }
+    })
+  })
+})
+
 describe('applyThemeUpdate', () => {
   test('setting one option preserves the others', () => {
     const current = {
       font: 'sans' as const,
       color: 'paper' as const,
-      radius: 'squishy' as const
+      radius: 'squishy' as const,
+      agent: 'triangle' as const
     }
     const result = applyThemeUpdate(current, { font: 'serif' })
     if (!result.ok) throw new Error('expected ok')
-    expect(result.theme).toEqual({ font: 'serif', color: 'paper', radius: 'squishy' })
+    expect(result.theme).toEqual({
+      font: 'serif',
+      color: 'paper',
+      radius: 'squishy',
+      agent: 'triangle'
+    })
     expect(result.applied).toEqual({ font: 'serif' })
   })
 
   test('setting color uses its preset key', () => {
-    const current = { font: 'mono' as const, color: 'default' as const, radius: 'subtle' as const }
+    const current = {
+      font: 'mono' as const,
+      color: 'default' as const,
+      radius: 'subtle' as const,
+      agent: 'round' as const
+    }
     const result = applyThemeUpdate(current, { color: 'paper' })
     if (!result.ok) throw new Error('expected ok')
-    expect(result.theme).toEqual({ font: 'mono', color: 'paper', radius: 'subtle' })
+    expect(result.theme).toEqual({
+      font: 'mono',
+      color: 'paper',
+      radius: 'subtle',
+      agent: 'round'
+    })
     expect(result.applied).toEqual({ color: 'paper' })
   })
 
   test("'sans' remains an explicit font preset", () => {
-    const current = { font: 'serif' as const, color: 'paper' as const, radius: 'soft' as const }
+    const current = {
+      font: 'serif' as const,
+      color: 'paper' as const,
+      radius: 'soft' as const,
+      agent: 'boxy' as const
+    }
     const result = applyThemeUpdate(current, { font: 'sans' })
     if (!result.ok) throw new Error('expected ok')
-    expect(result.theme).toEqual({ font: 'sans', color: 'paper', radius: 'soft' })
+    expect(result.theme).toEqual({
+      font: 'sans',
+      color: 'paper',
+      radius: 'soft',
+      agent: 'boxy'
+    })
   })
 
   test('combined font + color updates apply both', () => {
     const result = applyThemeUpdate(undefined, {
       font: 'serif',
       color: 'mint',
-      radius: 'square'
+      radius: 'square',
+      agent: 'capsule'
     })
     if (!result.ok) throw new Error('expected ok')
-    expect(result.theme).toEqual({ font: 'serif', color: 'mint', radius: 'square' })
-    expect(result.applied).toEqual({ font: 'serif', color: 'mint', radius: 'square' })
+    expect(result.theme).toEqual({
+      font: 'serif',
+      color: 'mint',
+      radius: 'square',
+      agent: 'capsule'
+    })
+    expect(result.applied).toEqual({
+      font: 'serif',
+      color: 'mint',
+      radius: 'square',
+      agent: 'capsule'
+    })
   })
 
   test('fills missing options with the workspace defaults', () => {
@@ -230,10 +279,20 @@ describe('applyThemeUpdate', () => {
   })
 
   test("'soft' remains an explicit preset", () => {
-    const current = { font: 'serif' as const, color: 'rose' as const, radius: 'squishy' as const }
+    const current = {
+      font: 'serif' as const,
+      color: 'rose' as const,
+      radius: 'squishy' as const,
+      agent: 'triangle' as const
+    }
     const result = applyThemeUpdate(current, { radius: 'soft' })
     if (!result.ok) throw new Error('expected ok')
-    expect(result.theme).toEqual({ font: 'serif', color: 'rose', radius: 'soft' })
+    expect(result.theme).toEqual({
+      font: 'serif',
+      color: 'rose',
+      radius: 'soft',
+      agent: 'triangle'
+    })
     expect(result.applied).toEqual({ radius: 'soft' })
   })
 
@@ -242,6 +301,20 @@ describe('applyThemeUpdate', () => {
     expect(result.ok).toBe(false)
     if (result.ok) throw new Error('expected error')
     expect(result.error).toContain('pillowy')
+  })
+
+  test('setting agent uses its preset key', () => {
+    const result = applyThemeUpdate(undefined, { agent: 'triangle' })
+    if (!result.ok) throw new Error('expected ok')
+    expect(result.theme).toEqual({ ...DEFAULT_WORKSPACE_THEME, agent: 'triangle' })
+    expect(result.applied).toEqual({ agent: 'triangle' })
+  })
+
+  test('rejects unknown agent key', () => {
+    const result = applyThemeUpdate(undefined, { agent: 'cloud' })
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected error')
+    expect(result.error).toContain('cloud')
   })
 })
 
@@ -254,7 +327,8 @@ describe('resolveWorkspaceTheme', () => {
     expect(resolveWorkspaceTheme({ font: 'serif' })).toEqual({
       font: 'serif',
       color: 'default',
-      radius: 'soft'
+      radius: 'soft',
+      agent: 'boxy'
     })
   })
 })
@@ -279,7 +353,8 @@ describe('loadLayout/saveLayout round-trip with theme', () => {
       theme: {
         font: 'serif',
         color: 'paper',
-        radius: 'subtle'
+        radius: 'subtle',
+        agent: 'triangle'
       }
     }
     await saveLayout(layout, tmpDir)

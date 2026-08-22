@@ -3,22 +3,29 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, test } from 'bun:test'
 
-import {
-  ChatWorkspaceWelcome,
-  WORKSPACE_ANALYSIS_PROMPT
-} from '@/client/features/chat/ChatEmptyState'
+import { ChatEmptyState, WORKSPACE_ANALYSIS_PROMPT } from '@/client/features/chat/ChatEmptyState'
 import { renderMoiContext } from '@/lib/moi-context'
 
-describe('ChatWorkspaceWelcome', () => {
+function renderExploreWorkspace(disabled = false): string {
+  return renderToStaticMarkup(
+    createElement(ChatEmptyState, {
+      agent: 'boxy',
+      kind: 'explore-workspace',
+      hasWorkspaceApplets: false,
+      disabled,
+      onSelectPrompt: () => undefined,
+      onNavigate: () => undefined
+    })
+  )
+}
+
+describe('ExploreWorkspaceState', () => {
   test('renders the workspace analysis copy and one plain prompt', () => {
-    const html = renderToStaticMarkup(
-      createElement(ChatWorkspaceWelcome, { onSelectPrompt: () => undefined })
-    )
+    const html = renderExploreWorkspace()
     const promptButtons = [...html.matchAll(/<button.*?<\/button>/gs)]
 
-    expect(html).toContain('Start with what’s already here')
     expect(html).toContain(
-      'Your agent can explore this workspace and suggest useful widgets and views based on its contents.'
+      'Your agent can explore this workspace and suggest useful widgets and views based on'
     )
     expect(html).toContain('Explore the workspace')
     expect(promptButtons).toHaveLength(1)
@@ -28,12 +35,7 @@ describe('ChatWorkspaceWelcome', () => {
   })
 
   test('disables the analysis prompt when sending is unavailable', () => {
-    const html = renderToStaticMarkup(
-      createElement(ChatWorkspaceWelcome, {
-        disabled: true,
-        onSelectPrompt: () => undefined
-      })
-    )
+    const html = renderExploreWorkspace(true)
 
     expect(html.match(/<button.*?<\/button>/s)?.[0]).toContain('disabled=""')
   })
@@ -44,9 +46,7 @@ describe('ChatWorkspaceWelcome', () => {
       prompt: 'Explore this workspace and suggest what moi can build based on its content'
     })
 
-    const html = renderToStaticMarkup(
-      createElement(ChatWorkspaceWelcome, { onSelectPrompt: () => undefined })
-    )
+    const html = renderExploreWorkspace()
     expect(html).not.toContain('Wait for me to choose')
 
     const context = renderMoiContext({
