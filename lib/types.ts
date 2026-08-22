@@ -428,10 +428,10 @@ export type HarnessAvailability =
 // Codex returns a URL for the browser. Claude opens it from its own CLI.
 export type HarnessLogin = { url?: string }
 
-// The server-owned login ceremony, one per workspace. `pending` means a watch
-// loop is re-probing the provider until the login lands or the deadline
-// passes; transitions arrive as `agent:updated` events, so every tab shows
-// the same ceremony without polling.
+// The server-owned login ceremony for a workspace. `pending` means a watch loop
+// is re-probing the provider until the login lands or the deadline passes;
+// transitions arrive as `agent:updated` events, so every tab shows the same
+// ceremony without polling.
 export type AgentLoginState =
   | { state: 'pending'; url?: string }
   | { state: 'failed'; reason: string }

@@ -139,8 +139,8 @@ describe('workspace import provider', () => {
     const login = await api.request(`/api/workspaces/${entry.id}/auth/login`, { method: 'POST' })
     expect(await login.json()).toEqual({ url: 'https://example.com/login' })
 
-    // A second start joins the pending ceremony instead of opening another
-    // provider flow, and the agent snapshot reports it.
+    // A second start reuses the pending browser URL, and the agent snapshot
+    // reports the ceremony.
     const rejoin = await api.request(`/api/workspaces/${entry.id}/auth/login`, { method: 'POST' })
     expect(await rejoin.json()).toEqual({ url: 'https://example.com/login' })
     const pending = await api.request(`/api/workspaces/${entry.id}/agent`)

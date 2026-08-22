@@ -50,7 +50,7 @@ test('shows a generic unavailable reason without suggesting login', () => {
   expect(html).not.toContain('<button')
 })
 
-test('shows the shared ceremony state while a login is pending', () => {
+test('keeps the login action available while a login is pending', () => {
   const html = renderToStaticMarkup(
     createElement(AgentAvailabilityBanner, {
       availability: {
@@ -62,8 +62,8 @@ test('shows the shared ceremony state while a login is pending', () => {
     })
   )
 
-  expect(html).toContain('Waiting for log in…')
-  expect(html).toContain('disabled')
+  expect(html).toContain('>Log in</button>')
+  expect(html).not.toContain(' disabled=""')
 })
 
 test('surfaces a failed ceremony and offers login again', () => {

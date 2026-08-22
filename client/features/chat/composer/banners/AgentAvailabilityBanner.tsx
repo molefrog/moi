@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useState } from 'react'
 
 import {
   IconAlertCircle,
@@ -42,35 +42,17 @@ export function AgentAvailabilityBanner({
 
 type LoginRequiredBannerProps = Pick<AgentAvailabilityBannerProps, 'login' | 'onStartLogin'>
 
-type LoginPhase = 'idle' | 'starting' | 'waiting'
-
-const LOGIN_PHASE_LABELS: Record<LoginPhase, string> = {
-  idle: 'Log in',
-  starting: 'Opening browser to sign in…',
-  waiting: 'Waiting for log in…'
-}
-
 function LoginRequiredBanner({ login, onStartLogin }: LoginRequiredBannerProps) {
-  // Local phase only bridges the gap between the POST resolving and the
-  // server's `agent:updated` event landing; the ceremony state is the truth.
-  const [phase, setPhase] = useState<LoginPhase>('idle')
+  const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // A settled ceremony (failed, or replaced by a fresh signed-out state)
-  // re-enables the button.
-  useEffect(() => {
-    if (login?.state !== 'pending') setPhase('idle')
-  }, [login?.state])
-
-  const effectivePhase = login?.state === 'pending' ? 'waiting' : phase
   const failure = login?.state === 'failed' ? login.reason : null
-  const busy = effectivePhase !== 'idle'
   const loginError = error ?? failure
 
   const startLogin = async () => {
     const authWindow = window.open('about:blank', 'moi-agent-login')
     if (authWindow) authWindow.opener = null
-    setPhase('starting')
+    setStarting(true)
     setError(null)
     try {
       const result = await onStartLogin()
@@ -80,11 +62,11 @@ function LoginRequiredBanner({ login, onStartLogin }: LoginRequiredBannerProps) 
       } else {
         authWindow?.close()
       }
-      setPhase('waiting')
     } catch (err) {
       authWindow?.close()
-      setPhase('idle')
       setError(err instanceof Error ? err.message : 'Could not start sign-in')
+    } finally {
+      setStarting(false)
     }
   }
 
@@ -96,9 +78,9 @@ function LoginRequiredBanner({ login, onStartLogin }: LoginRequiredBannerProps) 
         {loginError && <div className="wrap-break-word text-destructive">{loginError}</div>}
       </div>
 
-      <Button type="button" size="sm" onClick={() => void startLogin()} disabled={busy}>
-        {busy && <IconLoader2 stroke={1.75} className="animate-spin" />}
-        {LOGIN_PHASE_LABELS[effectivePhase]}
+      <Button type="button" size="sm" onClick={() => void startLogin()} disabled={starting}>
+        {starting && <IconLoader2 stroke={1.75} className="animate-spin" />}
+        Log in
       </Button>
     </ComposerBannerShell>
   )

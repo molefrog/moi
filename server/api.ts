@@ -681,8 +681,8 @@ one.put('/env', async c => {
 
 // Start a provider login ceremony. Codex returns a browser OAuth URL for the
 // host to open; Claude launches its browser flow through the CLI itself.
-// Idempotent per workspace: a second call joins the pending ceremony instead
-// of starting another provider flow. Completion is pushed as `agent:updated`.
+// Browser-based logins reuse a pending URL; URL-less provider flows restart
+// when requested again. Completion is pushed as `agent:updated`.
 one.post('/auth/login', async c => {
   const ws = c.get('ws')
   if (!harnessFor(ws).startLogin) return c.text('This agent requires terminal sign-in', 409)

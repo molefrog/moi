@@ -111,6 +111,24 @@ test('a second login start joins the pending ceremony', async () => {
   expect(store.getLogin(ws.id)).toEqual({ state: 'pending', url: 'https://example.com/login' })
 })
 
+test('a second login start restarts a pending URL-less provider flow', async () => {
+  let starts = 0
+  const store = createAgentStore({
+    probe: async () => signedOut,
+    startLogin: async () => {
+      starts++
+      return {}
+    },
+    publish: () => {},
+    loginPollMs: 10_000
+  })
+
+  expect(await store.startLogin(ws)).toEqual({})
+  expect(await store.startLogin(ws)).toEqual({})
+  expect(starts).toBe(2)
+  expect(store.getLogin(ws.id)).toEqual({ state: 'pending' })
+})
+
 test('publishes the completed login and clears the ceremony', async () => {
   const events: AgentUpdatedEvent[] = []
   let loggedIn = false
