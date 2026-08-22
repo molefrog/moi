@@ -200,12 +200,3 @@ Cheapest first — stop at the first level that works:
    every applet using it, and `add` won't overwrite it without `--force`.
 4. **Wrapper components** — compose primitives into app-level pieces (a `ConfirmDialog` wrapping
    `AlertDialog` parts) in `.moi/widgets/_shared.tsx`-style files.
-
-## Fit within applets
-
-- **Widgets** are small: keep the composition compact, the number of controls low, and enough room
-  around each action. Keep interactions inline and self-contained; avoid layered UI such as
-  popovers and tooltips. Page-scale chrome (sidebars, nav menus, sheets, toasts) is deliberately not
-  in the set — widgets don't need it, and a view's chrome should be custom (see
-  `references/DESIGN.md`).
-- **Views** can use the full set, including `resizable` layouts and `data-table`.
