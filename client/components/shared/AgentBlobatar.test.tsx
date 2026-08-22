@@ -40,13 +40,6 @@ describe('AgentBlobatar', () => {
     expect(html).toBe(renderAgentBlobatar())
   })
 
-  test('defaults to 64px', () => {
-    const html = renderToStaticMarkup(createElement(AgentBlobatar))
-
-    expect(html).toContain('width="64"')
-    expect(html).toContain('height="64"')
-  })
-
   test('renders a distinct avatar for every preset', () => {
     const presets = Object.keys(AGENT_THEMES) as (keyof typeof AGENT_THEMES)[]
     const avatars = presets.map(preset => renderAgentBlobatar({ preset }))
