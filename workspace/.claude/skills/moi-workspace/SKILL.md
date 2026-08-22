@@ -192,8 +192,6 @@ function cx(...classes: (string | false | undefined | null)[]) {
 }
 ```
 
-<!-- moi:experimental-shadcn -->
-
 ## Standard UI components
 
 Need a standard control (button, dialog, select, table, chart…)? Don't hand-roll it —
@@ -211,8 +209,8 @@ relatively: `import { Button } from '../ui/button'`.
   `.moi/` and run `moi bundle` yourself.
 - Files in `.moi/ui/` are yours to customize (edits propagate to every applet using them);
   re-running `add` refuses to overwrite them without `--force`.
-
-<!-- /moi:experimental-shadcn -->
+- Component names, their API, and the CLI are very close to a selected subset of shadcn, but the
+  actual implementation might differ.
 
 ## Server functions — `<name>.server.ts`
 
@@ -441,4 +439,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.14.0" />
+<moi-skill version="0.15.0" />
