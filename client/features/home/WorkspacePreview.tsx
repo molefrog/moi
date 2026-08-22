@@ -1,10 +1,12 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 
+import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
 import { cn } from '@/client/lib/cn'
 import {
   getWorkspaceThemeColorStyle,
   getWorkspaceThemeStyle
 } from '@/client/runtime/workspace-theme'
+import { resolveWorkspaceTheme } from '@/lib/themes'
 
 import { useWorkspacePreview } from './api'
 
@@ -120,6 +122,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
   const slots = THUMBNAIL_STYLES.slice(THUMBNAIL_STYLES.length - thumbnails.length)
   const firstUserMessage = query.data?.firstUserMessage
   const theme = query.data?.theme
+  const agent = resolveWorkspaceTheme(theme).agent
   const { ref, horizontalRadiusScale } = useFolderRadiusScale()
   const backdropPath = folderBackdropPath(horizontalRadiusScale)
   const noiseFilterId = `folder-noise-${workspaceId}`
@@ -207,6 +210,13 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
           'mask-[linear-gradient(to_bottom,rgba(0,0,0,0.9)_0%,black_50%)] backdrop-blur-lg',
           'inset-shadow-[0_0_12px_color-mix(in_oklab,var(--background)_20%,transparent)]'
         )}
+      />
+
+      <AgentBlobatar
+        preset={agent}
+        color="primary"
+        size={48}
+        className="absolute right-3 bottom-3 drop-shadow-sm drop-shadow-primary/20"
       />
     </div>
   )
