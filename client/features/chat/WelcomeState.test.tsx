@@ -36,7 +36,7 @@ describe('WelcomeState', () => {
 
     expect(renderedParagraphs(html)).toEqual([
       "moi is the visual workspace for you and your agent. It grows and adapts to the work you're doing.",
-      'Ask your agent to build Widgets that surface information and quick actions, or entire Views for more complex tools. Use Scratchpad for exploring and shaping ideas with your agent.',
+      'Ask agent to build Widgets that surface information and quick actions, or entire Views for more complex tools. Use Scratchpad for exploring and shaping ideas with your agent.',
       'Try an example:'
     ])
   })

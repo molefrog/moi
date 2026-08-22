@@ -198,7 +198,7 @@ function WelcomeState({
             you're doing.
           </p>
           <p>
-            Ask your agent to build{' '}
+            Ask agent to build{' '}
             <WelcomeTerm Icon={IconLayout2} destination="widgets" onNavigate={onNavigate}>
               Widgets
             </WelcomeTerm>{' '}
