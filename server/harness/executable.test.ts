@@ -43,7 +43,7 @@ describe('PATH harness executables', () => {
     expect(findHarnessExecutable('claude-code', tempDir)).toBeNull()
     expect(findHarnessExecutable('codex', tempDir)).toBeNull()
     expect(await pathHarnessAvailability('claude-code', tempDir)).toEqual({
-      available: false,
+      status: 'unavailable',
       reason: 'Run curl -fsSL https://claude.ai/install.sh | sh in your terminal to install Claude'
     })
     expect(() => requireHarnessExecutable('codex', tempDir)).toThrow(

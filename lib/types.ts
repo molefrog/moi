@@ -418,19 +418,20 @@ export type WorkspaceSkillsUpdateFailure = WorkspaceSkillsStatus & {
   error: string
 }
 
-// Setup checks only runtime availability. Workspace checks may also attach a
-// login command, which makes the composer show its Sign in action.
+// Setup checks only runtime availability. Workspace checks may also report
+// that the provider needs a login the host can start.
 export type HarnessAvailability =
-  | { available: true }
-  | { available: false; reason: string; loginCommand?: string }
+  | { status: 'available' }
+  | { status: 'login-required'; reason: string }
+  | { status: 'unavailable'; reason: string }
 
 // Codex returns a URL for the browser. Claude opens it from its own CLI.
 export type HarnessLogin = { url?: string }
 
-// The server-owned login ceremony, one per workspace. `pending` means a watch
-// loop is re-probing the provider until the login lands or the deadline
-// passes; transitions arrive as `agent:updated` events, so every tab shows
-// the same ceremony without polling.
+// The server-owned login ceremony for a workspace. `pending` means a watch loop
+// is re-probing the provider until the login lands or the deadline passes;
+// transitions arrive as `agent:updated` events, so every tab shows the same
+// ceremony without polling.
 export type AgentLoginState =
   | { state: 'pending'; url?: string }
   | { state: 'failed'; reason: string }

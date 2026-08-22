@@ -11,7 +11,6 @@ import {
 
 import {
   canSubmitComposerAction,
-  type ComposerAvailability,
   Composer,
   ComposerFooter,
   ComposerSubmitButton,
@@ -22,6 +21,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/client/componen
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { stageComposerFiles } from '@/client/features/chat/attachment-staging'
 import { cn } from '@/client/lib/cn'
+import type { AgentAvailability } from '@/client/lib/agent-availability'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import {
   type ChatAttachment,
@@ -56,7 +56,7 @@ type ChatComposerProps = {
   processing: boolean
   sessionId: string | null
   modelSessionId: string | null
-  availability: ComposerAvailability
+  availability: AgentAvailability
   annotation?: ComposerAnnotationControls
   onRemoveDrawing?: (localId: string) => void
   allowFiles?: boolean

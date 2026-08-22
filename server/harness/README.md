@@ -210,10 +210,10 @@ workspace env; `claude auth login` launches its browser sign-in from the compose
 uses app-server `account/read` and returns a browser OAuth URL through
 `account/login/start`. The server owns the recovery loop (`server/agent.ts`):
 `GET /api/workspaces/:id/agent` serves a cached availability snapshot alongside
-the model catalog, `POST .../auth/login` starts (or joins) the one ceremony per
-workspace, and a server-side watch loop re-probes until the login lands or times
-out, pushing `agent:updated` events to every tab. The composer renders that
-state; it never polls.
+the model catalog, `POST .../auth/login` reuses a pending browser URL or restarts
+a URL-less provider flow, and a server-side watch loop re-probes until the login
+lands or times out, pushing `agent:updated` events to every tab. The composer
+renders that state; it never polls.
 
 ## What a harness adapter must support
 

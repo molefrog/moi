@@ -23,7 +23,7 @@ beforeEach(async () => {
   setRegistryPath(join(tempDir, 'workspaces.json'))
   setSelectedSessionPath(join(tempDir, 'selected-sessions.json'))
   setViewBuilderStorePath(join(tempDir, 'view-builders.json'))
-  codexHarness.availability = async () => ({ available: true })
+  codexHarness.availability = async () => ({ status: 'available' })
   codexHarness.sendMessage = async () => {}
 })
 
@@ -135,7 +135,7 @@ describe('view builder availability', () => {
     const draft = (await createResponse.json()) as ViewBuilder
     const reason =
       'Run curl -fsSL https://chatgpt.com/codex/install.sh | sh in your terminal to install Codex'
-    codexHarness.availability = async () => ({ available: false, reason })
+    codexHarness.availability = async () => ({ status: 'unavailable', reason })
 
     const response = await api.request(
       `/api/workspaces/${workspace.id}/view-builders/${draft.id}/submit`,

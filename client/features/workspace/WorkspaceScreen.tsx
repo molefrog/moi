@@ -271,7 +271,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     selectSession,
     dismissError
   } = useChat({ activeTab, appletParams })
-  const { composerBanner, builderComposerBanner, composerAvailability } = useWorkspaceComposerState(
+  const { composerBanner, builderComposerBanner, agentAvailability } = useWorkspaceComposerState(
     workspaceId,
     {
       chatError: error,
@@ -483,7 +483,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   // Chat messages fired from applet UI. `openChat` is the reveal: on a view tab
   // in full-screen mode the chat is a closed popover, and a run the user can't
   // see is worse than a panel that opens itself.
-  useAppletChatMessage({ send, revealChat: openChat, composerAvailability })
+  useAppletChatMessage({ send, revealChat: openChat, agentAvailability })
 
   const createItems: CreateWorkspaceTabItem[] = [
     ...(!dockedSplit && !openSet.has('agent')
@@ -585,7 +585,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       sessionId={sessionId}
       processing={processing}
       composerBanner={builderChatDraft ? builderComposerBanner : composerBanner}
-      composerAvailability={composerAvailability}
+      agentAvailability={agentAvailability}
       send={send}
       stop={stop}
       onNavigateFromWelcome={navigateFromWelcome}
@@ -608,7 +608,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       sessionId={sessionId}
       processing={processing}
       composerBanner={composerBanner}
-      composerAvailability={composerAvailability}
+      agentAvailability={agentAvailability}
       send={send}
       stop={stop}
       onNavigateFromWelcome={navigateFromWelcome}
@@ -767,7 +767,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               sessionId={sessionId}
               processing={processing}
               composerBanner={builderChatDraft ? builderComposerBanner : composerBanner}
-              composerAvailability={composerAvailability}
+              agentAvailability={agentAvailability}
               send={send}
               stop={stop}
               onNavigateFromWelcome={navigateFromWelcome}

@@ -4,12 +4,12 @@ import { Button } from '@/client/components/ui/button'
 
 import { ComposerBannerShell } from './ComposerBanner'
 
-type ChatErrorBannerProps = {
+type ErrorBannerProps = {
   error: string
   onDismiss: () => void
 }
 
-export function ChatErrorBanner({ error, onDismiss }: ChatErrorBannerProps) {
+export function ErrorBanner({ error, onDismiss }: ErrorBannerProps) {
   return (
     <ComposerBannerShell role="alert" className="flex items-center gap-2 text-destructive">
       <span className="flex-1 wrap-break-word">{error}</span>

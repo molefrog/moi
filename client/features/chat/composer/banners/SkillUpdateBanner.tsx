@@ -7,19 +7,19 @@ import { ComposerBannerShell } from './ComposerBanner'
 
 export type WorkspaceSkillUpdateAction = 'auto' | 'once'
 
-export type WorkspaceSkillUpdateBannerProps = {
+export type SkillUpdateBannerProps = {
   error: string | null
   pendingAction: WorkspaceSkillUpdateAction | null
   onUpdate: (action: WorkspaceSkillUpdateAction) => void
   onDismiss: () => void
 }
 
-export function WorkspaceSkillUpdateBanner({
+export function SkillUpdateBanner({
   error,
   pendingAction,
   onUpdate,
   onDismiss
-}: WorkspaceSkillUpdateBannerProps) {
+}: SkillUpdateBannerProps) {
   if (!error && pendingAction === 'auto') {
     return (
       <ComposerBannerShell

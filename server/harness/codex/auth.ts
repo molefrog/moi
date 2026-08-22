@@ -10,17 +10,13 @@ export type CodexAccountResponse = {
 type CodexLoginResponse = { type: string; authUrl?: string }
 
 function needsCodexLogin(reason: string): HarnessAvailability {
-  return {
-    available: false,
-    reason,
-    loginCommand: 'codex login'
-  }
+  return { status: 'login-required', reason }
 }
 
 export function codexAccountReadiness(response: CodexAccountResponse): HarnessAvailability {
   // Non-OpenAI model providers can run without a Codex account. For OpenAI,
   // an account object is the app-server's authoritative logged-in signal.
-  if (!response.requiresOpenaiAuth || response.account) return { available: true }
+  if (!response.requiresOpenaiAuth || response.account) return { status: 'available' }
   return needsCodexLogin('Codex is signed out. Sign in to send messages')
 }
 

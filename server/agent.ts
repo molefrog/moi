@@ -2,11 +2,11 @@
 //
 // The client never polls for auth. `GET /api/workspaces/:id/agent` serves the
 // snapshot from this store (one probe per workspace inside the TTL, however
-// many tabs are open); `POST .../auth/login` starts — or joins — the single
-// ceremony per workspace. While a ceremony is pending, a watch loop re-probes
-// the provider until the login lands or the deadline passes, and every
-// transition is pushed to all tabs as an `agent:updated` event on the
-// workspace events socket.
+// many tabs are open); `POST .../auth/login` starts a ceremony per workspace.
+// Browser-based logins reuse their pending URL, while URL-less provider flows
+// can be started again. A watch loop re-probes until the login lands or the
+// deadline passes, and every transition is pushed to all tabs as an
+// `agent:updated` event on the workspace events socket.
 import type {
   AgentLoginState,
   HarnessAvailability,
@@ -127,11 +127,11 @@ export function createAgentStore(options: AgentStoreOptions) {
       try {
         value = await probeFresh(ws)
       } catch {
-        value = { available: false, reason: 'Could not verify the login' }
+        value = { status: 'login-required', reason: 'Could not verify the login' }
       }
       if (stopped) return
       const entry = entryFor(ws.id)
-      if (value.available) {
+      if (value.status === 'available') {
         entry.login = undefined
         publish(ws.id, value)
         return
@@ -153,11 +153,13 @@ export function createAgentStore(options: AgentStoreOptions) {
 
   async function startLogin(ws: AgentWorkspace): Promise<HarnessLogin> {
     const entry = entryFor(ws.id)
-    // Join the in-flight ceremony instead of starting a second provider flow
-    // (two tabs, a remount, a double-click — all land here).
+    // Concurrent starts share the provider call. Once started, browser-based
+    // flows reuse their URL; URL-less flows can be launched again on demand.
     const current = entry.login
     if (current?.starting) return current.starting
-    if (current?.state.state === 'pending') return { url: current.state.url }
+    if (current?.state.state === 'pending' && current.state.url) {
+      return { url: current.state.url }
+    }
 
     current?.stop()
     const starting = options.startLogin(ws)
@@ -167,7 +169,10 @@ export function createAgentStore(options: AgentStoreOptions) {
       const result = await starting
       login.starting = undefined
       login.state = { state: 'pending', ...(result.url ? { url: result.url } : {}) }
-      publish(ws.id, entry.cached?.value ?? { available: false, reason: 'Waiting for sign-in' })
+      publish(
+        ws.id,
+        entry.cached?.value ?? { status: 'login-required', reason: 'Waiting for sign-in' }
+      )
       watch(ws, login)
       return result
     } catch (err) {
@@ -189,7 +194,7 @@ export function createAgentStore(options: AgentStoreOptions) {
 export type AgentStore = ReturnType<typeof createAgentStore>
 
 export const agentStore = createAgentStore({
-  probe: async ws => (await harnessFor(ws).availability?.(ws)) ?? { available: true },
+  probe: async ws => (await harnessFor(ws).availability?.(ws)) ?? { status: 'available' },
   startLogin: ws => {
     const start = harnessFor(ws).startLogin
     if (!start) throw new Error('This agent requires terminal sign-in')

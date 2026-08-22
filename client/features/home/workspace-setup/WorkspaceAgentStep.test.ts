@@ -29,7 +29,7 @@ describe('getWorkspaceAgentOptions', () => {
     }
   ])('keeps the vendor description and exposes the disabled reason for $type', input => {
     const options = getWorkspaceAgentOptions({
-      availability: { [input.type]: { available: false, reason: input.reason } },
+      availability: { [input.type]: { status: 'unavailable', reason: input.reason } },
       detectedTypes: ['openclaw']
     })
 
@@ -83,8 +83,8 @@ describe('getWorkspaceAgentOptions', () => {
   test('falls back to the first unlocked agent when the selection is locked', () => {
     const options = getWorkspaceAgentOptions({
       availability: {
-        'claude-code': { available: false, reason: 'Install Claude' },
-        codex: { available: true }
+        'claude-code': { status: 'unavailable', reason: 'Install Claude' },
+        codex: { status: 'available' }
       }
     })
 
@@ -94,8 +94,8 @@ describe('getWorkspaceAgentOptions', () => {
   test('keeps an unlocked selection and returns nothing when every agent is locked', () => {
     const options = getWorkspaceAgentOptions({
       availability: {
-        'claude-code': { available: false, reason: 'Install Claude' },
-        codex: { available: false, reason: 'Install Codex' }
+        'claude-code': { status: 'unavailable', reason: 'Install Claude' },
+        codex: { status: 'unavailable', reason: 'Install Codex' }
       }
     })
 

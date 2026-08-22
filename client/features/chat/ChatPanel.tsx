@@ -2,11 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
 import { IconChevronDown, IconChevronsRight, IconX } from '@tabler/icons-react'
 
-import {
-  canSubmitComposerAction,
-  type ComposerAvailability,
-  focusComposer
-} from '@/client/components/shared/Composer'
+import { canSubmitComposerAction, focusComposer } from '@/client/components/shared/Composer'
 import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
 import { useStickToBottom } from '@/client/features/chat/useStickToBottom'
 import { groupTurns } from '@/client/features/chat/group-turns'
@@ -25,6 +21,7 @@ import { TurnView } from './TurnView'
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { cn } from '@/client/lib/cn'
+import type { AgentAvailability } from '@/client/lib/agent-availability'
 import { useUiStore } from '@/client/store/ui'
 
 export type ViewBuilderChatDraft = {
@@ -56,7 +53,7 @@ type ChatPanelProps = {
   sessionId?: string | null
   processing: boolean
   composerBanner?: ComposerBanner
-  composerAvailability: ComposerAvailability
+  agentAvailability: AgentAvailability
   annotation?: ComposerAnnotationControls
   send: (text: string, options?: ChatSendOptions) => void
   stop: () => void
@@ -81,7 +78,7 @@ export function ChatPanel({
   sessionId,
   processing,
   composerBanner,
-  composerAvailability,
+  agentAvailability,
   annotation,
   send,
   stop,
@@ -104,7 +101,7 @@ export function ChatPanel({
       attachment => attachment.status === 'uploading'
     )
   )
-  const promptDisabled = !canSubmitComposerAction(true, attachmentsUploading, composerAvailability)
+  const promptDisabled = !canSubmitComposerAction(true, attachmentsUploading, agentAvailability)
   // Visual grouping: fold consecutive tool-only assistant turns into one
   // synthetic turn so OpenAI Codex–style traces (which serialize one
   // assistant message per agent step) don't render with the wider
@@ -260,7 +257,7 @@ export function ChatPanel({
             processing={effectiveProcessing}
             sessionId={effectiveSessionId}
             modelSessionId={modelSessionId}
-            availability={composerAvailability}
+            availability={agentAvailability}
             annotation={builderDraft ? undefined : annotation}
             onRemoveDrawing={builderDraft?.onRemoveDrawing ?? annotation?.onRemove}
             allowFiles={!builderDraft}
