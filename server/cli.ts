@@ -17,7 +17,8 @@ import {
   DEFAULT_WORKSPACE_THEME,
   FONT_THEMES,
   RADIUS_THEMES,
-  deriveThemeColors
+  deriveThemeColors,
+  resolveWorkspaceTheme
 } from '@/lib/themes'
 import type { AgentTheme, ColorTheme, FontTheme, RadiusTheme } from '@/lib/themes'
 import { isParamsRecord } from '@/lib/workspace-tabs'
@@ -810,6 +811,54 @@ function themeSwatch(primary?: string): string {
   return swatch(formatHex(colors.primary), formatHex(colors.primaryForeground))
 }
 
+// `moi theme tokens` — the resolved token table. Reads `.moi/.workspace.json`
+// directly (no control server needed): token values are pure derivation, and
+// agents ask for them while composing UI, when the server may not be running.
+async function runThemeTokens(path: string): Promise<void> {
+  const { loadLayout } = await import('./layout')
+  const { resolveWorkspaceThemeTokens } = await import('./theme-tokens')
+  const layout = await loadLayout(path)
+  const theme = resolveWorkspaceTheme(layout.theme)
+  const font = FONT_THEMES[theme.font]
+  const radius = RADIUS_THEMES[theme.radius]
+
+  console.log(
+    '\n' +
+      pc.bold('moi theme tokens') +
+      pc.dim(` — resolved values for the ${pc.bold(theme.color)} color preset`) +
+      '\n'
+  )
+  const rows = resolveWorkspaceThemeTokens(layout.theme).map(row => [
+    pc.cyan(`--${row.token}`),
+    row.light,
+    swatch(row.light.slice(0, 7)),
+    row.dark,
+    swatch(row.dark.slice(0, 7)),
+    pc.dim(row.derived ? 'from preset primary' : 'default')
+  ])
+  console.log(
+    columns(
+      ['token', 'light', '', 'dark', '', 'source'].map(h => pc.dim(h)),
+      rows
+    )
+  )
+  console.log()
+  console.log(
+    keyValue([
+      ['--sans', font.sans],
+      ['--mono', font.mono],
+      ['--radius', radius.radius]
+    ])
+  )
+  console.log(
+    pc.dim(
+      '\n  Tokens marked "from preset primary" follow the workspace color preset and apply in\n' +
+        '  both light and dark; the rest reveal the stock defaults. Use them as Tailwind\n' +
+        '  classes (bg-primary, text-muted-foreground, bg-chart-2) — never raw colors.\n'
+    )
+  )
+}
+
 const theme = defineCommand({
   meta: { name: 'theme', description: 'Show or set the workspace appearance' },
   args: {
@@ -821,10 +870,19 @@ const theme = defineCommand({
     font: { type: 'string', description: 'Font theme key to apply' },
     color: { type: 'string', description: 'Color preset key to apply' },
     radius: { type: 'string', description: 'Radius preset key to apply' },
-    agent: { type: 'string', description: 'Agent preset key to apply' }
+    agent: { type: 'string', description: 'Agent preset key to apply' },
+    tokens: {
+      type: 'boolean',
+      default: false,
+      description: 'Print the resolved theme tokens (hex) for this workspace'
+    }
   },
   async run({ args }) {
     const path = resolve(args.dir)
+    if (args.tokens) {
+      await runThemeTokens(path)
+      return
+    }
     const notice = await staleSkillNotice(path)
     const ws = new WebSocket(CONTROL_URL)
 
@@ -885,7 +943,10 @@ const theme = defineCommand({
       const currentAgent: AgentTheme = res.currentAgent ?? DEFAULT_WORKSPACE_THEME.agent
       console.log('\n' + pc.bold('moi theme') + ' — workspace appearance')
       console.log(
-        pc.dim('  Usage: moi theme --font=<key> --color=<key> --radius=<key> --agent=<key>') + '\n'
+        pc.dim(
+          '  Usage: moi theme --font=<key> --color=<key> --radius=<key> --agent=<key>\n' +
+            '         moi theme --tokens   resolved token values (hex) for this workspace'
+        ) + '\n'
       )
 
       const fontRows = (Object.keys(FONT_THEMES) as FontTheme[]).map(key => {
