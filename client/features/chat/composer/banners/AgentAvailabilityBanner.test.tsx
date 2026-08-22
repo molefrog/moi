@@ -2,11 +2,11 @@ import { expect, test } from 'bun:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-import { WorkspaceAgentAvailabilityBanner } from './WorkspaceAgentAvailabilityBanner'
+import { AgentAvailabilityBanner } from './AgentAvailabilityBanner'
 
 test('offers login when the agent supports it', () => {
   const html = renderToStaticMarkup(
-    createElement(WorkspaceAgentAvailabilityBanner, {
+    createElement(AgentAvailabilityBanner, {
       availability: {
         status: 'login-required',
         reason: 'Sign in'
@@ -21,7 +21,7 @@ test('offers login when the agent supports it', () => {
 
 test('shows a disconnected state without login copy or action', () => {
   const html = renderToStaticMarkup(
-    createElement(WorkspaceAgentAvailabilityBanner, {
+    createElement(AgentAvailabilityBanner, {
       availability: { status: 'disconnected' },
       onStartLogin: async () => ({})
     })
@@ -35,7 +35,7 @@ test('shows a disconnected state without login copy or action', () => {
 
 test('shows a generic unavailable reason without suggesting login', () => {
   const html = renderToStaticMarkup(
-    createElement(WorkspaceAgentAvailabilityBanner, {
+    createElement(AgentAvailabilityBanner, {
       availability: {
         status: 'unavailable',
         reason: 'Agent runtime is unavailable'
@@ -52,7 +52,7 @@ test('shows a generic unavailable reason without suggesting login', () => {
 
 test('shows the shared ceremony state while a login is pending', () => {
   const html = renderToStaticMarkup(
-    createElement(WorkspaceAgentAvailabilityBanner, {
+    createElement(AgentAvailabilityBanner, {
       availability: {
         status: 'login-required',
         reason: 'Sign in'
@@ -68,7 +68,7 @@ test('shows the shared ceremony state while a login is pending', () => {
 
 test('surfaces a failed ceremony and offers login again', () => {
   const html = renderToStaticMarkup(
-    createElement(WorkspaceAgentAvailabilityBanner, {
+    createElement(AgentAvailabilityBanner, {
       availability: {
         status: 'login-required',
         reason: 'Sign in'

@@ -21,7 +21,7 @@ import { TurnView } from './TurnView'
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { cn } from '@/client/lib/cn'
-import type { WorkspaceAgentAvailability } from '@/client/lib/workspace-agent-availability'
+import type { AgentAvailability } from '@/client/lib/agent-availability'
 import { useUiStore } from '@/client/store/ui'
 
 export type ViewBuilderChatDraft = {
@@ -53,7 +53,7 @@ type ChatPanelProps = {
   sessionId?: string | null
   processing: boolean
   composerBanner?: ComposerBanner
-  agentAvailability: WorkspaceAgentAvailability
+  agentAvailability: AgentAvailability
   annotation?: ComposerAnnotationControls
   send: (text: string, options?: ChatSendOptions) => void
   stop: () => void

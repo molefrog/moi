@@ -1,19 +1,19 @@
 import type { HarnessAvailability } from '@/lib/types'
 
-export type WorkspaceAgentAvailability =
+export type AgentAvailability =
   | HarnessAvailability
   | { status: 'checking' }
   | { status: 'disconnected' }
 
-export type WorkspaceAgentUnavailable = Exclude<
-  WorkspaceAgentAvailability,
+export type AgentUnavailable = Exclude<
+  AgentAvailability,
   { status: 'checking' } | { status: 'available' }
 >
 
-export function resolveWorkspaceAgentAvailability(
+export function resolveAgentAvailability(
   availability: HarnessAvailability | undefined,
   disconnected: boolean
-): WorkspaceAgentAvailability {
+): AgentAvailability {
   if (disconnected) return { status: 'disconnected' }
   return availability ?? { status: 'checking' }
 }

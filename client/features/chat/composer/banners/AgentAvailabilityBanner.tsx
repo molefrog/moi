@@ -9,13 +9,13 @@ import {
 } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
-import type { WorkspaceAgentUnavailable } from '@/client/lib/workspace-agent-availability'
+import type { AgentUnavailable } from '@/client/lib/agent-availability'
 import type { AgentLoginState, HarnessLogin } from '@/lib/types'
 
 import { ComposerBannerShell } from './ComposerBanner'
 
-type WorkspaceAgentAvailabilityBannerProps = {
-  availability: WorkspaceAgentUnavailable
+type AgentAvailabilityBannerProps = {
+  availability: AgentUnavailable
   // The server-owned ceremony. `pending` means some tab (maybe this one)
   // started a login and the server is watching for it to land; `failed` means
   // the last ceremony timed out or errored.
@@ -23,11 +23,11 @@ type WorkspaceAgentAvailabilityBannerProps = {
   onStartLogin: () => Promise<HarnessLogin>
 }
 
-export function WorkspaceAgentAvailabilityBanner({
+export function AgentAvailabilityBanner({
   availability,
   login,
   onStartLogin
-}: WorkspaceAgentAvailabilityBannerProps) {
+}: AgentAvailabilityBannerProps) {
   switch (availability.status) {
     case 'login-required':
       return <LoginRequiredBanner login={login} onStartLogin={onStartLogin} />
@@ -41,7 +41,7 @@ export function WorkspaceAgentAvailabilityBanner({
 }
 
 type LoginRequiredBannerProps = Pick<
-  WorkspaceAgentAvailabilityBannerProps,
+  AgentAvailabilityBannerProps,
   'login' | 'onStartLogin'
 >
 

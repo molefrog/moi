@@ -14,7 +14,7 @@ import { reportAppletError } from '@/client/features/applets/applet-log'
 import { type AppletChatMessage, useAppletEvent } from '@/client/features/applets/applet-runtime'
 import type { ChatSendOptions } from '@/client/features/chat/chat-send'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
-import type { WorkspaceAgentAvailability } from '@/client/lib/workspace-agent-availability'
+import type { AgentAvailability } from '@/client/lib/agent-availability'
 
 type UseAppletChatMessageOptions = {
   send: (draft: string, options?: ChatSendOptions) => void
@@ -23,13 +23,13 @@ type UseAppletChatMessageOptions = {
   // without this the agent would start working somewhere the user can't see.
   revealChat: () => void
   // Same explicit availability state the composer's send button uses.
-  agentAvailability: WorkspaceAgentAvailability
+  agentAvailability: AgentAvailability
 }
 
 // Why an applet message can't go out right now, or null when it can. The gate
 // is exactly the composer's. Starting a run the visible UI would have refused
 // is worse than dropping a click the user can repeat a moment later.
-export function appletSendBlockedReason(availability: WorkspaceAgentAvailability): string | null {
+export function appletSendBlockedReason(availability: AgentAvailability): string | null {
   if (availability.status === 'available') return null
   if (availability.status === 'checking') {
     return "this workspace's agent availability has not resolved yet"

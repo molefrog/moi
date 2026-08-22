@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import { canSubmitComposerAction } from '@/client/components/shared/Composer'
 import { appletSendBlockedReason } from '@/client/features/chat/useAppletChatMessage'
-import type { WorkspaceAgentAvailability } from '@/client/lib/workspace-agent-availability'
+import type { AgentAvailability } from '@/client/lib/agent-availability'
 
 // An applet message must not start a run the composer's own send button would
 // have refused, including while the availability query is still in flight.
@@ -36,7 +36,7 @@ describe('appletSendBlockedReason', () => {
   })
 
   test('agrees with the composer button on every availability state', () => {
-    const states: WorkspaceAgentAvailability[] = [
+    const states: AgentAvailability[] = [
       { status: 'available' },
       { status: 'checking' },
       { status: 'disconnected' },

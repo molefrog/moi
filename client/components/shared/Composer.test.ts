@@ -1,16 +1,16 @@
 import { describe, expect, test } from 'bun:test'
 
 import { canSubmitComposerAction, composerAvailabilityTooltip, focusComposer } from './Composer'
-import type { WorkspaceAgentAvailability } from '@/client/lib/workspace-agent-availability'
+import type { AgentAvailability } from '@/client/lib/agent-availability'
 
-const available: WorkspaceAgentAvailability = { status: 'available' }
-const checking: WorkspaceAgentAvailability = { status: 'checking' }
-const disconnected: WorkspaceAgentAvailability = { status: 'disconnected' }
-const loginRequired: WorkspaceAgentAvailability = {
+const available: AgentAvailability = { status: 'available' }
+const checking: AgentAvailability = { status: 'checking' }
+const disconnected: AgentAvailability = { status: 'disconnected' }
+const loginRequired: AgentAvailability = {
   status: 'login-required',
   reason: 'Sign in'
 }
-const unavailable: WorkspaceAgentAvailability = {
+const unavailable: AgentAvailability = {
   status: 'unavailable',
   reason: 'Agent unavailable'
 }
