@@ -65,7 +65,6 @@ export function ChatPopup({
                 <AgentBlobatar
                   preset={agent}
                   color="primary"
-                  size={56}
                   animated={loading}
                   expression={loading ? 'thinking' : undefined}
                   className={cn(

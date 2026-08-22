@@ -150,14 +150,7 @@ type EmptyStateFrameProps = {
 function EmptyStateFrame({ agent, children, className }: EmptyStateFrameProps) {
   return (
     <div className={cn('flex flex-1 flex-col items-center justify-center self-center', className)}>
-      <AgentBlobatar
-        preset={agent}
-        color="secondary"
-        expression="idle"
-        size={64}
-        className="mb-2"
-        animated
-      />
+      <AgentBlobatar preset={agent} color="secondary" expression="idle" className="mb-2" animated />
 
       {children}
     </div>

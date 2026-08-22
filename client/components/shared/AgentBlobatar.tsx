@@ -61,7 +61,7 @@ const AGENT_EXPRESSIONS = {
 } satisfies Record<AgentBlobatarExpression, Expression>
 
 type AgentBlobatarProps = {
-  size: number
+  size?: number
   preset?: AgentTheme
   animated?: boolean
   color?: AgentBlobatarColor
@@ -70,7 +70,7 @@ type AgentBlobatarProps = {
 }
 
 function AgentBlobatar({
-  size,
+  size = 64,
   preset = DEFAULT_WORKSPACE_THEME.agent,
   animated = false,
   color = 'default',
@@ -85,7 +85,7 @@ function AgentBlobatar({
       palette={AGENT_PALETTES[color]}
       expression={expression ? AGENT_EXPRESSIONS[expression] : undefined}
       className={cn('shrink-0', className)}
-      traits={{ shape: AGENT_THEMES[preset].shape }}
+      traits={AGENT_THEMES[preset].traits}
     />
   )
 }

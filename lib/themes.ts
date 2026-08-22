@@ -1,3 +1,4 @@
+import type { TraitOverrides } from 'blobatar'
 import { wcagLuminance } from 'culori'
 
 export type FontTheme =
@@ -86,14 +87,14 @@ export type AgentTheme = 'blob' | 'boxy' | 'pill' | 'dorito'
 
 export type AgentThemeConfig = {
   label: string
-  shape: number
+  traits: TraitOverrides
 }
 
 export const AGENT_THEMES: Record<AgentTheme, AgentThemeConfig> = {
-  blob: { label: 'Blob', shape: 0.11 },
-  boxy: { label: 'Boxy', shape: 0.54 },
-  pill: { label: 'Pill', shape: 0.65 },
-  dorito: { label: 'Dorito', shape: 0.99 }
+  blob: { label: 'Blob', traits: { shape: 0.11, 'body.r': 0.25, 'body.ratio': 0, 'body.n': 0.5 } },
+  boxy: { label: 'Boxy', traits: { shape: 0.54, 'body.r': 1, 'body.ratio': 0 } },
+  pill: { label: 'Pill', traits: { shape: 0.65, 'body.r': 1 } },
+  dorito: { label: 'Dorito', traits: { shape: 0.99, 'body.r': 1, 'body.ratio': 0, 'body.rot': 0 } }
 }
 
 export type ColorTheme =

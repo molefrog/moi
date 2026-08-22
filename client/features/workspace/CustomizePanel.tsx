@@ -183,7 +183,7 @@ export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
             >
               <div className="flex items-center gap-2">
                 <span className="flex size-5 shrink-0 items-center justify-center">
-                  <AgentBlobatar preset={key} color="primary" size={32} />
+                  <AgentBlobatar preset={key} color="primary" size={28} />
                 </span>
                 <span className="text-sm font-medium">{preset.label}</span>
               </div>

@@ -220,7 +220,6 @@ export function ChatPanel({
                 <AgentBlobatar
                   preset={agent}
                   color="primary"
-                  size={72}
                   animated={effectiveProcessing}
                   expression={effectiveProcessing ? 'thinking' : undefined}
                 />
