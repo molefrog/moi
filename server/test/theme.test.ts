@@ -193,10 +193,10 @@ describe('radius themes', () => {
 describe('agent themes', () => {
   test('defines the four fixed Blobatar presets', () => {
     expect(AGENT_THEMES).toEqual({
-      round: { label: 'Round', shape: 0.11 },
+      round: { label: 'Blob', shape: 0.11 },
       boxy: { label: 'Boxy', shape: 0.54 },
-      capsule: { label: 'Capsule', shape: 0.65 },
-      triangle: { label: 'Triangle', shape: 0.99 }
+      capsule: { label: 'Pill', shape: 0.65 },
+      triangle: { label: 'Dorito', shape: 0.99 }
     })
   })
 })
