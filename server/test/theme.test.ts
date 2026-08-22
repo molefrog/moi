@@ -25,6 +25,25 @@ describe('color themes', () => {
     expect(css).toContain(`--primary: ${DEFAULT_PRIMARY_COLOR};`)
   })
 
+  // index.html carries a hardcoded first-paint background, because the
+  // stylesheet that defines `--muted` is render-blocking and the browser would
+  // otherwise paint its white canvas first. A literal cannot follow the token,
+  // so pin them together here — drift shows up as a white flash on cold loads,
+  // which nothing else would catch.
+  test('keeps the shell first-paint background aligned with --muted', async () => {
+    const html = await Bun.file(join(import.meta.dir, '../../client/index.html')).text()
+    const indexCss = await Bun.file(join(import.meta.dir, '../../client/index.css')).text()
+
+    const shellBackground = html.match(/html \{\s*background:\s*([^;]+);/)?.[1]?.trim()
+    const root = indexCss.match(/:root \{([\s\S]*?)\n\}/)?.[1]
+    const muted = root?.match(/--muted:\s*([^;]+);/)?.[1]?.trim()
+
+    expect(shellBackground).toBeDefined()
+    expect(muted).toBeDefined()
+    expect(shellBackground).toBe(muted)
+    expect(html).toContain('<meta name="color-scheme" content="light" />')
+  })
+
   test('defines and exposes the default shadcn compatibility tokens', async () => {
     const indexCss = await Bun.file(join(import.meta.dir, '../../client/index.css')).text()
     const themeCss = await Bun.file(join(import.meta.dir, '../../client/theme.css')).text()
