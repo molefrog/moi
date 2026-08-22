@@ -4,11 +4,7 @@ import { resolveWorkspaceEnv } from '../../workspace-env'
 import { findHarnessExecutable } from '../executable'
 
 function signedOut(reason: string): HarnessAvailability {
-  return {
-    available: false,
-    reason,
-    loginCommand: 'claude auth login'
-  }
+  return { status: 'login-required', reason }
 }
 
 // Claude Code 2.1.42+ exposes a stable JSON auth probe. Run it with the same
@@ -31,7 +27,7 @@ export async function getClaudeAuthReadiness(workspacePath: string): Promise<Har
     const exitCode = await proc.exited
     clearTimeout(timeout)
     return exitCode === 0
-      ? { available: true }
+      ? { status: 'available' }
       : signedOut('Claude is signed out. Sign in to send messages')
   } catch {
     return signedOut('Could not verify the Claude login')

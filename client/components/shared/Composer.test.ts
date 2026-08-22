@@ -1,15 +1,19 @@
 import { describe, expect, test } from 'bun:test'
 
-import {
-  canSubmitComposerAction,
-  type ComposerAvailability,
-  composerAvailabilityTooltip,
-  focusComposer
-} from './Composer'
+import { canSubmitComposerAction, composerAvailabilityTooltip, focusComposer } from './Composer'
+import type { WorkspaceAgentAvailability } from '@/client/lib/workspace-agent-availability'
 
-const available: ComposerAvailability = { status: 'available' }
-const checking: ComposerAvailability = { status: 'checking' }
-const unavailable: ComposerAvailability = { status: 'unavailable' }
+const available: WorkspaceAgentAvailability = { status: 'available' }
+const checking: WorkspaceAgentAvailability = { status: 'checking' }
+const disconnected: WorkspaceAgentAvailability = { status: 'disconnected' }
+const loginRequired: WorkspaceAgentAvailability = {
+  status: 'login-required',
+  reason: 'Sign in'
+}
+const unavailable: WorkspaceAgentAvailability = {
+  status: 'unavailable',
+  reason: 'Agent unavailable'
+}
 
 test('focuses a composer with the caret after its draft', () => {
   let focused = false
@@ -38,6 +42,8 @@ describe('canSubmitComposerAction', () => {
     { hasContent: false, busy: false, availability: available },
     { hasContent: true, busy: true, availability: available },
     { hasContent: true, busy: false, availability: checking },
+    { hasContent: true, busy: false, availability: disconnected },
+    { hasContent: true, busy: false, availability: loginRequired },
     { hasContent: true, busy: false, availability: unavailable }
   ])('blocks unavailable or incomplete composer actions', ({ hasContent, busy, availability }) => {
     expect(canSubmitComposerAction(hasContent, busy, availability)).toBe(false)
@@ -47,6 +53,8 @@ describe('canSubmitComposerAction', () => {
 describe('composerAvailabilityTooltip', () => {
   test('only shows while agent availability is checking', () => {
     expect(composerAvailabilityTooltip(checking)).toBe('Checking agent status…')
+    expect(composerAvailabilityTooltip(disconnected)).toBeUndefined()
+    expect(composerAvailabilityTooltip(loginRequired)).toBeUndefined()
     expect(composerAvailabilityTooltip(unavailable)).toBeUndefined()
     expect(composerAvailabilityTooltip(available)).toBeUndefined()
   })

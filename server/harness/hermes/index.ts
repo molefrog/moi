@@ -116,13 +116,12 @@ export const hermesHarness: Harness = {
 
   availability: async (ws): Promise<HarnessAvailability> => {
     const runtime = await pathHarnessAvailability('hermes')
-    if (!runtime.available || !ws) return runtime
+    if (runtime.status !== 'available' || !ws) return runtime
     const profile = await resolveHermesProfile(ws.path, ws.agentId)
-    if (profile) return { available: true }
+    if (profile) return { status: 'available' }
     return {
-      available: false,
-      reason: 'Hermes profile not found — run moi hermes init to re-import it',
-      loginCommand: 'hermes profile list'
+      status: 'unavailable',
+      reason: 'Hermes profile not found — run moi hermes init to re-import it'
     }
   },
 

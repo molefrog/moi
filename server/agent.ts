@@ -127,11 +127,11 @@ export function createAgentStore(options: AgentStoreOptions) {
       try {
         value = await probeFresh(ws)
       } catch {
-        value = { available: false, reason: 'Could not verify the login' }
+        value = { status: 'login-required', reason: 'Could not verify the login' }
       }
       if (stopped) return
       const entry = entryFor(ws.id)
-      if (value.available) {
+      if (value.status === 'available') {
         entry.login = undefined
         publish(ws.id, value)
         return
@@ -167,7 +167,10 @@ export function createAgentStore(options: AgentStoreOptions) {
       const result = await starting
       login.starting = undefined
       login.state = { state: 'pending', ...(result.url ? { url: result.url } : {}) }
-      publish(ws.id, entry.cached?.value ?? { available: false, reason: 'Waiting for sign-in' })
+      publish(
+        ws.id,
+        entry.cached?.value ?? { status: 'login-required', reason: 'Waiting for sign-in' }
+      )
       watch(ws, login)
       return result
     } catch (err) {
@@ -189,7 +192,7 @@ export function createAgentStore(options: AgentStoreOptions) {
 export type AgentStore = ReturnType<typeof createAgentStore>
 
 export const agentStore = createAgentStore({
-  probe: async ws => (await harnessFor(ws).availability?.(ws)) ?? { available: true },
+  probe: async ws => (await harnessFor(ws).availability?.(ws)) ?? { status: 'available' },
   startLogin: ws => {
     const start = harnessFor(ws).startLogin
     if (!start) throw new Error('This agent requires terminal sign-in')

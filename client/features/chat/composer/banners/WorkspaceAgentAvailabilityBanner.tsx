@@ -1,14 +1,21 @@
-import { useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 
-import { IconLoader2, IconLogin } from '@tabler/icons-react'
+import {
+  IconAlertCircle,
+  IconLoader2,
+  IconLogin,
+  IconPlugConnectedX,
+  type TablerIcon
+} from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
-import type { AgentLoginState, HarnessAvailability, HarnessLogin } from '@/lib/types'
+import type { WorkspaceAgentUnavailable } from '@/client/lib/workspace-agent-availability'
+import type { AgentLoginState, HarnessLogin } from '@/lib/types'
 
 import { ComposerBannerShell } from './ComposerBanner'
 
 type WorkspaceAgentAvailabilityBannerProps = {
-  availability: Extract<HarnessAvailability, { available: false }>
+  availability: WorkspaceAgentUnavailable
   // The server-owned ceremony. `pending` means some tab (maybe this one)
   // started a login and the server is watching for it to land; `failed` means
   // the last ceremony timed out or errored.
@@ -21,9 +28,35 @@ export function WorkspaceAgentAvailabilityBanner({
   login,
   onStartLogin
 }: WorkspaceAgentAvailabilityBannerProps) {
+  switch (availability.status) {
+    case 'login-required':
+      return <LoginRequiredBanner login={login} onStartLogin={onStartLogin} />
+    case 'disconnected':
+      return (
+        <AvailabilityMessage icon={IconPlugConnectedX}>Reconnecting to moi…</AvailabilityMessage>
+      )
+    case 'unavailable':
+      return <AvailabilityMessage icon={IconAlertCircle}>{availability.reason}</AvailabilityMessage>
+  }
+}
+
+type LoginRequiredBannerProps = Pick<
+  WorkspaceAgentAvailabilityBannerProps,
+  'login' | 'onStartLogin'
+>
+
+type LoginPhase = 'idle' | 'starting' | 'waiting'
+
+const LOGIN_PHASE_LABELS: Record<LoginPhase, string> = {
+  idle: 'Log in',
+  starting: 'Opening browser to sign in…',
+  waiting: 'Waiting for log in…'
+}
+
+function LoginRequiredBanner({ login, onStartLogin }: LoginRequiredBannerProps) {
   // Local phase only bridges the gap between the POST resolving and the
   // server's `agent:updated` event landing; the ceremony state is the truth.
-  const [phase, setPhase] = useState<'idle' | 'starting' | 'waiting'>('idle')
+  const [phase, setPhase] = useState<LoginPhase>('idle')
   const [error, setError] = useState<string | null>(null)
 
   // A settled ceremony (failed, or replaced by a fresh signed-out state)
@@ -32,9 +65,10 @@ export function WorkspaceAgentAvailabilityBanner({
     if (login?.state !== 'pending') setPhase('idle')
   }, [login?.state])
 
-  const waiting = login?.state === 'pending' || phase === 'waiting'
+  const effectivePhase = login?.state === 'pending' ? 'waiting' : phase
   const failure = login?.state === 'failed' ? login.reason : null
-  const busy = waiting || phase === 'starting'
+  const busy = effectivePhase !== 'idle'
+  const loginError = error ?? failure
 
   const startLogin = async () => {
     const authWindow = window.open('about:blank', 'moi-agent-login')
@@ -62,21 +96,27 @@ export function WorkspaceAgentAvailabilityBanner({
       <IconLogin size={20} stroke={1.5} />
       <div className="min-w-0 flex-1 space-y-1">
         <div className="wrap-break-word">Log in to your agent to send messages</div>
-        {(error ?? failure) && (
-          <div className="wrap-break-word text-destructive">{error ?? failure}</div>
-        )}
+        {loginError && <div className="wrap-break-word text-destructive">{loginError}</div>}
       </div>
 
-      {availability.loginCommand && (
-        <Button type="button" size="sm" onClick={() => void startLogin()} disabled={busy}>
-          {busy && <IconLoader2 stroke={1.75} className="animate-spin" />}
-          {phase === 'starting'
-            ? 'Opening browser to sign in…'
-            : waiting
-              ? 'Waiting for log in…'
-              : 'Log in'}
-        </Button>
-      )}
+      <Button type="button" size="sm" onClick={() => void startLogin()} disabled={busy}>
+        {busy && <IconLoader2 stroke={1.75} className="animate-spin" />}
+        {LOGIN_PHASE_LABELS[effectivePhase]}
+      </Button>
+    </ComposerBannerShell>
+  )
+}
+
+type AvailabilityMessageProps = {
+  icon: TablerIcon
+  children: ReactNode
+}
+
+function AvailabilityMessage({ icon: Icon, children }: AvailabilityMessageProps) {
+  return (
+    <ComposerBannerShell role="alert" className="flex items-center gap-2">
+      <Icon size={20} stroke={1.5} />
+      <div className="min-w-0 flex-1 wrap-break-word">{children}</div>
     </ComposerBannerShell>
   )
 }

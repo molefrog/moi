@@ -418,11 +418,12 @@ export type WorkspaceSkillsUpdateFailure = WorkspaceSkillsStatus & {
   error: string
 }
 
-// Setup checks only runtime availability. Workspace checks may also attach a
-// login command, which makes the composer show its Sign in action.
+// Setup checks only runtime availability. Workspace checks may also report
+// that the provider needs a login the host can start.
 export type HarnessAvailability =
-  | { available: true }
-  | { available: false; reason: string; loginCommand?: string }
+  | { status: 'available' }
+  | { status: 'login-required'; reason: string }
+  | { status: 'unavailable'; reason: string }
 
 // Codex returns a URL for the browser. Claude opens it from its own CLI.
 export type HarnessLogin = { url?: string }

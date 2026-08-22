@@ -20,8 +20,8 @@ const originalCodexListModels = codexHarness.listModels
 beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), 'moi-api-import-'))
   setRegistryPath(join(tempDir, 'workspaces.json'))
-  claudeCodeHarness.availability = async () => ({ available: true })
-  codexHarness.availability = async () => ({ available: true })
+  claudeCodeHarness.availability = async () => ({ status: 'available' })
+  codexHarness.availability = async () => ({ status: 'available' })
   // /agent bundles the model catalog; keep the probe out of these tests.
   claudeCodeHarness.listModels = async () => []
   codexHarness.listModels = async () => []
@@ -81,7 +81,7 @@ describe('workspace import provider', () => {
         'Run curl -fsSL https://chatgpt.com/codex/install.sh | sh in your terminal to install Codex'
     }
   ])('rejects unavailable $type before provisioning', async ({ type, harness, reason }) => {
-    harness.availability = async () => ({ available: false, reason })
+    harness.availability = async () => ({ status: 'unavailable', reason })
     const workspacePath = join(tempDir, type)
 
     const response = await api.request('/api/workspaces', {
@@ -108,7 +108,7 @@ describe('workspace import provider', () => {
         'Run curl -fsSL https://chatgpt.com/codex/install.sh | sh in your terminal to install Codex'
     }
   ])('reports unavailable $type for a registered workspace', async ({ type, harness, reason }) => {
-    harness.availability = async () => ({ available: false, reason })
+    harness.availability = async () => ({ status: 'unavailable', reason })
     const entry = await registerWorkspace(join(tempDir, type), { type })
 
     const response = await api.request(`/api/workspaces/${entry.id}/agent`)
@@ -116,26 +116,24 @@ describe('workspace import provider', () => {
     expect(response.status).toBe(200)
     const agent = (await response.json()) as WorkspaceAgent
     expect(agent.provider).toBe(type)
-    expect(agent.availability).toEqual({ available: false, reason })
+    expect(agent.availability).toEqual({ status: 'unavailable', reason })
   })
 
   test('reports a signed-out workspace and starts its login', async () => {
     codexHarness.availability = async ws =>
       ws
         ? {
-            available: false,
-            reason: 'Codex is signed out. Sign in to send messages',
-            loginCommand: 'codex login'
+            status: 'login-required',
+            reason: 'Codex is signed out. Sign in to send messages'
           }
-        : { available: true }
+        : { status: 'available' }
     codexHarness.startLogin = async () => ({ url: 'https://example.com/login' })
     const entry = await registerWorkspace(join(tempDir, 'codex-login'), { type: 'codex' })
 
     const response = await api.request(`/api/workspaces/${entry.id}/agent`)
     expect(((await response.json()) as WorkspaceAgent).availability).toEqual({
-      available: false,
-      reason: 'Codex is signed out. Sign in to send messages',
-      loginCommand: 'codex login'
+      status: 'login-required',
+      reason: 'Codex is signed out. Sign in to send messages'
     })
 
     const login = await api.request(`/api/workspaces/${entry.id}/auth/login`, { method: 'POST' })

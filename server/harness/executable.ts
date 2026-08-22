@@ -91,6 +91,6 @@ export async function pathHarnessAvailability(
   // probe anyway so the very first request can't report a false negative.
   if (path === undefined) await loginShellPath()
   return findHarnessExecutable(type, path)
-    ? { available: true }
-    : { available: false, reason: executableConfig[type].unavailableReason }
+    ? { status: 'available' }
+    : { status: 'unavailable', reason: executableConfig[type].unavailableReason }
 }

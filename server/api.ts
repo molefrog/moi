@@ -289,7 +289,7 @@ one.post('/view-builders/:builderId/submit', async c => {
     return c.text('Sketch attachment not found or expired', 400)
   }
   const availability = await workspaceTypeAvailability(ws.type ?? 'claude-code')
-  if (!availability.available) return c.text(availability.reason, 400)
+  if (availability.status !== 'available') return c.text(availability.reason, 400)
   try {
     const builder = await beginViewBuilder(
       ws.id,
@@ -966,7 +966,7 @@ workspaces.post('/', async c => {
   if (!isHarnessType(requestedType)) return c.text('Unknown workspace type', 400)
   const type: WorkspaceType = requestedType
   const availability = await workspaceTypeAvailability(type)
-  if (!availability.available) return c.text(availability.reason, 400)
+  if (availability.status !== 'available') return c.text(availability.reason, 400)
   const path = resolve(String(body.path))
   let metadata: WorkspaceImportMetadata
   try {
@@ -998,7 +998,7 @@ workspaces.get('/discover', async c => c.json(await discoverWorkspaces()))
 const CREATABLE_TYPES = new Set<WorkspaceType>(['claude-code', 'codex'])
 
 async function workspaceTypeAvailability(type: WorkspaceType): Promise<HarnessAvailability> {
-  return (await harnessFor(type).availability?.()) ?? { available: true }
+  return (await harnessFor(type).availability?.()) ?? { status: 'available' }
 }
 
 // Per-backend runtime availability, keyed by workspace type. Harnesses without
@@ -1036,7 +1036,7 @@ workspaces.post('/create', async c => {
     return c.text('Workspaces of this type arrive through discovery, not creation', 400)
   }
   const availability = await workspaceTypeAvailability(type)
-  if (!availability.available) return c.text(availability.reason, 400)
+  if (availability.status !== 'available') return c.text(availability.reason, 400)
   const name = typeof body?.name === 'string' ? body.name.trim() : ''
   const invalid = validateWorkspaceFolderName(name)
   if (invalid) return c.text(invalid, 400)

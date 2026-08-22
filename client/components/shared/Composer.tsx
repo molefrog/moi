@@ -5,6 +5,7 @@ import { IconArrowUp } from '@tabler/icons-react'
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { cn } from '@/client/lib/cn'
+import type { WorkspaceAgentAvailability } from '@/client/lib/workspace-agent-availability'
 import { Spinner } from '../ui/spinner'
 
 type ComposerProps = Omit<ComponentProps<'form'>, 'ref'> & {
@@ -77,13 +78,8 @@ export function ComposerFooter({ className, children, ...props }: ComposerFooter
   )
 }
 
-export type ComposerAvailability =
-  | { status: 'checking' }
-  | { status: 'available' }
-  | { status: 'unavailable' }
-
 export function composerAvailabilityTooltip(
-  availability: ComposerAvailability
+  availability: WorkspaceAgentAvailability
 ): string | undefined {
   if (availability.status === 'checking') return 'Checking agent status…'
   return undefined
@@ -92,7 +88,7 @@ export function composerAvailabilityTooltip(
 export function canSubmitComposerAction(
   hasContent: boolean,
   busy: boolean,
-  availability: ComposerAvailability
+  availability: WorkspaceAgentAvailability
 ): boolean {
   return hasContent && !busy && availability.status === 'available'
 }
@@ -102,7 +98,7 @@ type ComposerSubmitButtonProps = {
   hasContent: boolean
   busy?: boolean
   loading?: boolean
-  availability: ComposerAvailability
+  availability: WorkspaceAgentAvailability
 }
 
 export function ComposerSubmitButton({

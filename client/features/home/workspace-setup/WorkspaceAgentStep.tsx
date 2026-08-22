@@ -52,7 +52,7 @@ export function getWorkspaceAgentOptions({
 }: WorkspaceAgentOptionsInput): WorkspaceAgentOption[] {
   return WORKSPACE_TYPE_ORDER.map(type => {
     const state = availability?.[type]
-    const unavailableReason = state?.available === false ? state.reason : undefined
+    const unavailableReason = state && state.status !== 'available' ? state.reason : undefined
     const importOnlyReason = !detectedTypes.includes(type)
       ? IMPORT_ONLY_DESCRIPTION[type]
       : undefined

@@ -1,5 +1,8 @@
-import type { ComposerAvailability } from '@/client/components/shared/Composer'
 import { startWorkspaceLogin, useWorkspaceAgent } from '@/client/features/workspace/api'
+import {
+  resolveWorkspaceAgentAvailability,
+  type WorkspaceAgentAvailability
+} from '@/client/lib/workspace-agent-availability'
 
 import { ChatErrorBanner } from './banners/ChatErrorBanner'
 import { resolveComposerBanner, type ComposerBanner } from './banners/ComposerBanner'
@@ -15,7 +18,7 @@ type WorkspaceComposerStateOptions = {
 type WorkspaceComposerState = {
   composerBanner?: ComposerBanner
   builderComposerBanner?: ComposerBanner
-  composerAvailability: ComposerAvailability
+  agentAvailability: WorkspaceAgentAvailability
 }
 
 export function useWorkspaceComposerState(
@@ -25,21 +28,11 @@ export function useWorkspaceComposerState(
   const { data: agent, error } = useWorkspaceAgent(workspaceId)
   const availability = agent?.availability
   const { bannerProps: skillUpdateBanner } = useWorkspaceSkillUpdates(workspaceId)
-
-  let unavailable = availability?.available === false ? availability : undefined
-  if (error) {
-    unavailable = {
-      available: false,
-      reason: `Could not check agent status: ${error.message}`
-    }
-  }
-
-  let composerAvailability: ComposerAvailability = { status: 'checking' }
-  if (unavailable) {
-    composerAvailability = { status: 'unavailable' }
-  } else if (availability) {
-    composerAvailability = { status: 'available' }
-  }
+  const agentAvailability = resolveWorkspaceAgentAvailability(availability, Boolean(error))
+  const unavailable =
+    agentAvailability.status === 'checking' || agentAvailability.status === 'available'
+      ? undefined
+      : agentAvailability
 
   const agentUnavailableBanner: ComposerBanner | undefined = unavailable
     ? {
@@ -75,5 +68,5 @@ export function useWorkspaceComposerState(
     skillUpdate
   })
 
-  return { composerAvailability, composerBanner, builderComposerBanner }
+  return { agentAvailability, composerBanner, builderComposerBanner }
 }
