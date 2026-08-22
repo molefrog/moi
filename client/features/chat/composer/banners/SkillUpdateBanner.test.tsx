@@ -3,17 +3,15 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, test } from 'bun:test'
 
-import { WorkspaceSkillUpdateBanner } from './WorkspaceSkillUpdateBanner'
+import { SkillUpdateBanner } from './SkillUpdateBanner'
 import {
   shouldAutomaticallyUpdateWorkspaceSkills,
-  shouldShowWorkspaceSkillUpdateBanner
+  shouldShowSkillUpdateBanner
 } from '../useWorkspaceSkillUpdates'
 
-function renderBanner(
-  props: Partial<Parameters<typeof WorkspaceSkillUpdateBanner>[0]> = {}
-): string {
+function renderBanner(props: Partial<Parameters<typeof SkillUpdateBanner>[0]> = {}): string {
   return renderToStaticMarkup(
-    createElement(WorkspaceSkillUpdateBanner, {
+    createElement(SkillUpdateBanner, {
       error: null,
       pendingAction: null,
       onUpdate: () => undefined,
@@ -23,7 +21,7 @@ function renderBanner(
   )
 }
 
-describe('WorkspaceSkillUpdateBanner', () => {
+describe('SkillUpdateBanner', () => {
   test('renders the primary, secondary, and dismiss actions', () => {
     const html = renderBanner()
 
@@ -71,14 +69,14 @@ describe('WorkspaceSkillUpdateBanner', () => {
 describe('workspace skill banner visibility', () => {
   test('shows an available update once per manual visit', () => {
     expect(
-      shouldShowWorkspaceSkillUpdateBanner({
+      shouldShowSkillUpdateBanner({
         updateAvailable: true,
         autoUpdateEnabled: false,
         phase: 'idle'
       })
     ).toBe(true)
     expect(
-      shouldShowWorkspaceSkillUpdateBanner({
+      shouldShowSkillUpdateBanner({
         updateAvailable: true,
         autoUpdateEnabled: false,
         phase: 'dismissed'
@@ -88,7 +86,7 @@ describe('workspace skill banner visibility', () => {
 
   test('keeps an engaged automatic update visible', () => {
     expect(
-      shouldShowWorkspaceSkillUpdateBanner({
+      shouldShowSkillUpdateBanner({
         updateAvailable: true,
         autoUpdateEnabled: true,
         phase: 'active'
@@ -98,7 +96,7 @@ describe('workspace skill banner visibility', () => {
 
   test('does not open a fresh prompt when automatic updates are enabled', () => {
     expect(
-      shouldShowWorkspaceSkillUpdateBanner({
+      shouldShowSkillUpdateBanner({
         updateAvailable: true,
         autoUpdateEnabled: true,
         phase: 'idle'

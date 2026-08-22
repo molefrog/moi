@@ -1,10 +1,10 @@
 import { startWorkspaceLogin, useWorkspaceAgent } from '@/client/features/workspace/api'
 import { resolveAgentAvailability, type AgentAvailability } from '@/client/lib/agent-availability'
 
-import { ChatErrorBanner } from './banners/ChatErrorBanner'
+import { ErrorBanner } from './banners/ErrorBanner'
 import { resolveComposerBanner, type ComposerBanner } from './banners/ComposerBanner'
 import { AgentAvailabilityBanner } from './banners/AgentAvailabilityBanner'
-import { WorkspaceSkillUpdateBanner } from './banners/WorkspaceSkillUpdateBanner'
+import { SkillUpdateBanner } from './banners/SkillUpdateBanner'
 import { useWorkspaceSkillUpdates } from './useWorkspaceSkillUpdates'
 
 type WorkspaceComposerStateOptions = {
@@ -46,13 +46,13 @@ export function useWorkspaceComposerState(
   const chatErrorBanner: ComposerBanner | undefined = chatError
     ? {
         tone: 'error',
-        content: <ChatErrorBanner error={chatError} onDismiss={onDismissChatError} />
+        content: <ErrorBanner error={chatError} onDismiss={onDismissChatError} />
       }
     : undefined
   const skillUpdate: ComposerBanner | undefined = skillUpdateBanner
     ? {
         tone: 'default',
-        content: <WorkspaceSkillUpdateBanner {...skillUpdateBanner} />
+        content: <SkillUpdateBanner {...skillUpdateBanner} />
       }
     : undefined
   const composerBanner = resolveComposerBanner({

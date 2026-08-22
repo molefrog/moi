@@ -4,9 +4,9 @@ import { useAppSettings, useSaveAppSettings } from '@/client/features/settings/a
 import { useUpdateWorkspaceSkills, useWorkspaceSkills } from '@/client/features/workspace/api'
 
 import type {
-  WorkspaceSkillUpdateAction,
-  WorkspaceSkillUpdateBannerProps
-} from './banners/WorkspaceSkillUpdateBanner'
+  SkillUpdateBannerProps,
+  WorkspaceSkillUpdateAction
+} from './banners/SkillUpdateBanner'
 
 type VisitPhase = 'idle' | 'active' | 'dismissed'
 
@@ -18,7 +18,7 @@ type VisitState = {
 }
 
 export type WorkspaceSkillUpdates = {
-  bannerProps: WorkspaceSkillUpdateBannerProps | null
+  bannerProps: SkillUpdateBannerProps | null
 }
 
 function initialVisitState(workspaceId: string): VisitState {
@@ -30,7 +30,7 @@ function initialVisitState(workspaceId: string): VisitState {
   }
 }
 
-export function shouldShowWorkspaceSkillUpdateBanner(input: {
+export function shouldShowSkillUpdateBanner(input: {
   updateAvailable: boolean
   autoUpdateEnabled: boolean
   phase: VisitPhase
@@ -136,7 +136,7 @@ export function useWorkspaceSkillUpdates(workspaceId: string): WorkspaceSkillUpd
 
   const visible =
     settingsReady &&
-    shouldShowWorkspaceSkillUpdateBanner({
+    shouldShowSkillUpdateBanner({
       updateAvailable,
       autoUpdateEnabled,
       phase: currentVisit.phase
