@@ -255,10 +255,7 @@ frame tokens onto the wrapper is a possible follow-up.
    offline transform tests in `server/test/ui-components.test.ts`.
 3. **Skill** — ✅ SKILL.md pointer + `references/UI-COMPONENTS.md` cheat
    sheet (catalog at a glance, install/rebuild responsibility, the
-   relative-import rule, per-kind fit). TEMPORARILY gated: the section and
-   cheat sheet install only for workspaces created with
-   `moi init --experimental-shadcn` (marker-stripped otherwise; the
-   installed SKILL.md carries the choice across `moi skill update` — see
-   `server/skills-template.ts`). The command itself is always available;
-   the gate only controls whether the skill advertises it. Remove when the
-   feature graduates.
+   relative-import rule, per-kind fit). Ships to every workspace as of skill
+   version 0.15.0 — the `moi init --experimental-shadcn` gate is gone.
+   Workspaces installed before that get the section on their next
+   `moi skill update`.

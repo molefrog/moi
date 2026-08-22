@@ -36,28 +36,17 @@ export type ProvisionResult = {
   scaffold: 'exists' | 'installing' | number
 }
 
-export type ProvisionOptions = {
-  // TEMPORARY: include the experimental ui-components section in the
-  // installed skill (`moi init --experimental-shadcn`). Omitted or false, a
-  // workspace that opted in earlier keeps the section — the installed
-  // SKILL.md carries the choice (see skills-template.ts).
-  experimentalShadcn?: boolean
-}
-
 // Lay down everything a workspace needs: create the folder, copy the bundled
 // skills into the backend's skills dir, and bootstrap `.moi/`. Idempotent —
 // re-running refreshes skills and leaves an existing `.moi/` untouched.
 // Registration in the workspace registry is a separate, caller-owned step.
 export async function provisionWorkspace(
   workspaceRoot: string,
-  type?: WorkspaceType,
-  options: ProvisionOptions = {}
+  type?: WorkspaceType
 ): Promise<ProvisionResult> {
   const skillsDir = skillsDirFor(workspaceRoot, type)
   await mkdir(workspaceRoot, { recursive: true })
-  await installBundledSkills(skillsDir, {
-    experimentalShadcn: options.experimentalShadcn || undefined
-  })
+  await installBundledSkills(skillsDir)
   const scaffold = await scaffoldMoiDir(workspaceRoot)
   return { skillsDir, scaffold }
 }
