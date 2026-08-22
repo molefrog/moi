@@ -70,7 +70,7 @@ type AgentBlobatarProps = {
 }
 
 function AgentBlobatar({
-  size = 64,
+  size = 56,
   preset = DEFAULT_WORKSPACE_THEME.agent,
   animated = false,
   color = 'default',
