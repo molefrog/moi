@@ -9,10 +9,13 @@
 // written to `.moi/ui/` and imported relatively (`../ui/button`). The command
 // writes source files and nothing else: it never installs dependencies and
 // never rebuilds — it prints next steps for the agent instead.
-import { getRegistryItems } from 'shadcn/registry'
-import { transformIcons, transformMenu } from 'shadcn/utils'
-import { Project, ScriptKind, SyntaxKind } from 'ts-morph'
-import type { SourceFile } from 'ts-morph'
+// `shadcn/registry`, `shadcn/utils` and `ts-morph` are imported at their call
+// sites rather than here, deliberately. Together they are ~31 MB of JS across
+// 1600 modules (ts-morph alone embeds the whole TypeScript compiler), and the
+// cost is parse + top-level evaluation, so bundling does not help — measured
+// at ~300 ms. Only `moi ui-components add` ever fetches or transforms; a
+// static import here made every `moi` command pay it, `moi version` included.
+import type { Project, SourceFile } from 'ts-morph'
 import { join } from 'path'
 
 // ---------------------------------------------------------------------------
@@ -265,6 +268,8 @@ export async function fetchUiComponents(registryNames: string[]): Promise<Fetche
   const fetched = new Set<string>()
   let queue = [...new Set(['utils', ...registryNames])]
 
+  const { getRegistryItems } = await import('shadcn/registry')
+
   while (queue.length > 0) {
     const batch = queue.filter(name => !fetched.has(name))
     if (batch.length === 0) break
@@ -330,7 +335,12 @@ function rewriteRegistryImports(sourceFile: SourceFile): void {
 // `ui/applet-portal.tsx`) that re-establishes the scope attribute on the
 // portalled subtree. Type positions (`X.Portal.Props`) are untouched — the
 // rewrite only sees JSX tag names.
-function rewritePortals(sourceFile: SourceFile): boolean {
+// `SyntaxKind` is passed in rather than imported: ts-morph is loaded lazily by
+// the one caller below, so this helper cannot close over a module-level import.
+function rewritePortals(
+  sourceFile: SourceFile,
+  SyntaxKind: typeof import('ts-morph').SyntaxKind
+): boolean {
   const PORTAL_TAG = /^[A-Za-z_$][\w$]*\.Portal$/
   let touched = false
 
@@ -369,6 +379,9 @@ let project: Project | undefined
 // (cn-menu-* classes for the default menu color), then the relative-import
 // rewrite and the portal codemod.
 export async function transformUiComponentSource(name: string, raw: string): Promise<string> {
+  const { Project, ScriptKind, SyntaxKind } = await import('ts-morph')
+  const { transformIcons, transformMenu } = await import('shadcn/utils')
+
   project ??= new Project({ useInMemoryFileSystem: true })
   const sourceFile = project.createSourceFile(`moi-ui/${name}`, raw, {
     scriptKind: name.endsWith('.tsx') ? ScriptKind.TSX : ScriptKind.TS,
@@ -378,7 +391,7 @@ export async function transformUiComponentSource(name: string, raw: string): Pro
   await transformIcons(opts)
   await transformMenu(opts)
   rewriteRegistryImports(sourceFile)
-  rewritePortals(sourceFile)
+  rewritePortals(sourceFile, SyntaxKind)
   return sourceFile.getFullText()
 }
 

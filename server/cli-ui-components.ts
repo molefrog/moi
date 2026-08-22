@@ -240,20 +240,19 @@ const list = defineCommand({
   }
 })
 
-const uiComponentsSubCommands = { add, docs, list }
+// Exported so cli.ts can keep a static command shell (name + description, all
+// the root help needs) and pull this module in only when a subcommand actually
+// runs — see the lazy `uiComponents` there.
+export const uiComponentsSubCommands = { add, docs, list }
 
-export const uiComponents = defineCommand({
-  meta: {
-    name: 'ui-components',
-    description: 'Standard UI components for applets (curated shadcn set)'
-  },
-  subCommands: uiComponentsSubCommands,
-  async run({ rawArgs }) {
-    // citty invokes the parent run even after dispatching a subcommand — only
-    // render the catalog when no subcommand ran (same pattern as `moi env`).
-    const first = rawArgs.find(a => !a.startsWith('-'))
-    if (first && Object.hasOwn(uiComponentsSubCommands, first)) return
-    const entry = await resolveCwdWorkspace()
-    renderCatalog(uiDirFor(entry.path))
-  }
-})
+// The bare `moi ui-components` behavior, factored out of the command object so
+// cli.ts can invoke it from a static shell without importing this module until
+// the command actually runs.
+export async function runUiComponentsCatalog(rawArgs: string[]): Promise<void> {
+  // citty invokes the parent run even after dispatching a subcommand — only
+  // render the catalog when no subcommand ran (same pattern as `moi env`).
+  const first = rawArgs.find(a => !a.startsWith('-'))
+  if (first && Object.hasOwn(uiComponentsSubCommands, first)) return
+  const entry = await resolveCwdWorkspace()
+  renderCatalog(uiDirFor(entry.path))
+}

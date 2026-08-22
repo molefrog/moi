@@ -41,7 +41,6 @@ import {
   renderEnvView,
   resolveCwdWorkspace
 } from './cli-env'
-import { uiComponents } from './cli-ui-components'
 import { columns, keyValue } from './cli-ui'
 import { CONTROL_HOST, CONTROL_PORT, CONTROL_URL, PORT } from './constants'
 import { type ControlProbe, controlFailureMessage, probeControlServer } from './control-client'
@@ -2929,6 +2928,25 @@ const version = defineCommand({
   meta: { name: 'version', description: 'Print the moi version' },
   run() {
     console.log(versionWithCommit())
+  }
+})
+
+// A static shell over ./cli-ui-components, which reaches `shadcn` and
+// `ts-morph` — ~31 MB of JS that costs ~300 ms to parse and evaluate. The meta
+// is inlined here (duplicating the real command's) because it is all the root
+// help needs: both citty's usage renderer and printMainHelp read only
+// `meta.description`, so a lazily-resolved subcommand would be imported by
+// every `moi --help`. Keeping the shell static defers the module to the point
+// where a subcommand actually runs.
+const uiComponents = defineCommand({
+  meta: {
+    name: 'ui-components',
+    description: 'Standard UI components for applets (curated shadcn set)'
+  },
+  subCommands: () => import('./cli-ui-components').then(m => m.uiComponentsSubCommands),
+  async run({ rawArgs }) {
+    const { runUiComponentsCatalog } = await import('./cli-ui-components')
+    await runUiComponentsCatalog(rawArgs)
   }
 })
 
