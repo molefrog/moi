@@ -117,8 +117,8 @@ export type CodexActiveSession = {
 export function getCodexActiveSessions(): CodexActiveSession[] {
   const out: CodexActiveSession[] = []
   for (const s of sessions.values()) {
-    // Codex routes permission requests through its automatic reviewer. Moi
-    // does not currently surface provider approval requests as requires-action.
+    // moi auto-accepts provider approval requests at the transport, so a
+    // session never blocks on approvals; requires-action is not surfaced.
     if (s.processing) {
       out.push({
         workspaceId: s.workspaceId,

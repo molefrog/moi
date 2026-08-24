@@ -25,6 +25,7 @@ import {
 } from './adapter'
 import type { WorkspaceActivityPreview } from '../types'
 import { findHarnessExecutable, requireHarnessExecutable } from '../executable'
+import { codexServerRequestResponse } from './permissions'
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
 import { resolveWorkspaceEnv } from '../../workspace-env'
@@ -160,16 +161,12 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
     }
   }
 
-  // Server→client requests MUST be answered or the turn hangs. Permission
-  // requests normally stay inside Codex's automatic reviewer. Anything that
-  // reaches this transport fallback fails closed instead of bypassing review.
+  // Server→client requests MUST be answered or the turn hangs. moi approves
+  // approval requests by default — an interim policy until UI approvals land;
+  // non-approval requests are rejected as unsupported.
   function answerServerRequest(msg: Json) {
     const method = msg.method as string
-    send({
-      jsonrpc: '2.0',
-      id: msg.id,
-      error: { code: -32601, message: `moi does not handle ${method}` }
-    })
+    send({ jsonrpc: '2.0', id: msg.id, ...codexServerRequestResponse(method) })
   }
 
   function handleLine(line: string) {

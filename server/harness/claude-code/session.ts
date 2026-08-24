@@ -610,6 +610,10 @@ function createLiveSession(input: {
     // live token-by-token preview. Off = unchanged behavior (whole blocks only).
     includePartialMessages: input.stream,
     permissionMode: 'auto',
+    // The auto-mode classifier reviews most actions on its own; whatever still
+    // escalates to a permission prompt (ask rules, MCP tools that require
+    // interaction) is approved here by default until UI approvals land.
+    canUseTool: async (_toolName, input) => ({ behavior: 'allow', updatedInput: input }),
     settingSources: ['user', 'project'],
     // MOI_AGENT marks every shell this session spawns as agent-driven (the
     // moi CLI reads it — see agent-caller.ts), surviving the CLAUDECODE strip.
