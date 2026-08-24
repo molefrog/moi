@@ -9,54 +9,23 @@ const unavailable: HarnessAvailability = {
   reason: 'Could not check the Claude login status'
 }
 
-test('accepts an explicit logged-in Claude status', () => {
-  expect(
-    claudeAuthReadiness({
-      exitCode: 0,
-      stdout: JSON.stringify({ loggedIn: true, authMethod: 'oauth' }),
-      timedOut: false
-    })
-  ).toEqual({ status: 'available' })
+test('accepts the documented logged-in exit code', () => {
+  expect(claudeAuthReadiness({ exitCode: 0, timedOut: false })).toEqual({
+    status: 'available'
+  })
 })
 
-test('requires login only for an explicit signed-out Claude status', () => {
-  expect(
-    claudeAuthReadiness({
-      exitCode: 1,
-      stdout: JSON.stringify({ loggedIn: false, authMethod: 'none' }),
-      timedOut: false
-    })
-  ).toEqual({
+test('requires login only for the documented signed-out exit code', () => {
+  expect(claudeAuthReadiness({ exitCode: 1, timedOut: false })).toEqual({
     status: 'login-required',
     reason: 'Claude is signed out. Sign in to send messages'
   })
 })
 
-test('reports malformed Claude auth output as unavailable', () => {
-  expect(claudeAuthReadiness({ exitCode: 1, stdout: 'not json', timedOut: false })).toEqual(
-    unavailable
-  )
-  expect(claudeAuthReadiness({ exitCode: 1, stdout: JSON.stringify({}), timedOut: false })).toEqual(
-    unavailable
-  )
-})
-
 test('reports a timed-out Claude auth probe as unavailable', () => {
-  expect(
-    claudeAuthReadiness({
-      exitCode: 1,
-      stdout: JSON.stringify({ loggedIn: false }),
-      timedOut: true
-    })
-  ).toEqual(unavailable)
+  expect(claudeAuthReadiness({ exitCode: 1, timedOut: true })).toEqual(unavailable)
 })
 
 test('reports an abnormal Claude auth exit as unavailable', () => {
-  expect(
-    claudeAuthReadiness({
-      exitCode: 2,
-      stdout: JSON.stringify({ loggedIn: true }),
-      timedOut: false
-    })
-  ).toEqual(unavailable)
+  expect(claudeAuthReadiness({ exitCode: 2, timedOut: false })).toEqual(unavailable)
 })
