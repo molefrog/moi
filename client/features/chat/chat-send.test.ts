@@ -77,7 +77,7 @@ describe('startOptimisticSession', () => {
 describe('resolveChatRunOptions', () => {
   const models: WorkspaceAgent = {
     provider: 'claude-code',
-    availability: { available: true },
+    availability: { status: 'available' },
     supportsStreaming: true,
     models: [
       {

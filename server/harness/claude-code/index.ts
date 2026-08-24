@@ -99,7 +99,7 @@ export const claudeCodeHarness: Harness = {
   discoverWorkspaces,
   availability: async ws => {
     const runtime = await pathHarnessAvailability('claude-code')
-    return runtime.available && ws ? getClaudeAuthReadiness(ws.path) : runtime
+    return runtime.status === 'available' && ws ? getClaudeAuthReadiness(ws.path) : runtime
   },
   startLogin: ws => startClaudeLogin(ws.path),
 

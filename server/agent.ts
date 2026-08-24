@@ -2,11 +2,11 @@
 //
 // The client never polls for auth. `GET /api/workspaces/:id/agent` serves the
 // snapshot from this store (one probe per workspace inside the TTL, however
-// many tabs are open); `POST .../auth/login` starts — or joins — the single
-// ceremony per workspace. While a ceremony is pending, a watch loop re-probes
-// the provider until the login lands or the deadline passes, and every
-// transition is pushed to all tabs as an `agent:updated` event on the
-// workspace events socket.
+// many tabs are open); `POST .../auth/login` starts a ceremony per workspace.
+// Browser-based logins reuse their pending URL, while URL-less provider flows
+// can be started again. A watch loop re-probes until the login lands or the
+// deadline passes, and every transition is pushed to all tabs as an
+// `agent:updated` event on the workspace events socket.
 import type {
   AgentLoginState,
   HarnessAvailability,
@@ -53,6 +53,17 @@ type AgentEntry = {
   login?: LoginCeremony
 }
 
+function failedProbeAvailability(ws: AgentWorkspace, err: unknown): HarnessAvailability {
+  console.error(`[agent] availability probe failed for ${ws.type ?? 'claude-code'}`, err)
+  return { status: 'unavailable', reason: 'Could not check agent availability' }
+}
+
+function sameAvailability(a: HarnessAvailability, b: HarnessAvailability): boolean {
+  if (a.status !== b.status) return false
+  if (a.status === 'available' || b.status === 'available') return true
+  return a.reason === b.reason
+}
+
 export function createAgentStore(options: AgentStoreOptions) {
   const ttlMs = options.availabilityTtlMs ?? 30_000
   const pollMs = options.loginPollMs ?? 2_000
@@ -81,9 +92,12 @@ export function createAgentStore(options: AgentStoreOptions) {
   async function probeFresh(ws: AgentWorkspace): Promise<HarnessAvailability> {
     const entry = entryFor(ws.id)
     if (!entry.probe) {
-      entry.probe = options.probe(ws).finally(() => {
-        entry.probe = undefined
-      })
+      entry.probe = Promise.resolve()
+        .then(() => options.probe(ws))
+        .catch(err => failedProbeAvailability(ws, err))
+        .finally(() => {
+          entry.probe = undefined
+        })
     }
     const value = await entry.probe
     entry.cached = { value, checkedAt: Date.now() }
@@ -114,24 +128,24 @@ export function createAgentStore(options: AgentStoreOptions) {
 
   // Re-probe until the login lands or the deadline passes. One loop per
   // ceremony; a replaced or completed ceremony stops its loop.
-  function watch(ws: AgentWorkspace, login: LoginCeremony) {
+  function watch(
+    ws: AgentWorkspace,
+    login: LoginCeremony,
+    initialAvailability: HarnessAvailability
+  ) {
     const deadline = Date.now() + deadlineMs
     let stopped = false
+    let publishedAvailability = initialAvailability
     let timer: ReturnType<typeof setTimeout>
     login.stop = () => {
       stopped = true
       clearTimeout(timer)
     }
     const tick = async () => {
-      let value: HarnessAvailability
-      try {
-        value = await probeFresh(ws)
-      } catch {
-        value = { available: false, reason: 'Could not verify the login' }
-      }
+      const value = await probeFresh(ws)
       if (stopped) return
       const entry = entryFor(ws.id)
-      if (value.available) {
+      if (value.status === 'available') {
         entry.login = undefined
         publish(ws.id, value)
         return
@@ -143,6 +157,10 @@ export function createAgentStore(options: AgentStoreOptions) {
         publish(ws.id, value)
         return
       }
+      if (!sameAvailability(value, publishedAvailability)) {
+        publishedAvailability = value
+        publish(ws.id, value)
+      }
       timer = setTimeout(tick, pollMs)
       timer.unref?.()
     }
@@ -153,11 +171,13 @@ export function createAgentStore(options: AgentStoreOptions) {
 
   async function startLogin(ws: AgentWorkspace): Promise<HarnessLogin> {
     const entry = entryFor(ws.id)
-    // Join the in-flight ceremony instead of starting a second provider flow
-    // (two tabs, a remount, a double-click — all land here).
+    // Concurrent starts share the provider call. Once started, browser-based
+    // flows reuse their URL; URL-less flows can be launched again on demand.
     const current = entry.login
     if (current?.starting) return current.starting
-    if (current?.state.state === 'pending') return { url: current.state.url }
+    if (current?.state.state === 'pending' && current.state.url) {
+      return { url: current.state.url }
+    }
 
     current?.stop()
     const starting = options.startLogin(ws)
@@ -167,8 +187,12 @@ export function createAgentStore(options: AgentStoreOptions) {
       const result = await starting
       login.starting = undefined
       login.state = { state: 'pending', ...(result.url ? { url: result.url } : {}) }
-      publish(ws.id, entry.cached?.value ?? { available: false, reason: 'Waiting for sign-in' })
-      watch(ws, login)
+      const availability = entry.cached?.value ?? {
+        status: 'login-required',
+        reason: 'Waiting for sign-in'
+      }
+      publish(ws.id, availability)
+      watch(ws, login, availability)
       return result
     } catch (err) {
       entry.login = undefined
@@ -189,7 +213,7 @@ export function createAgentStore(options: AgentStoreOptions) {
 export type AgentStore = ReturnType<typeof createAgentStore>
 
 export const agentStore = createAgentStore({
-  probe: async ws => (await harnessFor(ws).availability?.(ws)) ?? { available: true },
+  probe: async ws => (await harnessFor(ws).availability?.(ws)) ?? { status: 'available' },
   startLogin: ws => {
     const start = harnessFor(ws).startLogin
     if (!start) throw new Error('This agent requires terminal sign-in')

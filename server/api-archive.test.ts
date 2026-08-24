@@ -133,8 +133,8 @@ test('every provider supports archiving, openclaw via gateway patch', async () =
   const openclaw = await registerWorkspace(join(tempDir, 'openclaw'), { type: 'openclaw' })
   claudeCodeHarness.listModels = async () => []
   codexHarness.listModels = async () => []
-  claudeCodeHarness.availability = async () => ({ available: true })
-  codexHarness.availability = async () => ({ available: true })
+  claudeCodeHarness.availability = async () => ({ status: 'available' })
+  codexHarness.availability = async () => ({ status: 'available' })
   const archived: string[] = []
   openclawHarness.interrupt = async () => {}
   openclawHarness.archiveSession = async (_, sessionId) => {

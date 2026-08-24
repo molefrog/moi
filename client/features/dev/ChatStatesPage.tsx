@@ -23,7 +23,7 @@ import {
 } from '@/client/components/ui/dropdown-menu'
 import { Switch } from '@/client/components/ui/switch'
 import { ChatNoticeRow } from '@/client/features/chat/ChatPanel'
-import { ChatErrorBanner } from '@/client/features/chat/composer/banners/ChatErrorBanner'
+import { ErrorBanner } from '@/client/features/chat/composer/banners/ErrorBanner'
 import { ChatSessionItem } from '@/client/features/chat/ChatSelector'
 import { TurnView } from '@/client/features/chat/TurnView'
 import { isSessionRunning, liveStore } from '@/client/features/chat/chat-store'
@@ -330,7 +330,7 @@ export function ChatStatesPage() {
 
               {showError && (
                 <div className="mt-6 flex w-full flex-col gap-2 rounded-t-xl rounded-b-2xl bg-destructive/10 p-2">
-                  <ChatErrorBanner error={chatError} onDismiss={() => setShowError(false)} />
+                  <ErrorBanner error={chatError} onDismiss={() => setShowError(false)} />
                 </div>
               )}
             </div>

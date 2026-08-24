@@ -1,10 +1,10 @@
-import type { ComposerAvailability } from '@/client/components/shared/Composer'
 import { startWorkspaceLogin, useWorkspaceAgent } from '@/client/features/workspace/api'
+import { resolveAgentAvailability, type AgentAvailability } from '@/client/lib/agent-availability'
 
-import { ChatErrorBanner } from './banners/ChatErrorBanner'
+import { ErrorBanner } from './banners/ErrorBanner'
 import { resolveComposerBanner, type ComposerBanner } from './banners/ComposerBanner'
-import { WorkspaceAgentAvailabilityBanner } from './banners/WorkspaceAgentAvailabilityBanner'
-import { WorkspaceSkillUpdateBanner } from './banners/WorkspaceSkillUpdateBanner'
+import { AgentAvailabilityBanner } from './banners/AgentAvailabilityBanner'
+import { SkillUpdateBanner } from './banners/SkillUpdateBanner'
 import { useWorkspaceSkillUpdates } from './useWorkspaceSkillUpdates'
 
 type WorkspaceComposerStateOptions = {
@@ -15,7 +15,7 @@ type WorkspaceComposerStateOptions = {
 type WorkspaceComposerState = {
   composerBanner?: ComposerBanner
   builderComposerBanner?: ComposerBanner
-  composerAvailability: ComposerAvailability
+  agentAvailability: AgentAvailability
 }
 
 export function useWorkspaceComposerState(
@@ -25,27 +25,17 @@ export function useWorkspaceComposerState(
   const { data: agent, error } = useWorkspaceAgent(workspaceId)
   const availability = agent?.availability
   const { bannerProps: skillUpdateBanner } = useWorkspaceSkillUpdates(workspaceId)
-
-  let unavailable = availability?.available === false ? availability : undefined
-  if (error) {
-    unavailable = {
-      available: false,
-      reason: `Could not check agent status: ${error.message}`
-    }
-  }
-
-  let composerAvailability: ComposerAvailability = { status: 'checking' }
-  if (unavailable) {
-    composerAvailability = { status: 'unavailable' }
-  } else if (availability) {
-    composerAvailability = { status: 'available' }
-  }
+  const agentAvailability = resolveAgentAvailability(availability, Boolean(error))
+  const unavailable =
+    agentAvailability.status === 'checking' || agentAvailability.status === 'available'
+      ? undefined
+      : agentAvailability
 
   const agentUnavailableBanner: ComposerBanner | undefined = unavailable
     ? {
         tone: 'default',
         content: (
-          <WorkspaceAgentAvailabilityBanner
+          <AgentAvailabilityBanner
             availability={unavailable}
             login={agent?.login}
             onStartLogin={() => startWorkspaceLogin(workspaceId)}
@@ -56,13 +46,13 @@ export function useWorkspaceComposerState(
   const chatErrorBanner: ComposerBanner | undefined = chatError
     ? {
         tone: 'error',
-        content: <ChatErrorBanner error={chatError} onDismiss={onDismissChatError} />
+        content: <ErrorBanner error={chatError} onDismiss={onDismissChatError} />
       }
     : undefined
   const skillUpdate: ComposerBanner | undefined = skillUpdateBanner
     ? {
         tone: 'default',
-        content: <WorkspaceSkillUpdateBanner {...skillUpdateBanner} />
+        content: <SkillUpdateBanner {...skillUpdateBanner} />
       }
     : undefined
   const composerBanner = resolveComposerBanner({
@@ -75,5 +65,5 @@ export function useWorkspaceComposerState(
     skillUpdate
   })
 
-  return { composerAvailability, composerBanner, builderComposerBanner }
+  return { agentAvailability, composerBanner, builderComposerBanner }
 }

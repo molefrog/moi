@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test'
+import { expect, spyOn, test } from 'bun:test'
 
 import type { HarnessAvailability, WorkspaceEntry } from '@/lib/types'
 
@@ -8,9 +8,8 @@ import { createAgentStore } from './agent'
 const ws: WorkspaceEntry = { id: 'w1', path: '/tmp/w1', addedAt: '2026-01-01T00:00:00.000Z' }
 
 const signedOut: HarnessAvailability = {
-  available: false,
-  reason: 'Signed out',
-  loginCommand: 'codex login'
+  status: 'login-required',
+  reason: 'Signed out'
 }
 
 async function until(cond: () => boolean, ms = 2_000) {
@@ -26,19 +25,19 @@ test('serves the cached availability within the TTL and re-probes after invalida
   const store = createAgentStore({
     probe: async () => {
       probes++
-      return { available: true }
+      return { status: 'available' }
     },
     startLogin: async () => ({}),
     publish: () => {},
     availabilityTtlMs: 60_000
   })
 
-  expect(await store.getAvailability(ws)).toEqual({ available: true })
-  expect(await store.getAvailability(ws)).toEqual({ available: true })
+  expect(await store.getAvailability(ws)).toEqual({ status: 'available' })
+  expect(await store.getAvailability(ws)).toEqual({ status: 'available' })
   expect(probes).toBe(1)
 
   store.invalidate(ws.id)
-  expect(await store.getAvailability(ws)).toEqual({ available: true })
+  expect(await store.getAvailability(ws)).toEqual({ status: 'available' })
   expect(probes).toBe(2)
 })
 
@@ -49,25 +48,28 @@ test('refresh bypasses the TTL and publishes even when nothing else asked', asyn
   const store = createAgentStore({
     probe: async () => {
       probes++
-      return { available }
+      return available ? { status: 'available' } : { status: 'unavailable', reason: 'Signed out' }
     },
     startLogin: async () => ({}),
     publish: event => events.push(event),
     availabilityTtlMs: 60_000
   })
 
-  expect(await store.getAvailability(ws)).toEqual({ available: true })
+  expect(await store.getAvailability(ws)).toEqual({ status: 'available' })
   expect(probes).toBe(1)
 
   // The provider was signed out from outside moi; the cache doesn't know yet.
   available = false
-  expect(await store.getAvailability(ws)).toEqual({ available: true })
+  expect(await store.getAvailability(ws)).toEqual({ status: 'available' })
   expect(probes).toBe(1)
 
-  expect(await store.refresh(ws)).toEqual({ available: false })
+  expect(await store.refresh(ws)).toEqual({ status: 'unavailable', reason: 'Signed out' })
   expect(probes).toBe(2)
-  expect(events.at(-1)?.availability).toEqual({ available: false })
-  expect(await store.getAvailability(ws)).toEqual({ available: false })
+  expect(events.at(-1)?.availability).toEqual({ status: 'unavailable', reason: 'Signed out' })
+  expect(await store.getAvailability(ws)).toEqual({
+    status: 'unavailable',
+    reason: 'Signed out'
+  })
 })
 
 test('concurrent reads share one in-flight probe', async () => {
@@ -76,16 +78,43 @@ test('concurrent reads share one in-flight probe', async () => {
     probe: async () => {
       probes++
       await Bun.sleep(20)
-      return { available: true }
+      return { status: 'available' }
     },
     startLogin: async () => ({}),
     publish: () => {}
   })
 
   const [a, b] = await Promise.all([store.getAvailability(ws), store.getAvailability(ws)])
-  expect(a).toEqual({ available: true })
-  expect(b).toEqual({ available: true })
+  expect(a).toEqual({ status: 'available' })
+  expect(b).toEqual({ status: 'available' })
   expect(probes).toBe(1)
+})
+
+test('turns a rejected probe into a cached unavailable result', async () => {
+  const errorLog = spyOn(console, 'error').mockImplementation(() => {})
+  let probes = 0
+  const store = createAgentStore({
+    probe: async () => {
+      probes++
+      throw new Error('gateway down')
+    },
+    startLogin: async () => ({}),
+    publish: () => {},
+    availabilityTtlMs: 60_000
+  })
+
+  try {
+    const expected: HarnessAvailability = {
+      status: 'unavailable',
+      reason: 'Could not check agent availability'
+    }
+    expect(await store.getAvailability(ws)).toEqual(expected)
+    expect(await store.getAvailability(ws)).toEqual(expected)
+    expect(probes).toBe(1)
+    expect(errorLog).toHaveBeenCalledTimes(1)
+  } finally {
+    errorLog.mockRestore()
+  }
 })
 
 test('a second login start joins the pending ceremony', async () => {
@@ -109,11 +138,29 @@ test('a second login start joins the pending ceremony', async () => {
   expect(store.getLogin(ws.id)).toEqual({ state: 'pending', url: 'https://example.com/login' })
 })
 
+test('a second login start restarts a pending URL-less provider flow', async () => {
+  let starts = 0
+  const store = createAgentStore({
+    probe: async () => signedOut,
+    startLogin: async () => {
+      starts++
+      return {}
+    },
+    publish: () => {},
+    loginPollMs: 10_000
+  })
+
+  expect(await store.startLogin(ws)).toEqual({})
+  expect(await store.startLogin(ws)).toEqual({})
+  expect(starts).toBe(2)
+  expect(store.getLogin(ws.id)).toEqual({ state: 'pending' })
+})
+
 test('publishes the completed login and clears the ceremony', async () => {
   const events: AgentUpdatedEvent[] = []
   let loggedIn = false
   const store = createAgentStore({
-    probe: async () => (loggedIn ? { available: true } : signedOut),
+    probe: async () => (loggedIn ? { status: 'available' } : signedOut),
     startLogin: async () => ({ url: 'https://example.com/login' }),
     publish: event => events.push(event),
     availabilityTtlMs: 0,
@@ -126,10 +173,44 @@ test('publishes the completed login and clears the ceremony', async () => {
   expect(events.at(-1)?.login).toEqual({ state: 'pending', url: 'https://example.com/login' })
 
   loggedIn = true
-  await until(() => events.at(-1)?.availability.available === true)
+  await until(() => events.at(-1)?.availability.status === 'available')
   expect(events.at(-1)?.login).toBeUndefined()
   expect(store.getLogin(ws.id)).toBeUndefined()
-  expect(await store.getAvailability(ws)).toEqual({ available: true })
+  expect(await store.getAvailability(ws)).toEqual({ status: 'available' })
+})
+
+test('publishes one unavailable transition during login and keeps watching for recovery', async () => {
+  const events: AgentUpdatedEvent[] = []
+  let probes = 0
+  let availability: HarnessAvailability = signedOut
+  const store = createAgentStore({
+    probe: async () => {
+      probes++
+      return availability
+    },
+    startLogin: async () => ({ url: 'https://example.com/login' }),
+    publish: event => events.push(event),
+    availabilityTtlMs: 0,
+    loginPollMs: 5,
+    loginDeadlineMs: 60_000
+  })
+
+  await store.getAvailability(ws)
+  await store.startLogin(ws)
+  availability = { status: 'unavailable', reason: 'Codex app-server exited' }
+
+  await until(() => probes >= 4)
+  const unavailableEvents = events.filter(event => event.availability.status === 'unavailable')
+  expect(unavailableEvents).toHaveLength(1)
+  expect(unavailableEvents[0]?.login).toEqual({
+    state: 'pending',
+    url: 'https://example.com/login'
+  })
+
+  availability = { status: 'available' }
+  await until(() => events.at(-1)?.availability.status === 'available')
+  expect(events.at(-1)?.login).toBeUndefined()
+  expect(store.getLogin(ws.id)).toBeUndefined()
 })
 
 test('a ceremony that never lands fails at the deadline', async () => {

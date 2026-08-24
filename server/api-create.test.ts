@@ -8,8 +8,8 @@ const originalClaudeAvailability = claudeCodeHarness.availability
 const originalCodexAvailability = codexHarness.availability
 
 beforeEach(() => {
-  claudeCodeHarness.availability = async () => ({ available: true })
-  codexHarness.availability = async () => ({ available: true })
+  claudeCodeHarness.availability = async () => ({ status: 'available' })
+  codexHarness.availability = async () => ({ status: 'available' })
 })
 
 afterEach(() => {
@@ -54,26 +54,26 @@ test('creating a workspace rejects a provider that only supports discovery', asy
 
 test('setup info reports Claude and Codex availability from their harnesses', async () => {
   claudeCodeHarness.availability = async () => ({
-    available: false,
+    status: 'unavailable',
     reason: 'Install Claude'
   })
   codexHarness.availability = async () => ({
-    available: false,
+    status: 'unavailable',
     reason: 'Install Codex'
   })
 
   const response = await api.request('/api/workspaces/create')
   const body = (await response.json()) as {
-    availability: Record<string, { available: boolean; reason?: string }>
+    availability: Record<string, { status: string; reason?: string }>
   }
 
   expect(response.status).toBe(200)
   expect(body.availability['claude-code']).toEqual({
-    available: false,
+    status: 'unavailable',
     reason: 'Install Claude'
   })
   expect(body.availability.codex).toEqual({
-    available: false,
+    status: 'unavailable',
     reason: 'Install Codex'
   })
 })

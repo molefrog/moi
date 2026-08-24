@@ -64,7 +64,7 @@ export const codexHarness: Harness = {
   discoverWorkspaces: registeredPaths => discoverCodexWorkspaces(registeredPaths),
   availability: async ws => {
     const runtime = await pathHarnessAvailability('codex')
-    return runtime.available && ws ? getCodexAuthReadiness(ws.path) : runtime
+    return runtime.status === 'available' && ws ? getCodexAuthReadiness(ws.path) : runtime
   },
   startLogin: ws => startCodexLogin(ws.path),
 

@@ -4,37 +4,52 @@ import { resolveWorkspaceEnv } from '../../workspace-env'
 import { findHarnessExecutable } from '../executable'
 
 function signedOut(reason: string): HarnessAvailability {
-  return {
-    available: false,
-    reason,
-    loginCommand: 'claude auth login'
-  }
+  return { status: 'login-required', reason }
 }
 
-// Claude Code 2.1.42+ exposes a stable JSON auth probe. Run it with the same
-// workspace env as the actual Agent SDK subprocess so API-key and enterprise
-// provider configuration are evaluated consistently with the eventual send.
+function unavailable(reason: string): HarnessAvailability {
+  return { status: 'unavailable', reason }
+}
+
+type ClaudeAuthProbeResult = {
+  exitCode: number
+  timedOut: boolean
+}
+
+const CLAUDE_AUTH_UNAVAILABLE = 'Could not check the Claude login status'
+
+export function claudeAuthReadiness(result: ClaudeAuthProbeResult): HarnessAvailability {
+  if (result.timedOut) return unavailable(CLAUDE_AUTH_UNAVAILABLE)
+  if (result.exitCode === 0) return { status: 'available' }
+  if (result.exitCode === 1) return signedOut('Claude is signed out. Sign in to send messages')
+  return unavailable(CLAUDE_AUTH_UNAVAILABLE)
+}
+
+// Claude Code documents exit 0 as logged in and exit 1 as logged out. Run the
+// probe with the same workspace env as the actual Agent SDK subprocess so
+// API-key and enterprise provider configuration match the eventual send.
 export async function getClaudeAuthReadiness(workspacePath: string): Promise<HarnessAvailability> {
   const executable = findHarnessExecutable('claude-code')
-  if (!executable) return signedOut('Claude is not installed')
+  if (!executable) return unavailable('Claude is not installed')
 
+  const workspaceEnv = await resolveWorkspaceEnv(workspacePath)
+  const proc = Bun.spawn([executable, 'auth', 'status'], {
+    cwd: workspacePath,
+    env: { ...process.env, ...workspaceEnv },
+    stdin: 'ignore',
+    stdout: 'ignore',
+    stderr: 'ignore'
+  })
+  let timedOut = false
+  const timeout = setTimeout(() => {
+    timedOut = true
+    proc.kill()
+  }, 5_000)
   try {
-    const workspaceEnv = await resolveWorkspaceEnv(workspacePath)
-    const proc = Bun.spawn([executable, 'auth', 'status'], {
-      cwd: workspacePath,
-      env: { ...process.env, ...workspaceEnv },
-      stdin: 'ignore',
-      stdout: 'ignore',
-      stderr: 'ignore'
-    })
-    const timeout = setTimeout(() => proc.kill(), 5_000)
     const exitCode = await proc.exited
+    return claudeAuthReadiness({ exitCode, timedOut })
+  } finally {
     clearTimeout(timeout)
-    return exitCode === 0
-      ? { available: true }
-      : signedOut('Claude is signed out. Sign in to send messages')
-  } catch {
-    return signedOut('Could not verify the Claude login')
   }
 }
 

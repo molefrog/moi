@@ -1,9 +1,11 @@
+import { useEffect } from 'react'
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
+import { onWorkspaceEventsReconnect, useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import type {
   HarnessLogin,
   ViewInfo,
@@ -38,6 +40,13 @@ export function useWorkspaceLayout(workspaceId: string) {
 // refetch stays as a cheap safety net (the server serves its cache).
 export function useWorkspaceAgent(workspaceId: string) {
   const queryClient = useQueryClient()
+  useEffect(
+    () =>
+      onWorkspaceEventsReconnect(() => {
+        void queryClient.invalidateQueries({ queryKey: workspaceKeys.agent(workspaceId) })
+      }),
+    [queryClient, workspaceId]
+  )
   useWorkspaceEvent(event => {
     if (event.type === 'agent:updated' && event.workspaceId === workspaceId) {
       queryClient.setQueryData<WorkspaceAgent>(workspaceKeys.agent(workspaceId), prev =>

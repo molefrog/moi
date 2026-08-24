@@ -19,7 +19,7 @@ beforeEach(() => {
   process.env.MOI_EXPERIMENTS = ''
   process.env.MOI_DEMO_INSTALL_URL = 'https://moi.computer'
   resetAppConfig()
-  claudeCodeHarness.availability = async () => ({ available: true })
+  claudeCodeHarness.availability = async () => ({ status: 'available' })
 })
 
 afterEach(() => {

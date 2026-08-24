@@ -4,11 +4,11 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { Button } from '@/client/components/ui/button'
 
-import { ChatErrorBanner } from './ChatErrorBanner'
+import { ErrorBanner } from './ErrorBanner'
 
 test('renders a dismissible destructive chat error', () => {
   const html = renderToStaticMarkup(
-    createElement(ChatErrorBanner, {
+    createElement(ErrorBanner, {
       error: 'The agent stopped unexpectedly',
       onDismiss: () => undefined
     })
@@ -22,7 +22,7 @@ test('renders a dismissible destructive chat error', () => {
 
 test('dismisses the chat error', () => {
   let dismissed = false
-  const banner = ChatErrorBanner({
+  const banner = ErrorBanner({
     error: 'The agent stopped unexpectedly',
     onDismiss: () => {
       dismissed = true
