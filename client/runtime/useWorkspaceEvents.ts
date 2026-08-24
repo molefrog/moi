@@ -64,6 +64,19 @@ let everConnected = false
 let ws: WebSocket | null = null
 let connecting = false
 
+// Reconnect delay grows exponentially on repeated drops so a downed server
+// doesn't get hammered with a request every 2s; resets once a connection
+// actually opens.
+const RECONNECT_BASE_DELAY_MS = 1000
+const RECONNECT_MAX_DELAY_MS = 30_000
+let reconnectAttempt = 0
+
+function scheduleReconnect() {
+  const delay = Math.min(RECONNECT_BASE_DELAY_MS * 2 ** reconnectAttempt, RECONNECT_MAX_DELAY_MS)
+  reconnectAttempt++
+  setTimeout(ensureConnection, delay)
+}
+
 function ensureConnection() {
   if (ws || connecting) return
   connecting = true
@@ -73,6 +86,7 @@ function ensureConnection() {
   socket.onopen = () => {
     ws = socket
     connecting = false
+    reconnectAttempt = 0
     if (everConnected) for (const handler of reconnectListeners) handler()
     everConnected = true
   }
@@ -87,9 +101,9 @@ function ensureConnection() {
   socket.onclose = () => {
     ws = null
     connecting = false
-    // Reconnect after 2s if there are still listeners
+    // Reconnect with backoff if there are still listeners
     if (listeners.size > 0) {
-      setTimeout(ensureConnection, 2000)
+      scheduleReconnect()
     }
   }
 
