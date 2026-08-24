@@ -146,12 +146,15 @@ SDK's `.jsonl` files, with per-turn token usage folded into the final
 assistant turn. The Agent SDK remains the transport, while every query is
 forced through the `claude` executable resolved via `executable.ts` (server
 PATH merged with the login-shell PATH).
-Sessions use Claude Code's `auto` permission mode so its model classifier
-reviews permission prompts; whatever still escalates to `canUseTool` (ask
-rules, MCP tools that require interaction) moi approves by default — an
-interim policy until UI approvals land. Known gaps: no interactive approval
-flow yet, and effort/streaming changes require a teardown-and-resume because
-the SDK has no live setter for them.
+Sessions approve every tool call up front: a `PreToolUse` hook returns
+`allow` (`claude-code/permissions.ts`), which short-circuits the whole
+permission chain — settings rules, the `auto` mode classifier, and
+`canUseTool` alike. `canUseTool` stays registered as a fallback for anything
+that reaches a prompt without passing through `PreToolUse`. This is strictly
+more access than the CLI default — the classifier's safety verdicts no longer
+apply — and is an interim policy until UI approvals land. Known gaps: no
+interactive approval flow yet, and effort/streaming changes require a
+teardown-and-resume because the SDK has no live setter for them.
 
 **OpenClaw — shipped.** Chat over the local gateway's WebSocket JSON-RPC
 (wire protocol 4 — the 2026.7.x and 2026.6.x lines; protocol-3 gateways are
