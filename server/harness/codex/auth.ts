@@ -2,32 +2,42 @@ import type { HarnessAvailability, HarnessLogin } from '@/lib/types'
 
 import { getCodexClient } from './client'
 
-export type CodexAccountResponse = {
-  account: unknown | null
-  requiresOpenaiAuth: boolean
-}
-
 type CodexLoginResponse = { type: string; authUrl?: string }
 
 function needsCodexLogin(reason: string): HarnessAvailability {
   return { status: 'login-required', reason }
 }
 
-export function codexAccountReadiness(response: CodexAccountResponse): HarnessAvailability {
+function unavailable(reason: string): HarnessAvailability {
+  return { status: 'unavailable', reason }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+const CODEX_AUTH_UNAVAILABLE = 'Could not check the Codex login status'
+
+export function codexAccountReadiness(response: unknown): HarnessAvailability {
+  if (
+    !isRecord(response) ||
+    typeof response.requiresOpenaiAuth !== 'boolean' ||
+    !('account' in response) ||
+    (response.account !== null && !isRecord(response.account))
+  ) {
+    return unavailable(CODEX_AUTH_UNAVAILABLE)
+  }
+
   // Non-OpenAI model providers can run without a Codex account. For OpenAI,
   // an account object is the app-server's authoritative logged-in signal.
-  if (!response.requiresOpenaiAuth || response.account) return { status: 'available' }
+  if (!response.requiresOpenaiAuth || response.account !== null) return { status: 'available' }
   return needsCodexLogin('Codex is signed out. Sign in to send messages')
 }
 
 export async function getCodexAuthReadiness(workspacePath: string): Promise<HarnessAvailability> {
-  try {
-    const client = await getCodexClient(workspacePath)
-    const account = await client.rpc<CodexAccountResponse>('account/read', { refreshToken: true })
-    return codexAccountReadiness(account)
-  } catch {
-    return needsCodexLogin('Could not verify the Codex login')
-  }
+  const client = await getCodexClient(workspacePath)
+  const account = await client.rpc<unknown>('account/read', { refreshToken: true })
+  return codexAccountReadiness(account)
 }
 
 export async function startCodexLogin(workspacePath: string): Promise<HarnessLogin> {

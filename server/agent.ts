@@ -53,6 +53,17 @@ type AgentEntry = {
   login?: LoginCeremony
 }
 
+function failedProbeAvailability(ws: AgentWorkspace, err: unknown): HarnessAvailability {
+  console.error(`[agent] availability probe failed for ${ws.type ?? 'claude-code'}`, err)
+  return { status: 'unavailable', reason: 'Could not check agent availability' }
+}
+
+function sameAvailability(a: HarnessAvailability, b: HarnessAvailability): boolean {
+  if (a.status !== b.status) return false
+  if (a.status === 'available' || b.status === 'available') return true
+  return a.reason === b.reason
+}
+
 export function createAgentStore(options: AgentStoreOptions) {
   const ttlMs = options.availabilityTtlMs ?? 30_000
   const pollMs = options.loginPollMs ?? 2_000
@@ -81,9 +92,12 @@ export function createAgentStore(options: AgentStoreOptions) {
   async function probeFresh(ws: AgentWorkspace): Promise<HarnessAvailability> {
     const entry = entryFor(ws.id)
     if (!entry.probe) {
-      entry.probe = options.probe(ws).finally(() => {
-        entry.probe = undefined
-      })
+      entry.probe = Promise.resolve()
+        .then(() => options.probe(ws))
+        .catch(err => failedProbeAvailability(ws, err))
+        .finally(() => {
+          entry.probe = undefined
+        })
     }
     const value = await entry.probe
     entry.cached = { value, checkedAt: Date.now() }
@@ -114,21 +128,21 @@ export function createAgentStore(options: AgentStoreOptions) {
 
   // Re-probe until the login lands or the deadline passes. One loop per
   // ceremony; a replaced or completed ceremony stops its loop.
-  function watch(ws: AgentWorkspace, login: LoginCeremony) {
+  function watch(
+    ws: AgentWorkspace,
+    login: LoginCeremony,
+    initialAvailability: HarnessAvailability
+  ) {
     const deadline = Date.now() + deadlineMs
     let stopped = false
+    let publishedAvailability = initialAvailability
     let timer: ReturnType<typeof setTimeout>
     login.stop = () => {
       stopped = true
       clearTimeout(timer)
     }
     const tick = async () => {
-      let value: HarnessAvailability
-      try {
-        value = await probeFresh(ws)
-      } catch {
-        value = { status: 'login-required', reason: 'Could not verify the login' }
-      }
+      const value = await probeFresh(ws)
       if (stopped) return
       const entry = entryFor(ws.id)
       if (value.status === 'available') {
@@ -142,6 +156,10 @@ export function createAgentStore(options: AgentStoreOptions) {
         login.state = { state: 'failed', reason: 'Sign-in did not complete. Try again' }
         publish(ws.id, value)
         return
+      }
+      if (!sameAvailability(value, publishedAvailability)) {
+        publishedAvailability = value
+        publish(ws.id, value)
       }
       timer = setTimeout(tick, pollMs)
       timer.unref?.()
@@ -169,11 +187,12 @@ export function createAgentStore(options: AgentStoreOptions) {
       const result = await starting
       login.starting = undefined
       login.state = { state: 'pending', ...(result.url ? { url: result.url } : {}) }
-      publish(
-        ws.id,
-        entry.cached?.value ?? { status: 'login-required', reason: 'Waiting for sign-in' }
-      )
-      watch(ws, login)
+      const availability = entry.cached?.value ?? {
+        status: 'login-required',
+        reason: 'Waiting for sign-in'
+      }
+      publish(ws.id, availability)
+      watch(ws, login, availability)
       return result
     } catch (err) {
       entry.login = undefined

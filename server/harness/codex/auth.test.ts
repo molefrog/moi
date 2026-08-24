@@ -1,5 +1,7 @@
 import { expect, test } from 'bun:test'
 
+import type { HarnessAvailability } from '@/lib/types'
+
 import { codexAccountReadiness } from './auth'
 
 test('requires a Codex login for an unauthenticated OpenAI provider', () => {
@@ -19,4 +21,17 @@ test('accepts a Codex account or a provider that does not require OpenAI auth', 
   expect(codexAccountReadiness({ account: null, requiresOpenaiAuth: false })).toEqual({
     status: 'available'
   })
+})
+
+test('reports malformed Codex account responses as unavailable', () => {
+  const unavailable: HarnessAvailability = {
+    status: 'unavailable',
+    reason: 'Could not check the Codex login status'
+  }
+
+  expect(codexAccountReadiness(null)).toEqual(unavailable)
+  expect(codexAccountReadiness({ requiresOpenaiAuth: true })).toEqual(unavailable)
+  expect(codexAccountReadiness({ account: 'unexpected', requiresOpenaiAuth: true })).toEqual(
+    unavailable
+  )
 })
