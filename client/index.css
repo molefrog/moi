@@ -135,8 +135,13 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* `bg-muted`, not `bg-background`: every route shell (SidebarLayout) paints
+     `h-dvh bg-muted`, so matching it here means the first paint — before the
+     SPA boots and before any workspace theme lands — is already the colour the
+     app settles on, instead of flashing white. It also fixes the overscroll
+     gutter, which browsers paint from the body background. */
   body {
-    @apply bg-background font-sans text-foreground;
+    @apply bg-muted font-sans text-foreground;
   }
 }
 

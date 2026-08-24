@@ -1,6 +1,7 @@
 import { Route, Switch } from 'wouter'
 
 import { ChatStatesPage } from './ChatStatesPage'
+import { BlobatarShapesPage } from './BlobatarShapesPage'
 import { DevIndexPage } from './DevIndexPage'
 import { HarnessDebugPage } from './HarnessDebugPage'
 import { TextureLabPage } from './TextureLabPage'
@@ -14,6 +15,7 @@ export default function DevRoutes() {
   return (
     <Switch>
       <Route path="/dev/harness" component={HarnessDebugPage} />
+      <Route path="/dev/blobatar-shapes" component={BlobatarShapesPage} />
       <Route path="/dev/chat-states" component={ChatStatesPage} />
       <Route path="/dev/tool-calls" component={ToolCallsPage} />
       <Route path="/dev/textures" component={TextureLabPage} />

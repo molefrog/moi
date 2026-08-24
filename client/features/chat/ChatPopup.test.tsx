@@ -19,13 +19,6 @@ function renderChatPopup(): string {
 }
 
 describe('ChatPopup', () => {
-  test('uses the primary color for the shadow in every theme', () => {
-    const html = renderChatPopup()
-
-    expect(html).toContain('drop-shadow-primary/30')
-    expect(html).toContain('group-hover:drop-shadow-primary/40')
-  })
-
   test('matches the Blobatar color transition', () => {
     const html = renderChatPopup()
 

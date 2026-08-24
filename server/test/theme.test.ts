@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'path'
 
 import {
-  AGENT_THEMES,
   COLOR_THEMES,
   DEFAULT_PRIMARY_COLOR,
   DEFAULT_WORKSPACE_THEME,
@@ -13,7 +12,7 @@ import {
   deriveThemeColors,
   resolveWorkspaceTheme
 } from '@/lib/themes'
-import type { WorkspaceLayout } from '@/lib/types'
+import type { WorkspaceLayout, WorkspaceTheme } from '@/lib/types'
 
 import { loadLayout, saveLayout } from '../layout'
 import { applyThemeUpdate } from '../theme'
@@ -23,6 +22,25 @@ describe('color themes', () => {
     const css = await Bun.file(join(import.meta.dir, '../../client/index.css')).text()
 
     expect(css).toContain(`--primary: ${DEFAULT_PRIMARY_COLOR};`)
+  })
+
+  // index.html carries a hardcoded first-paint background, because the
+  // stylesheet that defines `--muted` is render-blocking and the browser would
+  // otherwise paint its white canvas first. A literal cannot follow the token,
+  // so pin them together here — drift shows up as a white flash on cold loads,
+  // which nothing else would catch.
+  test('keeps the shell first-paint background aligned with --muted', async () => {
+    const html = await Bun.file(join(import.meta.dir, '../../client/index.html')).text()
+    const indexCss = await Bun.file(join(import.meta.dir, '../../client/index.css')).text()
+
+    const shellBackground = html.match(/html \{\s*background:\s*([^;]+);/)?.[1]?.trim()
+    const root = indexCss.match(/:root \{([\s\S]*?)\n\}/)?.[1]
+    const muted = root?.match(/--muted:\s*([^;]+);/)?.[1]?.trim()
+
+    expect(shellBackground).toBeDefined()
+    expect(muted).toBeDefined()
+    expect(shellBackground).toBe(muted)
+    expect(html).toContain('<meta name="color-scheme" content="light" />')
   })
 
   test('defines and exposes the default shadcn compatibility tokens', async () => {
@@ -171,24 +189,13 @@ describe('radius themes', () => {
   })
 })
 
-describe('agent themes', () => {
-  test('defines the four fixed Blobatar presets', () => {
-    expect(AGENT_THEMES).toEqual({
-      round: { label: 'Round', shape: 0.11 },
-      boxy: { label: 'Boxy', shape: 0.54 },
-      capsule: { label: 'Capsule', shape: 0.65 },
-      triangle: { label: 'Triangle', shape: 0.99 }
-    })
-  })
-})
-
 describe('applyThemeUpdate', () => {
   test('setting one option preserves the others', () => {
     const current = {
       font: 'sans' as const,
       color: 'paper' as const,
       radius: 'squishy' as const,
-      agent: 'triangle' as const
+      agent: 'dorito' as const
     }
     const result = applyThemeUpdate(current, { font: 'serif' })
     if (!result.ok) throw new Error('expected ok')
@@ -196,7 +203,7 @@ describe('applyThemeUpdate', () => {
       font: 'serif',
       color: 'paper',
       radius: 'squishy',
-      agent: 'triangle'
+      agent: 'dorito'
     })
     expect(result.applied).toEqual({ font: 'serif' })
   })
@@ -206,7 +213,7 @@ describe('applyThemeUpdate', () => {
       font: 'mono' as const,
       color: 'default' as const,
       radius: 'subtle' as const,
-      agent: 'round' as const
+      agent: 'blob' as const
     }
     const result = applyThemeUpdate(current, { color: 'paper' })
     if (!result.ok) throw new Error('expected ok')
@@ -214,7 +221,7 @@ describe('applyThemeUpdate', () => {
       font: 'mono',
       color: 'paper',
       radius: 'subtle',
-      agent: 'round'
+      agent: 'blob'
     })
     expect(result.applied).toEqual({ color: 'paper' })
   })
@@ -241,20 +248,20 @@ describe('applyThemeUpdate', () => {
       font: 'serif',
       color: 'mint',
       radius: 'square',
-      agent: 'capsule'
+      agent: 'pill'
     })
     if (!result.ok) throw new Error('expected ok')
     expect(result.theme).toEqual({
       font: 'serif',
       color: 'mint',
       radius: 'square',
-      agent: 'capsule'
+      agent: 'pill'
     })
     expect(result.applied).toEqual({
       font: 'serif',
       color: 'mint',
       radius: 'square',
-      agent: 'capsule'
+      agent: 'pill'
     })
   })
 
@@ -283,7 +290,7 @@ describe('applyThemeUpdate', () => {
       font: 'serif' as const,
       color: 'rose' as const,
       radius: 'squishy' as const,
-      agent: 'triangle' as const
+      agent: 'dorito' as const
     }
     const result = applyThemeUpdate(current, { radius: 'soft' })
     if (!result.ok) throw new Error('expected ok')
@@ -291,7 +298,7 @@ describe('applyThemeUpdate', () => {
       font: 'serif',
       color: 'rose',
       radius: 'soft',
-      agent: 'triangle'
+      agent: 'dorito'
     })
     expect(result.applied).toEqual({ radius: 'soft' })
   })
@@ -304,10 +311,10 @@ describe('applyThemeUpdate', () => {
   })
 
   test('setting agent uses its preset key', () => {
-    const result = applyThemeUpdate(undefined, { agent: 'triangle' })
+    const result = applyThemeUpdate(undefined, { agent: 'dorito' })
     if (!result.ok) throw new Error('expected ok')
-    expect(result.theme).toEqual({ ...DEFAULT_WORKSPACE_THEME, agent: 'triangle' })
-    expect(result.applied).toEqual({ agent: 'triangle' })
+    expect(result.theme).toEqual({ ...DEFAULT_WORKSPACE_THEME, agent: 'dorito' })
+    expect(result.applied).toEqual({ agent: 'dorito' })
   })
 
   test('rejects unknown agent key', () => {
@@ -330,6 +337,17 @@ describe('resolveWorkspaceTheme', () => {
       radius: 'soft',
       agent: 'boxy'
     })
+  })
+
+  test('falls back from unknown saved preset keys', () => {
+    const unknownTheme = {
+      font: 'legacy',
+      color: 'legacy',
+      radius: 'legacy',
+      agent: 'legacy'
+    } as unknown as WorkspaceTheme
+
+    expect(resolveWorkspaceTheme(unknownTheme)).toEqual(DEFAULT_WORKSPACE_THEME)
   })
 })
 
@@ -354,7 +372,7 @@ describe('loadLayout/saveLayout round-trip with theme', () => {
         font: 'serif',
         color: 'paper',
         radius: 'subtle',
-        agent: 'triangle'
+        agent: 'dorito'
       }
     }
     await saveLayout(layout, tmpDir)

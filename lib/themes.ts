@@ -1,3 +1,4 @@
+import type { TraitOverrides } from 'blobatar'
 import { wcagLuminance } from 'culori'
 
 export type FontTheme =
@@ -82,18 +83,18 @@ export const RADIUS_THEMES: Record<RadiusTheme, RadiusThemeConfig> = {
   square: { label: 'Square', radius: '0' }
 }
 
-export type AgentTheme = 'round' | 'boxy' | 'capsule' | 'triangle'
+export type AgentTheme = 'blob' | 'boxy' | 'pill' | 'dorito'
 
 export type AgentThemeConfig = {
   label: string
-  shape: number
+  traits: TraitOverrides
 }
 
 export const AGENT_THEMES: Record<AgentTheme, AgentThemeConfig> = {
-  round: { label: 'Round', shape: 0.11 },
-  boxy: { label: 'Boxy', shape: 0.54 },
-  capsule: { label: 'Capsule', shape: 0.65 },
-  triangle: { label: 'Triangle', shape: 0.99 }
+  blob: { label: 'Blob', traits: { shape: 0.11, 'body.r': 0.5, 'body.ratio': 0, 'body.n': 0.5 } },
+  boxy: { label: 'Boxy', traits: { shape: 0.54, 'body.r': 1, 'body.ratio': 0 } },
+  pill: { label: 'Pill', traits: { shape: 0.65, 'body.r': 1 } },
+  dorito: { label: 'Dorito', traits: { shape: 0.99, 'body.r': 1, 'body.ratio': 0, 'body.rot': 0 } }
 }
 
 export type ColorTheme =
@@ -212,6 +213,19 @@ export const DEFAULT_WORKSPACE_THEME: WorkspaceTheme = {
   agent: 'boxy'
 }
 
+function resolveThemePreset<T extends string>(
+  value: unknown,
+  presets: Record<T, unknown>,
+  fallback: T
+): T {
+  return typeof value === 'string' && Object.hasOwn(presets, value) ? (value as T) : fallback
+}
+
 export function resolveWorkspaceTheme(theme?: Partial<WorkspaceTheme>): WorkspaceTheme {
-  return { ...DEFAULT_WORKSPACE_THEME, ...theme }
+  return {
+    font: resolveThemePreset(theme?.font, FONT_THEMES, DEFAULT_WORKSPACE_THEME.font),
+    color: resolveThemePreset(theme?.color, COLOR_THEMES, DEFAULT_WORKSPACE_THEME.color),
+    radius: resolveThemePreset(theme?.radius, RADIUS_THEMES, DEFAULT_WORKSPACE_THEME.radius),
+    agent: resolveThemePreset(theme?.agent, AGENT_THEMES, DEFAULT_WORKSPACE_THEME.agent)
+  }
 }

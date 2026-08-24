@@ -51,7 +51,7 @@ describe('getWorkspaceThemeStyle', () => {
       font: 'blobby',
       color: 'paper',
       radius: 'squishy',
-      agent: 'round'
+      agent: 'blob'
     })
 
     expect(style).toMatchObject({
@@ -103,7 +103,7 @@ describe('getWorkspaceThemeStyle', () => {
 
     expect(
       getWorkspaceThemeStyle(
-        { font: 'sans', color: 'paper', radius: 'soft', agent: 'capsule' },
+        { font: 'sans', color: 'paper', radius: 'soft', agent: 'pill' },
         'widget'
       )
     ).toMatchObject({

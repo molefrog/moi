@@ -94,21 +94,21 @@ const THUMBNAIL_STYLES = [
   {
     frame: cn(
       '-translate-x-3 translate-y-3 -rotate-6',
-      'group-hover:translate-y-2 group-focus-visible:translate-y-2'
+      'group-focus-within:translate-y-2 group-hover:translate-y-2'
     ),
     img: 'opacity-40'
   },
   {
     frame: cn(
       'translate-x-3 translate-y-2 rotate-5',
-      'group-hover:translate-y-1 group-focus-visible:translate-y-1'
+      'group-focus-within:translate-y-1 group-hover:translate-y-1'
     ),
     img: 'opacity-50'
   },
   {
     frame: cn(
       '-translate-x-1 translate-y-1 -rotate-2',
-      'group-hover:-translate-y-2 group-focus-visible:-translate-y-2'
+      'group-focus-within:-translate-y-2 group-hover:-translate-y-2'
     ),
     img: 'opacity-100'
   }
@@ -191,7 +191,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
               'w-max max-w-40 origin-center rounded-lg bg-card px-3 py-2 font-sans shadow-xs',
               'animate-in transition-transform duration-300 ease-out fade-in',
               '-translate-x-1 translate-y-1 -rotate-2',
-              'group-hover:translate-y-0.5 group-focus-visible:translate-y-0.5'
+              'group-focus-within:translate-y-0.5 group-hover:translate-y-0.5'
             )}
           >
             <p className="line-clamp-3 text-sm leading-normal whitespace-normal">

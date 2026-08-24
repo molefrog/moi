@@ -8,6 +8,11 @@ type DevRouteEntry = {
 
 const DEV_ROUTES: DevRouteEntry[] = [
   {
+    path: '/dev/blobatar-shapes',
+    title: 'Blobatar shape builder',
+    description: 'Tune all 10 shape families and their geometry traits for the agent.'
+  },
+  {
     path: '/dev/chat-states',
     title: 'Chat states',
     description:

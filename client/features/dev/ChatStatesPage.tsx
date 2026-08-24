@@ -135,7 +135,6 @@ function Transcript({
       <div className="-ml-3 pt-2">
         <AgentBlobatar
           color="primary"
-          size={64}
           animated={processing}
           expression={processing ? 'thinking' : undefined}
         />
