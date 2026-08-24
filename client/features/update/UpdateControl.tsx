@@ -35,7 +35,19 @@ export function getUpdateButtonState(
   return { busy, blocked, label }
 }
 
-export function Update() {
+type UpdateButtonProps = {
+  busy: boolean
+  blocked: boolean
+  label: string
+  errorMessage: string | null
+  onClick: () => void
+}
+
+export type UpdateControl =
+  | { status: 'loading' | 'unavailable' }
+  | { status: 'available'; button: UpdateButtonProps }
+
+export function useUpdateControl(): UpdateControl {
   const update = useUpdate()
   const statusQuery = useUpdateStatus(update.isSuccess)
   const agentRunning = useLive(state => hasRunningActivity(state.activity))
@@ -46,11 +58,23 @@ export function Update() {
     if (shouldReloadAfterUpdate(status, restartTarget)) window.location.reload()
   }, [restartTarget, status])
 
-  if (!status?.availableVersion) return null
+  if (statusQuery.isPending) return { status: 'loading' }
+  if (!status?.availableVersion && !update.isSuccess) return { status: 'unavailable' }
 
   const restarting = update.isSuccess
   const button = getUpdateButtonState(agentRunning, update.isPending, restarting)
 
+  return {
+    status: 'available',
+    button: {
+      ...button,
+      errorMessage: update.error?.message ?? null,
+      onClick: () => update.mutate()
+    }
+  }
+}
+
+export function UpdateButton({ busy, blocked, label, errorMessage, onClick }: UpdateButtonProps) {
   // The div gives TooltipTrigger an enabled event target when the button is disabled.
   return (
     <Tooltip>
@@ -60,18 +84,18 @@ export function Update() {
             <Button
               type="button"
               size="icon"
-              variant={button.busy ? 'ghost' : 'default'}
-              aria-label={button.label}
-              disabled={button.blocked || button.busy}
-              onClick={() => update.mutate()}
+              variant={busy ? 'ghost' : 'default'}
+              aria-label={label}
+              disabled={blocked || busy}
+              onClick={onClick}
             >
-              {button.busy ? <Spinner stroke={1.5} /> : <IconDownload stroke={1.5} />}
+              {busy ? <Spinner stroke={1.5} /> : <IconDownload stroke={1.5} />}
             </Button>
           </div>
         }
       />
-      <TooltipContent side="right" className={button.blocked ? 'max-w-56' : undefined}>
-        {button.blocked ? UPDATE_ACTIVE_AGENT_MESSAGE : (update.error?.message ?? button.label)}
+      <TooltipContent side="right" className={blocked ? 'max-w-56' : undefined}>
+        {blocked ? UPDATE_ACTIVE_AGENT_MESSAGE : (errorMessage ?? label)}
       </TooltipContent>
     </Tooltip>
   )

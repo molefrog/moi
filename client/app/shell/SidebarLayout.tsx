@@ -1,12 +1,17 @@
 import { type ReactNode } from 'react'
 
-import { IconAlertSquareRoundedFilled, IconPlus, IconSmartHome } from '@tabler/icons-react'
+import {
+  IconAlertSquareRoundedFilled,
+  IconMessage2Share,
+  IconPlus,
+  IconSmartHome
+} from '@tabler/icons-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'wouter'
 
 import { useAppConfig } from '@/client/api/app-config'
 import { useReorderWorkspaces, useWorkspaces } from '@/client/features/home/api'
-import { Update } from '@/client/features/update/Update'
+import { UpdateButton, useUpdateControl } from '@/client/features/update/UpdateControl'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import { CreateWorkspaceDialog } from '@/client/features/home/workspace-setup/CreateWorkspaceDialog'
@@ -26,6 +31,8 @@ import {
 } from '@/client/features/home/workspace-presentation'
 import { cn } from '@/client/lib/cn'
 import type { WorkspaceEntry } from '@/lib/types'
+
+const FEEDBACK_URL = 'https://mlfrg.notion.site/3c678a44b6788042b734d775dd2e935e?pvs=105'
 
 function sidebarNavButtonClass(active: boolean): string {
   return cn(
@@ -72,7 +79,6 @@ type SidebarProps = {
 
 function Sidebar({ workspaces }: SidebarProps) {
   const reorder = useReorderWorkspaces()
-  const { cloudDemo } = useAppConfig()
 
   return (
     <TooltipProvider delay={500}>
@@ -131,20 +137,53 @@ function Sidebar({ workspaces }: SidebarProps) {
         </nav>
 
         <div className="size-8 shrink-0">
-          {cloudDemo ? (
-            <DemoDialog
-              trigger={
-                <Button size="icon" aria-label="Unlock all features" title="Unlock all features">
-                  <IconAlertSquareRoundedFilled stroke={1.5} />
-                </Button>
-              }
-            />
-          ) : (
-            <Update />
-          )}
+          <SidebarFooterAction />
         </div>
       </aside>
     </TooltipProvider>
+  )
+}
+
+function SidebarFooterAction() {
+  const { cloudDemo } = useAppConfig()
+  const updateControl = useUpdateControl()
+
+  if (cloudDemo) {
+    return (
+      <DemoDialog
+        trigger={
+          <Button size="icon" aria-label="Unlock all features" title="Unlock all features">
+            <IconAlertSquareRoundedFilled stroke={1.5} />
+          </Button>
+        }
+      />
+    )
+  }
+
+  if (updateControl.status === 'loading') return null
+  if (updateControl.status === 'available') return <UpdateButton {...updateControl.button} />
+
+  return <FeedbackLink />
+}
+
+function FeedbackLink() {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            render={<a href={FEEDBACK_URL} target="_blank" rel="noreferrer" />}
+            variant="ghost"
+            size="icon"
+            aria-label="Leave feedback"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <IconMessage2Share stroke={1.5} />
+          </Button>
+        }
+      />
+      <TooltipContent side="right">Leave feedback</TooltipContent>
+    </Tooltip>
   )
 }
 

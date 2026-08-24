@@ -9,7 +9,12 @@ import { UPDATE_ACTIVE_AGENT_MESSAGE } from '@/lib/update'
 import type { UpdateStatus } from '@/lib/types'
 
 import { updateKey } from './api'
-import { getUpdateButtonState, shouldReloadAfterUpdate, Update } from './Update'
+import {
+  getUpdateButtonState,
+  shouldReloadAfterUpdate,
+  UpdateButton,
+  useUpdateControl
+} from './UpdateControl'
 
 const available: UpdateStatus = {
   runningVersion: '0.5.2',
@@ -24,12 +29,19 @@ function renderControl(status: UpdateStatus): string {
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(TooltipProvider, null, createElement(Update))
+      createElement(TooltipProvider, null, createElement(UpdateControlHarness))
     )
   )
 }
 
-describe('Update', () => {
+function UpdateControlHarness() {
+  const updateControl = useUpdateControl()
+  return updateControl.status === 'available'
+    ? createElement(UpdateButton, updateControl.button)
+    : null
+}
+
+describe('Update button', () => {
   test('stays hidden for non-actionable states', () => {
     expect(
       renderControl({
