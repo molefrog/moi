@@ -2,36 +2,40 @@ import type { HarnessAvailability, HarnessLogin } from '@/lib/types'
 
 import { getCodexClient } from './client'
 
+type CodexAccount = { type: string }
+type CodexAccountReadResponse = {
+  account: CodexAccount | null
+  requiresOpenaiAuth: boolean
+}
 type CodexLoginResponse = { type: string; authUrl?: string }
 
-function needsCodexLogin(reason: string): HarnessAvailability {
-  return { status: 'login-required', reason }
+const CODEX_AVAILABLE: HarnessAvailability = { status: 'available' }
+const CODEX_LOGIN_REQUIRED: HarnessAvailability = {
+  status: 'login-required',
+  reason: 'Codex is signed out. Sign in to send messages'
 }
-
-function unavailable(reason: string): HarnessAvailability {
-  return { status: 'unavailable', reason }
+const CODEX_AUTH_UNAVAILABLE: HarnessAvailability = {
+  status: 'unavailable',
+  reason: 'Could not check the Codex login status'
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
-const CODEX_AUTH_UNAVAILABLE = 'Could not check the Codex login status'
+function isCodexAccountReadResponse(value: unknown): value is CodexAccountReadResponse {
+  return (
+    isRecord(value) &&
+    typeof value.requiresOpenaiAuth === 'boolean' &&
+    (value.account === null || (isRecord(value.account) && typeof value.account.type === 'string'))
+  )
+}
 
 export function codexAccountReadiness(response: unknown): HarnessAvailability {
-  if (
-    !isRecord(response) ||
-    typeof response.requiresOpenaiAuth !== 'boolean' ||
-    !('account' in response) ||
-    (response.account !== null && !isRecord(response.account))
-  ) {
-    return unavailable(CODEX_AUTH_UNAVAILABLE)
-  }
+  if (!isCodexAccountReadResponse(response)) return CODEX_AUTH_UNAVAILABLE
 
-  // Non-OpenAI model providers can run without a Codex account. For OpenAI,
-  // an account object is the app-server's authoritative logged-in signal.
-  if (!response.requiresOpenaiAuth || response.account !== null) return { status: 'available' }
-  return needsCodexLogin('Codex is signed out. Sign in to send messages')
+  if (response.requiresOpenaiAuth && response.account === null) return CODEX_LOGIN_REQUIRED
+  return CODEX_AVAILABLE
 }
 
 export async function getCodexAuthReadiness(workspacePath: string): Promise<HarnessAvailability> {
