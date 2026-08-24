@@ -814,10 +814,24 @@ function themeSwatch(primary?: string): string {
 // `moi theme tokens` — the resolved token table. Reads `.moi/.workspace.json`
 // directly (no control server needed): token values are pure derivation, and
 // agents ask for them while composing UI, when the server may not be running.
+// The registry lookup mirrors the control server's resolveWorkspace so the
+// command works from `.moi/` or any subdirectory — passing a subdirectory to
+// loadLayout would silently fall back to the default theme.
 async function runThemeTokens(path: string): Promise<void> {
   const { loadLayout } = await import('./layout')
   const { resolveWorkspaceThemeTokens } = await import('./theme-tokens')
-  const layout = await loadLayout(path)
+  const { findWorkspaceForPath } = await import('./registry')
+  const entry = findWorkspaceForPath(await listWorkspaces(), path)
+  if (!entry) {
+    console.error(
+      '\n' +
+        pc.red('✗') +
+        ` ${path} is not inside a registered moi workspace.\n` +
+        pc.dim('  Open it in moi, or run from the workspace root.\n')
+    )
+    process.exit(1)
+  }
+  const layout = await loadLayout(entry.path)
   const theme = resolveWorkspaceTheme(layout.theme)
   const font = FONT_THEMES[theme.font]
   const radius = RADIUS_THEMES[theme.radius]
