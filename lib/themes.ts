@@ -155,6 +155,11 @@ export const THEME_COLOR_TOKENS = Object.keys(
   THEME_COLOR_DERIVATIONS.workspace
 ) as ThemeColorToken[]
 
+export function themeColorProperty(token: ThemeColorToken): `--${string}` {
+  const name = token.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)
+  return `--${name}`
+}
+
 export function deriveThemeColors(
   primary: string,
   mode: ThemeColorMode = 'workspace'
@@ -228,4 +233,14 @@ export function resolveWorkspaceTheme(theme?: Partial<WorkspaceTheme>): Workspac
     radius: resolveThemePreset(theme?.radius, RADIUS_THEMES, DEFAULT_WORKSPACE_THEME.radius),
     agent: resolveThemePreset(theme?.agent, AGENT_THEMES, DEFAULT_WORKSPACE_THEME.agent)
   }
+}
+
+export function resolveThemeColorOverrides(
+  theme?: Partial<WorkspaceTheme>,
+  mode: ThemeColorMode = 'workspace'
+): ThemeColors | undefined {
+  const resolved = resolveWorkspaceTheme(theme)
+  const color = COLOR_THEMES[resolved.color]
+  const primary = color.primary ?? (mode === 'widget' ? DEFAULT_PRIMARY_COLOR : undefined)
+  return primary ? deriveThemeColors(primary, mode) : undefined
 }

@@ -2,16 +2,15 @@ import { useEffect } from 'react'
 import type { CSSProperties } from 'react'
 
 import {
-  COLOR_THEMES,
-  DEFAULT_PRIMARY_COLOR,
   DEFAULT_WORKSPACE_THEME,
   FONT_THEMES,
   RADIUS_THEMES,
   THEME_COLOR_TOKENS,
-  deriveThemeColors,
+  resolveThemeColorOverrides,
+  themeColorProperty,
   resolveWorkspaceTheme
 } from '@/lib/themes'
-import type { ThemeColorMode, ThemeColorToken } from '@/lib/themes'
+import type { ThemeColorMode } from '@/lib/themes'
 import type { WorkspaceLayout } from '@/lib/types'
 
 const FONT_LINK_ID = 'moi-fonts'
@@ -38,11 +37,6 @@ type WorkspaceThemeStyle = CSSProperties & {
   [property: `--${string}`]: string | undefined
 }
 
-function themeColorProperty(token: ThemeColorToken): `--${string}` {
-  const name = token.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)
-  return `--${name}`
-}
-
 export function getWorkspaceThemeFontStyle(theme: WorkspaceLayout['theme']): WorkspaceThemeStyle {
   const style: WorkspaceThemeStyle = {}
   const resolved = resolveWorkspaceTheme(theme)
@@ -61,11 +55,7 @@ export function getWorkspaceThemeColorStyle(
   colorMode: ThemeColorMode = 'workspace'
 ): WorkspaceThemeStyle {
   const style: WorkspaceThemeStyle = {}
-  const resolved = resolveWorkspaceTheme(theme)
-
-  const color = COLOR_THEMES[resolved.color] ?? COLOR_THEMES[DEFAULT_WORKSPACE_THEME.color]
-  const primary = color.primary ?? (colorMode === 'widget' ? DEFAULT_PRIMARY_COLOR : undefined)
-  const colors = primary ? deriveThemeColors(primary, colorMode) : undefined
+  const colors = resolveThemeColorOverrides(theme, colorMode)
 
   for (const [token, property] of WORKSPACE_COLOR_PROPERTIES) {
     style[property] = colors?.[token]

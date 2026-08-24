@@ -811,15 +811,26 @@ function themeSwatch(primary?: string): string {
   return swatch(formatHex(colors.primary), formatHex(colors.primaryForeground))
 }
 
-// `moi theme tokens` — the resolved token table. Reads `.moi/.workspace.json`
+type ThemeTokenScope = 'view' | 'widget'
+
+function isThemeTokenScope(value: unknown): value is ThemeTokenScope {
+  return value === 'view' || value === 'widget'
+}
+
+function exitThemeArgument(message: string): never {
+  console.error('\n' + pc.red('✗') + ` ${message}\n`)
+  process.exit(1)
+}
+
+// `moi theme --tokens` — the resolved token table. Reads `.moi/.workspace.json`
 // directly (no control server needed): token values are pure derivation, and
 // agents ask for them while composing UI, when the server may not be running.
 // The registry lookup mirrors the control server's resolveWorkspace so the
 // command works from `.moi/` or any subdirectory — passing a subdirectory to
 // loadLayout would silently fall back to the default theme.
-async function runThemeTokens(path: string): Promise<void> {
+async function runThemeTokens(path: string, scope: ThemeTokenScope, json: boolean): Promise<void> {
   const { loadLayout } = await import('./layout')
-  const { resolveWorkspaceThemeTokens } = await import('./theme-tokens')
+  const { loadThemeTokenSource, resolveWorkspaceThemeTokens } = await import('./theme-tokens')
   const { findWorkspaceForPath } = await import('./registry')
   const entry = findWorkspaceForPath(await listWorkspaces(), path)
   if (!entry) {
@@ -835,25 +846,58 @@ async function runThemeTokens(path: string): Promise<void> {
   const theme = resolveWorkspaceTheme(layout.theme)
   const font = FONT_THEMES[theme.font]
   const radius = RADIUS_THEMES[theme.radius]
+  let rows: ReturnType<typeof resolveWorkspaceThemeTokens>
+  try {
+    rows = resolveWorkspaceThemeTokens(await loadThemeTokenSource(), layout.theme, scope)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('\n' + pc.red('✗') + ` Could not resolve theme tokens: ${message}\n`)
+    process.exit(1)
+  }
+
+  if (json) {
+    console.log(
+      JSON.stringify(
+        {
+          scope,
+          theme,
+          values: {
+            '--sans': font.sans,
+            '--mono': font.mono,
+            '--radius': radius.radius
+          },
+          colors: Object.fromEntries(
+            rows.map(row => [
+              `--${row.token}`,
+              { light: row.light, dark: row.dark, derived: row.derived }
+            ])
+          )
+        },
+        null,
+        2
+      )
+    )
+    return
+  }
 
   console.log(
     '\n' +
-      pc.bold('moi theme tokens') +
-      pc.dim(` — resolved values for the ${pc.bold(theme.color)} color preset`) +
+      pc.bold('moi theme --tokens') +
+      pc.dim(` — ${pc.bold(scope)} scope, ${pc.bold(theme.color)} color preset`) +
       '\n'
   )
-  const rows = resolveWorkspaceThemeTokens(layout.theme).map(row => [
+  const tableRows = rows.map(row => [
     pc.cyan(`--${row.token}`),
     row.light,
     swatch(row.light.slice(0, 7)),
     row.dark,
     swatch(row.dark.slice(0, 7)),
-    pc.dim(row.derived ? 'from preset primary' : 'default')
+    pc.dim(row.derived ? 'derived' : 'base')
   ])
   console.log(
     columns(
       ['token', 'light', '', 'dark', '', 'source'].map(h => pc.dim(h)),
-      rows
+      tableRows
     )
   )
   console.log()
@@ -866,9 +910,9 @@ async function runThemeTokens(path: string): Promise<void> {
   )
   console.log(
     pc.dim(
-      '\n  Tokens marked "from preset primary" follow the workspace color preset and apply in\n' +
-        '  both light and dark; the rest reveal the stock defaults. Use them as Tailwind\n' +
-        '  classes (bg-primary, text-muted-foreground, bg-chart-2) — never raw colors.\n'
+      `\n  Tokens marked "derived" follow the active ${scope} color surface; the rest use the\n` +
+        '  base light/dark theme. Use them as Tailwind classes such as bg-primary,\n' +
+        '  text-muted-foreground, and bg-chart-2 — never raw colors.\n'
     )
   )
 }
@@ -889,14 +933,36 @@ const theme = defineCommand({
       type: 'boolean',
       default: false,
       description: 'Print the resolved theme tokens (hex) for this workspace'
+    },
+    scope: {
+      type: 'string',
+      description: 'Token scope: "view" or "widget" (required with --tokens)'
+    },
+    json: {
+      type: 'boolean',
+      default: false,
+      description: 'Machine-readable token output (requires --tokens)'
     }
   },
   async run({ args }) {
     const path = resolve(args.dir)
     if (args.tokens) {
-      await runThemeTokens(path)
+      if (
+        args.font !== undefined ||
+        args.color !== undefined ||
+        args.radius !== undefined ||
+        args.agent !== undefined
+      ) {
+        exitThemeArgument('--tokens cannot be combined with theme-setting flags')
+      }
+      if (!isThemeTokenScope(args.scope)) {
+        exitThemeArgument('--tokens requires --scope=view or --scope=widget')
+      }
+      await runThemeTokens(path, args.scope, args.json)
       return
     }
+    if (args.scope !== undefined) exitThemeArgument('--scope can only be used with --tokens')
+    if (args.json) exitThemeArgument('--json can only be used with --tokens')
     const notice = await staleSkillNotice(path)
     const ws = new WebSocket(CONTROL_URL)
 
@@ -959,7 +1025,7 @@ const theme = defineCommand({
       console.log(
         pc.dim(
           '  Usage: moi theme --font=<key> --color=<key> --radius=<key> --agent=<key>\n' +
-            '         moi theme --tokens   resolved token values (hex) for this workspace'
+            '         moi theme --tokens --scope=<view|widget> [--json]'
         ) + '\n'
       )
 

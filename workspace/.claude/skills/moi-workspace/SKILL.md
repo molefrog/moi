@@ -131,8 +131,9 @@ never from inside `.moi/` itself. You don't pass paths; moi resolves the workspa
 - `moi theme --font=<key>` — change font theme (omit `--font` to list options)
 - `moi theme --color=<key>` — change color preset (omit `--color` to list options)
 - `moi theme --radius=<key>` — change corner-radius preset (omit `--radius` to list options)
-- `moi theme --tokens` — print what every semantic color token resolves to (hex, light and
-  dark) under the current theme — check before picking `chart-*` or contrast-sensitive colors
+- `moi theme --tokens --scope=<view|widget> [--json]` — print what every semantic color token
+  resolves to (hex, light and dark) for the matching applet scope; check before picking `chart-*`
+  or contrast-sensitive colors
 - `moi config` — set the workspace name & icon (`moi config --help` for usage)
 - `moi env` — list available env keys and where they come from (never values);
   `moi env exec -- <cmd>` runs a command with the workspace env (see Environment & secrets)
@@ -443,4 +444,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.15.1" />
+<moi-skill version="0.15.2" />
