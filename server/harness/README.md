@@ -146,9 +146,15 @@ SDK's `.jsonl` files, with per-turn token usage folded into the final
 assistant turn. The Agent SDK remains the transport, while every query is
 forced through the `claude` executable resolved via `executable.ts` (server
 PATH merged with the login-shell PATH).
-Known gaps: runs with `bypassPermissions` only (no interactive approval
-flow), and effort/streaming changes require a teardown-and-resume because the
-SDK has no live setter for them.
+Sessions approve every tool call up front: a `PreToolUse` hook returns
+`allow` (`claude-code/permissions.ts`), which short-circuits the whole
+permission chain — settings rules, the `auto` mode classifier, and
+`canUseTool` alike. `canUseTool` stays registered as a fallback for anything
+that reaches a prompt without passing through `PreToolUse`. This is strictly
+more access than the CLI default — the classifier's safety verdicts no longer
+apply — and is an interim policy until UI approvals land. Known gaps: no
+interactive approval flow yet, and effort/streaming changes require a
+teardown-and-resume because the SDK has no live setter for them.
 
 **OpenClaw — shipped.** Chat over the local gateway's WebSocket JSON-RPC
 (wire protocol 4 — the 2026.7.x and 2026.6.x lines; protocol-3 gateways are
@@ -198,11 +204,14 @@ MCP-startup notices. Workspace discovery scans `~/.codex/sessions` rollout
 heads for cwds (`codex/discovery.ts` — no binary needed), and `availability()`
 reports a missing `codex` executable (PATH + login-shell PATH lookup, with a
 Codex Desktop app-bundle fallback — `executable.ts`) to setup flows and the
-workspace composer. Runs `danger-full-access` + `approvalPolicy: never`
-to match moi's bypass-permissions trust model. Known gaps: no interactive
-approval flow (server→client approval requests are auto-accepted
-defensively), and images ride inline as data URLs only (no `localImage` path
-mode).
+workspace composer. Sessions use `workspace-write` with network disabled by
+default and `approvalPolicy: on-request`; server→client approval requests are
+accepted by moi at the transport — an interim default-approve policy until UI
+approvals land (`codex/permissions.ts`). The same policy is reapplied on
+thread start, resume, and every turn. Known gaps: no interactive approval flow
+yet. Per-turn application context tells Codex to request escalated localhost
+access before control-server commands. Images ride inline as data URLs only
+(no `localImage` path mode).
 
 Workspace availability also checks provider authentication when a workspace is
 given. Claude Code is probed with `claude auth status` under the effective

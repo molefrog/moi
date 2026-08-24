@@ -39,6 +39,12 @@ import {
   withCodexTurnDuration
 } from './adapter'
 import { type CodexClient, getCodexClient, interruptCodexTurn, readSubagentRecords } from './client'
+import {
+  CODEX_LOCAL_CONTROL_CONTEXT,
+  CODEX_LOCAL_CONTROL_FALLBACK,
+  CODEX_THREAD_ACCESS,
+  CODEX_TURN_ACCESS
+} from './permissions'
 import { generateCodexSessionTitle, renameCodexSessionIfUnchanged } from './session-title'
 import { agentStore } from '../../agent'
 import { debug } from '../../debug'
@@ -52,13 +58,6 @@ import {
   resolveUploads,
   uploadToDisplayPart
 } from '../../uploads'
-
-// moi's trust model matches Claude Code's `bypassPermissions`: the agent acts
-// autonomously in the workspace. Codex expresses that as full sandbox access
-// with approvals disabled (approval prompts would otherwise arrive as
-// server→client requests we have no UI for yet).
-const SANDBOX_MODE = 'danger-full-access'
-const APPROVAL_POLICY = 'never'
 
 type CodexUserInputItem = { type: 'text'; text: string } | { type: 'image'; url: string }
 
@@ -118,10 +117,8 @@ export type CodexActiveSession = {
 export function getCodexActiveSessions(): CodexActiveSession[] {
   const out: CodexActiveSession[] = []
   for (const s of sessions.values()) {
-    // Codex never surfaces `requires-action`: approvals are designed out
-    // (APPROVAL_POLICY 'never' + transport auto-accept in client.ts). If that
-    // policy is ever relaxed, `*requestApproval` / `elicitation` server
-    // requests are the signals to map to it.
+    // moi auto-accepts provider approval requests at the transport, so a
+    // session never blocks on approvals; requires-action is not surfaced.
     if (s.processing) {
       out.push({
         workspaceId: s.workspaceId,
@@ -532,7 +529,8 @@ async function resumeSession(input: {
   if (existing) return existing
   const client = await getCodexClient(input.workspacePath)
   const resumed = await client.rpc<{ thread: CodexThread }>('thread/resume', {
-    threadId: input.sessionId
+    threadId: input.sessionId,
+    ...CODEX_THREAD_ACCESS
   })
   const rec = createRecord({ ...input, sessionId: resumed.thread.id, client })
   // Rebuild child-agent transcripts from their own threads and register them
@@ -614,8 +612,7 @@ export async function sendCodexMessage(input: {
       const client = await getCodexClient(input.workspacePath)
       const started = await client.rpc<{ thread: CodexThread }>('thread/start', {
         cwd: input.workspacePath,
-        sandbox: SANDBOX_MODE,
-        approvalPolicy: APPROVAL_POLICY,
+        ...CODEX_THREAD_ACCESS,
         ...(input.model ? { model: input.model } : {}),
         ...(serviceTier !== undefined ? { serviceTier } : {})
       })
@@ -695,12 +692,19 @@ export async function sendCodexMessage(input: {
     // inject nothing) and never echoed back in userMessage items. The entry
     // key becomes the tag, so ship the unwrapped body. Older servers silently
     // drop the field, so append to the text item there instead.
-    const additionalContext =
-      input.context && client.supportsAdditionalContext
-        ? { 'moi-context': { value: renderMoiContextBody(input.context), kind: 'application' } }
-        : undefined
-    if (input.context && !additionalContext) {
-      const envelope = renderMoiContext(input.context)
+    const additionalContext = client.supportsAdditionalContext
+      ? {
+          ...CODEX_LOCAL_CONTROL_CONTEXT,
+          ...(input.context
+            ? { 'moi-context': { value: renderMoiContextBody(input.context), kind: 'application' } }
+            : {})
+        }
+      : undefined
+    if (!additionalContext) {
+      const envelope = [
+        CODEX_LOCAL_CONTROL_FALLBACK,
+        ...(input.context ? [renderMoiContext(input.context)] : [])
+      ].join('\n\n')
       const last = userInput[userInput.length - 1]
       if (last?.type === 'text') last.text = appendMoiContext(last.text, envelope)
       else userInput.push({ type: 'text', text: envelope })
@@ -709,6 +713,7 @@ export async function sendCodexMessage(input: {
       threadId: rec.sessionId,
       clientUserMessageId: turnId,
       input: userInput,
+      ...CODEX_TURN_ACCESS,
       ...(additionalContext ? { additionalContext } : {}),
       // Without an explicit summary mode Codex still reasons but emits the
       // reasoning item with EMPTY summary/content (verified on the wire —
