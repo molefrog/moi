@@ -1,3 +1,4 @@
+import { FEATURED_MODELS_CAP, featuredModels } from '@/lib/frontier-models'
 import type { Model, WorkspaceType } from '@/lib/types'
 
 export const DEFAULT_EFFORT = 'high'
@@ -88,4 +89,36 @@ export function groupModels(models: readonly Model[], fallbackLabel: string): Mo
     else groups.push({ label, models: [model] })
   }
   return groups
+}
+
+// A "More models" submenu that hides fewer rows than this costs more than it
+// saves — show the whole group inline instead. Small groups (local Ollama,
+// where every model was pulled by hand) never split; neither does a group the
+// curation would only trim by a row or two (Codex's 7-model list).
+const MIN_SPLIT_OVERFLOW = 3
+
+export type SplitModelGroup = { label: string; featured: Model[]; more: Model[] }
+
+// Curated view of one picker section. Groups that merge a large upstream
+// catalog (Hermes providers) feature only frontier-family models; the rest
+// move to a "More models" submenu, in backend order. A group with no frontier
+// match falls back to its first rows so it is never submenu-only, and the
+// selected model is always featured so the checked row cannot hide in the
+// overflow.
+export function splitModelGroup(group: ModelGroup, currentValue: string): SplitModelGroup {
+  let featured = featuredModels(group.models)
+  if (featured.length === 0) featured = group.models.slice(0, FEATURED_MODELS_CAP)
+
+  const featuredValues = new Set(featured.map(model => model.value))
+  const current = group.models.find(model => model.value === currentValue)
+  if (current && !featuredValues.has(current.value)) {
+    featured = [...featured, current]
+    featuredValues.add(current.value)
+  }
+
+  const more = group.models.filter(model => !featuredValues.has(model.value))
+  if (more.length < MIN_SPLIT_OVERFLOW) {
+    return { label: group.label, featured: group.models, more: [] }
+  }
+  return { label: group.label, featured, more }
 }
