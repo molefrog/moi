@@ -5,9 +5,9 @@
 //   moi ui-components add <name…>    → fetch, transform, write to .moi/ui/
 //   moi ui-components docs <name…>   → official docs as markdown, on stdout
 //
-// The command is deliberately not smart: add never installs dependencies,
-// never rebuilds, never edits existing files — it prints next steps and the
-// agent owns them.
+// The command is deliberately not smart: add never rebuilds and never edits
+// existing files, and installs dependencies only when asked to (--install) —
+// otherwise it prints next steps and the agent owns them.
 import { defineCommand } from 'citty'
 import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
@@ -21,6 +21,7 @@ import {
   UI_COMPONENT_NAMES,
   UI_DOCS_BASE,
   fetchUiComponents,
+  partitionUiWrites,
   planUiWrites,
   resolveUiComponentRequest,
   suggestUiComponents,
@@ -59,6 +60,11 @@ const add = defineCommand({
       type: 'boolean',
       default: false,
       description: 'Overwrite existing files of the requested components'
+    },
+    install: {
+      type: 'boolean',
+      default: false,
+      description: 'Run `bun install` in .moi/ for the printed dependencies'
     }
   },
   async run({ args }) {
@@ -89,17 +95,19 @@ const add = defineCommand({
       exists: existsSync
     })
 
-    // Hand-customized components are never silently overwritten: any requested
-    // file that already exists fails the whole add unless --force. Existing
-    // support files (utils, applet-portal, registry deps that rode along) are
-    // kept as-is either way.
-    const conflicts = plans.filter(plan => plan.exists && !plan.support)
-    if (conflicts.length > 0 && !args.force) {
+    // Hand-customized components are never silently overwritten: without
+    // --force a requested file that already exists is skipped and reported, so
+    // a bulk add still installs everything new. Only when every requested
+    // component already exists does the add fail. Existing support files
+    // (utils, applet-portal, registry deps that rode along) are kept as-is
+    // either way, even under --force.
+    const partition = partitionUiWrites(plans, args.force)
+    if (partition.allInstalled) {
       console.error(
         '\n' +
           pc.red('✗') +
           ' Already installed: ' +
-          conflicts.map(plan => pc.bold(plan.name)).join(', ') +
+          partition.skipInstalled.map(plan => pc.bold(plan.name)).join(', ') +
           '\n' +
           pc.dim('  Files in .moi/ui/ may carry your customizations.\n') +
           pc.dim('  Re-run with --force to overwrite them.\n')
@@ -109,18 +117,15 @@ const add = defineCommand({
 
     await mkdir(uiDir, { recursive: true })
     const written: string[] = []
-    const kept: string[] = []
-    for (const plan of plans) {
-      if (plan.exists && plan.support) {
-        kept.push(plan.name)
-        continue
-      }
+    for (const plan of partition.write) {
       const content = plan.name.endsWith('.tsx')
         ? await transformUiComponentSource(plan.name, plan.content)
         : plan.content
       await Bun.write(plan.path, content)
       written.push(plan.name)
     }
+    const kept = partition.keepSupport.map(plan => plan.name)
+    const skipped = partition.skipInstalled.map(plan => plan.name)
 
     // Deps the `moi init` scaffold already pre-seeds never need a mention;
     // registry specifiers may be versioned (`recharts@3.8.0`), so compare by
@@ -135,16 +140,52 @@ const add = defineCommand({
     if (kept.length > 0) {
       console.log(pc.dim(`  kept existing: ${kept.join(', ')}`))
     }
+    if (skipped.length > 0) {
+      console.log(
+        pc.dim(
+          `  already installed, kept: ${skipped.join(', ')} — re-run with --force to overwrite`
+        )
+      )
+    }
+    const moiDir = join(entry.path, '.moi')
+    let installNeeded = deps.length > 0
+    if (args.install) {
+      // `bun install` with no extra deps still materializes the pre-seeded
+      // baseline, which older workspaces may be missing — always run it.
+      const proc = Bun.spawnSync(['bun', 'install', ...deps], {
+        cwd: moiDir,
+        stdout: 'inherit',
+        stderr: 'inherit'
+      })
+      if (proc.exitCode !== 0) {
+        console.error(
+          '\n' +
+            pc.red('✗') +
+            ` bun install failed in ${pc.bold('.moi/')} — install the dependencies yourself:\n` +
+            pc.dim(`  bun install ${deps.join(' ')}\n`)
+        )
+        process.exit(1)
+      }
+      console.log(
+        pc.green('✓') +
+          ' Installed dependencies in ' +
+          pc.bold('.moi/') +
+          (deps.length > 0 ? pc.dim(` (${deps.join(', ')})`) : '')
+      )
+      installNeeded = false
+    }
+
     console.log('\nNext steps (yours):')
-    if (deps.length > 0) {
+    if (installNeeded) {
       // The command runs from anywhere inside the workspace (resolveCwdWorkspace),
       // so point the install at the real `.moi/` relative to the caller's cwd —
       // a literal `cd .moi` is wrong from `.moi/` itself or a widgets/ subdir.
-      const moiDir = join(entry.path, '.moi')
       const rel = relative(process.cwd(), moiDir)
       const cdPrefix = rel === '' ? '' : `cd ${/\s/.test(rel) ? JSON.stringify(rel) : rel} && `
       console.log(
-        '  1. Install dependencies: ' + pc.bold(`${cdPrefix}bun install ${deps.join(' ')}`)
+        '  1. Install dependencies: ' +
+          pc.bold(`${cdPrefix}bun install ${deps.join(' ')}`) +
+          pc.dim(' (or re-run add with --install)')
       )
       console.log('  2. Import relatively — ' + pc.bold(`import { … } from '../ui/<name>'`))
       console.log('  3. Rebuild: ' + pc.bold('moi bundle'))
@@ -152,7 +193,7 @@ const add = defineCommand({
       console.log('  1. Import relatively — ' + pc.bold(`import { … } from '../ui/<name>'`))
       console.log('  2. Rebuild: ' + pc.bold('moi bundle'))
     }
-    console.log(pc.dim(`\n  Component docs: moi ui-components docs ${request.entries[0]}\n`))
+    console.log(pc.dim(`\n  Component docs: moi ui-components docs ${request.entries.join(' ')}\n`))
   }
 })
 
@@ -216,9 +257,9 @@ function renderCatalog(uiDir: string, query?: string): void {
   console.log(
     '\n' +
       pc.dim('  ✓ installed in .moi/ui/ · add: ') +
-      pc.bold('moi ui-components add <name>') +
+      pc.bold('moi ui-components add <name…>') +
       pc.dim(' · docs: ') +
-      pc.bold('moi ui-components docs <name>') +
+      pc.bold('moi ui-components docs <name…>') +
       '\n'
   )
 }

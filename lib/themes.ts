@@ -229,3 +229,13 @@ export function resolveWorkspaceTheme(theme?: Partial<WorkspaceTheme>): Workspac
     agent: resolveThemePreset(theme?.agent, AGENT_THEMES, DEFAULT_WORKSPACE_THEME.agent)
   }
 }
+
+export function resolveThemeColorOverrides(
+  theme?: Partial<WorkspaceTheme>,
+  mode: ThemeColorMode = 'workspace'
+): ThemeColors | undefined {
+  const resolved = resolveWorkspaceTheme(theme)
+  const color = COLOR_THEMES[resolved.color]
+  const primary = color.primary ?? (mode === 'widget' ? DEFAULT_PRIMARY_COLOR : undefined)
+  return primary ? deriveThemeColors(primary, mode) : undefined
+}

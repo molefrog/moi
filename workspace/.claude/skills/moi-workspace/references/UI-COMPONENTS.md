@@ -13,11 +13,13 @@ Radix-era shadcn you may know.
 ## Workflow
 
 ```sh
-moi ui-components                  # catalog + what's installed
-moi ui-components add select      # → .moi/ui/select.tsx (+ any support files)
-moi ui-components docs select     # official docs as markdown
-bun install <deps>                # in .moi/ — only when `add` prints extra deps
-moi bundle                        # rebuild applets
+moi ui-components                     # catalog + what's installed
+moi ui-components add select          # → .moi/ui/select.tsx (+ any support files)
+moi ui-components add table badge tabs --install   # any number of names, one call —
+                                      # always prefer this over one `add` per
+                                      # component; --install runs the bun install too
+moi ui-components docs select table   # official docs as markdown
+moi bundle                            # rebuild applets
 ```
 
 ```tsx
@@ -26,8 +28,9 @@ import { Button } from '../ui/button'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 ```
 
-- `add` writes source files and nothing else — installing the deps it prints and rebuilding is
-  your job.
+- `add` writes source files and nothing else by default — installing the deps it prints and
+  rebuilding is your job. Pass `--install` to have it run the `bun install` in `.moi/` for you;
+  rebuilding (`moi bundle`) stays yours either way.
 - **If the build fails on a missing package** (happens in workspaces scaffolded before this
   feature — `.moi/package.json` may lack the deps ui components need): check
   `.moi/package.json` and install what's missing. Every ui component needs the baseline
@@ -39,9 +42,11 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
   (run in `.moi/`), plus whatever `add` printed for the specific component (`recharts`,
   `embla-carousel-react`, `react-day-picker` + `date-fns`, `react-resizable-panels`,
   `@tanstack/react-table`).
-- Files in `.moi/ui/` are yours to customize; `add` refuses to overwrite them without `--force`.
+- Files in `.moi/ui/` are yours to customize; `add` never overwrites them without `--force` —
+  in a multi-name add, already-installed components are skipped (reported as kept) and the new
+  ones still install.
 - Support files appear without being asked for (`utils.ts` with `cn`, `applet-portal.tsx`, and
-  registry dependencies like `separator`, `card`, `toggle`) — normal; use them if handy.
+  registry dependencies like `card` or `toggle`) — normal; use them if handy.
   `applet-portal.tsx` is auto-generated machinery: never edit or remove it.
 
 ## Catalog
@@ -64,7 +69,7 @@ docs) · `chart` (Recharts wired to theme tokens) · `attachment` (file/image ti
 (chat message)
 
 **Structure & navigation:** `accordion` · `collapsible` · `tabs` · `carousel` · `pagination` ·
-`resizable` (split panels)
+`resizable` (split panels) · `separator` (divider line)
 
 Picking one: quick info on hover → `hover-card` or `tooltip` · contextual panel on click →
 `popover` · focused task needing input → `dialog` · destructive confirmation → `alert-dialog` ·
@@ -134,6 +139,9 @@ The biggest source of bugs when you know Radix-era shadcn. When unsure, `moi ui-
 - **Slider**: plain number for one thumb (`defaultValue={50}`), array only for ranges.
 - **Accordion**: no `type`/`collapsible` props — `defaultValue` is **always an array**
   (`defaultValue={["item-1"]}`), `multiple` to allow several open.
+- **`AlertAction` is absolutely positioned** in the alert's top-right corner, and the alert
+  reserves only ~4.5rem of right padding for it. Keep it to one small control (`size="sm"`
+  button or icon button); anything wider overlaps the title and description text.
 
 ## Forms
 
@@ -178,7 +186,10 @@ The biggest source of bugs when you know Radix-era shadcn. When unsure, `moi ui-
   component's colors or typography.
 - **`gap-*`, not `space-x-*`/`space-y-*`** (`flex flex-col gap-4`). **`size-10`, not
   `w-10 h-10`.** **`truncate`**, not the three-class spell.
-- **`cn()` from `../ui/utils` for conditional classes** — no template-literal ternaries.
+- **`cn()` from `../ui/utils` for conditional classes** — no template-literal ternaries. The
+  same import works from `_`-prefixed shared modules next to your applets (a
+  `.moi/widgets/_utils.tsx` importing `cn` uses `../ui/utils` too) — no need to re-implement
+  it.
 - **No manual `z-index` on overlays** — dialog/popover/menu/tooltip handle their own stacking.
 
 ## Icons
@@ -199,4 +210,5 @@ Cheapest first — stop at the first level that works:
 3. **Edit the file in `.moi/ui/`** — e.g. add a `cva` variant to `button.tsx`; propagates to
    every applet using it, and `add` won't overwrite it without `--force`.
 4. **Wrapper components** — compose primitives into app-level pieces (a `ConfirmDialog` wrapping
-   `AlertDialog` parts) in `.moi/widgets/_shared.tsx`-style files.
+   `AlertDialog` parts) in a `_`-prefixed shared module (`.moi/widgets/_utils.tsx` — see the
+   workspace layout in the skill).

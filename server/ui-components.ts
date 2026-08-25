@@ -168,6 +168,10 @@ export const UI_COMPONENTS: Record<string, UiComponentEntry> = {
     description: 'Native-feeling select with a styled popup',
     registryItems: ['select']
   },
+  separator: {
+    description: 'Horizontal or vertical dividing line',
+    registryItems: ['separator']
+  },
   skeleton: {
     description: 'Loading placeholder block',
     registryItems: ['skeleton']
@@ -521,6 +525,31 @@ export type PlannedWrite = {
   // overwritten — they may carry hand customizations; existing requested
   // files fail the add unless --force.
   support: boolean
+}
+
+export type UiWritePartition = {
+  // Files to write now: everything new, plus existing requested files under
+  // --force. Existing support files are never here.
+  write: PlannedWrite[]
+  // Existing support files, always left untouched.
+  keepSupport: PlannedWrite[]
+  // Requested components already installed, skipped without --force — a bulk
+  // add proceeds past them instead of failing the whole batch.
+  skipInstalled: PlannedWrite[]
+  // Every requested file already exists and --force is off: the add would be
+  // a no-op, so the CLI fails loudly instead of quietly keeping everything.
+  allInstalled: boolean
+}
+
+export function partitionUiWrites(plans: PlannedWrite[], force: boolean): UiWritePartition {
+  const requested = plans.filter(plan => !plan.support)
+  const skipInstalled = force ? [] : requested.filter(plan => plan.exists)
+  return {
+    write: plans.filter(plan => !plan.exists || (force && !plan.support)),
+    keepSupport: plans.filter(plan => plan.support && plan.exists),
+    skipInstalled,
+    allInstalled: !force && requested.length > 0 && skipInstalled.length === requested.length
+  }
 }
 
 export function planUiWrites(opts: {

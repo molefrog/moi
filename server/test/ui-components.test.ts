@@ -5,6 +5,7 @@ import {
   APPLET_PORTAL_SOURCE,
   UI_COMPONENTS,
   UI_COMPONENT_NAMES,
+  partitionUiWrites,
   planUiWrites,
   resolveUiComponentRequest,
   suggestUiComponents,
@@ -178,6 +179,64 @@ describe('planUiWrites', () => {
   })
 })
 
+describe('partitionUiWrites', () => {
+  const plan = (name: string, opts: { exists?: boolean; support?: boolean } = {}) => ({
+    name,
+    path: `/ws/.moi/ui/${name}`,
+    content: name,
+    exists: opts.exists ?? false,
+    support: opts.support ?? false
+  })
+
+  test('a bulk add skips installed components and writes the rest', () => {
+    const partition = partitionUiWrites(
+      [
+        plan('button.tsx', { exists: true }),
+        plan('badge.tsx'),
+        plan('utils.ts', { support: true, exists: true }),
+        plan('applet-portal.tsx', { support: true })
+      ],
+      false
+    )
+
+    expect(partition.write.map(p => p.name)).toEqual(['badge.tsx', 'applet-portal.tsx'])
+    expect(partition.skipInstalled.map(p => p.name)).toEqual(['button.tsx'])
+    expect(partition.keepSupport.map(p => p.name)).toEqual(['utils.ts'])
+    expect(partition.allInstalled).toBe(false)
+  })
+
+  test('flags the no-op add when every requested component exists', () => {
+    const partition = partitionUiWrites(
+      [
+        plan('button.tsx', { exists: true }),
+        plan('badge.tsx', { exists: true }),
+        plan('utils.ts', { support: true, exists: true })
+      ],
+      false
+    )
+
+    expect(partition.allInstalled).toBe(true)
+    expect(partition.skipInstalled.map(p => p.name)).toEqual(['button.tsx', 'badge.tsx'])
+    expect(partition.write).toEqual([])
+  })
+
+  test('--force overwrites requested files but never existing support files', () => {
+    const partition = partitionUiWrites(
+      [
+        plan('button.tsx', { exists: true }),
+        plan('badge.tsx'),
+        plan('utils.ts', { support: true, exists: true })
+      ],
+      true
+    )
+
+    expect(partition.write.map(p => p.name)).toEqual(['button.tsx', 'badge.tsx'])
+    expect(partition.skipInstalled).toEqual([])
+    expect(partition.keepSupport.map(p => p.name)).toEqual(['utils.ts'])
+    expect(partition.allInstalled).toBe(false)
+  })
+})
+
 describe('catalog', () => {
   test('every entry has a description and at least one registry item', () => {
     for (const name of UI_COMPONENT_NAMES) {
@@ -223,6 +282,7 @@ describe('catalog', () => {
       'radio-group',
       'resizable',
       'select',
+      'separator',
       'skeleton',
       'slider',
       'spinner',
