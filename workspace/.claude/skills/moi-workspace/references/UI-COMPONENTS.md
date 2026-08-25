@@ -139,18 +139,6 @@ The biggest source of bugs when you know Radix-era shadcn. When unsure, `moi ui-
 - **Slider**: plain number for one thumb (`defaultValue={50}`), array only for ranges.
 - **Accordion**: no `type`/`collapsible` props — `defaultValue` is **always an array**
   (`defaultValue={["item-1"]}`), `multiple` to allow several open.
-- **Progress renders its own bar** — `<Progress value={60} />` is complete. The wrapper
-  auto-appends `Track` + `Indicator` after its children, so composing
-  `<ProgressTrack><ProgressIndicator /></ProgressTrack>` yourself (the Radix-era shape) silently
-  draws **two** bars. Children are only for `ProgressLabel` / `ProgressValue`:
-
-  ```tsx
-  <Progress value={60}>
-    <ProgressLabel>Uploading</ProgressLabel>
-    <ProgressValue />
-  </Progress>
-  ```
-
 - **`AlertAction` is absolutely positioned** in the alert's top-right corner, and the alert
   reserves only ~4.5rem of right padding for it. Keep it to one small control (`size="sm"`
   button or icon button); anything wider overlaps the title and description text.
