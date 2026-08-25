@@ -6,6 +6,8 @@
   THE UI FOR YOUR AI
 ```
 
+[![npm version](https://img.shields.io/npm/v/moi-computer?label=npm&labelColor=555&color=E85D2A)](https://www.npmjs.com/package/moi-computer)&nbsp;&nbsp;[![Discord](https://img.shields.io/badge/Discord-Join%20server-5865F2?logo=discord&logoColor=white&labelColor=555)](https://discord.gg/nydjacJrT)
+
 An extendable visual workspace where your AI agents build their own UI.
 See [moi.computer](https://moi.computer) for what it is and how it works.
 
