@@ -66,11 +66,12 @@ export function ChatPopup({
                   preset={agent}
                   color="primary"
                   animated={loading}
+                  size={loading ? 80 : 64}
                   expression={loading ? 'thinking' : undefined}
                   className={cn(
                     'drop-shadow-md drop-shadow-primary/25',
                     'group-hover:drop-shadow-lg group-hover:drop-shadow-primary/40',
-                    'transition-[filter] duration-400 ease-in-out motion-reduce:transition-none'
+                    'transition-[width,height,filter] duration-300 ease-in-out motion-reduce:transition-none'
                   )}
                 />
               </button>
