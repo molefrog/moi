@@ -7,10 +7,9 @@ import {
   RADIUS_THEMES,
   THEME_COLOR_TOKENS,
   resolveThemeColorOverrides,
-  themeColorProperty,
   resolveWorkspaceTheme
 } from '@/lib/themes'
-import type { ThemeColorMode } from '@/lib/themes'
+import type { ThemeColorMode, ThemeColorToken } from '@/lib/themes'
 import type { WorkspaceLayout } from '@/lib/types'
 
 const FONT_LINK_ID = 'moi-fonts'
@@ -35,6 +34,11 @@ const WORKSPACE_THEME_PROPERTIES = [
 
 type WorkspaceThemeStyle = CSSProperties & {
   [property: `--${string}`]: string | undefined
+}
+
+function themeColorProperty(token: ThemeColorToken): `--${string}` {
+  const name = token.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)
+  return `--${name}`
 }
 
 export function getWorkspaceThemeFontStyle(theme: WorkspaceLayout['theme']): WorkspaceThemeStyle {

@@ -155,11 +155,6 @@ export const THEME_COLOR_TOKENS = Object.keys(
   THEME_COLOR_DERIVATIONS.workspace
 ) as ThemeColorToken[]
 
-export function themeColorProperty(token: ThemeColorToken): `--${string}` {
-  const name = token.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)
-  return `--${name}`
-}
-
 export function deriveThemeColors(
   primary: string,
   mode: ThemeColorMode = 'workspace'

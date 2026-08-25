@@ -188,9 +188,6 @@ The biggest source of bugs when you know Radix-era shadcn. When unsure, `moi ui-
   `name`/`name-foreground` (background / text-on-it): `background`, `card`, `popover`,
   `primary`, `secondary`, `muted`, `accent`, `destructive`, plus `border`, `input`, `ring`,
   `chart-1…5`, and `--radius`. Status colors come from `Badge` variants or `text-destructive`.
-- **Inspect resolved tokens in the matching scope** with `moi theme --tokens --scope=view` or
-  `moi theme --tokens --scope=widget` (`--json` for machine-readable output). Use this to pick
-  between `chart-1…5` or check contrast deliberately instead of guessing what a token looks like.
 - **Built-in variants before custom classes**: `variant="outline"`, `size="sm"` — not
   hand-rolled border/bg utilities on `Button`.
 - **Prefer each component's default size.** Use smaller variants such as `sm` or `xs` only when a
