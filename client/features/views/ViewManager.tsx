@@ -13,7 +13,7 @@
 // because both builds share the slot's style tag (see ViewSlot), and it is
 // worth the 200ms — it is the only signal that the thing under your cursor just
 // changed underneath you.
-import { Activity, type ComponentType, useCallback, useEffect, useRef, useState } from 'react'
+import { Activity, type ComponentType, memo, useCallback, useEffect, useRef, useState } from 'react'
 
 import { Spinner } from '@/client/components/ui/spinner'
 import { appletScope, appletStyleKey } from '@/client/features/applets/applet-cache'
@@ -48,7 +48,18 @@ type ViewManagerProps = {
   params: Record<string, unknown>
 }
 
-export function ViewManager({ views, activeViewId, params }: ViewManagerProps) {
+// Memoized against the workspace screen's own churn: the screen re-renders on
+// every streaming delta of the selected chat (and on focus/popup state), and
+// without the bail-out each of those re-renders the full applet tree of every
+// resident view — typing next to a streaming agent then janks on a big view.
+// All three props are identity-stable outside real changes: `views` comes from
+// the workspace query cache, `activeViewId` is a string, and `params` is
+// memoized by navigation state.
+export const ViewManager = memo(function ViewManager({
+  views,
+  activeViewId,
+  params
+}: ViewManagerProps) {
   const residents = useResidentViews(activeViewId, views)
   // Render in workspace order, not residency order: the policy ranks views by
   // recency, and reordering the children would make React move live DOM around
@@ -68,7 +79,7 @@ export function ViewManager({ views, activeViewId, params }: ViewManagerProps) {
         ))}
     </div>
   )
-}
+})
 
 // The views mounted right now: the active one, plus the recently-visited ones
 // parked offscreen. The policy (and its timing) lives in view-residency.ts.

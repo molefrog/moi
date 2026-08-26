@@ -296,10 +296,12 @@ export const liveStore = createStore<LiveStore>()(set => ({
 }))
 
 // Select the live previews for a session, split into the root (top-level
-// assistant) stream and per-subagent streams. Takes the raw `previews` record
-// (a stable store slice) so callers select that slice and run this inside a
-// `useMemo` — never return a fresh object straight from a zustand selector.
-// `null` sessionId yields empties.
+// assistant) stream and per-subagent streams. The container object is fresh
+// per call, but `root` and the `byParent` values are the STORED preview
+// objects — so a zustand selector may return one of those directly (identity
+// only changes when that stream gets a delta), while returning the container
+// itself from a selector would re-render on every store write. `null`
+// sessionId yields empties.
 export function selectPreviews(
   previews: Record<string, LivePreview>,
   workspaceId: string,

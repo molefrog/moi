@@ -8,7 +8,7 @@ import {
   buildPreviewTurn,
   previewBlocksToParts
 } from '@/client/features/chat/preview-turn'
-import { type LivePreview, selectPreviews } from '@/client/features/chat/chat-store'
+import { type LivePreview, liveStore, selectPreviews } from '@/client/features/chat/chat-store'
 import type { Part, PreviewBlock, Turn, ToolCall } from '@/lib/types'
 
 const WS = 'ws1'
@@ -149,5 +149,33 @@ describe('selectPreviews', () => {
   test('null session → empties', () => {
     const previews = Object.fromEntries([entry('m', null, SID)])
     expect(selectPreviews(previews, WS, null)).toEqual({ root: null, byParent: {} })
+  })
+
+  // The screen subscribes to `root` through a zustand selector, so its
+  // IDENTITY is the re-render contract: another session's delta must return
+  // the same stored object (no re-render), and this session's own delta must
+  // return the replacement (re-render with the new text).
+  test('root identity survives other sessions’ deltas and follows its own', () => {
+    liveStore.setState({ previews: {} })
+    const frame = (messageId: string, sessionId: string, text: string) => ({
+      workspaceId: WS,
+      sessionId,
+      messageId,
+      parentToolUseId: null,
+      blocks: [{ index: 0, kind: 'text' as const, text }]
+    })
+
+    liveStore.getState().setPreview(frame('msg_mine', SID, 'hello'))
+    const root = selectPreviews(liveStore.getState().previews, WS, SID).root
+    expect(root?.blocks).toEqual([{ index: 0, kind: 'text', text: 'hello' }])
+
+    liveStore.getState().setPreview(frame('msg_other', 'sess-2', 'noise'))
+    expect(selectPreviews(liveStore.getState().previews, WS, SID).root).toBe(root!)
+
+    liveStore.getState().setPreview(frame('msg_mine', SID, 'hello world'))
+    const next = selectPreviews(liveStore.getState().previews, WS, SID).root
+    expect(next).not.toBe(root!)
+    expect(next?.blocks).toEqual([{ index: 0, kind: 'text', text: 'hello world' }])
+    liveStore.setState({ previews: {} })
   })
 })
