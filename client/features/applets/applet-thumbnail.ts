@@ -17,6 +17,20 @@ const SETTLE_MS = 5_000
 const ASSET_TIMEOUT_MS = 1_000
 const CAPTURE_TIMEOUT_MS = 10_000
 
+// Content outside the capture frame is clipped from the rendered image, so
+// cloning it is pure main-thread cost: the DOM clone + style-inline walk is
+// synchronous and scales with node count, and a view with a few thousand list
+// rows freezes the page for minutes while the user types in the chat. The
+// capture filter keeps only elements that can reach the frame, padded a little
+// so edge shadows survive.
+export const CAPTURE_AREA_PAD_PX = 100
+
+// Even in-frame content has a ceiling: past this many kept elements the
+// synchronous clone is guaranteed to jank (measured well over SLOW_CAPTURE_MS),
+// and no thumbnail is worth that. The count uses the same filter with an early
+// bail, so checking is cheap no matter how big the applet's DOM is.
+export const MAX_CAPTURE_NODES = 5_000
+
 export type AppletThumbnailTarget = {
   id: string
   revision?: string
@@ -75,11 +89,69 @@ const timeoutNull = (ms: number) =>
     setTimeout(() => resolve(null), ms)
   })
 
+type CaptureRect = Pick<DOMRect, 'top' | 'bottom' | 'left' | 'right' | 'width' | 'height'>
+
+type CaptureRectSource = { getBoundingClientRect: () => CaptureRect }
+
+// The clone filter: keep an element only when its box can reach the capture
+// frame. Zero-size elements stay — `display: contents` wrappers and collapsed
+// positioning hosts report an empty rect while their children are visible, and
+// they cost nothing themselves. Excluding an element excludes its whole
+// subtree, which is what makes capturing a long scrollable list cheap: every
+// off-screen row costs one rect read instead of a full clone.
+export function captureAreaFilter(
+  root: CaptureRectSource,
+  pad = CAPTURE_AREA_PAD_PX
+): (node: Node) => boolean {
+  const frame = root.getBoundingClientRect()
+  const top = frame.top - pad
+  const bottom = frame.bottom + pad
+  const left = frame.left - pad
+  const right = frame.right + pad
+  return node => {
+    // Literal ELEMENT_NODE: the global `Node` constant isn't available in the
+    // DOM-less test runtime.
+    if (node.nodeType !== 1) return true
+    const rect = (node as Element).getBoundingClientRect()
+    if (rect.width === 0 && rect.height === 0) return true
+    return rect.bottom > top && rect.top < bottom && rect.right > left && rect.left < right
+  }
+}
+
+type CaptureTreeNode = { children: Iterable<CaptureTreeNode> } & Node
+
+// True when the filtered clone would still visit more than `budget` elements.
+// Walks exactly the subtrees the clone would, bailing out at the budget, so a
+// huge but mostly off-screen DOM is answered in a few thousand rect reads.
+export function exceedsCaptureBudget(
+  root: CaptureTreeNode,
+  keep: (node: Node) => boolean,
+  budget = MAX_CAPTURE_NODES
+): boolean {
+  let remaining = budget
+  const walk = (node: CaptureTreeNode): boolean => {
+    for (const child of node.children) {
+      if (!keep(child)) continue
+      if (--remaining < 0) return true
+      if (walk(child)) return true
+    }
+    return false
+  }
+  return walk(root)
+}
+
 async function captureThumbnail(
   element: HTMLElement,
   stripHostChrome: boolean
 ): Promise<string | null> {
   const { createContext, destroyContext, domToDataUrl } = await import('modern-screenshot')
+
+  // The budget check runs before the expensive clone; a target too dense even
+  // inside the frame skips capture entirely. The null result is recorded like a
+  // failed capture — any previous thumbnail is kept, and the next routine
+  // attempt re-runs only this cheap check.
+  const keep = captureAreaFilter(element)
+  if (exceedsCaptureBudget(element, keep)) return null
 
   const run = async () => {
     const context = await createContext(element, {
@@ -88,6 +160,7 @@ async function captureThumbnail(
       quality: 0.8,
       backgroundColor: '#ffffff',
       timeout: ASSET_TIMEOUT_MS,
+      filter: keep,
       ...(stripHostChrome && {
         onCreateForeignObjectSvg: (svg: SVGSVGElement) => {
           const style = document.createElement('style')
