@@ -81,13 +81,13 @@ export function useChat(address: WorkspaceTabAddress) {
   // The live streaming preview as a synthetic assistant turn, so the ChatPanel
   // can run it through the SAME groupTurns pipeline as finalized turns — a
   // thinking-only preview then folds into the current tool group instead of
-  // rendering as a detached block. Recomputed per delta (the previews slice is
-  // stable across other updates); null when there's nothing visible yet.
-  const previews = useLive(s => s.previews)
-  const previewTurn = useMemo(
-    () => buildPreviewTurn(selectPreviews(previews, workspaceId, selectedSessionId).root),
-    [previews, workspaceId, selectedSessionId]
-  )
+  // rendering as a detached block. The selector returns the stored root-preview
+  // object for THIS session (not the whole slice): deltas for other sessions
+  // and subagent streams keep its identity, so only the selected session's own
+  // stream re-renders the screen hosting this hook. Null when there's nothing
+  // visible yet.
+  const rootPreview = useLive(s => selectPreviews(s.previews, workspaceId, selectedSessionId).root)
+  const previewTurn = useMemo(() => buildPreviewTurn(rootPreview), [rootPreview])
 
   // The selected session's persisted model/effort. For a brand-new chat (no
   // session yet) this is empty and `send` falls back to workspace defaults.
