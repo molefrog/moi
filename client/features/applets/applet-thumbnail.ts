@@ -94,11 +94,19 @@ type CaptureRect = Pick<DOMRect, 'top' | 'bottom' | 'left' | 'right' | 'width' |
 type CaptureRectSource = { getBoundingClientRect: () => CaptureRect }
 
 // The clone filter: keep an element only when its box can reach the capture
-// frame. Zero-size elements stay — `display: contents` wrappers and collapsed
-// positioning hosts report an empty rect while their children are visible, and
-// they cost nothing themselves. Excluding an element excludes its whole
+// frame. Zero-size elements stay unless hidden — `display: contents` wrappers
+// and collapsed positioning hosts report an empty rect while their children
+// are visible, but a `display: none` element heads a subtree where every
+// descendant also reports a zero box, and keeping it would spend the budget
+// and the clone on invisible content. Excluding an element excludes its whole
 // subtree, which is what makes capturing a long scrollable list cheap: every
 // off-screen row costs one rect read instead of a full clone.
+//
+// Known tradeoff: an off-frame ancestor is pruned even if an absolutely- or
+// fixed-positioned descendant would render back inside the frame. Rects are
+// post-transform and zero-size hosts are kept, so in practice this only costs
+// decorative thumbnail fidelity for escape-positioned content — never keep
+// whole off-screen subtrees to chase it; that is the freeze this filter fixes.
 export function captureAreaFilter(
   root: CaptureRectSource,
   pad = CAPTURE_AREA_PAD_PX
@@ -112,8 +120,14 @@ export function captureAreaFilter(
     // Literal ELEMENT_NODE: the global `Node` constant isn't available in the
     // DOM-less test runtime.
     if (node.nodeType !== 1) return true
-    const rect = (node as Element).getBoundingClientRect()
-    if (rect.width === 0 && rect.height === 0) return true
+    const element = node as Element
+    const rect = element.getBoundingClientRect()
+    if (rect.width === 0 && rect.height === 0) {
+      // Optional chains double as the test seam: fake nodes without a document
+      // read as structural wrappers and stay kept.
+      const display = element.ownerDocument?.defaultView?.getComputedStyle(element).display
+      return display !== 'none'
+    }
     return rect.bottom > top && rect.top < bottom && rect.right > left && rect.left < right
   }
 }

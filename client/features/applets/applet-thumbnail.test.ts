@@ -27,6 +27,7 @@ type FakeNode = {
   nodeType: number
   children: FakeNode[]
   getBoundingClientRect: () => FakeRect & { width: number; height: number }
+  ownerDocument?: { defaultView: { getComputedStyle: (el: unknown) => { display: string } } }
 }
 
 function box(rect: Partial<FakeRect>, children: FakeNode[] = [], nodeType = 1): FakeNode {
@@ -39,6 +40,14 @@ function box(rect: Partial<FakeRect>, children: FakeNode[] = [], nodeType = 1): 
       width: full.right - full.left,
       height: full.bottom - full.top
     })
+  }
+}
+
+// A zero-size node backed by a document whose computed style reports `display`.
+function zeroBox(display: string): FakeNode {
+  return {
+    ...box({}),
+    ownerDocument: { defaultView: { getComputedStyle: () => ({ display }) } }
   }
 }
 
@@ -112,6 +121,15 @@ describe('applet thumbnails', () => {
     // non-element nodes always pass.
     expect(keep(asNode(box({ top: 5000, bottom: 5000, left: 0, right: 0 })))).toBe(true)
     expect(keep(asNode(box({ top: 5000, bottom: 6000, left: 0, right: 100 }, [], 3)))).toBe(true)
+  })
+
+  test('prunes hidden zero-size subtrees but keeps structural wrappers', () => {
+    const keep = captureAreaFilter(frame())
+    // A `display: none` panel reports a zero box for its whole subtree — it is
+    // pruned at the root so invisible content never spends the budget.
+    expect(keep(asNode(zeroBox('none')))).toBe(false)
+    expect(keep(asNode(zeroBox('contents')))).toBe(true)
+    expect(keep(asNode(zeroBox('block')))).toBe(true)
   })
 
   test('bounds the capture budget by kept elements only', () => {
