@@ -648,8 +648,9 @@ export type Model = {
   // Id used to select the model (Claude `value`; OpenClaw catalog id).
   value: string
   // Canonical wire model id this row resolves to (Claude, e.g. 'default' and
-  // 'opus[1m]' both → 'claude-opus-4-8[1m]'). Lets the picker map the synthetic
-  // "default" entry onto the concrete model it points at.
+  // 'opus[1m]' both → 'claude-opus-4-8[1m]'; Hermes maps its structured ACP
+  // default the same way). Lets the picker map a synthetic "default" entry
+  // onto the concrete model it points at.
   resolvedModel?: string
   // Human-readable label (Claude `displayName`; OpenClaw `name`).
   displayName: string

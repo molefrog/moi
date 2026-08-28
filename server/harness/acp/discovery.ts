@@ -5,7 +5,7 @@ import { type AcpProviderConfig, type AcpSpawnContext } from './session'
 import { acpSessionToSessionInfo } from './adapter'
 import { archivedAcpSessions } from './archived'
 import { getAcpClient, peekAcpClient } from './client'
-import type { ListSessionsResponse, AcpModelInfo, AcpModelState, AcpNewSessionResult } from './wire'
+import type { ListSessionsResponse, AcpModelState, AcpNewSessionResult } from './wire'
 import type { WorkspaceActivityPreview } from '../types'
 import { debug } from '../../debug'
 
@@ -78,10 +78,23 @@ export async function acpWorkspacePreview(
 }
 
 // The model catalog arrives inline on `session/new`, so there is no standalone
-// list RPC. Cache it per workspace: creating a session just to read models is
-// wasteful, and an empty session is invisible to `session/list` anyway (agents
-// skip zero-history rows).
+// list RPC. Cache it per workspace by default: creating a session just to read
+// models is wasteful, and an empty session is invisible to `session/list`
+// anyway (agents skip zero-history rows). Providers whose state includes a
+// mutable external default can opt into refreshing it on each picker snapshot.
 const modelCatalogs = new Map<string, Promise<AcpModelState | undefined>>()
+
+async function discoverAcpModelState(
+  config: AcpProviderConfig,
+  ctx: AcpSpawnContext
+): Promise<AcpModelState | undefined> {
+  const client = await getAcpClient(await config.spawn(ctx))
+  const created = await client.rpc<AcpNewSessionResult>('session/new', {
+    cwd: ctx.workspacePath,
+    mcpServers: []
+  })
+  return created.models ?? undefined
+}
 
 export function cacheAcpModelState(workspacePath: string, models: AcpModelState | undefined): void {
   if (models?.availableModels?.length) {
@@ -97,32 +110,31 @@ export async function listAcpModels(
   config: AcpProviderConfig,
   ctx: AcpSpawnContext
 ): Promise<Model[]> {
-  let cached: Promise<AcpModelState | undefined> | undefined = modelCatalogs.get(ctx.workspacePath)
-  if (!cached) {
-    cached = (async () => {
-      const client = await getAcpClient(await config.spawn(ctx))
-      const created = await client.rpc<AcpNewSessionResult>('session/new', {
-        cwd: ctx.workspacePath,
-        mcpServers: []
+  let statePromise: Promise<AcpModelState | undefined>
+  if (config.refreshModelState) {
+    statePromise = discoverAcpModelState(config, ctx)
+  } else {
+    let cached = modelCatalogs.get(ctx.workspacePath)
+    if (!cached) {
+      cached = discoverAcpModelState(config, ctx).catch(err => {
+        modelCatalogs.delete(ctx.workspacePath)
+        throw err
       })
-      return created.models ?? undefined
-    })().catch(err => {
-      modelCatalogs.delete(ctx.workspacePath)
-      throw err
-    })
-    modelCatalogs.set(ctx.workspacePath, cached)
+      modelCatalogs.set(ctx.workspacePath, cached)
+    }
+    statePromise = cached
   }
   const mapModels =
     config.mapModels ??
-    ((infos: AcpModelInfo[]): Model[] =>
-      infos.map(m => ({
+    ((modelState: AcpModelState): Model[] =>
+      (modelState.availableModels ?? []).map(m => ({
         value: m.modelId,
         displayName: m.name ?? m.modelId,
         ...(m.description ? { description: m.description } : {})
       })))
   try {
-    const state = await cached
-    return mapModels(state?.availableModels ?? [])
+    const state = await statePromise
+    return mapModels(state ?? {})
   } catch (err) {
     debug(`${config.id} model catalog failed: ${err instanceof Error ? err.message : String(err)}`)
     return []

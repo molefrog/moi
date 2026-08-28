@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 
 import { hermesModels } from './models'
-import type { AcpModelInfo } from '../acp/wire'
+import type { AcpModelInfo, AcpModelState } from '../acp/wire'
 
 function one(info: AcpModelInfo) {
-  return hermesModels([info])[0]
+  return hermesModels({ availableModels: [info] })[0]
 }
 
 describe('hermesModels', () => {
@@ -112,32 +112,119 @@ describe('hermesModels deduping', () => {
   // Hermes lists a configured provider's models twice — under the provider id
   // and again namespaced under `custom:` — both routing to the same endpoint.
   test('keeps the first of two ids for the same provider and model', () => {
-    const models = hermesModels([
-      {
-        modelId: 'ollama-launch:gpt-oss:20b',
-        name: 'Ollama · gpt-oss:20b',
-        description: 'Provider: Ollama'
-      },
-      {
-        modelId: 'custom:ollama-launch:gpt-oss:20b',
-        name: 'gpt-oss:20b',
-        description: 'Provider: Ollama'
-      }
-    ])
+    const models = hermesModels({
+      availableModels: [
+        {
+          modelId: 'ollama-launch:gpt-oss:20b',
+          name: 'Ollama · gpt-oss:20b',
+          description: 'Provider: Ollama'
+        },
+        {
+          modelId: 'custom:ollama-launch:gpt-oss:20b',
+          name: 'gpt-oss:20b',
+          description: 'Provider: Ollama'
+        }
+      ]
+    })
 
     expect(models.map(m => m.value)).toEqual(['ollama-launch:gpt-oss:20b'])
   })
 
-  test('keeps same-named models from different providers', () => {
-    const models = hermesModels([
-      {
-        modelId: 'nous:x-ai/grok-4.5',
-        name: 'Nous Portal · x-ai/grok-4.5',
-        description: 'Provider: Nous Portal'
-      },
-      { modelId: 'xai-oauth:grok-4.5', name: 'xAI · grok-4.5', description: 'Provider: xAI' }
+  test('keeps the current id when it is the duplicate spelling', () => {
+    const models = hermesModels({
+      availableModels: [
+        {
+          modelId: 'ollama-launch:gpt-oss:20b',
+          name: 'Ollama · gpt-oss:20b',
+          description: 'Provider: Ollama'
+        },
+        {
+          modelId: 'custom:ollama-launch:gpt-oss:20b',
+          name: 'gpt-oss:20b',
+          description: 'Provider: Ollama • current'
+        }
+      ],
+      currentModelId: 'custom:ollama-launch:gpt-oss:20b'
+    })
+
+    expect(models.map(model => model.value)).toEqual([
+      'default',
+      'custom:ollama-launch:gpt-oss:20b'
     ])
+    expect(models.every(model => model.resolvedModel === 'custom:ollama-launch:gpt-oss:20b')).toBe(
+      true
+    )
+  })
+
+  test('keeps same-named models from different providers', () => {
+    const models = hermesModels({
+      availableModels: [
+        {
+          modelId: 'nous:x-ai/grok-4.5',
+          name: 'Nous Portal · x-ai/grok-4.5',
+          description: 'Provider: Nous Portal'
+        },
+        { modelId: 'xai-oauth:grok-4.5', name: 'xAI · grok-4.5', description: 'Provider: xAI' }
+      ]
+    })
 
     expect(models.map(m => m.providerId)).toEqual(['nous', 'xai-oauth'])
+  })
+})
+
+describe('hermesModels default', () => {
+  const availableModels: AcpModelInfo[] = [
+    {
+      modelId: 'bedrock:us.anthropic.claude-sonnet-4-6',
+      name: 'AWS Bedrock · us.anthropic.claude-sonnet-4-6',
+      description: 'Provider: AWS Bedrock • current'
+    },
+    {
+      modelId: 'openrouter:anthropic/claude-opus-4.6',
+      name: 'OpenRouter · anthropic/claude-opus-4.6',
+      description: 'Provider: OpenRouter'
+    }
+  ]
+
+  test('maps currentModelId onto the concrete current model', () => {
+    const state: AcpModelState = {
+      availableModels,
+      currentModelId: 'bedrock:us.anthropic.claude-sonnet-4-6'
+    }
+
+    expect(hermesModels(state)).toEqual([
+      {
+        value: 'default',
+        resolvedModel: 'bedrock:us.anthropic.claude-sonnet-4-6',
+        displayName: 'Default (from Hermes)'
+      },
+      {
+        value: 'bedrock:us.anthropic.claude-sonnet-4-6',
+        resolvedModel: 'bedrock:us.anthropic.claude-sonnet-4-6',
+        displayName: 'us.anthropic.claude-sonnet-4-6',
+        group: 'AWS Bedrock',
+        providerId: 'bedrock'
+      },
+      {
+        value: 'openrouter:anthropic/claude-opus-4.6',
+        displayName: 'anthropic/claude-opus-4.6',
+        group: 'OpenRouter',
+        providerId: 'openrouter'
+      }
+    ])
+  })
+
+  test('keeps the catalog unchanged without currentModelId', () => {
+    expect(hermesModels({ availableModels }).map(model => model.value)).toEqual([
+      'bedrock:us.anthropic.claude-sonnet-4-6',
+      'openrouter:anthropic/claude-opus-4.6'
+    ])
+    expect(hermesModels({})).toEqual([])
+  })
+
+  test('keeps the catalog unchanged when currentModelId is unavailable', () => {
+    expect(
+      hermesModels({ availableModels, currentModelId: 'bedrock:missing' }).map(model => model.value)
+    ).toEqual(['bedrock:us.anthropic.claude-sonnet-4-6', 'openrouter:anthropic/claude-opus-4.6'])
   })
 })

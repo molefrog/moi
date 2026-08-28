@@ -42,6 +42,10 @@ const config: AcpProviderConfig = {
   provider: 'hermes',
   noPromptModeId: NO_PROMPT_MODE,
   mapModels: hermesModels,
+  // Hermes's global default can change outside moi while the server stays up.
+  // Its only structured source is `currentModelId` on `session/new`, so refresh
+  // that state for each picker snapshot instead of freezing it with the catalog.
+  refreshModelState: true,
   supportsImages: true,
   async spawn(ctx) {
     const bin = findHarnessExecutable('hermes')
