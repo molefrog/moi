@@ -1,6 +1,6 @@
 import type { HarnessAvailability, HarnessLogin } from '@/lib/types'
 
-import { getCodexClient } from './client'
+import { CODEX_MIN_SUPPORTED_VERSION, codexCliOutdated, getCodexClient } from './client'
 
 type CodexAccount = { type: string }
 type CodexAccountReadResponse = {
@@ -38,8 +38,23 @@ export function codexAccountReadiness(response: unknown): HarnessAvailability {
   return CODEX_AVAILABLE
 }
 
+// Servers older than the supported floor reject every method moi calls with a
+// bare "Invalid request", which the probe would surface as a generic failure —
+// report the actionable cause instead.
+export function codexOutdatedAvailability(
+  cliVersion: string | undefined
+): HarnessAvailability | undefined {
+  if (!codexCliOutdated(cliVersion)) return undefined
+  return {
+    status: 'unavailable',
+    reason: `Codex ${cliVersion} is out of date. Update Codex to ${CODEX_MIN_SUPPORTED_VERSION} or newer`
+  }
+}
+
 export async function getCodexAuthReadiness(workspacePath: string): Promise<HarnessAvailability> {
   const client = await getCodexClient(workspacePath)
+  const outdated = codexOutdatedAvailability(client.cliVersion)
+  if (outdated) return outdated
   const account = await client.rpc<unknown>('account/read', { refreshToken: true })
   return codexAccountReadiness(account)
 }

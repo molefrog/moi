@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 
-import { archiveCodexThread, codexSupportsAdditionalContext, interruptCodexTurn } from './client'
+import {
+  archiveCodexThread,
+  codexCliOutdated,
+  codexSupportsAdditionalContext,
+  interruptCodexTurn,
+  parseCodexCliVersion
+} from './client'
 
 describe('codexSupportsAdditionalContext', () => {
   test('accepts versions at and above 0.135.0', () => {
@@ -18,6 +24,37 @@ describe('codexSupportsAdditionalContext', () => {
     expect(codexSupportsAdditionalContext(undefined)).toBe(false)
     expect(codexSupportsAdditionalContext('')).toBe(false)
     expect(codexSupportsAdditionalContext('codex_cli_rs')).toBe(false)
+  })
+})
+
+describe('parseCodexCliVersion', () => {
+  test('extracts the version from an initialize userAgent', () => {
+    expect(parseCodexCliVersion('codex_cli_rs/0.45.0 (Mac OS 15.1; arm64)')).toBe('0.45.0')
+    expect(parseCodexCliVersion('codex_cli_rs/0.150.1')).toBe('0.150.1')
+  })
+
+  test('returns undefined for missing or unparsable userAgent', () => {
+    expect(parseCodexCliVersion(undefined)).toBeUndefined()
+    expect(parseCodexCliVersion('')).toBeUndefined()
+    expect(parseCodexCliVersion('codex_cli_rs')).toBeUndefined()
+  })
+})
+
+describe('codexCliOutdated', () => {
+  test('flags versions below the supported floor', () => {
+    expect(codexCliOutdated('0.45.0')).toBe(true)
+    expect(codexCliOutdated('0.88.0')).toBe(true)
+  })
+
+  test('accepts versions at and above the supported floor', () => {
+    expect(codexCliOutdated('0.89.0')).toBe(false)
+    expect(codexCliOutdated('0.150.1')).toBe(false)
+    expect(codexCliOutdated('1.0.0')).toBe(false)
+  })
+
+  test('never flags unknown versions or 0.0.0 dev builds', () => {
+    expect(codexCliOutdated(undefined)).toBe(false)
+    expect(codexCliOutdated('0.0.0')).toBe(false)
   })
 })
 

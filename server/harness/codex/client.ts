@@ -68,6 +68,9 @@ export type CodexClient = {
   // Whether this app-server accepts `turn/start.additionalContext` (the native
   // per-turn context channel). Resolved from the initialize handshake.
   supportsAdditionalContext: boolean
+  // CLI version from the initialize handshake's userAgent; undefined when it
+  // could not be parsed.
+  cliVersion: string | undefined
 }
 
 // `additionalContext` shipped in codex 0.135.0 (openai/codex#24154, May 2026).
@@ -76,16 +79,41 @@ export type CodexClient = {
 // reliable signal is the version embedded in the initialize response's
 // userAgent (e.g. `codex_cli_rs/0.144.5 (…)`); an unparsable userAgent gates
 // to false and the session path falls back to appending context to the text.
-const ADDITIONAL_CONTEXT_MIN_VERSION = [0, 135, 0] as const
+const ADDITIONAL_CONTEXT_MIN_VERSION = '0.135.0'
 
-export function codexSupportsAdditionalContext(userAgent: string | undefined): boolean {
-  const m = userAgent?.match(/\/(\d+)\.(\d+)\.(\d+)/)
-  if (!m) return false
-  const v = [Number(m[1]), Number(m[2]), Number(m[3])]
+// The oldest codex whose app-server speaks every RPC method moi calls.
+// `thread/read` was the last to land (openai/codex#9569, codex 0.89.0,
+// Jan 2026); the core v2 thread/turn/account/model API arrived in 0.56.0
+// and `config/read` in 0.64.0. Older servers complete the initialize
+// handshake normally and then reject each method with a bare
+// "Invalid request", so the handshake version is the only usable signal.
+export const CODEX_MIN_SUPPORTED_VERSION = '0.89.0'
+
+// Every codex release embeds `codex_cli_rs/<version> (…)` in the initialize
+// response's userAgent (verified back to 0.45.0).
+export function parseCodexCliVersion(userAgent: string | undefined): string | undefined {
+  return userAgent?.match(/\/(\d+\.\d+\.\d+)/)?.[1]
+}
+
+function versionAtLeast(version: string, min: string): boolean {
+  const v = version.split('.').map(Number)
+  const m = min.split('.').map(Number)
   for (let i = 0; i < 3; i++) {
-    if (v[i] !== ADDITIONAL_CONTEXT_MIN_VERSION[i]) return v[i] > ADDITIONAL_CONTEXT_MIN_VERSION[i]
+    if (v[i] !== m[i]) return v[i] > m[i]
   }
   return true
+}
+
+// Unknown versions never flag as outdated — dev builds of codex report 0.0.0
+// regardless of what they actually support.
+export function codexCliOutdated(cliVersion: string | undefined): boolean {
+  if (!cliVersion || cliVersion === '0.0.0') return false
+  return !versionAtLeast(cliVersion, CODEX_MIN_SUPPORTED_VERSION)
+}
+
+export function codexSupportsAdditionalContext(userAgent: string | undefined): boolean {
+  const version = parseCodexCliVersion(userAgent)
+  return version ? versionAtLeast(version, ADDITIONAL_CONTEXT_MIN_VERSION) : false
 }
 
 type ClientRecord = {
@@ -246,7 +274,8 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
     },
     isAlive: () => alive,
     workspacePath,
-    supportsAdditionalContext: false
+    supportsAdditionalContext: false,
+    cliVersion: undefined
   }
   const record: ClientRecord = { client, proc }
   const recordPromise = Promise.resolve(record)
@@ -263,6 +292,7 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
     capabilities: { experimentalApi: true, requestAttestation: false }
   })
   client.supportsAdditionalContext = codexSupportsAdditionalContext(init?.userAgent)
+  client.cliVersion = parseCodexCliVersion(init?.userAgent)
   send({ jsonrpc: '2.0', method: 'initialized', params: {} })
   debug(
     `codex app-server started ws=${workspacePath} bin=${bin} ua=${init?.userAgent ?? 'unknown'} additionalContext=${client.supportsAdditionalContext}`
