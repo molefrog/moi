@@ -39,7 +39,7 @@ type NoWidgetsCreatedProps = {
 
 function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
   return (
-    <div className="relative min-h-0 flex-1 pt-7">
+    <div className="relative min-h-0 w-full max-w-(--column-w) flex-1 pt-7">
       <div aria-hidden="true">
         <WidgetGridLayout items={EMPTY_WIDGET_ITEMS} renderItem={renderEmptyWidget} />
       </div>
@@ -71,7 +71,7 @@ type WidgetActionsProps = {
 
 function WidgetActions({ editing, onCreateWidget, onEditingChange }: WidgetActionsProps) {
   return (
-    <div className="mx-auto mb-4 flex w-full max-w-(--column-w) shrink-0 items-center justify-end gap-2">
+    <div className="mb-4 flex w-full max-w-(--column-w) shrink-0 items-center justify-end gap-2">
       {editing && (
         <Button
           type="button"
@@ -198,7 +198,10 @@ export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: W
       <LayoutGroup>
         <div
           className={cn(
-            'relative flex h-full flex-col p-4',
+            // items-center + capped children instead of mx-auto: Chrome can
+            // report stale 0px for auto margins after layout animations, which
+            // clones them flush-left in annotation captures (capture-element.ts).
+            'relative flex h-full flex-col items-center p-4',
             hasWidgets ? 'overflow-y-auto' : 'overflow-hidden'
           )}
         >
@@ -211,7 +214,7 @@ export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: W
               />
               {visibleItems.length === 0 ? (
                 <motion.div
-                  className="mx-auto flex min-h-0 w-full max-w-[var(--column-w)] flex-1 flex-col"
+                  className="flex min-h-0 w-full max-w-(--column-w) flex-1 flex-col"
                   animate={{ paddingBottom: panelOpen ? panelHeight : 0 }}
                   transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
                 >
@@ -221,6 +224,7 @@ export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: W
                 // The open panel's height is reserved below the grid so every card
                 // can scroll clear of the panel.
                 <motion.div
+                  className="w-full max-w-(--column-w)"
                   animate={{ marginBottom: panelOpen ? panelHeight : 0 }}
                   transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
                 >

@@ -63,7 +63,7 @@ export function WidgetGridLayout({
   )
 
   return (
-    <div ref={containerRef} className="mx-auto w-full max-w-[var(--column-w)]">
+    <div ref={containerRef} className="w-full">
       {mounted && (
         <GridLayout
           width={width}

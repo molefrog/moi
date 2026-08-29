@@ -14,6 +14,17 @@ function rejectAfter(ms: number): Promise<never> {
   })
 }
 
+// Scrollbars are meaningless in a static capture, and a cloned scroll
+// container can reserve a classic scrollbar gutter the live page (overlay
+// scrollbars) doesn't have — shifting centered content by the gutter width.
+// Hidden clips exactly like auto/scroll minus the gutter.
+function hideCloneScrollbars(node: Node): void {
+  if (!(node instanceof HTMLElement)) return
+  const { overflowX, overflowY } = node.style
+  if (overflowY === 'auto' || overflowY === 'scroll') node.style.overflowY = 'hidden'
+  if (overflowX === 'auto' || overflowX === 'scroll') node.style.overflowX = 'hidden'
+}
+
 // Capture one visible DOM region into a canvas. This is deliberately unaware
 // of workspaces, chat, and drawing so other flows can reuse it later.
 export async function captureElement(element: HTMLElement): Promise<HTMLCanvasElement> {
@@ -32,7 +43,8 @@ export async function captureElement(element: HTMLElement): Promise<HTMLCanvasEl
       backgroundColor: getComputedStyle(element).backgroundColor,
       timeout: ASSET_TIMEOUT_MS,
       features: { restoreScrollPosition: true },
-      style: { overflow: 'hidden' }
+      style: { overflow: 'hidden' },
+      onCloneEachNode: hideCloneScrollbars
     })
     try {
       return await domToCanvas(context)
