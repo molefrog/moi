@@ -213,18 +213,24 @@ function ViewFrame({ view, build, params, entering, thumbnailTarget }: ViewFrame
       className={cn(
         // Keep applet z-indexes inside the view. Host overlays render after this
         // frame and should always stack above the view as a single unit.
-        'absolute inset-0 isolate overflow-auto',
+        'absolute inset-0 isolate',
         entering && 'animate-in duration-200 ease-out blur-in-4 fade-in'
       )}
     >
-      <WidgetErrorBoundary
-        name={view.id}
-        kind="view"
-        workspaceId={workspaceId}
-        resetKey={build.version}
-      >
-        <build.Component params={params} />
-      </WidgetErrorBoundary>
+      {/* Scrolling lives one level down so the [data-applet] frame itself never
+          scrolls: overlays that portal into the frame and position absolutely
+          (the drawer ui component) stay pinned to the visible applet area even
+          when a view overflows. */}
+      <div className="size-full overflow-auto">
+        <WidgetErrorBoundary
+          name={view.id}
+          kind="view"
+          workspaceId={workspaceId}
+          resetKey={build.version}
+        >
+          <build.Component params={params} />
+        </WidgetErrorBoundary>
+      </div>
     </div>
   )
 }

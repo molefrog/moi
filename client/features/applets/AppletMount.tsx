@@ -19,12 +19,16 @@ type AppletMountProps = {
 // page. This is the widget path. Views don't use it: ViewManager parks a view's
 // DOM offscreen instead of unmounting it, so it holds the styles itself, above
 // the boundary that hides the view.
+//
+// `relative isolate` makes the `[data-applet]` element the positioning anchor
+// and stacking boundary for applet overlays that portal into it (the drawer ui
+// component docks against this box), mirroring the view frame in ViewManager.
 export function AppletMount({ segment, name, version, children }: AppletMountProps) {
   const workspaceId = useWorkspaceId()
   useAppletStyle(appletStyleKey(segment, workspaceId, name), version)
 
   return (
-    <div data-applet={appletScope(segment, name)} className="size-full">
+    <div data-applet={appletScope(segment, name)} className="relative isolate size-full">
       {children}
     </div>
   )

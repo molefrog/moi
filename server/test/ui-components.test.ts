@@ -143,6 +143,19 @@ describe('resolveUiComponentRequest', () => {
     expect(request.unknown).toEqual(['sidebar'])
   })
 
+  test('carries moi-authored sources next to their registry building blocks', () => {
+    const request = resolveUiComponentRequest(['drawer'])
+
+    // The drawer itself is not fetched — only the button its close button
+    // composes; the source rides along verbatim.
+    expect(request.registryItems).toEqual(['button'])
+    expect(request.localFiles.map(file => file.name)).toEqual(['drawer.tsx'])
+    expect(request.localFiles[0].content).toBe(UI_COMPONENTS.drawer.localFiles![0].content)
+
+    // Registry-only requests carry none.
+    expect(resolveUiComponentRequest(['button']).localFiles).toEqual([])
+  })
+
   test('suggests close catalog names for typos', () => {
     expect(suggestUiComponents('alertdialog')[0]).toBe('alert-dialog')
     expect(suggestUiComponents('tooltp')[0]).toBe('tooltip')
@@ -176,6 +189,28 @@ describe('planUiWrites', () => {
       path: join(uiDir, 'applet-portal.tsx')
     })
     expect(byName.get('applet-portal.tsx')?.content).toBe(APPLET_PORTAL_SOURCE)
+  })
+
+  test('local sources are requested files that skip the transform pipeline', () => {
+    const plans = planUiWrites({
+      files: [{ name: 'button.tsx', content: 'button' }, ...files.slice(2)],
+      localFiles: [{ name: 'drawer.tsx', content: 'drawer source' }],
+      requestedItems: ['button'],
+      uiDir,
+      exists: () => false
+    })
+
+    const byName = new Map(plans.map(plan => [plan.name, plan]))
+    // Requested like the entry that carried it — --force overwrites it, an
+    // existing copy is reported as installed — but written verbatim: the
+    // portal codemod would rewrite its container-targeting Portal JSX.
+    expect(byName.get('drawer.tsx')).toMatchObject({
+      support: false,
+      pretransformed: true,
+      content: 'drawer source'
+    })
+    expect(byName.get('button.tsx')).toMatchObject({ support: false, pretransformed: false })
+    expect(byName.get('applet-portal.tsx')).toMatchObject({ pretransformed: true })
   })
 })
 
@@ -238,13 +273,16 @@ describe('partitionUiWrites', () => {
 })
 
 describe('catalog', () => {
-  test('every entry has a description and at least one registry item', () => {
+  test('every entry has a description and at least one file to write', () => {
     for (const name of UI_COMPONENT_NAMES) {
       const entry = UI_COMPONENTS[name]
       expect(entry.description.length).toBeGreaterThan(0)
-      expect(entry.registryItems.length).toBeGreaterThan(0)
+      expect(entry.registryItems.length + (entry.localFiles?.length ?? 0)).toBeGreaterThan(0)
       // Catalog keys are kebab-case slugs — they double as docs slugs.
       expect(name).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/)
+      // Entries with moi-authored sources must document themselves — there is
+      // no upstream page for `docs` to fetch.
+      if (entry.localFiles?.length) expect(entry.localDocs?.length).toBeGreaterThan(0)
     }
   })
 
@@ -270,6 +308,7 @@ describe('catalog', () => {
       'data-table',
       'date-picker',
       'dialog',
+      'drawer',
       'dropdown-menu',
       'field',
       'hover-card',

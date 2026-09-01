@@ -22,7 +22,7 @@ and a curated subset instead of the full upstream catalog.
   config as an in-memory object that lives inside moi.
 - Always and only Base UI primitives. Tabler icons. Workspace tokens —
   never hardcoded colors.
-- **A curated subset, not the catalog** (component review, Aug 2026): 40
+- **A curated subset, not the catalog** (component review, Aug 2026): 41
   entries — the everyday controls plus `attachment`, `bubble`, `chart`,
   `data-table` and `date-picker` as patterns — and deliberately no
   page-scale chrome (`sidebar`, `navigation-menu`, `sheet`, `menubar`,
@@ -30,6 +30,14 @@ and a curated subset instead of the full upstream catalog.
   The list is `UI_COMPONENTS` in `server/ui-components.ts`; registry
   dependencies of a curated item (`separator`, `card`, `toggle`) install
   implicitly as support files.
+- One entry is moi-authored rather than proxied: `drawer`, the
+  applet-scoped replacement for the excluded `sheet` — it portals into the
+  applet's `[data-applet]` mount container and positions `absolute`
+  against it, so the panel docks to an edge of the applet area instead of
+  covering the app. Local sources ship embedded in `ui-components.ts`
+  (`DRAWER_SOURCE`, written verbatim — the transform pipeline, portal
+  codemod included, must not touch them) with embedded docs
+  (`DRAWER_DOCS`) served by `docs` in place of an upstream page.
 - Components live in `.moi/ui/`, one fixed place, created on first use.
 - Applets import them relatively: `../ui/button`. Never `@/` aliases (the
   skill states this; unresolved imports already fail loudly at build).

@@ -63,6 +63,11 @@ description + error) · `label` · `checkbox` · `radio-group` · `switch` · `s
 **Overlays (portal-patched):** `dialog` · `alert-dialog` (destructive confirm) · `popover` ·
 `dropdown-menu` · `context-menu` (right-click) · `hover-card` · `tooltip`
 
+**Applet-scoped overlay:** `drawer` — panel sliding in from an edge of the applet area (the
+widget card or view region, never the whole app), non-modal, built for master-detail detail
+panels. moi-authored: its API is not the upstream sheet/drawer — read
+`moi ui-components docs drawer` before first use.
+
 **Display & feedback:** `alert` (callouts) · `badge` · `avatar` · `skeleton` · `spinner` ·
 `progress` · `table` · `data-table` (pattern on `table` + `@tanstack/react-table` — see its
 docs) · `chart` (Recharts wired to theme tokens) · `attachment` (file/image tile) · `bubble`
@@ -72,9 +77,10 @@ docs) · `chart` (Recharts wired to theme tokens) · `attachment` (file/image ti
 `resizable` (split panels) · `separator` (divider line)
 
 Picking one: quick info on hover → `hover-card` or `tooltip` · contextual panel on click →
-`popover` · focused task needing input → `dialog` · destructive confirmation → `alert-dialog` ·
-option sets of 2–7 → `toggle-group` · long searchable lists → `combobox` · boolean setting →
-`switch`, boolean in a form → `checkbox`.
+`popover` · details panel that stays open beside the content while the user keeps clicking
+through items (inspector, master-detail) → `drawer` · focused task needing input → `dialog` ·
+destructive confirmation → `alert-dialog` · option sets of 2–7 → `toggle-group` · long
+searchable lists → `combobox` · boolean setting → `switch`, boolean in a form → `checkbox`.
 
 ## Composition rules
 
@@ -97,8 +103,8 @@ option sets of 2–7 → `toggle-group` · long searchable lists → `combobox` 
   `DropdownMenuItem`/`DropdownMenuLabel`/`DropdownMenuSub` → `DropdownMenuGroup`;
   `ContextMenuItem` → `ContextMenuGroup`. A Label outside its Group **crashes the component at
   runtime** (Base UI requires the group context); keep items grouped too.
-- **`Dialog` and `AlertDialog` always need a Title** (`DialogTitle` — use
-  `className="sr-only"` to hide it visually).
+- **`Dialog`, `AlertDialog`, and `Drawer` always need a Title** (`DialogTitle`/`DrawerTitle` —
+  use `className="sr-only"` to hide it visually).
 - **`TabsTrigger` must be inside `TabsList`**, never directly in `Tabs`.
 - **`Avatar` always needs `AvatarFallback`** for when the image fails.
 - **Button has no `isLoading`** — compose: `<Button disabled><Spinner data-icon="inline-start" />Saving…</Button>`.
@@ -142,6 +148,10 @@ The biggest source of bugs when you know Radix-era shadcn. When unsure, `moi ui-
 - **`AlertAction` is absolutely positioned** in the alert's top-right corner, and the alert
   reserves only ~4.5rem of right padding for it. Keep it to one small control (`size="sm"`
   button or icon button); anything wider overlaps the title and description text.
+- **Drawer is always non-modal, and outside clicks don't close it** by default (pass
+  `disablePointerDismissal={false}` on the root for click-outside-to-close; `overlay` on
+  `DrawerContent` dims the applet behind it). It docks to the applet area, not the page —
+  use `dialog`/`alert-dialog` for blocking flows.
 
 ## Forms
 
