@@ -20,7 +20,8 @@ export const MOI_PACKAGE_JSON = {
     // Base UI primitives and the cn() stack, so one install at workspace
     // creation covers the common path. Component-specific deps (recharts,
     // embla, …) stay agent-installed on demand — `add` prints them.
-    '@base-ui/react': '^1.2.0',
+    // 1.3.0 floor: the drawer's Base UI primitive left preview there.
+    '@base-ui/react': '^1.3.0',
     'class-variance-authority': '^0.7.1',
     clsx: '^2.1.1',
     'tailwind-merge': '^3.3.1'

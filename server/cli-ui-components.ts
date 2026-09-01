@@ -90,7 +90,6 @@ const add = defineCommand({
 
     const plans = planUiWrites({
       files: fetched.files,
-      localFiles: request.localFiles,
       requestedItems: request.registryItems,
       uiDir,
       exists: existsSync
@@ -119,12 +118,17 @@ const add = defineCommand({
     await mkdir(uiDir, { recursive: true })
     const written: string[] = []
     for (const plan of partition.write) {
-      // moi-authored sources ship in final form; only fetched registry files
-      // go through the transform pipeline.
-      const content =
-        plan.name.endsWith('.tsx') && !plan.pretransformed
-          ? await transformUiComponentSource(plan.name, plan.content)
-          : plan.content
+      let content = plan.content
+      if (plan.name.endsWith('.tsx')) {
+        try {
+          content = await transformUiComponentSource(plan.name, plan.content)
+        } catch (err) {
+          // A moi source patch refusing to apply (upstream drift) is the one
+          // expected failure here — surface it as a message, not a stack.
+          console.error('\n' + pc.red('✗') + ` ${(err as Error).message}\n`)
+          process.exit(1)
+        }
+      }
       await Bun.write(plan.path, content)
       written.push(plan.name)
     }
@@ -219,13 +223,6 @@ const docs = defineCommand({
 
     for (const name of request.entries) {
       const entry = UI_COMPONENTS[name]
-      // moi-authored components document themselves — there is no upstream
-      // page, and their API deliberately differs from any upstream namesake.
-      if (entry.localDocs) {
-        if (request.entries.length > 1) console.log(`\n---\n# ${name}\n`)
-        console.log(entry.localDocs)
-        continue
-      }
       const slug = entry.docsSlug ?? name
       const url = `${UI_DOCS_BASE}/${slug}.md`
       try {
@@ -233,10 +230,16 @@ const docs = defineCommand({
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         if (request.entries.length > 1) console.log(`\n---\n# ${name}\n`)
         console.log(await res.text())
+        // Components moi patches at install document their deltas right under
+        // the upstream page (drawer: applet scoping, flipped defaults).
+        if (entry.docsAppendix) console.log(entry.docsAppendix)
       } catch (err) {
         console.error(
           pc.red('✗') + ` Could not fetch docs for "${name}" (${url}): ${(err as Error).message}`
         )
+        // The moi deltas still stand on their own when the upstream page is
+        // unreachable — print them so the agent gets the applet-specific API.
+        if (entry.docsAppendix) console.log('\n' + entry.docsAppendix)
         process.exitCode = 1
       }
     }
@@ -252,12 +255,7 @@ function renderCatalog(uiDir: string, query?: string): void {
     if (needle && !name.includes(needle) && !entry.description.toLowerCase().includes(needle)) {
       continue
     }
-    // An entry is installed when every file it would write is present — the
-    // registry items it fetches plus any moi-authored sources it carries.
-    const installed = [
-      ...entry.registryItems.map(item => `${item}.tsx`),
-      ...(entry.localFiles ?? []).map(file => file.name)
-    ].every(file => existsSync(join(uiDir, file)))
+    const installed = entry.registryItems.every(item => existsSync(join(uiDir, `${item}.tsx`)))
     rows.push(
       '  ' +
         (installed ? pc.green('✓ ') : '  ') +

@@ -63,10 +63,12 @@ description + error) · `label` · `checkbox` · `radio-group` · `switch` · `s
 **Overlays (portal-patched):** `dialog` · `alert-dialog` (destructive confirm) · `popover` ·
 `dropdown-menu` · `context-menu` (right-click) · `hover-card` · `tooltip`
 
-**Applet-scoped overlay:** `drawer` — panel sliding in from an edge of the applet area (the
-widget card or view region, never the whole app), non-modal, built for master-detail detail
-panels. moi-authored: its API is not the upstream sheet/drawer — read
-`moi ui-components docs drawer` before first use.
+**Applet-scoped overlay:** `drawer` — the upstream shadcn drawer (swipe to dismiss, snap
+points), patched at install so it docks to an edge of the applet area (the widget card or
+view region, never the whole app). Non-modal by default, built for master-detail detail
+panels; the docking side comes from `swipeDirection` on the root. Read
+`moi ui-components docs drawer` before first use — the moi deltas are appended to the
+upstream docs.
 
 **Display & feedback:** `alert` (callouts) · `badge` · `avatar` · `skeleton` · `spinner` ·
 `progress` · `table` · `data-table` (pattern on `table` + `@tanstack/react-table` — see its
@@ -148,10 +150,12 @@ The biggest source of bugs when you know Radix-era shadcn. When unsure, `moi ui-
 - **`AlertAction` is absolutely positioned** in the alert's top-right corner, and the alert
   reserves only ~4.5rem of right padding for it. Keep it to one small control (`size="sm"`
   button or icon button); anything wider overlaps the title and description text.
-- **Drawer is always non-modal, and outside clicks don't close it** by default (pass
-  `disablePointerDismissal={false}` on the root for click-outside-to-close; `overlay` on
-  `DrawerContent` dims the applet behind it). It docks to the applet area, not the page —
-  use `dialog`/`alert-dialog` for blocking flows.
+- **Drawer defaults differ from upstream**: non-modal (`modal` defaults `false`) and outside
+  clicks don't close it (`disablePointerDismissal` defaults `true` — pass `false` for
+  click-outside-to-close). The docking side comes from `swipeDirection` on the root
+  (`"right"` for an inspector panel; `"down"`, the default, is a bottom sheet), and there is
+  no built-in close button — compose `DrawerClose`. It docks to the applet area, not the
+  page — use `dialog`/`alert-dialog` for blocking flows.
 
 ## Forms
 

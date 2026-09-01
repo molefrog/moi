@@ -35,129 +35,83 @@ export type UiComponentEntry = {
   extraDeps?: string[]
   // Docs slug when it differs from the entry name (none currently).
   docsSlug?: string
-  // Source files moi authors itself (drawer) — written verbatim, next to any
-  // fetched registryItems the component builds on. Already in final form:
-  // relative imports, Tabler icons, no registry aliases — so the transform
-  // pipeline is skipped for them.
-  localFiles?: FetchedUiFile[]
-  // Embedded docs markdown for moi-authored components, printed by
-  // `moi ui-components docs <name>` instead of fetching an upstream page.
-  localDocs?: string
+  // Extra markdown printed after the fetched upstream docs — how moi's
+  // install-time source patch (see UI_SOURCE_PATCHES) changes the component.
+  docsAppendix?: string
 }
 
 // ---------------------------------------------------------------------------
-// The drawer — moi-authored, not in the upstream registry
+// Source patches — the applet-scoping patch for the upstream drawer
 // ---------------------------------------------------------------------------
 
-// A side panel scoped to the applet area. The upstream `sheet`/`drawer` items
-// portal to document.body and position `fixed`, covering the whole app — wrong
-// inside moi, where an applet owns only its own region. This derivative of the
-// base-nova sheet portals into the applet's own mount container instead (the
-// `[data-applet]` element every mount provides — AppletMount and ViewManager
-// keep it `relative`/positioned and non-scrolling exactly so overlays can
-// anchor to it) and positions `absolute`, so it docks to an edge of the applet
-// and never leaves it. Because the portal target is inside `[data-applet]`,
-// scoped applet CSS keeps matching — no AppletPortal re-scoping needed, and
-// the `DrawerPrimitive.Portal` JSX must NOT be rewritten by the portal
-// codemod, which is why local files skip transformUiComponentSource.
+export type UiSourcePatch = {
+  // Verbatim anchor in the pristine upstream source. Every anchor must match,
+  // or the patch refuses to apply — half-patched output is worse than a loud
+  // failure when upstream drifts.
+  find: string
+  replace: string
+}
+
+// The upstream `drawer` (Base UI Drawer primitive: swipe to dismiss, snap
+// points, nested stacking) portals to document.body and positions `fixed`,
+// covering the whole page — wrong inside moi, where an applet owns only its
+// own region. Rather than forking it, `add` fetches the registry item like any
+// other component and applies this patch, keeping everything else — gestures,
+// snap points, stacking, transitions — upstream's:
 //
-// Deliberate departures from the sheet:
-//   • Always non-modal (`modal={false}` hard-wired): a modal Base UI dialog
-//     locks page scroll and inerts everything outside the popup — the host
-//     app included. Global takeover is exactly what this component exists to
-//     avoid; blocking flows belong to `dialog`/`alert-dialog`.
-//   • Outside clicks don't dismiss by default (`disablePointerDismissal`
-//     defaults true, callers can flip it): the canonical use is master-detail
-//     — click a row, inspect, click the next row — where dismiss-on-outside
-//     would close and reopen the panel on every selection.
-//   • No backdrop by default; `overlay` on DrawerContent opts in, and the
-//     backdrop covers the applet area only.
-// The popup sits in a `Dialog.Viewport` pinned over the applet
-// (`absolute inset-0 overflow-hidden`) that clips the slide-in and, being
-// `pointer-events-none`, lets the rest of the applet stay interactive.
-export const DRAWER_SOURCE = `"use client"
-
-// Installed by \`moi ui-components add drawer\` — a moi-authored component,
-// yours to customize like every file in this folder.
-//
-// A panel that slides in from an edge of the APPLET AREA — the widget card or
-// view region it renders in — never over the whole app. It stays non-modal:
-// the rest of the applet keeps working while the drawer is open, and outside
-// clicks don't close it (pass \`disablePointerDismissal={false}\` on the root
-// for click-outside-to-close). Built for master-detail: keep it open and swap
-// its content as the selection changes.
-import * as React from "react"
-import { Dialog as DrawerPrimitive } from "@base-ui/react/dialog"
-import { IconX } from "@tabler/icons-react"
-
-import { cn } from "./utils"
-import { Button } from "./button"
-
-function Drawer({
+//   • The portal targets the applet's own mount container (the `[data-applet]`
+//     element — AppletMount and ViewManager keep it positioned and
+//     non-scrolling exactly so overlays can anchor to it). Because the portal
+//     stays inside `[data-applet]`, scoped applet CSS keeps matching with no
+//     AppletPortal re-scoping; the aliased `DrawerPortalPrimitive` in the
+//     replacement is deliberate — it keeps the portal codemod (rewritePortals
+//     below) from wrapping this portal, which must keep its `container`.
+//   • `fixed` → `absolute` on backdrop, viewport, and popup, and viewport
+//     units (`dvh`) → container percentages, so the drawer docks to an edge of
+//     the applet area. Snap points already measure the Viewport element
+//     (never the window), so they turn applet-relative on their own. The
+//     viewport also gains `overflow-hidden`: it clips the popup's off-screen
+//     closed position at the applet edge, where the page edge used to clip it.
+//   • Defaults flip to non-modal + no pointer dismissal (both stay props): a
+//     modal drawer locks page scroll and inerts everything outside the popup,
+//     the host app included, and the canonical applet use is master-detail —
+//     click a row, inspect, click the next row — where an outside-press
+//     dismissal would close and reopen the panel on every selection. Blocking
+//     flows belong to `dialog`/`alert-dialog`.
+export const UI_SOURCE_PATCHES: Record<string, UiSourcePatch[]> = {
+  'drawer.tsx': [
+    {
+      // Non-modal, non-dismissing defaults; the new prop is forwarded below.
+      find: `function Drawer({
+  modal = true,
+  showSwipeHandle = false,`,
+      replace: `function Drawer({
+  // moi: non-modal by default — a modal drawer locks page scroll and disables
+  // the whole app outside the popup. Outside clicks don't dismiss by default
+  // either, so master-detail selection clicks never close the panel. Both
+  // stay props.
+  modal = false,
   disablePointerDismissal = true,
-  ...props
-}: Omit<DrawerPrimitive.Root.Props, "modal">) {
-  return (
-    <DrawerPrimitive.Root
-      data-slot="drawer"
-      modal={false}
-      disablePointerDismissal={disablePointerDismissal}
-      {...props}
-    />
-  )
-}
+  showSwipeHandle = false,`
+    },
+    {
+      find: `        modal={modal}
+        snapPoints={snapPoints}`,
+      replace: `        modal={modal}
+        disablePointerDismissal={disablePointerDismissal}
+        snapPoints={snapPoints}`
+    },
+    {
+      // Portal into the applet's mount container instead of document.body.
+      find: `function DrawerPortal({ ...props }: DrawerPrimitive.Portal.Props) {
+  return <DrawerPrimitive.Portal data-slot="drawer-portal" {...props} />
+}`,
+      replace: `const DrawerPortalPrimitive = DrawerPrimitive.Portal
 
-function DrawerTrigger({ ...props }: DrawerPrimitive.Trigger.Props) {
-  return <DrawerPrimitive.Trigger data-slot="drawer-trigger" {...props} />
-}
-
-function DrawerClose({ ...props }: DrawerPrimitive.Close.Props) {
-  return <DrawerPrimitive.Close data-slot="drawer-close" {...props} />
-}
-
-function DrawerOverlay({ className, ...props }: DrawerPrimitive.Backdrop.Props) {
-  return (
-    <DrawerPrimitive.Backdrop
-      data-slot="drawer-overlay"
-      className={cn(
-        "absolute inset-0 z-50 bg-black/10 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter:backdrop-blur-xs",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-// Geometry per side as plain (unprefixed) classes, so callers can override
-// them from \`className\` — \`cn\` merges \`w-80\` over \`w-3/4\`, which
-// \`data-[side=…]:\`-prefixed classes would win against on specificity.
-const drawerSideClasses = {
-  top: "inset-x-0 top-0 max-h-3/4 border-b data-ending-style:translate-y-[-2.5rem] data-starting-style:translate-y-[-2.5rem]",
-  right:
-    "inset-y-0 right-0 w-3/4 max-w-sm border-l data-ending-style:translate-x-[2.5rem] data-starting-style:translate-x-[2.5rem]",
-  bottom:
-    "inset-x-0 bottom-0 max-h-3/4 border-t data-ending-style:translate-y-[2.5rem] data-starting-style:translate-y-[2.5rem]",
-  left: "inset-y-0 left-0 w-3/4 max-w-sm border-r data-ending-style:translate-x-[-2.5rem] data-starting-style:translate-x-[-2.5rem]"
-}
-
-function DrawerContent({
-  className,
-  children,
-  side = "right",
-  overlay = false,
-  showCloseButton = true,
-  ...props
-}: DrawerPrimitive.Popup.Props & {
-  side?: keyof typeof drawerSideClasses
-  // Dim the applet area behind the panel. The backdrop also swallows clicks on
-  // the applet underneath, so combine with disablePointerDismissal={false}
-  // when it should close on a click outside.
-  overlay?: boolean
-  showCloseButton?: boolean
-}) {
-  // The applet's mount container — the drawer portals into it and positions
-  // against it, so it docks to the applet area, not the page. Outside a moi
-  // mount (plain previews, tests) it falls back to the body.
+function DrawerPortal({ ...props }: DrawerPrimitive.Portal.Props) {
+  // moi: portal into the applet's own mount container ([data-applet]) so the
+  // drawer docks to the applet area, not the page. Falls back to the body
+  // outside a moi mount (plain previews, tests).
   const [container, setContainer] = React.useState<HTMLElement | null>(null)
   const marker = React.useCallback((node: HTMLSpanElement | null) => {
     if (node) {
@@ -168,190 +122,128 @@ function DrawerContent({
     <>
       <span hidden ref={marker} />
       {container && (
-        <DrawerPrimitive.Portal data-slot="drawer-portal" container={container}>
-          {overlay && <DrawerOverlay />}
-          <DrawerPrimitive.Viewport
-            data-slot="drawer-viewport"
-            className="pointer-events-none absolute inset-0 z-50 overflow-hidden"
-          >
-            <DrawerPrimitive.Popup
-              data-slot="drawer-content"
-              data-side={side}
-              className={cn(
-                "pointer-events-auto absolute flex flex-col gap-4 bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg transition duration-200 ease-in-out data-ending-style:opacity-0 data-starting-style:opacity-0",
-                drawerSideClasses[side],
-                className
-              )}
-              {...props}
-            >
-              {children}
-              {showCloseButton && (
-                <DrawerPrimitive.Close
-                  data-slot="drawer-close"
-                  render={
-                    <Button
-                      variant="ghost"
-                      className="absolute top-3 right-3"
-                      size="icon-sm"
-                    />
-                  }
-                >
-                  <IconX />
-                  <span className="sr-only">Close</span>
-                </DrawerPrimitive.Close>
-              )}
-            </DrawerPrimitive.Popup>
-          </DrawerPrimitive.Viewport>
-        </DrawerPrimitive.Portal>
+        <DrawerPortalPrimitive data-slot="drawer-portal" container={container} {...props} />
       )}
     </>
   )
+}`
+    },
+    {
+      // Backdrop: absolute within the applet. The dvh floor and the iOS
+      // absolute fallback (below) are page-viewport workarounds with no
+      // container equivalent.
+      find: `"fixed inset-0 z-50 min-h-dvh bg-black/10`,
+      replace: `"absolute inset-0 z-50 bg-black/10`
+    },
+    {
+      find: ` supports-[-webkit-touch-callout:none]:absolute",`,
+      replace: `",`
+    },
+    {
+      // Viewport: pinned over the applet area; overflow-hidden clips the
+      // popup's off-screen closed position at the applet edge.
+      find: `className="pointer-events-none fixed inset-0 z-50 select-none data-[modal=true]:pointer-events-auto"`,
+      replace: `className="pointer-events-none absolute inset-0 z-50 overflow-hidden select-none data-[modal=true]:pointer-events-auto"`
+    },
+    {
+      find: `pointer-events-auto fixed z-50 m-(--drawer-inset,0px)`,
+      replace: `pointer-events-auto absolute z-50 m-(--drawer-inset,0px)`
+    },
+    {
+      // Container-relative sizing: the viewport fills the applet area, so %
+      // replaces dvh (Tailwind normalizes the calc operator spacing).
+      find: `data-[swipe-axis=y]:[--drawer-content-max-height:calc(100dvh-6rem)]`,
+      replace: `data-[swipe-axis=y]:[--drawer-content-max-height:calc(100%-6rem)]`
+    },
+    {
+      find: `data-[swipe-axis=y]:data-snap-points:[--drawer-content-height:100dvh]`,
+      replace: `data-[swipe-axis=y]:data-snap-points:[--drawer-content-height:100%]`
+    }
+  ]
 }
 
-function DrawerHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="drawer-header"
-      className={cn("flex flex-col gap-0.5 p-4", className)}
-      {...props}
-    />
-  )
+// Apply a file's source patch, refusing half-application: a missing anchor
+// means the upstream source drifted and the patch needs updating — fail the
+// add loudly rather than install a broken component.
+export function applyUiSourcePatches(name: string, source: string): string {
+  const patches = UI_SOURCE_PATCHES[name]
+  if (!patches) return source
+  let patched = source
+  for (const patch of patches) {
+    if (!patched.includes(patch.find)) {
+      throw new Error(
+        `The registry source for ${name} no longer matches moi's applet-scoping patch ` +
+          `(missing anchor: ${JSON.stringify(patch.find.slice(0, 60))}…). ` +
+          'Upstream drifted — update UI_SOURCE_PATCHES in server/ui-components.ts.'
+      )
+    }
+    patched = patched.replace(patch.find, patch.replace)
+  }
+  return patched
 }
 
-function DrawerFooter({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="drawer-footer"
-      className={cn("mt-auto flex flex-col gap-2 p-4", className)}
-      {...props}
-    />
-  )
-}
+// Printed by `moi ui-components docs drawer` after the upstream page — the
+// deltas the install-time patch introduces, plus applet-specific usage.
+export const DRAWER_DOCS_APPENDIX = `---
 
-function DrawerTitle({ className, ...props }: DrawerPrimitive.Title.Props) {
-  return (
-    <DrawerPrimitive.Title
-      data-slot="drawer-title"
-      className={cn(
-        "cn-font-heading text-base font-medium text-foreground",
-        className
-      )}
-      {...props}
-    />
-  )
-}
+## moi notes (applet-scoped drawer)
 
-function DrawerDescription({
-  className,
-  ...props
-}: DrawerPrimitive.Description.Props) {
-  return (
-    <DrawerPrimitive.Description
-      data-slot="drawer-description"
-      className={cn("text-sm text-muted-foreground", className)}
-      {...props}
-    />
-  )
-}
+moi patches the drawer at install so it docks to an edge of the **applet
+area** — the widget card or view region it renders in — instead of covering
+the page: it portals into the applet's own mount container and positions
+against it. Swipe to dismiss, snap points, and stacking all still work and
+are measured against the applet area, not the browser viewport.
 
-export {
-  Drawer,
-  DrawerTrigger,
-  DrawerClose,
-  DrawerContent,
-  DrawerOverlay,
-  DrawerHeader,
-  DrawerFooter,
-  DrawerTitle,
-  DrawerDescription,
-}
-`
+Deltas from the upstream docs:
 
-// Printed by `moi ui-components docs drawer` — the drawer has no upstream docs
-// page, and its API deliberately differs from the sheet it derives from.
-export const DRAWER_DOCS = `# Drawer
+- **Non-modal by default** (\`modal\` defaults to \`false\`): no backdrop, and
+  the rest of the applet stays interactive. \`modal={true}\` still renders the
+  backdrop over the applet area but locks scroll and interaction for the whole
+  page, not just the applet — prefer \`dialog\`/\`alert-dialog\` for blocking
+  flows.
+- **Outside clicks don't dismiss by default** (\`disablePointerDismissal\`
+  defaults to \`true\`): built for master-detail, where clicking the next row
+  must not close the panel. Pass \`disablePointerDismissal={false}\` for
+  click-outside-to-close. Escape and swiping still close it.
+- **Docking side** comes from \`swipeDirection\` on the root: \`"right"\` docks
+  the panel to the right edge (swipe right to dismiss) — the inspector
+  pattern; \`"down"\` (the default) is a bottom sheet.
+- **Width/height**: x-axis drawers default to 75% of the applet width, capped
+  at 24rem; override with a width utility — \`<DrawerContent className="w-80">\`
+  (cn() merges it over the built-in variable width). y-axis height follows
+  content; fix it with the \`--drawer-height\` variable
+  (\`className="[--drawer-height:50%]"\`) or snap points — both applet-relative.
+- **No built-in close button**: compose one —
+  \`<DrawerClose render={<Button variant="ghost" size="icon-sm" />}><IconX /></DrawerClose>\`.
+- Always give the drawer a \`DrawerTitle\` (\`className="sr-only"\` to hide it)
+  or an \`aria-label\` on DrawerContent.
+- Needs \`@base-ui/react\` **1.3.0+** (where the Drawer primitive left
+  preview). A workspace scaffolded earlier may have an older lockfile pin —
+  if the build fails on a missing \`Drawer\` export, run
+  \`bun update @base-ui/react\` in \`.moi/\`.
 
-A panel that slides in from an edge of the **applet area** — the widget card or
-view region it renders in. It never covers the whole app: the panel portals
-into the applet's own mount container and positions against it. Non-modal by
-design — the rest of the applet stays interactive while it is open.
-
-Use it for contextual detail that accompanies the main content: a master-detail
-inspector (click a table row, see its details docked to the right), filters, or
-a settings pane. For a blocking flow that demands a response, use \`dialog\` or
-\`alert-dialog\` instead.
-
-## Usage
-
-\`\`\`tsx
-import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from '../ui/drawer'
-\`\`\`
-
-\`\`\`tsx
-<Drawer>
-  <DrawerTrigger render={<Button variant="outline" />}>Open</DrawerTrigger>
-  <DrawerContent>
-    <DrawerHeader>
-      <DrawerTitle>Boldstart Ventures</DrawerTitle>
-      <DrawerDescription>Fund · New York, NY</DrawerDescription>
-    </DrawerHeader>
-    <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">…</div>
-  </DrawerContent>
-</Drawer>
-\`\`\`
-
-## Master-detail (the canonical pattern)
-
-Control the open state from the selection; keep the drawer open and swap its
-content as the user clicks through items. Outside clicks do not close the
-drawer (that is the default), so selecting another row simply updates the
-panel:
+Master-detail (the canonical applet pattern):
 
 \`\`\`tsx
 const [selected, setSelected] = React.useState<Item | null>(null)
 
-<Drawer open={selected !== null} onOpenChange={open => !open && setSelected(null)}>
+<Drawer
+  swipeDirection="right"
+  open={selected !== null}
+  onOpenChange={open => !open && setSelected(null)}
+>
   <DrawerContent aria-label="Item details">
     {selected && (
       <>
         <DrawerHeader>
           <DrawerTitle>{selected.name}</DrawerTitle>
         </DrawerHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">…</div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">…</div>
       </>
     )}
   </DrawerContent>
 </Drawer>
 \`\`\`
-
-## API notes
-
-- **\`side\`** on DrawerContent: \`right\` (default), \`left\`, \`top\`, \`bottom\`.
-- **Width/height**: defaults to 3/4 of the applet area capped at \`max-w-sm\`;
-  override with layout classes — \`<DrawerContent className="w-80 max-w-full">\`.
-- **\`overlay\`** on DrawerContent dims the applet area behind the panel (off by
-  default). The backdrop also swallows clicks on the applet underneath.
-- **\`disablePointerDismissal\`** on Drawer defaults to \`true\` (outside clicks
-  don't close). Pass \`false\` for click-outside-to-close — pair it with
-  \`overlay\` so the dismissal area is visible.
-- **\`showCloseButton\`** on DrawerContent (default \`true\`) renders the ✕ in the
-  top-right corner.
-- **Always give the drawer a title**: a \`DrawerTitle\` (use
-  \`className="sr-only"\` to hide it) or an \`aria-label\` on DrawerContent.
-- **Scrolling content** goes in a \`min-h-0 flex-1 overflow-y-auto\` region
-  between header and footer (the popup is a flex column).
-- There is no \`modal\` prop: the drawer is always non-modal. Focus still moves
-  into the panel on open; pass \`initialFocus={false}\` on DrawerContent to
-  leave focus where it is (e.g. keyboard navigation over a table).
-- The drawer needs a moi applet mount (\`[data-applet]\`) to dock to; anywhere
-  else it falls back to the page body.
 `
 
 // The agreed subset (UI component review, Aug 2026). Upstream ships ~63 ui
@@ -438,12 +330,12 @@ export const UI_COMPONENTS: Record<string, UiComponentEntry> = {
     registryItems: ['dialog']
   },
   drawer: {
-    description: 'Panel sliding in from an edge of the applet area — non-modal, applet-scoped',
-    // The close button composes `button`; the drawer source itself is
-    // moi-authored (see DRAWER_SOURCE above) and rides along verbatim.
-    registryItems: ['button'],
-    localFiles: [{ name: 'drawer.tsx', content: DRAWER_SOURCE }],
-    localDocs: DRAWER_DOCS
+    description:
+      'Swipeable panel docking to an edge of the applet area — the upstream drawer, applet-scoped at install',
+    // The upstream item, with moi's applet-scoping patch applied by the
+    // transform pipeline (see UI_SOURCE_PATCHES above).
+    registryItems: ['drawer'],
+    docsAppendix: DRAWER_DOCS_APPENDIX
   },
   'dropdown-menu': {
     description: 'Menu opened from a trigger: items, groups, submenus',
@@ -711,12 +603,17 @@ export async function transformUiComponentSource(name: string, raw: string): Pro
   const { Project, ScriptKind, SyntaxKind } = await import('ts-morph')
   const { transformIcons, transformMenu } = await import('shadcn/utils')
 
+  // moi's source patches (drawer) run first, on the pristine upstream text —
+  // their anchors are verbatim registry source, and the patched output is
+  // shaped to survive the codemods below (see UI_SOURCE_PATCHES).
+  const source = applyUiSourcePatches(name, raw)
+
   project ??= new Project({ useInMemoryFileSystem: true })
-  const sourceFile = project.createSourceFile(`moi-ui/${name}`, raw, {
+  const sourceFile = project.createSourceFile(`moi-ui/${name}`, source, {
     scriptKind: name.endsWith('.tsx') ? ScriptKind.TSX : ScriptKind.TS,
     overwrite: true
   })
-  const opts = { sourceFile, filename: name, raw, config: ENGINE_CONFIG }
+  const opts = { sourceFile, filename: name, raw: source, config: ENGINE_CONFIG }
   await transformIcons(opts)
   await transformMenu(opts)
   rewriteRegistryImports(sourceFile)
@@ -785,8 +682,6 @@ export type ResolvedRequest = {
   entries: string[]
   // Registry items to fetch (patterns expanded), deduplicated, in request order.
   registryItems: string[]
-  // moi-authored sources the requested entries carry, deduplicated by file.
-  localFiles: FetchedUiFile[]
   // Union of extraDeps across the requested entries.
   extraDeps: string[]
   unknown: string[]
@@ -795,7 +690,6 @@ export type ResolvedRequest = {
 export function resolveUiComponentRequest(names: string[]): ResolvedRequest {
   const entries: string[] = []
   const registryItems: string[] = []
-  const localFiles = new Map<string, FetchedUiFile>()
   const extraDeps = new Set<string>()
   const unknown: string[] = []
 
@@ -806,22 +700,14 @@ export function resolveUiComponentRequest(names: string[]): ResolvedRequest {
       unknown.push(raw)
       continue
     }
-    if (entries.includes(name)) continue
-    entries.push(name)
+    if (!entries.includes(name)) entries.push(name)
     for (const item of entry.registryItems) {
       if (!registryItems.includes(item)) registryItems.push(item)
     }
-    for (const file of entry.localFiles ?? []) localFiles.set(file.name, file)
     for (const dep of entry.extraDeps ?? []) extraDeps.add(dep)
   }
 
-  return {
-    entries,
-    registryItems,
-    localFiles: [...localFiles.values()],
-    extraDeps: [...extraDeps].sort(),
-    unknown
-  }
+  return { entries, registryItems, extraDeps: [...extraDeps].sort(), unknown }
 }
 
 // Closest catalog names for a typo, by shared-prefix + substring heuristics —
@@ -861,11 +747,6 @@ export type PlannedWrite = {
   // overwritten — they may carry hand customizations; existing requested
   // files fail the add unless --force.
   support: boolean
-  // Already in final form (moi-authored sources: drawer, applet-portal) — the
-  // registry transform pipeline must not touch these. In particular the portal
-  // codemod would rewrite the drawer's `DrawerPrimitive.Portal` (its container
-  // targeting is the whole point) into an AppletPortal.
-  pretransformed: boolean
 }
 
 export type UiWritePartition = {
@@ -895,10 +776,6 @@ export function partitionUiWrites(plans: PlannedWrite[], force: boolean): UiWrit
 
 export function planUiWrites(opts: {
   files: FetchedUiFile[]
-  // moi-authored sources riding along with the request — always requested
-  // files (the entry that carries them was asked for by name), never fetched,
-  // never transformed.
-  localFiles?: FetchedUiFile[]
   requestedItems: string[]
   uiDir: string
   exists: (path: string) => boolean
@@ -908,21 +785,9 @@ export function planUiWrites(opts: {
     ...opts.files.map(file => ({
       name: file.name,
       content: file.content,
-      support: !requested.has(file.name),
-      pretransformed: false
+      support: !requested.has(file.name)
     })),
-    ...(opts.localFiles ?? []).map(file => ({
-      name: file.name,
-      content: file.content,
-      support: false,
-      pretransformed: true
-    })),
-    {
-      name: 'applet-portal.tsx',
-      content: APPLET_PORTAL_SOURCE,
-      support: true,
-      pretransformed: true
-    }
+    { name: 'applet-portal.tsx', content: APPLET_PORTAL_SOURCE, support: true }
   ].map(file => {
     const path = join(opts.uiDir, file.name)
     return { ...file, path, exists: opts.exists(path) }

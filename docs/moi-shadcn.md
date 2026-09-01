@@ -30,14 +30,18 @@ and a curated subset instead of the full upstream catalog.
   The list is `UI_COMPONENTS` in `server/ui-components.ts`; registry
   dependencies of a curated item (`separator`, `card`, `toggle`) install
   implicitly as support files.
-- One entry is moi-authored rather than proxied: `drawer`, the
-  applet-scoped replacement for the excluded `sheet` — it portals into the
-  applet's `[data-applet]` mount container and positions `absolute`
-  against it, so the panel docks to an edge of the applet area instead of
-  covering the app. Local sources ship embedded in `ui-components.ts`
-  (`DRAWER_SOURCE`, written verbatim — the transform pipeline, portal
-  codemod included, must not touch them) with embedded docs
-  (`DRAWER_DOCS`) served by `docs` in place of an upstream page.
+- One entry is patched at install rather than shipped verbatim: `drawer`.
+  The upstream item (Base UI Drawer primitive: swipe to dismiss, snap
+  points, stacking) is fetched like any other, then `UI_SOURCE_PATCHES`
+  in `server/ui-components.ts` rewrites it to applet scope — the portal
+  targets the applet's `[data-applet]` mount container, `fixed` becomes
+  `absolute` (and `dvh` container percentages), and the defaults flip to
+  non-modal / no pointer dismissal. Patch anchors are verbatim upstream
+  source: when upstream drifts, the patch refuses to apply and `add`
+  fails loudly instead of installing a half-patched component.
+  `docs drawer` appends the moi deltas (`DRAWER_DOCS_APPENDIX`) to the
+  upstream page. Requires `@base-ui/react` ≥1.3.0 (the workspace
+  baseline's floor).
 - Components live in `.moi/ui/`, one fixed place, created on first use.
 - Applets import them relatively: `../ui/button`. Never `@/` aliases (the
   skill states this; unresolved imports already fail loudly at build).
