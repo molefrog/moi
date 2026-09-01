@@ -17,6 +17,7 @@ import pc from './cli-pc'
 import { resolveCwdWorkspace } from './cli-env'
 import { MOI_PACKAGE_JSON } from './moi-scaffold'
 import {
+  type FetchedUiComponents,
   UI_COMPONENTS,
   UI_COMPONENT_NAMES,
   UI_DOCS_BASE,
@@ -25,7 +26,8 @@ import {
   planUiWrites,
   resolveUiComponentRequest,
   suggestUiComponents,
-  transformUiComponentSource
+  transformUiComponentSource,
+  uiComponentFiles
 } from './ui-components'
 
 function uiDirFor(workspacePath: string): string {
@@ -74,9 +76,14 @@ const add = defineCommand({
     const entry = await resolveCwdWorkspace()
     const uiDir = uiDirFor(entry.path)
 
-    let fetched
+    // A moi-authored entry brings its own source, so the registry is only
+    // needed for registry items and for the `utils` helper every component
+    // imports — a drawer-only add into a workspace that already has it works
+    // offline.
+    const needsRegistry = request.registryItems.length > 0 || !existsSync(join(uiDir, 'utils.ts'))
+    let fetched: FetchedUiComponents = { files: [], dependencies: [] }
     try {
-      fetched = await fetchUiComponents(request.registryItems)
+      if (needsRegistry) fetched = await fetchUiComponents(request.registryItems)
     } catch (err) {
       console.error(
         '\n' +
@@ -89,8 +96,12 @@ const add = defineCommand({
     }
 
     const plans = planUiWrites({
-      files: fetched.files,
-      requestedItems: request.registryItems,
+      files: [...fetched.files, ...request.localFiles],
+      // A moi-authored entry is requested under its own name.
+      requestedItems: [
+        ...request.registryItems,
+        ...request.entries.filter(name => UI_COMPONENTS[name].source)
+      ],
       uiDir,
       exists: existsSync
     })
@@ -118,9 +129,10 @@ const add = defineCommand({
     await mkdir(uiDir, { recursive: true })
     const written: string[] = []
     for (const plan of partition.write) {
-      const content = plan.name.endsWith('.tsx')
-        ? await transformUiComponentSource(plan.name, plan.content)
-        : plan.content
+      const content =
+        plan.name.endsWith('.tsx') && !plan.verbatim
+          ? await transformUiComponentSource(plan.name, plan.content)
+          : plan.content
       await Bun.write(plan.path, content)
       written.push(plan.name)
     }
@@ -214,7 +226,14 @@ const docs = defineCommand({
     if (request.unknown.length > 0) exitUnknownNames(request.unknown)
 
     for (const name of request.entries) {
-      const slug = UI_COMPONENTS[name].docsSlug ?? name
+      const entry = UI_COMPONENTS[name]
+      // moi-authored entries have no upstream page; their docs ship inline.
+      if (entry.docs) {
+        if (request.entries.length > 1) console.log(`\n---\n# ${name}\n`)
+        console.log(entry.docs)
+        continue
+      }
+      const slug = entry.docsSlug ?? name
       const url = `${UI_DOCS_BASE}/${slug}.md`
       try {
         const res = await fetch(url, { signal: AbortSignal.timeout(20_000) })
@@ -240,7 +259,7 @@ function renderCatalog(uiDir: string, query?: string): void {
     if (needle && !name.includes(needle) && !entry.description.toLowerCase().includes(needle)) {
       continue
     }
-    const installed = entry.registryItems.every(item => existsSync(join(uiDir, `${item}.tsx`)))
+    const installed = uiComponentFiles(name).every(file => existsSync(join(uiDir, file)))
     rows.push(
       '  ' +
         (installed ? pc.green('✓ ') : '  ') +

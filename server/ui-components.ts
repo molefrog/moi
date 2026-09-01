@@ -4,7 +4,9 @@
 //
 // Opinions, enforced here: the upstream registry is the source of truth
 // (style `base-nova`, Base UI primitives, Tabler icons); the command exposes
-// only a curated subset of it; no config files ever land in the workspace —
+// only a curated subset of it, plus moi-authored components the registry has
+// no applet-fit version of (`drawer`, in ./ui-components-drawer.ts); no config
+// files ever land in the workspace —
 // the engine takes its config as the in-memory object below; components are
 // written to `.moi/ui/` and imported relatively (`../ui/button`). The command
 // writes source files and nothing else: it never installs dependencies and
@@ -17,6 +19,8 @@
 // static import here made every `moi` command pay it, `moi version` included.
 import type { Project, SourceFile } from 'ts-morph'
 import { join } from 'path'
+
+import { DRAWER_DOCS, DRAWER_SOURCE } from './ui-components-drawer'
 
 // ---------------------------------------------------------------------------
 // The curated catalog
@@ -35,6 +39,15 @@ export type UiComponentEntry = {
   extraDeps?: string[]
   // Docs slug when it differs from the entry name (none currently).
   docsSlug?: string
+  // moi-authored source, written verbatim instead of fetched — for a component
+  // the upstream registry has no applet-fit version of (see `drawer`). Such an
+  // entry lists no registry items of its own (`utils` still rides along), and
+  // the source is already in its final form — relative imports, Tabler icons —
+  // so the transform pipeline skips it.
+  source?: string
+  // Inline docs for `moi ui-components docs <name>` when there is no upstream
+  // page to fetch. Set together with `source`.
+  docs?: string
 }
 
 // The agreed subset (UI component review, Aug 2026). Upstream ships ~63 ui
@@ -119,6 +132,12 @@ export const UI_COMPONENTS: Record<string, UiComponentEntry> = {
   dialog: {
     description: 'Modal dialog with backdrop, header, and footer',
     registryItems: ['dialog']
+  },
+  drawer: {
+    description: 'Side panel scoped to the applet: slides in over the widget or view, not the page',
+    registryItems: [],
+    source: DRAWER_SOURCE,
+    docs: DRAWER_DOCS
   },
   'dropdown-menu': {
     description: 'Menu opened from a trigger: items, groups, submenus',
@@ -212,6 +231,13 @@ export const UI_COMPONENTS: Record<string, UiComponentEntry> = {
 
 export const UI_COMPONENT_NAMES = Object.keys(UI_COMPONENTS)
 
+// The `.tsx` files in `.moi/ui/` whose presence makes an entry count as
+// installed: its registry items, plus its own file for a moi-authored entry.
+export function uiComponentFiles(name: string): string[] {
+  const entry = UI_COMPONENTS[name]
+  return [...entry.registryItems, ...(entry.source ? [name] : [])].map(item => `${item}.tsx`)
+}
+
 // ---------------------------------------------------------------------------
 // Engine config — the in-memory replacement for components.json
 // ---------------------------------------------------------------------------
@@ -245,6 +271,9 @@ export type FetchedUiFile = {
   // File name inside `.moi/ui/` (`button.tsx`, `utils.ts`).
   name: string
   content: string
+  // Already in its final form: skip the registry transform pipeline. Set on
+  // moi-authored sources; registry content is always transformed.
+  verbatim?: boolean
 }
 
 export type FetchedUiComponents = {
@@ -460,6 +489,8 @@ export type ResolvedRequest = {
   entries: string[]
   // Registry items to fetch (patterns expanded), deduplicated, in request order.
   registryItems: string[]
+  // moi-authored sources to write as-is (entries with `source`).
+  localFiles: FetchedUiFile[]
   // Union of extraDeps across the requested entries.
   extraDeps: string[]
   unknown: string[]
@@ -468,6 +499,7 @@ export type ResolvedRequest = {
 export function resolveUiComponentRequest(names: string[]): ResolvedRequest {
   const entries: string[] = []
   const registryItems: string[] = []
+  const localFiles: FetchedUiFile[] = []
   const extraDeps = new Set<string>()
   const unknown: string[] = []
 
@@ -478,14 +510,17 @@ export function resolveUiComponentRequest(names: string[]): ResolvedRequest {
       unknown.push(raw)
       continue
     }
-    if (!entries.includes(name)) entries.push(name)
+    if (entries.includes(name)) continue
+    entries.push(name)
+    if (entry.source)
+      localFiles.push({ name: `${name}.tsx`, content: entry.source, verbatim: true })
     for (const item of entry.registryItems) {
       if (!registryItems.includes(item)) registryItems.push(item)
     }
     for (const dep of entry.extraDeps ?? []) extraDeps.add(dep)
   }
 
-  return { entries, registryItems, extraDeps: [...extraDeps].sort(), unknown }
+  return { entries, registryItems, localFiles, extraDeps: [...extraDeps].sort(), unknown }
 }
 
 // Closest catalog names for a typo, by shared-prefix + substring heuristics —
@@ -525,6 +560,9 @@ export type PlannedWrite = {
   // overwritten — they may carry hand customizations; existing requested
   // files fail the add unless --force.
   support: boolean
+  // Written as-is, skipping the registry transform pipeline (moi-authored
+  // sources and the portal helper).
+  verbatim: boolean
 }
 
 export type UiWritePartition = {
@@ -563,9 +601,10 @@ export function planUiWrites(opts: {
     ...opts.files.map(file => ({
       name: file.name,
       content: file.content,
-      support: !requested.has(file.name)
+      support: !requested.has(file.name),
+      verbatim: file.verbatim ?? false
     })),
-    { name: 'applet-portal.tsx', content: APPLET_PORTAL_SOURCE, support: true }
+    { name: 'applet-portal.tsx', content: APPLET_PORTAL_SOURCE, support: true, verbatim: true }
   ].map(file => {
     const path = join(opts.uiDir, file.name)
     return { ...file, path, exists: opts.exists(path) }
