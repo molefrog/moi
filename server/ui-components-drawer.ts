@@ -20,13 +20,14 @@
 // file stays greppable and the test suite can assert on it.
 export const DRAWER_SOURCE = `"use client"
 
-// moi drawer — a slide-in panel scoped to the applet it is used in.
+// moi drawer — a slide-in panel scoped to the view it is used in.
 //
-// A dialog's overlay covers the whole page; the drawer covers only the applet
-// (the widget card or the view) it belongs to. Its backdrop dims that area
-// alone, and the rest of the workspace — chat, tabs, other widgets — stays
-// visible and usable. Built on Base UI's Dialog, so focus trapping, Escape,
-// backdrop press, and accessible naming come for free.
+// A dialog's overlay covers the whole page; the drawer covers only the view it
+// belongs to. Its backdrop dims that area alone, and the rest of the workspace
+// — chat, tabs, widgets — stays visible and usable. It opens from the right by
+// default. Views only: a widget card has no room for a panel, and \`moi bundle\`
+// refuses a widget that imports this file. Built on Base UI's Dialog, so focus
+// trapping, Escape, backdrop press, and accessible naming come for free.
 //
 //   <Drawer>
 //     <DrawerTrigger render={<Button variant="outline" />}>Details</DrawerTrigger>
@@ -75,7 +76,7 @@ const SIDE_CLASSES: Record<DrawerSide, string> = {
 }
 
 type DrawerContentProps = DrawerPrimitive.Popup.Props & {
-  // The edge of the applet the panel slides in from.
+  // The edge of the view the panel slides in from; right by default.
   side?: DrawerSide
   showCloseButton?: boolean
 }
@@ -87,10 +88,10 @@ function DrawerContent({
   showCloseButton = true,
   ...props
 }: DrawerContentProps) {
-  // The panel renders into the applet's root element instead of <body>, so it
-  // can only ever cover the applet. The hidden marker finds that root from
-  // where the drawer is used; until it has, the portal renders nothing (Base
-  // UI waits on a \`null\` container instead of falling back to body).
+  // The panel renders into the view's root element instead of <body>, so it
+  // can only ever cover the view. The hidden marker finds that root from where
+  // the drawer is used; until it has, the portal renders nothing (Base UI
+  // waits on a \`null\` container instead of falling back to body).
   const [container, setContainer] = React.useState<HTMLElement | null>(null)
   const marker = React.useCallback((node: HTMLElement | null) => {
     if (node) setContainer(node.closest<HTMLElement>("[data-applet]") ?? node.parentElement)
@@ -100,9 +101,9 @@ function DrawerContent({
     <>
       <span hidden ref={marker} />
       <DrawerPrimitive.Portal container={container}>
-        {/* z-50 so the panel also covers applet content that raised itself
-            (a sticky table header with z-10); the applet root is a stacking
-            context, so nothing leaks past the applet. */}
+        {/* z-50 so the panel also covers view content that raised itself (a
+            sticky table header with z-10); the view root is a stacking
+            context, so nothing leaks past the view. */}
         <DrawerPrimitive.Backdrop
           data-slot="drawer-backdrop"
           className="absolute inset-0 z-50 bg-foreground/20 duration-200 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
@@ -139,8 +140,9 @@ function DrawerHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-// The scrolling region: applet areas are small, so put anything that can grow
-// here and the header and footer stay put while it scrolls.
+// The scrolling region: a view shares the screen with the chat, so put
+// anything that can grow here and the header and footer stay put while it
+// scrolls.
 function DrawerBody({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -157,9 +159,8 @@ function DrawerFooter({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-// The title inherits the popup's \`text-popover-foreground\` on purpose: inside a
-// widget, \`text-foreground\` is the widget's own (often light) text color and
-// would vanish on the popover surface.
+// The title inherits the popup's \`text-popover-foreground\` on purpose: text on
+// the popover surface uses the popover pair, not the page foreground.
 function DrawerTitle({ className, ...props }: DrawerPrimitive.Title.Props) {
   return (
     <DrawerPrimitive.Title
@@ -196,10 +197,14 @@ export {
 // Printed by `moi ui-components docs drawer` in place of an upstream page.
 export const DRAWER_DOCS = `# Drawer
 
-A panel that slides in over the applet it is used in — the widget card or the view — and
-nothing else. The backdrop dims only that area; chat, tabs, and other widgets stay visible and
-usable. Use it for a detail pane, a filter or settings sheet, or a short form that belongs to
-this applet's task. For something that must interrupt the whole workspace, use \`dialog\`.
+A panel that slides in from the right over the view it is used in, and nothing else. The
+backdrop dims only that area; chat, tabs, and widgets stay visible and usable. Use it for a
+detail pane, a filter or settings sheet, or a short form that belongs to the view's task. For
+something that must interrupt the whole workspace, use \`dialog\`.
+
+Views only. A widget card has no room for a panel, so \`moi bundle\` fails a widget that imports
+the drawer. From a widget, send the user to a view with \`focusTab\`, or use \`dialog\` or \`popover\`
+for something small.
 
 moi-authored — there is no upstream shadcn page for it. Base UI Dialog underneath, styled like
 the shadcn sheet, portalled into the applet root instead of \`document.body\`.
@@ -238,7 +243,7 @@ import {
 - \`DrawerTitle\` is required (\`className="sr-only"\` hides it): it names the panel for assistive
   technology.
 - Put growing content in \`DrawerBody\`. It is the scroll region, so the header, footer, and close
-  button stay put. Applet areas are small: a one-row widget is 160 px tall.
+  button stay put. A view shares the screen with the chat, so the panel is often narrow.
 - Header and footer carry \`p-4\`; the body carries \`px-4\`. Give body content its own vertical
   spacing.
 
@@ -252,11 +257,12 @@ Pass \`modal={false}\` to let focus leave the panel.
 \`DrawerContent\` — Base UI \`Dialog.Popup\` props plus:
 
 - \`side\` — \`"right"\` (default), \`"left"\`, \`"top"\`, \`"bottom"\`. Left and right panels take 3/4 of
-  the applet width up to \`max-w-sm\`; top and bottom panels size to content up to 3/4 of the
-  height.
+  the view width up to \`max-w-sm\`; top and bottom panels size to content up to 3/4 of the
+  height. Right is the standard detail pane next to a table or list; reach for another side only
+  when the layout calls for it.
 - \`showCloseButton\` — the top-right X, default \`true\`.
 - \`className\` — layout only: \`max-w-xs\` for a narrower panel, \`w-full max-w-none\` to cover the
-  applet.
+  view.
 
 \`DrawerTrigger\` / \`DrawerClose\` — Base UI \`Dialog.Trigger\` / \`Dialog.Close\`. Custom elements go
 through the \`render\` prop, never by wrapping.
@@ -280,11 +286,10 @@ const [order, setOrder] = useState<Order | null>(null)
 
 ## Fit
 
-- Widgets: \`side="right"\` or \`"bottom"\` on footprints of two or more columns. A 1×1 widget is
-  too cramped for a panel; send the user to a view with \`focusTab\` instead. One drawer per widget.
-- Views: any side. A right drawer is the standard detail pane next to a table or list.
-- Open it from the applet's own content. Opened from inside a \`dialog\` it lands in the wrong place,
-  because the dialog renders outside the applet root.
+- Open it from the view's own content. Opened from inside a \`dialog\` it lands in the wrong place,
+  because the dialog renders outside the view root.
 - Escape, the backdrop, and \`DrawerClose\` close it. So does a click elsewhere in the workspace: it
   is not page-modal.
+- One drawer open at a time per view; a second detail pane is a sign the view wants a master-detail
+  layout instead.
 `

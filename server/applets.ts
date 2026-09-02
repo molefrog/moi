@@ -20,7 +20,11 @@ import { dirname, join, resolve, sep } from 'path'
 import {
   APPLET_API_BASE_SENTINEL,
   type AppletKind,
+  MAX_GRAPH_FILES,
+  MODULE_FILE_RE,
+  TS_ONLY_FILE_RE,
   buildApplet,
+  resolveModuleImport,
   scanRelativeImports
 } from './bundler/build-applet'
 import { pruneAppletThumbnails } from './thumbnails'
@@ -76,24 +80,6 @@ async function resolveSource(sourceDir: string, name: string): Promise<string | 
   }
   return null
 }
-
-// Backstop for pathological graphs: an applet wiring more distinct files than
-// this is reported stale without walking further — stale-but-rebuilt is the
-// safe degradation, and the cap keeps the per-bundle check bounded no matter
-// what the imports look like. Counts every input, images and JSON included, so
-// it sits well above what an asset-heavy applet reaches (the walk never enters
-// node_modules); hitting it means something is off anyway.
-const MAX_GRAPH_FILES = 256
-
-// Files the walk keeps descending through — anything Bun treats as a module
-// (`.ts`, `.mjs`, `.cts`, …). Everything else (`.json`, `.css`, images) is a
-// leaf.
-const MODULE_FILE_RE = /\.[mc]?[jt]sx?$/
-// Which transpiler loader lexes a module's imports. Only `.ts`/`.mts`/`.cts`
-// take the `ts` loader: angle-bracket casts (`<string>x`) parse there and are
-// JSX everywhere else. `.js`/`.mjs`/`.cjs` go through `tsx`, which accepts both
-// plain JS and the JSX some of them contain.
-const TS_ONLY_FILE_RE = /\.[mc]?ts$/
 
 // A bundle is stale if its entry `index.js` is missing, any file in its local
 // import graph has an mtime >= the built entry's, or one of those imports no
@@ -152,64 +138,6 @@ async function needsRebuild(buildDir: string, name: string, srcPath: string): Pr
     }
   }
   return false
-}
-
-// Extensions Bun appends to an extensionless import, in its own preference
-// order (`./data` finds `data.tsx` before `data.ts` before … `data.json`).
-// Doubles as the directory-index set: `./helpers` → `helpers/index.jsx`.
-const RESOLVE_EXTENSIONS = ['.tsx', '.ts', '.jsx', '.js', '.mjs', '.cjs', '.json', '.mts', '.cts']
-
-// TypeScript's output-extension rewrite: an import written against the emitted
-// file name resolves to the source that produces it. (`.cjs` → `.cts` is
-// deliberately absent — Bun doesn't do that one.)
-const TS_EXTENSION_REWRITES: Record<string, string[]> = {
-  '.js': ['.ts', '.tsx'],
-  '.jsx': ['.tsx'],
-  '.mjs': ['.mts']
-}
-
-// Resolve a relative import to the file the bundler will actually read. This
-// mirrors Bun's resolution rather than delegating to `Bun.resolveSync`, which
-// memoizes results for the life of the process: in the long-running server it
-// keeps handing back the path of a dependency that has since been deleted or
-// renamed, which is exactly the case this check has to catch. Every candidate
-// is probed against the filesystem, in Bun's order — literal path, TS
-// extension rewrite, appended extension, then directory (`package.json` main,
-// else `index.*`). Returns null when nothing on disk answers the specifier.
-async function resolveModuleImport(dir: string, specifier: string): Promise<string | null> {
-  const base = join(dir, specifier)
-  const candidates = [base]
-
-  // Extension of the final segment only — a dot in a directory name (`./v1.2/x`)
-  // is not one.
-  const ext = /\.[^./\\]+$/.exec(base)?.[0] ?? ''
-  for (const rewrite of TS_EXTENSION_REWRITES[ext] ?? []) {
-    candidates.push(base.slice(0, base.length - ext.length) + rewrite)
-  }
-  for (const e of RESOLVE_EXTENSIONS) candidates.push(base + e)
-
-  for (const candidate of candidates) {
-    if (await Bun.file(candidate).exists()) return candidate
-  }
-
-  // Directory import. `package.json` main wins over `index.*`, matching Bun;
-  // an unreadable or `main`-less manifest just falls through to the indexes.
-  const pkg: unknown = await Bun.file(join(base, 'package.json'))
-    .json()
-    .catch(() => null)
-  const main =
-    typeof pkg === 'object' && pkg !== null && 'main' in pkg && typeof pkg.main === 'string'
-      ? pkg.main
-      : null
-  if (main) {
-    const mainPath = join(base, main)
-    if (await Bun.file(mainPath).exists()) return mainPath
-  }
-  for (const e of RESOLVE_EXTENSIONS) {
-    const index = join(base, `index${e}`)
-    if (await Bun.file(index).exists()) return index
-  }
-  return null
 }
 
 // Built applet names: subdirectories of `buildDir` that hold an `index.js`

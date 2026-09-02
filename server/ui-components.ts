@@ -20,6 +20,8 @@
 import type { Project, SourceFile } from 'ts-morph'
 import { join } from 'path'
 
+import type { AppletKind } from '@/lib/types'
+
 import { DRAWER_DOCS, DRAWER_SOURCE } from './ui-components-drawer'
 
 // ---------------------------------------------------------------------------
@@ -48,6 +50,11 @@ export type UiComponentEntry = {
   // Inline docs for `moi ui-components docs <name>` when there is no upstream
   // page to fetch. Set together with `source`.
   docs?: string
+  // Applet kinds the component fits; omitted means every kind. `moi bundle`
+  // refuses an applet of another kind that imports the file (the guard in
+  // server/bundler/build-applet.ts): a view-only panel must not ship inside a
+  // widget half-working.
+  kinds?: AppletKind[]
 }
 
 // The agreed subset (UI component review, Aug 2026). Upstream ships ~63 ui
@@ -134,10 +141,11 @@ export const UI_COMPONENTS: Record<string, UiComponentEntry> = {
     registryItems: ['dialog']
   },
   drawer: {
-    description: 'Side panel scoped to the applet: slides in over the widget or view, not the page',
+    description: 'Views only: side panel that slides in from the right over the view, not the page',
     registryItems: [],
     source: DRAWER_SOURCE,
-    docs: DRAWER_DOCS
+    docs: DRAWER_DOCS,
+    kinds: ['view']
   },
   'dropdown-menu': {
     description: 'Menu opened from a trigger: items, groups, submenus',
@@ -236,6 +244,13 @@ export const UI_COMPONENT_NAMES = Object.keys(UI_COMPONENTS)
 export function uiComponentFiles(name: string): string[] {
   const entry = UI_COMPONENTS[name]
   return [...entry.registryItems, ...(entry.source ? [name] : [])].map(item => `${item}.tsx`)
+}
+
+// The kind restriction on an installed `.moi/ui/<name>` file, or undefined
+// when it fits every kind — including files outside the catalog (hand-written
+// helpers next to the components).
+export function uiComponentKinds(name: string): AppletKind[] | undefined {
+  return UI_COMPONENTS[name]?.kinds
 }
 
 // ---------------------------------------------------------------------------

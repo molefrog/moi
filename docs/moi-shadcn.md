@@ -29,9 +29,9 @@ and a curated subset instead of the full upstream catalog.
   `sonner`, `command`) and no `breadcrumb`/`input-otp` (cut in review).
   The list is `UI_COMPONENTS` in `server/ui-components.ts`; registry
   dependencies of a curated item (`separator`, `card`, `toggle`) install
-  implicitly as support files. `sheet`'s job inside an applet is done by
-  the moi-authored `drawer` (see "moi-authored entries" below) — the one
-  entry that is not registry content.
+  implicitly as support files. `sheet`'s job inside a view is done by the
+  moi-authored, view-only `drawer` (see "moi-authored entries" below) —
+  the one entry that is not registry content.
 - Components live in `.moi/ui/`, one fixed place, created on first use.
 - Applets import them relatively: `../ui/button`. Never `@/` aliases (the
   skill states this; unresolved imports already fail loudly at build).
@@ -246,17 +246,16 @@ host `:root`, not the widget frame's inline per-widget derivations
 a heavily themed workspace can show slightly off-theme popups. Copying
 frame tokens onto the wrapper is a possible follow-up.
 
-The `drawer` is the deliberate exception: it portals INTO the applet root
-instead of out to body, because covering only the applet is its point (next
-section). Being inside the root, it needs no scope wrapper and picks up the
-frame's per-widget tokens for free.
+The `drawer` is the deliberate exception: it portals INTO the view's applet
+root instead of out to body, because covering only the view is its point
+(next section). Being inside the root, it needs no scope wrapper.
 
 ## moi-authored entries (decided: embedded source, verbatim write)
 
 Some jobs the registry only solves page-wide. Its `sheet`/`drawer` are
 `position: fixed` overlays portalled to body — page chrome the curated set
-leaves out — yet inside an applet the same need is common: a detail pane
-next to a table, a filter sheet on a widget. A catalog entry can therefore
+leaves out — yet inside a view the same need is common: a detail pane next
+to a table, a filter sheet. A catalog entry can therefore
 carry a `source` (the component, already in workspace form: relative
 imports, Tabler icons, no portal codemod needed) plus `docs` (printed by
 `docs <name>` in place of an upstream page). `add` writes such a file
@@ -270,34 +269,39 @@ The `drawer` (`.moi/ui/drawer.tsx`) is the first such entry — a
 sheet-shaped API (`Drawer`, `DrawerTrigger`, `DrawerContent side=`,
 `DrawerHeader`/`DrawerBody`/`DrawerFooter`, `DrawerTitle`,
 `DrawerDescription`, `DrawerClose`) over Base UI's Dialog, scoped to the
-applet area:
+view it is used in, right side by default:
 
 - **Portal target is the applet root.** `DrawerContent` renders a hidden
   marker where it is used, reads `closest('[data-applet]')`, and hands that
   element to `Dialog.Portal`'s `container` (`null` until resolved — Base
   UI waits on an explicit `null` rather than falling back to body). Backdrop
   and popup are `position: absolute` against it, so the panel covers the
-  widget card or the view and nothing else; the applet's scoped CSS matches
-  without a wrapper, and the frame's per-widget theme tokens apply.
-- **The host guarantees the root is a positioned, non-scrolling box.**
-  `AppletMount` (widgets) is `relative`; `ViewFrame` (views) is the
-  `absolute inset-0 isolate` frame with the `overflow-auto` scroller moved
-  to a child — an absolutely positioned panel inside a scroll container
-  would scroll away with the view's content.
+  view and nothing else; the applet's scoped CSS matches without a wrapper.
+- **Views only, enforced at build.** The entry carries `kinds: ['view']`.
+  The applet bundler's runtime plugin checks every relative import in the
+  graph and fails a widget build that reaches `.moi/ui/drawer` — directly
+  or through a shared `_`-module — with the reason in `moi bundle`'s
+  output. A 160 px widget card has no room for a panel; the widget's move
+  is `focusTab` to a view, or a dialog/popover. `add` prints the same
+  limit when installing.
+- **The host guarantees the view root is a positioned, non-scrolling box.**
+  `ViewFrame` is the `absolute inset-0 isolate` frame with the
+  `overflow-auto` scroller moved to a child — an absolutely positioned
+  panel inside a scroll container would scroll away with the view's content.
 - **Not page-modal.** `Dialog.Root` runs with `modal="trap-focus"`: focus
   stays inside the panel, but the page keeps scrolling and the rest of the
   workspace (chat, tabs, other widgets) stays clickable. `modal={true}`
   would add Base UI's viewport-wide inert backdrop and scroll lock — exactly
   the global behavior the component exists to avoid. Escape, the backdrop,
   `DrawerClose`, and an outside press all close it.
-- **`z-50` on backdrop and popup** — the one justified z-index: applet
+- **`z-50` on backdrop and popup** — the one justified z-index: view
   content that raised itself (a `sticky z-10` table header) must still end
-  up underneath, and the applet root is a stacking context so nothing leaks
-  past the applet.
-- **`DrawerBody` is the scroll region.** Applet areas are small (a one-row
-  widget is 160 px), so the popup is a flex column whose body scrolls while
-  header, footer, and the close button stay put; the popup itself also
-  scrolls as a safety net when no body is used.
+  up underneath, and the view root is a stacking context so nothing leaks
+  past the view.
+- **`DrawerBody` is the scroll region.** A view shares the screen with the
+  chat, so the popup is a flex column whose body scrolls while header,
+  footer, and the close button stay put; the popup itself also scrolls as a
+  safety net when no body is used.
 - **Animations** use the same tw-animate-css vocabulary the registry
   components compile against (`data-open:animate-in slide-in-from-right`,
   `data-closed:animate-out slide-out-to-right`), so the synthetic-Tailwind

@@ -159,6 +159,15 @@ const add = defineCommand({
         )
       )
     }
+    // A kind-restricted component gets its limit spelled out at install time:
+    // the build refuses the other kind anyway, but a heads-up beats a failed
+    // bundle later.
+    for (const name of request.entries) {
+      const kinds = UI_COMPONENTS[name].kinds
+      if (kinds) {
+        console.log(pc.dim(`  ${name} is for ${kinds.map(kind => `${kind}s`).join(' and ')} only`))
+      }
+    }
     const moiDir = join(entry.path, '.moi')
     let installNeeded = deps.length > 0
     if (args.install) {
