@@ -35,10 +35,21 @@ function forbiddenImports(source: string): string[] {
   )
 }
 
+// A port nothing is listening on, for the child's control server (below).
+async function freePort(): Promise<number> {
+  const probe = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: () => new Response('') })
+  const port = probe.port
+  probe.stop(true)
+  return port
+}
+
 // Loaded React modules after importing `entry` in a fresh process. React's npm
 // packages are CommonJS, so every one that gets evaluated shows up in
-// `require.cache` under its `node_modules/react[-dom]/` path.
-function reactModulesLoadedBy(entry: string): string[] {
+// `require.cache` under its `node_modules/react[-dom]/` path. `control.ts`
+// starts its control server at module load, so the child gets a free port for
+// it — otherwise the check would die with EADDRINUSE whenever a moi server
+// (`bun run dev`, or an installed one) is running alongside the tests.
+async function reactModulesLoadedBy(entry: string): Promise<string[]> {
   const code = [
     `await import(${JSON.stringify(entry)})`,
     `const hits = Object.keys(require.cache).filter(k => /node_modules\\/(react|react-dom)\\//.test(k))`,
@@ -46,7 +57,10 @@ function reactModulesLoadedBy(entry: string): string[] {
     // tldraw leaves timers behind; don't let the process linger on them.
     `process.exit(0)`
   ].join('\n')
-  const proc = Bun.spawnSync([process.execPath, '-e', code], { cwd: ROOT, env: process.env })
+  const proc = Bun.spawnSync([process.execPath, '-e', code], {
+    cwd: ROOT,
+    env: { ...process.env, MOI_CONTROL_PORT: String(await freePort()) }
+  })
   if (proc.exitCode !== 0) throw new Error(`import of ${entry} failed:\n${proc.stderr.toString()}`)
   const lines = proc.stdout.toString().trim().split('\n')
   return JSON.parse(lines[lines.length - 1]) as string[]
@@ -81,12 +95,12 @@ describe('the server never loads React', () => {
   // `api.ts` (every HTTP route) and `control.ts` (the CLI's control port, which
   // pulls in the scratchpad writer, bundler, harnesses…) together import
   // practically the whole server. `web.ts` is left out only because importing it
-  // binds the ports; it adds nothing but the Bun.serve wiring on top of these.
-  test.each(['server/api.ts', 'server/control.ts'])('%s loads without React', entry => {
-    expect(reactModulesLoadedBy(join(ROOT, entry))).toEqual([])
+  // binds the HTTP port; it adds nothing but the Bun.serve wiring on top of these.
+  test.each(['server/api.ts', 'server/control.ts'])('%s loads without React', async entry => {
+    expect(await reactModulesLoadedBy(join(ROOT, entry))).toEqual([])
   })
 
-  test('(control) the runtime check does see React when the tldraw package loads', () => {
-    expect(reactModulesLoadedBy('tldraw').length).toBeGreaterThan(0)
+  test('(control) the runtime check does see React when the tldraw package loads', async () => {
+    expect((await reactModulesLoadedBy('tldraw')).length).toBeGreaterThan(0)
   })
 })
