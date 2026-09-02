@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
 
+import reactDomPkg from 'react-dom/package.json'
+import reactPkg from 'react/package.json'
+
+import pkg from '../../package.json'
 import { serveVendorEmojibase, serveVendorReact } from '../vendor'
 
 const VENDOR = join(import.meta.dir, '..', '..', 'client', 'vendor', 'react')
@@ -83,4 +87,39 @@ describe('serveVendorEmojibase route', () => {
     expect((await get('/vendor/emojibase/en/data.js')).status).toBe(404)
     expect((await get('/vendor/emojibase/xx/data.json')).status).toBe(404)
   })
+})
+
+// React is pinned EXACTLY in package.json, and the vendored ESM must be built
+// from that very version. The vendored files are the one React the browser
+// ever runs (host app and applets alike, via the importmap), generated from
+// node_modules by `bun run vendor:react` and committed — nothing regenerates
+// them on install. With a range, a `bun update` could move the installed
+// React (and so @types, the dev bundler, the prepack client build) past the
+// committed artifacts without anyone noticing. Bumping React is deliberate:
+// change both pins, `bun install`, `bun run vendor:react`, commit the result.
+describe('React version is pinned and vendored consistently', () => {
+  const pinned = { react: pkg.dependencies.react, 'react-dom': pkg.dependencies['react-dom'] }
+
+  test('react and react-dom are pinned to the same exact version', () => {
+    expect(pinned.react).toMatch(/^\d/)
+    expect(pinned['react-dom']).toBe(pinned.react)
+  })
+
+  test('the installed packages match the pin', () => {
+    expect(reactPkg.version).toBe(pinned.react)
+    expect(reactDomPkg.version).toBe(pinned['react-dom'])
+  })
+
+  for (const mode of ['production', 'development'] as const) {
+    test(`${mode} artifacts were generated from the pinned version`, async () => {
+      for (const [name, spec, pin] of [
+        ['react.js', 'react', 'react'],
+        ['react-dom.js', 'react-dom', 'react-dom'],
+        ['react-dom-client.js', 'react-dom/client', 'react-dom']
+      ] as const) {
+        const header = (await Bun.file(join(VENDOR, mode, name)).text()).split('\n')[0]
+        expect(header, name).toContain(`${spec}@${pinned[pin]} (${mode})`)
+      }
+    })
+  }
 })

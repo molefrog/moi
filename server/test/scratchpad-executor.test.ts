@@ -4,11 +4,13 @@ import { readdir } from 'node:fs/promises'
 import { join } from 'path'
 import sharp from 'sharp'
 
+import { createTLSchema } from '@tldraw/tlschema'
 import { createTLStore, defaultBindingUtils, defaultShapeUtils, loadSnapshot } from 'tldraw'
 
 import type { ScratchOp } from '@/lib/types'
 
 import { executeScratchOp } from '../scratchpad-executor'
+import { SHAPE_DEFAULTS } from '../scratchpad-shape-defaults'
 import {
   getScratchpadPath,
   loadScratchpadDoc,
@@ -39,6 +41,35 @@ async function assertLoadable(): Promise<number> {
   loadSnapshot(store, { document } as unknown as Parameters<typeof loadSnapshot>[1])
   return store.allRecords().filter(r => r.typeName === 'shape').length
 }
+
+// The server builds its store from `@tldraw/tlschema` (React-free) while the
+// browser builds its own from the `tldraw` shape utils. Both must serialize to
+// the same schema: it's stamped into every snapshot, and a difference would
+// make each server write look like a schema change to the browser (and vice
+// versa), churning the `.bak` backup and the skew detection on every save.
+test('the headless schema is the browser schema', () => {
+  const browser = createTLStore({
+    shapeUtils: defaultShapeUtils,
+    bindingUtils: defaultBindingUtils
+  })
+  expect(createTLSchema().serialize()).toEqual(browser.schema.serialize())
+})
+
+// The server's static shape defaults are a copy of each ShapeUtil's
+// `getDefaultProps()` (the server can't import the utils — they live behind the
+// React editor). Pin them to the real thing so a tldraw bump that changes a
+// default fails here instead of writing shapes the canvas renders differently.
+test('SHAPE_DEFAULTS match the tldraw shape utils', () => {
+  expect(Object.keys(SHAPE_DEFAULTS).sort()).toEqual(['arrow', 'geo', 'image', 'note', 'text'])
+  for (const [type, defaults] of Object.entries(SHAPE_DEFAULTS)) {
+    const Util = defaultShapeUtils.find(u => u.type === type)
+    expect(Util, type).toBeDefined()
+    const util = new (Util as unknown as new (editor: unknown) => {
+      getDefaultProps(): Record<string, unknown>
+    })({})
+    expect(defaults, type).toEqual(util.getDefaultProps())
+  }
+})
 
 describe('executeScratchOp (headless)', () => {
   test('draws to disk with no browser, and the snapshot is browser-loadable', async () => {

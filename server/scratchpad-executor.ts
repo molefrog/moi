@@ -1,23 +1,19 @@
 import { basename } from 'path'
 import sharp from 'sharp'
 
+import { Store } from '@tldraw/store'
 import {
-  type IndexKey,
   type TLPageId,
   type TLRecord,
-  type TLStore,
+  type TLStoreProps,
+  type TLStoreSnapshot,
   AssetRecordType,
-  ZERO_INDEX_KEY,
   createBindingId,
   createShapeId,
-  createTLStore,
-  defaultBindingUtils,
-  defaultShapeUtils,
-  getIndexAbove,
-  getSnapshot,
-  loadSnapshot,
+  createTLSchema,
   toRichText
-} from 'tldraw'
+} from '@tldraw/tlschema'
+import { type IndexKey, ZERO_INDEX_KEY, getIndexAbove } from '@tldraw/utils'
 
 import { describeNewerWriter, sequencesAhead } from '@/lib/scratchpad-skew'
 import type {
@@ -36,6 +32,7 @@ import {
   saveScratchpadDoc
 } from './scratchpad'
 import { storeScratchpadAsset } from './scratchpad-assets'
+import { SHAPE_DEFAULTS } from './scratchpad-shape-defaults'
 
 // Server-side Scratchpad writer. The browser is no longer required to draw: we run
 // the same ops against a *headless* tldraw store here, persist the snapshot, and
@@ -47,24 +44,42 @@ import { storeScratchpadAsset } from './scratchpad-assets'
 // DOM + text measurement that don't exist in the server runtime. The store
 // validates every `put`, so a malformed record throws instead of corrupting the
 // file — that validation is what keeps hand-built records honest.
+//
+// Deliberately built from `@tldraw/store` + `@tldraw/tlschema` (+ `@tldraw/utils`),
+// NOT the `tldraw` package: the `tldraw` entry point evaluates the whole React
+// editor, and `react-dom` (19.2+) throws at load time whenever the `react` it
+// resolves is a different version — a real hazard for a global `bun i -g`
+// install, whose shared, hoisted `node_modules` can pair moi's `react-dom` with a
+// `react` some other global package locked earlier. That crash used to take the
+// entire server down at `moi start`, before it served a single request. The
+// sub-packages import no React at all, so the server never resolves it. A test
+// (`server/test/server-react-free.test.ts`) keeps this module React-free.
 
-// Each shape type's default props, read once from its ShapeUtil. `getDefaultProps`
-// is an instance method but doesn't touch the editor for the shapes we create, so a
-// throwaway instance is enough; the result is static per type, so we cache it.
-const shapeDefaults = new Map<string, Record<string, unknown>>()
+// The headless store. `TLStoreProps` is what a schema built by `createTLSchema`
+// expects, but the only prop anything reads here is `defaultName` (the
+// integrity checker, when it seeds the document record). The rest — asset
+// upload, user resolution, editor mount — exists for a mounted `Editor`, which
+// this store never gets.
+type HeadlessStore = Store<TLRecord, TLStoreProps>
+
+const unsupported = (what: string) => (): never => {
+  throw new Error(`${what} is not available on the server-side scratchpad store`)
+}
+
+// Cast: the editor-facing props are unreachable on a store that never mounts an
+// `Editor`; `defaultName` is the one field the store itself consumes.
+const HEADLESS_STORE_PROPS = {
+  defaultName: '',
+  assets: { upload: unsupported('Asset upload'), resolve: () => null, remove: async () => {} },
+  users: { currentUser: null, resolve: () => null },
+  onMount: () => {}
+} as unknown as TLStoreProps
+
+// A fresh copy of a shape type's default props (see scratchpad-shape-defaults.ts).
 function defaultProps(type: string): Record<string, unknown> {
-  let cached = shapeDefaults.get(type)
-  if (!cached) {
-    const Util = defaultShapeUtils.find(u => (u as unknown as { type: string }).type === type)
-    if (!Util) throw new Error(`Unknown shape type "${type}"`)
-    // eslint-disable-next-line new-cap -- Util is a class constructor pulled from a list
-    const util = new (Util as unknown as new (editor: unknown) => {
-      getDefaultProps(): Record<string, unknown>
-    })({})
-    cached = util.getDefaultProps()
-    shapeDefaults.set(type, cached)
-  }
-  return { ...cached }
+  const defaults = SHAPE_DEFAULTS[type]
+  if (!defaults) throw new Error(`Unknown shape type "${type}"`)
+  return { ...defaults }
 }
 
 // Map an op's optional color/size/fill onto tldraw shape props (omitted → tldraw default).
@@ -81,7 +96,7 @@ function styleProps(style: ScratchStyle): Record<string, unknown> {
 // itself, which reaches the `moi scratch` caller ahead of — and contradicting —
 // the actionable error we throw below ("the file is intact"). Whatever it says
 // is replayed if the load actually succeeds, so only the swallowed-by-a-throw
-// case is lost. Safe to swap `console.error` around: `loadSnapshot` is sync.
+// case is lost. Safe to swap `console.error` around: `loadStoreSnapshot` is sync.
 function loadQuietly(load: () => void): void {
   const original = console.error
   const held: unknown[][] = []
@@ -102,36 +117,44 @@ function loadQuietly(load: () => void): void {
 // so a snapshot written by a newer tldraw is unreadable here — but intact.
 // That gets a loud, actionable error instead of tldraw's bare `migration-error`
 // (which surfaces verbatim through the control port to the `moi scratch` CLI).
-function buildStore(doc: ScratchpadDoc | null, writer: ScratchpadWriter | undefined): TLStore {
-  const store = createTLStore({ shapeUtils: defaultShapeUtils, bindingUtils: defaultBindingUtils })
-  if (doc?.store) {
-    try {
-      loadQuietly(() =>
-        loadSnapshot(store, { document: doc } as unknown as Parameters<typeof loadSnapshot>[1])
-      )
-    } catch (err) {
-      const ahead = sequencesAhead(doc.schema, store.schema.serialize().sequences)
-      if (ahead.length > 0) {
-        throw new Error(
-          `Scratchpad was written by a newer moi (${describeNewerWriter(writer, ahead)}); ` +
-            `this server has tldraw ${SCRATCHPAD_WRITER.tldraw}. Restart the newer server or ` +
-            `update this install (bun install -g moi-computer@latest). ` +
-            `The canvas file is intact — do not reset it.`
-        )
-      }
-      // Not skew — the snapshot itself is bad. Keep the original cause visible.
+function buildStore(
+  doc: ScratchpadDoc | null,
+  writer: ScratchpadWriter | undefined
+): HeadlessStore {
+  // `createTLSchema()` with no arguments is tldraw's default shape/binding/asset
+  // set — the same schema the browser's `createTLStore` builds from
+  // `defaultShapeUtils` + `defaultBindingUtils` (a test pins the two serialized
+  // schemas equal), so a snapshot written here round-trips into the live canvas.
+  const store: HeadlessStore = new Store({ schema: createTLSchema(), props: HEADLESS_STORE_PROPS })
+  // `loadStoreSnapshot` migrates the records forward to this schema, replaces the
+  // store's contents, and seeds whatever a usable document still lacks (the
+  // document/page records of a fresh or partial canvas) — so an empty canvas
+  // loads an empty snapshot rather than skipping the load.
+  const snapshot = doc?.store
+    ? (doc as unknown as TLStoreSnapshot)
+    : { store: {}, schema: store.schema.serialize() }
+  try {
+    loadQuietly(() => store.loadStoreSnapshot(snapshot))
+  } catch (err) {
+    const ahead = sequencesAhead(doc?.schema, store.schema.serialize().sequences)
+    if (ahead.length > 0) {
       throw new Error(
-        `Scratchpad snapshot failed to load (not a version mismatch — the file may be ` +
-          `corrupted): ${err instanceof Error ? err.message : String(err)}`
+        `Scratchpad was written by a newer moi (${describeNewerWriter(writer, ahead)}); ` +
+          `this server has tldraw ${SCRATCHPAD_WRITER.tldraw}. Restart the newer server or ` +
+          `update this install (bun install -g moi-computer@latest). ` +
+          `The canvas file is intact — do not reset it.`
       )
     }
+    // Not skew — the snapshot itself is bad. Keep the original cause visible.
+    throw new Error(
+      `Scratchpad snapshot failed to load (not a version mismatch — the file may be ` +
+        `corrupted): ${err instanceof Error ? err.message : String(err)}`
+    )
   }
-  // Seed the document/page records a fresh (or partial) store needs to be valid.
-  store.ensureStoreIsUsable()
   return store
 }
 
-function firstPageId(store: TLStore): TLPageId {
+function firstPageId(store: HeadlessStore): TLPageId {
   for (const record of store.allRecords()) {
     if (record.typeName === 'page') return record.id
   }
@@ -141,7 +164,7 @@ function firstPageId(store: TLStore): TLPageId {
 
 // The next fractional index above every shape on the page, so a new shape lands on
 // top. IndexKeys sort lexicographically, so a string max is a valid ordering.
-function nextIndex(store: TLStore, pageId: TLPageId): IndexKey {
+function nextIndex(store: HeadlessStore, pageId: TLPageId): IndexKey {
   let max: IndexKey = ZERO_INDEX_KEY
   for (const record of store.allRecords()) {
     if (record.typeName === 'shape' && record.parentId === pageId && record.index > max) {
@@ -231,7 +254,7 @@ async function processCanvasImage(
 // reference — never a base64 blob (see scratchpad-assets.ts). Async — unlike
 // the other ops — because it decodes and resizes the image first.
 async function applyAddImage(
-  store: TLStore,
+  store: HeadlessStore,
   workspacePath: string,
   op: Extract<ScratchOp, { kind: 'add-image' }>
 ): Promise<ScratchOpResult> {
@@ -275,7 +298,7 @@ async function applyAddImage(
 
 // Apply one mutating op to the store. `read` and `view` are handled elsewhere
 // (disk / browser) and never reach here. Returns the op's result.
-function applyOp(store: TLStore, op: ScratchOp): ScratchOpResult {
+function applyOp(store: HeadlessStore, op: ScratchOp): ScratchOpResult {
   const pageId = firstPageId(store)
   const requireShape = (name: string) => {
     const shape = store.get(createShapeId(name))
@@ -412,7 +435,7 @@ function applyOp(store: TLStore, op: ScratchOp): ScratchOpResult {
 // True if any shape still references the given asset id. tldraw lets several
 // shapes share one asset (e.g. a duplicated image), so delete/replace only drops
 // the asset record when its last user is gone — leaving the file for the sweep.
-function anyShapeUsesAsset(store: TLStore, assetId: string): boolean {
+function anyShapeUsesAsset(store: HeadlessStore, assetId: string): boolean {
   for (const record of store.allRecords()) {
     if (record.typeName !== 'shape') continue
     const props = (record as unknown as { props?: { assetId?: unknown } }).props
@@ -422,7 +445,7 @@ function anyShapeUsesAsset(store: TLStore, assetId: string): boolean {
 }
 
 // Ids of bindings whose start/end is the named shape.
-function bindingsTouching(store: TLStore, name: string): TLRecord['id'][] {
+function bindingsTouching(store: HeadlessStore, name: string): TLRecord['id'][] {
   const target = createShapeId(name)
   const ids: TLRecord['id'][] = []
   for (const record of store.allRecords()) {
@@ -459,7 +482,7 @@ export function executeScratchOp(
     // add-image decodes/resizes the file first, so it's the one async op.
     const result =
       op.kind === 'add-image' ? await applyAddImage(store, workspacePath, op) : applyOp(store, op)
-    const next = getSnapshot(store).document as unknown as ScratchpadDoc
+    const next = store.getStoreSnapshot() as unknown as ScratchpadDoc
     await saveScratchpadDoc(next, workspacePath)
     publishEvent({ type: 'scratchpad:updated', workspaceId })
     return result

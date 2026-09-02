@@ -120,13 +120,25 @@ on the server (the mutations). Only `view` — rendering pixels — genuinely re
 - **Reading** (`moi scratch read`, `read-image`) parses that snapshot straight off disk — the
   shape listing, or one image's bytes. No browser, no tldraw runtime.
 - **Drawing** (`add`/`move`/`set`/`delete`/`clear`) runs on the server: it loads the snapshot
-  into a headless `tldraw` store (`createTLStore` + the default shape/binding utils), applies
-  the op as store records — using each shape's `getDefaultProps()` so records are schema-valid —
-  writes the snapshot back, and nudges open tabs to reload. **No live tab required.** The store
-  validates every record on `put`, so a malformed shape throws instead of corrupting the file.
-  `add image` additionally resizes the file through `sharp` (the same dep the icon pipeline uses)
-  before embedding it. (We drive the store, not an `Editor`, because the Editor needs a DOM + text
-  measurement the server runtime doesn't have. See `server/scratchpad-executor.ts`.)
+  into a headless tldraw store (`@tldraw/store` + the default schema from `@tldraw/tlschema`),
+  applies the op as store records — using a copy of each shape's `getDefaultProps()` so records
+  are schema-valid — writes the snapshot back, and nudges open tabs to reload. **No live tab
+  required.** The store validates every record on `put`, so a malformed shape throws instead of
+  corrupting the file. `add image` additionally resizes the file through `sharp` (the same dep
+  the icon pipeline uses) before embedding it. (We drive the store, not an `Editor`, because the
+  Editor needs a DOM + text measurement the server runtime doesn't have. See
+  `server/scratchpad-executor.ts`.)
+- **The server never imports the `tldraw` package itself** — only its React-free sub-packages.
+  The `tldraw` entry point evaluates the whole React editor, and `react-dom` 19.2+ throws at
+  load time whenever the `react` it resolves is a different version. That is a live hazard for
+  a global `bun i -g` install: every global package shares one hoisted `node_modules`, so moi's
+  `react-dom` can land next to a `react` some other global package locked earlier, and the
+  server then died at `moi start` before serving a request. The browser gets React from moi's
+  own vendored ESM (`client/vendor/react`), so nothing outside the browser needs it.
+  `server/test/server-react-free.test.ts` keeps it that way (a static import scan of
+  `server/` + `lib/`, plus a runtime check that loading the writer pulls in no React module);
+  `server/scratchpad-shape-defaults.ts` holds the copied defaults, pinned to the real shape
+  utils by a test.
 - **Viewing** (`moi scratch view`) is the one op still relayed to a connected tab: only the
   browser can rasterize the canvas (`editor.toImageDataUrl`). With no tab showing **this**
   workspace's scratchpad it returns "No live canvas" — every other op still works off disk.
@@ -157,8 +169,13 @@ open in an older one. That's the invariant everything below defends.
   than its own server, which writes snapshots that client can't read. The pin also keeps
   side-by-side installs (global package vs repo checkout) on the same schema as long as
   they're the same moi version.
-- **Bumping tldraw is a deliberate act**: change the pin, `bun install`, test, and
-  release-note that canvases touched by the new version won't open in older moi.
+- **`@tldraw/store`, `@tldraw/tlschema`, and `@tldraw/utils` are pinned to the same exact
+  version** as `tldraw` (the same test checks). They are the schema the server writes;
+  `tldraw` is the schema the browser reads — and a test asserts the two serialize
+  identically, so a server save never registers as a schema change in the browser.
+- **Bumping tldraw is a deliberate act**: change all four pins together, `bun install`, test
+  (the defaults and schema-parity tests catch what changed), and release-note that canvases
+  touched by the new version won't open in older moi.
 - **Every save is stamped** with the writer (`{ writer: { moi, tldraw } }` next to
   `document`), so when an older moi does hit a newer file, the error can name the version
   it needs. Deliberate downgrades and branch-hopping can't be prevented — only made loud,
