@@ -12,8 +12,9 @@ import { join, relative } from 'path'
 //   1. a static scan: first-party server/lib code never imports `react`,
 //      `react-dom`, or the `tldraw` package (whose entry point is the React
 //      editor) — `tldraw/package.json` is fine, it's data;
-//   2. a runtime check: loading the scratchpad writer in a fresh Bun process
-//      leaves no React module in `require.cache`, transitive deps included.
+//   2. a runtime check: loading the server's entry modules in a fresh Bun
+//      process leaves no React module in `require.cache`, transitive deps
+//      included — the static scan can't see what third-party code imports.
 
 const ROOT = join(import.meta.dir, '..', '..')
 
@@ -77,8 +78,12 @@ describe('the server never loads React', () => {
     expect(forbiddenImports(`import { toRichText } from '@tldraw/tlschema'`)).toEqual([])
   })
 
-  test('the scratchpad writer loads without React', () => {
-    expect(reactModulesLoadedBy(join(ROOT, 'server', 'scratchpad-executor.ts'))).toEqual([])
+  // `api.ts` (every HTTP route) and `control.ts` (the CLI's control port, which
+  // pulls in the scratchpad writer, bundler, harnesses…) together import
+  // practically the whole server. `web.ts` is left out only because importing it
+  // binds the ports; it adds nothing but the Bun.serve wiring on top of these.
+  test.each(['server/api.ts', 'server/control.ts'])('%s loads without React', entry => {
+    expect(reactModulesLoadedBy(join(ROOT, entry))).toEqual([])
   })
 
   test('(control) the runtime check does see React when the tldraw package loads', () => {
