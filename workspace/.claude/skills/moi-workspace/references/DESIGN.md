@@ -176,7 +176,8 @@ A small Widget has one primary element and at most two supporting groups. Larger
 carry more when hierarchy remains clear. Prefer live information over labels that repeat context.
 Limit controls to the immediate task: filters, toggles, refresh actions, and links are appropriate.
 Keep feedback on the control and leave the Widget surface unchanged on hover. Tabs, wizards,
-multi-step workflows, and deep navigation belong in a View.
+multi-step workflows, deep navigation, and slide-in panels belong in a View (the `drawer` ui
+component is views only).
 
 ## Views
 
@@ -186,7 +187,7 @@ width, including when chat shares the workspace.
 
 One View represents one screen. Cross-screen navigation belongs to the workspace. Internal tabs,
 filters, and master-detail layouts may organize the current task without adding a client-side
-router.
+router; a `drawer` opening from the right is the standard detail pane beside a table or list.
 
 Let content choose the frame. Most Views need clear page context, a primary work area, and an
 obvious place for the main action. A title with an optional subtitle or action is a useful default;

@@ -308,6 +308,39 @@ view it is used in, right side by default:
   patch above already covers it; a build test compiles the embedded source
   as an installed file and asserts on the emitted CSS.
 
+## Spacing: installed components vs the host's copies (investigated Sep 2026)
+
+Reported as "some installed components have missing padding — compare the
+shadcn dropdown with ours". Measured, not missing: a spacing detector run
+over 34 installed base-nova components rendered in a view and in a widget
+(every overlay opened — dropdown, context menu, select, combobox, popover,
+tooltip, hover card, dialog, alert dialog; ~190 utility classes per pass)
+found every `p*`/`m*`/`gap*` class taking effect. The only classes that
+did not resolve to their own value were intentional compound overrides in
+the components themselves (`input-group` shrinking its input's padding
+next to an addon, `pagination` links via button size variants). The real
+`getRegistryItems` path returns byte-identical content to the
+`r/styles/base-nova/<name>.json` files the detector ran against.
+
+What the eye catches instead is **drift between the registry and the host's
+own shadcn copies** (`client/components/ui/`, taken 2026-08-18). Upstream
+base-nova has since tightened its menus and popups, so an applet's fresh
+install sits visibly denser next to host chrome:
+
+| slot                           | host copy            | registry today   |
+| ------------------------------ | -------------------- | ---------------- |
+| dropdown item / sub-trigger    | `px-2 gap-2`         | `px-1.5 gap-1.5` |
+| dropdown label                 | `px-2 pt-1.5 pb-0.5` | `px-1.5 py-1`    |
+| dropdown checkbox / radio item | `pl-2 gap-2`         | `pl-1.5 gap-1.5` |
+| dropdown separator             | `mx-2 my-1`          | `-mx-1 my-1`     |
+| popover content                | `p-3 gap-3`          | `p-2.5 gap-2.5`  |
+| tooltip content                | `px-2.5`             | `px-3`           |
+
+Both are deliberate scales; nothing is dropped in the build. If the two
+should match, the choice is a host decision (`DESIGN.md`): either refresh
+the host copies from the registry, or accept the registry's compact scale
+in applets. Not changed here.
+
 ## Open items
 
 - Per-kind component rules refinement in `references/UI-COMPONENTS.md`

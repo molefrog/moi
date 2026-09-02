@@ -211,6 +211,9 @@ Import relatively: `import { Button } from '../ui/button'`.
 - Files in `.moi/ui/` are yours to customize (edits propagate to every applet using them);
   `add` skips already-installed components (reported as kept) and overwrites only with
   `--force`.
+- Some components fit one applet kind only — `drawer`, a panel that slides in over a view, is
+  views only. `moi bundle` fails a widget that imports one and says why; from a widget, `focusTab`
+  to a view or use `dialog`/`popover` instead.
 - Component names, their API, and the CLI are very close to a selected subset of shadcn, but the
   actual implementation might differ.
 
