@@ -9,12 +9,22 @@ import {
   UI_COMPONENT_NAMES,
   partitionUiWrites,
   planUiWrites,
+  registryItemName,
   resolveUiComponentRequest,
   suggestUiComponents,
   transformUiComponentSource,
   uiComponentFiles
 } from '../ui-components'
-import { DRAWER_DOCS, DRAWER_SOURCE } from '../ui-components-drawer'
+
+const REPO_ROOT = join(import.meta.dir, '../..')
+
+async function loadDrawerRegistryItem() {
+  const { loadRegistryItem } = await import('shadcn/registry')
+  const item = await loadRegistryItem('drawer', { cwd: REPO_ROOT })
+  const file = item.files?.find(candidate => candidate.path.endsWith('/drawer.tsx'))
+  if (!file?.content) throw new Error('Drawer registry source is missing')
+  return { item, source: file.content }
+}
 
 // Raw registry content, shrunk from real base-nova items: the icon
 // placeholder shape, alias imports, and the two portal shapes (pass-through
@@ -243,13 +253,12 @@ describe('partitionUiWrites', () => {
 })
 
 describe('catalog', () => {
-  test('every entry has a description and either registry items or its own source', () => {
+  test('every entry has a description and registry items', () => {
     for (const name of UI_COMPONENT_NAMES) {
       const entry = UI_COMPONENTS[name]
       expect(entry.description.length).toBeGreaterThan(0)
-      expect(entry.registryItems.length > 0 || Boolean(entry.source)).toBe(true)
-      // Inline docs exist exactly for the entries with no upstream page.
-      expect(Boolean(entry.docs)).toBe(Boolean(entry.source))
+      expect(entry.registryItems.length).toBeGreaterThan(0)
+      if (entry.docs) expect(entry.docs).toBe('registry')
       // Catalog keys are kebab-case slugs — they double as docs slugs.
       expect(name).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/)
     }
@@ -304,15 +313,29 @@ describe('catalog', () => {
   })
 })
 
-describe('moi-authored entries', () => {
-  test('drawer resolves to its embedded source and no registry items', () => {
+describe('moi registry', () => {
+  test('loads its single Drawer item from the local source registry', async () => {
+    const { loadRegistry } = await import('shadcn/registry')
+    const registry = await loadRegistry({ cwd: REPO_ROOT })
+
+    expect(registry).toMatchObject({ name: 'moi', homepage: 'https://moi.computer' })
+    expect(registry.items).toHaveLength(1)
+    expect(registry.items[0]).toMatchObject({
+      name: 'drawer',
+      title: 'Drawer',
+      type: 'registry:ui',
+      dependencies: ['@base-ui/react', '@tabler/icons-react'],
+      registryDependencies: ['utils'],
+      files: [{ path: 'ui-components/drawer.tsx', type: 'registry:ui' }]
+    })
+    expect(registry.items[0]?.docs).toContain('Every DrawerContent must contain a DrawerTitle')
+  })
+
+  test('drawer resolves to its GitHub registry item', () => {
     const request = resolveUiComponentRequest(['drawer'])
 
     expect(request.entries).toEqual(['drawer'])
-    expect(request.registryItems).toEqual([])
-    expect(request.localFiles).toEqual([
-      { name: 'drawer.tsx', content: DRAWER_SOURCE, verbatim: true }
-    ])
+    expect(request.registryItems).toEqual(['molefrog/moi/drawer'])
     expect(request.unknown).toEqual([])
   })
 
@@ -320,63 +343,70 @@ describe('moi-authored entries', () => {
     const request = resolveUiComponentRequest(['drawer', 'button', 'drawer'])
 
     expect(request.entries).toEqual(['drawer', 'button'])
-    expect(request.registryItems).toEqual(['button'])
-    expect(request.localFiles.map(file => file.name)).toEqual(['drawer.tsx'])
+    expect(request.registryItems).toEqual(['molefrog/moi/drawer', 'button'])
   })
 
-  test('counts as installed by its own file', () => {
+  test('uses the final address segment for installed files', () => {
+    expect(registryItemName('molefrog/moi/drawer')).toBe('drawer')
+    expect(registryItemName('molefrog/moi/drawer#v1.0.0')).toBe('drawer')
     expect(uiComponentFiles('drawer')).toEqual(['drawer.tsx'])
     expect(uiComponentFiles('button')).toEqual(['button.tsx'])
     expect(uiComponentFiles('date-picker')).toEqual(['calendar.tsx', 'popover.tsx', 'button.tsx'])
   })
 
-  test('is planned as a requested, verbatim write', () => {
+  test('plans GitHub registry files as requested transformed writes', () => {
     const plans = planUiWrites({
       files: [
         { name: 'utils.ts', content: 'utils' },
-        ...resolveUiComponentRequest(['drawer']).localFiles
+        { name: 'drawer.tsx', content: 'drawer' }
       ],
-      requestedItems: ['drawer'],
+      requestedItems: ['molefrog/moi/drawer'],
       uiDir: '/ws/.moi/ui',
       exists: () => false
     })
 
     const byName = new Map(plans.map(plan => [plan.name, plan]))
-    expect(byName.get('drawer.tsx')).toMatchObject({ support: false, verbatim: true })
-    // Registry content still goes through the transform pipeline.
+    expect(byName.get('drawer.tsx')).toMatchObject({ support: false, verbatim: false })
     expect(byName.get('utils.ts')).toMatchObject({ support: true, verbatim: false })
-    // The portal helper is moi-authored too — nothing in it to transform.
     expect(byName.get('applet-portal.tsx')).toMatchObject({ support: true, verbatim: true })
   })
 })
 
 describe('drawer source', () => {
-  test('is already in workspace form', () => {
-    // What the transform pipeline would otherwise have to produce: relative
-    // imports, Tabler icons, no registry aliases, no placeholder icons.
-    expect(DRAWER_SOURCE).toContain('from "./utils"')
-    expect(DRAWER_SOURCE).toContain('from "@tabler/icons-react"')
-    expect(DRAWER_SOURCE).toContain('from "@base-ui/react/dialog"')
-    expect(DRAWER_SOURCE).not.toContain('@/')
-    expect(DRAWER_SOURCE).not.toContain('IconPlaceholder')
-    expect(DRAWER_SOURCE).not.toContain('lucide')
+  test('uses registry imports that transform to workspace imports', async () => {
+    const { source } = await loadDrawerRegistryItem()
+    const installed = await transformUiComponentSource('drawer.tsx', source)
+
+    expect(source).toContain("from '@/registry/moi/lib/utils'")
+    expect(installed).toContain("from './utils'")
+    expect(installed).toContain("from '@tabler/icons-react'")
+    expect(installed).toContain("from '@base-ui/react/dialog'")
+    expect(installed).not.toContain('@/registry')
+    expect(installed).not.toContain('IconPlaceholder')
+    expect(installed).not.toContain('lucide')
+    expect(installed).toContain('<DrawerPrimitive.Portal container={container}>')
+    expect(installed).not.toContain('AppletPortal')
   })
 
-  test('scopes itself to the applet root, never the page', () => {
+  test('scopes itself to the applet root, never the page', async () => {
+    const { source } = await loadDrawerRegistryItem()
+
     // Portals into the nearest [data-applet] element and positions against
     // it: no body portal, no fixed positioning, and no page-modal state
     // (trap-focus keeps the rest of the workspace scrollable and clickable).
-    expect(DRAWER_SOURCE).toContain('closest<HTMLElement>("[data-applet]")')
-    expect(DRAWER_SOURCE).toContain('<DrawerPrimitive.Portal container={container}>')
-    expect(DRAWER_SOURCE).toContain('modal = "trap-focus"')
-    expect(DRAWER_SOURCE).toContain('side = "right"')
-    expect(DRAWER_SOURCE).not.toContain('document.body')
-    expect(DRAWER_SOURCE).not.toMatch(/\bfixed\b/)
+    expect(source).toContain("closest<HTMLElement>('[data-applet]')")
+    expect(source).toContain('<DrawerPrimitive.Portal container={container}>')
+    expect(source).toContain("modal = 'trap-focus'")
+    expect(source).toContain("side = 'right'")
+    expect(source).not.toContain('document.body')
+    expect(source).not.toMatch(/\bfixed\b/)
     // Not wrapped by the body-portal helper either — that would defeat it.
-    expect(DRAWER_SOURCE).not.toContain('AppletPortal')
+    expect(source).not.toContain('AppletPortal')
   })
 
-  test('exports the sheet-shaped parts and documents each', () => {
+  test('exports and documents the sheet-shaped parts', async () => {
+    const { item, source } = await loadDrawerRegistryItem()
+
     for (const part of [
       'Drawer',
       'DrawerTrigger',
@@ -388,18 +418,18 @@ describe('drawer source', () => {
       'DrawerDescription',
       'DrawerClose'
     ]) {
-      expect(DRAWER_SOURCE).toContain(`function ${part}(`)
-      expect(DRAWER_SOURCE).toMatch(new RegExp(`^  ${part},?$`, 'm'))
-      expect(DRAWER_DOCS).toContain(part)
+      expect(source).toContain(`function ${part}(`)
+      expect(source).toMatch(new RegExp(`^  ${part},?$`, 'm'))
+      expect(item.docs).toContain(part)
     }
   })
 })
 
 describe('drawer build', () => {
-  // The source compiles the way an installed `.moi/ui/drawer.tsx` would: Base
-  // UI and Tabler resolve, and the synthetic Tailwind entry emits the
-  // animation vocabulary the panel relies on. Laid out like a workspace —
-  // `ui/` beside `views/` — inside the repo tree so
+  // The transformed registry source compiles the way an installed
+  // `.moi/ui/drawer.tsx` would: Base UI and Tabler resolve, and the synthetic
+  // Tailwind entry emits the animation vocabulary the panel relies on. Laid
+  // out like a workspace — `ui/` beside `views/` — inside the repo tree so
   // `@import 'tailwindcss'` and the component deps resolve against the repo's
   // node_modules.
   let root: string
@@ -426,6 +456,8 @@ describe('drawer build', () => {
   }
 
   beforeAll(async () => {
+    const { source } = await loadDrawerRegistryItem()
+    const installed = await transformUiComponentSource('drawer.tsx', source)
     root = mkdtempSync(join(import.meta.dir, 'drawer-ws-'))
     mkdirSync(join(root, 'ui'))
     mkdirSync(join(root, 'views'))
@@ -437,7 +469,7 @@ describe('drawer build', () => {
         'export function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)) }'
       ].join('\n')
     )
-    writeFileSync(join(root, 'ui', 'drawer.tsx'), DRAWER_SOURCE)
+    writeFileSync(join(root, 'ui', 'drawer.tsx'), installed)
     writeFileSync(join(root, 'views', 'consumer.tsx'), CONSUMER)
     // Same first-build quirk as build-applet.test.ts: under `bun test` the very
     // first Bun.build with this option combo fails to resolve the entry.

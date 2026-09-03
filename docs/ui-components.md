@@ -2,7 +2,8 @@
 
 `moi ui-components` is a curated component installer powered by the
 `shadcn` package's programmatic engine and wrapped in moi's conventions.
-The upstream registry is the source of truth, Base UI is the primitive layer,
+The shadcn registry supplies standard components, while moi-authored components
+come from this repository's source registry. Base UI is the primitive layer,
 and the workspace needs no shadcn config files.
 
 Status: shipped (Aug 2026) — `server/ui-components.ts` (engine),
@@ -29,12 +30,13 @@ and a curated subset instead of the full upstream catalog.
   The list is `UI_COMPONENTS` in `server/ui-components.ts`; registry
   dependencies of a curated item (`separator`, `card`, `toggle`) install
   implicitly as support files. `sheet`'s job inside a view is done by the
-  moi-authored, view-only `drawer` (see "moi-authored entries" below) —
-  the one entry that is not registry content.
+  moi-authored `drawer` from the repository's source registry (see "moi
+  registry" below).
 - Components live in `.moi/ui/`, one fixed place, created on first use.
 - Applets import them relatively: `../ui/button`. Never `@/` aliases (the
   skill states this; unresolved imports already fail loudly at build).
-- No moi-hosted registry. `add` goes straight to the shadcn registry;
+- No registry server or generated registry output. Standard components come
+  from shadcn and moi-authored components use the public GitHub repository;
   offline is unsupported for now.
 - The command is deliberately not smart: it never rebuilds, never edits
   existing files, and installs dependencies only on explicit `--install`.
@@ -56,10 +58,10 @@ V1 (shipped):
   opt-in exception: it runs the `bun install` in `.moi/` itself (also
   materializing the pre-seeded baseline in older workspaces);
   rebuilding stays the agent's job.
-- `moi ui-components docs <name…>` — official docs fetched as markdown
+- `moi ui-components docs <name…>` — component docs fetched as markdown
   (`ui.shadcn.com/docs/components/base/<name>.md` serves raw markdown;
-  works for the `data-table`/`date-picker` pattern pages too). A
-  moi-authored entry (`drawer`) prints its inline docs instead.
+  works for the `data-table`/`date-picker` pattern pages too). For Drawer,
+  the docs come from its registry item.
 - `moi ui-components` / `list [-q term]` — the curated catalog with
   installed state; `-q` filters by name/description.
 
@@ -68,20 +70,21 @@ composition code — for an agent about to build UI, higher value than
 docs) and `diff [name]` (installed file vs upstream; pairs with the
 no-overwrite rule as the update story).
 
-Never: `init` (moi is init), `build`/`registry` (registry publishing),
-`mcp`, `eject` (absorbed into the applet build), presets, migrations,
-config management.
+Never exposed by the moi CLI: `init` (moi is init), `build`/`registry`, `mcp`,
+`eject` (absorbed into the applet build), presets, migrations, config
+management.
 
 ## What `add` does, exactly
 
 1. Validates names against the curated catalog (typos get suggestions),
    expands patterns (`date-picker` → `calendar` + `popover` + `button`,
    `data-table` → `table` + a note about `@tanstack/react-table`).
-2. `getRegistryItems(names, { config })` via the pinned `shadcn` package —
-   the config is a ~10-line object literal inside moi (style `base-nova`,
-   `iconLibrary: 'tabler'`); `registryDependencies` are closed
-   transitively by the engine (`fetchUiComponents`), `utils` always rides
-   along.
+2. `resolveRegistryItems(names, { config })` via the pinned `shadcn` package —
+   bare names resolve against shadcn and `molefrog/moi/drawer` resolves against
+   the public GitHub source registry. The config is a ~10-line object literal
+   inside moi (style `base-nova`, `iconLibrary: 'tabler'`);
+   shadcn resolves and flattens `registryDependencies`, and `utils` always
+   rides along.
 3. `transformIcons` (shadcn's own, ts-morph): registry content ships
    `<IconPlaceholder lucide="…" tabler="…"/>`; the transform picks the
    tabler attribute and writes the `@tabler/icons-react` import. lucide
@@ -227,10 +230,11 @@ in PR #78) but overlays portal to body _for a reason_: they must escape
 the widget frame's `overflow-hidden` and stacking. Decision: **keep the
 body portal, put the scope back inside it.**
 
-`add` rewrites every `<X.Portal …>` to `<AppletPortal portal={X.Portal} …>`
-(the codemod handles both upstream shapes: self-closing pass-through
-wrappers with spread props, and inline `Portal > Positioner > Popup`;
-type positions like `X.Portal.Props` are untouched). `AppletPortal`
+`add` rewrites each `<X.Portal …>` without an explicit `container` to
+`<AppletPortal portal={X.Portal} …>` (the codemod handles both upstream shapes:
+self-closing pass-through wrappers with spread props, and inline
+`Portal > Positioner > Popup`; type positions like `X.Portal.Props` are
+untouched). `AppletPortal`
 (installed as `ui/applet-portal.tsx`) renders a hidden marker where the
 overlay is _used_ — inside the applet's DOM — reads the nearest
 `data-applet` scope from it, and wraps the portalled children in a
@@ -249,20 +253,24 @@ The `drawer` is the deliberate exception: it portals INTO the view's applet
 root instead of out to body, because covering only the view is its point
 (next section). Being inside the root, it needs no scope wrapper.
 
-## moi-authored entries (decided: embedded source, verbatim write)
+## moi registry (decided: GitHub source registry)
 
 Some jobs the registry only solves page-wide. Its `sheet`/`drawer` are
 `position: fixed` overlays portalled to body — page chrome the curated set
 leaves out — yet inside a view the same need is common: a detail pane next
-to a table, a filter sheet. A catalog entry can therefore
-carry a `source` (the component, already in workspace form: relative
-imports, Tabler icons, no portal codemod needed) plus `docs` (printed by
-`docs <name>` in place of an upstream page). `add` writes such a file
-verbatim — the transform pipeline is skipped (`verbatim` on the planned
-write) — and `utils` still rides along, so a drawer-only add into a
-workspace that already has `utils.ts` never touches the registry. The
-sources live in `server/ui-components-drawer.ts`; `uiComponentFiles()`
-tells the catalog which files count as installed.
+to a table, a filter sheet. Moi-authored components live in the root
+`registry.json` and referenced files under `ui-components/`. The public GitHub
+repository is the registry: no server, build output, or namespace is involved.
+The catalog uses the GitHub address `molefrog/moi/drawer`, while users keep the
+short `moi ui-components add drawer` command.
+
+Drawer declares its npm dependencies, the built-in shadcn `utils` registry
+dependency, source file, and short usage docs in `registry.json`. Its source
+uses the standard `@/registry/moi/lib/utils` authoring import. The normal moi
+transform rewrites that to `./utils` before writing `.moi/ui/drawer.tsx`, so
+the GitHub item follows the same install path as every upstream component.
+`moi ui-components docs drawer` reads the item's `docs` field through the same
+registry API.
 
 The `drawer` (`.moi/ui/drawer.tsx`) is the first such entry: a panel over Base
 UI's Dialog, scoped to the view it is used in. It opens from the right by

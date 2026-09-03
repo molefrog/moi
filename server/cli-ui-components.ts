@@ -3,7 +3,7 @@
 //
 //   moi ui-components                → the curated catalog + installed state
 //   moi ui-components add <name…>    → fetch, transform, write to .moi/ui/
-//   moi ui-components docs <name…>   → official docs as markdown, on stdout
+//   moi ui-components docs <name…>   → component docs as markdown, on stdout
 //
 // The command is deliberately not smart: add never rebuilds and never edits
 // existing files, and installs dependencies only when asked to (--install) —
@@ -21,6 +21,7 @@ import {
   UI_COMPONENTS,
   UI_COMPONENT_NAMES,
   UI_DOCS_BASE,
+  fetchUiComponentDocs,
   fetchUiComponents,
   partitionUiWrites,
   planUiWrites,
@@ -76,18 +77,14 @@ const add = defineCommand({
     const entry = await resolveCwdWorkspace()
     const uiDir = uiDirFor(entry.path)
 
-    // A moi-authored entry brings its own source, so the registry is only
-    // needed for registry items and for the `utils` helper every component
-    // imports.
-    const needsRegistry = request.registryItems.length > 0 || !existsSync(join(uiDir, 'utils.ts'))
-    let fetched: FetchedUiComponents = { files: [], dependencies: [] }
+    let fetched: FetchedUiComponents
     try {
-      if (needsRegistry) fetched = await fetchUiComponents(request.registryItems)
+      fetched = await fetchUiComponents(request.registryItems)
     } catch (err) {
       console.error(
         '\n' +
           pc.red('✗') +
-          ' Could not reach the shadcn registry (ui.shadcn.com). ' +
+          ' Could not reach the component registry. ' +
           'The command needs network access; offline use is not supported.\n' +
           pc.dim(`  ${(err as Error).message}\n`)
       )
@@ -95,12 +92,8 @@ const add = defineCommand({
     }
 
     const plans = planUiWrites({
-      files: [...fetched.files, ...request.localFiles],
-      // A moi-authored entry is requested under its own name.
-      requestedItems: [
-        ...request.registryItems,
-        ...request.entries.filter(name => UI_COMPONENTS[name].source)
-      ],
+      files: fetched.files,
+      requestedItems: request.registryItems,
       uiDir,
       exists: existsSync
     })
@@ -211,7 +204,7 @@ const add = defineCommand({
 const docs = defineCommand({
   meta: {
     name: 'docs',
-    description: 'Print official component docs as markdown'
+    description: 'Print component docs as markdown'
   },
   args: {
     name: {
@@ -226,22 +219,26 @@ const docs = defineCommand({
 
     for (const name of request.entries) {
       const entry = UI_COMPONENTS[name]
-      // moi-authored entries have no upstream page; their docs ship inline.
-      if (entry.docs) {
-        if (request.entries.length > 1) console.log(`\n---\n# ${name}\n`)
-        console.log(entry.docs)
-        continue
-      }
-      const slug = entry.docsSlug ?? name
-      const url = `${UI_DOCS_BASE}/${slug}.md`
+      const source =
+        entry.docs === 'registry'
+          ? entry.registryItems[0]
+          : `${UI_DOCS_BASE}/${entry.docsSlug ?? name}.md`
       try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(20_000) })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        if (!source) throw new Error(`No docs source configured for "${name}"`)
+        let markdown: string
+        if (entry.docs === 'registry') {
+          markdown = await fetchUiComponentDocs(source)
+        } else {
+          const res = await fetch(source, { signal: AbortSignal.timeout(20_000) })
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          markdown = await res.text()
+        }
         if (request.entries.length > 1) console.log(`\n---\n# ${name}\n`)
-        console.log(await res.text())
+        console.log(markdown)
       } catch (err) {
         console.error(
-          pc.red('✗') + ` Could not fetch docs for "${name}" (${url}): ${(err as Error).message}`
+          pc.red('✗') +
+            ` Could not fetch docs for "${name}" (${source ?? 'missing source'}): ${(err as Error).message}`
         )
         process.exitCode = 1
       }

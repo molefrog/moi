@@ -1,0 +1,22 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "moi",
+  "homepage": "https://moi.computer",
+  "items": [
+    {
+      "name": "drawer",
+      "type": "registry:ui",
+      "title": "Drawer",
+      "description": "An applet-scoped side panel for moi views.",
+      "dependencies": ["@base-ui/react", "@tabler/icons-react"],
+      "registryDependencies": ["utils"],
+      "files": [
+        {
+          "path": "ui-components/drawer.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "docs": "# Drawer\n\nUse Drawer for a side panel that stays inside its applet. Every DrawerContent must contain a DrawerTitle; use className=\"sr-only\" when the title should be visually hidden. Put growing content in DrawerBody so the header and footer stay in place. Compose custom triggers and close buttons with Base UI's render prop.\n\n```tsx\n<Drawer>\n  <DrawerTrigger render={<Button variant=\"outline\" />}>Details</DrawerTrigger>\n  <DrawerContent>\n    <DrawerHeader>\n      <DrawerTitle>Order details</DrawerTitle>\n      <DrawerDescription>Placed two days ago</DrawerDescription>\n    </DrawerHeader>\n    <DrawerBody>...</DrawerBody>\n    <DrawerFooter>\n      <DrawerClose render={<Button />}>Done</DrawerClose>\n    </DrawerFooter>\n  </DrawerContent>\n</Drawer>\n```"
+    }
+  ]
+}
