@@ -27,22 +27,17 @@ const RADIUS_OPTIONS = Object.entries(RADIUS_THEMES) as [RadiusTheme, RadiusThem
 
 const AGENT_OPTIONS = Object.entries(AGENT_THEMES) as [AgentTheme, AgentThemeConfig][]
 
-const CUSTOMIZE_OPTION_CLASS =
+const STYLE_OPTION_CLASS =
   'relative w-full rounded-lg bg-card text-left ring-1 ring-border transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
 
-type CustomizeOptionGroupProps = {
+type StyleOptionGroupProps = {
   children: ReactNode
   className?: string
   gridClassName?: string
   label: string
 }
 
-function CustomizeOptionGroup({
-  children,
-  className,
-  gridClassName,
-  label
-}: CustomizeOptionGroupProps) {
+function StyleOptionGroup({ children, className, gridClassName, label }: StyleOptionGroupProps) {
   return (
     <div className={cn('flex flex-col gap-2', className)}>
       <p className="text-xs font-medium">{label}</p>
@@ -57,7 +52,7 @@ function CustomizeOptionGroup({
   )
 }
 
-type CustomizeOptionProps = {
+type StyleOptionProps = {
   active: boolean
   children: ReactNode
   className?: string
@@ -65,14 +60,14 @@ type CustomizeOptionProps = {
   style?: CSSProperties
 }
 
-function CustomizeOption({ active, children, className, onSelect, style }: CustomizeOptionProps) {
+function StyleOption({ active, children, className, onSelect, style }: StyleOptionProps) {
   return (
     <button
       type="button"
       aria-pressed={active}
       onClick={onSelect}
       className={cn(
-        CUSTOMIZE_OPTION_CLASS,
+        STYLE_OPTION_CLASS,
         'flex items-center gap-2 p-3',
         className,
         !active && 'cursor-pointer pr-9 opacity-70 hover:opacity-100'
@@ -85,12 +80,12 @@ function CustomizeOption({ active, children, className, onSelect, style }: Custo
   )
 }
 
-type CustomizePanelProps = {
+type StylePanelProps = {
   onClose: () => void
   ref?: Ref<HTMLDivElement>
 }
 
-export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
+export function StylePanel({ onClose, ref }: StylePanelProps) {
   usePreloadWorkspaceFonts()
   const { layout, setLayout } = useWorkspaceLayoutCtx()
   const theme = resolveWorkspaceTheme(layout.theme)
@@ -100,30 +95,30 @@ export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
   }
 
   return (
-    <BottomPanel ref={ref} title="Customize" onClose={onClose} className="@4xl/workspace:max-w-5xl">
+    <BottomPanel ref={ref} title="Style" onClose={onClose} className="@4xl/workspace:max-w-5xl">
       <div className="grid grid-cols-1 gap-4 @4xl/workspace:grid-cols-[repeat(2,minmax(0,1fr))_0.5rem_repeat(2,minmax(0,1fr))_0.5rem_minmax(0,1fr)_0.5rem_minmax(0,1fr)] @4xl/workspace:gap-x-2">
-        <CustomizeOptionGroup
+        <StyleOptionGroup
           label="Font"
           className="@4xl/workspace:col-span-2 @4xl/workspace:col-start-1"
         >
           {FONT_OPTIONS.map(([key, config]) => (
-            <CustomizeOption
+            <StyleOption
               key={key}
               active={key === theme.font}
               onSelect={() => setTheme({ font: key })}
               style={{ fontFamily: config.sans }}
             >
               <span className="text-sm font-medium">{config.label}</span>
-            </CustomizeOption>
+            </StyleOption>
           ))}
-        </CustomizeOptionGroup>
+        </StyleOptionGroup>
 
-        <CustomizeOptionGroup
+        <StyleOptionGroup
           label="Colors"
           className="@4xl/workspace:col-span-2 @4xl/workspace:col-start-4"
         >
           {COLOR_OPTIONS.map(([key, preset]) => (
-            <CustomizeOption
+            <StyleOption
               key={key}
               active={key === theme.color}
               className={preset.primary && 'bg-background text-foreground'}
@@ -143,17 +138,17 @@ export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
                 </span>
                 <span className="text-sm font-medium">{preset.label}</span>
               </div>
-            </CustomizeOption>
+            </StyleOption>
           ))}
-        </CustomizeOptionGroup>
+        </StyleOptionGroup>
 
-        <CustomizeOptionGroup
+        <StyleOptionGroup
           label="Radius"
           className="@4xl/workspace:col-start-7"
           gridClassName="@4xl/workspace:grid-cols-1"
         >
           {RADIUS_OPTIONS.map(([key, preset]) => (
-            <CustomizeOption
+            <StyleOption
               key={key}
               active={key === theme.radius}
               onSelect={() => setTheme({ radius: key })}
@@ -166,17 +161,17 @@ export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
                 />
                 <span className="text-sm font-medium">{preset.label}</span>
               </div>
-            </CustomizeOption>
+            </StyleOption>
           ))}
-        </CustomizeOptionGroup>
+        </StyleOptionGroup>
 
-        <CustomizeOptionGroup
+        <StyleOptionGroup
           label="Agent"
           className="@4xl/workspace:col-start-9"
           gridClassName="@4xl/workspace:grid-cols-1"
         >
           {AGENT_OPTIONS.map(([key, preset]) => (
-            <CustomizeOption
+            <StyleOption
               key={key}
               active={key === theme.agent}
               onSelect={() => setTheme({ agent: key })}
@@ -187,9 +182,9 @@ export function CustomizePanel({ onClose, ref }: CustomizePanelProps) {
                 </span>
                 <span className="text-sm font-medium">{preset.label}</span>
               </div>
-            </CustomizeOption>
+            </StyleOption>
           ))}
-        </CustomizeOptionGroup>
+        </StyleOptionGroup>
       </div>
     </BottomPanel>
   )

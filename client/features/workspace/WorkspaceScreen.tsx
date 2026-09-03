@@ -18,7 +18,7 @@ import { useChatAnnotation } from '@/client/features/drawings/useChatAnnotation'
 import { ChatPanel } from '@/client/features/chat/ChatPanel'
 import type { WelcomeDestination } from '@/client/features/chat/ChatEmptyState'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
-import { CustomizePanel } from '@/client/features/workspace/CustomizePanel'
+import { StylePanel } from '@/client/features/workspace/StylePanel'
 import { useAppletEvent } from '@/client/features/applets/applet-runtime'
 import { Overview } from '@/client/features/overview/Overview'
 import { PanelHeader } from '@/client/components/shared/PanelHeader'
@@ -136,7 +136,7 @@ type WorkspaceScreenProps = {
   builders: ViewBuilderData[]
 }
 
-type WidgetMode = 'idle' | 'editing' | 'customizing'
+type WidgetMode = 'idle' | 'editing' | 'styling'
 
 function tabItemFor(
   tab: WorkspaceTabId,
@@ -621,10 +621,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
           ) : activeTab === 'overview' ? (
             <Overview
               editing={widgetMode === 'editing'}
-              customizing={widgetMode === 'customizing'}
-              onCustomize={() =>
-                setWidgetMode(widgetMode === 'customizing' ? 'idle' : 'customizing')
-              }
+              styling={widgetMode === 'styling'}
+              onStyle={() => setWidgetMode(widgetMode === 'styling' ? 'idle' : 'styling')}
               onEditingChange={editing => setWidgetMode(editing ? 'editing' : 'idle')}
               widgets={widgets}
               views={views}
@@ -685,8 +683,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       </div>
 
       <AnimatePresence>
-        {activeTab === 'overview' && widgetMode === 'customizing' && (
-          <CustomizePanel onClose={() => setWidgetMode('idle')} />
+        {activeTab === 'overview' && widgetMode === 'styling' && (
+          <StylePanel onClose={() => setWidgetMode('idle')} />
         )}
       </AnimatePresence>
 
