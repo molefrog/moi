@@ -30,6 +30,7 @@ import { useAppletChatMessage } from '@/client/features/chat/useAppletChatMessag
 import { useChat } from '@/client/features/chat/useChat'
 import { ViewBuilder, type ViewBuilderHandle } from '@/client/features/views/ViewBuilder'
 import { ViewManager } from '@/client/features/views/ViewManager'
+import { getViewIcon, getViewLabel } from '@/client/features/views/view-presentation'
 import { useViewBuilderActions } from '@/client/features/views/useViewBuilderActions'
 import { useViewBuilderDrafts } from '@/client/features/views/useViewBuilderDrafts'
 import { useFitsSplitLayout } from '@/client/features/workspace/useFitsSplitLayout'
@@ -57,6 +58,7 @@ import {
   type WorkspaceTabItem,
   WorkspaceTabs
 } from '@/client/features/workspace/WorkspaceTabs'
+import { isDefaultWidget } from '@/lib/default-widgets'
 import type {
   LayoutMode,
   ViewBuilder as ViewBuilderData,
@@ -79,15 +81,7 @@ const Scratchpad = lazy(() =>
   }))
 )
 
-// Tab label for a view: its configured title, or the file-name id as fallback.
-const viewLabel = (v: ViewInfo) => v.config.title || v.id
-
 const viewBuilderIcon = (builder: ViewBuilderData) => resolveAppIcon(builder.icon) ?? IconArticle
-
-function viewIcon(view: ViewInfo, builders: ViewBuilderData[]) {
-  const builder = builders.find(candidate => candidate.viewId === view.id)
-  return resolveAppIcon(view.config.icon) ?? resolveAppIcon(builder?.icon) ?? IconArticle
-}
 
 type SectionControlsProps = {
   onToggleMode: () => void
@@ -193,8 +187,8 @@ function tabItemFor(
   return view
     ? {
         key: tab,
-        Icon: viewIcon(view, builders),
-        label: viewLabel(view),
+        Icon: getViewIcon(view, builders),
+        label: getViewLabel(view),
         closable
       }
     : null
@@ -240,7 +234,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const openTabIds = effectiveOpenTabs(normalizeTabsState(layout.tabs), views, builders)
   const nonAgentOpenTabs = openTabIds.filter(tab => tab !== 'agent')
   const hasWorkspaceContent = nonAgentOpenTabs.length > 0
-  const hasWorkspaceApplets = widgets.length > 0 || views.length > 0
+  const hasAppletWidgets = widgets.some(widget => !isDefaultWidget(widget.id))
+  const hasWorkspaceApplets = hasAppletWidgets || views.length > 0
 
   // Effective layout mode. Split is only visible with workspace content and
   // enough row width; the saved mode remains the user's intent.
@@ -316,7 +311,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const activeDraftBuilderId = activeDraftBuilder?.id
   const canAnnotate =
     widgetMode === 'idle' &&
-    ((activeTab === 'widgets' && widgets.length > 0) || activeView !== undefined)
+    ((activeTab === 'widgets' && hasAppletWidgets) || activeView !== undefined)
   const annotation = useChatAnnotation({
     workspaceId,
     sessionId,
@@ -396,11 +391,17 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     }
   }
 
+  const createView = () => {
+    // Do NOT select the draft's pre-minted sessionId here: no session exists
+    // behind it until submit. Submit selects it once the chat actually starts.
+    void builderActions.create().then(builder => openTab(viewBuilderTabId(builder.id)))
+  }
+
   const navigateFromWelcome = (destination: WelcomeDestination) => {
     if (destination === 'views') {
       const firstView = views[0]
       if (firstView) openTab(viewTabId(firstView.id))
-      else void builderActions.create().then(builder => openTab(viewBuilderTabId(builder.id)))
+      else createView()
     } else {
       openTab(destination)
     }
@@ -522,8 +523,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       .map(
         ({ view, tab }): CreateWorkspaceTabItem => ({
           key: tab,
-          Icon: viewIcon(view, builders),
-          label: viewLabel(view),
+          Icon: getViewIcon(view, builders),
+          label: getViewLabel(view),
           onClick: () => openTab(tab)
         })
       ),
@@ -543,13 +544,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       key: 'create-view',
       Icon: IconBrowserPlus,
       label: 'New view',
-      onClick: () => {
-        // Do NOT select the draft's pre-minted sessionId here: no session
-        // exists behind it until submit, so making it the chat selection turns
-        // the chat into a dead "New chat" whose sends try to resume a session
-        // that isn't there. Submit selects it once the chat actually starts.
-        void builderActions.create().then(builder => openTab(viewBuilderTabId(builder.id)))
-      }
+      onClick: createView
     }
   ]
 
@@ -635,6 +630,10 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               editing={widgetMode === 'editing'}
               onEditingChange={editing => setWidgetMode(editing ? 'editing' : 'idle')}
               widgets={widgets}
+              views={views}
+              builders={builders}
+              onOpenView={viewId => openTab(viewTabId(viewId))}
+              onCreateView={createView}
               onCreateWidget={() => {
                 selectSession(null)
                 openChat('Create widget')

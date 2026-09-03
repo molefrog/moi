@@ -11,9 +11,8 @@ import {
   useWorkspaceLayoutCtx
 } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { WorkspaceScreen } from '@/client/features/workspace/WorkspaceScreen'
-import { useWorkspaceViews, useWorkspaceWidgets } from '@/client/features/workspace/api'
-import { useViewBuilders } from '@/client/features/views/api'
-import { useGridReconcile } from '@/client/features/widgets/useGridReconcile'
+import { useViewBuilders, useViews } from '@/client/features/views/api'
+import { useWidgets } from '@/client/features/widgets/api'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 
 type WorkspaceRouteProps = {
@@ -35,11 +34,10 @@ export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
 function WorkspaceLoader({ id }: WorkspaceRouteProps) {
   const queryClient = useQueryClient()
   const [selectedSessionId] = useSelectedSession()
-  const { layout, setLayout, isLoading: layoutLoading } = useWorkspaceLayoutCtx()
-  const widgets = useWorkspaceWidgets(id)
-  const views = useWorkspaceViews(id)
+  const { isLoading: layoutLoading } = useWorkspaceLayoutCtx()
+  const widgets = useWidgets(id)
+  const views = useViews(id)
   const builders = useViewBuilders(id)
-  useGridReconcile(id, widgets.data, layout, setLayout)
   useAppletCacheInvalidation()
 
   useWorkspaceEvent(event => {
@@ -72,7 +70,7 @@ function WorkspaceLoader({ id }: WorkspaceRouteProps) {
           </div>
         ) : (
           <WorkspaceScreen
-            widgets={widgets.data ?? []}
+            widgets={widgets.data}
             views={views.data ?? []}
             builders={builders.data ?? []}
           />

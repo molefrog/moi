@@ -6,22 +6,20 @@ import { IconPlus } from '@tabler/icons-react'
 
 import { useAppletThumbnails } from '@/client/features/applets/applet-thumbnail'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
+import { renderDefaultWidget } from '@/client/features/widgets/default-widget-registry'
 import { findFreePosition } from '@/client/features/widgets/grid'
 import type { GridItem } from '@/client/features/widgets/grid'
 import { WidgetShell } from '@/client/features/applets/WidgetShell'
 import { Button } from '@/client/components/ui/button'
 import { Skeleton } from '@/client/components/ui/skeleton'
 import { cn } from '@/client/lib/cn'
-import type { WidgetInfo } from '@/lib/types'
+import type { ViewBuilder, ViewInfo, WidgetInfo } from '@/lib/types'
+import { isDefaultWidget } from '@/lib/default-widgets'
 
 import { HiddenPanel } from './HiddenPanel'
 import { WidgetGrid, WidgetGridLayout } from './WidgetGrid'
 
-function renderItem(id: string) {
-  return <WidgetShell name={id} />
-}
-
-const EMPTY_WIDGET_ITEMS: GridItem[] = Array.from({ length: 10 }, (_, index) => ({
+const EMPTY_WIDGET_ITEMS: GridItem[] = Array.from({ length: 4 }, (_, index) => ({
   id: `empty-widget-${index}`,
   w: 2,
   h: 1
@@ -39,13 +37,13 @@ type NoWidgetsCreatedProps = {
 
 function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
   return (
-    <div className="relative min-h-0 w-full max-w-(--column-w) flex-1 pt-7">
+    <div className="relative min-h-0">
       <div aria-hidden="true">
         <WidgetGridLayout items={EMPTY_WIDGET_ITEMS} renderItem={renderEmptyWidget} />
       </div>
 
-      <div className="absolute inset-0 flex items-center justify-center p-6">
-        <div className="flex h-full w-full max-w-(--column-w) flex-col items-center justify-center gap-4 bg-radial from-background from-30% to-transparent to-80% text-center">
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="flex h-full w-full max-w-(--column-w) flex-col items-center justify-center gap-4 bg-radial from-background from-40% to-transparent to-80% text-center">
           <div className="flex flex-col gap-1.5">
             <h2 className="font-medium">A little empty here</h2>
             <p className="mx-auto max-w-xs text-sm text-muted-foreground">
@@ -71,7 +69,7 @@ type WidgetActionsProps = {
 
 function WidgetActions({ editing, onCreateWidget, onEditingChange }: WidgetActionsProps) {
   return (
-    <div className="mb-4 flex w-full max-w-(--column-w) shrink-0 items-center justify-end gap-2">
+    <div className="mx-auto mb-4 flex w-full max-w-(--column-w) shrink-0 items-center justify-end gap-2">
       {editing && (
         <Button
           type="button"
@@ -114,14 +112,6 @@ function WidgetActions({ editing, onCreateWidget, onEditingChange }: WidgetActio
   )
 }
 
-function NoWidgetsAdded() {
-  return (
-    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3">
-      <p className="text-sm text-muted-foreground">No widgets added yet</p>
-    </div>
-  )
-}
-
 // Tracks the rendered (border-box) height of whichever bottom panel is open, so
 // the grid can reserve matching space below it and every card stays reachable.
 function usePanelHeight() {
@@ -140,28 +130,42 @@ function usePanelHeight() {
 
 type WidgetsProps = {
   onCreateWidget: () => void
+  onCreateView: () => void
+  onOpenView: (viewId: string) => void
   editing: boolean
   onEditingChange: (editing: boolean) => void
-  // Authoritative widget set from the widgets query; positions come from layout.
+  // Authoritative widget set from useWidgets; positions come from layout.
   widgets: WidgetInfo[]
+  views: ViewInfo[]
+  builders: ViewBuilder[]
 }
 
-export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: WidgetsProps) {
+export function Widgets({
+  onCreateWidget,
+  onCreateView,
+  onOpenView,
+  editing,
+  onEditingChange,
+  widgets,
+  views,
+  builders
+}: WidgetsProps) {
   const { layout, setLayout } = useWorkspaceLayoutCtx()
-  const hasWidgets = widgets.length > 0
+  const widgetById = new Map(widgets.map(widget => [widget.id, widget]))
 
   const gridIds = new Set(layout.widgetGrid.map(g => g.i))
 
   const visibleItems: GridItem[] = layout.widgetGrid
-    .filter(g => widgets.some(w => w.id === g.i))
+    .filter(g => widgetById.has(g.i))
     .map(g => {
-      const widget = widgets.find(w => w.id === g.i)!
+      const widget = widgetById.get(g.i)!
       return { id: g.i, w: widget.config.colSpan, h: widget.config.rowSpan, x: g.x, y: g.y }
     })
 
   const hiddenItems: GridItem[] = widgets
     .filter(w => !gridIds.has(w.id))
     .map(w => ({ id: w.id, w: w.config.colSpan, h: w.config.rowSpan }))
+  const showCreationState = visibleItems.every(item => isDefaultWidget(item.id))
 
   const [panelRef, panelHeight] = usePanelHeight()
   const panelOpen = editing && hiddenItems.length > 0
@@ -169,21 +173,29 @@ export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: W
   useAppletThumbnails({
     kind: 'widget',
     enabled: !editing,
-    targets: visibleItems.map(item => ({
-      id: item.id,
-      revision: widgets.find(widget => widget.id === item.id)?.revision
-    }))
+    targets: visibleItems
+      .filter(item => !isDefaultWidget(item.id))
+      .map(item => ({
+        id: item.id,
+        revision: widgets.find(widget => widget.id === item.id)?.revision
+      }))
   })
+
+  function renderItem(id: string) {
+    const defaultWidget = renderDefaultWidget(id, { views, builders, onOpenView, onCreateView })
+    if (defaultWidget) return defaultWidget
+    return <WidgetShell name={id} />
+  }
 
   function hide(id: string) {
     setLayout({ widgetGrid: layout.widgetGrid.filter(g => g.i !== id) })
   }
 
   function restore(id: string) {
-    const widget = widgets.find(w => w.id === id)
+    const widget = widgetById.get(id)
     if (!widget) return
     const gridWithSizes = layout.widgetGrid.map(g => {
-      const w = widgets.find(w => w.id === g.i)
+      const w = widgetById.get(g.i)
       return { ...g, w: w?.config.colSpan ?? 1, h: w?.config.rowSpan ?? 1 }
     })
     const pos = findFreePosition(gridWithSizes, widget.config.colSpan, widget.config.rowSpan, 4)
@@ -191,64 +203,41 @@ export function Widgets({ onCreateWidget, editing, onEditingChange, widgets }: W
   }
 
   return (
-    // Shared working area below the header and positioning context for the
-    // bottom panel. Created-widget states scroll; the initial empty state clips
-    // its fixed-height skeleton grid.
+    // Shared working area below the header and positioning context for the bottom panel.
     <div className="group/widgets relative min-h-0 flex-1">
       <LayoutGroup>
-        <div
-          className={cn(
-            // items-center + capped children instead of mx-auto: Chrome can
-            // report stale 0px for auto margins after layout animations, which
-            // clones them flush-left in annotation captures (capture-element.ts).
-            'relative flex h-full flex-col items-center p-4',
-            hasWidgets ? 'overflow-y-auto' : 'overflow-hidden'
-          )}
-        >
-          {hasWidgets ? (
-            <>
-              <WidgetActions
+        <div className="relative flex h-full flex-col overflow-y-auto p-4">
+          <WidgetActions
+            editing={editing}
+            onCreateWidget={onCreateWidget}
+            onEditingChange={onEditingChange}
+          />
+          {/* The open panel's height is reserved below the content so every card
+              and the creation state can scroll clear of the panel. */}
+          <motion.div
+            className="flex min-h-0 flex-1 flex-col gap-2"
+            animate={{ marginBottom: panelOpen ? panelHeight : 0 }}
+            transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+          >
+            {visibleItems.length > 0 && (
+              <WidgetGrid
+                items={visibleItems}
                 editing={editing}
-                onCreateWidget={onCreateWidget}
-                onEditingChange={onEditingChange}
+                renderItem={renderItem}
+                onRemove={hide}
+                onLayoutChange={items =>
+                  setLayout({
+                    widgetGrid: items.map(i => ({ i: i.id, x: i.x ?? 0, y: i.y ?? 0 }))
+                  })
+                }
               />
-              {visibleItems.length === 0 ? (
-                <motion.div
-                  className="flex min-h-0 w-full max-w-(--column-w) flex-1 flex-col"
-                  animate={{ paddingBottom: panelOpen ? panelHeight : 0 }}
-                  transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
-                >
-                  <NoWidgetsAdded />
-                </motion.div>
-              ) : (
-                // The open panel's height is reserved below the grid so every card
-                // can scroll clear of the panel.
-                <motion.div
-                  className="w-full max-w-(--column-w)"
-                  animate={{ marginBottom: panelOpen ? panelHeight : 0 }}
-                  transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
-                >
-                  <WidgetGrid
-                    items={visibleItems}
-                    editing={editing}
-                    renderItem={renderItem}
-                    onRemove={hide}
-                    onLayoutChange={items =>
-                      setLayout({
-                        widgetGrid: items.map(i => ({ i: i.id, x: i.x ?? 0, y: i.y ?? 0 }))
-                      })
-                    }
-                  />
-                </motion.div>
-              )}
-            </>
-          ) : (
-            <NoWidgetsCreated onCreateWidget={onCreateWidget} />
-          )}
+            )}
+            {showCreationState && <NoWidgetsCreated onCreateWidget={onCreateWidget} />}
+          </motion.div>
         </div>
 
         <AnimatePresence>
-          {hasWidgets && editing && hiddenItems.length > 0 && (
+          {editing && hiddenItems.length > 0 && (
             <HiddenPanel
               ref={panelRef}
               items={hiddenItems}

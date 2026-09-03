@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 
+import { DEFAULT_VIEWS_WIDGET } from '@/lib/default-widgets'
 import type { AppletKind, WorkspaceLayout } from '@/lib/types'
 
 import { getLayoutPath, getWorkspacePreview, loadLayout, mergeLayoutForSave } from '../layout'
@@ -68,6 +69,7 @@ describe('loadLayout', () => {
     try {
       const loaded = await loadLayout(dir)
       expect(loaded.layoutMode).toBe('split')
+      expect(loaded.widgetGrid).toEqual([{ i: DEFAULT_VIEWS_WIDGET.id, x: 0, y: 0 }])
       expect(loaded.tabs).toEqual({
         open: ['agent', 'widgets', 'scratchpad'],
         active: 'agent'
@@ -85,6 +87,12 @@ describe('loadLayout', () => {
         open: ['agent', 'widgets', 'scratchpad'],
         active: 'agent'
       })
+    })
+  })
+
+  test('keeps an existing saved empty grid empty', async () => {
+    await withWorkspaceFile({ ...base, widgetGrid: [] }, async dir => {
+      expect((await loadLayout(dir)).widgetGrid).toEqual([])
     })
   })
 

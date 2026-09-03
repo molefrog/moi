@@ -1,3 +1,4 @@
+import { createDefaultWidgetGrid } from './default-widgets'
 import type { WorkspaceLayout, WorkspaceTabsState } from './types'
 
 export function createDefaultWorkspaceTabs(): WorkspaceTabsState {
@@ -7,7 +8,7 @@ export function createDefaultWorkspaceTabs(): WorkspaceTabsState {
 export function createDefaultWorkspaceLayout(): WorkspaceLayout {
   return {
     version: 1,
-    widgetGrid: [],
+    widgetGrid: createDefaultWidgetGrid(),
     layoutMode: 'split',
     tabs: createDefaultWorkspaceTabs()
   }
