@@ -6,6 +6,7 @@ import { api } from './api'
 import { PORT } from './constants'
 import { control } from './control'
 import { EVENTS_TOPIC, publishEvent, setEventServer } from './events'
+import { killBuildWorkers } from './bundler/build-worker'
 import { killAllWorkers } from './functions'
 import { startScratchpadSweeper } from './scratchpad'
 import { resolveScratchOp } from './scratchpad-relay'
@@ -215,7 +216,8 @@ startServiceLogMaintenance()
 
 // Graceful shutdown. In dev the supervisor sends SIGTERM on server-file
 // changes; in any context Ctrl-C sends SIGINT. Close both servers and kill the
-// per-workspace function workers so no child processes are orphaned.
+// per-workspace function workers and any in-flight applet build child so no
+// child processes are orphaned.
 function shutdown() {
   try {
     app.stop(true)
@@ -225,6 +227,7 @@ function shutdown() {
   } catch {}
   for (const h of allHarnesses()) h.shutdown?.()
   killAllWorkers()
+  killBuildWorkers()
   process.exit()
 }
 process.on('SIGTERM', shutdown)
