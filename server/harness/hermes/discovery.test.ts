@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import {
   discoverHermesProfiles,
   findHermesProfile,
+  hermesConfigFingerprint,
   profileHomeFromWorkspace,
   profileWorkspace,
   resolveHermesProfile
@@ -153,5 +154,26 @@ describe('profileHomeFromWorkspace', () => {
   test('returns null for a path that is not a moi-laid-out workspace', () => {
     expect(profileHomeFromWorkspace('/home/u/projects/app')).toBeNull()
     expect(profileHomeFromWorkspace('/home/u/.hermes/profiles/research')).toBeNull()
+  })
+})
+
+describe('hermesConfigFingerprint', () => {
+  test('changes only when a config file is rewritten or appears', async () => {
+    await writeProfile(home, { model: 'grok-build-0.1' })
+    const stamp = await hermesConfigFingerprint(home)
+    expect(await hermesConfigFingerprint(home)).toBe(stamp)
+
+    // Force a distinct mtime rather than relying on filesystem granularity.
+    const later = new Date(Date.now() + 5_000)
+    await utimes(join(home, 'config.yaml'), later, later)
+    const rewritten = await hermesConfigFingerprint(home)
+    expect(rewritten).not.toBe(stamp)
+
+    await Bun.write(join(home, '.env'), 'XAI_API_KEY=x\n')
+    expect(await hermesConfigFingerprint(home)).not.toBe(rewritten)
+  })
+
+  test('has no stamp without a profile home', async () => {
+    expect(await hermesConfigFingerprint(null)).toBeUndefined()
   })
 })

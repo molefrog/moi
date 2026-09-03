@@ -5,6 +5,7 @@ import { type AcpProviderConfig, type AcpSpawnContext } from './session'
 import { acpSessionToSessionInfo } from './adapter'
 import { archivedAcpSessions } from './archived'
 import { getAcpClient, peekAcpClient } from './client'
+import { clearAcpModelCache, peekAcpModelState, storeAcpModelState } from './model-state'
 import type { ListSessionsResponse, AcpModelState, AcpNewSessionResult } from './wire'
 import type { WorkspaceActivityPreview } from '../types'
 import { debug } from '../../debug'
@@ -78,12 +79,10 @@ export async function acpWorkspacePreview(
 }
 
 // The model catalog arrives inline on `session/new`, so there is no standalone
-// list RPC. Cache it per workspace by default: creating a session just to read
-// models is wasteful, and an empty session is invisible to `session/list`
-// anyway (agents skip zero-history rows). Providers whose state includes a
-// mutable external default can opt into refreshing it on each picker snapshot.
-const modelCatalogs = new Map<string, Promise<AcpModelState | undefined>>()
-
+// list RPC. Read it through the per-workspace cache (./model-state.ts): the
+// first picker snapshot pays for one throwaway session, every chat moi starts
+// afterwards refreshes the cache for free, and a provider fingerprint catches a
+// default changed outside moi in between.
 async function discoverAcpModelState(
   config: AcpProviderConfig,
   ctx: AcpSpawnContext
@@ -96,33 +95,20 @@ async function discoverAcpModelState(
   return created.models ?? undefined
 }
 
-export function cacheAcpModelState(workspacePath: string, models: AcpModelState | undefined): void {
-  if (models?.availableModels?.length) {
-    modelCatalogs.set(workspacePath, Promise.resolve(models))
-  }
-}
-
-export function clearAcpModelCache(workspacePath: string): void {
-  modelCatalogs.delete(workspacePath)
-}
-
 export async function listAcpModels(
   config: AcpProviderConfig,
   ctx: AcpSpawnContext
 ): Promise<Model[]> {
-  let statePromise: Promise<AcpModelState | undefined>
-  if (config.refreshModelState) {
-    statePromise = discoverAcpModelState(config, ctx)
-  } else {
-    let cached = modelCatalogs.get(ctx.workspacePath)
-    if (!cached) {
-      cached = discoverAcpModelState(config, ctx).catch(err => {
-        modelCatalogs.delete(ctx.workspacePath)
-        throw err
-      })
-      modelCatalogs.set(ctx.workspacePath, cached)
-    }
-    statePromise = cached
+  // Read the fingerprint before the RPC so a change racing the discovery
+  // invalidates the next lookup instead of hiding behind a fresher stamp.
+  const fingerprint = await config.modelStateFingerprint?.(ctx)
+  let state = peekAcpModelState(ctx.workspacePath, fingerprint)
+  if (!state) {
+    state = discoverAcpModelState(config, ctx).catch(err => {
+      clearAcpModelCache(ctx.workspacePath)
+      throw err
+    })
+    storeAcpModelState(ctx.workspacePath, state, fingerprint)
   }
   const mapModels =
     config.mapModels ??
@@ -133,8 +119,7 @@ export async function listAcpModels(
         ...(m.description ? { description: m.description } : {})
       })))
   try {
-    const state = await statePromise
-    return mapModels(state ?? {})
+    return mapModels((await state) ?? {})
   } catch (err) {
     debug(`${config.id} model catalog failed: ${err instanceof Error ? err.message : String(err)}`)
     return []

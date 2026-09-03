@@ -182,6 +182,24 @@ what moi's current backends expose — it already carries `cwd`, `git_branch`,
 `git_repo_root`, `parent_session_id`, per-session token counts and
 `estimated_cost_usd`/`actual_cost_usd`.
 
+#### 3.2.2 The default model rides on `currentModelId`, and the catalog is cached
+
+`session/new` also returns `currentModelId` — the model Hermes resolves from
+the profile's `config.yaml` (`model.default` + `model.provider`, rewritten by
+`hermes model`). `./models.ts` maps it onto a synthetic `default` row with
+`resolvedModel`, the same convention the Claude and Codex harnesses use, so
+the picker preselects the model a promptless chat would actually run.
+Verified against v0.20.0 (`xai-oauth:grok-build-0.1`, 67 raw rows).
+
+The catalog only ever arrives on `session/new`, and every such call persists a
+zero-message row in `state.db` that `hermes sessions list` shows as a blank
+entry (moi's own list hides them). So the state is cached per workspace
+(`../acp/model-state.ts`): the first picker snapshot opens one throwaway
+session, every real chat start refreshes the cache from its own `session/new`,
+and the cache is stamped with the mtimes of the profile's `config.yaml` and
+`.env` (`hermesConfigFingerprint`) so a default changed outside moi is
+rediscovered on the next snapshot instead of on every one.
+
 ### 3.3 The prompt stream
 
 `session/prompt` streams `session/update` notifications and resolves with

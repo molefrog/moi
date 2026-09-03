@@ -153,3 +153,23 @@ export async function resolveHermesProfile(
   }
   return profiles.find(p => p.path === workspacePath) ?? null
 }
+
+// Version stamp for the profile inputs that decide its default model:
+// config.yaml (`model.default`, rewritten by `hermes model`) and .env
+// (provider keys, which gate which entries the catalog lists at all). Mtimes,
+// not contents — the ACP session reports the real resolved state, this only
+// says when to ask again. A missing file stamps as such, so creating it later
+// still counts as a change.
+export async function hermesConfigFingerprint(home: string | null): Promise<string | undefined> {
+  if (!home) return undefined
+  const stamps = await Promise.all(
+    ['config.yaml', '.env'].map(async file => {
+      try {
+        return String((await stat(join(home, file))).mtimeMs)
+      } catch {
+        return 'missing'
+      }
+    })
+  )
+  return stamps.join(' ')
+}

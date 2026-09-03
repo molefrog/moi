@@ -26,6 +26,7 @@ import { getAcpProcessInfo, killAcpWorkspace, killAllAcpClients } from '../acp/c
 import {
   DEFAULT_PROFILE,
   discoverHermesProfiles,
+  hermesConfigFingerprint,
   profileHomeFromWorkspace,
   resolveHermesProfile
 } from './discovery'
@@ -42,10 +43,14 @@ const config: AcpProviderConfig = {
   provider: 'hermes',
   noPromptModeId: NO_PROMPT_MODE,
   mapModels: hermesModels,
-  // Hermes's global default can change outside moi while the server stays up.
-  // Its only structured source is `currentModelId` on `session/new`, so refresh
-  // that state for each picker snapshot instead of freezing it with the catalog.
-  refreshModelState: true,
+  // The profile's default model (`currentModelId` on `session/new`) follows
+  // config.yaml, which `hermes model` and hand edits change while moi runs.
+  // Stamp the cache with the config mtimes so such a change is picked up on
+  // the next snapshot without opening a throwaway session every time.
+  modelStateFingerprint: async ctx => {
+    const profile = await resolveHermesProfile(ctx.workspacePath, ctx.agentId)
+    return hermesConfigFingerprint(profile?.home ?? profileHomeFromWorkspace(ctx.workspacePath))
+  },
   supportsImages: true,
   async spawn(ctx) {
     const bin = findHarnessExecutable('hermes')

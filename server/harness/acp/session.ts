@@ -32,6 +32,7 @@ import {
   toolTurnId
 } from './adapter'
 import { type AcpClient, type AcpSpawnSpec, getAcpClient } from './client'
+import { cacheAcpModelState } from './model-state'
 import { appendRunDuration, runDurations } from './run-durations'
 import {
   type AcpModelState,
@@ -77,11 +78,12 @@ export type AcpProviderConfig = {
   // also preserves a structured provider default such as `currentModelId`.
   // Defaults to a straight catalog passthrough.
   mapModels?: (state: AcpModelState) => Model[]
-  // Re-read the model state whenever the picker snapshot is fetched. Most ACP
-  // catalogs are stable enough to cache for the process lifetime, but a
-  // backend whose `currentModelId` follows mutable external config must opt in
-  // so the picker cannot drift from what a fresh session would run.
-  refreshModelState?: boolean
+  // Version stamp for the external inputs behind the model state (Hermes: the
+  // profile's config file mtimes). The cached catalog is reused while it
+  // matches and rediscovered when it changes, so a default edited outside moi
+  // reaches the picker without a throwaway session per snapshot. Omit for
+  // backends whose state is stable for the process lifetime.
+  modelStateFingerprint?: (ctx: AcpSpawnContext) => Promise<string | undefined>
 }
 
 type QueuedSend = { blocks: AcpPromptBlock[]; turnId: string }
@@ -613,10 +615,14 @@ export async function sendAcpMessage(
   try {
     if (input.isNew) {
       const client = await getAcpClient(await config.spawn(input))
+      const fingerprint = await config.modelStateFingerprint?.(input)
       const created = await client.rpc<AcpNewSessionResult>('session/new', {
         cwd: input.workspacePath,
         mcpServers: []
       })
+      // A real session start carries the same model state the picker would
+      // otherwise open a throwaway session for — keep the cache current.
+      cacheAcpModelState(input.workspacePath, created.models, fingerprint)
       const realId = created.sessionId
       const model = input.model ?? created.models?.currentModelId
       if (realId !== input.sessionId) {

@@ -1,9 +1,9 @@
-// Replay-path test for the ACP session layer: a mock ACP agent (a tiny
-// newline-JSON-RPC script) answers `initialize` and replays a canned history
-// as `session/update` notifications on `session/load`, exercising the REAL
-// client transport + session record + adapter — everything except a live
-// backend. This is the path a thread fetch takes after a server restart
-// (sessionEvents → ensureAcpSessionLive → resumeSession).
+// Tests for the ACP session layer against a mock ACP agent (a tiny
+// newline-JSON-RPC script), exercising the REAL client transport + session
+// record + adapter — everything except a live backend. Covers the replay path
+// a thread fetch takes after a server restart (sessionEvents →
+// ensureAcpSessionLive → resumeSession) and the model state a chat start and
+// the picker share.
 import { afterAll, describe, expect, test } from 'bun:test'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -12,6 +12,8 @@ import { join } from 'node:path'
 import { appendMoiContext, renderMoiContext } from '@/lib/moi-context'
 
 import { killAllAcpClients } from './client'
+import { listAcpModels } from './discovery'
+import { clearAcpModelCache } from './model-state'
 import { appendRunDuration, setRunDurationsPath } from './run-durations'
 import {
   type AcpProviderConfig,
@@ -23,13 +25,15 @@ import {
 let seq = 0
 
 // The agent script speaks the same wire dialect client.ts does: one JSON
-// object per line on stdio. Replay updates ride in via MOCK_UPDATES so each
-// test controls its own history.
+// object per line on stdio. Each test scripts it through env: MOCK_UPDATES is
+// the history replayed on `session/load`, MOCK_NEW_SESSIONS answers successive
+// `session/new` calls (the last entry repeats), and every request is appended
+// to MOCK_METHOD_LOG.
 const AGENT_SOURCE = `
 const { appendFileSync } = require('node:fs')
 const updates = JSON.parse(process.env.MOCK_UPDATES ?? '[]')
-const newSession = JSON.parse(process.env.MOCK_NEW_SESSION ?? 'null')
-const methodLog = process.env.MOCK_METHOD_LOG
+const newSessions = JSON.parse(process.env.MOCK_NEW_SESSIONS ?? '[]')
+let created = 0
 const send = o => process.stdout.write(JSON.stringify(o) + '\\n')
 let buf = ''
 process.stdin.on('data', chunk => {
@@ -40,13 +44,12 @@ process.stdin.on('data', chunk => {
     buf = buf.slice(nl + 1)
     if (!line.trim()) continue
     const msg = JSON.parse(line)
-    if (methodLog && msg.method !== 'initialize') {
-      appendFileSync(methodLog, JSON.stringify({ method: msg.method, params: msg.params }) + '\\n')
-    }
+    appendFileSync(process.env.MOCK_METHOD_LOG, JSON.stringify({ method: msg.method, params: msg.params }) + '\\n')
     if (msg.method === 'initialize') {
       send({ jsonrpc: '2.0', id: msg.id, result: { protocolVersion: 1, agentCapabilities: {} } })
-    } else if (msg.method === 'session/new' && newSession) {
-      send({ jsonrpc: '2.0', id: msg.id, result: newSession })
+    } else if (msg.method === 'session/new' && newSessions.length) {
+      const next = newSessions[Math.min(created++, newSessions.length - 1)]
+      send({ jsonrpc: '2.0', id: msg.id, result: { sessionId: process.env.MOCK_SESSION_ID, ...next } })
     } else if (msg.method === 'session/load') {
       for (const update of updates) {
         send({
@@ -65,51 +68,30 @@ process.stdin.on('data', chunk => {
 })
 `
 
-async function replayThroughMockAgent(updates: unknown[], seedDurations: number[] = []) {
+type LoggedRpc = { method: string; params?: unknown }
+
+type MockAgentOptions = {
+  updates?: unknown[]
+  newSessions?: unknown[]
+  modelStateFingerprint?: AcpProviderConfig['modelStateFingerprint']
+}
+
+// One agent per test. Its temp dir doubles as the workspace path, and session
+// records key on (workspaceId, sessionId) in module state, so every call gets
+// fresh ids or the second test would reuse the first's record.
+async function mockAgent(options: MockAgentOptions = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'acp-session-test-'))
-  const agentPath = join(dir, 'mock-acp-agent.js')
-  await Bun.write(agentPath, AGENT_SOURCE)
-  setRunDurationsPath(join(dir, 'run-durations.json'))
-  const config: AcpProviderConfig = {
-    id: 'hermes',
-    provider: 'hermes',
-    spawn: async () => ({
-      provider: 'hermes',
-      command: process.execPath,
-      args: [agentPath],
-      workspacePath: dir,
-      env: { MOCK_UPDATES: JSON.stringify(updates) }
-    })
-  }
-  // Session records key on (workspaceId, sessionId) in module state, so each
-  // call gets fresh ids or the second test would reuse the first's record.
-  seq++
-  const sessionId = `sess-replay-${seq}`
-  for (const ms of seedDurations) await appendRunDuration(dir, sessionId, ms)
-  return ensureAcpSessionLive(config, {
-    workspaceId: `ws-test-${seq}`,
-    workspacePath: dir,
-    sessionId
-  })
-}
-
-type LoggedRpc = {
-  method: string
-  params?: unknown
-}
-
-async function exerciseModelSwitchThroughMockAgent(): Promise<LoggedRpc[]> {
-  const dir = await mkdtemp(join(tmpdir(), 'acp-model-switch-test-'))
   const agentPath = join(dir, 'mock-acp-agent.js')
   const methodLog = join(dir, 'methods.jsonl')
   await Bun.write(agentPath, AGENT_SOURCE)
-  const sessionId = 'sess-model-' + ++seq
-  const workspaceId = 'ws-model-' + seq
-  const currentModelId = 'bedrock:us.anthropic.claude-sonnet-4-6'
-  const alternateModelId = 'bedrock:global.anthropic.claude-sonnet-4-6'
+  seq++
+  const sessionId = `sess-test-${seq}`
   const config: AcpProviderConfig = {
     id: 'hermes',
     provider: 'hermes',
+    ...(options.modelStateFingerprint
+      ? { modelStateFingerprint: options.modelStateFingerprint }
+      : {}),
     spawn: async () => ({
       provider: 'hermes',
       command: process.execPath,
@@ -117,38 +99,31 @@ async function exerciseModelSwitchThroughMockAgent(): Promise<LoggedRpc[]> {
       workspacePath: dir,
       env: {
         MOCK_METHOD_LOG: methodLog,
-        MOCK_NEW_SESSION: JSON.stringify({
-          sessionId,
-          models: {
-            availableModels: [{ modelId: currentModelId }, { modelId: alternateModelId }],
-            currentModelId
-          }
-        })
+        MOCK_SESSION_ID: sessionId,
+        MOCK_UPDATES: JSON.stringify(options.updates ?? []),
+        MOCK_NEW_SESSIONS: JSON.stringify(options.newSessions ?? [])
       }
     })
   }
-
-  await sendAcpMessage(config, {
-    workspaceId,
-    workspacePath: dir,
+  return {
+    dir,
+    config,
     sessionId,
-    isNew: true,
-    content: 'first'
-  })
-  await sendAcpMessage(config, {
-    workspaceId,
-    workspacePath: dir,
-    sessionId,
-    isNew: false,
-    content: 'second',
-    model: alternateModelId
-  })
+    ctx: { workspaceId: `ws-test-${seq}`, workspacePath: dir },
+    // Every request the agent received, in order.
+    calls: async (): Promise<LoggedRpc[]> =>
+      (await Bun.file(methodLog).text())
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line) as LoggedRpc)
+  }
+}
 
-  return (await Bun.file(methodLog).text())
-    .trim()
-    .split('\n')
-    .filter(Boolean)
-    .map(line => JSON.parse(line) as LoggedRpc)
+async function replayThroughMockAgent(updates: unknown[], seedDurations: number[] = []) {
+  const agent = await mockAgent({ updates })
+  setRunDurationsPath(join(agent.dir, 'run-durations.json'))
+  for (const ms of seedDurations) await appendRunDuration(agent.dir, agent.sessionId, ms)
+  return ensureAcpSessionLive(agent.config, { ...agent.ctx, sessionId: agent.sessionId })
 }
 
 afterAll(() => {
@@ -328,22 +303,75 @@ describe('ACP session replay', () => {
   })
 })
 
-describe('ACP model selection', () => {
-  test('uses the agent default until moi explicitly switches before the next prompt', async () => {
-    const calls = await exerciseModelSwitchThroughMockAgent()
+// A `session/new` result whose catalog names the session it came from, so a
+// picker row's value tells which session (the chat's own, or a throwaway
+// discovery) the cache was filled from.
+const newSession = (...modelIds: string[]) => ({
+  models: { availableModels: modelIds.map(modelId => ({ modelId })), currentModelId: modelIds[0] }
+})
 
-    expect(calls.map(call => call.method)).toEqual([
+describe('ACP model state', () => {
+  const sessions = [newSession('model-a'), newSession('model-b')]
+  const catalog = async (agent: Awaited<ReturnType<typeof mockAgent>>) =>
+    (await listAcpModels(agent.config, agent.ctx)).map(m => m.value)
+
+  test('caches the catalog per workspace until cleared', async () => {
+    const agent = await mockAgent({ newSessions: sessions })
+
+    expect(await catalog(agent)).toEqual(['model-a'])
+    expect(await catalog(agent)).toEqual(['model-a'])
+    clearAcpModelCache(agent.dir)
+    expect(await catalog(agent)).toEqual(['model-b'])
+  })
+
+  test('rediscovers only when the provider fingerprint changes', async () => {
+    let stamp = 'v1'
+    const agent = await mockAgent({
+      newSessions: sessions,
+      modelStateFingerprint: async () => stamp
+    })
+
+    expect(await catalog(agent)).toEqual(['model-a'])
+    stamp = 'v2'
+    expect(await catalog(agent)).toEqual(['model-b'])
+    expect(await catalog(agent)).toEqual(['model-b'])
+  })
+
+  test('a chat start seeds the cache, so the picker opens no session of its own', async () => {
+    const agent = await mockAgent({ newSessions: sessions })
+
+    await sendAcpMessage(agent.config, {
+      ...agent.ctx,
+      sessionId: agent.sessionId,
+      isNew: true,
+      content: 'first'
+    })
+
+    expect(await catalog(agent)).toEqual(['model-a'])
+  })
+
+  test('runs on the agent default until moi switches before the next prompt', async () => {
+    const agent = await mockAgent({ newSessions: [newSession('model-a', 'model-b')] })
+    const send = (content: string, model?: string) =>
+      sendAcpMessage(agent.config, {
+        ...agent.ctx,
+        sessionId: agent.sessionId,
+        isNew: content === 'first',
+        content,
+        ...(model ? { model } : {})
+      })
+
+    await send('first')
+    await send('second', 'model-b')
+
+    const calls = await agent.calls()
+    expect(calls.map(c => c.method)).toEqual([
+      'initialize',
       'session/new',
       'session/prompt',
       'session/set_model',
       'session/prompt'
     ])
-    expect(calls[2]).toMatchObject({
-      method: 'session/set_model',
-      params: {
-        sessionId: expect.stringMatching(/^sess-model-/),
-        modelId: 'bedrock:global.anthropic.claude-sonnet-4-6'
-      }
-    })
+    expect(calls[3].params).toEqual({ sessionId: agent.sessionId, modelId: 'model-b' })
   })
 })
