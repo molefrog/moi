@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { type ComponentProps, useCallback, useState } from 'react'
 
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 
@@ -20,10 +20,12 @@ import type { GridItem, GridPosition, PositionedGridItem } from '@/client/featur
 import { WidgetShell } from '@/client/features/applets/WidgetShell'
 import { Button } from '@/client/components/ui/button'
 import { Skeleton } from '@/client/components/ui/skeleton'
+import { cn } from '@/client/lib/cn'
 import type { ViewBuilder, ViewInfo, WidgetInfo } from '@/lib/types'
 import { isDefaultWidget } from '@/lib/default-widgets'
 
 import { HiddenPanel } from './HiddenPanel'
+import { WorkspaceName } from './WorkspaceName'
 import { WidgetCanvas } from './WidgetCanvas'
 
 type NoWidgetsCreatedProps = {
@@ -62,29 +64,32 @@ function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
 }
 
 type OverviewHeaderProps = {
-  workspaceName: string
-  workspaceIcon: string
   editing: boolean
   customizing: boolean
   onEditingChange: (editing: boolean) => void
   onCustomize: () => void
 }
 
-type OverviewHeaderActionProps = {
+type OverviewHeaderActionProps = Omit<ComponentProps<typeof Button>, 'children'> & {
   Icon: TablerIcon
   label: string
   active?: boolean
-  onClick: () => void
 }
 
-function OverviewHeaderAction({ Icon, label, active, onClick }: OverviewHeaderActionProps) {
+function OverviewHeaderAction({
+  Icon,
+  label,
+  active,
+  className,
+  ...props
+}: OverviewHeaderActionProps) {
   return (
     <Button
       type="button"
       variant={active ? 'default' : 'secondary'}
-      className="relative h-16 w-24 rounded-lg px-4 py-0 text-xs [&_svg]:size-5"
+      className={cn('relative h-16 w-24 rounded-lg px-4 py-0 text-xs [&_svg]:size-5', className)}
       aria-pressed={active}
-      onClick={onClick}
+      {...props}
     >
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.span
@@ -108,8 +113,6 @@ function OverviewHeaderAction({ Icon, label, active, onClick }: OverviewHeaderAc
 }
 
 function OverviewHeader({
-  workspaceName,
-  workspaceIcon,
   editing,
   customizing,
   onEditingChange,
@@ -117,10 +120,7 @@ function OverviewHeader({
 }: OverviewHeaderProps) {
   return (
     <div className="flex size-full items-center gap-4">
-      <div className="flex min-w-0 flex-1 items-center gap-4">
-        <img src={workspaceIcon} alt="" className="size-10 shrink-0 rounded-lg" />
-        <h1 className="min-w-0 truncate text-3xl font-semibold">{workspaceName}</h1>
-      </div>
+      <WorkspaceName />
       <div className="flex shrink-0 items-center gap-2">
         <OverviewHeaderAction
           Icon={IconReplace}
@@ -135,9 +135,7 @@ function OverviewHeader({
           onClick={onCustomize}
         />
         <WorkspaceSettings
-          renderTrigger={open => (
-            <OverviewHeaderAction Icon={IconSettings} label="Settings" onClick={open} />
-          )}
+          renderTrigger={() => <OverviewHeaderAction Icon={IconSettings} label="Settings" />}
         />
       </div>
     </div>
@@ -160,8 +158,6 @@ function usePanelHeight() {
 }
 
 type OverviewProps = {
-  workspaceName: string
-  workspaceIcon: string
   onCreateWidget: () => void
   onCreateView: () => void
   onOpenView: (viewId: string) => void
@@ -176,8 +172,6 @@ type OverviewProps = {
 }
 
 export function Overview({
-  workspaceName,
-  workspaceIcon,
   onCreateWidget,
   onCreateView,
   onOpenView,
@@ -254,8 +248,6 @@ export function Overview({
           editing={editing}
           header={
             <OverviewHeader
-              workspaceName={workspaceName}
-              workspaceIcon={workspaceIcon}
               editing={editing}
               customizing={customizing}
               onEditingChange={onEditingChange}

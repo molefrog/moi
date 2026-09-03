@@ -1,3 +1,5 @@
+import { formatHex } from 'culori'
+
 // Rasterizes a workspace icon (emoji or Tabler glyph, over an optional gradient
 // background) into a PNG Blob, ready to PUT to `/api/workspaces/:id/icon` — the
 // server normalizes it to a 128×128 WebP. Keeping everything in the existing
@@ -13,6 +15,12 @@ export type IconGradient = {
   stops: string[]
 }
 
+export type WorkspaceIconUpdate =
+  | { kind: 'emoji'; emoji: string; background: IconGradient | null }
+  | { kind: 'icon'; svg: string; background: IconGradient | null }
+  | { kind: 'upload'; file: Blob }
+  | { kind: 'reset' }
+
 // Hand-tuned presets shown as swatches. `randomGradient()` below generates
 // endless extras in the same family.
 export const GRADIENT_PRESETS: { id: string; gradient: IconGradient }[] = [
@@ -23,31 +31,7 @@ export const GRADIENT_PRESETS: { id: string; gradient: IconGradient }[] = [
   { id: 'midnight', gradient: { angle: 135, stops: ['#30CFD0', '#330867'] } }
 ]
 
-// OKLCH → sRGB hex. Generating in OKLCH keeps random gradients perceptually
-// even — equal lightness/chroma reads equally vivid at any hue, which is what
-// makes the shuffle output feel curated rather than arbitrary.
-function oklchToHex(l: number, c: number, h: number): string {
-  const hr = (h * Math.PI) / 180
-  const a = c * Math.cos(hr)
-  const b = c * Math.sin(hr)
-  const l_ = (l + 0.3963377774 * a + 0.2158037573 * b) ** 3
-  const m_ = (l - 0.1055613458 * a - 0.0638541728 * b) ** 3
-  const s_ = (l - 0.0894841775 * a - 1.291485548 * b) ** 3
-  const channels = [
-    4.0767416621 * l_ - 3.3077115913 * m_ + 0.2309699292 * s_,
-    -1.2684380046 * l_ + 2.6097574011 * m_ - 0.3413193965 * s_,
-    -0.0041960863 * l_ - 0.7034186147 * m_ + 1.707614701 * s_
-  ]
-  return `#${channels
-    .map(x => {
-      const clamped = Math.min(1, Math.max(0, x))
-      const srgb = clamped <= 0.0031308 ? 12.92 * clamped : 1.055 * clamped ** (1 / 2.4) - 0.055
-      return Math.round(srgb * 255)
-        .toString(16)
-        .padStart(2, '0')
-    })
-    .join('')}`
-}
+const randomOklch = (l: number, c: number, h: number) => formatHex({ mode: 'oklch', l, c, h })
 
 // Generate a fresh gradient: random hue, a 35–90° hue swing toward the dark
 // end, light→dark diagonal. A third mid-stop drops in ~40% of the time for
@@ -56,10 +40,10 @@ export function randomGradient(): IconGradient {
   const hue = Math.random() * 360
   const swing = (35 + Math.random() * 55) * (Math.random() < 0.5 ? -1 : 1)
   const angle = Math.round(115 + Math.random() * 55)
-  const light = oklchToHex(0.83 + Math.random() * 0.06, 0.09 + Math.random() * 0.06, hue)
-  const dark = oklchToHex(0.5 + Math.random() * 0.14, 0.17 + Math.random() * 0.07, hue + swing)
+  const light = randomOklch(0.83 + Math.random() * 0.06, 0.09 + Math.random() * 0.06, hue)
+  const dark = randomOklch(0.5 + Math.random() * 0.14, 0.17 + Math.random() * 0.07, hue + swing)
   if (Math.random() < 0.4) {
-    const mid = oklchToHex(0.7 + Math.random() * 0.05, 0.15, hue + swing / 2)
+    const mid = randomOklch(0.7 + Math.random() * 0.05, 0.15, hue + swing / 2)
     return { angle, stops: [light, mid, dark] }
   }
   return { angle, stops: [light, dark] }
@@ -132,7 +116,7 @@ const EMOJI_BARE = 0.92
 const EMOJI_ON_GRADIENT = 0.68
 
 // Rasterize a single emoji centered over the chosen background (null = none).
-export async function renderEmojiIcon(emoji: string, bg: IconGradient | null): Promise<Blob> {
+async function renderEmojiIcon(emoji: string, bg: IconGradient | null): Promise<Blob> {
   const [canvas, ctx] = newCanvas()
   if (bg) paintGradient(ctx, bg)
   ctx.textAlign = 'center'
@@ -160,7 +144,7 @@ const GLYPH_ON_GRADIENT = 0.6
 // Rasterize a Tabler glyph (passed as serialized SVG markup) centered over the
 // chosen background. The glyph is recolored white on a gradient, near-black when
 // the background is transparent, so it reads in either case.
-export async function renderGlyphIcon(svg: string, bg: IconGradient | null): Promise<Blob> {
+async function renderGlyphIcon(svg: string, bg: IconGradient | null): Promise<Blob> {
   const [canvas, ctx] = newCanvas()
   if (bg) paintGradient(ctx, bg)
   const color = bg ? '#ffffff' : '#18181b'
@@ -170,4 +154,17 @@ export async function renderGlyphIcon(svg: string, bg: IconGradient | null): Pro
   const offset = (SIZE - glyph) / 2
   ctx.drawImage(img, offset, offset, glyph, glyph)
   return toBlob(canvas)
+}
+
+export function workspaceIconBlob(update: WorkspaceIconUpdate): Blob | Promise<Blob> | null {
+  switch (update.kind) {
+    case 'emoji':
+      return renderEmojiIcon(update.emoji, update.background)
+    case 'icon':
+      return renderGlyphIcon(update.svg, update.background)
+    case 'upload':
+      return update.file
+    case 'reset':
+      return null
+  }
 }

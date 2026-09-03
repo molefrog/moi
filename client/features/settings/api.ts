@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
+import { workspaceIconBlob, type WorkspaceIconUpdate } from '@/client/features/settings/render-icon'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import type { AppSettings, WorkspaceEntry, WorkspaceEnvView } from '@/lib/types'
 
@@ -78,33 +79,26 @@ export function useSaveWorkspaceName(workspaceId: string) {
   })
 }
 
-export function useSaveWorkspaceIcon(workspaceId: string) {
+export function useUpdateWorkspaceIcon(workspaceId: string) {
   const queryClient = useQueryClient()
-  return useMutation<{ icon: string }, Error, Blob>({
+  return useMutation<void, Error, WorkspaceIconUpdate>({
     scope: { id: `workspace-icon:${workspaceId}` },
-    mutationFn: blob =>
-      requestJson(`/api/workspaces/${workspaceId}/icon`, {
+    mutationFn: async update => {
+      const blob = await workspaceIconBlob(update)
+      if (blob === null) {
+        await requestVoid(
+          `/api/workspaces/${workspaceId}/icon`,
+          { method: 'DELETE' },
+          'Failed to reset icon'
+        )
+        return
+      }
+      await requestJson(`/api/workspaces/${workspaceId}/icon`, {
         method: 'PUT',
         headers: { 'Content-Type': blob.type || 'application/octet-stream' },
         body: blob
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.all })
-    }
-  })
-}
-
-export function useResetWorkspaceIcon(workspaceId: string) {
-  const queryClient = useQueryClient()
-  return useMutation<void, Error, void>({
-    scope: { id: `workspace-icon:${workspaceId}` },
-    mutationFn: () =>
-      requestVoid(
-        `/api/workspaces/${workspaceId}/icon`,
-        { method: 'DELETE' },
-        'Failed to reset icon'
-      ),
+      })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })
       queryClient.invalidateQueries({ queryKey: workspaceKeys.all })

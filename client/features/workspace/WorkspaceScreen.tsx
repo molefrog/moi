@@ -624,8 +624,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
             tabbedChat
           ) : activeTab === 'overview' ? (
             <Overview
-              workspaceName={name ?? 'Workspace'}
-              workspaceIcon={workspaceIcon}
               editing={widgetMode === 'editing'}
               customizing={widgetMode === 'customizing'}
               onCustomize={() =>

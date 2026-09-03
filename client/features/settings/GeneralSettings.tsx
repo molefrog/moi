@@ -1,31 +1,19 @@
-import { useState } from 'react'
-
 import { IconLoader2 } from '@tabler/icons-react'
 import { useLocation } from 'wouter'
 
 import { useAppConfig } from '@/client/api/app-config'
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
-import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { useRemoveWorkspace } from '@/client/features/home/api'
+import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 
-import { useSaveWorkspaceName } from './api'
-import { IconPicker } from './IconPicker'
 import { SettingsPage, SettingsRow, SettingsSection } from './SettingsLayout'
 
 export function GeneralSettings() {
   const { cloudDemo } = useAppConfig()
-  const { name, icon, cwd, workspaceId } = useWorkspaceLayoutCtx()
+  const { name, cwd, workspaceId } = useWorkspaceLayoutCtx()
   const [, navigate] = useLocation()
-  const saveName = useSaveWorkspaceName(workspaceId)
   const removeWorkspace = useRemoveWorkspace()
-  const [draft, setDraft] = useState(name ?? '')
-
-  const commit = () => {
-    const next = draft.trim()
-    if (next === (name ?? '')) return
-    saveName.mutate(next === '' ? null : next)
-  }
 
   const remove = () => {
     const label = name ?? cwd ?? 'this space'
@@ -38,22 +26,6 @@ export function GeneralSettings() {
     <SettingsPage title="General" description="Basic details for this space.">
       <SettingsSection>
         <SettingsRow
-          title="Name"
-          description="Shown in the sidebar and the workspace header."
-          control={
-            <Input
-              value={draft}
-              onChange={event => setDraft(event.target.value)}
-              onBlur={commit}
-              onKeyDown={event => {
-                if (event.key === 'Enter') event.currentTarget.blur()
-              }}
-              placeholder="Space name"
-              className="w-56"
-            />
-          }
-        />
-        <SettingsRow
           title="Path"
           control={
             <Input
@@ -65,15 +37,6 @@ export function GeneralSettings() {
             />
           }
         />
-        <div className="flex flex-col gap-4 px-3.5 py-3.5">
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">Icon</span>
-            <span className="text-xs text-muted-foreground">
-              Pick an emoji or a glyph on a generated background, or upload an image.
-            </span>
-          </div>
-          <IconPicker icon={icon} />
-        </div>
       </SettingsSection>
 
       {!cloudDemo && (
