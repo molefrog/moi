@@ -12,8 +12,7 @@ import {
   resolveUiComponentRequest,
   suggestUiComponents,
   transformUiComponentSource,
-  uiComponentFiles,
-  uiComponentKinds
+  uiComponentFiles
 } from '../ui-components'
 import { DRAWER_DOCS, DRAWER_SOURCE } from '../ui-components-drawer'
 
@@ -251,11 +250,6 @@ describe('catalog', () => {
       expect(entry.registryItems.length > 0 || Boolean(entry.source)).toBe(true)
       // Inline docs exist exactly for the entries with no upstream page.
       expect(Boolean(entry.docs)).toBe(Boolean(entry.source))
-      // A kind restriction names real kinds and never rules out every kind.
-      if (entry.kinds) {
-        expect(entry.kinds.length).toBeGreaterThan(0)
-        for (const kind of entry.kinds) expect(['widget', 'view']).toContain(kind)
-      }
       // Catalog keys are kebab-case slugs — they double as docs slugs.
       expect(name).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/)
     }
@@ -336,13 +330,6 @@ describe('moi-authored entries', () => {
     expect(uiComponentFiles('date-picker')).toEqual(['calendar.tsx', 'popover.tsx', 'button.tsx'])
   })
 
-  test('drawer is view-only; unrestricted and non-catalog files fit every kind', () => {
-    expect(uiComponentKinds('drawer')).toEqual(['view'])
-    expect(uiComponentKinds('button')).toBeUndefined()
-    expect(uiComponentKinds('utils')).toBeUndefined()
-    expect(uiComponentKinds('_my-helper')).toBeUndefined()
-  })
-
   test('is planned as a requested, verbatim write', () => {
     const plans = planUiWrites({
       files: [
@@ -412,7 +399,7 @@ describe('drawer build', () => {
   // The source compiles the way an installed `.moi/ui/drawer.tsx` would: Base
   // UI and Tabler resolve, and the synthetic Tailwind entry emits the
   // animation vocabulary the panel relies on. Laid out like a workspace —
-  // `ui/` beside `views/` and `widgets/` — inside the repo tree so
+  // `ui/` beside `views/` — inside the repo tree so
   // `@import 'tailwindcss'` and the component deps resolve against the repo's
   // node_modules.
   let root: string
@@ -442,7 +429,6 @@ describe('drawer build', () => {
     root = mkdtempSync(join(import.meta.dir, 'drawer-ws-'))
     mkdirSync(join(root, 'ui'))
     mkdirSync(join(root, 'views'))
-    mkdirSync(join(root, 'widgets'))
     writeFileSync(
       join(root, 'ui', 'utils.ts'),
       [
@@ -453,17 +439,6 @@ describe('drawer build', () => {
     )
     writeFileSync(join(root, 'ui', 'drawer.tsx'), DRAWER_SOURCE)
     writeFileSync(join(root, 'views', 'consumer.tsx'), CONSUMER)
-    writeFileSync(join(root, 'widgets', 'consumer.tsx'), CONSUMER)
-    // The indirect route: a widget that only imports a shared module which in
-    // turn pulls the drawer in.
-    writeFileSync(
-      join(root, 'widgets', '_panel.tsx'),
-      CONSUMER.replace('export default ', 'export ')
-    )
-    writeFileSync(
-      join(root, 'widgets', 'indirect.tsx'),
-      "import { Consumer } from './_panel'\nexport default function Indirect() { return <Consumer /> }\n"
-    )
     // Same first-build quirk as build-applet.test.ts: under `bun test` the very
     // first Bun.build with this option combo fails to resolve the entry.
     await buildApplet(join(root, 'views', 'consumer.tsx'), root, 'view').catch(() => {})
@@ -495,19 +470,5 @@ describe('drawer build', () => {
     ]) {
       expect(css).toContain(marker)
     }
-  })
-
-  test('refuses a widget that imports it', async () => {
-    await expect(
-      buildApplet(join(root, 'widgets', 'consumer.tsx'), root, 'widget')
-    ).rejects.toThrow(
-      'The "drawer" ui component is view-only, but widget "consumer.tsx" imports it'
-    )
-  })
-
-  test('refuses a widget that reaches it through a shared module', async () => {
-    await expect(
-      buildApplet(join(root, 'widgets', 'indirect.tsx'), root, 'widget')
-    ).rejects.toThrow('view-only, but widget "_panel.tsx" imports it')
   })
 })

@@ -1,5 +1,5 @@
 // The `moi ui-components` engine: a shadcn-lite proxy over the `shadcn`
-// package's own programmatic registry + transform APIs (see docs/moi-shadcn.md
+// package's own programmatic registry + transform APIs (see docs/ui-components.md
 // for the full spec and the research trail in PR #78).
 //
 // Opinions, enforced here: the upstream registry is the source of truth
@@ -19,8 +19,6 @@
 // static import here made every `moi` command pay it, `moi version` included.
 import type { Project, SourceFile } from 'ts-morph'
 import { join } from 'path'
-
-import type { AppletKind } from '@/lib/types'
 
 import { DRAWER_DOCS, DRAWER_SOURCE } from './ui-components-drawer'
 
@@ -50,11 +48,6 @@ export type UiComponentEntry = {
   // Inline docs for `moi ui-components docs <name>` when there is no upstream
   // page to fetch. Set together with `source`.
   docs?: string
-  // Applet kinds the component fits; omitted means every kind. `moi bundle`
-  // refuses an applet of another kind that imports the file (the guard in
-  // server/bundler/build-applet.ts): a view-only panel must not ship inside a
-  // widget half-working.
-  kinds?: AppletKind[]
 }
 
 // The agreed subset (UI component review, Aug 2026). Upstream ships ~63 ui
@@ -141,11 +134,10 @@ export const UI_COMPONENTS: Record<string, UiComponentEntry> = {
     registryItems: ['dialog']
   },
   drawer: {
-    description: 'Views only: side panel that slides in from the right over the view, not the page',
+    description: 'Right-side detail panel scoped to the current view',
     registryItems: [],
     source: DRAWER_SOURCE,
-    docs: DRAWER_DOCS,
-    kinds: ['view']
+    docs: DRAWER_DOCS
   },
   'dropdown-menu': {
     description: 'Menu opened from a trigger: items, groups, submenus',
@@ -244,13 +236,6 @@ export const UI_COMPONENT_NAMES = Object.keys(UI_COMPONENTS)
 export function uiComponentFiles(name: string): string[] {
   const entry = UI_COMPONENTS[name]
   return [...entry.registryItems, ...(entry.source ? [name] : [])].map(item => `${item}.tsx`)
-}
-
-// The kind restriction on an installed `.moi/ui/<name>` file, or undefined
-// when it fits every kind — including files outside the catalog (hand-written
-// helpers next to the components).
-export function uiComponentKinds(name: string): AppletKind[] | undefined {
-  return UI_COMPONENTS[name]?.kinds
 }
 
 // ---------------------------------------------------------------------------
@@ -354,7 +339,7 @@ export async function fetchUiComponents(registryNames: string[]): Promise<Fetche
 // Rewrite `@/registry/<style>/{lib,ui,hooks}/<x>` specifiers to sibling-relative
 // paths. There is no engine knob for this: aliases are validated against
 // tsconfig paths, so a relative alias value is rejected outright (verified —
-// see docs/moi-shadcn.md). Walks import AND export declarations on the same
+// see docs/ui-components.md). Walks import AND export declarations on the same
 // ts-morph SourceFile the icon transform used, so re-exports are covered.
 function rewriteRegistryImports(sourceFile: SourceFile): void {
   const rewrite = (spec: string): string | null => {

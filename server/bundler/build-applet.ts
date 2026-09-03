@@ -8,7 +8,6 @@ import { basename, dirname, join, relative, sep } from 'path'
 import { APP_ICON_IDS, isAppIconId } from '@/lib/app-icons'
 import type { AppletKind, ViewConfig, WidgetConfig } from '@/lib/types'
 
-import { uiComponentKinds } from '../ui-components'
 import { scopeAppletCss } from './applet-css'
 
 // An **applet** is any custom UI unit embedded in a workspace; `widget` and
@@ -584,135 +583,6 @@ export function scanRelativeImports(source: string, loader: 'ts' | 'tsx' = 'tsx'
   return imports.map(i => i.path).filter(p => /^\.\.?\//.test(p))
 }
 
-// Backstop for pathological graphs: the local import-graph walks (the
-// staleness check in applets.ts, the ui-component kind check below) stop at
-// this many distinct files — stale-but-rebuilt and unchecked-but-built are the
-// safe degradations, and the cap keeps the per-bundle work bounded no matter
-// what the imports look like. Counts every input, images and JSON included, so
-// it sits well above what an asset-heavy applet reaches (the walks never enter
-// node_modules); hitting it means something is off anyway.
-export const MAX_GRAPH_FILES = 256
-
-// Files the walks keep descending through — anything Bun treats as a module
-// (`.ts`, `.mjs`, `.cts`, …). Everything else (`.json`, `.css`, images) is a
-// leaf.
-export const MODULE_FILE_RE = /\.[mc]?[jt]sx?$/
-// Which transpiler loader lexes a module's imports. Only `.ts`/`.mts`/`.cts`
-// take the `ts` loader: angle-bracket casts (`<string>x`) parse there and are
-// JSX everywhere else. `.js`/`.mjs`/`.cjs` go through `tsx`, which accepts both
-// plain JS and the JSX some of them contain.
-export const TS_ONLY_FILE_RE = /\.[mc]?ts$/
-
-// Extensions Bun appends to an extensionless import, in its own preference
-// order (`./data` finds `data.tsx` before `data.ts` before … `data.json`).
-// Doubles as the directory-index set: `./helpers` → `helpers/index.jsx`.
-const RESOLVE_EXTENSIONS = ['.tsx', '.ts', '.jsx', '.js', '.mjs', '.cjs', '.json', '.mts', '.cts']
-
-// TypeScript's output-extension rewrite: an import written against the emitted
-// file name resolves to the source that produces it. (`.cjs` → `.cts` is
-// deliberately absent — Bun doesn't do that one.)
-const TS_EXTENSION_REWRITES: Record<string, string[]> = {
-  '.js': ['.ts', '.tsx'],
-  '.jsx': ['.tsx'],
-  '.mjs': ['.mts']
-}
-
-// Resolve a relative import to the file the bundler will actually read. This
-// mirrors Bun's resolution rather than delegating to `Bun.resolveSync`, which
-// memoizes results for the life of the process: in the long-running server it
-// keeps handing back the path of a dependency that has since been deleted or
-// renamed, which is exactly the case the staleness check has to catch. Every
-// candidate is probed against the filesystem, in Bun's order — literal path, TS
-// extension rewrite, appended extension, then directory (`package.json` main,
-// else `index.*`). Returns null when nothing on disk answers the specifier.
-export async function resolveModuleImport(dir: string, specifier: string): Promise<string | null> {
-  const base = join(dir, specifier)
-  const candidates = [base]
-
-  // Extension of the final segment only — a dot in a directory name (`./v1.2/x`)
-  // is not one.
-  const ext = /\.[^./\\]+$/.exec(base)?.[0] ?? ''
-  for (const rewrite of TS_EXTENSION_REWRITES[ext] ?? []) {
-    candidates.push(base.slice(0, base.length - ext.length) + rewrite)
-  }
-  for (const e of RESOLVE_EXTENSIONS) candidates.push(base + e)
-
-  for (const candidate of candidates) {
-    if (await Bun.file(candidate).exists()) return candidate
-  }
-
-  // Directory import. `package.json` main wins over `index.*`, matching Bun;
-  // an unreadable or `main`-less manifest just falls through to the indexes.
-  const pkg: unknown = await Bun.file(join(base, 'package.json'))
-    .json()
-    .catch(() => null)
-  const main =
-    typeof pkg === 'object' && pkg !== null && 'main' in pkg && typeof pkg.main === 'string'
-      ? pkg.main
-      : null
-  if (main) {
-    const mainPath = join(base, main)
-    if (await Bun.file(mainPath).exists()) return mainPath
-  }
-  for (const e of RESOLVE_EXTENSIONS) {
-    const index = join(base, `index${e}`)
-    if (await Bun.file(index).exists()) return index
-  }
-  return null
-}
-
-// A ui component the catalog marks for one kind must not be bundled into the
-// other (`kinds` in server/ui-components.ts): the drawer is a panel that
-// covers the view, and a 160 px widget card has no room for it. Refusing it
-// fails `moi bundle` with the reason — where the agent is looking — instead of
-// shipping a widget that half-works. The check walks the entry's relative
-// import graph (the same graph the staleness check walks) ahead of the
-// bundler, so a component reached through a shared `_`-module is caught too.
-// It deliberately does NOT run as a plugin `onResolve` hook: a hook matching
-// every relative import also fires for Base UI's own internal imports, and a
-// hook that merely falls through made Bun drop modules from the bundle
-// ("DialogRoot is not defined" at runtime). Server modules never ship to the
-// client, so the walk does not descend into them.
-async function prevalidateUiComponentKinds(
-  entrypoint: string,
-  moiRoot: string,
-  kind: AppletKind
-): Promise<void> {
-  const uiDir = join(realpathOr(moiRoot), 'ui')
-  const queue = [entrypoint]
-  const visited = new Set<string>()
-  while (queue.length > 0) {
-    const path = queue.pop()!
-    if (visited.has(path) || visited.size >= MAX_GRAPH_FILES) continue
-    visited.add(path)
-    if (!MODULE_FILE_RE.test(path) || /\.server\.ts$/.test(path)) continue
-    const file = Bun.file(path)
-    if (!(await file.exists())) continue
-    const source = await file.text()
-    const dir = dirname(path)
-    for (const specifier of scanRelativeImports(
-      source,
-      TS_ONLY_FILE_RE.test(path) ? 'ts' : 'tsx'
-    )) {
-      const resolved = await resolveModuleImport(dir, specifier)
-      // Nothing on disk answers this import: the build reports that itself.
-      if (!resolved) continue
-      const real = realpathOr(resolved)
-      if (dirname(real) === uiDir) {
-        const name = basename(real).replace(/\.[^.]+$/, '')
-        const kinds = uiComponentKinds(name)
-        if (kinds && !kinds.includes(kind)) {
-          throw new Error(
-            `The "${name}" ui component is ${kinds.join('/')}-only, but ${kind} "${basename(path)}" imports it. ` +
-              `Put it in a view (a widget can focusTab to it), or use dialog or popover here.`
-          )
-        }
-      }
-      queue.push(resolved)
-    }
-  }
-}
-
 async function prevalidateServerFiles(entrypoint: string): Promise<void> {
   const sourceDir = dirname(entrypoint)
   const source = await Bun.file(entrypoint).text()
@@ -739,7 +609,6 @@ export async function buildApplet(
   const widgetName = basename(entrypoint).replace(/\.tsx?$/, '')
 
   await prevalidateServerFiles(entrypoint)
-  await prevalidateUiComponentKinds(entrypoint, moiRoot, kind)
 
   const { plugin: runtime, serverModules, assets } = appletRuntimePlugin(sourceDir, moiRoot)
   const syntheticCssPath = await writeSyntheticTailwindCss(entrypoint, moiRoot, kind)

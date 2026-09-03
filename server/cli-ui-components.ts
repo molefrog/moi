@@ -1,5 +1,5 @@
 // CLI face of `moi ui-components` (see server/ui-components.ts for the
-// engine and docs/moi-shadcn.md for the spec). Three verbs:
+// engine and docs/ui-components.md for the spec). Three verbs:
 //
 //   moi ui-components                → the curated catalog + installed state
 //   moi ui-components add <name…>    → fetch, transform, write to .moi/ui/
@@ -78,8 +78,7 @@ const add = defineCommand({
 
     // A moi-authored entry brings its own source, so the registry is only
     // needed for registry items and for the `utils` helper every component
-    // imports — a drawer-only add into a workspace that already has it works
-    // offline.
+    // imports.
     const needsRegistry = request.registryItems.length > 0 || !existsSync(join(uiDir, 'utils.ts'))
     let fetched: FetchedUiComponents = { files: [], dependencies: [] }
     try {
@@ -158,15 +157,6 @@ const add = defineCommand({
           `  already installed, kept: ${skipped.join(', ')} — re-run with --force to overwrite`
         )
       )
-    }
-    // A kind-restricted component gets its limit spelled out at install time:
-    // the build refuses the other kind anyway, but a heads-up beats a failed
-    // bundle later.
-    for (const name of request.entries) {
-      const kinds = UI_COMPONENTS[name].kinds
-      if (kinds) {
-        console.log(pc.dim(`  ${name} is for ${kinds.map(kind => `${kind}s`).join(' and ')} only`))
-      }
     }
     const moiDir = join(entry.path, '.moi')
     let installNeeded = deps.length > 0

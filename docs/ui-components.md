@@ -1,10 +1,9 @@
 # moi ui-components — spec
 
-`moi ui-components` (né `moi shadcn`) is an opinionated shadcn-lite proxy:
-one command driven by the `shadcn` package's own programmatic engine,
-wrapped in moi's conventions. Upstream registry as the source of truth,
-zero config files in the workspace, Base UI only. The command writes source
-files; the agent owns everything else.
+`moi ui-components` is a curated component installer powered by the
+`shadcn` package's programmatic engine and wrapped in moi's conventions.
+The upstream registry is the source of truth, Base UI is the primitive layer,
+and the workspace needs no shadcn config files.
 
 Status: shipped (Aug 2026) — `server/ui-components.ts` (engine),
 `server/cli-ui-components.ts` (CLI), the synthetic-Tailwind vocabulary
@@ -22,7 +21,7 @@ and a curated subset instead of the full upstream catalog.
   config as an in-memory object that lives inside moi.
 - Always and only Base UI primitives. Tabler icons. Workspace tokens —
   never hardcoded colors.
-- **A curated subset, not the catalog** (component review, Aug 2026): 40
+- **A curated subset, not the catalog** (component review, Aug 2026): 42
   entries — the everyday controls plus `attachment`, `bubble`, `chart`,
   `data-table` and `date-picker` as patterns — and deliberately no
   page-scale chrome (`sidebar`, `navigation-menu`, `sheet`, `menubar`,
@@ -265,11 +264,9 @@ workspace that already has `utils.ts` never touches the registry. The
 sources live in `server/ui-components-drawer.ts`; `uiComponentFiles()`
 tells the catalog which files count as installed.
 
-The `drawer` (`.moi/ui/drawer.tsx`) is the first such entry — a
-sheet-shaped API (`Drawer`, `DrawerTrigger`, `DrawerContent side=`,
-`DrawerHeader`/`DrawerBody`/`DrawerFooter`, `DrawerTitle`,
-`DrawerDescription`, `DrawerClose`) over Base UI's Dialog, scoped to the
-view it is used in, right side by default:
+The `drawer` (`.moi/ui/drawer.tsx`) is the first such entry: a panel over Base
+UI's Dialog, scoped to the view it is used in. It opens from the right by
+default and also supports the other three edges.
 
 - **Portal target is the applet root.** `DrawerContent` renders a hidden
   marker where it is used, reads `closest('[data-applet]')`, and hands that
@@ -277,75 +274,22 @@ view it is used in, right side by default:
   UI waits on an explicit `null` rather than falling back to body). Backdrop
   and popup are `position: absolute` against it, so the panel covers the
   view and nothing else; the applet's scoped CSS matches without a wrapper.
-- **Views only, enforced at build.** The entry carries `kinds: ['view']`.
-  The applet bundler's runtime plugin checks every relative import in the
-  graph and fails a widget build that reaches `.moi/ui/drawer` — directly
-  or through a shared `_`-module — with the reason in `moi bundle`'s
-  output. A 160 px widget card has no room for a panel; the widget's move
-  is `focusTab` to a view, or a dialog/popover. `add` prints the same
-  limit when installing.
 - **The host guarantees the view root is a positioned, non-scrolling box.**
   `ViewFrame` is the `absolute inset-0 isolate` frame with the
   `overflow-auto` scroller moved to a child — an absolutely positioned
   panel inside a scroll container would scroll away with the view's content.
-- **Not page-modal.** `Dialog.Root` runs with `modal="trap-focus"`: focus
-  stays inside the panel, but the page keeps scrolling and the rest of the
-  workspace (chat, tabs, other widgets) stays clickable. `modal={true}`
-  would add Base UI's viewport-wide inert backdrop and scroll lock — exactly
-  the global behavior the component exists to avoid. Escape, the backdrop,
-  `DrawerClose`, and an outside press all close it.
-- **`z-50` on backdrop and popup** — the one justified z-index: view
-  content that raised itself (a `sticky z-10` table header) must still end
-  up underneath, and the view root is a stacking context so nothing leaks
-  past the view.
-- **`DrawerBody` is the scroll region.** A view shares the screen with the
-  chat, so the popup is a flex column whose body scrolls while header,
-  footer, and the close button stay put; the popup itself also scrolls as a
-  safety net when no body is used.
-- **Animations** use the same tw-animate-css vocabulary the registry
-  components compile against (`data-open:animate-in slide-in-from-right`,
-  `data-closed:animate-out slide-out-to-right`), so the synthetic-Tailwind
-  patch above already covers it; a build test compiles the embedded source
-  as an installed file and asserts on the emitted CSS.
-
-## Spacing: installed components vs the host's copies (investigated Sep 2026)
-
-Reported as "some installed components have missing padding — compare the
-shadcn dropdown with ours". Measured, not missing: a spacing detector run
-over 34 installed base-nova components rendered in a view and in a widget
-(every overlay opened — dropdown, context menu, select, combobox, popover,
-tooltip, hover card, dialog, alert dialog; ~190 utility classes per pass)
-found every `p*`/`m*`/`gap*` class taking effect. The only classes that
-did not resolve to their own value were intentional compound overrides in
-the components themselves (`input-group` shrinking its input's padding
-next to an addon, `pagination` links via button size variants). The real
-`getRegistryItems` path returns byte-identical content to the
-`r/styles/base-nova/<name>.json` files the detector ran against.
-
-What the eye catches instead is **drift between the registry and the host's
-own shadcn copies** (`client/components/ui/`, taken 2026-08-18). Upstream
-base-nova has since tightened its menus and popups, so an applet's fresh
-install sits visibly denser next to host chrome:
-
-| slot                           | host copy            | registry today   |
-| ------------------------------ | -------------------- | ---------------- |
-| dropdown item / sub-trigger    | `px-2 gap-2`         | `px-1.5 gap-1.5` |
-| dropdown label                 | `px-2 pt-1.5 pb-0.5` | `px-1.5 py-1`    |
-| dropdown checkbox / radio item | `pl-2 gap-2`         | `pl-1.5 gap-1.5` |
-| dropdown separator             | `mx-2 my-1`          | `-mx-1 my-1`     |
-| popover content                | `p-3 gap-3`          | `p-2.5 gap-2.5`  |
-| tooltip content                | `px-2.5`             | `px-3`           |
-
-Both are deliberate scales; nothing is dropped in the build. If the two
-should match, the choice is a host decision (`DESIGN.md`): either refresh
-the host copies from the registry, or accept the registry's compact scale
-in applets. Not changed here.
+- **Focus is trapped by default.** The rest of the workspace remains scrollable
+  and clickable. Callers can pass `modal={false}` to let focus leave the drawer.
+- **Backdrop and popup each use `z-50`** so raised view content such as a sticky
+  table header stays underneath. The view root is a stacking context, so the
+  drawer cannot escape the view.
+- **The popup and `DrawerBody` currently both own vertical overflow.** The
+  follow-up Drawer cleanup should reduce this to one scroll region.
+- **Transitions** use the `data-open` and `data-closed` animation utilities
+  supplied by `tw-animate-css`.
 
 ## Open items
 
-- Per-kind component rules refinement in `references/UI-COMPONENTS.md`
-  (widgets prefer compact/overlay-light patterns; page chrome stays out
-  of the set by design).
 - Theming foundation (below) — the token-vocabulary work is still open.
 - Portal wrapper theme-token copying (see Portals above).
 
@@ -362,7 +306,7 @@ in applets. Not changed here.
    offline transform tests in `server/test/ui-components.test.ts`.
 3. **Skill** — ✅ SKILL.md pointer + `references/UI-COMPONENTS.md` cheat
    sheet (catalog at a glance, install/rebuild responsibility, the
-   relative-import rule, per-kind fit). Ships to every workspace as of skill
-   version 0.15.0 — the `moi init --experimental-shadcn` gate is gone.
+   relative-import rule, and component fit). Ships to every workspace as of
+   skill version 0.16.0 — the `moi init --experimental-shadcn` gate is gone.
    Workspaces installed before that get the section on their next
    `moi skill update`.

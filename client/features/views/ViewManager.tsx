@@ -204,10 +204,8 @@ type ViewFrameProps = {
 // One build of one view, in its style scope. Frames stack absolutely, so during
 // a rebuild the incoming one dissolves in over the outgoing one still on screen.
 //
-// The frame itself never scrolls; a child does. The frame is the `[data-applet]`
-// root that applet-scoped overlays (the `drawer` ui component) portal into and
-// position against, and an absolutely positioned panel inside a scroll
-// container would scroll away with the view's content.
+// The frame itself never scrolls; a child does. Applet-scoped overlays portal
+// into this root and position against it.
 function ViewFrame({ view, build, params, entering, thumbnailTarget }: ViewFrameProps) {
   const workspaceId = useWorkspaceId()
 

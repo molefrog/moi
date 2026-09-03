@@ -62,8 +62,8 @@ description + error) · `label` · `checkbox` · `radio-group` · `switch` · `s
 `button`)
 
 **Overlays (portal-patched):** `dialog` · `alert-dialog` (destructive confirm) · `popover` ·
-`dropdown-menu` · `context-menu` (right-click) · `hover-card` · `tooltip` · `drawer` (views only:
-side panel that slides in from the right over the view, never the page — moi-authored)
+`dropdown-menu` · `context-menu` (right-click) · `hover-card` · `tooltip` · `drawer` (right-side
+detail panel scoped to a view — moi-authored)
 
 **Display & feedback:** `alert` (callouts) · `badge` · `avatar` · `skeleton` · `spinner` ·
 `progress` · `table` · `data-table` (pattern on `table` + `@tanstack/react-table` — see its
@@ -74,7 +74,7 @@ docs) · `chart` (Recharts wired to theme tokens) · `attachment` (file/image ti
 `resizable` (split panels) · `separator` (divider line)
 
 Picking one: quick info on hover → `hover-card` or `tooltip` · contextual panel on click →
-`popover` · detail pane, filters, or a short form inside a view → `drawer` (views only) ·
+`popover` · detail pane, filters, or a short form inside a view → `drawer` ·
 focused task that must interrupt the whole workspace → `dialog` · destructive confirmation →
 `alert-dialog` ·
 option sets of 2–7 → `toggle-group` · long searchable lists → `combobox` · boolean setting →
@@ -103,11 +103,9 @@ option sets of 2–7 → `toggle-group` · long searchable lists → `combobox` 
   runtime** (Base UI requires the group context); keep items grouped too.
 - **`Dialog`, `AlertDialog`, and `Drawer` always need a Title** (`DialogTitle` / `DrawerTitle` —
   use `className="sr-only"` to hide it visually).
-- **`Drawer` is for views only**: it slides in from the right over the view it is used in and dims
-  only that area; the rest of the workspace stays usable. `moi bundle` fails a widget that imports
-  it — from a widget, `focusTab` to a view or use `dialog`/`popover`. Put growing content in
-  `DrawerBody` (the scroll region), and open it from view content, never from inside a `dialog`. It
-  is moi-authored, so `moi ui-components docs drawer` prints its docs instead of an upstream page.
+- **Use `Drawer` in views** for details, filters, or short forms. It covers and dims only the
+  current view. Put growing content in `DrawerBody`; from a widget, use `focusTab`, `dialog`, or
+  `popover`. `moi ui-components docs drawer` has its full API.
 - **`TabsTrigger` must be inside `TabsList`**, never directly in `Tabs`.
 - **`Avatar` always needs `AvatarFallback`** for when the image fails.
 - **Button has no `isLoading`** — compose: `<Button disabled><Spinner data-icon="inline-start" />Saving…</Button>`.
