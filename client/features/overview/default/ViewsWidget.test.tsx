@@ -8,13 +8,14 @@ import { ViewsWidget } from './ViewsWidget'
 
 const noop = () => {}
 
-function render(views: ViewInfo[]): string {
+function render(views: ViewInfo[], showOnboarding = true): string {
   return renderToStaticMarkup(
     createElement(ViewsWidget, {
       views,
       builders: [],
       onOpenView: noop,
-      onCreateView: noop
+      onCreateView: noop,
+      showOnboarding
     })
   )
 }
@@ -43,5 +44,12 @@ describe('ViewsWidget', () => {
     expect(html).toContain('aria-label="Create new view"')
     expect(html.match(/<button/g)).toHaveLength(1)
     expect(html).toContain('Create new views when you need separate pages for focused tasks')
+  })
+
+  test('hides the empty-state hint outside onboarding', () => {
+    const html = render([], false)
+
+    expect(html).toContain('aria-label="Create new view"')
+    expect(html).not.toContain('Create new views when you need separate pages for focused tasks')
   })
 })
