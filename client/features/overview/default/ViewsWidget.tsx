@@ -27,7 +27,8 @@ function ViewButton({ variant = 'default', Icon, label, ariaLabel, onClick }: Vi
         className={cn(
           'size-16 rounded-2xl',
           variant === 'outline' && 'shadow-xs',
-          variant !== 'secondary' && 'transition-shadow duration-300 ease-out group-hover:shadow-xl'
+          variant !== 'secondary' &&
+            'transition-shadow duration-300 ease-out group-hover:shadow-2xl'
         )}
       >
         <div
@@ -36,7 +37,7 @@ function ViewButton({ variant = 'default', Icon, label, ariaLabel, onClick }: Vi
             variant === 'default'
               ? 'bg-primary text-primary-foreground inset-shadow-[0_0_10px_color-mix(in_oklab,var(--color-white)_30%,transparent)]'
               : variant === 'outline'
-                ? 'bg-background text-foreground'
+                ? 'bg-card text-foreground'
                 : 'bg-accent'
           )}
           data-vivid={variant === 'default' || undefined}
