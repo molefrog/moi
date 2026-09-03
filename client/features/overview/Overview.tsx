@@ -1,12 +1,12 @@
 import { useCallback, useState } from 'react'
 
-import { AnimatePresence, LayoutGroup } from 'motion/react'
+import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 
 import {
   IconCheck,
-  IconEdit,
+  IconLayoutGridAdd,
   IconLetterCase,
-  IconPlus,
+  IconReplace,
   IconSettings,
   type TablerIcon
 } from '@tabler/icons-react'
@@ -25,7 +25,6 @@ import { isDefaultWidget } from '@/lib/default-widgets'
 
 import { HiddenPanel } from './HiddenPanel'
 import { WidgetCanvas } from './WidgetCanvas'
-import { cn } from '@/client/lib/cn'
 
 type NoWidgetsCreatedProps = {
   onCreateWidget: () => void
@@ -53,8 +52,8 @@ function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
             </p>
           </div>
           <Button type="button" variant="secondary" onClick={onCreateWidget}>
-            <IconPlus data-icon="inline-start" stroke={1.5} />
-            Create widget
+            <IconLayoutGridAdd data-icon="inline-start" stroke={1.5} />
+            New widget
           </Button>
         </div>
       </div>
@@ -64,6 +63,7 @@ function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
 
 type OverviewHeaderProps = {
   workspaceName: string
+  workspaceIcon: string
   editing: boolean
   customizing: boolean
   onEditingChange: (editing: boolean) => void
@@ -81,22 +81,35 @@ function OverviewHeaderAction({ Icon, label, active, onClick }: OverviewHeaderAc
   return (
     <Button
       type="button"
-      variant="secondary"
-      className={cn(
-        'h-20 w-28 flex-col gap-1.5 rounded-xl px-4 py-0 [&_svg]:size-6',
-        active && 'bg-accent text-accent-foreground'
-      )}
+      variant={active ? 'default' : 'secondary'}
+      className="relative h-16 w-24 rounded-lg px-4 py-0 text-xs [&_svg]:size-5"
       aria-pressed={active}
       onClick={onClick}
     >
-      <Icon stroke={1.5} />
-      <span>{label}</span>
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={active ? 'done' : 'action'}
+          className="flex flex-col items-center gap-1.5"
+          variants={{
+            from: { opacity: 0, filter: 'blur(4px)' },
+            to: { opacity: 1, filter: 'blur(0px)' }
+          }}
+          initial="from"
+          animate="to"
+          exit="from"
+          transition={{ type: 'spring', duration: 0.2, bounce: 0 }}
+        >
+          {active ? <IconCheck stroke={1.5} /> : <Icon stroke={1.5} />}
+          <span>{active ? 'Done' : label}</span>
+        </motion.span>
+      </AnimatePresence>
     </Button>
   )
 }
 
 function OverviewHeader({
   workspaceName,
+  workspaceIcon,
   editing,
   customizing,
   onEditingChange,
@@ -104,17 +117,20 @@ function OverviewHeader({
 }: OverviewHeaderProps) {
   return (
     <div className="flex size-full items-center gap-4">
-      <h1 className="min-w-0 flex-1 truncate text-3xl font-medium">{workspaceName}</h1>
+      <div className="flex min-w-0 flex-1 items-center gap-4">
+        <img src={workspaceIcon} alt="" className="size-10 shrink-0 rounded-lg" />
+        <h1 className="min-w-0 truncate text-3xl font-semibold">{workspaceName}</h1>
+      </div>
       <div className="flex shrink-0 items-center gap-2">
         <OverviewHeaderAction
-          Icon={editing ? IconCheck : IconEdit}
-          label={editing ? 'Done' : 'Edit widgets'}
+          Icon={IconReplace}
+          label="Customize"
           active={editing}
           onClick={() => onEditingChange(!editing)}
         />
         <OverviewHeaderAction
           Icon={IconLetterCase}
-          label="Customize"
+          label="Style"
           active={customizing}
           onClick={onCustomize}
         />
@@ -145,6 +161,7 @@ function usePanelHeight() {
 
 type OverviewProps = {
   workspaceName: string
+  workspaceIcon: string
   onCreateWidget: () => void
   onCreateView: () => void
   onOpenView: (viewId: string) => void
@@ -160,6 +177,7 @@ type OverviewProps = {
 
 export function Overview({
   workspaceName,
+  workspaceIcon,
   onCreateWidget,
   onCreateView,
   onOpenView,
@@ -229,7 +247,7 @@ export function Overview({
 
   return (
     // Shared working area below the header and positioning context for the bottom panel.
-    <div className="relative min-h-0 flex-1">
+    <div className="relative min-h-0 flex-1 bg-background">
       <LayoutGroup>
         <WidgetCanvas
           items={visibleItems}
@@ -237,6 +255,7 @@ export function Overview({
           header={
             <OverviewHeader
               workspaceName={workspaceName}
+              workspaceIcon={workspaceIcon}
               editing={editing}
               customizing={customizing}
               onEditingChange={onEditingChange}

@@ -46,7 +46,7 @@ export function ChatPopup({
           legible regardless of the active theme background. */}
       <PopoverTrigger
         render={
-          <div className="fixed right-4 bottom-4 sm:right-4 sm:bottom-4">
+          <div className="fixed right-3 bottom-3">
             <motion.div
               variants={{
                 from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
@@ -59,7 +59,7 @@ export function ChatPopup({
             >
               <button
                 type="button"
-                className="group block cursor-pointer rounded-xl p-0 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="group block cursor-pointer rounded-xl p-0 drop-shadow-[0_0_4px_var(--primary-foreground)] outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
                 aria-label="Agent"
               >
                 <AgentBlobatar
