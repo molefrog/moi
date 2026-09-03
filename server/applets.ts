@@ -20,9 +20,9 @@ import { dirname, join, resolve, sep } from 'path'
 import {
   APPLET_API_BASE_SENTINEL,
   type AppletKind,
-  buildApplet,
   scanRelativeImports
 } from './bundler/build-applet'
+import { buildAppletsInChild } from './bundler/build-worker'
 import { pruneAppletThumbnails } from './thumbnails'
 
 export type AppletPaths = {
@@ -609,35 +609,36 @@ export async function buildApplets<C>(
     })
   )
 
-  const results = await Promise.all(
-    jobs.map(async (job): Promise<AppletBuildResult<C>> => {
-      if (job.status === 'failed') return { name: job.name, status: 'failed', error: job.error }
-      if (job.status === 'skipped') return { name: job.name, status: 'skipped' }
-      try {
-        const artifact = await buildApplet(job.srcPath!, moiRoot, kind)
-        // Clear the dir first so stale hashed assets from a prior build don't
-        // accumulate, then write the fresh entry + chunks + assets.
-        const dir = join(buildDir, job.name)
-        await rm(dir, { recursive: true, force: true })
-        await mkdir(dir, { recursive: true })
-        for (const f of artifact.files) {
-          await Bun.write(join(dir, f.name), f.data)
-        }
-        return {
-          name: job.name,
-          status: 'built',
-          serverModules: artifact.serverModules.map(m => m.name),
-          config: (artifact.config as C | null) ?? null
-        }
-      } catch (err) {
-        return {
-          name: job.name,
-          status: 'failed',
-          error: err instanceof Error ? err.message : 'Unknown error'
-        }
-      }
-    })
+  // Compile the pending set in a fresh child process (see build-worker.ts:
+  // Bun's resolver cache is process-wide and never forgets a failed lookup, so
+  // an in-process build could not see packages installed after the server
+  // started). The child writes each bundle dir; only the per-job outcome comes
+  // back.
+  const built = new Map(
+    (
+      await buildAppletsInChild({
+        moiRoot,
+        kind,
+        jobs: jobs
+          .filter(job => job.status === 'pending')
+          .map(job => ({ name: job.name, srcPath: job.srcPath!, outDir: join(buildDir, job.name) }))
+      })
+    ).map(r => [r.name, r])
   )
+
+  const results = jobs.map((job): AppletBuildResult<C> => {
+    if (job.status === 'failed') return { name: job.name, status: 'failed', error: job.error }
+    if (job.status === 'skipped') return { name: job.name, status: 'skipped' }
+    const r = built.get(job.name)
+    if (!r) return { name: job.name, status: 'failed', error: 'Build worker returned no result' }
+    if (r.status === 'failed') return { name: job.name, status: 'failed', error: r.error }
+    return {
+      name: job.name,
+      status: 'built',
+      serverModules: r.serverModules,
+      config: (r.config as C | null) ?? null
+    }
+  })
 
   return { names, results, ms: Math.round(performance.now() - t0) }
 }
