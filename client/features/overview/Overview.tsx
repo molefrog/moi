@@ -20,6 +20,7 @@ import type { GridItem, GridPosition, PositionedGridItem } from '@/client/featur
 import { WidgetShell } from '@/client/features/applets/WidgetShell'
 import { Button } from '@/client/components/ui/button'
 import { cn } from '@/client/lib/cn'
+import { useUiStore } from '@/client/store/ui'
 import type { ViewBuilder, ViewInfo, WidgetInfo } from '@/lib/types'
 import { isDefaultWidget } from '@/lib/default-widgets'
 
@@ -29,9 +30,10 @@ import { WidgetCanvas } from './WidgetCanvas'
 
 type NoWidgetsCreatedProps = {
   onCreateWidget: () => void
+  showOnboarding: boolean
 }
 
-function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
+function NoWidgetsCreated({ onCreateWidget, showOnboarding }: NoWidgetsCreatedProps) {
   return (
     <div className="relative grid size-full grid-cols-2 grid-rows-2 gap-2 overflow-hidden">
       <div className="overflow-hidden rounded-2xl bg-muted texture-checker [corner-shape:superellipse(1.2)]">
@@ -42,11 +44,13 @@ function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
       <div className="overflow-hidden rounded-2xl bg-muted texture-checker [corner-shape:superellipse(1.2)]" />
       <div className="overflow-hidden rounded-2xl bg-muted texture-checker [corner-shape:superellipse(1.2)]" />
       <div className="overflow-hidden rounded-2xl bg-muted texture-checker [corner-shape:superellipse(1.2)]">
-        <div className="flex size-full items-end justify-end">
-          <span className="m-8 max-w-56 text-right text-sm text-muted-foreground">
-            Widgets can surface information, read data, and perform actions
-          </span>
-        </div>
+        {showOnboarding && (
+          <div className="flex size-full items-end justify-end">
+            <span className="m-8 max-w-56 text-right text-sm text-muted-foreground">
+              Widgets can surface information, read data, and perform actions
+            </span>
+          </div>
+        )}
       </div>
       <div className="absolute inset-0 flex items-center justify-center">
         <Button
@@ -184,6 +188,7 @@ export function Overview({
   builders
 }: OverviewProps) {
   const { layout, setLayout } = useWorkspaceLayoutCtx()
+  const hasSentMessageFromMoi = useUiStore(state => state.hasSentMessageFromMoi)
   const widgetById = new Map(widgets.map(widget => [widget.id, widget]))
 
   const gridIds = new Set(layout.widgetGrid.map(g => g.i))
@@ -199,6 +204,8 @@ export function Overview({
     .filter(w => !gridIds.has(w.id))
     .map(w => ({ id: w.id, w: w.config.colSpan, h: w.config.rowSpan }))
   const showCreationState = visibleItems.every(item => isDefaultWidget(item.id))
+  const showOnboarding =
+    !hasSentMessageFromMoi && widgets.every(widget => isDefaultWidget(widget.id))
 
   const [panelRef, panelHeight] = usePanelHeight()
   const panelOpen = customizing
@@ -215,7 +222,13 @@ export function Overview({
   })
 
   function renderItem(id: string) {
-    const defaultWidget = renderDefaultWidget(id, { views, builders, onOpenView, onCreateView })
+    const defaultWidget = renderDefaultWidget(id, {
+      views,
+      builders,
+      onOpenView,
+      onCreateView,
+      showOnboarding
+    })
     if (defaultWidget) return defaultWidget
     return <WidgetShell name={id} />
   }
@@ -255,7 +268,9 @@ export function Overview({
             />
           }
           emptyState={
-            showCreationState ? <NoWidgetsCreated onCreateWidget={onCreateWidget} /> : undefined
+            showCreationState ? (
+              <NoWidgetsCreated onCreateWidget={onCreateWidget} showOnboarding={showOnboarding} />
+            ) : undefined
           }
           bottomInset={panelOpen ? panelHeight : 0}
           renderItem={renderItem}

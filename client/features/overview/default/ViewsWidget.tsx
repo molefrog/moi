@@ -57,9 +57,16 @@ type ViewsWidgetProps = {
   builders: ViewBuilder[]
   onOpenView: (viewId: string) => void
   onCreateView: () => void
+  showOnboarding: boolean
 }
 
-export function ViewsWidget({ views, builders, onOpenView, onCreateView }: ViewsWidgetProps) {
+export function ViewsWidget({
+  views,
+  builders,
+  onOpenView,
+  onCreateView,
+  showOnboarding
+}: ViewsWidgetProps) {
   const empty = views.length === 0
 
   return (
@@ -93,7 +100,7 @@ export function ViewsWidget({ views, builders, onOpenView, onCreateView }: Views
           onClick={onCreateView}
         />
       </div>
-      {empty && (
+      {empty && showOnboarding && (
         <p className="relative mr-8 ml-auto max-w-56 text-right text-sm text-muted-foreground">
           Create new views when you need separate pages for focused tasks
         </p>
