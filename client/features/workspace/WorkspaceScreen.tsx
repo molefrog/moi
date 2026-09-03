@@ -81,26 +81,6 @@ const Scratchpad = lazy(() =>
 
 const viewBuilderIcon = (builder: ViewBuilderData) => resolveAppIcon(builder.icon) ?? IconArticle
 
-type SectionControlsProps = {
-  onToggleMode: () => void
-}
-
-// Full-screen workspace action: open the chat as a docked split column.
-function SectionControls({ onToggleMode }: SectionControlsProps) {
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button variant="ghost" size="icon-sm" onClick={onToggleMode} aria-label="Dock agent">
-            <IconLayoutSidebarRight stroke={1.75} />
-          </Button>
-        }
-      />
-      <TooltipContent>Dock agent</TooltipContent>
-    </Tooltip>
-  )
-}
-
 type WorkspaceScreenProps = {
   widgets: WidgetInfo[]
   views: ViewInfo[]
@@ -676,11 +656,23 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
             onReorder={reorderTabs}
           />
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          {hasWorkspaceContent && canUseSplit && mode === 'fullscreen' && (
-            <SectionControls onToggleMode={() => setMode('split')} />
-          )}
-        </div>
+        {hasWorkspaceContent && canUseSplit && mode === 'fullscreen' && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setMode('split')}
+                  aria-label="Dock agent"
+                >
+                  <IconLayoutSidebarRight stroke={1.75} />
+                </Button>
+              }
+            />
+            <TooltipContent>Dock agent</TooltipContent>
+          </Tooltip>
+        )}
       </PanelHeader>
     </div>
   )
