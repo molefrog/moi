@@ -36,7 +36,7 @@ describe('WelcomeState', () => {
 
     expect(renderedParagraphs(html)).toEqual([
       "moi is the visual workspace for you and your agent. It grows and adapts to the work you're doing.",
-      'Ask agent to build Widgets that surface information and quick actions, or entire Views for more complex tools. Use Scratchpad for exploring and shaping ideas with your agent.',
+      'Ask agent to build widgets on Overview that surface information and quick actions, or entire Views for more complex tools. Use Scratchpad for exploring and shaping ideas with your agent.',
       'Try an example:'
     ])
   })
@@ -51,7 +51,7 @@ describe('WelcomeState', () => {
 
     expect(welcomeTerms).toHaveLength(3)
     expect(welcomeTerms.every(([term]) => term.includes('<svg'))).toBe(true)
-    expect(html).toContain('data-welcome-destination="widgets"')
+    expect(html).toContain('data-welcome-destination="overview"')
     expect(html).toContain('data-welcome-destination="views"')
     expect(html).toContain('data-welcome-destination="scratchpad"')
     expect(promptButtons).toHaveLength(3)

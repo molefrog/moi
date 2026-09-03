@@ -526,7 +526,7 @@ export type LayoutMode = 'fullscreen' | 'split'
 
 export type WorkspaceTabId =
   | 'agent'
-  | 'widgets'
+  | 'overview'
   | 'scratchpad'
   | `view:${string}`
   | `view-builder:${string}`

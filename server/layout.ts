@@ -1,21 +1,9 @@
 import { join } from 'path'
 
 import type { AppletKind, WorkspaceLayout, WorkspacePreview } from '@/lib/types'
-import { createDefaultWorkspaceLayout, createDefaultWorkspaceTabs } from '@/lib/workspace-layout'
-import { isWorkspaceTabId } from '@/lib/workspace-tabs'
+import { createDefaultWorkspaceLayout, normalizeWorkspaceTabs } from '@/lib/workspace-layout'
 
 import { getCapturedThumbnails } from './thumbnails'
-
-function normalizeTabs(value: unknown): WorkspaceLayout['tabs'] {
-  if (!value || typeof value !== 'object') return createDefaultWorkspaceTabs()
-  const raw = value as Record<string, unknown>
-  const open = Array.isArray(raw.open)
-    ? raw.open.filter(isWorkspaceTabId).filter((tab, index, all) => all.indexOf(tab) === index)
-    : []
-  if (open.length === 0) return createDefaultWorkspaceTabs()
-  const active = isWorkspaceTabId(raw.active) && open.includes(raw.active) ? raw.active : open[0]
-  return { open, active }
-}
 
 function normalizeLayout(parsed: Record<string, unknown>): WorkspaceLayout {
   const defaults = createDefaultWorkspaceLayout()
@@ -23,7 +11,7 @@ function normalizeLayout(parsed: Record<string, unknown>): WorkspaceLayout {
   if (layout.layoutMode !== 'split' && layout.layoutMode !== 'fullscreen') {
     layout.layoutMode = defaults.layoutMode
   }
-  layout.tabs = normalizeTabs(layout.tabs)
+  layout.tabs = normalizeWorkspaceTabs(layout.tabs)
   // Legacy thumbnail caches are intentionally dropped, not migrated — images
   // now live as files under `.moi/.cache/thumbnails` (server/thumbnails.ts)
   // and applets are simply captured again there.
@@ -73,6 +61,7 @@ export function mergeLayoutForSave(
   delete (editor as Record<string, unknown>).appletThumbnails
   return {
     ...editor,
+    tabs: normalizeWorkspaceTabs(editor.tabs),
     ...(existing.name !== undefined && { name: existing.name }),
     ...(existing.icon !== undefined && { icon: existing.icon })
   }

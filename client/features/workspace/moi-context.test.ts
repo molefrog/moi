@@ -78,7 +78,7 @@ describe('envelopeTabParams', () => {
   test('tabs without addressable state report nothing, params or not', () => {
     // Widgets are not navigation targets, and the static tabs take no params —
     // so a stray record here means nothing and must not reach the envelope.
-    expect(envelopeTabParams('widgets', params)).toBeUndefined()
+    expect(envelopeTabParams('overview', params)).toBeUndefined()
     expect(envelopeTabParams('agent', params)).toBeUndefined()
     expect(envelopeTabParams('scratchpad', params)).toBeUndefined()
     expect(envelopeTabParams('view-builder:b-42', params)).toBeUndefined()

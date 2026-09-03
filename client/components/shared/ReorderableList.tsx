@@ -40,6 +40,7 @@ type ReorderableListProps<T> = {
   className?: string
   itemClassName?: (item: T, state: ReorderableRenderState) => string | undefined
   dragDisabled?: boolean
+  isItemDragDisabled?: (item: T) => boolean
   onReorder: (orderedIds: ReorderableId[]) => void
   renderItem: (item: T, state: ReorderableRenderState) => ReactNode
   renderPlaceholder?: (item: T) => ReactNode
@@ -63,6 +64,7 @@ export function ReorderableList<T>({
   className,
   itemClassName,
   dragDisabled = false,
+  isItemDragDisabled,
   onReorder,
   renderItem,
   renderPlaceholder,
@@ -83,7 +85,10 @@ export function ReorderableList<T>({
     .map(id => itemById.get(id))
     .filter((item): item is T => Boolean(item))
   const draggingItem = draggingId ? itemById.get(draggingId) : undefined
-  const disabled = dragDisabled || items.length < 2
+  const reorderableCount = isItemDragDisabled
+    ? items.filter(item => !isItemDragDisabled(item)).length
+    : items.length
+  const disabled = dragDisabled || reorderableCount < 2
 
   const handleDragOver = (event: DragOverEvent) => {
     const activeId = String(event.active.id)
@@ -132,7 +137,7 @@ export function ReorderableList<T>({
             key={getId(item)}
             id={getId(item)}
             item={item}
-            disabled={disabled}
+            disabled={disabled || isItemDragDisabled?.(item) === true}
             itemClassName={itemClassName}
             renderItem={renderItem}
             renderPlaceholder={renderPlaceholder}

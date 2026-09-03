@@ -190,7 +190,7 @@ describe('composer attachments', () => {
       localId: 'a3',
       name: 'Annotation.png',
       mediaType: 'image/png',
-      sourceTab: 'widgets',
+      sourceTab: 'overview',
       status: 'draft'
     }
   ]
@@ -235,7 +235,7 @@ describe('composer attachments', () => {
         localId: 'annotation-1',
         name: 'Annotation.png',
         mediaType: 'image/png',
-        sourceTab: 'widgets',
+        sourceTab: 'overview',
         status: 'ready',
         upload: { id: 'up-annotation', kind: 'image' } as ChatAttachment['upload']
       },
@@ -254,7 +254,7 @@ describe('composer attachments', () => {
     expect(withAttachmentDirectives({ directives: ['Keep this concise.'] }, annotations)).toEqual({
       directives: [
         'Keep this concise.',
-        'Annotation attachment sources in attachment order: 2. "widgets"; 3. "view:roadmap".'
+        'Annotation attachment sources in attachment order: 2. "overview"; 3. "view:roadmap".'
       ]
     })
   })
@@ -266,7 +266,7 @@ describe('composer attachments', () => {
       localId: 'annotation-1',
       name: 'Annotation.png',
       mediaType: 'image/png',
-      sourceTab: 'widgets',
+      sourceTab: 'overview',
       status: 'ready',
       upload: { id: 'up-annotation', kind: 'image' } as ChatAttachment['upload']
     }

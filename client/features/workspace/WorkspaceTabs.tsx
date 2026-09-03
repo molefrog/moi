@@ -20,6 +20,7 @@ export type WorkspaceTabItem = {
   Icon: TabIcon
   label: string
   closable?: boolean
+  reorderable?: boolean
   loading?: boolean
 }
 
@@ -186,6 +187,7 @@ export function WorkspaceTabs({
         <ReorderableList
           items={tabs}
           getId={tab => tab.key}
+          isItemDragDisabled={tab => tab.reorderable === false}
           className="flex w-max items-center gap-1"
           onReorder={ordered => onReorder(ordered as WorkspaceTabId[])}
           renderPlaceholder={() => (

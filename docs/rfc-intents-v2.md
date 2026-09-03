@@ -15,7 +15,7 @@ from applet UI**. The "intent" vocabulary disappears from the API surface — th
 ## 1. Routes: the URL is the tab address
 
 - Route becomes `/workspace/:id/*?` — the wildcard suffix is a tab id:
-  `/workspace/ws1/view:roadmap`, `/workspace/ws1/widgets`, `/workspace/ws1/scratchpad`,
+  `/workspace/ws1/view:roadmap`, `/workspace/ws1/overview`, `/workspace/ws1/scratchpad`,
   `/workspace/ws1/view-builder:abc`. Tab ids are URL-safe as-is (`:` is a legal path character).
 - **Missing tab** (`/workspace/:id`) → redirect to the workspace's default tab (the layout's
   saved `active`, same behavior as today), using a **history replace** so Back never bounces
@@ -58,8 +58,8 @@ moi tab focus <tab-id> [--params '<json-object>']
 moi tabs — workspace tabs, the default one marked
 
      tab          title
-  ●  agent        Agent
-     widgets      Widgets
+  ●  overview     Overview
+     agent        Agent
      scratchpad   Scratchpad
      view:orders  Orders
      view:shop    Shop
