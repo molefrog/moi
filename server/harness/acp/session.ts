@@ -34,7 +34,7 @@ import {
 import { type AcpClient, type AcpSpawnSpec, getAcpClient } from './client'
 import { appendRunDuration, runDurations } from './run-durations'
 import {
-  type AcpModelInfo,
+  type AcpModelState,
   type AcpNewSessionResult,
   type AcpPromptBlock,
   type ContentChunk,
@@ -71,11 +71,17 @@ export type AcpProviderConfig = {
   noPromptModeId?: string
   // Does the backend send images as base64 content blocks?
   supportsImages?: boolean
-  // How the backend's model catalog becomes picker rows. ACP says nothing
-  // about how `name`/`description` are formatted, so a backend that packs
-  // extra structure into them (Hermes: the provider) unpacks it here.
-  // Defaults to a straight passthrough.
-  mapModels?: (models: AcpModelInfo[]) => Model[]
+  // How the backend's model state becomes picker rows. ACP says nothing about
+  // how `name`/`description` are formatted, so a backend that packs extra
+  // structure into them (Hermes: the provider) unpacks it here. The full state
+  // also preserves a structured provider default such as `currentModelId`.
+  // Defaults to a straight catalog passthrough.
+  mapModels?: (state: AcpModelState) => Model[]
+  // Re-read the model state whenever the picker snapshot is fetched. Most ACP
+  // catalogs are stable enough to cache for the process lifetime, but a
+  // backend whose `currentModelId` follows mutable external config must opt in
+  // so the picker cannot drift from what a fresh session would run.
+  refreshModelState?: boolean
 }
 
 type QueuedSend = { blocks: AcpPromptBlock[]; turnId: string }

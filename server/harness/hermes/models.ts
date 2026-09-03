@@ -15,10 +15,11 @@
 // in `description` alone, which is why the group comes from that field.
 import type { Model } from '@/lib/types'
 
-import type { AcpModelInfo } from '../acp/wire'
+import type { AcpModelInfo, AcpModelState } from '../acp/wire'
 
 const PROVIDER_PREFIX = /^Provider:\s*/
-// Hermes marks the model it would pick itself; moi tracks its own selection.
+// This is display cleanup only. The default comes from structured
+// `currentModelId`, never by inferring it from this suffix.
 const CURRENT_SUFFIX = /\s*•\s*current$/
 
 function providerOf(description: string | undefined): string | undefined {
@@ -65,15 +66,34 @@ function hermesModel(info: AcpModelInfo): Model {
 // — for the same endpoint and model. Both spellings work, so keep the first
 // and drop rows the picker would render as an exact duplicate. Keyed on
 // `providerId` where there is one, since both spellings normalize to it.
-export function hermesModels(infos: AcpModelInfo[]): Model[] {
-  const seen = new Set<string>()
+export function hermesModels(state: AcpModelState): Model[] {
+  const seen = new Map<string, number>()
   const out: Model[] = []
-  for (const info of infos) {
+  for (const info of state.availableModels ?? []) {
     const model = hermesModel(info)
     const key = `${model.providerId ?? model.group ?? ''} ${model.displayName}`
-    if (seen.has(key)) continue
-    seen.add(key)
+    const existingIndex = seen.get(key)
+    if (existingIndex !== undefined) {
+      // If Hermes names a duplicate spelling as current, retain that exact id
+      // so the structured default can resolve to a visible picker row.
+      if (info.modelId === state.currentModelId) out[existingIndex] = model
+      continue
+    }
+    seen.set(key, out.length)
     out.push(model)
   }
-  return out
+
+  if (!state.currentModelId) return out
+  const currentIndex = out.findIndex(model => model.value === state.currentModelId)
+  if (currentIndex === -1) return out
+
+  out[currentIndex] = { ...out[currentIndex], resolvedModel: state.currentModelId }
+  return [
+    {
+      value: 'default',
+      resolvedModel: state.currentModelId,
+      displayName: 'Default (from Hermes)'
+    },
+    ...out
+  ]
 }

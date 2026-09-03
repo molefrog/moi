@@ -13,7 +13,12 @@ import { appendMoiContext, renderMoiContext } from '@/lib/moi-context'
 
 import { killAllAcpClients } from './client'
 import { appendRunDuration, setRunDurationsPath } from './run-durations'
-import { type AcpProviderConfig, ensureAcpSessionLive, forgetAllAcpSessions } from './session'
+import {
+  type AcpProviderConfig,
+  ensureAcpSessionLive,
+  forgetAllAcpSessions,
+  sendAcpMessage
+} from './session'
 
 let seq = 0
 
@@ -21,7 +26,10 @@ let seq = 0
 // object per line on stdio. Replay updates ride in via MOCK_UPDATES so each
 // test controls its own history.
 const AGENT_SOURCE = `
+const { appendFileSync } = require('node:fs')
 const updates = JSON.parse(process.env.MOCK_UPDATES ?? '[]')
+const newSession = JSON.parse(process.env.MOCK_NEW_SESSION ?? 'null')
+const methodLog = process.env.MOCK_METHOD_LOG
 const send = o => process.stdout.write(JSON.stringify(o) + '\\n')
 let buf = ''
 process.stdin.on('data', chunk => {
@@ -32,8 +40,13 @@ process.stdin.on('data', chunk => {
     buf = buf.slice(nl + 1)
     if (!line.trim()) continue
     const msg = JSON.parse(line)
+    if (methodLog && msg.method !== 'initialize') {
+      appendFileSync(methodLog, JSON.stringify({ method: msg.method, params: msg.params }) + '\\n')
+    }
     if (msg.method === 'initialize') {
       send({ jsonrpc: '2.0', id: msg.id, result: { protocolVersion: 1, agentCapabilities: {} } })
+    } else if (msg.method === 'session/new' && newSession) {
+      send({ jsonrpc: '2.0', id: msg.id, result: newSession })
     } else if (msg.method === 'session/load') {
       for (const update of updates) {
         send({
@@ -43,6 +56,8 @@ process.stdin.on('data', chunk => {
         })
       }
       send({ jsonrpc: '2.0', id: msg.id, result: {} })
+    } else if (msg.method === 'session/prompt') {
+      send({ jsonrpc: '2.0', id: msg.id, result: { stopReason: 'end_turn' } })
     } else if (msg.id !== undefined) {
       send({ jsonrpc: '2.0', id: msg.id, result: {} })
     }
@@ -76,6 +91,64 @@ async function replayThroughMockAgent(updates: unknown[], seedDurations: number[
     workspacePath: dir,
     sessionId
   })
+}
+
+type LoggedRpc = {
+  method: string
+  params?: unknown
+}
+
+async function exerciseModelSwitchThroughMockAgent(): Promise<LoggedRpc[]> {
+  const dir = await mkdtemp(join(tmpdir(), 'acp-model-switch-test-'))
+  const agentPath = join(dir, 'mock-acp-agent.js')
+  const methodLog = join(dir, 'methods.jsonl')
+  await Bun.write(agentPath, AGENT_SOURCE)
+  const sessionId = 'sess-model-' + ++seq
+  const workspaceId = 'ws-model-' + seq
+  const currentModelId = 'bedrock:us.anthropic.claude-sonnet-4-6'
+  const alternateModelId = 'bedrock:global.anthropic.claude-sonnet-4-6'
+  const config: AcpProviderConfig = {
+    id: 'hermes',
+    provider: 'hermes',
+    spawn: async () => ({
+      provider: 'hermes',
+      command: process.execPath,
+      args: [agentPath],
+      workspacePath: dir,
+      env: {
+        MOCK_METHOD_LOG: methodLog,
+        MOCK_NEW_SESSION: JSON.stringify({
+          sessionId,
+          models: {
+            availableModels: [{ modelId: currentModelId }, { modelId: alternateModelId }],
+            currentModelId
+          }
+        })
+      }
+    })
+  }
+
+  await sendAcpMessage(config, {
+    workspaceId,
+    workspacePath: dir,
+    sessionId,
+    isNew: true,
+    content: 'first'
+  })
+  await sendAcpMessage(config, {
+    workspaceId,
+    workspacePath: dir,
+    sessionId,
+    isNew: false,
+    content: 'second',
+    model: alternateModelId
+  })
+
+  return (await Bun.file(methodLog).text())
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map(line => JSON.parse(line) as LoggedRpc)
 }
 
 afterAll(() => {
@@ -252,5 +325,25 @@ describe('ACP session replay', () => {
     expect(turns[0].parts).toEqual([
       { type: 'file', mediaType: 'image/png', url: 'data:image/png;base64,aGVsbG8=' }
     ])
+  })
+})
+
+describe('ACP model selection', () => {
+  test('uses the agent default until moi explicitly switches before the next prompt', async () => {
+    const calls = await exerciseModelSwitchThroughMockAgent()
+
+    expect(calls.map(call => call.method)).toEqual([
+      'session/new',
+      'session/prompt',
+      'session/set_model',
+      'session/prompt'
+    ])
+    expect(calls[2]).toMatchObject({
+      method: 'session/set_model',
+      params: {
+        sessionId: expect.stringMatching(/^sess-model-/),
+        modelId: 'bedrock:global.anthropic.claude-sonnet-4-6'
+      }
+    })
   })
 })
