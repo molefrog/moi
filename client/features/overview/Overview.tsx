@@ -65,9 +65,9 @@ function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
 
 type OverviewHeaderProps = {
   editing: boolean
-  customizing: boolean
+  styling: boolean
   onEditingChange: (editing: boolean) => void
-  onCustomize: () => void
+  onStyle: () => void
 }
 
 type OverviewHeaderActionProps = Omit<ComponentProps<typeof Button>, 'children'> & {
@@ -112,12 +112,7 @@ function OverviewHeaderAction({
   )
 }
 
-function OverviewHeader({
-  editing,
-  customizing,
-  onEditingChange,
-  onCustomize
-}: OverviewHeaderProps) {
+function OverviewHeader({ editing, styling, onEditingChange, onStyle }: OverviewHeaderProps) {
   return (
     <div className="flex size-full items-center gap-4">
       <WorkspaceName />
@@ -131,8 +126,8 @@ function OverviewHeader({
         <OverviewHeaderAction
           Icon={IconLetterCase}
           label="Style"
-          active={customizing}
-          onClick={onCustomize}
+          active={styling}
+          onClick={onStyle}
         />
         <WorkspaceSettings
           renderTrigger={() => <OverviewHeaderAction Icon={IconSettings} label="Settings" />}
@@ -162,8 +157,8 @@ type OverviewProps = {
   onCreateView: () => void
   onOpenView: (viewId: string) => void
   editing: boolean
-  customizing: boolean
-  onCustomize: () => void
+  styling: boolean
+  onStyle: () => void
   onEditingChange: (editing: boolean) => void
   // Authoritative widget set from useWidgets; positions come from layout.
   widgets: WidgetInfo[]
@@ -176,8 +171,8 @@ export function Overview({
   onCreateView,
   onOpenView,
   editing,
-  customizing,
-  onCustomize,
+  styling,
+  onStyle,
   onEditingChange,
   widgets,
   views,
@@ -249,9 +244,9 @@ export function Overview({
           header={
             <OverviewHeader
               editing={editing}
-              customizing={customizing}
+              styling={styling}
               onEditingChange={onEditingChange}
-              onCustomize={onCustomize}
+              onStyle={onStyle}
             />
           }
           emptyState={
