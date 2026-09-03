@@ -665,6 +665,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
                   size="icon-sm"
                   onClick={() => setMode('split')}
                   aria-label="Dock agent"
+                  className="text-muted-foreground"
                 >
                   <IconLayoutSidebarRight stroke={1.75} />
                 </Button>
