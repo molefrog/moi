@@ -208,6 +208,7 @@ function applyVisibleTabOrder(
 export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenProps) {
   const { layout, setLayout, name, icon, provider, workspaceId } = useWorkspaceLayoutCtx()
   const theme = resolveWorkspaceTheme(layout.theme)
+  const workspaceIcon = icon ?? workspaceProviderIcon[provider ?? 'claude-code']
   const builderActions = useViewBuilderActions()
   const {
     ref: rowRef,
@@ -620,6 +621,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
           ) : activeTab === 'overview' ? (
             <Overview
               workspaceName={name ?? 'Workspace'}
+              workspaceIcon={workspaceIcon}
               editing={widgetMode === 'editing'}
               customizing={widgetMode === 'customizing'}
               onCustomize={() =>
@@ -693,11 +695,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       <PanelHeader>
         <div className="flex min-w-0 flex-1 items-center gap-4">
           <div className="flex items-center gap-2">
-            <img
-              src={icon ?? workspaceProviderIcon[provider ?? 'claude-code']}
-              alt=""
-              className="size-5 shrink-0 rounded-xs"
-            />
+            <img src={workspaceIcon} alt="" className="size-5 shrink-0 rounded-xs" />
             {name && <span className="truncate text-sm font-medium text-foreground">{name}</span>}
           </div>
           <WorkspaceTabs

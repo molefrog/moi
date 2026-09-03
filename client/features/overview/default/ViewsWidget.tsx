@@ -13,13 +13,15 @@ type ViewsWidgetProps = {
 
 export function ViewsWidget({ views, builders, onOpenView, onCreateView }: ViewsWidgetProps) {
   return (
-    <div className="flex size-full items-center bg-muted px-2">
+    <div className="flex size-full items-center bg-background">
       {views.length === 0 ? (
-        <div className="flex w-full justify-center">
-          <Button type="button" variant="secondary" onClick={onCreateView}>
-            <IconBrowserPlus data-icon="inline-start" stroke={1.5} />
-            New view
-          </Button>
+        <div className="flex size-full items-center justify-center bg-muted texture-checker">
+          <div className="flex size-full max-w-(--column-w) items-center justify-center bg-radial from-background from-40% to-transparent to-80%">
+            <Button type="button" variant="secondary" onClick={onCreateView}>
+              <IconBrowserPlus data-icon="inline-start" stroke={1.5} />
+              New view
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="no-scrollbar w-full min-w-0 scroll-fade-x overflow-x-auto overflow-y-hidden [--scroll-fade-reveal:16px]">

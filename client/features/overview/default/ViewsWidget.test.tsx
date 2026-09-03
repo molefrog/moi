@@ -32,6 +32,10 @@ describe('ViewsWidget', () => {
   })
 
   test('renders the new-view action before a view exists', () => {
-    expect(render([])).toContain('New view')
+    const html = render([])
+
+    expect(html).toContain('New view')
+    expect(html).toContain('texture-checker')
+    expect(html).toContain('bg-radial')
   })
 })

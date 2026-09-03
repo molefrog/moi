@@ -4,7 +4,6 @@ import { IconKey, IconPlugConnected, IconSettings, IconX } from '@tabler/icons-r
 
 import { Button } from '@/client/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/client/components/ui/dialog'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 
 import { ConnectorsSettings } from './ConnectorsSettings'
 import { EnvironmentSettings } from './EnvironmentSettings'
@@ -19,7 +18,7 @@ const NAV: { id: SettingsNav; label: string; icon: typeof IconSettings }[] = [
 ]
 
 type WorkspaceSettingsProps = {
-  renderTrigger?: (open: () => void) => ReactNode
+  renderTrigger: (open: () => void) => ReactNode
 }
 
 export function WorkspaceSettings({ renderTrigger }: WorkspaceSettingsProps) {
@@ -28,25 +27,7 @@ export function WorkspaceSettings({ renderTrigger }: WorkspaceSettingsProps) {
 
   return (
     <>
-      {renderTrigger ? (
-        renderTrigger(() => setOpen(true))
-      ) : (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Settings"
-                onClick={() => setOpen(true)}
-              >
-                <IconSettings stroke={1.75} />
-              </Button>
-            }
-          />
-          <TooltipContent>Settings</TooltipContent>
-        </Tooltip>
-      )}
+      {renderTrigger(() => setOpen(true))}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="flex h-[min(680px,90vh)] w-[880px] max-w-[94vw]">

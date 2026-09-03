@@ -69,7 +69,7 @@ export function HiddenPanel({
       actions={
         <Button type="button" variant="secondary" size="sm" onClick={onCreateWidget}>
           <IconPlus data-icon="inline-start" stroke={1.75} />
-          Add widget
+          New widget
         </Button>
       }
       onClose={onClose}
