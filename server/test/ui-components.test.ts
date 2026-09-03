@@ -398,6 +398,8 @@ describe('drawer source', () => {
     expect(source).toContain('<DrawerPrimitive.Portal container={container}>')
     expect(source).toContain("modal = 'trap-focus'")
     expect(source).toContain("side = 'right'")
+    expect(source).toContain('data-slot="drawer-overlay"')
+    expect(source).toContain('overflow-y-auto overscroll-contain')
     expect(source).not.toContain('document.body')
     expect(source).not.toMatch(/\bfixed\b/)
     // Not wrapped by the body-portal helper either — that would defeat it.

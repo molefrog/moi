@@ -84,7 +84,7 @@ function DrawerContent({
             sticky table header with z-10); the view root is a stacking
             context, so nothing leaks past the view. */}
         <DrawerPrimitive.Backdrop
-          data-slot="drawer-backdrop"
+          data-slot="drawer-overlay"
           className="absolute inset-0 z-50 bg-foreground/20 duration-200 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
         />
         <DrawerPrimitive.Popup
@@ -130,7 +130,7 @@ function DrawerBody({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="drawer-body"
-      className={cn('min-h-0 flex-1 overflow-y-auto px-4', className)}
+      className={cn('min-h-0 flex-1 overflow-y-auto overscroll-contain px-4', className)}
       {...props}
     />
   )
