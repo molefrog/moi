@@ -200,7 +200,7 @@ function WelcomeState({
           </p>
           <p>
             Ask the{' '}
-            <WelcomeTerm Icon={IconMessages} destination="overview" onNavigate={onNavigate}>
+            <WelcomeTerm Icon={IconMessages} destination="agent" onNavigate={onNavigate}>
               Agent
             </WelcomeTerm>{' '}
             to build widgets on the{' '}
