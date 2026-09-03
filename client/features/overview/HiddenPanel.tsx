@@ -65,7 +65,7 @@ export function HiddenPanel({
   return (
     <BottomPanel
       ref={ref}
-      title="Hidden widgets"
+      title="Widgets"
       actions={
         <Button type="button" variant="secondary" size="sm" onClick={onCreateWidget}>
           <IconPlus data-icon="inline-start" stroke={1.75} />
@@ -75,28 +75,35 @@ export function HiddenPanel({
       onClose={onClose}
       className="max-h-[60vh]"
     >
-      {/* gap-2 + grid-cols-4 + [grid-auto-rows:160px] matches RGL's margin/rowHeight exactly */}
-      <div className="grid auto-rows-[160px] grid-cols-4 gap-2">
-        <AnimatePresence>
-          {layout.map(item => (
-            <motion.div
-              key={item.i}
-              layoutId={item.i}
-              className={cn(
-                COL_START[item.x],
-                ROW_START[item.y],
-                COL_SPAN[item.w],
-                ROW_SPAN[item.h]
-              )}
-              transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
-            >
-              <WidgetFrame customizing widgetId={item.i} onRemove={() => onRestore(item.i)} hidden>
-                {renderItem(item.i)}
-              </WidgetFrame>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
+      {layout.length > 0 && (
+        /* gap-2 + grid-cols-4 + [grid-auto-rows:160px] matches RGL's margin/rowHeight exactly */
+        <div className="grid auto-rows-[160px] grid-cols-4 gap-2">
+          <AnimatePresence>
+            {layout.map(item => (
+              <motion.div
+                key={item.i}
+                layoutId={item.i}
+                className={cn(
+                  COL_START[item.x],
+                  ROW_START[item.y],
+                  COL_SPAN[item.w],
+                  ROW_SPAN[item.h]
+                )}
+                transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
+              >
+                <WidgetFrame
+                  customizing
+                  widgetId={item.i}
+                  onRemove={() => onRestore(item.i)}
+                  hidden
+                >
+                  {renderItem(item.i)}
+                </WidgetFrame>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
     </BottomPanel>
   )
 }
