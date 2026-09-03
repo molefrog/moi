@@ -90,7 +90,7 @@ export function HiddenPanel({
               )}
               transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
             >
-              <WidgetFrame editing widgetId={item.i} onRemove={() => onRestore(item.i)} hidden>
+              <WidgetFrame customizing widgetId={item.i} onRemove={() => onRestore(item.i)} hidden>
                 {renderItem(item.i)}
               </WidgetFrame>
             </motion.div>
