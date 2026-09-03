@@ -7,7 +7,6 @@ import {
   IconBrowserPlus,
   IconLayout2,
   IconLayoutSidebarRight,
-  IconLetterCase,
   IconMessages,
   IconSketching
 } from '@tabler/icons-react'
@@ -25,7 +24,6 @@ import { PanelHeader } from '@/client/components/shared/PanelHeader'
 import { workspaceProviderIcon } from '@/client/features/home/workspace-presentation'
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
-import { WorkspaceSettings } from '@/client/features/settings/WorkspaceSettings'
 import { useAppletChatMessage } from '@/client/features/chat/useAppletChatMessage'
 import { useChat } from '@/client/features/chat/useChat'
 import { ViewBuilder, type ViewBuilderHandle } from '@/client/features/views/ViewBuilder'
@@ -99,33 +97,6 @@ function SectionControls({ onToggleMode }: SectionControlsProps) {
         }
       />
       <TooltipContent>Dock agent</TooltipContent>
-    </Tooltip>
-  )
-}
-
-type WorkspaceCustomizeActionProps = {
-  active: boolean
-  onToggle: () => void
-}
-
-function WorkspaceCustomizeAction({ active, onToggle }: WorkspaceCustomizeActionProps) {
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Customize"
-            aria-pressed={active}
-            onClick={onToggle}
-            className={cn(active && 'bg-accent')}
-          >
-            <IconLetterCase stroke={1.75} />
-          </Button>
-        }
-      />
-      <TooltipContent>Customize</TooltipContent>
     </Tooltip>
   )
 }
@@ -704,17 +675,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
           />
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {activeTab !== 'widgets' && (
-            <>
-              <WorkspaceCustomizeAction
-                active={widgetMode === 'customizing'}
-                onToggle={() =>
-                  setWidgetMode(widgetMode === 'customizing' ? 'idle' : 'customizing')
-                }
-              />
-              <WorkspaceSettings />
-            </>
-          )}
           {hasWorkspaceContent && canUseSplit && mode === 'fullscreen' && (
             <SectionControls onToggleMode={() => setMode('split')} />
           )}
