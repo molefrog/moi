@@ -52,17 +52,15 @@ function NoWidgetsCreated({ onCreateWidget, showOnboarding }: NoWidgetsCreatedPr
           </div>
         )}
       </div>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <Button
-          type="button"
-          variant="outline"
-          className="rounded-xl px-4 py-6 transition-shadow duration-300 ease-out hover:shadow-md"
-          onClick={onCreateWidget}
-        >
-          <IconPlus data-icon="inline-start" stroke={1.5} />
-          New widget
-        </Button>
-      </div>
+      <Button
+        type="button"
+        variant="outline"
+        className="absolute inset-0 m-auto h-fit w-fit rounded-xl p-4 pl-3! transition-shadow duration-300 ease-out hover:shadow-md"
+        onClick={onCreateWidget}
+      >
+        <IconPlus data-icon="inline-start" stroke={1.5} />
+        New widget
+      </Button>
     </div>
   )
 }
@@ -203,7 +201,7 @@ export function Overview({
   const hiddenItems: GridItem[] = widgets
     .filter(w => !gridIds.has(w.id))
     .map(w => ({ id: w.id, w: w.config.colSpan, h: w.config.rowSpan }))
-  const showCreationState = visibleItems.every(item => isDefaultWidget(item.id))
+  const showCreationState = !customizing && visibleItems.every(item => isDefaultWidget(item.id))
   const showOnboarding =
     !hasSentMessageFromMoi && widgets.every(widget => isDefaultWidget(widget.id))
 
