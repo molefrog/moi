@@ -98,11 +98,11 @@ describe('color themes', () => {
     expect(deriveThemeColors(primary)).toEqual({
       primary,
       primaryForeground: 'oklch(0 0 0)',
-      background: 'color-mix(in srgb, var(--primary) 3%, oklch(1 0 0) 97%)',
+      background: 'color-mix(in srgb, var(--primary) 2%, oklch(1 0 0) 98%)',
       foreground: 'color-mix(in srgb, var(--primary) 20%, oklch(0 0 0) 80%)',
       muted: 'color-mix(in srgb, var(--background) 97%, var(--foreground) 3%)',
       mutedForeground: 'color-mix(in srgb, var(--background) 50%, var(--foreground) 50%)',
-      accent: 'color-mix(in srgb, var(--primary) 4%, var(--foreground) 4%)',
+      accent: 'color-mix(in srgb, var(--primary) 3%, var(--foreground) 4%)',
       accentForeground: 'var(--foreground)',
       border: 'color-mix(in srgb, var(--foreground) 7%, transparent)',
       ring: 'color-mix(in srgb, var(--background) 50%, var(--primary) 50%)'
@@ -114,13 +114,13 @@ describe('color themes', () => {
     const colors = deriveThemeColors(primary, 'widget')
 
     expect(colors).toEqual({
-      primary: 'color-mix(in srgb, var(--background) 3%, oklch(1 0 0) 97%)',
+      primary: 'color-mix(in srgb, var(--background) 2%, oklch(1 0 0) 98%)',
       primaryForeground: 'color-mix(in srgb, var(--background) 20%, oklch(0 0 0) 80%)',
       background: primary,
       foreground: 'oklch(0 0 0)',
       muted: 'color-mix(in srgb, var(--background) 97%, var(--foreground) 3%)',
       mutedForeground: 'color-mix(in srgb, var(--background) 50%, var(--foreground) 50%)',
-      accent: 'color-mix(in srgb, var(--primary) 4%, var(--foreground) 4%)',
+      accent: 'color-mix(in srgb, var(--primary) 3%, var(--foreground) 4%)',
       accentForeground: 'var(--foreground)',
       border: 'color-mix(in srgb, var(--foreground) 15%, transparent)',
       ring: 'color-mix(in srgb, var(--background) 50%, var(--primary) 50%)'
