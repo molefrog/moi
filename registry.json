@@ -19,7 +19,7 @@
           "type": "registry:lib"
         }
       ],
-      "docs": "# Drawer\n\nUse Drawer for a side panel that stays inside its applet. Every DrawerContent must contain a DrawerTitle; use className=\"sr-only\" when the title should be visually hidden. Put growing content in DrawerBody so the header and footer stay in place. Compose custom triggers and close buttons with Base UI's render prop.\n\n```tsx\n<Drawer>\n  <DrawerTrigger render={<Button variant=\"outline\" />}>Details</DrawerTrigger>\n  <DrawerContent>\n    <DrawerHeader>\n      <DrawerTitle>Order details</DrawerTitle>\n      <DrawerDescription>Placed two days ago</DrawerDescription>\n    </DrawerHeader>\n    <DrawerBody>...</DrawerBody>\n    <DrawerFooter>\n      <DrawerClose render={<Button />}>Done</DrawerClose>\n    </DrawerFooter>\n  </DrawerContent>\n</Drawer>\n```"
+      "docs": "# Drawer\n\nUse Drawer for a side panel that stays inside its applet. Every DrawerContent must contain a DrawerTitle; use className=\"sr-only\" when the title should be visually hidden. Put growing content in DrawerBody so the header and footer stay in place. DrawerContent has a 1rem inset by default; override it with className=\"[--drawer-inset:0px]\". Compose custom triggers and close buttons with Base UI's render prop.\n\n```tsx\n<Drawer>\n  <DrawerTrigger render={<Button variant=\"outline\" />}>Details</DrawerTrigger>\n  <DrawerContent>\n    <DrawerHeader>\n      <DrawerTitle>Order details</DrawerTitle>\n      <DrawerDescription>Placed two days ago</DrawerDescription>\n    </DrawerHeader>\n    <DrawerBody>...</DrawerBody>\n    <DrawerFooter>\n      <DrawerClose render={<Button />}>Done</DrawerClose>\n    </DrawerFooter>\n  </DrawerContent>\n</Drawer>\n```"
     }
   ]
 }

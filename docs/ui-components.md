@@ -249,52 +249,26 @@ host `:root`, not the widget frame's inline per-widget derivations
 a heavily themed workspace can show slightly off-theme popups. Copying
 frame tokens onto the wrapper is a possible follow-up.
 
-The `drawer` is the deliberate exception: it portals INTO the view's applet
-root instead of out to body, because covering only the view is its point
-(next section). Being inside the root, it needs no scope wrapper.
+Drawer is the exception: it stays inside the applet root so it covers only the
+current view.
 
 ## moi registry (decided: local-first source registry)
 
-Some jobs the registry only solves page-wide. Its `sheet`/`drawer` are
-`position: fixed` overlays portalled to body — page chrome the curated set
-leaves out — yet inside a view the same need is common: a detail pane next
-to a table, a filter sheet. Moi-authored components live in the root
-`registry.json` and referenced files under `ui-components/`. Both ship in the
-`moi-computer` package, so the catalog can use the short `drawer` name and load
-it without network access. The public GitHub repository remains a source
-registry for direct `molefrog/moi/drawer` installs. No server, build output, or
-namespace is involved.
+Moi-owned components are declared in the root `registry.json`, with their
+sources under `ui-components/`. Both ship in the `moi-computer` package, so
+`moi ui-components add drawer` and `moi ui-components docs drawer` work without
+network access. Components missing from the local registry continue through
+shadcn's online registry. The public GitHub repository also supports direct
+`molefrog/moi/drawer` installs.
 
-Drawer declares its npm dependencies, source file, `utils.ts` support file, and
-short usage docs in `registry.json`. Its source uses the standard
-`@/registry/moi/lib/utils` authoring import. The normal moi transform rewrites
-that to `./utils` before writing `.moi/ui/drawer.tsx`. The support file stays
-protected by the existing no-overwrite rule. `moi ui-components docs drawer`
-reads the item's bundled `docs` field through the same registry API.
+Drawer is the first moi-owned component. It keeps shadcn's familiar component
+structure and styling, with three deliberate differences:
 
-The `drawer` (`.moi/ui/drawer.tsx`) is the first such entry: a panel over Base
-UI's Dialog, scoped to the view it is used in. It opens from the right by
-default and also supports the other three edges.
-
-- **Portal target is the applet root.** `DrawerContent` renders a hidden
-  marker where it is used, reads `closest('[data-applet]')`, and hands that
-  element to `Dialog.Portal`'s `container` (`null` until resolved — Base
-  UI waits on an explicit `null` rather than falling back to body). Backdrop
-  and popup are `position: absolute` against it, so the panel covers the
-  view and nothing else; the applet's scoped CSS matches without a wrapper.
-- **The host guarantees the view root is a positioned, non-scrolling box.**
-  `ViewFrame` is the `absolute inset-0 isolate` frame with the
-  `overflow-auto` scroller moved to a child — an absolutely positioned
-  panel inside a scroll container would scroll away with the view's content.
-- **Focus is trapped by default.** The rest of the workspace remains scrollable
-  and clickable. Callers can pass `modal={false}` to let focus leave the drawer.
-- **Backdrop and popup each use `z-50`** so raised view content such as a sticky
-  table header stays underneath. The view root is a stacking context, so the
-  drawer cannot escape the view.
-- **The popup and `DrawerBody` currently both own vertical overflow.** The
-  follow-up Drawer cleanup should reduce this to one scroll region.
-- **Transitions** use the `data-open` and `data-closed` animation utilities
-  supplied by `tw-animate-css`.
+- It renders inside the current applet and covers only that view.
+- It opens from the right by default, with the other three sides still
+  available.
+- It uses Base UI Dialog without gestures, snap points, or nested-drawer
+  machinery.
 
 ## Open items
 
