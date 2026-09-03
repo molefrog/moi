@@ -1,5 +1,12 @@
 {
   "extends": "./tsconfig.json",
-  "include": ["client/**/*.ts", "client/**/*.tsx", "client/**/*.d.ts", "lib/**/*.ts"],
+  "include": [
+    "client/**/*.ts",
+    "client/**/*.tsx",
+    "client/**/*.d.ts",
+    "lib/**/*.ts",
+    "ui-components/**/*.ts",
+    "ui-components/**/*.tsx"
+  ],
   "exclude": ["node_modules"]
 }

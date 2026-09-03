@@ -491,11 +491,11 @@ describe('moi registry', () => {
 })
 
 describe('drawer source', () => {
-  test('uses registry imports that transform to workspace imports', async () => {
+  test('keeps its local utils import when installed', async () => {
     const { source } = await loadDrawerRegistryItem()
     const installed = await transformUiComponentSource('drawer.tsx', source)
 
-    expect(source).toContain("from '@/registry/moi/lib/utils'")
+    expect(source).toContain("from './utils'")
     expect(installed).toContain("from './utils'")
     expect(installed).toContain("from '@tabler/icons-react'")
     expect(installed).toContain("from '@base-ui/react/dialog'")

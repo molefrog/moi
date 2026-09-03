@@ -25,7 +25,7 @@ import * as React from 'react'
 import { Dialog as DrawerPrimitive } from '@base-ui/react/dialog'
 import { IconX } from '@tabler/icons-react'
 
-import { cn } from '@/registry/moi/lib/utils'
+import { cn } from './utils'
 
 // `trap-focus` keeps keyboard focus inside the open drawer without locking
 // page scroll or blocking pointer interaction with the rest of the workspace —

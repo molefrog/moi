@@ -32,5 +32,8 @@ jobs:
       - name: Validate registry
         run: bun run registry:validate
 
+      - name: Typecheck
+        run: bun run typecheck:client
+
       - name: Test
         run: bun test
