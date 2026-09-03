@@ -13,7 +13,7 @@ import { WidgetFrame } from './WidgetFrame'
 
 export type WidgetCanvasProps = {
   items: PositionedGridItem[]
-  editing?: boolean
+  customizing?: boolean
   header: ReactNode
   emptyState?: ReactNode
   bottomInset?: number
@@ -24,13 +24,13 @@ export type WidgetCanvasProps = {
 
 type WidgetGridProps = {
   items: PositionedGridItem[]
-  editing?: boolean
+  customizing?: boolean
   renderItem: (id: string) => ReactNode
   onMove?: (positions: GridPosition[]) => void
   onRemove?: (id: string) => void
 }
 
-function WidgetGrid({ items, editing, renderItem, onMove, onRemove }: WidgetGridProps) {
+function WidgetGrid({ items, customizing, renderItem, onMove, onRemove }: WidgetGridProps) {
   const [layout, setLayout] = useState<Layout>(() => packItems(items))
   const [previousItems, setPreviousItems] = useState(items)
   const { width, containerRef, mounted } = useContainerWidth({ measureBeforeMount: true })
@@ -68,7 +68,7 @@ function WidgetGrid({ items, editing, renderItem, onMove, onRemove }: WidgetGrid
           width={width}
           layout={layout}
           gridConfig={{ cols: 4, rowHeight: 160, margin: [8, 8], containerPadding: [0, 0] }}
-          dragConfig={{ enabled: !!editing }}
+          dragConfig={{ enabled: !!customizing }}
           resizeConfig={{ enabled: false }}
           compactor={verticalCompactor}
           onLayoutChange={handleLayoutChange}
@@ -82,7 +82,7 @@ function WidgetGrid({ items, editing, renderItem, onMove, onRemove }: WidgetGrid
                 transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
               >
                 <WidgetFrame
-                  editing={editing}
+                  customizing={customizing}
                   widgetId={item.i}
                   onRemove={onRemove ? () => onRemove(item.i) : undefined}
                 >
@@ -99,7 +99,7 @@ function WidgetGrid({ items, editing, renderItem, onMove, onRemove }: WidgetGrid
 
 export function WidgetCanvas({
   items,
-  editing,
+  customizing,
   header,
   emptyState,
   bottomInset = 0,
@@ -118,7 +118,7 @@ export function WidgetCanvas({
         {items.length > 0 && (
           <WidgetGrid
             items={items}
-            editing={editing}
+            customizing={customizing}
             renderItem={renderItem}
             onMove={onMove}
             onRemove={onRemove}

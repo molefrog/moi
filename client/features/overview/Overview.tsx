@@ -64,9 +64,9 @@ function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
 }
 
 type OverviewHeaderProps = {
-  editing: boolean
+  customizing: boolean
   styling: boolean
-  onEditingChange: (editing: boolean) => void
+  onCustomizingChange: (customizing: boolean) => void
   onStyle: () => void
 }
 
@@ -112,7 +112,12 @@ function OverviewHeaderAction({
   )
 }
 
-function OverviewHeader({ editing, styling, onEditingChange, onStyle }: OverviewHeaderProps) {
+function OverviewHeader({
+  customizing,
+  styling,
+  onCustomizingChange,
+  onStyle
+}: OverviewHeaderProps) {
   return (
     <div className="flex size-full items-center gap-4">
       <WorkspaceName />
@@ -120,8 +125,8 @@ function OverviewHeader({ editing, styling, onEditingChange, onStyle }: Overview
         <OverviewHeaderAction
           Icon={IconReplace}
           label="Customize"
-          active={editing}
-          onClick={() => onEditingChange(!editing)}
+          active={customizing}
+          onClick={() => onCustomizingChange(!customizing)}
         />
         <OverviewHeaderAction
           Icon={IconLetterCase}
@@ -156,10 +161,10 @@ type OverviewProps = {
   onCreateWidget: () => void
   onCreateView: () => void
   onOpenView: (viewId: string) => void
-  editing: boolean
+  customizing: boolean
   styling: boolean
   onStyle: () => void
-  onEditingChange: (editing: boolean) => void
+  onCustomizingChange: (customizing: boolean) => void
   // Authoritative widget set from useWidgets; positions come from layout.
   widgets: WidgetInfo[]
   views: ViewInfo[]
@@ -170,10 +175,10 @@ export function Overview({
   onCreateWidget,
   onCreateView,
   onOpenView,
-  editing,
+  customizing,
   styling,
   onStyle,
-  onEditingChange,
+  onCustomizingChange,
   widgets,
   views,
   builders
@@ -196,11 +201,11 @@ export function Overview({
   const showCreationState = visibleItems.every(item => isDefaultWidget(item.id))
 
   const [panelRef, panelHeight] = usePanelHeight()
-  const panelOpen = editing
+  const panelOpen = customizing
 
   useAppletThumbnails({
     kind: 'widget',
-    enabled: !editing,
+    enabled: !customizing,
     targets: visibleItems
       .filter(item => !isDefaultWidget(item.id))
       .map(item => ({
@@ -240,12 +245,12 @@ export function Overview({
       <LayoutGroup>
         <WidgetCanvas
           items={visibleItems}
-          editing={editing}
+          customizing={customizing}
           header={
             <OverviewHeader
-              editing={editing}
+              customizing={customizing}
               styling={styling}
-              onEditingChange={onEditingChange}
+              onCustomizingChange={onCustomizingChange}
               onStyle={onStyle}
             />
           }
@@ -259,13 +264,13 @@ export function Overview({
         />
 
         <AnimatePresence>
-          {editing && (
+          {customizing && (
             <HiddenPanel
               ref={panelRef}
               items={hiddenItems}
               renderItem={renderItem}
               onCreateWidget={onCreateWidget}
-              onClose={() => onEditingChange(false)}
+              onClose={() => onCustomizingChange(false)}
               onRestore={restore}
             />
           )}

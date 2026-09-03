@@ -107,7 +107,7 @@ type WorkspaceScreenProps = {
   builders: ViewBuilderData[]
 }
 
-type WidgetMode = 'idle' | 'editing' | 'styling'
+type WidgetMode = 'idle' | 'customizing' | 'styling'
 
 function tabItemFor(
   tab: WorkspaceTabId,
@@ -591,10 +591,12 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
             tabbedChat
           ) : activeTab === 'overview' ? (
             <Overview
-              editing={widgetMode === 'editing'}
+              customizing={widgetMode === 'customizing'}
               styling={widgetMode === 'styling'}
               onStyle={() => setWidgetMode(widgetMode === 'styling' ? 'idle' : 'styling')}
-              onEditingChange={editing => setWidgetMode(editing ? 'editing' : 'idle')}
+              onCustomizingChange={customizing =>
+                setWidgetMode(customizing ? 'customizing' : 'idle')
+              }
               widgets={widgets}
               views={views}
               builders={builders}

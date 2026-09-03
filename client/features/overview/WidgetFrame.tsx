@@ -12,14 +12,20 @@ import { getWorkspaceThemeStyle } from '@/client/runtime/workspace-theme'
 import { isDefaultWidget } from '@/lib/default-widgets'
 
 type WidgetFrameProps = {
-  editing?: boolean
+  customizing?: boolean
   hidden?: boolean
   widgetId?: string
   onRemove?: () => void
   children?: ReactNode
 }
 
-export function WidgetFrame({ editing, hidden, widgetId, onRemove, children }: WidgetFrameProps) {
+export function WidgetFrame({
+  customizing,
+  hidden,
+  widgetId,
+  onRemove,
+  children
+}: WidgetFrameProps) {
   const theme = useWorkspaceThemeSetting()
   const vivid = !widgetId || !isDefaultWidget(widgetId)
 
@@ -34,7 +40,7 @@ export function WidgetFrame({ editing, hidden, widgetId, onRemove, children }: W
           }
         }
       }}
-      animate={editing ? 'wiggle' : 'idle'}
+      animate={customizing ? 'wiggle' : 'idle'}
       transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
       className="group/widget relative size-full"
     >
@@ -46,13 +52,13 @@ export function WidgetFrame({ editing, hidden, widgetId, onRemove, children }: W
         style={vivid ? getWorkspaceThemeStyle(theme, 'widget') : undefined}
         className={cn(
           'absolute inset-0 overflow-hidden rounded-2xl text-foreground [corner-shape:superellipse(1.2)]',
-          editing && 'pointer-events-none'
+          customizing && 'pointer-events-none'
         )}
       >
         {children}
       </div>
 
-      {editing && onRemove && (
+      {customizing && onRemove && (
         <div className="absolute -top-2 -right-2 opacity-0 transition-opacity group-hover/widget:opacity-100">
           <Button
             size="icon-sm"
