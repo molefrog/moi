@@ -13,8 +13,8 @@
 // So every build batch runs in a fresh `bun` child: the child imports this
 // module as its entry, receives one `BuildRequest` over IPC, compiles each job
 // with `buildApplet`, writes the bundle dirs, replies with a `BuildResponse`,
-// and exits. A cold child costs ~150ms (the TS compiler used for `.server.ts`
-// validation loads lazily), which is noise next to a Tailwind build — and a
+// and exits. A cold child costs ~150ms, almost all of it importing this
+// module's graph (bun-plugin-tailwind, applet-css, @babel/parser) — and a
 // crash inside Bun's bundler no longer takes the server down with it.
 //
 // `buildApplet` itself stays in-process-capable: tests call it directly, and
