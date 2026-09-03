@@ -114,7 +114,11 @@ export function WidgetGrid({
       editing={editing}
       onLayoutChange={onLayoutChange}
       renderItem={id => (
-        <WidgetFrame editing={editing} onRemove={onRemove ? () => onRemove(id) : undefined}>
+        <WidgetFrame
+          editing={editing}
+          widgetId={id}
+          onRemove={onRemove ? () => onRemove(id) : undefined}
+        >
           {renderItem(id)}
         </WidgetFrame>
       )}
