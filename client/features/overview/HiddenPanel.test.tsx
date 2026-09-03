@@ -17,7 +17,7 @@ describe('HiddenPanel', () => {
       })
     )
 
-    expect(html).toContain('Hidden widgets')
+    expect(html).toContain('Widgets')
     expect(html).toContain('New widget')
   })
 })
