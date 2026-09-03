@@ -4,21 +4,18 @@
 // turn (URL segment + layout + what actually exists) into the rendered state.
 import type { ViewBuilder, ViewInfo, WorkspaceTabId, WorkspaceTabsState } from '@/lib/types'
 import { parseWorkspaceTab, viewBuilderIdFromTab, viewIdFromTab } from '@/lib/workspace-tabs'
-import { createDefaultWorkspaceTabs } from '@/lib/workspace-layout'
+import { createDefaultWorkspaceTabs, normalizeWorkspaceTabs } from '@/lib/workspace-layout'
 
 const DEFAULT_TABS = createDefaultWorkspaceTabs()
 
 export function normalizeTabsState(tabs: WorkspaceTabsState | undefined): WorkspaceTabsState {
-  if (!tabs || !Array.isArray(tabs.open)) return DEFAULT_TABS
-  const open = tabs.open.filter((tab, index, all) => all.indexOf(tab) === index)
-  if (open.length === 0) return DEFAULT_TABS
-  return { open, active: open.includes(tabs.active) ? tabs.active : open[0] }
+  return normalizeWorkspaceTabs(tabs)
 }
 
 // Whether a tab id points at something that exists: static tabs always do,
 // view/builder tabs only while their view or builder is around.
 export function tabAvailable(tab: WorkspaceTabId, views: ViewInfo[], builders: ViewBuilder[]) {
-  if (tab === 'agent' || tab === 'widgets' || tab === 'scratchpad') return true
+  if (tab === 'agent' || tab === 'overview' || tab === 'scratchpad') return true
   const builderId = viewBuilderIdFromTab(tab)
   if (builderId) return builders.some(builder => builder.id === builderId)
   const viewId = viewIdFromTab(tab)
@@ -71,5 +68,5 @@ export function resolveActiveTab(
   }
   const open = effectiveOpenTabs(tabs, views, builders)
   const visible = split ? open.filter(tab => tab !== 'agent') : open
-  return visible.includes(tabs.active) ? tabs.active : (visible[0] ?? 'agent')
+  return visible.includes(tabs.active) ? tabs.active : (visible[0] ?? 'overview')
 }

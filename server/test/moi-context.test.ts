@@ -126,7 +126,7 @@ describe('moi context envelope', () => {
 
   test('an applet message with no context renders without a context line', () => {
     const rendered = renderMoiContext({
-      activeTab: 'widgets',
+      activeTab: 'overview',
       applet: { source: 'view:board' }
     })
     expect(rendered).toContain('the "board" view (.moi/views/board.tsx) sent it')
@@ -170,7 +170,7 @@ describe('moi context envelope', () => {
 
   test('an oversized applet context is truncated, not sent whole', () => {
     const rendered = renderMoiContext({
-      activeTab: 'widgets',
+      activeTab: 'overview',
       applet: { source: 'widget:noisy', context: { blob: 'x'.repeat(5000) } }
     })
     expect(rendered).toContain('… (truncated)')

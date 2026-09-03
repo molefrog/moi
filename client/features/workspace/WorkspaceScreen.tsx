@@ -155,12 +155,13 @@ function tabItemFor(
       loading: agentRunning
     }
   }
-  if (tab === 'widgets') {
+  if (tab === 'overview') {
     return {
       key: tab,
       Icon: IconLayout2,
-      label: 'Widgets',
-      closable
+      label: 'Overview',
+      closable: false,
+      reorderable: false
     }
   }
   if (tab === 'scratchpad') {
@@ -311,7 +312,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const activeDraftBuilderId = activeDraftBuilder?.id
   const canAnnotate =
     widgetMode === 'idle' &&
-    ((activeTab === 'widgets' && hasAppletWidgets) || activeView !== undefined)
+    ((activeTab === 'overview' && hasAppletWidgets) || activeView !== undefined)
   const annotation = useChatAnnotation({
     workspaceId,
     sessionId,
@@ -366,7 +367,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     }
     if (!changed) return
     const active = replacements.get(tabsState.active) ?? tabsState.active
-    setLayout({ tabs: { open: open.length > 0 ? open : ['agent'], active } })
+    setLayout({ tabs: { open: open.length > 0 ? open : ['overview'], active } })
   }, [activeTab, builders, navigateToTab, setLayout, tabsState, views])
 
   useEffect(() => {
@@ -423,18 +424,19 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   })
 
   const closeTab = (tab: WorkspaceTabId) => {
+    if (tab === 'overview') return
     const builderId = viewBuilderIdFromTab(tab)
     const builder = builderId ? builders.find(candidate => candidate.id === builderId) : undefined
     if ((!canCloseTabs && !builder) || !openSet.has(tab)) return
     let open = tabsState.open.filter(t => t !== tab)
-    if (open.length === 0) open = ['agent']
+    if (open.length === 0) open = ['overview']
     // The neighbor that takes over when the tab on screen closes.
     const visibleIndex = visibleTabIds.indexOf(tab)
     const nextTab =
       visibleTabIds[visibleIndex + 1] ??
       visibleTabIds[visibleIndex - 1] ??
       open.find(t => tabAvailable(t, views, builders)) ??
-      'agent'
+      'overview'
     const active =
       tabsState.active === tab || !open.includes(tabsState.active) ? nextTab : tabsState.active
     // Persist the open set BEFORE navigating so the sync effect (which reads
@@ -452,7 +454,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     const tab = viewBuilderTabId(builder.id)
     if (openSet.has(tab)) {
       let open = tabsState.open.filter(item => item !== tab)
-      if (open.length === 0) open = ['agent']
+      if (open.length === 0) open = ['overview']
       setTabs({ open, active: tabsState.active === tab ? open[0] : tabsState.active })
       if (activeTab === tab) navigateToTab(open[0])
     }
@@ -494,16 +496,6 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
             Icon: IconMessages,
             label: 'Agent',
             onClick: () => openTab('agent')
-          }
-        ] satisfies CreateWorkspaceTabItem[])
-      : []),
-    ...(!openSet.has('widgets')
-      ? ([
-          {
-            key: 'widgets',
-            Icon: IconLayout2,
-            label: 'Widgets',
-            onClick: () => openTab('widgets')
           }
         ] satisfies CreateWorkspaceTabItem[])
       : []),
@@ -625,7 +617,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
         >
           {activeTab === 'agent' ? (
             tabbedChat
-          ) : activeTab === 'widgets' ? (
+          ) : activeTab === 'overview' ? (
             <Widgets
               workspaceName={name ?? 'Workspace'}
               editing={widgetMode === 'editing'}
@@ -693,7 +685,9 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       </div>
 
       <AnimatePresence>
-        {widgetMode === 'customizing' && <CustomizePanel onClose={() => setWidgetMode('idle')} />}
+        {activeTab === 'overview' && widgetMode === 'customizing' && (
+          <CustomizePanel onClose={() => setWidgetMode('idle')} />
+        )}
       </AnimatePresence>
 
       <PanelHeader>

@@ -83,7 +83,7 @@ export const WORKSPACE_ANALYSIS_PROMPT = {
 } satisfies ChatPrompt
 
 export type ChatEmptyStateKind = 'view-builder' | 'welcome' | 'explore-workspace' | 'empty'
-export type WelcomeDestination = 'agent' | 'widgets' | 'views' | 'scratchpad'
+export type WelcomeDestination = 'agent' | 'overview' | 'views' | 'scratchpad'
 
 type ResolveChatEmptyStateOptions = {
   isViewBuilderDraft: boolean
@@ -199,8 +199,8 @@ function WelcomeState({
           </p>
           <p>
             Ask agent to build{' '}
-            <WelcomeTerm Icon={IconLayout2} destination="widgets" onNavigate={onNavigate}>
-              Widgets
+            <WelcomeTerm Icon={IconLayout2} destination="overview" onNavigate={onNavigate}>
+              widgets on Overview
             </WelcomeTerm>{' '}
             that surface information and quick actions, or entire{' '}
             <WelcomeTerm Icon={IconArticle} destination="views" onNavigate={onNavigate}>

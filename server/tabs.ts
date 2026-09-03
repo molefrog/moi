@@ -14,8 +14,8 @@ export type TabRow = {
 
 // The always-present tabs, titled like the tab bar renders them.
 const STATIC_TABS: { id: WorkspaceTabId; title: string }[] = [
+  { id: 'overview', title: 'Overview' },
   { id: 'agent', title: 'Agent' },
-  { id: 'widgets', title: 'Widgets' },
   { id: 'scratchpad', title: 'Scratchpad' }
 ]
 

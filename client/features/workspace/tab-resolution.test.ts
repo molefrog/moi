@@ -23,18 +23,18 @@ const tabs = (open: WorkspaceTabsState['open'], active: WorkspaceTabsState['acti
 describe('normalizeTabsState', () => {
   test('falls back to defaults on missing/empty state', () => {
     expect(normalizeTabsState(undefined)).toEqual({
-      open: ['agent', 'widgets', 'scratchpad'],
-      active: 'agent'
+      open: ['overview', 'agent', 'scratchpad'],
+      active: 'overview'
     })
     expect(normalizeTabsState(tabs([], 'agent'))).toEqual({
-      open: ['agent', 'widgets', 'scratchpad'],
-      active: 'agent'
+      open: ['overview', 'agent', 'scratchpad'],
+      active: 'overview'
     })
   })
 
-  test('dedupes open and repairs an active outside the open set', () => {
-    expect(normalizeTabsState(tabs(['agent', 'agent', 'widgets'], 'scratchpad'))).toEqual({
-      open: ['agent', 'widgets'],
+  test('pins Overview first, dedupes open, and preserves a valid active tab', () => {
+    expect(normalizeTabsState(tabs(['agent', 'overview', 'agent'], 'agent'))).toEqual({
+      open: ['overview', 'agent'],
       active: 'agent'
     })
   })
@@ -42,8 +42,8 @@ describe('normalizeTabsState', () => {
 
 describe('tabAvailable', () => {
   test('static tabs always exist', () => {
+    expect(tabAvailable('overview', [], [])).toBe(true)
     expect(tabAvailable('agent', [], [])).toBe(true)
-    expect(tabAvailable('widgets', [], [])).toBe(true)
     expect(tabAvailable('scratchpad', [], [])).toBe(true)
   })
 
@@ -64,18 +64,18 @@ describe('effectiveOpenTabs', () => {
 
   test('falls back to the default open set when nothing survives', () => {
     expect(effectiveOpenTabs(tabs(['view:gone'], 'view:gone'), [], [])).toEqual([
+      'overview',
       'agent',
-      'widgets',
       'scratchpad'
     ])
   })
 })
 
 describe('resolveActiveTab', () => {
-  const state = tabs(['agent', 'widgets', 'view:orders'], 'widgets')
+  const state = tabs(['overview', 'agent', 'view:orders'], 'overview')
 
   test('a bare URL resolves to the saved default', () => {
-    expect(resolveActiveTab(null, state, views, [], false)).toBe('widgets')
+    expect(resolveActiveTab(null, state, views, [], false)).toBe('overview')
   })
 
   test('a valid URL tab wins, even when not in the open set', () => {
@@ -84,8 +84,8 @@ describe('resolveActiveTab', () => {
   })
 
   test('an unavailable URL tab falls back to the default', () => {
-    expect(resolveActiveTab('view:gone', state, views, [], false)).toBe('widgets')
-    expect(resolveActiveTab('view-builder:b2', state, views, [], false)).toBe('widgets')
+    expect(resolveActiveTab('view:gone', state, views, [], false)).toBe('overview')
+    expect(resolveActiveTab('view-builder:b2', state, views, [], false)).toBe('overview')
   })
 
   test('an unavailable saved default falls back to the first surviving tab', () => {
@@ -95,11 +95,11 @@ describe('resolveActiveTab', () => {
 
   test('when nothing survives, the default open set answers', () => {
     const dead = tabs(['view:gone'], 'view:gone')
-    expect(resolveActiveTab(null, dead, [], [], false)).toBe('agent')
+    expect(resolveActiveTab(null, dead, [], [], false)).toBe('overview')
   })
 
   test('split mode: agent is not a workspace tab, a visible tab is derived', () => {
-    expect(resolveActiveTab('agent', state, views, [], true)).toBe('widgets')
+    expect(resolveActiveTab('agent', state, views, [], true)).toBe('overview')
     const agentDefault = tabs(['agent', 'view:orders'], 'agent')
     expect(resolveActiveTab(null, agentDefault, views, [], true)).toBe('view:orders')
   })
@@ -129,7 +129,7 @@ describe('isStaleTabLink', () => {
 
   test('the agent tab is never stale — split mode redirects it by design', () => {
     expect(isStaleTabLink('agent')).toBe(false)
-    expect(isStaleTabLink('widgets')).toBe(false)
+    expect(isStaleTabLink('overview')).toBe(false)
     expect(isStaleTabLink('scratchpad')).toBe(false)
   })
 
