@@ -1,7 +1,7 @@
 # Custom Views
 
 **Key idea:** a workspace can define full-screen, full-stack "apps" — _views_ — that
-live in the workspace nav alongside Chat / Widgets / Scratchpad. Think dashboard
+live in the workspace nav alongside Agent / Overview / Scratchpad. Think dashboard
 pages: a users table, a kanban board, a CRM. At most one view is visible at a time;
 the user switches via the nav tabs.
 

@@ -12,7 +12,7 @@ import {
 } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { WorkspaceScreen } from '@/client/features/workspace/WorkspaceScreen'
 import { useViewBuilders, useViews } from '@/client/features/views/api'
-import { useWidgets } from '@/client/features/widgets/api'
+import { useWidgets } from '@/client/features/overview/api'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 
 type WorkspaceRouteProps = {

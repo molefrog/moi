@@ -33,7 +33,7 @@ Works with the harness you already use:
   fonts, color scheme and more.
 - **Scratchpad**. A shared canvas where you ideate together with the agent: ask
   it to draw diagrams, add feedback or comments, visualize knowledge and plans.
-- **Widgets**. A dynamic dashboard made of small apps wired to the data from
+- **Overview**. A dynamic home made of small widgets wired to the data from
   your workspace. They can be rearranged, modified, and completely customized.
 - **Views**. An app embedded in the workspace that lives in its own tab. Build
   complex interfaces: CRMs, task trackers, second brain storage, customer
@@ -41,7 +41,7 @@ Works with the harness you already use:
 
 <table>
   <tr>
-    <td align="center"><img src="assets/screenshots/moi-moi-dash-2.webp" alt="Widgets dashboard" /><br /><sub>Widgets wired to live project stats</sub></td>
+    <td align="center"><img src="assets/screenshots/moi-moi-dash-2.webp" alt="Overview" /><br /><sub>Widgets wired to live project stats</sub></td>
     <td align="center"><img src="assets/screenshots/moi-magazin-scratch-2.webp" alt="Scratchpad" /><br /><sub>Order funnel on the scratchpad, live from Postgres</sub></td>
     <td align="center"><img src="assets/screenshots/moi-magazin-products-2.webp" alt="Products view" /><br /><sub>Use the agent as a copilot when working with products</sub></td>
   </tr>

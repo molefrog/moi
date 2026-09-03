@@ -8,6 +8,23 @@ export type GridItem = {
   y?: number
 }
 
+export type PositionedGridItem = GridItem & {
+  x: number
+  y: number
+}
+
+export type GridPosition = {
+  id: string
+  x: number
+  y: number
+}
+
+type StoredGridItem = {
+  i: string
+  x: number
+  y: number
+}
+
 export function findFreePosition(
   existing: LayoutItem[],
   w: number,
@@ -38,4 +55,23 @@ export function packItems(items: GridItem[], existing: LayoutItem[] = [], cols =
     placed.push({ i: item.id, x, y, w: item.w, h: item.h })
   }
   return placed
+}
+
+export function findWidgetPosition(
+  existing: LayoutItem[],
+  w: number,
+  h: number
+): { x: number; y: number } {
+  return findFreePosition(existing, w, h, 4)
+}
+
+export function updateStoredGridPositions<T extends StoredGridItem>(
+  items: readonly T[],
+  positions: readonly GridPosition[]
+): T[] {
+  const positionById = new Map(positions.map(position => [position.id, position]))
+  return items.map(item => {
+    const position = positionById.get(item.i)
+    return position ? { ...item, x: position.x, y: position.y } : item
+  })
 }
