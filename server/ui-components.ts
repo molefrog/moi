@@ -2,10 +2,10 @@
 // package's own programmatic registry + transform APIs (see docs/ui-components.md
 // for the full spec and the research trail in PR #78).
 //
-// Opinions, enforced here: the upstream registry is the source of truth for
-// standard components (style `base-nova`, Base UI primitives, Tabler icons),
-// while moi-authored components come from the repository's GitHub registry;
-// the command exposes only a curated subset of both. No config files ever land
+// Opinions, enforced here: moi-authored components come from the source
+// registry bundled with the package, while standard components fall back to
+// the upstream registry (style `base-nova`, Base UI primitives, Tabler icons).
+// The command exposes only a curated subset of both. No config files ever land
 // in the workspace —
 // the engine takes its config as the in-memory object below; components are
 // written to `.moi/ui/` and imported relatively (`../ui/button`). The command
@@ -20,6 +20,8 @@
 // version` included.
 import type { Project, SourceFile } from 'ts-morph'
 import { join } from 'path'
+
+import { PACKAGE_ROOT } from './version'
 
 // ---------------------------------------------------------------------------
 // The curated catalog
@@ -38,7 +40,7 @@ export type UiComponentEntry = {
   extraDeps?: string[]
   // Docs slug when it differs from the entry name (none currently).
   docsSlug?: string
-  // Fetch docs from the entry's registry item instead of the upstream docs
+  // Load docs from the entry's registry item instead of the upstream docs
   // site. Used by moi-authored components such as Drawer.
   docs?: 'registry'
 }
@@ -128,7 +130,7 @@ export const UI_COMPONENTS: Record<string, UiComponentEntry> = {
   },
   drawer: {
     description: 'Right-side detail panel scoped to the current view',
-    registryItems: ['molefrog/moi/drawer'],
+    registryItems: ['drawer'],
     docs: 'registry'
   },
   'dropdown-menu': {
@@ -279,6 +281,11 @@ export type FetchedUiComponents = {
   dependencies: string[]
 }
 
+export type FetchUiComponentsOptions = {
+  registryRoot?: string
+  resolveRemote?: (registryNames: string[]) => Promise<FetchedUiComponents>
+}
+
 // Where a registry file lands in `.moi/ui/`. Registry paths look like
 // `registry/base-nova/ui/button.tsx`, `registry/base-nova/lib/utils.ts`,
 // `registry/base-nova/hooks/use-mobile.ts` — everything flattens into the one
@@ -288,9 +295,7 @@ function uiFileName(registryPath: string): string {
   return base
 }
 
-// Fetch and flatten the requested registry items with their dependencies.
-// `utils` (the `cn` helper) rides along on every fetch.
-export async function fetchUiComponents(registryNames: string[]): Promise<FetchedUiComponents> {
+async function fetchRemoteUiComponents(registryNames: string[]): Promise<FetchedUiComponents> {
   const { resolveRegistryItems } = await import('shadcn/registry')
   const tree = await resolveRegistryItems([...new Set(['utils', ...registryNames])], {
     config: ENGINE_CONFIG
@@ -306,10 +311,69 @@ export async function fetchUiComponents(registryNames: string[]): Promise<Fetche
   }
 }
 
-export async function fetchUiComponentDocs(registryName: string): Promise<string> {
+async function localRegistryNames(registryRoot: string): Promise<Set<string>> {
+  if (!(await Bun.file(join(registryRoot, 'registry.json')).exists())) return new Set()
+  const { loadRegistry } = await import('shadcn/registry')
+  const registry = await loadRegistry({ cwd: registryRoot })
+  return new Set(registry.items.map(item => item.name))
+}
+
+// Fetch requested items from the registry shipped with moi first. Only names
+// missing there reach the upstream shadcn registry. Local files win collisions
+// so a moi component and its support files always stay together.
+export async function fetchUiComponents(
+  registryNames: string[],
+  options: FetchUiComponentsOptions = {}
+): Promise<FetchedUiComponents> {
+  const registryRoot = options.registryRoot ?? PACKAGE_ROOT
+  const names = [...new Set(registryNames)]
+  const availableLocally = await localRegistryNames(registryRoot)
+  const local = names.filter(name => availableLocally.has(registryItemName(name)))
+  const remote = names.filter(name => !availableLocally.has(registryItemName(name)))
+  const files = new Map<string, string>()
+  const dependencies = new Set<string>()
+
+  if (local.length > 0) {
+    const { loadRegistryItem } = await import('shadcn/registry')
+    for (const name of local) {
+      const item = await loadRegistryItem(registryItemName(name), { cwd: registryRoot })
+      for (const file of item.files ?? []) {
+        if (file.content) files.set(uiFileName(file.path), file.content)
+      }
+      for (const dependency of item.dependencies ?? []) dependencies.add(dependency)
+    }
+  }
+
+  if (remote.length > 0) {
+    const resolveRemote = options.resolveRemote ?? fetchRemoteUiComponents
+    const resolved = await resolveRemote(remote)
+    for (const file of resolved.files) {
+      if (!files.has(file.name)) files.set(file.name, file.content)
+    }
+    for (const dependency of resolved.dependencies) dependencies.add(dependency)
+  }
+
+  return {
+    files: [...files.entries()].map(([name, content]) => ({ name, content })),
+    dependencies: [...dependencies].sort()
+  }
+}
+
+export async function fetchUiComponentDocs(
+  registryName: string,
+  registryRoot: string = PACKAGE_ROOT
+): Promise<string> {
+  const itemName = registryItemName(registryName)
+  const availableLocally = await localRegistryNames(registryRoot)
+  if (availableLocally.has(itemName)) {
+    const { loadRegistryItem } = await import('shadcn/registry')
+    const item = await loadRegistryItem(itemName, { cwd: registryRoot })
+    if (!item.docs) throw new Error(`Registry item "${registryName}" has no docs`)
+    return item.docs
+  }
+
   const { getRegistryItems } = await import('shadcn/registry')
   const items = await getRegistryItems([registryName], { config: ENGINE_CONFIG })
-  const itemName = registryItemName(registryName)
   const item = items?.find(candidate => candidate.name === itemName)
   if (!item?.docs) throw new Error(`Registry item "${registryName}" has no docs`)
   return item.docs

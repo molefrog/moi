@@ -33,6 +33,8 @@
     "client",
     "lib",
     "workspace",
+    "registry.json",
+    "ui-components",
     "bunfig.toml",
     "tsconfig.json",
     "dist",

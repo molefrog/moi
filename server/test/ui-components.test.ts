@@ -7,6 +7,8 @@ import {
   APPLET_PORTAL_SOURCE,
   UI_COMPONENTS,
   UI_COMPONENT_NAMES,
+  fetchUiComponentDocs,
+  fetchUiComponents,
   partitionUiWrites,
   planUiWrites,
   registryItemName,
@@ -324,18 +326,21 @@ describe('moi registry', () => {
       name: 'drawer',
       title: 'Drawer',
       type: 'registry:ui',
-      dependencies: ['@base-ui/react', '@tabler/icons-react'],
-      registryDependencies: ['utils'],
-      files: [{ path: 'ui-components/drawer.tsx', type: 'registry:ui' }]
+      dependencies: ['@base-ui/react', '@tabler/icons-react', 'clsx', 'tailwind-merge'],
+      files: [
+        { path: 'ui-components/drawer.tsx', type: 'registry:ui' },
+        { path: 'ui-components/utils.ts', type: 'registry:lib' }
+      ]
     })
+    expect(registry.items[0]?.registryDependencies).toBeUndefined()
     expect(registry.items[0]?.docs).toContain('Every DrawerContent must contain a DrawerTitle')
   })
 
-  test('drawer resolves to its GitHub registry item', () => {
+  test('drawer resolves to the local-first registry name', () => {
     const request = resolveUiComponentRequest(['drawer'])
 
     expect(request.entries).toEqual(['drawer'])
-    expect(request.registryItems).toEqual(['molefrog/moi/drawer'])
+    expect(request.registryItems).toEqual(['drawer'])
     expect(request.unknown).toEqual([])
   })
 
@@ -343,7 +348,7 @@ describe('moi registry', () => {
     const request = resolveUiComponentRequest(['drawer', 'button', 'drawer'])
 
     expect(request.entries).toEqual(['drawer', 'button'])
-    expect(request.registryItems).toEqual(['molefrog/moi/drawer', 'button'])
+    expect(request.registryItems).toEqual(['drawer', 'button'])
   })
 
   test('uses the final address segment for installed files', () => {
@@ -354,13 +359,13 @@ describe('moi registry', () => {
     expect(uiComponentFiles('date-picker')).toEqual(['calendar.tsx', 'popover.tsx', 'button.tsx'])
   })
 
-  test('plans GitHub registry files as requested transformed writes', () => {
+  test('plans local registry files as requested transformed writes', () => {
     const plans = planUiWrites({
       files: [
         { name: 'utils.ts', content: 'utils' },
         { name: 'drawer.tsx', content: 'drawer' }
       ],
-      requestedItems: ['molefrog/moi/drawer'],
+      requestedItems: ['drawer'],
       uiDir: '/ws/.moi/ui',
       exists: () => false
     })
@@ -369,6 +374,119 @@ describe('moi registry', () => {
     expect(byName.get('drawer.tsx')).toMatchObject({ support: false, verbatim: false })
     expect(byName.get('utils.ts')).toMatchObject({ support: true, verbatim: false })
     expect(byName.get('applet-portal.tsx')).toMatchObject({ support: true, verbatim: true })
+  })
+
+  test('loads Drawer and its docs locally without calling the remote resolver', async () => {
+    let remoteCalled = false
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = () => Promise.reject(new Error('network access attempted'))
+
+    try {
+      const fetched = await fetchUiComponents(['drawer'], {
+        resolveRemote: async () => {
+          remoteCalled = true
+          throw new Error('remote resolver called')
+        }
+      })
+      const docs = await fetchUiComponentDocs('drawer')
+
+      expect(remoteCalled).toBeFalse()
+      expect(fetched.files.map(file => file.name)).toEqual(['drawer.tsx', 'utils.ts'])
+      expect(fetched.dependencies).toEqual([
+        '@base-ui/react',
+        '@tabler/icons-react',
+        'clsx',
+        'tailwind-merge'
+      ])
+      expect(docs).toContain('Every DrawerContent must contain a DrawerTitle')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  test('routes missing local items to shadcn', async () => {
+    let remoteNames: string[] = []
+    const fetched = await fetchUiComponents(['button'], {
+      resolveRemote: async names => {
+        remoteNames = names
+        return {
+          files: [{ name: 'button.tsx', content: 'button' }],
+          dependencies: ['@base-ui/react']
+        }
+      }
+    })
+
+    expect(remoteNames).toEqual(['button'])
+    expect(fetched).toEqual({
+      files: [{ name: 'button.tsx', content: 'button' }],
+      dependencies: ['@base-ui/react']
+    })
+  })
+
+  test('fails when a declared local source file is missing', async () => {
+    const registryRoot = mkdtempSync(join(import.meta.dir, 'missing-registry-source-'))
+    writeFileSync(
+      join(registryRoot, 'registry.json'),
+      JSON.stringify({
+        $schema: 'https://ui.shadcn.com/schema/registry.json',
+        name: 'test',
+        homepage: 'https://example.com',
+        items: [
+          {
+            name: 'drawer',
+            type: 'registry:ui',
+            files: [{ path: 'missing.tsx', type: 'registry:ui' }]
+          }
+        ]
+      })
+    )
+    let remoteCalled = false
+
+    try {
+      await expect(
+        fetchUiComponents(['drawer'], {
+          registryRoot,
+          resolveRemote: async () => {
+            remoteCalled = true
+            return { files: [], dependencies: [] }
+          }
+        })
+      ).rejects.toThrow()
+      expect(remoteCalled).toBeFalse()
+    } finally {
+      rmSync(registryRoot, { recursive: true, force: true })
+    }
+  })
+
+  test('merges local and remote results with local files winning', async () => {
+    const fetched = await fetchUiComponents(['drawer', 'button'], {
+      resolveRemote: async () => ({
+        files: [
+          { name: 'utils.ts', content: 'remote utils' },
+          { name: 'button.tsx', content: 'button' }
+        ],
+        dependencies: ['@base-ui/react', 'class-variance-authority']
+      })
+    })
+
+    expect(fetched.files.map(file => file.name)).toEqual(['drawer.tsx', 'utils.ts', 'button.tsx'])
+    expect(fetched.files.find(file => file.name === 'utils.ts')?.content).toContain('twMerge')
+    expect(fetched.dependencies).toEqual([
+      '@base-ui/react',
+      '@tabler/icons-react',
+      'class-variance-authority',
+      'clsx',
+      'tailwind-merge'
+    ])
+  })
+
+  test('ships the local registry with the npm package', async () => {
+    const packageJson = (await Bun.file(join(REPO_ROOT, 'package.json')).json()) as {
+      files: string[]
+    }
+
+    expect(packageJson.files).toContain('registry.json')
+    expect(packageJson.files).toContain('ui-components')
   })
 })
 

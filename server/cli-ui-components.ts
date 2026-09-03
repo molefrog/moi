@@ -84,8 +84,8 @@ const add = defineCommand({
       console.error(
         '\n' +
           pc.red('✗') +
-          ' Could not reach the component registry. ' +
-          'The command needs network access; offline use is not supported.\n' +
+          ' Could not load the requested components. ' +
+          'Components bundled with moi work offline; other components need network access.\n' +
           pc.dim(`  ${(err as Error).message}\n`)
       )
       process.exit(1)

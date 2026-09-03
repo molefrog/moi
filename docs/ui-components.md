@@ -3,8 +3,8 @@
 `moi ui-components` is a curated component installer powered by the
 `shadcn` package's programmatic engine and wrapped in moi's conventions.
 The shadcn registry supplies standard components, while moi-authored components
-come from this repository's source registry. Base UI is the primitive layer,
-and the workspace needs no shadcn config files.
+come from the source registry bundled with the moi package. Base UI is the
+primitive layer, and the workspace needs no shadcn config files.
 
 Status: shipped (Aug 2026) — `server/ui-components.ts` (engine),
 `server/cli-ui-components.ts` (CLI), the synthetic-Tailwind vocabulary
@@ -35,9 +35,9 @@ and a curated subset instead of the full upstream catalog.
 - Components live in `.moi/ui/`, one fixed place, created on first use.
 - Applets import them relatively: `../ui/button`. Never `@/` aliases (the
   skill states this; unresolved imports already fail loudly at build).
-- No registry server or generated registry output. Standard components come
-  from shadcn and moi-authored components use the public GitHub repository;
-  offline is unsupported for now.
+- No registry server or generated registry output. Moi-authored components load
+  from the installed package and work offline. Names missing from that local
+  registry fall back to shadcn and need network access.
 - The command is deliberately not smart: it never rebuilds, never edits
   existing files, and installs dependencies only on explicit `--install`.
 
@@ -45,7 +45,7 @@ and a curated subset instead of the full upstream catalog.
 
 V1 (shipped):
 
-- `moi ui-components add <name…> [--force] [--install]` — fetches items
+- `moi ui-components add <name…> [--force] [--install]` — loads items
   (any number of names in one call), applies moi transforms, writes
   files to `.moi/ui/`. A **requested** file that exists is **skipped and
   reported** with a hint naming the `--force` flag, so a bulk add still
@@ -58,7 +58,7 @@ V1 (shipped):
   opt-in exception: it runs the `bun install` in `.moi/` itself (also
   materializing the pre-seeded baseline in older workspaces);
   rebuilding stays the agent's job.
-- `moi ui-components docs <name…>` — component docs fetched as markdown
+- `moi ui-components docs <name…>` — component docs loaded as markdown
   (`ui.shadcn.com/docs/components/base/<name>.md` serves raw markdown;
   works for the `data-table`/`date-picker` pattern pages too). For Drawer,
   the docs come from its registry item.
@@ -79,12 +79,12 @@ management.
 1. Validates names against the curated catalog (typos get suggestions),
    expands patterns (`date-picker` → `calendar` + `popover` + `button`,
    `data-table` → `table` + a note about `@tanstack/react-table`).
-2. `resolveRegistryItems(names, { config })` via the pinned `shadcn` package —
-   bare names resolve against shadcn and `molefrog/moi/drawer` resolves against
-   the public GitHub source registry. The config is a ~10-line object literal
-   inside moi (style `base-nova`, `iconLibrary: 'tabler'`);
-   shadcn resolves and flattens `registryDependencies`, and `utils` always
-   rides along.
+2. Read the source registry at the running package's root. Matching names load
+   with `loadRegistryItem`; missing names pass to
+   `resolveRegistryItems(names, { config })` against shadcn. The config is a
+   ~10-line object literal inside moi (style `base-nova`,
+   `iconLibrary: 'tabler'`). Local files win filename collisions, and remote
+   resolution is skipped when every requested item is bundled.
 3. `transformIcons` (shadcn's own, ts-morph): registry content ships
    `<IconPlaceholder lucide="…" tabler="…"/>`; the transform picks the
    tabler attribute and writes the `@tabler/icons-react` import. lucide
@@ -117,8 +117,8 @@ management.
   `class-variance-authority`, `clsx`, `tailwind-merge` — one install at
   workspace creation covers the common path (base-nova registry items
   declare no npm deps; upstream assumes init handled them).
-- The command never installs. The skill makes installation the agent's
-  job, prompted by `add`'s output.
+- Dependency installation is opt-in through `--install`. Otherwise the skill
+  leaves it to the agent, prompted by `add`'s output.
 - Old workspaces (scaffolded before the pre-seed) are covered by the same
   fallback: the skill lists the required deps, a failing build is the
   signal, the agent adds them. Pre-seeding is the ideal path, not a
@@ -253,24 +253,24 @@ The `drawer` is the deliberate exception: it portals INTO the view's applet
 root instead of out to body, because covering only the view is its point
 (next section). Being inside the root, it needs no scope wrapper.
 
-## moi registry (decided: GitHub source registry)
+## moi registry (decided: local-first source registry)
 
 Some jobs the registry only solves page-wide. Its `sheet`/`drawer` are
 `position: fixed` overlays portalled to body — page chrome the curated set
 leaves out — yet inside a view the same need is common: a detail pane next
 to a table, a filter sheet. Moi-authored components live in the root
-`registry.json` and referenced files under `ui-components/`. The public GitHub
-repository is the registry: no server, build output, or namespace is involved.
-The catalog uses the GitHub address `molefrog/moi/drawer`, while users keep the
-short `moi ui-components add drawer` command.
+`registry.json` and referenced files under `ui-components/`. Both ship in the
+`moi-computer` package, so the catalog can use the short `drawer` name and load
+it without network access. The public GitHub repository remains a source
+registry for direct `molefrog/moi/drawer` installs. No server, build output, or
+namespace is involved.
 
-Drawer declares its npm dependencies, the built-in shadcn `utils` registry
-dependency, source file, and short usage docs in `registry.json`. Its source
-uses the standard `@/registry/moi/lib/utils` authoring import. The normal moi
-transform rewrites that to `./utils` before writing `.moi/ui/drawer.tsx`, so
-the GitHub item follows the same install path as every upstream component.
-`moi ui-components docs drawer` reads the item's `docs` field through the same
-registry API.
+Drawer declares its npm dependencies, source file, `utils.ts` support file, and
+short usage docs in `registry.json`. Its source uses the standard
+`@/registry/moi/lib/utils` authoring import. The normal moi transform rewrites
+that to `./utils` before writing `.moi/ui/drawer.tsx`. The support file stays
+protected by the existing no-overwrite rule. `moi ui-components docs drawer`
+reads the item's bundled `docs` field through the same registry API.
 
 The `drawer` (`.moi/ui/drawer.tsx`) is the first such entry: a panel over Base
 UI's Dialog, scoped to the view it is used in. It opens from the right by
@@ -311,7 +311,8 @@ default and also supports the other three edges.
    dark set) — a theming change, tracked separately.
 2. **`moi ui-components` v1** — ✅ `add` / `docs` / `list` over the pinned
    engine + the portal codemod; prints next steps, does nothing else;
-   offline transform tests in `server/test/ui-components.test.ts`.
+   local-first loading and offline transform tests in
+   `server/test/ui-components.test.ts`.
 3. **Skill** — ✅ SKILL.md pointer + `references/UI-COMPONENTS.md` cheat
    sheet (catalog at a glance, install/rebuild responsibility, the
    relative-import rule, and component fit). Ships to every workspace as of
