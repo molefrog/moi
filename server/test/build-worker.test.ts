@@ -3,6 +3,11 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { dirname, join } from 'path'
 
 import { buildApplets } from '../applets'
+import {
+  buildAppletsInChild,
+  killBuildWorkers,
+  liveBuildWorkerCount
+} from '../bundler/build-worker'
 
 // The applet build loop compiles in a fresh child process per batch because
 // Bun's resolver cache is process-wide and permanent: a failed bare-specifier
@@ -122,5 +127,35 @@ describe('buildApplets compiles out of process', () => {
         config: { rowSpan: 2, colSpan: 3 }
       }
     ])
+  })
+
+  test('the child is reaped once its result is in, and none linger', async () => {
+    seed('.moi/widgets/ok.tsx', `export default function Ok() { return <div>ok</div> }`)
+    const { results } = await buildApplets(WS, 'widget', true)
+    expect(results[0]).toMatchObject({ status: 'built' })
+    expect(liveBuildWorkerCount()).toBe(0)
+  })
+
+  test('killBuildWorkers fails an in-flight batch instead of leaving it hanging', async () => {
+    const srcPath = seed(
+      '.moi/widgets/slow.tsx',
+      `export default function S() { return <div>s</div> }`
+    )
+    const pending = buildAppletsInChild({
+      moiRoot: join(WS, '.moi'),
+      kind: 'widget',
+      jobs: [{ name: 'slow', srcPath, outDir: join(WS, '.moi', '.build', 'widgets', 'slow') }]
+    })
+    expect(liveBuildWorkerCount()).toBe(1)
+    killBuildWorkers()
+    const results = await pending
+    expect(results).toEqual([
+      {
+        name: 'slow',
+        status: 'failed',
+        error: expect.stringContaining('Build worker exited (signal')
+      }
+    ])
+    expect(liveBuildWorkerCount()).toBe(0)
   })
 })

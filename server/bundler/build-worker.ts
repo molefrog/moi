@@ -12,10 +12,20 @@
 //
 // So every build batch runs in a fresh `bun` child: the child imports this
 // module as its entry, receives one `BuildRequest` over IPC, compiles each job
-// with `buildApplet`, writes the bundle dirs, replies with a `BuildResponse`,
-// and exits. A cold child costs ~150ms, almost all of it importing this
+// with `buildApplet`, writes the bundle dirs, and replies with a
+// `BuildResponse`. A cold child costs ~150ms, almost all of it importing this
 // module's graph (bun-plugin-tailwind, applet-css, @babel/parser) — and a
 // crash inside Bun's bundler no longer takes the server down with it.
+//
+// Lifecycle: the child never exits on its own after replying. `process.exit`
+// right after `process.send` drops the message once it outgrows the IPC pipe
+// buffer (~1MB — a handful of failed applets with long Bun diagnostics gets
+// there), so the parent kills the child once the result has arrived. The
+// child exits by itself only when the parent is gone: on IPC `disconnect`,
+// or when its parent pid changes (a crashed/SIGKILLed server never sends
+// disconnect, but the orphan is reparented). Live children are tracked so the
+// server's shutdown path can kill them — an untracked build outliving a dev
+// restart would keep rewriting `.build/` under the replacement server.
 //
 // `buildApplet` itself stays in-process-capable: tests call it directly, and
 // nothing here changes its contract.
@@ -55,6 +65,23 @@ export type BuildResponse = {
 }
 
 const WORKER_PATH = join(import.meta.dir, 'build-worker.ts')
+
+// Children currently compiling a batch, for `killBuildWorkers()`.
+const liveWorkers = new Set<ReturnType<typeof Bun.spawn>>()
+
+// How many build children are alive right now (tests assert none leak).
+export function liveBuildWorkerCount(): number {
+  return liveWorkers.size
+}
+
+// Kill every in-flight build child. Called from the server's shutdown path
+// (SIGTERM from the dev supervisor, Ctrl-C) alongside the function-worker pool
+// so a half-done bundle can't keep writing after the server is gone. Pending
+// batches settle as failed through `onExit`.
+export function killBuildWorkers(): void {
+  for (const proc of liveWorkers) proc.kill()
+  liveWorkers.clear()
+}
 
 // Compile every job and write its bundle dir. Runs inside the child, but is a
 // plain function so the batch semantics (parallel jobs, per-job failure
@@ -106,11 +133,17 @@ export function buildAppletsInChild(req: Omit<BuildRequest, 'type'>): Promise<Bu
     const proc = Bun.spawn([process.execPath, WORKER_PATH], {
       stdio: ['ignore', 'inherit', 'inherit'],
       serialization: 'json',
-      ipc(message) {
+      ipc(message, child) {
         const msg = message as Partial<BuildResponse>
-        if (msg.type === 'result' && Array.isArray(msg.results)) settle(msg.results)
+        if (msg.type !== 'result' || !Array.isArray(msg.results)) return
+        settle(msg.results)
+        // The result is in hand — the child has nothing left to do (see the
+        // lifecycle note above for why it doesn't exit on its own).
+        liveWorkers.delete(child)
+        child.kill()
       },
-      onExit(_proc, code, signal) {
+      onExit(child, code, signal) {
+        liveWorkers.delete(child)
         const why = signal ? `signal ${signal}` : `code ${code}`
         settle(
           req.jobs.map(job => ({
@@ -121,17 +154,25 @@ export function buildAppletsInChild(req: Omit<BuildRequest, 'type'>): Promise<Bu
         )
       }
     })
+    liveWorkers.add(proc)
     proc.send(request)
   })
 }
 
 if (import.meta.main) {
+  // Orphan guards — the only ways the child ends itself. See the lifecycle
+  // note at the top: the parent kills us after it has read the result.
+  const parentPid = process.ppid
+  process.on('disconnect', () => process.exit(0))
+  setInterval(() => {
+    if (process.ppid !== parentPid) process.exit(0)
+  }, 500)
+
   process.on('message', async message => {
     const req = message as Partial<BuildRequest>
     if (req.type !== 'build' || !Array.isArray(req.jobs)) return
     const results = await runBuildJobs(req as BuildRequest)
     const response: BuildResponse = { type: 'result', results }
     process.send?.(response)
-    process.exit(0)
   })
 }
