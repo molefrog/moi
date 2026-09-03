@@ -11,7 +11,7 @@ type UseViewBuilderDraftsOptions = {
 
 // Builder draft text lives in the UI store and is subscribed from the
 // composer, so a keystroke re-renders only the composer — never the workspace
-// screen with its tab bar, widgets, mounted views, and builder canvases. This
+// screen with its tab bar, Overview, mounted views, and builder canvases. This
 // hook owns the writes: the store update, the debounced server save, and the
 // cleanup when a builder leaves its draft state.
 export function useViewBuilderDrafts({ builders, onSave }: UseViewBuilderDraftsOptions) {

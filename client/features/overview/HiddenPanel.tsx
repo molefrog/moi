@@ -7,8 +7,8 @@ import { IconPlus } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
 import { cn } from '@/client/lib/cn'
-import { packItems } from '@/client/features/widgets/grid'
-import type { GridItem } from '@/client/features/widgets/grid'
+import { packItems } from '@/client/features/overview/grid'
+import type { GridItem } from '@/client/features/overview/grid'
 import { BottomPanel } from '@/client/components/shared/BottomPanel'
 
 import { WidgetFrame } from './WidgetFrame'

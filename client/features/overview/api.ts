@@ -6,7 +6,7 @@ import { requestJson } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
-import { useGridReconcile } from '@/client/features/widgets/useGridReconcile'
+import { useGridReconcile } from '@/client/features/overview/useGridReconcile'
 import { withDefaultWidgets } from '@/lib/default-widgets'
 import type { WidgetInfo } from '@/lib/types'
 

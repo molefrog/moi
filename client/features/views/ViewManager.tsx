@@ -40,7 +40,7 @@ type ViewManagerProps = {
   views: ViewInfo[]
   // The view the active tab names, or null when another tab is on screen. The
   // manager stays mounted either way — that is what makes coming back from the
-  // agent or widgets tab instant too.
+  // agent or Overview tab instant too.
   activeViewId: string | null
   // The active view's addressable state, read from navigation state (focusTab /
   // `moi tab focus`). `{}` on a fresh mount, a new browser tab, or a plain

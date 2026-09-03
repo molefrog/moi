@@ -20,7 +20,7 @@ import type { WelcomeDestination } from '@/client/features/chat/ChatEmptyState'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { CustomizePanel } from '@/client/features/workspace/CustomizePanel'
 import { useAppletEvent } from '@/client/features/applets/applet-runtime'
-import { Widgets } from '@/client/features/widgets/Widgets'
+import { Overview } from '@/client/features/overview/Overview'
 import { PanelHeader } from '@/client/components/shared/PanelHeader'
 import { workspaceProviderIcon } from '@/client/features/home/workspace-presentation'
 import { Button } from '@/client/components/ui/button'
@@ -618,7 +618,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
           {activeTab === 'agent' ? (
             tabbedChat
           ) : activeTab === 'overview' ? (
-            <Widgets
+            <Overview
               workspaceName={name ?? 'Workspace'}
               editing={widgetMode === 'editing'}
               customizing={widgetMode === 'customizing'}

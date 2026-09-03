@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 
-import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
+import { AnimatePresence, LayoutGroup } from 'motion/react'
 
 import {
   IconCheck,
@@ -14,9 +14,9 @@ import {
 import { useAppletThumbnails } from '@/client/features/applets/applet-thumbnail'
 import { WorkspaceSettings } from '@/client/features/settings/WorkspaceSettings'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
-import { renderDefaultWidget } from '@/client/features/widgets/default/registry'
-import { findFreePosition } from '@/client/features/widgets/grid'
-import type { GridItem } from '@/client/features/widgets/grid'
+import { renderDefaultWidget } from '@/client/features/overview/default/registry'
+import { findWidgetPosition, updateStoredGridPositions } from '@/client/features/overview/grid'
+import type { GridItem, GridPosition, PositionedGridItem } from '@/client/features/overview/grid'
 import { WidgetShell } from '@/client/features/applets/WidgetShell'
 import { Button } from '@/client/components/ui/button'
 import { Skeleton } from '@/client/components/ui/skeleton'
@@ -24,20 +24,8 @@ import type { ViewBuilder, ViewInfo, WidgetInfo } from '@/lib/types'
 import { isDefaultWidget } from '@/lib/default-widgets'
 
 import { HiddenPanel } from './HiddenPanel'
-import { WidgetGrid, WidgetGridLayout } from './WidgetGrid'
+import { WidgetCanvas } from './WidgetCanvas'
 import { cn } from '@/client/lib/cn'
-
-const EMPTY_WIDGET_ITEMS: GridItem[] = Array.from({ length: 4 }, (_, index) => ({
-  id: `empty-widget-${index}`,
-  w: 2,
-  h: 1
-}))
-
-function renderEmptyWidget() {
-  return (
-    <Skeleton className="size-full animate-none rounded-2xl texture-checker [corner-shape:superellipse(1.2)]" />
-  )
-}
 
 type NoWidgetsCreatedProps = {
   onCreateWidget: () => void
@@ -45,9 +33,14 @@ type NoWidgetsCreatedProps = {
 
 function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
   return (
-    <div className="relative min-h-0">
-      <div aria-hidden="true">
-        <WidgetGridLayout items={EMPTY_WIDGET_ITEMS} renderItem={renderEmptyWidget} />
+    <div className="relative size-full">
+      <div aria-hidden="true" className="grid size-full grid-cols-2 grid-rows-2 gap-2">
+        {[0, 1, 2, 3].map(slot => (
+          <Skeleton
+            key={slot}
+            className="size-full animate-none rounded-2xl texture-checker [corner-shape:superellipse(1.2)]"
+          />
+        ))}
       </div>
 
       <div className="absolute inset-0 flex items-center justify-center">
@@ -69,7 +62,7 @@ function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
   )
 }
 
-type WidgetsHeaderProps = {
+type OverviewHeaderProps = {
   workspaceName: string
   editing: boolean
   customizing: boolean
@@ -77,51 +70,49 @@ type WidgetsHeaderProps = {
   onCustomize: () => void
 }
 
-type WidgetsHeaderActionProps = {
+type OverviewHeaderActionProps = {
   Icon: TablerIcon
   label: string
   active?: boolean
   onClick: () => void
 }
 
-function WidgetsHeaderAction({ Icon, label, active, onClick }: WidgetsHeaderActionProps) {
+function OverviewHeaderAction({ Icon, label, active, onClick }: OverviewHeaderActionProps) {
   return (
     <Button
       type="button"
       variant="secondary"
       className={cn(
-        'h-20 w-28 rounded-xl p-0 [&_svg]:size-6',
+        'h-20 w-28 flex-col gap-1.5 rounded-xl px-4 py-0 [&_svg]:size-6',
         active && 'bg-accent text-accent-foreground'
       )}
       aria-pressed={active}
       onClick={onClick}
     >
-      <span className="flex size-full flex-col items-center justify-center gap-1.5 px-4">
-        <Icon stroke={1.5} />
-        <span>{label}</span>
-      </span>
+      <Icon stroke={1.5} />
+      <span>{label}</span>
     </Button>
   )
 }
 
-function WidgetsHeader({
+function OverviewHeader({
   workspaceName,
   editing,
   customizing,
   onEditingChange,
   onCustomize
-}: WidgetsHeaderProps) {
+}: OverviewHeaderProps) {
   return (
-    <div className="mx-auto my-6 flex w-full max-w-(--column-w) items-center gap-4">
+    <div className="flex size-full items-center gap-4">
       <h1 className="min-w-0 flex-1 truncate text-3xl font-medium">{workspaceName}</h1>
       <div className="flex shrink-0 items-center gap-2">
-        <WidgetsHeaderAction
+        <OverviewHeaderAction
           Icon={editing ? IconCheck : IconEdit}
           label={editing ? 'Done' : 'Edit widgets'}
           active={editing}
           onClick={() => onEditingChange(!editing)}
         />
-        <WidgetsHeaderAction
+        <OverviewHeaderAction
           Icon={IconLetterCase}
           label="Customize"
           active={customizing}
@@ -129,7 +120,7 @@ function WidgetsHeader({
         />
         <WorkspaceSettings
           renderTrigger={open => (
-            <WidgetsHeaderAction Icon={IconSettings} label="Settings" onClick={open} />
+            <OverviewHeaderAction Icon={IconSettings} label="Settings" onClick={open} />
           )}
         />
       </div>
@@ -137,8 +128,7 @@ function WidgetsHeader({
   )
 }
 
-// Tracks the rendered (border-box) height of whichever bottom panel is open, so
-// the grid can reserve matching space below it and every card stays reachable.
+// Reserve the open bottom panel's height in the canvas so every widget stays reachable.
 function usePanelHeight() {
   const [height, setHeight] = useState(0)
   const ref = useCallback((node: HTMLDivElement | null) => {
@@ -153,7 +143,7 @@ function usePanelHeight() {
   return [ref, height] as const
 }
 
-type WidgetsProps = {
+type OverviewProps = {
   workspaceName: string
   onCreateWidget: () => void
   onCreateView: () => void
@@ -168,7 +158,7 @@ type WidgetsProps = {
   builders: ViewBuilder[]
 }
 
-export function Widgets({
+export function Overview({
   workspaceName,
   onCreateWidget,
   onCreateView,
@@ -180,13 +170,13 @@ export function Widgets({
   widgets,
   views,
   builders
-}: WidgetsProps) {
+}: OverviewProps) {
   const { layout, setLayout } = useWorkspaceLayoutCtx()
   const widgetById = new Map(widgets.map(widget => [widget.id, widget]))
 
   const gridIds = new Set(layout.widgetGrid.map(g => g.i))
 
-  const visibleItems: GridItem[] = layout.widgetGrid
+  const visibleItems: PositionedGridItem[] = layout.widgetGrid
     .filter(g => widgetById.has(g.i))
     .map(g => {
       const widget = widgetById.get(g.i)!
@@ -208,7 +198,7 @@ export function Widgets({
       .filter(item => !isDefaultWidget(item.id))
       .map(item => ({
         id: item.id,
-        revision: widgets.find(widget => widget.id === item.id)?.revision
+        revision: widgetById.get(item.id)?.revision
       }))
   })
 
@@ -229,45 +219,38 @@ export function Widgets({
       const w = widgetById.get(g.i)
       return { ...g, w: w?.config.colSpan ?? 1, h: w?.config.rowSpan ?? 1 }
     })
-    const pos = findFreePosition(gridWithSizes, widget.config.colSpan, widget.config.rowSpan, 4)
+    const pos = findWidgetPosition(gridWithSizes, widget.config.colSpan, widget.config.rowSpan)
     setLayout({ widgetGrid: [...layout.widgetGrid, { i: id, x: pos.x, y: pos.y }] })
+  }
+
+  function move(positions: GridPosition[]) {
+    setLayout({ widgetGrid: updateStoredGridPositions(layout.widgetGrid, positions) })
   }
 
   return (
     // Shared working area below the header and positioning context for the bottom panel.
     <div className="relative min-h-0 flex-1">
       <LayoutGroup>
-        <div className="relative flex h-full flex-col overflow-y-auto p-4">
-          <WidgetsHeader
-            workspaceName={workspaceName}
-            editing={editing}
-            customizing={customizing}
-            onEditingChange={onEditingChange}
-            onCustomize={onCustomize}
-          />
-          {/* The open panel's height is reserved below the content so every card
-              and the creation state can scroll clear of the panel. */}
-          <motion.div
-            className="flex min-h-0 flex-1 flex-col gap-2"
-            animate={{ marginBottom: panelOpen ? panelHeight : 0 }}
-            transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
-          >
-            {visibleItems.length > 0 && (
-              <WidgetGrid
-                items={visibleItems}
-                editing={editing}
-                renderItem={renderItem}
-                onRemove={hide}
-                onLayoutChange={items =>
-                  setLayout({
-                    widgetGrid: items.map(i => ({ i: i.id, x: i.x ?? 0, y: i.y ?? 0 }))
-                  })
-                }
-              />
-            )}
-            {showCreationState && <NoWidgetsCreated onCreateWidget={onCreateWidget} />}
-          </motion.div>
-        </div>
+        <WidgetCanvas
+          items={visibleItems}
+          editing={editing}
+          header={
+            <OverviewHeader
+              workspaceName={workspaceName}
+              editing={editing}
+              customizing={customizing}
+              onEditingChange={onEditingChange}
+              onCustomize={onCustomize}
+            />
+          }
+          emptyState={
+            showCreationState ? <NoWidgetsCreated onCreateWidget={onCreateWidget} /> : undefined
+          }
+          bottomInset={panelOpen ? panelHeight : 0}
+          renderItem={renderItem}
+          onMove={move}
+          onRemove={hide}
+        />
 
         <AnimatePresence>
           {editing && (
