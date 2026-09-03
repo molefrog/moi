@@ -1,8 +1,55 @@
-import { IconBrowserPlus } from '@tabler/icons-react'
+import { IconPlus, type TablerIcon } from '@tabler/icons-react'
 
-import { Button } from '@/client/components/ui/button'
 import { getViewIcon, getViewLabel } from '@/client/features/views/view-presentation'
+import { cn } from '@/client/lib/cn'
 import type { ViewBuilder, ViewInfo } from '@/lib/types'
+
+type ViewButtonProps = {
+  variant?: 'default' | 'secondary' | 'outline'
+  Icon: TablerIcon
+  label: string
+  ariaLabel: string
+  onClick: () => void
+}
+
+function ViewButton({ variant = 'default', Icon, label, ariaLabel, onClick }: ViewButtonProps) {
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      onClick={onClick}
+      className={cn(
+        'group flex w-20 shrink-0 cursor-pointer flex-col items-center gap-2 text-sm',
+        variant === 'secondary' ? 'text-muted-foreground' : 'text-foreground'
+      )}
+    >
+      <div
+        className={cn(
+          'size-16 rounded-2xl',
+          variant === 'outline' && 'shadow-xs',
+          variant !== 'secondary' && 'transition-shadow duration-300 ease-out group-hover:shadow-xl'
+        )}
+      >
+        <div
+          className={cn(
+            'flex size-full items-center justify-center rounded-2xl',
+            variant === 'default'
+              ? 'bg-primary text-primary-foreground inset-shadow-[0_0_10px_color-mix(in_oklab,var(--color-white)_30%,transparent)]'
+              : variant === 'outline'
+                ? 'bg-background text-foreground'
+                : 'bg-accent'
+          )}
+          data-vivid={variant === 'default' || undefined}
+        >
+          <Icon size={32} stroke={1} />
+        </div>
+      </div>
+      <span className="line-clamp-2 w-full text-xs leading-snug font-medium text-ellipsis">
+        {label}
+      </span>
+    </button>
+  )
+}
 
 type ViewsWidgetProps = {
   views: ViewInfo[]
@@ -12,41 +59,43 @@ type ViewsWidgetProps = {
 }
 
 export function ViewsWidget({ views, builders, onOpenView, onCreateView }: ViewsWidgetProps) {
+  const empty = views.length === 0
+
   return (
-    <div className="flex size-full items-center bg-background">
-      {views.length === 0 ? (
-        <div className="flex size-full items-center justify-center bg-muted texture-checker">
-          <div className="flex size-full max-w-(--column-w) items-center justify-center bg-radial from-background from-40% to-transparent to-80%">
-            <Button type="button" variant="secondary" onClick={onCreateView}>
-              <IconBrowserPlus data-icon="inline-start" stroke={1.5} />
-              New view
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="no-scrollbar w-full min-w-0 scroll-fade-x overflow-x-auto overflow-y-hidden [--scroll-fade-reveal:16px]">
-          <div className="flex w-max items-center gap-1 px-2">
-            {views.map(view => {
-              const Icon = getViewIcon(view, builders)
-              const label = getViewLabel(view)
-              return (
-                <button
-                  key={view.id}
-                  type="button"
-                  title={label}
-                  aria-label={`Open ${label}`}
-                  onClick={() => onOpenView(view.id)}
-                  className="group/view flex w-20 shrink-0 flex-col items-center gap-2 rounded-lg p-2 text-sm outline-none hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50"
-                >
-                  <span className="flex size-12 items-center justify-center rounded-xl bg-muted text-foreground shadow-xs transition-shadow duration-100 group-hover/view:shadow-sm">
-                    <Icon size={24} stroke={1.5} />
-                  </span>
-                  <span className="w-full truncate">{label}</span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
+    <div className="relative no-scrollbar flex size-full items-center overflow-hidden bg-muted">
+      {empty && (
+        <div
+          className="pointer-events-none absolute inset-0 texture-checker [mask-image:linear-gradient(to_right,transparent_40%,black)]"
+          aria-hidden
+        />
+      )}
+      <h2 className="relative pr-6 pl-12 text-2xl font-semibold text-foreground">Views</h2>
+      <div className="relative no-scrollbar flex scroll-fade-x gap-2 overflow-x-auto px-6 pt-4 [--scroll-fade-reveal:16px]">
+        {views.map(view => {
+          const Icon = getViewIcon(view, builders)
+          const label = getViewLabel(view)
+          return (
+            <ViewButton
+              key={view.id}
+              Icon={Icon}
+              label={label}
+              ariaLabel={`Open ${label}`}
+              onClick={() => onOpenView(view.id)}
+            />
+          )
+        })}
+        <ViewButton
+          variant={empty ? 'outline' : 'secondary'}
+          Icon={IconPlus}
+          label="New view"
+          ariaLabel="Create new view"
+          onClick={onCreateView}
+        />
+      </div>
+      {empty && (
+        <p className="relative mr-8 ml-auto max-w-56 text-right text-sm text-muted-foreground">
+          Create new views when you need separate pages for focused tasks
+        </p>
       )}
     </div>
   )

@@ -4,8 +4,8 @@ import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 
 import {
   IconCheck,
-  IconLayoutGridAdd,
   IconLetterCase,
+  IconPlus,
   IconReplace,
   IconSettings,
   type TablerIcon
@@ -19,7 +19,6 @@ import { findWidgetPosition, updateStoredGridPositions } from '@/client/features
 import type { GridItem, GridPosition, PositionedGridItem } from '@/client/features/overview/grid'
 import { WidgetShell } from '@/client/features/applets/WidgetShell'
 import { Button } from '@/client/components/ui/button'
-import { Skeleton } from '@/client/components/ui/skeleton'
 import { cn } from '@/client/lib/cn'
 import type { ViewBuilder, ViewInfo, WidgetInfo } from '@/lib/types'
 import { isDefaultWidget } from '@/lib/default-widgets'
@@ -34,30 +33,31 @@ type NoWidgetsCreatedProps = {
 
 function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
   return (
-    <div className="relative size-full">
-      <div aria-hidden="true" className="grid size-full grid-cols-2 grid-rows-2 gap-2">
-        {[0, 1, 2, 3].map(slot => (
-          <Skeleton
-            key={slot}
-            className="size-full animate-none rounded-2xl texture-checker [corner-shape:superellipse(1.2)]"
-          />
-        ))}
-      </div>
-
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="flex h-full w-full max-w-(--column-w) flex-col items-center justify-center gap-4 bg-radial from-background from-40% to-transparent to-80% text-center">
-          <div className="flex flex-col gap-1.5">
-            <h2 className="font-medium">A little empty here</h2>
-            <p className="mx-auto max-w-xs text-sm text-muted-foreground">
-              Widgets are small apps that can read data, perform tasks, and surface important
-              information
-            </p>
-          </div>
-          <Button type="button" variant="secondary" onClick={onCreateWidget}>
-            <IconLayoutGridAdd data-icon="inline-start" stroke={1.5} />
-            New widget
-          </Button>
+    <div className="relative grid size-full grid-cols-2 grid-rows-2 gap-2 overflow-hidden">
+      <div className="overflow-hidden rounded-2xl bg-muted texture-checker [corner-shape:superellipse(1.2)]">
+        <div className="flex size-full items-start justify-start bg-radial-[at_top_left] from-muted from-40% to-transparent p-12">
+          <h2 className="text-2xl font-semibold text-foreground">Widgets</h2>
         </div>
+      </div>
+      <div className="overflow-hidden rounded-2xl bg-muted texture-checker [corner-shape:superellipse(1.2)]" />
+      <div className="overflow-hidden rounded-2xl bg-muted texture-checker [corner-shape:superellipse(1.2)]" />
+      <div className="overflow-hidden rounded-2xl bg-muted texture-checker [corner-shape:superellipse(1.2)]">
+        <div className="flex size-full items-end justify-end">
+          <span className="m-8 max-w-56 text-right text-sm text-muted-foreground">
+            Widgets can surface information, read data, and perform actions
+          </span>
+        </div>
+      </div>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <Button
+          type="button"
+          variant="outline"
+          className="rounded-xl px-4 py-6 transition-shadow duration-300 ease-out hover:shadow-md"
+          onClick={onCreateWidget}
+        >
+          <IconPlus data-icon="inline-start" stroke={1.5} />
+          New widget
+        </Button>
       </div>
     </div>
   )

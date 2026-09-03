@@ -27,15 +27,26 @@ describe('ViewsWidget', () => {
     ])
 
     expect(html.indexOf('Roadmap')).toBeLessThan(html.indexOf('Reports'))
+    expect(html).toContain('>Views</h2>')
     expect(html).toContain('aria-label="Open Roadmap"')
     expect(html).toContain('aria-label="Open Reports"')
+    expect(html.indexOf('Reports')).toBeLessThan(html.indexOf('New view'))
+    expect(html).toContain('aria-label="Create new view"')
+    expect(html).not.toContain('texture-checker')
+    expect(html).not.toContain('<p class=')
   })
 
-  test('renders the new-view action before a view exists', () => {
+  test('renders the new-view launcher as the only item before a view exists', () => {
     const html = render([])
 
     expect(html).toContain('New view')
+    expect(html).toContain('>Views</h2>')
+    expect(html).toContain('aria-label="Create new view"')
+    expect(html.match(/<button/g)).toHaveLength(1)
+    expect(html).toContain('bg-card text-foreground')
+    expect(html).toContain('group-hover:shadow-2xl')
     expect(html).toContain('texture-checker')
-    expect(html).toContain('bg-radial')
+    expect(html).toContain('mask-image:linear-gradient')
+    expect(html).toContain('<p class=')
   })
 })
