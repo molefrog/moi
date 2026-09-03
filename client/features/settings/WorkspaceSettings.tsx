@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 
 import { IconKey, IconPlugConnected, IconSettings, IconX } from '@tabler/icons-react'
 
@@ -18,27 +18,35 @@ const NAV: { id: SettingsNav; label: string; icon: typeof IconSettings }[] = [
   { id: 'environment', label: 'Environment', icon: IconKey }
 ]
 
-export function WorkspaceSettings() {
+type WorkspaceSettingsProps = {
+  renderTrigger?: (open: () => void) => ReactNode
+}
+
+export function WorkspaceSettings({ renderTrigger }: WorkspaceSettingsProps) {
   const [open, setOpen] = useState(false)
   const [page, setPage] = useState<SettingsNav>('general')
 
   return (
     <>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Settings"
-              onClick={() => setOpen(true)}
-            >
-              <IconSettings stroke={1.75} />
-            </Button>
-          }
-        />
-        <TooltipContent>Settings</TooltipContent>
-      </Tooltip>
+      {renderTrigger ? (
+        renderTrigger(() => setOpen(true))
+      ) : (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Settings"
+                onClick={() => setOpen(true)}
+              >
+                <IconSettings stroke={1.75} />
+              </Button>
+            }
+          />
+          <TooltipContent>Settings</TooltipContent>
+        </Tooltip>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="flex h-[min(680px,90vh)] w-[880px] max-w-[94vw]">

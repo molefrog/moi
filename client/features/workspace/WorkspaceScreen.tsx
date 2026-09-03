@@ -627,7 +627,12 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
             tabbedChat
           ) : activeTab === 'widgets' ? (
             <Widgets
+              workspaceName={name ?? 'Workspace'}
               editing={widgetMode === 'editing'}
+              customizing={widgetMode === 'customizing'}
+              onCustomize={() =>
+                setWidgetMode(widgetMode === 'customizing' ? 'idle' : 'customizing')
+              }
               onEditingChange={editing => setWidgetMode(editing ? 'editing' : 'idle')}
               widgets={widgets}
               views={views}
@@ -711,11 +716,17 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
           />
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <WorkspaceCustomizeAction
-            active={widgetMode === 'customizing'}
-            onToggle={() => setWidgetMode(widgetMode === 'customizing' ? 'idle' : 'customizing')}
-          />
-          <WorkspaceSettings />
+          {activeTab !== 'widgets' && (
+            <>
+              <WorkspaceCustomizeAction
+                active={widgetMode === 'customizing'}
+                onToggle={() =>
+                  setWidgetMode(widgetMode === 'customizing' ? 'idle' : 'customizing')
+                }
+              />
+              <WorkspaceSettings />
+            </>
+          )}
           {hasWorkspaceContent && canUseSplit && mode === 'fullscreen' && (
             <SectionControls onToggleMode={() => setMode('split')} />
           )}

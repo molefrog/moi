@@ -13,7 +13,7 @@ type ViewsWidgetProps = {
 
 export function ViewsWidget({ views, builders, onOpenView, onCreateView }: ViewsWidgetProps) {
   return (
-    <div className="flex size-full items-center bg-background px-2">
+    <div className="flex size-full items-center bg-muted px-2">
       {views.length === 0 ? (
         <div className="flex w-full justify-center">
           <Button type="button" variant="secondary" onClick={onCreateView}>

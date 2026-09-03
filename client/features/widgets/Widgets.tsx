@@ -2,22 +2,30 @@ import { useCallback, useState } from 'react'
 
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 
-import { IconPlus } from '@tabler/icons-react'
+import {
+  IconCheck,
+  IconEdit,
+  IconLetterCase,
+  IconPlus,
+  IconSettings,
+  type TablerIcon
+} from '@tabler/icons-react'
 
 import { useAppletThumbnails } from '@/client/features/applets/applet-thumbnail'
+import { WorkspaceSettings } from '@/client/features/settings/WorkspaceSettings'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
-import { renderDefaultWidget } from '@/client/features/widgets/default-widget-registry'
+import { renderDefaultWidget } from '@/client/features/widgets/default/registry'
 import { findFreePosition } from '@/client/features/widgets/grid'
 import type { GridItem } from '@/client/features/widgets/grid'
 import { WidgetShell } from '@/client/features/applets/WidgetShell'
 import { Button } from '@/client/components/ui/button'
 import { Skeleton } from '@/client/components/ui/skeleton'
-import { cn } from '@/client/lib/cn'
 import type { ViewBuilder, ViewInfo, WidgetInfo } from '@/lib/types'
 import { isDefaultWidget } from '@/lib/default-widgets'
 
 import { HiddenPanel } from './HiddenPanel'
 import { WidgetGrid, WidgetGridLayout } from './WidgetGrid'
+import { cn } from '@/client/lib/cn'
 
 const EMPTY_WIDGET_ITEMS: GridItem[] = Array.from({ length: 4 }, (_, index) => ({
   id: `empty-widget-${index}`,
@@ -61,53 +69,70 @@ function NoWidgetsCreated({ onCreateWidget }: NoWidgetsCreatedProps) {
   )
 }
 
-type WidgetActionsProps = {
+type WidgetsHeaderProps = {
+  workspaceName: string
   editing: boolean
-  onCreateWidget: () => void
+  customizing: boolean
   onEditingChange: (editing: boolean) => void
+  onCustomize: () => void
 }
 
-function WidgetActions({ editing, onCreateWidget, onEditingChange }: WidgetActionsProps) {
+type WidgetsHeaderActionProps = {
+  Icon: TablerIcon
+  label: string
+  active?: boolean
+  onClick: () => void
+}
+
+function WidgetsHeaderAction({ Icon, label, active, onClick }: WidgetsHeaderActionProps) {
   return (
-    <div className="mx-auto mb-4 flex w-full max-w-(--column-w) shrink-0 items-center justify-end gap-2">
-      {editing && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="mr-auto"
-          onClick={onCreateWidget}
-        >
-          <IconPlus data-icon="inline-start" stroke={1.75} />
-          New widget
-        </Button>
+    <Button
+      type="button"
+      variant="secondary"
+      className={cn(
+        'h-20 w-28 rounded-xl p-0 [&_svg]:size-6',
+        active && 'bg-accent text-accent-foreground'
       )}
-      <AnimatePresence mode="popLayout" initial={false}>
-        <motion.div
-          key={editing ? 'done' : 'edit'}
-          variants={{
-            from: { opacity: 0, scale: 0.8, filter: 'blur(4px)' },
-            to: { opacity: 1, scale: 1, filter: 'blur(0px)' }
-          }}
-          initial="from"
-          animate="to"
-          exit="from"
-          transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
-        >
-          <Button
-            type="button"
-            variant={editing ? 'default' : 'ghost'}
-            size="sm"
-            className={cn(
-              !editing &&
-                'text-muted-foreground group-hover/widgets:opacity-100 [@media(hover:hover)]:opacity-0'
-            )}
-            onClick={() => onEditingChange(!editing)}
-          >
-            {editing ? 'Done' : 'Edit widgets'}
-          </Button>
-        </motion.div>
-      </AnimatePresence>
+      aria-pressed={active}
+      onClick={onClick}
+    >
+      <span className="flex size-full flex-col items-center justify-center gap-1.5 px-4">
+        <Icon stroke={1.5} />
+        <span>{label}</span>
+      </span>
+    </Button>
+  )
+}
+
+function WidgetsHeader({
+  workspaceName,
+  editing,
+  customizing,
+  onEditingChange,
+  onCustomize
+}: WidgetsHeaderProps) {
+  return (
+    <div className="mx-auto my-6 flex w-full max-w-(--column-w) items-center gap-4">
+      <h1 className="min-w-0 flex-1 truncate text-3xl font-medium">{workspaceName}</h1>
+      <div className="flex shrink-0 items-center gap-2">
+        <WidgetsHeaderAction
+          Icon={editing ? IconCheck : IconEdit}
+          label={editing ? 'Done' : 'Edit widgets'}
+          active={editing}
+          onClick={() => onEditingChange(!editing)}
+        />
+        <WidgetsHeaderAction
+          Icon={IconLetterCase}
+          label="Customize"
+          active={customizing}
+          onClick={onCustomize}
+        />
+        <WorkspaceSettings
+          renderTrigger={open => (
+            <WidgetsHeaderAction Icon={IconSettings} label="Settings" onClick={open} />
+          )}
+        />
+      </div>
     </div>
   )
 }
@@ -129,10 +154,13 @@ function usePanelHeight() {
 }
 
 type WidgetsProps = {
+  workspaceName: string
   onCreateWidget: () => void
   onCreateView: () => void
   onOpenView: (viewId: string) => void
   editing: boolean
+  customizing: boolean
+  onCustomize: () => void
   onEditingChange: (editing: boolean) => void
   // Authoritative widget set from useWidgets; positions come from layout.
   widgets: WidgetInfo[]
@@ -141,10 +169,13 @@ type WidgetsProps = {
 }
 
 export function Widgets({
+  workspaceName,
   onCreateWidget,
   onCreateView,
   onOpenView,
   editing,
+  customizing,
+  onCustomize,
   onEditingChange,
   widgets,
   views,
@@ -168,7 +199,7 @@ export function Widgets({
   const showCreationState = visibleItems.every(item => isDefaultWidget(item.id))
 
   const [panelRef, panelHeight] = usePanelHeight()
-  const panelOpen = editing && hiddenItems.length > 0
+  const panelOpen = editing
 
   useAppletThumbnails({
     kind: 'widget',
@@ -204,13 +235,15 @@ export function Widgets({
 
   return (
     // Shared working area below the header and positioning context for the bottom panel.
-    <div className="group/widgets relative min-h-0 flex-1">
+    <div className="relative min-h-0 flex-1">
       <LayoutGroup>
         <div className="relative flex h-full flex-col overflow-y-auto p-4">
-          <WidgetActions
+          <WidgetsHeader
+            workspaceName={workspaceName}
             editing={editing}
-            onCreateWidget={onCreateWidget}
+            customizing={customizing}
             onEditingChange={onEditingChange}
+            onCustomize={onCustomize}
           />
           {/* The open panel's height is reserved below the content so every card
               and the creation state can scroll clear of the panel. */}
@@ -237,11 +270,12 @@ export function Widgets({
         </div>
 
         <AnimatePresence>
-          {editing && hiddenItems.length > 0 && (
+          {editing && (
             <HiddenPanel
               ref={panelRef}
               items={hiddenItems}
               renderItem={renderItem}
+              onCreateWidget={onCreateWidget}
               onClose={() => onEditingChange(false)}
               onRestore={restore}
             />

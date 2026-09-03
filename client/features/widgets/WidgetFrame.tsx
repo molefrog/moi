@@ -9,16 +9,19 @@ import { cn } from '@/client/lib/cn'
 import { Button } from '@/client/components/ui/button'
 import { useWorkspaceThemeSetting } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { getWorkspaceThemeStyle } from '@/client/runtime/workspace-theme'
+import { isDefaultWidget } from '@/lib/default-widgets'
 
 type WidgetFrameProps = {
   editing?: boolean
   hidden?: boolean
+  widgetId?: string
   onRemove?: () => void
   children?: ReactNode
 }
 
-export function WidgetFrame({ editing, hidden, onRemove, children }: WidgetFrameProps) {
+export function WidgetFrame({ editing, hidden, widgetId, onRemove, children }: WidgetFrameProps) {
   const theme = useWorkspaceThemeSetting()
+  const vivid = !widgetId || !isDefaultWidget(widgetId)
 
   return (
     <motion.div
@@ -39,18 +42,10 @@ export function WidgetFrame({ editing, hidden, onRemove, children }: WidgetFrame
         // Stable hook for widget thumbnails: the capture clone overrides this
         // element's chrome (radius/shadow/stroke) so thumbnails come out square.
         data-widget-chrome
-        data-vivid
-        style={getWorkspaceThemeStyle(theme, 'widget')}
+        data-vivid={vivid ? true : undefined}
+        style={vivid ? getWorkspaceThemeStyle(theme, 'widget') : undefined}
         className={cn(
           'absolute inset-0 overflow-hidden rounded-2xl text-foreground [corner-shape:superellipse(1.2)]',
-          // Outer drop shadow on the wrapper itself.
-          'shadow-[0_1px_2px_-1px_rgba(0,0,0,0.08),0_2px_4px_0_rgba(0,0,0,0.03)]',
-          // 1px inset stroke painted on a pseudo so it lands ON TOP of the
-          // widget content (e.g. coloured backgrounds) rather than being
-          // covered by the child filling the frame.
-          'after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit]',
-          "after:content-[''] after:[corner-shape:inherit]",
-          'after:shadow-[inset_0_0_0_1px_rgba(0,0,0,0.05)]',
           editing && 'pointer-events-none'
         )}
       >

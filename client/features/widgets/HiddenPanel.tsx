@@ -3,6 +3,9 @@ import { useMemo } from 'react'
 
 import { AnimatePresence, motion } from 'motion/react'
 
+import { IconPlus } from '@tabler/icons-react'
+
+import { Button } from '@/client/components/ui/button'
 import { cn } from '@/client/lib/cn'
 import { packItems } from '@/client/features/widgets/grid'
 import type { GridItem } from '@/client/features/widgets/grid'
@@ -43,16 +46,35 @@ const ROW_SPAN: Record<number, string> = {
 type HiddenPanelProps = {
   items: GridItem[]
   renderItem: (id: string) => ReactNode
+  onCreateWidget: () => void
   onClose: () => void
   onRestore: (id: string) => void
   ref?: Ref<HTMLDivElement>
 }
 
-export function HiddenPanel({ items, renderItem, onClose, onRestore, ref }: HiddenPanelProps) {
+export function HiddenPanel({
+  items,
+  renderItem,
+  onCreateWidget,
+  onClose,
+  onRestore,
+  ref
+}: HiddenPanelProps) {
   const layout = useMemo(() => packItems(items), [items])
 
   return (
-    <BottomPanel ref={ref} title="Hidden widgets" onClose={onClose} className="max-h-[60vh]">
+    <BottomPanel
+      ref={ref}
+      title="Hidden widgets"
+      actions={
+        <Button type="button" variant="secondary" size="sm" onClick={onCreateWidget}>
+          <IconPlus data-icon="inline-start" stroke={1.75} />
+          Add widget
+        </Button>
+      }
+      onClose={onClose}
+      className="max-h-[60vh]"
+    >
       {/* gap-2 + grid-cols-4 + [grid-auto-rows:160px] matches RGL's margin/rowHeight exactly */}
       <div className="grid auto-rows-[160px] grid-cols-4 gap-2">
         <AnimatePresence>
@@ -68,7 +90,7 @@ export function HiddenPanel({ items, renderItem, onClose, onRestore, ref }: Hidd
               )}
               transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
             >
-              <WidgetFrame editing onRemove={() => onRestore(item.i)} hidden>
+              <WidgetFrame editing widgetId={item.i} onRemove={() => onRestore(item.i)} hidden>
                 {renderItem(item.i)}
               </WidgetFrame>
             </motion.div>

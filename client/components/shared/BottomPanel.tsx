@@ -8,6 +8,7 @@ import { Button } from '@/client/components/ui/button'
 import { cn } from '@/client/lib/cn'
 
 type BottomPanelProps = {
+  actions?: ReactNode
   className?: string
   title: string
   children: ReactNode
@@ -17,7 +18,14 @@ type BottomPanelProps = {
   ref?: Ref<HTMLDivElement>
 }
 
-export function BottomPanel({ className, title, children, onClose, ref }: BottomPanelProps) {
+export function BottomPanel({
+  actions,
+  className,
+  title,
+  children,
+  onClose,
+  ref
+}: BottomPanelProps) {
   return (
     <motion.div
       ref={ref}
@@ -37,15 +45,18 @@ export function BottomPanel({ className, title, children, onClose, ref }: Bottom
     >
       <div className="flex shrink-0 items-center justify-between gap-4">
         <p className="text-sm font-medium">{title}</p>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={onClose}
-          aria-label="Close panel"
-        >
-          <IconX stroke={1.75} />
-        </Button>
+        <div className="flex items-center gap-2">
+          {actions}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={onClose}
+            aria-label="Close panel"
+          >
+            <IconX stroke={1.75} />
+          </Button>
+        </div>
       </div>
       <div className="flex-1 pb-(--page-pad)">{children}</div>
     </motion.div>
