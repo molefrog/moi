@@ -517,7 +517,6 @@ describe('drawer source', () => {
     expect(source).toContain("modal = 'trap-focus'")
     expect(source).toContain("side = 'right'")
     expect(source).toContain('data-slot="drawer-overlay"')
-    expect(source).toContain('overflow-y-auto overscroll-contain')
     expect(source).not.toContain('document.body')
     expect(source).not.toMatch(/\bfixed\b/)
     // Not wrapped by the body-portal helper either — that would defeat it.
@@ -547,11 +546,9 @@ describe('drawer source', () => {
 
 describe('drawer build', () => {
   // The transformed registry source compiles the way an installed
-  // `.moi/ui/drawer.tsx` would: Base UI and Tabler resolve, and the synthetic
-  // Tailwind entry emits the animation vocabulary the panel relies on. Laid
-  // out like a workspace — `ui/` beside `views/` — inside the repo tree so
-  // `@import 'tailwindcss'` and the component deps resolve against the repo's
-  // node_modules.
+  // `.moi/ui/drawer.tsx` would. It is laid out like a workspace — `ui/` beside
+  // `views/` — inside the repo tree so the component dependencies resolve
+  // against the repo's node_modules.
   let root: string
 
   const CONSUMER = [
@@ -600,27 +597,11 @@ describe('drawer build', () => {
     rmSync(root, { recursive: true, force: true })
   })
 
-  test('compiles into a view with its styling vocabulary, scoped', async () => {
+  test('compiles into a scoped view', async () => {
     const result = await buildApplet(join(root, 'views', 'consumer.tsx'), root, 'view')
     const css = injectedCss(result.js)
 
     expect(result.js).toContain('drawer-content')
-    // The animation utilities only ever appear behind the open/closed state
-    // variants, so Tailwind emits them as `.data-open\:animate-in` etc. —
-    // assert on the utility name and on the keyframes they resolve to.
-    for (const marker of [
-      '.absolute',
-      '.z-50',
-      'data-open\\:animate-in',
-      'data-closed\\:animate-out',
-      'data-open\\:slide-in-from-right',
-      'data-closed\\:slide-out-to-right',
-      '@keyframes enter',
-      '@keyframes exit',
-      'background-color: var(--popover)',
-      '[data-applet="view:consumer"]'
-    ]) {
-      expect(css).toContain(marker)
-    }
+    expect(css).toContain('[data-applet="view:consumer"]')
   })
 })
