@@ -77,7 +77,7 @@ const add = defineCommand({
 
     let loaded: LoadedUiComponents
     try {
-      loaded = await loadUiComponents(request.registryItems)
+      loaded = await loadUiComponents(request.entries)
     } catch (err) {
       console.error(
         '\n' +
@@ -90,19 +90,19 @@ const add = defineCommand({
 
     const plans = planUiWrites({
       files: loaded.files,
-      requestedItems: request.registryItems,
+      requestedFiles: request.entries.flatMap(uiComponentFiles),
       uiDir,
       exists: existsSync
     })
 
     // Hand-customized components are never silently overwritten: without
     // --force a requested file that already exists is skipped and reported, so
-    // a bulk add still installs everything new. Only when every requested
-    // component already exists does the add fail. Existing support files
+    // a bulk add still installs everything new. Only when nothing needs to be
+    // written does the add fail. Existing support files
     // (utils, applet-portal, registry deps that rode along) are kept as-is
     // either way, even under --force.
     const partition = partitionUiWrites(plans, args.force)
-    if (partition.allInstalled) {
+    if (partition.write.length === 0) {
       console.error(
         '\n' +
           pc.red('✗') +
@@ -128,7 +128,7 @@ const add = defineCommand({
     // registry specifiers may be versioned (`recharts@3.8.0`), so compare by
     // package name.
     const baseline = new Set(Object.keys(MOI_PACKAGE_JSON.dependencies))
-    const deps = [...new Set([...loaded.dependencies, ...request.extraDeps])]
+    const deps = [...new Set(loaded.dependencies)]
       .filter(spec => !baseline.has(spec.replace(/@[^@/]+$/, '')))
       .sort()
 

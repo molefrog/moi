@@ -17,7 +17,7 @@ import {
 } from '../ui-components'
 
 const REPO_ROOT = join(import.meta.dir, '../..')
-const INTERNAL_ITEMS = ['applet-portal', 'card', 'toggle', 'utils']
+const SUPPORT_ITEMS = ['applet-portal', 'utils']
 const PORTALLED_COMPONENTS = [
   'alert-dialog',
   'combobox',
@@ -30,22 +30,20 @@ const PORTALLED_COMPONENTS = [
   'tooltip'
 ]
 
+function packageName(specifier: string): string {
+  if (!specifier.startsWith('@')) return specifier.split('@', 1)[0].split('/', 1)[0]
+  const packageEnd = specifier.indexOf('@', specifier.indexOf('/') + 1)
+  return packageEnd === -1
+    ? specifier.split('/').slice(0, 2).join('/')
+    : specifier.slice(0, packageEnd)
+}
+
 describe('resolveUiComponentRequest', () => {
   test('maps curated names to registry items, deduplicated', () => {
     const request = resolveUiComponentRequest(['button', 'popover', 'button'])
 
     expect(request.entries).toEqual(['button', 'popover'])
-    expect(request.registryItems).toEqual(['button', 'popover'])
     expect(request.unknown).toEqual([])
-  })
-
-  test('expands pattern entries to their building blocks', () => {
-    const datePicker = resolveUiComponentRequest(['date-picker'])
-    expect(datePicker.registryItems).toEqual(['calendar', 'popover', 'button'])
-
-    const dataTable = resolveUiComponentRequest(['data-table'])
-    expect(dataTable.registryItems).toEqual(['table'])
-    expect(dataTable.extraDeps).toEqual(['@tanstack/react-table'])
   })
 
   test('collects unknown names and suggests close matches', () => {
@@ -75,7 +73,7 @@ describe('write planning', () => {
         { name: 'label.tsx', content: 'label' },
         { name: 'utils.ts', content: 'utils' }
       ],
-      requestedItems: ['field'],
+      requestedFiles: ['field.tsx'],
       uiDir: '/ws/.moi/ui',
       exists: path => path.endsWith('label.tsx')
     })
@@ -99,10 +97,9 @@ describe('write planning', () => {
     expect(partition.write.map(candidate => candidate.name)).toEqual(['badge.tsx'])
     expect(partition.skipInstalled.map(candidate => candidate.name)).toEqual(['button.tsx'])
     expect(partition.keepSupport.map(candidate => candidate.name)).toEqual(['utils.ts'])
-    expect(partition.allInstalled).toBeFalse()
   })
 
-  test('detects a no-op install', () => {
+  test('has nothing to write when every file exists', () => {
     const partition = partitionUiWrites(
       [
         plan('button.tsx', { exists: true }),
@@ -112,8 +109,17 @@ describe('write planning', () => {
       false
     )
 
-    expect(partition.allInstalled).toBeTrue()
     expect(partition.write).toEqual([])
+  })
+
+  test('restores missing support files for an installed component', () => {
+    const partition = partitionUiWrites(
+      [plan('chart.tsx', { exists: true }), plan('card.tsx', { support: true })],
+      false
+    )
+
+    expect(partition.write.map(candidate => candidate.name)).toEqual(['card.tsx'])
+    expect(partition.skipInstalled.map(candidate => candidate.name)).toEqual(['chart.tsx'])
   })
 
   test('--force overwrites requested files and protects support files', () => {
@@ -144,6 +150,7 @@ describe('catalog', () => {
       'button',
       'button-group',
       'calendar',
+      'card',
       'carousel',
       'chart',
       'checkbox',
@@ -174,38 +181,71 @@ describe('catalog', () => {
       'table',
       'tabs',
       'textarea',
+      'toggle',
       'toggle-group',
       'tooltip'
     ])
   })
 
-  test('keeps support items out of the public catalog', () => {
-    for (const name of INTERNAL_ITEMS) expect(UI_COMPONENTS[name]).toBeUndefined()
+  test('keeps library items out of the public catalog', () => {
+    for (const name of SUPPORT_ITEMS) expect(UI_COMPONENTS[name]).toBeUndefined()
     for (const name of UI_COMPONENT_NAMES) {
       expect(UI_COMPONENTS[name].description.length).toBeGreaterThan(0)
-      expect(UI_COMPONENTS[name].registryItems.length).toBeGreaterThan(0)
     }
   })
 
   test('uses the final registry address segment for installed files', () => {
     expect(registryItemName('molefrog/moi/drawer#v1.0.0')).toBe('drawer')
     expect(uiComponentFiles('drawer')).toEqual(['drawer.tsx'])
+    expect(uiComponentFiles('card')).toEqual(['card.tsx'])
+    expect(uiComponentFiles('data-table')).toEqual(['table.tsx'])
     expect(uiComponentFiles('date-picker')).toEqual(['calendar.tsx', 'popover.tsx', 'button.tsx'])
   })
 })
 
 describe('local registry', () => {
+  test('declares imported packages and only uses supported item fields', async () => {
+    const registry = (await Bun.file(join(REPO_ROOT, 'registry.json')).json()) as {
+      items: Array<{
+        name: string
+        dependencies?: string[]
+        files?: Array<{ path: string }>
+        [key: string]: unknown
+      }>
+    }
+    const unsupportedFields = ['devDependencies', 'css', 'cssVars', 'envVars', 'tailwind']
+    const frameworkPackages = new Set(['react', 'react-dom'])
+    const missingDependencies: string[] = []
+
+    for (const item of registry.items) {
+      for (const field of unsupportedFields) expect(item[field]).toBeUndefined()
+
+      const declared = new Set((item.dependencies ?? []).map(packageName))
+      for (const file of item.files ?? []) {
+        const source = await Bun.file(join(REPO_ROOT, file.path)).text()
+        for (const match of source.matchAll(/from ['"]([^'"]+)['"]/g)) {
+          const specifier = match[1]
+          if (specifier.startsWith('.')) continue
+          const imported = packageName(specifier)
+          if (!frameworkPackages.has(imported) && !declared.has(imported)) {
+            missingDependencies.push(`${item.name}: ${imported}`)
+          }
+        }
+      }
+    }
+
+    expect([...new Set(missingDependencies)]).toEqual([])
+  })
+
   test('contains every public component and its internal support items', async () => {
     const { loadRegistry } = await import('shadcn/registry')
     const registry = await loadRegistry({ cwd: REPO_ROOT })
     const names = new Set(registry.items.map(item => item.name))
 
     expect(registry).toMatchObject({ name: 'moi', homepage: 'https://moi.computer' })
-    expect(registry.items).toHaveLength(44)
-    for (const entry of Object.values(UI_COMPONENTS)) {
-      for (const name of entry.registryItems) expect(names.has(registryItemName(name))).toBeTrue()
-    }
-    for (const name of INTERNAL_ITEMS) expect(names.has(name)).toBeTrue()
+    expect(registry.items).toHaveLength(46)
+    for (const name of UI_COMPONENT_NAMES) expect(names.has(name)).toBeTrue()
+    for (const name of SUPPORT_ITEMS) expect(names.has(name)).toBeTrue()
   })
 
   test('resolves the complete catalog and docs without network access', async () => {
@@ -217,11 +257,11 @@ describe('local registry', () => {
     try {
       for (const name of UI_COMPONENT_NAMES) {
         const request = resolveUiComponentRequest([name])
-        const resolved = await loadUiComponents(request.registryItems)
+        const resolved = await loadUiComponents(request.entries)
         const files = new Set(resolved.files.map(file => file.name))
-        const missingItems = request.registryItems.filter(
-          item => !files.has(`${registryItemName(item)}.tsx`)
-        )
+        const missingItems = request.entries
+          .flatMap(uiComponentFiles)
+          .filter(file => !files.has(file))
         const missingImports: string[] = []
         for (const file of resolved.files) {
           for (const match of file.content.matchAll(/from ['"](\.\/[^'"]+)['"]/g)) {
@@ -241,9 +281,21 @@ describe('local registry', () => {
     }
   })
 
+  test('resolves recipe components and npm dependencies', async () => {
+    const datePicker = await loadUiComponents(['date-picker'])
+    const datePickerFiles = new Set(datePicker.files.map(file => file.name))
+    expect(datePickerFiles.has('calendar.tsx')).toBeTrue()
+    expect(datePickerFiles.has('popover.tsx')).toBeTrue()
+    expect(datePickerFiles.has('button.tsx')).toBeTrue()
+
+    const dataTable = await loadUiComponents(['data-table'])
+    expect(dataTable.files.some(file => file.name === 'table.tsx')).toBeTrue()
+    expect(dataTable.dependencies).toContain('@tanstack/react-table')
+  })
+
   test('ships install-ready relative imports and scoped portals', async () => {
     const request = resolveUiComponentRequest(UI_COMPONENT_NAMES)
-    const resolved = await loadUiComponents(request.registryItems)
+    const resolved = await loadUiComponents(request.entries)
     const names = new Set(resolved.files.map(file => file.name))
     const invalidSources: string[] = []
     const missingImports: string[] = []
@@ -271,7 +323,7 @@ describe('local registry', () => {
 
   test('fails clearly for a missing item', async () => {
     await expect(loadUiComponents(['missing-component'])).rejects.toThrow(
-      'Registry item "missing-component" is missing from the local registry'
+      'Registry item "missing-component" was not found'
     )
   })
 
@@ -330,7 +382,7 @@ describe('moi components', () => {
 
   beforeAll(async () => {
     const request = resolveUiComponentRequest(UI_COMPONENT_NAMES)
-    const resolved = await loadUiComponents(request.registryItems)
+    const resolved = await loadUiComponents(request.entries)
     buildRoot = mkdtempSync(join(import.meta.dir, 'ui-registry-ws-'))
     mkdirSync(join(buildRoot, 'ui'))
     mkdirSync(join(buildRoot, 'views'))

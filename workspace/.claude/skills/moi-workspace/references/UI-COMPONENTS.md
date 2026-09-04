@@ -55,18 +55,16 @@ Import from `../ui/<name>` (same as the component name).
 **Form & input:** `button` (variants, sizes, icons) · `button-group` (segmented buttons) ·
 `input` · `textarea` · `input-group` (input with addons) · `field` (label + control +
 description + error) · `label` · `checkbox` · `radio-group` · `switch` · `slider` · `select` ·
-`combobox` (type-to-filter for long lists) · `toggle-group` (2–7 option sets) · `calendar` ·
-`date-picker` (pattern: calendar in a popover — see its docs; installs `calendar` + `popover` +
-`button`)
+`combobox` (type-to-filter for long lists) · `toggle` · `toggle-group` (2–7 option sets) ·
+`calendar` · `date-picker` (recipe: Calendar + Popover + Button)
 
 **Overlays:** `dialog` · `alert-dialog` (destructive confirm) · `popover` ·
 `dropdown-menu` · `context-menu` (right-click) · `hover-card` · `tooltip` · `drawer` (right-side
 detail panel scoped to a view — moi-authored registry item)
 
 **Display & feedback:** `alert` (callouts) · `badge` · `avatar` · `skeleton` · `spinner` ·
-`progress` · `table` · `data-table` (pattern on `table` + `@tanstack/react-table` — see its
-docs) · `chart` (Recharts wired to theme tokens) · `attachment` (file/image tile) · `bubble`
-(chat message)
+`progress` · `card` · `table` · `data-table` (recipe: Table + TanStack Table) · `chart` (Recharts wired to theme tokens) · `attachment`
+(file/image tile) · `bubble` (chat message)
 
 **Structure & navigation:** `accordion` · `collapsible` · `tabs` · `carousel` · `pagination` ·
 `resizable` (split panels) · `separator` (divider line)

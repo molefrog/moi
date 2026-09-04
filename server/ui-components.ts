@@ -2,6 +2,7 @@
 // and docs are bundled, so installs do not depend on a remote registry.
 import { join } from 'path'
 
+import registry from '../registry.json'
 import { PACKAGE_ROOT } from './version'
 
 // ---------------------------------------------------------------------------
@@ -11,192 +12,25 @@ import { PACKAGE_ROOT } from './version'
 export type UiComponentEntry = {
   // One line for `moi ui-components list` and the skill cheat sheet.
   description: string
-  // Registry items `add` actually loads. Most entries map to themselves;
-  // pattern entries (data-table, date-picker) map to their building blocks
-  // and exist only as bundled docs.
-  registryItems: string[]
-  // npm packages the entry needs that no loaded registry item declares —
-  // pattern-only additions their docs assume (data-table → TanStack Table).
-  // Everything else flows from the resolved items' own `dependencies`.
-  extraDeps?: string[]
 }
 
-// The agreed subset (UI component review, Aug 2026). Upstream ships ~63 ui
-// items; only these are exposed. Registry dependencies of a curated item
-// (e.g. field → label + separator, chart → card, toggle-group → toggle) are
-// resolved and written implicitly — they are support files, not catalog
-// entries.
-export const UI_COMPONENTS: Record<string, UiComponentEntry> = {
-  accordion: {
-    description: 'Vertically stacked sections that expand one at a time',
-    registryItems: ['accordion']
-  },
-  alert: {
-    description: 'Callout box for statuses and short messages',
-    registryItems: ['alert']
-  },
-  'alert-dialog': {
-    description: 'Modal confirmation dialog for destructive or blocking actions',
-    registryItems: ['alert-dialog']
-  },
-  attachment: {
-    description: 'File or image attachment tile with metadata and actions',
-    registryItems: ['attachment']
-  },
-  avatar: {
-    description: 'User or entity image with fallback initials',
-    registryItems: ['avatar']
-  },
-  badge: {
-    description: 'Small status or count label',
-    registryItems: ['badge']
-  },
-  bubble: {
-    description: 'Chat message bubble',
-    registryItems: ['bubble']
-  },
-  button: {
-    description: 'The button: variants, sizes, icon support',
-    registryItems: ['button']
-  },
-  'button-group': {
-    description: 'Buttons joined into one segmented control',
-    registryItems: ['button-group']
-  },
-  calendar: {
-    description: 'Month calendar for picking dates and ranges',
-    registryItems: ['calendar']
-  },
-  carousel: {
-    description: 'Swipeable slides with prev/next controls',
-    registryItems: ['carousel']
-  },
-  chart: {
-    description: 'Recharts-based charts wired to workspace theme tokens',
-    registryItems: ['chart']
-  },
-  checkbox: {
-    description: 'Binary checkbox with indeterminate state',
-    registryItems: ['checkbox']
-  },
-  collapsible: {
-    description: 'Single section that expands and collapses',
-    registryItems: ['collapsible']
-  },
-  combobox: {
-    description: 'Text input with a filtered dropdown of options',
-    registryItems: ['combobox']
-  },
-  'context-menu': {
-    description: 'Right-click menu with items, submenus, and shortcuts',
-    registryItems: ['context-menu']
-  },
-  'data-table': {
-    description: 'Sortable, filterable table pattern built on table + TanStack Table',
-    registryItems: ['table'],
-    extraDeps: ['@tanstack/react-table']
-  },
-  'date-picker': {
-    description: 'Date picker pattern: calendar in a popover',
-    registryItems: ['calendar', 'popover', 'button']
-  },
-  dialog: {
-    description: 'Modal dialog with backdrop, header, and footer',
-    registryItems: ['dialog']
-  },
-  drawer: {
-    description: 'Right-side detail panel scoped to the current view',
-    registryItems: ['drawer']
-  },
-  'dropdown-menu': {
-    description: 'Menu opened from a trigger: items, groups, submenus',
-    registryItems: ['dropdown-menu']
-  },
-  field: {
-    description: 'Form field wrapper: label, control, description, error',
-    registryItems: ['field']
-  },
-  'hover-card': {
-    description: 'Preview card shown on hover over a link or element',
-    registryItems: ['hover-card']
-  },
-  input: {
-    description: 'Single-line text input',
-    registryItems: ['input']
-  },
-  'input-group': {
-    description: 'Input with attached addons, buttons, or icons',
-    registryItems: ['input-group']
-  },
-  label: {
-    description: 'Form control label',
-    registryItems: ['label']
-  },
-  pagination: {
-    description: 'Page navigation with prev/next and page links',
-    registryItems: ['pagination']
-  },
-  popover: {
-    description: 'Floating panel anchored to a trigger',
-    registryItems: ['popover']
-  },
-  progress: {
-    description: 'Determinate progress bar',
-    registryItems: ['progress']
-  },
-  'radio-group': {
-    description: 'Single-choice radio button set',
-    registryItems: ['radio-group']
-  },
-  resizable: {
-    description: 'Resizable split panels with drag handles',
-    registryItems: ['resizable']
-  },
-  select: {
-    description: 'Native-feeling select with a styled popup',
-    registryItems: ['select']
-  },
-  separator: {
-    description: 'Horizontal or vertical dividing line',
-    registryItems: ['separator']
-  },
-  skeleton: {
-    description: 'Loading placeholder block',
-    registryItems: ['skeleton']
-  },
-  slider: {
-    description: 'Range slider with one or more thumbs',
-    registryItems: ['slider']
-  },
-  spinner: {
-    description: 'Inline loading spinner',
-    registryItems: ['spinner']
-  },
-  switch: {
-    description: 'On/off toggle switch',
-    registryItems: ['switch']
-  },
-  table: {
-    description: 'Styled table primitives (header, body, rows, cells)',
-    registryItems: ['table']
-  },
-  tabs: {
-    description: 'Tabbed panels with a tab list',
-    registryItems: ['tabs']
-  },
-  textarea: {
-    description: 'Multi-line text input',
-    registryItems: ['textarea']
-  },
-  'toggle-group': {
-    description: 'Group of two-state toggle buttons',
-    registryItems: ['toggle-group']
-  },
-  tooltip: {
-    description: 'Small label shown on hover or focus',
-    registryItems: ['tooltip']
-  }
+type RegistryCatalogItem = {
+  name: string
+  type: string
+  files?: Array<{ path: string }>
+  registryDependencies?: string[]
 }
+
+const REGISTRY_ITEMS = new Map(
+  (registry.items as RegistryCatalogItem[]).map(item => [item.name, item] as const)
+)
+
+export const UI_COMPONENTS: Record<string, UiComponentEntry> = Object.fromEntries(
+  registry.items
+    .filter(item => item.type === 'registry:ui' || item.type === 'registry:block')
+    .map(item => [item.name, { description: item.description ?? item.title ?? item.name }] as const)
+    .sort(([a], [b]) => a.localeCompare(b))
+)
 
 export const UI_COMPONENT_NAMES = Object.keys(UI_COMPONENTS)
 
@@ -207,11 +41,29 @@ export function registryItemName(registryItem: string): string {
   return withoutRef.split('/').at(-1) ?? withoutRef
 }
 
-// The `.tsx` files in `.moi/ui/` whose presence makes an entry count as
-// installed.
+// A block has no source of its own, so its direct component dependencies are
+// the files users install and can later update with --force.
 export function uiComponentFiles(name: string): string[] {
-  const entry = UI_COMPONENTS[name]
-  return entry.registryItems.map(item => `${registryItemName(item)}.tsx`)
+  const files = new Set<string>()
+  const visited = new Set<string>()
+
+  const collect = (itemName: string): void => {
+    if (visited.has(itemName)) return
+    visited.add(itemName)
+
+    const item = REGISTRY_ITEMS.get(itemName)
+    if (!item) return
+    if (item.files?.length) {
+      for (const file of item.files) files.add(uiFileName(file.path))
+      return
+    }
+    for (const dependency of item.registryDependencies ?? []) {
+      collect(registryItemName(dependency))
+    }
+  }
+
+  collect(registryItemName(name))
+  return [...files]
 }
 
 export type LoadedUiFile = {
@@ -239,14 +91,7 @@ export async function loadUiComponents(
   registryNames: string[],
   registryRoot: string = PACKAGE_ROOT
 ): Promise<LoadedUiComponents> {
-  const registryPath = join(registryRoot, 'registry.json')
-  if (!(await Bun.file(registryPath).exists())) {
-    throw new Error(`Missing local registry: ${registryPath}`)
-  }
-
-  const { loadRegistry, loadRegistryItem } = await import('shadcn/registry')
-  const registry = await loadRegistry({ cwd: registryRoot })
-  const available = new Set(registry.items.map(item => item.name))
+  const { loadRegistryItem } = await import('shadcn/registry')
   const files = new Map<string, string>()
   const dependencies = new Set<string>()
   const loaded = new Set<string>()
@@ -254,9 +99,6 @@ export async function loadUiComponents(
   const loadItem = async (address: string): Promise<void> => {
     const itemName = registryItemName(address)
     if (loaded.has(itemName)) return
-    if (!available.has(itemName)) {
-      throw new Error(`Registry item "${itemName}" is missing from the local registry`)
-    }
     loaded.add(itemName)
 
     const item = await loadRegistryItem(itemName, { cwd: registryRoot })
@@ -296,19 +138,13 @@ export async function loadUiComponentDocs(
 // ---------------------------------------------------------------------------
 
 export type ResolvedRequest = {
-  // Curated entries requested, validated.
+  // Registry items requested, validated and deduplicated.
   entries: string[]
-  // Registry items to load (patterns expanded), deduplicated, in request order.
-  registryItems: string[]
-  // Union of extraDeps across the requested entries.
-  extraDeps: string[]
   unknown: string[]
 }
 
 export function resolveUiComponentRequest(names: string[]): ResolvedRequest {
   const entries: string[] = []
-  const registryItems: string[] = []
-  const extraDeps = new Set<string>()
   const unknown: string[] = []
 
   for (const raw of names) {
@@ -320,13 +156,9 @@ export function resolveUiComponentRequest(names: string[]): ResolvedRequest {
     }
     if (entries.includes(name)) continue
     entries.push(name)
-    for (const item of entry.registryItems) {
-      if (!registryItems.includes(item)) registryItems.push(item)
-    }
-    for (const dep of entry.extraDeps ?? []) extraDeps.add(dep)
   }
 
-  return { entries, registryItems, extraDeps: [...extraDeps].sort(), unknown }
+  return { entries, unknown }
 }
 
 // Closest catalog names for a typo, by shared-prefix + substring heuristics —
@@ -377,9 +209,6 @@ export type UiWritePartition = {
   // Requested components already installed, skipped without --force — a bulk
   // add proceeds past them instead of failing the whole batch.
   skipInstalled: PlannedWrite[]
-  // Every requested file already exists and --force is off: the add would be
-  // a no-op, so the CLI fails loudly instead of quietly keeping everything.
-  allInstalled: boolean
 }
 
 export function partitionUiWrites(plans: PlannedWrite[], force: boolean): UiWritePartition {
@@ -388,18 +217,17 @@ export function partitionUiWrites(plans: PlannedWrite[], force: boolean): UiWrit
   return {
     write: plans.filter(plan => !plan.exists || (force && !plan.support)),
     keepSupport: plans.filter(plan => plan.support && plan.exists),
-    skipInstalled,
-    allInstalled: !force && requested.length > 0 && skipInstalled.length === requested.length
+    skipInstalled
   }
 }
 
 export function planUiWrites(opts: {
   files: LoadedUiFile[]
-  requestedItems: string[]
+  requestedFiles: string[]
   uiDir: string
   exists: (path: string) => boolean
 }): PlannedWrite[] {
-  const requested = new Set(opts.requestedItems.map(item => `${registryItemName(item)}.tsx`))
+  const requested = new Set(opts.requestedFiles)
   const plans: PlannedWrite[] = opts.files.map(file => {
     const path = join(opts.uiDir, file.name)
     return {

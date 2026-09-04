@@ -6,6 +6,7 @@
     {
       "name": "accordion",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "@tabler/icons-react"],
       "registryDependencies": ["molefrog/moi/utils"],
       "files": [
         {
@@ -19,6 +20,7 @@
     {
       "name": "alert",
       "type": "registry:ui",
+      "dependencies": ["class-variance-authority"],
       "registryDependencies": ["molefrog/moi/utils"],
       "files": [
         {
@@ -32,6 +34,7 @@
     {
       "name": "alert-dialog",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
       "registryDependencies": [
         "molefrog/moi/button",
         "molefrog/moi/utils",
@@ -62,6 +65,7 @@
     {
       "name": "attachment",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "class-variance-authority"],
       "registryDependencies": ["molefrog/moi/button", "molefrog/moi/utils"],
       "files": [
         {
@@ -75,6 +79,7 @@
     {
       "name": "avatar",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
       "registryDependencies": ["molefrog/moi/utils"],
       "files": [
         {
@@ -88,6 +93,7 @@
     {
       "name": "badge",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "class-variance-authority"],
       "registryDependencies": ["molefrog/moi/utils"],
       "files": [
         {
@@ -101,6 +107,7 @@
     {
       "name": "bubble",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "class-variance-authority"],
       "registryDependencies": ["molefrog/moi/utils"],
       "files": [
         {
@@ -115,7 +122,7 @@
       "name": "button",
       "type": "registry:ui",
       "title": "Button",
-      "description": "The shared button for the host and its views.",
+      "description": "The button: variants, sizes, icon support",
       "dependencies": ["@base-ui/react", "class-variance-authority"],
       "registryDependencies": ["molefrog/moi/utils"],
       "files": [
@@ -128,6 +135,7 @@
     {
       "name": "button-group",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "class-variance-authority"],
       "registryDependencies": ["molefrog/moi/separator", "molefrog/moi/utils"],
       "files": [
         {
@@ -141,7 +149,7 @@
     {
       "name": "calendar",
       "type": "registry:ui",
-      "dependencies": ["react-day-picker@latest", "date-fns"],
+      "dependencies": ["@tabler/icons-react", "date-fns", "react-day-picker@latest"],
       "registryDependencies": ["molefrog/moi/button", "molefrog/moi/utils"],
       "files": [
         {
@@ -163,12 +171,12 @@
         }
       ],
       "title": "Card",
-      "description": "Card primitives used by registry components."
+      "description": "Container with header, content, and footer"
     },
     {
       "name": "carousel",
       "type": "registry:ui",
-      "dependencies": ["embla-carousel-react"],
+      "dependencies": ["@tabler/icons-react", "embla-carousel-react"],
       "registryDependencies": ["molefrog/moi/button", "molefrog/moi/utils"],
       "files": [
         {
@@ -196,6 +204,7 @@
     {
       "name": "checkbox",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "@tabler/icons-react"],
       "registryDependencies": ["molefrog/moi/utils"],
       "files": [
         {
@@ -209,6 +218,7 @@
     {
       "name": "collapsible",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
       "files": [
         {
           "path": "ui-components/collapsible.tsx",
@@ -221,7 +231,7 @@
     {
       "name": "combobox",
       "type": "registry:ui",
-      "dependencies": ["@base-ui/react"],
+      "dependencies": ["@base-ui/react", "@tabler/icons-react"],
       "registryDependencies": [
         "molefrog/moi/button",
         "molefrog/moi/input-group",
@@ -240,6 +250,7 @@
     {
       "name": "context-menu",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "@tabler/icons-react"],
       "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/applet-portal"],
       "files": [
         {
@@ -251,8 +262,28 @@
       "description": "Right-click menu with items, submenus, and shortcuts"
     },
     {
+      "name": "data-table",
+      "type": "registry:block",
+      "dependencies": ["@tanstack/react-table"],
+      "registryDependencies": ["molefrog/moi/table"],
+      "title": "Data Table",
+      "description": "Sortable, filterable table pattern built on Table and TanStack Table"
+    },
+    {
+      "name": "date-picker",
+      "type": "registry:block",
+      "registryDependencies": [
+        "molefrog/moi/calendar",
+        "molefrog/moi/popover",
+        "molefrog/moi/button"
+      ],
+      "title": "Date Picker",
+      "description": "Date picker pattern built from Calendar, Popover, and Button"
+    },
+    {
       "name": "dialog",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "@tabler/icons-react"],
       "registryDependencies": [
         "molefrog/moi/button",
         "molefrog/moi/utils",
@@ -271,7 +302,7 @@
       "name": "drawer",
       "type": "registry:ui",
       "title": "Drawer",
-      "description": "A Drawer scoped to views.",
+      "description": "Right-side detail panel scoped to the current view",
       "dependencies": ["@base-ui/react", "@tabler/icons-react"],
       "registryDependencies": ["molefrog/moi/button", "molefrog/moi/utils"],
       "files": [
@@ -284,6 +315,7 @@
     {
       "name": "dropdown-menu",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "@tabler/icons-react"],
       "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/applet-portal"],
       "files": [
         {
@@ -297,6 +329,7 @@
     {
       "name": "field",
       "type": "registry:ui",
+      "dependencies": ["class-variance-authority"],
       "registryDependencies": [
         "molefrog/moi/label",
         "molefrog/moi/separator",
@@ -314,6 +347,7 @@
     {
       "name": "hover-card",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
       "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/applet-portal"],
       "files": [
         {
@@ -327,6 +361,7 @@
     {
       "name": "input",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
       "registryDependencies": ["molefrog/moi/utils"],
       "files": [
         {
@@ -340,6 +375,7 @@
     {
       "name": "input-group",
       "type": "registry:ui",
+      "dependencies": ["class-variance-authority"],
       "registryDependencies": [
         "molefrog/moi/button",
         "molefrog/moi/input",
@@ -371,6 +407,7 @@
     {
       "name": "pagination",
       "type": "registry:ui",
+      "dependencies": ["@tabler/icons-react"],
       "registryDependencies": ["molefrog/moi/button", "molefrog/moi/utils"],
       "files": [
         {
@@ -384,6 +421,7 @@
     {
       "name": "popover",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
       "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/applet-portal"],
       "files": [
         {
@@ -397,6 +435,7 @@
     {
       "name": "progress",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
       "registryDependencies": ["molefrog/moi/utils"],
       "files": [
         {
@@ -410,6 +449,7 @@
     {
       "name": "radio-group",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
       "registryDependencies": ["molefrog/moi/utils"],
       "files": [
         {
@@ -437,6 +477,7 @@
     {
       "name": "select",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "@tabler/icons-react"],
       "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/applet-portal"],
       "files": [
         {
@@ -450,6 +491,7 @@
     {
       "name": "separator",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
       "registryDependencies": ["molefrog/moi/utils"],
       "files": [
         {
@@ -476,6 +518,7 @@
     {
       "name": "slider",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
       "registryDependencies": ["molefrog/moi/utils"],
       "files": [
         {
@@ -489,6 +532,7 @@
     {
       "name": "spinner",
       "type": "registry:ui",
+      "dependencies": ["@tabler/icons-react"],
       "registryDependencies": ["molefrog/moi/utils"],
       "files": [
         {
@@ -502,6 +546,7 @@
     {
       "name": "switch",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
       "registryDependencies": ["molefrog/moi/utils"],
       "files": [
         {
@@ -528,6 +573,7 @@
     {
       "name": "tabs",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "class-variance-authority"],
       "registryDependencies": ["molefrog/moi/utils"],
       "files": [
         {
@@ -554,6 +600,7 @@
     {
       "name": "toggle",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "class-variance-authority"],
       "registryDependencies": ["molefrog/moi/utils"],
       "files": [
         {
@@ -562,11 +609,12 @@
         }
       ],
       "title": "Toggle",
-      "description": "Two-state button used by Toggle Group."
+      "description": "Two-state button that can be on or off"
     },
     {
       "name": "toggle-group",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "class-variance-authority"],
       "registryDependencies": ["molefrog/moi/toggle", "molefrog/moi/utils"],
       "files": [
         {
@@ -580,6 +628,7 @@
     {
       "name": "tooltip",
       "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
       "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/applet-portal"],
       "files": [
         {
