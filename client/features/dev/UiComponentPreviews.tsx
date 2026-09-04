@@ -429,9 +429,9 @@ function ContextMenuPreview() {
         Right-click here
       </ContextMenuTrigger>
       <ContextMenuContent className="w-48">
-        <ContextMenuLabel>Order</ContextMenuLabel>
-        <ContextMenuSeparator />
         <ContextMenuGroup>
+          <ContextMenuLabel>Order</ContextMenuLabel>
+          <ContextMenuSeparator />
           <ContextMenuItem>
             Open <ContextMenuShortcut>↵</ContextMenuShortcut>
           </ContextMenuItem>
@@ -494,9 +494,9 @@ function DropdownMenuPreview() {
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="outline" />}>Open menu</DropdownMenuTrigger>
       <DropdownMenuContent className="w-48">
-        <DropdownMenuLabel>Order actions</DropdownMenuLabel>
-        <DropdownMenuSeparator />
         <DropdownMenuGroup>
+          <DropdownMenuLabel>Order actions</DropdownMenuLabel>
+          <DropdownMenuSeparator />
           <DropdownMenuItem>
             Open <DropdownMenuShortcut>↵</DropdownMenuShortcut>
           </DropdownMenuItem>
