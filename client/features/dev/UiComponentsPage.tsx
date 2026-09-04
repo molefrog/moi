@@ -59,7 +59,7 @@ export const UI_COMPONENT_PREVIEWS = {
   drawer: DrawerPreview
 }
 
-const registryItems = registry.items.filter(item => item.type === 'registry:ui')
+const registryItems = registry.items.filter(item => item.name in UI_COMPONENT_PREVIEWS)
 
 export function UiComponentsPage() {
   const [selectedName, setSelectedName] = useState(registryItems[0]?.name ?? '')
@@ -78,7 +78,7 @@ export function UiComponentsPage() {
           </p>
           <h1 className="mt-2 text-3xl font-medium tracking-tight">UI components</h1>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Interactive previews for every component in the local moi registry.
+            Interactive previews for moi components.
           </p>
         </header>
 

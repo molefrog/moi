@@ -20,6 +20,7 @@
     "workspace/**",
     "server/test/__fixtures__",
     "**/.build",
-    "client/vendor"
+    "client/vendor",
+    "ui-components/docs"
   ]
 }

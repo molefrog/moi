@@ -4,41 +4,878 @@
   "homepage": "https://moi.computer",
   "items": [
     {
+      "name": "accordion",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/accordion.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/accordion",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/accordion-example.tsx",
+          "api": "https://base-ui.com/react/components/accordion.md"
+        }
+      },
+      "title": "Accordion",
+      "description": "Vertically stacked sections that expand one at a time"
+    },
+    {
+      "name": "alert",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/alert.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/alert",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/alert-example.tsx"
+        }
+      },
+      "title": "Alert",
+      "description": "Callout box for statuses and short messages"
+    },
+    {
+      "name": "alert-dialog",
+      "type": "registry:ui",
+      "registryDependencies": [
+        "molefrog/moi/button",
+        "molefrog/moi/utils",
+        "molefrog/moi/applet-portal"
+      ],
+      "files": [
+        {
+          "path": "ui-components/alert-dialog.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/alert-dialog",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/alert-dialog-example.tsx",
+          "api": "https://base-ui.com/react/components/alert-dialog.md"
+        }
+      },
+      "title": "Alert Dialog",
+      "description": "Modal confirmation dialog for destructive or blocking actions"
+    },
+    {
+      "name": "applet-portal",
+      "type": "registry:lib",
+      "files": [
+        {
+          "path": "ui-components/applet-portal.tsx",
+          "type": "registry:lib",
+          "target": "@ui/applet-portal.tsx"
+        }
+      ],
+      "title": "Applet Portal",
+      "description": "Keeps portalled overlays inside applet styles."
+    },
+    {
+      "name": "attachment",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/button", "molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/attachment.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/attachment"
+        }
+      },
+      "title": "Attachment",
+      "description": "File or image attachment tile with metadata and actions"
+    },
+    {
+      "name": "avatar",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/avatar.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/avatar",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/avatar-example.tsx",
+          "api": "https://base-ui.com/react/components/avatar.md"
+        }
+      },
+      "title": "Avatar",
+      "description": "User or entity image with fallback initials"
+    },
+    {
+      "name": "badge",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/badge.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/badge",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/badge-example.tsx"
+        }
+      },
+      "title": "Badge",
+      "description": "Small status or count label"
+    },
+    {
+      "name": "bubble",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/bubble.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/bubble"
+        }
+      },
+      "title": "Bubble",
+      "description": "Chat message bubble"
+    },
+    {
       "name": "button",
       "type": "registry:ui",
       "title": "Button",
       "description": "The shared button for moi and its views.",
-      "dependencies": ["@base-ui/react", "class-variance-authority", "clsx", "tailwind-merge"],
+      "dependencies": ["@base-ui/react", "class-variance-authority"],
+      "registryDependencies": ["molefrog/moi/utils"],
       "files": [
         {
           "path": "ui-components/button.tsx",
           "type": "registry:ui"
-        },
-        {
-          "path": "ui-components/utils.ts",
-          "type": "registry:lib"
         }
       ],
-      "docs": "# Button\n\nVariants: `default`, `secondary`, `outline`, `ghost`, and `destructive`. Sizes: `xs`, `sm`, `default`, `lg`, `icon-xs`, `icon-sm`, `icon`, and `icon-lg`. Add `data-icon=\"inline-start\"` or `data-icon=\"inline-end\"` to inline icons. Use `buttonVariants` on links.\n\n```tsx\n<Button variant=\"outline\">Open</Button>\n```"
+      "meta": {
+        "links": {
+          "docs": "https://github.com/molefrog/moi/blob/main/ui-components/docs/button.md"
+        }
+      }
+    },
+    {
+      "name": "button-group",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/separator", "molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/button-group.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/button-group",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/button-group-example.tsx"
+        }
+      },
+      "title": "Button Group",
+      "description": "Buttons joined into one segmented control"
+    },
+    {
+      "name": "calendar",
+      "type": "registry:ui",
+      "dependencies": ["react-day-picker@latest", "date-fns"],
+      "registryDependencies": ["molefrog/moi/button", "molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/calendar.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/calendar",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/calendar-example.tsx",
+          "api": "https://react-day-picker.js.org"
+        }
+      },
+      "title": "Calendar",
+      "description": "Month calendar for picking dates and ranges"
+    },
+    {
+      "name": "card",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/card.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/card",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/card-example.tsx"
+        }
+      },
+      "title": "Card",
+      "description": "Card primitives used by registry components."
+    },
+    {
+      "name": "carousel",
+      "type": "registry:ui",
+      "dependencies": ["embla-carousel-react"],
+      "registryDependencies": ["molefrog/moi/button", "molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/carousel.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/carousel",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/carousel-example.tsx",
+          "api": "https://www.embla-carousel.com/get-started/react"
+        }
+      },
+      "title": "Carousel",
+      "description": "Swipeable slides with prev/next controls"
+    },
+    {
+      "name": "chart",
+      "type": "registry:ui",
+      "dependencies": ["recharts@3.8.0"],
+      "registryDependencies": ["molefrog/moi/card", "molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/chart.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/chart",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/chart-example.tsx"
+        }
+      },
+      "title": "Chart",
+      "description": "Recharts-based charts wired to workspace theme tokens"
+    },
+    {
+      "name": "checkbox",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/checkbox.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/checkbox",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/checkbox-example.tsx",
+          "api": "https://base-ui.com/react/components/checkbox.md"
+        }
+      },
+      "title": "Checkbox",
+      "description": "Binary checkbox with indeterminate state"
+    },
+    {
+      "name": "collapsible",
+      "type": "registry:ui",
+      "files": [
+        {
+          "path": "ui-components/collapsible.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/collapsible",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/collapsible-example.tsx",
+          "api": "https://base-ui.com/react/components/collapsible.md"
+        }
+      },
+      "title": "Collapsible",
+      "description": "Single section that expands and collapses"
+    },
+    {
+      "name": "combobox",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
+      "registryDependencies": [
+        "molefrog/moi/button",
+        "molefrog/moi/input-group",
+        "molefrog/moi/utils",
+        "molefrog/moi/applet-portal"
+      ],
+      "files": [
+        {
+          "path": "ui-components/combobox.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/combobox",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/combobox-example.tsx",
+          "api": "https://base-ui.com/react/components/combobox.md"
+        }
+      },
+      "title": "Combobox",
+      "description": "Text input with a filtered dropdown of options"
+    },
+    {
+      "name": "context-menu",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/applet-portal"],
+      "files": [
+        {
+          "path": "ui-components/context-menu.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/context-menu",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/context-menu-example.tsx",
+          "api": "https://base-ui.com/react/components/context-menu.md"
+        }
+      },
+      "title": "Context Menu",
+      "description": "Right-click menu with items, submenus, and shortcuts"
+    },
+    {
+      "name": "dialog",
+      "type": "registry:ui",
+      "registryDependencies": [
+        "molefrog/moi/button",
+        "molefrog/moi/utils",
+        "molefrog/moi/applet-portal"
+      ],
+      "files": [
+        {
+          "path": "ui-components/dialog.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/dialog",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/dialog-example.tsx",
+          "api": "https://base-ui.com/react/components/dialog.md"
+        }
+      },
+      "title": "Dialog",
+      "description": "Modal dialog with backdrop, header, and footer"
     },
     {
       "name": "drawer",
       "type": "registry:ui",
       "title": "Drawer",
       "description": "A Drawer scoped to moi views.",
-      "dependencies": ["@base-ui/react", "@tabler/icons-react", "clsx", "tailwind-merge"],
-      "registryDependencies": ["molefrog/moi/button"],
+      "dependencies": ["@base-ui/react", "@tabler/icons-react"],
+      "registryDependencies": ["molefrog/moi/button", "molefrog/moi/utils"],
       "files": [
         {
           "path": "ui-components/drawer.tsx",
           "type": "registry:ui"
-        },
-        {
-          "path": "ui-components/utils.ts",
-          "type": "registry:lib"
         }
       ],
-      "docs": "# Drawer\n\nA Drawer that stays inside the moi view that opens it. It opens from the right and traps focus by default while leaving the rest of the view interactive. Pass modal={true} for a backdrop and full modal behavior. Every DrawerContent needs a DrawerTitle; use className=\"sr-only\" when the title should be visually hidden. Put growing content in DrawerBody. DrawerContent includes a close button; pass showCloseButton={false} to hide it. Set swipeDirection on Drawer to choose another edge. Other Base UI Drawer props, including snap points, pass through. Compose custom triggers and close buttons with Base UI's render prop.\n\n```tsx\n<Drawer>\n  <DrawerTrigger render={<Button variant=\"outline\" />}>Details</DrawerTrigger>\n  <DrawerContent>\n    <DrawerHeader>\n      <DrawerTitle>Order details</DrawerTitle>\n      <DrawerDescription>Placed two days ago</DrawerDescription>\n    </DrawerHeader>\n    <DrawerBody>...</DrawerBody>\n    <DrawerFooter>\n      <DrawerClose render={<Button />}>Done</DrawerClose>\n    </DrawerFooter>\n  </DrawerContent>\n</Drawer>\n```"
+      "meta": {
+        "links": {
+          "docs": "https://github.com/molefrog/moi/blob/main/ui-components/docs/drawer.md"
+        }
+      }
+    },
+    {
+      "name": "dropdown-menu",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/applet-portal"],
+      "files": [
+        {
+          "path": "ui-components/dropdown-menu.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/dropdown-menu",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/dropdown-menu-example.tsx",
+          "api": "https://base-ui.com/react/components/menu.md"
+        }
+      },
+      "title": "Dropdown Menu",
+      "description": "Menu opened from a trigger: items, groups, submenus"
+    },
+    {
+      "name": "field",
+      "type": "registry:ui",
+      "registryDependencies": [
+        "molefrog/moi/label",
+        "molefrog/moi/separator",
+        "molefrog/moi/utils"
+      ],
+      "files": [
+        {
+          "path": "ui-components/field.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/field",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/field-example.tsx"
+        }
+      },
+      "title": "Field",
+      "description": "Form field wrapper: label, control, description, error"
+    },
+    {
+      "name": "hover-card",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/applet-portal"],
+      "files": [
+        {
+          "path": "ui-components/hover-card.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/hover-card",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/hover-card-example.tsx",
+          "api": "https://base-ui.com/react/components/hover-card.md"
+        }
+      },
+      "title": "Hover Card",
+      "description": "Preview card shown on hover over a link or element"
+    },
+    {
+      "name": "input",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/input.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/input",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/input-example.tsx"
+        }
+      },
+      "title": "Input",
+      "description": "Single-line text input"
+    },
+    {
+      "name": "input-group",
+      "type": "registry:ui",
+      "registryDependencies": [
+        "molefrog/moi/button",
+        "molefrog/moi/input",
+        "molefrog/moi/textarea",
+        "molefrog/moi/utils"
+      ],
+      "files": [
+        {
+          "path": "ui-components/input-group.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/input-group",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/input-group-example.tsx"
+        }
+      },
+      "title": "Input Group",
+      "description": "Input with attached addons, buttons, or icons"
+    },
+    {
+      "name": "label",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/label.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/label",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/label-example.tsx",
+          "api": "https://base-ui.com/react/components/label.md"
+        }
+      },
+      "title": "Label",
+      "description": "Form control label"
+    },
+    {
+      "name": "pagination",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/button", "molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/pagination.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/pagination",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/pagination-example.tsx"
+        }
+      },
+      "title": "Pagination",
+      "description": "Page navigation with prev/next and page links"
+    },
+    {
+      "name": "popover",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/applet-portal"],
+      "files": [
+        {
+          "path": "ui-components/popover.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/popover",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/popover-example.tsx",
+          "api": "https://base-ui.com/react/components/popover.md"
+        }
+      },
+      "title": "Popover",
+      "description": "Floating panel anchored to a trigger"
+    },
+    {
+      "name": "progress",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/progress.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/progress",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/progress-example.tsx",
+          "api": "https://base-ui.com/react/components/progress.md"
+        }
+      },
+      "title": "Progress",
+      "description": "Determinate progress bar"
+    },
+    {
+      "name": "radio-group",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/radio-group.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/radio-group",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/radio-group-example.tsx",
+          "api": "https://base-ui.com/react/components/radio-group.md"
+        }
+      },
+      "title": "Radio Group",
+      "description": "Single-choice radio button set"
+    },
+    {
+      "name": "resizable",
+      "type": "registry:ui",
+      "dependencies": ["react-resizable-panels"],
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/resizable.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/resizable",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/resizable-example.tsx",
+          "api": "https://github.com/bvaughn/react-resizable-panels"
+        }
+      },
+      "title": "Resizable",
+      "description": "Resizable split panels with drag handles"
+    },
+    {
+      "name": "select",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/applet-portal"],
+      "files": [
+        {
+          "path": "ui-components/select.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/select",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/select-example.tsx",
+          "api": "https://base-ui.com/react/components/select.md"
+        }
+      },
+      "title": "Select",
+      "description": "Native-feeling select with a styled popup"
+    },
+    {
+      "name": "separator",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/separator.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/separator",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/separator-example.tsx",
+          "api": "https://base-ui.com/react/components/separator.md"
+        }
+      },
+      "title": "Separator",
+      "description": "Horizontal or vertical dividing line"
+    },
+    {
+      "name": "skeleton",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/skeleton.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/skeleton",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/skeleton-example.tsx"
+        }
+      },
+      "title": "Skeleton",
+      "description": "Loading placeholder block"
+    },
+    {
+      "name": "slider",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/slider.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/slider",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/slider-example.tsx",
+          "api": "https://base-ui.com/react/components/slider.md"
+        }
+      },
+      "title": "Slider",
+      "description": "Range slider with one or more thumbs"
+    },
+    {
+      "name": "spinner",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/spinner.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/spinner",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/spinner-example.tsx"
+        }
+      },
+      "title": "Spinner",
+      "description": "Inline loading spinner"
+    },
+    {
+      "name": "switch",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/switch.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/switch",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/switch-example.tsx",
+          "api": "https://base-ui.com/react/components/switch.md"
+        }
+      },
+      "title": "Switch",
+      "description": "On/off toggle switch"
+    },
+    {
+      "name": "table",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/table.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/table",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/table-example.tsx"
+        }
+      },
+      "title": "Table",
+      "description": "Styled table primitives (header, body, rows, cells)"
+    },
+    {
+      "name": "tabs",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/tabs.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/tabs",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/tabs-example.tsx",
+          "api": "https://base-ui.com/react/components/tabs.md"
+        }
+      },
+      "title": "Tabs",
+      "description": "Tabbed panels with a tab list"
+    },
+    {
+      "name": "textarea",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/textarea.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/textarea",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/textarea-example.tsx"
+        }
+      },
+      "title": "Textarea",
+      "description": "Multi-line text input"
+    },
+    {
+      "name": "toggle",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/toggle.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/toggle",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/toggle-example.tsx",
+          "api": "https://base-ui.com/react/components/toggle.md"
+        }
+      },
+      "title": "Toggle",
+      "description": "Two-state button used by Toggle Group."
+    },
+    {
+      "name": "toggle-group",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/toggle", "molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/toggle-group.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/toggle-group",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/toggle-group-example.tsx",
+          "api": "https://base-ui.com/react/components/toggle-group.md"
+        }
+      },
+      "title": "Toggle Group",
+      "description": "Group of two-state toggle buttons"
+    },
+    {
+      "name": "tooltip",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/applet-portal"],
+      "files": [
+        {
+          "path": "ui-components/tooltip.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "meta": {
+        "links": {
+          "docs": "https://ui.shadcn.com/docs/components/base/tooltip",
+          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/tooltip-example.tsx",
+          "api": "https://base-ui.com/react/components/tooltip.md"
+        }
+      },
+      "title": "Tooltip",
+      "description": "Small label shown on hover or focus"
+    },
+    {
+      "name": "utils",
+      "type": "registry:lib",
+      "dependencies": ["clsx", "tailwind-merge"],
+      "files": [
+        {
+          "path": "ui-components/utils.ts",
+          "type": "registry:lib",
+          "target": "@ui/utils.ts"
+        }
+      ],
+      "title": "Utils",
+      "description": "Shared class name utility."
     }
   ]
 }

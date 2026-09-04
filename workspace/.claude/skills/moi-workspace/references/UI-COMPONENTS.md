@@ -1,12 +1,11 @@
 # UI components cheat sheet
 
-`moi ui-components` installs standard controls from selected shadcn and moi registry items,
-pre-tuned for moi applets: **Base UI** primitives, **Tabler** icons, workspace theme tokens,
-relative imports, and overlays patched so applet styling survives portalling. Drawer is
-moi-authored to the same conventions. Components land in `.moi/ui/` as plain source files you own.
+`moi ui-components` installs controls from the registry bundled with moi. Source and docs work
+offline. Components use **Base UI**, **Tabler** icons, workspace theme tokens, relative imports,
+and applet-scoped overlays. They land in `.moi/ui/` as plain source files you own.
 
 This file is the catalog plus the essential usage rules (condensed from the official shadcn
-skill). Read it once; fetch full per-component docs with `moi ui-components docs <name>` **before
+skill). Read it once; read full bundled docs with `moi ui-components docs <name>` **before
 composing a component you haven't used in this workspace** — the parts API is Base UI, not the
 Radix-era shadcn you may know.
 
@@ -47,7 +46,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
   ones still install.
 - Support files appear without being asked for (`utils.ts` with `cn`, `applet-portal.tsx`, and
   registry dependencies like `card` or `toggle`) — normal; use them if handy.
-  `applet-portal.tsx` is auto-generated machinery: never edit or remove it.
+  `applet-portal.tsx` is managed support code: never edit or remove it.
 
 ## Catalog
 

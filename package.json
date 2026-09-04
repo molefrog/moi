@@ -100,7 +100,7 @@
     "react-resizable-panels": "^4.12.2",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
-    "shadcn": "4.13.0",
+    "shadcn": "4.21.0",
     "sharp": "^0.35.1",
     "shell-quote": "^1.10.0",
     "sugar-high": "^1.2.1",
@@ -122,8 +122,12 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-grid-layout": "^2.1.0",
+    "date-fns": "^4.4.0",
+    "embla-carousel-react": "^8.6.0",
     "oxfmt": "^0.54.0",
     "oxlint": "^1.69.0",
+    "react-day-picker": "^10.0.1",
+    "recharts": "3.8.0",
     "typescript": "^5.9.3"
   }
 }
