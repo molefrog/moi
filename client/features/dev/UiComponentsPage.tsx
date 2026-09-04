@@ -30,7 +30,10 @@ export function UiComponentsPage() {
         </header>
 
         <div className="mt-8 grid items-start gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
-          <aside aria-label="UI components" className="flex flex-col gap-1">
+          <aside
+            aria-label="UI components"
+            className="flex h-[min(42rem,70dvh)] flex-col gap-1 overflow-y-auto"
+          >
             {registryItems.map(item => (
               <Button
                 key={item.name}
