@@ -333,7 +333,7 @@ describe('moi registry', () => {
       ]
     })
     expect(registry.items[0]?.registryDependencies).toBeUndefined()
-    expect(registry.items[0]?.docs).toContain('Every DrawerContent must contain a DrawerTitle')
+    expect(registry.items[0]?.docs).toContain('# Drawer')
   })
 
   test('drawer resolves to the local-first registry name', () => {
@@ -398,7 +398,7 @@ describe('moi registry', () => {
         'clsx',
         'tailwind-merge'
       ])
-      expect(docs).toContain('Every DrawerContent must contain a DrawerTitle')
+      expect(docs).toContain('# Drawer')
     } finally {
       globalThis.fetch = originalFetch
     }
@@ -498,11 +498,13 @@ describe('drawer source', () => {
     expect(source).toContain("from './utils'")
     expect(installed).toContain("from './utils'")
     expect(installed).toContain("from '@tabler/icons-react'")
-    expect(installed).toContain("from '@base-ui/react/dialog'")
+    expect(installed).toContain("from '@base-ui/react/drawer'")
     expect(installed).not.toContain('@/registry')
     expect(installed).not.toContain('IconPlaceholder')
     expect(installed).not.toContain('lucide')
-    expect(installed).toContain('<DrawerPrimitive.Portal container={container}>')
+    expect(installed).toContain(
+      '<DrawerPrimitive.Portal data-slot="drawer-portal" container={container}>'
+    )
     expect(installed).not.toContain('AppletPortal')
   })
 
@@ -513,17 +515,21 @@ describe('drawer source', () => {
     // it: no body portal, no fixed positioning, and no page-modal state
     // (trap-focus keeps the rest of the workspace scrollable and clickable).
     expect(source).toContain("closest<HTMLElement>('[data-applet]')")
-    expect(source).toContain('<DrawerPrimitive.Portal container={container}>')
+    expect(source).toContain(
+      '<DrawerPrimitive.Portal data-slot="drawer-portal" container={container}>'
+    )
     expect(source).toContain("modal = 'trap-focus'")
-    expect(source).toContain("side = 'right'")
+    expect(source).toContain("swipeDirection = 'right'")
     expect(source).toContain('data-slot="drawer-overlay"')
+    expect(source).toContain('{modal === true && (')
+    expect(source).toContain('data-modal={modal}')
     expect(source).not.toContain('document.body')
     expect(source).not.toMatch(/\bfixed\b/)
     // Not wrapped by the body-portal helper either — that would defeat it.
     expect(source).not.toContain('AppletPortal')
   })
 
-  test('exports and documents the sheet-shaped parts', async () => {
+  test('exports the consumer-facing parts and documents the basic composition', async () => {
     const { item, source } = await loadDrawerRegistryItem()
 
     for (const part of [
@@ -539,6 +545,26 @@ describe('drawer source', () => {
     ]) {
       expect(source).toContain(`function ${part}(`)
       expect(source).toMatch(new RegExp(`^  ${part},?$`, 'm'))
+    }
+    const exportBlock = source.match(/export\s*\{([\s\S]*?)\}\s*$/)?.[1]
+    expect(exportBlock).toBeDefined()
+    expect(exportBlock).not.toContain('DrawerPortal')
+    expect(exportBlock).not.toContain('DrawerSwipeHandle')
+    expect(source).not.toContain('function DrawerPortal')
+    expect(source).not.toContain('function DrawerOverlay')
+    expect(source).not.toContain('showSwipeHandle')
+
+    for (const part of [
+      'Drawer',
+      'DrawerTrigger',
+      'DrawerContent',
+      'DrawerHeader',
+      'DrawerBody',
+      'DrawerFooter',
+      'DrawerTitle',
+      'DrawerDescription',
+      'DrawerClose'
+    ]) {
       expect(item.docs).toContain(part)
     }
   })

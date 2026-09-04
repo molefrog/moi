@@ -261,14 +261,10 @@ network access. Components missing from the local registry continue through
 shadcn's online registry. The public GitHub repository also supports direct
 `molefrog/moi/drawer` installs.
 
-Drawer is the first moi-owned component. It keeps shadcn's familiar component
-structure and styling, with three deliberate differences:
-
-- It renders inside the current applet and covers only that view.
-- It opens from the right by default, with the other three sides still
-  available.
-- It uses Base UI Dialog without gestures, snap points, or nested-drawer
-  machinery.
+Drawer uses Base UI Drawer, renders inside the current view, opens from the
+right, and defaults to `modal="trap-focus"`. `DrawerContent` adds a close button,
+and `DrawerBody` provides scrolling. The portal, overlay, and swipe handle stay
+internal.
 
 ## Open items
 
