@@ -257,13 +257,11 @@ describe('update status', () => {
   })
 
   test('shares one package-manager process across concurrent requests', async () => {
-    let finish: ((code: number) => void) | null = null
+    const completion = Promise.withResolvers<number>()
     let runs = 0
     const runManager = () => {
       runs += 1
-      return new Promise<number>(resolve => {
-        finish = resolve
-      })
+      return completion.promise
     }
     const options = {
       runningVersion: '0.5.2',
@@ -280,7 +278,7 @@ describe('update status', () => {
     expect(runs).toBe(0)
     await Bun.sleep(0)
     expect(runs).toBe(1)
-    finish?.(0)
+    completion.resolve(0)
     await Promise.all([first, second])
   })
 })
@@ -486,7 +484,7 @@ describe('install mutex', () => {
   afterEach(() => __resetUpdateStateForTests())
 
   test('reports an install in flight until it settles', async () => {
-    let finish: ((code: number) => void) | null = null
+    const completion = Promise.withResolvers<number>()
     expect(updateInProgress()).toBe(false)
 
     const install = installUpdate({
@@ -498,13 +496,13 @@ describe('install mutex', () => {
       },
       fetchLatest: async () => '0.6.0',
       detectManager: async () => 'bun',
-      runManager: () => new Promise<number>(resolve => (finish = resolve)),
+      runManager: () => completion.promise,
       readInstalledVersion: async () => '0.6.0'
     })
 
     await Bun.sleep(0)
     expect(updateInProgress()).toBe(true)
-    finish?.(0)
+    completion.resolve(0)
     await install
     expect(updateInProgress()).toBe(true) // latched until the restart lands
   })

@@ -54,9 +54,9 @@ describe('view builder sketch submission', () => {
         'base64'
       )
     })
-    let sent: SendMessageInput | null = null
+    const sent: SendMessageInput[] = []
     codexHarness.sendMessage = async input => {
-      sent = input
+      sent.push(input)
     }
 
     const response = await api.request(
@@ -74,9 +74,9 @@ describe('view builder sketch submission', () => {
 
     if (!response.ok) throw new Error(await response.text())
     expect(response.status).toBe(200)
-    expect(sent?.attachments).toEqual([upload.id])
-    expect(sent?.content).toBe('')
-    expect(sent?.context?.directives).toContain(
+    expect(sent[0]?.attachments).toEqual([upload.id])
+    expect(sent[0]?.content).toBe('')
+    expect(sent[0]?.context?.directives).toContain(
       "The attached image is the user's sketch of the intended view layout."
     )
   })

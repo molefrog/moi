@@ -106,7 +106,9 @@ beforeAll(async () => {
         })
       }
       if (path.endsWith('.tgz')) {
-        return new Response(tarball, { headers: { 'Content-Type': 'application/octet-stream' } })
+        return new Response(new Uint8Array(tarball), {
+          headers: { 'Content-Type': 'application/octet-stream' }
+        })
       }
       return new Response('not found', { status: 404 })
     }

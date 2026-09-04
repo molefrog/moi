@@ -84,7 +84,7 @@ describe('readImageRelPath', () => {
   const call = (name: string, file_path?: string): ToolCall => ({
     toolCallId: 't1',
     name,
-    caller: 'agent',
+    caller: 'model',
     provider: 'claude-code',
     state: 'success',
     input: file_path === undefined ? {} : { file_path }

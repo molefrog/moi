@@ -14,6 +14,7 @@ type ViewBuilderStore = Record<string, ViewBuilder[]>
 // `waiting`, even if its session still looks live. Generous so a slow but real
 // build is never cut off mid-flight.
 const STALE_BUILD_MS = 10 * 60_000
+const APP_ICON_NAMES: readonly string[] = APP_ICON_IDS
 
 export class ViewBuilderError extends Error {
   status: 400 | 404 | 409
@@ -198,7 +199,7 @@ export async function setBuilder(
   }
   if (input.icon !== undefined && !isAppIconId(input.icon)) {
     throw new ViewBuilderError(
-      `Unknown view icon id "${input.icon}". Use one of: ${APP_ICON_IDS.join(', ')}`,
+      `Unknown view icon id "${input.icon}". Use one of: ${APP_ICON_NAMES.join(', ')}`,
       400
     )
   }

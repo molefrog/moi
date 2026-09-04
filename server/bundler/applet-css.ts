@@ -134,7 +134,12 @@ export function unqualifyNonSubjectHas(selector: string): string {
 }
 
 function insideKeyframes(parent: Container | Document | undefined): boolean {
-  return parent?.type === 'atrule' && /keyframes$/i.test((parent as { name: string }).name)
+  return (
+    parent?.type === 'atrule' &&
+    'name' in parent &&
+    typeof parent.name === 'string' &&
+    /keyframes$/i.test(parent.name)
+  )
 }
 
 export function scopeAppletCss(css: string, scope: string): string {

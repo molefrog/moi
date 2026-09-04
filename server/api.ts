@@ -149,7 +149,9 @@ async function handleFunctionCall(
 // the context. Mounted on the single-workspace sub-app so every nested route
 // shares the lookup instead of repeating `getWorkspace(...) ?? 404`.
 const withWorkspace = createMiddleware<ApiEnv>(async (c, next) => {
-  const ws = await getWorkspace(c.req.param('id'))
+  const id = c.req.param('id')
+  if (!id) return c.text('Workspace not found', 404)
+  const ws = await getWorkspace(id)
   if (!ws) return c.text('Workspace not found', 404)
   c.set('ws', ws)
   await next()
@@ -161,7 +163,6 @@ one.use('*', withWorkspace)
 
 one.get('/preview', async c => {
   const ws = c.get('ws')
-  const wsId = c.req.param('id')
   const views = await getViewList(ws.path)
   return c.json(
     await getWorkspacePreview(ws.path, {
@@ -169,7 +170,7 @@ one.get('/preview', async c => {
         harnessFor(ws).workspacePreview(ws, includeFirstUserMessage),
       viewIds: views.map(view => view.id),
       thumbnailUrl: (kind, id) =>
-        `/api/workspaces/${wsId}/applet-thumbnails/${kind}/${encodeURIComponent(id)}`
+        `/api/workspaces/${ws.id}/applet-thumbnails/${kind}/${encodeURIComponent(id)}`
     })
   )
 })
@@ -181,10 +182,10 @@ one.get('/widgets', c => listWidgets(c.get('ws').path))
 // path lists, `/*` serves a file from the bundle dir (`<name>/<file>`:
 // index.js, a chunk, or a hashed asset).
 one.get('/widgets/*', c => {
-  const id = c.req.param('id')
-  const { name, file } = parseAppletTail(c.req.url, id, 'widgets')
+  const ws = c.get('ws')
+  const { name, file } = parseAppletTail(c.req.url, ws.id, 'widgets')
   if (!name) return c.text('Not found', 404)
-  return serveWidget(name, file, c.get('ws').path, apiBaseFor(id), c.req.header('if-none-match'))
+  return serveWidget(name, file, ws.path, apiBaseFor(ws.id), c.req.header('if-none-match'))
 })
 
 // Views — full-screen agent apps. Mirrors the widget pair above: the exact path
@@ -192,10 +193,10 @@ one.get('/widgets/*', c => {
 one.get('/views', c => listViews(c.get('ws').path))
 
 one.get('/views/*', c => {
-  const id = c.req.param('id')
-  const { name, file } = parseAppletTail(c.req.url, id, 'views')
+  const ws = c.get('ws')
+  const { name, file } = parseAppletTail(c.req.url, ws.id, 'views')
   if (!name) return c.text('Not found', 404)
-  return serveView(name, file, c.get('ws').path, apiBaseFor(id), c.req.header('if-none-match'))
+  return serveView(name, file, ws.path, apiBaseFor(ws.id), c.req.header('if-none-match'))
 })
 
 function viewBuilderError(err: unknown): { message: string; status: 400 | 404 | 409 } | null {
@@ -358,23 +359,18 @@ one.delete('/view-builders/:builderId', async c => {
 // are allowed — the workspace holds secrets, and this route is unauthenticated.
 // localhost binding is NOT the guard.
 one.get('/fs/*', c => {
-  const id = c.req.param('id')
-  const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${id}/fs/`)[1] ?? ''
-  return serveWorkspaceFile(
-    c.get('ws').path,
-    tail,
-    c.req.header('range'),
-    c.req.header('if-none-match')
-  )
+  const ws = c.get('ws')
+  const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${ws.id}/fs/`)[1] ?? ''
+  return serveWorkspaceFile(ws.path, tail, c.req.header('range'), c.req.header('if-none-match'))
 })
 
 // Applet RPC — the home for server-function calls from a bundle. The bundle's
 // sentinel base resolves to `/api/workspaces/<id>`, so it POSTs to
 // `…/rpc/<module>/<fn>`.
 one.post('/rpc/*', c => {
-  const id = c.req.param('id')
-  const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${id}/rpc/`)[1] ?? ''
-  return handleFunctionCall(c.req.raw, tail, c.get('ws').path)
+  const ws = c.get('ws')
+  const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${ws.id}/rpc/`)[1] ?? ''
+  return handleFunctionCall(c.req.raw, tail, ws.path)
 })
 
 // Browser-side applet errors (module load failures, render crashes, window
@@ -428,9 +424,9 @@ one.post('/applet-log', async c => {
 // use this to show the picture an agent `Read` — same guards as /fs/ above,
 // images only, resized server-side (see server/preview.ts).
 one.get('/preview/*', c => {
-  const id = c.req.param('id')
-  const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${id}/preview/`)[1] ?? ''
-  return serveWorkspaceImagePreview(c.get('ws').path, tail, c.req.header('if-none-match'))
+  const ws = c.get('ws')
+  const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${ws.id}/preview/`)[1] ?? ''
+  return serveWorkspaceImagePreview(ws.path, tail, c.req.header('if-none-match'))
 })
 
 // Chat attachments. The composer POSTs files here (drag/drop, paste, or the
@@ -439,7 +435,7 @@ one.get('/preview/*', c => {
 // vision blocks at send time; other files are referenced by a temp path. See
 // server/uploads.ts and dev/file-uploads.md.
 one.post('/uploads', async c => {
-  const id = c.req.param('id')
+  const ws = c.get('ws')
   let form: FormData
   try {
     form = await c.req.formData()
@@ -459,7 +455,7 @@ one.post('/uploads', async c => {
       const bytes = Buffer.from(await file.arrayBuffer())
       out.push(
         await addUpload({
-          workspaceId: id,
+          workspaceId: ws.id,
           filename: file.name || 'file',
           mediaType: file.type || 'application/octet-stream',
           bytes
@@ -478,9 +474,9 @@ one.post('/uploads', async c => {
 // is content-addressed (sha256), so the response is immutable while it lives —
 // let the browser cache it for the store's TTL.
 one.get('/uploads/:uploadId', c => {
-  const u = getUpload(c.req.param('id'), c.req.param('uploadId'))
+  const u = getUpload(c.get('ws').id, c.req.param('uploadId'))
   if (!u) return c.text('Not found or expired', 404)
-  const body: BodyInit | null = u.data ?? (u.path ? Bun.file(u.path) : null)
+  const body = u.data ? new Uint8Array(u.data) : u.path ? Bun.file(u.path) : null
   if (!body) return c.text('Not found or expired', 404)
   return new Response(body, {
     headers: {
@@ -771,7 +767,7 @@ one.put('/scratchpad', async c => {
   await saveScratchpadDoc(body.document, ws.path)
   publishEvent({
     type: 'scratchpad:updated',
-    workspaceId: c.req.param('id'),
+    workspaceId: ws.id,
     origin: typeof body.origin === 'string' ? body.origin : undefined
   })
   return c.body(null, 204)
@@ -910,7 +906,7 @@ one.put('/', async c => {
 })
 
 one.delete('/', async c => {
-  const ok = await removeWorkspace(c.req.param('id'))
+  const ok = await removeWorkspace(c.get('ws').id)
   if (!ok) return c.text('Workspace not found', 404)
   return c.body(null, 204)
 })

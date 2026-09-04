@@ -97,10 +97,10 @@ export const app = Bun.serve<WsData>({
 
     // Locally-vendored React ESM (offline; no CDN). The importmap in
     // client/index.html points here; the handler picks dev/prod per env.
-    '/vendor/react/*': req => serveVendorReact(req),
+    '/vendor/react/*': (req: Request) => serveVendorReact(req),
 
     // Vendored emojibase-data for the settings emoji picker (offline; no CDN).
-    '/vendor/emojibase/*': req => serveVendorEmojibase(req),
+    '/vendor/emojibase/*': (req: Request) => serveVendorEmojibase(req),
 
     // Client-side routes — serve the SPA shell.
     '/': shell,
@@ -110,12 +110,13 @@ export const app = Bun.serve<WsData>({
 
     // Chat websocket — app-wide (one per client, not per workspace). Each chat
     // frame carries its own workspaceId.
-    '/ws': (req, server) => upgrade(server, req, { channel: 'chat', workspaceId: '' }),
+    '/ws': (req: Request, server: Bun.Server<WsData>) =>
+      upgrade(server, req, { channel: 'chat', workspaceId: '' }),
 
     // Live widget-event stream (build/refresh pushes). A static path, so Bun
     // routes it ahead of the Hono-served `/api/workspaces/:id`; the upgrade
     // happens in-handler via the route's `server` argument.
-    '/api/workspaces/ws': (req, server) =>
+    '/api/workspaces/ws': (req: Request, server: Bun.Server<WsData>) =>
       upgrade(server, req, { channel: 'events', workspaceId: '' })
   },
   // Anything not matched above (the whole HTTP API + prod static assets + 404)

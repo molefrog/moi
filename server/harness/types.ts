@@ -72,6 +72,8 @@ export type DiscoveredWorkspaceCandidate = {
   type: WorkspaceType
 }
 
+export type HarnessWorkspace = Pick<WorkspaceEntry, 'id' | 'path' | 'type' | 'agentId'>
+
 export type Harness = {
   id: WorkspaceType
   capabilities: HarnessCapabilities
@@ -104,9 +106,9 @@ export type Harness = {
   discoverWorkspaces?(registeredPaths: Set<string>): Promise<DiscoveredWorkspaceCandidate[]>
   // Without a workspace, only check whether the runtime is installed. With a
   // workspace, also check provider state such as authentication.
-  availability?(ws?: WorkspaceEntry): Promise<HarnessAvailability>
+  availability?(ws?: HarnessWorkspace): Promise<HarnessAvailability>
   // Optional recovery flow the host can start without a terminal.
-  startLogin?(ws: WorkspaceEntry): Promise<HarnessLogin>
+  startLogin?(ws: HarnessWorkspace): Promise<HarnessLogin>
 
   // -- host integration hooks -------------------------------------------------
   // Env is frozen at spawn everywhere; this reaps idle sessions/processes so
