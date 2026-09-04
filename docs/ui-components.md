@@ -46,6 +46,9 @@ sibling paths, apply applet portal scoping and project icon strokes, and run rep
 Then update `registry.json`, docs, and the pinned `shadcn` dependency together.
 Convert doc examples to Tabler too, including imports, icon names, and icon types.
 
+Compare CLI output using the repository's `components.json` and `client/index.css`.
+Generated output depends on project settings and theme tokens.
+
 The package whitelist includes `registry.json` and `ui-components/`, which makes
 the same files available from packed or published installs.
 
