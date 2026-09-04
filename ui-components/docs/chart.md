@@ -12,82 +12,81 @@ component: true
 </Callout>
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
+import * as React from 'react'
+import { Bar, BarChart, CartesianGrid, XAxis } from 'recharts'
 
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
-} from "@/registry/new-york-v4/ui/card"
+  CardTitle
+} from '@/registry/new-york-v4/ui/card'
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-  type ChartConfig,
-} from "@/registry/new-york-v4/ui/chart"
+  type ChartConfig
+} from '@/registry/new-york-v4/ui/chart'
 
-export const description = "An interactive bar chart"
+export const description = 'An interactive bar chart'
 
 const chartData = [
-  { date: "2024-04-01", desktop: 222, mobile: 150 },
-  { date: "2024-04-02", desktop: 97, mobile: 180 },
-  { date: "2024-04-03", desktop: 167, mobile: 120 },
-  { date: "2024-04-04", desktop: 242, mobile: 260 },
-  { date: "2024-04-05", desktop: 373, mobile: 290 },
-  { date: "2024-04-06", desktop: 301, mobile: 340 },
-  { date: "2024-04-07", desktop: 245, mobile: 180 },
-  { date: "2024-04-08", desktop: 409, mobile: 320 },
-  { date: "2024-04-09", desktop: 59, mobile: 110 },
-  { date: "2024-04-10", desktop: 261, mobile: 190 },
-  { date: "2024-04-11", desktop: 327, mobile: 350 },
-  { date: "2024-04-12", desktop: 292, mobile: 210 },
-  { date: "2024-04-13", desktop: 342, mobile: 380 },
-  { date: "2024-04-14", desktop: 137, mobile: 220 },
-  { date: "2024-04-15", desktop: 120, mobile: 170 },
-  { date: "2024-04-16", desktop: 138, mobile: 190 },
-  { date: "2024-04-17", desktop: 446, mobile: 360 },
-  { date: "2024-04-18", desktop: 364, mobile: 410 },
-  { date: "2024-04-19", desktop: 243, mobile: 180 },
-  { date: "2024-04-20", desktop: 89, mobile: 150 },
-  { date: "2024-04-21", desktop: 137, mobile: 200 },
-  { date: "2024-04-22", desktop: 224, mobile: 170 },
-  { date: "2024-04-23", desktop: 138, mobile: 230 },
-  { date: "2024-04-24", desktop: 387, mobile: 290 },
-  { date: "2024-04-25", desktop: 215, mobile: 250 },
-  { date: "2024-04-26", desktop: 75, mobile: 130 },
-  { date: "2024-04-27", desktop: 383, mobile: 420 },
-  { date: "2024-04-28", desktop: 122, mobile: 180 },
-  { date: "2024-04-29", desktop: 315, mobile: 240 },
-  { date: "2024-04-30", desktop: 454, mobile: 380 },
+  { date: '2024-04-01', desktop: 222, mobile: 150 },
+  { date: '2024-04-02', desktop: 97, mobile: 180 },
+  { date: '2024-04-03', desktop: 167, mobile: 120 },
+  { date: '2024-04-04', desktop: 242, mobile: 260 },
+  { date: '2024-04-05', desktop: 373, mobile: 290 },
+  { date: '2024-04-06', desktop: 301, mobile: 340 },
+  { date: '2024-04-07', desktop: 245, mobile: 180 },
+  { date: '2024-04-08', desktop: 409, mobile: 320 },
+  { date: '2024-04-09', desktop: 59, mobile: 110 },
+  { date: '2024-04-10', desktop: 261, mobile: 190 },
+  { date: '2024-04-11', desktop: 327, mobile: 350 },
+  { date: '2024-04-12', desktop: 292, mobile: 210 },
+  { date: '2024-04-13', desktop: 342, mobile: 380 },
+  { date: '2024-04-14', desktop: 137, mobile: 220 },
+  { date: '2024-04-15', desktop: 120, mobile: 170 },
+  { date: '2024-04-16', desktop: 138, mobile: 190 },
+  { date: '2024-04-17', desktop: 446, mobile: 360 },
+  { date: '2024-04-18', desktop: 364, mobile: 410 },
+  { date: '2024-04-19', desktop: 243, mobile: 180 },
+  { date: '2024-04-20', desktop: 89, mobile: 150 },
+  { date: '2024-04-21', desktop: 137, mobile: 200 },
+  { date: '2024-04-22', desktop: 224, mobile: 170 },
+  { date: '2024-04-23', desktop: 138, mobile: 230 },
+  { date: '2024-04-24', desktop: 387, mobile: 290 },
+  { date: '2024-04-25', desktop: 215, mobile: 250 },
+  { date: '2024-04-26', desktop: 75, mobile: 130 },
+  { date: '2024-04-27', desktop: 383, mobile: 420 },
+  { date: '2024-04-28', desktop: 122, mobile: 180 },
+  { date: '2024-04-29', desktop: 315, mobile: 240 },
+  { date: '2024-04-30', desktop: 454, mobile: 380 }
 ]
 
 const chartConfig = {
   views: {
-    label: "Page Views",
+    label: 'Page Views'
   },
   desktop: {
-    label: "Desktop",
-    color: "var(--chart-2)",
+    label: 'Desktop',
+    color: 'var(--chart-2)'
   },
   mobile: {
-    label: "Mobile",
-    color: "var(--chart-1)",
-  },
+    label: 'Mobile',
+    color: 'var(--chart-1)'
+  }
 } satisfies ChartConfig
 
 export function ChartDemo() {
-  const [activeChart, setActiveChart] =
-    React.useState<keyof typeof chartConfig>("desktop")
+  const [activeChart, setActiveChart] = React.useState<keyof typeof chartConfig>('desktop')
 
   const total = React.useMemo(
     () => ({
       desktop: chartData.reduce((acc, curr) => acc + curr.desktop, 0),
-      mobile: chartData.reduce((acc, curr) => acc + curr.mobile, 0),
+      mobile: chartData.reduce((acc, curr) => acc + curr.mobile, 0)
     }),
     []
   )
@@ -97,12 +96,10 @@ export function ChartDemo() {
       <CardHeader className="flex flex-col items-stretch border-b p-0! sm:flex-row">
         <div className="flex flex-1 flex-col justify-center gap-1 px-6 pt-4 pb-3 sm:py-0!">
           <CardTitle>Bar Chart - Interactive</CardTitle>
-          <CardDescription>
-            Showing total visitors for the last 3 months
-          </CardDescription>
+          <CardDescription>Showing total visitors for the last 3 months</CardDescription>
         </div>
         <div className="flex">
-          {["desktop", "mobile"].map((key) => {
+          {['desktop', 'mobile'].map(key => {
             const chart = key as keyof typeof chartConfig
             return (
               <button
@@ -111,9 +108,7 @@ export function ChartDemo() {
                 className="relative z-30 flex flex-1 flex-col justify-center gap-1 border-t px-6 py-4 text-left even:border-l data-[active=true]:bg-muted/50 sm:border-t-0 sm:border-l sm:px-8 sm:py-6"
                 onClick={() => setActiveChart(chart)}
               >
-                <span className="text-xs text-muted-foreground">
-                  {chartConfig[chart].label}
-                </span>
+                <span className="text-xs text-muted-foreground">{chartConfig[chart].label}</span>
                 <span className="text-lg leading-none font-bold sm:text-3xl">
                   {total[key as keyof typeof total].toLocaleString()}
                 </span>
@@ -123,16 +118,13 @@ export function ChartDemo() {
         </div>
       </CardHeader>
       <CardContent className="px-2 sm:p-6">
-        <ChartContainer
-          config={chartConfig}
-          className="aspect-auto h-[250px] w-full"
-        >
+        <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
           <BarChart
             accessibilityLayer
             data={chartData}
             margin={{
               left: 12,
-              right: 12,
+              right: 12
             }}
           >
             <CartesianGrid vertical={false} />
@@ -142,11 +134,11 @@ export function ChartDemo() {
               axisLine={false}
               tickMargin={8}
               minTickGap={32}
-              tickFormatter={(value) => {
+              tickFormatter={value => {
                 const date = new Date(value)
-                return date.toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
+                return date.toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric'
                 })
               }}
             />
@@ -155,11 +147,11 @@ export function ChartDemo() {
                 <ChartTooltipContent
                   className="w-[150px]"
                   nameKey="views"
-                  labelFormatter={(value) => {
-                    return new Date(value).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
+                  labelFormatter={value => {
+                    return new Date(value).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
                     })
                   }}
                 />
@@ -172,7 +164,6 @@ export function ChartDemo() {
     </Card>
   )
 }
-
 ```
 
 Introducing **Charts**. A collection of chart components that you can copy and paste into your apps.
@@ -188,9 +179,9 @@ We use [Recharts](https://recharts.org/) under the hood.
 We designed the `chart` component with composition in mind. **You build your charts using Recharts components and only bring in custom components, such as `ChartTooltip`, when and where you need it**.
 
 ```tsx showLineNumbers /ChartContainer/ /ChartTooltipContent/
-import { Bar, BarChart } from "recharts"
+import { Bar, BarChart } from 'recharts'
 
-import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart"
+import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart'
 
 export function MyChart() {
   return (
@@ -297,12 +288,12 @@ The following data represents the number of desktop and mobile users for each mo
 
 ```tsx title="components/example-chart.tsx" showLineNumbers
 const chartData = [
-  { month: "January", desktop: 186, mobile: 80 },
-  { month: "February", desktop: 305, mobile: 200 },
-  { month: "March", desktop: 237, mobile: 120 },
-  { month: "April", desktop: 73, mobile: 190 },
-  { month: "May", desktop: 209, mobile: 130 },
-  { month: "June", desktop: 214, mobile: 140 },
+  { month: 'January', desktop: 186, mobile: 80 },
+  { month: 'February', desktop: 305, mobile: 200 },
+  { month: 'March', desktop: 237, mobile: 120 },
+  { month: 'April', desktop: 73, mobile: 190 },
+  { month: 'May', desktop: 209, mobile: 130 },
+  { month: 'June', desktop: 214, mobile: 140 }
 ]
 ```
 
@@ -311,17 +302,17 @@ const chartData = [
 The chart config holds configuration for the chart. This is where you place human-readable strings, such as labels, icons and color tokens for theming.
 
 ```tsx title="components/example-chart.tsx" showLineNumbers
-import { type ChartConfig } from "@/components/ui/chart"
+import { type ChartConfig } from '@/components/ui/chart'
 
 const chartConfig = {
   desktop: {
-    label: "Desktop",
-    color: "#2563eb",
+    label: 'Desktop',
+    color: '#2563eb'
   },
   mobile: {
-    label: "Mobile",
-    color: "#60a5fa",
-  },
+    label: 'Mobile',
+    color: '#60a5fa'
+  }
 } satisfies ChartConfig
 ```
 
@@ -336,30 +327,30 @@ You can now build your chart using Recharts components.
 </Callout>
 
 ```tsx
-"use client"
+'use client'
 
-import { Bar, BarChart } from "recharts"
+import { Bar, BarChart } from 'recharts'
 
-import { ChartContainer, type ChartConfig } from "@/components/ui/chart"
+import { ChartContainer, type ChartConfig } from '@/components/ui/chart'
 
 const chartData = [
-  { month: "January", desktop: 186, mobile: 80 },
-  { month: "February", desktop: 305, mobile: 200 },
-  { month: "March", desktop: 237, mobile: 120 },
-  { month: "April", desktop: 73, mobile: 190 },
-  { month: "May", desktop: 209, mobile: 130 },
-  { month: "June", desktop: 214, mobile: 140 },
+  { month: 'January', desktop: 186, mobile: 80 },
+  { month: 'February', desktop: 305, mobile: 200 },
+  { month: 'March', desktop: 237, mobile: 120 },
+  { month: 'April', desktop: 73, mobile: 190 },
+  { month: 'May', desktop: 209, mobile: 130 },
+  { month: 'June', desktop: 214, mobile: 140 }
 ]
 
 const chartConfig = {
   desktop: {
-    label: "Desktop",
-    color: "#2563eb",
+    label: 'Desktop',
+    color: '#2563eb'
   },
   mobile: {
-    label: "Mobile",
-    color: "#60a5fa",
-  },
+    label: 'Mobile',
+    color: '#60a5fa'
+  }
 } satisfies ChartConfig
 
 export function ChartExample() {
@@ -372,7 +363,6 @@ export function ChartExample() {
     </ChartContainer>
   )
 }
-
 ```
 
 </Steps>
@@ -386,7 +376,7 @@ Let's add a grid to the chart.
 <Step>Import the `CartesianGrid` component.</Step>
 
 ```tsx /CartesianGrid/
-import { Bar, BarChart, CartesianGrid } from "recharts"
+import { Bar, BarChart, CartesianGrid } from 'recharts'
 ```
 
 <Step>Add the `CartesianGrid` component to your chart.</Step>
@@ -402,30 +392,30 @@ import { Bar, BarChart, CartesianGrid } from "recharts"
 ```
 
 ```tsx
-"use client"
+'use client'
 
-import { Bar, BarChart, CartesianGrid } from "recharts"
+import { Bar, BarChart, CartesianGrid } from 'recharts'
 
-import { ChartContainer, type ChartConfig } from "@/components/ui/chart"
+import { ChartContainer, type ChartConfig } from '@/components/ui/chart'
 
 const chartData = [
-  { month: "January", desktop: 186, mobile: 80 },
-  { month: "February", desktop: 305, mobile: 200 },
-  { month: "March", desktop: 237, mobile: 120 },
-  { month: "April", desktop: 73, mobile: 190 },
-  { month: "May", desktop: 209, mobile: 130 },
-  { month: "June", desktop: 214, mobile: 140 },
+  { month: 'January', desktop: 186, mobile: 80 },
+  { month: 'February', desktop: 305, mobile: 200 },
+  { month: 'March', desktop: 237, mobile: 120 },
+  { month: 'April', desktop: 73, mobile: 190 },
+  { month: 'May', desktop: 209, mobile: 130 },
+  { month: 'June', desktop: 214, mobile: 140 }
 ]
 
 const chartConfig = {
   desktop: {
-    label: "Desktop",
-    color: "#2563eb",
+    label: 'Desktop',
+    color: '#2563eb'
   },
   mobile: {
-    label: "Mobile",
-    color: "#60a5fa",
-  },
+    label: 'Mobile',
+    color: '#60a5fa'
+  }
 } satisfies ChartConfig
 
 export function ChartBarDemoGrid() {
@@ -439,7 +429,6 @@ export function ChartBarDemoGrid() {
     </ChartContainer>
   )
 }
-
 ```
 
 </Steps>
@@ -453,7 +442,7 @@ To add an x-axis to the chart, we'll use the `XAxis` component.
 <Step>Import the `XAxis` component.</Step>
 
 ```tsx /XAxis/
-import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, XAxis } from 'recharts'
 ```
 
 <Step>Add the `XAxis` component to your chart.</Step>
@@ -467,7 +456,7 @@ import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
       tickLine={false}
       tickMargin={10}
       axisLine={false}
-      tickFormatter={(value) => value.slice(0, 3)}
+      tickFormatter={value => value.slice(0, 3)}
     />
     <Bar dataKey="desktop" fill="var(--color-desktop)" radius={4} />
     <Bar dataKey="mobile" fill="var(--color-mobile)" radius={4} />
@@ -476,30 +465,30 @@ import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
 ```
 
 ```tsx
-"use client"
+'use client'
 
-import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, XAxis } from 'recharts'
 
-import { ChartContainer, type ChartConfig } from "@/components/ui/chart"
+import { ChartContainer, type ChartConfig } from '@/components/ui/chart'
 
 const chartData = [
-  { month: "January", desktop: 186, mobile: 80 },
-  { month: "February", desktop: 305, mobile: 200 },
-  { month: "March", desktop: 237, mobile: 120 },
-  { month: "April", desktop: 73, mobile: 190 },
-  { month: "May", desktop: 209, mobile: 130 },
-  { month: "June", desktop: 214, mobile: 140 },
+  { month: 'January', desktop: 186, mobile: 80 },
+  { month: 'February', desktop: 305, mobile: 200 },
+  { month: 'March', desktop: 237, mobile: 120 },
+  { month: 'April', desktop: 73, mobile: 190 },
+  { month: 'May', desktop: 209, mobile: 130 },
+  { month: 'June', desktop: 214, mobile: 140 }
 ]
 
 const chartConfig = {
   desktop: {
-    label: "Desktop",
-    color: "#2563eb",
+    label: 'Desktop',
+    color: '#2563eb'
   },
   mobile: {
-    label: "Mobile",
-    color: "#60a5fa",
-  },
+    label: 'Mobile',
+    color: '#60a5fa'
+  }
 } satisfies ChartConfig
 
 export function ChartBarDemoAxis() {
@@ -512,7 +501,7 @@ export function ChartBarDemoAxis() {
           tickLine={false}
           tickMargin={10}
           axisLine={false}
-          tickFormatter={(value) => value.slice(0, 3)}
+          tickFormatter={value => value.slice(0, 3)}
         />
         <Bar dataKey="desktop" fill="var(--color-desktop)" radius={4} />
         <Bar dataKey="mobile" fill="var(--color-mobile)" radius={4} />
@@ -520,7 +509,6 @@ export function ChartBarDemoAxis() {
     </ChartContainer>
   )
 }
-
 ```
 
 </Steps>
@@ -536,7 +524,7 @@ To add a tooltip, we'll use the custom `ChartTooltip` and `ChartTooltipContent` 
 <Step>Import the `ChartTooltip` and `ChartTooltipContent` components.</Step>
 
 ```tsx
-import { ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 ```
 
 <Step>Add the components to your chart.</Step>
@@ -550,7 +538,7 @@ import { ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
       tickLine={false}
       tickMargin={10}
       axisLine={false}
-      tickFormatter={(value) => value.slice(0, 3)}
+      tickFormatter={value => value.slice(0, 3)}
     />
     <ChartTooltip content={<ChartTooltipContent />} />
     <Bar dataKey="desktop" fill="var(--color-desktop)" radius={4} />
@@ -560,35 +548,35 @@ import { ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 ```
 
 ```tsx
-"use client"
+'use client'
 
-import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, XAxis } from 'recharts'
 
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart"
+  type ChartConfig
+} from '@/components/ui/chart'
 
 const chartData = [
-  { month: "January", desktop: 186, mobile: 80 },
-  { month: "February", desktop: 305, mobile: 200 },
-  { month: "March", desktop: 237, mobile: 120 },
-  { month: "April", desktop: 73, mobile: 190 },
-  { month: "May", desktop: 209, mobile: 130 },
-  { month: "June", desktop: 214, mobile: 140 },
+  { month: 'January', desktop: 186, mobile: 80 },
+  { month: 'February', desktop: 305, mobile: 200 },
+  { month: 'March', desktop: 237, mobile: 120 },
+  { month: 'April', desktop: 73, mobile: 190 },
+  { month: 'May', desktop: 209, mobile: 130 },
+  { month: 'June', desktop: 214, mobile: 140 }
 ]
 
 const chartConfig = {
   desktop: {
-    label: "Desktop",
-    color: "#2563eb",
+    label: 'Desktop',
+    color: '#2563eb'
   },
   mobile: {
-    label: "Mobile",
-    color: "#60a5fa",
-  },
+    label: 'Mobile',
+    color: '#60a5fa'
+  }
 } satisfies ChartConfig
 
 export function ChartBarDemoTooltip() {
@@ -601,7 +589,7 @@ export function ChartBarDemoTooltip() {
           tickLine={false}
           tickMargin={10}
           axisLine={false}
-          tickFormatter={(value) => value.slice(0, 3)}
+          tickFormatter={value => value.slice(0, 3)}
         />
         <ChartTooltip content={<ChartTooltipContent />} />
         <Bar dataKey="desktop" fill="var(--color-desktop)" radius={4} />
@@ -610,7 +598,6 @@ export function ChartBarDemoTooltip() {
     </ChartContainer>
   )
 }
-
 ```
 
 Hover to see the tooltips. Easy, right? Two components, and we've got a beautiful tooltip.
@@ -626,7 +613,7 @@ We'll do the same for the legend. We'll use the `ChartLegend` and `ChartLegendCo
 <Step>Import the `ChartLegend` and `ChartLegendContent` components.</Step>
 
 ```tsx
-import { ChartLegend, ChartLegendContent } from "@/components/ui/chart"
+import { ChartLegend, ChartLegendContent } from '@/components/ui/chart'
 ```
 
 <Step>Add the components to your chart.</Step>
@@ -640,7 +627,7 @@ import { ChartLegend, ChartLegendContent } from "@/components/ui/chart"
       tickLine={false}
       tickMargin={10}
       axisLine={false}
-      tickFormatter={(value) => value.slice(0, 3)}
+      tickFormatter={value => value.slice(0, 3)}
     />
     <ChartTooltip content={<ChartTooltipContent />} />
     <ChartLegend content={<ChartLegendContent />} />
@@ -651,9 +638,9 @@ import { ChartLegend, ChartLegendContent } from "@/components/ui/chart"
 ```
 
 ```tsx
-"use client"
+'use client'
 
-import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, XAxis } from 'recharts'
 
 import {
   ChartContainer,
@@ -661,27 +648,27 @@ import {
   ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart"
+  type ChartConfig
+} from '@/components/ui/chart'
 
 const chartData = [
-  { month: "January", desktop: 186, mobile: 80 },
-  { month: "February", desktop: 305, mobile: 200 },
-  { month: "March", desktop: 237, mobile: 120 },
-  { month: "April", desktop: 73, mobile: 190 },
-  { month: "May", desktop: 209, mobile: 130 },
-  { month: "June", desktop: 214, mobile: 140 },
+  { month: 'January', desktop: 186, mobile: 80 },
+  { month: 'February', desktop: 305, mobile: 200 },
+  { month: 'March', desktop: 237, mobile: 120 },
+  { month: 'April', desktop: 73, mobile: 190 },
+  { month: 'May', desktop: 209, mobile: 130 },
+  { month: 'June', desktop: 214, mobile: 140 }
 ]
 
 const chartConfig = {
   desktop: {
-    label: "Desktop",
-    color: "#2563eb",
+    label: 'Desktop',
+    color: '#2563eb'
   },
   mobile: {
-    label: "Mobile",
-    color: "#60a5fa",
-  },
+    label: 'Mobile',
+    color: '#60a5fa'
+  }
 } satisfies ChartConfig
 
 export function ChartBarDemoLegend() {
@@ -694,7 +681,7 @@ export function ChartBarDemoLegend() {
           tickLine={false}
           tickMargin={10}
           axisLine={false}
-          tickFormatter={(value) => value.slice(0, 3)}
+          tickFormatter={value => value.slice(0, 3)}
         />
         <ChartTooltip content={<ChartTooltipContent />} />
         <ChartLegend content={<ChartLegendContent />} />
@@ -704,7 +691,6 @@ export function ChartBarDemoLegend() {
     </ChartContainer>
   )
 }
-
 ```
 
 </Steps>
@@ -724,22 +710,22 @@ It is intentionally decoupled from chart data.
 This allows you to share config and color tokens between charts. It can also work independently for cases where your data or color tokens live remotely or in a different format.
 
 ```tsx showLineNumbers /ChartConfig/
-import { Monitor } from "lucide-react"
+import { Monitor } from 'lucide-react'
 
-import { type ChartConfig } from "@/components/ui/chart"
+import { type ChartConfig } from '@/components/ui/chart'
 
 const chartConfig = {
   desktop: {
-    label: "Desktop",
+    label: 'Desktop',
     icon: Monitor,
     // A color like 'hsl(220, 98%, 61%)' or 'var(--color-name)'
-    color: "#2563eb",
+    color: '#2563eb',
     // OR a theme object with 'light' and 'dark' keys
     theme: {
-      light: "#2563eb",
-      dark: "#dc2626",
-    },
-  },
+      light: '#2563eb',
+      dark: '#dc2626'
+    }
+  }
 } satisfies ChartConfig
 ```
 
@@ -772,13 +758,13 @@ Charts have built-in support for theming. You can use css variables (recommended
 ```tsx title="components/example-chart.tsx" showLineNumbers
 const chartConfig = {
   desktop: {
-    label: "Desktop",
-    color: "var(--chart-1)",
+    label: 'Desktop',
+    color: 'var(--chart-1)'
   },
   mobile: {
-    label: "Mobile",
-    color: "var(--chart-2)",
-  },
+    label: 'Mobile',
+    color: 'var(--chart-2)'
+  }
 } satisfies ChartConfig
 ```
 
@@ -791,21 +777,21 @@ You can also define your colors directly in the chart config. Use the color form
 ```tsx title="components/example-chart.tsx" showLineNumbers
 const chartConfig = {
   desktop: {
-    label: "Desktop",
-    color: "#2563eb",
+    label: 'Desktop',
+    color: '#2563eb'
   },
   mobile: {
-    label: "Mobile",
-    color: "hsl(220, 98%, 61%)",
+    label: 'Mobile',
+    color: 'hsl(220, 98%, 61%)'
   },
   tablet: {
-    label: "Tablet",
-    color: "oklch(0.5 0.2 240)",
+    label: 'Tablet',
+    color: 'oklch(0.5 0.2 240)'
   },
   laptop: {
-    label: "Laptop",
-    color: "var(--chart-2)",
-  },
+    label: 'Laptop',
+    color: 'var(--chart-2)'
+  }
 } satisfies ChartConfig
 ```
 
@@ -823,8 +809,8 @@ To use the theme colors in your chart, reference the colors using the format `va
 
 ```tsx title="components/example-chart.tsx" showLineNumbers
 const chartData = [
-  { browser: "chrome", visitors: 275, fill: "var(--color-chrome)" },
-  { browser: "safari", visitors: 200, fill: "var(--color-safari)" },
+  { browser: 'chrome', visitors: 275, fill: 'var(--color-chrome)' },
+  { browser: 'safari', visitors: 200, fill: 'var(--color-safari)' }
 ]
 ```
 
@@ -839,18 +825,16 @@ const chartData = [
 A chart tooltip contains a label, name, indicator and value. You can use a combination of these to customize your tooltip.
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import { cn } from "cn"
+import * as React from 'react'
+import { cn } from 'cn'
 
 export function ChartTooltipDemo() {
   return (
     <div className="grid aspect-video w-full max-w-md justify-center text-foreground md:grid-cols-2 [&>div]:relative [&>div]:flex [&>div]:h-[137px] [&>div]:w-[224px] [&>div]:items-center [&>div]:justify-center [&>div]:p-4">
       <div>
-        <div className="absolute top-[45px] left-[-35px] z-10 text-sm font-medium">
-          Label
-        </div>
+        <div className="absolute top-[45px] left-[-35px] z-10 text-sm font-medium">Label</div>
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 193 40"
@@ -874,16 +858,14 @@ export function ChartTooltipDemo() {
         <TooltipDemo
           label="Page Views"
           payload={[
-            { name: "Desktop", value: 186, fill: "var(--chart-1)" },
-            { name: "Mobile", value: 80, fill: "var(--chart-2)" },
+            { name: 'Desktop', value: 186, fill: 'var(--chart-1)' },
+            { name: 'Mobile', value: 80, fill: 'var(--chart-2)' }
           ]}
           className="w-[8rem]"
         />
       </div>
       <div className="items-end">
-        <div className="absolute top-[0px] left-[122px] z-10 text-sm font-medium">
-          Name
-        </div>
+        <div className="absolute top-[0px] left-[122px] z-10 text-sm font-medium">Name</div>
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="35"
@@ -908,8 +890,8 @@ export function ChartTooltipDemo() {
           label="Browser"
           hideLabel
           payload={[
-            { name: "Chrome", value: 1286, fill: "var(--chart-3)" },
-            { name: "Firefox", value: 1000, fill: "var(--chart-4)" },
+            { name: 'Chrome', value: 1286, fill: 'var(--chart-3)' },
+            { name: 'Firefox', value: 1000, fill: 'var(--chart-4)' }
           ]}
           indicator="dashed"
           className="w-[8rem]"
@@ -918,19 +900,17 @@ export function ChartTooltipDemo() {
       <div className="hidden! md:flex!">
         <TooltipDemo
           label="Page Views"
-          payload={[{ name: "Desktop", value: 12486, fill: "var(--chart-3)" }]}
+          payload={[{ name: 'Desktop', value: 12486, fill: 'var(--chart-3)' }]}
           className="w-[9rem]"
           indicator="line"
         />
       </div>
       <div className="items-start! justify-start!">
-        <div className="absolute top-[60px] left-[50px] z-10 text-sm font-medium">
-          Indicator
-        </div>
+        <div className="absolute top-[60px] left-[50px] z-10 text-sm font-medium">Indicator</div>
         <TooltipDemo
           label="Browser"
           hideLabel
-          payload={[{ name: "Chrome", value: 1286, fill: "var(--chart-1)" }]}
+          payload={[{ name: 'Chrome', value: 1286, fill: 'var(--chart-1)' }]}
           indicator="dot"
           className="w-[8rem]"
         />
@@ -960,17 +940,17 @@ export function ChartTooltipDemo() {
 }
 
 function TooltipDemo({
-  indicator = "dot",
+  indicator = 'dot',
   label,
   payload,
   hideLabel,
   hideIndicator,
-  className,
+  className
 }: {
   label: string
   hideLabel?: boolean
   hideIndicator?: boolean
-  indicator?: "line" | "dot" | "dashed"
+  indicator?: 'line' | 'dot' | 'dashed'
   payload: {
     name: string
     value: number
@@ -978,21 +958,19 @@ function TooltipDemo({
   }[]
   nameKey?: string
   labelKey?: string
-} & React.ComponentProps<"div">) {
-  const tooltipLabel = hideLabel ? null : (
-    <div className="font-medium">{label}</div>
-  )
+} & React.ComponentProps<'div'>) {
+  const tooltipLabel = hideLabel ? null : <div className="font-medium">{label}</div>
 
   if (!payload?.length) {
     return null
   }
 
-  const nestLabel = payload.length === 1 && indicator !== "dot"
+  const nestLabel = payload.length === 1 && indicator !== 'dot'
 
   return (
     <div
       className={cn(
-        "grid min-w-[8rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl transition-all ease-in-out hover:-translate-y-0.5",
+        'grid min-w-[8rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl transition-all ease-in-out hover:-translate-y-0.5',
         className
       )}
     >
@@ -1005,35 +983,34 @@ function TooltipDemo({
             <div
               key={index}
               className={cn(
-                "flex w-full items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-muted-foreground",
-                indicator === "dot" && "items-center"
+                'flex w-full items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-muted-foreground',
+                indicator === 'dot' && 'items-center'
               )}
             >
               <>
                 {!hideIndicator && (
                   <div
                     className={cn(
-                      "shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)",
+                      'shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)',
                       {
-                        "h-2.5 w-2.5": indicator === "dot",
-                        "w-1": indicator === "line",
-                        "w-0 border-[1.5px] border-dashed bg-transparent":
-                          indicator === "dashed",
-                        "my-0.5": nestLabel && indicator === "dashed",
+                        'h-2.5 w-2.5': indicator === 'dot',
+                        'w-1': indicator === 'line',
+                        'w-0 border-[1.5px] border-dashed bg-transparent': indicator === 'dashed',
+                        'my-0.5': nestLabel && indicator === 'dashed'
                       }
                     )}
                     style={
                       {
-                        "--color-bg": indicatorColor,
-                        "--color-border": indicatorColor,
+                        '--color-bg': indicatorColor,
+                        '--color-border': indicatorColor
                       } as React.CSSProperties
                     }
                   />
                 )}
                 <div
                   className={cn(
-                    "flex flex-1 justify-between leading-none",
-                    nestLabel ? "items-end" : "items-center"
+                    'flex flex-1 justify-between leading-none',
+                    nestLabel ? 'items-end' : 'items-center'
                   )}
                 >
                   <div className="grid gap-1.5">
@@ -1052,7 +1029,6 @@ function TooltipDemo({
     </div>
   )
 }
-
 ```
 
 You can turn on/off any of these using the `hideLabel`, `hideIndicator` props and customize the indicator style using the `indicator` prop.
@@ -1062,7 +1038,7 @@ Use `labelKey` and `nameKey` to use a custom key for the tooltip label and name.
 Chart comes with the `<ChartTooltip>` and `<ChartTooltipContent>` components. You can use these two components to add custom tooltips to your chart.
 
 ```tsx title="components/example-chart.tsx"
-import { ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 ```
 
 ```tsx title="components/example-chart.tsx"
@@ -1091,29 +1067,27 @@ To use a custom key for tooltip label and names, use the `labelKey` and `nameKey
 
 ```tsx showLineNumbers /browser/
 const chartData = [
-  { browser: "chrome", visitors: 187, fill: "var(--color-chrome)" },
-  { browser: "safari", visitors: 200, fill: "var(--color-safari)" },
+  { browser: 'chrome', visitors: 187, fill: 'var(--color-chrome)' },
+  { browser: 'safari', visitors: 200, fill: 'var(--color-safari)' }
 ]
 
 const chartConfig = {
   visitors: {
-    label: "Total Visitors",
+    label: 'Total Visitors'
   },
   chrome: {
-    label: "Chrome",
-    color: "var(--chart-1)",
+    label: 'Chrome',
+    color: 'var(--chart-1)'
   },
   safari: {
-    label: "Safari",
-    color: "var(--chart-2)",
-  },
+    label: 'Safari',
+    color: 'var(--chart-2)'
+  }
 } satisfies ChartConfig
 ```
 
 ```tsx title="components/example-chart.tsx"
-<ChartTooltip
-  content={<ChartTooltipContent labelKey="visitors" nameKey="browser" />}
-/>
+<ChartTooltip content={<ChartTooltipContent labelKey="visitors" nameKey="browser" />} />
 ```
 
 This will use `Total Visitors` for label and `Chrome` and `Safari` for the tooltip names.
@@ -1123,7 +1097,7 @@ This will use `Total Visitors` for label and `Chrome` and `Safari` for the toolt
 You can use the custom `<ChartLegend>` and `<ChartLegendContent>` components to add a legend to your chart.
 
 ```tsx title="components/example-chart.tsx"
-import { ChartLegend, ChartLegendContent } from "@/components/ui/chart"
+import { ChartLegend, ChartLegendContent } from '@/components/ui/chart'
 ```
 
 ```tsx title="components/example-chart.tsx"
@@ -1140,19 +1114,19 @@ To use a custom key for legend names, use the `nameKey` prop.
 
 ```tsx showLineNumbers /browser/
 const chartData = [
-  { browser: "chrome", visitors: 187, fill: "var(--color-chrome)" },
-  { browser: "safari", visitors: 200, fill: "var(--color-safari)" },
+  { browser: 'chrome', visitors: 187, fill: 'var(--color-chrome)' },
+  { browser: 'safari', visitors: 200, fill: 'var(--color-safari)' }
 ]
 
 const chartConfig = {
   chrome: {
-    label: "Chrome",
-    color: "var(--chart-1)",
+    label: 'Chrome',
+    color: 'var(--chart-1)'
   },
   safari: {
-    label: "Safari",
-    color: "var(--chart-2)",
-  },
+    label: 'Safari',
+    color: 'var(--chart-2)'
+  }
 } satisfies ChartConfig
 ```
 
@@ -1177,110 +1151,100 @@ This prop adds keyboard access and screen reader support to your charts.
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, XAxis } from 'recharts'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
+import { useTranslation, type Translations } from '@/components/language-selector'
 import {
   ChartContainer,
   ChartLegend,
   ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart"
+  type ChartConfig
+} from '@/components/ui/chart'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      january: "January",
-      february: "February",
-      march: "March",
-      april: "April",
-      may: "May",
-      june: "June",
-      desktop: "Desktop",
-      mobile: "Mobile",
-    },
+      january: 'January',
+      february: 'February',
+      march: 'March',
+      april: 'April',
+      may: 'May',
+      june: 'June',
+      desktop: 'Desktop',
+      mobile: 'Mobile'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      january: "يناير",
-      february: "فبراير",
-      march: "مارس",
-      april: "أبريل",
-      may: "مايو",
-      june: "يونيو",
-      desktop: "سطح المكتب",
-      mobile: "الجوال",
-    },
+      january: 'يناير',
+      february: 'فبراير',
+      march: 'مارس',
+      april: 'أبريل',
+      may: 'مايو',
+      june: 'يونيو',
+      desktop: 'سطح المكتب',
+      mobile: 'الجوال'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      january: "ינואר",
-      february: "פברואר",
-      march: "מרץ",
-      april: "אפריל",
-      may: "מאי",
-      june: "יוני",
-      desktop: "מחשב",
-      mobile: "נייד",
-    },
-  },
+      january: 'ינואר',
+      february: 'פברואר',
+      march: 'מרץ',
+      april: 'אפריל',
+      may: 'מאי',
+      june: 'יוני',
+      desktop: 'מחשב',
+      mobile: 'נייד'
+    }
+  }
 }
 
 const chartData = [
-  { month: "january", desktop: 186, mobile: 80 },
-  { month: "february", desktop: 305, mobile: 200 },
-  { month: "march", desktop: 237, mobile: 120 },
-  { month: "april", desktop: 73, mobile: 190 },
-  { month: "may", desktop: 209, mobile: 130 },
-  { month: "june", desktop: 214, mobile: 140 },
+  { month: 'january', desktop: 186, mobile: 80 },
+  { month: 'february', desktop: 305, mobile: 200 },
+  { month: 'march', desktop: 237, mobile: 120 },
+  { month: 'april', desktop: 73, mobile: 190 },
+  { month: 'may', desktop: 209, mobile: 130 },
+  { month: 'june', desktop: 214, mobile: 140 }
 ]
 
 export function ChartRtl() {
-  const { t, dir } = useTranslation(translations, "ar")
+  const { t, dir } = useTranslation(translations, 'ar')
 
   const chartConfig = {
     desktop: {
       label: t.desktop,
-      color: "var(--chart-2)",
+      color: 'var(--chart-2)'
     },
     mobile: {
       label: t.mobile,
-      color: "var(--chart-1)",
-    },
+      color: 'var(--chart-1)'
+    }
   } satisfies ChartConfig
 
   return (
     <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
       <BarChart accessibilityLayer data={chartData}>
-        <CartesianGrid
-          vertical={false}
-          orientation={dir === "rtl" ? "right" : "left"}
-        />
+        <CartesianGrid vertical={false} orientation={dir === 'rtl' ? 'right' : 'left'} />
         <XAxis
           dataKey="month"
           tickLine={false}
           tickMargin={10}
           axisLine={false}
-          tickFormatter={(value) =>
-            (t[value as keyof typeof t] as string).slice(0, 3)
-          }
-          reversed={dir === "rtl"}
+          tickFormatter={value => (t[value as keyof typeof t] as string).slice(0, 3)}
+          reversed={dir === 'rtl'}
         />
         <ChartTooltip
           content={
-            <ChartTooltipContent
-              labelFormatter={(value) => t[value as keyof typeof t] as string}
-            />
+            <ChartTooltipContent labelFormatter={value => t[value as keyof typeof t] as string} />
           }
           labelClassName="w-32"
         />
@@ -1291,5 +1255,4 @@ export function ChartRtl() {
     </ChartContainer>
   )
 }
-
 ```

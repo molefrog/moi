@@ -6,7 +6,7 @@ component: true
 ---
 
 ```tsx
-import { Badge } from "@/components/ui/badge"
+import { Badge } from '@/components/ui/badge'
 
 export function BadgeDemo() {
   return (
@@ -18,7 +18,6 @@ export function BadgeDemo() {
     </div>
   )
 }
-
 ```
 
 ## Installation
@@ -60,7 +59,7 @@ npx shadcn@latest add badge
 ## Usage
 
 ```tsx
-import { Badge } from "@/components/ui/badge"
+import { Badge } from '@/components/ui/badge'
 ```
 
 ```tsx
@@ -72,7 +71,7 @@ import { Badge } from "@/components/ui/badge"
 Use the `variant` prop to change the variant of the badge.
 
 ```tsx
-import { Badge } from "@/components/ui/badge"
+import { Badge } from '@/components/ui/badge'
 
 export function BadgeVariants() {
   return (
@@ -85,7 +84,6 @@ export function BadgeVariants() {
     </div>
   )
 }
-
 ```
 
 ## With Icon
@@ -93,9 +91,9 @@ export function BadgeVariants() {
 You can render an icon inside the badge. Use `data-icon="inline-start"` to render the icon on the left and `data-icon="inline-end"` to render the icon on the right.
 
 ```tsx
-import { BadgeCheck, BookmarkIcon } from "lucide-react"
+import { BadgeCheck, BookmarkIcon } from 'lucide-react'
 
-import { Badge } from "@/components/ui/badge"
+import { Badge } from '@/components/ui/badge'
 
 export function BadgeWithIconLeft() {
   return (
@@ -111,7 +109,6 @@ export function BadgeWithIconLeft() {
     </div>
   )
 }
-
 ```
 
 ## With Spinner
@@ -119,8 +116,8 @@ export function BadgeWithIconLeft() {
 You can render a spinner inside the badge. Remember to add the `data-icon="inline-start"` or `data-icon="inline-end"` prop to the spinner.
 
 ```tsx
-import { Badge } from "@/components/ui/badge"
-import { Spinner } from "@/components/ui/spinner"
+import { Badge } from '@/components/ui/badge'
+import { Spinner } from '@/components/ui/spinner'
 
 export function BadgeWithSpinner() {
   return (
@@ -136,7 +133,6 @@ export function BadgeWithSpinner() {
     </div>
   )
 }
-
 ```
 
 ## Link
@@ -144,9 +140,9 @@ export function BadgeWithSpinner() {
 Use the `render` prop to render a link as a badge.
 
 ```tsx
-import { ArrowUpRightIcon } from "lucide-react"
+import { ArrowUpRightIcon } from 'lucide-react'
 
-import { Badge } from "@/components/ui/badge"
+import { Badge } from '@/components/ui/badge'
 
 export function BadgeAsLink() {
   return (
@@ -155,7 +151,6 @@ export function BadgeAsLink() {
     </Badge>
   )
 }
-
 ```
 
 ## Custom Colors
@@ -163,30 +158,23 @@ export function BadgeAsLink() {
 You can customize the colors of a badge by adding custom classes such as `bg-green-50 dark:bg-green-800` to the `Badge` component.
 
 ```tsx
-import { Badge } from "@/components/ui/badge"
+import { Badge } from '@/components/ui/badge'
 
 export function BadgeCustomColors() {
   return (
     <div className="flex flex-wrap gap-2">
-      <Badge className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-        Blue
-      </Badge>
+      <Badge className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">Blue</Badge>
       <Badge className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300">
         Green
       </Badge>
-      <Badge className="bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300">
-        Sky
-      </Badge>
+      <Badge className="bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300">Sky</Badge>
       <Badge className="bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
         Purple
       </Badge>
-      <Badge className="bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300">
-        Red
-      </Badge>
+      <Badge className="bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300">Red</Badge>
     </div>
   )
 }
-
 ```
 
 ## RTL
@@ -194,55 +182,52 @@ export function BadgeCustomColors() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import { BadgeCheck, BookmarkIcon } from "lucide-react"
+import * as React from 'react'
+import { BadgeCheck, BookmarkIcon } from 'lucide-react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import { Badge } from "@/components/ui/badge"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Badge } from '@/components/ui/badge'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      badge: "Badge",
-      secondary: "Secondary",
-      destructive: "Destructive",
-      outline: "Outline",
-      verified: "Verified",
-      bookmark: "Bookmark",
-    },
+      badge: 'Badge',
+      secondary: 'Secondary',
+      destructive: 'Destructive',
+      outline: 'Outline',
+      verified: 'Verified',
+      bookmark: 'Bookmark'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      badge: "شارة",
-      secondary: "ثانوي",
-      destructive: "مدمر",
-      outline: "مخطط",
-      verified: "متحقق",
-      bookmark: "إشارة مرجعية",
-    },
+      badge: 'شارة',
+      secondary: 'ثانوي',
+      destructive: 'مدمر',
+      outline: 'مخطط',
+      verified: 'متحقق',
+      bookmark: 'إشارة مرجعية'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      badge: "תג",
-      secondary: "משני",
-      destructive: "הרסני",
-      outline: "קווי מתאר",
-      verified: "מאומת",
-      bookmark: "סימנייה",
-    },
-  },
+      badge: 'תג',
+      secondary: 'משני',
+      destructive: 'הרסני',
+      outline: 'קווי מתאר',
+      verified: 'מאומת',
+      bookmark: 'סימנייה'
+    }
+  }
 }
 
 export function BadgeRtl() {
-  const { dir, t } = useTranslation(translations, "ar")
+  const { dir, t } = useTranslation(translations, 'ar')
 
   return (
     <div className="flex w-full flex-wrap justify-center gap-2" dir={dir}>
@@ -261,7 +246,6 @@ export function BadgeRtl() {
     </div>
   )
 }
-
 ```
 
 ## API Reference

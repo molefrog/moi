@@ -8,13 +8,9 @@ component: true
 import { IconInfoCircle } from "@tabler/icons-react"
 
 ```tsx
-import { Search } from "lucide-react"
+import { Search } from 'lucide-react'
 
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group"
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 
 export function InputGroupDemo() {
   return (
@@ -27,7 +23,6 @@ export function InputGroupDemo() {
     </InputGroup>
   )
 }
-
 ```
 
 ## Installation
@@ -75,8 +70,8 @@ import {
   InputGroupButton,
   InputGroupInput,
   InputGroupText,
-  InputGroupTextarea,
-} from "@/components/ui/input-group"
+  InputGroupTextarea
+} from '@/components/ui/input-group'
 ```
 
 ```tsx showLineNumbers
@@ -115,18 +110,10 @@ Use the `align` prop on `InputGroupAddon` to position the addon relative to the 
 Use `align="inline-start"` to position the addon at the start of the input. This is the default.
 
 ```tsx
-import { SearchIcon } from "lucide-react"
+import { SearchIcon } from 'lucide-react'
 
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group"
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 
 export function InputGroupInlineStart() {
   return (
@@ -142,7 +129,6 @@ export function InputGroupInlineStart() {
     </Field>
   )
 }
-
 ```
 
 ### inline-end
@@ -150,29 +136,17 @@ export function InputGroupInlineStart() {
 Use `align="inline-end"` to position the addon at the end of the input.
 
 ```tsx
-import { EyeOffIcon } from "lucide-react"
+import { EyeOffIcon } from 'lucide-react'
 
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group"
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 
 export function InputGroupInlineEnd() {
   return (
     <Field className="max-w-sm">
       <FieldLabel htmlFor="inline-end-input">Input</FieldLabel>
       <InputGroup>
-        <InputGroupInput
-          id="inline-end-input"
-          type="password"
-          placeholder="Enter password"
-        />
+        <InputGroupInput id="inline-end-input" type="password" placeholder="Enter password" />
         <InputGroupAddon align="inline-end">
           <EyeOffIcon />
         </InputGroupAddon>
@@ -181,7 +155,6 @@ export function InputGroupInlineEnd() {
     </Field>
   )
 }
-
 ```
 
 ### block-start
@@ -189,22 +162,17 @@ export function InputGroupInlineEnd() {
 Use `align="block-start"` to position the addon above the input.
 
 ```tsx
-import { CopyIcon, FileCodeIcon } from "lucide-react"
+import { CopyIcon, FileCodeIcon } from 'lucide-react'
 
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
   InputGroupText,
-  InputGroupTextarea,
-} from "@/components/ui/input-group"
+  InputGroupTextarea
+} from '@/components/ui/input-group'
 
 export function InputGroupBlockStart() {
   return (
@@ -212,10 +180,7 @@ export function InputGroupBlockStart() {
       <Field>
         <FieldLabel htmlFor="block-start-input">Input</FieldLabel>
         <InputGroup className="h-auto">
-          <InputGroupInput
-            id="block-start-input"
-            placeholder="Enter your name"
-          />
+          <InputGroupInput id="block-start-input" placeholder="Enter your name" />
           <InputGroupAddon align="block-start">
             <InputGroupText>Full Name</InputGroupText>
           </InputGroupAddon>
@@ -239,14 +204,11 @@ export function InputGroupBlockStart() {
             </InputGroupButton>
           </InputGroupAddon>
         </InputGroup>
-        <FieldDescription>
-          Header positioned above the textarea.
-        </FieldDescription>
+        <FieldDescription>Header positioned above the textarea.</FieldDescription>
       </Field>
     </FieldGroup>
   )
 }
-
 ```
 
 ### block-end
@@ -254,20 +216,15 @@ export function InputGroupBlockStart() {
 Use `align="block-end"` to position the addon below the input.
 
 ```tsx
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
   InputGroupText,
-  InputGroupTextarea,
-} from "@/components/ui/input-group"
+  InputGroupTextarea
+} from '@/components/ui/input-group'
 
 export function InputGroupBlockEnd() {
   return (
@@ -285,10 +242,7 @@ export function InputGroupBlockEnd() {
       <Field>
         <FieldLabel htmlFor="block-end-textarea">Textarea</FieldLabel>
         <InputGroup>
-          <InputGroupTextarea
-            id="block-end-textarea"
-            placeholder="Write a comment..."
-          />
+          <InputGroupTextarea id="block-end-textarea" placeholder="Write a comment..." />
           <InputGroupAddon align="block-end">
             <InputGroupText>0/280</InputGroupText>
             <InputGroupButton variant="default" size="sm" className="ml-auto">
@@ -296,33 +250,19 @@ export function InputGroupBlockEnd() {
             </InputGroupButton>
           </InputGroupAddon>
         </InputGroup>
-        <FieldDescription>
-          Footer positioned below the textarea.
-        </FieldDescription>
+        <FieldDescription>Footer positioned below the textarea.</FieldDescription>
       </Field>
     </FieldGroup>
   )
 }
-
 ```
 
 ## Icon
 
 ```tsx
-import {
-  CheckIcon,
-  CreditCardIcon,
-  InfoIcon,
-  MailIcon,
-  SearchIcon,
-  StarIcon,
-} from "lucide-react"
+import { CheckIcon, CreditCardIcon, InfoIcon, MailIcon, SearchIcon, StarIcon } from 'lucide-react'
 
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group"
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 
 export function InputGroupIcon() {
   return (
@@ -358,7 +298,6 @@ export function InputGroupIcon() {
     </div>
   )
 }
-
 ```
 
 ## Text
@@ -369,8 +308,8 @@ import {
   InputGroupAddon,
   InputGroupInput,
   InputGroupText,
-  InputGroupTextarea,
-} from "@/components/ui/input-group"
+  InputGroupTextarea
+} from '@/components/ui/input-group'
 
 export function InputGroupTextExample() {
   return (
@@ -410,34 +349,24 @@ export function InputGroupTextExample() {
     </div>
   )
 }
-
 ```
 
 ## Button
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import {
-  IconCheck,
-  IconCopy,
-  IconInfoCircle,
-  IconStar,
-} from "@tabler/icons-react"
+import * as React from 'react'
+import { IconCheck, IconCopy, IconInfoCircle, IconStar } from '@tabler/icons-react'
 
-import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard"
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
-  InputGroupInput,
-} from "@/components/ui/input-group"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+  InputGroupInput
+} from '@/components/ui/input-group'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 export function InputGroupButtonExample() {
   const { copyToClipboard, isCopied } = useCopyToClipboard()
@@ -453,7 +382,7 @@ export function InputGroupButtonExample() {
             title="Copy"
             size="icon-xs"
             onClick={() => {
-              copyToClipboard("https://x.com/shadcn")
+              copyToClipboard('https://x.com/shadcn')
             }}
           >
             {isCopied ? <IconCheck /> : <IconCopy />}
@@ -467,23 +396,15 @@ export function InputGroupButtonExample() {
               <IconInfoCircle />
             </InputGroupButton>
           </PopoverTrigger>
-          <PopoverContent
-            align="start"
-            className="flex flex-col gap-1 rounded-xl text-sm"
-          >
+          <PopoverContent align="start" className="flex flex-col gap-1 rounded-xl text-sm">
             <p className="font-medium">Your connection is not secure.</p>
             <p>You should not enter any sensitive information on this site.</p>
           </PopoverContent>
         </Popover>
-        <InputGroupAddon className="pl-1.5 text-muted-foreground">
-          https://
-        </InputGroupAddon>
+        <InputGroupAddon className="pl-1.5 text-muted-foreground">https://</InputGroupAddon>
         <InputGroupInput id="input-secure-19" />
         <InputGroupAddon align="inline-end">
-          <InputGroupButton
-            onClick={() => setIsFavorite(!isFavorite)}
-            size="icon-xs"
-          >
+          <InputGroupButton onClick={() => setIsFavorite(!isFavorite)} size="icon-xs">
             <IconStar
               data-favorite={isFavorite}
               className="data-[favorite=true]:fill-blue-600 data-[favorite=true]:stroke-blue-600"
@@ -500,20 +421,15 @@ export function InputGroupButtonExample() {
     </div>
   )
 }
-
 ```
 
 ## Kbd
 
 ```tsx
-import { SearchIcon } from "lucide-react"
+import { SearchIcon } from 'lucide-react'
 
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group"
-import { Kbd } from "@/components/ui/kbd"
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
+import { Kbd } from '@/components/ui/kbd'
 
 export function InputGroupKbd() {
   return (
@@ -528,29 +444,28 @@ export function InputGroupKbd() {
     </InputGroup>
   )
 }
-
 ```
 
 ## Dropdown
 
 ```tsx
-"use client"
+'use client'
 
-import { ChevronDownIcon, MoreHorizontal } from "lucide-react"
+import { ChevronDownIcon, MoreHorizontal } from 'lucide-react'
 
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
-  InputGroupInput,
-} from "@/components/ui/input-group"
+  InputGroupInput
+} from '@/components/ui/input-group'
 
 export function InputGroupDropdown() {
   return (
@@ -560,13 +475,7 @@ export function InputGroupDropdown() {
         <InputGroupAddon align="inline-end">
           <DropdownMenu>
             <DropdownMenuTrigger
-              render={
-                <InputGroupButton
-                  variant="ghost"
-                  aria-label="More"
-                  size="icon-xs"
-                />
-              }
+              render={<InputGroupButton variant="ghost" aria-label="More" size="icon-xs" />}
             >
               <MoreHorizontal />
             </DropdownMenuTrigger>
@@ -585,9 +494,7 @@ export function InputGroupDropdown() {
         <InputGroupAddon align="inline-end">
           <DropdownMenu>
             <DropdownMenuTrigger
-              render={
-                <InputGroupButton variant="ghost" className="pr-1.5! text-xs" />
-              }
+              render={<InputGroupButton variant="ghost" className="pr-1.5! text-xs" />}
             >
               Search In... <ChevronDownIcon className="size-3" />
             </DropdownMenuTrigger>
@@ -604,21 +511,20 @@ export function InputGroupDropdown() {
     </div>
   )
 }
-
 ```
 
 ## Spinner
 
 ```tsx
-import { LoaderIcon } from "lucide-react"
+import { LoaderIcon } from 'lucide-react'
 
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
-  InputGroupText,
-} from "@/components/ui/input-group"
-import { Spinner } from "@/components/ui/spinner"
+  InputGroupText
+} from '@/components/ui/input-group'
+import { Spinner } from '@/components/ui/spinner'
 
 export function InputGroupSpinner() {
   return (
@@ -648,34 +554,26 @@ export function InputGroupSpinner() {
           <LoaderIcon className="animate-spin" />
         </InputGroupAddon>
         <InputGroupAddon align="inline-end">
-          <InputGroupText className="text-muted-foreground">
-            Please wait...
-          </InputGroupText>
+          <InputGroupText className="text-muted-foreground">Please wait...</InputGroupText>
         </InputGroupAddon>
       </InputGroup>
     </div>
   )
 }
-
 ```
 
 ## Textarea
 
 ```tsx
-import {
-  IconBrandJavascript,
-  IconCopy,
-  IconCornerDownLeft,
-  IconRefresh,
-} from "@tabler/icons-react"
+import { IconBrandJavascript, IconCopy, IconCornerDownLeft, IconRefresh } from '@tabler/icons-react'
 
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupText,
-  InputGroupTextarea,
-} from "@/components/ui/input-group"
+  InputGroupTextarea
+} from '@/components/ui/input-group'
 
 export function InputGroupTextareaExample() {
   return (
@@ -708,7 +606,6 @@ export function InputGroupTextareaExample() {
     </div>
   )
 }
-
 ```
 
 ## Custom Input
@@ -718,15 +615,11 @@ Add the `data-slot="input-group-control"` attribute to your custom input for aut
 Here's an example of a custom resizable textarea from a third-party library.
 
 ```tsx
-"use client"
+'use client'
 
-import TextareaAutosize from "react-textarea-autosize"
+import TextareaAutosize from 'react-textarea-autosize'
 
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-} from "@/components/ui/input-group"
+import { InputGroup, InputGroupAddon, InputGroupButton } from '@/components/ui/input-group'
 
 export function InputGroupCustom() {
   return (
@@ -746,7 +639,6 @@ export function InputGroupCustom() {
     </div>
   )
 }
-
 ```
 
 ## RTL
@@ -754,81 +646,73 @@ export function InputGroupCustom() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import { Search } from "lucide-react"
+import * as React from 'react'
+import { Search } from 'lucide-react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
   InputGroupText,
-  InputGroupTextarea,
-} from "@/components/ui/input-group"
-import { Spinner } from "@/components/ui/spinner"
+  InputGroupTextarea
+} from '@/components/ui/input-group'
+import { Spinner } from '@/components/ui/spinner'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      placeholder: "Search...",
-      results: "12 results",
-      searching: "Searching...",
-      saving: "Saving...",
-      savingChanges: "Saving changes...",
-      textareaLabel: "Textarea",
-      textareaPlaceholder: "Write a comment...",
-      characterCount: "0/280",
-      post: "Post",
-      textareaDescription: "Footer positioned below the textarea.",
-    },
+      placeholder: 'Search...',
+      results: '12 results',
+      searching: 'Searching...',
+      saving: 'Saving...',
+      savingChanges: 'Saving changes...',
+      textareaLabel: 'Textarea',
+      textareaPlaceholder: 'Write a comment...',
+      characterCount: '0/280',
+      post: 'Post',
+      textareaDescription: 'Footer positioned below the textarea.'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      placeholder: "بحث...",
-      results: "١٢ نتيجة",
-      searching: "جاري البحث...",
-      saving: "جاري الحفظ...",
-      savingChanges: "جاري حفظ التغييرات...",
-      textareaLabel: "منطقة النص",
-      textareaPlaceholder: "اكتب تعليقًا...",
-      characterCount: "٠/٢٨٠",
-      post: "نشر",
-      textareaDescription: "تذييل موضع أسفل منطقة النص.",
-    },
+      placeholder: 'بحث...',
+      results: '١٢ نتيجة',
+      searching: 'جاري البحث...',
+      saving: 'جاري الحفظ...',
+      savingChanges: 'جاري حفظ التغييرات...',
+      textareaLabel: 'منطقة النص',
+      textareaPlaceholder: 'اكتب تعليقًا...',
+      characterCount: '٠/٢٨٠',
+      post: 'نشر',
+      textareaDescription: 'تذييل موضع أسفل منطقة النص.'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      placeholder: "חפש...",
-      results: "12 תוצאות",
-      searching: "מחפש...",
-      saving: "שומר...",
-      savingChanges: "שומר שינויים...",
-      textareaLabel: "אזור טקסט",
-      textareaPlaceholder: "כתוב תגובה...",
-      characterCount: "0/280",
-      post: "פרסם",
-      textareaDescription: "כותרת תחתונה ממוקמת מתחת לאזור הטקסט.",
-    },
-  },
+      placeholder: 'חפש...',
+      results: '12 תוצאות',
+      searching: 'מחפש...',
+      saving: 'שומר...',
+      savingChanges: 'שומר שינויים...',
+      textareaLabel: 'אזור טקסט',
+      textareaPlaceholder: 'כתוב תגובה...',
+      characterCount: '0/280',
+      post: 'פרסם',
+      textareaDescription: 'כותרת תחתונה ממוקמת מתחת לאזור הטקסט.'
+    }
+  }
 }
 
 export function InputGroupRtl() {
-  const { dir, t } = useTranslation(translations, "ar")
+  const { dir, t } = useTranslation(translations, 'ar')
 
   return (
     <div className="grid w-full max-w-sm gap-6">
@@ -856,10 +740,7 @@ export function InputGroupRtl() {
         <Field>
           <FieldLabel htmlFor="rtl-textarea">{t.textareaLabel}</FieldLabel>
           <InputGroup>
-            <InputGroupTextarea
-              id="rtl-textarea"
-              placeholder={t.textareaPlaceholder}
-            />
+            <InputGroupTextarea id="rtl-textarea" placeholder={t.textareaPlaceholder} />
             <InputGroupAddon align="block-end">
               <InputGroupText>{t.characterCount}</InputGroupText>
               <InputGroupButton variant="default" size="sm" className="ms-auto">
@@ -873,7 +754,6 @@ export function InputGroupRtl() {
     </div>
   )
 }
-
 ```
 
 ## API Reference
@@ -898,8 +778,8 @@ The main component that wraps inputs and addons.
 Displays icons, text, buttons, or other content alongside inputs.
 
 <Callout icon={<IconInfoCircle />} title="Focus Navigation">
-  For proper focus navigation, the `InputGroupAddon` component should be placed
-  after the input. Set the `align` prop to position the addon.
+For proper focus navigation, the `InputGroupAddon` component should be placed
+after the input. Set the `align` prop to position the addon.
 </Callout>
 
 | Prop        | Type                                                             | Default          |

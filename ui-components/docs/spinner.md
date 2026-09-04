@@ -6,13 +6,8 @@ component: true
 ---
 
 ```tsx
-import {
-  Item,
-  ItemContent,
-  ItemMedia,
-  ItemTitle,
-} from "@/components/ui/item"
-import { Spinner } from "@/components/ui/spinner"
+import { Item, ItemContent, ItemMedia, ItemTitle } from '@/components/ui/item'
+import { Spinner } from '@/components/ui/spinner'
 
 export function SpinnerDemo() {
   return (
@@ -31,7 +26,6 @@ export function SpinnerDemo() {
     </div>
   )
 }
-
 ```
 
 ## Installation
@@ -73,7 +67,7 @@ npx shadcn@latest add spinner
 ## Usage
 
 ```tsx
-import { Spinner } from "@/components/ui/spinner"
+import { Spinner } from '@/components/ui/spinner'
 ```
 
 ```tsx
@@ -85,15 +79,15 @@ import { Spinner } from "@/components/ui/spinner"
 You can replace the default spinner icon with any other icon by editing the `Spinner` component.
 
 ```tsx
-import { cn } from "cn"
-import { LoaderIcon } from "lucide-react"
+import { cn } from 'cn'
+import { LoaderIcon } from 'lucide-react'
 
-function Spinner({ className, ...props }: React.ComponentProps<"svg">) {
+function Spinner({ className, ...props }: React.ComponentProps<'svg'>) {
   return (
     <LoaderIcon
       role="status"
       aria-label="Loading"
-      className={cn("size-4 animate-spin", className)}
+      className={cn('size-4 animate-spin', className)}
       {...props}
     />
   )
@@ -106,19 +100,18 @@ export function SpinnerCustom() {
     </div>
   )
 }
-
 ```
 
 ```tsx showLineNumbers title="components/ui/spinner.tsx"
-import { cn } from "cn"
-import { LoaderIcon } from "lucide-react"
+import { cn } from 'cn'
+import { LoaderIcon } from 'lucide-react'
 
-function Spinner({ className, ...props }: React.ComponentProps<"svg">) {
+function Spinner({ className, ...props }: React.ComponentProps<'svg'>) {
   return (
     <LoaderIcon
       role="status"
       aria-label="Loading"
-      className={cn("size-4 animate-spin", className)}
+      className={cn('size-4 animate-spin', className)}
       {...props}
     />
   )
@@ -132,7 +125,7 @@ export { Spinner }
 Use the `size-*` utility class to change the size of the spinner.
 
 ```tsx
-import { Spinner } from "@/components/ui/spinner"
+import { Spinner } from '@/components/ui/spinner'
 
 export function SpinnerSize() {
   return (
@@ -144,7 +137,6 @@ export function SpinnerSize() {
     </div>
   )
 }
-
 ```
 
 ## Button
@@ -152,8 +144,8 @@ export function SpinnerSize() {
 Add a spinner to a button to indicate a loading state. Place the `<Spinner />` before the label with `data-icon="inline-start"` for a start position, or after the label with `data-icon="inline-end"` for an end position.
 
 ```tsx
-import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
+import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 
 export function SpinnerButton() {
   return (
@@ -173,7 +165,6 @@ export function SpinnerButton() {
     </div>
   )
 }
-
 ```
 
 ## Badge
@@ -181,8 +172,8 @@ export function SpinnerButton() {
 Add a spinner to a badge to indicate a loading state. Place the `<Spinner />` before the label with `data-icon="inline-start"` for a start position, or after the label with `data-icon="inline-end"` for an end position.
 
 ```tsx
-import { Badge } from "@/components/ui/badge"
-import { Spinner } from "@/components/ui/spinner"
+import { Badge } from '@/components/ui/badge'
+import { Spinner } from '@/components/ui/spinner'
 
 export function SpinnerBadge() {
   return (
@@ -202,22 +193,21 @@ export function SpinnerBadge() {
     </div>
   )
 }
-
 ```
 
 ## Input Group
 
 ```tsx
-import { ArrowUpIcon } from "lucide-react"
+import { ArrowUpIcon } from 'lucide-react'
 
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
-  InputGroupTextarea,
-} from "@/components/ui/input-group"
-import { Spinner } from "@/components/ui/spinner"
+  InputGroupTextarea
+} from '@/components/ui/input-group'
+import { Spinner } from '@/components/ui/spinner'
 
 export function SpinnerInputGroup() {
   return (
@@ -241,22 +231,21 @@ export function SpinnerInputGroup() {
     </div>
   )
 }
-
 ```
 
 ## Empty
 
 ```tsx
-import { Button } from "@/components/ui/button"
+import { Button } from '@/components/ui/button'
 import {
   Empty,
   EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty"
-import { Spinner } from "@/components/ui/spinner"
+  EmptyTitle
+} from '@/components/ui/empty'
+import { Spinner } from '@/components/ui/spinner'
 
 export function SpinnerEmpty() {
   return (
@@ -278,7 +267,6 @@ export function SpinnerEmpty() {
     </Empty>
   )
 }
-
 ```
 
 ## RTL
@@ -286,54 +274,43 @@ export function SpinnerEmpty() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import {
-  Item,
-  ItemContent,
-  ItemMedia,
-  ItemTitle,
-} from "@/components/ui/item"
-import { Spinner } from "@/components/ui/spinner"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Item, ItemContent, ItemMedia, ItemTitle } from '@/components/ui/item'
+import { Spinner } from '@/components/ui/spinner'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      title: "Processing payment...",
-      amount: "$100.00",
-    },
+      title: 'Processing payment...',
+      amount: '$100.00'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      title: "جاري معالجة الدفع...",
-      amount: "١٠٠.٠٠ دولار",
-    },
+      title: 'جاري معالجة الدفع...',
+      amount: '١٠٠.٠٠ دولار'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      title: "מעבד תשלום...",
-      amount: "$100.00",
-    },
-  },
+      title: 'מעבד תשלום...',
+      amount: '$100.00'
+    }
+  }
 }
 
 export function SpinnerRtl() {
-  const { dir, t } = useTranslation(translations, "ar")
+  const { dir, t } = useTranslation(translations, 'ar')
 
   return (
-    <div
-      className="flex w-full max-w-xs flex-col gap-4 [--radius:1rem]"
-      dir={dir}
-    >
+    <div className="flex w-full max-w-xs flex-col gap-4 [--radius:1rem]" dir={dir}>
       <Item variant="muted" dir={dir}>
         <ItemMedia>
           <Spinner />
@@ -348,5 +325,4 @@ export function SpinnerRtl() {
     </div>
   )
 }
-
 ```

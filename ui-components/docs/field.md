@@ -6,8 +6,8 @@ component: true
 ---
 
 ```tsx
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Field,
   FieldDescription,
@@ -15,43 +15,43 @@ import {
   FieldLabel,
   FieldLegend,
   FieldSeparator,
-  FieldSet,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+  FieldSet
+} from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
   SelectGroup,
   SelectItem,
   SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
+  SelectValue
+} from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 
 const months = [
-  { label: "MM", value: null },
-  { label: "01", value: "01" },
-  { label: "02", value: "02" },
-  { label: "03", value: "03" },
-  { label: "04", value: "04" },
-  { label: "05", value: "05" },
-  { label: "06", value: "06" },
-  { label: "07", value: "07" },
-  { label: "08", value: "08" },
-  { label: "09", value: "09" },
-  { label: "10", value: "10" },
-  { label: "11", value: "11" },
-  { label: "12", value: "12" },
+  { label: 'MM', value: null },
+  { label: '01', value: '01' },
+  { label: '02', value: '02' },
+  { label: '03', value: '03' },
+  { label: '04', value: '04' },
+  { label: '05', value: '05' },
+  { label: '06', value: '06' },
+  { label: '07', value: '07' },
+  { label: '08', value: '08' },
+  { label: '09', value: '09' },
+  { label: '10', value: '10' },
+  { label: '11', value: '11' },
+  { label: '12', value: '12' }
 ]
 
 const years = [
-  { label: "YYYY", value: null },
-  { label: "2024", value: "2024" },
-  { label: "2025", value: "2025" },
-  { label: "2026", value: "2026" },
-  { label: "2027", value: "2027" },
-  { label: "2028", value: "2028" },
-  { label: "2029", value: "2029" },
+  { label: 'YYYY', value: null },
+  { label: '2024', value: '2024' },
+  { label: '2025', value: '2025' },
+  { label: '2026', value: '2026' },
+  { label: '2027', value: '2027' },
+  { label: '2028', value: '2028' },
+  { label: '2029', value: '2029' }
 ]
 
 export function FieldDemo() {
@@ -61,45 +61,31 @@ export function FieldDemo() {
         <FieldGroup>
           <FieldSet>
             <FieldLegend>Payment Method</FieldLegend>
-            <FieldDescription>
-              All transactions are secure and encrypted
-            </FieldDescription>
+            <FieldDescription>All transactions are secure and encrypted</FieldDescription>
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="checkout-7j9-card-name-43j">
-                  Name on Card
-                </FieldLabel>
-                <Input
-                  id="checkout-7j9-card-name-43j"
-                  placeholder="Evil Rabbit"
-                  required
-                />
+                <FieldLabel htmlFor="checkout-7j9-card-name-43j">Name on Card</FieldLabel>
+                <Input id="checkout-7j9-card-name-43j" placeholder="Evil Rabbit" required />
               </Field>
               <Field>
-                <FieldLabel htmlFor="checkout-7j9-card-number-uw1">
-                  Card Number
-                </FieldLabel>
+                <FieldLabel htmlFor="checkout-7j9-card-number-uw1">Card Number</FieldLabel>
                 <Input
                   id="checkout-7j9-card-number-uw1"
                   placeholder="1234 5678 9012 3456"
                   required
                 />
-                <FieldDescription>
-                  Enter your 16-digit card number
-                </FieldDescription>
+                <FieldDescription>Enter your 16-digit card number</FieldDescription>
               </Field>
               <div className="grid grid-cols-3 gap-4">
                 <Field>
-                  <FieldLabel htmlFor="checkout-exp-month-ts6">
-                    Month
-                  </FieldLabel>
+                  <FieldLabel htmlFor="checkout-exp-month-ts6">Month</FieldLabel>
                   <Select items={months}>
                     <SelectTrigger id="checkout-exp-month-ts6">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        {months.map((item) => (
+                        {months.map(item => (
                           <SelectItem key={item.value} value={item.value}>
                             {item.label}
                           </SelectItem>
@@ -109,16 +95,14 @@ export function FieldDemo() {
                   </Select>
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="checkout-7j9-exp-year-f59">
-                    Year
-                  </FieldLabel>
+                  <FieldLabel htmlFor="checkout-7j9-exp-year-f59">Year</FieldLabel>
                   <Select items={years}>
                     <SelectTrigger id="checkout-7j9-exp-year-f59">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        {years.map((item) => (
+                        {years.map(item => (
                           <SelectItem key={item.value} value={item.value}>
                             {item.label}
                           </SelectItem>
@@ -142,14 +126,8 @@ export function FieldDemo() {
             </FieldDescription>
             <FieldGroup>
               <Field orientation="horizontal">
-                <Checkbox
-                  id="checkout-7j9-same-as-shipping-wgm"
-                  defaultChecked
-                />
-                <FieldLabel
-                  htmlFor="checkout-7j9-same-as-shipping-wgm"
-                  className="font-normal"
-                >
+                <Checkbox id="checkout-7j9-same-as-shipping-wgm" defaultChecked />
+                <FieldLabel htmlFor="checkout-7j9-same-as-shipping-wgm" className="font-normal">
                   Same as shipping address
                 </FieldLabel>
               </Field>
@@ -158,9 +136,7 @@ export function FieldDemo() {
           <FieldSet>
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="checkout-7j9-optional-comments">
-                  Comments
-                </FieldLabel>
+                <FieldLabel htmlFor="checkout-7j9-optional-comments">Comments</FieldLabel>
                 <Textarea
                   id="checkout-7j9-optional-comments"
                   placeholder="Add any additional comments"
@@ -180,7 +156,6 @@ export function FieldDemo() {
     </div>
   )
 }
-
 ```
 
 ## Installation
@@ -232,8 +207,8 @@ import {
   FieldLegend,
   FieldSeparator,
   FieldSet,
-  FieldTitle,
-} from "@/components/ui/field"
+  FieldTitle
+} from '@/components/ui/field'
 ```
 
 ```tsx showLineNumbers
@@ -333,14 +308,8 @@ See the [Form](/docs/forms) documentation for building forms with the `Field` co
 ## Input
 
 ```tsx
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-  FieldSet,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Field, FieldDescription, FieldGroup, FieldLabel, FieldSet } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 
 export function FieldInput() {
   return (
@@ -349,35 +318,24 @@ export function FieldInput() {
         <Field>
           <FieldLabel htmlFor="username">Username</FieldLabel>
           <Input id="username" type="text" placeholder="Max Leiter" />
-          <FieldDescription>
-            Choose a unique username for your account.
-          </FieldDescription>
+          <FieldDescription>Choose a unique username for your account.</FieldDescription>
         </Field>
         <Field>
           <FieldLabel htmlFor="password">Password</FieldLabel>
-          <FieldDescription>
-            Must be at least 8 characters long.
-          </FieldDescription>
+          <FieldDescription>Must be at least 8 characters long.</FieldDescription>
           <Input id="password" type="password" placeholder="••••••••" />
         </Field>
       </FieldGroup>
     </FieldSet>
   )
 }
-
 ```
 
 ## Textarea
 
 ```tsx
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-  FieldSet,
-} from "@/components/ui/field"
-import { Textarea } from "@/components/ui/textarea"
+import { Field, FieldDescription, FieldGroup, FieldLabel, FieldSet } from '@/components/ui/field'
+import { Textarea } from '@/components/ui/textarea'
 
 export function FieldTextarea() {
   return (
@@ -385,49 +343,38 @@ export function FieldTextarea() {
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="feedback">Feedback</FieldLabel>
-          <Textarea
-            id="feedback"
-            placeholder="Your feedback helps us improve..."
-            rows={4}
-          />
-          <FieldDescription>
-            Share your thoughts about our service.
-          </FieldDescription>
+          <Textarea id="feedback" placeholder="Your feedback helps us improve..." rows={4} />
+          <FieldDescription>Share your thoughts about our service.</FieldDescription>
         </Field>
       </FieldGroup>
     </FieldSet>
   )
 }
-
 ```
 
 ## Select
 
 ```tsx
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import {
   Select,
   SelectContent,
   SelectGroup,
   SelectItem,
   SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  SelectValue
+} from '@/components/ui/select'
 
 const items = [
-  { label: "Choose department", value: null },
-  { label: "Engineering", value: "engineering" },
-  { label: "Design", value: "design" },
-  { label: "Marketing", value: "marketing" },
-  { label: "Sales", value: "sales" },
-  { label: "Customer Support", value: "support" },
-  { label: "Human Resources", value: "hr" },
-  { label: "Finance", value: "finance" },
-  { label: "Operations", value: "operations" },
+  { label: 'Choose department', value: null },
+  { label: 'Engineering', value: 'engineering' },
+  { label: 'Design', value: 'design' },
+  { label: 'Marketing', value: 'marketing' },
+  { label: 'Sales', value: 'sales' },
+  { label: 'Customer Support', value: 'support' },
+  { label: 'Human Resources', value: 'hr' },
+  { label: 'Finance', value: 'finance' },
+  { label: 'Operations', value: 'operations' }
 ]
 
 export function FieldSelect() {
@@ -440,7 +387,7 @@ export function FieldSelect() {
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            {items.map((item) => (
+            {items.map(item => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
               </SelectItem>
@@ -448,28 +395,21 @@ export function FieldSelect() {
           </SelectGroup>
         </SelectContent>
       </Select>
-      <FieldDescription>
-        Select your department or area of work.
-      </FieldDescription>
+      <FieldDescription>Select your department or area of work.</FieldDescription>
     </Field>
   )
 }
-
 ```
 
 ## Slider
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  Field,
-  FieldDescription,
-  FieldTitle,
-} from "@/components/ui/field"
-import { Slider } from "@/components/ui/slider"
+import { Field, FieldDescription, FieldTitle } from '@/components/ui/field'
+import { Slider } from '@/components/ui/slider'
 
 export function FieldSlider() {
   const [value, setValue] = React.useState([200, 800])
@@ -479,12 +419,12 @@ export function FieldSlider() {
       <FieldTitle>Price Range</FieldTitle>
       <FieldDescription>
         Set your budget range ($
-        <span className="font-medium tabular-nums">{value[0]}</span> -{" "}
+        <span className="font-medium tabular-nums">{value[0]}</span> -{' '}
         <span className="font-medium tabular-nums">{value[1]}</span>).
       </FieldDescription>
       <Slider
         value={value}
-        onValueChange={(value) => setValue(value as [number, number])}
+        onValueChange={value => setValue(value as [number, number])}
         max={1000}
         min={0}
         step={10}
@@ -494,7 +434,6 @@ export function FieldSlider() {
     </Field>
   )
 }
-
 ```
 
 ## Fieldset
@@ -506,17 +445,15 @@ import {
   FieldGroup,
   FieldLabel,
   FieldLegend,
-  FieldSet,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+  FieldSet
+} from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 
 export function FieldFieldset() {
   return (
     <FieldSet className="w-full max-w-sm">
       <FieldLegend>Address Information</FieldLegend>
-      <FieldDescription>
-        We need your address to deliver your order.
-      </FieldDescription>
+      <FieldDescription>We need your address to deliver your order.</FieldDescription>
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="street">Street Address</FieldLabel>
@@ -536,13 +473,12 @@ export function FieldFieldset() {
     </FieldSet>
   )
 }
-
 ```
 
 ## Checkbox
 
 ```tsx
-import { Checkbox } from "@/components/ui/checkbox"
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Field,
   FieldContent,
@@ -551,19 +487,15 @@ import {
   FieldLabel,
   FieldLegend,
   FieldSeparator,
-  FieldSet,
-} from "@/components/ui/field"
+  FieldSet
+} from '@/components/ui/field'
 
 export function FieldCheckbox() {
   return (
     <FieldGroup className="w-full max-w-xs">
       <FieldSet>
-        <FieldLegend variant="label">
-          Show these items on the desktop
-        </FieldLegend>
-        <FieldDescription>
-          Select the items you want to show on the desktop.
-        </FieldDescription>
+        <FieldLegend variant="label">Show these items on the desktop</FieldLegend>
+        <FieldDescription>Select the items you want to show on the desktop.</FieldDescription>
         <FieldGroup className="gap-3">
           <Field orientation="horizontal">
             <Checkbox id="finder-pref-9k2-hard-disks-ljj" />
@@ -577,28 +509,19 @@ export function FieldCheckbox() {
           </Field>
           <Field orientation="horizontal">
             <Checkbox id="finder-pref-9k2-external-disks-1yg" />
-            <FieldLabel
-              htmlFor="finder-pref-9k2-external-disks-1yg"
-              className="font-normal"
-            >
+            <FieldLabel htmlFor="finder-pref-9k2-external-disks-1yg" className="font-normal">
               External disks
             </FieldLabel>
           </Field>
           <Field orientation="horizontal">
             <Checkbox id="finder-pref-9k2-cds-dvds-fzt" />
-            <FieldLabel
-              htmlFor="finder-pref-9k2-cds-dvds-fzt"
-              className="font-normal"
-            >
+            <FieldLabel htmlFor="finder-pref-9k2-cds-dvds-fzt" className="font-normal">
               CDs, DVDs, and iPods
             </FieldLabel>
           </Field>
           <Field orientation="horizontal">
             <Checkbox id="finder-pref-9k2-connected-servers-6l2" />
-            <FieldLabel
-              htmlFor="finder-pref-9k2-connected-servers-6l2"
-              className="font-normal"
-            >
+            <FieldLabel htmlFor="finder-pref-9k2-connected-servers-6l2" className="font-normal">
               Connected servers
             </FieldLabel>
           </Field>
@@ -612,36 +535,27 @@ export function FieldCheckbox() {
             Sync Desktop & Documents folders
           </FieldLabel>
           <FieldDescription>
-            Your Desktop & Documents folders are being synced with iCloud Drive.
-            You can access them from other devices.
+            Your Desktop & Documents folders are being synced with iCloud Drive. You can access them
+            from other devices.
           </FieldDescription>
         </FieldContent>
       </Field>
     </FieldGroup>
   )
 }
-
 ```
 
 ## Radio
 
 ```tsx
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-  FieldLegend,
-  FieldSet,
-} from "@/components/ui/field"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 export function FieldRadio() {
   return (
     <FieldSet className="w-full max-w-xs">
       <FieldLegend variant="label">Subscription Plan</FieldLegend>
-      <FieldDescription>
-        Yearly and lifetime plans offer significant savings.
-      </FieldDescription>
+      <FieldDescription>Yearly and lifetime plans offer significant savings.</FieldDescription>
       <RadioGroup defaultValue="monthly">
         <Field orientation="horizontal">
           <RadioGroupItem value="monthly" id="plan-monthly" />
@@ -665,14 +579,13 @@ export function FieldRadio() {
     </FieldSet>
   )
 }
-
 ```
 
 ## Switch
 
 ```tsx
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Switch } from "@/components/ui/switch"
+import { Field, FieldLabel } from '@/components/ui/field'
+import { Switch } from '@/components/ui/switch'
 
 export function FieldSwitch() {
   return (
@@ -682,7 +595,6 @@ export function FieldSwitch() {
     </Field>
   )
 }
-
 ```
 
 ## Choice Card
@@ -698,26 +610,22 @@ import {
   FieldLabel,
   FieldLegend,
   FieldSet,
-  FieldTitle,
-} from "@/components/ui/field"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+  FieldTitle
+} from '@/components/ui/field'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 export function FieldChoiceCard() {
   return (
     <FieldGroup className="w-full max-w-xs">
       <FieldSet>
         <FieldLegend variant="label">Compute Environment</FieldLegend>
-        <FieldDescription>
-          Select the compute environment for your cluster.
-        </FieldDescription>
+        <FieldDescription>Select the compute environment for your cluster.</FieldDescription>
         <RadioGroup defaultValue="kubernetes">
           <FieldLabel htmlFor="kubernetes-r2h">
             <Field orientation="horizontal">
               <FieldContent>
                 <FieldTitle>Kubernetes</FieldTitle>
-                <FieldDescription>
-                  Run GPU workloads on a K8s cluster.
-                </FieldDescription>
+                <FieldDescription>Run GPU workloads on a K8s cluster.</FieldDescription>
               </FieldContent>
               <RadioGroupItem value="kubernetes" id="kubernetes-r2h" />
             </Field>
@@ -726,9 +634,7 @@ export function FieldChoiceCard() {
             <Field orientation="horizontal">
               <FieldContent>
                 <FieldTitle>Virtual Machine</FieldTitle>
-                <FieldDescription>
-                  Access a cluster to run GPU workloads.
-                </FieldDescription>
+                <FieldDescription>Access a cluster to run GPU workloads.</FieldDescription>
               </FieldContent>
               <RadioGroupItem value="vm" id="vm-z4k" />
             </Field>
@@ -738,7 +644,6 @@ export function FieldChoiceCard() {
     </FieldGroup>
   )
 }
-
 ```
 
 ## Field Group
@@ -746,15 +651,15 @@ export function FieldChoiceCard() {
 Stack `Field` components with `FieldGroup`. Add `FieldSeparator` to divide them.
 
 ```tsx
-import { Checkbox } from "@/components/ui/checkbox"
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Field,
   FieldDescription,
   FieldGroup,
   FieldLabel,
   FieldSeparator,
-  FieldSet,
-} from "@/components/ui/field"
+  FieldSet
+} from '@/components/ui/field'
 
 export function FieldGroupExample() {
   return (
@@ -762,8 +667,8 @@ export function FieldGroupExample() {
       <FieldSet>
         <FieldLabel>Responses</FieldLabel>
         <FieldDescription>
-          Get notified when ChatGPT responds to requests that take time, like
-          research or image generation.
+          Get notified when ChatGPT responds to requests that take time, like research or image
+          generation.
         </FieldDescription>
         <FieldGroup data-slot="checkbox-group">
           <Field orientation="horizontal">
@@ -778,8 +683,7 @@ export function FieldGroupExample() {
       <FieldSet>
         <FieldLabel>Tasks</FieldLabel>
         <FieldDescription>
-          Get notified when tasks you&apos;ve created have updates.{" "}
-          <a href="#">Manage tasks</a>
+          Get notified when tasks you&apos;ve created have updates. <a href="#">Manage tasks</a>
         </FieldDescription>
         <FieldGroup data-slot="checkbox-group">
           <Field orientation="horizontal">
@@ -799,7 +703,6 @@ export function FieldGroupExample() {
     </FieldGroup>
   )
 }
-
 ```
 
 ## RTL
@@ -807,16 +710,13 @@ export function FieldGroupExample() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Field,
   FieldDescription,
@@ -824,150 +724,149 @@ import {
   FieldLabel,
   FieldLegend,
   FieldSeparator,
-  FieldSet,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+  FieldSet
+} from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
   SelectGroup,
   SelectItem,
   SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
+  SelectValue
+} from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 
 const months = [
-  { label: "MM", value: null },
-  { label: "01", value: "01" },
-  { label: "02", value: "02" },
-  { label: "03", value: "03" },
-  { label: "04", value: "04" },
-  { label: "05", value: "05" },
-  { label: "06", value: "06" },
-  { label: "07", value: "07" },
-  { label: "08", value: "08" },
-  { label: "09", value: "09" },
-  { label: "10", value: "10" },
-  { label: "11", value: "11" },
-  { label: "12", value: "12" },
+  { label: 'MM', value: null },
+  { label: '01', value: '01' },
+  { label: '02', value: '02' },
+  { label: '03', value: '03' },
+  { label: '04', value: '04' },
+  { label: '05', value: '05' },
+  { label: '06', value: '06' },
+  { label: '07', value: '07' },
+  { label: '08', value: '08' },
+  { label: '09', value: '09' },
+  { label: '10', value: '10' },
+  { label: '11', value: '11' },
+  { label: '12', value: '12' }
 ]
 
 const years = [
-  { label: "YYYY", value: null },
-  { label: "2024", value: "2024" },
-  { label: "2025", value: "2025" },
-  { label: "2026", value: "2026" },
-  { label: "2027", value: "2027" },
-  { label: "2028", value: "2028" },
-  { label: "2029", value: "2029" },
+  { label: 'YYYY', value: null },
+  { label: '2024', value: '2024' },
+  { label: '2025', value: '2025' },
+  { label: '2026', value: '2026' },
+  { label: '2027', value: '2027' },
+  { label: '2028', value: '2028' },
+  { label: '2029', value: '2029' }
 ]
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      paymentMethod: "Payment Method",
-      secureTransactions: "All transactions are secure and encrypted",
-      nameOnCard: "Name on Card",
-      cardNumber: "Card Number",
-      cardNumberDescription: "Enter your 16-digit card number",
-      month: "Month",
-      year: "Year",
-      cvv: "CVV",
-      monthPlaceholder: "MM",
-      month01: "01",
-      month02: "02",
-      month03: "03",
-      month04: "04",
-      month05: "05",
-      month06: "06",
-      month07: "07",
-      month08: "08",
-      month09: "09",
-      month10: "10",
-      month11: "11",
-      month12: "12",
-      billingAddress: "Billing Address",
-      billingAddressDescription:
-        "The billing address associated with your payment method",
-      sameAsShipping: "Same as shipping address",
-      comments: "Comments",
-      commentsPlaceholder: "Add any additional comments",
-      submit: "Submit",
-      cancel: "Cancel",
-    },
+      paymentMethod: 'Payment Method',
+      secureTransactions: 'All transactions are secure and encrypted',
+      nameOnCard: 'Name on Card',
+      cardNumber: 'Card Number',
+      cardNumberDescription: 'Enter your 16-digit card number',
+      month: 'Month',
+      year: 'Year',
+      cvv: 'CVV',
+      monthPlaceholder: 'MM',
+      month01: '01',
+      month02: '02',
+      month03: '03',
+      month04: '04',
+      month05: '05',
+      month06: '06',
+      month07: '07',
+      month08: '08',
+      month09: '09',
+      month10: '10',
+      month11: '11',
+      month12: '12',
+      billingAddress: 'Billing Address',
+      billingAddressDescription: 'The billing address associated with your payment method',
+      sameAsShipping: 'Same as shipping address',
+      comments: 'Comments',
+      commentsPlaceholder: 'Add any additional comments',
+      submit: 'Submit',
+      cancel: 'Cancel'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      paymentMethod: "طريقة الدفع",
-      secureTransactions: "جميع المعاملات آمنة ومشفرة",
-      nameOnCard: "الاسم على البطاقة",
-      cardNumber: "رقم البطاقة",
-      cardNumberDescription: "أدخل رقم البطاقة المكون من 16 رقمًا",
-      month: "الشهر",
-      year: "السنة",
-      cvv: "CVV",
-      monthPlaceholder: "ش.ش",
-      month01: "٠١",
-      month02: "٠٢",
-      month03: "٠٣",
-      month04: "٠٤",
-      month05: "٠٥",
-      month06: "٠٦",
-      month07: "٠٧",
-      month08: "٠٨",
-      month09: "٠٩",
-      month10: "١٠",
-      month11: "١١",
-      month12: "١٢",
-      billingAddress: "عنوان الفوترة",
-      billingAddressDescription: "عنوان الفوترة المرتبط بطريقة الدفع الخاصة بك",
-      sameAsShipping: "نفس عنوان الشحن",
-      comments: "تعليقات",
-      commentsPlaceholder: "أضف أي تعليقات إضافية",
-      submit: "إرسال",
-      cancel: "إلغاء",
-    },
+      paymentMethod: 'طريقة الدفع',
+      secureTransactions: 'جميع المعاملات آمنة ومشفرة',
+      nameOnCard: 'الاسم على البطاقة',
+      cardNumber: 'رقم البطاقة',
+      cardNumberDescription: 'أدخل رقم البطاقة المكون من 16 رقمًا',
+      month: 'الشهر',
+      year: 'السنة',
+      cvv: 'CVV',
+      monthPlaceholder: 'ش.ش',
+      month01: '٠١',
+      month02: '٠٢',
+      month03: '٠٣',
+      month04: '٠٤',
+      month05: '٠٥',
+      month06: '٠٦',
+      month07: '٠٧',
+      month08: '٠٨',
+      month09: '٠٩',
+      month10: '١٠',
+      month11: '١١',
+      month12: '١٢',
+      billingAddress: 'عنوان الفوترة',
+      billingAddressDescription: 'عنوان الفوترة المرتبط بطريقة الدفع الخاصة بك',
+      sameAsShipping: 'نفس عنوان الشحن',
+      comments: 'تعليقات',
+      commentsPlaceholder: 'أضف أي تعليقات إضافية',
+      submit: 'إرسال',
+      cancel: 'إلغاء'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      paymentMethod: "אמצעי תשלום",
-      secureTransactions: "כל העסקאות מאובטחות ומוצפנות",
-      nameOnCard: "שם על הכרטיס",
-      cardNumber: "מספר כרטיס",
-      cardNumberDescription: "הזן את מספר הכרטיס בן 16 הספרות שלך",
-      month: "חודש",
-      year: "שנה",
-      cvv: "CVV",
-      monthPlaceholder: "MM",
-      month01: "01",
-      month02: "02",
-      month03: "03",
-      month04: "04",
-      month05: "05",
-      month06: "06",
-      month07: "07",
-      month08: "08",
-      month09: "09",
-      month10: "10",
-      month11: "11",
-      month12: "12",
-      billingAddress: "כתובת חיוב",
-      billingAddressDescription: "כתובת החיוב המשויכת לאמצעי התשלום שלך",
-      sameAsShipping: "זהה לכתובת המשלוח",
-      comments: "הערות",
-      commentsPlaceholder: "הוסף הערות נוספות",
-      submit: "שלח",
-      cancel: "בטל",
-    },
-  },
+      paymentMethod: 'אמצעי תשלום',
+      secureTransactions: 'כל העסקאות מאובטחות ומוצפנות',
+      nameOnCard: 'שם על הכרטיס',
+      cardNumber: 'מספר כרטיס',
+      cardNumberDescription: 'הזן את מספר הכרטיס בן 16 הספרות שלך',
+      month: 'חודש',
+      year: 'שנה',
+      cvv: 'CVV',
+      monthPlaceholder: 'MM',
+      month01: '01',
+      month02: '02',
+      month03: '03',
+      month04: '04',
+      month05: '05',
+      month06: '06',
+      month07: '07',
+      month08: '08',
+      month09: '09',
+      month10: '10',
+      month11: '11',
+      month12: '12',
+      billingAddress: 'כתובת חיוב',
+      billingAddressDescription: 'כתובת החיוב המשויכת לאמצעי התשלום שלך',
+      sameAsShipping: 'זהה לכתובת המשלוח',
+      comments: 'הערות',
+      commentsPlaceholder: 'הוסף הערות נוספות',
+      submit: 'שלח',
+      cancel: 'בטל'
+    }
+  }
 }
 
 export function FieldRtl() {
-  const { dir, t } = useTranslation(translations, "ar")
+  const { dir, t } = useTranslation(translations, 'ar')
 
   const getMonthLabel = (value: string | null): string => {
     if (value === null) return t.monthPlaceholder
@@ -984,19 +883,11 @@ export function FieldRtl() {
             <FieldDescription>{t.secureTransactions}</FieldDescription>
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="checkout-7j9-card-name-43j-rtl">
-                  {t.nameOnCard}
-                </FieldLabel>
-                <Input
-                  id="checkout-7j9-card-name-43j-rtl"
-                  placeholder="Evil Rabbit"
-                  required
-                />
+                <FieldLabel htmlFor="checkout-7j9-card-name-43j-rtl">{t.nameOnCard}</FieldLabel>
+                <Input id="checkout-7j9-card-name-43j-rtl" placeholder="Evil Rabbit" required />
               </Field>
               <Field>
-                <FieldLabel htmlFor="checkout-7j9-card-number-uw1-rtl">
-                  {t.cardNumber}
-                </FieldLabel>
+                <FieldLabel htmlFor="checkout-7j9-card-number-uw1-rtl">{t.cardNumber}</FieldLabel>
                 <Input
                   id="checkout-7j9-card-number-uw1-rtl"
                   placeholder="1234 5678 9012 3456"
@@ -1006,16 +897,14 @@ export function FieldRtl() {
               </Field>
               <div className="grid grid-cols-3 gap-4">
                 <Field>
-                  <FieldLabel htmlFor="checkout-exp-month-ts6-rtl">
-                    {t.month}
-                  </FieldLabel>
+                  <FieldLabel htmlFor="checkout-exp-month-ts6-rtl">{t.month}</FieldLabel>
                   <Select items={months}>
                     <SelectTrigger id="checkout-exp-month-ts6-rtl">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent dir={dir}>
                       <SelectGroup>
-                        {months.map((item) => (
+                        {months.map(item => (
                           <SelectItem key={item.value} value={item.value}>
                             {getMonthLabel(item.value)}
                           </SelectItem>
@@ -1025,16 +914,14 @@ export function FieldRtl() {
                   </Select>
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="checkout-7j9-exp-year-f59-rtl">
-                    {t.year}
-                  </FieldLabel>
+                  <FieldLabel htmlFor="checkout-7j9-exp-year-f59-rtl">{t.year}</FieldLabel>
                   <Select items={years}>
                     <SelectTrigger id="checkout-7j9-exp-year-f59-rtl">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent dir={dir}>
                       <SelectGroup>
-                        {years.map((item) => (
+                        {years.map(item => (
                           <SelectItem key={item.value} value={item.value}>
                             {item.label}
                           </SelectItem>
@@ -1044,9 +931,7 @@ export function FieldRtl() {
                   </Select>
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="checkout-7j9-cvv-rtl">
-                    {t.cvv}
-                  </FieldLabel>
+                  <FieldLabel htmlFor="checkout-7j9-cvv-rtl">{t.cvv}</FieldLabel>
                   <Input id="checkout-7j9-cvv-rtl" placeholder="123" required />
                 </Field>
               </div>
@@ -1058,14 +943,8 @@ export function FieldRtl() {
             <FieldDescription>{t.billingAddressDescription}</FieldDescription>
             <FieldGroup>
               <Field orientation="horizontal">
-                <Checkbox
-                  id="checkout-7j9-same-as-shipping-wgm-rtl"
-                  defaultChecked
-                />
-                <FieldLabel
-                  htmlFor="checkout-7j9-same-as-shipping-wgm-rtl"
-                  className="font-normal"
-                >
+                <Checkbox id="checkout-7j9-same-as-shipping-wgm-rtl" defaultChecked />
+                <FieldLabel htmlFor="checkout-7j9-same-as-shipping-wgm-rtl" className="font-normal">
                   {t.sameAsShipping}
                 </FieldLabel>
               </Field>
@@ -1074,9 +953,7 @@ export function FieldRtl() {
           <FieldSet>
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="checkout-7j9-optional-comments-rtl">
-                  {t.comments}
-                </FieldLabel>
+                <FieldLabel htmlFor="checkout-7j9-optional-comments-rtl">{t.comments}</FieldLabel>
                 <Textarea
                   id="checkout-7j9-optional-comments-rtl"
                   placeholder={t.commentsPlaceholder}
@@ -1096,7 +973,6 @@ export function FieldRtl() {
     </div>
   )
 }
-
 ```
 
 ## Responsive Layout
@@ -1106,7 +982,7 @@ export function FieldRtl() {
 - **Responsive fields:** Set `orientation="responsive"` for automatic column layouts inside container-aware parents. Apply `@container/field-group` classes on `FieldGroup` to switch orientations at specific breakpoints.
 
 ```tsx
-import { Button } from "@/components/ui/button"
+import { Button } from '@/components/ui/button'
 import {
   Field,
   FieldContent,
@@ -1114,9 +990,9 @@ import {
   FieldGroup,
   FieldLabel,
   FieldLegend,
-  FieldSet,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+  FieldSet
+} from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 
 export function FieldResponsive() {
   return (
@@ -1129,9 +1005,7 @@ export function FieldResponsive() {
             <Field orientation="responsive">
               <FieldContent>
                 <FieldLabel htmlFor="name">Name</FieldLabel>
-                <FieldDescription>
-                  Provide your full name for identification
-                </FieldDescription>
+                <FieldDescription>Provide your full name for identification</FieldDescription>
               </FieldContent>
               <Input id="name" placeholder="Evil Rabbit" required />
             </Field>
@@ -1147,7 +1021,6 @@ export function FieldResponsive() {
     </div>
   )
 }
-
 ```
 
 ## Validation and Errors

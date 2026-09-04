@@ -10,32 +10,22 @@ links:
 ---
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import { ChevronsUpDown } from "lucide-react"
+import * as React from 'react'
+import { ChevronsUpDown } from 'lucide-react'
 
-import { Button } from "@/components/ui/button"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+import { Button } from '@/components/ui/button'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 
 export function CollapsibleDemo() {
   const [isOpen, setIsOpen] = React.useState(false)
 
   return (
-    <Collapsible
-      open={isOpen}
-      onOpenChange={setIsOpen}
-      className="flex w-[350px] flex-col gap-2"
-    >
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="flex w-[350px] flex-col gap-2">
       <div className="flex items-center justify-between gap-4 px-4">
         <h4 className="text-sm font-semibold">Order #4189</h4>
-        <CollapsibleTrigger
-          render={<Button variant="ghost" size="icon" className="size-8" />}
-        >
+        <CollapsibleTrigger render={<Button variant="ghost" size="icon" className="size-8" />}>
           <ChevronsUpDown />
           <span className="sr-only">Toggle details</span>
         </CollapsibleTrigger>
@@ -57,7 +47,6 @@ export function CollapsibleDemo() {
     </Collapsible>
   )
 }
-
 ```
 
 ## Installation
@@ -105,19 +94,14 @@ npm install @base-ui/react
 ## Usage
 
 ```tsx showLineNumbers
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 ```
 
 ```tsx showLineNumbers
 <Collapsible>
   <CollapsibleTrigger>Can I use this in my project?</CollapsibleTrigger>
   <CollapsibleContent>
-    Yes. Free to use for personal and commercial projects. No attribution
-    required.
+    Yes. Free to use for personal and commercial projects. No attribution required.
   </CollapsibleContent>
 </Collapsible>
 ```
@@ -137,7 +121,7 @@ Collapsible
 Use the `open` and `onOpenChange` props to control the state.
 
 ```tsx showLineNumbers
-import * as React from "react"
+import * as React from 'react'
 
 export function Example() {
   const [open, setOpen] = React.useState(false)
@@ -154,31 +138,22 @@ export function Example() {
 ## Basic
 
 ```tsx
-import { ChevronDownIcon } from "@/registry/icons/__lucide__"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+import { ChevronDownIcon } from '@/registry/icons/__lucide__'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 
 export function CollapsibleBasic() {
   return (
     <Card className="mx-auto w-full max-w-sm">
       <CardContent>
         <Collapsible className="rounded-md data-open:bg-muted">
-          <CollapsibleTrigger
-            render={<Button variant="ghost" className="w-full" />}
-          >
+          <CollapsibleTrigger render={<Button variant="ghost" className="w-full" />}>
             Product details
             <ChevronDownIcon className="ml-auto group-data-panel-open/button:rotate-180" />
           </CollapsibleTrigger>
           <CollapsibleContent className="flex flex-col items-start gap-2 p-2.5 pt-0 text-sm">
-            <div>
-              This panel can be expanded or collapsed to reveal additional
-              content.
-            </div>
+            <div>This panel can be expanded or collapsed to reveal additional content.</div>
             <Button size="xs">Learn More</Button>
           </CollapsibleContent>
         </Collapsible>
@@ -186,7 +161,6 @@ export function CollapsibleBasic() {
     </Card>
   )
 }
-
 ```
 
 ## Settings Panel
@@ -194,26 +168,16 @@ export function CollapsibleBasic() {
 Use a trigger button to reveal additional settings.
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import { MaximizeIcon, MinimizeIcon } from "lucide-react"
+import * as React from 'react'
+import { MaximizeIcon, MinimizeIcon } from 'lucide-react'
 
-import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 
 export function CollapsibleSettings() {
   const [isOpen, setIsOpen] = React.useState(false)
@@ -225,11 +189,7 @@ export function CollapsibleSettings() {
         <CardDescription>Set the corner radius of the element.</CardDescription>
       </CardHeader>
       <CardContent>
-        <Collapsible
-          open={isOpen}
-          onOpenChange={setIsOpen}
-          className="flex items-start gap-2"
-        >
+        <Collapsible open={isOpen} onOpenChange={setIsOpen} className="flex items-start gap-2">
           <FieldGroup className="grid w-full grid-cols-2 gap-2">
             <Field>
               <FieldLabel htmlFor="radius-x" className="sr-only">
@@ -266,7 +226,6 @@ export function CollapsibleSettings() {
     </Card>
   )
 }
-
 ```
 
 ## File Tree
@@ -274,74 +233,66 @@ export function CollapsibleSettings() {
 Use nested collapsibles to build a file tree.
 
 ```tsx
-import { ChevronRightIcon, FileIcon, FolderIcon } from "lucide-react"
+import { ChevronRightIcon, FileIcon, FolderIcon } from 'lucide-react'
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 type FileTreeItem = { name: string } | { name: string; items: FileTreeItem[] }
 
 export function CollapsibleFileTree() {
   const fileTree: FileTreeItem[] = [
     {
-      name: "components",
+      name: 'components',
       items: [
         {
-          name: "ui",
+          name: 'ui',
           items: [
-            { name: "button.tsx" },
-            { name: "card.tsx" },
-            { name: "dialog.tsx" },
-            { name: "input.tsx" },
-            { name: "select.tsx" },
-            { name: "table.tsx" },
-          ],
+            { name: 'button.tsx' },
+            { name: 'card.tsx' },
+            { name: 'dialog.tsx' },
+            { name: 'input.tsx' },
+            { name: 'select.tsx' },
+            { name: 'table.tsx' }
+          ]
         },
-        { name: "login-form.tsx" },
-        { name: "register-form.tsx" },
-      ],
+        { name: 'login-form.tsx' },
+        { name: 'register-form.tsx' }
+      ]
     },
     {
-      name: "lib",
-      items: [{ name: "utils.ts" }, { name: "cn.ts" }, { name: "api.ts" }],
+      name: 'lib',
+      items: [{ name: 'utils.ts' }, { name: 'cn.ts' }, { name: 'api.ts' }]
     },
     {
-      name: "hooks",
+      name: 'hooks',
       items: [
-        { name: "use-media-query.ts" },
-        { name: "use-debounce.ts" },
-        { name: "use-local-storage.ts" },
-      ],
+        { name: 'use-media-query.ts' },
+        { name: 'use-debounce.ts' },
+        { name: 'use-local-storage.ts' }
+      ]
     },
     {
-      name: "types",
-      items: [{ name: "index.d.ts" }, { name: "api.d.ts" }],
+      name: 'types',
+      items: [{ name: 'index.d.ts' }, { name: 'api.d.ts' }]
     },
     {
-      name: "public",
-      items: [
-        { name: "favicon.ico" },
-        { name: "logo.svg" },
-        { name: "images" },
-      ],
+      name: 'public',
+      items: [{ name: 'favicon.ico' }, { name: 'logo.svg' }, { name: 'images' }]
     },
-    { name: "app.tsx" },
-    { name: "layout.tsx" },
-    { name: "globals.css" },
-    { name: "package.json" },
-    { name: "tsconfig.json" },
-    { name: "README.md" },
-    { name: ".gitignore" },
+    { name: 'app.tsx' },
+    { name: 'layout.tsx' },
+    { name: 'globals.css' },
+    { name: 'package.json' },
+    { name: 'tsconfig.json' },
+    { name: 'README.md' },
+    { name: '.gitignore' }
   ]
 
   const renderItem = (fileItem: FileTreeItem) => {
-    if ("items" in fileItem) {
+    if ('items' in fileItem) {
       return (
         <Collapsible key={fileItem.name}>
           <CollapsibleTrigger
@@ -359,7 +310,7 @@ export function CollapsibleFileTree() {
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-1 ml-5 style-lyra:ml-4">
             <div className="flex flex-col gap-1">
-              {fileItem.items.map((child) => renderItem(child))}
+              {fileItem.items.map(child => renderItem(child))}
             </div>
           </CollapsibleContent>
         </Collapsible>
@@ -389,14 +340,11 @@ export function CollapsibleFileTree() {
         </Tabs>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col gap-1">
-          {fileTree.map((item) => renderItem(item))}
-        </div>
+        <div className="flex flex-col gap-1">{fileTree.map(item => renderItem(item))}</div>
       </CardContent>
     </Card>
   )
 }
-
 ```
 
 ## RTL
@@ -404,63 +352,56 @@ export function CollapsibleFileTree() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import { ChevronsUpDown } from "lucide-react"
+import * as React from 'react'
+import { ChevronsUpDown } from 'lucide-react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import { Button } from "@/components/ui/button"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Button } from '@/components/ui/button'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      orderNumber: "Order #4189",
-      status: "Status",
-      shipped: "Shipped",
-      shippingAddress: "Shipping address",
-      address: "100 Market St, San Francisco",
-      items: "Items",
-      itemsDescription: "2x Studio Headphones",
-    },
+      orderNumber: 'Order #4189',
+      status: 'Status',
+      shipped: 'Shipped',
+      shippingAddress: 'Shipping address',
+      address: '100 Market St, San Francisco',
+      items: 'Items',
+      itemsDescription: '2x Studio Headphones'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      orderNumber: "الطلب #4189",
-      status: "الحالة",
-      shipped: "تم الشحن",
-      shippingAddress: "عنوان الشحن",
-      address: "100 Market St, San Francisco",
-      items: "العناصر",
-      itemsDescription: "2x سماعات الاستوديو",
-    },
+      orderNumber: 'الطلب #4189',
+      status: 'الحالة',
+      shipped: 'تم الشحن',
+      shippingAddress: 'عنوان الشحن',
+      address: '100 Market St, San Francisco',
+      items: 'العناصر',
+      itemsDescription: '2x سماعات الاستوديو'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      orderNumber: "הזמנה #4189",
-      status: "סטטוס",
-      shipped: "נשלח",
-      shippingAddress: "כתובת משלוח",
-      address: "100 Market St, San Francisco",
-      items: "פריטים",
-      itemsDescription: "2x אוזניות סטודיו",
-    },
-  },
+      orderNumber: 'הזמנה #4189',
+      status: 'סטטוס',
+      shipped: 'נשלח',
+      shippingAddress: 'כתובת משלוח',
+      address: '100 Market St, San Francisco',
+      items: 'פריטים',
+      itemsDescription: '2x אוזניות סטודיו'
+    }
+  }
 }
 
 export function CollapsibleRtl() {
-  const { dir, t } = useTranslation(translations, "ar")
+  const { dir, t } = useTranslation(translations, 'ar')
   const [isOpen, setIsOpen] = React.useState(false)
 
   return (
@@ -472,9 +413,7 @@ export function CollapsibleRtl() {
     >
       <div className="flex items-center justify-between gap-4 px-4">
         <h4 className="text-sm font-semibold">{t.orderNumber}</h4>
-        <CollapsibleTrigger
-          render={<Button variant="ghost" size="icon" className="size-8" />}
-        >
+        <CollapsibleTrigger render={<Button variant="ghost" size="icon" className="size-8" />}>
           <ChevronsUpDown />
           <span className="sr-only">Toggle details</span>
         </CollapsibleTrigger>
@@ -496,7 +435,6 @@ export function CollapsibleRtl() {
     </Collapsible>
   )
 }
-
 ```
 
 ## API Reference

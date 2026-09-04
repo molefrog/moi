@@ -9,26 +9,22 @@ links:
 ---
 
 ```tsx
-import { Separator } from "@/components/ui/separator"
+import { Separator } from '@/components/ui/separator'
 
 export function SeparatorDemo() {
   return (
     <div className="flex max-w-sm flex-col gap-4 text-sm">
       <div className="flex flex-col gap-1.5">
         <div className="leading-none font-medium">shadcn/ui</div>
-        <div className="text-muted-foreground">
-          The Foundation for your Design System
-        </div>
+        <div className="text-muted-foreground">The Foundation for your Design System</div>
       </div>
       <Separator />
       <div>
-        A set of beautifully designed components that you can customize, extend,
-        and build on.
+        A set of beautifully designed components that you can customize, extend, and build on.
       </div>
     </div>
   )
 }
-
 ```
 
 ## Installation
@@ -76,7 +72,7 @@ npm install @base-ui/react
 ## Usage
 
 ```tsx showLineNumbers
-import { Separator } from "@/components/ui/separator"
+import { Separator } from '@/components/ui/separator'
 ```
 
 ```tsx showLineNumbers
@@ -88,7 +84,7 @@ import { Separator } from "@/components/ui/separator"
 Use `orientation="vertical"` for a vertical separator.
 
 ```tsx
-import { Separator } from "@/components/ui/separator"
+import { Separator } from '@/components/ui/separator'
 
 export function SeparatorVertical() {
   return (
@@ -101,7 +97,6 @@ export function SeparatorVertical() {
     </div>
   )
 }
-
 ```
 
 ## Menu
@@ -109,23 +104,19 @@ export function SeparatorVertical() {
 Vertical separators between menu items with descriptions.
 
 ```tsx
-import { Separator } from "@/components/ui/separator"
+import { Separator } from '@/components/ui/separator'
 
 export function SeparatorMenu() {
   return (
     <div className="flex items-center gap-2 text-sm md:gap-4">
       <div className="flex flex-col gap-1">
         <span className="font-medium">Settings</span>
-        <span className="text-xs text-muted-foreground">
-          Manage preferences
-        </span>
+        <span className="text-xs text-muted-foreground">Manage preferences</span>
       </div>
       <Separator orientation="vertical" />
       <div className="flex flex-col gap-1">
         <span className="font-medium">Account</span>
-        <span className="text-xs text-muted-foreground">
-          Profile & security
-        </span>
+        <span className="text-xs text-muted-foreground">Profile & security</span>
       </div>
       <Separator orientation="vertical" className="hidden md:block" />
       <div className="hidden flex-col gap-1 md:flex">
@@ -135,7 +126,6 @@ export function SeparatorMenu() {
     </div>
   )
 }
-
 ```
 
 ## List
@@ -143,7 +133,7 @@ export function SeparatorMenu() {
 Horizontal separators between list items.
 
 ```tsx
-import { Separator } from "@/components/ui/separator"
+import { Separator } from '@/components/ui/separator'
 
 export function SeparatorList() {
   return (
@@ -165,7 +155,6 @@ export function SeparatorList() {
     </div>
   )
 }
-
 ```
 
 ## RTL
@@ -173,48 +162,43 @@ export function SeparatorList() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import { Separator } from "@/components/ui/separator"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Separator } from '@/components/ui/separator'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      title: "shadcn/ui",
-      subtitle: "The Foundation for your Design System",
+      title: 'shadcn/ui',
+      subtitle: 'The Foundation for your Design System',
       description:
-        "A set of beautifully designed components that you can customize, extend, and build on.",
-    },
+        'A set of beautifully designed components that you can customize, extend, and build on.'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      title: "shadcn/ui",
-      subtitle: "الأساس لنظام التصميم الخاص بك",
-      description:
-        "مجموعة من المكونات المصممة بشكل جميل يمكنك تخصيصها وتوسيعها والبناء عليها.",
-    },
+      title: 'shadcn/ui',
+      subtitle: 'الأساس لنظام التصميم الخاص بك',
+      description: 'مجموعة من المكونات المصممة بشكل جميل يمكنك تخصيصها وتوسيعها والبناء عليها.'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      title: "shadcn/ui",
-      subtitle: "הבסיס למערכת העיצוב שלך",
-      description:
-        "סט של רכיבים מעוצבים בצורה יפה שאתה יכול להתאים אישית, להרחיב ולבנות עליהם.",
-    },
-  },
+      title: 'shadcn/ui',
+      subtitle: 'הבסיס למערכת העיצוב שלך',
+      description: 'סט של רכיבים מעוצבים בצורה יפה שאתה יכול להתאים אישית, להרחיב ולבנות עליהם.'
+    }
+  }
 }
 
 export function SeparatorRtl() {
-  const { dir, t } = useTranslation(translations, "ar")
+  const { dir, t } = useTranslation(translations, 'ar')
 
   return (
     <div className="flex max-w-sm flex-col gap-4 text-sm" dir={dir}>
@@ -227,7 +211,6 @@ export function SeparatorRtl() {
     </div>
   )
 }
-
 ```
 
 ## API Reference

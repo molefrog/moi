@@ -9,12 +9,9 @@ links:
 ---
 
 ```tsx
-import { Bold, Italic, Underline } from "lucide-react"
+import { Bold, Italic, Underline } from 'lucide-react'
 
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group"
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 export function ToggleGroupDemo() {
   return (
@@ -31,7 +28,6 @@ export function ToggleGroupDemo() {
     </ToggleGroup>
   )
 }
-
 ```
 
 ## Installation
@@ -79,7 +75,7 @@ npm install @base-ui/react
 ## Usage
 
 ```tsx
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 ```
 
 ```tsx
@@ -105,14 +101,11 @@ ToggleGroup
 Use `variant="outline"` for an outline style.
 
 ```tsx
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group"
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 export function ToggleGroupOutline() {
   return (
-    <ToggleGroup variant="outline" defaultValue={["all"]}>
+    <ToggleGroup variant="outline" defaultValue={['all']}>
       <ToggleGroupItem value="all" aria-label="Toggle all">
         All
       </ToggleGroupItem>
@@ -122,7 +115,6 @@ export function ToggleGroupOutline() {
     </ToggleGroup>
   )
 }
-
 ```
 
 ## Size
@@ -130,15 +122,12 @@ export function ToggleGroupOutline() {
 Use the `size` prop to change the size of the toggle group.
 
 ```tsx
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group"
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 export function ToggleGroupSizes() {
   return (
     <div className="flex flex-col gap-4">
-      <ToggleGroup size="sm" defaultValue={["top"]} variant="outline">
+      <ToggleGroup size="sm" defaultValue={['top']} variant="outline">
         <ToggleGroupItem value="top" aria-label="Toggle top">
           Top
         </ToggleGroupItem>
@@ -152,7 +141,7 @@ export function ToggleGroupSizes() {
           Right
         </ToggleGroupItem>
       </ToggleGroup>
-      <ToggleGroup defaultValue={["top"]} variant="outline">
+      <ToggleGroup defaultValue={['top']} variant="outline">
         <ToggleGroupItem value="top" aria-label="Toggle top">
           Top
         </ToggleGroupItem>
@@ -169,7 +158,6 @@ export function ToggleGroupSizes() {
     </div>
   )
 }
-
 ```
 
 ## Spacing
@@ -177,14 +165,11 @@ export function ToggleGroupSizes() {
 Use `spacing` to add spacing between toggle group items.
 
 ```tsx
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group"
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 export function ToggleGroupSpacing() {
   return (
-    <ToggleGroup size="sm" defaultValue={["top"]} variant="outline" spacing={2}>
+    <ToggleGroup size="sm" defaultValue={['top']} variant="outline" spacing={2}>
       <ToggleGroupItem value="top" aria-label="Toggle top">
         Top
       </ToggleGroupItem>
@@ -200,7 +185,6 @@ export function ToggleGroupSpacing() {
     </ToggleGroup>
   )
 }
-
 ```
 
 ## Vertical
@@ -208,21 +192,13 @@ export function ToggleGroupSpacing() {
 Use `orientation="vertical"` for vertical toggle groups.
 
 ```tsx
-import { BoldIcon, ItalicIcon, UnderlineIcon } from "lucide-react"
+import { BoldIcon, ItalicIcon, UnderlineIcon } from 'lucide-react'
 
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group"
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 export function ToggleGroupVertical() {
   return (
-    <ToggleGroup
-      multiple
-      orientation="vertical"
-      spacing={1}
-      defaultValue={["bold", "italic"]}
-    >
+    <ToggleGroup multiple orientation="vertical" spacing={1} defaultValue={['bold', 'italic']}>
       <ToggleGroupItem value="bold" aria-label="Toggle bold">
         <BoldIcon />
       </ToggleGroupItem>
@@ -235,18 +211,14 @@ export function ToggleGroupVertical() {
     </ToggleGroup>
   )
 }
-
 ```
 
 ## Disabled
 
 ```tsx
-import { Bold, Italic, Underline } from "lucide-react"
+import { Bold, Italic, Underline } from 'lucide-react'
 
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group"
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 export function ToggleGroupDisabled() {
   return (
@@ -263,7 +235,6 @@ export function ToggleGroupDisabled() {
     </ToggleGroup>
   )
 }
-
 ```
 
 ## Custom
@@ -271,28 +242,21 @@ export function ToggleGroupDisabled() {
 A custom toggle group example.
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group"
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 export function ToggleGroupFontWeightSelector() {
-  const [fontWeight, setFontWeight] = React.useState("normal")
+  const [fontWeight, setFontWeight] = React.useState('normal')
   return (
     <Field>
       <FieldLabel>Font Weight</FieldLabel>
       <ToggleGroup
         value={[fontWeight]}
-        onValueChange={(value) => setFontWeight(value[0])}
+        onValueChange={value => setFontWeight(value[0])}
         variant="outline"
         spacing={2}
         size="lg"
@@ -331,16 +295,12 @@ export function ToggleGroupFontWeightSelector() {
         </ToggleGroupItem>
       </ToggleGroup>
       <FieldDescription>
-        Use{" "}
-        <code className="rounded-md bg-muted px-1 py-0.5 font-mono">
-          font-{fontWeight}
-        </code>{" "}
-        to set the font weight.
+        Use <code className="rounded-md bg-muted px-1 py-0.5 font-mono">font-{fontWeight}</code> to
+        set the font weight.
       </FieldDescription>
     </Field>
   )
 }
-
 ```
 
 ## RTL
@@ -348,51 +308,45 @@ export function ToggleGroupFontWeightSelector() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      list: "List",
-      grid: "Grid",
-      cards: "Cards",
-    },
+      list: 'List',
+      grid: 'Grid',
+      cards: 'Cards'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      list: "قائمة",
-      grid: "شبكة",
-      cards: "بطاقات",
-    },
+      list: 'قائمة',
+      grid: 'شبكة',
+      cards: 'بطاقات'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      list: "רשימה",
-      grid: "רשת",
-      cards: "כרטיסים",
-    },
-  },
+      list: 'רשימה',
+      grid: 'רשת',
+      cards: 'כרטיסים'
+    }
+  }
 }
 
 export function ToggleGroupRtl() {
-  const { dir, t } = useTranslation(translations, "ar")
+  const { dir, t } = useTranslation(translations, 'ar')
 
   return (
-    <ToggleGroup variant="outline" defaultValue={["list"]} dir={dir}>
+    <ToggleGroup variant="outline" defaultValue={['list']} dir={dir}>
       <ToggleGroupItem value="list" aria-label={t.list}>
         {t.list}
       </ToggleGroupItem>
@@ -405,7 +359,6 @@ export function ToggleGroupRtl() {
     </ToggleGroup>
   )
 }
-
 ```
 
 ## API Reference

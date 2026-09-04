@@ -9,7 +9,7 @@ links:
 ---
 
 ```tsx
-"use client"
+'use client'
 
 import {
   Combobox,
@@ -17,16 +17,10 @@ import {
   ComboboxEmpty,
   ComboboxInput,
   ComboboxItem,
-  ComboboxList,
-} from "@/components/ui/combobox"
+  ComboboxList
+} from '@/components/ui/combobox'
 
-const frameworks = [
-  "Next.js",
-  "SvelteKit",
-  "Nuxt.js",
-  "Remix",
-  "Astro",
-] as const
+const frameworks = ['Next.js', 'SvelteKit', 'Nuxt.js', 'Remix', 'Astro'] as const
 
 export function ComboboxBasic() {
   return (
@@ -35,7 +29,7 @@ export function ComboboxBasic() {
       <ComboboxContent>
         <ComboboxEmpty>No items found.</ComboboxEmpty>
         <ComboboxList>
-          {(item) => (
+          {item => (
             <ComboboxItem key={item} value={item}>
               {item}
             </ComboboxItem>
@@ -45,7 +39,6 @@ export function ComboboxBasic() {
     </Combobox>
   )
 }
-
 ```
 
 ## Installation
@@ -98,12 +91,12 @@ import {
   ComboboxEmpty,
   ComboboxInput,
   ComboboxItem,
-  ComboboxList,
-} from "@/components/ui/combobox"
+  ComboboxList
+} from '@/components/ui/combobox'
 ```
 
 ```tsx showLineNumbers
-const frameworks = ["Next.js", "SvelteKit", "Nuxt.js", "Remix", "Astro"]
+const frameworks = ['Next.js', 'SvelteKit', 'Nuxt.js', 'Remix', 'Astro']
 
 export function ExampleCombobox() {
   return (
@@ -112,7 +105,7 @@ export function ExampleCombobox() {
       <ComboboxContent>
         <ComboboxEmpty>No items found.</ComboboxEmpty>
         <ComboboxList>
-          {(item) => (
+          {item => (
             <ComboboxItem key={item} value={item}>
               {item}
             </ComboboxItem>
@@ -185,7 +178,7 @@ Combobox
 Use `itemToStringValue` when your items are objects.
 
 ```tsx showLineNumbers
-import * as React from "react"
+import * as React from 'react'
 
 import {
   Combobox,
@@ -193,8 +186,8 @@ import {
   ComboboxEmpty,
   ComboboxInput,
   ComboboxItem,
-  ComboboxList,
-} from "@/components/ui/combobox"
+  ComboboxList
+} from '@/components/ui/combobox'
 
 type Framework = {
   label: string
@@ -202,22 +195,19 @@ type Framework = {
 }
 
 const frameworks: Framework[] = [
-  { label: "Next.js", value: "next" },
-  { label: "SvelteKit", value: "sveltekit" },
-  { label: "Nuxt", value: "nuxt" },
+  { label: 'Next.js', value: 'next' },
+  { label: 'SvelteKit', value: 'sveltekit' },
+  { label: 'Nuxt', value: 'nuxt' }
 ]
 
 export function ExampleComboboxCustomItems() {
   return (
-    <Combobox
-      items={frameworks}
-      itemToStringValue={(framework) => framework.label}
-    >
+    <Combobox items={frameworks} itemToStringValue={framework => framework.label}>
       <ComboboxInput placeholder="Select a framework" />
       <ComboboxContent>
         <ComboboxEmpty>No items found.</ComboboxEmpty>
         <ComboboxList>
-          {(framework) => (
+          {framework => (
             <ComboboxItem key={framework.value} value={framework}>
               {framework.label}
             </ComboboxItem>
@@ -234,7 +224,7 @@ export function ExampleComboboxCustomItems() {
 Use `multiple` with chips for multi-select behavior.
 
 ```tsx showLineNumbers
-import * as React from "react"
+import * as React from 'react'
 
 import {
   Combobox,
@@ -246,24 +236,19 @@ import {
   ComboboxInput,
   ComboboxItem,
   ComboboxList,
-  ComboboxValue,
-} from "@/components/ui/combobox"
+  ComboboxValue
+} from '@/components/ui/combobox'
 
-const frameworks = ["Next.js", "SvelteKit", "Nuxt.js", "Remix", "Astro"]
+const frameworks = ['Next.js', 'SvelteKit', 'Nuxt.js', 'Remix', 'Astro']
 
 export function ExampleComboboxMultiple() {
   const [value, setValue] = React.useState<string[]>([])
 
   return (
-    <Combobox
-      items={frameworks}
-      multiple
-      value={value}
-      onValueChange={setValue}
-    >
+    <Combobox items={frameworks} multiple value={value} onValueChange={setValue}>
       <ComboboxChips>
         <ComboboxValue>
-          {value.map((item) => (
+          {value.map(item => (
             <ComboboxChip key={item}>{item}</ComboboxChip>
           ))}
         </ComboboxValue>
@@ -272,7 +257,7 @@ export function ExampleComboboxMultiple() {
       <ComboboxContent>
         <ComboboxEmpty>No items found.</ComboboxEmpty>
         <ComboboxList>
-          {(item) => (
+          {item => (
             <ComboboxItem key={item} value={item}>
               {item}
             </ComboboxItem>
@@ -289,7 +274,7 @@ export function ExampleComboboxMultiple() {
 A simple combobox with a list of frameworks.
 
 ```tsx
-"use client"
+'use client'
 
 import {
   Combobox,
@@ -297,16 +282,10 @@ import {
   ComboboxEmpty,
   ComboboxInput,
   ComboboxItem,
-  ComboboxList,
-} from "@/components/ui/combobox"
+  ComboboxList
+} from '@/components/ui/combobox'
 
-const frameworks = [
-  "Next.js",
-  "SvelteKit",
-  "Nuxt.js",
-  "Remix",
-  "Astro",
-] as const
+const frameworks = ['Next.js', 'SvelteKit', 'Nuxt.js', 'Remix', 'Astro'] as const
 
 export function ComboboxBasic() {
   return (
@@ -315,7 +294,7 @@ export function ComboboxBasic() {
       <ComboboxContent>
         <ComboboxEmpty>No items found.</ComboboxEmpty>
         <ComboboxList>
-          {(item) => (
+          {item => (
             <ComboboxItem key={item} value={item}>
               {item}
             </ComboboxItem>
@@ -325,7 +304,6 @@ export function ComboboxBasic() {
     </Combobox>
   )
 }
-
 ```
 
 ## Multiple
@@ -333,9 +311,9 @@ export function ComboboxBasic() {
 A combobox with multiple selection using `multiple` and `ComboboxChips`.
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
 import {
   Combobox,
@@ -347,30 +325,19 @@ import {
   ComboboxItem,
   ComboboxList,
   ComboboxValue,
-  useComboboxAnchor,
-} from "@/components/ui/combobox"
+  useComboboxAnchor
+} from '@/components/ui/combobox'
 
-const frameworks = [
-  "Next.js",
-  "SvelteKit",
-  "Nuxt.js",
-  "Remix",
-  "Astro",
-] as const
+const frameworks = ['Next.js', 'SvelteKit', 'Nuxt.js', 'Remix', 'Astro'] as const
 
 export function ComboboxMultiple() {
   const anchor = useComboboxAnchor()
 
   return (
-    <Combobox
-      multiple
-      autoHighlight
-      items={frameworks}
-      defaultValue={[frameworks[0]]}
-    >
+    <Combobox multiple autoHighlight items={frameworks} defaultValue={[frameworks[0]]}>
       <ComboboxChips ref={anchor} className="w-full max-w-xs">
         <ComboboxValue>
-          {(values) => (
+          {values => (
             <React.Fragment>
               {values.map((value: string) => (
                 <ComboboxChip key={value}>{value}</ComboboxChip>
@@ -383,7 +350,7 @@ export function ComboboxMultiple() {
       <ComboboxContent anchor={anchor}>
         <ComboboxEmpty>No items found.</ComboboxEmpty>
         <ComboboxList>
-          {(item) => (
+          {item => (
             <ComboboxItem key={item} value={item}>
               {item}
             </ComboboxItem>
@@ -393,7 +360,6 @@ export function ComboboxMultiple() {
     </Combobox>
   )
 }
-
 ```
 
 ## Clear Button
@@ -401,7 +367,7 @@ export function ComboboxMultiple() {
 Use the `showClear` prop to show a clear button.
 
 ```tsx
-"use client"
+'use client'
 
 import {
   Combobox,
@@ -409,16 +375,10 @@ import {
   ComboboxEmpty,
   ComboboxInput,
   ComboboxItem,
-  ComboboxList,
-} from "@/components/ui/combobox"
+  ComboboxList
+} from '@/components/ui/combobox'
 
-const frameworks = [
-  "Next.js",
-  "SvelteKit",
-  "Nuxt.js",
-  "Remix",
-  "Astro",
-] as const
+const frameworks = ['Next.js', 'SvelteKit', 'Nuxt.js', 'Remix', 'Astro'] as const
 
 export function ComboboxWithClear() {
   return (
@@ -427,7 +387,7 @@ export function ComboboxWithClear() {
       <ComboboxContent>
         <ComboboxEmpty>No items found.</ComboboxEmpty>
         <ComboboxList>
-          {(item) => (
+          {item => (
             <ComboboxItem key={item} value={item}>
               {item}
             </ComboboxItem>
@@ -437,7 +397,6 @@ export function ComboboxWithClear() {
     </Combobox>
   )
 }
-
 ```
 
 ## Groups
@@ -445,7 +404,7 @@ export function ComboboxWithClear() {
 Use `ComboboxGroup` and `ComboboxSeparator` to group items.
 
 ```tsx
-"use client"
+'use client'
 
 import {
   Combobox,
@@ -457,43 +416,43 @@ import {
   ComboboxItem,
   ComboboxLabel,
   ComboboxList,
-  ComboboxSeparator,
-} from "@/components/ui/combobox"
+  ComboboxSeparator
+} from '@/components/ui/combobox'
 
 const timezones = [
   {
-    value: "Americas",
+    value: 'Americas',
     items: [
-      "(GMT-5) New York",
-      "(GMT-8) Los Angeles",
-      "(GMT-6) Chicago",
-      "(GMT-5) Toronto",
-      "(GMT-8) Vancouver",
-      "(GMT-3) São Paulo",
-    ],
+      '(GMT-5) New York',
+      '(GMT-8) Los Angeles',
+      '(GMT-6) Chicago',
+      '(GMT-5) Toronto',
+      '(GMT-8) Vancouver',
+      '(GMT-3) São Paulo'
+    ]
   },
   {
-    value: "Europe",
+    value: 'Europe',
     items: [
-      "(GMT+0) London",
-      "(GMT+1) Paris",
-      "(GMT+1) Berlin",
-      "(GMT+1) Rome",
-      "(GMT+1) Madrid",
-      "(GMT+1) Amsterdam",
-    ],
+      '(GMT+0) London',
+      '(GMT+1) Paris',
+      '(GMT+1) Berlin',
+      '(GMT+1) Rome',
+      '(GMT+1) Madrid',
+      '(GMT+1) Amsterdam'
+    ]
   },
   {
-    value: "Asia/Pacific",
+    value: 'Asia/Pacific',
     items: [
-      "(GMT+9) Tokyo",
-      "(GMT+8) Shanghai",
-      "(GMT+8) Singapore",
-      "(GMT+4) Dubai",
-      "(GMT+11) Sydney",
-      "(GMT+9) Seoul",
-    ],
-  },
+      '(GMT+9) Tokyo',
+      '(GMT+8) Shanghai',
+      '(GMT+8) Singapore',
+      '(GMT+4) Dubai',
+      '(GMT+11) Sydney',
+      '(GMT+9) Seoul'
+    ]
+  }
 ] as const
 
 export function ComboboxWithGroupsAndSeparator() {
@@ -507,7 +466,7 @@ export function ComboboxWithGroupsAndSeparator() {
             <ComboboxGroup key={group.value} items={group.items}>
               <ComboboxLabel>{group.value}</ComboboxLabel>
               <ComboboxCollection>
-                {(item) => (
+                {item => (
                   <ComboboxItem key={item} value={item}>
                     {item}
                   </ComboboxItem>
@@ -521,7 +480,6 @@ export function ComboboxWithGroupsAndSeparator() {
     </Combobox>
   )
 }
-
 ```
 
 ## Custom Items
@@ -529,7 +487,7 @@ export function ComboboxWithGroupsAndSeparator() {
 You can render a custom component inside `ComboboxItem`.
 
 ```tsx
-"use client"
+'use client'
 
 import {
   Combobox,
@@ -537,85 +495,78 @@ import {
   ComboboxEmpty,
   ComboboxInput,
   ComboboxItem,
-  ComboboxList,
-} from "@/components/ui/combobox"
-import {
-  Item,
-  ItemContent,
-  ItemDescription,
-  ItemTitle,
-} from "@/components/ui/item"
+  ComboboxList
+} from '@/components/ui/combobox'
+import { Item, ItemContent, ItemDescription, ItemTitle } from '@/components/ui/item'
 
 const countries = [
-  { code: "", value: "", continent: "", label: "Select country" },
+  { code: '', value: '', continent: '', label: 'Select country' },
   {
-    code: "ar",
-    value: "argentina",
-    label: "Argentina",
-    continent: "South America",
+    code: 'ar',
+    value: 'argentina',
+    label: 'Argentina',
+    continent: 'South America'
   },
-  { code: "au", value: "australia", label: "Australia", continent: "Oceania" },
-  { code: "br", value: "brazil", label: "Brazil", continent: "South America" },
-  { code: "ca", value: "canada", label: "Canada", continent: "North America" },
-  { code: "cn", value: "china", label: "China", continent: "Asia" },
+  { code: 'au', value: 'australia', label: 'Australia', continent: 'Oceania' },
+  { code: 'br', value: 'brazil', label: 'Brazil', continent: 'South America' },
+  { code: 'ca', value: 'canada', label: 'Canada', continent: 'North America' },
+  { code: 'cn', value: 'china', label: 'China', continent: 'Asia' },
   {
-    code: "co",
-    value: "colombia",
-    label: "Colombia",
-    continent: "South America",
+    code: 'co',
+    value: 'colombia',
+    label: 'Colombia',
+    continent: 'South America'
   },
-  { code: "eg", value: "egypt", label: "Egypt", continent: "Africa" },
-  { code: "fr", value: "france", label: "France", continent: "Europe" },
-  { code: "de", value: "germany", label: "Germany", continent: "Europe" },
-  { code: "it", value: "italy", label: "Italy", continent: "Europe" },
-  { code: "jp", value: "japan", label: "Japan", continent: "Asia" },
-  { code: "ke", value: "kenya", label: "Kenya", continent: "Africa" },
-  { code: "mx", value: "mexico", label: "Mexico", continent: "North America" },
+  { code: 'eg', value: 'egypt', label: 'Egypt', continent: 'Africa' },
+  { code: 'fr', value: 'france', label: 'France', continent: 'Europe' },
+  { code: 'de', value: 'germany', label: 'Germany', continent: 'Europe' },
+  { code: 'it', value: 'italy', label: 'Italy', continent: 'Europe' },
+  { code: 'jp', value: 'japan', label: 'Japan', continent: 'Asia' },
+  { code: 'ke', value: 'kenya', label: 'Kenya', continent: 'Africa' },
+  { code: 'mx', value: 'mexico', label: 'Mexico', continent: 'North America' },
   {
-    code: "nz",
-    value: "new-zealand",
-    label: "New Zealand",
-    continent: "Oceania",
+    code: 'nz',
+    value: 'new-zealand',
+    label: 'New Zealand',
+    continent: 'Oceania'
   },
-  { code: "ng", value: "nigeria", label: "Nigeria", continent: "Africa" },
+  { code: 'ng', value: 'nigeria', label: 'Nigeria', continent: 'Africa' },
   {
-    code: "za",
-    value: "south-africa",
-    label: "South Africa",
-    continent: "Africa",
+    code: 'za',
+    value: 'south-africa',
+    label: 'South Africa',
+    continent: 'Africa'
   },
-  { code: "kr", value: "south-korea", label: "South Korea", continent: "Asia" },
+  { code: 'kr', value: 'south-korea', label: 'South Korea', continent: 'Asia' },
   {
-    code: "gb",
-    value: "united-kingdom",
-    label: "United Kingdom",
-    continent: "Europe",
+    code: 'gb',
+    value: 'united-kingdom',
+    label: 'United Kingdom',
+    continent: 'Europe'
   },
   {
-    code: "us",
-    value: "united-states",
-    label: "United States",
-    continent: "North America",
-  },
+    code: 'us',
+    value: 'united-states',
+    label: 'United States',
+    continent: 'North America'
+  }
 ]
 
 export function ComboboxWithCustomItems() {
   return (
     <Combobox
-      items={countries.filter((country) => country.code !== "")}
+      items={countries.filter(country => country.code !== '')}
       itemToStringValue={(country: (typeof countries)[number]) => country.label}
     >
       <ComboboxInput placeholder="Search countries..." />
       <ComboboxContent>
         <ComboboxEmpty>No countries found.</ComboboxEmpty>
         <ComboboxList>
-          {(country) => (
+          {country => (
             <ComboboxItem key={country.code} value={country}>
               <Item size="xs" className="p-0">
                 <ItemContent>
-                  <ItemTitle className="whitespace-nowrap">
-                    {country.label}
-                  </ItemTitle>
+                  <ItemTitle className="whitespace-nowrap">{country.label}</ItemTitle>
                   <ItemDescription>
                     {country.continent} ({country.code})
                   </ItemDescription>
@@ -628,7 +579,6 @@ export function ComboboxWithCustomItems() {
     </Combobox>
   )
 }
-
 ```
 
 ## Invalid
@@ -636,7 +586,7 @@ export function ComboboxWithCustomItems() {
 Use the `aria-invalid` prop to make the combobox invalid.
 
 ```tsx
-"use client"
+'use client'
 
 import {
   Combobox,
@@ -644,16 +594,10 @@ import {
   ComboboxEmpty,
   ComboboxInput,
   ComboboxItem,
-  ComboboxList,
-} from "@/components/ui/combobox"
+  ComboboxList
+} from '@/components/ui/combobox'
 
-const frameworks = [
-  "Next.js",
-  "SvelteKit",
-  "Nuxt.js",
-  "Remix",
-  "Astro",
-] as const
+const frameworks = ['Next.js', 'SvelteKit', 'Nuxt.js', 'Remix', 'Astro'] as const
 
 export function ComboboxInvalid() {
   return (
@@ -662,7 +606,7 @@ export function ComboboxInvalid() {
       <ComboboxContent>
         <ComboboxEmpty>No items found.</ComboboxEmpty>
         <ComboboxList>
-          {(item) => (
+          {item => (
             <ComboboxItem key={item} value={item}>
               {item}
             </ComboboxItem>
@@ -672,7 +616,6 @@ export function ComboboxInvalid() {
     </Combobox>
   )
 }
-
 ```
 
 ## Disabled
@@ -680,7 +623,7 @@ export function ComboboxInvalid() {
 Use the `disabled` prop to disable the combobox.
 
 ```tsx
-"use client"
+'use client'
 
 import {
   Combobox,
@@ -688,16 +631,10 @@ import {
   ComboboxEmpty,
   ComboboxInput,
   ComboboxItem,
-  ComboboxList,
-} from "@/components/ui/combobox"
+  ComboboxList
+} from '@/components/ui/combobox'
 
-const frameworks = [
-  "Next.js",
-  "SvelteKit",
-  "Nuxt.js",
-  "Remix",
-  "Astro",
-] as const
+const frameworks = ['Next.js', 'SvelteKit', 'Nuxt.js', 'Remix', 'Astro'] as const
 
 export function ComboboxDisabled() {
   return (
@@ -706,7 +643,7 @@ export function ComboboxDisabled() {
       <ComboboxContent>
         <ComboboxEmpty>No items found.</ComboboxEmpty>
         <ComboboxList>
-          {(item) => (
+          {item => (
             <ComboboxItem key={item} value={item}>
               {item}
             </ComboboxItem>
@@ -716,7 +653,6 @@ export function ComboboxDisabled() {
     </Combobox>
   )
 }
-
 ```
 
 ## Auto Highlight
@@ -724,7 +660,7 @@ export function ComboboxDisabled() {
 Use the `autoHighlight` prop to automatically highlight the first item on filter.
 
 ```tsx
-"use client"
+'use client'
 
 import {
   Combobox,
@@ -732,16 +668,10 @@ import {
   ComboboxEmpty,
   ComboboxInput,
   ComboboxItem,
-  ComboboxList,
-} from "@/components/ui/combobox"
+  ComboboxList
+} from '@/components/ui/combobox'
 
-const frameworks = [
-  "Next.js",
-  "SvelteKit",
-  "Nuxt.js",
-  "Remix",
-  "Astro",
-] as const
+const frameworks = ['Next.js', 'SvelteKit', 'Nuxt.js', 'Remix', 'Astro'] as const
 
 export function ComboboxAutoHighlight() {
   return (
@@ -750,7 +680,7 @@ export function ComboboxAutoHighlight() {
       <ComboboxContent>
         <ComboboxEmpty>No items found.</ComboboxEmpty>
         <ComboboxList>
-          {(item) => (
+          {item => (
             <ComboboxItem key={item} value={item}>
               {item}
             </ComboboxItem>
@@ -760,7 +690,6 @@ export function ComboboxAutoHighlight() {
     </Combobox>
   )
 }
-
 ```
 
 ## Popup
@@ -768,9 +697,9 @@ export function ComboboxAutoHighlight() {
 You can trigger the combobox from a button or any other component by using the `render` prop. Move the `ComboboxInput` inside the `ComboboxContent`.
 
 ```tsx
-"use client"
+'use client'
 
-import { Button } from "@/components/ui/button"
+import { Button } from '@/components/ui/button'
 import {
   Combobox,
   ComboboxContent,
@@ -779,60 +708,60 @@ import {
   ComboboxItem,
   ComboboxList,
   ComboboxTrigger,
-  ComboboxValue,
-} from "@/components/ui/combobox"
+  ComboboxValue
+} from '@/components/ui/combobox'
 
 const countries = [
-  { code: "", value: "", continent: "", label: "Select country" },
+  { code: '', value: '', continent: '', label: 'Select country' },
   {
-    code: "ar",
-    value: "argentina",
-    label: "Argentina",
-    continent: "South America",
+    code: 'ar',
+    value: 'argentina',
+    label: 'Argentina',
+    continent: 'South America'
   },
-  { code: "au", value: "australia", label: "Australia", continent: "Oceania" },
-  { code: "br", value: "brazil", label: "Brazil", continent: "South America" },
-  { code: "ca", value: "canada", label: "Canada", continent: "North America" },
-  { code: "cn", value: "china", label: "China", continent: "Asia" },
+  { code: 'au', value: 'australia', label: 'Australia', continent: 'Oceania' },
+  { code: 'br', value: 'brazil', label: 'Brazil', continent: 'South America' },
+  { code: 'ca', value: 'canada', label: 'Canada', continent: 'North America' },
+  { code: 'cn', value: 'china', label: 'China', continent: 'Asia' },
   {
-    code: "co",
-    value: "colombia",
-    label: "Colombia",
-    continent: "South America",
+    code: 'co',
+    value: 'colombia',
+    label: 'Colombia',
+    continent: 'South America'
   },
-  { code: "eg", value: "egypt", label: "Egypt", continent: "Africa" },
-  { code: "fr", value: "france", label: "France", continent: "Europe" },
-  { code: "de", value: "germany", label: "Germany", continent: "Europe" },
-  { code: "it", value: "italy", label: "Italy", continent: "Europe" },
-  { code: "jp", value: "japan", label: "Japan", continent: "Asia" },
-  { code: "ke", value: "kenya", label: "Kenya", continent: "Africa" },
-  { code: "mx", value: "mexico", label: "Mexico", continent: "North America" },
+  { code: 'eg', value: 'egypt', label: 'Egypt', continent: 'Africa' },
+  { code: 'fr', value: 'france', label: 'France', continent: 'Europe' },
+  { code: 'de', value: 'germany', label: 'Germany', continent: 'Europe' },
+  { code: 'it', value: 'italy', label: 'Italy', continent: 'Europe' },
+  { code: 'jp', value: 'japan', label: 'Japan', continent: 'Asia' },
+  { code: 'ke', value: 'kenya', label: 'Kenya', continent: 'Africa' },
+  { code: 'mx', value: 'mexico', label: 'Mexico', continent: 'North America' },
   {
-    code: "nz",
-    value: "new-zealand",
-    label: "New Zealand",
-    continent: "Oceania",
+    code: 'nz',
+    value: 'new-zealand',
+    label: 'New Zealand',
+    continent: 'Oceania'
   },
-  { code: "ng", value: "nigeria", label: "Nigeria", continent: "Africa" },
+  { code: 'ng', value: 'nigeria', label: 'Nigeria', continent: 'Africa' },
   {
-    code: "za",
-    value: "south-africa",
-    label: "South Africa",
-    continent: "Africa",
+    code: 'za',
+    value: 'south-africa',
+    label: 'South Africa',
+    continent: 'Africa'
   },
-  { code: "kr", value: "south-korea", label: "South Korea", continent: "Asia" },
+  { code: 'kr', value: 'south-korea', label: 'South Korea', continent: 'Asia' },
   {
-    code: "gb",
-    value: "united-kingdom",
-    label: "United Kingdom",
-    continent: "Europe",
+    code: 'gb',
+    value: 'united-kingdom',
+    label: 'United Kingdom',
+    continent: 'Europe'
   },
   {
-    code: "us",
-    value: "united-states",
-    label: "United States",
-    continent: "North America",
-  },
+    code: 'us',
+    value: 'united-states',
+    label: 'United States',
+    continent: 'North America'
+  }
 ]
 
 export function ComboboxPopup() {
@@ -840,12 +769,7 @@ export function ComboboxPopup() {
     <>
       <Combobox items={countries} defaultValue={countries[0]}>
         <ComboboxTrigger
-          render={
-            <Button
-              variant="outline"
-              className="w-64 justify-between font-normal"
-            />
-          }
+          render={<Button variant="outline" className="w-64 justify-between font-normal" />}
         >
           <ComboboxValue />
         </ComboboxTrigger>
@@ -853,7 +777,7 @@ export function ComboboxPopup() {
           <ComboboxInput showTrigger={false} placeholder="Search" />
           <ComboboxEmpty>No items found.</ComboboxEmpty>
           <ComboboxList>
-            {(item) => (
+            {item => (
               <ComboboxItem key={item.code} value={item}>
                 {item.label}
               </ComboboxItem>
@@ -864,7 +788,6 @@ export function ComboboxPopup() {
     </>
   )
 }
-
 ```
 
 ## Input Group
@@ -872,9 +795,9 @@ export function ComboboxPopup() {
 You can add an addon to the combobox by using the `InputGroupAddon` component inside the `ComboboxInput`.
 
 ```tsx
-"use client"
+'use client'
 
-import { GlobeIcon } from "lucide-react"
+import { GlobeIcon } from 'lucide-react'
 
 import {
   Combobox,
@@ -885,44 +808,44 @@ import {
   ComboboxInput,
   ComboboxItem,
   ComboboxLabel,
-  ComboboxList,
-} from "@/components/ui/combobox"
-import { InputGroupAddon } from "@/components/ui/input-group"
+  ComboboxList
+} from '@/components/ui/combobox'
+import { InputGroupAddon } from '@/components/ui/input-group'
 
 const timezones = [
   {
-    value: "Americas",
+    value: 'Americas',
     items: [
-      "(GMT-5) New York",
-      "(GMT-8) Los Angeles",
-      "(GMT-6) Chicago",
-      "(GMT-5) Toronto",
-      "(GMT-8) Vancouver",
-      "(GMT-3) São Paulo",
-    ],
+      '(GMT-5) New York',
+      '(GMT-8) Los Angeles',
+      '(GMT-6) Chicago',
+      '(GMT-5) Toronto',
+      '(GMT-8) Vancouver',
+      '(GMT-3) São Paulo'
+    ]
   },
   {
-    value: "Europe",
+    value: 'Europe',
     items: [
-      "(GMT+0) London",
-      "(GMT+1) Paris",
-      "(GMT+1) Berlin",
-      "(GMT+1) Rome",
-      "(GMT+1) Madrid",
-      "(GMT+1) Amsterdam",
-    ],
+      '(GMT+0) London',
+      '(GMT+1) Paris',
+      '(GMT+1) Berlin',
+      '(GMT+1) Rome',
+      '(GMT+1) Madrid',
+      '(GMT+1) Amsterdam'
+    ]
   },
   {
-    value: "Asia/Pacific",
+    value: 'Asia/Pacific',
     items: [
-      "(GMT+9) Tokyo",
-      "(GMT+8) Shanghai",
-      "(GMT+8) Singapore",
-      "(GMT+4) Dubai",
-      "(GMT+11) Sydney",
-      "(GMT+9) Seoul",
-    ],
-  },
+      '(GMT+9) Tokyo',
+      '(GMT+8) Shanghai',
+      '(GMT+8) Singapore',
+      '(GMT+4) Dubai',
+      '(GMT+11) Sydney',
+      '(GMT+9) Seoul'
+    ]
+  }
 ] as const
 
 export function ComboxboxInputGroup() {
@@ -936,11 +859,11 @@ export function ComboxboxInputGroup() {
       <ComboboxContent alignOffset={-28} className="w-60">
         <ComboboxEmpty>No timezones found.</ComboboxEmpty>
         <ComboboxList>
-          {(group) => (
+          {group => (
             <ComboboxGroup key={group.value} items={group.items}>
               <ComboboxLabel>{group.value}</ComboboxLabel>
               <ComboboxCollection>
-                {(item) => (
+                {item => (
                   <ComboboxItem key={item} value={item}>
                     {item}
                   </ComboboxItem>
@@ -953,7 +876,6 @@ export function ComboxboxInputGroup() {
     </Combobox>
   )
 }
-
 ```
 
 ## RTL
@@ -961,14 +883,11 @@ export function ComboxboxInputGroup() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
+import { useTranslation, type Translations } from '@/components/language-selector'
 import {
   Combobox,
   ComboboxChip,
@@ -979,66 +898,59 @@ import {
   ComboboxItem,
   ComboboxList,
   ComboboxValue,
-  useComboboxAnchor,
-} from "@/components/ui/combobox"
-import { Field, FieldLabel } from "@/components/ui/field"
+  useComboboxAnchor
+} from '@/components/ui/combobox'
+import { Field, FieldLabel } from '@/components/ui/field'
 
-const categories = [
-  "technology",
-  "design",
-  "business",
-  "marketing",
-  "education",
-  "health",
-] as const
+const categories = ['technology', 'design', 'business', 'marketing', 'education', 'health'] as const
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      label: "Categories",
-      placeholder: "Add categories",
-      empty: "No categories found.",
-      technology: "Technology",
-      design: "Design",
-      business: "Business",
-      marketing: "Marketing",
-      education: "Education",
-      health: "Health",
-    },
+      label: 'Categories',
+      placeholder: 'Add categories',
+      empty: 'No categories found.',
+      technology: 'Technology',
+      design: 'Design',
+      business: 'Business',
+      marketing: 'Marketing',
+      education: 'Education',
+      health: 'Health'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      label: "الفئات",
-      placeholder: "أضف فئات",
-      empty: "لم يتم العثور على فئات.",
-      technology: "التكنولوجيا",
-      design: "التصميم",
-      business: "الأعمال",
-      marketing: "التسويق",
-      education: "التعليم",
-      health: "الصحة",
-    },
+      label: 'الفئات',
+      placeholder: 'أضف فئات',
+      empty: 'لم يتم العثور على فئات.',
+      technology: 'التكنولوجيا',
+      design: 'التصميم',
+      business: 'الأعمال',
+      marketing: 'التسويق',
+      education: 'التعليم',
+      health: 'الصحة'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      label: "קטגוריות",
-      placeholder: "הוסף קטגוריות",
-      empty: "לא נמצאו קטגוריות.",
-      technology: "טכנולוגיה",
-      design: "עיצוב",
-      business: "עסקים",
-      marketing: "שיווק",
-      education: "חינוך",
-      health: "בריאות",
-    },
-  },
+      label: 'קטגוריות',
+      placeholder: 'הוסף קטגוריות',
+      empty: 'לא נמצאו קטגוריות.',
+      technology: 'טכנולוגיה',
+      design: 'עיצוב',
+      business: 'עסקים',
+      marketing: 'שיווק',
+      education: 'חינוך',
+      health: 'בריאות'
+    }
+  }
 }
 
 export function ComboboxRtl() {
-  const { dir, t, language } = useTranslation(translations, "ar")
+  const { dir, t, language } = useTranslation(translations, 'ar')
   const anchor = useComboboxAnchor()
 
   const categoryLabels: Record<string, string> = {
@@ -1047,7 +959,7 @@ export function ComboboxRtl() {
     business: t.business,
     marketing: t.marketing,
     education: t.education,
-    health: t.health,
+    health: t.health
   }
 
   return (
@@ -1058,32 +970,24 @@ export function ComboboxRtl() {
         autoHighlight
         items={categories}
         defaultValue={[categories[0]]}
-        itemToStringValue={(item: (typeof categories)[number]) =>
-          categoryLabels[item] || item
-        }
+        itemToStringValue={(item: (typeof categories)[number]) => categoryLabels[item] || item}
       >
         <ComboboxChips ref={anchor}>
           <ComboboxValue>
-            {(values) => (
+            {values => (
               <React.Fragment>
                 {values.map((value: string) => (
-                  <ComboboxChip key={value}>
-                    {categoryLabels[value] || value}
-                  </ComboboxChip>
+                  <ComboboxChip key={value}>{categoryLabels[value] || value}</ComboboxChip>
                 ))}
                 <ComboboxChipsInput placeholder={t.placeholder} />
               </React.Fragment>
             )}
           </ComboboxValue>
         </ComboboxChips>
-        <ComboboxContent
-          anchor={anchor}
-          dir={dir}
-          data-lang={dir === "rtl" ? language : undefined}
-        >
+        <ComboboxContent anchor={anchor} dir={dir} data-lang={dir === 'rtl' ? language : undefined}>
           <ComboboxEmpty>{t.empty}</ComboboxEmpty>
           <ComboboxList>
-            {(item) => (
+            {item => (
               <ComboboxItem key={item} value={item}>
                 {categoryLabels[item] || item}
               </ComboboxItem>
@@ -1094,7 +998,6 @@ export function ComboboxRtl() {
     </Field>
   )
 }
-
 ```
 
 ## API Reference

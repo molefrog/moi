@@ -8,9 +8,9 @@ links:
 ---
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 import {
   columnFilteringFeature,
   columnVisibilityFeature,
@@ -28,12 +28,12 @@ import {
   useTable,
   type ColumnFiltersState,
   type ColumnVisibilityState,
-  type SortingState,
-} from "@tanstack/react-table"
-import { ArrowUpDown, ChevronDown, MoreHorizontal } from "lucide-react"
+  type SortingState
+} from '@tanstack/react-table'
+import { ArrowUpDown, ChevronDown, MoreHorizontal } from 'lucide-react'
 
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -42,17 +42,17 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  TableRow
+} from '@/components/ui/table'
 
 // New in v9: declare the features this table uses — anything you don't
 // register is tree-shaken out of the bundle.
@@ -66,128 +66,120 @@ const features = tableFeatures({
   paginatedRowModel: createPaginatedRowModel(),
   sortedRowModel: createSortedRowModel(),
   filterFns: { includesString: filterFn_includesString },
-  sortFns: { alphanumeric: sortFn_alphanumeric, text: sortFn_text },
+  sortFns: { alphanumeric: sortFn_alphanumeric, text: sortFn_text }
 })
 
 const columnHelper = createColumnHelper<typeof features, Payment>()
 
 const data: Payment[] = [
   {
-    id: "m5gr84i9",
+    id: 'm5gr84i9',
     amount: 316,
-    status: "success",
-    email: "ken99@example.com",
+    status: 'success',
+    email: 'ken99@example.com'
   },
   {
-    id: "3u1reuv4",
+    id: '3u1reuv4',
     amount: 242,
-    status: "success",
-    email: "Abe45@example.com",
+    status: 'success',
+    email: 'Abe45@example.com'
   },
   {
-    id: "derv1ws0",
+    id: 'derv1ws0',
     amount: 837,
-    status: "processing",
-    email: "Monserrat44@example.com",
+    status: 'processing',
+    email: 'Monserrat44@example.com'
   },
   {
-    id: "5kma53ae",
+    id: '5kma53ae',
     amount: 874,
-    status: "success",
-    email: "Silas22@example.com",
+    status: 'success',
+    email: 'Silas22@example.com'
   },
   {
-    id: "bhqecj4p",
+    id: 'bhqecj4p',
     amount: 721,
-    status: "failed",
-    email: "carmella@example.com",
-  },
+    status: 'failed',
+    email: 'carmella@example.com'
+  }
 ]
 
 export type Payment = {
   id: string
   amount: number
-  status: "pending" | "processing" | "success" | "failed"
+  status: 'pending' | 'processing' | 'success' | 'failed'
   email: string
 }
 
 export const columns = columnHelper.columns([
   columnHelper.display({
-    id: "select",
+    id: 'select',
     header: ({ table }) => (
       <Checkbox
         checked={table.getIsAllPageRowsSelected()}
-        indeterminate={
-          table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        indeterminate={table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()}
+        onCheckedChange={value => table.toggleAllPageRowsSelected(!!value)}
         aria-label="Select all"
       />
     ),
     cell: ({ row }) => (
       <Checkbox
         checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
+        onCheckedChange={value => row.toggleSelected(!!value)}
         aria-label="Select row"
       />
     ),
     enableSorting: false,
-    enableHiding: false,
+    enableHiding: false
   }),
-  columnHelper.accessor("status", {
-    header: "Status",
-    cell: ({ row }) => (
-      <div className="capitalize">{row.getValue("status")}</div>
-    ),
+  columnHelper.accessor('status', {
+    header: 'Status',
+    cell: ({ row }) => <div className="capitalize">{row.getValue('status')}</div>
   }),
-  columnHelper.accessor("email", {
+  columnHelper.accessor('email', {
     header: ({ column }) => {
       return (
         <Button
           variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
         >
           Email
           <ArrowUpDown />
         </Button>
       )
     },
-    cell: ({ row }) => <div className="lowercase">{row.getValue("email")}</div>,
+    cell: ({ row }) => <div className="lowercase">{row.getValue('email')}</div>
   }),
-  columnHelper.accessor("amount", {
+  columnHelper.accessor('amount', {
     header: () => <div className="text-right">Amount</div>,
     cell: ({ row }) => {
-      const amount = parseFloat(row.getValue("amount"))
+      const amount = parseFloat(row.getValue('amount'))
 
       // Format the amount as a dollar amount.
-      const formatted = new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
+      const formatted = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
       }).format(amount)
 
       return <div className="text-right font-medium">{formatted}</div>
-    },
+    }
   }),
   columnHelper.display({
-    id: "actions",
+    id: 'actions',
     enableHiding: false,
     cell: ({ row }) => {
       const payment = row.original
 
       return (
         <DropdownMenu>
-          <DropdownMenuTrigger
-            render={<Button variant="ghost" size="icon-xs" />}
-          >
+          <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" />}>
             <span className="sr-only">Open menu</span>
             <MoreHorizontal />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
             <DropdownMenuGroup>
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={() => navigator.clipboard.writeText(payment.id)}
-              >
+              <DropdownMenuItem onClick={() => navigator.clipboard.writeText(payment.id)}>
                 Copy payment ID
               </DropdownMenuItem>
             </DropdownMenuGroup>
@@ -199,17 +191,14 @@ export const columns = columnHelper.columns([
           </DropdownMenuContent>
         </DropdownMenu>
       )
-    },
-  }),
+    }
+  })
 ])
 
 export function DataTableDemo() {
   const [sorting, setSorting] = React.useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  )
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<ColumnVisibilityState>({})
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+  const [columnVisibility, setColumnVisibility] = React.useState<ColumnVisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
 
   const table = useTable({
@@ -224,8 +213,8 @@ export function DataTableDemo() {
       sorting,
       columnFilters,
       columnVisibility,
-      rowSelection,
-    },
+      rowSelection
+    }
   })
 
   return (
@@ -233,32 +222,26 @@ export function DataTableDemo() {
       <div className="flex items-center py-4">
         <Input
           placeholder="Filter emails..."
-          value={(table.getColumn("email")?.getFilterValue() as string) ?? ""}
-          onChange={(event) =>
-            table.getColumn("email")?.setFilterValue(event.target.value)
-          }
+          value={(table.getColumn('email')?.getFilterValue() as string) ?? ''}
+          onChange={event => table.getColumn('email')?.setFilterValue(event.target.value)}
           className="max-w-sm"
         />
         <DropdownMenu>
-          <DropdownMenuTrigger
-            render={<Button variant="outline" className="ml-auto" />}
-          >
+          <DropdownMenuTrigger render={<Button variant="outline" className="ml-auto" />}>
             Columns <ChevronDown />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
             <DropdownMenuGroup>
               {table
                 .getAllColumns()
-                .filter((column) => column.getCanHide())
-                .map((column) => {
+                .filter(column => column.getCanHide())
+                .map(column => {
                   return (
                     <DropdownMenuCheckboxItem
                       key={column.id}
                       className="capitalize"
                       checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
+                      onCheckedChange={value => column.toggleVisibility(!!value)}
                     >
                       {column.id}
                     </DropdownMenuCheckboxItem>
@@ -271,14 +254,12 @@ export function DataTableDemo() {
       <div className="overflow-hidden rounded-md border">
         <Table>
           <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
+            {table.getHeaderGroups().map(headerGroup => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
+                {headerGroup.headers.map(header => {
                   return (
                     <TableHead key={header.id}>
-                      {header.isPlaceholder ? null : (
-                        <table.FlexRender header={header} />
-                      )}
+                      {header.isPlaceholder ? null : <table.FlexRender header={header} />}
                     </TableHead>
                   )
                 })}
@@ -287,12 +268,9 @@ export function DataTableDemo() {
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                >
-                  {row.getVisibleCells().map((cell) => (
+              table.getRowModel().rows.map(row => (
+                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
+                  {row.getVisibleCells().map(cell => (
                     <TableCell key={cell.id}>
                       <table.FlexRender cell={cell} />
                     </TableCell>
@@ -301,10 +279,7 @@ export function DataTableDemo() {
               ))
             ) : (
               <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
+                <TableCell colSpan={columns.length} className="h-24 text-center">
                   No results.
                 </TableCell>
               </TableRow>
@@ -314,7 +289,7 @@ export function DataTableDemo() {
       </div>
       <div className="flex items-center justify-end space-x-2 py-4">
         <div className="flex-1 text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length} of{" "}
+          {table.getFilteredSelectedRowModel().rows.length} of{' '}
           {table.getFilteredRowModel().rows.length} row(s) selected.
         </div>
         <div className="space-x-2">
@@ -339,7 +314,6 @@ export function DataTableDemo() {
     </div>
   )
 }
-
 ```
 
 ## Introduction
@@ -394,23 +368,23 @@ We are going to build a table to show recent payments. Here's what our data look
 type Payment = {
   id: string
   amount: number
-  status: "pending" | "processing" | "success" | "failed"
+  status: 'pending' | 'processing' | 'success' | 'failed'
   email: string
 }
 
 export const payments: Payment[] = [
   {
-    id: "728ed52f",
+    id: '728ed52f',
     amount: 100,
-    status: "pending",
-    email: "m@example.com",
+    status: 'pending',
+    email: 'm@example.com'
   },
   {
-    id: "489e1d42",
+    id: '489e1d42',
     amount: 125,
-    status: "processing",
-    email: "example@gmail.com",
-  },
+    status: 'processing',
+    email: 'example@gmail.com'
+  }
   // ...
 ]
 ```
@@ -452,8 +426,8 @@ import {
   rowSortingFeature,
   sortFn_alphanumeric,
   sortFn_text,
-  tableFeatures,
-} from "@tanstack/react-table"
+  tableFeatures
+} from '@tanstack/react-table'
 
 // New in v9: declare the features this table uses — anything you don't
 // register is tree-shaken out of the bundle.
@@ -467,7 +441,7 @@ export const features = tableFeatures({
   paginatedRowModel: createPaginatedRowModel(),
   sortedRowModel: createSortedRowModel(),
   filterFns: { includesString: filterFn_includesString },
-  sortFns: { alphanumeric: sortFn_alphanumeric, text: sortFn_text },
+  sortFns: { alphanumeric: sortFn_alphanumeric, text: sortFn_text }
 })
 
 // Pass this as the first generic argument to `ColumnDef`, `Column`, `Table`,
@@ -492,18 +466,18 @@ Let's start by building a basic table.
 First, we'll define our columns.
 
 ```tsx showLineNumbers title="app/payments/columns.tsx" {3,5,16-17,19-29}
-"use client"
+'use client'
 
-import { createColumnHelper } from "@tanstack/react-table"
+import { createColumnHelper } from '@tanstack/react-table'
 
-import { type DataTableFeatures } from "./data-table-features"
+import { type DataTableFeatures } from './data-table-features'
 
 // This type is used to define the shape of our data.
 // You can use a Zod schema here if you want.
 export type Payment = {
   id: string
   amount: number
-  status: "pending" | "processing" | "success" | "failed"
+  status: 'pending' | 'processing' | 'success' | 'failed'
   email: string
 }
 
@@ -511,15 +485,15 @@ export type Payment = {
 const columnHelper = createColumnHelper<DataTableFeatures, Payment>()
 
 export const columns = columnHelper.columns([
-  columnHelper.accessor("status", {
-    header: "Status",
+  columnHelper.accessor('status', {
+    header: 'Status'
   }),
-  columnHelper.accessor("email", {
-    header: "Email",
+  columnHelper.accessor('email', {
+    header: 'Email'
   }),
-  columnHelper.accessor("amount", {
-    header: "Amount",
-  }),
+  columnHelper.accessor('amount', {
+    header: 'Amount'
+  })
 ])
 ```
 
@@ -536,9 +510,9 @@ formatted, sorted and filtered.
 Next, we'll create a `<DataTable />` component to render our table.
 
 ```tsx showLineNumbers title="app/payments/data-table.tsx"
-"use client"
+'use client'
 
-import { useTable, type ColumnDef, type RowData } from "@tanstack/react-table"
+import { useTable, type ColumnDef, type RowData } from '@tanstack/react-table'
 
 import {
   Table,
@@ -546,38 +520,33 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  TableRow
+} from '@/components/ui/table'
 
-import { features, type DataTableFeatures } from "./data-table-features"
+import { features, type DataTableFeatures } from './data-table-features'
 
 interface DataTableProps<TData extends RowData> {
   columns: ColumnDef<DataTableFeatures, TData>[]
   data: TData[]
 }
 
-export function DataTable<TData extends RowData>({
-  columns,
-  data,
-}: DataTableProps<TData>) {
+export function DataTable<TData extends RowData>({ columns, data }: DataTableProps<TData>) {
   const table = useTable({
     features,
     data,
-    columns,
+    columns
   })
 
   return (
     <div className="overflow-hidden rounded-md border">
       <Table>
         <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
+          {table.getHeaderGroups().map(headerGroup => (
             <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => {
+              {headerGroup.headers.map(header => {
                 return (
                   <TableHead key={header.id}>
-                    {header.isPlaceholder ? null : (
-                      <table.FlexRender header={header} />
-                    )}
+                    {header.isPlaceholder ? null : <table.FlexRender header={header} />}
                   </TableHead>
                 )
               })}
@@ -586,12 +555,9 @@ export function DataTable<TData extends RowData>({
         </TableHeader>
         <TableBody>
           {table.getRowModel().rows?.length ? (
-            table.getRowModel().rows.map((row) => (
-              <TableRow
-                key={row.id}
-                data-state={row.getIsSelected() && "selected"}
-              >
-                {row.getVisibleCells().map((cell) => (
+            table.getRowModel().rows.map(row => (
+              <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
+                {row.getVisibleCells().map(cell => (
                   <TableCell key={cell.id}>
                     <table.FlexRender cell={cell} />
                   </TableCell>
@@ -631,18 +597,18 @@ export function DataTable<TData extends RowData>({
 Finally, we'll render our table in our page component.
 
 ```tsx showLineNumbers title="app/payments/page.tsx" {22}
-import { columns, Payment } from "./columns"
-import { DataTable } from "./data-table"
+import { columns, Payment } from './columns'
+import { DataTable } from './data-table'
 
 async function getData(): Promise<Payment[]> {
   // Fetch data from your API here.
   return [
     {
-      id: "728ed52f",
+      id: '728ed52f',
       amount: 100,
-      status: "pending",
-      email: "m@example.com",
-    },
+      status: 'pending',
+      email: 'm@example.com'
+    }
     // ...
   ]
 }
@@ -672,18 +638,18 @@ Update the `header` and `cell` definitions for amount as follows:
 
 ```tsx showLineNumbers title="app/payments/columns.tsx" {3-13}
 export const columns = columnHelper.columns([
-  columnHelper.accessor("amount", {
+  columnHelper.accessor('amount', {
     header: () => <div className="text-right">Amount</div>,
     cell: ({ row }) => {
-      const amount = parseFloat(row.getValue("amount"))
-      const formatted = new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
+      const amount = parseFloat(row.getValue('amount'))
+      const formatted = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
       }).format(amount)
 
       return <div className="text-right font-medium">{formatted}</div>
-    },
-  }),
+    }
+  })
 ])
 ```
 
@@ -702,41 +668,37 @@ Let's add row actions to our table. We'll use a `<DropdownMenu />` component for
 Update our columns definition to add a new `actions` column. The `actions` cell returns a `<DropdownMenu />` component.
 
 ```tsx showLineNumbers title="app/payments/columns.tsx" {4,6-14,18-45}
-"use client"
+'use client'
 
-import { createColumnHelper } from "@tanstack/react-table"
-import { MoreHorizontal } from "lucide-react"
+import { createColumnHelper } from '@tanstack/react-table'
+import { MoreHorizontal } from 'lucide-react'
 
-import { Button } from "@/components/ui/button"
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 
 export const columns = columnHelper.columns([
   // ...
   columnHelper.display({
-    id: "actions",
+    id: 'actions',
     cell: ({ row }) => {
       const payment = row.original
 
       return (
         <DropdownMenu>
-          <DropdownMenuTrigger
-            render={<Button variant="ghost" className="h-8 w-8 p-0" />}
-          >
+          <DropdownMenuTrigger render={<Button variant="ghost" className="h-8 w-8 p-0" />}>
             <span className="sr-only">Open menu</span>
             <MoreHorizontal className="h-4 w-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(payment.id)}
-            >
+            <DropdownMenuItem onClick={() => navigator.clipboard.writeText(payment.id)}>
               Copy payment ID
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -745,8 +707,8 @@ export const columns = columnHelper.columns([
           </DropdownMenuContent>
         </DropdownMenu>
       )
-    },
-  }),
+    }
+  })
   // ...
 ])
 ```
@@ -868,25 +830,25 @@ export function DataTable<TData extends RowData>({
 We can now update the `email` header cell to add sorting controls.
 
 ```tsx showLineNumbers title="app/payments/columns.tsx" {4,8-18}
-"use client"
+'use client'
 
-import { createColumnHelper } from "@tanstack/react-table"
-import { ArrowUpDown } from "lucide-react"
+import { createColumnHelper } from '@tanstack/react-table'
+import { ArrowUpDown } from 'lucide-react'
 
 export const columns = columnHelper.columns([
-  columnHelper.accessor("email", {
+  columnHelper.accessor('email', {
     header: ({ column }) => {
       return (
         <Button
           variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
         >
           Email
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       )
-    },
-  }),
+    }
+  })
 ])
 ```
 
@@ -1077,52 +1039,44 @@ Next, we're going to add row selection to our table.
 ### Update column definitions
 
 ```tsx showLineNumbers title="app/payments/columns.tsx" {6,9-30}
-"use client"
+'use client'
 
-import { createColumnHelper } from "@tanstack/react-table"
+import { createColumnHelper } from '@tanstack/react-table'
 
-import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 
 export const columns = columnHelper.columns([
   columnHelper.display({
-    id: "select",
+    id: 'select',
     header: ({ table }) => (
       <Checkbox
         checked={table.getIsAllPageRowsSelected()}
-        indeterminate={
-          table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        indeterminate={table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()}
+        onCheckedChange={value => table.toggleAllPageRowsSelected(!!value)}
         aria-label="Select all"
       />
     ),
     cell: ({ row }) => (
       <Checkbox
         checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
+        onCheckedChange={value => row.toggleSelected(!!value)}
         aria-label="Select row"
       />
     ),
     enableSorting: false,
-    enableHiding: false,
-  }),
+    enableHiding: false
+  })
 ])
 ```
 
 ### Update `<DataTable>`
 
 ```tsx showLineNumbers title="app/payments/data-table.tsx" {11,20,25}
-export function DataTable<TData extends RowData>({
-  columns,
-  data,
-}: DataTableProps<TData>) {
+export function DataTable<TData extends RowData>({ columns, data }: DataTableProps<TData>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  )
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<ColumnVisibilityState>({})
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+  const [columnVisibility, setColumnVisibility] = React.useState<ColumnVisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
 
   const table = useTable({
@@ -1137,8 +1091,8 @@ export function DataTable<TData extends RowData>({
       sorting,
       columnFilters,
       columnVisibility,
-      rowSelection,
-    },
+      rowSelection
+    }
   })
 
   return (
@@ -1159,8 +1113,8 @@ You can show the number of selected rows using the `table.getFilteredSelectedRow
 
 ```tsx
 <div className="flex-1 text-sm text-muted-foreground">
-  {table.getFilteredSelectedRowModel().rows.length} of{" "}
-  {table.getFilteredRowModel().rows.length} row(s) selected.
+  {table.getFilteredSelectedRowModel().rows.length} of {table.getFilteredRowModel().rows.length}{' '}
+  row(s) selected.
 </div>
 ```
 
@@ -1181,11 +1135,9 @@ Make any column header sortable and hideable.
 
 ```tsx showLineNumbers {4}
 export const columns = columnHelper.columns([
-  columnHelper.accessor("email", {
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Email" />
-    ),
-  }),
+  columnHelper.accessor('email', {
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Email" />
+  })
 ])
 ```
 
@@ -1220,9 +1172,9 @@ A component to toggle column visibility.
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 import {
   columnFilteringFeature,
   columnVisibilityFeature,
@@ -1240,16 +1192,13 @@ import {
   useTable,
   type ColumnFiltersState,
   type ColumnVisibilityState,
-  type SortingState,
-} from "@tanstack/react-table"
-import { ArrowUpDown, ChevronDown, MoreHorizontal } from "lucide-react"
+  type SortingState
+} from '@tanstack/react-table'
+import { ArrowUpDown, ChevronDown, MoreHorizontal } from 'lucide-react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -1258,97 +1207,97 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  TableRow
+} from '@/components/ui/table'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      filterEmails: "Filter emails...",
-      columns: "Columns",
-      status: "Status",
-      email: "Email",
-      amount: "Amount",
-      actions: "Actions",
-      copyPaymentId: "Copy payment ID",
-      viewCustomer: "View customer",
-      viewPaymentDetails: "View payment details",
-      selectAll: "Select all",
-      selectRow: "Select row",
-      openMenu: "Open menu",
-      noResults: "No results.",
-      rowsSelected: "of",
-      rowsSelectedSuffix: "row(s) selected.",
-      previous: "Previous",
-      next: "Next",
-      success: "Success",
-      processing: "Processing",
-      failed: "Failed",
-      pending: "Pending",
-    },
+      filterEmails: 'Filter emails...',
+      columns: 'Columns',
+      status: 'Status',
+      email: 'Email',
+      amount: 'Amount',
+      actions: 'Actions',
+      copyPaymentId: 'Copy payment ID',
+      viewCustomer: 'View customer',
+      viewPaymentDetails: 'View payment details',
+      selectAll: 'Select all',
+      selectRow: 'Select row',
+      openMenu: 'Open menu',
+      noResults: 'No results.',
+      rowsSelected: 'of',
+      rowsSelectedSuffix: 'row(s) selected.',
+      previous: 'Previous',
+      next: 'Next',
+      success: 'Success',
+      processing: 'Processing',
+      failed: 'Failed',
+      pending: 'Pending'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      filterEmails: "تصفية البريد الإلكتروني...",
-      columns: "الأعمدة",
-      status: "الحالة",
-      email: "البريد الإلكتروني",
-      amount: "المبلغ",
-      actions: "الإجراءات",
-      copyPaymentId: "نسخ معرف الدفع",
-      viewCustomer: "عرض العميل",
-      viewPaymentDetails: "عرض تفاصيل الدفع",
-      selectAll: "تحديد الكل",
-      selectRow: "تحديد الصف",
-      openMenu: "فتح القائمة",
-      noResults: "لا توجد نتائج.",
-      rowsSelected: "من",
-      rowsSelectedSuffix: "صف(وف) محدد.",
-      previous: "السابق",
-      next: "التالي",
-      success: "ناجح",
-      processing: "قيد المعالجة",
-      failed: "فشل",
-      pending: "قيد الانتظار",
-    },
+      filterEmails: 'تصفية البريد الإلكتروني...',
+      columns: 'الأعمدة',
+      status: 'الحالة',
+      email: 'البريد الإلكتروني',
+      amount: 'المبلغ',
+      actions: 'الإجراءات',
+      copyPaymentId: 'نسخ معرف الدفع',
+      viewCustomer: 'عرض العميل',
+      viewPaymentDetails: 'عرض تفاصيل الدفع',
+      selectAll: 'تحديد الكل',
+      selectRow: 'تحديد الصف',
+      openMenu: 'فتح القائمة',
+      noResults: 'لا توجد نتائج.',
+      rowsSelected: 'من',
+      rowsSelectedSuffix: 'صف(وف) محدد.',
+      previous: 'السابق',
+      next: 'التالي',
+      success: 'ناجح',
+      processing: 'قيد المعالجة',
+      failed: 'فشل',
+      pending: 'قيد الانتظار'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      filterEmails: "סנן אימיילים...",
-      columns: "עמודות",
-      status: "סטטוס",
-      email: "אימייל",
-      amount: "סכום",
-      actions: "פעולות",
-      copyPaymentId: "העתק מזהה תשלום",
-      viewCustomer: "צפה בלקוח",
-      viewPaymentDetails: "צפה בפרטי תשלום",
-      selectAll: "בחר הכל",
-      selectRow: "בחר שורה",
-      openMenu: "פתח תפריט",
-      noResults: "אין תוצאות.",
-      rowsSelected: "מתוך",
-      rowsSelectedSuffix: "שורות נבחרו.",
-      previous: "הקודם",
-      next: "הבא",
-      success: "הצליח",
-      processing: "מעבד",
-      failed: "נכשל",
-      pending: "ממתין",
-    },
-  },
+      filterEmails: 'סנן אימיילים...',
+      columns: 'עמודות',
+      status: 'סטטוס',
+      email: 'אימייל',
+      amount: 'סכום',
+      actions: 'פעולות',
+      copyPaymentId: 'העתק מזהה תשלום',
+      viewCustomer: 'צפה בלקוח',
+      viewPaymentDetails: 'צפה בפרטי תשלום',
+      selectAll: 'בחר הכל',
+      selectRow: 'בחר שורה',
+      openMenu: 'פתח תפריט',
+      noResults: 'אין תוצאות.',
+      rowsSelected: 'מתוך',
+      rowsSelectedSuffix: 'שורות נבחרו.',
+      previous: 'הקודם',
+      next: 'הבא',
+      success: 'הצליח',
+      processing: 'מעבד',
+      failed: 'נכשל',
+      pending: 'ממתין'
+    }
+  }
 }
 
 // New in v9: declare the features this table uses — anything you don't
@@ -1363,7 +1312,7 @@ const features = tableFeatures({
   paginatedRowModel: createPaginatedRowModel(),
   sortedRowModel: createSortedRowModel(),
   filterFns: { includesString: filterFn_includesString },
-  sortFns: { alphanumeric: sortFn_alphanumeric, text: sortFn_text },
+  sortFns: { alphanumeric: sortFn_alphanumeric, text: sortFn_text }
 })
 
 const columnHelper = createColumnHelper<typeof features, Payment>()
@@ -1371,151 +1320,132 @@ const columnHelper = createColumnHelper<typeof features, Payment>()
 type Payment = {
   id: string
   amount: number
-  status: "pending" | "processing" | "success" | "failed"
+  status: 'pending' | 'processing' | 'success' | 'failed'
   email: string
 }
 
 const data: Payment[] = [
   {
-    id: "m5gr84i9",
+    id: 'm5gr84i9',
     amount: 316,
-    status: "success",
-    email: "ken99@example.com",
+    status: 'success',
+    email: 'ken99@example.com'
   },
   {
-    id: "3u1reuv4",
+    id: '3u1reuv4',
     amount: 242,
-    status: "success",
-    email: "Abe45@example.com",
+    status: 'success',
+    email: 'Abe45@example.com'
   },
   {
-    id: "derv1ws0",
+    id: 'derv1ws0',
     amount: 837,
-    status: "processing",
-    email: "Monserrat44@example.com",
+    status: 'processing',
+    email: 'Monserrat44@example.com'
   },
   {
-    id: "5kma53ae",
+    id: '5kma53ae',
     amount: 874,
-    status: "success",
-    email: "Silas22@example.com",
+    status: 'success',
+    email: 'Silas22@example.com'
   },
   {
-    id: "bhqecj4p",
+    id: 'bhqecj4p',
     amount: 721,
-    status: "failed",
-    email: "carmella@example.com",
-  },
+    status: 'failed',
+    email: 'carmella@example.com'
+  }
 ]
 
 export function DataTableRtl() {
-  const { t, dir, language } = useTranslation(translations, "ar")
+  const { t, dir, language } = useTranslation(translations, 'ar')
   const [sorting, setSorting] = React.useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  )
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<ColumnVisibilityState>({})
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+  const [columnVisibility, setColumnVisibility] = React.useState<ColumnVisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
 
   const columns = React.useMemo(
     () =>
       columnHelper.columns([
         columnHelper.display({
-          id: "select",
+          id: 'select',
           header: ({ table }) => (
             <Checkbox
               checked={table.getIsAllPageRowsSelected()}
-              indeterminate={
-                table.getIsSomePageRowsSelected() &&
-                !table.getIsAllPageRowsSelected()
-              }
-              onCheckedChange={(value) =>
-                table.toggleAllPageRowsSelected(!!value)
-              }
+              indeterminate={table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()}
+              onCheckedChange={value => table.toggleAllPageRowsSelected(!!value)}
               aria-label={t.selectAll}
             />
           ),
           cell: ({ row }) => (
             <Checkbox
               checked={row.getIsSelected()}
-              onCheckedChange={(value) => row.toggleSelected(!!value)}
+              onCheckedChange={value => row.toggleSelected(!!value)}
               aria-label={t.selectRow}
             />
           ),
           enableSorting: false,
-          enableHiding: false,
+          enableHiding: false
         }),
-        columnHelper.accessor("status", {
+        columnHelper.accessor('status', {
           header: t.status,
           cell: ({ row }) => {
-            const status = row.getValue("status") as string
+            const status = row.getValue('status') as string
             const statusMap: Record<string, string> = {
               success: t.success,
               processing: t.processing,
               failed: t.failed,
-              pending: t.pending,
+              pending: t.pending
             }
             return <div className="capitalize">{statusMap[status]}</div>
-          },
+          }
         }),
-        columnHelper.accessor("email", {
+        columnHelper.accessor('email', {
           header: ({ column }) => {
             return (
               <Button
                 variant="ghost"
-                onClick={() =>
-                  column.toggleSorting(column.getIsSorted() === "asc")
-                }
+                onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
               >
                 {t.email}
                 <ArrowUpDown />
               </Button>
             )
           },
-          cell: ({ row }) => (
-            <div className="lowercase">{row.getValue("email")}</div>
-          ),
+          cell: ({ row }) => <div className="lowercase">{row.getValue('email')}</div>
         }),
-        columnHelper.accessor("amount", {
+        columnHelper.accessor('amount', {
           header: () => <div className="text-start">{t.amount}</div>,
           cell: ({ row }) => {
-            const amount = parseFloat(row.getValue("amount"))
-            const formatted = new Intl.NumberFormat(
-              dir === "rtl" ? "ar-SA" : "en-US",
-              {
-                style: "currency",
-                currency: "USD",
-              }
-            ).format(amount)
+            const amount = parseFloat(row.getValue('amount'))
+            const formatted = new Intl.NumberFormat(dir === 'rtl' ? 'ar-SA' : 'en-US', {
+              style: 'currency',
+              currency: 'USD'
+            }).format(amount)
 
             return <div className="text-start font-medium">{formatted}</div>
-          },
+          }
         }),
         columnHelper.display({
-          id: "actions",
+          id: 'actions',
           enableHiding: false,
           cell: ({ row }) => {
             const payment = row.original
 
             return (
               <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={<Button variant="ghost" size="icon-xs" />}
-                >
+                <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" />}>
                   <span className="sr-only">{t.openMenu}</span>
                   <MoreHorizontal />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                  align={dir === "rtl" ? "start" : "end"}
-                  data-lang={dir === "rtl" ? language : undefined}
+                  align={dir === 'rtl' ? 'start' : 'end'}
+                  data-lang={dir === 'rtl' ? language : undefined}
                   className="w-40"
                 >
                   <DropdownMenuGroup>
                     <DropdownMenuLabel>{t.actions}</DropdownMenuLabel>
-                    <DropdownMenuItem
-                      onClick={() => navigator.clipboard.writeText(payment.id)}
-                    >
+                    <DropdownMenuItem onClick={() => navigator.clipboard.writeText(payment.id)}>
                       {t.copyPaymentId}
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
@@ -1527,8 +1457,8 @@ export function DataTableRtl() {
                 </DropdownMenuContent>
               </DropdownMenu>
             )
-          },
-        }),
+          }
+        })
       ]),
     [t, dir, language]
   )
@@ -1545,8 +1475,8 @@ export function DataTableRtl() {
       sorting,
       columnFilters,
       columnVisibility,
-      rowSelection,
-    },
+      rowSelection
+    }
   })
 
   return (
@@ -1554,35 +1484,29 @@ export function DataTableRtl() {
       <div className="flex items-center gap-2 py-4">
         <Input
           placeholder={t.filterEmails}
-          value={(table.getColumn("email")?.getFilterValue() as string) ?? ""}
-          onChange={(event) =>
-            table.getColumn("email")?.setFilterValue(event.target.value)
-          }
+          value={(table.getColumn('email')?.getFilterValue() as string) ?? ''}
+          onChange={event => table.getColumn('email')?.setFilterValue(event.target.value)}
           className="max-w-sm"
         />
         <DropdownMenu>
-          <DropdownMenuTrigger
-            render={<Button variant="outline" className="ms-auto" />}
-          >
+          <DropdownMenuTrigger render={<Button variant="outline" className="ms-auto" />}>
             {t.columns} <ChevronDown />
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            align={dir === "rtl" ? "start" : "end"}
-            data-lang={dir === "rtl" ? language : undefined}
+            align={dir === 'rtl' ? 'start' : 'end'}
+            data-lang={dir === 'rtl' ? language : undefined}
           >
             <DropdownMenuGroup>
               {table
                 .getAllColumns()
-                .filter((column) => column.getCanHide())
-                .map((column) => {
+                .filter(column => column.getCanHide())
+                .map(column => {
                   return (
                     <DropdownMenuCheckboxItem
                       key={column.id}
                       className="capitalize"
                       checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
+                      onCheckedChange={value => column.toggleVisibility(!!value)}
                     >
                       {column.id}
                     </DropdownMenuCheckboxItem>
@@ -1595,14 +1519,12 @@ export function DataTableRtl() {
       <div className="overflow-hidden rounded-md border">
         <Table>
           <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
+            {table.getHeaderGroups().map(headerGroup => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
+                {headerGroup.headers.map(header => {
                   return (
                     <TableHead key={header.id}>
-                      {header.isPlaceholder ? null : (
-                        <table.FlexRender header={header} />
-                      )}
+                      {header.isPlaceholder ? null : <table.FlexRender header={header} />}
                     </TableHead>
                   )
                 })}
@@ -1611,12 +1533,9 @@ export function DataTableRtl() {
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                >
-                  {row.getVisibleCells().map((cell) => (
+              table.getRowModel().rows.map(row => (
+                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
+                  {row.getVisibleCells().map(cell => (
                     <TableCell key={cell.id}>
                       <table.FlexRender cell={cell} />
                     </TableCell>
@@ -1625,10 +1544,7 @@ export function DataTableRtl() {
               ))
             ) : (
               <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
+                <TableCell colSpan={columns.length} className="h-24 text-center">
                   {t.noResults}
                 </TableCell>
               </TableRow>
@@ -1638,7 +1554,7 @@ export function DataTableRtl() {
       </div>
       <div className="flex items-center justify-end gap-2 py-4">
         <div className="flex-1 text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length} {t.rowsSelected}{" "}
+          {table.getFilteredSelectedRowModel().rows.length} {t.rowsSelected}{' '}
           {table.getFilteredRowModel().rows.length} {t.rowsSelectedSuffix}
         </div>
         <div className="flex gap-2">
@@ -1663,5 +1579,4 @@ export function DataTableRtl() {
     </div>
   )
 }
-
 ```

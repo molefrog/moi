@@ -23,19 +23,15 @@ import {
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
+  ContextMenuTrigger
+} from '@/components/ui/context-menu'
 
 export function ContextMenuDemo() {
   return (
     <ContextMenu>
       <ContextMenuTrigger className="flex aspect-video w-full max-w-xs items-center justify-center rounded-xl border border-dashed text-sm">
-        <span className="hidden pointer-fine:inline-block">
-          Right click here
-        </span>
-        <span className="hidden pointer-coarse:inline-block">
-          Long press here
-        </span>
+        <span className="hidden pointer-fine:inline-block">Right click here</span>
+        <span className="hidden pointer-coarse:inline-block">Long press here</span>
       </ContextMenuTrigger>
       <ContextMenuContent className="w-48">
         <ContextMenuGroup>
@@ -72,18 +68,14 @@ export function ContextMenuDemo() {
         </ContextMenuGroup>
         <ContextMenuSeparator />
         <ContextMenuGroup>
-          <ContextMenuCheckboxItem checked>
-            Show Bookmarks
-          </ContextMenuCheckboxItem>
+          <ContextMenuCheckboxItem checked>Show Bookmarks</ContextMenuCheckboxItem>
           <ContextMenuCheckboxItem>Show Full URLs</ContextMenuCheckboxItem>
         </ContextMenuGroup>
         <ContextMenuSeparator />
         <ContextMenuGroup>
           <ContextMenuRadioGroup value="pedro">
             <ContextMenuLabel>People</ContextMenuLabel>
-            <ContextMenuRadioItem value="pedro">
-              Pedro Duarte
-            </ContextMenuRadioItem>
+            <ContextMenuRadioItem value="pedro">Pedro Duarte</ContextMenuRadioItem>
             <ContextMenuRadioItem value="colm">Colm Tuite</ContextMenuRadioItem>
           </ContextMenuRadioGroup>
         </ContextMenuGroup>
@@ -91,7 +83,6 @@ export function ContextMenuDemo() {
     </ContextMenu>
   )
 }
-
 ```
 
 ## Installation
@@ -143,8 +134,8 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
+  ContextMenuTrigger
+} from '@/components/ui/context-menu'
 ```
 
 ```tsx showLineNumbers
@@ -200,19 +191,15 @@ import {
   ContextMenuContent,
   ContextMenuGroup,
   ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
+  ContextMenuTrigger
+} from '@/components/ui/context-menu'
 
 export function ContextMenuBasic() {
   return (
     <ContextMenu>
       <ContextMenuTrigger className="flex aspect-video w-full max-w-xs items-center justify-center rounded-xl border border-dashed text-sm">
-        <span className="hidden pointer-fine:inline-block">
-          Right click here
-        </span>
-        <span className="hidden pointer-coarse:inline-block">
-          Long press here
-        </span>
+        <span className="hidden pointer-fine:inline-block">Right click here</span>
+        <span className="hidden pointer-coarse:inline-block">Long press here</span>
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuGroup>
@@ -224,7 +211,6 @@ export function ContextMenuBasic() {
     </ContextMenu>
   )
 }
-
 ```
 
 ## Submenu
@@ -242,19 +228,15 @@ import {
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
+  ContextMenuTrigger
+} from '@/components/ui/context-menu'
 
 export function ContextMenuSubmenu() {
   return (
     <ContextMenu>
       <ContextMenuTrigger className="flex aspect-video w-full max-w-xs items-center justify-center rounded-xl border border-dashed text-sm">
-        <span className="hidden pointer-fine:inline-block">
-          Right click here
-        </span>
-        <span className="hidden pointer-coarse:inline-block">
-          Long press here
-        </span>
+        <span className="hidden pointer-fine:inline-block">Right click here</span>
+        <span className="hidden pointer-coarse:inline-block">Long press here</span>
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuGroup>
@@ -289,7 +271,6 @@ export function ContextMenuSubmenu() {
     </ContextMenu>
   )
 }
-
 ```
 
 ## Shortcuts
@@ -304,19 +285,15 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuShortcut,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
+  ContextMenuTrigger
+} from '@/components/ui/context-menu'
 
 export function ContextMenuShortcuts() {
   return (
     <ContextMenu>
       <ContextMenuTrigger className="flex aspect-video w-full max-w-xs items-center justify-center rounded-xl border border-dashed text-sm">
-        <span className="hidden pointer-fine:inline-block">
-          Right click here
-        </span>
-        <span className="hidden pointer-coarse:inline-block">
-          Long press here
-        </span>
+        <span className="hidden pointer-fine:inline-block">Right click here</span>
+        <span className="hidden pointer-coarse:inline-block">Long press here</span>
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuGroup>
@@ -348,7 +325,6 @@ export function ContextMenuShortcuts() {
     </ContextMenu>
   )
 }
-
 ```
 
 ## Groups
@@ -364,19 +340,15 @@ import {
   ContextMenuLabel,
   ContextMenuSeparator,
   ContextMenuShortcut,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
+  ContextMenuTrigger
+} from '@/components/ui/context-menu'
 
 export function ContextMenuGroups() {
   return (
     <ContextMenu>
       <ContextMenuTrigger className="flex aspect-video w-full max-w-xs items-center justify-center rounded-xl border border-dashed text-sm">
-        <span className="hidden pointer-fine:inline-block">
-          Right click here
-        </span>
-        <span className="hidden pointer-coarse:inline-block">
-          Long press here
-        </span>
+        <span className="hidden pointer-fine:inline-block">Right click here</span>
+        <span className="hidden pointer-coarse:inline-block">Long press here</span>
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuGroup>
@@ -432,7 +404,6 @@ export function ContextMenuGroups() {
     </ContextMenu>
   )
 }
-
 ```
 
 ## Icons
@@ -440,12 +411,7 @@ export function ContextMenuGroups() {
 Combine icons with labels for quick scanning.
 
 ```tsx
-import {
-  ClipboardPasteIcon,
-  CopyIcon,
-  ScissorsIcon,
-  TrashIcon,
-} from "lucide-react"
+import { ClipboardPasteIcon, CopyIcon, ScissorsIcon, TrashIcon } from 'lucide-react'
 
 import {
   ContextMenu,
@@ -453,19 +419,15 @@ import {
   ContextMenuGroup,
   ContextMenuItem,
   ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
+  ContextMenuTrigger
+} from '@/components/ui/context-menu'
 
 export function ContextMenuIcons() {
   return (
     <ContextMenu>
       <ContextMenuTrigger className="flex aspect-video w-full max-w-xs items-center justify-center rounded-xl border border-dashed text-sm">
-        <span className="hidden pointer-fine:inline-block">
-          Right click here
-        </span>
-        <span className="hidden pointer-coarse:inline-block">
-          Long press here
-        </span>
+        <span className="hidden pointer-fine:inline-block">Right click here</span>
+        <span className="hidden pointer-coarse:inline-block">Long press here</span>
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuGroup>
@@ -493,7 +455,6 @@ export function ContextMenuIcons() {
     </ContextMenu>
   )
 }
-
 ```
 
 ## Checkboxes
@@ -506,35 +467,26 @@ import {
   ContextMenuCheckboxItem,
   ContextMenuContent,
   ContextMenuGroup,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
+  ContextMenuTrigger
+} from '@/components/ui/context-menu'
 
 export function ContextMenuCheckboxes() {
   return (
     <ContextMenu>
       <ContextMenuTrigger className="flex aspect-video w-full max-w-xs items-center justify-center rounded-xl border border-dashed text-sm">
-        <span className="hidden pointer-fine:inline-block">
-          Right click here
-        </span>
-        <span className="hidden pointer-coarse:inline-block">
-          Long press here
-        </span>
+        <span className="hidden pointer-fine:inline-block">Right click here</span>
+        <span className="hidden pointer-coarse:inline-block">Long press here</span>
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuGroup>
-          <ContextMenuCheckboxItem defaultChecked>
-            Show Bookmarks Bar
-          </ContextMenuCheckboxItem>
+          <ContextMenuCheckboxItem defaultChecked>Show Bookmarks Bar</ContextMenuCheckboxItem>
           <ContextMenuCheckboxItem>Show Full URLs</ContextMenuCheckboxItem>
-          <ContextMenuCheckboxItem defaultChecked>
-            Show Developer Tools
-          </ContextMenuCheckboxItem>
+          <ContextMenuCheckboxItem defaultChecked>Show Developer Tools</ContextMenuCheckboxItem>
         </ContextMenuGroup>
       </ContextMenuContent>
     </ContextMenu>
   )
 }
-
 ```
 
 ## Radio
@@ -542,9 +494,9 @@ export function ContextMenuCheckboxes() {
 Use `ContextMenuRadioItem` for exclusive choices.
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
 import {
   ContextMenu,
@@ -554,30 +506,24 @@ import {
   ContextMenuRadioGroup,
   ContextMenuRadioItem,
   ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
+  ContextMenuTrigger
+} from '@/components/ui/context-menu'
 
 export function ContextMenuRadio() {
-  const [user, setUser] = React.useState("pedro")
-  const [theme, setTheme] = React.useState("light")
+  const [user, setUser] = React.useState('pedro')
+  const [theme, setTheme] = React.useState('light')
 
   return (
     <ContextMenu>
       <ContextMenuTrigger className="flex aspect-video w-full max-w-xs items-center justify-center rounded-xl border border-dashed text-sm">
-        <span className="hidden pointer-fine:inline-block">
-          Right click here
-        </span>
-        <span className="hidden pointer-coarse:inline-block">
-          Long press here
-        </span>
+        <span className="hidden pointer-fine:inline-block">Right click here</span>
+        <span className="hidden pointer-coarse:inline-block">Long press here</span>
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuGroup>
           <ContextMenuLabel>People</ContextMenuLabel>
           <ContextMenuRadioGroup value={user} onValueChange={setUser}>
-            <ContextMenuRadioItem value="pedro">
-              Pedro Duarte
-            </ContextMenuRadioItem>
+            <ContextMenuRadioItem value="pedro">Pedro Duarte</ContextMenuRadioItem>
             <ContextMenuRadioItem value="colm">Colm Tuite</ContextMenuRadioItem>
           </ContextMenuRadioGroup>
         </ContextMenuGroup>
@@ -594,7 +540,6 @@ export function ContextMenuRadio() {
     </ContextMenu>
   )
 }
-
 ```
 
 ## Destructive
@@ -602,7 +547,7 @@ export function ContextMenuRadio() {
 Use `variant="destructive"` to style the menu item as destructive.
 
 ```tsx
-import { ArchiveIcon, PencilIcon, ShareIcon, TrashIcon } from "lucide-react"
+import { ArchiveIcon, PencilIcon, ShareIcon, TrashIcon } from 'lucide-react'
 
 import {
   ContextMenu,
@@ -610,19 +555,15 @@ import {
   ContextMenuGroup,
   ContextMenuItem,
   ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
+  ContextMenuTrigger
+} from '@/components/ui/context-menu'
 
 export function ContextMenuDestructive() {
   return (
     <ContextMenu>
       <ContextMenuTrigger className="flex aspect-video w-full max-w-xs items-center justify-center rounded-xl border border-dashed text-sm">
-        <span className="hidden pointer-fine:inline-block">
-          Right click here
-        </span>
-        <span className="hidden pointer-coarse:inline-block">
-          Long press here
-        </span>
+        <span className="hidden pointer-fine:inline-block">Right click here</span>
+        <span className="hidden pointer-coarse:inline-block">Long press here</span>
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuGroup>
@@ -646,7 +587,6 @@ export function ContextMenuDestructive() {
     </ContextMenu>
   )
 }
-
 ```
 
 ## Sides
@@ -659,20 +599,16 @@ import {
   ContextMenuContent,
   ContextMenuGroup,
   ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
+  ContextMenuTrigger
+} from '@/components/ui/context-menu'
 
 export function ContextMenuSides() {
   return (
     <div className="grid w-full max-w-sm grid-cols-2 gap-4">
       <ContextMenu>
         <ContextMenuTrigger className="flex aspect-video w-full max-w-xs items-center justify-center rounded-xl border border-dashed text-sm">
-          <span className="hidden pointer-fine:inline-block">
-            Right click (top)
-          </span>
-          <span className="hidden pointer-coarse:inline-block">
-            Long press (top)
-          </span>
+          <span className="hidden pointer-fine:inline-block">Right click (top)</span>
+          <span className="hidden pointer-coarse:inline-block">Long press (top)</span>
         </ContextMenuTrigger>
         <ContextMenuContent side="top">
           <ContextMenuGroup>
@@ -684,12 +620,8 @@ export function ContextMenuSides() {
       </ContextMenu>
       <ContextMenu>
         <ContextMenuTrigger className="flex aspect-video w-full max-w-xs items-center justify-center rounded-xl border border-dashed text-sm">
-          <span className="hidden pointer-fine:inline-block">
-            Right click (right)
-          </span>
-          <span className="hidden pointer-coarse:inline-block">
-            Long press (right)
-          </span>
+          <span className="hidden pointer-fine:inline-block">Right click (right)</span>
+          <span className="hidden pointer-coarse:inline-block">Long press (right)</span>
         </ContextMenuTrigger>
         <ContextMenuContent side="right">
           <ContextMenuGroup>
@@ -701,12 +633,8 @@ export function ContextMenuSides() {
       </ContextMenu>
       <ContextMenu>
         <ContextMenuTrigger className="flex aspect-video w-full max-w-xs items-center justify-center rounded-xl border border-dashed text-sm">
-          <span className="hidden pointer-fine:inline-block">
-            Right click (bottom)
-          </span>
-          <span className="hidden pointer-coarse:inline-block">
-            Long press (bottom)
-          </span>
+          <span className="hidden pointer-fine:inline-block">Right click (bottom)</span>
+          <span className="hidden pointer-coarse:inline-block">Long press (bottom)</span>
         </ContextMenuTrigger>
         <ContextMenuContent side="bottom">
           <ContextMenuGroup>
@@ -718,12 +646,8 @@ export function ContextMenuSides() {
       </ContextMenu>
       <ContextMenu>
         <ContextMenuTrigger className="flex aspect-video w-full max-w-xs items-center justify-center rounded-xl border border-dashed text-sm">
-          <span className="hidden pointer-fine:inline-block">
-            Right click (left)
-          </span>
-          <span className="hidden pointer-coarse:inline-block">
-            Long press (left)
-          </span>
+          <span className="hidden pointer-fine:inline-block">Right click (left)</span>
+          <span className="hidden pointer-coarse:inline-block">Long press (left)</span>
         </ContextMenuTrigger>
         <ContextMenuContent side="left">
           <ContextMenuGroup>
@@ -736,7 +660,6 @@ export function ContextMenuSides() {
     </div>
   )
 }
-
 ```
 
 ## RTL
@@ -744,15 +667,12 @@ export function ContextMenuSides() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import { ArrowLeftIcon, ArrowRightIcon, RotateCwIcon } from "lucide-react"
+import * as React from 'react'
+import { ArrowLeftIcon, ArrowRightIcon, RotateCwIcon } from 'lucide-react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
+import { useTranslation, type Translations } from '@/components/language-selector'
 import {
   ContextMenu,
   ContextMenuCheckboxItem,
@@ -767,94 +687,92 @@ import {
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
+  ContextMenuTrigger
+} from '@/components/ui/context-menu'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      rightClick: "Right click here",
-      longPress: "Long press here",
-      navigation: "Navigation",
-      back: "Back",
-      forward: "Forward",
-      reload: "Reload",
-      moreTools: "More Tools",
-      savePage: "Save Page...",
-      createShortcut: "Create Shortcut...",
-      nameWindow: "Name Window...",
-      developerTools: "Developer Tools",
-      delete: "Delete",
-      showBookmarks: "Show Bookmarks",
-      showFullUrls: "Show Full URLs",
-      people: "People",
-      pedro: "Pedro Duarte",
-      colm: "Colm Tuite",
-    },
+      rightClick: 'Right click here',
+      longPress: 'Long press here',
+      navigation: 'Navigation',
+      back: 'Back',
+      forward: 'Forward',
+      reload: 'Reload',
+      moreTools: 'More Tools',
+      savePage: 'Save Page...',
+      createShortcut: 'Create Shortcut...',
+      nameWindow: 'Name Window...',
+      developerTools: 'Developer Tools',
+      delete: 'Delete',
+      showBookmarks: 'Show Bookmarks',
+      showFullUrls: 'Show Full URLs',
+      people: 'People',
+      pedro: 'Pedro Duarte',
+      colm: 'Colm Tuite'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      rightClick: "انقر بزر الماوس الأيمن هنا",
-      longPress: "اضغط مطولاً هنا",
-      navigation: "التنقل",
-      back: "رجوع",
-      forward: "تقدم",
-      reload: "إعادة تحميل",
-      moreTools: "المزيد من الأدوات",
-      savePage: "حفظ الصفحة...",
-      createShortcut: "إنشاء اختصار...",
-      nameWindow: "تسمية النافذة...",
-      developerTools: "أدوات المطور",
-      delete: "حذف",
-      showBookmarks: "إظهار الإشارات المرجعية",
-      showFullUrls: "إظهار عناوين URL الكاملة",
-      people: "الأشخاص",
-      pedro: "Pedro Duarte",
-      colm: "Colm Tuite",
-    },
+      rightClick: 'انقر بزر الماوس الأيمن هنا',
+      longPress: 'اضغط مطولاً هنا',
+      navigation: 'التنقل',
+      back: 'رجوع',
+      forward: 'تقدم',
+      reload: 'إعادة تحميل',
+      moreTools: 'المزيد من الأدوات',
+      savePage: 'حفظ الصفحة...',
+      createShortcut: 'إنشاء اختصار...',
+      nameWindow: 'تسمية النافذة...',
+      developerTools: 'أدوات المطور',
+      delete: 'حذف',
+      showBookmarks: 'إظهار الإشارات المرجعية',
+      showFullUrls: 'إظهار عناوين URL الكاملة',
+      people: 'الأشخاص',
+      pedro: 'Pedro Duarte',
+      colm: 'Colm Tuite'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      rightClick: "לחץ לחיצה ימנית כאן",
-      longPress: "לחץ לחיצה ארוכה כאן",
-      navigation: "ניווט",
-      back: "חזור",
-      forward: "קדימה",
-      reload: "רענן",
-      moreTools: "כלים נוספים",
-      savePage: "שמור עמוד...",
-      createShortcut: "צור קיצור דרך...",
-      nameWindow: "שם חלון...",
-      developerTools: "כלי מפתח",
-      delete: "מחק",
-      showBookmarks: "הצג סימניות",
-      showFullUrls: "הצג כתובות URL מלאות",
-      people: "אנשים",
-      pedro: "Pedro Duarte",
-      colm: "Colm Tuite",
-    },
-  },
+      rightClick: 'לחץ לחיצה ימנית כאן',
+      longPress: 'לחץ לחיצה ארוכה כאן',
+      navigation: 'ניווט',
+      back: 'חזור',
+      forward: 'קדימה',
+      reload: 'רענן',
+      moreTools: 'כלים נוספים',
+      savePage: 'שמור עמוד...',
+      createShortcut: 'צור קיצור דרך...',
+      nameWindow: 'שם חלון...',
+      developerTools: 'כלי מפתח',
+      delete: 'מחק',
+      showBookmarks: 'הצג סימניות',
+      showFullUrls: 'הצג כתובות URL מלאות',
+      people: 'אנשים',
+      pedro: 'Pedro Duarte',
+      colm: 'Colm Tuite'
+    }
+  }
 }
 
 export function ContextMenuRtl() {
-  const { dir, t, language } = useTranslation(translations, "ar")
-  const [people, setPeople] = React.useState("pedro")
+  const { dir, t, language } = useTranslation(translations, 'ar')
+  const [people, setPeople] = React.useState('pedro')
 
   return (
     <ContextMenu>
       <ContextMenuTrigger className="flex aspect-video w-full max-w-xs items-center justify-center rounded-xl border border-dashed text-sm">
         <span className="hidden pointer-fine:inline-block">{t.rightClick}</span>
-        <span className="hidden pointer-coarse:inline-block">
-          {t.longPress}
-        </span>
+        <span className="hidden pointer-coarse:inline-block">{t.longPress}</span>
       </ContextMenuTrigger>
       <ContextMenuContent
         className="w-48"
         dir={dir}
-        data-lang={dir === "rtl" ? language : undefined}
+        data-lang={dir === 'rtl' ? language : undefined}
       >
         <ContextMenuGroup>
           <ContextMenuSub>
@@ -862,7 +780,7 @@ export function ContextMenuRtl() {
             <ContextMenuSubContent
               className="w-44"
               dir={dir}
-              data-lang={dir === "rtl" ? language : undefined}
+              data-lang={dir === 'rtl' ? language : undefined}
             >
               <ContextMenuGroup>
                 <ContextMenuItem>
@@ -888,7 +806,7 @@ export function ContextMenuRtl() {
             <ContextMenuSubContent
               className="w-44"
               dir={dir}
-              data-lang={dir === "rtl" ? language : undefined}
+              data-lang={dir === 'rtl' ? language : undefined}
             >
               <ContextMenuGroup>
                 <ContextMenuItem>{t.savePage}</ContextMenuItem>
@@ -901,18 +819,14 @@ export function ContextMenuRtl() {
               </ContextMenuGroup>
               <ContextMenuSeparator />
               <ContextMenuGroup>
-                <ContextMenuItem variant="destructive">
-                  {t.delete}
-                </ContextMenuItem>
+                <ContextMenuItem variant="destructive">{t.delete}</ContextMenuItem>
               </ContextMenuGroup>
             </ContextMenuSubContent>
           </ContextMenuSub>
         </ContextMenuGroup>
         <ContextMenuSeparator />
         <ContextMenuGroup>
-          <ContextMenuCheckboxItem checked>
-            {t.showBookmarks}
-          </ContextMenuCheckboxItem>
+          <ContextMenuCheckboxItem checked>{t.showBookmarks}</ContextMenuCheckboxItem>
           <ContextMenuCheckboxItem>{t.showFullUrls}</ContextMenuCheckboxItem>
         </ContextMenuGroup>
         <ContextMenuSeparator />
@@ -927,7 +841,6 @@ export function ContextMenuRtl() {
     </ContextMenu>
   )
 }
-
 ```
 
 Use `side="inline-end"` to place the menu on the logical right side of the trigger.

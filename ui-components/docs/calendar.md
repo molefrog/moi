@@ -8,11 +8,11 @@ links:
 ---
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import { Calendar } from "@/components/ui/calendar"
+import { Calendar } from '@/components/ui/calendar'
 
 export function CalendarDemo() {
   const [date, setDate] = React.useState<Date | undefined>(new Date())
@@ -27,7 +27,6 @@ export function CalendarDemo() {
     />
   )
 }
-
 ```
 
 ## Installation
@@ -79,20 +78,13 @@ The `Calendar` component uses the `Button` component. Make sure you have it inst
 ## Usage
 
 ```tsx showLineNumbers
-import { Calendar } from "@/components/ui/calendar"
+import { Calendar } from '@/components/ui/calendar'
 ```
 
 ```tsx showLineNumbers
 const [date, setDate] = React.useState<Date | undefined>(new Date())
 
-return (
-  <Calendar
-    mode="single"
-    selected={date}
-    onSelect={setDate}
-    className="rounded-lg border"
-  />
-)
+return <Calendar mode="single" selected={date} onSelect={setDate} className="rounded-lg border" />
 ```
 
 See the [React DayPicker](https://react-day-picker.js.org) documentation for more information.
@@ -115,27 +107,21 @@ To use the Persian calendar, edit `components/ui/calendar.tsx` and replace `reac
 ```
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import { Vazirmatn } from "next/font/google"
-import { cn } from "cn"
-import {
-  ChevronDownIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-} from "lucide-react"
-import { getDefaultClassNames, type DayButton } from "react-day-picker"
-import { DayPicker } from "react-day-picker/persian"
+import * as React from 'react'
+import { Vazirmatn } from 'next/font/google'
+import { cn } from 'cn'
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
+import { getDefaultClassNames, type DayButton } from 'react-day-picker'
+import { DayPicker } from 'react-day-picker/persian'
 
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button, buttonVariants } from '@/components/ui/button'
 
-const vazirmatn = Vazirmatn({ subsets: ["arabic"] })
+const vazirmatn = Vazirmatn({ subsets: ['arabic'] })
 
 export function CalendarHijri() {
-  const [date, setDate] = React.useState<Date | undefined>(
-    new Date(2025, 5, 12)
-  )
+  const [date, setDate] = React.useState<Date | undefined>(new Date(2025, 5, 12))
 
   return (
     <div className={vazirmatn.className}>
@@ -158,13 +144,13 @@ function Calendar({
   className,
   classNames,
   showOutsideDays = true,
-  captionLayout = "label",
-  buttonVariant = "ghost",
+  captionLayout = 'label',
+  buttonVariant = 'ghost',
   formatters,
   components,
   ...props
 }: React.ComponentProps<typeof DayPicker> & {
-  buttonVariant?: React.ComponentProps<typeof Button>["variant"]
+  buttonVariant?: React.ComponentProps<typeof Button>['variant']
 }) {
   const defaultClassNames = getDefaultClassNames()
 
@@ -172,128 +158,99 @@ function Calendar({
     <DayPicker
       showOutsideDays={showOutsideDays}
       className={cn(
-        "group/calendar bg-background p-3 [--cell-size:--spacing(8)] [[data-slot=card-content]_&]:bg-transparent [[data-slot=popover-content]_&]:bg-transparent",
+        'group/calendar bg-background p-3 [--cell-size:--spacing(8)] [[data-slot=card-content]_&]:bg-transparent [[data-slot=popover-content]_&]:bg-transparent',
         String.raw`rtl:**:[.rdp-button\_next>svg]:rotate-180`,
         String.raw`rtl:**:[.rdp-button\_previous>svg]:rotate-180`,
         className
       )}
       captionLayout={captionLayout}
       formatters={{
-        formatMonthDropdown: (date) =>
-          date.toLocaleString("default", { month: "short" }),
-        ...formatters,
+        formatMonthDropdown: date => date.toLocaleString('default', { month: 'short' }),
+        ...formatters
       }}
       classNames={{
-        root: cn("w-fit", defaultClassNames.root),
-        months: cn(
-          "relative flex flex-col gap-4 md:flex-row",
-          defaultClassNames.months
-        ),
-        month: cn("flex w-full flex-col gap-4", defaultClassNames.month),
+        root: cn('w-fit', defaultClassNames.root),
+        months: cn('relative flex flex-col gap-4 md:flex-row', defaultClassNames.months),
+        month: cn('flex w-full flex-col gap-4', defaultClassNames.month),
         nav: cn(
-          "absolute inset-x-0 top-0 flex w-full items-center justify-between gap-1",
+          'absolute inset-x-0 top-0 flex w-full items-center justify-between gap-1',
           defaultClassNames.nav
         ),
         button_previous: cn(
           buttonVariants({ variant: buttonVariant }),
-          "size-(--cell-size) p-0 select-none aria-disabled:opacity-50",
+          'size-(--cell-size) p-0 select-none aria-disabled:opacity-50',
           defaultClassNames.button_previous
         ),
         button_next: cn(
           buttonVariants({ variant: buttonVariant }),
-          "size-(--cell-size) p-0 select-none aria-disabled:opacity-50",
+          'size-(--cell-size) p-0 select-none aria-disabled:opacity-50',
           defaultClassNames.button_next
         ),
         month_caption: cn(
-          "flex h-(--cell-size) w-full items-center justify-center px-(--cell-size)",
+          'flex h-(--cell-size) w-full items-center justify-center px-(--cell-size)',
           defaultClassNames.month_caption
         ),
         dropdowns: cn(
-          "flex h-(--cell-size) w-full items-center justify-center gap-1.5 text-sm font-medium",
+          'flex h-(--cell-size) w-full items-center justify-center gap-1.5 text-sm font-medium',
           defaultClassNames.dropdowns
         ),
         dropdown_root: cn(
-          "relative rounded-md border border-input shadow-xs has-focus:border-ring has-focus:ring-[3px] has-focus:ring-ring/50",
+          'relative rounded-md border border-input shadow-xs has-focus:border-ring has-focus:ring-[3px] has-focus:ring-ring/50',
           defaultClassNames.dropdown_root
         ),
-        dropdown: cn("absolute inset-0 opacity-0", defaultClassNames.dropdown),
+        dropdown: cn('absolute inset-0 opacity-0', defaultClassNames.dropdown),
         caption_label: cn(
-          "font-medium select-none",
-          captionLayout === "label"
-            ? "text-sm"
-            : "flex h-8 items-center gap-1 rounded-md pr-1 pl-2 text-sm [&>svg]:size-3.5 [&>svg]:text-muted-foreground",
+          'font-medium select-none',
+          captionLayout === 'label'
+            ? 'text-sm'
+            : 'flex h-8 items-center gap-1 rounded-md pr-1 pl-2 text-sm [&>svg]:size-3.5 [&>svg]:text-muted-foreground',
           defaultClassNames.caption_label
         ),
-        month_grid: cn("w-full border-collapse", defaultClassNames.month_grid),
-        weekdays: cn("flex", defaultClassNames.weekdays),
+        month_grid: cn('w-full border-collapse', defaultClassNames.month_grid),
+        weekdays: cn('flex', defaultClassNames.weekdays),
         weekday: cn(
-          "flex-1 rounded-md text-[0.8rem] font-normal text-muted-foreground select-none",
+          'flex-1 rounded-md text-[0.8rem] font-normal text-muted-foreground select-none',
           defaultClassNames.weekday
         ),
-        week: cn("mt-2 flex w-full", defaultClassNames.week),
-        week_number_header: cn(
-          "w-(--cell-size) select-none",
-          defaultClassNames.week_number_header
-        ),
+        week: cn('mt-2 flex w-full', defaultClassNames.week),
+        week_number_header: cn('w-(--cell-size) select-none', defaultClassNames.week_number_header),
         week_number: cn(
-          "text-[0.8rem] text-muted-foreground select-none",
+          'text-[0.8rem] text-muted-foreground select-none',
           defaultClassNames.week_number
         ),
         day: cn(
-          "group/day relative aspect-square h-full w-full p-0 text-center select-none [&:first-child[data-selected=true]_button]:rounded-l-md [&:last-child[data-selected=true]_button]:rounded-r-md",
+          'group/day relative aspect-square h-full w-full p-0 text-center select-none [&:first-child[data-selected=true]_button]:rounded-l-md [&:last-child[data-selected=true]_button]:rounded-r-md',
           defaultClassNames.day
         ),
-        range_start: cn(
-          "rounded-l-md bg-accent",
-          defaultClassNames.range_start
-        ),
-        range_middle: cn("rounded-none", defaultClassNames.range_middle),
-        range_end: cn("rounded-r-md bg-accent", defaultClassNames.range_end),
+        range_start: cn('rounded-l-md bg-accent', defaultClassNames.range_start),
+        range_middle: cn('rounded-none', defaultClassNames.range_middle),
+        range_end: cn('rounded-r-md bg-accent', defaultClassNames.range_end),
         today: cn(
-          "rounded-md bg-accent text-accent-foreground data-[selected=true]:rounded-none",
+          'rounded-md bg-accent text-accent-foreground data-[selected=true]:rounded-none',
           defaultClassNames.today
         ),
         outside: cn(
-          "text-muted-foreground aria-selected:text-muted-foreground",
+          'text-muted-foreground aria-selected:text-muted-foreground',
           defaultClassNames.outside
         ),
-        disabled: cn(
-          "text-muted-foreground opacity-50",
-          defaultClassNames.disabled
-        ),
-        hidden: cn("invisible", defaultClassNames.hidden),
-        ...classNames,
+        disabled: cn('text-muted-foreground opacity-50', defaultClassNames.disabled),
+        hidden: cn('invisible', defaultClassNames.hidden),
+        ...classNames
       }}
       components={{
         Root: ({ className, rootRef, ...props }) => {
-          return (
-            <div
-              data-slot="calendar"
-              ref={rootRef}
-              className={cn(className)}
-              {...props}
-            />
-          )
+          return <div data-slot="calendar" ref={rootRef} className={cn(className)} {...props} />
         },
         Chevron: ({ className, orientation, ...props }) => {
-          if (orientation === "left") {
-            return (
-              <ChevronLeftIcon className={cn("size-4", className)} {...props} />
-            )
+          if (orientation === 'left') {
+            return <ChevronLeftIcon className={cn('size-4', className)} {...props} />
           }
 
-          if (orientation === "right") {
-            return (
-              <ChevronRightIcon
-                className={cn("size-4", className)}
-                {...props}
-              />
-            )
+          if (orientation === 'right') {
+            return <ChevronRightIcon className={cn('size-4', className)} {...props} />
           }
 
-          return (
-            <ChevronDownIcon className={cn("size-4", className)} {...props} />
-          )
+          return <ChevronDownIcon className={cn('size-4', className)} {...props} />
         },
         DayButton: CalendarDayButton,
         WeekNumber: ({ children, ...props }) => {
@@ -305,7 +262,7 @@ function Calendar({
             </td>
           )
         },
-        ...components,
+        ...components
       }}
       {...props}
     />
@@ -340,7 +297,7 @@ function CalendarDayButton({
       data-range-end={modifiers.range_end}
       data-range-middle={modifiers.range_middle}
       className={cn(
-        "flex aspect-square size-auto w-full min-w-(--cell-size) flex-col gap-1 leading-none font-normal group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 group-data-[focused=true]/day:border-ring group-data-[focused=true]/day:ring-[3px] group-data-[focused=true]/day:ring-ring/50 data-[range-end=true]:rounded-md data-[range-end=true]:rounded-r-md data-[range-end=true]:bg-primary data-[range-end=true]:text-primary-foreground data-[range-middle=true]:rounded-none data-[range-middle=true]:bg-accent data-[range-middle=true]:text-accent-foreground data-[range-start=true]:rounded-md data-[range-start=true]:rounded-l-md data-[range-start=true]:bg-primary data-[range-start=true]:text-primary-foreground data-[selected-single=true]:bg-primary data-[selected-single=true]:text-primary-foreground dark:hover:text-accent-foreground [&>span]:text-xs [&>span]:opacity-70",
+        'flex aspect-square size-auto w-full min-w-(--cell-size) flex-col gap-1 leading-none font-normal group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 group-data-[focused=true]/day:border-ring group-data-[focused=true]/day:ring-[3px] group-data-[focused=true]/day:ring-ring/50 data-[range-end=true]:rounded-md data-[range-end=true]:rounded-r-md data-[range-end=true]:bg-primary data-[range-end=true]:text-primary-foreground data-[range-middle=true]:rounded-none data-[range-middle=true]:bg-accent data-[range-middle=true]:text-accent-foreground data-[range-start=true]:rounded-md data-[range-start=true]:rounded-l-md data-[range-start=true]:bg-primary data-[range-start=true]:text-primary-foreground data-[selected-single=true]:bg-primary data-[selected-single=true]:text-primary-foreground dark:hover:text-accent-foreground [&>span]:text-xs [&>span]:opacity-70',
         defaultClassNames.day,
         className
       )}
@@ -348,7 +305,6 @@ function CalendarDayButton({
     />
   )
 }
-
 ```
 
 ## Selected Date (With TimeZone)
@@ -364,14 +320,7 @@ export function CalendarWithTimezone() {
     setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone)
   }, [])
 
-  return (
-    <Calendar
-      mode="single"
-      selected={date}
-      onSelect={setDate}
-      timeZone={timeZone}
-    />
-  )
+  return <Calendar mode="single" selected={date} onSelect={setDate} timeZone={timeZone} />
 }
 ```
 
@@ -384,14 +333,13 @@ export function CalendarWithTimezone() {
 A basic calendar component. We used `className="rounded-lg border"` to style the calendar.
 
 ```tsx
-"use client"
+'use client'
 
-import { Calendar } from "@/components/ui/calendar"
+import { Calendar } from '@/components/ui/calendar'
 
 export function CalendarBasic() {
   return <Calendar mode="single" className="rounded-lg border" />
 }
-
 ```
 
 ## Range Calendar
@@ -399,19 +347,19 @@ export function CalendarBasic() {
 Use the `mode="range"` prop to enable range selection.
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import { addDays } from "date-fns"
-import { type DateRange } from "react-day-picker"
+import * as React from 'react'
+import { addDays } from 'date-fns'
+import { type DateRange } from 'react-day-picker'
 
-import { Calendar } from "@/components/ui/calendar"
-import { Card, CardContent } from "@/components/ui/card"
+import { Calendar } from '@/components/ui/calendar'
+import { Card, CardContent } from '@/components/ui/card'
 
 export function CalendarRange() {
   const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
     from: new Date(new Date().getFullYear(), 0, 12),
-    to: addDays(new Date(new Date().getFullYear(), 0, 12), 30),
+    to: addDays(new Date(new Date().getFullYear(), 0, 12), 30)
   })
 
   return (
@@ -425,7 +373,6 @@ export function CalendarRange() {
     />
   )
 }
-
 ```
 
 ## Month and Year Selector
@@ -433,33 +380,26 @@ export function CalendarRange() {
 Use `captionLayout="dropdown"` to show month and year dropdowns.
 
 ```tsx
-"use client"
+'use client'
 
-import { Calendar } from "@/components/ui/calendar"
+import { Calendar } from '@/components/ui/calendar'
 
 export function CalendarCaption() {
-  return (
-    <Calendar
-      mode="single"
-      captionLayout="dropdown"
-      className="rounded-lg border"
-    />
-  )
+  return <Calendar mode="single" captionLayout="dropdown" className="rounded-lg border" />
 }
-
 ```
 
 ## Presets
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import { addDays } from "date-fns"
+import * as React from 'react'
+import { addDays } from 'date-fns'
 
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
-import { Card, CardContent, CardFooter } from "@/components/ui/card"
+import { Button } from '@/components/ui/button'
+import { Calendar } from '@/components/ui/calendar'
+import { Card, CardContent, CardFooter } from '@/components/ui/card'
 
 export function CalendarWithPresets() {
   const [date, setDate] = React.useState<Date | undefined>(
@@ -484,12 +424,12 @@ export function CalendarWithPresets() {
       </CardContent>
       <CardFooter className="flex flex-wrap gap-2 border-t">
         {[
-          { label: "Today", value: 0 },
-          { label: "Tomorrow", value: 1 },
-          { label: "In 3 days", value: 3 },
-          { label: "In a week", value: 7 },
-          { label: "In 2 weeks", value: 14 },
-        ].map((preset) => (
+          { label: 'Today', value: 0 },
+          { label: 'Tomorrow', value: 1 },
+          { label: 'In 3 days', value: 3 },
+          { label: 'In a week', value: 7 },
+          { label: 'In 2 weeks', value: 14 }
+        ].map(preset => (
           <Button
             key={preset.value}
             variant="outline"
@@ -498,9 +438,7 @@ export function CalendarWithPresets() {
             onClick={() => {
               const newDate = addDays(new Date(), preset.value)
               setDate(newDate)
-              setCurrentMonth(
-                new Date(newDate.getFullYear(), newDate.getMonth(), 1)
-              )
+              setCurrentMonth(new Date(newDate.getFullYear(), newDate.getMonth(), 1))
             }}
           >
             {preset.label}
@@ -510,25 +448,20 @@ export function CalendarWithPresets() {
     </Card>
   )
 }
-
 ```
 
 ## Date and Time Picker
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import { Clock2Icon } from "lucide-react"
+import * as React from 'react'
+import { Clock2Icon } from 'lucide-react'
 
-import { Calendar } from "@/components/ui/calendar"
-import { Card, CardContent, CardFooter } from "@/components/ui/card"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group"
+import { Calendar } from '@/components/ui/calendar'
+import { Card, CardContent, CardFooter } from '@/components/ui/card'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 
 export function CalendarWithTime() {
   const [date, setDate] = React.useState<Date | undefined>(
@@ -538,12 +471,7 @@ export function CalendarWithTime() {
   return (
     <Card size="sm" className="mx-auto w-fit">
       <CardContent>
-        <Calendar
-          mode="single"
-          selected={date}
-          onSelect={setDate}
-          className="p-0"
-        />
+        <Calendar mode="single" selected={date} onSelect={setDate} className="p-0" />
       </CardContent>
       <CardFooter className="border-t bg-card">
         <FieldGroup>
@@ -582,23 +510,20 @@ export function CalendarWithTime() {
     </Card>
   )
 }
-
 ```
 
 ## Booked dates
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import { Calendar } from "@/components/ui/calendar"
-import { Card, CardContent } from "@/components/ui/card"
+import { Calendar } from '@/components/ui/calendar'
+import { Card, CardContent } from '@/components/ui/card'
 
 export function CalendarBookedDates() {
-  const [date, setDate] = React.useState<Date | undefined>(
-    new Date(new Date().getFullYear(), 0, 6)
-  )
+  const [date, setDate] = React.useState<Date | undefined>(new Date(new Date().getFullYear(), 0, 6))
   const bookedDates = Array.from(
     { length: 15 },
     (_, i) => new Date(new Date().getFullYear(), 0, 12 + i)
@@ -614,35 +539,34 @@ export function CalendarBookedDates() {
           onSelect={setDate}
           disabled={bookedDates}
           modifiers={{
-            booked: bookedDates,
+            booked: bookedDates
           }}
           modifiersClassNames={{
-            booked: "[&>button]:line-through opacity-100",
+            booked: '[&>button]:line-through opacity-100'
           }}
         />
       </CardContent>
     </Card>
   )
 }
-
 ```
 
 ## Custom Cell Size
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import { addDays } from "date-fns"
-import { type DateRange } from "react-day-picker"
+import * as React from 'react'
+import { addDays } from 'date-fns'
+import { type DateRange } from 'react-day-picker'
 
-import { Calendar, CalendarDayButton } from "@/components/ui/calendar"
-import { Card, CardContent } from "@/components/ui/card"
+import { Calendar, CalendarDayButton } from '@/components/ui/calendar'
+import { Card, CardContent } from '@/components/ui/card'
 
 export function CalendarCustomDays() {
   const [range, setRange] = React.useState<DateRange | undefined>({
     from: new Date(new Date().getFullYear(), 11, 8),
-    to: addDays(new Date(new Date().getFullYear(), 11, 8), 10),
+    to: addDays(new Date(new Date().getFullYear(), 11, 8), 10)
   })
 
   return (
@@ -657,31 +581,27 @@ export function CalendarCustomDays() {
           captionLayout="dropdown"
           className="[--cell-size:--spacing(10)] md:[--cell-size:--spacing(12)]"
           formatters={{
-            formatMonthDropdown: (date) => {
-              return date.toLocaleString("default", { month: "long" })
-            },
+            formatMonthDropdown: date => {
+              return date.toLocaleString('default', { month: 'long' })
+            }
           }}
           components={{
             DayButton: ({ children, modifiers, day, ...props }) => {
-              const isWeekend =
-                day.date.getDay() === 0 || day.date.getDay() === 6
+              const isWeekend = day.date.getDay() === 0 || day.date.getDay() === 6
 
               return (
                 <CalendarDayButton day={day} modifiers={modifiers} {...props}>
                   {children}
-                  {!modifiers.outside && (
-                    <span>{isWeekend ? "$120" : "$100"}</span>
-                  )}
+                  {!modifiers.outside && <span>{isWeekend ? '$120' : '$100'}</span>}
                 </CalendarDayButton>
               )
-            },
+            }
           }}
         />
       </CardContent>
     </Card>
   )
 }
-
 ```
 
 You can customize the size of calendar cells using the `--cell-size` CSS variable. You can also make it responsive by using breakpoint-specific values:
@@ -711,12 +631,12 @@ Or use fixed values:
 Use `showWeekNumber` to show week numbers.
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import { Calendar } from "@/components/ui/calendar"
-import { Card, CardContent } from "@/components/ui/card"
+import { Calendar } from '@/components/ui/calendar'
+import { Card, CardContent } from '@/components/ui/card'
 
 export function CalendarWeekNumbers() {
   const [date, setDate] = React.useState<Date | undefined>(
@@ -737,7 +657,6 @@ export function CalendarWeekNumbers() {
     </Card>
   )
 }
-
 ```
 
 ## RTL
@@ -747,39 +666,36 @@ To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl)
 See also the [Hijri Guide](#persian--hijri--jalali-calendar) for enabling the Persian / Hijri / Jalali calendar.
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import { arSA, he } from "react-day-picker/locale"
+import * as React from 'react'
+import { arSA, he } from 'react-day-picker/locale'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import { Calendar } from "@/components/ui/calendar"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Calendar } from '@/components/ui/calendar'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
-    values: {},
+    dir: 'ltr',
+    values: {}
   },
   ar: {
-    dir: "rtl",
-    values: {},
+    dir: 'rtl',
+    values: {}
   },
   he: {
-    dir: "rtl",
-    values: {},
-  },
+    dir: 'rtl',
+    values: {}
+  }
 }
 
 const locales = {
   ar: arSA,
-  he: he,
+  he: he
 } as const
 
 export function CalendarRtl() {
-  const { dir, language } = useTranslation(translations, "ar")
+  const { dir, language } = useTranslation(translations, 'ar')
   const [date, setDate] = React.useState<Date | undefined>(new Date())
 
   return (
@@ -790,27 +706,17 @@ export function CalendarRtl() {
       className="rounded-lg border [--cell-size:--spacing(9)]"
       captionLayout="dropdown"
       dir={dir}
-      locale={
-        dir === "rtl" ? locales[language as keyof typeof locales] : undefined
-      }
+      locale={dir === 'rtl' ? locales[language as keyof typeof locales] : undefined}
     />
   )
 }
-
 ```
 
 When using RTL, import the locale from `react-day-picker/locale` and pass both the `locale` and `dir` props to the Calendar component:
 
 ```tsx showLineNumbers
-import { arSA } from "react-day-picker/locale"
-
-;<Calendar
-  mode="single"
-  selected={date}
-  onSelect={setDate}
-  locale={arSA}
-  dir="rtl"
-/>
+import { arSA } from 'react-day-picker/locale'
+;<Calendar mode="single" selected={date} onSelect={setDate} locale={arSA} dir="rtl" />
 ```
 
 ## API Reference
@@ -953,7 +859,6 @@ Replace directional classes with logical properties for better RTL support:
 After applying these changes, you can use the `locale` prop to provide locale-specific formatting:
 
 ```tsx
-import { enUS } from "react-day-picker/locale"
-
+import { enUS } from 'react-day-picker/locale'
 ;<Calendar mode="single" selected={date} onSelect={setDate} locale={enUS} />
 ```

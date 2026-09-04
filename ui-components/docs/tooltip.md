@@ -9,26 +9,19 @@ links:
 ---
 
 ```tsx
-import { Button } from "@/components/ui/button"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export function TooltipDemo() {
   return (
     <Tooltip>
-      <TooltipTrigger render={<Button variant="outline" />}>
-        Hover
-      </TooltipTrigger>
+      <TooltipTrigger render={<Button variant="outline" />}>Hover</TooltipTrigger>
       <TooltipContent>
         <p>Add to library</p>
       </TooltipContent>
     </Tooltip>
   )
 }
-
 ```
 
 ## Installation
@@ -52,7 +45,7 @@ npx shadcn@latest add tooltip
 <Step>Add the `TooltipProvider` to the root of your app.</Step>
 
 ```tsx title="app/layout.tsx" showLineNumbers {1,7}
-import { TooltipProvider } from "@/components/ui/tooltip"
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 export default function RootLayout({ children }) {
   return (
@@ -92,7 +85,7 @@ npm install @base-ui/react
 <Step>Add the `TooltipProvider` to the root of your app.</Step>
 
 ```tsx title="app/layout.tsx" showLineNumbers {1,7}
-import { TooltipProvider } from "@/components/ui/tooltip"
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 export default function RootLayout({ children }) {
   return (
@@ -114,11 +107,7 @@ export default function RootLayout({ children }) {
 ## Usage
 
 ```tsx showLineNumbers
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 ```
 
 ```tsx showLineNumbers
@@ -145,21 +134,15 @@ Tooltip
 Use the `side` prop to change the position of the tooltip.
 
 ```tsx
-import { Button } from "@/components/ui/button"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export function TooltipSides() {
   return (
     <div className="flex flex-wrap gap-2">
-      {(["left", "top", "bottom", "right"] as const).map((side) => (
+      {(['left', 'top', 'bottom', 'right'] as const).map(side => (
         <Tooltip key={side}>
-          <TooltipTrigger
-            render={<Button variant="outline" className="w-fit capitalize" />}
-          >
+          <TooltipTrigger render={<Button variant="outline" className="w-fit capitalize" />}>
             {side}
           </TooltipTrigger>
           <TooltipContent side={side}>
@@ -170,21 +153,16 @@ export function TooltipSides() {
     </div>
   )
 }
-
 ```
 
 ## With Keyboard Shortcut
 
 ```tsx
-import { SaveIcon } from "lucide-react"
+import { SaveIcon } from 'lucide-react'
 
-import { Button } from "@/components/ui/button"
-import { Kbd } from "@/components/ui/kbd"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Button } from '@/components/ui/button'
+import { Kbd } from '@/components/ui/kbd'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export function TooltipKeyboard() {
   return (
@@ -198,7 +176,6 @@ export function TooltipKeyboard() {
     </Tooltip>
   )
 }
-
 ```
 
 ## Disabled Button
@@ -206,12 +183,8 @@ export function TooltipKeyboard() {
 Show a tooltip on a disabled button by wrapping it with a span.
 
 ```tsx
-import { Button } from "@/components/ui/button"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export function TooltipDisabled() {
   return (
@@ -229,7 +202,6 @@ export function TooltipDisabled() {
     </>
   )
 }
-
 ```
 
 ## RTL
@@ -237,72 +209,63 @@ export function TooltipDisabled() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import { Button } from "@/components/ui/button"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      content: "Add to library",
-      "inline-start": "Inline Start",
-      left: "Left",
-      top: "Top",
-      bottom: "Bottom",
-      right: "Right",
-      "inline-end": "Inline End",
-    },
+      content: 'Add to library',
+      'inline-start': 'Inline Start',
+      left: 'Left',
+      top: 'Top',
+      bottom: 'Bottom',
+      right: 'Right',
+      'inline-end': 'Inline End'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      content: "إضافة إلى المكتبة",
-      "inline-start": "بداية السطر",
-      left: "يسار",
-      top: "أعلى",
-      bottom: "أسفل",
-      right: "يمين",
-      "inline-end": "نهاية السطر",
-    },
+      content: 'إضافة إلى المكتبة',
+      'inline-start': 'بداية السطر',
+      left: 'يسار',
+      top: 'أعلى',
+      bottom: 'أسفل',
+      right: 'يمين',
+      'inline-end': 'نهاية السطر'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      content: "הוסף לספרייה",
-      "inline-start": "תחילת השורה",
-      left: "שמאל",
-      top: "למעלה",
-      bottom: "למטה",
-      right: "ימין",
-      "inline-end": "סוף השורה",
-    },
-  },
+      content: 'הוסף לספרייה',
+      'inline-start': 'תחילת השורה',
+      left: 'שמאל',
+      top: 'למעלה',
+      bottom: 'למטה',
+      right: 'ימין',
+      'inline-end': 'סוף השורה'
+    }
+  }
 }
 
-const physicalSides = ["left", "top", "bottom", "right"] as const
-const logicalSides = ["inline-start", "inline-end"] as const
+const physicalSides = ['left', 'top', 'bottom', 'right'] as const
+const logicalSides = ['inline-start', 'inline-end'] as const
 
 export function TooltipRtl() {
-  const { dir, t } = useTranslation(translations, "ar")
+  const { dir, t } = useTranslation(translations, 'ar')
 
   return (
     <div className="grid gap-4">
       <div className="flex flex-wrap justify-center gap-2">
-        {physicalSides.map((side) => (
+        {physicalSides.map(side => (
           <Tooltip key={side}>
-            <TooltipTrigger render={<Button variant="outline" />}>
-              {t[side]}
-            </TooltipTrigger>
+            <TooltipTrigger render={<Button variant="outline" />}>{t[side]}</TooltipTrigger>
             <TooltipContent side={side} dir={dir}>
               {t.content}
             </TooltipContent>
@@ -310,11 +273,9 @@ export function TooltipRtl() {
         ))}
       </div>
       <div className="flex flex-wrap justify-center gap-2">
-        {logicalSides.map((side) => (
+        {logicalSides.map(side => (
           <Tooltip key={side}>
-            <TooltipTrigger render={<Button variant="outline" />}>
-              {t[side]}
-            </TooltipTrigger>
+            <TooltipTrigger render={<Button variant="outline" />}>{t[side]}</TooltipTrigger>
             <TooltipContent side={side} dir={dir}>
               {t.content}
             </TooltipContent>
@@ -324,7 +285,6 @@ export function TooltipRtl() {
     </div>
   )
 }
-
 ```
 
 ## API Reference

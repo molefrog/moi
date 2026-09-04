@@ -9,18 +9,11 @@ links:
 ---
 
 ```tsx
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable"
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 
 export function ResizableDemo() {
   return (
-    <ResizablePanelGroup
-      orientation="horizontal"
-      className="max-w-sm rounded-lg border"
-    >
+    <ResizablePanelGroup orientation="horizontal" className="max-w-sm rounded-lg border">
       <ResizablePanel defaultSize="50%">
         <div className="flex h-[200px] items-center justify-center p-6">
           <span className="font-semibold">One</span>
@@ -45,7 +38,6 @@ export function ResizableDemo() {
     </ResizablePanelGroup>
   )
 }
-
 ```
 
 ## About
@@ -97,11 +89,7 @@ npm install react-resizable-panels
 ## Usage
 
 ```tsx showLineNumbers
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable"
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 ```
 
 ```tsx showLineNumbers
@@ -128,11 +116,7 @@ ResizablePanelGroup
 Use `orientation="vertical"` for vertical resizing.
 
 ```tsx
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable"
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 
 export function ResizableVertical() {
   return (
@@ -154,7 +138,6 @@ export function ResizableVertical() {
     </ResizablePanelGroup>
   )
 }
-
 ```
 
 ## Handle
@@ -162,11 +145,7 @@ export function ResizableVertical() {
 Use the `withHandle` prop on `ResizableHandle` to show a visible handle.
 
 ```tsx
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable"
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 
 export function ResizableHandleDemo() {
   return (
@@ -188,7 +167,6 @@ export function ResizableHandleDemo() {
     </ResizablePanelGroup>
   )
 }
-
 ```
 
 ## RTL
@@ -196,56 +174,45 @@ export function ResizableHandleDemo() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      one: "One",
-      two: "Two",
-      three: "Three",
-    },
+      one: 'One',
+      two: 'Two',
+      three: 'Three'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      one: "واحد",
-      two: "اثنان",
-      three: "ثلاثة",
-    },
+      one: 'واحد',
+      two: 'اثنان',
+      three: 'ثلاثة'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      one: "אחד",
-      two: "שניים",
-      three: "שלושה",
-    },
-  },
+      one: 'אחד',
+      two: 'שניים',
+      three: 'שלושה'
+    }
+  }
 }
 
 export function ResizableRtl() {
-  const { dir, t } = useTranslation(translations, "ar")
+  const { dir, t } = useTranslation(translations, 'ar')
 
   return (
-    <ResizablePanelGroup
-      orientation="horizontal"
-      className="max-w-sm rounded-lg border"
-      dir={dir}
-    >
+    <ResizablePanelGroup orientation="horizontal" className="max-w-sm rounded-lg border" dir={dir}>
       <ResizablePanel defaultSize="50%">
         <div className="flex h-[200px] items-center justify-center p-6">
           <span className="font-semibold">{t.one}</span>
@@ -270,7 +237,6 @@ export function ResizableRtl() {
     </ResizablePanelGroup>
   )
 }
-
 ```
 
 ## API Reference

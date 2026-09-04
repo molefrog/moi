@@ -19,22 +19,20 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
+  AlertDialogTrigger
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
 
 export function AlertDialogDemo() {
   return (
     <AlertDialog>
-      <AlertDialogTrigger render={<Button variant="outline" />}>
-        Show Dialog
-      </AlertDialogTrigger>
+      <AlertDialogTrigger render={<Button variant="outline" />}>Show Dialog</AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
           <AlertDialogDescription>
-            This action cannot be undone. This will permanently delete your
-            account from our servers.
+            This action cannot be undone. This will permanently delete your account from our
+            servers.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -45,7 +43,6 @@ export function AlertDialogDemo() {
     </AlertDialog>
   )
 }
-
 ```
 
 ## Installation
@@ -102,21 +99,18 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+  AlertDialogTrigger
+} from '@/components/ui/alert-dialog'
 ```
 
 ```tsx showLineNumbers
 <AlertDialog>
-  <AlertDialogTrigger render={<Button variant="outline" />}>
-    Show Dialog
-  </AlertDialogTrigger>
+  <AlertDialogTrigger render={<Button variant="outline" />}>Show Dialog</AlertDialogTrigger>
   <AlertDialogContent>
     <AlertDialogHeader>
       <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
       <AlertDialogDescription>
-        This action cannot be undone. This will permanently delete your account
-        from our servers.
+        This action cannot be undone. This will permanently delete your account from our servers.
       </AlertDialogDescription>
     </AlertDialogHeader>
     <AlertDialogFooter>
@@ -158,22 +152,20 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
+  AlertDialogTrigger
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
 
 export function AlertDialogBasic() {
   return (
     <AlertDialog>
-      <AlertDialogTrigger
-        render={<Button variant="outline">Show Dialog</Button>}
-      />
+      <AlertDialogTrigger render={<Button variant="outline">Show Dialog</Button>} />
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
           <AlertDialogDescription>
-            This action cannot be undone. This will permanently delete your
-            account and remove your data from our servers.
+            This action cannot be undone. This will permanently delete your account and remove your
+            data from our servers.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -184,7 +176,6 @@ export function AlertDialogBasic() {
     </AlertDialog>
   )
 }
-
 ```
 
 ## Small
@@ -201,16 +192,14 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
+  AlertDialogTrigger
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
 
 export function AlertDialogSmall() {
   return (
     <AlertDialog>
-      <AlertDialogTrigger
-        render={<Button variant="outline">Show Dialog</Button>}
-      />
+      <AlertDialogTrigger render={<Button variant="outline">Show Dialog</Button>} />
       <AlertDialogContent size="sm">
         <AlertDialogHeader>
           <AlertDialogTitle>Allow accessory to connect?</AlertDialogTitle>
@@ -226,7 +215,6 @@ export function AlertDialogSmall() {
     </AlertDialog>
   )
 }
-
 ```
 
 ## Media
@@ -234,7 +222,7 @@ export function AlertDialogSmall() {
 Use the `AlertDialogMedia` component to add a media element such as an icon or image to the alert dialog.
 
 ```tsx
-import { CircleFadingPlusIcon } from "lucide-react"
+import { CircleFadingPlusIcon } from 'lucide-react'
 
 import {
   AlertDialog,
@@ -246,16 +234,14 @@ import {
   AlertDialogHeader,
   AlertDialogMedia,
   AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
+  AlertDialogTrigger
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
 
 export function AlertDialogWithMedia() {
   return (
     <AlertDialog>
-      <AlertDialogTrigger
-        render={<Button variant="outline">Share Project</Button>}
-      />
+      <AlertDialogTrigger render={<Button variant="outline">Share Project</Button>} />
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogMedia>
@@ -274,7 +260,6 @@ export function AlertDialogWithMedia() {
     </AlertDialog>
   )
 }
-
 ```
 
 ## Small with Media
@@ -282,7 +267,7 @@ export function AlertDialogWithMedia() {
 Use the `size="sm"` prop to make the alert dialog smaller and the `AlertDialogMedia` component to add a media element such as an icon or image to the alert dialog.
 
 ```tsx
-import { BluetoothIcon } from "lucide-react"
+import { BluetoothIcon } from 'lucide-react'
 
 import {
   AlertDialog,
@@ -294,16 +279,14 @@ import {
   AlertDialogHeader,
   AlertDialogMedia,
   AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
+  AlertDialogTrigger
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
 
 export function AlertDialogSmallWithMedia() {
   return (
     <AlertDialog>
-      <AlertDialogTrigger
-        render={<Button variant="outline">Show Dialog</Button>}
-      />
+      <AlertDialogTrigger render={<Button variant="outline">Show Dialog</Button>} />
 
       <AlertDialogContent size="sm">
         <AlertDialogHeader>
@@ -323,7 +306,6 @@ export function AlertDialogSmallWithMedia() {
     </AlertDialog>
   )
 }
-
 ```
 
 ## Destructive
@@ -331,7 +313,7 @@ export function AlertDialogSmallWithMedia() {
 Use the `AlertDialogAction` component to add a destructive action button to the alert dialog.
 
 ```tsx
-import { Trash2Icon } from "lucide-react"
+import { Trash2Icon } from 'lucide-react'
 
 import {
   AlertDialog,
@@ -343,16 +325,14 @@ import {
   AlertDialogHeader,
   AlertDialogMedia,
   AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
+  AlertDialogTrigger
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
 
 export function AlertDialogDestructive() {
   return (
     <AlertDialog>
-      <AlertDialogTrigger
-        render={<Button variant="destructive">Delete Chat</Button>}
-      />
+      <AlertDialogTrigger render={<Button variant="destructive">Delete Chat</Button>} />
       <AlertDialogContent size="sm">
         <AlertDialogHeader>
           <AlertDialogMedia className="bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive">
@@ -360,8 +340,8 @@ export function AlertDialogDestructive() {
           </AlertDialogMedia>
           <AlertDialogTitle>Delete chat?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete this chat conversation. View{" "}
-            <a href="#">Settings</a> delete any memories saved during this chat.
+            This will permanently delete this chat conversation. View <a href="#">Settings</a>{' '}
+            delete any memories saved during this chat.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -372,7 +352,6 @@ export function AlertDialogDestructive() {
     </AlertDialog>
   )
 }
-
 ```
 
 ## RTL
@@ -380,14 +359,11 @@ export function AlertDialogDestructive() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import { BluetoothIcon } from "lucide-react"
+import { BluetoothIcon } from 'lucide-react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
+import { useTranslation, type Translations } from '@/components/language-selector'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -398,64 +374,61 @@ import {
   AlertDialogHeader,
   AlertDialogMedia,
   AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
+  AlertDialogTrigger
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      showDialog: "Show Dialog",
-      showDialogSm: "Show Dialog (sm)",
-      title: "Are you absolutely sure?",
+      showDialog: 'Show Dialog',
+      showDialogSm: 'Show Dialog (sm)',
+      title: 'Are you absolutely sure?',
       description:
-        "This action cannot be undone. This will permanently delete your account from our servers.",
-      cancel: "Cancel",
-      continue: "Continue",
-      smallTitle: "Allow accessory to connect?",
-      smallDescription:
-        "Do you want to allow the USB accessory to connect to this device?",
+        'This action cannot be undone. This will permanently delete your account from our servers.',
+      cancel: 'Cancel',
+      continue: 'Continue',
+      smallTitle: 'Allow accessory to connect?',
+      smallDescription: 'Do you want to allow the USB accessory to connect to this device?',
       dontAllow: "Don't allow",
-      allow: "Allow",
-    },
+      allow: 'Allow'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      showDialog: "إظهار الحوار",
-      showDialogSm: "إظهار الحوار (صغير)",
-      title: "هل أنت متأكد تمامًا؟",
-      description:
-        "لا يمكن التراجع عن هذا الإجراء. سيؤدي هذا إلى حذف حسابك نهائيًا من خوادمنا.",
-      cancel: "إلغاء",
-      continue: "متابعة",
-      smallTitle: "السماح للملحق بالاتصال؟",
-      smallDescription: "هل تريد السماح لملحق USB بالاتصال بهذا الجهاز؟",
-      dontAllow: "عدم السماح",
-      allow: "السماح",
-    },
+      showDialog: 'إظهار الحوار',
+      showDialogSm: 'إظهار الحوار (صغير)',
+      title: 'هل أنت متأكد تمامًا؟',
+      description: 'لا يمكن التراجع عن هذا الإجراء. سيؤدي هذا إلى حذف حسابك نهائيًا من خوادمنا.',
+      cancel: 'إلغاء',
+      continue: 'متابعة',
+      smallTitle: 'السماح للملحق بالاتصال؟',
+      smallDescription: 'هل تريد السماح لملحق USB بالاتصال بهذا الجهاز؟',
+      dontAllow: 'عدم السماح',
+      allow: 'السماح'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      showDialog: "הצג דיאלוג",
-      showDialogSm: "הצג דיאלוג (קטן)",
-      title: "האם אתה בטוח לחלוטין?",
-      description:
-        "פעולה זו לא ניתנת לביטול. זה ימחק לצמיתות את החשבון שלך מהשרתים שלנו.",
-      cancel: "ביטול",
-      continue: "המשך",
-      smallTitle: "לאפשר להתקן להתחבר?",
-      smallDescription: "האם אתה רוצה לאפשר להתקן USB להתחבר למכשיר זה?",
-      dontAllow: "אל תאפשר",
-      allow: "אפשר",
-    },
-  },
+      showDialog: 'הצג דיאלוג',
+      showDialogSm: 'הצג דיאלוג (קטן)',
+      title: 'האם אתה בטוח לחלוטין?',
+      description: 'פעולה זו לא ניתנת לביטול. זה ימחק לצמיתות את החשבון שלך מהשרתים שלנו.',
+      cancel: 'ביטול',
+      continue: 'המשך',
+      smallTitle: 'לאפשר להתקן להתחבר?',
+      smallDescription: 'האם אתה רוצה לאפשר להתקן USB להתחבר למכשיר זה?',
+      dontAllow: 'אל תאפשר',
+      allow: 'אפשר'
+    }
+  }
 }
 
 export function AlertDialogRtl() {
-  const { dir, t, language } = useTranslation(translations, "ar")
+  const { dir, t, language } = useTranslation(translations, 'ar')
 
   return (
     <div className="flex gap-4" dir={dir}>
@@ -463,10 +436,7 @@ export function AlertDialogRtl() {
         <AlertDialogTrigger render={<Button variant="outline" />}>
           {t.showDialog}
         </AlertDialogTrigger>
-        <AlertDialogContent
-          dir={dir}
-          data-lang={dir === "rtl" ? language : undefined}
-        >
+        <AlertDialogContent dir={dir} data-lang={dir === 'rtl' ? language : undefined}>
           <AlertDialogHeader>
             <AlertDialogTitle>{t.title}</AlertDialogTitle>
             <AlertDialogDescription>{t.description}</AlertDialogDescription>
@@ -481,19 +451,13 @@ export function AlertDialogRtl() {
         <AlertDialogTrigger render={<Button variant="outline" />}>
           {t.showDialogSm}
         </AlertDialogTrigger>
-        <AlertDialogContent
-          size="sm"
-          dir={dir}
-          data-lang={dir === "rtl" ? language : undefined}
-        >
+        <AlertDialogContent size="sm" dir={dir} data-lang={dir === 'rtl' ? language : undefined}>
           <AlertDialogHeader>
             <AlertDialogMedia>
               <BluetoothIcon />
             </AlertDialogMedia>
             <AlertDialogTitle>{t.smallTitle}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t.smallDescription}
-            </AlertDialogDescription>
+            <AlertDialogDescription>{t.smallDescription}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t.dontAllow}</AlertDialogCancel>
@@ -504,7 +468,6 @@ export function AlertDialogRtl() {
     </div>
   )
 }
-
 ```
 
 ## API Reference

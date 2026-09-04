@@ -9,19 +9,11 @@ links:
 ---
 
 ```tsx
-import { Slider } from "@/components/ui/slider"
+import { Slider } from '@/components/ui/slider'
 
 export function SliderDemo() {
-  return (
-    <Slider
-      defaultValue={[75]}
-      max={100}
-      step={1}
-      className="mx-auto w-full max-w-xs"
-    />
-  )
+  return <Slider defaultValue={[75]} max={100} step={1} className="mx-auto w-full max-w-xs" />
 }
-
 ```
 
 ## Installation
@@ -69,7 +61,7 @@ npm install @base-ui/react
 ## Usage
 
 ```tsx
-import { Slider } from "@/components/ui/slider"
+import { Slider } from '@/components/ui/slider'
 ```
 
 ```tsx
@@ -81,19 +73,11 @@ import { Slider } from "@/components/ui/slider"
 Use an array with two values for a range slider.
 
 ```tsx
-import { Slider } from "@/components/ui/slider"
+import { Slider } from '@/components/ui/slider'
 
 export function SliderRange() {
-  return (
-    <Slider
-      defaultValue={[25, 50]}
-      max={100}
-      step={5}
-      className="mx-auto w-full max-w-xs"
-    />
-  )
+  return <Slider defaultValue={[25, 50]} max={100} step={5} className="mx-auto w-full max-w-xs" />
 }
-
 ```
 
 ## Multiple Thumbs
@@ -101,19 +85,13 @@ export function SliderRange() {
 Use an array with multiple values for multiple thumbs.
 
 ```tsx
-import { Slider } from "@/components/ui/slider"
+import { Slider } from '@/components/ui/slider'
 
 export function SliderMultiple() {
   return (
-    <Slider
-      defaultValue={[10, 20, 70]}
-      max={100}
-      step={10}
-      className="mx-auto w-full max-w-xs"
-    />
+    <Slider defaultValue={[10, 20, 70]} max={100} step={10} className="mx-auto w-full max-w-xs" />
   )
 }
-
 ```
 
 ## Vertical
@@ -121,40 +99,27 @@ export function SliderMultiple() {
 Use `orientation="vertical"` for a vertical slider.
 
 ```tsx
-import { Slider } from "@/components/ui/slider"
+import { Slider } from '@/components/ui/slider'
 
 export function SliderVertical() {
   return (
     <div className="mx-auto flex w-full max-w-xs items-center justify-center gap-6">
-      <Slider
-        defaultValue={[50]}
-        max={100}
-        step={1}
-        orientation="vertical"
-        className="h-40"
-      />
-      <Slider
-        defaultValue={[25]}
-        max={100}
-        step={1}
-        orientation="vertical"
-        className="h-40"
-      />
+      <Slider defaultValue={[50]} max={100} step={1} orientation="vertical" className="h-40" />
+      <Slider defaultValue={[25]} max={100} step={1} orientation="vertical" className="h-40" />
     </div>
   )
 }
-
 ```
 
 ## Controlled
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import { Label } from "@/components/ui/label"
-import { Slider } from "@/components/ui/slider"
+import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
 
 export function SliderControlled() {
   const [value, setValue] = React.useState([0.3, 0.7])
@@ -163,14 +128,12 @@ export function SliderControlled() {
     <div className="mx-auto grid w-full max-w-xs gap-3">
       <div className="flex items-center justify-between gap-2">
         <Label htmlFor="slider-demo-temperature">Temperature</Label>
-        <span className="text-sm text-muted-foreground">
-          {value.join(", ")}
-        </span>
+        <span className="text-sm text-muted-foreground">{value.join(', ')}</span>
       </div>
       <Slider
         id="slider-demo-temperature"
         value={value}
-        onValueChange={(value) => setValue(value as number[])}
+        onValueChange={value => setValue(value as number[])}
         min={0}
         max={1}
         step={0.1}
@@ -178,7 +141,6 @@ export function SliderControlled() {
     </div>
   )
 }
-
 ```
 
 ## Disabled
@@ -186,20 +148,13 @@ export function SliderControlled() {
 Use the `disabled` prop to disable the slider.
 
 ```tsx
-import { Slider } from "@/components/ui/slider"
+import { Slider } from '@/components/ui/slider'
 
 export function SliderDisabled() {
   return (
-    <Slider
-      defaultValue={[50]}
-      max={100}
-      step={1}
-      disabled
-      className="mx-auto w-full max-w-xs"
-    />
+    <Slider defaultValue={[50]} max={100} step={1} disabled className="mx-auto w-full max-w-xs" />
   )
 }
-
 ```
 
 ## RTL
@@ -207,45 +162,35 @@ export function SliderDisabled() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import { Slider } from "@/components/ui/slider"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Slider } from '@/components/ui/slider'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
-    values: {},
+    dir: 'ltr',
+    values: {}
   },
   ar: {
-    dir: "rtl",
-    values: {},
+    dir: 'rtl',
+    values: {}
   },
   he: {
-    dir: "rtl",
-    values: {},
-  },
+    dir: 'rtl',
+    values: {}
+  }
 }
 
 export function SliderRtl() {
-  const { dir } = useTranslation(translations, "ar")
+  const { dir } = useTranslation(translations, 'ar')
 
   return (
-    <Slider
-      defaultValue={[75]}
-      max={100}
-      step={1}
-      className="mx-auto w-full max-w-xs"
-      dir={dir}
-    />
+    <Slider defaultValue={[75]} max={100} step={1} className="mx-auto w-full max-w-xs" dir={dir} />
   )
 }
-
 ```
 
 ## API Reference

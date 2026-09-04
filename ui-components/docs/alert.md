@@ -6,13 +6,9 @@ component: true
 ---
 
 ```tsx
-import { CheckCircle2Icon, InfoIcon } from "lucide-react"
+import { CheckCircle2Icon, InfoIcon } from 'lucide-react'
 
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 export function AlertDemo() {
   return (
@@ -21,22 +17,19 @@ export function AlertDemo() {
         <CheckCircle2Icon />
         <AlertTitle>Payment successful</AlertTitle>
         <AlertDescription>
-          Your payment of $29.99 has been processed. A receipt has been sent to
-          your email address.
+          Your payment of $29.99 has been processed. A receipt has been sent to your email address.
         </AlertDescription>
       </Alert>
       <Alert>
         <InfoIcon />
         <AlertTitle>New feature available</AlertTitle>
         <AlertDescription>
-          We&apos;ve added dark mode support. You can enable it in your account
-          settings.
+          We&apos;ve added dark mode support. You can enable it in your account settings.
         </AlertDescription>
       </Alert>
     </div>
   )
 }
-
 ```
 
 ## Installation
@@ -78,12 +71,7 @@ npx shadcn@latest add alert
 ## Usage
 
 ```tsx showLineNumbers
-import {
-  Alert,
-  AlertAction,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert"
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert'
 ```
 
 ```tsx showLineNumbers
@@ -116,13 +104,9 @@ Alert
 A basic alert with an icon, title and description.
 
 ```tsx
-import { CheckCircle2Icon } from "lucide-react"
+import { CheckCircle2Icon } from 'lucide-react'
 
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 export function AlertBasic() {
   return (
@@ -130,13 +114,11 @@ export function AlertBasic() {
       <CheckCircle2Icon />
       <AlertTitle>Account updated successfully</AlertTitle>
       <AlertDescription>
-        Your profile information has been saved. Changes will be reflected
-        immediately.
+        Your profile information has been saved. Changes will be reflected immediately.
       </AlertDescription>
     </Alert>
   )
 }
-
 ```
 
 ## Destructive
@@ -144,13 +126,9 @@ export function AlertBasic() {
 Use `variant="destructive"` to create a destructive alert.
 
 ```tsx
-import { AlertCircleIcon } from "lucide-react"
+import { AlertCircleIcon } from 'lucide-react'
 
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 export function AlertDestructive() {
   return (
@@ -158,13 +136,11 @@ export function AlertDestructive() {
       <AlertCircleIcon />
       <AlertTitle>Payment failed</AlertTitle>
       <AlertDescription>
-        Your payment could not be processed. Please check your payment method
-        and try again.
+        Your payment could not be processed. Please check your payment method and try again.
       </AlertDescription>
     </Alert>
   )
 }
-
 ```
 
 ## Action
@@ -172,21 +148,14 @@ export function AlertDestructive() {
 Use `AlertAction` to add a button or other action element to the alert.
 
 ```tsx
-import {
-  Alert,
-  AlertAction,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 
 export function AlertActionExample() {
   return (
     <Alert className="max-w-md">
       <AlertTitle>Dark mode is now available</AlertTitle>
-      <AlertDescription>
-        Enable it under your profile settings to get started.
-      </AlertDescription>
+      <AlertDescription>Enable it under your profile settings to get started.</AlertDescription>
       <AlertAction>
         <Button size="xs" variant="default">
           Enable
@@ -195,7 +164,6 @@ export function AlertActionExample() {
     </Alert>
   )
 }
-
 ```
 
 ## Custom Colors
@@ -203,13 +171,9 @@ export function AlertActionExample() {
 You can customize the alert colors by adding custom classes such as `bg-amber-50 dark:bg-amber-950` to the `Alert` component.
 
 ```tsx
-import { AlertTriangleIcon } from "lucide-react"
+import { AlertTriangleIcon } from 'lucide-react'
 
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 export function AlertColors() {
   return (
@@ -217,13 +181,12 @@ export function AlertColors() {
       <AlertTriangleIcon />
       <AlertTitle>Your subscription will expire in 3 days.</AlertTitle>
       <AlertDescription>
-        Renew now to avoid service interruption or upgrade to a paid plan to
-        continue using the service.
+        Renew now to avoid service interruption or upgrade to a paid plan to continue using the
+        service.
       </AlertDescription>
     </Alert>
   )
 }
-
 ```
 
 ## RTL
@@ -231,72 +194,62 @@ export function AlertColors() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import { CheckCircle2Icon, InfoIcon } from "lucide-react"
+import * as React from 'react'
+import { CheckCircle2Icon, InfoIcon } from 'lucide-react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      paymentTitle: "Payment successful",
+      paymentTitle: 'Payment successful',
       paymentDescription:
-        "Your payment of $29.99 has been processed. A receipt has been sent to your email address.",
-      featureTitle: "New feature available",
+        'Your payment of $29.99 has been processed. A receipt has been sent to your email address.',
+      featureTitle: 'New feature available',
       featureDescription:
-        "We've added dark mode support. You can enable it in your account settings.",
-    },
+        "We've added dark mode support. You can enable it in your account settings."
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      paymentTitle: "تم الدفع بنجاح",
+      paymentTitle: 'تم الدفع بنجاح',
       paymentDescription:
-        "تمت معالجة دفعتك البالغة 29.99 دولارًا. تم إرسال إيصال إلى عنوان بريدك الإلكتروني.",
-      featureTitle: "ميزة جديدة متاحة",
-      featureDescription:
-        "لقد أضفنا دعم الوضع الداكن. يمكنك تفعيله في إعدادات حسابك.",
-    },
+        'تمت معالجة دفعتك البالغة 29.99 دولارًا. تم إرسال إيصال إلى عنوان بريدك الإلكتروني.',
+      featureTitle: 'ميزة جديدة متاحة',
+      featureDescription: 'لقد أضفنا دعم الوضع الداكن. يمكنك تفعيله في إعدادات حسابك.'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      paymentTitle: "התשלום בוצע בהצלחה",
-      paymentDescription:
-        "התשלום שלך בסך 29.99 דולר עובד. קבלה נשלחה לכתובת האימייל שלך.",
-      featureTitle: "תכונה חדשה זמינה",
-      featureDescription:
-        "הוספנו תמיכה במצב כהה. אתה יכול להפעיל אותו בהגדרות החשבון שלך.",
-    },
-  },
+      paymentTitle: 'התשלום בוצע בהצלחה',
+      paymentDescription: 'התשלום שלך בסך 29.99 דולר עובד. קבלה נשלחה לכתובת האימייל שלך.',
+      featureTitle: 'תכונה חדשה זמינה',
+      featureDescription: 'הוספנו תמיכה במצב כהה. אתה יכול להפעיל אותו בהגדרות החשבון שלך.'
+    }
+  }
 }
 
 const alerts = [
   {
     icon: CheckCircle2Icon,
-    titleKey: "paymentTitle" as const,
-    descriptionKey: "paymentDescription" as const,
+    titleKey: 'paymentTitle' as const,
+    descriptionKey: 'paymentDescription' as const
   },
   {
     icon: InfoIcon,
-    titleKey: "featureTitle" as const,
-    descriptionKey: "featureDescription" as const,
-  },
+    titleKey: 'featureTitle' as const,
+    descriptionKey: 'featureDescription' as const
+  }
 ] as const
 
 export function AlertRtl() {
-  const { dir, t } = useTranslation(translations, "ar")
+  const { dir, t } = useTranslation(translations, 'ar')
 
   return (
     <div className="grid w-full max-w-md items-start gap-4" dir={dir}>
@@ -313,7 +266,6 @@ export function AlertRtl() {
     </div>
   )
 }
-
 ```
 
 ## API Reference

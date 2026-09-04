@@ -9,8 +9,8 @@ links:
 ---
 
 ```tsx
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 
 export function SwitchDemo() {
   return (
@@ -20,7 +20,6 @@ export function SwitchDemo() {
     </div>
   )
 }
-
 ```
 
 ## Installation
@@ -68,7 +67,7 @@ npm install @base-ui/react
 ## Usage
 
 ```tsx
-import { Switch } from "@/components/ui/switch"
+import { Switch } from '@/components/ui/switch'
 ```
 
 ```tsx
@@ -78,21 +77,14 @@ import { Switch } from "@/components/ui/switch"
 ## Description
 
 ```tsx
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
-import { Switch } from "@/components/ui/switch"
+import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Switch } from '@/components/ui/switch'
 
 export function SwitchDescription() {
   return (
     <Field orientation="horizontal" className="max-w-sm">
       <FieldContent>
-        <FieldLabel htmlFor="switch-focus-mode">
-          Share across devices
-        </FieldLabel>
+        <FieldLabel htmlFor="switch-focus-mode">Share across devices</FieldLabel>
         <FieldDescription>
           Focus is shared across devices, and turns off when you leave the app.
         </FieldDescription>
@@ -101,7 +93,6 @@ export function SwitchDescription() {
     </Field>
   )
 }
-
 ```
 
 ## Choice Card
@@ -115,9 +106,9 @@ import {
   FieldDescription,
   FieldGroup,
   FieldLabel,
-  FieldTitle,
-} from "@/components/ui/field"
-import { Switch } from "@/components/ui/switch"
+  FieldTitle
+} from '@/components/ui/field'
+import { Switch } from '@/components/ui/switch'
 
 export function SwitchChoiceCard() {
   return (
@@ -127,8 +118,7 @@ export function SwitchChoiceCard() {
           <FieldContent>
             <FieldTitle>Share across devices</FieldTitle>
             <FieldDescription>
-              Focus is shared across devices, and turns off when you leave the
-              app.
+              Focus is shared across devices, and turns off when you leave the app.
             </FieldDescription>
           </FieldContent>
           <Switch id="switch-share" />
@@ -148,7 +138,6 @@ export function SwitchChoiceCard() {
     </FieldGroup>
   )
 }
-
 ```
 
 ## Disabled
@@ -156,8 +145,8 @@ export function SwitchChoiceCard() {
 Add the `disabled` prop to the `Switch` component to disable the switch. Add the `data-disabled` prop to the `Field` component for styling.
 
 ```tsx
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Switch } from "@/components/ui/switch"
+import { Field, FieldLabel } from '@/components/ui/field'
+import { Switch } from '@/components/ui/switch'
 
 export function SwitchDisabled() {
   return (
@@ -167,7 +156,6 @@ export function SwitchDisabled() {
     </Field>
   )
 }
-
 ```
 
 ## Invalid
@@ -175,30 +163,20 @@ export function SwitchDisabled() {
 Add the `aria-invalid` prop to the `Switch` component to indicate an invalid state. Add the `data-invalid` prop to the `Field` component for styling.
 
 ```tsx
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
-import { Switch } from "@/components/ui/switch"
+import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Switch } from '@/components/ui/switch'
 
 export function SwitchInvalid() {
   return (
     <Field orientation="horizontal" className="max-w-sm" data-invalid>
       <FieldContent>
-        <FieldLabel htmlFor="switch-terms">
-          Accept terms and conditions
-        </FieldLabel>
-        <FieldDescription>
-          You must accept the terms and conditions to continue.
-        </FieldDescription>
+        <FieldLabel htmlFor="switch-terms">Accept terms and conditions</FieldLabel>
+        <FieldDescription>You must accept the terms and conditions to continue.</FieldDescription>
       </FieldContent>
       <Switch id="switch-terms" aria-invalid />
     </Field>
   )
 }
-
 ```
 
 ## Size
@@ -206,8 +184,8 @@ export function SwitchInvalid() {
 Use the `size` prop to change the size of the switch.
 
 ```tsx
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Switch } from "@/components/ui/switch"
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Switch } from '@/components/ui/switch'
 
 export function SwitchSizes() {
   return (
@@ -223,7 +201,6 @@ export function SwitchSizes() {
     </FieldGroup>
   )
 }
-
 ```
 
 ## RTL
@@ -231,50 +208,40 @@ export function SwitchSizes() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
-import { Switch } from "@/components/ui/switch"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Switch } from '@/components/ui/switch'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      label: "Share across devices",
-      description:
-        "Focus is shared across devices, and turns off when you leave the app.",
-    },
+      label: 'Share across devices',
+      description: 'Focus is shared across devices, and turns off when you leave the app.'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      label: "المشاركة عبر الأجهزة",
-      description:
-        "يتم مشاركة التركيز عبر الأجهزة، ويتم إيقاف تشغيله عند مغادرة التطبيق.",
-    },
+      label: 'المشاركة عبر الأجهزة',
+      description: 'يتم مشاركة التركيز عبر الأجهزة، ويتم إيقاف تشغيله عند مغادرة التطبيق.'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      label: "שיתוף בין מכשירים",
-      description: "המיקוד משותף בין מכשירים, וכבה כשאתה עוזב את האפליקציה.",
-    },
-  },
+      label: 'שיתוף בין מכשירים',
+      description: 'המיקוד משותף בין מכשירים, וכבה כשאתה עוזב את האפליקציה.'
+    }
+  }
 }
 
 export function SwitchRtl() {
-  const { dir, t } = useTranslation(translations, "ar")
+  const { dir, t } = useTranslation(translations, 'ar')
 
   return (
     <Field orientation="horizontal" className="max-w-sm" dir={dir}>
@@ -288,7 +255,6 @@ export function SwitchRtl() {
     </Field>
   )
 }
-
 ```
 
 ## API Reference

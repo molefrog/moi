@@ -9,39 +9,24 @@ links:
 ---
 
 ```tsx
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card"
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 
 export function HoverCardDemo() {
   return (
     <HoverCard>
-      <HoverCardTrigger
-        delay={10}
-        closeDelay={100}
-        render={<Button variant="link" />}
-      >
+      <HoverCardTrigger delay={10} closeDelay={100} render={<Button variant="link" />}>
         Hover Here
       </HoverCardTrigger>
       <HoverCardContent className="flex w-64 flex-col gap-0.5">
         <div className="font-semibold">@nextjs</div>
         <div>The React Framework – created and maintained by @vercel.</div>
-        <div className="mt-1 text-xs text-muted-foreground">
-          Joined December 2021
-        </div>
+        <div className="mt-1 text-xs text-muted-foreground">Joined December 2021</div>
       </HoverCardContent>
     </HoverCard>
   )
 }
-
 ```
 
 ## Installation
@@ -89,19 +74,13 @@ npm install @base-ui/react
 ## Usage
 
 ```tsx showLineNumbers
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card"
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 ```
 
 ```tsx showLineNumbers
 <HoverCard>
   <HoverCardTrigger>Hover</HoverCardTrigger>
-  <HoverCardContent>
-    The React Framework – created and maintained by @vercel.
-  </HoverCardContent>
+  <HoverCardContent>The React Framework – created and maintained by @vercel.</HoverCardContent>
 </HoverCard>
 ```
 
@@ -145,57 +124,38 @@ Use the `side` and `align` props on `HoverCardContent` to control placement.
 ## Basic
 
 ```tsx
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card"
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 
 export function HoverCardDemo() {
   return (
     <HoverCard>
-      <HoverCardTrigger
-        delay={10}
-        closeDelay={100}
-        render={<Button variant="link" />}
-      >
+      <HoverCardTrigger delay={10} closeDelay={100} render={<Button variant="link" />}>
         Hover Here
       </HoverCardTrigger>
       <HoverCardContent className="flex w-64 flex-col gap-0.5">
         <div className="font-semibold">@nextjs</div>
         <div>The React Framework – created and maintained by @vercel.</div>
-        <div className="mt-1 text-xs text-muted-foreground">
-          Joined December 2021
-        </div>
+        <div className="mt-1 text-xs text-muted-foreground">Joined December 2021</div>
       </HoverCardContent>
     </HoverCard>
   )
 }
-
 ```
 
 ## Sides
 
 ```tsx
-import { Button } from "@/components/ui/button"
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card"
+import { Button } from '@/components/ui/button'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 
-const HOVER_CARD_SIDES = ["left", "top", "bottom", "right"] as const
+const HOVER_CARD_SIDES = ['left', 'top', 'bottom', 'right'] as const
 
 export function HoverCardSides() {
   return (
     <div className="flex flex-wrap justify-center gap-2">
-      {HOVER_CARD_SIDES.map((side) => (
+      {HOVER_CARD_SIDES.map(side => (
         <HoverCard key={side}>
           <HoverCardTrigger
             delay={100}
@@ -215,7 +175,6 @@ export function HoverCardSides() {
     </div>
   )
 }
-
 ```
 
 ## RTL
@@ -223,87 +182,72 @@ export function HoverCardSides() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import { Button } from "@/components/ui/button"
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Button } from '@/components/ui/button'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      trigger: "Wireless Headphones",
-      name: "Wireless Headphones",
-      price: "$99.99",
-      "inline-start": "Inline Start",
-      left: "Left",
-      top: "Top",
-      bottom: "Bottom",
-      right: "Right",
-      "inline-end": "Inline End",
-    },
+      trigger: 'Wireless Headphones',
+      name: 'Wireless Headphones',
+      price: '$99.99',
+      'inline-start': 'Inline Start',
+      left: 'Left',
+      top: 'Top',
+      bottom: 'Bottom',
+      right: 'Right',
+      'inline-end': 'Inline End'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      trigger: "سماعات لاسلكية",
-      name: "سماعات لاسلكية",
-      price: "٩٩.٩٩ $",
-      "inline-start": "بداية السطر",
-      left: "يسار",
-      top: "أعلى",
-      bottom: "أسفل",
-      right: "يمين",
-      "inline-end": "نهاية السطر",
-    },
+      trigger: 'سماعات لاسلكية',
+      name: 'سماعات لاسلكية',
+      price: '٩٩.٩٩ $',
+      'inline-start': 'بداية السطر',
+      left: 'يسار',
+      top: 'أعلى',
+      bottom: 'أسفل',
+      right: 'يمين',
+      'inline-end': 'نهاية السطر'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      trigger: "אוזניות אלחוטיות",
-      name: "אוזניות אלחוטיות",
-      price: "99.99 $",
-      "inline-start": "תחילת השורה",
-      left: "שמאל",
-      top: "למעלה",
-      bottom: "למטה",
-      right: "ימין",
-      "inline-end": "סוף השורה",
-    },
-  },
+      trigger: 'אוזניות אלחוטיות',
+      name: 'אוזניות אלחוטיות',
+      price: '99.99 $',
+      'inline-start': 'תחילת השורה',
+      left: 'שמאל',
+      top: 'למעלה',
+      bottom: 'למטה',
+      right: 'ימין',
+      'inline-end': 'סוף השורה'
+    }
+  }
 }
 
-const physicalSides = ["left", "top", "bottom", "right"] as const
-const logicalSides = ["inline-start", "inline-end"] as const
+const physicalSides = ['left', 'top', 'bottom', 'right'] as const
+const logicalSides = ['inline-start', 'inline-end'] as const
 
 export function HoverCardRtl() {
-  const { dir, t } = useTranslation(translations, "ar")
+  const { dir, t } = useTranslation(translations, 'ar')
 
   return (
     <div className="grid gap-4">
       <div className="flex flex-wrap justify-center gap-2">
-        {physicalSides.map((side) => (
+        {physicalSides.map(side => (
           <HoverCard key={side}>
-            <HoverCardTrigger
-              delay={10}
-              closeDelay={100}
-              render={<Button variant="outline" />}
-            >
+            <HoverCardTrigger delay={10} closeDelay={100} render={<Button variant="outline" />}>
               {t[side]}
             </HoverCardTrigger>
-            <HoverCardContent
-              side={side}
-              className="flex w-64 flex-col gap-1"
-              dir={dir}
-            >
+            <HoverCardContent side={side} className="flex w-64 flex-col gap-1" dir={dir}>
               <div className="font-semibold">{t.name}</div>
               <div className="text-sm text-muted-foreground">{t.price}</div>
             </HoverCardContent>
@@ -311,20 +255,12 @@ export function HoverCardRtl() {
         ))}
       </div>
       <div className="flex flex-wrap justify-center gap-2">
-        {logicalSides.map((side) => (
+        {logicalSides.map(side => (
           <HoverCard key={side}>
-            <HoverCardTrigger
-              delay={10}
-              closeDelay={100}
-              render={<Button variant="outline" />}
-            >
+            <HoverCardTrigger delay={10} closeDelay={100} render={<Button variant="outline" />}>
               {t[side]}
             </HoverCardTrigger>
-            <HoverCardContent
-              side={side}
-              className="flex w-64 flex-col gap-1"
-              dir={dir}
-            >
+            <HoverCardContent side={side} className="flex w-64 flex-col gap-1" dir={dir}>
               <div className="font-semibold">{t.name}</div>
               <div className="text-sm text-muted-foreground">{t.price}</div>
             </HoverCardContent>
@@ -334,7 +270,6 @@ export function HoverCardRtl() {
     </div>
   )
 }
-
 ```
 
 ## API Reference

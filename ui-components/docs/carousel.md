@@ -9,16 +9,16 @@ links:
 ---
 
 ```tsx
-import * as React from "react"
+import * as React from 'react'
 
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
   CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel"
+  CarouselPrevious
+} from '@/components/ui/carousel'
 
 export function CarouselDemo() {
   return (
@@ -41,7 +41,6 @@ export function CarouselDemo() {
     </Carousel>
   )
 }
-
 ```
 
 ## About
@@ -99,8 +98,8 @@ import {
   CarouselContent,
   CarouselItem,
   CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel"
+  CarouselPrevious
+} from '@/components/ui/carousel'
 ```
 
 ```tsx showLineNumbers
@@ -133,22 +132,22 @@ Carousel
 To set the size of the items, you can use the `basis` utility class on the `<CarouselItem />`.
 
 ```tsx
-import * as React from "react"
+import * as React from 'react'
 
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
   CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel"
+  CarouselPrevious
+} from '@/components/ui/carousel'
 
 export function CarouselSize() {
   return (
     <Carousel
       opts={{
-        align: "start",
+        align: 'start'
       }}
       className="w-full max-w-[12rem] sm:max-w-xs md:max-w-sm"
     >
@@ -170,7 +169,6 @@ export function CarouselSize() {
     </Carousel>
   )
 }
-
 ```
 
 ```tsx showLineNumbers {4-6}
@@ -200,16 +198,16 @@ export function CarouselSize() {
 To set the spacing between the items, we use a `pl-[VALUE]` utility on the `<CarouselItem />` and a negative `-ml-[VALUE]` on the `<CarouselContent />`.
 
 ```tsx
-import * as React from "react"
+import * as React from 'react'
 
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
   CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel"
+  CarouselPrevious
+} from '@/components/ui/carousel'
 
 export function CarouselSpacing() {
   return (
@@ -232,7 +230,6 @@ export function CarouselSpacing() {
     </Carousel>
   )
 }
-
 ```
 
 ```tsx showLineNumbers /-ml-4/ /pl-4/
@@ -260,22 +257,22 @@ export function CarouselSpacing() {
 Use the `orientation` prop to set the orientation of the carousel.
 
 ```tsx
-import * as React from "react"
+import * as React from 'react'
 
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
   CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel"
+  CarouselPrevious
+} from '@/components/ui/carousel'
 
 export function CarouselOrientation() {
   return (
     <Carousel
       opts={{
-        align: "start",
+        align: 'start'
       }}
       orientation="vertical"
       className="w-full max-w-xs"
@@ -298,7 +295,6 @@ export function CarouselOrientation() {
     </Carousel>
   )
 }
-
 ```
 
 ```tsx showLineNumbers /vertical | horizontal/
@@ -318,8 +314,8 @@ You can pass options to the carousel using the `opts` prop. See the [Embla Carou
 ```tsx showLineNumbers {2-5}
 <Carousel
   opts={{
-    align: "start",
-    loop: true,
+    align: 'start',
+    loop: true
   }}
 >
   <CarouselContent>
@@ -335,19 +331,19 @@ You can pass options to the carousel using the `opts` prop. See the [Embla Carou
 Use a state and the `setApi` prop to get an instance of the carousel API.
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
-  type CarouselApi,
-} from "@/components/ui/carousel"
+  type CarouselApi
+} from '@/components/ui/carousel'
 
 export function CarouselDApiDemo() {
   const [api, setApi] = React.useState<CarouselApi>()
@@ -362,7 +358,7 @@ export function CarouselDApiDemo() {
     setCount(api.scrollSnapList().length)
     setCurrent(api.selectedScrollSnap() + 1)
 
-    api.on("select", () => {
+    api.on('select', () => {
       setCurrent(api.selectedScrollSnap() + 1)
     })
   }, [api])
@@ -390,11 +386,10 @@ export function CarouselDApiDemo() {
     </div>
   )
 }
-
 ```
 
 ```tsx showLineNumbers {1,4,22}
-import { type CarouselApi } from "@/components/ui/carousel"
+import { type CarouselApi } from '@/components/ui/carousel'
 
 export function Example() {
   const [api, setApi] = React.useState<CarouselApi>()
@@ -409,7 +404,7 @@ export function Example() {
     setCount(api.scrollSnapList().length)
     setCurrent(api.selectedScrollSnap() + 1)
 
-    api.on("select", () => {
+    api.on('select', () => {
       setCurrent(api.selectedScrollSnap() + 1)
     })
   }, [api])
@@ -431,7 +426,7 @@ export function Example() {
 You can listen to events using the api instance from `setApi`.
 
 ```tsx showLineNumbers {1,4-14,16}
-import { type CarouselApi } from "@/components/ui/carousel"
+import { type CarouselApi } from '@/components/ui/carousel'
 
 export function Example() {
   const [api, setApi] = React.useState<CarouselApi>()
@@ -441,7 +436,7 @@ export function Example() {
       return
     }
 
-    api.on("select", () => {
+    api.on('select', () => {
       // Do something on select.
     })
   }, [api])
@@ -483,24 +478,22 @@ export function Example() {
 ```
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import Autoplay from "embla-carousel-autoplay"
+import * as React from 'react'
+import Autoplay from 'embla-carousel-autoplay'
 
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
   CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel"
+  CarouselPrevious
+} from '@/components/ui/carousel'
 
 export function CarouselPlugin() {
-  const plugin = React.useRef(
-    Autoplay({ delay: 2000, stopOnInteraction: true })
-  )
+  const plugin = React.useRef(Autoplay({ delay: 2000, stopOnInteraction: true }))
 
   return (
     <Carousel
@@ -527,7 +520,6 @@ export function CarouselPlugin() {
     </Carousel>
   )
 }
-
 ```
 
 ## RTL
@@ -535,52 +527,49 @@ export function CarouselPlugin() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import { Card, CardContent } from "@/components/ui/card"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
   CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel"
+  CarouselPrevious
+} from '@/components/ui/carousel'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
-    values: {},
+    dir: 'ltr',
+    values: {}
   },
   ar: {
-    dir: "rtl",
-    values: {},
+    dir: 'rtl',
+    values: {}
   },
   he: {
-    dir: "rtl",
-    values: {},
-  },
+    dir: 'rtl',
+    values: {}
+  }
 }
 
 function toArabicNumerals(num: number): string {
-  const arabicNumerals = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"]
+  const arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩']
   return num
     .toString()
-    .split("")
-    .map((digit) => arabicNumerals[parseInt(digit, 10)])
-    .join("")
+    .split('')
+    .map(digit => arabicNumerals[parseInt(digit, 10)])
+    .join('')
 }
 
 export function CarouselRtl() {
-  const { dir, language } = useTranslation(translations, "ar")
+  const { dir, language } = useTranslation(translations, 'ar')
 
   const formatNumber = (num: number): string => {
-    if (language === "ar") {
+    if (language === 'ar') {
       return toArabicNumerals(num)
     }
     return num.toString()
@@ -591,7 +580,7 @@ export function CarouselRtl() {
       dir={dir}
       className="w-full max-w-[12rem] sm:max-w-xs"
       opts={{
-        direction: dir,
+        direction: dir
       }}
     >
       <CarouselContent>
@@ -600,9 +589,7 @@ export function CarouselRtl() {
             <div className="p-1">
               <Card>
                 <CardContent className="flex aspect-square items-center justify-center p-6">
-                  <span className="text-4xl font-semibold">
-                    {formatNumber(index + 1)}
-                  </span>
+                  <span className="text-4xl font-semibold">{formatNumber(index + 1)}</span>
                 </CardContent>
               </Card>
             </div>
@@ -614,7 +601,6 @@ export function CarouselRtl() {
     </Carousel>
   )
 }
-
 ```
 
 When localizing the carousel for RTL languages, you need to set the `direction` option in the `opts` prop to match the text direction. This ensures the carousel scrolls in the correct direction.
@@ -623,7 +609,7 @@ When localizing the carousel for RTL languages, you need to set the `direction` 
 <Carousel
   dir={dir}
   opts={{
-    direction: dir,
+    direction: dir
   }}
 >
   <CarouselContent>

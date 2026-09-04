@@ -6,12 +6,11 @@ component: true
 ---
 
 ```tsx
-import { Textarea } from "@/components/ui/textarea"
+import { Textarea } from '@/components/ui/textarea'
 
 export function TextareaDemo() {
   return <Textarea placeholder="Type your message here." />
 }
-
 ```
 
 ## Installation
@@ -53,7 +52,7 @@ npx shadcn@latest add textarea
 ## Usage
 
 ```tsx
-import { Textarea } from "@/components/ui/textarea"
+import { Textarea } from '@/components/ui/textarea'
 ```
 
 ```tsx
@@ -65,12 +64,8 @@ import { Textarea } from "@/components/ui/textarea"
 Use `Field`, `FieldLabel`, and `FieldDescription` to create a textarea with a label and description.
 
 ```tsx
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
-import { Textarea } from "@/components/ui/textarea"
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Textarea } from '@/components/ui/textarea'
 
 export function TextareaField() {
   return (
@@ -81,7 +76,6 @@ export function TextareaField() {
     </Field>
   )
 }
-
 ```
 
 ## Disabled
@@ -89,22 +83,17 @@ export function TextareaField() {
 Use the `disabled` prop to disable the textarea. To style the disabled state, add the `data-disabled` attribute to the `Field` component.
 
 ```tsx
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Textarea } from "@/components/ui/textarea"
+import { Field, FieldLabel } from '@/components/ui/field'
+import { Textarea } from '@/components/ui/textarea'
 
 export function TextareaDisabled() {
   return (
     <Field data-disabled>
       <FieldLabel htmlFor="textarea-disabled">Message</FieldLabel>
-      <Textarea
-        id="textarea-disabled"
-        placeholder="Type your message here."
-        disabled
-      />
+      <Textarea id="textarea-disabled" placeholder="Type your message here." disabled />
     </Field>
   )
 }
-
 ```
 
 ## Invalid
@@ -112,27 +101,18 @@ export function TextareaDisabled() {
 Use the `aria-invalid` prop to mark the textarea as invalid. To style the invalid state, add the `data-invalid` attribute to the `Field` component.
 
 ```tsx
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
-import { Textarea } from "@/components/ui/textarea"
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Textarea } from '@/components/ui/textarea'
 
 export function TextareaInvalid() {
   return (
     <Field data-invalid>
       <FieldLabel htmlFor="textarea-invalid">Message</FieldLabel>
-      <Textarea
-        id="textarea-invalid"
-        placeholder="Type your message here."
-        aria-invalid
-      />
+      <Textarea id="textarea-invalid" placeholder="Type your message here." aria-invalid />
       <FieldDescription>Please enter a valid message.</FieldDescription>
     </Field>
   )
 }
-
 ```
 
 ## Button
@@ -140,8 +120,8 @@ export function TextareaInvalid() {
 Pair with `Button` to create a textarea with a submit button.
 
 ```tsx
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 
 export function TextareaButton() {
   return (
@@ -151,7 +131,6 @@ export function TextareaButton() {
     </div>
   )
 }
-
 ```
 
 ## RTL
@@ -159,50 +138,43 @@ export function TextareaButton() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
-import { Textarea } from "@/components/ui/textarea"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Textarea } from '@/components/ui/textarea'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      label: "Feedback",
-      placeholder: "Your feedback helps us improve...",
-      description: "Share your thoughts about our service.",
-    },
+      label: 'Feedback',
+      placeholder: 'Your feedback helps us improve...',
+      description: 'Share your thoughts about our service.'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      label: "التعليقات",
-      placeholder: "تعليقاتك تساعدنا على التحسين...",
-      description: "شاركنا أفكارك حول خدمتنا.",
-    },
+      label: 'التعليقات',
+      placeholder: 'تعليقاتك تساعدنا على التحسين...',
+      description: 'شاركنا أفكارك حول خدمتنا.'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      label: "משוב",
-      placeholder: "המשוב שלך עוזר לנו להשתפר...",
-      description: "שתף את מחשבותיך על השירות שלנו.",
-    },
-  },
+      label: 'משוב',
+      placeholder: 'המשוב שלך עוזר לנו להשתפר...',
+      description: 'שתף את מחשבותיך על השירות שלנו.'
+    }
+  }
 }
 
 export function TextareaRtl() {
-  const { dir, t } = useTranslation(translations, "ar")
+  const { dir, t } = useTranslation(translations, 'ar')
 
   return (
     <Field className="w-full max-w-xs" dir={dir}>
@@ -214,5 +186,4 @@ export function TextareaRtl() {
     </Field>
   )
 }
-
 ```

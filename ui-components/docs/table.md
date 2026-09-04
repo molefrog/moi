@@ -14,52 +14,52 @@ import {
   TableFooter,
   TableHead,
   TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  TableRow
+} from '@/components/ui/table'
 
 const invoices = [
   {
-    invoice: "INV001",
-    paymentStatus: "Paid",
-    totalAmount: "$250.00",
-    paymentMethod: "Credit Card",
+    invoice: 'INV001',
+    paymentStatus: 'Paid',
+    totalAmount: '$250.00',
+    paymentMethod: 'Credit Card'
   },
   {
-    invoice: "INV002",
-    paymentStatus: "Pending",
-    totalAmount: "$150.00",
-    paymentMethod: "PayPal",
+    invoice: 'INV002',
+    paymentStatus: 'Pending',
+    totalAmount: '$150.00',
+    paymentMethod: 'PayPal'
   },
   {
-    invoice: "INV003",
-    paymentStatus: "Unpaid",
-    totalAmount: "$350.00",
-    paymentMethod: "Bank Transfer",
+    invoice: 'INV003',
+    paymentStatus: 'Unpaid',
+    totalAmount: '$350.00',
+    paymentMethod: 'Bank Transfer'
   },
   {
-    invoice: "INV004",
-    paymentStatus: "Paid",
-    totalAmount: "$450.00",
-    paymentMethod: "Credit Card",
+    invoice: 'INV004',
+    paymentStatus: 'Paid',
+    totalAmount: '$450.00',
+    paymentMethod: 'Credit Card'
   },
   {
-    invoice: "INV005",
-    paymentStatus: "Paid",
-    totalAmount: "$550.00",
-    paymentMethod: "PayPal",
+    invoice: 'INV005',
+    paymentStatus: 'Paid',
+    totalAmount: '$550.00',
+    paymentMethod: 'PayPal'
   },
   {
-    invoice: "INV006",
-    paymentStatus: "Pending",
-    totalAmount: "$200.00",
-    paymentMethod: "Bank Transfer",
+    invoice: 'INV006',
+    paymentStatus: 'Pending',
+    totalAmount: '$200.00',
+    paymentMethod: 'Bank Transfer'
   },
   {
-    invoice: "INV007",
-    paymentStatus: "Unpaid",
-    totalAmount: "$300.00",
-    paymentMethod: "Credit Card",
-  },
+    invoice: 'INV007',
+    paymentStatus: 'Unpaid',
+    totalAmount: '$300.00',
+    paymentMethod: 'Credit Card'
+  }
 ]
 
 export function TableDemo() {
@@ -75,7 +75,7 @@ export function TableDemo() {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {invoices.map((invoice) => (
+        {invoices.map(invoice => (
           <TableRow key={invoice.invoice}>
             <TableCell className="font-medium">{invoice.invoice}</TableCell>
             <TableCell>{invoice.paymentStatus}</TableCell>
@@ -93,7 +93,6 @@ export function TableDemo() {
     </Table>
   )
 }
-
 ```
 
 ## Installation
@@ -142,8 +141,8 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  TableRow
+} from '@/components/ui/table'
 ```
 
 ```tsx showLineNumbers
@@ -208,52 +207,52 @@ import {
   TableFooter,
   TableHead,
   TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  TableRow
+} from '@/components/ui/table'
 
 const invoices = [
   {
-    invoice: "INV001",
-    paymentStatus: "Paid",
-    totalAmount: "$250.00",
-    paymentMethod: "Credit Card",
+    invoice: 'INV001',
+    paymentStatus: 'Paid',
+    totalAmount: '$250.00',
+    paymentMethod: 'Credit Card'
   },
   {
-    invoice: "INV002",
-    paymentStatus: "Pending",
-    totalAmount: "$150.00",
-    paymentMethod: "PayPal",
+    invoice: 'INV002',
+    paymentStatus: 'Pending',
+    totalAmount: '$150.00',
+    paymentMethod: 'PayPal'
   },
   {
-    invoice: "INV003",
-    paymentStatus: "Unpaid",
-    totalAmount: "$350.00",
-    paymentMethod: "Bank Transfer",
+    invoice: 'INV003',
+    paymentStatus: 'Unpaid',
+    totalAmount: '$350.00',
+    paymentMethod: 'Bank Transfer'
   },
   {
-    invoice: "INV004",
-    paymentStatus: "Paid",
-    totalAmount: "$450.00",
-    paymentMethod: "Credit Card",
+    invoice: 'INV004',
+    paymentStatus: 'Paid',
+    totalAmount: '$450.00',
+    paymentMethod: 'Credit Card'
   },
   {
-    invoice: "INV005",
-    paymentStatus: "Paid",
-    totalAmount: "$550.00",
-    paymentMethod: "PayPal",
+    invoice: 'INV005',
+    paymentStatus: 'Paid',
+    totalAmount: '$550.00',
+    paymentMethod: 'PayPal'
   },
   {
-    invoice: "INV006",
-    paymentStatus: "Pending",
-    totalAmount: "$200.00",
-    paymentMethod: "Bank Transfer",
+    invoice: 'INV006',
+    paymentStatus: 'Pending',
+    totalAmount: '$200.00',
+    paymentMethod: 'Bank Transfer'
   },
   {
-    invoice: "INV007",
-    paymentStatus: "Unpaid",
-    totalAmount: "$300.00",
-    paymentMethod: "Credit Card",
-  },
+    invoice: 'INV007',
+    paymentStatus: 'Unpaid',
+    totalAmount: '$300.00',
+    paymentMethod: 'Credit Card'
+  }
 ]
 
 export function TableFooterExample() {
@@ -269,7 +268,7 @@ export function TableFooterExample() {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {invoices.slice(0, 3).map((invoice) => (
+        {invoices.slice(0, 3).map(invoice => (
           <TableRow key={invoice.invoice}>
             <TableCell className="font-medium">{invoice.invoice}</TableCell>
             <TableCell>{invoice.paymentStatus}</TableCell>
@@ -287,7 +286,6 @@ export function TableFooterExample() {
     </Table>
   )
 }
-
 ```
 
 ## Actions
@@ -295,24 +293,24 @@ export function TableFooterExample() {
 A table showing actions for each row using a `<DropdownMenu />` component.
 
 ```tsx
-import { MoreHorizontalIcon } from "lucide-react"
+import { MoreHorizontalIcon } from 'lucide-react'
 
-import { Button } from "@/components/ui/button"
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  TableRow
+} from '@/components/ui/table'
 
 export function TableActions() {
   return (
@@ -331,9 +329,7 @@ export function TableActions() {
           <TableCell className="text-right">
             <DropdownMenu>
               <DropdownMenuTrigger
-                render={
-                  <Button variant="ghost" size="icon" className="size-8" />
-                }
+                render={<Button variant="ghost" size="icon" className="size-8" />}
               >
                 <MoreHorizontalIcon />
                 <span className="sr-only">Open menu</span>
@@ -342,9 +338,7 @@ export function TableActions() {
                 <DropdownMenuItem>Edit</DropdownMenuItem>
                 <DropdownMenuItem>Duplicate</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive">
-                  Delete
-                </DropdownMenuItem>
+                <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </TableCell>
@@ -355,9 +349,7 @@ export function TableActions() {
           <TableCell className="text-right">
             <DropdownMenu>
               <DropdownMenuTrigger
-                render={
-                  <Button variant="ghost" size="icon" className="size-8" />
-                }
+                render={<Button variant="ghost" size="icon" className="size-8" />}
               >
                 <MoreHorizontalIcon />
                 <span className="sr-only">Open menu</span>
@@ -366,9 +358,7 @@ export function TableActions() {
                 <DropdownMenuItem>Edit</DropdownMenuItem>
                 <DropdownMenuItem>Duplicate</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive">
-                  Delete
-                </DropdownMenuItem>
+                <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </TableCell>
@@ -379,9 +369,7 @@ export function TableActions() {
           <TableCell className="text-right">
             <DropdownMenu>
               <DropdownMenuTrigger
-                render={
-                  <Button variant="ghost" size="icon" className="size-8" />
-                }
+                render={<Button variant="ghost" size="icon" className="size-8" />}
               >
                 <MoreHorizontalIcon />
                 <span className="sr-only">Open menu</span>
@@ -390,9 +378,7 @@ export function TableActions() {
                 <DropdownMenuItem>Edit</DropdownMenuItem>
                 <DropdownMenuItem>Duplicate</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive">
-                  Delete
-                </DropdownMenuItem>
+                <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </TableCell>
@@ -401,7 +387,6 @@ export function TableActions() {
     </Table>
   )
 }
-
 ```
 
 ## Data Table
@@ -417,14 +402,11 @@ You can also see an example of a data table in the [Tasks](/examples/tasks) demo
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
+import { useTranslation, type Translations } from '@/components/language-selector'
 import {
   Table,
   TableBody,
@@ -433,110 +415,110 @@ import {
   TableFooter,
   TableHead,
   TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  TableRow
+} from '@/components/ui/table'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      caption: "A list of your recent invoices.",
-      invoice: "Invoice",
-      status: "Status",
-      method: "Method",
-      amount: "Amount",
-      paid: "Paid",
-      pending: "Pending",
-      unpaid: "Unpaid",
-      creditCard: "Credit Card",
-      paypal: "PayPal",
-      bankTransfer: "Bank Transfer",
-      total: "Total",
-    },
+      caption: 'A list of your recent invoices.',
+      invoice: 'Invoice',
+      status: 'Status',
+      method: 'Method',
+      amount: 'Amount',
+      paid: 'Paid',
+      pending: 'Pending',
+      unpaid: 'Unpaid',
+      creditCard: 'Credit Card',
+      paypal: 'PayPal',
+      bankTransfer: 'Bank Transfer',
+      total: 'Total'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      caption: "قائمة بفواتيرك الأخيرة.",
-      invoice: "الفاتورة",
-      status: "الحالة",
-      method: "الطريقة",
-      amount: "المبلغ",
-      paid: "مدفوع",
-      pending: "قيد الانتظار",
-      unpaid: "غير مدفوع",
-      creditCard: "بطاقة ائتمانية",
-      paypal: "PayPal",
-      bankTransfer: "تحويل بنكي",
-      total: "المجموع",
-    },
+      caption: 'قائمة بفواتيرك الأخيرة.',
+      invoice: 'الفاتورة',
+      status: 'الحالة',
+      method: 'الطريقة',
+      amount: 'المبلغ',
+      paid: 'مدفوع',
+      pending: 'قيد الانتظار',
+      unpaid: 'غير مدفوع',
+      creditCard: 'بطاقة ائتمانية',
+      paypal: 'PayPal',
+      bankTransfer: 'تحويل بنكي',
+      total: 'المجموع'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      caption: "רשימת החשבוניות האחרונות שלך.",
-      invoice: "חשבונית",
-      status: "סטטוס",
-      method: "שיטה",
-      amount: "סכום",
-      paid: "שולם",
-      pending: "ממתין",
-      unpaid: "לא שולם",
-      creditCard: "כרטיס אשראי",
-      paypal: "PayPal",
-      bankTransfer: "העברה בנקאית",
-      total: 'סה"כ',
-    },
-  },
+      caption: 'רשימת החשבוניות האחרונות שלך.',
+      invoice: 'חשבונית',
+      status: 'סטטוס',
+      method: 'שיטה',
+      amount: 'סכום',
+      paid: 'שולם',
+      pending: 'ממתין',
+      unpaid: 'לא שולם',
+      creditCard: 'כרטיס אשראי',
+      paypal: 'PayPal',
+      bankTransfer: 'העברה בנקאית',
+      total: 'סה"כ'
+    }
+  }
 }
 
 const invoices = [
   {
-    invoice: "INV001",
-    paymentStatus: "paid" as const,
-    totalAmount: "$250.00",
-    paymentMethod: "creditCard" as const,
+    invoice: 'INV001',
+    paymentStatus: 'paid' as const,
+    totalAmount: '$250.00',
+    paymentMethod: 'creditCard' as const
   },
   {
-    invoice: "INV002",
-    paymentStatus: "pending" as const,
-    totalAmount: "$150.00",
-    paymentMethod: "paypal" as const,
+    invoice: 'INV002',
+    paymentStatus: 'pending' as const,
+    totalAmount: '$150.00',
+    paymentMethod: 'paypal' as const
   },
   {
-    invoice: "INV003",
-    paymentStatus: "unpaid" as const,
-    totalAmount: "$350.00",
-    paymentMethod: "bankTransfer" as const,
+    invoice: 'INV003',
+    paymentStatus: 'unpaid' as const,
+    totalAmount: '$350.00',
+    paymentMethod: 'bankTransfer' as const
   },
   {
-    invoice: "INV004",
-    paymentStatus: "paid" as const,
-    totalAmount: "$450.00",
-    paymentMethod: "creditCard" as const,
+    invoice: 'INV004',
+    paymentStatus: 'paid' as const,
+    totalAmount: '$450.00',
+    paymentMethod: 'creditCard' as const
   },
   {
-    invoice: "INV005",
-    paymentStatus: "paid" as const,
-    totalAmount: "$550.00",
-    paymentMethod: "paypal" as const,
+    invoice: 'INV005',
+    paymentStatus: 'paid' as const,
+    totalAmount: '$550.00',
+    paymentMethod: 'paypal' as const
   },
   {
-    invoice: "INV006",
-    paymentStatus: "pending" as const,
-    totalAmount: "$200.00",
-    paymentMethod: "bankTransfer" as const,
+    invoice: 'INV006',
+    paymentStatus: 'pending' as const,
+    totalAmount: '$200.00',
+    paymentMethod: 'bankTransfer' as const
   },
   {
-    invoice: "INV007",
-    paymentStatus: "unpaid" as const,
-    totalAmount: "$300.00",
-    paymentMethod: "creditCard" as const,
-  },
+    invoice: 'INV007',
+    paymentStatus: 'unpaid' as const,
+    totalAmount: '$300.00',
+    paymentMethod: 'creditCard' as const
+  }
 ]
 
 export function TableRtl() {
-  const { dir, t } = useTranslation(translations, "ar")
+  const { dir, t } = useTranslation(translations, 'ar')
 
   return (
     <Table dir={dir}>
@@ -550,7 +532,7 @@ export function TableRtl() {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {invoices.map((invoice) => (
+        {invoices.map(invoice => (
           <TableRow key={invoice.invoice}>
             <TableCell className="font-medium">{invoice.invoice}</TableCell>
             <TableCell>{t[invoice.paymentStatus]}</TableCell>
@@ -568,5 +550,4 @@ export function TableRtl() {
     </Table>
   )
 }
-
 ```

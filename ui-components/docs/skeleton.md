@@ -6,7 +6,7 @@ component: true
 ---
 
 ```tsx
-import { Skeleton } from "@/components/ui/skeleton"
+import { Skeleton } from '@/components/ui/skeleton'
 
 export function SkeletonDemo() {
   return (
@@ -19,7 +19,6 @@ export function SkeletonDemo() {
     </div>
   )
 }
-
 ```
 
 ## Installation
@@ -61,7 +60,7 @@ npx shadcn@latest add skeleton
 ## Usage
 
 ```tsx
-import { Skeleton } from "@/components/ui/skeleton"
+import { Skeleton } from '@/components/ui/skeleton'
 ```
 
 ```tsx
@@ -71,7 +70,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 ## Avatar
 
 ```tsx
-import { Skeleton } from "@/components/ui/skeleton"
+import { Skeleton } from '@/components/ui/skeleton'
 
 export function SkeletonAvatar() {
   return (
@@ -84,14 +83,13 @@ export function SkeletonAvatar() {
     </div>
   )
 }
-
 ```
 
 ## Card
 
 ```tsx
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export function SkeletonCard() {
   return (
@@ -106,13 +104,12 @@ export function SkeletonCard() {
     </Card>
   )
 }
-
 ```
 
 ## Text
 
 ```tsx
-import { Skeleton } from "@/components/ui/skeleton"
+import { Skeleton } from '@/components/ui/skeleton'
 
 export function SkeletonText() {
   return (
@@ -123,13 +120,12 @@ export function SkeletonText() {
     </div>
   )
 }
-
 ```
 
 ## Form
 
 ```tsx
-import { Skeleton } from "@/components/ui/skeleton"
+import { Skeleton } from '@/components/ui/skeleton'
 
 export function SkeletonForm() {
   return (
@@ -146,13 +142,12 @@ export function SkeletonForm() {
     </div>
   )
 }
-
 ```
 
 ## Table
 
 ```tsx
-import { Skeleton } from "@/components/ui/skeleton"
+import { Skeleton } from '@/components/ui/skeleton'
 
 export function SkeletonTable() {
   return (
@@ -167,7 +162,6 @@ export function SkeletonTable() {
     </div>
   )
 }
-
 ```
 
 ## RTL
@@ -175,33 +169,30 @@ export function SkeletonTable() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import { Skeleton } from "@/components/ui/skeleton"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
-    values: {},
+    dir: 'ltr',
+    values: {}
   },
   ar: {
-    dir: "rtl",
-    values: {},
+    dir: 'rtl',
+    values: {}
   },
   he: {
-    dir: "rtl",
-    values: {},
-  },
+    dir: 'rtl',
+    values: {}
+  }
 }
 
 export function SkeletonRtl() {
-  const { dir } = useTranslation(translations, "ar")
+  const { dir } = useTranslation(translations, 'ar')
 
   return (
     <div className="flex items-center gap-4" dir={dir}>
@@ -213,5 +204,4 @@ export function SkeletonRtl() {
     </div>
   )
 }
-
 ```

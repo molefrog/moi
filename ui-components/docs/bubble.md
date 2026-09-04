@@ -6,12 +6,7 @@ component: true
 ---
 
 ```tsx
-import {
-  Bubble,
-  BubbleContent,
-  BubbleGroup,
-  BubbleReactions,
-} from "@/components/ui/bubble"
+import { Bubble, BubbleContent, BubbleGroup, BubbleReactions } from '@/components/ui/bubble'
 
 export function BubbleDemo() {
   return (
@@ -25,8 +20,7 @@ export function BubbleDemo() {
         </Bubble>
         <Bubble variant="muted">
           <BubbleContent>
-            I can group messages, switch sides, and keep the whole thread easy
-            to scan.
+            I can group messages, switch sides, and keep the whole thread easy to scan.
           </BubbleContent>
           <BubbleReactions role="img" aria-label="Reaction: thumbs up">
             <span>👍</span>
@@ -38,13 +32,9 @@ export function BubbleDemo() {
       </Bubble>
       <Bubble variant="muted">
         <BubbleContent>
-          Yes. You are reading a demo that is demoing itself. Very meta. Very
-          on-brand.
+          Yes. You are reading a demo that is demoing itself. Very meta. Very on-brand.
         </BubbleContent>
-        <BubbleReactions
-          role="img"
-          aria-label="Reactions: thumbs up, fire, eyes, and 2 more"
-        >
+        <BubbleReactions role="img" aria-label="Reactions: thumbs up, fire, eyes, and 2 more">
           <span>👍</span>
           <span>🔥</span>
           <span>👀</span>
@@ -54,7 +44,6 @@ export function BubbleDemo() {
     </div>
   )
 }
-
 ```
 
 The `Bubble` component displays framed conversational content. Use it for chat text, short structured output, quoted replies, suggestions, and reactions.
@@ -100,14 +89,12 @@ npx shadcn@latest add bubble
 ## Usage
 
 ```tsx showLineNumbers
-import { Bubble, BubbleContent, BubbleReactions } from "@/components/ui/bubble"
+import { Bubble, BubbleContent, BubbleReactions } from '@/components/ui/bubble'
 ```
 
 ```tsx showLineNumbers
 <Bubble>
-  <BubbleContent>
-    I checked the registry output and removed the stale route.
-  </BubbleContent>
+  <BubbleContent>I checked the registry output and removed the stale route.</BubbleContent>
   <BubbleReactions>
     <span>👍</span>
   </BubbleReactions>
@@ -148,12 +135,8 @@ BubbleGroup
 Use `variant` to change the visual treatment of the bubble.
 
 ```tsx
-import { Markdown } from "@/components/markdown"
-import {
-  Bubble,
-  BubbleContent,
-  BubbleReactions,
-} from "@/components/ui/bubble"
+import { Markdown } from '@/components/markdown'
+import { Bubble, BubbleContent, BubbleReactions } from '@/components/ui/bubble'
 
 export function BubbleVariantsDemo() {
   return (
@@ -174,8 +157,7 @@ export function BubbleVariantsDemo() {
       </Bubble>
       <Bubble variant="tinted" align="end">
         <BubbleContent>
-          This one is tinted. The tint is a softer color derived from the
-          primary color.
+          This one is tinted. The tint is a softer color derived from the primary color.
         </BubbleContent>
       </Bubble>
       <Bubble variant="outline">
@@ -200,7 +182,6 @@ Ghost bubbles are full width and can take the full width of the container.
     </div>
   )
 }
-
 ```
 
 | Variant       | Description                                            |
@@ -220,7 +201,7 @@ A bubble sizes to its content, up to 80% of the container width. The `ghost` var
 Use `align` on `Bubble` to align the bubble to the start or end of the conversation.
 
 ```tsx
-import { Bubble, BubbleContent } from "@/components/ui/bubble"
+import { Bubble, BubbleContent } from '@/components/ui/bubble'
 
 export function BubbleAlignmentDemo() {
   return (
@@ -238,7 +219,6 @@ export function BubbleAlignmentDemo() {
     </div>
   )
 }
-
 ```
 
 | align   | Description                                        |
@@ -261,12 +241,7 @@ BubbleGroup
 ```
 
 ```tsx
-import {
-  Bubble,
-  BubbleContent,
-  BubbleGroup,
-  BubbleReactions,
-} from "@/components/ui/bubble"
+import { Bubble, BubbleContent, BubbleGroup, BubbleReactions } from '@/components/ui/bubble'
 
 export function BubbleGroupDemo() {
   return (
@@ -290,14 +265,13 @@ export function BubbleGroupDemo() {
       </BubbleGroup>
       <Bubble variant="muted">
         <BubbleContent>
-          Want me to diff yesterday&apos;s you against today&apos;s you?
-          It&apos;s a bit embarrassing.
+          Want me to diff yesterday&apos;s you against today&apos;s you? It&apos;s a bit
+          embarrassing.
         </BubbleContent>
       </Bubble>
     </div>
   )
 }
-
 ```
 
 ## Links and Buttons
@@ -305,15 +279,11 @@ export function BubbleGroupDemo() {
 You can turn a bubble into a link or button by using the `render` prop on `BubbleContent`.
 
 ```tsx
-"use client"
+'use client'
 
-import { toast } from "sonner"
+import { toast } from 'sonner'
 
-import {
-  Bubble,
-  BubbleContent,
-  BubbleGroup,
-} from "@/components/ui/bubble"
+import { Bubble, BubbleContent, BubbleGroup } from '@/components/ui/bubble'
 
 export function BubbleLinkButtonDemo() {
   return (
@@ -323,21 +293,13 @@ export function BubbleLinkButtonDemo() {
       </Bubble>
       <BubbleGroup>
         <Bubble variant="tinted" align="end">
-          <BubbleContent
-            render={
-              <button onClick={() => toast("You clicked forgot password")} />
-            }
-          >
+          <BubbleContent render={<button onClick={() => toast('You clicked forgot password')} />}>
             I forgot my password
           </BubbleContent>
         </Bubble>
         <Bubble variant="tinted" align="end">
           <BubbleContent
-            render={
-              <button
-                onClick={() => toast("You clicked help with subscription")}
-              />
-            }
+            render={<button onClick={() => toast('You clicked help with subscription')} />}
           >
             I need help with my subscription
           </BubbleContent>
@@ -345,11 +307,7 @@ export function BubbleLinkButtonDemo() {
         <Bubble variant="tinted" align="end">
           <BubbleContent
             render={
-              <button
-                onClick={() =>
-                  toast("You clicked something else. Talk to a human.")
-                }
-              />
+              <button onClick={() => toast('You clicked something else. Talk to a human.')} />
             }
           >
             Something else. Talk to a human.
@@ -359,11 +317,10 @@ export function BubbleLinkButtonDemo() {
     </div>
   )
 }
-
 ```
 
 ```tsx showLineNumbers
-import { Bubble, BubbleContent } from "@/components/ui/bubble"
+import { Bubble, BubbleContent } from '@/components/ui/bubble'
 
 export function BubbleLinkDemo() {
   return (
@@ -379,51 +336,35 @@ export function BubbleLinkDemo() {
 Use `BubbleReactions` for bubble reactions. You can use it to display reactions or quick action buttons. Use `side` and `align` to position the row — `side="top"` anchors it to the upper edge. Reactions overlap the bubble edge, so leave vertical space between rows — the examples below use a larger `gap` for this reason.
 
 ```tsx
-"use client"
+'use client'
 
-import { toast } from "sonner"
+import { toast } from 'sonner'
 
-import {
-  Bubble,
-  BubbleContent,
-  BubbleReactions,
-} from "@/components/ui/bubble"
-import { Button } from "@/components/ui/button"
+import { Bubble, BubbleContent, BubbleReactions } from '@/components/ui/bubble'
+import { Button } from '@/components/ui/button'
 
 export function BubbleReactionsDemo() {
   return (
     <div className="flex w-full max-w-sm flex-col gap-12 py-12">
       <Bubble variant="muted" align="end">
-        <BubbleContent>
-          I don&apos;t need tests, I know my code works.
-        </BubbleContent>
-        <BubbleReactions
-          align="start"
-          role="img"
-          aria-label="Reactions: thumbs up, surprised"
-        >
+        <BubbleContent>I don&apos;t need tests, I know my code works.</BubbleContent>
+        <BubbleReactions align="start" role="img" aria-label="Reactions: thumbs up, surprised">
           <span>👍</span>
           <span>😮</span>
         </BubbleReactions>
       </Bubble>
       <Bubble variant="muted">
         <BubbleContent>
-          Bold. Fine I&apos;ll add some tests. I&apos;ll let you know when
-          they&apos;re done.
+          Bold. Fine I&apos;ll add some tests. I&apos;ll let you know when they&apos;re done.
         </BubbleContent>
-        <BubbleReactions
-          role="img"
-          aria-label="Reactions: eyes, rocket, and 2 more"
-        >
+        <BubbleReactions role="img" aria-label="Reactions: eyes, rocket, and 2 more">
           <span>👀</span>
           <span>🚀</span>
           <span>+2</span>
         </BubbleReactions>
       </Bubble>
       <Bubble variant="default" align="end">
-        <BubbleContent>
-          Tests passed on the first try. All 142 of them. Looking good!
-        </BubbleContent>
+        <BubbleContent>Tests passed on the first try. All 142 of them. Looking good!</BubbleContent>
         <BubbleReactions
           side="top"
           align="start"
@@ -440,7 +381,7 @@ export function BubbleReactionsDemo() {
           <Button
             variant="ghost"
             size="xs"
-            onClick={() => toast.success("You clicked yes, running command...")}
+            onClick={() => toast.success('You clicked yes, running command...')}
           >
             Yes, run it
           </Button>
@@ -449,7 +390,6 @@ export function BubbleReactionsDemo() {
     </div>
   )
 }
-
 ```
 
 ## Show More / Collapsible
@@ -457,17 +397,14 @@ export function BubbleReactionsDemo() {
 Long bubble content can be composed with [`Collapsible`](/docs/components/collapsible) to allow for a show more or show less interaction. Use the `CollapsibleTrigger` component to trigger the collapsible content.
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import { ChevronDownIcon } from "lucide-react"
+import * as React from 'react'
+import { ChevronDownIcon } from 'lucide-react'
 
-import { Bubble, BubbleContent } from "@/components/ui/bubble"
-import { Button } from "@/components/ui/button"
-import {
-  Collapsible,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+import { Bubble, BubbleContent } from '@/components/ui/bubble'
+import { Button } from '@/components/ui/button'
+import { Collapsible, CollapsibleTrigger } from '@/components/ui/collapsible'
 
 const text = `The accessibility review found two focus states that were visually too subtle in dark mode.
 
@@ -496,14 +433,9 @@ export function BubbleCollapsible() {
             <div>{open || !isLong ? text : preview}</div>
             {isLong ? (
               <CollapsibleTrigger
-                render={
-                  <Button
-                    variant="link"
-                    className="gap-1 p-0 text-muted-foreground"
-                  />
-                }
+                render={<Button variant="link" className="gap-1 p-0 text-muted-foreground" />}
               >
-                {open ? "Show less" : "Show more"}
+                {open ? 'Show less' : 'Show more'}
                 <ChevronDownIcon
                   data-icon="inline-end"
                   className="group-data-panel-open/button:rotate-180"
@@ -516,7 +448,6 @@ export function BubbleCollapsible() {
     </div>
   )
 }
-
 ```
 
 ## Tooltip
@@ -524,19 +455,11 @@ export function BubbleCollapsible() {
 Wrap a bubble in a [`Tooltip`](/docs/components/tooltip) to reveal metadata on hover, such as when a message was read.
 
 ```tsx
-import { CheckIcon } from "lucide-react"
+import { CheckIcon } from 'lucide-react'
 
-import {
-  Bubble,
-  BubbleContent,
-  BubbleReactions,
-} from "@/components/ui/bubble"
-import { Button } from "@/components/ui/button"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Bubble, BubbleContent, BubbleReactions } from '@/components/ui/bubble'
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export function BubbleTooltipDemo() {
   return (
@@ -558,7 +481,6 @@ export function BubbleTooltipDemo() {
     </div>
   )
 }
-
 ```
 
 ## Popover
@@ -566,22 +488,18 @@ export function BubbleTooltipDemo() {
 Pair a bubble with a [`Popover`](/docs/components/popover) to surface more information on demand, such as the full error message for a failed action.
 
 ```tsx
-import { InfoIcon } from "lucide-react"
+import { InfoIcon } from 'lucide-react'
 
-import {
-  Bubble,
-  BubbleContent,
-  BubbleReactions,
-} from "@/components/ui/bubble"
-import { Button } from "@/components/ui/button"
+import { Bubble, BubbleContent, BubbleReactions } from '@/components/ui/bubble'
+import { Button } from '@/components/ui/button'
 import {
   Popover,
   PopoverContent,
   PopoverDescription,
   PopoverHeader,
   PopoverTitle,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+  PopoverTrigger
+} from '@/components/ui/popover'
 
 export function BubblePopoverDemo() {
   return (
@@ -607,9 +525,7 @@ export function BubblePopoverDemo() {
             </PopoverTrigger>
             <PopoverContent>
               <PopoverHeader>
-                <PopoverTitle className="text-sm">
-                  Command failed with exit code 1
-                </PopoverTitle>
+                <PopoverTitle className="text-sm">Command failed with exit code 1</PopoverTitle>
                 <PopoverDescription className="text-sm">
                   ENOENT: no such file or directory, open pnpm-lock.yaml
                 </PopoverDescription>
@@ -621,7 +537,6 @@ export function BubblePopoverDemo() {
     </div>
   )
 }
-
 ```
 
 ## Accessibility

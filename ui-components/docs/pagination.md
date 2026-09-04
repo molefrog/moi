@@ -13,8 +13,8 @@ import {
   PaginationItem,
   PaginationLink,
   PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
+  PaginationPrevious
+} from '@/components/ui/pagination'
 
 export function PaginationDemo() {
   return (
@@ -44,7 +44,6 @@ export function PaginationDemo() {
     </Pagination>
   )
 }
-
 ```
 
 ## Installation
@@ -93,8 +92,8 @@ import {
   PaginationItem,
   PaginationLink,
   PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
+  PaginationPrevious
+} from '@/components/ui/pagination'
 ```
 
 ```tsx showLineNumbers
@@ -150,8 +149,8 @@ import {
   Pagination,
   PaginationContent,
   PaginationItem,
-  PaginationLink,
-} from "@/components/ui/pagination"
+  PaginationLink
+} from '@/components/ui/pagination'
 
 export function PaginationSimple() {
   return (
@@ -178,7 +177,6 @@ export function PaginationSimple() {
     </Pagination>
   )
 }
-
 ```
 
 ## Icons Only
@@ -186,22 +184,22 @@ export function PaginationSimple() {
 Use just the previous and next buttons without page numbers. This is useful for data tables with a rows per page selector.
 
 ```tsx
-import { Field, FieldLabel } from "@/components/ui/field"
+import { Field, FieldLabel } from '@/components/ui/field'
 import {
   Pagination,
   PaginationContent,
   PaginationItem,
   PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
+  PaginationPrevious
+} from '@/components/ui/pagination'
 import {
   Select,
   SelectContent,
   SelectGroup,
   SelectItem,
   SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  SelectValue
+} from '@/components/ui/select'
 
 export function PaginationIconsOnly() {
   return (
@@ -235,7 +233,6 @@ export function PaginationIconsOnly() {
     </div>
   )
 }
-
 ```
 
 ## Next.js
@@ -273,14 +270,11 @@ const PaginationLink = ({...props }: ) => (
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
+import { useTranslation, type Translations } from '@/components/language-selector'
 import {
   Pagination,
   PaginationContent,
@@ -288,47 +282,47 @@ import {
   PaginationItem,
   PaginationLink,
   PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
+  PaginationPrevious
+} from '@/components/ui/pagination'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      previous: "Previous",
-      next: "Next",
-    },
+      previous: 'Previous',
+      next: 'Next'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      previous: "السابق",
-      next: "التالي",
-    },
+      previous: 'السابق',
+      next: 'التالي'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      previous: "הקודם",
-      next: "הבא",
-    },
-  },
+      previous: 'הקודם',
+      next: 'הבא'
+    }
+  }
 }
 
 function toArabicNumerals(num: number): string {
-  const arabicNumerals = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"]
+  const arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩']
   return num
     .toString()
-    .split("")
-    .map((digit) => arabicNumerals[parseInt(digit, 10)])
-    .join("")
+    .split('')
+    .map(digit => arabicNumerals[parseInt(digit, 10)])
+    .join('')
 }
 
 export function PaginationRtl() {
-  const { dir, t, language } = useTranslation(translations, "ar")
+  const { dir, t, language } = useTranslation(translations, 'ar')
 
   const formatNumber = (num: number): string => {
-    if (language === "ar") {
+    if (language === 'ar') {
       return toArabicNumerals(num)
     }
     return num.toString()
@@ -361,7 +355,6 @@ export function PaginationRtl() {
     </Pagination>
   )
 }
-
 ```
 
 ## Changelog

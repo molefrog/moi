@@ -9,11 +9,11 @@ links:
 ---
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import { Progress } from "@/components/ui/progress"
+import { Progress } from '@/components/ui/progress'
 
 export function ProgressDemo() {
   const [progress, setProgress] = React.useState(13)
@@ -25,7 +25,6 @@ export function ProgressDemo() {
 
   return <Progress value={progress} className="w-[60%]" />
 }
-
 ```
 
 ## Installation
@@ -73,7 +72,7 @@ npm install @base-ui/react
 ## Usage
 
 ```tsx showLineNumbers
-import { Progress } from "@/components/ui/progress"
+import { Progress } from '@/components/ui/progress'
 ```
 
 ```tsx showLineNumbers
@@ -87,12 +86,7 @@ import { Progress } from "@/components/ui/progress"
 Use `ProgressLabel` and `ProgressValue` to add a label and value display.
 
 ```tsx showLineNumbers
-import {
-  Progress,
-  ProgressLabel,
-  ProgressValue,
-} from "@/components/ui/progress"
-
+import { Progress, ProgressLabel, ProgressValue } from '@/components/ui/progress'
 ;<Progress value={56} className="w-full max-w-sm">
   <ProgressLabel>Upload progress</ProgressLabel>
   <ProgressValue />
@@ -112,11 +106,7 @@ Progress
 Use `ProgressLabel` and `ProgressValue` to add a label and value display.
 
 ```tsx
-import {
-  Progress,
-  ProgressLabel,
-  ProgressValue,
-} from "@/components/ui/progress"
+import { Progress, ProgressLabel, ProgressValue } from '@/components/ui/progress'
 
 export function ProgressWithLabel() {
   return (
@@ -126,7 +116,6 @@ export function ProgressWithLabel() {
     </Progress>
   )
 }
-
 ```
 
 ## Controlled
@@ -134,12 +123,12 @@ export function ProgressWithLabel() {
 A progress bar that can be controlled by a slider.
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import { Progress } from "@/components/ui/progress"
-import { Slider } from "@/components/ui/slider"
+import { Progress } from '@/components/ui/progress'
+import { Slider } from '@/components/ui/slider'
 
 export function ProgressControlled() {
   const [value, setValue] = React.useState(50)
@@ -149,7 +138,7 @@ export function ProgressControlled() {
       <Progress value={value} className="w-full" />
       <Slider
         value={value}
-        onValueChange={(value) => setValue(value as number)}
+        onValueChange={value => setValue(value as number)}
         min={0}
         max={100}
         step={1}
@@ -157,7 +146,6 @@ export function ProgressControlled() {
     </div>
   )
 }
-
 ```
 
 ## RTL
@@ -165,55 +153,48 @@ export function ProgressControlled() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import {
-  Progress,
-  ProgressLabel,
-  ProgressValue,
-} from "@/components/ui/progress"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Progress, ProgressLabel, ProgressValue } from '@/components/ui/progress'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      label: "Upload progress",
-    },
+      label: 'Upload progress'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      label: "تقدم الرفع",
-    },
+      label: 'تقدم الرفع'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      label: "התקדמות העלאה",
-    },
-  },
+      label: 'התקדמות העלאה'
+    }
+  }
 }
 
 function toArabicNumerals(num: number): string {
-  const arabicNumerals = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"]
+  const arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩']
   return num
     .toString()
-    .split("")
-    .map((digit) => arabicNumerals[parseInt(digit, 10)])
-    .join("")
+    .split('')
+    .map(digit => arabicNumerals[parseInt(digit, 10)])
+    .join('')
 }
 
 export function ProgressRtl() {
-  const { dir, t, language } = useTranslation(translations, "ar")
+  const { dir, t, language } = useTranslation(translations, 'ar')
 
   const formatNumber = (num: number): string => {
-    if (language === "ar") {
+    if (language === 'ar') {
       return toArabicNumerals(num)
     }
     return num.toString()
@@ -223,16 +204,11 @@ export function ProgressRtl() {
     <Progress value={56} className="w-full max-w-sm" dir={dir}>
       <ProgressLabel>{t.label}</ProgressLabel>
       <ProgressValue>
-        {(value) => (
-          <span className="ms-auto">
-            {formatNumber(parseFloat(value ?? "0"))}%
-          </span>
-        )}
+        {value => <span className="ms-auto">{formatNumber(parseFloat(value ?? '0'))}%</span>}
       </ProgressValue>
     </Progress>
   )
 }
-
 ```
 
 ## API Reference

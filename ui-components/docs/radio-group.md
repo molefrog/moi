@@ -9,8 +9,8 @@ links:
 ---
 
 ```tsx
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 export function RadioGroupDemo() {
   return (
@@ -30,7 +30,6 @@ export function RadioGroupDemo() {
     </RadioGroup>
   )
 }
-
 ```
 
 ## Installation
@@ -78,8 +77,8 @@ npm install @base-ui/react
 ## Usage
 
 ```tsx showLineNumbers
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 ```
 
 ```tsx showLineNumbers
@@ -110,13 +109,8 @@ RadioGroup
 Radio group items with a description using the `Field` component.
 
 ```tsx
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 export function RadioGroupDescription() {
   return (
@@ -125,9 +119,7 @@ export function RadioGroupDescription() {
         <RadioGroupItem value="default" id="desc-r1" />
         <FieldContent>
           <FieldLabel htmlFor="desc-r1">Default</FieldLabel>
-          <FieldDescription>
-            Standard spacing for most use cases.
-          </FieldDescription>
+          <FieldDescription>Standard spacing for most use cases.</FieldDescription>
         </FieldContent>
       </Field>
       <Field orientation="horizontal">
@@ -141,15 +133,12 @@ export function RadioGroupDescription() {
         <RadioGroupItem value="compact" id="desc-r3" />
         <FieldContent>
           <FieldLabel htmlFor="desc-r3">Compact</FieldLabel>
-          <FieldDescription>
-            Minimal spacing for dense layouts.
-          </FieldDescription>
+          <FieldDescription>Minimal spacing for dense layouts.</FieldDescription>
         </FieldContent>
       </Field>
     </RadioGroup>
   )
 }
-
 ```
 
 ## Choice Card
@@ -162,9 +151,9 @@ import {
   FieldContent,
   FieldDescription,
   FieldLabel,
-  FieldTitle,
-} from "@/components/ui/field"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+  FieldTitle
+} from '@/components/ui/field'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 export function RadioGroupChoiceCard() {
   return (
@@ -173,9 +162,7 @@ export function RadioGroupChoiceCard() {
         <Field orientation="horizontal">
           <FieldContent>
             <FieldTitle>Plus</FieldTitle>
-            <FieldDescription>
-              For individuals and small teams.
-            </FieldDescription>
+            <FieldDescription>For individuals and small teams.</FieldDescription>
           </FieldContent>
           <RadioGroupItem value="plus" id="plus-plan" />
         </Field>
@@ -193,9 +180,7 @@ export function RadioGroupChoiceCard() {
         <Field orientation="horizontal">
           <FieldContent>
             <FieldTitle>Enterprise</FieldTitle>
-            <FieldDescription>
-              For large teams and enterprises.
-            </FieldDescription>
+            <FieldDescription>For large teams and enterprises.</FieldDescription>
           </FieldContent>
           <RadioGroupItem value="enterprise" id="enterprise-plan" />
         </Field>
@@ -203,7 +188,6 @@ export function RadioGroupChoiceCard() {
     </RadioGroup>
   )
 }
-
 ```
 
 ## Fieldset
@@ -211,22 +195,14 @@ export function RadioGroupChoiceCard() {
 Use `FieldSet` and `FieldLegend` to group radio items with a label and description.
 
 ```tsx
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-  FieldLegend,
-  FieldSet,
-} from "@/components/ui/field"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 export function RadioGroupFieldset() {
   return (
     <FieldSet className="w-full max-w-xs">
       <FieldLegend variant="label">Subscription Plan</FieldLegend>
-      <FieldDescription>
-        Yearly and lifetime plans offer significant savings.
-      </FieldDescription>
+      <FieldDescription>Yearly and lifetime plans offer significant savings.</FieldDescription>
       <RadioGroup defaultValue="monthly">
         <Field orientation="horizontal">
           <RadioGroupItem value="monthly" id="plan-monthly" />
@@ -250,7 +226,6 @@ export function RadioGroupFieldset() {
     </FieldSet>
   )
 }
-
 ```
 
 ## Disabled
@@ -258,8 +233,8 @@ export function RadioGroupFieldset() {
 Use the `disabled` prop on `RadioGroup` to disable all items.
 
 ```tsx
-import { Field, FieldLabel } from "@/components/ui/field"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Field, FieldLabel } from '@/components/ui/field'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 export function RadioGroupDisabled() {
   return (
@@ -285,7 +260,6 @@ export function RadioGroupDisabled() {
     </RadioGroup>
   )
 }
-
 ```
 
 ## Invalid
@@ -293,22 +267,14 @@ export function RadioGroupDisabled() {
 Use `aria-invalid` on `RadioGroupItem` and `data-invalid` on `Field` to show validation errors.
 
 ```tsx
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-  FieldLegend,
-  FieldSet,
-} from "@/components/ui/field"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 export function RadioGroupInvalid() {
   return (
     <FieldSet className="w-full max-w-xs">
       <FieldLegend variant="label">Notification Preferences</FieldLegend>
-      <FieldDescription>
-        Choose how you want to receive notifications.
-      </FieldDescription>
+      <FieldDescription>Choose how you want to receive notifications.</FieldDescription>
       <RadioGroup defaultValue="email">
         <Field orientation="horizontal" data-invalid>
           <RadioGroupItem value="email" id="invalid-email" aria-invalid />
@@ -332,7 +298,6 @@ export function RadioGroupInvalid() {
     </FieldSet>
   )
 }
-
 ```
 
 ## RTL
@@ -340,63 +305,52 @@ export function RadioGroupInvalid() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
-import {
-  RadioGroup,
-  RadioGroupItem,
-} from "@/components/ui/radio-group"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      default: "Default",
-      defaultDescription: "Standard spacing for most use cases.",
-      comfortable: "Comfortable",
-      comfortableDescription: "More space between elements.",
-      compact: "Compact",
-      compactDescription: "Minimal spacing for dense layouts.",
-    },
+      default: 'Default',
+      defaultDescription: 'Standard spacing for most use cases.',
+      comfortable: 'Comfortable',
+      comfortableDescription: 'More space between elements.',
+      compact: 'Compact',
+      compactDescription: 'Minimal spacing for dense layouts.'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      default: "افتراضي",
-      defaultDescription: "تباعد قياسي لمعظم حالات الاستخدام.",
-      comfortable: "مريح",
-      comfortableDescription: "مساحة أكبر بين العناصر.",
-      compact: "مضغوط",
-      compactDescription: "تباعد أدنى للتخطيطات الكثيفة.",
-    },
+      default: 'افتراضي',
+      defaultDescription: 'تباعد قياسي لمعظم حالات الاستخدام.',
+      comfortable: 'مريح',
+      comfortableDescription: 'مساحة أكبر بين العناصر.',
+      compact: 'مضغوط',
+      compactDescription: 'تباعد أدنى للتخطيطات الكثيفة.'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      default: "ברירת מחדל",
-      defaultDescription: "ריווח סטנדרטי לרוב מקרי השימוש.",
-      comfortable: "נוח",
-      comfortableDescription: "יותר מקום בין האלמנטים.",
-      compact: "קומפקטי",
-      compactDescription: "ריווח מינימלי לפריסות צפופות.",
-    },
-  },
+      default: 'ברירת מחדל',
+      defaultDescription: 'ריווח סטנדרטי לרוב מקרי השימוש.',
+      comfortable: 'נוח',
+      comfortableDescription: 'יותר מקום בין האלמנטים.',
+      compact: 'קומפקטי',
+      compactDescription: 'ריווח מינימלי לפריסות צפופות.'
+    }
+  }
 }
 
 export function RadioGroupRtl() {
-  const { dir, t } = useTranslation(translations, "ar")
+  const { dir, t } = useTranslation(translations, 'ar')
 
   return (
     <RadioGroup defaultValue="comfortable" className="w-fit" dir={dir}>
@@ -415,9 +369,7 @@ export function RadioGroupRtl() {
           <FieldLabel htmlFor="r2-rtl" dir={dir}>
             {t.comfortable}
           </FieldLabel>
-          <FieldDescription dir={dir}>
-            {t.comfortableDescription}
-          </FieldDescription>
+          <FieldDescription dir={dir}>{t.comfortableDescription}</FieldDescription>
         </FieldContent>
       </Field>
       <Field orientation="horizontal">
@@ -432,7 +384,6 @@ export function RadioGroupRtl() {
     </RadioGroup>
   )
 }
-
 ```
 
 ## API Reference

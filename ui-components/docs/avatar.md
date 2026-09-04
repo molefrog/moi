@@ -15,25 +15,18 @@ import {
   AvatarFallback,
   AvatarGroup,
   AvatarGroupCount,
-  AvatarImage,
-} from "@/components/ui/avatar"
+  AvatarImage
+} from '@/components/ui/avatar'
 
 export function AvatarDemo() {
   return (
     <div className="flex flex-row flex-wrap items-center gap-6 md:gap-12">
       <Avatar>
-        <AvatarImage
-          src="https://github.com/shadcn.png"
-          alt="@shadcn"
-          className="grayscale"
-        />
+        <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" className="grayscale" />
         <AvatarFallback>CN</AvatarFallback>
       </Avatar>
       <Avatar>
-        <AvatarImage
-          src="https://github.com/evilrabbit.png"
-          alt="@evilrabbit"
-        />
+        <AvatarImage src="https://github.com/evilrabbit.png" alt="@evilrabbit" />
         <AvatarFallback>ER</AvatarFallback>
         <AvatarBadge className="bg-green-600 dark:bg-green-800" />
       </Avatar>
@@ -43,17 +36,11 @@ export function AvatarDemo() {
           <AvatarFallback>CN</AvatarFallback>
         </Avatar>
         <Avatar>
-          <AvatarImage
-            src="https://github.com/maxleiter.png"
-            alt="@maxleiter"
-          />
+          <AvatarImage src="https://github.com/maxleiter.png" alt="@maxleiter" />
           <AvatarFallback>LR</AvatarFallback>
         </Avatar>
         <Avatar>
-          <AvatarImage
-            src="https://github.com/evilrabbit.png"
-            alt="@evilrabbit"
-          />
+          <AvatarImage src="https://github.com/evilrabbit.png" alt="@evilrabbit" />
           <AvatarFallback>ER</AvatarFallback>
         </Avatar>
         <AvatarGroupCount>+3</AvatarGroupCount>
@@ -61,7 +48,6 @@ export function AvatarDemo() {
     </div>
   )
 }
-
 ```
 
 ## Installation
@@ -109,7 +95,7 @@ npm install @base-ui/react
 ## Usage
 
 ```tsx showLineNumbers
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 ```
 
 ```tsx showLineNumbers
@@ -150,25 +136,16 @@ AvatarGroup
 A basic avatar component with an image and a fallback.
 
 ```tsx
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 export function AvatarDemo() {
   return (
     <Avatar>
-      <AvatarImage
-        src="https://github.com/shadcn.png"
-        alt="@shadcn"
-        className="grayscale"
-      />
+      <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" className="grayscale" />
       <AvatarFallback>CN</AvatarFallback>
     </Avatar>
   )
 }
-
 ```
 
 ## Badge
@@ -176,12 +153,7 @@ export function AvatarDemo() {
 Use the `AvatarBadge` component to add a badge to the avatar. The badge is positioned at the bottom right of the avatar.
 
 ```tsx
-import {
-  Avatar,
-  AvatarBadge,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
+import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 export function AvatarWithBadge() {
   return (
@@ -192,7 +164,6 @@ export function AvatarWithBadge() {
     </Avatar>
   )
 }
-
 ```
 
 Use the `className` prop to add custom styles to the badge such as custom colors, sizes, etc.
@@ -210,14 +181,9 @@ Use the `className` prop to add custom styles to the badge such as custom colors
 You can also use an icon inside `<AvatarBadge>`.
 
 ```tsx
-import { PlusIcon } from "lucide-react"
+import { PlusIcon } from 'lucide-react'
 
-import {
-  Avatar,
-  AvatarBadge,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
+import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 export function AvatarBadgeIconExample() {
   return (
@@ -230,7 +196,6 @@ export function AvatarBadgeIconExample() {
     </Avatar>
   )
 }
-
 ```
 
 ## Avatar Group
@@ -238,12 +203,7 @@ export function AvatarBadgeIconExample() {
 Use the `AvatarGroup` component to add a group of avatars.
 
 ```tsx
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarGroup,
-  AvatarImage,
-} from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarGroup, AvatarImage } from '@/components/ui/avatar'
 
 export function AvatarGroupExample() {
   return (
@@ -257,16 +217,12 @@ export function AvatarGroupExample() {
         <AvatarFallback>LR</AvatarFallback>
       </Avatar>
       <Avatar>
-        <AvatarImage
-          src="https://github.com/evilrabbit.png"
-          alt="@evilrabbit"
-        />
+        <AvatarImage src="https://github.com/evilrabbit.png" alt="@evilrabbit" />
         <AvatarFallback>ER</AvatarFallback>
       </Avatar>
     </AvatarGroup>
   )
 }
-
 ```
 
 ## Avatar Group Count
@@ -279,8 +235,8 @@ import {
   AvatarFallback,
   AvatarGroup,
   AvatarGroupCount,
-  AvatarImage,
-} from "@/components/ui/avatar"
+  AvatarImage
+} from '@/components/ui/avatar'
 
 export function AvatarGroupCountExample() {
   return (
@@ -294,17 +250,13 @@ export function AvatarGroupCountExample() {
         <AvatarFallback>LR</AvatarFallback>
       </Avatar>
       <Avatar>
-        <AvatarImage
-          src="https://github.com/evilrabbit.png"
-          alt="@evilrabbit"
-        />
+        <AvatarImage src="https://github.com/evilrabbit.png" alt="@evilrabbit" />
         <AvatarFallback>ER</AvatarFallback>
       </Avatar>
       <AvatarGroupCount>+3</AvatarGroupCount>
     </AvatarGroup>
   )
 }
-
 ```
 
 ## Avatar Group with Icon
@@ -312,15 +264,15 @@ export function AvatarGroupCountExample() {
 You can also use an icon inside `<AvatarGroupCount>`.
 
 ```tsx
-import { PlusIcon } from "lucide-react"
+import { PlusIcon } from 'lucide-react'
 
 import {
   Avatar,
   AvatarFallback,
   AvatarGroup,
   AvatarGroupCount,
-  AvatarImage,
-} from "@/components/ui/avatar"
+  AvatarImage
+} from '@/components/ui/avatar'
 
 export function AvatarGroupCountIconExample() {
   return (
@@ -334,10 +286,7 @@ export function AvatarGroupCountIconExample() {
         <AvatarFallback>LR</AvatarFallback>
       </Avatar>
       <Avatar>
-        <AvatarImage
-          src="https://github.com/evilrabbit.png"
-          alt="@evilrabbit"
-        />
+        <AvatarImage src="https://github.com/evilrabbit.png" alt="@evilrabbit" />
         <AvatarFallback>ER</AvatarFallback>
       </Avatar>
       <AvatarGroupCount>
@@ -346,7 +295,6 @@ export function AvatarGroupCountIconExample() {
     </AvatarGroup>
   )
 }
-
 ```
 
 ## Sizes
@@ -354,11 +302,7 @@ export function AvatarGroupCountIconExample() {
 Use the `size` prop to change the size of the avatar.
 
 ```tsx
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 export function AvatarSizeExample() {
   return (
@@ -378,7 +322,6 @@ export function AvatarSizeExample() {
     </div>
   )
 }
-
 ```
 
 ## Dropdown
@@ -386,29 +329,23 @@ export function AvatarSizeExample() {
 You can use the `Avatar` component as a trigger for a dropdown menu.
 
 ```tsx
-"use client"
+'use client'
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 
 export function AvatarDropdown() {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        render={<Button variant="ghost" size="icon" className="rounded-full" />}
-      >
+      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="rounded-full" />}>
         <Avatar>
           <AvatarImage src="https://github.com/shadcn.png" alt="shadcn" />
           <AvatarFallback>CN</AvatarFallback>
@@ -428,7 +365,6 @@ export function AvatarDropdown() {
     </DropdownMenu>
   )
 }
-
 ```
 
 ## RTL
@@ -436,65 +372,52 @@ export function AvatarDropdown() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
+import { useTranslation, type Translations } from '@/components/language-selector'
 import {
   Avatar,
   AvatarBadge,
   AvatarFallback,
   AvatarGroup,
   AvatarGroupCount,
-  AvatarImage,
-} from "@/components/ui/avatar"
+  AvatarImage
+} from '@/components/ui/avatar'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      moreUsers: "+3",
-    },
+      moreUsers: '+3'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      moreUsers: "+٣",
-    },
+      moreUsers: '+٣'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      moreUsers: "+3",
-    },
-  },
+      moreUsers: '+3'
+    }
+  }
 }
 
 export function AvatarRtl() {
-  const { dir, t } = useTranslation(translations, "ar")
+  const { dir, t } = useTranslation(translations, 'ar')
 
   return (
-    <div
-      className="flex flex-row flex-wrap items-center gap-6 md:gap-12"
-      dir={dir}
-    >
+    <div className="flex flex-row flex-wrap items-center gap-6 md:gap-12" dir={dir}>
       <Avatar>
-        <AvatarImage
-          src="https://github.com/shadcn.png"
-          alt="@shadcn"
-          className="grayscale"
-        />
+        <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" className="grayscale" />
         <AvatarFallback>CN</AvatarFallback>
       </Avatar>
       <Avatar>
-        <AvatarImage
-          src="https://github.com/evilrabbit.png"
-          alt="@evilrabbit"
-        />
+        <AvatarImage src="https://github.com/evilrabbit.png" alt="@evilrabbit" />
         <AvatarFallback>ER</AvatarFallback>
         <AvatarBadge className="bg-green-600 dark:bg-green-800" />
       </Avatar>
@@ -504,17 +427,11 @@ export function AvatarRtl() {
           <AvatarFallback>CN</AvatarFallback>
         </Avatar>
         <Avatar>
-          <AvatarImage
-            src="https://github.com/maxleiter.png"
-            alt="@maxleiter"
-          />
+          <AvatarImage src="https://github.com/maxleiter.png" alt="@maxleiter" />
           <AvatarFallback>LR</AvatarFallback>
         </Avatar>
         <Avatar>
-          <AvatarImage
-            src="https://github.com/evilrabbit.png"
-            alt="@evilrabbit"
-          />
+          <AvatarImage src="https://github.com/evilrabbit.png" alt="@evilrabbit" />
           <AvatarFallback>ER</AvatarFallback>
         </Avatar>
         <AvatarGroupCount>{t.moreUsers}</AvatarGroupCount>
@@ -522,7 +439,6 @@ export function AvatarRtl() {
     </div>
   )
 }
-
 ```
 
 ## API Reference

@@ -6,9 +6,9 @@ component: true
 ---
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 import {
   ArchiveIcon,
   ArrowLeftIcon,
@@ -18,11 +18,11 @@ import {
   MailCheckIcon,
   MoreHorizontalIcon,
   TagIcon,
-  Trash2Icon,
-} from "lucide-react"
+  Trash2Icon
+} from 'lucide-react'
 
-import { Button } from "@/components/ui/button"
-import { ButtonGroup } from "@/components/ui/button-group"
+import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,11 +34,11 @@ import {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 
 export function ButtonGroupDemo() {
-  const [label, setLabel] = React.useState("personal")
+  const [label, setLabel] = React.useState('personal')
 
   return (
     <ButtonGroup>
@@ -55,9 +55,7 @@ export function ButtonGroupDemo() {
         <Button variant="outline">Snooze</Button>
         <DropdownMenu>
           <DropdownMenuTrigger
-            render={
-              <Button variant="outline" size="icon" aria-label="More Options" />
-            }
+            render={<Button variant="outline" size="icon" aria-label="More Options" />}
           >
             <MoreHorizontalIcon />
           </DropdownMenuTrigger>
@@ -92,19 +90,10 @@ export function ButtonGroupDemo() {
                   Label As...
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
-                  <DropdownMenuRadioGroup
-                    value={label}
-                    onValueChange={setLabel}
-                  >
-                    <DropdownMenuRadioItem value="personal">
-                      Personal
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="work">
-                      Work
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="other">
-                      Other
-                    </DropdownMenuRadioItem>
+                  <DropdownMenuRadioGroup value={label} onValueChange={setLabel}>
+                    <DropdownMenuRadioItem value="personal">Personal</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="work">Work</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="other">Other</DropdownMenuRadioItem>
                   </DropdownMenuRadioGroup>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
@@ -122,7 +111,6 @@ export function ButtonGroupDemo() {
     </ButtonGroup>
   )
 }
-
 ```
 
 ## Installation
@@ -170,11 +158,7 @@ npm install @base-ui/react
 ## Usage
 
 ```tsx
-import {
-  ButtonGroup,
-  ButtonGroupSeparator,
-  ButtonGroupText,
-} from "@/components/ui/button-group"
+import { ButtonGroup, ButtonGroupSeparator, ButtonGroupText } from '@/components/ui/button-group'
 ```
 
 ```tsx
@@ -218,18 +202,14 @@ ButtonGroup
 Set the `orientation` prop to change the button group layout.
 
 ```tsx
-import { MinusIcon, PlusIcon } from "lucide-react"
+import { MinusIcon, PlusIcon } from 'lucide-react'
 
-import { Button } from "@/components/ui/button"
-import { ButtonGroup } from "@/components/ui/button-group"
+import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
 
 export function ButtonGroupOrientation() {
   return (
-    <ButtonGroup
-      orientation="vertical"
-      aria-label="Media controls"
-      className="h-fit"
-    >
+    <ButtonGroup orientation="vertical" aria-label="Media controls" className="h-fit">
       <Button variant="outline" size="icon">
         <PlusIcon />
       </Button>
@@ -239,7 +219,6 @@ export function ButtonGroupOrientation() {
     </ButtonGroup>
   )
 }
-
 ```
 
 ## Size
@@ -247,10 +226,10 @@ export function ButtonGroupOrientation() {
 Control the size of buttons using the `size` prop on individual buttons.
 
 ```tsx
-import { PlusIcon } from "lucide-react"
+import { PlusIcon } from 'lucide-react'
 
-import { Button } from "@/components/ui/button"
-import { ButtonGroup } from "@/components/ui/button-group"
+import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
 
 export function ButtonGroupSize() {
   return (
@@ -294,7 +273,6 @@ export function ButtonGroupSize() {
     </div>
   )
 }
-
 ```
 
 ## Nested
@@ -302,21 +280,13 @@ export function ButtonGroupSize() {
 Nest `<ButtonGroup>` components to create button groups with spacing.
 
 ```tsx
-import { AudioLinesIcon, PlusIcon } from "lucide-react"
+import { AudioLinesIcon, PlusIcon } from 'lucide-react'
 
-import { Button } from "@/components/ui/button"
-import { ButtonGroup } from "@/components/ui/button-group"
-import { Input } from "@/components/ui/input"
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
+import { Input } from '@/components/ui/input'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export function ButtonGroupNested() {
   return (
@@ -340,7 +310,6 @@ export function ButtonGroupNested() {
     </ButtonGroup>
   )
 }
-
 ```
 
 ## Separator
@@ -350,11 +319,8 @@ The `ButtonGroupSeparator` component visually divides buttons within a group.
 Buttons with variant `outline` do not need a separator since they have a border. For other variants, a separator is recommended to improve the visual hierarchy.
 
 ```tsx
-import { Button } from "@/components/ui/button"
-import {
-  ButtonGroup,
-  ButtonGroupSeparator,
-} from "@/components/ui/button-group"
+import { Button } from '@/components/ui/button'
+import { ButtonGroup, ButtonGroupSeparator } from '@/components/ui/button-group'
 
 export function ButtonGroupSeparatorDemo() {
   return (
@@ -369,7 +335,6 @@ export function ButtonGroupSeparatorDemo() {
     </ButtonGroup>
   )
 }
-
 ```
 
 ## Split
@@ -377,13 +342,10 @@ export function ButtonGroupSeparatorDemo() {
 Create a split button group by adding two buttons separated by a `ButtonGroupSeparator`.
 
 ```tsx
-import { IconPlus } from "@tabler/icons-react"
+import { IconPlus } from '@tabler/icons-react'
 
-import { Button } from "@/components/ui/button"
-import {
-  ButtonGroup,
-  ButtonGroupSeparator,
-} from "@/components/ui/button-group"
+import { Button } from '@/components/ui/button'
+import { ButtonGroup, ButtonGroupSeparator } from '@/components/ui/button-group'
 
 export function ButtonGroupSplit() {
   return (
@@ -396,7 +358,6 @@ export function ButtonGroupSplit() {
     </ButtonGroup>
   )
 }
-
 ```
 
 ## Input
@@ -404,11 +365,11 @@ export function ButtonGroupSplit() {
 Wrap an `Input` component with buttons.
 
 ```tsx
-import { SearchIcon } from "lucide-react"
+import { SearchIcon } from 'lucide-react'
 
-import { Button } from "@/components/ui/button"
-import { ButtonGroup } from "@/components/ui/button-group"
-import { Input } from "@/components/ui/input"
+import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
+import { Input } from '@/components/ui/input'
 
 export function ButtonGroupInput() {
   return (
@@ -420,7 +381,6 @@ export function ButtonGroupInput() {
     </ButtonGroup>
   )
 }
-
 ```
 
 ## Input Group
@@ -428,24 +388,20 @@ export function ButtonGroupInput() {
 Wrap an `InputGroup` component to create complex input layouts.
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import { AudioLinesIcon, PlusIcon } from "lucide-react"
+import * as React from 'react'
+import { AudioLinesIcon, PlusIcon } from 'lucide-react'
 
-import { Button } from "@/components/ui/button"
-import { ButtonGroup } from "@/components/ui/button-group"
+import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
-  InputGroupInput,
-} from "@/components/ui/input-group"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+  InputGroupInput
+} from '@/components/ui/input-group'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export function ButtonGroupInputGroup() {
   const [voiceEnabled, setVoiceEnabled] = React.useState(false)
@@ -460,9 +416,7 @@ export function ButtonGroupInputGroup() {
       <ButtonGroup>
         <InputGroup>
           <InputGroupInput
-            placeholder={
-              voiceEnabled ? "Record and send audio..." : "Send a message..."
-            }
+            placeholder={voiceEnabled ? 'Record and send audio...' : 'Send a message...'}
             disabled={voiceEnabled}
           />
           <InputGroupAddon align="inline-end">
@@ -488,7 +442,6 @@ export function ButtonGroupInputGroup() {
     </ButtonGroup>
   )
 }
-
 ```
 
 ## Dropdown Menu
@@ -496,7 +449,7 @@ export function ButtonGroupInputGroup() {
 Create a split button group with a `DropdownMenu` component.
 
 ```tsx
-"use client"
+'use client'
 
 import {
   AlertTriangleIcon,
@@ -506,28 +459,26 @@ import {
   ShareIcon,
   TrashIcon,
   UserRoundXIcon,
-  VolumeOffIcon,
-} from "lucide-react"
+  VolumeOffIcon
+} from 'lucide-react'
 
-import { Button } from "@/components/ui/button"
-import { ButtonGroup } from "@/components/ui/button-group"
+import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 
 export function ButtonGroupDropdown() {
   return (
     <ButtonGroup>
       <Button variant="outline">Follow</Button>
       <DropdownMenu>
-        <DropdownMenuTrigger
-          render={<Button variant="outline" className="pl-2!" />}
-        >
+        <DropdownMenuTrigger render={<Button variant="outline" className="pl-2!" />}>
           <ChevronDownIcon />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
@@ -569,7 +520,6 @@ export function ButtonGroupDropdown() {
     </ButtonGroup>
   )
 }
-
 ```
 
 ## Select
@@ -577,30 +527,30 @@ export function ButtonGroupDropdown() {
 Pair with a `Select` component.
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
-import { ArrowRightIcon } from "lucide-react"
+import * as React from 'react'
+import { ArrowRightIcon } from 'lucide-react'
 
-import { Button } from "@/components/ui/button"
-import { ButtonGroup } from "@/components/ui/button-group"
-import { Input } from "@/components/ui/input"
+import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
   SelectGroup,
   SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select"
+  SelectTrigger
+} from '@/components/ui/select'
 
 const CURRENCIES = [
-  { label: "US Dollar", value: "$" },
-  { label: "Euro", value: "€" },
-  { label: "British Pound", value: "£" },
+  { label: 'US Dollar', value: '$' },
+  { label: 'Euro', value: '€' },
+  { label: 'British Pound', value: '£' }
 ]
 
 export function ButtonGroupSelect() {
-  const [currency, setCurrency] = React.useState("$")
+  const [currency, setCurrency] = React.useState('$')
 
   return (
     <ButtonGroup>
@@ -608,15 +558,14 @@ export function ButtonGroupSelect() {
         <Select
           items={CURRENCIES}
           value={currency}
-          onValueChange={(value) => setCurrency(value as string)}
+          onValueChange={value => setCurrency(value as string)}
         >
           <SelectTrigger className="font-mono">{currency}</SelectTrigger>
           <SelectContent alignItemWithTrigger={false} align="start">
             <SelectGroup>
-              {CURRENCIES.map((item) => (
+              {CURRENCIES.map(item => (
                 <SelectItem key={item.value} value={item.value}>
-                  {item.value}{" "}
-                  <span className="text-muted-foreground">{item.label}</span>
+                  {item.value} <span className="text-muted-foreground">{item.label}</span>
                 </SelectItem>
               ))}
             </SelectGroup>
@@ -632,7 +581,6 @@ export function ButtonGroupSelect() {
     </ButtonGroup>
   )
 }
-
 ```
 
 ## Popover
@@ -640,24 +588,20 @@ export function ButtonGroupSelect() {
 Use with a `Popover` component.
 
 ```tsx
-import { BotIcon, ChevronDownIcon } from "lucide-react"
+import { BotIcon, ChevronDownIcon } from 'lucide-react'
 
-import { Button } from "@/components/ui/button"
-import { ButtonGroup } from "@/components/ui/button-group"
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
+import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import {
   Popover,
   PopoverContent,
   PopoverDescription,
   PopoverHeader,
   PopoverTitle,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import { Textarea } from "@/components/ui/textarea"
+  PopoverTrigger
+} from '@/components/ui/popover'
+import { Textarea } from '@/components/ui/textarea'
 
 export function ButtonGroupPopover() {
   return (
@@ -666,39 +610,26 @@ export function ButtonGroupPopover() {
         <BotIcon /> Copilot
       </Button>
       <Popover>
-        <PopoverTrigger
-          render={
-            <Button variant="outline" size="icon" aria-label="Open Popover" />
-          }
-        >
+        <PopoverTrigger render={<Button variant="outline" size="icon" aria-label="Open Popover" />}>
           <ChevronDownIcon />
         </PopoverTrigger>
         <PopoverContent align="end" className="rounded-xl text-sm">
           <PopoverHeader>
             <PopoverTitle>Start a new task with Copilot</PopoverTitle>
-            <PopoverDescription>
-              Describe your task in natural language.
-            </PopoverDescription>
+            <PopoverDescription>Describe your task in natural language.</PopoverDescription>
           </PopoverHeader>
           <Field>
             <FieldLabel htmlFor="task" className="sr-only">
               Task Description
             </FieldLabel>
-            <Textarea
-              id="task"
-              placeholder="I need to..."
-              className="resize-none"
-            />
-            <FieldDescription>
-              Copilot will open a pull request for review.
-            </FieldDescription>
+            <Textarea id="task" placeholder="I need to..." className="resize-none" />
+            <FieldDescription>Copilot will open a pull request for review.</FieldDescription>
           </Field>
         </PopoverContent>
       </Popover>
     </ButtonGroup>
   )
 }
-
 ```
 
 ## RTL
@@ -706,9 +637,9 @@ export function ButtonGroupPopover() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 import {
   ArchiveIcon,
   ArrowLeftIcon,
@@ -718,15 +649,12 @@ import {
   MailCheckIcon,
   MoreHorizontalIcon,
   TagIcon,
-  Trash2Icon,
-} from "lucide-react"
+  Trash2Icon
+} from 'lucide-react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import { Button } from "@/components/ui/button"
-import { ButtonGroup } from "@/components/ui/button-group"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -738,63 +666,63 @@ import {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      archive: "Archive",
-      report: "Report",
-      snooze: "Snooze",
-      markAsRead: "Mark as Read",
-      addToCalendar: "Add to Calendar",
-      addToList: "Add to List",
-      labelAs: "Label As...",
-      personal: "Personal",
-      work: "Work",
-      other: "Other",
-      trash: "Trash",
-    },
+      archive: 'Archive',
+      report: 'Report',
+      snooze: 'Snooze',
+      markAsRead: 'Mark as Read',
+      addToCalendar: 'Add to Calendar',
+      addToList: 'Add to List',
+      labelAs: 'Label As...',
+      personal: 'Personal',
+      work: 'Work',
+      other: 'Other',
+      trash: 'Trash'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      archive: "أرشفة",
-      report: "تقرير",
-      snooze: "تأجيل",
-      markAsRead: "وضع علامة كمقروء",
-      addToCalendar: "إضافة إلى التقويم",
-      addToList: "إضافة إلى القائمة",
-      labelAs: "تصنيف كـ...",
-      personal: "شخصي",
-      work: "عمل",
-      other: "آخر",
-      trash: "سلة المهملات",
-    },
+      archive: 'أرشفة',
+      report: 'تقرير',
+      snooze: 'تأجيل',
+      markAsRead: 'وضع علامة كمقروء',
+      addToCalendar: 'إضافة إلى التقويم',
+      addToList: 'إضافة إلى القائمة',
+      labelAs: 'تصنيف كـ...',
+      personal: 'شخصي',
+      work: 'عمل',
+      other: 'آخر',
+      trash: 'سلة المهملات'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      archive: "ארכיון",
-      report: "דוח",
-      snooze: "דחה",
-      markAsRead: "סמן כנקרא",
-      addToCalendar: "הוסף ליומן",
-      addToList: "הוסף לרשימה",
-      labelAs: "תייג כ...",
-      personal: "אישי",
-      work: "עבודה",
-      other: "אחר",
-      trash: "פח",
-    },
-  },
+      archive: 'ארכיון',
+      report: 'דוח',
+      snooze: 'דחה',
+      markAsRead: 'סמן כנקרא',
+      addToCalendar: 'הוסף ליומן',
+      addToList: 'הוסף לרשימה',
+      labelAs: 'תייג כ...',
+      personal: 'אישי',
+      work: 'עבודה',
+      other: 'אחר',
+      trash: 'פח'
+    }
+  }
 }
 
 export function ButtonGroupRtl() {
-  const { dir, t, language } = useTranslation(translations, "ar")
-  const [label, setLabel] = React.useState("personal")
+  const { dir, t, language } = useTranslation(translations, 'ar')
+  const [label, setLabel] = React.useState('personal')
 
   return (
     <div dir={dir}>
@@ -812,19 +740,13 @@ export function ButtonGroupRtl() {
           <Button variant="outline">{t.snooze}</Button>
           <DropdownMenu>
             <DropdownMenuTrigger
-              render={
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label="More Options"
-                />
-              }
+              render={<Button variant="outline" size="icon" aria-label="More Options" />}
             >
               <MoreHorizontalIcon />
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              align={dir === "rtl" ? "start" : "end"}
-              data-lang={dir === "rtl" ? language : undefined}
+              align={dir === 'rtl' ? 'start' : 'end'}
+              data-lang={dir === 'rtl' ? language : undefined}
               dir={dir}
               className="w-40"
             >
@@ -859,21 +781,12 @@ export function ButtonGroupRtl() {
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent
                     dir={dir}
-                    data-lang={dir === "rtl" ? language : undefined}
+                    data-lang={dir === 'rtl' ? language : undefined}
                   >
-                    <DropdownMenuRadioGroup
-                      value={label}
-                      onValueChange={setLabel}
-                    >
-                      <DropdownMenuRadioItem value="personal">
-                        {t.personal}
-                      </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="work">
-                        {t.work}
-                      </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="other">
-                        {t.other}
-                      </DropdownMenuRadioItem>
+                    <DropdownMenuRadioGroup value={label} onValueChange={setLabel}>
+                      <DropdownMenuRadioItem value="personal">{t.personal}</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="work">{t.work}</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="other">{t.other}</DropdownMenuRadioItem>
                     </DropdownMenuRadioGroup>
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
@@ -892,7 +805,6 @@ export function ButtonGroupRtl() {
     </div>
   )
 }
-
 ```
 
 ## API Reference
@@ -955,8 +867,8 @@ Use this component to display text within a button group.
 Use the `render` prop to render a custom component as the text, for example a label.
 
 ```tsx showLineNumbers
-import { ButtonGroupText } from "@/components/ui/button-group"
-import { Label } from "@/components/ui/label"
+import { ButtonGroupText } from '@/components/ui/button-group'
+import { Label } from '@/components/ui/label'
 
 export function ButtonGroupTextDemo() {
   return (

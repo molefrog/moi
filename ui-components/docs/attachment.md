@@ -6,7 +6,7 @@ component: true
 ---
 
 ```tsx
-import { FileCodeIcon, XIcon } from "lucide-react"
+import { FileCodeIcon, XIcon } from 'lucide-react'
 
 import {
   Attachment,
@@ -16,36 +16,36 @@ import {
   AttachmentDescription,
   AttachmentGroup,
   AttachmentMedia,
-  AttachmentTitle,
-} from "@/components/ui/attachment"
-import { Spinner } from "@/components/ui/spinner"
+  AttachmentTitle
+} from '@/components/ui/attachment'
+import { Spinner } from '@/components/ui/spinner'
 
 const images = [
   {
-    name: "workspace.png",
-    meta: "PNG · 820 KB",
-    src: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=900&auto=format&fit=crop&q=80",
-    alt: "Workspace",
+    name: 'workspace.png',
+    meta: 'PNG · 820 KB',
+    src: 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=900&auto=format&fit=crop&q=80',
+    alt: 'Workspace'
   },
   {
-    name: "desk-reference.jpg",
-    meta: "JPG · 1.1 MB",
-    src: "https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=900&auto=format&fit=crop&q=80",
-    alt: "Desk",
+    name: 'desk-reference.jpg',
+    meta: 'JPG · 1.1 MB',
+    src: 'https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=900&auto=format&fit=crop&q=80',
+    alt: 'Desk'
   },
   {
-    name: "office-reference.jpg",
-    meta: "JPG · 940 KB",
-    src: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=900&auto=format&fit=crop&q=80",
-    alt: "Office",
-  },
+    name: 'office-reference.jpg',
+    meta: 'JPG · 940 KB',
+    src: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=900&auto=format&fit=crop&q=80',
+    alt: 'Office'
+  }
 ]
 
 export function AttachmentDemo() {
   return (
     <div className="mx-auto flex w-full max-w-sm flex-col gap-3 py-12">
       <AttachmentGroup>
-        {images.map((image) => (
+        {images.map(image => (
           <Attachment key={image.name} orientation="vertical">
             <AttachmentMedia variant="image">
               <img src={image.src} alt={image.alt} />
@@ -88,7 +88,6 @@ export function AttachmentDemo() {
     </div>
   )
 }
-
 ```
 
 The `Attachment` component displays a file or image attachment, its media, name, and metadata, with optional actions and upload state. Use it for files and images in chat composers, message threads, and upload lists.
@@ -145,8 +144,8 @@ import {
   AttachmentContent,
   AttachmentDescription,
   AttachmentMedia,
-  AttachmentTitle,
-} from "@/components/ui/attachment"
+  AttachmentTitle
+} from '@/components/ui/attachment'
 ```
 
 ```tsx
@@ -203,7 +202,7 @@ AttachmentGroup
 Set `variant="image"` on `AttachmentMedia` and render an `<img>` inside it. Use `orientation="vertical"` to stack the media above the content.
 
 ```tsx
-import { XIcon } from "lucide-react"
+import { XIcon } from 'lucide-react'
 
 import {
   Attachment,
@@ -214,35 +213,35 @@ import {
   AttachmentGroup,
   AttachmentMedia,
   AttachmentTitle,
-  AttachmentTrigger,
-} from "@/components/ui/attachment"
+  AttachmentTrigger
+} from '@/components/ui/attachment'
 
 const images = [
   {
-    name: "workspace.png",
-    meta: "PNG · 820 KB",
-    src: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=900&auto=format&fit=crop&q=80",
-    alt: "Workspace",
+    name: 'workspace.png',
+    meta: 'PNG · 820 KB',
+    src: 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=900&auto=format&fit=crop&q=80',
+    alt: 'Workspace'
   },
   {
-    name: "desk-reference.jpg",
-    meta: "JPG · 1.1 MB",
-    src: "https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=900&auto=format&fit=crop&q=80",
-    alt: "Desk",
+    name: 'desk-reference.jpg',
+    meta: 'JPG · 1.1 MB',
+    src: 'https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=900&auto=format&fit=crop&q=80',
+    alt: 'Desk'
   },
   {
-    name: "office-reference.jpg",
-    meta: "JPG · 940 KB",
-    src: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=900&auto=format&fit=crop&q=80",
-    alt: "Office",
-  },
+    name: 'office-reference.jpg',
+    meta: 'JPG · 940 KB',
+    src: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=900&auto=format&fit=crop&q=80',
+    alt: 'Office'
+  }
 ]
 
 export function AttachmentImage() {
   return (
     <div className="mx-auto w-full max-w-sm py-12">
       <AttachmentGroup className="w-full">
-        {images.map((image) => (
+        {images.map(image => (
           <Attachment key={image.name} orientation="vertical">
             <AttachmentMedia variant="image">
               <img src={image.src} alt={image.alt} />
@@ -272,7 +271,6 @@ export function AttachmentImage() {
     </div>
   )
 }
-
 ```
 
 ## States
@@ -286,8 +284,8 @@ import {
   FileTextIcon,
   FileWarningIcon,
   RefreshCwIcon,
-  XIcon,
-} from "lucide-react"
+  XIcon
+} from 'lucide-react'
 
 import {
   Attachment,
@@ -296,9 +294,9 @@ import {
   AttachmentContent,
   AttachmentDescription,
   AttachmentMedia,
-  AttachmentTitle,
-} from "@/components/ui/attachment"
-import { Spinner } from "@/components/ui/spinner"
+  AttachmentTitle
+} from '@/components/ui/attachment'
+import { Spinner } from '@/components/ui/spinner'
 
 export function AttachmentStates() {
   return (
@@ -351,9 +349,7 @@ export function AttachmentStates() {
         </AttachmentMedia>
         <AttachmentContent>
           <AttachmentTitle>financial-model.xlsx</AttachmentTitle>
-          <AttachmentDescription>
-            Upload failed. Try again.
-          </AttachmentDescription>
+          <AttachmentDescription>Upload failed. Try again.</AttachmentDescription>
         </AttachmentContent>
         <AttachmentActions>
           <AttachmentAction aria-label="Retry upload">
@@ -381,7 +377,6 @@ export function AttachmentStates() {
     </div>
   )
 }
-
 ```
 
 ## Sizes
@@ -389,15 +384,15 @@ export function AttachmentStates() {
 Use `size` to switch between `default`, `sm`, and `xs`.
 
 ```tsx
-import { FileTextIcon } from "lucide-react"
+import { FileTextIcon } from 'lucide-react'
 
 import {
   Attachment,
   AttachmentContent,
   AttachmentDescription,
   AttachmentMedia,
-  AttachmentTitle,
-} from "@/components/ui/attachment"
+  AttachmentTitle
+} from '@/components/ui/attachment'
 
 export function AttachmentSizes() {
   return (
@@ -431,7 +426,6 @@ export function AttachmentSizes() {
     </div>
   )
 }
-
 ```
 
 ## Group
@@ -439,13 +433,7 @@ export function AttachmentSizes() {
 Wrap attachments in `AttachmentGroup` to lay them out in a horizontally scrollable, snapping row with an edge fade.
 
 ```tsx
-import {
-  FileCodeIcon,
-  FileTextIcon,
-  TableIcon,
-  XIcon,
-  type LucideIcon,
-} from "lucide-react"
+import { FileCodeIcon, FileTextIcon, TableIcon, XIcon, type LucideIcon } from 'lucide-react'
 
 import {
   Attachment,
@@ -455,8 +443,8 @@ import {
   AttachmentDescription,
   AttachmentGroup,
   AttachmentMedia,
-  AttachmentTitle,
-} from "@/components/ui/attachment"
+  AttachmentTitle
+} from '@/components/ui/attachment'
 
 type Item = {
   name: string
@@ -466,21 +454,21 @@ type Item = {
 }
 
 const items: Item[] = [
-  { name: "briefing-notes.pdf", meta: "PDF · 1.4 MB", icon: FileTextIcon },
+  { name: 'briefing-notes.pdf', meta: 'PDF · 1.4 MB', icon: FileTextIcon },
   {
-    name: "workspace.png",
-    meta: "PNG · 820 KB",
-    src: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=900&auto=format&fit=crop&q=80",
+    name: 'workspace.png',
+    meta: 'PNG · 820 KB',
+    src: 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=900&auto=format&fit=crop&q=80'
   },
-  { name: "customers.csv", meta: "CSV · 18 KB", icon: TableIcon },
-  { name: "renderer.tsx", meta: "TSX · 12 KB", icon: FileCodeIcon },
+  { name: 'customers.csv', meta: 'CSV · 18 KB', icon: TableIcon },
+  { name: 'renderer.tsx', meta: 'TSX · 12 KB', icon: FileCodeIcon }
 ]
 
 export function AttachmentGroupDemo() {
   return (
     <div className="mx-auto w-full max-w-sm py-12">
       <AttachmentGroup className="w-full">
-        {items.map((item) => {
+        {items.map(item => {
           const Icon = item.icon
 
           return (
@@ -510,7 +498,6 @@ export function AttachmentGroupDemo() {
     </div>
   )
 }
-
 ```
 
 ## Trigger
@@ -518,7 +505,7 @@ export function AttachmentGroupDemo() {
 Add an `AttachmentTrigger` to make the whole card open a link or dialog. It fills the card behind the actions, so the actions stay clickable.
 
 ```tsx
-import { CopyIcon, FileSearchIcon, XIcon } from "lucide-react"
+import { CopyIcon, FileSearchIcon, XIcon } from 'lucide-react'
 
 import {
   Attachment,
@@ -528,16 +515,16 @@ import {
   AttachmentDescription,
   AttachmentMedia,
   AttachmentTitle,
-  AttachmentTrigger,
-} from "@/components/ui/attachment"
+  AttachmentTrigger
+} from '@/components/ui/attachment'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+  DialogTrigger
+} from '@/components/ui/dialog'
 
 export function AttachmentTriggerDemo() {
   return (
@@ -559,18 +546,14 @@ export function AttachmentTriggerDemo() {
               <XIcon />
             </AttachmentAction>
           </AttachmentActions>
-          <DialogTrigger
-            render={
-              <AttachmentTrigger aria-label="Preview research-summary.pdf" />
-            }
-          />
+          <DialogTrigger render={<AttachmentTrigger aria-label="Preview research-summary.pdf" />} />
         </Attachment>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>research-summary.pdf</DialogTitle>
             <DialogDescription>
-              The attachment trigger fills the card and opens the dialog, while
-              the actions stay independently clickable above it.
+              The attachment trigger fills the card and opens the dialog, while the actions stay
+              independently clickable above it.
             </DialogDescription>
           </DialogHeader>
         </DialogContent>
@@ -578,16 +561,13 @@ export function AttachmentTriggerDemo() {
     </div>
   )
 }
-
 ```
 
 ```tsx showLineNumbers
 <Dialog>
   <Attachment>
     {/* media, content, actions */}
-    <DialogTrigger
-      render={<AttachmentTrigger aria-label="Preview research-summary.pdf" />}
-    />
+    <DialogTrigger render={<AttachmentTrigger aria-label="Preview research-summary.pdf" />} />
   </Attachment>
   <DialogContent>{/* ... */}</DialogContent>
 </Dialog>
@@ -613,14 +593,7 @@ export function AttachmentTriggerDemo() {
 
 ```tsx showLineNumbers
 <AttachmentTrigger
-  render={
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      aria-label="Open workspace.png"
-    />
-  }
+  render={<a href={url} target="_blank" rel="noreferrer" aria-label="Open workspace.png" />}
 />
 ```
 

@@ -6,25 +6,18 @@ component: true
 ---
 
 ```tsx
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 
 export function InputDemo() {
   return (
     <Field>
       <FieldLabel htmlFor="input-demo-api-key">API Key</FieldLabel>
       <Input id="input-demo-api-key" type="password" placeholder="sk-..." />
-      <FieldDescription>
-        Your API key is encrypted and stored securely.
-      </FieldDescription>
+      <FieldDescription>Your API key is encrypted and stored securely.</FieldDescription>
     </Field>
   )
 }
-
 ```
 
 ## Installation
@@ -66,7 +59,7 @@ npx shadcn@latest add input
 ## Usage
 
 ```tsx
-import { Input } from "@/components/ui/input"
+import { Input } from '@/components/ui/input'
 ```
 
 ```tsx
@@ -76,12 +69,11 @@ import { Input } from "@/components/ui/input"
 ## Basic
 
 ```tsx
-import { Input } from "@/components/ui/input"
+import { Input } from '@/components/ui/input'
 
 export function InputBasic() {
   return <Input placeholder="Enter text" />
 }
-
 ```
 
 ## Field
@@ -90,29 +82,18 @@ Use `Field`, `FieldLabel`, and `FieldDescription` to create an input with a
 label and description.
 
 ```tsx
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 
 export function InputField() {
   return (
     <Field>
       <FieldLabel htmlFor="input-field-username">Username</FieldLabel>
-      <Input
-        id="input-field-username"
-        type="text"
-        placeholder="Enter your username"
-      />
-      <FieldDescription>
-        Choose a unique username for your account.
-      </FieldDescription>
+      <Input id="input-field-username" type="text" placeholder="Enter your username" />
+      <FieldDescription>Choose a unique username for your account.</FieldDescription>
     </Field>
   )
 }
-
 ```
 
 ## Field Group
@@ -120,14 +101,9 @@ export function InputField() {
 Use `FieldGroup` to show multiple `Field` blocks and to build forms.
 
 ```tsx
-import { Button } from "@/components/ui/button"
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Button } from '@/components/ui/button'
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 
 export function InputFieldgroup() {
   return (
@@ -138,14 +114,8 @@ export function InputFieldgroup() {
       </Field>
       <Field>
         <FieldLabel htmlFor="fieldgroup-email">Email</FieldLabel>
-        <Input
-          id="fieldgroup-email"
-          type="email"
-          placeholder="name@example.com"
-        />
-        <FieldDescription>
-          We&apos;ll send updates to this address.
-        </FieldDescription>
+        <Input id="fieldgroup-email" type="email" placeholder="name@example.com" />
+        <FieldDescription>We&apos;ll send updates to this address.</FieldDescription>
       </Field>
       <Field orientation="horizontal">
         <Button type="reset" variant="outline">
@@ -156,7 +126,6 @@ export function InputFieldgroup() {
     </FieldGroup>
   )
 }
-
 ```
 
 ## Disabled
@@ -164,28 +133,18 @@ export function InputFieldgroup() {
 Use the `disabled` prop to disable the input. To style the disabled state, add the `data-disabled` attribute to the `Field` component.
 
 ```tsx
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 
 export function InputDisabled() {
   return (
     <Field data-disabled>
       <FieldLabel htmlFor="input-demo-disabled">Email</FieldLabel>
-      <Input
-        id="input-demo-disabled"
-        type="email"
-        placeholder="Email"
-        disabled
-      />
+      <Input id="input-demo-disabled" type="email" placeholder="Email" disabled />
       <FieldDescription>This field is currently disabled.</FieldDescription>
     </Field>
   )
 }
-
 ```
 
 ## Invalid
@@ -193,25 +152,18 @@ export function InputDisabled() {
 Use the `aria-invalid` prop to mark the input as invalid. To style the invalid state, add the `data-invalid` attribute to the `Field` component.
 
 ```tsx
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 
 export function InputInvalid() {
   return (
     <Field data-invalid>
       <FieldLabel htmlFor="input-invalid">Invalid Input</FieldLabel>
       <Input id="input-invalid" placeholder="Error" aria-invalid />
-      <FieldDescription>
-        This field contains validation errors.
-      </FieldDescription>
+      <FieldDescription>This field contains validation errors.</FieldDescription>
     </Field>
   )
 }
-
 ```
 
 ## File
@@ -219,12 +171,8 @@ export function InputInvalid() {
 Use the `type="file"` prop to create a file input.
 
 ```tsx
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 
 export function InputFile() {
   return (
@@ -235,7 +183,6 @@ export function InputFile() {
     </Field>
   )
 }
-
 ```
 
 ## Inline
@@ -244,9 +191,9 @@ Use `Field` with `orientation="horizontal"` to create an inline input.
 Pair with `Button` to create a search input with a button.
 
 ```tsx
-import { Button } from "@/components/ui/button"
-import { Field } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Button } from '@/components/ui/button'
+import { Field } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 
 export function InputInline() {
   return (
@@ -256,7 +203,6 @@ export function InputInline() {
     </Field>
   )
 }
-
 ```
 
 ## Grid
@@ -264,8 +210,8 @@ export function InputInline() {
 Use a grid layout to place multiple inputs side by side.
 
 ```tsx
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 
 export function InputGrid() {
   return (
@@ -281,7 +227,6 @@ export function InputGrid() {
     </FieldGroup>
   )
 }
-
 ```
 
 ## Required
@@ -289,12 +234,8 @@ export function InputGrid() {
 Use the `required` attribute to indicate required inputs.
 
 ```tsx
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 
 export function InputRequired() {
   return (
@@ -302,16 +243,11 @@ export function InputRequired() {
       <FieldLabel htmlFor="input-required">
         Required Field <span className="text-destructive">*</span>
       </FieldLabel>
-      <Input
-        id="input-required"
-        placeholder="This field is required"
-        required
-      />
+      <Input id="input-required" placeholder="This field is required" required />
       <FieldDescription>This field must be filled out.</FieldDescription>
     </Field>
   )
 }
-
 ```
 
 ## Badge
@@ -319,28 +255,23 @@ export function InputRequired() {
 Use `Badge` in the label to highlight a recommended field.
 
 ```tsx
-import { Badge } from "@/components/ui/badge"
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Badge } from '@/components/ui/badge'
+import { Field, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 
 export function InputBadge() {
   return (
     <Field>
       <FieldLabel htmlFor="input-badge">
-        Webhook URL{" "}
+        Webhook URL{' '}
         <Badge variant="secondary" className="ml-auto">
           Beta
         </Badge>
       </FieldLabel>
-      <Input
-        id="input-badge"
-        type="url"
-        placeholder="https://api.example.com/webhook"
-      />
+      <Input id="input-badge" type="url" placeholder="https://api.example.com/webhook" />
     </Field>
   )
 }
-
 ```
 
 ## Input Group
@@ -348,15 +279,15 @@ export function InputBadge() {
 To add icons, text, or buttons inside an input, use the `InputGroup` component. See the [Input Group](/docs/components/input-group) component for more examples.
 
 ```tsx
-import { InfoIcon } from "lucide-react"
+import { InfoIcon } from 'lucide-react'
 
-import { Field, FieldLabel } from "@/components/ui/field"
+import { Field, FieldLabel } from '@/components/ui/field'
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
-  InputGroupText,
-} from "@/components/ui/input-group"
+  InputGroupText
+} from '@/components/ui/input-group'
 
 export function InputInputGroup() {
   return (
@@ -374,7 +305,6 @@ export function InputInputGroup() {
     </Field>
   )
 }
-
 ```
 
 ## Button Group
@@ -382,10 +312,10 @@ export function InputInputGroup() {
 To add buttons to an input, use the `ButtonGroup` component. See the [Button Group](/docs/components/button-group) component for more examples.
 
 ```tsx
-import { Button } from "@/components/ui/button"
-import { ButtonGroup } from "@/components/ui/button-group"
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
+import { Field, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 
 export function InputButtonGroup() {
   return (
@@ -398,7 +328,6 @@ export function InputButtonGroup() {
     </Field>
   )
 }
-
 ```
 
 ## Form
@@ -406,47 +335,35 @@ export function InputButtonGroup() {
 A full form example with multiple inputs, a select, and a button.
 
 ```tsx
-import { Button } from "@/components/ui/button"
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Button } from '@/components/ui/button'
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
   SelectGroup,
   SelectItem,
   SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  SelectValue
+} from '@/components/ui/select'
 
 export function InputForm() {
   const countries = [
-    { label: "United States", value: "us" },
-    { label: "United Kingdom", value: "uk" },
-    { label: "Canada", value: "ca" },
+    { label: 'United States', value: 'us' },
+    { label: 'United Kingdom', value: 'uk' },
+    { label: 'Canada', value: 'ca' }
   ]
   return (
     <form className="w-full max-w-sm">
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="form-name">Name</FieldLabel>
-          <Input
-            id="form-name"
-            type="text"
-            placeholder="Evil Rabbit"
-            required
-          />
+          <Input id="form-name" type="text" placeholder="Evil Rabbit" required />
         </Field>
         <Field>
           <FieldLabel htmlFor="form-email">Email</FieldLabel>
           <Input id="form-email" type="email" placeholder="john@example.com" />
-          <FieldDescription>
-            We&apos;ll never share your email with anyone.
-          </FieldDescription>
+          <FieldDescription>We&apos;ll never share your email with anyone.</FieldDescription>
         </Field>
         <div className="grid grid-cols-2 gap-4">
           <Field>
@@ -461,7 +378,7 @@ export function InputForm() {
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  {countries.map((country) => (
+                  {countries.map(country => (
                     <SelectItem key={country.value} value={country.value}>
                       {country.label}
                     </SelectItem>
@@ -485,7 +402,6 @@ export function InputForm() {
     </form>
   )
 }
-
 ```
 
 ## RTL
@@ -493,63 +409,50 @@ export function InputForm() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      apiKey: "API Key",
-      placeholder: "sk-...",
-      description: "Your API key is encrypted and stored securely.",
-    },
+      apiKey: 'API Key',
+      placeholder: 'sk-...',
+      description: 'Your API key is encrypted and stored securely.'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      apiKey: "مفتاح API",
-      placeholder: "sk-...",
-      description: "مفتاح API الخاص بك مشفر ومخزن بأمان.",
-    },
+      apiKey: 'مفتاح API',
+      placeholder: 'sk-...',
+      description: 'مفتاح API الخاص بك مشفر ومخزن بأمان.'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      apiKey: "מפתח API",
-      placeholder: "sk-...",
-      description: "מפתח ה-API שלך מוצפן ונשמר בצורה מאובטחת.",
-    },
-  },
+      apiKey: 'מפתח API',
+      placeholder: 'sk-...',
+      description: 'מפתח ה-API שלך מוצפן ונשמר בצורה מאובטחת.'
+    }
+  }
 }
 
 export function InputRtl() {
-  const { dir, t } = useTranslation(translations, "ar")
+  const { dir, t } = useTranslation(translations, 'ar')
 
   return (
     <Field dir={dir}>
       <FieldLabel htmlFor="input-rtl-api-key">{t.apiKey}</FieldLabel>
-      <Input
-        id="input-rtl-api-key"
-        type="password"
-        placeholder={t.placeholder}
-        dir={dir}
-      />
+      <Input id="input-rtl-api-key" type="password" placeholder={t.placeholder} dir={dir} />
       <FieldDescription>{t.description}</FieldDescription>
     </Field>
   )
 }
-
 ```

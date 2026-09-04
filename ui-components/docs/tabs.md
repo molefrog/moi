@@ -9,19 +9,8 @@ links:
 ---
 
 ```tsx
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export function TabsDemo() {
   return (
@@ -37,8 +26,8 @@ export function TabsDemo() {
           <CardHeader>
             <CardTitle>Overview</CardTitle>
             <CardDescription>
-              View your key metrics and recent project activity. Track progress
-              across all your active projects.
+              View your key metrics and recent project activity. Track progress across all your
+              active projects.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
@@ -51,8 +40,8 @@ export function TabsDemo() {
           <CardHeader>
             <CardTitle>Analytics</CardTitle>
             <CardDescription>
-              Track performance and user engagement metrics. Monitor trends and
-              identify growth opportunities.
+              Track performance and user engagement metrics. Monitor trends and identify growth
+              opportunities.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
@@ -65,8 +54,8 @@ export function TabsDemo() {
           <CardHeader>
             <CardTitle>Reports</CardTitle>
             <CardDescription>
-              Generate and download your detailed reports. Export data in
-              multiple formats for analysis.
+              Generate and download your detailed reports. Export data in multiple formats for
+              analysis.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
@@ -79,8 +68,8 @@ export function TabsDemo() {
           <CardHeader>
             <CardTitle>Settings</CardTitle>
             <CardDescription>
-              Manage your account preferences and options. Customize your
-              experience to fit your needs.
+              Manage your account preferences and options. Customize your experience to fit your
+              needs.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
@@ -91,7 +80,6 @@ export function TabsDemo() {
     </Tabs>
   )
 }
-
 ```
 
 ## Installation
@@ -139,7 +127,7 @@ npm install @base-ui/react
 ## Usage
 
 ```tsx showLineNumbers
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 ```
 
 ```tsx showLineNumbers
@@ -171,7 +159,7 @@ Tabs
 Use the `variant="line"` prop on `TabsList` for a line style.
 
 ```tsx
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export function TabsLine() {
   return (
@@ -184,7 +172,6 @@ export function TabsLine() {
     </Tabs>
   )
 }
-
 ```
 
 ## Vertical
@@ -192,7 +179,7 @@ export function TabsLine() {
 Use `orientation="vertical"` for vertical tabs.
 
 ```tsx
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export function TabsVertical() {
   return (
@@ -205,13 +192,12 @@ export function TabsVertical() {
     </Tabs>
   )
 }
-
 ```
 
 ## Disabled
 
 ```tsx
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export function TabsDisabled() {
   return (
@@ -225,15 +211,14 @@ export function TabsDisabled() {
     </Tabs>
   )
 }
-
 ```
 
 ## Icons
 
 ```tsx
-import { AppWindowIcon, CodeIcon } from "lucide-react"
+import { AppWindowIcon, CodeIcon } from 'lucide-react'
 
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export function TabsIcons() {
   return (
@@ -251,7 +236,6 @@ export function TabsIcons() {
     </Tabs>
   )
 }
-
 ```
 
 ## RTL
@@ -259,108 +243,89 @@ export function TabsIcons() {
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 
-import {
-  useTranslation,
-  type Translations,
-} from "@/components/language-selector"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
+import { useTranslation, type Translations } from '@/components/language-selector'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 const translations: Translations = {
   en: {
-    dir: "ltr",
+    dir: 'ltr',
     values: {
-      overview: "Overview",
-      analytics: "Analytics",
-      reports: "Reports",
-      settings: "Settings",
-      overviewTitle: "Overview",
+      overview: 'Overview',
+      analytics: 'Analytics',
+      reports: 'Reports',
+      settings: 'Settings',
+      overviewTitle: 'Overview',
       overviewDesc:
-        "View your key metrics and recent project activity. Track progress across all your active projects.",
-      overviewContent: "You have 12 active projects and 3 pending tasks.",
-      analyticsTitle: "Analytics",
+        'View your key metrics and recent project activity. Track progress across all your active projects.',
+      overviewContent: 'You have 12 active projects and 3 pending tasks.',
+      analyticsTitle: 'Analytics',
       analyticsDesc:
-        "Track performance and user engagement metrics. Monitor trends and identify growth opportunities.",
-      analyticsContent: "Page views are up 25% compared to last month.",
-      reportsTitle: "Reports",
+        'Track performance and user engagement metrics. Monitor trends and identify growth opportunities.',
+      analyticsContent: 'Page views are up 25% compared to last month.',
+      reportsTitle: 'Reports',
       reportsDesc:
-        "Generate and download your detailed reports. Export data in multiple formats for analysis.",
-      reportsContent: "You have 5 reports ready and available to export.",
-      settingsTitle: "Settings",
+        'Generate and download your detailed reports. Export data in multiple formats for analysis.',
+      reportsContent: 'You have 5 reports ready and available to export.',
+      settingsTitle: 'Settings',
       settingsDesc:
-        "Manage your account preferences and options. Customize your experience to fit your needs.",
-      settingsContent: "Configure notifications, security, and themes.",
-    },
+        'Manage your account preferences and options. Customize your experience to fit your needs.',
+      settingsContent: 'Configure notifications, security, and themes.'
+    }
   },
   ar: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      overview: "نظرة عامة",
-      analytics: "التحليلات",
-      reports: "التقارير",
-      settings: "الإعدادات",
-      overviewTitle: "نظرة عامة",
+      overview: 'نظرة عامة',
+      analytics: 'التحليلات',
+      reports: 'التقارير',
+      settings: 'الإعدادات',
+      overviewTitle: 'نظرة عامة',
       overviewDesc:
-        "عرض مقاييسك الرئيسية وأنشطة المشروع الأخيرة. تتبع التقدم عبر جميع مشاريعك النشطة.",
-      overviewContent: "لديك ١٢ مشروعًا نشطًا و٣ مهام معلقة.",
-      analyticsTitle: "التحليلات",
-      analyticsDesc:
-        "تتبع مقاييس الأداء ومشاركة المستخدمين. راقب الاتجاهات وحدد فرص النمو.",
-      analyticsContent: "زادت مشاهدات الصفحة بنسبة ٢٥٪ مقارنة بالشهر الماضي.",
-      reportsTitle: "التقارير",
-      reportsDesc:
-        "إنشاء وتنزيل تقاريرك التفصيلية. تصدير البيانات بتنسيقات متعددة للتحليل.",
-      reportsContent: "لديك ٥ تقارير جاهزة ومتاحة للتصدير.",
-      settingsTitle: "الإعدادات",
-      settingsDesc:
-        "إدارة تفضيلات حسابك وخياراته. تخصيص تجربتك لتناسب احتياجاتك.",
-      settingsContent: "تكوين الإشعارات والأمان والسمات.",
-    },
+        'عرض مقاييسك الرئيسية وأنشطة المشروع الأخيرة. تتبع التقدم عبر جميع مشاريعك النشطة.',
+      overviewContent: 'لديك ١٢ مشروعًا نشطًا و٣ مهام معلقة.',
+      analyticsTitle: 'التحليلات',
+      analyticsDesc: 'تتبع مقاييس الأداء ومشاركة المستخدمين. راقب الاتجاهات وحدد فرص النمو.',
+      analyticsContent: 'زادت مشاهدات الصفحة بنسبة ٢٥٪ مقارنة بالشهر الماضي.',
+      reportsTitle: 'التقارير',
+      reportsDesc: 'إنشاء وتنزيل تقاريرك التفصيلية. تصدير البيانات بتنسيقات متعددة للتحليل.',
+      reportsContent: 'لديك ٥ تقارير جاهزة ومتاحة للتصدير.',
+      settingsTitle: 'الإعدادات',
+      settingsDesc: 'إدارة تفضيلات حسابك وخياراته. تخصيص تجربتك لتناسب احتياجاتك.',
+      settingsContent: 'تكوين الإشعارات والأمان والسمات.'
+    }
   },
   he: {
-    dir: "rtl",
+    dir: 'rtl',
     values: {
-      overview: "סקירה כללית",
-      analytics: "אנליטיקה",
-      reports: "דוחות",
-      settings: "הגדרות",
-      overviewTitle: "סקירה כללית",
+      overview: 'סקירה כללית',
+      analytics: 'אנליטיקה',
+      reports: 'דוחות',
+      settings: 'הגדרות',
+      overviewTitle: 'סקירה כללית',
       overviewDesc:
-        "הצג את המדדים העיקריים שלך ופעילות הפרויקט האחרונה. עקוב אחר התקדמות בכל הפרויקטים הפעילים שלך.",
-      overviewContent: "יש לך 12 פרויקטים פעילים ו-3 משימות ממתינות.",
-      analyticsTitle: "אנליטיקה",
-      analyticsDesc:
-        "עקוב אחר ביצועים ומדדי מעורבות משתמשים. עקוב אחר מגמות וזהה הזדמנויות צמיחה.",
-      analyticsContent: "צפיות בדף עלו ב-25% בהשוואה לחודש שעבר.",
-      reportsTitle: "דוחות",
-      reportsDesc:
-        "צור והורד את הדוחות המפורטים שלך. ייצא נתונים בפורמטים מרובים לניתוח.",
-      reportsContent: "יש לך 5 דוחות מוכנים וזמינים לייצוא.",
-      settingsTitle: "הגדרות",
+        'הצג את המדדים העיקריים שלך ופעילות הפרויקט האחרונה. עקוב אחר התקדמות בכל הפרויקטים הפעילים שלך.',
+      overviewContent: 'יש לך 12 פרויקטים פעילים ו-3 משימות ממתינות.',
+      analyticsTitle: 'אנליטיקה',
+      analyticsDesc: 'עקוב אחר ביצועים ומדדי מעורבות משתמשים. עקוב אחר מגמות וזהה הזדמנויות צמיחה.',
+      analyticsContent: 'צפיות בדף עלו ב-25% בהשוואה לחודש שעבר.',
+      reportsTitle: 'דוחות',
+      reportsDesc: 'צור והורד את הדוחות המפורטים שלך. ייצא נתונים בפורמטים מרובים לניתוח.',
+      reportsContent: 'יש לך 5 דוחות מוכנים וזמינים לייצוא.',
+      settingsTitle: 'הגדרות',
       settingsDesc:
-        "נהל את העדפות החשבון והאפשרויות שלך. התאם אישית את החוויה שלך כך שתתאים לצרכים שלך.",
-      settingsContent: "הגדר התראות, אבטחה וערכות נושא.",
-    },
-  },
+        'נהל את העדפות החשבון והאפשרויות שלך. התאם אישית את החוויה שלך כך שתתאים לצרכים שלך.',
+      settingsContent: 'הגדר התראות, אבטחה וערכות נושא.'
+    }
+  }
 }
 
 export function TabsRtl() {
-  const { dir, t } = useTranslation(translations, "ar")
+  const { dir, t } = useTranslation(translations, 'ar')
 
   return (
     <Tabs defaultValue="overview" className="w-full max-w-sm" dir={dir}>
@@ -376,9 +341,7 @@ export function TabsRtl() {
             <CardTitle>{t.overviewTitle}</CardTitle>
             <CardDescription>{t.overviewDesc}</CardDescription>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {t.overviewContent}
-          </CardContent>
+          <CardContent className="text-sm text-muted-foreground">{t.overviewContent}</CardContent>
         </Card>
       </TabsContent>
       <TabsContent value="analytics">
@@ -387,9 +350,7 @@ export function TabsRtl() {
             <CardTitle>{t.analyticsTitle}</CardTitle>
             <CardDescription>{t.analyticsDesc}</CardDescription>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {t.analyticsContent}
-          </CardContent>
+          <CardContent className="text-sm text-muted-foreground">{t.analyticsContent}</CardContent>
         </Card>
       </TabsContent>
       <TabsContent value="reports">
@@ -398,9 +359,7 @@ export function TabsRtl() {
             <CardTitle>{t.reportsTitle}</CardTitle>
             <CardDescription>{t.reportsDesc}</CardDescription>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {t.reportsContent}
-          </CardContent>
+          <CardContent className="text-sm text-muted-foreground">{t.reportsContent}</CardContent>
         </Card>
       </TabsContent>
       <TabsContent value="settings">
@@ -409,15 +368,12 @@ export function TabsRtl() {
             <CardTitle>{t.settingsTitle}</CardTitle>
             <CardDescription>{t.settingsDesc}</CardDescription>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {t.settingsContent}
-          </CardContent>
+          <CardContent className="text-sm text-muted-foreground">{t.settingsContent}</CardContent>
         </Card>
       </TabsContent>
     </Tabs>
   )
 }
-
 ```
 
 ## API Reference
