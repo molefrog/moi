@@ -19,7 +19,7 @@
           "type": "registry:lib"
         }
       ],
-      "docs": "# Button\n\nVariants: `default`, `secondary`, `outline`, `ghost`, `destructive`, and `link`. Sizes: `xs`, `sm`, `default`, `lg`, `icon-xs`, `icon-sm`, `icon`, and `icon-lg`. Add `data-icon=\"inline-start\"` or `data-icon=\"inline-end\"` to inline icons. Use `buttonVariants` on links.\n\n```tsx\n<Button variant=\"outline\">Open</Button>\n```"
+      "docs": "# Button\n\nVariants: `default`, `secondary`, `outline`, `ghost`, and `destructive`. Sizes: `xs`, `sm`, `default`, `lg`, `icon-xs`, `icon-sm`, `icon`, and `icon-lg`. Add `data-icon=\"inline-start\"` or `data-icon=\"inline-end\"` to inline icons. Use `buttonVariants` on links.\n\n```tsx\n<Button variant=\"outline\">Open</Button>\n```"
     },
     {
       "name": "drawer",
