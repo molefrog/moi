@@ -1,612 +1,426 @@
-# ACP agents — conformance, findings, and the plan
-
-Three ACP-speaking agents driven through the **same** checklist by
-`scripts/probe-acp.ts`, the provider-agnostic probe. Hermes background is in `../hermes/NOTES.md`;
-fx specifics are in §9 of this file. Every cell
-below is a verdict the probe printed, not a reading of docs. Run date
-2026-09-04, macOS arm64.
-
-| Agent  | Command            | Version                                                     | Model used                          | Result                                                                        |
-| ------ | ------------------ | ----------------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------- |
-| Hermes | `hermes acp`       | 0.20.0 (2026.8.3) **and 0.21.0 (2026.8.31)**, local install | `xai-oauth:grok-build-0.1`          | 39 pass · 3 partial · 2 fail · 1 skip (0.21.0: 38 · 4 · 2 · 1, same verdicts) |
-| fx     | `fx acp`           | 0.0.7 dev `7e02f32f7fca`                                    | `zai/glm-5.3-flash` (gateway)       | 36 pass · 2 partial · 6 fail                                                  |
-| Cursor | `cursor-agent acp` | 2026.09.02-c22c1a3                                          | `auto-smart[optimize_for=balanced]` | 35 pass · 2 partial · 7 fail                                                  |
-
-Reproduce (each run opens a few real sessions and costs a handful of short
-model turns):
-
-```bash
-ACP_CMD="hermes acp"       PROBE_CWD=/tmp/ws-h bun scripts/probe-acp.ts matrix
-ACP_CMD="fx acp"           PROBE_CWD=/tmp/ws-f PROBE_MODEL=openai/gpt-5.4-nano bun scripts/probe-acp.ts matrix
-ACP_CMD="cursor-agent acp" PROBE_CWD=/tmp/ws-c PROBE_MODEL='composer-2.5[fast=true]' bun scripts/probe-acp.ts matrix
-# all with PROBE_MCP_SERVER=$PWD/scripts/mini-mcp-server.ts PROBE_OUT=<file>.json
-```
-
-The Grok CLI (`~/.grok/bin/agent`) was checked and set aside: it emits ACP
-session updates as an output format but has no ACP server mode.
-
-**Bottom line.** All three work end to end over ACP: tools, env injection,
-streaming, cancel, images, per-session MCP, cold `session/list` by cwd, and a
-conversation that survives a process restart. Each has one structural gap a
-generic host must design around:
-
-- **Hermes**: file-tool calls never get their live completion (known, §3.4 of
-  its notes); the approval gate covers file tools only, the model routes
-  around a denial with a shell redirect; no `messageId` on chunks.
-- **fx**: **one active session per process** — opening or resuming a second
-  session invalidates the first (`Session is not active`), so moi must run a
-  process per chat, not per workspace; `session/load` flattens tool history
-  into prose; startup diagnostics leak into the assistant stream.
-- **Cursor**: no `agentInfo`, no usage of any kind; resumes chats through
-  `session/load` with full replay (the documented path — only the newer
-  attach-without-replay `session/resume` RPC and `session/close` are absent);
-  asks permission for shell and MCP calls even in `agent` mode (silenced by
-  the global `--force` flag); plan mode sends a custom `cursor/create_plan`
-  request the client must answer.
-
-## 1. Feature matrix (what a moi harness needs)
-
-Legend: ✅ works · ⚠️ partial or needs a workaround · ❌ missing. "Custom ACP"
-is what a generic adapter may assume of an unknown agent: only what all three
-share, everything else feature-detected.
-
-| Feature                              | Hermes 0.20.0                                                    | fx 0.0.7                                                                                                                            | Cursor 2026.09.02                                                                                                                                                                      | Custom ACP (assume)                                      |
-| ------------------------------------ | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| Process topology                     | ✅ 1 process / N sessions                                        | ❌ 1 **active** session / process; `resume`/`load` switch it                                                                        | ✅ 1 process / N sessions                                                                                                                                                              | detect (probe row)                                       |
-| Start cost                           | ⚠️ init 0.4 s, `session/new` 2.5 s, first token ~13 s            | ✅ init 0.6 s, `session/new` 3 ms, first token 2 s                                                                                  | ⚠️ init 0.4 s, `session/new` 3.1 s, first token ~13 s                                                                                                                                  | hold processes open                                      |
-| `agentInfo`                          | ✅ hermes-agent/0.20.0                                           | ✅ fx/0.0.7                                                                                                                         | ❌ absent                                                                                                                                                                              | optional                                                 |
-| Auth discovery                       | ✅ `authMethods` (oauth + terminal setup)                        | ❌ none → `fx status --json`                                                                                                        | ✅ `cursor_login` (+ `agent status`)                                                                                                                                                   | optional, out-of-band hook                               |
-| Model catalog                        | ✅ pre-1.0 `models` on `session/new` (70, provider-merged)       | ✅ `configOptions[model]` (241)                                                                                                     | ✅ both `models` and `configOptions` (37, parameterized ids)                                                                                                                           | either shape or none                                     |
-| Live model switch                    | ✅ `session/set_model` (drops session MCP, NOTES §3.10)          | ✅ `session/set_config_option`                                                                                                      | ✅ `session/set_config_option` (`set_model` also answers `{}`)                                                                                                                         | whichever is advertised                                  |
-| Effort / reasoning control           | ❌ none over ACP (gateway only)                                  | ❌ `effort` exists in settings, not over ACP; `set_config_option effort` silently ignored; a bogus model id is accepted unvalidated | ⚠️ baked into the model id (`…[effort=high]`); only the exact catalog strings are accepted — a custom bracket or bare id is "Invalid model value", `effort` is "Unknown config option" | none                                                     |
-| Permission modes                     | ✅ default / accept_edits / dont_ask                             | ✅ ask / code (+ `FX_PERMISSION_MODE=yolo` env)                                                                                     | ✅ agent / plan / ask (+ global `--force`)                                                                                                                                             | modes optional                                           |
-| Reported mode after new/load         | ✅ honest                                                        | ❌ says `ask`, behaves as configured `auto` until set                                                                               | ✅ honest                                                                                                                                                                              | always re-set the mode                                   |
-| Interactive approvals                | ⚠️ real for file tools; shell not gated, model bypassed a denial | ✅ real; denial respected                                                                                                           | ⚠️ asks for shell + MCP in `agent`, never for writes; plan/ask are read-only, not approvals                                                                                            | answer `request_permission`                              |
-| Token streaming                      | ✅ text + heavy thoughts (96 frames)                             | ✅ text; thoughts sparse on this model                                                                                              | ✅ text + thoughts                                                                                                                                                                     | yes                                                      |
-| `messageId` on chunks                | ❌                                                               | ✅                                                                                                                                  | ❌                                                                                                                                                                                     | optional                                                 |
-| Clean assistant stream               | ✅                                                               | ❌ diagnostics arrive as the first message chunks                                                                                   | ✅                                                                                                                                                                                     | filter hook                                              |
-| Tool-call labels                     | ✅ descriptive `title` + `locations` + `diff` content            | ⚠️ generic `title` ("Running"); identity in non-spec `name` + `rawInput`                                                            | ⚠️ shell titled by command, files "Edit File"/"Read File"; `rawInput` empty at start, filled on update; `diff` content, `rawOutput`, `locations` on updates                            | kind + title + rawInput                                  |
-| Live tool pairing                    | ⚠️ file tools never complete (3 starts / 1 update)               | ✅ incremental `in_progress` chunks then JSON envelope                                                                              | ✅ 3 starts / 8 updates                                                                                                                                                                | close open calls at turn end                             |
-| Tool-call ids                        | ✅ `tc-<hash>` live, `functions.<tool>:<n>` on replay            | ✅ `chatcmpl-tool-<hex>`                                                                                                            | ⚠️ contain a newline (`call-…-0\nfc_…`)                                                                                                                                                | opaque string                                            |
-| Usage on `session/prompt`            | ✅ in/out/cached/thought/total                                   | ⚠️ in/out only                                                                                                                      | ❌ none                                                                                                                                                                                | optional                                                 |
-| `usage_update` (context meter)       | ✅ used/size                                                     | ✅ used/size + non-spec `cost`                                                                                                      | ❌                                                                                                                                                                                     | optional                                                 |
-| Session titles                       | ✅ generated                                                     | ⚠️ 40-char prompt prefix                                                                                                            | ✅ generated, async (sometimes "Okay")                                                                                                                                                 | optional                                                 |
-| `session/list` by cwd                | ✅                                                               | ✅                                                                                                                                  | ✅                                                                                                                                                                                     | optional (`sessionCapabilities.list`)                    |
-| History replay (`session/load`)      | ✅ user + thoughts + paired tools (1.5 s)                        | ❌ tools flattened into prose, no thoughts (3 ms)                                                                                   | ✅ user + thoughts + paired tools (3.7 s)                                                                                                                                              | lossy or absent                                          |
-| `session/resume` (attach, no replay) | ✅ (also replays)                                                | ✅ no replay, switches the active session                                                                                           | ❌ Method not found — resume goes through `session/load` (full replay), as Cursor's docs prescribe                                                                                     | optional                                                 |
-| `session/fork` / `close` / `delete`  | ✅ / ✅ / ❌                                                     | ❌ / ✅ / ❌                                                                                                                        | ❌ / ❌ / ❌                                                                                                                                                                           | none                                                     |
-| Cancel                               | ✅ `cancelled` in 84 ms                                          | ✅ 28 ms                                                                                                                            | ✅ 3 ms                                                                                                                                                                                | yes                                                      |
-| Images in prompt                     | ✅                                                               | ✅                                                                                                                                  | ✅                                                                                                                                                                                     | check `promptCapabilities.image`                         |
-| Embedded `resource` block            | ✅ inline                                                        | ⚠️ local `file://` only; read via tool this run                                                                                     | ✅ inline (despite advertising `embeddedContext: false`)                                                                                                                               | check capability, fall back to a path note               |
-| Session-scoped MCP                   | ✅ (`tool_search` → `mcp__mini__…`)                              | ✅ (`capability_search` → `mcp_select_tool` → `mcp_mini_…`); global `mcp.json` ignored                                              | ✅ (asks permission per call)                                                                                                                                                          | pass `mcpServers`, expect failures to fail `session/new` |
-| Env injection                        | ✅                                                               | ✅                                                                                                                                  | ✅                                                                                                                                                                                     | yes                                                      |
-| Mid-turn steer                       | ❌ (ACP) — but advertises `/steer` and `/queue` slash commands   | ❌                                                                                                                                  | ❌                                                                                                                                                                                     | no                                                       |
-| Subagent lanes                       | ❌ flat tool call                                                | ❌ flat tool call                                                                                                                   | not probed                                                                                                                                                                             | no                                                       |
-| Non-spec extras seen                 | `_meta.hermes.sessionProvenance`                                 | `name`, `command_result`, `cost`, `permissionMode`                                                                                  | `cursor/create_plan` request, `rawOutput`                                                                                                                                              | ignore unknown fields                                    |
-| On-disk store                        | global `state.db` (SQLite)                                       | `~/.fx/sessions/<id>/` event log with full turns + diffs                                                                            | `~/.cursor/acp-sessions/<id>/` `meta.json` + `store.db` (encrypted blobs)                                                                                                              | none                                                     |
-
-## 2. Per-agent notes
-
-### Hermes — re-verified locally, on 0.20.0 and again after updating to 0.21.0
-
-The Linux research in `../hermes/NOTES.md` holds on this macOS install
-(`~/.hermes`, provider `xai-oauth`, default `grok-build-0.1`). `hermes update`
-took the install from 0.20.0 (2026.8.3) to **0.21.0 (2026.8.31, upstream
-`d3630f85`, 10,297 commits)** and the matrix was rerun: **not one verdict
-changed**. The only differences are a bigger catalog (70 → 92 rows, same
-`Provider: …` description format, so `hermes/models.ts` still parses it),
-a slower `session/new` (2.5 s → 6.6 s) and first token (13 s → 24 s) on the
-same model, and the embedded-resource test answering via a tool read
-instead of inline — model behaviour, not protocol. Reading the 0.21.0
-adapter source confirms the rest: still pinned to `agent-client-protocol==0.9.0`
-(pre-1.0 `models` / `set_model` dialect, `configOptions` empty),
-`set_session_model` still rebuilds the agent without re-attaching session
-MCP servers (§3.10 of the Hermes notes), live tool completion is still paired
-by tool name through a FIFO queue (§3.4), and no `messageId` anywhere. New:
-`session/set_config_option` accepts `edit_approval_policy` (`ask` / …) mapped
-onto the three modes — a second way to set the mode, still undeclared on
-`session/new`.
-
-Observations from both runs:
-
-- `initialize` now returns the provider's oauth entry in `authMethods` next
-  to the terminal setup entry, so `availability()` could read it.
-- Both the file-tool completion gap (§3.4) and the honest-but-noisy stream
-  (96 thought frames before 28 text frames, first token at 13 s) reproduce.
-- **New:** in `default` mode the approval prompt arrived with a proper diff
-  and the probe denied it, but the model then ran
-  `echo 'no-prompt-needed' > gated-default.txt` through the terminal tool,
-  which is not gated in that mode. A denial is advice to the model, not a
-  sandbox. Only `dont_ask` is honest about that.
-- **New:** `session/resume` replays history exactly like `session/load`
-  (4 user chunks, 3 tool pairs), so the two are interchangeable for Hermes.
-- **New:** `available_commands_update` lists `/steer` ("Inject guidance into
-  the currently running agent turn") and `/queue`. ACP has no steer RPC, but
-  a client could send `/steer …` as a prompt; untested.
-- `session_info_update` carries `_meta.hermes.sessionProvenance` on every
-  frame — lineage across compaction, still unused by moi.
-- Global `session/list` shows the profile's own sessions (`cwd:
-~/.hermes/workspace`) alongside workspace ones; the cwd filter is what keeps
-  moi's list clean.
-
-### fx — see §9; two corrections from this run
-
-- **One active session per process.** `session/new` #2 makes #1 answer
-  `-32602 Session is not active`; `session/resume` or `session/load` switch
-  the active session back and forth. This overturns the "one process per
-  workspace is a convenience" line in the earlier fx probe: moi must spawn **one
-  `fx acp` per chat** (cheap, 3 ms per `session/new`) or serialize every
-  chat of a workspace through resume-switching, which cannot host two
-  concurrent turns. Per-chat processes it is.
-- The embedded resource test went through a tool call this time (the earlier
-  run answered inline); treat inline resources as best-effort on fx.
-
-Everything else matches the notes: diagnostics in the stream, lossy
-`session/load`, `session/resume` attaches silently, generic tool titles,
-cost in `usage_update`, denial respected in `ask` mode.
-
-### Cursor — first look
-
-`cursor-agent acp` (the Cursor CLI's ACP server; the same binary is
-`agent` on PATH via `~/.local/bin/cursor-agent`). Auth is the Cursor login
-(`agent status` → "Logged in as …"); `authMethods` advertises `cursor_login`.
-
-Shape of the surface:
-
-- `initialize`: `loadSession: true`, `mcpCapabilities.http/sse`,
-  `promptCapabilities.image: true`, `embeddedContext: false` (but inline
-  resources worked), `sessionCapabilities.list` only, **no `agentInfo`**.
-- `session/new` (3 s): `modes` agent / plan / ask, **both** a pre-1.0
-  `models` block and `configOptions` (`mode`, `model`). Model ids are
-  parameterized: `claude-opus-5[thinking=true,context=300k,effort=high,fast=false]`,
-  `auto-smart[optimize_for=balanced]`, `composer-2.5[fast=true]`. That is
-  Cursor's own effort/context/fast surface folded into the id — a picker can
-  expose it by parsing the bracket list. `available_commands_update` lists
-  ~20 slash commands and skills.
-- Tool calls: shell calls are titled by their command (`` `printenv …` ``),
-  file calls generically (`Edit File`, `Read File`) with `rawInput: {}` on
-  the opening frame; the `tool_call_update`s then carry `rawInput`,
-  `rawOutput`, `locations` and `diff` content. `toolCallId` values contain a
-  literal newline.
-- Approvals: in `agent` mode a shell command and an MCP call each raised
-  `session/request_permission`; file writes did not. `plan` and `ask` are
-  read-only modes, not approval flows — in `plan` the agent sent a custom
-  `cursor/create_plan` request (an ACP extension request) instead of
-  writing. The global `--force` flag (`cursor-agent --force acp`) removes
-  the prompts entirely: 0 prompts on the same turn.
-- Nothing about usage: no `usage` on the prompt result, no `usage_update`.
-- Titles are generated asynchronously; one run got "Shell Command E2E", a
-  `caps` run got "Okay".
-- Resuming a chat is `session/load`, and its replay is complete (user
-  chunks, thoughts, paired tool calls). That is the path Cursor's ACP docs
-  name ("Resume an existing conversation: `session/load`"); the newer
-  `session/resume` RPC, plus `close`, `fork` and `delete`, are "Method not
-  found". Replay was broken until CLI build 2026.06.04 (Cursor forum thread
-  158388: `session/load` sent no `session/update`s in 2026.04 and 2026.05
-  builds, fixed in 2026.06.04) — a host should keep a floor on the CLI
-  version.
-- On disk: `~/.cursor/acp-sessions/<id>/meta.json` (`cwd`, `title`) and a
-  `store.db` SQLite of encrypted blobs, plus `acp-config.json` holding the
-  selected model. `session/list` and `session/load` read that store cold.
-  It is **separate from the interactive CLI's chats**: `cursor-agent -p
---resume <acp session id>` answered "I don't have that earlier turn in this
-  thread", so ACP sessions are not visible to `agent ls` / `agent resume`
-  and vice versa.
-- Process is shared across sessions (multi-session check passes).
-
-## 3. Effort (reasoning level)
-
-None of the three exposes effort over ACP, although the spec has a slot for
-it: a `configOptions` entry with `category: "thought_level"`. What each agent
-does natively, and how moi could reach it outside ACP:
-
-| Agent  | Native surface                                                                                                                                                                                               | Over ACP                                                                                                                                                                                               | Backup path for moi                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Hermes | `hermes chat --reasoning none\|minimal\|low\|medium\|high\|xhigh\|max\|ultra`; config `agent.reasoning_effort` + per-model `agent.reasoning_overrides`; `/reasoning` slash command in the TUI                | nothing; `hermes acp` has no `--reasoning`; `/reasoning` is not in the ACP command list; `set_config_option` stores any id but nothing reads it                                                        | **write `agent.reasoning_effort` (or a `reasoning_overrides` entry) into the profile's `config.yaml`** — `_make_agent` calls `load_config()` on every `session/new`, `load`, `resume` and `set_model`, so the next attach picks it up without a process restart. Workspace-scoped because moi binds a profile per workspace; moi already fingerprints that file.                                                                                                    |
-| fx     | `~/.fx/settings.json` `effort` (`auto` default), copied into each session's `preferences.effort`; `/model <id> <effort> [normal\|fast]` in the TUI; no `--effort` flag, no `FX_EFFORT` env (only `FX_MODEL`) | nothing; `configOptions` are `provider`, `model`, `mode`; `set_config_option effort` is silently accepted and ignored                                                                                  | **write `effort` into `~/.fx/settings.json` before `session/new`** — verified: `effort: "high"` in settings → session `preferences.effort: "high"` and the gateway request carries `effort=high reasoning=selected` (trace). Global file, so write → spawn → `session/new` → restore, which the per-chat process topology makes atomic enough. Do **not** send `/model …` as prompt text: the model treated it as an instruction and edited `settings.json` itself. |
-| Cursor | bracket parameters on the model id (`claude-opus-5[thinking=true,context=300k,effort=high,fast=false]`); `--model 'x[effort=low]'` for the interactive CLI; `~/.cursor/cli-config.json` `modelParameters`    | one fixed variant per model in the catalog; `set_config_option model` accepts only those exact strings (`Invalid model value` for any other bracket or a bare id); `effort` is `Unknown config option` | **none found.** Editing `modelParameters` / `selectedModel` in `cli-config.json`, editing `acp-config.json`, and `cursor-agent --model '…[effort=low]' acp` all leave the catalog variant unchanged — the variants are server-defined. Upstream ask only.                                                                                                                                                                                                           |
-
-Recommendation: keep `liveEffortSwitch: false` for the `acp` type. If effort
-is wanted before upstream adds `thought_level` options, Hermes and fx can be
-driven through their config files at attach time (a `setEffort?(ctx, level)`
-hook on the agent definition); Cursor cannot.
-
-## 4. Subagents
-
-All three delegate through a single tool call; none nests child activity in
-ACP frames. Where the child's transcript can be recovered:
-
-| Agent  | Tool on the wire                                                                                                                                                                                                   | Child activity over ACP                         | Child transcript on disk                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Hermes | `delegate_task` (`title: "delegate: <goal>"`, kind `execute`), returns `{status: "dispatched", mode: "background", delegation_id}`; the parent then polls a `subagents` tool and reads the child's log with `read` | none                                            | **live, append-only log**: `~/.hermes/cache/delegation/live/<delegation_id>/task-N.log`, one line per event (`user`, `start`, `tool -> terminal(echo …)`, `result terminal ok 0.1s: {...}`, `think`, `assistant`, `final status=completed duration=6.13s`) plus `manifest.json` (goal, status, log path). The `delegation_id` is in the tool result on the wire, so moi could tail the log into a subagent lane while it runs. Children are not sessions in `state.db`. |
-| fx     | `subagent` (`title: "Managing"`, kind `other`, `rawInput.request.{action: "run", task}`), returns `{ok, result}` prose                                                                                             | none                                            | **a full hidden session**: `~/.fx/sessions/<parent>/subagent/children.json` lists child ids; each child is its own `~/.fx/sessions/<childId>/` with `events.jsonl` (`history_turn_committed` → `tool_steps` with `shell`, `write_file`, `read_file`), absent from `index.json` and returning 0 turns from `fx session --id`. Recoverable after the fact, not live.                                                                                                      |
-| Cursor | `task` (`title: "Task: <name>"`, kind `other`, `rawInput._toolName: "task"` + `prompt`), returns the child's report                                                                                                | none (one `tool_call` for the whole delegation) | nothing readable: the ACP store is encrypted blobs. Subagents are defined as `.cursor/agents/<name>.md` (project) or `~/.cursor/agents/` (user) with `name` + `description` frontmatter and a system prompt body; a project one was picked up without restart.                                                                                                                                                                                                          |
-
-For moi: a flat tool card is the honest render today. A Hermes subagent lane
-is feasible by tailing the live log keyed on `delegation_id`; an fx lane is
-feasible from disk once the child finishes. Neither is in the nine changes.
-
-## 5. Sessions: list, archive, and where the agent can run
-
-| Question                     | Hermes                                                                                                                                                                                                                                | fx                                                                                                                                                                                                                                                                                                                     | Cursor                                                                                                                                                       |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| List over ACP                | ✅ `session/list { cwd }`, no cursor seen; rows `{ sessionId, cwd, title, updatedAt }`, titles generated                                                                                                                              | ✅ `session/list { cwd }`; titles are the prompt prefix                                                                                                                                                                                                                                                                | ✅ `session/list { cwd }`; titles generated async                                                                                                            |
-| List without spawning        | `state.db` (SQLite, global; ACP rows recover cwd from a JSON blob, the `cwd` column is empty)                                                                                                                                         | `~/.fx/sessions/index.json` (`workspace_root`, `title`, `preview`, `updated_at_ms`) or `fx sessions --json [--all] --limit --cursor` with pagination                                                                                                                                                                   | `~/.cursor/acp-sessions/<id>/meta.json` (`cwd`, `title`)                                                                                                     |
-| History without ACP          | `state.db` only                                                                                                                                                                                                                       | `fx session --id <id> --json` returns `history[]` with `tool_steps` (same shape as the event log) — a supported CLI path                                                                                                                                                                                               | none (encrypted)                                                                                                                                             |
-| Archive / delete over ACP    | ❌ `session/delete` Method not found                                                                                                                                                                                                  | ❌                                                                                                                                                                                                                                                                                                                     | ❌                                                                                                                                                           |
-| Archive / delete via CLI     | `hermes sessions delete <id>` (hard delete); `hermes sessions archive` is filter-based and **did not match ACP sessions** by `--cwd` (empty column) or `--title` (`--source acp` too)                                                 | none (`fx session` inspects, resumes, migrates, recovers; no delete)                                                                                                                                                                                                                                                   | none (`agent ls` / `resume` are interactive; no delete)                                                                                                      |
-| moi's answer                 | keep the moi-side archive store (`archived.ts`) for all three                                                                                                                                                                         | same                                                                                                                                                                                                                                                                                                                   | same                                                                                                                                                         |
-| Any folder or preconfigured? | **any cwd**: `session/new { cwd }` works in a scratch dir. Identity, skills and memory are per profile, so moi's profile-per-workspace binding is a moi choice, not a Hermes requirement (OpenClaw-style agent binding is not needed) | **any cwd under `$HOME`**: works anywhere, but project rules (`AGENTS.md`) are applied only when the workspace is below the home directory — outside it the trace logs `project_rules_omitted reason=workspace is not below home` (verified both ways). `fx workspace add PATH` adds extra roots per primary workspace | **any cwd**: worked in scratch dirs with no trust prompt over ACP; the interactive CLI has `--trust`. Subagents and rules come from `.cursor/` in the folder |
-
-So none of the three needs a preconfigured workspace the way OpenClaw does.
-fx's home-directory rule is the one constraint worth surfacing in moi's
-workspace setup (a workspace under `/tmp` silently loses its `AGENTS.md`).
-
-## 6. What moi needs
-
-Only the changes moi's harness contract and UI consume today; everything else the probes found is in §7 and stays out.
-
-### What breaks today
-
-`acp/` is already the provider-agnostic layer and `hermes/` a thin config on
-top. Nine assumptions in it fail on the next two agents or on a custom one:
-
-| Assumption in `acp/` today                                  | Breaks on                             |
-| ----------------------------------------------------------- | ------------------------------------- |
-| one process per workspace serves every session              | fx (one active session per process)   |
-| catalog is `models` on `session/new`, switch is `set_model` | fx (config options only), Cursor      |
-| the opening `tool_call.title` is the card label             | fx ("Running"), Cursor ("Edit File")  |
-| newest `content` replaces the card output                   | fx (incremental `in_progress` chunks) |
-| every `agent_message_chunk` is assistant text               | fx (diagnostics)                      |
-| cold load = `session/load` replay                           | fx (prose), custom agent (maybe none) |
-| auth state comes from `authMethods` or a known CLI          | fx (empty), custom agent              |
-| `WorkspaceType` is the provider (`'hermes'`)                | custom agents (no code per agent)     |
-| provider is a compile-time `Record` key in the client       | custom agents                         |
-
-### The nine changes
-
-#### 1. Topology per agent (`client.ts`)
-
-Key the process pool by `workspacePath` for `per-workspace` agents (Hermes,
-Cursor) and by `workspacePath + sessionId` for `per-session` agents (fx).
-Nothing else in the transport changes: env injection, stderr draining, the
-unbounded `session/prompt` timeout, `__exit` fan-out. Per-session processes
-are reaped on archive and on the existing idle TTL.
-
-#### 2. Two model dialects (`discovery.ts`, `model-state.ts`, `session.ts`)
-
-Read the catalog from `configOptions[id=model]` when present, else from
-`models` (Cursor sends both and they agree). Switch with
-`session/set_config_option { configId: 'model' }` when the catalog came from
-config options, else `session/set_model`. Refresh the cache from the switch
-response, which fx and Cursor return in full. Remember a `-32601` per
-process so the layer stops retrying an unsupported method. Effort stays
-`liveEffortSwitch: false`; if it is ever wanted, it is an optional
-`setEffort?(ctx, level)` hook on the definition that edits the agent's own
-config file before attach (Hermes profile `config.yaml`, fx `settings.json`),
-see §3 — Cursor has no path.
-
-#### 3. Re-apply the mode after new, load and resume (`session.ts`)
-
-Every agent comes back in its default mode after `session/load`, and fx
-reports `ask` while behaving as `auto` until told otherwise. The recipe is
-per agent and includes what is not a mode:
-
-| Agent  | mode id                                                                    | plus                                       |
-| ------ | -------------------------------------------------------------------------- | ------------------------------------------ |
-| Hermes | `dont_ask`                                                                 | —                                          |
-| fx     | `code`                                                                     | env `FX_PERMISSION_MODE=yolo`              |
-| Cursor | `agent`                                                                    | `--force` before `acp` on the command line |
-| custom | first of `dont_ask` / `code` / `agent` / `yolo` the agent lists, else none |
-
-`applyNoPromptMode` already runs on new and resume; it needs the env/args
-half and to run after load too.
-
-#### 4. One cold-load path per agent (`session.ts` + new `journal.ts`)
-
-`session/load` replay is complete on Hermes and Cursor and stays their path.
-fx replays tool history as prose, and a custom agent may not replay at all,
-so moi keeps its own transcript: append every emitted `StreamEvent` of a
-moi-driven session to `DATA_DIR/acp-journal/<workspace-hash>/<sessionId>.jsonl`.
-Cold load = journal if present, else `session/load` replay. The journal
-carries real timestamps, which retires `run-durations.ts`. Re-attaching a
-process to a session stays `session/load` (replay consumed silently when
-the journal was used), because that is the one method all three implement.
-
-#### 5. Tool cards keyed on identity, appending output (`adapter.ts`)
-
-Label from a per-agent vocabulary keyed on the non-spec `name` (fx) or on
-`kind` + `rawInput` / `locations` (all), falling back to `title`. Append
-`in_progress` content instead of replacing it; treat the `completed`
-payload as metadata when the card already has streamed output; fold fx's
-`command_result` and Cursor's `rawOutput` into output and exit code. Keep
-the existing rules: the opening title outranks a bare `kind`, and calls
-still open when the prompt resolves are closed as success. Port tgfx's
-`tools.ts` table for fx.
-
-#### 6. Drop fx's diagnostic chunks (`adapter.ts`)
-
-The first `agent_message_chunk` message of a turn whose text starts with
-`[context]` or `skill discovery warning:` becomes a `SystemNotice`, never
-assistant text. They share one `messageId`, so the check is per message,
-not per chunk. Harmless on agents that never send them.
-
-#### 7. Availability out of band (per agent)
-
-fx advertises no `authMethods`; the composer banner needs an answer anyway.
-Per agent: fx runs `fx status --json` (`auth`, `auth_refreshable`), Cursor
-runs `agent status`, Hermes keeps its profile check. Login spawns `fx login`
-/ `agent login` and the existing server watch loop re-probes. A custom agent
-reports available when its binary resolves.
-
-#### 8. One `acp` workspace type plus an agent definition
-
-Instead of one `WorkspaceType` per agent:
-
-```
-lib/types.ts        WorkspaceType = 'claude-code' | 'openclaw' | 'codex' | 'acp'
-                    WorkspaceEntry.acp?: { agent: string }   // 'hermes' | 'fx' | 'cursor' | 'custom:<uuid>'
-.moi/.workspace.json   { "harness": { "type": "acp", "agent": "fx" } }
-DATA_DIR/acp-agents.json   custom entries: { label, command, args, env }
-```
-
-The definition is data plus the hooks above:
-
-```ts
-type AcpAgentDefinition = {
-  id: string
-  label: string
-  icon: string
-  command: { bin: string; args: string[]; env?: Record<string, string> }
-  topology: 'per-workspace' | 'per-session' // §1
-  catalog?: 'config-options' | 'models' | 'auto' // §2 (auto = detect)
-  noPrompt?: { modeId?: string; env?: Record<string, string>; args?: string[] } // §3
-  tools?: ToolVocabulary
-  dropDiagnostics?: boolean // §5, §6
-  availability?(ctx): Promise<HarnessAvailability>
-  startLogin?(ctx) // §7
-  discoverWorkspaces?(): Promise<DiscoveredWorkspaceCandidate[]> // hermes profiles
-  models?: { map?(state): Model[]; fingerprint?(ctx): Promise<string> } // hermes
-}
-```
-
-Presets live in `acp/agents/{hermes,fx,cursor,generic}.ts`; the registry
-merges them with the custom file. The `Harness` object is built once from a
-definition. `'hermes'` remains a valid registry value for one release and is
-read as `{ type: 'acp', agent: 'hermes' }`.
-
-#### 9. Client fallbacks
-
-- `WorkspaceType` gains `'acp'`; icon and label maps resolve
-  `acpAgentPresentation(agentId)` with a generic plug icon and the
-  definition's label as the default.
-- One `format/acp.ts` tool-group formatter keyed on `kind`, with the agent's
-  vocabulary supplied in `meta.provider` (`acp:fx`, `acp:cursor`), replaces
-  `format/hermes.ts`.
-- Workspace setup lists presets from `GET /api/harnesses/acp/agents` plus a
-  "Custom…" entry (command, args, env).
-
-### Order
-
-1. §1 topology key and §2 dialect shim — Hermes keeps working, fx becomes
-   possible.
-2. §3, §5, §6 in `session.ts` / `adapter.ts` with a per-agent config object
-   (today's `AcpProviderConfig` grown into the definition above).
-3. §4 journal.
-4. §8 and §9 — the type, the registry, the client lookup, the setup entry.
-5. fx and Cursor presets; §7 availability hooks.
-
-Each step ships alone. Nothing needs a big-bang change.
-
-## 7. Probed, and deliberately left out of the plan
-
-Findings that moi does not consume today, kept so nobody re-probes them. The
-probe's raw per-check rows are regenerated by running it (`PROBE_OUT=` writes
-JSON):
-
-- `session/fork`, `session/close`, `session/delete`, and the `session/resume`
-  versus `session/load` distinction beyond the cold-load path. Archiving is
-  moi-side; idle kill replaces close.
-- `messageId` on chunks — moi accumulates chunks itself.
-- Usage on the prompt result, `usage_update`, fx `cost`, Cursor's missing
-  usage — no context meter or cost widget is wired.
-- Embedded `resource` blocks — the path-note fallback works on all three.
-- Session-scoped MCP semantics — moi passes no servers yet.
-- Approval modes, the deny A/B, the Hermes denial bypass, an `ask` policy —
-  moi bypasses approvals on every backend.
-- Cursor's `cursor/create_plan` request — `client.ts` already answers unknown
-  requests with an error, so nothing hangs.
-- Effort control — no agent exposes it over ACP (fx ignores an `effort`
-  config id, Cursor only accepts verbatim catalog ids); the effort picker
-  stays hidden for ACP workspaces.
-- Agent-generated titles, Cursor's newline in tool ids, fx's `provider`
-  option, Hermes `/steer` and `/queue`, subagent lanes, the safety reviewer,
-  `moi acp doctor`, nightly probe runs.
-
-## 8. Tracker — upstream issues and moi workarounds
-
-What we are fixing, waiting on, or have decided to work around. Update the
-status column as things move; the matrix above describes behaviour at probe
-time, this table describes intent.
-
-| #   | Agent  | Problem                                                               | Status                                                                                                                  | moi workaround while open                                                                    | When fixed upstream                                                                   |
-| --- | ------ | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| 1   | fx     | `session/load` collapses tool calls into prose, drops thoughts (§9.4) | **Reported** — [vercel-labs/fx#624](https://github.com/vercel-labs/fx/issues/624), open, maintainers said they will fix | journal of live events, or read `~/.fx/sessions/<id>/events.jsonl`                           | fx moves to the plain `session/load` path; journal stays as the custom-agent fallback |
-| 2   | fx     | startup diagnostics sent as `agent_message_chunk` (§9.3)              | **To report** — ask: stderr or an `_fx/…` extension notification                                                        | drop the first message of a turn starting with `[context]` / `skill discovery warning:`      | delete the `dropDiagnostics` flag                                                     |
-| 3   | fx     | one active session per process                                        | Not reporting — tgfx lives with it too; may be by design                                                                | `topology: 'per-session'`                                                                    | could fall back to per-workspace, no urgency                                          |
-| 4   | fx     | `currentModeId` says `ask` while the effective policy is `auto`       | To report (low)                                                                                                         | always `set_mode` after new/load/resume (needed anyway)                                      | nothing changes                                                                       |
-| 5   | fx     | generic tool `title`, identity only in non-spec `name`                | To report (low) — ask for descriptive titles and `locations`                                                            | per-agent tool vocabulary keyed on `name` + `rawInput`                                       | vocabulary becomes a fallback                                                         |
-| 6   | fx     | `set_config_option model` accepts a nonexistent id                    | To report (low)                                                                                                         | validate against the catalog before calling                                                  | keep the validation                                                                   |
-| 7   | Hermes | file-tool calls never complete live (Hermes notes §3.4)               | Known, not reported upstream yet; still present in 0.21.0                                                               | close open calls when `session/prompt` resolves (shipped)                                    | keep — harmless                                                                       |
-| 8   | Hermes | `set_model` drops session MCP servers (Hermes notes §3.10)            | Not reported; irrelevant until moi attaches MCP servers                                                                 | none needed today                                                                            | —                                                                                     |
-| 9   | Cursor | permission prompts for shell and MCP in `agent` mode                  | Not reporting — documented behaviour                                                                                    | `--force` before `acp`                                                                       | —                                                                                     |
-| 10  | Cursor | no usage on the wire                                                  | Not reporting for now                                                                                                   | none; no cost/usage shown for Cursor chats                                                   | fold into `TurnMeta` when it appears                                                  |
-| 11  | all    | mode resets to default after `session/load`                           | Protocol-level; expected                                                                                                | re-apply the mode on every attach                                                            | —                                                                                     |
-| 12  | fx     | no effort control over ACP (§3)                                       | **To report** — ask for `--effort` on `fx acp` or a `thought_level` config option                                       | write `effort` into `~/.fx/settings.json` around `session/new`, or leave effort hidden       | delete the settings hack                                                              |
-| 13  | Hermes | no effort control over ACP (§3)                                       | To report (low) — ask for a `thought_level` config option                                                               | write `agent.reasoning_effort` into the profile `config.yaml` before attach, or leave hidden | delete the config hack                                                                |
-| 14  | Cursor | effort fixed per catalog variant, not overridable (§3)                | To report (low) — ask for bracket overrides or a `thought_level` option over ACP                                        | none; effort hidden                                                                          | —                                                                                     |
-| 15  | all    | subagent activity is one flat tool call (§4)                          | Not reporting — no ACP primitive for nesting                                                                            | flat card; optional Hermes log tail / fx child session read                                  | —                                                                                     |
-
-## 9. Appendix: fx wire shapes
-
-The fx-specific samples the tool mapper, diagnostic filter and disk reader are written against (probed on fx 0.0.7). Full probe modes: `scripts/probe-acp.ts`.
-
-### 9.1 Tool calls carry a `name`; titles are generic
+# ACP agents — verified behavior and implementation plan
+
+Updated 2026-09-05 (Asia/Nicosia). These notes replace the original conformance
+report and its implementation plan. Findings, verification limits, and proposed
+solutions are consolidated here. The fixes below are not implemented.
+
+**Fix moi's session lifecycle and protocol mapping before adding providers.**
+The independent host probe exposed twelve failed behavior checks despite all
+42 existing ACP tests passing. Provider compatibility then needs a few focused
+hooks: fx process isolation and history retrieval, Hermes completion/usage
+handling, and Cursor config/replay support. A generic journal, workspace-type
+migration, and custom-agent registry are not prerequisites.
+
+## 1. Evidence and verification
+
+Fresh tests ran against moi `9bfd2ed` and `@agentclientprotocol/sdk@1.3.0`:
+
+| Agent  | Command            | Installed version             | Model used                          |
+| ------ | ------------------ | ----------------------------- | ----------------------------------- |
+| Hermes | `hermes acp`       | `0.21.0`, source `d3630f8532` | `xai-oauth:grok-build-0.1`          |
+| fx     | `fx acp`           | `0.0.7`                       | `zai/glm-5.3-flash`                 |
+| Cursor | `cursor-agent acp` | `2026.09.02-c22c1a3`          | `auto-smart[optimize_for=balanced]` |
+
+fx source was inspected at `7e02f32f7fca`; the installed binary reports only
+`0.0.7`, so that commit is corroborating source, not a proven binary identity.
+Hermes source was inspected in the installed checkout at the revision above.
+
+Fresh independent JSON-RPC probes exercised creation, config rejection, real
+shell/write/read operations, injected environment values checked against the
+resulting file, multiple sessions, cold list/load/resume, nonexistent sessions,
+nondefault modes, cancellation during tools, and broken MCP startup. Hermes
+steering was exercised during an active shell call. The host probe separately
+drove moi's actual ACP client, session, and adapter through a mock subprocess.
+
+Images, successful MCP calls, permission-denial behavior, Cursor `--force`, and
+subagent transcripts have **historical capture evidence only**. Those captures
+were inspected but these cases were not freshly rerun. The old matrix script
+and mini-MCP script are absent from this checkout and its available git history;
+the old command examples no longer apply. Aggregate pass/fail rankings have
+been removed: optional methods are not conformance failures, and an RPC
+acknowledgement does not prove that a setting took effect.
+
+The one-off probe scripts and separate audit artifacts are not retained in the
+repository. To repeat the provider checks, use an independent JSON-RPC client
+with the commands above, existing authentication, and disposable workspaces.
+Test nondefault modes before and after restarting the process, cancel while a
+tool is active, and verify file contents against a random environment marker.
+Restore the confirmed model after rejection tests. For host regressions, use
+the observed failures and acceptance criteria in §5; run the existing suite
+with `bun test server/harness/acp`.
+
+The audit did not upgrade agents, temporarily edit global settings, or file
+upstream issues. Fresh raw captures were stored in `/tmp/moi-acp-audit.f4Uoya/`;
+historical captures were inspected under
+`/tmp/claude-501/-Users-molefrog-git-moi/645be88d-e045-49f1-a68a-66b70769f71e/scratchpad/`.
+These temporary paths may disappear and are not durable test dependencies.
+
+## 2. Verified compatibility summary
+
+These are observations for the tested builds, not promises about every model,
+provider configuration, or future version. See the following sections for
+limitations and solutions.
+
+| Behavior                                      | Hermes                                  | fx                                                     | Cursor                                                      |
+| --------------------------------------------- | --------------------------------------- | ------------------------------------------------------ | ----------------------------------------------------------- |
+| Earlier session usable after creating another | Yes in sequential test                  | No: `Session is not active`                            | Yes in sequential test                                      |
+| Model configuration                           | Legacy `models` / `session/set_model`   | `configOptions`; distinct provider and model selectors | `models` and `configOptions`; exact parameterized model IDs |
+| Independently settable effort                 | Not verified; current path omits config | Unknown effort option is inert                         | No separate override established; use catalog variants      |
+| Live tool completion                          | File calls remain unsettled             | Output deltas and final shell envelope                 | Paired updates; inputs/output may arrive after start        |
+| Cold `session/load`                           | Structured replay                       | Tool history flattened into assistant prose            | Structured replay                                           |
+| `session/resume`                              | Supported, also replays                 | Attaches without replay                                | Method not found in tested build; use load                  |
+| Load nonexistent session                      | Returns `{}`                            | Error                                                  | Error                                                       |
+| Changed mode after warm load                  | `dont_ask` preserved                    | `code` resets to `ask`                                 | `plan` preserved                                            |
+| Changed mode after cold load                  | Resets to `default`                     | Resets to `ask`                                        | `plan` preserved                                            |
+| Cancel during a tool                          | Internal error in finalization          | `cancelled`, tool left unsettled                       | `cancelled`, tool left unsettled                            |
+| Mid-turn steering                             | `/steer` prompt works                   | No equivalent verified                                 | No equivalent verified                                      |
+| Broken stdio MCP executable on creation       | Returns a session ID                    | Rejects creation                                       | Returns a session ID                                        |
+| Prompt usage                                  | Cumulative agent counters               | Input/output observed                                  | None observed                                               |
+| Context usage update                          | Observed                                | Observed, including cost                               | None observed                                               |
+| Alternative history path                      | Local SQLite exists; prefer replay      | Supported `fx session --id <id> --json`                | Local store contains plaintext/JSON; prefer replay          |
+
+The Hermes/Cursor sequential test does not prove unrestricted concurrent
+session isolation. A safe default for unfamiliar agents is a dedicated process
+per open chat. Process sharing should be an explicit provider optimization,
+not a destructive runtime probe against a user's active sessions.
+
+## 3. Shared protocol rules
+
+### Tool updates replace collections
+
+The installed SDK explicitly defines `ToolCallUpdate.content` and `locations`
+as replacements. An omitted field preserves its previous value; an explicit
+`[]` clears it. moi currently fails to clear both and drops `rawOutput`.
+Preserve structured diffs and outputs instead of flattening them to `newText`.
+
+`rawOutput` and `UsageUpdate.cost` are standard fields in SDK 1.3.0; cost is a
+cumulative session value. `ToolCall.name` is present as an **unstable** field.
+fx's `command_result` is an extension. Do not discard useful standard fields
+as unknown provider extras. See [tool calls](https://agentclientprotocol.com/protocol/v1/tool-calls).
+
+fx's incremental shell output needs an fx-specific normalization hook that
+produces replacement snapshots for the shared adapter. Recognize its shell
+completion envelope before treating it as metadata; retain legitimate final
+text and failures. A global append rule duplicates cumulative snapshots and
+can hide the final result.
+
+### Supplied message IDs define boundaries
+
+Two adjacent assistant messages with IDs `a` and `b` currently collapse into
+one `onetwo` message. Flush on supplied identity changes for both user and
+assistant messages. Use role/tool boundary heuristics only when IDs are absent.
+Keep IDs opaque, including literal newlines. Live and replay IDs need not match:
+fresh Hermes replay used `call-…`, Cursor replay used `replay-…`, and both
+used different live IDs. The old Hermes `functions.<tool>:<n>` replay format is
+not universal. Do not reconcile persisted history through ephemeral wire IDs.
+
+### Configuration belongs to a session
+
+Support advertised `configOptions` and legacy `models`/`modes`, including grouped
+values and config updates. Keep selected values separate from the catalog cache.
+Prefer known preset option IDs; semantic categories are a fallback, not unique
+keys. fx marks **both** `provider` and `model` with category `model`.
+
+Other ACP agents can expose `thought_level`; detect it instead of declaring
+ACP incapable of effort control. Return only confirmed model/config selections
+and surface rejected changes. See [session config options](https://agentclientprotocol.com/protocol/v1/session-config-options).
+
+Modes are not a portable permission policy: `code` or `agent` does not imply
+bypass. Apply an explicit preset policy and answer permission requests.
+`resumeSession` already reapplies moi's no-prompt mode after `session/load`;
+adding that same load-path fix again would be redundant.
+
+### Capabilities and authentication need separate checks
+
+An executable resolving on PATH proves installation, not authenticated readiness.
+`authMethods` advertises login methods, not current login success; an empty list
+does not prove unavailability. Run provider status checks under the same
+profile/environment as the session and retain an unknown state for custom
+agents. No login was performed during this audit.
+
+Check advertised image/resource capabilities. An agent reading a supplied URI
+does not prove it consumed embedded content; a strict test needs an inline-only
+random marker with no readable file. moi's text-only chunk handler currently
+drops unsupported assistant media. Unknown extension requests should receive
+prompt errors, but returning an error is not implementing the associated feature.
+
+## 4. Provider-specific solutions
+
+### Hermes
+
+- **Missing live file-tool completions:** reproduced with three starts and one
+  update. Preserve an unknown/interrupted outcome when completion is absent;
+  never synthesize success at turn end. Upstream should pair completions by
+  invocation ID, not FIFO tool name, which also risks out-of-order same-name
+  calls. Related background is in [the Hermes notes](../hermes/NOTES.md), whose
+  older claims must be read against this audit.
+- **Cancellation crash:** a shell cancellation returned `-32603` with
+  `'NoneType' object has no attribute 'startswith'`. Source uses
+  `result.get('final_response', '')`, which leaves explicit `None` unchanged.
+  Normalize optional text upstream and guarantee cancelled finalization.
+  Locally preserve cancellation intent, settle cards honestly, and surface
+  unexpected errors; do not suppress every exception after a cancel request.
+- **Steering works over ACP:** during `sleep 12`, a concurrent prompt containing
+  `/steer … reply STEERED …` changed the original run's answer to `STEERED`.
+  The slash handler runs before the busy check. A dedicated Hermes steer hook
+  must distinguish the short acknowledgement RPC's `end_turn` from completion
+  of the original prompt. Its acknowledgement chunks share the session stream.
+  `/queue` is advertised but was not freshly exercised; ordinary queueing
+  remains the fallback.
+- **Model switching drops session MCP configuration:** `_switch_model` rebuilds
+  without reattaching it. Keep specs on the session and reattach after rebuild.
+  The registry is also process-global by server name; conflicting same-name
+  configs are not proven isolated. Use dedicated chat processes when connector
+  configs differ. The upstream fix needs instance-scoped MCP ownership.
+- **Broken MCP startup can still return a session:** creation success is not
+  connector readiness. Preserve connector diagnostics and verify availability
+  separately rather than assuming registration is all-or-nothing.
+- **Usage is cumulative:** the tools prompt reported 52,132 input / 899 output;
+  the next short prompt reported 65,761 / 1,017. `turn_finalizer.py` copies
+  `agent.session_*` counters into the response. Compute provider-specific deltas
+  only within a known agent instance; reset on rebuild/reconnect and guard
+  decreases. An unknown baseline is cumulative data, not invented turn usage.
+- **Effort-file workaround is unconnected:** `_make_agent` loads config but
+  does not pass resolved `reasoning_config` to `AIAgent`. A mocked constructor
+  with `agent.reasoning_effort: high` confirmed the omission. Resolve/pass
+  session-local reasoning on creation and rebuild, then expose `thought_level`
+  upstream. Keep the independent picker unavailable until that path works.
+- **Missing sessions appear to load:** the nonexistent-ID test returned `{}`.
+  Upstream should return an explicit error; locally check known membership
+  where available without treating a truncated list as authoritative absence.
+- **Modes:** warm load preserves `dont_ask`; cold load resets to `default`.
+  Reapply the chosen policy on attachment. Historical default-mode file denial
+  was bypassed through a shell redirect: that gate is not a filesystem sandbox.
+- **Discovery can truncate:** source scans at most 1,000 ACP records before cwd
+  filtering. A filtered empty result does not establish that no sessions exist.
+
+### fx
+
+- **One active session per process:** creating another session invalidates the
+  first. Source can cancel/reap current work, so serialize neither discovery nor
+  unrelated chats through an active chat process. Use one owned lease per open
+  chat and a separate short-lived discovery process when needed.
+- **Prefer supported history retrieval:**
+  `fx session --id <id> --json` returned tool inputs/results and a complete file
+  presentation/diff. Adapt that for cold display; attach through
+  `session/resume`. `session/load` remains a visibly lossy fallback. This is
+  simpler than building readers for private events/checkpoints or introducing
+  a generic journal first. [Issue #624](https://github.com/vercel-labs/fx/issues/624)
+  was open when checked on 2026-09-05; no new issue was filed.
+- **Normalize shell deltas locally:** accumulate incremental `in_progress`
+  text into a snapshot; recognize the final shell envelope and retain useful
+  `command_result` metadata. File writes can finish with ordinary prose and
+  failures with error text, so completion content is not universally metadata.
+- **Use tool identity separately from display:** generic titles such as
+  `Running` and `Writing` need `name`, `kind`, and `rawInput` for useful labels.
+  File paths may be in `rawInput.path` without `locations`; some tools wrap
+  inputs in `rawInput.request`. Preserve the native title where useful instead
+  of introducing a large vocabulary table upfront.
+- **Operational notices arrive as assistant chunks:** classify a buffered
+  prefix such as `[context]` or `skill discovery warning:` within the fx hook.
+  The prefix can span chunks; IDs rotate when switching between operational
+  and assistant output, so do not assume one diagnostic ID per run. Show
+  omitted-instruction notices instead of silently hiding missing context.
+- **Reapply explicit policy:** setting `code` then loading resets the reported
+  mode to `ask`, both warm and cold. Source/historical evidence distinguishes
+  reported mode from effective permission settings. Verify policy behavior,
+  not just a response label.
+- **Validate model selections:** the configured gateway accepted an invalid
+  model value; other providers have different validation paths. Prefer its
+  known `model` option ID and preserve the separate provider selector. Verify
+  returned state and fail the send when a required switch fails.
+- **Do not swap global settings for effort:** separate processes still race
+  on `~/.fx/settings.json`, crashes can leave a temporary value installed, and
+  unrelated CLI launches can observe it. Expose a validated session-local
+  `thought_level` option upstream and persist effort with the session.
+- **Keep measured run durations:** all four observed CLI tool results had the
+  same `created_at_ms`; the turn had no start/end fields. Those timestamps do
+  not establish per-tool duration and do not replace `run-durations.ts`.
+- **Instruction discovery outside home is limited:** source has a specific
+  omission reason for such workspaces. This does not prohibit execution there.
+  Report omitted rules; do not move the workspace or spoof `HOME`.
+
+Representative shell updates, abbreviated from the captures:
 
 ```json
-{"sessionUpdate":"tool_call","toolCallId":"chatcmpl-tool-1f8e…","name":"write_file","title":"Writing","kind":"edit","status":"pending","rawInput":{"content":"done","path":"out.txt"}}
-{"sessionUpdate":"tool_call","toolCallId":"chatcmpl-tool-c0d6…","name":"shell","title":"Running","kind":"execute","status":"pending","rawInput":{"action":"run","command":"echo hello","shell":{"kind":"executable","path":"/bin/zsh"},"tty":true}}
-{"sessionUpdate":"tool_call","toolCallId":"chatcmpl-tool-2cd5…","name":"subagent","title":"Managing","kind":"other","status":"pending","rawInput":{"request":{"action":"run","task":"…"}}}
-{"sessionUpdate":"tool_call","toolCallId":"chatcmpl-tool-59bb…","name":"mcp_mini_moi_secret_number","title":"mcp_mini_moi_secret_number","kind":"other","status":"pending","rawInput":{}}
+{"sessionUpdate":"tool_call","toolCallId":"…","name":"shell","title":"Running","kind":"execute","rawInput":{"action":"run","command":"echo hello"}}
+{"sessionUpdate":"tool_call_update","toolCallId":"…","status":"in_progress","content":[{"type":"content","content":{"type":"text","text":"hello\n"}}]}
+{"sessionUpdate":"tool_call_update","toolCallId":"…","status":"completed","content":[{"type":"content","content":{"type":"text","text":"{\"state\":\"completed\",\"exit_code\":0}"}}],"command_result":{"kind":"command","exit_code":0}}
 ```
 
-- `name` is not in the ACP schema; fx adds it (tgfx's PR #5 "Render tools from
-  the names and args fx now sends over ACP" is the moment it appeared). It is
-  the only reliable identity — `title` is a one-word gerund ("Running",
-  "Writing", "Reading", "Searching capabilities", "Managing", "Asking").
-  moi's `acpToolCallToTurn` prefers `title`, which would label every shell call
-  "Running": the fx mapper must key on `name` + `rawInput`, exactly what
-  tgfx's `describeTool` table does (`src/fx/tools.ts`).
-- No `locations` on file tools, so `sidecar.locations` stays empty; the path is
-  `rawInput.path`. Some tools wrap arguments in `rawInput.request` (subagent).
-- Ids are provider-generated (`chatcmpl-tool-<hex>`), unique per call — no
-  repeat-id aliasing needed (contrast Hermes replay, `acp/session.ts`
-  `toolCallSeq`).
-- `title` in `session/request_permission` is different again
-  (`file_mutation`), so the same call has three labels on the wire.
+Historical captures/source also describe yielded shell calls whose invocation
+finishes while their process remains running, followed by late output. Preserve
+that distinction: a completed tool invocation does not prove the underlying
+background command exited. Test this path before implementing late-output rules.
 
-### 9.2 Tool results stream incrementally, then finish with a JSON envelope
+### Cursor
 
-The `shell` tool sends **each** output chunk as its own `in_progress` update
-with **only the new bytes**:
+- **Use `session/load` for attachment and structured replay.** The tested
+  build does not implement `session/resume`. A newly created empty session
+  cannot be reloaded before its first prompt, so keep its live lease; do not
+  assume a discovery-created ID is already durable history.
+- **Keep exact catalog IDs opaque.** Parameterized variants are accepted;
+  invented brackets, bare IDs, and unknown config options were rejected.
+  Present the available variants without synthesizing combinations. No
+  separate per-chat effort override was established by this audit.
+- **Preserve delayed tool fields:** inputs, `rawOutput`, diffs, and locations
+  can arrive after the start. Tool IDs can include newlines; replay IDs differ.
+- **Keep the existing permission callback policy.** Shell approval was freshly
+  observed; successful MCP calls and `--force` have historical evidence.
+  The callback already supports moi's current auto-approval behavior; requiring
+  a global flag is unnecessary.
+- **Plan mode needs an implementation:** historical captures show a
+  `cursor/create_plan` request. Returning an unsupported-method error prevents
+  a hang but does not make plan mode usable. Implement and test the extension
+  before exposing the mode. Changed `plan` mode persisted across warm and
+  cold loads, contradicting the original universal-reset claim.
+- **Report usage unavailable:** no usage was observed in fresh prompts,
+  replay, or cancellation. Do not display zero or infer token counts. Consume
+  standard fields if a later version emits them.
+- **The store is not encrypted as claimed:** the audit session's `store.db`
+  contained 14 parseable JSON blobs plus 37 other blobs; 13 contained the test
+  marker in plaintext. Binary records do not prove encryption. This does not
+  establish a supported schema or complete child-history recovery; prefer load.
+- **Treat connector startup separately:** broken stdio MCP creation still
+  returned a session ID, as with Hermes.
 
-```json
-{"sessionUpdate":"tool_call_update","toolCallId":"…","status":"in_progress"}
-{"sessionUpdate":"tool_call_update","toolCallId":"…","status":"in_progress","content":[{"type":"content","content":{"type":"text","text":"moi-env-works-7391\n"}}]}
-{"sessionUpdate":"tool_call_update","toolCallId":"…","status":"completed","content":[{"type":"content","content":{"type":"text","text":"{\"session_id\":null,\"state\":\"completed\",\"backend\":\"captured\",\"persistence\":\"process\",\"output_truncated\":false,…,\"exit_code\":0,…}"}}],"command_result":{"kind":"command","command":"printenv MOI_TEST_ENV","cwd":"…","exit_code":0,"signal":null,"timed_out":false,"duration_ms":null,"stdout_bytes":19,"stderr_bytes":0,"truncated":false,…}}
-```
+## 5. Existing moi defects and acceptance criteria
 
-- moi's adapter keeps "whichever text we have most recently seen", which would
-  **replace** streamed output with each chunk and then with the envelope. The
-  fx mapper must **append** `in_progress` content and treat the `completed`
-  payload as metadata, not output. The envelope is fx's internal shell-tool
-  result (`session_id`, `backend: tty|captured`, `full_output_handle`, …);
-  the human-relevant bits are in the non-spec `command_result` sibling
-  (`command`, `cwd`, `exit_code`, `duration_ms`). tgfx preserves
-  `command_result` "as ACP raw output before schema validation" (SPEC).
-- A yielded/background shell run reports `completed` while the process is
-  still running (`"state":"running"`, `session_id: "shell-1"`), then streams
-  late output as further `in_progress` updates on the same id. tgfx's
-  projector pins a finished row finished ("fx marks a yielded `run`
-  completed, then streams the command's late output as `in_progress`").
-- `write_file` completes with prose (`wrote gated.txt (17 bytes)`) and no
-  diff on the wire, although the on-disk event log has a full
-  `committed_file_presentation` diff for it (§9.5). `read_file` returns
-  `<path>…</path>\n<content>\n1\tdone\n</content>` with line numbers.
-- Failures are `status: failed` with the error as text; permission denials
-  come back as a JSON `{"error":{"type":"tool_permission_denied",…}}` string,
-  and a held action as `{"error":{"type":"tool_review_held",…}}` (§5.3).
+The independent host probe reproduced twelve failed checks, grouped below into
+nine related problems. These are host defects, independent of the provider
+observations above. The grouped collection row covers three checks; the
+loading/readiness row covers two.
 
-### 9.3 Startup diagnostics leak into the assistant stream
+| Priority                   | Observed problem                                                       | Required behavior                                                                                                            |
+| -------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| P1                         | Concurrent cold loads issue two load RPCs and competing subscriptions. | Share one initialization promise per session; both callers receive the same complete replay from one RPC.                    |
+| P1                         | Loading records appear live; sends can run before replay finishes.     | Separate loading from ready. Register the receiver early, publish readiness late, and make reads/sends await initialization. |
+| P1                         | A queued send changes the model during the preceding prompt.           | Keep model/stream settings on the queue item and apply them at dequeue, preserving the original run's metadata.              |
+| P1                         | Cancellation/error cleanup marks unfinished tools successful.          | Only completion evidence yields success; use interrupted/unknown or an explicit error explanation for unresolved calls.      |
+| P1 before adding providers | Different provider specs in the same cwd reuse one client.             | Key by provider/profile/config generation and session scope; retain the concrete client lease on the session.                |
+| P2                         | Adjacent message IDs collapse into one message.                        | Respect identity changes, interleaved tools, and chunked diagnostics.                                                        |
+| P2                         | Empty content/locations do not clear; raw output is lost.              | Preserve omitted fields, replace explicit collections including `[]`, and retain output data.                                |
+| P2                         | A tool-only prompt loses its response usage.                           | Attach completion metadata to the final assistant/tool turn or a dedicated run record, even without final assistant text.    |
+| P2                         | RPC errors lose `code` and `data`.                                     | Preserve typed errors so `-32601` can drive capability fallback and nested provider details remain visible.                  |
 
-Every turn starts with one or two `agent_message_chunk`s that are **not model
-output**:
+Additional source-confirmed gaps, not separately exercised by that mock:
 
-```
-[context] skill catalog omitted 64 entries (careful, claude, …, +56 more): observed=56618 bytes effective=16384 bytes source=compiled default; override with --context-limit skill_catalog_bytes=BYTES|off
-skill discovery warning: candidate "/Users/molefrog/.claude/skills/react-pdf" was skipped because its metadata is invalid (unsupported_multiline); …; relaunch with FX_TRACE=1 to write a trace log
-```
+- `resumeSession` ignores returned model/config state. Seed it on attachment
+  so replay metadata is correct and the next send does not needlessly rebuild
+  an already selected Hermes model. Failed model switches are currently logged
+  and ignored; retain the last confirmed selection and surface failure.
+- There is **no ACP idle TTL**. `forgetAcpSession` drops the record/subscription
+  without cancelling work or releasing the backend session. Add ownership,
+  bounded idle cleanup, and cancel/close/release; never reap busy sessions.
+- Exit cleanup compares the pool's `startClient(...)` promise with a different
+  inner `Promise.resolve(record)`, so identity cannot match. Compare the actual
+  stored promise/record and prevent stale exits from deleting replacement
+  clients. Validate parsed envelopes against null/primitives and settle
+  read/write failures without leaving child processes behind.
+- After `__exit`, the old run's `finally` can drain queued work through a new
+  process before reattaching the session. Invalidate the client generation and
+  explicitly recover or discard queued work. Archive/forget must invalidate
+  its runner too.
+- Model discovery creates a real session on the shared process. This would
+  invalidate fx's active chat even if normal sends used separate keys. Reuse
+  ready-session config or acquire a separate discovery lease.
+- Listing stops after five pages; preview reads one page and trusts cwd
+  filtering. Expose paging, deduplicate IDs/cursors, filter mismatched cwds,
+  and report truncation. A generated title is not the first user message.
 
-They share one `messageId` that differs from the real answer's, so they can be
-dropped by id (first message of the turn whose text starts with `[context]` /
-`skill discovery warning:`) rather than by regex — tgfx uses a regex
-(`diagnosticOffset` in `projector.ts`). `--context-limit
-skill_catalog_bytes=off` removes the `[context]` line but stuffs the whole
-56 KB catalog into the prompt (turn cost went 11.8k → 22.2k tokens), and the
-skill warning still leaks. moi should render these as a `SystemNotice` (or
-drop them), never as assistant text. A rejected embedded resource produces the
-same kind of chunk (`[context] project instructions action=omitted reason=unsafe
-target …`, §3).
+## 6. Persistence and optional features
 
-### 9.4 What replay sends
+Keep transcript retrieval separate from backend attachment. A journal can
+restore display but cannot make an agent without load/resume remember previous
+context. Never silently replace a failed resume with a new empty conversation.
+See [session setup](https://agentclientprotocol.com/protocol/v1/session-setup).
 
-`session/load` on the `stream` session (5 tool calls, thoughts, one answer)
-replayed **three** frames:
+Use Hermes/Cursor load and fx's supported history CLI first. If a journal is
+still needed, define versioned records, run IDs, sequence numbers, begin/end
+markers, and coverage/freshness before making it authoritative. “Journal if
+present” hides external CLI/editor changes and partial recordings. Appending
+every accumulated UI snapshot can produce quadratic storage. Define imported
+sessions, crash recovery, reconciliation, attachment lifetime, and unavailable
+model context explicitly.
 
-```json
-{"sessionUpdate":"user_message_chunk","messageId":"0667…","content":{"type":"text","text":"Run 'echo hello' in the shell, …"}}
-{"sessionUpdate":"agent_message_chunk","messageId":"2a9f…","content":{"type":"text","text":"Previous tool execution:\n\nTool shell (failure):\nshell arguments must match the advertised action schema\n\nTool shell (failure):\n…\n\nTool shell (success):\n{\"session_id\":null,…"}}
-{"sessionUpdate":"agent_message_chunk","messageId":"f813…","content":{"type":"text","text":"'echo hello' printed \"hello\" with exit code 0, …"}}
-```
+Historical subagent traces support flat tool cards as the initial presentation.
+Hermes task logs and fx child stores may provide optional enrichment later.
+Claims that thoughts are never persisted, child data is only available after
+completion, or Cursor has no readable child data exceed the evidence. Do not
+couple the first integration to private subagent formats.
 
-Tool history is **flattened into a prose chunk** ("Previous tool execution:
-… Tool shell (success): …") — no `tool_call`/`tool_call_update`, no
-thoughts, no timestamps, no usage. That prose is presumably what fx feeds the
-model on resume, leaked verbatim to the client. In moi it would render as a
-wall of assistant text with embedded JSON envelopes instead of tool cards.
-The e2e "replay tool pairing" step fails for this reason (0 starts / 0
-updates for a 3-call turn).
+moi-side archive is distinct from deleting provider history and must still
+cancel/release owned resources. Historical missing close/fork/delete methods
+are observations, not universal protocol prohibitions; detect supported methods
+and preserve error codes for fallback.
 
-`session/resume` attaches to the session with no replay at all (one
-`session_info_update`) and the model remembers the conversation. That is the
-right call for a host that keeps its own transcript.
+## 7. Implementation order
 
-### 9.5 The on-disk store has everything, with timestamps
+1. **Fix lifecycle ownership and add regressions.** One pending/ready session
+   record, one client lease, one serialized queue, confirmed session config,
+   preserved RPC errors, explicit cancellation/release, and guarded recovery.
+   Cover the twelve reproduced behaviors before enabling more providers.
+2. **Correct the shared adapter.** Replacement collections, message boundaries,
+   structured output/diffs, honest final status, and tool-only completion data.
+   Keep fx delta/envelope/diagnostic handling in a small provider hook.
+3. **Add fx.** Dedicated chat processes, separate discovery, known selectors,
+   supported CLI history adapter, and `session/resume`; make fallback loss clear.
+4. **Add Cursor.** Reuse config/replay and the current permission callback.
+   Show usage as unavailable; implement/test plan requests before enabling plan.
+5. **Add user-defined agents only when that product surface is wanted.** Grow
+   the existing `AcpProviderConfig` with focused hooks first. A new workspace
+   type, migration, custom registry, presentation endpoint, and setup UI are
+   separate product work. Custom commands are machine-local; a shareable
+   workspace reference must handle a missing local definition explicitly.
+6. **Add a journal/private reader only for a demonstrated remaining gap.**
+   Define coverage, freshness, recovery, and backend-context behavior first.
 
-`~/.fx/sessions/index.json` (`schema_version: 3`) is a flat list, one row per
-session, cheap to read:
+## 8. Tracker
 
-```json
-{
-  "id": "fziAqm9wY0d-",
-  "created_at_ms": 1788417066330,
-  "updated_at_ms": 1788417092400,
-  "workspace_root": "/…/ws-stream",
-  "origin_workspace_root": "/…/ws-stream",
-  "history_len": 1,
-  "has_managed_children": false,
-  "title": "Run 'echo hello' in the shell, then write",
-  "preview": "Run 'echo hello' in the shell, then write out.txt containing 'done', …"
-}
-```
+Original IDs are retained so earlier references remain meaningful. “Confirmed”
+means observed or source-confirmed as specified above, not fixed. The only
+linked existing upstream issue is #1; no new reports were sent in this audit.
 
-That alone covers `listSessions()` (filter by `workspace_root`) **and**
-`workspacePreview()` (`preview` = first user message, `updated_at_ms`) with no
-process spawn — the cheap home-card path Hermes cannot offer.
+| #   | Agent  | Finding and disposition                                                                                                                        |
+| --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | fx     | Lossy load confirmed. [Issue #624](https://github.com/vercel-labs/fx/issues/624) open as of 2026-09-05; use supported CLI history plus resume. |
+| 2   | fx     | Diagnostics confirmed. Buffer/classify within fx and surface relevant notices; upstream should use a distinct notification.                    |
+| 3   | fx     | One active session confirmed. Dedicated chat leases, separate discovery, explicit cleanup.                                                     |
+| 4   | fx     | Mode reset confirmed; effective policy is distinct from its label. Apply/test explicit policy.                                                 |
+| 5   | fx     | Generic titles confirmed. Use name/kind/inputs for identity and display.                                                                       |
+| 6   | fx     | Invalid model accepted on the tested gateway. Validate picker values and confirmed state; do not generalize to every backend.                  |
+| 7   | Hermes | Missing file-tool completions confirmed. Honest unresolved outcomes locally; invocation-ID pairing upstream.                                   |
+| 8   | Hermes | Model rebuild omits MCP config in source. Retain/reattach specs and isolate conflicting registries.                                            |
+| 9   | Cursor | Shell approvals confirmed; MCP/force historical. Existing permission callback supports current moi policy.                                     |
+| 10  | Cursor | Usage absent in tested paths. Display unavailable and accept future standard updates.                                                          |
+| 11  | All    | Universal mode reset disproved. Cursor preserves plan; Hermes preserves warm mode; moi already reapplies mode after load.                      |
+| 12  | fx     | Effort option inert. No global settings swap; upstream session-local option and persistence.                                                   |
+| 13  | Hermes | Effort config not passed through constructor path. Resolve/pass session reasoning upstream; keep picker unavailable meanwhile.                 |
+| 14  | Cursor | Exact catalog variants work; separate effort override not established. Do not invent IDs or claim impossibility.                               |
+| 15  | All    | Flat subagent cards have historical evidence. Optional private-history enrichment remains separate work.                                       |
+| 16  | Hermes | Newly found cancellation finalizer crash. Normalize optional response text upstream; preserve stop intent and errors locally.                  |
+| 17  | Hermes | Newly found cumulative prompt usage. Delta only within a known agent instance and preserve unknown baselines.                                  |
+| 18  | Hermes | Newly found nonexistent load returns `{}`. Explicit error upstream; cautious membership checks locally.                                        |
+| 19  | Cursor | Newly found empty session cannot cold-load before its first prompt. Retain live ownership.                                                     |
+| 20  | moi    | Twelve failed host checks plus source-confirmed lifecycle gaps. Fix and regress before adding providers (§5–7).                                |
 
-Per session, `~/.fx/sessions/<id>/`:
+## 9. Sources and remaining uncertainty
 
-| File                                                                   | Contents                                                                                                             |
-| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `session.json`                                                         | `preferences: { model, effort, fast_mode, provider }`, token totals, `history_len`, event-log fingerprint            |
-| `display.json`                                                         | `title`, `preview`, `origin_workspace_root`                                                                          |
-| `events.jsonl`                                                         | append-only event log (`session_started`, `recovery_checkpoint_set`, `usage_checkpointed`, `history_turn_committed`) |
-| `checkpoint.json`                                                      | materialized state through a seq: preferences, `permission_state.rules`, usage, `recovery_checkpoint`                |
-| `usage-v2.json`                                                        | per-model cost/tokens incl. `cache_read_tokens`, `reasoning_tokens`, `lines_added/removed`, wall/api durations       |
-| `terminal/`, `logs/commands`, `artifacts/`, `subagent/`, `background/` | shell session state, command logs, fetched pages, child sessions                                                     |
+Primary sources: the installed ACP 1.3.0 schema, installed Hermes source, and
+fx's pinned [request handling](https://github.com/vercel-labs/fx/blob/7e02f32f7fca/src/acp/server.zig),
+[session handling](https://github.com/vercel-labs/fx/blob/7e02f32f7fca/src/acp/sessions.zig),
+[streaming](https://github.com/vercel-labs/fx/blob/7e02f32f7fca/src/acp/prompt.zig),
+and [configuration](https://github.com/vercel-labs/fx/blob/7e02f32f7fca/src/core/config/config_runtime.zig).
 
-`history_turn_committed.payload.turn` is the full-fidelity turn:
+Cursor's exact old-version replay-fix date, separation of interactive and ACP
+stores, every possible effort override, and the original Grok CLI exclusion
+were not independently established. Do not carry them forward as requirements.
+Catalog counts and timings vary; measure startup, first model token, and tool
+completion separately with repeated controlled runs. Diagnostic first bytes
+are not model latency.
 
-```
-turn.kind                       "assistant"
-turn.user                       { text, images[] }
-turn.assistant                  final answer text
-turn.execution.tool_steps[]     { assistant: string|null,
-                                  tool_calls[]:   { id, name, arguments_json, provider_result },
-                                  tool_results[]: { tool_call_id, tool_name, status: success|failure, output,
-                                                    created_at_ms, permission_feedback[],
-                                                    committed_file_presentation: { path, kind: added|…, lines[{kind,old_line,new_line,text}], additions, deletions, after_content },
-                                                    command_output_replay, command_process_presentation, terminal_action_presentation } }
-```
-
-So a disk-based `sessionEvents()` can rebuild user turns, tool cards with
-inputs/outputs/status, **file diffs**, per-step timestamps and per-turn usage —
-strictly more than the wire replay, and comparable to the Claude Code
-`.jsonl` path. Thoughts are not persisted anywhere. `recovery_checkpoint_set`
-events (12 per turn here) snapshot the in-flight turn, which is how fx resumes
-an interrupted turn. The format is private (`storage_format: event_log_v1`,
-`schema_version: 3`), so pin a schema check and fall back to `session/load`.
-
-Recommended shape for moi: live turns from the wire, cold loads from the
-journal or this log, and `run-durations.ts` retired because `created_at_ms`
-is real.
+At audit time, all 42 existing ACP tests passed. Full typechecking was blocked
+by the existing `ui-components/drawer.tsx` import of an unexported `Drawer`.
+The temporary probes passed lint and produced no type errors. Their twelve
+failed host checks remain unresolved; the test suite was not modified to accept
+those behaviors.
