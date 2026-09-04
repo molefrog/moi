@@ -38,7 +38,7 @@ Files under `ui-components/` are already install-ready:
 Docs live in `ui-components/docs/`. The standard docs are the matching 4.21
 snapshot with Tabler icons in the examples. Button and Drawer have concise local docs.
 
-Button, Spinner, and Tooltip are shared with the host through re-exports in
+Button, Collapsible, Skeleton, Spinner, and Tooltip are shared with the host through re-exports in
 `client/components/ui/`. Keep their implementations in `ui-components/` when updating.
 
 ## Updating the snapshot
