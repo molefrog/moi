@@ -6,7 +6,7 @@ component: true
 ---
 
 ```tsx
-import { CheckCircle2Icon, InfoIcon } from 'lucide-react'
+import { IconCircleCheck, IconInfoCircle } from '@tabler/icons-react'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
@@ -14,14 +14,14 @@ export function AlertDemo() {
   return (
     <div className="grid w-full max-w-md items-start gap-4">
       <Alert>
-        <CheckCircle2Icon />
+        <IconCircleCheck stroke={1.75} />
         <AlertTitle>Payment successful</AlertTitle>
         <AlertDescription>
           Your payment of $29.99 has been processed. A receipt has been sent to your email address.
         </AlertDescription>
       </Alert>
       <Alert>
-        <InfoIcon />
+        <IconInfoCircle stroke={1.75} />
         <AlertTitle>New feature available</AlertTitle>
         <AlertDescription>
           We&apos;ve added dark mode support. You can enable it in your account settings.
@@ -76,7 +76,7 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/u
 
 ```tsx showLineNumbers
 <Alert>
-  <InfoIcon />
+  <IconInfoCircle stroke={1.75} />
   <AlertTitle>Heads up!</AlertTitle>
   <AlertDescription>
     You can add components and dependencies to your app using the cli.
@@ -104,14 +104,14 @@ Alert
 A basic alert with an icon, title and description.
 
 ```tsx
-import { CheckCircle2Icon } from 'lucide-react'
+import { IconCircleCheck } from '@tabler/icons-react'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 export function AlertBasic() {
   return (
     <Alert className="max-w-md">
-      <CheckCircle2Icon />
+      <IconCircleCheck stroke={1.75} />
       <AlertTitle>Account updated successfully</AlertTitle>
       <AlertDescription>
         Your profile information has been saved. Changes will be reflected immediately.
@@ -126,14 +126,14 @@ export function AlertBasic() {
 Use `variant="destructive"` to create a destructive alert.
 
 ```tsx
-import { AlertCircleIcon } from 'lucide-react'
+import { IconAlertCircle } from '@tabler/icons-react'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 export function AlertDestructive() {
   return (
     <Alert variant="destructive" className="max-w-md">
-      <AlertCircleIcon />
+      <IconAlertCircle stroke={1.75} />
       <AlertTitle>Payment failed</AlertTitle>
       <AlertDescription>
         Your payment could not be processed. Please check your payment method and try again.
@@ -171,14 +171,14 @@ export function AlertActionExample() {
 You can customize the alert colors by adding custom classes such as `bg-amber-50 dark:bg-amber-950` to the `Alert` component.
 
 ```tsx
-import { AlertTriangleIcon } from 'lucide-react'
+import { IconAlertTriangle } from '@tabler/icons-react'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 export function AlertColors() {
   return (
     <Alert className="max-w-md border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-50">
-      <AlertTriangleIcon />
+      <IconAlertTriangle stroke={1.75} />
       <AlertTitle>Your subscription will expire in 3 days.</AlertTitle>
       <AlertDescription>
         Renew now to avoid service interruption or upgrade to a paid plan to continue using the
@@ -197,7 +197,7 @@ To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl)
 'use client'
 
 import * as React from 'react'
-import { CheckCircle2Icon, InfoIcon } from 'lucide-react'
+import { IconCircleCheck, IconInfoCircle } from '@tabler/icons-react'
 
 import { useTranslation, type Translations } from '@/components/language-selector'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -237,12 +237,12 @@ const translations: Translations = {
 
 const alerts = [
   {
-    icon: CheckCircle2Icon,
+    icon: IconCircleCheck,
     titleKey: 'paymentTitle' as const,
     descriptionKey: 'paymentDescription' as const
   },
   {
-    icon: InfoIcon,
+    icon: IconInfoCircle,
     titleKey: 'featureTitle' as const,
     descriptionKey: 'featureDescription' as const
   }
@@ -257,7 +257,7 @@ export function AlertRtl() {
         const Icon = alert.icon
         return (
           <Alert key={index}>
-            <Icon />
+            <Icon stroke={1.75} />
             <AlertTitle>{t[alert.titleKey]}</AlertTitle>
             <AlertDescription>{t[alert.descriptionKey]}</AlertDescription>
           </Alert>

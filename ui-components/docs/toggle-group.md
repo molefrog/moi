@@ -9,7 +9,7 @@ links:
 ---
 
 ```tsx
-import { Bold, Italic, Underline } from 'lucide-react'
+import { IconBold, IconItalic, IconUnderline } from '@tabler/icons-react'
 
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
@@ -17,13 +17,13 @@ export function ToggleGroupDemo() {
   return (
     <ToggleGroup variant="outline" multiple>
       <ToggleGroupItem value="bold" aria-label="Toggle bold">
-        <Bold />
+        <IconBold stroke={1.75} />
       </ToggleGroupItem>
       <ToggleGroupItem value="italic" aria-label="Toggle italic">
-        <Italic />
+        <IconItalic stroke={1.75} />
       </ToggleGroupItem>
       <ToggleGroupItem value="strikethrough" aria-label="Toggle strikethrough">
-        <Underline />
+        <IconUnderline stroke={1.75} />
       </ToggleGroupItem>
     </ToggleGroup>
   )
@@ -192,7 +192,7 @@ export function ToggleGroupSpacing() {
 Use `orientation="vertical"` for vertical toggle groups.
 
 ```tsx
-import { BoldIcon, ItalicIcon, UnderlineIcon } from 'lucide-react'
+import { IconBold, IconItalic, IconUnderline } from '@tabler/icons-react'
 
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
@@ -200,13 +200,13 @@ export function ToggleGroupVertical() {
   return (
     <ToggleGroup multiple orientation="vertical" spacing={1} defaultValue={['bold', 'italic']}>
       <ToggleGroupItem value="bold" aria-label="Toggle bold">
-        <BoldIcon />
+        <IconBold stroke={1.75} />
       </ToggleGroupItem>
       <ToggleGroupItem value="italic" aria-label="Toggle italic">
-        <ItalicIcon />
+        <IconItalic stroke={1.75} />
       </ToggleGroupItem>
       <ToggleGroupItem value="underline" aria-label="Toggle underline">
-        <UnderlineIcon />
+        <IconUnderline stroke={1.75} />
       </ToggleGroupItem>
     </ToggleGroup>
   )
@@ -216,7 +216,7 @@ export function ToggleGroupVertical() {
 ## Disabled
 
 ```tsx
-import { Bold, Italic, Underline } from 'lucide-react'
+import { IconBold, IconItalic, IconUnderline } from '@tabler/icons-react'
 
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
@@ -224,13 +224,13 @@ export function ToggleGroupDisabled() {
   return (
     <ToggleGroup disabled>
       <ToggleGroupItem value="bold" aria-label="Toggle bold">
-        <Bold />
+        <IconBold stroke={1.75} />
       </ToggleGroupItem>
       <ToggleGroupItem value="italic" aria-label="Toggle italic">
-        <Italic />
+        <IconItalic stroke={1.75} />
       </ToggleGroupItem>
       <ToggleGroupItem value="strikethrough" aria-label="Toggle strikethrough">
-        <Underline />
+        <IconUnderline stroke={1.75} />
       </ToggleGroupItem>
     </ToggleGroup>
   )

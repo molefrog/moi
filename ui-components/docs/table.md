@@ -293,7 +293,7 @@ export function TableFooterExample() {
 A table showing actions for each row using a `<DropdownMenu />` component.
 
 ```tsx
-import { MoreHorizontalIcon } from 'lucide-react'
+import { IconDots } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -331,7 +331,7 @@ export function TableActions() {
               <DropdownMenuTrigger
                 render={<Button variant="ghost" size="icon" className="size-8" />}
               >
-                <MoreHorizontalIcon />
+                <IconDots stroke={1.5} />
                 <span className="sr-only">Open menu</span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -351,7 +351,7 @@ export function TableActions() {
               <DropdownMenuTrigger
                 render={<Button variant="ghost" size="icon" className="size-8" />}
               >
-                <MoreHorizontalIcon />
+                <IconDots stroke={1.5} />
                 <span className="sr-only">Open menu</span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -371,7 +371,7 @@ export function TableActions() {
               <DropdownMenuTrigger
                 render={<Button variant="ghost" size="icon" className="size-8" />}
               >
-                <MoreHorizontalIcon />
+                <IconDots stroke={1.5} />
                 <span className="sr-only">Open menu</span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">

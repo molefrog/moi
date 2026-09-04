@@ -158,7 +158,7 @@ export function TooltipSides() {
 ## With Keyboard Shortcut
 
 ```tsx
-import { SaveIcon } from 'lucide-react'
+import { IconDeviceFloppy } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
@@ -168,7 +168,7 @@ export function TooltipKeyboard() {
   return (
     <Tooltip>
       <TooltipTrigger render={<Button variant="outline" size="icon-sm" />}>
-        <SaveIcon />
+        <IconDeviceFloppy stroke={1.75} />
       </TooltipTrigger>
       <TooltipContent>
         Save Changes <Kbd>S</Kbd>

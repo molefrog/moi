@@ -35,10 +35,12 @@ function AccordionTrigger({ className, children, ...props }: AccordionPrimitive.
       >
         {children}
         <IconChevronDown
+          stroke={1.75}
           data-slot="accordion-trigger-icon"
           className="pointer-events-none shrink-0 group-aria-expanded/accordion-trigger:hidden"
         />
         <IconChevronUp
+          stroke={1.75}
           data-slot="accordion-trigger-icon"
           className="pointer-events-none hidden shrink-0 group-aria-expanded/accordion-trigger:inline"
         />

@@ -400,7 +400,7 @@ Long bubble content can be composed with [`Collapsible`](/docs/components/collap
 'use client'
 
 import * as React from 'react'
-import { ChevronDownIcon } from 'lucide-react'
+import { IconChevronDown } from '@tabler/icons-react'
 
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Button } from '@/components/ui/button'
@@ -436,7 +436,8 @@ export function BubbleCollapsible() {
                 render={<Button variant="link" className="gap-1 p-0 text-muted-foreground" />}
               >
                 {open ? 'Show less' : 'Show more'}
-                <ChevronDownIcon
+                <IconChevronDown
+                  stroke={1.5}
                   data-icon="inline-end"
                   className="group-data-panel-open/button:rotate-180"
                 />
@@ -455,7 +456,7 @@ export function BubbleCollapsible() {
 Wrap a bubble in a [`Tooltip`](/docs/components/tooltip) to reveal metadata on hover, such as when a message was read.
 
 ```tsx
-import { CheckIcon } from 'lucide-react'
+import { IconCheck } from '@tabler/icons-react'
 
 import { Bubble, BubbleContent, BubbleReactions } from '@/components/ui/bubble'
 import { Button } from '@/components/ui/button'
@@ -472,7 +473,7 @@ export function BubbleTooltipDemo() {
         <BubbleReactions>
           <Tooltip>
             <TooltipTrigger render={<Button variant="ghost" size="icon-xs" />}>
-              <CheckIcon />
+              <IconCheck stroke={1.75} />
             </TooltipTrigger>
             <TooltipContent>Read on Jan 5, 2026 at 4:32 PM</TooltipContent>
           </Tooltip>
@@ -488,7 +489,7 @@ export function BubbleTooltipDemo() {
 Pair a bubble with a [`Popover`](/docs/components/popover) to surface more information on demand, such as the full error message for a failed action.
 
 ```tsx
-import { InfoIcon } from 'lucide-react'
+import { IconInfoCircle } from '@tabler/icons-react'
 
 import { Bubble, BubbleContent, BubbleReactions } from '@/components/ui/bubble'
 import { Button } from '@/components/ui/button'
@@ -521,7 +522,7 @@ export function BubblePopoverDemo() {
                 />
               }
             >
-              <InfoIcon />
+              <IconInfoCircle stroke={1.75} />
             </PopoverTrigger>
             <PopoverContent>
               <PopoverHeader>
@@ -560,7 +561,7 @@ When reactions are interactive, render buttons instead and give icon-only button
 ```tsx showLineNumbers
 <BubbleReactions>
   <Button aria-label="Thumbs up" variant="secondary" size="icon-xs">
-    <ThumbsUpIcon />
+    <IconThumbUp stroke={1.75} />
   </Button>
 </BubbleReactions>
 ```

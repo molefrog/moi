@@ -797,7 +797,7 @@ You can add an addon to the combobox by using the `InputGroupAddon` component in
 ```tsx
 'use client'
 
-import { GlobeIcon } from 'lucide-react'
+import { IconWorld } from '@tabler/icons-react'
 
 import {
   Combobox,
@@ -853,7 +853,7 @@ export function ComboxboxInputGroup() {
     <Combobox items={timezones}>
       <ComboboxInput placeholder="Select a timezone">
         <InputGroupAddon>
-          <GlobeIcon />
+          <IconWorld stroke={1.75} />
         </InputGroupAddon>
       </ComboboxInput>
       <ComboboxContent alignOffset={-28} className="w-60">

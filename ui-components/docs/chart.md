@@ -710,14 +710,14 @@ It is intentionally decoupled from chart data.
 This allows you to share config and color tokens between charts. It can also work independently for cases where your data or color tokens live remotely or in a different format.
 
 ```tsx showLineNumbers /ChartConfig/
-import { Monitor } from 'lucide-react'
+import { IconDeviceDesktop } from '@tabler/icons-react'
 
 import { type ChartConfig } from '@/components/ui/chart'
 
 const chartConfig = {
   desktop: {
     label: 'Desktop',
-    icon: Monitor,
+    icon: IconDeviceDesktop,
     // A color like 'hsl(220, 98%, 61%)' or 'var(--color-name)'
     color: '#2563eb',
     // OR a theme object with 'light' and 'dark' keys

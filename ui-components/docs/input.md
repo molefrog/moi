@@ -279,7 +279,7 @@ export function InputBadge() {
 To add icons, text, or buttons inside an input, use the `InputGroup` component. See the [Input Group](/docs/components/input-group) component for more examples.
 
 ```tsx
-import { InfoIcon } from 'lucide-react'
+import { IconInfoCircle } from '@tabler/icons-react'
 
 import { Field, FieldLabel } from '@/components/ui/field'
 import {
@@ -299,7 +299,7 @@ export function InputInputGroup() {
           <InputGroupText>https://</InputGroupText>
         </InputGroupAddon>
         <InputGroupAddon align="inline-end">
-          <InfoIcon />
+          <IconInfoCircle stroke={1.75} />
         </InputGroupAddon>
       </InputGroup>
     </Field>

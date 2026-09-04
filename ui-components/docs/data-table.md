@@ -30,7 +30,7 @@ import {
   type ColumnVisibilityState,
   type SortingState
 } from '@tanstack/react-table'
-import { ArrowUpDown, ChevronDown, MoreHorizontal } from 'lucide-react'
+import { IconArrowsUpDown, IconChevronDown, IconDots } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -144,7 +144,7 @@ export const columns = columnHelper.columns([
           onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
         >
           Email
-          <ArrowUpDown />
+          <IconArrowsUpDown stroke={1.5} />
         </Button>
       )
     },
@@ -174,7 +174,7 @@ export const columns = columnHelper.columns([
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" />}>
             <span className="sr-only">Open menu</span>
-            <MoreHorizontal />
+            <IconDots stroke={1.75} />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
             <DropdownMenuGroup>
@@ -228,7 +228,7 @@ export function DataTableDemo() {
         />
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="outline" className="ml-auto" />}>
-            Columns <ChevronDown />
+            Columns <IconChevronDown stroke={1.5} />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
             <DropdownMenuGroup>
@@ -671,7 +671,7 @@ Update our columns definition to add a new `actions` column. The `actions` cell 
 'use client'
 
 import { createColumnHelper } from '@tanstack/react-table'
-import { MoreHorizontal } from 'lucide-react'
+import { IconDots } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -694,7 +694,7 @@ export const columns = columnHelper.columns([
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="ghost" className="h-8 w-8 p-0" />}>
             <span className="sr-only">Open menu</span>
-            <MoreHorizontal className="h-4 w-4" />
+            <IconDots stroke={1.5} className="h-4 w-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
@@ -833,7 +833,7 @@ We can now update the `email` header cell to add sorting controls.
 'use client'
 
 import { createColumnHelper } from '@tanstack/react-table'
-import { ArrowUpDown } from 'lucide-react'
+import { IconArrowsUpDown } from '@tabler/icons-react'
 
 export const columns = columnHelper.columns([
   columnHelper.accessor('email', {
@@ -844,7 +844,7 @@ export const columns = columnHelper.columns([
           onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
         >
           Email
-          <ArrowUpDown className="ml-2 h-4 w-4" />
+          <IconArrowsUpDown stroke={1.5} className="ml-2 h-4 w-4" />
         </Button>
       )
     }
@@ -1194,7 +1194,7 @@ import {
   type ColumnVisibilityState,
   type SortingState
 } from '@tanstack/react-table'
-import { ArrowUpDown, ChevronDown, MoreHorizontal } from 'lucide-react'
+import { IconArrowsUpDown, IconChevronDown, IconDots } from '@tabler/icons-react'
 
 import { useTranslation, type Translations } from '@/components/language-selector'
 import { Button } from '@/components/ui/button'
@@ -1408,7 +1408,7 @@ export function DataTableRtl() {
                 onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
               >
                 {t.email}
-                <ArrowUpDown />
+                <IconArrowsUpDown stroke={1.5} />
               </Button>
             )
           },
@@ -1436,7 +1436,7 @@ export function DataTableRtl() {
               <DropdownMenu>
                 <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" />}>
                   <span className="sr-only">{t.openMenu}</span>
-                  <MoreHorizontal />
+                  <IconDots stroke={1.75} />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   align={dir === 'rtl' ? 'start' : 'end'}
@@ -1490,7 +1490,7 @@ export function DataTableRtl() {
         />
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="outline" className="ms-auto" />}>
-            {t.columns} <ChevronDown />
+            {t.columns} <IconChevronDown stroke={1.5} />
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align={dir === 'rtl' ? 'start' : 'end'}

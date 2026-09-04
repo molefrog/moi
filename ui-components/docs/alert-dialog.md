@@ -222,7 +222,7 @@ export function AlertDialogSmall() {
 Use the `AlertDialogMedia` component to add a media element such as an icon or image to the alert dialog.
 
 ```tsx
-import { CircleFadingPlusIcon } from 'lucide-react'
+import { IconCircleDashedPlus } from '@tabler/icons-react'
 
 import {
   AlertDialog,
@@ -245,7 +245,7 @@ export function AlertDialogWithMedia() {
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogMedia>
-            <CircleFadingPlusIcon />
+            <IconCircleDashedPlus stroke={1.5} />
           </AlertDialogMedia>
           <AlertDialogTitle>Share this project?</AlertDialogTitle>
           <AlertDialogDescription>
@@ -267,7 +267,7 @@ export function AlertDialogWithMedia() {
 Use the `size="sm"` prop to make the alert dialog smaller and the `AlertDialogMedia` component to add a media element such as an icon or image to the alert dialog.
 
 ```tsx
-import { BluetoothIcon } from 'lucide-react'
+import { IconBluetooth } from '@tabler/icons-react'
 
 import {
   AlertDialog,
@@ -291,7 +291,7 @@ export function AlertDialogSmallWithMedia() {
       <AlertDialogContent size="sm">
         <AlertDialogHeader>
           <AlertDialogMedia>
-            <BluetoothIcon />
+            <IconBluetooth stroke={1.5} />
           </AlertDialogMedia>
           <AlertDialogTitle>Allow accessory to connect?</AlertDialogTitle>
           <AlertDialogDescription>
@@ -313,7 +313,7 @@ export function AlertDialogSmallWithMedia() {
 Use the `AlertDialogAction` component to add a destructive action button to the alert dialog.
 
 ```tsx
-import { Trash2Icon } from 'lucide-react'
+import { IconTrash } from '@tabler/icons-react'
 
 import {
   AlertDialog,
@@ -336,7 +336,7 @@ export function AlertDialogDestructive() {
       <AlertDialogContent size="sm">
         <AlertDialogHeader>
           <AlertDialogMedia className="bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive">
-            <Trash2Icon />
+            <IconTrash stroke={1.5} />
           </AlertDialogMedia>
           <AlertDialogTitle>Delete chat?</AlertDialogTitle>
           <AlertDialogDescription>
@@ -361,7 +361,7 @@ To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl)
 ```tsx
 'use client'
 
-import { BluetoothIcon } from 'lucide-react'
+import { IconBluetooth } from '@tabler/icons-react'
 
 import { useTranslation, type Translations } from '@/components/language-selector'
 import {
@@ -454,7 +454,7 @@ export function AlertDialogRtl() {
         <AlertDialogContent size="sm" dir={dir} data-lang={dir === 'rtl' ? language : undefined}>
           <AlertDialogHeader>
             <AlertDialogMedia>
-              <BluetoothIcon />
+              <IconBluetooth stroke={1.5} />
             </AlertDialogMedia>
             <AlertDialogTitle>{t.smallTitle}</AlertDialogTitle>
             <AlertDialogDescription>{t.smallDescription}</AlertDialogDescription>

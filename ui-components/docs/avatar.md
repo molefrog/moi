@@ -181,7 +181,7 @@ Use the `className` prop to add custom styles to the badge such as custom colors
 You can also use an icon inside `<AvatarBadge>`.
 
 ```tsx
-import { PlusIcon } from 'lucide-react'
+import { IconPlus } from '@tabler/icons-react'
 
 import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
@@ -191,7 +191,7 @@ export function AvatarBadgeIconExample() {
       <AvatarImage src="https://github.com/pranathip.png" alt="@pranathip" />
       <AvatarFallback>PP</AvatarFallback>
       <AvatarBadge>
-        <PlusIcon />
+        <IconPlus stroke={1.75} />
       </AvatarBadge>
     </Avatar>
   )
@@ -264,7 +264,7 @@ export function AvatarGroupCountExample() {
 You can also use an icon inside `<AvatarGroupCount>`.
 
 ```tsx
-import { PlusIcon } from 'lucide-react'
+import { IconPlus } from '@tabler/icons-react'
 
 import {
   Avatar,
@@ -290,7 +290,7 @@ export function AvatarGroupCountIconExample() {
         <AvatarFallback>ER</AvatarFallback>
       </Avatar>
       <AvatarGroupCount>
-        <PlusIcon />
+        <IconPlus stroke={1.75} />
       </AvatarGroupCount>
     </AvatarGroup>
   )

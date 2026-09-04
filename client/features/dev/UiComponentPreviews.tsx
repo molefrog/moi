@@ -208,7 +208,7 @@ function AccordionPreview() {
 function AlertPreview() {
   return (
     <Alert className="w-full max-w-md">
-      <IconInfoCircle stroke={1.5} />
+      <IconInfoCircle stroke={1.75} />
       <AlertTitle>Order updated</AlertTitle>
       <AlertDescription>The delivery time changed to tomorrow at 10:00.</AlertDescription>
     </Alert>
@@ -237,7 +237,7 @@ function AttachmentPreview() {
   return (
     <Attachment className="w-full max-w-sm">
       <AttachmentMedia>
-        <IconFile stroke={1.5} />
+        <IconFile stroke={1.75} />
       </AttachmentMedia>
       <AttachmentContent>
         <AttachmentTitle>order-summary.pdf</AttachmentTitle>

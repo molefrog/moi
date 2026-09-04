@@ -112,7 +112,7 @@ To use the Persian calendar, edit `components/ui/calendar.tsx` and replace `reac
 import * as React from 'react'
 import { Vazirmatn } from 'next/font/google'
 import { cn } from 'cn'
-import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
+import { IconChevronDown, IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
 import { getDefaultClassNames, type DayButton } from 'react-day-picker'
 import { DayPicker } from 'react-day-picker/persian'
 
@@ -243,14 +243,14 @@ function Calendar({
         },
         Chevron: ({ className, orientation, ...props }) => {
           if (orientation === 'left') {
-            return <ChevronLeftIcon className={cn('size-4', className)} {...props} />
+            return <IconChevronLeft stroke={1.75} className={cn('size-4', className)} {...props} />
           }
 
           if (orientation === 'right') {
-            return <ChevronRightIcon className={cn('size-4', className)} {...props} />
+            return <IconChevronRight stroke={1.75} className={cn('size-4', className)} {...props} />
           }
 
-          return <ChevronDownIcon className={cn('size-4', className)} {...props} />
+          return <IconChevronDown stroke={1.75} className={cn('size-4', className)} {...props} />
         },
         DayButton: CalendarDayButton,
         WeekNumber: ({ children, ...props }) => {
@@ -456,7 +456,7 @@ export function CalendarWithPresets() {
 'use client'
 
 import * as React from 'react'
-import { Clock2Icon } from 'lucide-react'
+import { IconClockHour2 } from '@tabler/icons-react'
 
 import { Calendar } from '@/components/ui/calendar'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
@@ -486,7 +486,7 @@ export function CalendarWithTime() {
                 className="appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
               />
               <InputGroupAddon>
-                <Clock2Icon className="text-muted-foreground" />
+                <IconClockHour2 stroke={1.75} className="text-muted-foreground" />
               </InputGroupAddon>
             </InputGroup>
           </Field>
@@ -501,7 +501,7 @@ export function CalendarWithTime() {
                 className="appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
               />
               <InputGroupAddon>
-                <Clock2Icon className="text-muted-foreground" />
+                <IconClockHour2 stroke={1.75} className="text-muted-foreground" />
               </InputGroupAddon>
             </InputGroup>
           </Field>

@@ -10,7 +10,7 @@ component: true
 
 import * as React from 'react'
 import { format } from 'date-fns'
-import { ChevronDownIcon } from 'lucide-react'
+import { IconChevronDown } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
@@ -31,7 +31,7 @@ export function DatePickerDemo() {
         }
       >
         {date ? format(date, 'PPP') : <span>Pick a date</span>}
-        <ChevronDownIcon data-icon="inline-end" />
+        <IconChevronDown stroke={1.5} data-icon="inline-end" />
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar mode="single" selected={date} onSelect={setDate} defaultMonth={date} />
@@ -55,7 +55,7 @@ See installation instructions for the [Popover](/docs/components/base/popover#in
 import * as React from 'react'
 import { cn } from 'cn'
 import { format } from 'date-fns'
-import { Calendar as CalendarIcon } from 'lucide-react'
+import { IconCalendar } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
@@ -75,7 +75,7 @@ export function DatePickerDemo() {
           />
         }
       >
-        <CalendarIcon />
+        <IconCalendar stroke={1.5} />
         {date ? format(date, 'PPP') : <span>Pick a date</span>}
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0">
@@ -150,7 +150,7 @@ A date picker component for selecting a range of dates.
 
 import * as React from 'react'
 import { addDays, format } from 'date-fns'
-import { CalendarIcon } from 'lucide-react'
+import { IconCalendar } from '@tabler/icons-react'
 import { type DateRange } from 'react-day-picker'
 
 import { Button } from '@/components/ui/button'
@@ -177,7 +177,7 @@ export function DatePickerWithRange() {
             />
           }
         >
-          <CalendarIcon data-icon="inline-start" />
+          <IconCalendar stroke={1.5} data-icon="inline-start" />
           {date?.from ? (
             date.to ? (
               <>
@@ -258,7 +258,7 @@ A date picker component with an input field for selecting a date.
 'use client'
 
 import * as React from 'react'
-import { CalendarIcon } from 'lucide-react'
+import { IconCalendar } from '@tabler/icons-react'
 
 import { Calendar } from '@/components/ui/calendar'
 import { Field, FieldLabel } from '@/components/ui/field'
@@ -330,7 +330,7 @@ export function DatePickerInput() {
                 />
               }
             >
-              <CalendarIcon />
+              <IconCalendar stroke={1.5} />
               <span className="sr-only">Select date</span>
             </PopoverTrigger>
             <PopoverContent
@@ -368,7 +368,7 @@ A date picker component with a time input field for selecting a time.
 
 import * as React from 'react'
 import { format } from 'date-fns'
-import { ChevronDownIcon } from 'lucide-react'
+import { IconChevronDown } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
@@ -395,7 +395,7 @@ export function DatePickerTime() {
             }
           >
             {date ? format(date, 'PPP') : 'Select date'}
-            <ChevronDownIcon data-icon="inline-end" />
+            <IconChevronDown stroke={1.5} data-icon="inline-end" />
           </PopoverTrigger>
           <PopoverContent className="w-auto overflow-hidden p-0" align="start">
             <Calendar
@@ -435,7 +435,7 @@ This component uses the `chrono-node` library to parse natural language dates.
 
 import * as React from 'react'
 import { parseDate } from 'chrono-node'
-import { CalendarIcon } from 'lucide-react'
+import { IconCalendar } from '@tabler/icons-react'
 
 import { Calendar } from '@/components/ui/calendar'
 import { Field, FieldLabel } from '@/components/ui/field'
@@ -498,7 +498,7 @@ export function DatePickerNaturalLanguage() {
                 />
               }
             >
-              <CalendarIcon />
+              <IconCalendar stroke={1.5} />
               <span className="sr-only">Select date</span>
             </PopoverTrigger>
             <PopoverContent className="w-auto overflow-hidden p-0" align="end" sideOffset={8}>
@@ -535,7 +535,7 @@ To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl)
 import * as React from 'react'
 import { format } from 'date-fns'
 import { arSA, he } from 'date-fns/locale'
-import { ChevronDownIcon } from 'lucide-react'
+import { IconChevronDown } from '@tabler/icons-react'
 import { arSA as arSADayPicker, he as heDayPicker } from 'react-day-picker/locale'
 
 import { useTranslation, type Translations } from '@/components/language-selector'
@@ -596,7 +596,7 @@ export function DatePickerRtl() {
         }
       >
         {date ? format(date, 'PPP', { locale: dateFnsLocale }) : <span>{t.placeholder}</span>}
-        <ChevronDownIcon data-icon="inline-end" />
+        <IconChevronDown stroke={1.5} data-icon="inline-end" />
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start" dir={dir}>
         <Calendar

@@ -10,16 +10,16 @@ component: true
 
 import * as React from 'react'
 import {
-  ArchiveIcon,
-  ArrowLeftIcon,
-  CalendarPlusIcon,
-  ClockIcon,
-  ListFilterIcon,
-  MailCheckIcon,
-  MoreHorizontalIcon,
-  TagIcon,
-  Trash2Icon
-} from 'lucide-react'
+  IconArchive,
+  IconArrowLeft,
+  IconCalendarPlus,
+  IconClock,
+  IconFilter,
+  IconMailCheck,
+  IconDots,
+  IconTag,
+  IconTrash
+} from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
@@ -44,7 +44,7 @@ export function ButtonGroupDemo() {
     <ButtonGroup>
       <ButtonGroup className="hidden sm:flex">
         <Button variant="outline" size="icon" aria-label="Go Back">
-          <ArrowLeftIcon />
+          <IconArrowLeft stroke={1.5} />
         </Button>
       </ButtonGroup>
       <ButtonGroup>
@@ -57,36 +57,36 @@ export function ButtonGroupDemo() {
           <DropdownMenuTrigger
             render={<Button variant="outline" size="icon" aria-label="More Options" />}
           >
-            <MoreHorizontalIcon />
+            <IconDots stroke={1.5} />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-40">
             <DropdownMenuGroup>
               <DropdownMenuItem>
-                <MailCheckIcon />
+                <IconMailCheck stroke={1.75} />
                 Mark as Read
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <ArchiveIcon />
+                <IconArchive stroke={1.75} />
                 Archive
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem>
-                <ClockIcon />
+                <IconClock stroke={1.75} />
                 Snooze
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <CalendarPlusIcon />
+                <IconCalendarPlus stroke={1.75} />
                 Add to Calendar
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <ListFilterIcon />
+                <IconFilter stroke={1.75} />
                 Add to List
               </DropdownMenuItem>
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
-                  <TagIcon />
+                  <IconTag stroke={1.75} />
                   Label As...
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
@@ -101,7 +101,7 @@ export function ButtonGroupDemo() {
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem variant="destructive">
-                <Trash2Icon />
+                <IconTrash stroke={1.75} />
                 Trash
               </DropdownMenuItem>
             </DropdownMenuGroup>
@@ -202,7 +202,7 @@ ButtonGroup
 Set the `orientation` prop to change the button group layout.
 
 ```tsx
-import { MinusIcon, PlusIcon } from 'lucide-react'
+import { IconMinus, IconPlus } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
@@ -211,10 +211,10 @@ export function ButtonGroupOrientation() {
   return (
     <ButtonGroup orientation="vertical" aria-label="Media controls" className="h-fit">
       <Button variant="outline" size="icon">
-        <PlusIcon />
+        <IconPlus stroke={1.5} />
       </Button>
       <Button variant="outline" size="icon">
-        <MinusIcon />
+        <IconMinus stroke={1.5} />
       </Button>
     </ButtonGroup>
   )
@@ -226,7 +226,7 @@ export function ButtonGroupOrientation() {
 Control the size of buttons using the `size` prop on individual buttons.
 
 ```tsx
-import { PlusIcon } from 'lucide-react'
+import { IconPlus } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
@@ -245,7 +245,7 @@ export function ButtonGroupSize() {
           Group
         </Button>
         <Button variant="outline" size="icon-sm">
-          <PlusIcon />
+          <IconPlus stroke={1.75} />
         </Button>
       </ButtonGroup>
       <ButtonGroup>
@@ -253,7 +253,7 @@ export function ButtonGroupSize() {
         <Button variant="outline">Button</Button>
         <Button variant="outline">Group</Button>
         <Button variant="outline" size="icon">
-          <PlusIcon />
+          <IconPlus stroke={1.5} />
         </Button>
       </ButtonGroup>
       <ButtonGroup>
@@ -267,7 +267,7 @@ export function ButtonGroupSize() {
           Group
         </Button>
         <Button variant="outline" size="icon-lg">
-          <PlusIcon />
+          <IconPlus stroke={1.5} />
         </Button>
       </ButtonGroup>
     </div>
@@ -280,7 +280,7 @@ export function ButtonGroupSize() {
 Nest `<ButtonGroup>` components to create button groups with spacing.
 
 ```tsx
-import { AudioLinesIcon, PlusIcon } from 'lucide-react'
+import { IconWaveSine, IconPlus } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
@@ -293,7 +293,7 @@ export function ButtonGroupNested() {
     <ButtonGroup>
       <ButtonGroup>
         <Button variant="outline" size="icon">
-          <PlusIcon />
+          <IconPlus stroke={1.5} />
         </Button>
       </ButtonGroup>
       <ButtonGroup>
@@ -301,7 +301,7 @@ export function ButtonGroupNested() {
           <InputGroupInput placeholder="Send a message..." />
           <Tooltip>
             <TooltipTrigger render={<InputGroupAddon align="inline-end" />}>
-              <AudioLinesIcon />
+              <IconWaveSine stroke={1.75} />
             </TooltipTrigger>
             <TooltipContent>Voice Mode</TooltipContent>
           </Tooltip>
@@ -353,7 +353,7 @@ export function ButtonGroupSplit() {
       <Button variant="secondary">Button</Button>
       <ButtonGroupSeparator />
       <Button size="icon" variant="secondary">
-        <IconPlus />
+        <IconPlus stroke={1.5} />
       </Button>
     </ButtonGroup>
   )
@@ -365,7 +365,7 @@ export function ButtonGroupSplit() {
 Wrap an `Input` component with buttons.
 
 ```tsx
-import { SearchIcon } from 'lucide-react'
+import { IconSearch } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
@@ -376,7 +376,7 @@ export function ButtonGroupInput() {
     <ButtonGroup>
       <Input placeholder="Search..." />
       <Button variant="outline" aria-label="Search">
-        <SearchIcon />
+        <IconSearch stroke={1.5} />
       </Button>
     </ButtonGroup>
   )
@@ -391,7 +391,7 @@ Wrap an `InputGroup` component to create complex input layouts.
 'use client'
 
 import * as React from 'react'
-import { AudioLinesIcon, PlusIcon } from 'lucide-react'
+import { IconWaveSine, IconPlus } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
@@ -410,7 +410,7 @@ export function ButtonGroupInputGroup() {
     <ButtonGroup className="[--radius:9999rem]">
       <ButtonGroup>
         <Button variant="outline" size="icon">
-          <PlusIcon />
+          <IconPlus stroke={1.5} />
         </Button>
       </ButtonGroup>
       <ButtonGroup>
@@ -432,7 +432,7 @@ export function ButtonGroupInputGroup() {
                   />
                 }
               >
-                <AudioLinesIcon />
+                <IconWaveSine stroke={1.5} />
               </TooltipTrigger>
               <TooltipContent>Voice Mode</TooltipContent>
             </Tooltip>
@@ -452,15 +452,15 @@ Create a split button group with a `DropdownMenu` component.
 'use client'
 
 import {
-  AlertTriangleIcon,
-  CheckIcon,
-  ChevronDownIcon,
-  CopyIcon,
-  ShareIcon,
-  TrashIcon,
-  UserRoundXIcon,
-  VolumeOffIcon
-} from 'lucide-react'
+  IconAlertTriangle,
+  IconCheck,
+  IconChevronDown,
+  IconCopy,
+  IconShare,
+  IconTrash,
+  IconUserX,
+  IconVolumeOff
+} from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
@@ -479,39 +479,39 @@ export function ButtonGroupDropdown() {
       <Button variant="outline">Follow</Button>
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="outline" className="pl-2!" />}>
-          <ChevronDownIcon />
+          <IconChevronDown stroke={1.5} />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
           <DropdownMenuGroup>
             <DropdownMenuItem>
-              <VolumeOffIcon />
+              <IconVolumeOff stroke={1.75} />
               Mute Conversation
             </DropdownMenuItem>
             <DropdownMenuItem>
-              <CheckIcon />
+              <IconCheck stroke={1.75} />
               Mark as Read
             </DropdownMenuItem>
             <DropdownMenuItem>
-              <AlertTriangleIcon />
+              <IconAlertTriangle stroke={1.75} />
               Report Conversation
             </DropdownMenuItem>
             <DropdownMenuItem>
-              <UserRoundXIcon />
+              <IconUserX stroke={1.75} />
               Block User
             </DropdownMenuItem>
             <DropdownMenuItem>
-              <ShareIcon />
+              <IconShare stroke={1.75} />
               Share Conversation
             </DropdownMenuItem>
             <DropdownMenuItem>
-              <CopyIcon />
+              <IconCopy stroke={1.75} />
               Copy Conversation
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
             <DropdownMenuItem variant="destructive">
-              <TrashIcon />
+              <IconTrash stroke={1.75} />
               Delete Conversation
             </DropdownMenuItem>
           </DropdownMenuGroup>
@@ -530,7 +530,7 @@ Pair with a `Select` component.
 'use client'
 
 import * as React from 'react'
-import { ArrowRightIcon } from 'lucide-react'
+import { IconArrowRight } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
@@ -575,7 +575,7 @@ export function ButtonGroupSelect() {
       </ButtonGroup>
       <ButtonGroup>
         <Button aria-label="Send" size="icon" variant="outline">
-          <ArrowRightIcon />
+          <IconArrowRight stroke={1.5} />
         </Button>
       </ButtonGroup>
     </ButtonGroup>
@@ -588,7 +588,7 @@ export function ButtonGroupSelect() {
 Use with a `Popover` component.
 
 ```tsx
-import { BotIcon, ChevronDownIcon } from 'lucide-react'
+import { IconRobot, IconChevronDown } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
@@ -607,11 +607,11 @@ export function ButtonGroupPopover() {
   return (
     <ButtonGroup>
       <Button variant="outline">
-        <BotIcon /> Copilot
+        <IconRobot stroke={1.5} /> Copilot
       </Button>
       <Popover>
         <PopoverTrigger render={<Button variant="outline" size="icon" aria-label="Open Popover" />}>
-          <ChevronDownIcon />
+          <IconChevronDown stroke={1.5} />
         </PopoverTrigger>
         <PopoverContent align="end" className="rounded-xl text-sm">
           <PopoverHeader>
@@ -641,16 +641,16 @@ To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl)
 
 import * as React from 'react'
 import {
-  ArchiveIcon,
-  ArrowLeftIcon,
-  CalendarPlusIcon,
-  ClockIcon,
-  ListFilterIcon,
-  MailCheckIcon,
-  MoreHorizontalIcon,
-  TagIcon,
-  Trash2Icon
-} from 'lucide-react'
+  IconArchive,
+  IconArrowLeft,
+  IconCalendarPlus,
+  IconClock,
+  IconFilter,
+  IconMailCheck,
+  IconDots,
+  IconTag,
+  IconTrash
+} from '@tabler/icons-react'
 
 import { useTranslation, type Translations } from '@/components/language-selector'
 import { Button } from '@/components/ui/button'
@@ -729,7 +729,7 @@ export function ButtonGroupRtl() {
       <ButtonGroup>
         <ButtonGroup className="hidden sm:flex">
           <Button variant="outline" size="icon" aria-label="Go Back">
-            <ArrowLeftIcon className="rtl:rotate-180" />
+            <IconArrowLeft stroke={1.5} className="rtl:rotate-180" />
           </Button>
         </ButtonGroup>
         <ButtonGroup>
@@ -742,7 +742,7 @@ export function ButtonGroupRtl() {
             <DropdownMenuTrigger
               render={<Button variant="outline" size="icon" aria-label="More Options" />}
             >
-              <MoreHorizontalIcon />
+              <IconDots stroke={1.5} />
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align={dir === 'rtl' ? 'start' : 'end'}
@@ -752,31 +752,31 @@ export function ButtonGroupRtl() {
             >
               <DropdownMenuGroup>
                 <DropdownMenuItem>
-                  <MailCheckIcon />
+                  <IconMailCheck stroke={1.75} />
                   {t.markAsRead}
                 </DropdownMenuItem>
                 <DropdownMenuItem>
-                  <ArchiveIcon />
+                  <IconArchive stroke={1.75} />
                   {t.archive}
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
                 <DropdownMenuItem>
-                  <ClockIcon />
+                  <IconClock stroke={1.75} />
                   {t.snooze}
                 </DropdownMenuItem>
                 <DropdownMenuItem>
-                  <CalendarPlusIcon />
+                  <IconCalendarPlus stroke={1.75} />
                   {t.addToCalendar}
                 </DropdownMenuItem>
                 <DropdownMenuItem>
-                  <ListFilterIcon />
+                  <IconFilter stroke={1.75} />
                   {t.addToList}
                 </DropdownMenuItem>
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
-                    <TagIcon />
+                    <IconTag stroke={1.75} />
                     {t.labelAs}
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent
@@ -794,7 +794,7 @@ export function ButtonGroupRtl() {
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
                 <DropdownMenuItem variant="destructive">
-                  <Trash2Icon />
+                  <IconTrash stroke={1.75} />
                   {t.trash}
                 </DropdownMenuItem>
               </DropdownMenuGroup>

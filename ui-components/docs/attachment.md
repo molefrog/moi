@@ -6,7 +6,7 @@ component: true
 ---
 
 ```tsx
-import { FileCodeIcon, XIcon } from 'lucide-react'
+import { IconFileCode, IconX } from '@tabler/icons-react'
 
 import {
   Attachment,
@@ -59,7 +59,7 @@ export function AttachmentDemo() {
       </AttachmentGroup>
       <Attachment state="uploading" className="w-full">
         <AttachmentMedia>
-          <Spinner />
+          <Spinner stroke={1.75} />
         </AttachmentMedia>
         <AttachmentContent>
           <AttachmentTitle>sales-dashboard.pdf</AttachmentTitle>
@@ -67,13 +67,13 @@ export function AttachmentDemo() {
         </AttachmentContent>
         <AttachmentActions>
           <AttachmentAction aria-label="Cancel upload">
-            <XIcon />
+            <IconX stroke={1.75} />
           </AttachmentAction>
         </AttachmentActions>
       </Attachment>
       <Attachment className="w-full">
         <AttachmentMedia>
-          <FileCodeIcon />
+          <IconFileCode stroke={1.75} />
         </AttachmentMedia>
         <AttachmentContent>
           <AttachmentTitle>message-renderer.tsx</AttachmentTitle>
@@ -81,7 +81,7 @@ export function AttachmentDemo() {
         </AttachmentContent>
         <AttachmentActions>
           <AttachmentAction aria-label="Remove message-renderer.tsx">
-            <XIcon />
+            <IconX stroke={1.75} />
           </AttachmentAction>
         </AttachmentActions>
       </Attachment>
@@ -151,7 +151,7 @@ import {
 ```tsx
 <Attachment>
   <AttachmentMedia>
-    <FileTextIcon />
+    <IconFileText stroke={1.75} />
   </AttachmentMedia>
   <AttachmentContent>
     <AttachmentTitle>sales-dashboard.pdf</AttachmentTitle>
@@ -159,7 +159,7 @@ import {
   </AttachmentContent>
   <AttachmentActions>
     <AttachmentAction aria-label="Remove sales-dashboard.pdf">
-      <XIcon />
+      <IconX stroke={1.75} />
     </AttachmentAction>
   </AttachmentActions>
 </Attachment>
@@ -202,7 +202,7 @@ AttachmentGroup
 Set `variant="image"` on `AttachmentMedia` and render an `<img>` inside it. Use `orientation="vertical"` to stack the media above the content.
 
 ```tsx
-import { XIcon } from 'lucide-react'
+import { IconX } from '@tabler/icons-react'
 
 import {
   Attachment,
@@ -252,7 +252,7 @@ export function AttachmentImage() {
             </AttachmentContent>
             <AttachmentActions>
               <AttachmentAction aria-label={`Remove ${image.name}`}>
-                <XIcon />
+                <IconX stroke={1.75} />
               </AttachmentAction>
             </AttachmentActions>
             <AttachmentTrigger
@@ -279,13 +279,13 @@ Set `state` to reflect the upload lifecycle. `uploading` and `processing` shimme
 
 ```tsx
 import {
-  CheckIcon,
-  ClockIcon,
-  FileTextIcon,
-  FileWarningIcon,
-  RefreshCwIcon,
-  XIcon
-} from 'lucide-react'
+  IconCheck,
+  IconClock,
+  IconFileText,
+  IconFileAlert,
+  IconRefresh,
+  IconX
+} from '@tabler/icons-react'
 
 import {
   Attachment,
@@ -303,7 +303,7 @@ export function AttachmentStates() {
     <div className="mx-auto flex w-full max-w-sm flex-col gap-2 py-12">
       <Attachment state="idle" className="w-full">
         <AttachmentMedia>
-          <ClockIcon />
+          <IconClock stroke={1.75} />
         </AttachmentMedia>
         <AttachmentContent>
           <AttachmentTitle>selected-file.pdf</AttachmentTitle>
@@ -311,13 +311,13 @@ export function AttachmentStates() {
         </AttachmentContent>
         <AttachmentActions>
           <AttachmentAction aria-label="Remove selected-file.pdf">
-            <XIcon />
+            <IconX stroke={1.75} />
           </AttachmentAction>
         </AttachmentActions>
       </Attachment>
       <Attachment state="uploading" className="w-full">
         <AttachmentMedia>
-          <Spinner />
+          <Spinner stroke={1.75} />
         </AttachmentMedia>
         <AttachmentContent>
           <AttachmentTitle>design-system.zip</AttachmentTitle>
@@ -325,13 +325,13 @@ export function AttachmentStates() {
         </AttachmentContent>
         <AttachmentActions>
           <AttachmentAction aria-label="Cancel upload">
-            <XIcon />
+            <IconX stroke={1.75} />
           </AttachmentAction>
         </AttachmentActions>
       </Attachment>
       <Attachment state="processing" className="w-full">
         <AttachmentMedia>
-          <FileTextIcon />
+          <IconFileText stroke={1.75} />
         </AttachmentMedia>
         <AttachmentContent>
           <AttachmentTitle>market-research.pdf</AttachmentTitle>
@@ -339,13 +339,13 @@ export function AttachmentStates() {
         </AttachmentContent>
         <AttachmentActions>
           <AttachmentAction aria-label="Remove market-research.pdf">
-            <XIcon />
+            <IconX stroke={1.75} />
           </AttachmentAction>
         </AttachmentActions>
       </Attachment>
       <Attachment state="error" className="w-full">
         <AttachmentMedia>
-          <FileWarningIcon />
+          <IconFileAlert stroke={1.75} />
         </AttachmentMedia>
         <AttachmentContent>
           <AttachmentTitle>financial-model.xlsx</AttachmentTitle>
@@ -353,16 +353,16 @@ export function AttachmentStates() {
         </AttachmentContent>
         <AttachmentActions>
           <AttachmentAction aria-label="Retry upload">
-            <RefreshCwIcon />
+            <IconRefresh stroke={1.75} />
           </AttachmentAction>
           <AttachmentAction aria-label="Remove financial-model.xlsx">
-            <XIcon />
+            <IconX stroke={1.75} />
           </AttachmentAction>
         </AttachmentActions>
       </Attachment>
       <Attachment state="done" className="w-full">
         <AttachmentMedia>
-          <CheckIcon />
+          <IconCheck stroke={1.75} />
         </AttachmentMedia>
         <AttachmentContent>
           <AttachmentTitle>uploaded-report.pdf</AttachmentTitle>
@@ -370,7 +370,7 @@ export function AttachmentStates() {
         </AttachmentContent>
         <AttachmentActions>
           <AttachmentAction aria-label="Remove uploaded-report.pdf">
-            <XIcon />
+            <IconX stroke={1.75} />
           </AttachmentAction>
         </AttachmentActions>
       </Attachment>
@@ -384,7 +384,7 @@ export function AttachmentStates() {
 Use `size` to switch between `default`, `sm`, and `xs`.
 
 ```tsx
-import { FileTextIcon } from 'lucide-react'
+import { IconFileText } from '@tabler/icons-react'
 
 import {
   Attachment,
@@ -399,7 +399,7 @@ export function AttachmentSizes() {
     <div className="mx-auto flex w-full max-w-sm flex-col gap-3 py-12">
       <Attachment size="default" className="w-full">
         <AttachmentMedia>
-          <FileTextIcon />
+          <IconFileText stroke={1.75} />
         </AttachmentMedia>
         <AttachmentContent>
           <AttachmentTitle>Default attachment</AttachmentTitle>
@@ -408,7 +408,7 @@ export function AttachmentSizes() {
       </Attachment>
       <Attachment size="sm" className="w-full">
         <AttachmentMedia>
-          <FileTextIcon />
+          <IconFileText stroke={1.75} />
         </AttachmentMedia>
         <AttachmentContent>
           <AttachmentTitle>Small attachment</AttachmentTitle>
@@ -417,7 +417,7 @@ export function AttachmentSizes() {
       </Attachment>
       <Attachment size="xs" className="w-full">
         <AttachmentMedia>
-          <FileTextIcon />
+          <IconFileText stroke={1.75} />
         </AttachmentMedia>
         <AttachmentContent>
           <AttachmentTitle>Extra small attachment</AttachmentTitle>
@@ -433,7 +433,8 @@ export function AttachmentSizes() {
 Wrap attachments in `AttachmentGroup` to lay them out in a horizontally scrollable, snapping row with an edge fade.
 
 ```tsx
-import { FileCodeIcon, FileTextIcon, TableIcon, XIcon, type LucideIcon } from 'lucide-react'
+import { IconFileCode, IconFileText, IconTable, IconX } from '@tabler/icons-react'
+import type { TablerIcon } from '@tabler/icons-react'
 
 import {
   Attachment,
@@ -449,19 +450,19 @@ import {
 type Item = {
   name: string
   meta: string
-  icon?: LucideIcon
+  icon?: TablerIcon
   src?: string
 }
 
 const items: Item[] = [
-  { name: 'briefing-notes.pdf', meta: 'PDF · 1.4 MB', icon: FileTextIcon },
+  { name: 'briefing-notes.pdf', meta: 'PDF · 1.4 MB', icon: IconFileText },
   {
     name: 'workspace.png',
     meta: 'PNG · 820 KB',
     src: 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=900&auto=format&fit=crop&q=80'
   },
-  { name: 'customers.csv', meta: 'CSV · 18 KB', icon: TableIcon },
-  { name: 'renderer.tsx', meta: 'TSX · 12 KB', icon: FileCodeIcon }
+  { name: 'customers.csv', meta: 'CSV · 18 KB', icon: IconTable },
+  { name: 'renderer.tsx', meta: 'TSX · 12 KB', icon: IconFileCode }
 ]
 
 export function AttachmentGroupDemo() {
@@ -479,7 +480,7 @@ export function AttachmentGroupDemo() {
                 </AttachmentMedia>
               ) : Icon ? (
                 <AttachmentMedia>
-                  <Icon />
+                  <Icon stroke={1.75} />
                 </AttachmentMedia>
               ) : null}
               <AttachmentContent>
@@ -488,7 +489,7 @@ export function AttachmentGroupDemo() {
               </AttachmentContent>
               <AttachmentActions>
                 <AttachmentAction aria-label={`Remove ${item.name}`}>
-                  <XIcon />
+                  <IconX stroke={1.75} />
                 </AttachmentAction>
               </AttachmentActions>
             </Attachment>
@@ -505,7 +506,7 @@ export function AttachmentGroupDemo() {
 Add an `AttachmentTrigger` to make the whole card open a link or dialog. It fills the card behind the actions, so the actions stay clickable.
 
 ```tsx
-import { CopyIcon, FileSearchIcon, XIcon } from 'lucide-react'
+import { IconCopy, IconFileSearch, IconX } from '@tabler/icons-react'
 
 import {
   Attachment,
@@ -532,7 +533,7 @@ export function AttachmentTriggerDemo() {
       <Dialog>
         <Attachment className="w-full">
           <AttachmentMedia>
-            <FileSearchIcon />
+            <IconFileSearch stroke={1.75} />
           </AttachmentMedia>
           <AttachmentContent>
             <AttachmentTitle>research-summary.pdf</AttachmentTitle>
@@ -540,10 +541,10 @@ export function AttachmentTriggerDemo() {
           </AttachmentContent>
           <AttachmentActions>
             <AttachmentAction aria-label="Copy link">
-              <CopyIcon />
+              <IconCopy stroke={1.75} />
             </AttachmentAction>
             <AttachmentAction aria-label="Remove research-summary.pdf">
-              <XIcon />
+              <IconX stroke={1.75} />
             </AttachmentAction>
           </AttachmentActions>
           <DialogTrigger render={<AttachmentTrigger aria-label="Preview research-summary.pdf" />} />
@@ -583,7 +584,7 @@ export function AttachmentTriggerDemo() {
 
 ```tsx showLineNumbers
 <AttachmentAction aria-label="Remove sales-dashboard.pdf">
-  <XIcon />
+  <IconX stroke={1.75} />
 </AttachmentAction>
 ```
 

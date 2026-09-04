@@ -118,14 +118,14 @@ function Calendar({
         },
         Chevron: ({ className, orientation, ...props }) => {
           if (orientation === 'left') {
-            return <IconChevronLeft className={cn('size-4', className)} {...props} />
+            return <IconChevronLeft stroke={1.75} className={cn('size-4', className)} {...props} />
           }
 
           if (orientation === 'right') {
-            return <IconChevronRight className={cn('size-4', className)} {...props} />
+            return <IconChevronRight stroke={1.75} className={cn('size-4', className)} {...props} />
           }
 
-          return <IconChevronDown className={cn('size-4', className)} {...props} />
+          return <IconChevronDown stroke={1.75} className={cn('size-4', className)} {...props} />
         },
         DayButton: ({ ...props }) => <CalendarDayButton locale={locale} {...props} />,
         WeekNumber: ({ children, ...props }) => {

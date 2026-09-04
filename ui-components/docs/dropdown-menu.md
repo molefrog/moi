@@ -351,7 +351,7 @@ Combine icons with labels for quick scanning.
 ```tsx
 'use client'
 
-import { CreditCardIcon, LogOutIcon, SettingsIcon, UserIcon } from 'lucide-react'
+import { IconCreditCard, IconLogout, IconSettings, IconUser } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -368,20 +368,20 @@ export function DropdownMenuIcons() {
       <DropdownMenuTrigger render={<Button variant="outline" />}>Open</DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuItem>
-          <UserIcon />
+          <IconUser stroke={1.75} />
           Profile
         </DropdownMenuItem>
         <DropdownMenuItem>
-          <CreditCardIcon />
+          <IconCreditCard stroke={1.75} />
           Billing
         </DropdownMenuItem>
         <DropdownMenuItem>
-          <SettingsIcon />
+          <IconSettings stroke={1.75} />
           Settings
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive">
-          <LogOutIcon />
+          <IconLogout stroke={1.75} />
           Log out
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -451,7 +451,7 @@ Add icons to checkbox items.
 'use client'
 
 import * as React from 'react'
-import { BellIcon, MailIcon, MessageSquareIcon } from 'lucide-react'
+import { IconBell, IconMail, IconMessage } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -482,7 +482,7 @@ export function DropdownMenuCheckboxesIcons() {
               setNotifications({ ...notifications, email: checked === true })
             }
           >
-            <MailIcon />
+            <IconMail stroke={1.75} />
             Email notifications
           </DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem
@@ -491,7 +491,7 @@ export function DropdownMenuCheckboxesIcons() {
               setNotifications({ ...notifications, sms: checked === true })
             }
           >
-            <MessageSquareIcon />
+            <IconMessage stroke={1.75} />
             SMS notifications
           </DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem
@@ -500,7 +500,7 @@ export function DropdownMenuCheckboxesIcons() {
               setNotifications({ ...notifications, push: checked === true })
             }
           >
-            <BellIcon />
+            <IconBell stroke={1.75} />
             Push notifications
           </DropdownMenuCheckboxItem>
         </DropdownMenuGroup>
@@ -559,7 +559,7 @@ Show radio options with icons.
 'use client'
 
 import * as React from 'react'
-import { Building2Icon, CreditCardIcon, WalletIcon } from 'lucide-react'
+import { IconBuilding, IconCreditCard, IconWallet } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -585,15 +585,15 @@ export function DropdownMenuRadioIcons() {
           <DropdownMenuLabel>Select Payment Method</DropdownMenuLabel>
           <DropdownMenuRadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
             <DropdownMenuRadioItem value="card">
-              <CreditCardIcon />
+              <IconCreditCard stroke={1.75} />
               Credit Card
             </DropdownMenuRadioItem>
             <DropdownMenuRadioItem value="paypal">
-              <WalletIcon />
+              <IconWallet stroke={1.75} />
               PayPal
             </DropdownMenuRadioItem>
             <DropdownMenuRadioItem value="bank">
-              <Building2Icon />
+              <IconBuilding stroke={1.75} />
               Bank Transfer
             </DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
@@ -611,7 +611,7 @@ Use `variant="destructive"` for irreversible actions.
 ```tsx
 'use client'
 
-import { PencilIcon, ShareIcon, TrashIcon } from 'lucide-react'
+import { IconPencil, IconShare, IconTrash } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -630,18 +630,18 @@ export function DropdownMenuDestructive() {
       <DropdownMenuContent>
         <DropdownMenuGroup>
           <DropdownMenuItem>
-            <PencilIcon />
+            <IconPencil stroke={1.75} />
             Edit
           </DropdownMenuItem>
           <DropdownMenuItem>
-            <ShareIcon />
+            <IconShare stroke={1.75} />
             Share
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem variant="destructive">
-            <TrashIcon />
+            <IconTrash stroke={1.75} />
             Delete
           </DropdownMenuItem>
         </DropdownMenuGroup>
@@ -658,7 +658,7 @@ An account switcher dropdown triggered by an avatar.
 ```tsx
 'use client'
 
-import { BadgeCheckIcon, BellIcon, CreditCardIcon, LogOutIcon } from 'lucide-react'
+import { IconRosetteDiscountCheck, IconBell, IconCreditCard, IconLogout } from '@tabler/icons-react'
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -683,21 +683,21 @@ export function DropdownMenuAvatar() {
       <DropdownMenuContent align="end">
         <DropdownMenuGroup>
           <DropdownMenuItem>
-            <BadgeCheckIcon />
+            <IconRosetteDiscountCheck stroke={1.75} />
             Account
           </DropdownMenuItem>
           <DropdownMenuItem>
-            <CreditCardIcon />
+            <IconCreditCard stroke={1.75} />
             Billing
           </DropdownMenuItem>
           <DropdownMenuItem>
-            <BellIcon />
+            <IconBell stroke={1.75} />
             Notifications
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem>
-          <LogOutIcon />
+          <IconLogout stroke={1.75} />
           Sign Out
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -715,32 +715,32 @@ A richer example combining groups, icons, and submenus.
 
 import * as React from 'react'
 import {
-  BellIcon,
-  CreditCardIcon,
-  DownloadIcon,
-  EyeIcon,
-  FileCodeIcon,
-  FileIcon,
-  FileTextIcon,
-  FolderIcon,
-  FolderOpenIcon,
-  FolderSearchIcon,
-  HelpCircleIcon,
-  KeyboardIcon,
-  LanguagesIcon,
-  LayoutIcon,
-  LogOutIcon,
-  MailIcon,
-  MonitorIcon,
-  MoonIcon,
-  MoreHorizontalIcon,
-  PaletteIcon,
-  SaveIcon,
-  SettingsIcon,
-  ShieldIcon,
-  SunIcon,
-  UserIcon
-} from 'lucide-react'
+  IconBell,
+  IconCreditCard,
+  IconDownload,
+  IconEye,
+  IconFileCode,
+  IconFile,
+  IconFileText,
+  IconFolder,
+  IconFolderOpen,
+  IconFolderSearch,
+  IconHelpCircle,
+  IconKeyboard,
+  IconLanguage,
+  IconLayout,
+  IconLogout,
+  IconMail,
+  IconDeviceDesktop,
+  IconMoon,
+  IconDots,
+  IconPalette,
+  IconDeviceFloppy,
+  IconSettings,
+  IconShield,
+  IconSun,
+  IconUser
+} from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -776,18 +776,18 @@ export function DropdownMenuComplex() {
         <DropdownMenuGroup>
           <DropdownMenuLabel>File</DropdownMenuLabel>
           <DropdownMenuItem>
-            <FileIcon />
+            <IconFile stroke={1.75} />
             New File
             <DropdownMenuShortcut>⌘N</DropdownMenuShortcut>
           </DropdownMenuItem>
           <DropdownMenuItem>
-            <FolderIcon />
+            <IconFolder stroke={1.75} />
             New Folder
             <DropdownMenuShortcut>⇧⌘N</DropdownMenuShortcut>
           </DropdownMenuItem>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <FolderOpenIcon />
+              <IconFolderOpen stroke={1.75} />
               Open Recent
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
@@ -795,26 +795,26 @@ export function DropdownMenuComplex() {
                 <DropdownMenuGroup>
                   <DropdownMenuLabel>Recent Projects</DropdownMenuLabel>
                   <DropdownMenuItem>
-                    <FileCodeIcon />
+                    <IconFileCode stroke={1.75} />
                     Project Alpha
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <FileCodeIcon />
+                    <IconFileCode stroke={1.75} />
                     Project Beta
                   </DropdownMenuItem>
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger>
-                      <MoreHorizontalIcon />
+                      <IconDots stroke={1.75} />
                       More Projects
                     </DropdownMenuSubTrigger>
                     <DropdownMenuPortal>
                       <DropdownMenuSubContent>
                         <DropdownMenuItem>
-                          <FileCodeIcon />
+                          <IconFileCode stroke={1.75} />
                           Project Gamma
                         </DropdownMenuItem>
                         <DropdownMenuItem>
-                          <FileCodeIcon />
+                          <IconFileCode stroke={1.75} />
                           Project Delta
                         </DropdownMenuItem>
                       </DropdownMenuSubContent>
@@ -824,7 +824,7 @@ export function DropdownMenuComplex() {
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                   <DropdownMenuItem>
-                    <FolderSearchIcon />
+                    <IconFolderSearch stroke={1.75} />
                     Browse...
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
@@ -833,12 +833,12 @@ export function DropdownMenuComplex() {
           </DropdownMenuSub>
           <DropdownMenuSeparator />
           <DropdownMenuItem>
-            <SaveIcon />
+            <IconDeviceFloppy stroke={1.75} />
             Save
             <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
           </DropdownMenuItem>
           <DropdownMenuItem>
-            <DownloadIcon />
+            <IconDownload stroke={1.75} />
             Export
             <DropdownMenuShortcut>⇧⌘E</DropdownMenuShortcut>
           </DropdownMenuItem>
@@ -852,7 +852,7 @@ export function DropdownMenuComplex() {
               setNotifications({ ...notifications, email: checked === true })
             }
           >
-            <EyeIcon />
+            <IconEye stroke={1.75} />
             Show Sidebar
           </DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem
@@ -861,12 +861,12 @@ export function DropdownMenuComplex() {
               setNotifications({ ...notifications, sms: checked === true })
             }
           >
-            <LayoutIcon />
+            <IconLayout stroke={1.75} />
             Show Status Bar
           </DropdownMenuCheckboxItem>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <PaletteIcon />
+              <IconPalette stroke={1.75} />
               Theme
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
@@ -875,15 +875,15 @@ export function DropdownMenuComplex() {
                   <DropdownMenuLabel>Appearance</DropdownMenuLabel>
                   <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
                     <DropdownMenuRadioItem value="light">
-                      <SunIcon />
+                      <IconSun stroke={1.75} />
                       Light
                     </DropdownMenuRadioItem>
                     <DropdownMenuRadioItem value="dark">
-                      <MoonIcon />
+                      <IconMoon stroke={1.75} />
                       Dark
                     </DropdownMenuRadioItem>
                     <DropdownMenuRadioItem value="system">
-                      <MonitorIcon />
+                      <IconDeviceDesktop stroke={1.75} />
                       System
                     </DropdownMenuRadioItem>
                   </DropdownMenuRadioGroup>
@@ -896,17 +896,17 @@ export function DropdownMenuComplex() {
         <DropdownMenuGroup>
           <DropdownMenuLabel>Account</DropdownMenuLabel>
           <DropdownMenuItem>
-            <UserIcon />
+            <IconUser stroke={1.75} />
             Profile
             <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
           </DropdownMenuItem>
           <DropdownMenuItem>
-            <CreditCardIcon />
+            <IconCreditCard stroke={1.75} />
             Billing
           </DropdownMenuItem>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <SettingsIcon />
+              <IconSettings stroke={1.75} />
               Settings
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
@@ -914,16 +914,16 @@ export function DropdownMenuComplex() {
                 <DropdownMenuGroup>
                   <DropdownMenuLabel>Preferences</DropdownMenuLabel>
                   <DropdownMenuItem>
-                    <KeyboardIcon />
+                    <IconKeyboard stroke={1.75} />
                     Keyboard Shortcuts
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <LanguagesIcon />
+                    <IconLanguage stroke={1.75} />
                     Language
                   </DropdownMenuItem>
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger>
-                      <BellIcon />
+                      <IconBell stroke={1.75} />
                       Notifications
                     </DropdownMenuSubTrigger>
                     <DropdownMenuPortal>
@@ -939,7 +939,7 @@ export function DropdownMenuComplex() {
                               })
                             }
                           >
-                            <BellIcon />
+                            <IconBell stroke={1.75} />
                             Push Notifications
                           </DropdownMenuCheckboxItem>
                           <DropdownMenuCheckboxItem
@@ -951,7 +951,7 @@ export function DropdownMenuComplex() {
                               })
                             }
                           >
-                            <MailIcon />
+                            <IconMail stroke={1.75} />
                             Email Notifications
                           </DropdownMenuCheckboxItem>
                         </DropdownMenuGroup>
@@ -962,7 +962,7 @@ export function DropdownMenuComplex() {
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                   <DropdownMenuItem>
-                    <ShieldIcon />
+                    <IconShield stroke={1.75} />
                     Privacy & Security
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
@@ -973,18 +973,18 @@ export function DropdownMenuComplex() {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem>
-            <HelpCircleIcon />
+            <IconHelpCircle stroke={1.75} />
             Help & Support
           </DropdownMenuItem>
           <DropdownMenuItem>
-            <FileTextIcon />
+            <IconFileText stroke={1.75} />
             Documentation
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem variant="destructive">
-            <LogOutIcon />
+            <IconLogout stroke={1.75} />
             Sign Out
             <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
           </DropdownMenuItem>
@@ -1003,7 +1003,7 @@ To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl)
 'use client'
 
 import * as React from 'react'
-import { CreditCardIcon, SettingsIcon, UserIcon } from 'lucide-react'
+import { IconCreditCard, IconSettings, IconUser } from '@tabler/icons-react'
 
 import { useTranslation, type Translations } from '@/components/language-selector'
 import { Button } from '@/components/ui/button'
@@ -1141,15 +1141,15 @@ export function DropdownMenuRtl() {
               <DropdownMenuSubContent dir={dir} data-lang={dir === 'rtl' ? language : undefined}>
                 <DropdownMenuGroup>
                   <DropdownMenuItem>
-                    <UserIcon />
+                    <IconUser stroke={1.75} />
                     {t.profile}
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <CreditCardIcon />
+                    <IconCreditCard stroke={1.75} />
                     {t.billing}
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <SettingsIcon />
+                    <IconSettings stroke={1.75} />
                     {t.settings}
                   </DropdownMenuItem>
                 </DropdownMenuGroup>

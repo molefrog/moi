@@ -70,7 +70,7 @@ This applies to all group-based components:
 ```tsx
 <Empty>
   <EmptyHeader>
-    <EmptyMedia variant="icon"><FolderIcon /></EmptyMedia>
+    <EmptyMedia variant="icon"><IconFolder stroke={1.5} /></EmptyMedia>
     <EmptyTitle>No projects yet</EmptyTitle>
     <EmptyDescription>Get started by creating a new project.</EmptyDescription>
   </EmptyHeader>
@@ -150,7 +150,7 @@ Compose with `Spinner` + `data-icon` + `disabled`:
 
 ```tsx
 <Button disabled>
-  <Spinner data-icon="inline-start" />
+  <Spinner stroke={1.5} data-icon="inline-start" />
   Saving...
 </Button>
 ```

@@ -216,7 +216,7 @@ export function TabsDisabled() {
 ## Icons
 
 ```tsx
-import { AppWindowIcon, CodeIcon } from 'lucide-react'
+import { IconAppWindow, IconCode } from '@tabler/icons-react'
 
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
@@ -225,11 +225,11 @@ export function TabsIcons() {
     <Tabs defaultValue="preview">
       <TabsList>
         <TabsTrigger value="preview">
-          <AppWindowIcon />
+          <IconAppWindow stroke={1.75} />
           Preview
         </TabsTrigger>
         <TabsTrigger value="code">
-          <CodeIcon />
+          <IconCode stroke={1.75} />
           Code
         </TabsTrigger>
       </TabsList>

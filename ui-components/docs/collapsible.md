@@ -13,7 +13,7 @@ links:
 'use client'
 
 import * as React from 'react'
-import { ChevronsUpDown } from 'lucide-react'
+import { IconSelector } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -26,7 +26,7 @@ export function CollapsibleDemo() {
       <div className="flex items-center justify-between gap-4 px-4">
         <h4 className="text-sm font-semibold">Order #4189</h4>
         <CollapsibleTrigger render={<Button variant="ghost" size="icon" className="size-8" />}>
-          <ChevronsUpDown />
+          <IconSelector stroke={1.5} />
           <span className="sr-only">Toggle details</span>
         </CollapsibleTrigger>
       </div>
@@ -138,7 +138,7 @@ export function Example() {
 ## Basic
 
 ```tsx
-import { ChevronDownIcon } from '@/registry/icons/__lucide__'
+import { IconChevronDown } from '@tabler/icons-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -150,7 +150,10 @@ export function CollapsibleBasic() {
         <Collapsible className="rounded-md data-open:bg-muted">
           <CollapsibleTrigger render={<Button variant="ghost" className="w-full" />}>
             Product details
-            <ChevronDownIcon className="ml-auto group-data-panel-open/button:rotate-180" />
+            <IconChevronDown
+              stroke={1.5}
+              className="ml-auto group-data-panel-open/button:rotate-180"
+            />
           </CollapsibleTrigger>
           <CollapsibleContent className="flex flex-col items-start gap-2 p-2.5 pt-0 text-sm">
             <div>This panel can be expanded or collapsed to reveal additional content.</div>
@@ -171,7 +174,7 @@ Use a trigger button to reveal additional settings.
 'use client'
 
 import * as React from 'react'
-import { MaximizeIcon, MinimizeIcon } from 'lucide-react'
+import { IconMaximize, IconMinimize } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -219,7 +222,7 @@ export function CollapsibleSettings() {
             </CollapsibleContent>
           </FieldGroup>
           <CollapsibleTrigger render={<Button variant="outline" size="icon" />}>
-            {isOpen ? <MinimizeIcon /> : <MaximizeIcon />}
+            {isOpen ? <IconMinimize stroke={1.5} /> : <IconMaximize stroke={1.5} />}
           </CollapsibleTrigger>
         </Collapsible>
       </CardContent>
@@ -233,7 +236,7 @@ export function CollapsibleSettings() {
 Use nested collapsibles to build a file tree.
 
 ```tsx
-import { ChevronRightIcon, FileIcon, FolderIcon } from 'lucide-react'
+import { IconChevronRight, IconFile, IconFolder } from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -304,8 +307,11 @@ export function CollapsibleFileTree() {
               />
             }
           >
-            <ChevronRightIcon className="transition-transform group-data-[state=open]:rotate-90" />
-            <FolderIcon />
+            <IconChevronRight
+              stroke={1.75}
+              className="transition-transform group-data-[state=open]:rotate-90"
+            />
+            <IconFolder stroke={1.75} />
             {fileItem.name}
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-1 ml-5 style-lyra:ml-4">
@@ -323,7 +329,7 @@ export function CollapsibleFileTree() {
         size="sm"
         className="w-full justify-start gap-2 text-foreground"
       >
-        <FileIcon />
+        <IconFile stroke={1.75} />
         <span>{fileItem.name}</span>
       </Button>
     )
@@ -355,7 +361,7 @@ To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl)
 'use client'
 
 import * as React from 'react'
-import { ChevronsUpDown } from 'lucide-react'
+import { IconSelector } from '@tabler/icons-react'
 
 import { useTranslation, type Translations } from '@/components/language-selector'
 import { Button } from '@/components/ui/button'
@@ -414,7 +420,7 @@ export function CollapsibleRtl() {
       <div className="flex items-center justify-between gap-4 px-4">
         <h4 className="text-sm font-semibold">{t.orderNumber}</h4>
         <CollapsibleTrigger render={<Button variant="ghost" size="icon" className="size-8" />}>
-          <ChevronsUpDown />
+          <IconSelector stroke={1.5} />
           <span className="sr-only">Toggle details</span>
         </CollapsibleTrigger>
       </div>

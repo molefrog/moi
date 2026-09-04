@@ -411,7 +411,7 @@ export function ContextMenuGroups() {
 Combine icons with labels for quick scanning.
 
 ```tsx
-import { ClipboardPasteIcon, CopyIcon, ScissorsIcon, TrashIcon } from 'lucide-react'
+import { IconClipboard, IconCopy, IconScissors, IconTrash } from '@tabler/icons-react'
 
 import {
   ContextMenu,
@@ -432,22 +432,22 @@ export function ContextMenuIcons() {
       <ContextMenuContent>
         <ContextMenuGroup>
           <ContextMenuItem>
-            <CopyIcon />
+            <IconCopy stroke={1.75} />
             Copy
           </ContextMenuItem>
           <ContextMenuItem>
-            <ScissorsIcon />
+            <IconScissors stroke={1.75} />
             Cut
           </ContextMenuItem>
           <ContextMenuItem>
-            <ClipboardPasteIcon />
+            <IconClipboard stroke={1.75} />
             Paste
           </ContextMenuItem>
         </ContextMenuGroup>
         <ContextMenuSeparator />
         <ContextMenuGroup>
           <ContextMenuItem variant="destructive">
-            <TrashIcon />
+            <IconTrash stroke={1.75} />
             Delete
           </ContextMenuItem>
         </ContextMenuGroup>
@@ -547,7 +547,7 @@ export function ContextMenuRadio() {
 Use `variant="destructive"` to style the menu item as destructive.
 
 ```tsx
-import { ArchiveIcon, PencilIcon, ShareIcon, TrashIcon } from 'lucide-react'
+import { IconArchive, IconPencil, IconShare, IconTrash } from '@tabler/icons-react'
 
 import {
   ContextMenu,
@@ -568,18 +568,18 @@ export function ContextMenuDestructive() {
       <ContextMenuContent>
         <ContextMenuGroup>
           <ContextMenuItem>
-            <PencilIcon />
+            <IconPencil stroke={1.75} />
             Edit
           </ContextMenuItem>
           <ContextMenuItem>
-            <ShareIcon />
+            <IconShare stroke={1.75} />
             Share
           </ContextMenuItem>
         </ContextMenuGroup>
         <ContextMenuSeparator />
         <ContextMenuGroup>
           <ContextMenuItem variant="destructive">
-            <TrashIcon />
+            <IconTrash stroke={1.75} />
             Delete
           </ContextMenuItem>
         </ContextMenuGroup>
@@ -670,7 +670,7 @@ To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl)
 'use client'
 
 import * as React from 'react'
-import { ArrowLeftIcon, ArrowRightIcon, RotateCwIcon } from 'lucide-react'
+import { IconArrowLeft, IconArrowRight, IconRotateClockwise } from '@tabler/icons-react'
 
 import { useTranslation, type Translations } from '@/components/language-selector'
 import {
@@ -784,17 +784,17 @@ export function ContextMenuRtl() {
             >
               <ContextMenuGroup>
                 <ContextMenuItem>
-                  <ArrowLeftIcon />
+                  <IconArrowLeft stroke={1.75} />
                   {t.back}
                   <ContextMenuShortcut>⌘[</ContextMenuShortcut>
                 </ContextMenuItem>
                 <ContextMenuItem disabled>
-                  <ArrowRightIcon />
+                  <IconArrowRight stroke={1.75} />
                   {t.forward}
                   <ContextMenuShortcut>⌘]</ContextMenuShortcut>
                 </ContextMenuItem>
                 <ContextMenuItem>
-                  <RotateCwIcon />
+                  <IconRotateClockwise stroke={1.75} />
                   {t.reload}
                   <ContextMenuShortcut>⌘R</ContextMenuShortcut>
                 </ContextMenuItem>

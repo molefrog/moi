@@ -91,7 +91,7 @@ export function BadgeVariants() {
 You can render an icon inside the badge. Use `data-icon="inline-start"` to render the icon on the left and `data-icon="inline-end"` to render the icon on the right.
 
 ```tsx
-import { BadgeCheck, BookmarkIcon } from 'lucide-react'
+import { IconRosetteDiscountCheck, IconBookmark } from '@tabler/icons-react'
 
 import { Badge } from '@/components/ui/badge'
 
@@ -99,12 +99,12 @@ export function BadgeWithIconLeft() {
   return (
     <div className="flex flex-wrap gap-2">
       <Badge variant="secondary">
-        <BadgeCheck data-icon="inline-start" />
+        <IconRosetteDiscountCheck stroke={1.75} data-icon="inline-start" />
         Verified
       </Badge>
       <Badge variant="outline">
         Bookmark
-        <BookmarkIcon data-icon="inline-end" />
+        <IconBookmark stroke={1.75} data-icon="inline-end" />
       </Badge>
     </div>
   )
@@ -123,12 +123,12 @@ export function BadgeWithSpinner() {
   return (
     <div className="flex flex-wrap gap-2">
       <Badge variant="destructive">
-        <Spinner data-icon="inline-start" />
+        <Spinner stroke={1.75} data-icon="inline-start" />
         Deleting
       </Badge>
       <Badge variant="secondary">
         Generating
-        <Spinner data-icon="inline-end" />
+        <Spinner stroke={1.75} data-icon="inline-end" />
       </Badge>
     </div>
   )
@@ -140,14 +140,14 @@ export function BadgeWithSpinner() {
 Use the `render` prop to render a link as a badge.
 
 ```tsx
-import { ArrowUpRightIcon } from 'lucide-react'
+import { IconArrowUpRight } from '@tabler/icons-react'
 
 import { Badge } from '@/components/ui/badge'
 
 export function BadgeAsLink() {
   return (
     <Badge render={<a href="#link" />}>
-      Open Link <ArrowUpRightIcon data-icon="inline-end" />
+      Open Link <IconArrowUpRight stroke={1.5} data-icon="inline-end" />
     </Badge>
   )
 }
@@ -185,7 +185,7 @@ To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl)
 'use client'
 
 import * as React from 'react'
-import { BadgeCheck, BookmarkIcon } from 'lucide-react'
+import { IconRosetteDiscountCheck, IconBookmark } from '@tabler/icons-react'
 
 import { useTranslation, type Translations } from '@/components/language-selector'
 import { Badge } from '@/components/ui/badge'
@@ -236,12 +236,12 @@ export function BadgeRtl() {
       <Badge variant="destructive">{t.destructive}</Badge>
       <Badge variant="outline">{t.outline}</Badge>
       <Badge variant="secondary">
-        <BadgeCheck data-icon="inline-start" />
+        <IconRosetteDiscountCheck stroke={1.75} data-icon="inline-start" />
         {t.verified}
       </Badge>
       <Badge variant="outline">
         {t.bookmark}
-        <BookmarkIcon data-icon="inline-end" />
+        <IconBookmark stroke={1.75} data-icon="inline-end" />
       </Badge>
     </div>
   )

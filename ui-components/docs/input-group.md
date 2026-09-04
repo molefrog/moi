@@ -8,7 +8,7 @@ component: true
 import { IconInfoCircle } from "@tabler/icons-react"
 
 ```tsx
-import { Search } from 'lucide-react'
+import { IconSearch } from '@tabler/icons-react'
 
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 
@@ -17,7 +17,7 @@ export function InputGroupDemo() {
     <InputGroup className="max-w-xs">
       <InputGroupInput placeholder="Search..." />
       <InputGroupAddon>
-        <Search />
+        <IconSearch stroke={1.75} />
       </InputGroupAddon>
       <InputGroupAddon align="inline-end">12 results</InputGroupAddon>
     </InputGroup>
@@ -78,7 +78,7 @@ import {
 <InputGroup>
   <InputGroupInput placeholder="Search..." />
   <InputGroupAddon>
-    <SearchIcon />
+    <IconSearch stroke={1.75} />
   </InputGroupAddon>
 </InputGroup>
 ```
@@ -110,7 +110,7 @@ Use the `align` prop on `InputGroupAddon` to position the addon relative to the 
 Use `align="inline-start"` to position the addon at the start of the input. This is the default.
 
 ```tsx
-import { SearchIcon } from 'lucide-react'
+import { IconSearch } from '@tabler/icons-react'
 
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
@@ -122,7 +122,7 @@ export function InputGroupInlineStart() {
       <InputGroup>
         <InputGroupInput id="inline-start-input" placeholder="Search..." />
         <InputGroupAddon align="inline-start">
-          <SearchIcon className="text-muted-foreground" />
+          <IconSearch stroke={1.75} className="text-muted-foreground" />
         </InputGroupAddon>
       </InputGroup>
       <FieldDescription>Icon positioned at the start.</FieldDescription>
@@ -136,7 +136,7 @@ export function InputGroupInlineStart() {
 Use `align="inline-end"` to position the addon at the end of the input.
 
 ```tsx
-import { EyeOffIcon } from 'lucide-react'
+import { IconEyeOff } from '@tabler/icons-react'
 
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
@@ -148,7 +148,7 @@ export function InputGroupInlineEnd() {
       <InputGroup>
         <InputGroupInput id="inline-end-input" type="password" placeholder="Enter password" />
         <InputGroupAddon align="inline-end">
-          <EyeOffIcon />
+          <IconEyeOff stroke={1.75} />
         </InputGroupAddon>
       </InputGroup>
       <FieldDescription>Icon positioned at the end.</FieldDescription>
@@ -162,7 +162,7 @@ export function InputGroupInlineEnd() {
 Use `align="block-start"` to position the addon above the input.
 
 ```tsx
-import { CopyIcon, FileCodeIcon } from 'lucide-react'
+import { IconCopy, IconFileCode } from '@tabler/icons-react'
 
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
 import {
@@ -196,10 +196,10 @@ export function InputGroupBlockStart() {
             className="font-mono text-sm"
           />
           <InputGroupAddon align="block-start">
-            <FileCodeIcon className="text-muted-foreground" />
+            <IconFileCode stroke={1.75} className="text-muted-foreground" />
             <InputGroupText className="font-mono">script.js</InputGroupText>
             <InputGroupButton size="icon-xs" className="ml-auto">
-              <CopyIcon />
+              <IconCopy stroke={1.5} />
               <span className="sr-only">Copy</span>
             </InputGroupButton>
           </InputGroupAddon>
@@ -260,7 +260,14 @@ export function InputGroupBlockEnd() {
 ## Icon
 
 ```tsx
-import { CheckIcon, CreditCardIcon, InfoIcon, MailIcon, SearchIcon, StarIcon } from 'lucide-react'
+import {
+  IconCheck,
+  IconCreditCard,
+  IconInfoCircle,
+  IconMail,
+  IconSearch,
+  IconStar
+} from '@tabler/icons-react'
 
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 
@@ -270,29 +277,29 @@ export function InputGroupIcon() {
       <InputGroup>
         <InputGroupInput placeholder="Search..." />
         <InputGroupAddon>
-          <SearchIcon />
+          <IconSearch stroke={1.75} />
         </InputGroupAddon>
       </InputGroup>
       <InputGroup>
         <InputGroupInput type="email" placeholder="Enter your email" />
         <InputGroupAddon>
-          <MailIcon />
+          <IconMail stroke={1.75} />
         </InputGroupAddon>
       </InputGroup>
       <InputGroup>
         <InputGroupInput placeholder="Card number" />
         <InputGroupAddon>
-          <CreditCardIcon />
+          <IconCreditCard stroke={1.75} />
         </InputGroupAddon>
         <InputGroupAddon align="inline-end">
-          <CheckIcon />
+          <IconCheck stroke={1.75} />
         </InputGroupAddon>
       </InputGroup>
       <InputGroup>
         <InputGroupInput placeholder="Card number" />
         <InputGroupAddon align="inline-end">
-          <StarIcon />
-          <InfoIcon />
+          <IconStar stroke={1.75} />
+          <IconInfoCircle stroke={1.75} />
         </InputGroupAddon>
       </InputGroup>
     </div>
@@ -385,7 +392,7 @@ export function InputGroupButtonExample() {
               copyToClipboard('https://x.com/shadcn')
             }}
           >
-            {isCopied ? <IconCheck /> : <IconCopy />}
+            {isCopied ? <IconCheck stroke={1.5} /> : <IconCopy stroke={1.5} />}
           </InputGroupButton>
         </InputGroupAddon>
       </InputGroup>
@@ -393,7 +400,7 @@ export function InputGroupButtonExample() {
         <Popover>
           <PopoverTrigger render={<InputGroupAddon />}>
             <InputGroupButton variant="secondary" size="icon-xs">
-              <IconInfoCircle />
+              <IconInfoCircle stroke={1.5} />
             </InputGroupButton>
           </PopoverTrigger>
           <PopoverContent align="start" className="flex flex-col gap-1 rounded-xl text-sm">
@@ -406,6 +413,7 @@ export function InputGroupButtonExample() {
         <InputGroupAddon align="inline-end">
           <InputGroupButton onClick={() => setIsFavorite(!isFavorite)} size="icon-xs">
             <IconStar
+              stroke={1.5}
               data-favorite={isFavorite}
               className="data-[favorite=true]:fill-blue-600 data-[favorite=true]:stroke-blue-600"
             />
@@ -426,7 +434,7 @@ export function InputGroupButtonExample() {
 ## Kbd
 
 ```tsx
-import { SearchIcon } from 'lucide-react'
+import { IconSearch } from '@tabler/icons-react'
 
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Kbd } from '@/components/ui/kbd'
@@ -436,7 +444,7 @@ export function InputGroupKbd() {
     <InputGroup className="max-w-sm">
       <InputGroupInput placeholder="Search..." />
       <InputGroupAddon>
-        <SearchIcon className="text-muted-foreground" />
+        <IconSearch stroke={1.75} className="text-muted-foreground" />
       </InputGroupAddon>
       <InputGroupAddon align="inline-end">
         <Kbd>⌘K</Kbd>
@@ -451,7 +459,7 @@ export function InputGroupKbd() {
 ```tsx
 'use client'
 
-import { ChevronDownIcon, MoreHorizontal } from 'lucide-react'
+import { IconChevronDown, IconDots } from '@tabler/icons-react'
 
 import {
   DropdownMenu,
@@ -477,7 +485,7 @@ export function InputGroupDropdown() {
             <DropdownMenuTrigger
               render={<InputGroupButton variant="ghost" aria-label="More" size="icon-xs" />}
             >
-              <MoreHorizontal />
+              <IconDots stroke={1.5} />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" sideOffset={8} alignOffset={-4}>
               <DropdownMenuGroup>
@@ -496,7 +504,7 @@ export function InputGroupDropdown() {
             <DropdownMenuTrigger
               render={<InputGroupButton variant="ghost" className="pr-1.5! text-xs" />}
             >
-              Search In... <ChevronDownIcon className="size-3" />
+              Search In... <IconChevronDown stroke={1.75} className="size-3" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" sideOffset={8} alignOffset={-4}>
               <DropdownMenuGroup>
@@ -516,7 +524,7 @@ export function InputGroupDropdown() {
 ## Spinner
 
 ```tsx
-import { LoaderIcon } from 'lucide-react'
+import { IconLoader } from '@tabler/icons-react'
 
 import {
   InputGroup,
@@ -532,26 +540,26 @@ export function InputGroupSpinner() {
       <InputGroup>
         <InputGroupInput placeholder="Searching..." />
         <InputGroupAddon align="inline-end">
-          <Spinner />
+          <Spinner stroke={1.75} />
         </InputGroupAddon>
       </InputGroup>
       <InputGroup>
         <InputGroupInput placeholder="Processing..." />
         <InputGroupAddon>
-          <Spinner />
+          <Spinner stroke={1.75} />
         </InputGroupAddon>
       </InputGroup>
       <InputGroup>
         <InputGroupInput placeholder="Saving changes..." />
         <InputGroupAddon align="inline-end">
           <InputGroupText>Saving...</InputGroupText>
-          <Spinner />
+          <Spinner stroke={1.75} />
         </InputGroupAddon>
       </InputGroup>
       <InputGroup>
         <InputGroupInput placeholder="Refreshing data..." />
         <InputGroupAddon>
-          <LoaderIcon className="animate-spin" />
+          <IconLoader stroke={1.75} className="animate-spin" />
         </InputGroupAddon>
         <InputGroupAddon align="inline-end">
           <InputGroupText className="text-muted-foreground">Please wait...</InputGroupText>
@@ -587,19 +595,19 @@ export function InputGroupTextareaExample() {
         <InputGroupAddon align="block-end" className="border-t">
           <InputGroupText>Line 1, Column 1</InputGroupText>
           <InputGroupButton size="sm" className="ml-auto" variant="default">
-            Run <IconCornerDownLeft />
+            Run <IconCornerDownLeft stroke={1.5} />
           </InputGroupButton>
         </InputGroupAddon>
         <InputGroupAddon align="block-start" className="border-b">
           <InputGroupText className="font-mono font-medium">
-            <IconBrandJavascript />
+            <IconBrandJavascript stroke={1.75} />
             script.js
           </InputGroupText>
           <InputGroupButton className="ml-auto" size="icon-xs">
-            <IconRefresh />
+            <IconRefresh stroke={1.5} />
           </InputGroupButton>
           <InputGroupButton variant="ghost" size="icon-xs">
-            <IconCopy />
+            <IconCopy stroke={1.5} />
           </InputGroupButton>
         </InputGroupAddon>
       </InputGroup>
@@ -649,7 +657,7 @@ To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl)
 'use client'
 
 import * as React from 'react'
-import { Search } from 'lucide-react'
+import { IconSearch } from '@tabler/icons-react'
 
 import { useTranslation, type Translations } from '@/components/language-selector'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -719,21 +727,21 @@ export function InputGroupRtl() {
       <InputGroup className="max-w-xs">
         <InputGroupInput placeholder={t.placeholder} />
         <InputGroupAddon>
-          <Search />
+          <IconSearch stroke={1.75} />
         </InputGroupAddon>
         <InputGroupAddon align="inline-end">{t.results}</InputGroupAddon>
       </InputGroup>
       <InputGroup>
         <InputGroupInput placeholder={t.searching} />
         <InputGroupAddon align="inline-end">
-          <Spinner />
+          <Spinner stroke={1.75} />
         </InputGroupAddon>
       </InputGroup>
       <InputGroup>
         <InputGroupInput placeholder={t.savingChanges} />
         <InputGroupAddon align="inline-end">
           <InputGroupText>{t.saving}</InputGroupText>
-          <Spinner />
+          <Spinner stroke={1.75} />
         </InputGroupAddon>
       </InputGroup>
       <FieldGroup className="max-w-sm">
@@ -777,7 +785,7 @@ The main component that wraps inputs and addons.
 
 Displays icons, text, buttons, or other content alongside inputs.
 
-<Callout icon={<IconInfoCircle />} title="Focus Navigation">
+<Callout icon={<IconInfoCircle stroke={1.75} />} title="Focus Navigation">
 For proper focus navigation, the `InputGroupAddon` component should be placed
 after the input. Set the `align` prop to position the addon.
 </Callout>
@@ -789,7 +797,7 @@ after the input. Set the `align` prop to position the addon.
 
 ```tsx
 <InputGroupAddon align="inline-end">
-  <SearchIcon />
+  <IconSearch stroke={1.75} />
 </InputGroupAddon>
 ```
 
@@ -817,7 +825,7 @@ Displays buttons within input groups.
 ```tsx
 <InputGroupButton>Button</InputGroupButton>
 <InputGroupButton size="icon-xs" aria-label="Copy">
-  <CopyIcon />
+  <IconCopy stroke={1.5} />
 </InputGroupButton>
 ```
 
@@ -835,7 +843,7 @@ All other props are passed through to the underlying `<Input />` component.
 <InputGroup>
   <InputGroupInput placeholder="Enter text..." />
   <InputGroupAddon>
-    <SearchIcon />
+    <IconSearch stroke={1.75} />
   </InputGroupAddon>
 </InputGroup>
 ```

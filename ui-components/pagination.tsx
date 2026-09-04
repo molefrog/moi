@@ -66,7 +66,10 @@ function PaginationPrevious({
       className={cn('pl-1.5!', className)}
       {...props}
     >
-      <IconChevronLeft data-icon="inline-start" />
+      <IconChevronLeft
+        stroke={['xs', 'sm', 'icon-xs', 'icon-sm'].includes(props.size ?? '') ? 1.75 : 1.5}
+        data-icon="inline-start"
+      />
       <span className="hidden sm:block">{text}</span>
     </PaginationLink>
   )
@@ -85,7 +88,10 @@ function PaginationNext({
       {...props}
     >
       <span className="hidden sm:block">{text}</span>
-      <IconChevronRight data-icon="inline-end" />
+      <IconChevronRight
+        stroke={['xs', 'sm', 'icon-xs', 'icon-sm'].includes(props.size ?? '') ? 1.75 : 1.5}
+        data-icon="inline-end"
+      />
     </PaginationLink>
   )
 }
@@ -101,7 +107,7 @@ function PaginationEllipsis({ className, ...props }: React.ComponentProps<'span'
       )}
       {...props}
     >
-      <IconDots />
+      <IconDots stroke={1.75} />
       <span className="sr-only">More pages</span>
     </span>
   )

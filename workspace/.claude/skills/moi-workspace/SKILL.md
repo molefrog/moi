@@ -194,24 +194,16 @@ function cx(...classes: (string | false | undefined | null)[]) {
 
 ## Standard UI components
 
-Need a standard control (button, dialog, select, table, chart…)? Don't hand-roll it —
-`moi ui-components add <name…>` installs components from the bundled registry (Base UI + Tabler
-icons, workspace theme tokens, applet-scoped overlays) into `.moi/ui/`, even offline. Pass every
-component you need in one call (`add table badge tabs`) instead of one `add` per component.
-Import relatively: `import { Button } from '../ui/button'`.
+Use bundled components for standard controls. Read the
+[shared usage rules](references/UI-COMPONENTS.md) before composing them.
 
-- `moi ui-components` — the catalog with installed state. Read
-  `references/UI-COMPONENTS.md` first: the full catalog plus the essential usage rules
-  (Base UI composition, forms, styling, icons — condensed from the official shadcn skill).
-- `moi ui-components docs <name…>` — bundled docs (markdown: anatomy, props, examples). Read them
-  before composing an unfamiliar component; the parts API (Base UI) differs from Radix-era shadcn.
-- `add` never rebuilds, and installs npm packages only with `--install` (pass it unless you
-  want to run the printed `bun install` yourself); run `moi bundle` yourself either way.
-- Files in `.moi/ui/` are yours to customize (edits propagate to every applet using them);
-  `add` skips already-installed components (reported as kept) and overwrites only with
-  `--force`.
-- Component names, their API, and the CLI are very close to a selected subset of shadcn, but the
-  actual implementation might differ.
+- `moi ui-components` lists available components and recipes with installed state.
+- `moi ui-components docs <name…>` prints bundled usage docs. Read them before using an
+  unfamiliar component.
+- `moi ui-components add <name…> --install` copies source into `.moi/ui/` and installs npm
+  dependencies. Pass all needed names in one call.
+- Import relatively, e.g. `import { Button } from '../ui/button'`, then run `moi bundle`
+  after editing applets.
 
 ## Server functions — `<name>.server.ts`
 

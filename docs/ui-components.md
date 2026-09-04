@@ -35,19 +35,20 @@ There is no remote fallback or install-time source transform.
 Files under `ui-components/` are already install-ready:
 
 - imports use sibling paths such as `./button` and `./utils`;
-- icons come from `@tabler/icons-react`;
+- icons come from `@tabler/icons-react` with explicit strokes from the [icon rules](../.agents/rules/icons.md);
 - portalled overlays use `AppletPortal` so applet-scoped styles still match;
 - Drawer portals into its view container instead of the page.
 
 Docs live in `ui-components/docs/`. The standard docs are the matching 4.21
-snapshot. Button and Drawer have concise local docs.
+snapshot with Tabler icons in the examples. Button and Drawer have concise local docs.
 
 ## Updating the snapshot
 
 Generate components with `bunx --bun shadcn@4.21.0` using Base Nova, Base UI,
 and Tabler. Keep generated APIs, markup, and styles. Only rewrite imports to
-sibling paths, apply applet portal scoping, and run repository formatting.
+sibling paths, apply applet portal scoping and project icon strokes, and run repository formatting.
 Then update `registry.json`, docs, and the pinned `shadcn` dependency together.
+Convert doc examples to Tabler too, including imports, icon names, and icon types.
 
 The package whitelist includes `registry.json` and `ui-components/`, which makes
 the same files available from packed or published installs.
@@ -116,7 +117,7 @@ components may contain them (upstream design, compiles fine).
 ## Pinning and upgrades
 
 The repository pins `shadcn` to `4.21.0`. Upgrades are deliberate source refreshes:
-regenerate all standard components, reapply the two source adaptations, update
+regenerate all standard components, reapply the source adaptations above, update
 the docs snapshot, and run the complete registry tests.
 
 ## Portals

@@ -62,7 +62,7 @@ function DialogContent({
             data-slot="dialog-close"
             render={<Button variant="ghost" className="absolute top-2 right-2" size="icon-sm" />}
           >
-            <IconX />
+            <IconX stroke={1.75} />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
         )}

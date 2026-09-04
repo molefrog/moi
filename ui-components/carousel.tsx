@@ -182,7 +182,9 @@ function CarouselPrevious({
       onClick={scrollPrev}
       {...props}
     >
-      <IconChevronLeft />
+      <IconChevronLeft
+        stroke={['xs', 'sm', 'icon-xs', 'icon-sm'].includes(size ?? '') ? 1.75 : 1.5}
+      />
       <span className="sr-only">Previous slide</span>
     </Button>
   )
@@ -212,7 +214,9 @@ function CarouselNext({
       onClick={scrollNext}
       {...props}
     >
-      <IconChevronRight />
+      <IconChevronRight
+        stroke={['xs', 'sm', 'icon-xs', 'icon-sm'].includes(size ?? '') ? 1.75 : 1.5}
+      />
       <span className="sr-only">Next slide</span>
     </Button>
   )

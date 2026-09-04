@@ -14,7 +14,7 @@ export function SpinnerDemo() {
     <div className="flex w-full max-w-xs flex-col gap-4 [--radius:1rem]">
       <Item variant="muted">
         <ItemMedia>
-          <Spinner />
+          <Spinner stroke={1.75} />
         </ItemMedia>
         <ItemContent>
           <ItemTitle className="line-clamp-1">Processing payment...</ItemTitle>
@@ -71,7 +71,7 @@ import { Spinner } from '@/components/ui/spinner'
 ```
 
 ```tsx
-<Spinner />
+<Spinner stroke={1.75} />
 ```
 
 ## Customization
@@ -80,11 +80,14 @@ You can replace the default spinner icon with any other icon by editing the `Spi
 
 ```tsx
 import { cn } from 'cn'
-import { LoaderIcon } from 'lucide-react'
+import { IconLoader } from '@tabler/icons-react'
 
-function Spinner({ className, ...props }: React.ComponentProps<'svg'>) {
+type SpinnerProps = React.ComponentProps<typeof IconLoader>
+
+function Spinner({ className, ...props }: SpinnerProps) {
   return (
-    <LoaderIcon
+    <IconLoader
+      stroke={1.75}
       role="status"
       aria-label="Loading"
       className={cn('size-4 animate-spin', className)}
@@ -96,7 +99,7 @@ function Spinner({ className, ...props }: React.ComponentProps<'svg'>) {
 export function SpinnerCustom() {
   return (
     <div className="flex items-center gap-4">
-      <Spinner />
+      <Spinner stroke={1.75} />
     </div>
   )
 }
@@ -104,11 +107,14 @@ export function SpinnerCustom() {
 
 ```tsx showLineNumbers title="components/ui/spinner.tsx"
 import { cn } from 'cn'
-import { LoaderIcon } from 'lucide-react'
+import { IconLoader } from '@tabler/icons-react'
 
-function Spinner({ className, ...props }: React.ComponentProps<'svg'>) {
+type SpinnerProps = React.ComponentProps<typeof IconLoader>
+
+function Spinner({ className, ...props }: SpinnerProps) {
   return (
-    <LoaderIcon
+    <IconLoader
+      stroke={1.75}
       role="status"
       aria-label="Loading"
       className={cn('size-4 animate-spin', className)}
@@ -130,10 +136,10 @@ import { Spinner } from '@/components/ui/spinner'
 export function SpinnerSize() {
   return (
     <div className="flex items-center gap-6">
-      <Spinner className="size-3" />
-      <Spinner className="size-4" />
-      <Spinner className="size-6" />
-      <Spinner className="size-8" />
+      <Spinner stroke={1.75} className="size-3" />
+      <Spinner stroke={1.75} className="size-4" />
+      <Spinner stroke={1.5} className="size-6" />
+      <Spinner stroke={1.5} className="size-8" />
     </div>
   )
 }
@@ -151,15 +157,15 @@ export function SpinnerButton() {
   return (
     <div className="flex flex-col items-center gap-4">
       <Button disabled size="sm">
-        <Spinner data-icon="inline-start" />
+        <Spinner stroke={1.75} data-icon="inline-start" />
         Loading...
       </Button>
       <Button variant="outline" disabled size="sm">
-        <Spinner data-icon="inline-start" />
+        <Spinner stroke={1.75} data-icon="inline-start" />
         Please wait
       </Button>
       <Button variant="secondary" disabled size="sm">
-        <Spinner data-icon="inline-start" />
+        <Spinner stroke={1.75} data-icon="inline-start" />
         Processing
       </Button>
     </div>
@@ -179,15 +185,15 @@ export function SpinnerBadge() {
   return (
     <div className="flex items-center gap-4 [--radius:1.2rem]">
       <Badge>
-        <Spinner data-icon="inline-start" />
+        <Spinner stroke={1.75} data-icon="inline-start" />
         Syncing
       </Badge>
       <Badge variant="secondary">
-        <Spinner data-icon="inline-start" />
+        <Spinner stroke={1.75} data-icon="inline-start" />
         Updating
       </Badge>
       <Badge variant="outline">
-        <Spinner data-icon="inline-start" />
+        <Spinner stroke={1.75} data-icon="inline-start" />
         Processing
       </Badge>
     </div>
@@ -198,7 +204,7 @@ export function SpinnerBadge() {
 ## Input Group
 
 ```tsx
-import { ArrowUpIcon } from 'lucide-react'
+import { IconArrowUp } from '@tabler/icons-react'
 
 import {
   InputGroup,
@@ -215,15 +221,15 @@ export function SpinnerInputGroup() {
       <InputGroup>
         <InputGroupInput placeholder="Send a message..." disabled />
         <InputGroupAddon align="inline-end">
-          <Spinner />
+          <Spinner stroke={1.75} />
         </InputGroupAddon>
       </InputGroup>
       <InputGroup>
         <InputGroupTextarea placeholder="Send a message..." disabled />
         <InputGroupAddon align="block-end">
-          <Spinner /> Validating...
+          <Spinner stroke={1.75} /> Validating...
           <InputGroupButton className="ml-auto" variant="default">
-            <ArrowUpIcon />
+            <IconArrowUp stroke={1.75} />
             <span className="sr-only">Send</span>
           </InputGroupButton>
         </InputGroupAddon>
@@ -252,7 +258,7 @@ export function SpinnerEmpty() {
     <Empty className="w-full">
       <EmptyHeader>
         <EmptyMedia variant="icon">
-          <Spinner />
+          <Spinner stroke={1.5} />
         </EmptyMedia>
         <EmptyTitle>Processing your request</EmptyTitle>
         <EmptyDescription>
@@ -313,7 +319,7 @@ export function SpinnerRtl() {
     <div className="flex w-full max-w-xs flex-col gap-4 [--radius:1rem]" dir={dir}>
       <Item variant="muted" dir={dir}>
         <ItemMedia>
-          <Spinner />
+          <Spinner stroke={1.75} />
         </ItemMedia>
         <ItemContent>
           <ItemTitle className="line-clamp-1">{t.title}</ItemTitle>
