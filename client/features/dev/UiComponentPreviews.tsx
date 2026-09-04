@@ -347,11 +347,13 @@ function CarouselPreview() {
       <CarouselContent>
         {[1, 2, 3].map(item => (
           <CarouselItem key={item}>
-            <Card>
-              <CardContent className="flex aspect-video items-center justify-center text-2xl">
-                {item}
-              </CardContent>
-            </Card>
+            <div className="p-1">
+              <Card>
+                <CardContent className="flex aspect-video items-center justify-center text-2xl">
+                  {item}
+                </CardContent>
+              </Card>
+            </div>
           </CarouselItem>
         ))}
       </CarouselContent>
