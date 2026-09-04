@@ -4,62 +4,9 @@ import { Link } from 'wouter'
 
 import { Button } from '@/client/components/ui/button'
 import registry from '@/registry.json'
-import {
-  Drawer,
-  DrawerBody,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger
-} from '@/ui-components/drawer'
+import { UI_COMPONENT_PREVIEWS } from './UiComponentPreviews'
 
-function ButtonPreview() {
-  return <Button>Button</Button>
-}
-
-function DrawerPreview() {
-  return (
-    <Drawer>
-      <DrawerTrigger render={<Button variant="outline" />}>Open drawer</DrawerTrigger>
-      <DrawerContent>
-        <DrawerHeader>
-          <DrawerTitle>Drawer</DrawerTitle>
-          <DrawerDescription>The component stays inside this view frame.</DrawerDescription>
-        </DrawerHeader>
-        <DrawerBody>
-          <div className="flex flex-col gap-4">
-            <section>
-              <p className="text-sm font-medium">Order #1048</p>
-              <p className="mt-1 text-sm text-muted-foreground">Desk lamp / Moss · 2 units</p>
-            </section>
-            <dl className="grid grid-cols-[6rem_1fr] gap-x-4 gap-y-3 text-sm">
-              <dt className="text-muted-foreground">Customer</dt>
-              <dd>Mira Chen</dd>
-              <dt className="text-muted-foreground">Status</dt>
-              <dd>Picking</dd>
-              <dt className="text-muted-foreground">Due</dt>
-              <dd>Today, 16:30</dd>
-            </dl>
-          </div>
-        </DrawerBody>
-        <DrawerFooter>
-          <Button>Mark packed</Button>
-          <DrawerClose render={<Button variant="outline" />}>Close</DrawerClose>
-        </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
-  )
-}
-
-export const UI_COMPONENT_PREVIEWS = {
-  button: ButtonPreview,
-  drawer: DrawerPreview
-}
-
-const registryItems = registry.items.filter(item => item.name in UI_COMPONENT_PREVIEWS)
+const registryItems = registry.items.filter(item => item.type === 'registry:ui')
 
 export function UiComponentsPage() {
   const [selectedName, setSelectedName] = useState(registryItems[0]?.name ?? '')
