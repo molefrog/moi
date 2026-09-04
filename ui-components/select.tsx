@@ -4,7 +4,7 @@ import * as React from 'react'
 import { Select as SelectPrimitive } from '@base-ui/react/select'
 import { cn } from './utils'
 import { IconSelector, IconCheck, IconChevronUp, IconChevronDown } from '@tabler/icons-react'
-import { AppletPortal } from './applet-portal'
+import { ScopedPortal } from './scoped-portal'
 
 const Select = SelectPrimitive.Root
 
@@ -74,7 +74,7 @@ function SelectContent({
     'align' | 'alignOffset' | 'side' | 'sideOffset' | 'alignItemWithTrigger'
   >) {
   return (
-    <AppletPortal portal={SelectPrimitive.Portal}>
+    <ScopedPortal portal={SelectPrimitive.Portal}>
       <SelectPrimitive.Positioner
         side={side}
         sideOffset={sideOffset}
@@ -97,7 +97,7 @@ function SelectContent({
           <SelectScrollDownButton />
         </SelectPrimitive.Popup>
       </SelectPrimitive.Positioner>
-    </AppletPortal>
+    </ScopedPortal>
   )
 }
 

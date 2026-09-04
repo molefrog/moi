@@ -2,7 +2,7 @@
 
 import { PreviewCard as PreviewCardPrimitive } from '@base-ui/react/preview-card'
 import { cn } from './utils'
-import { AppletPortal } from './applet-portal'
+import { ScopedPortal } from './scoped-portal'
 
 function HoverCard({ ...props }: PreviewCardPrimitive.Root.Props) {
   return <PreviewCardPrimitive.Root data-slot="hover-card" {...props} />
@@ -22,7 +22,7 @@ function HoverCardContent({
 }: PreviewCardPrimitive.Popup.Props &
   Pick<PreviewCardPrimitive.Positioner.Props, 'align' | 'alignOffset' | 'side' | 'sideOffset'>) {
   return (
-    <AppletPortal portal={PreviewCardPrimitive.Portal} data-slot="hover-card-portal">
+    <ScopedPortal portal={PreviewCardPrimitive.Portal} data-slot="hover-card-portal">
       <PreviewCardPrimitive.Positioner
         align={align}
         alignOffset={alignOffset}
@@ -39,7 +39,7 @@ function HoverCardContent({
           {...props}
         />
       </PreviewCardPrimitive.Positioner>
-    </AppletPortal>
+    </ScopedPortal>
   )
 }
 

@@ -5,7 +5,7 @@ import { cn } from './utils'
 import { Button } from './button'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from './input-group'
 import { IconChevronDown, IconX, IconCheck } from '@tabler/icons-react'
-import { AppletPortal } from './applet-portal'
+import { ScopedPortal } from './scoped-portal'
 
 const Combobox = ComboboxPrimitive.Root
 
@@ -85,7 +85,7 @@ function ComboboxContent({
     'side' | 'align' | 'sideOffset' | 'alignOffset' | 'anchor'
   >) {
   return (
-    <AppletPortal portal={ComboboxPrimitive.Portal}>
+    <ScopedPortal portal={ComboboxPrimitive.Portal}>
       <ComboboxPrimitive.Positioner
         side={side}
         sideOffset={sideOffset}
@@ -104,7 +104,7 @@ function ComboboxContent({
           {...props}
         />
       </ComboboxPrimitive.Positioner>
-    </AppletPortal>
+    </ScopedPortal>
   )
 }
 

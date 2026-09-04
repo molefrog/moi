@@ -1,16 +1,17 @@
-import { cn } from './utils'
-import { IconLoader } from '@tabler/icons-react'
+import { IconLoader2 } from '@tabler/icons-react'
 
-type SpinnerProps = React.ComponentProps<typeof IconLoader>
+import { cn } from './utils'
+
+type SpinnerProps = React.ComponentProps<typeof IconLoader2>
 
 function Spinner({ className, ...props }: SpinnerProps) {
   return (
-    <IconLoader
-      stroke={1.75}
+    <IconLoader2
       data-slot="spinner"
       role="status"
       aria-label="Loading"
       className={cn('size-4 animate-spin', className)}
+      stroke={1.75}
       {...props}
     />
   )

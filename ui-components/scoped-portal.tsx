@@ -1,14 +1,14 @@
 'use client'
 
-// Keeps portalled overlays inside the applet's scoped styles.
+// Preserves the surrounding CSS scope across a portal.
 import * as React from 'react'
 
-type AppletPortalProps = {
+type ScopedPortalProps = {
   portal: React.ElementType
   children?: React.ReactNode
 } & Record<string, unknown>
 
-function AppletPortal({ portal: Portal, children, ...props }: AppletPortalProps) {
+function ScopedPortal({ portal: Portal, children, ...props }: ScopedPortalProps) {
   const [scope, setScope] = React.useState<string | undefined>(undefined)
   const marker = React.useCallback((node: HTMLElement | null) => {
     if (node) {
@@ -28,4 +28,4 @@ function AppletPortal({ portal: Portal, children, ...props }: AppletPortalProps)
   )
 }
 
-export { AppletPortal }
+export { ScopedPortal }

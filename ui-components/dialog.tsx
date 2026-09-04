@@ -4,7 +4,7 @@ import { cn } from './utils'
 
 import { Button } from './button'
 import { IconX } from '@tabler/icons-react'
-import { AppletPortal } from './applet-portal'
+import { ScopedPortal } from './scoped-portal'
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
@@ -15,7 +15,7 @@ function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
 }
 
 function DialogPortal({ ...props }: DialogPrimitive.Portal.Props) {
-  return <AppletPortal portal={DialogPrimitive.Portal} data-slot="dialog-portal" {...props} />
+  return <ScopedPortal portal={DialogPrimitive.Portal} data-slot="dialog-portal" {...props} />
 }
 
 function DialogClose({ ...props }: DialogPrimitive.Close.Props) {

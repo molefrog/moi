@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { Popover as PopoverPrimitive } from '@base-ui/react/popover'
 import { cn } from './utils'
-import { AppletPortal } from './applet-portal'
+import { ScopedPortal } from './scoped-portal'
 
 function Popover({ ...props }: PopoverPrimitive.Root.Props) {
   return <PopoverPrimitive.Root data-slot="popover" {...props} />
@@ -23,7 +23,7 @@ function PopoverContent({
 }: PopoverPrimitive.Popup.Props &
   Pick<PopoverPrimitive.Positioner.Props, 'align' | 'alignOffset' | 'side' | 'sideOffset'>) {
   return (
-    <AppletPortal portal={PopoverPrimitive.Portal}>
+    <ScopedPortal portal={PopoverPrimitive.Portal}>
       <PopoverPrimitive.Positioner
         align={align}
         alignOffset={alignOffset}
@@ -40,7 +40,7 @@ function PopoverContent({
           {...props}
         />
       </PopoverPrimitive.Positioner>
-    </AppletPortal>
+    </ScopedPortal>
   )
 }
 

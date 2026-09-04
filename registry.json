@@ -38,7 +38,7 @@
       "registryDependencies": [
         "molefrog/moi/button",
         "molefrog/moi/utils",
-        "molefrog/moi/applet-portal"
+        "molefrog/moi/scoped-portal"
       ],
       "files": [
         {
@@ -50,17 +50,17 @@
       "description": "Modal confirmation dialog for destructive or blocking actions"
     },
     {
-      "name": "applet-portal",
+      "name": "scoped-portal",
       "type": "registry:lib",
       "files": [
         {
-          "path": "ui-components/applet-portal.tsx",
+          "path": "ui-components/scoped-portal.tsx",
           "type": "registry:lib",
-          "target": "@ui/applet-portal.tsx"
+          "target": "@ui/scoped-portal.tsx"
         }
       ],
-      "title": "Applet Portal",
-      "description": "Keeps portalled overlays inside applet styles."
+      "title": "Scoped portal",
+      "description": "Preserves the surrounding CSS scope across a portal."
     },
     {
       "name": "attachment",
@@ -236,7 +236,7 @@
         "molefrog/moi/button",
         "molefrog/moi/input-group",
         "molefrog/moi/utils",
-        "molefrog/moi/applet-portal"
+        "molefrog/moi/scoped-portal"
       ],
       "files": [
         {
@@ -251,7 +251,7 @@
       "name": "context-menu",
       "type": "registry:ui",
       "dependencies": ["@base-ui/react", "@tabler/icons-react"],
-      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/applet-portal"],
+      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/scoped-portal"],
       "files": [
         {
           "path": "ui-components/context-menu.tsx",
@@ -287,7 +287,7 @@
       "registryDependencies": [
         "molefrog/moi/button",
         "molefrog/moi/utils",
-        "molefrog/moi/applet-portal"
+        "molefrog/moi/scoped-portal"
       ],
       "files": [
         {
@@ -316,7 +316,7 @@
       "name": "dropdown-menu",
       "type": "registry:ui",
       "dependencies": ["@base-ui/react", "@tabler/icons-react"],
-      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/applet-portal"],
+      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/scoped-portal"],
       "files": [
         {
           "path": "ui-components/dropdown-menu.tsx",
@@ -348,7 +348,7 @@
       "name": "hover-card",
       "type": "registry:ui",
       "dependencies": ["@base-ui/react"],
-      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/applet-portal"],
+      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/scoped-portal"],
       "files": [
         {
           "path": "ui-components/hover-card.tsx",
@@ -422,7 +422,7 @@
       "name": "popover",
       "type": "registry:ui",
       "dependencies": ["@base-ui/react"],
-      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/applet-portal"],
+      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/scoped-portal"],
       "files": [
         {
           "path": "ui-components/popover.tsx",
@@ -478,7 +478,7 @@
       "name": "select",
       "type": "registry:ui",
       "dependencies": ["@base-ui/react", "@tabler/icons-react"],
-      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/applet-portal"],
+      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/scoped-portal"],
       "files": [
         {
           "path": "ui-components/select.tsx",
@@ -629,7 +629,7 @@
       "name": "tooltip",
       "type": "registry:ui",
       "dependencies": ["@base-ui/react"],
-      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/applet-portal"],
+      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/scoped-portal"],
       "files": [
         {
           "path": "ui-components/tooltip.tsx",

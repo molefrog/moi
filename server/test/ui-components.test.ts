@@ -17,7 +17,7 @@ import {
 } from '../ui-components'
 
 const REPO_ROOT = join(import.meta.dir, '../..')
-const SUPPORT_ITEMS = ['applet-portal', 'utils']
+const SUPPORT_ITEMS = ['scoped-portal', 'utils']
 const PORTALLED_COMPONENTS = [
   'alert-dialog',
   'combobox',
@@ -316,8 +316,8 @@ describe('local registry', () => {
 
     for (const name of PORTALLED_COMPONENTS) {
       const source = resolved.files.find(file => file.name === `${name}.tsx`)?.content
-      expect(source).toContain('./applet-portal')
-      expect(source).toContain('<AppletPortal')
+      expect(source).toContain('./scoped-portal')
+      expect(source).toContain('<ScopedPortal')
     }
   })
 
@@ -375,7 +375,7 @@ describe('moi components', () => {
     expect(source).toContain('<DrawerClose')
     expect(source).toContain('<Button')
     expect(source).not.toContain('document.body')
-    expect(source).not.toContain('AppletPortal')
+    expect(source).not.toContain('ScopedPortal')
   })
 
   let buildRoot: string

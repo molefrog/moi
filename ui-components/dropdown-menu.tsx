@@ -2,14 +2,14 @@ import * as React from 'react'
 import { Menu as MenuPrimitive } from '@base-ui/react/menu'
 import { cn } from './utils'
 import { IconChevronRight, IconCheck } from '@tabler/icons-react'
-import { AppletPortal } from './applet-portal'
+import { ScopedPortal } from './scoped-portal'
 
 function DropdownMenu({ ...props }: MenuPrimitive.Root.Props) {
   return <MenuPrimitive.Root data-slot="dropdown-menu" {...props} />
 }
 
 function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {
-  return <AppletPortal portal={MenuPrimitive.Portal} data-slot="dropdown-menu-portal" {...props} />
+  return <ScopedPortal portal={MenuPrimitive.Portal} data-slot="dropdown-menu-portal" {...props} />
 }
 
 function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {
@@ -26,7 +26,7 @@ function DropdownMenuContent({
 }: MenuPrimitive.Popup.Props &
   Pick<MenuPrimitive.Positioner.Props, 'align' | 'alignOffset' | 'side' | 'sideOffset'>) {
   return (
-    <AppletPortal portal={MenuPrimitive.Portal}>
+    <ScopedPortal portal={MenuPrimitive.Portal}>
       <MenuPrimitive.Positioner
         className="isolate z-50 outline-none"
         align={align}
@@ -43,7 +43,7 @@ function DropdownMenuContent({
           {...props}
         />
       </MenuPrimitive.Positioner>
-    </AppletPortal>
+    </ScopedPortal>
   )
 }
 

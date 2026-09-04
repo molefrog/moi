@@ -8,7 +8,7 @@ offline. Workspaces do not need `components.json` or path aliases.
 
 The public catalog is every `registry:ui` and `registry:block` item in
 `registry.json`. `data-table` and `date-picker` are recipes that install their
-component dependencies. `utils` and `applet-portal` are internal support items.
+component dependencies. `utils` and `scoped-portal` are internal support items.
 
 ## Commands
 
@@ -32,11 +32,14 @@ Files under `ui-components/` are already install-ready:
 
 - imports use sibling paths such as `./button` and `./utils`;
 - icons come from `@tabler/icons-react` with explicit strokes from the [icon rules](../.agents/rules/icons.md);
-- portalled overlays use `AppletPortal` so applet-scoped styles still match;
+- portalled overlays use `ScopedPortal` so applet-scoped styles still match;
 - Drawer portals into its view container instead of the page.
 
 Docs live in `ui-components/docs/`. The standard docs are the matching 4.21
 snapshot with Tabler icons in the examples. Button and Drawer have concise local docs.
+
+Button, Spinner, and Tooltip are shared with the host through re-exports in
+`client/components/ui/`. Keep their implementations in `ui-components/` when updating.
 
 ## Updating the snapshot
 
@@ -122,7 +125,7 @@ the docs snapshot, and run the complete registry tests.
 ## Portals
 
 Most overlays still portal to `document.body` so they can escape widget
-overflow and stacking. `AppletPortal` copies the current applet scope onto the
+overflow and stacking. `ScopedPortal` copies the current applet scope onto the
 portalled subtree, which keeps scoped CSS working. This wrapper is already
 baked into the checked-in overlay sources.
 

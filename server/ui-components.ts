@@ -193,7 +193,7 @@ export type PlannedWrite = {
   content: string
   // Whether a file already exists at the target path.
   exists: boolean
-  // Support files ride along with a request (utils, applet-portal, registry
+  // Support files ride along with a request (utils, scoped-portal, registry
   // deps of a requested component). Existing support files are never
   // overwritten — they may carry hand customizations; existing requested
   // files fail the add unless --force.

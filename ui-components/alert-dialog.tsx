@@ -5,7 +5,7 @@ import { AlertDialog as AlertDialogPrimitive } from '@base-ui/react/alert-dialog
 import { cn } from './utils'
 
 import { Button } from './button'
-import { AppletPortal } from './applet-portal'
+import { ScopedPortal } from './scoped-portal'
 
 function AlertDialog({ ...props }: AlertDialogPrimitive.Root.Props) {
   return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />
@@ -17,7 +17,7 @@ function AlertDialogTrigger({ ...props }: AlertDialogPrimitive.Trigger.Props) {
 
 function AlertDialogPortal({ ...props }: AlertDialogPrimitive.Portal.Props) {
   return (
-    <AppletPortal portal={AlertDialogPrimitive.Portal} data-slot="alert-dialog-portal" {...props} />
+    <ScopedPortal portal={AlertDialogPrimitive.Portal} data-slot="alert-dialog-portal" {...props} />
   )
 }
 

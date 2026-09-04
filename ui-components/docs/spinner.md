@@ -80,13 +80,13 @@ You can replace the default spinner icon with any other icon by editing the `Spi
 
 ```tsx
 import { cn } from 'cn'
-import { IconLoader } from '@tabler/icons-react'
+import { IconLoader2 } from '@tabler/icons-react'
 
-type SpinnerProps = React.ComponentProps<typeof IconLoader>
+type SpinnerProps = React.ComponentProps<typeof IconLoader2>
 
 function Spinner({ className, ...props }: SpinnerProps) {
   return (
-    <IconLoader
+    <IconLoader2
       stroke={1.75}
       role="status"
       aria-label="Loading"
@@ -107,13 +107,13 @@ export function SpinnerCustom() {
 
 ```tsx showLineNumbers title="components/ui/spinner.tsx"
 import { cn } from 'cn'
-import { IconLoader } from '@tabler/icons-react'
+import { IconLoader2 } from '@tabler/icons-react'
 
-type SpinnerProps = React.ComponentProps<typeof IconLoader>
+type SpinnerProps = React.ComponentProps<typeof IconLoader2>
 
 function Spinner({ className, ...props }: SpinnerProps) {
   return (
-    <IconLoader
+    <IconLoader2
       stroke={1.75}
       role="status"
       aria-label="Loading"

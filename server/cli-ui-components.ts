@@ -99,7 +99,7 @@ const add = defineCommand({
     // --force a requested file that already exists is skipped and reported, so
     // a bulk add still installs everything new. Only when nothing needs to be
     // written does the add fail. Existing support files
-    // (utils, applet-portal, registry deps that rode along) are kept as-is
+    // (utils, scoped-portal, registry deps that rode along) are kept as-is
     // either way, even under --force.
     const partition = partitionUiWrites(plans, args.force)
     if (partition.write.length === 0) {

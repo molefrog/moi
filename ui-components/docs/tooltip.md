@@ -106,8 +106,6 @@ export default function RootLayout({ children }) {
 
 ## Usage
 
-`TooltipProvider` defaults to a 100 ms delay. `TooltipContent` defaults to a 6 px offset and has no arrow.
-
 ```tsx showLineNumbers
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 ```
