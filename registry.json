@@ -13,13 +13,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/accordion",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/accordion-example.tsx",
-          "api": "https://base-ui.com/react/components/accordion.md"
-        }
-      },
       "title": "Accordion",
       "description": "Vertically stacked sections that expand one at a time"
     },
@@ -33,12 +26,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/alert",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/alert-example.tsx"
-        }
-      },
       "title": "Alert",
       "description": "Callout box for statuses and short messages"
     },
@@ -56,13 +43,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/alert-dialog",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/alert-dialog-example.tsx",
-          "api": "https://base-ui.com/react/components/alert-dialog.md"
-        }
-      },
       "title": "Alert Dialog",
       "description": "Modal confirmation dialog for destructive or blocking actions"
     },
@@ -89,11 +69,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/attachment"
-        }
-      },
       "title": "Attachment",
       "description": "File or image attachment tile with metadata and actions"
     },
@@ -107,13 +82,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/avatar",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/avatar-example.tsx",
-          "api": "https://base-ui.com/react/components/avatar.md"
-        }
-      },
       "title": "Avatar",
       "description": "User or entity image with fallback initials"
     },
@@ -127,12 +95,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/badge",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/badge-example.tsx"
-        }
-      },
       "title": "Badge",
       "description": "Small status or count label"
     },
@@ -146,11 +108,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/bubble"
-        }
-      },
       "title": "Bubble",
       "description": "Chat message bubble"
     },
@@ -166,12 +123,7 @@
           "path": "ui-components/button.tsx",
           "type": "registry:ui"
         }
-      ],
-      "meta": {
-        "links": {
-          "docs": "https://github.com/molefrog/moi/blob/main/ui-components/docs/button.md"
-        }
-      }
+      ]
     },
     {
       "name": "button-group",
@@ -183,12 +135,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/button-group",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/button-group-example.tsx"
-        }
-      },
       "title": "Button Group",
       "description": "Buttons joined into one segmented control"
     },
@@ -203,13 +149,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/calendar",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/calendar-example.tsx",
-          "api": "https://react-day-picker.js.org"
-        }
-      },
       "title": "Calendar",
       "description": "Month calendar for picking dates and ranges"
     },
@@ -223,12 +162,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/card",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/card-example.tsx"
-        }
-      },
       "title": "Card",
       "description": "Card primitives used by registry components."
     },
@@ -243,13 +176,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/carousel",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/carousel-example.tsx",
-          "api": "https://www.embla-carousel.com/get-started/react"
-        }
-      },
       "title": "Carousel",
       "description": "Swipeable slides with prev/next controls"
     },
@@ -264,12 +190,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/chart",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/chart-example.tsx"
-        }
-      },
       "title": "Chart",
       "description": "Recharts-based charts wired to workspace theme tokens"
     },
@@ -283,13 +203,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/checkbox",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/checkbox-example.tsx",
-          "api": "https://base-ui.com/react/components/checkbox.md"
-        }
-      },
       "title": "Checkbox",
       "description": "Binary checkbox with indeterminate state"
     },
@@ -302,13 +215,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/collapsible",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/collapsible-example.tsx",
-          "api": "https://base-ui.com/react/components/collapsible.md"
-        }
-      },
       "title": "Collapsible",
       "description": "Single section that expands and collapses"
     },
@@ -328,13 +234,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/combobox",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/combobox-example.tsx",
-          "api": "https://base-ui.com/react/components/combobox.md"
-        }
-      },
       "title": "Combobox",
       "description": "Text input with a filtered dropdown of options"
     },
@@ -348,13 +247,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/context-menu",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/context-menu-example.tsx",
-          "api": "https://base-ui.com/react/components/context-menu.md"
-        }
-      },
       "title": "Context Menu",
       "description": "Right-click menu with items, submenus, and shortcuts"
     },
@@ -372,13 +264,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/dialog",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/dialog-example.tsx",
-          "api": "https://base-ui.com/react/components/dialog.md"
-        }
-      },
       "title": "Dialog",
       "description": "Modal dialog with backdrop, header, and footer"
     },
@@ -394,12 +279,7 @@
           "path": "ui-components/drawer.tsx",
           "type": "registry:ui"
         }
-      ],
-      "meta": {
-        "links": {
-          "docs": "https://github.com/molefrog/moi/blob/main/ui-components/docs/drawer.md"
-        }
-      }
+      ]
     },
     {
       "name": "dropdown-menu",
@@ -411,13 +291,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/dropdown-menu",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/dropdown-menu-example.tsx",
-          "api": "https://base-ui.com/react/components/menu.md"
-        }
-      },
       "title": "Dropdown Menu",
       "description": "Menu opened from a trigger: items, groups, submenus"
     },
@@ -435,12 +308,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/field",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/field-example.tsx"
-        }
-      },
       "title": "Field",
       "description": "Form field wrapper: label, control, description, error"
     },
@@ -454,13 +321,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/hover-card",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/hover-card-example.tsx",
-          "api": "https://base-ui.com/react/components/hover-card.md"
-        }
-      },
       "title": "Hover Card",
       "description": "Preview card shown on hover over a link or element"
     },
@@ -474,12 +334,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/input",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/input-example.tsx"
-        }
-      },
       "title": "Input",
       "description": "Single-line text input"
     },
@@ -498,12 +352,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/input-group",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/input-group-example.tsx"
-        }
-      },
       "title": "Input Group",
       "description": "Input with attached addons, buttons, or icons"
     },
@@ -517,13 +365,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/label",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/label-example.tsx",
-          "api": "https://base-ui.com/react/components/label.md"
-        }
-      },
       "title": "Label",
       "description": "Form control label"
     },
@@ -537,12 +378,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/pagination",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/pagination-example.tsx"
-        }
-      },
       "title": "Pagination",
       "description": "Page navigation with prev/next and page links"
     },
@@ -556,13 +391,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/popover",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/popover-example.tsx",
-          "api": "https://base-ui.com/react/components/popover.md"
-        }
-      },
       "title": "Popover",
       "description": "Floating panel anchored to a trigger"
     },
@@ -576,13 +404,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/progress",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/progress-example.tsx",
-          "api": "https://base-ui.com/react/components/progress.md"
-        }
-      },
       "title": "Progress",
       "description": "Determinate progress bar"
     },
@@ -596,13 +417,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/radio-group",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/radio-group-example.tsx",
-          "api": "https://base-ui.com/react/components/radio-group.md"
-        }
-      },
       "title": "Radio Group",
       "description": "Single-choice radio button set"
     },
@@ -617,13 +431,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/resizable",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/resizable-example.tsx",
-          "api": "https://github.com/bvaughn/react-resizable-panels"
-        }
-      },
       "title": "Resizable",
       "description": "Resizable split panels with drag handles"
     },
@@ -637,13 +444,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/select",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/select-example.tsx",
-          "api": "https://base-ui.com/react/components/select.md"
-        }
-      },
       "title": "Select",
       "description": "Native-feeling select with a styled popup"
     },
@@ -657,13 +457,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/separator",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/separator-example.tsx",
-          "api": "https://base-ui.com/react/components/separator.md"
-        }
-      },
       "title": "Separator",
       "description": "Horizontal or vertical dividing line"
     },
@@ -677,12 +470,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/skeleton",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/skeleton-example.tsx"
-        }
-      },
       "title": "Skeleton",
       "description": "Loading placeholder block"
     },
@@ -696,13 +483,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/slider",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/slider-example.tsx",
-          "api": "https://base-ui.com/react/components/slider.md"
-        }
-      },
       "title": "Slider",
       "description": "Range slider with one or more thumbs"
     },
@@ -716,12 +496,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/spinner",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/spinner-example.tsx"
-        }
-      },
       "title": "Spinner",
       "description": "Inline loading spinner"
     },
@@ -735,13 +509,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/switch",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/switch-example.tsx",
-          "api": "https://base-ui.com/react/components/switch.md"
-        }
-      },
       "title": "Switch",
       "description": "On/off toggle switch"
     },
@@ -755,12 +522,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/table",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/table-example.tsx"
-        }
-      },
       "title": "Table",
       "description": "Styled table primitives (header, body, rows, cells)"
     },
@@ -774,13 +535,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/tabs",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/tabs-example.tsx",
-          "api": "https://base-ui.com/react/components/tabs.md"
-        }
-      },
       "title": "Tabs",
       "description": "Tabbed panels with a tab list"
     },
@@ -794,12 +548,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/textarea",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/textarea-example.tsx"
-        }
-      },
       "title": "Textarea",
       "description": "Multi-line text input"
     },
@@ -813,13 +561,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/toggle",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/toggle-example.tsx",
-          "api": "https://base-ui.com/react/components/toggle.md"
-        }
-      },
       "title": "Toggle",
       "description": "Two-state button used by Toggle Group."
     },
@@ -833,13 +574,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/toggle-group",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/toggle-group-example.tsx",
-          "api": "https://base-ui.com/react/components/toggle-group.md"
-        }
-      },
       "title": "Toggle Group",
       "description": "Group of two-state toggle buttons"
     },
@@ -853,13 +587,6 @@
           "type": "registry:ui"
         }
       ],
-      "meta": {
-        "links": {
-          "docs": "https://ui.shadcn.com/docs/components/base/tooltip",
-          "examples": "https://ui.shadcn.com/code/apps/v4/registry/bases/base/examples/tooltip-example.tsx",
-          "api": "https://base-ui.com/react/components/tooltip.md"
-        }
-      },
       "title": "Tooltip",
       "description": "Small label shown on hover or focus"
     },
