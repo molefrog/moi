@@ -6,6 +6,7 @@ import { api } from './api'
 import { PORT } from './constants'
 import { control } from './control'
 import { EVENTS_TOPIC, publishEvent, setEventServer } from './events'
+import { killBuildWorkers } from './bundler/build-worker'
 import { killAllWorkers } from './functions'
 import { startScratchpadSweeper } from './scratchpad'
 import { resolveScratchOp } from './scratchpad-relay'
@@ -96,10 +97,10 @@ export const app = Bun.serve<WsData>({
 
     // Locally-vendored React ESM (offline; no CDN). The importmap in
     // client/index.html points here; the handler picks dev/prod per env.
-    '/vendor/react/*': req => serveVendorReact(req),
+    '/vendor/react/*': (req: Request) => serveVendorReact(req),
 
     // Vendored emojibase-data for the settings emoji picker (offline; no CDN).
-    '/vendor/emojibase/*': req => serveVendorEmojibase(req),
+    '/vendor/emojibase/*': (req: Request) => serveVendorEmojibase(req),
 
     // Client-side routes — serve the SPA shell.
     '/': shell,
@@ -109,12 +110,13 @@ export const app = Bun.serve<WsData>({
 
     // Chat websocket — app-wide (one per client, not per workspace). Each chat
     // frame carries its own workspaceId.
-    '/ws': (req, server) => upgrade(server, req, { channel: 'chat', workspaceId: '' }),
+    '/ws': (req: Request, server: Bun.Server<WsData>) =>
+      upgrade(server, req, { channel: 'chat', workspaceId: '' }),
 
     // Live widget-event stream (build/refresh pushes). A static path, so Bun
     // routes it ahead of the Hono-served `/api/workspaces/:id`; the upgrade
     // happens in-handler via the route's `server` argument.
-    '/api/workspaces/ws': (req, server) =>
+    '/api/workspaces/ws': (req: Request, server: Bun.Server<WsData>) =>
       upgrade(server, req, { channel: 'events', workspaceId: '' })
   },
   // Anything not matched above (the whole HTTP API + prod static assets + 404)
@@ -215,7 +217,8 @@ startServiceLogMaintenance()
 
 // Graceful shutdown. In dev the supervisor sends SIGTERM on server-file
 // changes; in any context Ctrl-C sends SIGINT. Close both servers and kill the
-// per-workspace function workers so no child processes are orphaned.
+// per-workspace function workers and any in-flight applet build child so no
+// child processes are orphaned.
 function shutdown() {
   try {
     app.stop(true)
@@ -225,6 +228,7 @@ function shutdown() {
   } catch {}
   for (const h of allHarnesses()) h.shutdown?.()
   killAllWorkers()
+  killBuildWorkers()
   process.exit()
 }
 process.on('SIGTERM', shutdown)

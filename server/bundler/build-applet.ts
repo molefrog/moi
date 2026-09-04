@@ -17,6 +17,8 @@ import { scopeAppletCss } from './applet-css'
 // canonical in lib/types; re-exported here for this pipeline's consumers.
 export type { AppletKind }
 
+const APP_ICON_NAMES: readonly string[] = APP_ICON_IDS
+
 // Baked into the bundle wherever a runtime URL needs the workspace's API base
 // (RPC + workspace files). The serve route string-replaces it with the real
 // `/api/workspaces/<id>` in every `.js` it returns, so the on-disk bundle stays
@@ -163,7 +165,9 @@ export async function extractViewConfig(srcPath: string): Promise<ViewConfig | n
       if (prop.value.type === 'StringLiteral') {
         const icon = prop.value.value
         if (!isAppIconId(icon)) {
-          throw new Error(`Unknown view icon id "${icon}". Use one of: ${APP_ICON_IDS.join(', ')}`)
+          throw new Error(
+            `Unknown view icon id "${icon}". Use one of: ${APP_ICON_NAMES.join(', ')}`
+          )
         }
         result.icon = icon
       }

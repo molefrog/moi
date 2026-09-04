@@ -61,7 +61,9 @@ export async function serveWorkspaceImagePreview(
       .resize(PREVIEW_MAX_EDGE, PREVIEW_MAX_EDGE, { fit: 'inside', withoutEnlargement: true })
       .webp({ quality: 80 })
       .toBuffer()
-    return new Response(data, { headers: { ...headers, 'Content-Type': 'image/webp' } })
+    return new Response(new Uint8Array(data), {
+      headers: { ...headers, 'Content-Type': 'image/webp' }
+    })
   } catch {
     // Undecodable (corrupt, or an unsupported codec despite the extension) —
     // there's no preview to show; the client hides the <img> on error.

@@ -1,10 +1,12 @@
 // The `moi ui-components` engine: a shadcn-lite proxy over the `shadcn`
-// package's own programmatic registry + transform APIs (see docs/moi-shadcn.md
+// package's own programmatic registry + transform APIs (see docs/ui-components.md
 // for the full spec and the research trail in PR #78).
 //
-// Opinions, enforced here: the upstream registry is the source of truth
-// (style `base-nova`, Base UI primitives, Tabler icons); the command exposes
-// only a curated subset of it; no config files ever land in the workspace —
+// Opinions, enforced here: moi-authored components come from the source
+// registry bundled with the package, while standard components fall back to
+// the upstream registry (style `base-nova`, Base UI primitives, Tabler icons).
+// The command exposes only a curated subset of both. No config files ever land
+// in the workspace —
 // the engine takes its config as the in-memory object below; components are
 // written to `.moi/ui/` and imported relatively (`../ui/button`). The command
 // writes source files and nothing else: it never installs dependencies and
@@ -13,10 +15,13 @@
 // sites rather than here, deliberately. Together they are ~31 MB of JS across
 // 1600 modules (ts-morph alone embeds the whole TypeScript compiler), and the
 // cost is parse + top-level evaluation, so bundling does not help — measured
-// at ~300 ms. Only `moi ui-components add` ever fetches or transforms; a
-// static import here made every `moi` command pay it, `moi version` included.
+// at ~300 ms. Only `moi ui-components add` and registry-backed docs load this
+// machinery; a static import here made every `moi` command pay it, `moi
+// version` included.
 import type { Project, SourceFile } from 'ts-morph'
 import { join } from 'path'
+
+import { PACKAGE_ROOT } from './version'
 
 // ---------------------------------------------------------------------------
 // The curated catalog
@@ -35,6 +40,9 @@ export type UiComponentEntry = {
   extraDeps?: string[]
   // Docs slug when it differs from the entry name (none currently).
   docsSlug?: string
+  // Load docs from the entry's registry item instead of the upstream docs
+  // site. Used by moi-authored components such as Drawer.
+  docs?: 'registry'
 }
 
 // The agreed subset (UI component review, Aug 2026). Upstream ships ~63 ui
@@ -73,7 +81,8 @@ export const UI_COMPONENTS: Record<string, UiComponentEntry> = {
   },
   button: {
     description: 'The button: variants, sizes, icon support',
-    registryItems: ['button']
+    registryItems: ['button'],
+    docs: 'registry'
   },
   'button-group': {
     description: 'Buttons joined into one segmented control',
@@ -119,6 +128,11 @@ export const UI_COMPONENTS: Record<string, UiComponentEntry> = {
   dialog: {
     description: 'Modal dialog with backdrop, header, and footer',
     registryItems: ['dialog']
+  },
+  drawer: {
+    description: 'Right-side detail panel scoped to the current view',
+    registryItems: ['drawer'],
+    docs: 'registry'
   },
   'dropdown-menu': {
     description: 'Menu opened from a trigger: items, groups, submenus',
@@ -212,6 +226,20 @@ export const UI_COMPONENTS: Record<string, UiComponentEntry> = {
 
 export const UI_COMPONENT_NAMES = Object.keys(UI_COMPONENTS)
 
+// The final path segment names the component file for built-in, namespaced,
+// and GitHub registry addresses alike.
+export function registryItemName(registryItem: string): string {
+  const withoutRef = registryItem.split('#', 1)[0]
+  return withoutRef.split('/').at(-1) ?? withoutRef
+}
+
+// The `.tsx` files in `.moi/ui/` whose presence makes an entry count as
+// installed.
+export function uiComponentFiles(name: string): string[] {
+  const entry = UI_COMPONENTS[name]
+  return entry.registryItems.map(item => `${registryItemName(item)}.tsx`)
+}
+
 // ---------------------------------------------------------------------------
 // Engine config — the in-memory replacement for components.json
 // ---------------------------------------------------------------------------
@@ -254,6 +282,11 @@ export type FetchedUiComponents = {
   dependencies: string[]
 }
 
+export type FetchUiComponentsOptions = {
+  registryRoot?: string
+  resolveRemote?: (registryNames: string[]) => Promise<FetchedUiComponents>
+}
+
 // Where a registry file lands in `.moi/ui/`. Registry paths look like
 // `registry/base-nova/ui/button.tsx`, `registry/base-nova/lib/utils.ts`,
 // `registry/base-nova/hooks/use-mobile.ts` — everything flattens into the one
@@ -263,44 +296,108 @@ function uiFileName(registryPath: string): string {
   return base
 }
 
-// Fetch the requested registry items plus their registryDependencies, closed
-// transitively, deduplicated. `utils` (the `cn` helper) rides along on every
-// fetch — it is the one support file everything imports.
-export async function fetchUiComponents(registryNames: string[]): Promise<FetchedUiComponents> {
+async function fetchRemoteUiComponents(registryNames: string[]): Promise<FetchedUiComponents> {
+  const { resolveRegistryItems } = await import('shadcn/registry')
+  const tree = await resolveRegistryItems([...new Set(['utils', ...registryNames])], {
+    config: ENGINE_CONFIG
+  })
+  if (!tree) throw new Error(`Could not resolve registry items: ${registryNames.join(', ')}`)
+
+  const files = new Map<string, string>()
+  for (const file of tree.files ?? []) {
+    if (file.content) files.set(uiFileName(file.path), file.content)
+  }
+
+  return {
+    files: [...files.entries()].map(([name, content]) => ({ name, content })),
+    dependencies: [...new Set(tree.dependencies ?? [])].sort()
+  }
+}
+
+async function localRegistryNames(registryRoot: string): Promise<Set<string>> {
+  if (!(await Bun.file(join(registryRoot, 'registry.json')).exists())) return new Set()
+  const { loadRegistry } = await import('shadcn/registry')
+  const registry = await loadRegistry({ cwd: registryRoot })
+  return new Set(registry.items.map(item => item.name))
+}
+
+// Fetch requested items from the registry shipped with moi first. Local
+// registry dependencies stay local, and a local component replaces the same
+// file when it arrives as support for an upstream item.
+export async function fetchUiComponents(
+  registryNames: string[],
+  options: FetchUiComponentsOptions = {}
+): Promise<FetchedUiComponents> {
+  const registryRoot = options.registryRoot ?? PACKAGE_ROOT
+  const names = [...new Set(registryNames)]
+  const localItemNames = await localRegistryNames(registryRoot)
   const files = new Map<string, string>()
   const dependencies = new Set<string>()
-  const fetched = new Set<string>()
-  let queue = [...new Set(['utils', ...registryNames])]
+  const loadedLocalItems = new Set<string>()
+  const remote: string[] = []
+  const { loadRegistryItem } = await import('shadcn/registry')
 
-  const { getRegistryItems } = await import('shadcn/registry')
+  const addRemote = (name: string) => {
+    if (!remote.includes(name)) remote.push(name)
+  }
 
-  while (queue.length > 0) {
-    const batch = queue.filter(name => !fetched.has(name))
-    if (batch.length === 0) break
-    for (const name of batch) fetched.add(name)
+  const loadLocalItem = async (name: string): Promise<boolean> => {
+    const itemName = registryItemName(name)
+    if (!localItemNames.has(itemName)) return false
+    if (loadedLocalItems.has(itemName)) return true
+    loadedLocalItems.add(itemName)
 
-    const items = await getRegistryItems(batch, { config: ENGINE_CONFIG })
-    const next: string[] = []
-    for (const item of items ?? []) {
-      for (const dep of item.dependencies ?? []) dependencies.add(dep)
-      for (const dep of item.registryDependencies ?? []) {
-        // Registry deps are plain item names for the shadcn registry; URLs
-        // would point at third-party registries, which the curated set never
-        // references.
-        if (!fetched.has(dep)) next.push(dep)
-      }
-      for (const file of item.files ?? []) {
-        if (!file.content) continue
-        files.set(uiFileName(file.path), file.content)
-      }
+    const item = await loadRegistryItem(itemName, { cwd: registryRoot })
+    for (const file of item.files ?? []) {
+      if (file.content) files.set(uiFileName(file.path), file.content)
     }
-    queue = next
+    for (const dependency of item.dependencies ?? []) dependencies.add(dependency)
+    for (const registryDependency of item.registryDependencies ?? []) {
+      if (!(await loadLocalItem(registryDependency))) addRemote(registryDependency)
+    }
+    return true
+  }
+
+  for (const name of names) {
+    if (!(await loadLocalItem(name))) addRemote(name)
+  }
+
+  if (remote.length > 0) {
+    const resolveRemote = options.resolveRemote ?? fetchRemoteUiComponents
+    const resolved = await resolveRemote(remote)
+
+    for (const file of resolved.files) {
+      const itemName = file.name.endsWith('.tsx') ? file.name.slice(0, -4) : ''
+      if (localItemNames.has(itemName)) await loadLocalItem(itemName)
+      if (!files.has(file.name)) files.set(file.name, file.content)
+    }
+    for (const dependency of resolved.dependencies) dependencies.add(dependency)
   }
 
   return {
     files: [...files.entries()].map(([name, content]) => ({ name, content })),
     dependencies: [...dependencies].sort()
   }
+}
+
+export async function fetchUiComponentDocs(
+  registryName: string,
+  registryRoot: string = PACKAGE_ROOT
+): Promise<string> {
+  const itemName = registryItemName(registryName)
+  const availableLocally = await localRegistryNames(registryRoot)
+  if (availableLocally.has(itemName)) {
+    const { loadRegistryItem } = await import('shadcn/registry')
+    const item = await loadRegistryItem(itemName, { cwd: registryRoot })
+    if (!item.docs) throw new Error(`Registry item "${registryName}" has no docs`)
+    return item.docs
+  }
+
+  const { getRegistryItems } = await import('shadcn/registry')
+  const items = await getRegistryItems([registryName], { config: ENGINE_CONFIG })
+  const item = items?.find(candidate => candidate.name === itemName)
+  if (!item?.docs) throw new Error(`Registry item "${registryName}" has no docs`)
+  return item.docs
 }
 
 // ---------------------------------------------------------------------------
@@ -310,7 +407,7 @@ export async function fetchUiComponents(registryNames: string[]): Promise<Fetche
 // Rewrite `@/registry/<style>/{lib,ui,hooks}/<x>` specifiers to sibling-relative
 // paths. There is no engine knob for this: aliases are validated against
 // tsconfig paths, so a relative alias value is rejected outright (verified —
-// see docs/moi-shadcn.md). Walks import AND export declarations on the same
+// see docs/ui-components.md). Walks import AND export declarations on the same
 // ts-morph SourceFile the icon transform used, so re-exports are covered.
 function rewriteRegistryImports(sourceFile: SourceFile): void {
   const rewrite = (spec: string): string | null => {
@@ -334,11 +431,12 @@ function rewriteRegistryImports(sourceFile: SourceFile): void {
 // see server/bundler/applet-css.ts) stop matching and overlays render on
 // accidentally borrowed host styles. Overlays should keep portalling to body
 // (escaping the widget frame's overflow/stacking is the point) — so instead
-// of re-containering them, every `<X.Portal …>` JSX element is rewritten to
-// `<AppletPortal portal={X.Portal} …>`, a wrapper (installed as
+// of re-containering them, each `<X.Portal …>` without its own container is
+// rewritten to `<AppletPortal portal={X.Portal} …>`, a wrapper (installed as
 // `ui/applet-portal.tsx`) that re-establishes the scope attribute on the
-// portalled subtree. Type positions (`X.Portal.Props`) are untouched — the
-// rewrite only sees JSX tag names.
+// portalled subtree. A portal with an explicit `container` already owns its
+// scope and stays untouched. Type positions (`X.Portal.Props`) are untouched —
+// the rewrite only sees JSX tag names.
 // `SyntaxKind` is passed in rather than imported: ts-morph is loaded lazily by
 // the one caller below, so this helper cannot close over a module-level import.
 function rewritePortals(
@@ -350,6 +448,7 @@ function rewritePortals(
 
   for (const el of sourceFile.getDescendantsOfKind(SyntaxKind.JsxSelfClosingElement)) {
     if (!PORTAL_TAG.test(el.getTagNameNode().getText())) continue
+    if (el.getAttribute('container')) continue
     const portalExpr = el.getTagNameNode().getText()
     el.getTagNameNode().replaceWithText('AppletPortal')
     el.insertAttribute(0, { name: 'portal', initializer: `{${portalExpr}}` })
@@ -358,6 +457,7 @@ function rewritePortals(
   for (const el of sourceFile.getDescendantsOfKind(SyntaxKind.JsxElement)) {
     const opening = el.getOpeningElement()
     if (!PORTAL_TAG.test(opening.getTagNameNode().getText())) continue
+    if (opening.getAttribute('container')) continue
     const portalExpr = opening.getTagNameNode().getText()
     opening.getTagNameNode().replaceWithText('AppletPortal')
     el.getClosingElement().getTagNameNode().replaceWithText('AppletPortal')
@@ -403,8 +503,8 @@ export async function transformUiComponentSource(name: string, raw: string): Pro
 // The AppletPortal helper — installed once as `ui/applet-portal.tsx`
 // ---------------------------------------------------------------------------
 
-// Embedded as a string like the other scaffold templates (see
-// moi-scaffold.ts): the file belongs to the workspace, not to moi's bundle.
+// Embedded as a scaffold template (see moi-scaffold.ts): the file belongs to
+// the workspace, not to moi's bundle.
 // The hidden marker renders where the overlay is used — inside the applet's
 // DOM — and reads the nearest `data-applet` scope; the portalled children
 // then render under an element carrying the same attribute, so the applet's
@@ -478,7 +578,8 @@ export function resolveUiComponentRequest(names: string[]): ResolvedRequest {
       unknown.push(raw)
       continue
     }
-    if (!entries.includes(name)) entries.push(name)
+    if (entries.includes(name)) continue
+    entries.push(name)
     for (const item of entry.registryItems) {
       if (!registryItems.includes(item)) registryItems.push(item)
     }
@@ -525,6 +626,9 @@ export type PlannedWrite = {
   // overwritten — they may carry hand customizations; existing requested
   // files fail the add unless --force.
   support: boolean
+  // Written as-is, skipping the registry transform pipeline. Only the portal
+  // helper uses this path; component files always come from a registry.
+  verbatim: boolean
 }
 
 export type UiWritePartition = {
@@ -558,14 +662,15 @@ export function planUiWrites(opts: {
   uiDir: string
   exists: (path: string) => boolean
 }): PlannedWrite[] {
-  const requested = new Set(opts.requestedItems.map(item => `${item}.tsx`))
+  const requested = new Set(opts.requestedItems.map(item => `${registryItemName(item)}.tsx`))
   const plans: PlannedWrite[] = [
     ...opts.files.map(file => ({
       name: file.name,
       content: file.content,
-      support: !requested.has(file.name)
+      support: !requested.has(file.name),
+      verbatim: false
     })),
-    { name: 'applet-portal.tsx', content: APPLET_PORTAL_SOURCE, support: true }
+    { name: 'applet-portal.tsx', content: APPLET_PORTAL_SOURCE, support: true, verbatim: true }
   ].map(file => {
     const path = join(opts.uiDir, file.name)
     return { ...file, path, exists: opts.exists(path) }

@@ -1,9 +1,9 @@
 # UI components cheat sheet
 
-`moi ui-components` installs standard controls from a selected subset of the shadcn registry,
+`moi ui-components` installs standard controls from selected shadcn and moi registry items,
 pre-tuned for moi applets: **Base UI** primitives, **Tabler** icons, workspace theme tokens,
-relative imports, and overlays patched so applet styling survives portalling. Components land
-in `.moi/ui/` as plain source files you own.
+relative imports, and overlays patched so applet styling survives portalling. Drawer is
+moi-authored to the same conventions. Components land in `.moi/ui/` as plain source files you own.
 
 This file is the catalog plus the essential usage rules (condensed from the official shadcn
 skill). Read it once; fetch full per-component docs with `moi ui-components docs <name>` **before
@@ -18,7 +18,7 @@ moi ui-components add select          # → .moi/ui/select.tsx (+ any support fi
 moi ui-components add table badge tabs --install   # any number of names, one call —
                                       # always prefer this over one `add` per
                                       # component; --install runs the bun install too
-moi ui-components docs select table   # official docs as markdown
+moi ui-components docs select table   # component docs as markdown
 moi bundle                            # rebuild applets
 ```
 
@@ -60,8 +60,9 @@ description + error) · `label` · `checkbox` · `radio-group` · `switch` · `s
 `date-picker` (pattern: calendar in a popover — see its docs; installs `calendar` + `popover` +
 `button`)
 
-**Overlays (portal-patched):** `dialog` · `alert-dialog` (destructive confirm) · `popover` ·
-`dropdown-menu` · `context-menu` (right-click) · `hover-card` · `tooltip`
+**Overlays:** `dialog` · `alert-dialog` (destructive confirm) · `popover` ·
+`dropdown-menu` · `context-menu` (right-click) · `hover-card` · `tooltip` · `drawer` (right-side
+detail panel scoped to a view — moi-authored registry item)
 
 **Display & feedback:** `alert` (callouts) · `badge` · `avatar` · `skeleton` · `spinner` ·
 `progress` · `table` · `data-table` (pattern on `table` + `@tanstack/react-table` — see its
@@ -72,7 +73,9 @@ docs) · `chart` (Recharts wired to theme tokens) · `attachment` (file/image ti
 `resizable` (split panels) · `separator` (divider line)
 
 Picking one: quick info on hover → `hover-card` or `tooltip` · contextual panel on click →
-`popover` · focused task needing input → `dialog` · destructive confirmation → `alert-dialog` ·
+`popover` · detail pane, filters, or a short form inside a view → `drawer` ·
+focused task that must interrupt the whole workspace → `dialog` · destructive confirmation →
+`alert-dialog` ·
 option sets of 2–7 → `toggle-group` · long searchable lists → `combobox` · boolean setting →
 `switch`, boolean in a form → `checkbox`.
 
@@ -97,8 +100,11 @@ option sets of 2–7 → `toggle-group` · long searchable lists → `combobox` 
   `DropdownMenuItem`/`DropdownMenuLabel`/`DropdownMenuSub` → `DropdownMenuGroup`;
   `ContextMenuItem` → `ContextMenuGroup`. A Label outside its Group **crashes the component at
   runtime** (Base UI requires the group context); keep items grouped too.
-- **`Dialog` and `AlertDialog` always need a Title** (`DialogTitle` — use
-  `className="sr-only"` to hide it visually).
+- **`Dialog`, `AlertDialog`, and `Drawer` always need a Title** (`DialogTitle` / `DrawerTitle` —
+  use `className="sr-only"` to hide it visually).
+- **Use `Drawer` in views** for details, filters, or short forms. It covers and dims only the
+  current view. Put growing content in `DrawerBody`; from a widget, use `focusTab`, `dialog`, or
+  `popover`. `moi ui-components docs drawer` has its usage notes.
 - **`TabsTrigger` must be inside `TabsList`**, never directly in `Tabs`.
 - **`Avatar` always needs `AvatarFallback`** for when the image fails.
 - **Button has no `isLoading`** — compose: `<Button disabled><Spinner data-icon="inline-start" />Saving…</Button>`.

@@ -24,6 +24,11 @@ const DEV_ROUTES: DevRouteEntry[] = [
     description: 'Tool-call group fixtures: single and merged runs, live states, subagent traces.'
   },
   {
+    path: '/dev/ui-components',
+    title: 'UI components',
+    description: 'Interactive previews for every component in the local moi registry.'
+  },
+  {
     path: '/dev/textures',
     title: 'Texture lab',
     description: 'Every texture across color presets, dark mode, widget tokens, and vivid surfaces.'

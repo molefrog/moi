@@ -6,4 +6,4 @@
 // spawned CLI would otherwise read the developer's real data dir.
 import envPaths from 'env-paths'
 
-export const DATA_DIR = process.env.MOI_DATA_DIR || envPaths('moi', { suffix: false }).data
+export const DATA_DIR = process.env.MOI_DATA_DIR || envPaths('moi', { suffix: '' }).data

@@ -1,9 +1,9 @@
 // CLI face of `moi ui-components` (see server/ui-components.ts for the
-// engine and docs/moi-shadcn.md for the spec). Three verbs:
+// engine and docs/ui-components.md for the spec). Three verbs:
 //
 //   moi ui-components                → the curated catalog + installed state
 //   moi ui-components add <name…>    → fetch, transform, write to .moi/ui/
-//   moi ui-components docs <name…>   → official docs as markdown, on stdout
+//   moi ui-components docs <name…>   → component docs as markdown, on stdout
 //
 // The command is deliberately not smart: add never rebuilds and never edits
 // existing files, and installs dependencies only when asked to (--install) —
@@ -17,15 +17,18 @@ import pc from './cli-pc'
 import { resolveCwdWorkspace } from './cli-env'
 import { MOI_PACKAGE_JSON } from './moi-scaffold'
 import {
+  type FetchedUiComponents,
   UI_COMPONENTS,
   UI_COMPONENT_NAMES,
   UI_DOCS_BASE,
+  fetchUiComponentDocs,
   fetchUiComponents,
   partitionUiWrites,
   planUiWrites,
   resolveUiComponentRequest,
   suggestUiComponents,
-  transformUiComponentSource
+  transformUiComponentSource,
+  uiComponentFiles
 } from './ui-components'
 
 function uiDirFor(workspacePath: string): string {
@@ -74,15 +77,15 @@ const add = defineCommand({
     const entry = await resolveCwdWorkspace()
     const uiDir = uiDirFor(entry.path)
 
-    let fetched
+    let fetched: FetchedUiComponents
     try {
       fetched = await fetchUiComponents(request.registryItems)
     } catch (err) {
       console.error(
         '\n' +
           pc.red('✗') +
-          ' Could not reach the shadcn registry (ui.shadcn.com). ' +
-          'The command needs network access; offline use is not supported.\n' +
+          ' Could not load the requested components. ' +
+          'Components bundled with moi work offline; other components need network access.\n' +
           pc.dim(`  ${(err as Error).message}\n`)
       )
       process.exit(1)
@@ -118,9 +121,10 @@ const add = defineCommand({
     await mkdir(uiDir, { recursive: true })
     const written: string[] = []
     for (const plan of partition.write) {
-      const content = plan.name.endsWith('.tsx')
-        ? await transformUiComponentSource(plan.name, plan.content)
-        : plan.content
+      const content =
+        plan.name.endsWith('.tsx') && !plan.verbatim
+          ? await transformUiComponentSource(plan.name, plan.content)
+          : plan.content
       await Bun.write(plan.path, content)
       written.push(plan.name)
     }
@@ -200,7 +204,7 @@ const add = defineCommand({
 const docs = defineCommand({
   meta: {
     name: 'docs',
-    description: 'Print official component docs as markdown'
+    description: 'Print component docs as markdown'
   },
   args: {
     name: {
@@ -214,16 +218,27 @@ const docs = defineCommand({
     if (request.unknown.length > 0) exitUnknownNames(request.unknown)
 
     for (const name of request.entries) {
-      const slug = UI_COMPONENTS[name].docsSlug ?? name
-      const url = `${UI_DOCS_BASE}/${slug}.md`
+      const entry = UI_COMPONENTS[name]
+      const source =
+        entry.docs === 'registry'
+          ? entry.registryItems[0]
+          : `${UI_DOCS_BASE}/${entry.docsSlug ?? name}.md`
       try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(20_000) })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        if (!source) throw new Error(`No docs source configured for "${name}"`)
+        let markdown: string
+        if (entry.docs === 'registry') {
+          markdown = await fetchUiComponentDocs(source)
+        } else {
+          const res = await fetch(source, { signal: AbortSignal.timeout(20_000) })
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          markdown = await res.text()
+        }
         if (request.entries.length > 1) console.log(`\n---\n# ${name}\n`)
-        console.log(await res.text())
+        console.log(markdown)
       } catch (err) {
         console.error(
-          pc.red('✗') + ` Could not fetch docs for "${name}" (${url}): ${(err as Error).message}`
+          pc.red('✗') +
+            ` Could not fetch docs for "${name}" (${source ?? 'missing source'}): ${(err as Error).message}`
         )
         process.exitCode = 1
       }
@@ -240,7 +255,7 @@ function renderCatalog(uiDir: string, query?: string): void {
     if (needle && !name.includes(needle) && !entry.description.toLowerCase().includes(needle)) {
       continue
     }
-    const installed = entry.registryItems.every(item => existsSync(join(uiDir, `${item}.tsx`)))
+    const installed = uiComponentFiles(name).every(file => existsSync(join(uiDir, file)))
     rows.push(
       '  ' +
         (installed ? pc.green('✓ ') : '  ') +

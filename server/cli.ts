@@ -790,7 +790,7 @@ const refresh = defineCommand({
   }
 })
 
-function hexToRgb(hex: string): [number, number, number] {
+function swatchHexToRgb(hex: string): [number, number, number] {
   const value = Number.parseInt(hex.slice(1), 16)
   return [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff]
 }
@@ -799,8 +799,8 @@ function hexToRgb(hex: string): [number, number, number] {
 // Falls back to blank spaces when stdout is not a TTY, keeping piped output clean.
 function swatch(bg?: string, fg?: string): string {
   if (!process.stdout.isTTY || !bg) return '    '
-  const [br, bgg, bb] = hexToRgb(bg)
-  const [fr, fgg, fb] = hexToRgb(fg ?? '#000000')
+  const [br, bgg, bb] = swatchHexToRgb(bg)
+  const [fr, fgg, fb] = swatchHexToRgb(fg ?? '#000000')
   return `\x1b[48;2;${br};${bgg};${bb}m\x1b[38;2;${fr};${fgg};${fb}m Aa \x1b[0m`
 }
 
