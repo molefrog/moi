@@ -288,7 +288,7 @@ export function applyEvents(events: StreamEvent[]): ViewState {
   // entire transcript per event. The live single-event reducer stays immutable.
   const state = emptyViewState()
   const turnIndexes = new Map<string, number>()
-  const noticeIndexes = new Map<string, number>()
+  const notices = new Map<string, SystemNotice>()
   let maxSeq = -Infinity
 
   for (const event of events) {
@@ -323,19 +323,14 @@ export function applyEvents(events: StreamEvent[]): ViewState {
         if (seq !== undefined) maxSeq = Math.max(maxSeq, seq)
         break
       }
-      case 'notice': {
-        const index = noticeIndexes.get(event.notice.id)
-        if (index !== undefined) state.notices[index] = event.notice
-        else {
-          noticeIndexes.set(event.notice.id, state.notices.length)
-          state.notices.push(event.notice)
-        }
+      case 'notice':
+        notices.set(event.notice.id, event.notice)
         break
-      }
       case 'result':
         state.result = event.result
         break
     }
   }
+  state.notices = [...notices.values()]
   return state
 }

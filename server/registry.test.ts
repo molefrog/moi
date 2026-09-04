@@ -20,7 +20,7 @@ let tmpDir: string
 
 beforeEach(async () => {
   tmpDir = await mkdtemp(join(tmpdir(), 'moi-registry-test-'))
-  setRegistryPath(join(tmpDir, 'workspaces.json'))
+  setRegistryPath(join(tmpDir, 'data', 'workspaces.json'))
 })
 
 afterEach(async () => {

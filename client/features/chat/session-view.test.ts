@@ -44,7 +44,7 @@ function receive(event: StreamEvent, sid = sessionId) {
 test('first load retains socket events received before the cache exists', async () => {
   const response = Promise.withResolvers<Response>()
   fetchMock.mockImplementation(() => response.promise)
-  const loaded = client.fetchQuery(sessionViewOptions(client, workspaceId, sessionId))
+  const loaded = client.fetchQuery(sessionViewOptions(workspaceId, sessionId))
   receive(turn('live'))
   receive(turn('other'), 'another-session')
   expect(client.getQueryData<ViewState>(key)).toBeUndefined()
@@ -58,7 +58,7 @@ test('reconnect merges fetched history with live upserts, notices and results', 
   await client.invalidateQueries({ queryKey: key, refetchType: 'none' })
   const response = Promise.withResolvers<Response>()
   fetchMock.mockImplementation(() => response.promise)
-  const loaded = client.fetchQuery(sessionViewOptions(client, workspaceId, sessionId))
+  const loaded = client.fetchQuery(sessionViewOptions(workspaceId, sessionId))
   const live: StreamEvent[] = [
     turn('updated', 'new text'),
     turn('live'),
@@ -78,22 +78,22 @@ test('HTTP errors keep cached history and permit retry', async () => {
   client.setQueryData(key, existing)
   await client.invalidateQueries({ queryKey: key, refetchType: 'none' })
   fetchMock.mockResolvedValueOnce(new Response('Backend unavailable', { status: 503 }))
-  await expect(
-    client.fetchQuery(sessionViewOptions(client, workspaceId, sessionId))
-  ).rejects.toThrow('Backend unavailable')
+  await expect(client.fetchQuery(sessionViewOptions(workspaceId, sessionId))).rejects.toThrow(
+    'Backend unavailable'
+  )
   expect(client.getQueryData<ViewState>(key)).toEqual(existing)
   expect(client.getQueryState(key)?.status).toBe('error')
   // An event after failure must not leak into the next request's buffer.
   receive(turn('after-failure'))
   await client.invalidateQueries({ queryKey: key, refetchType: 'none' })
   fetchMock.mockResolvedValueOnce(Response.json([turn('recovered')]))
-  await client.fetchQuery(sessionViewOptions(client, workspaceId, sessionId))
+  await client.fetchQuery(sessionViewOptions(workspaceId, sessionId))
   expect(client.getQueryData<ViewState>(key)).toEqual(applyEvents([turn('recovered')]))
 })
 
 test('an initial failure is retried when the chat remounts', async () => {
   fetchMock.mockResolvedValueOnce(new Response(null, { status: 500 }))
-  const options = sessionViewOptions(client, workspaceId, sessionId)
+  const options = sessionViewOptions(workspaceId, sessionId)
   await expect(client.fetchQuery(options)).rejects.toThrow('Couldn’t load chat')
   expect(client.getQueryData<ViewState>(key)).toBeUndefined()
   const response = Promise.withResolvers<Response>()
@@ -115,7 +115,7 @@ test('automatic retry recovers an HTTP failure', async () => {
     .mockResolvedValueOnce(new Response(null, { status: 503 }))
     .mockResolvedValueOnce(Response.json([turn('recovered')]))
   await client.fetchQuery({
-    ...sessionViewOptions(client, workspaceId, sessionId),
+    ...sessionViewOptions(workspaceId, sessionId),
     retry: 1,
     retryDelay: 0
   })
@@ -134,7 +134,7 @@ test('cancelling a fetch aborts its request and leaves the next load independent
         )
       })
   )
-  const loaded = client.fetchQuery(sessionViewOptions(client, workspaceId, sessionId))
+  const loaded = client.fetchQuery(sessionViewOptions(workspaceId, sessionId))
   const rejected = loaded.then(
     () => false,
     () => true
@@ -144,6 +144,6 @@ test('cancelling a fetch aborts its request and leaves the next load independent
   expect(await rejected).toBe(true)
   expect(requestSignal?.aborted).toBe(true)
   fetchMock.mockResolvedValueOnce(Response.json([turn('next-load')]))
-  await client.fetchQuery(sessionViewOptions(client, workspaceId, sessionId))
+  await client.fetchQuery(sessionViewOptions(workspaceId, sessionId))
   expect(client.getQueryData<ViewState>(key)).toEqual(applyEvents([turn('next-load')]))
 })

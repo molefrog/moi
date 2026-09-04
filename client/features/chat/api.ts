@@ -42,9 +42,8 @@ export function useArchiveWorkspaceSession(workspaceId: string) {
 }
 
 export function useSessionView(workspaceId: string, sessionId: string | null) {
-  const client = useQueryClient()
   return useQuery({
-    ...sessionViewOptions(client, workspaceId, sessionId ?? ''),
+    ...sessionViewOptions(workspaceId, sessionId ?? ''),
     enabled: Boolean(sessionId)
   })
 }

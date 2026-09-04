@@ -28,10 +28,10 @@ export function bufferSessionEvent(
   }
 }
 
-export function sessionViewOptions(client: QueryClient, workspaceId: string, sessionId: string) {
+export function sessionViewOptions(workspaceId: string, sessionId: string) {
   return queryOptions({
     queryKey: workspaceKeys.events(workspaceId, sessionId),
-    queryFn: async ({ signal }) => {
+    queryFn: async ({ client, signal }) => {
       const requests = pendingFetches.get(client) ?? new Set<PendingFetch>()
       pendingFetches.set(client, requests)
       const pending: PendingFetch = { workspaceId, sessionId, events: [] }

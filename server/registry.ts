@@ -1,4 +1,4 @@
-import { mkdir, rename, rm } from 'node:fs/promises'
+import { rename, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'path'
 
@@ -43,7 +43,6 @@ async function readRegistry(): Promise<WorkspaceEntry[]> {
 }
 
 async function writeRegistry(entries: WorkspaceEntry[]): Promise<void> {
-  await mkdir(join(_registryPath, '..'), { recursive: true })
   const temporaryPath = `${_registryPath}.${crypto.randomUUID()}.tmp`
   try {
     await Bun.write(temporaryPath, JSON.stringify(entries, null, 2))
