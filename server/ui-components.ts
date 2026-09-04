@@ -81,7 +81,8 @@ export const UI_COMPONENTS: Record<string, UiComponentEntry> = {
   },
   button: {
     description: 'The button: variants, sizes, icon support',
-    registryItems: ['button']
+    registryItems: ['button'],
+    docs: 'registry'
   },
   'button-group': {
     description: 'Buttons joined into one segmented control',
@@ -318,36 +319,54 @@ async function localRegistryNames(registryRoot: string): Promise<Set<string>> {
   return new Set(registry.items.map(item => item.name))
 }
 
-// Fetch requested items from the registry shipped with moi first. Only names
-// missing there reach the upstream shadcn registry. Local files win collisions
-// so a moi component and its support files always stay together.
+// Fetch requested items from the registry shipped with moi first. Local
+// registry dependencies stay local, and a local component replaces the same
+// file when it arrives as support for an upstream item.
 export async function fetchUiComponents(
   registryNames: string[],
   options: FetchUiComponentsOptions = {}
 ): Promise<FetchedUiComponents> {
   const registryRoot = options.registryRoot ?? PACKAGE_ROOT
   const names = [...new Set(registryNames)]
-  const availableLocally = await localRegistryNames(registryRoot)
-  const local = names.filter(name => availableLocally.has(registryItemName(name)))
-  const remote = names.filter(name => !availableLocally.has(registryItemName(name)))
+  const localItemNames = await localRegistryNames(registryRoot)
   const files = new Map<string, string>()
   const dependencies = new Set<string>()
+  const loadedLocalItems = new Set<string>()
+  const remote: string[] = []
+  const { loadRegistryItem } = await import('shadcn/registry')
 
-  if (local.length > 0) {
-    const { loadRegistryItem } = await import('shadcn/registry')
-    for (const name of local) {
-      const item = await loadRegistryItem(registryItemName(name), { cwd: registryRoot })
-      for (const file of item.files ?? []) {
-        if (file.content) files.set(uiFileName(file.path), file.content)
-      }
-      for (const dependency of item.dependencies ?? []) dependencies.add(dependency)
+  const addRemote = (name: string) => {
+    if (!remote.includes(name)) remote.push(name)
+  }
+
+  const loadLocalItem = async (name: string): Promise<boolean> => {
+    const itemName = registryItemName(name)
+    if (!localItemNames.has(itemName)) return false
+    if (loadedLocalItems.has(itemName)) return true
+    loadedLocalItems.add(itemName)
+
+    const item = await loadRegistryItem(itemName, { cwd: registryRoot })
+    for (const file of item.files ?? []) {
+      if (file.content) files.set(uiFileName(file.path), file.content)
     }
+    for (const dependency of item.dependencies ?? []) dependencies.add(dependency)
+    for (const registryDependency of item.registryDependencies ?? []) {
+      if (!(await loadLocalItem(registryDependency))) addRemote(registryDependency)
+    }
+    return true
+  }
+
+  for (const name of names) {
+    if (!(await loadLocalItem(name))) addRemote(name)
   }
 
   if (remote.length > 0) {
     const resolveRemote = options.resolveRemote ?? fetchRemoteUiComponents
     const resolved = await resolveRemote(remote)
+
     for (const file of resolved.files) {
+      const itemName = file.name.endsWith('.tsx') ? file.name.slice(0, -4) : ''
+      if (localItemNames.has(itemName)) await loadLocalItem(itemName)
       if (!files.has(file.name)) files.set(file.name, file.content)
     }
     for (const dependency of resolved.dependencies) dependencies.add(dependency)

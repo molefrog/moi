@@ -16,6 +16,10 @@ import {
   DrawerTrigger
 } from '@/ui-components/drawer'
 
+function ButtonPreview() {
+  return <Button>Button</Button>
+}
+
 function DrawerPreview() {
   return (
     <Drawer>
@@ -51,6 +55,7 @@ function DrawerPreview() {
 }
 
 export const UI_COMPONENT_PREVIEWS = {
+  button: ButtonPreview,
   drawer: DrawerPreview
 }
 

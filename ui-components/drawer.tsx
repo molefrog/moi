@@ -4,6 +4,7 @@ import * as React from 'react'
 import { Drawer as DrawerPrimitive } from '@base-ui/react/drawer'
 import { IconX } from '@tabler/icons-react'
 
+import { Button } from './button'
 import { cn } from './utils'
 
 type DrawerContextProps = {
@@ -129,8 +130,16 @@ function DrawerContent({
             >
               {children}
               {showCloseButton && (
-                <DrawerClose className="absolute top-3 right-3 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground outline-hidden hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring">
-                  <IconX size={16} stroke={1.75} />
+                <DrawerClose
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="absolute top-3 right-3 text-muted-foreground"
+                    />
+                  }
+                >
+                  <IconX stroke={1.75} />
                   <span className="sr-only">Close</span>
                 </DrawerClose>
               )}

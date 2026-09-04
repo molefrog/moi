@@ -31,7 +31,8 @@ and a curated subset instead of the full upstream catalog.
   dependencies of a curated item (`separator`, `card`, `toggle`) install
   implicitly as support files. `sheet`'s job inside a view is done by the
   moi-authored `drawer` from the repository's source registry (see "moi
-  registry" below).
+  registry" below). `button` also comes from this registry so applets and the
+  host share one implementation.
 - Components live in `.moi/ui/`, one fixed place, created on first use.
 - Applets import them relatively: `../ui/button`. Never `@/` aliases (the
   skill states this; unresolved imports already fail loudly at build).
@@ -60,8 +61,8 @@ V1 (shipped):
   rebuilding stays the agent's job.
 - `moi ui-components docs <name…>` — component docs loaded as markdown
   (`ui.shadcn.com/docs/components/base/<name>.md` serves raw markdown;
-  works for the `data-table`/`date-picker` pattern pages too). For Drawer,
-  the docs come from its registry item.
+  works for the `data-table`/`date-picker` pattern pages too). Button and
+  Drawer docs come from their registry items and work offline.
 - `moi ui-components` / `list [-q term]` — the curated catalog with
   installed state; `-q` filters by name/description.
 
@@ -79,12 +80,13 @@ management.
 1. Validates names against the curated catalog (typos get suggestions),
    expands patterns (`date-picker` → `calendar` + `popover` + `button`,
    `data-table` → `table` + a note about `@tanstack/react-table`).
-2. Read the source registry at the running package's root. Matching names load
-   with `loadRegistryItem`; missing names pass to
+2. Read the source registry at the running package's root. Matching names and
+   their local registry dependencies load with `loadRegistryItem`; missing names pass to
    `resolveRegistryItems(names, { config })` against shadcn. The config is a
    ~10-line object literal inside moi (style `base-nova`,
-   `iconLibrary: 'tabler'`). Local files win filename collisions, and remote
-   resolution is skipped when every requested item is bundled.
+   `iconLibrary: 'tabler'`). Local files win filename collisions, including
+   when an upstream component brings its own Button. Remote resolution is
+   skipped when every requested item is bundled.
 3. `transformIcons` (shadcn's own, ts-morph): registry content ships
    `<IconPlaceholder lucide="…" tabler="…"/>`; the transform picks the
    tabler attribute and writes the `@tabler/icons-react` import. lucide
@@ -256,14 +258,13 @@ current view.
 
 Moi-owned components are declared in the root `registry.json`, with their
 sources under `ui-components/`. Both ship in the `moi-computer` package, so
-`moi ui-components add drawer` and `moi ui-components docs drawer` work without
-network access. Components missing from the local registry continue through
-shadcn's online registry. The public GitHub repository also supports direct
-`molefrog/moi/drawer` installs.
+Button and Drawer source and docs work without network access. Components
+missing from the local registry continue through shadcn's online registry. The
+public GitHub addresses are `molefrog/moi/button` and `molefrog/moi/drawer`.
 
 Drawer uses Base UI Drawer, renders inside the current view, opens from the
-right, and defaults to `modal="trap-focus"`. `DrawerContent` adds a close button,
-and `DrawerBody` provides scrolling. The portal, overlay, and swipe handle stay
+right, and defaults to `modal="trap-focus"`. Its close control uses the shared
+Button, and `DrawerBody` provides scrolling. The portal and overlay stay
 internal.
 
 ## Open items

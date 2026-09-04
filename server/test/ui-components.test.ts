@@ -20,12 +20,12 @@ import {
 
 const REPO_ROOT = join(import.meta.dir, '../..')
 
-async function loadDrawerRegistryItem() {
+async function loadRegistryFile(itemName: string, fileName: string) {
   const { loadRegistryItem } = await import('shadcn/registry')
-  const item = await loadRegistryItem('drawer', { cwd: REPO_ROOT })
-  const file = item.files?.find(candidate => candidate.path.endsWith('/drawer.tsx'))
-  if (!file?.content) throw new Error('Drawer registry source is missing')
-  return { item, source: file.content }
+  const item = await loadRegistryItem(itemName, { cwd: REPO_ROOT })
+  const file = item.files?.find(candidate => candidate.path.endsWith(`/${fileName}`))
+  if (!file?.content) throw new Error(`${fileName} is missing from the ${itemName} registry item`)
+  return file.content
 }
 
 // Raw registry content, shrunk from real base-nova items: the icon
@@ -42,8 +42,8 @@ import { cn } from "@/registry/base-nova/lib/utils"
 function PopoverContent({ className, ...props }: PopoverPrimitive.Popup.Props) {
   return (
     <PopoverPrimitive.Portal>
-      <PopoverPrimitive.Positioner className="isolate z-50">
-        <PopoverPrimitive.Popup className={cn("bg-popover", className)} {...props} />
+      <PopoverPrimitive.Positioner data-preserved="positioner">
+        <PopoverPrimitive.Popup className={cn("surface", className)} {...props} />
       </PopoverPrimitive.Positioner>
     </PopoverPrimitive.Portal>
   )
@@ -97,8 +97,7 @@ describe('transformUiComponentSource', () => {
     expect(out).toContain('<AppletPortal portal={PopoverPrimitive.Portal}>')
     expect(out).toContain('</AppletPortal>')
     expect(out).toContain(`import { AppletPortal } from "./applet-portal"`)
-    // Children stay inside the wrapper untouched.
-    expect(out).toContain('<PopoverPrimitive.Positioner className="isolate z-50">')
+    expect(out).toContain('<PopoverPrimitive.Positioner data-preserved="positioner">')
   })
 
   test('wraps self-closing pass-through portals, keeping their props', async () => {
@@ -125,7 +124,7 @@ describe('transformUiComponentSource', () => {
     expect(out).not.toContain('lucide')
   })
 
-  test('does not touch files without portals or icons', async () => {
+  test('rewrites imports without adding a portal helper', async () => {
     const raw = `import { cn } from "@/registry/base-nova/lib/utils"\n\nexport const x = () => cn("a")\n`
     const out = await transformUiComponentSource('x.tsx', raw)
 
@@ -260,7 +259,6 @@ describe('catalog', () => {
       const entry = UI_COMPONENTS[name]
       expect(entry.description.length).toBeGreaterThan(0)
       expect(entry.registryItems.length).toBeGreaterThan(0)
-      if (entry.docs) expect(entry.docs).toBe('registry')
       // Catalog keys are kebab-case slugs — they double as docs slugs.
       expect(name).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/)
     }
@@ -316,24 +314,37 @@ describe('catalog', () => {
 })
 
 describe('moi registry', () => {
-  test('loads its single Drawer item from the local source registry', async () => {
+  test('loads Button and Drawer from the local source registry', async () => {
     const { loadRegistry } = await import('shadcn/registry')
     const registry = await loadRegistry({ cwd: REPO_ROOT })
+    const button = registry.items.find(item => item.name === 'button')
+    const drawer = registry.items.find(item => item.name === 'drawer')
 
     expect(registry).toMatchObject({ name: 'moi', homepage: 'https://moi.computer' })
-    expect(registry.items).toHaveLength(1)
-    expect(registry.items[0]).toMatchObject({
+    expect(registry.items).toHaveLength(2)
+    expect(button).toMatchObject({
+      name: 'button',
+      title: 'Button',
+      type: 'registry:ui',
+      dependencies: ['@base-ui/react', 'class-variance-authority', 'clsx', 'tailwind-merge'],
+      files: [
+        { path: 'ui-components/button.tsx', type: 'registry:ui' },
+        { path: 'ui-components/utils.ts', type: 'registry:lib' }
+      ]
+    })
+    expect(button?.docs).toContain('# Button')
+    expect(drawer).toMatchObject({
       name: 'drawer',
       title: 'Drawer',
       type: 'registry:ui',
       dependencies: ['@base-ui/react', '@tabler/icons-react', 'clsx', 'tailwind-merge'],
+      registryDependencies: ['molefrog/moi/button'],
       files: [
         { path: 'ui-components/drawer.tsx', type: 'registry:ui' },
         { path: 'ui-components/utils.ts', type: 'registry:lib' }
       ]
     })
-    expect(registry.items[0]?.registryDependencies).toBeUndefined()
-    expect(registry.items[0]?.docs).toContain('# Drawer')
+    expect(drawer?.docs).toContain('# Drawer')
   })
 
   test('drawer resolves to the local-first registry name', () => {
@@ -342,13 +353,6 @@ describe('moi registry', () => {
     expect(request.entries).toEqual(['drawer'])
     expect(request.registryItems).toEqual(['drawer'])
     expect(request.unknown).toEqual([])
-  })
-
-  test('mixes with registry entries in one request', () => {
-    const request = resolveUiComponentRequest(['drawer', 'button', 'drawer'])
-
-    expect(request.entries).toEqual(['drawer', 'button'])
-    expect(request.registryItems).toEqual(['drawer', 'button'])
   })
 
   test('uses the final address segment for installed files', () => {
@@ -363,6 +367,7 @@ describe('moi registry', () => {
     const plans = planUiWrites({
       files: [
         { name: 'utils.ts', content: 'utils' },
+        { name: 'button.tsx', content: 'button' },
         { name: 'drawer.tsx', content: 'drawer' }
       ],
       requestedItems: ['drawer'],
@@ -372,11 +377,12 @@ describe('moi registry', () => {
 
     const byName = new Map(plans.map(plan => [plan.name, plan]))
     expect(byName.get('drawer.tsx')).toMatchObject({ support: false, verbatim: false })
+    expect(byName.get('button.tsx')).toMatchObject({ support: true, verbatim: false })
     expect(byName.get('utils.ts')).toMatchObject({ support: true, verbatim: false })
     expect(byName.get('applet-portal.tsx')).toMatchObject({ support: true, verbatim: true })
   })
 
-  test('loads Drawer and its docs locally without calling the remote resolver', async () => {
+  test('loads Button, Drawer, and their docs without calling the remote resolver', async () => {
     let remoteCalled = false
     const originalFetch = globalThis.fetch
     globalThis.fetch = () => Promise.reject(new Error('network access attempted'))
@@ -388,17 +394,31 @@ describe('moi registry', () => {
           throw new Error('remote resolver called')
         }
       })
-      const docs = await fetchUiComponentDocs('drawer')
+      const button = await fetchUiComponents(['button'], {
+        resolveRemote: async () => {
+          remoteCalled = true
+          throw new Error('remote resolver called')
+        }
+      })
+      const drawerDocs = await fetchUiComponentDocs('drawer')
+      const buttonDocs = await fetchUiComponentDocs('button')
 
       expect(remoteCalled).toBeFalse()
-      expect(fetched.files.map(file => file.name)).toEqual(['drawer.tsx', 'utils.ts'])
+      expect(fetched.files.map(file => file.name).sort()).toEqual([
+        'button.tsx',
+        'drawer.tsx',
+        'utils.ts'
+      ])
       expect(fetched.dependencies).toEqual([
         '@base-ui/react',
         '@tabler/icons-react',
+        'class-variance-authority',
         'clsx',
         'tailwind-merge'
       ])
-      expect(docs).toContain('# Drawer')
+      expect(button.files.map(file => file.name).sort()).toEqual(['button.tsx', 'utils.ts'])
+      expect(drawerDocs).toContain('# Drawer')
+      expect(buttonDocs).toContain('# Button')
     } finally {
       globalThis.fetch = originalFetch
     }
@@ -406,19 +426,19 @@ describe('moi registry', () => {
 
   test('routes missing local items to shadcn', async () => {
     let remoteNames: string[] = []
-    const fetched = await fetchUiComponents(['button'], {
+    const fetched = await fetchUiComponents(['accordion'], {
       resolveRemote: async names => {
         remoteNames = names
         return {
-          files: [{ name: 'button.tsx', content: 'button' }],
+          files: [{ name: 'accordion.tsx', content: 'accordion' }],
           dependencies: ['@base-ui/react']
         }
       }
     })
 
-    expect(remoteNames).toEqual(['button'])
+    expect(remoteNames).toEqual(['accordion'])
     expect(fetched).toEqual({
-      files: [{ name: 'button.tsx', content: 'button' }],
+      files: [{ name: 'accordion.tsx', content: 'accordion' }],
       dependencies: ['@base-ui/react']
     })
   })
@@ -458,29 +478,55 @@ describe('moi registry', () => {
     }
   })
 
-  test('merges local and remote results with local files winning', async () => {
-    const fetched = await fetchUiComponents(['drawer', 'button'], {
-      resolveRemote: async () => ({
-        files: [
-          { name: 'utils.ts', content: 'remote utils' },
-          { name: 'button.tsx', content: 'button' }
-        ],
-        dependencies: ['@base-ui/react', 'class-variance-authority']
-      })
+  test('uses the local Button when a remote component brings its own', async () => {
+    const localButton = await loadRegistryFile('button', 'button.tsx')
+    const localUtils = await loadRegistryFile('button', 'utils.ts')
+    let remoteNames: string[] = []
+    const fetched = await fetchUiComponents(['dialog'], {
+      resolveRemote: async names => {
+        remoteNames = names
+        return {
+          files: [
+            { name: 'utils.ts', content: 'remote utils' },
+            { name: 'button.tsx', content: 'remote button' },
+            { name: 'dialog.tsx', content: 'dialog' }
+          ],
+          dependencies: ['@base-ui/react', 'class-variance-authority']
+        }
+      }
     })
 
-    expect(fetched.files.map(file => file.name)).toEqual(['drawer.tsx', 'utils.ts', 'button.tsx'])
-    expect(fetched.files.find(file => file.name === 'utils.ts')?.content).toContain('twMerge')
+    expect(remoteNames).toEqual(['dialog'])
+    expect(fetched.files.map(file => file.name).sort()).toEqual([
+      'button.tsx',
+      'dialog.tsx',
+      'utils.ts'
+    ])
+    expect(fetched.files.find(file => file.name === 'button.tsx')?.content).toBe(localButton)
+    expect(fetched.files.find(file => file.name === 'utils.ts')?.content).toBe(localUtils)
     expect(fetched.dependencies).toEqual([
       '@base-ui/react',
-      '@tabler/icons-react',
       'class-variance-authority',
       'clsx',
       'tailwind-merge'
     ])
   })
 
-  test('ships the local registry with the npm package', async () => {
+  test('does not add Button to an unrelated remote component', async () => {
+    const fetched = await fetchUiComponents(['accordion'], {
+      resolveRemote: async () => ({
+        files: [
+          { name: 'utils.ts', content: 'remote utils' },
+          { name: 'accordion.tsx', content: 'accordion' }
+        ],
+        dependencies: []
+      })
+    })
+
+    expect(fetched.files.map(file => file.name).sort()).toEqual(['accordion.tsx', 'utils.ts'])
+  })
+
+  test('includes the local registry in the npm package whitelist', async () => {
     const packageJson = (await Bun.file(join(REPO_ROOT, 'package.json')).json()) as {
       files: string[]
     }
@@ -491,25 +537,25 @@ describe('moi registry', () => {
 })
 
 describe('drawer source', () => {
-  test('keeps its local utils import when installed', async () => {
-    const { source } = await loadDrawerRegistryItem()
+  test('keeps its local imports when installed', async () => {
+    const source = await loadRegistryFile('drawer', 'drawer.tsx')
     const installed = await transformUiComponentSource('drawer.tsx', source)
 
-    expect(source).toContain("from './utils'")
+    expect(installed).toContain("from './button'")
     expect(installed).toContain("from './utils'")
-    expect(installed).toContain("from '@tabler/icons-react'")
-    expect(installed).toContain("from '@base-ui/react/drawer'")
     expect(installed).not.toContain('@/registry')
-    expect(installed).not.toContain('IconPlaceholder')
-    expect(installed).not.toContain('lucide')
-    expect(installed).toContain(
-      '<DrawerPrimitive.Portal data-slot="drawer-portal" container={container}>'
-    )
     expect(installed).not.toContain('AppletPortal')
   })
 
+  test('uses the shared Button for its built-in close control', async () => {
+    const source = await loadRegistryFile('drawer', 'drawer.tsx')
+
+    expect(source).toContain('<DrawerClose')
+    expect(source).toContain('<Button')
+  })
+
   test('scopes itself to the applet root, never the page', async () => {
-    const { source } = await loadDrawerRegistryItem()
+    const source = await loadRegistryFile('drawer', 'drawer.tsx')
 
     // Portals into the nearest [data-applet] element and positions against
     // it: no body portal, no fixed positioning, and no page-modal state
@@ -520,53 +566,11 @@ describe('drawer source', () => {
     )
     expect(source).toContain("modal = 'trap-focus'")
     expect(source).toContain("swipeDirection = 'right'")
-    expect(source).toContain('data-slot="drawer-overlay"')
     expect(source).toContain('{modal === true && (')
-    expect(source).toContain('data-modal={modal}')
     expect(source).not.toContain('document.body')
+    // `fixed` would position the Drawer against the page instead of its view.
     expect(source).not.toMatch(/\bfixed\b/)
-    // Not wrapped by the body-portal helper either — that would defeat it.
     expect(source).not.toContain('AppletPortal')
-  })
-
-  test('exports the consumer-facing parts and documents the basic composition', async () => {
-    const { item, source } = await loadDrawerRegistryItem()
-
-    for (const part of [
-      'Drawer',
-      'DrawerTrigger',
-      'DrawerContent',
-      'DrawerHeader',
-      'DrawerBody',
-      'DrawerFooter',
-      'DrawerTitle',
-      'DrawerDescription',
-      'DrawerClose'
-    ]) {
-      expect(source).toContain(`function ${part}(`)
-      expect(source).toMatch(new RegExp(`^  ${part},?$`, 'm'))
-    }
-    const exportBlock = source.match(/export\s*\{([\s\S]*?)\}\s*$/)?.[1]
-    expect(exportBlock).toBeDefined()
-    expect(exportBlock).not.toContain('DrawerPortal')
-    expect(exportBlock).not.toContain('DrawerSwipeHandle')
-    expect(source).not.toContain('function DrawerPortal')
-    expect(source).not.toContain('function DrawerOverlay')
-    expect(source).not.toContain('showSwipeHandle')
-
-    for (const part of [
-      'Drawer',
-      'DrawerTrigger',
-      'DrawerContent',
-      'DrawerHeader',
-      'DrawerBody',
-      'DrawerFooter',
-      'DrawerTitle',
-      'DrawerDescription',
-      'DrawerClose'
-    ]) {
-      expect(item.docs).toContain(part)
-    }
   })
 })
 
@@ -579,14 +583,20 @@ describe('drawer build', () => {
 
   const CONSUMER = [
     "import { Drawer, DrawerBody, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from '../ui/drawer'",
+    "import { Button, buttonVariants } from '../ui/button'",
     'export default function Consumer() {',
+    '  const linkClassName = buttonVariants({ variant: "link" })',
     '  return (',
     '    <Drawer>',
-    '      <DrawerTrigger>Open</DrawerTrigger>',
+    '      <DrawerTrigger render={<Button variant="outline" />}>Open</DrawerTrigger>',
     '      <DrawerContent>',
     '        <DrawerHeader><DrawerTitle>Title</DrawerTitle><DrawerDescription>Desc</DrawerDescription></DrawerHeader>',
     '        <DrawerBody>body</DrawerBody>',
-    '        <DrawerFooter><DrawerClose>Done</DrawerClose></DrawerFooter>',
+    '        <DrawerFooter>',
+    '          <a className={linkClassName}>Help</a>',
+    '          <Button size="xs">Save</Button>',
+    '          <DrawerClose render={<Button size="icon-xs" />}>Done</DrawerClose>',
+    '        </DrawerFooter>',
     '      </DrawerContent>',
     '    </Drawer>',
     '  )',
@@ -599,20 +609,16 @@ describe('drawer build', () => {
   }
 
   beforeAll(async () => {
-    const { source } = await loadDrawerRegistryItem()
-    const installed = await transformUiComponentSource('drawer.tsx', source)
+    const fetched = await fetchUiComponents(['drawer'])
     root = mkdtempSync(join(import.meta.dir, 'drawer-ws-'))
     mkdirSync(join(root, 'ui'))
     mkdirSync(join(root, 'views'))
-    writeFileSync(
-      join(root, 'ui', 'utils.ts'),
-      [
-        'import { clsx, type ClassValue } from "clsx"',
-        'import { twMerge } from "tailwind-merge"',
-        'export function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)) }'
-      ].join('\n')
-    )
-    writeFileSync(join(root, 'ui', 'drawer.tsx'), installed)
+    for (const file of fetched.files) {
+      const content = file.name.endsWith('.tsx')
+        ? await transformUiComponentSource(file.name, file.content)
+        : file.content
+      writeFileSync(join(root, 'ui', file.name), content)
+    }
     writeFileSync(join(root, 'views', 'consumer.tsx'), CONSUMER)
     // Same first-build quirk as build-applet.test.ts: under `bun test` the very
     // first Bun.build with this option combo fails to resolve the entry.

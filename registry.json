@@ -4,11 +4,30 @@
   "homepage": "https://moi.computer",
   "items": [
     {
+      "name": "button",
+      "type": "registry:ui",
+      "title": "Button",
+      "description": "The shared button for moi and its views.",
+      "dependencies": ["@base-ui/react", "class-variance-authority", "clsx", "tailwind-merge"],
+      "files": [
+        {
+          "path": "ui-components/button.tsx",
+          "type": "registry:ui"
+        },
+        {
+          "path": "ui-components/utils.ts",
+          "type": "registry:lib"
+        }
+      ],
+      "docs": "# Button\n\nVariants: `default`, `secondary`, `outline`, `ghost`, `destructive`, and `link`. Sizes: `xs`, `sm`, `default`, `lg`, `icon-xs`, `icon-sm`, `icon`, and `icon-lg`. Add `data-icon=\"inline-start\"` or `data-icon=\"inline-end\"` to inline icons. Use `buttonVariants` on links.\n\n```tsx\n<Button variant=\"outline\">Open</Button>\n```"
+    },
+    {
       "name": "drawer",
       "type": "registry:ui",
       "title": "Drawer",
       "description": "A Drawer scoped to moi views.",
       "dependencies": ["@base-ui/react", "@tabler/icons-react", "clsx", "tailwind-merge"],
+      "registryDependencies": ["molefrog/moi/button"],
       "files": [
         {
           "path": "ui-components/drawer.tsx",
