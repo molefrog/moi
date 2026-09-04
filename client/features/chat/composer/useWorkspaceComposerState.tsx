@@ -10,6 +10,8 @@ import { useWorkspaceSkillUpdates } from './useWorkspaceSkillUpdates'
 type WorkspaceComposerStateOptions = {
   chatError: string | null
   onDismissChatError: () => void
+  chatLoadError?: string | null
+  onRetryChatLoad?: () => void
 }
 
 type WorkspaceComposerState = {
@@ -20,7 +22,7 @@ type WorkspaceComposerState = {
 
 export function useWorkspaceComposerState(
   workspaceId: string,
-  { chatError, onDismissChatError }: WorkspaceComposerStateOptions
+  { chatError, onDismissChatError, chatLoadError, onRetryChatLoad }: WorkspaceComposerStateOptions
 ): WorkspaceComposerState {
   const { data: agent, error } = useWorkspaceAgent(workspaceId)
   const availability = agent?.availability
@@ -43,12 +45,18 @@ export function useWorkspaceComposerState(
         )
       }
     : undefined
-  const chatErrorBanner: ComposerBanner | undefined = chatError
-    ? {
-        tone: 'error',
-        content: <ErrorBanner error={chatError} onDismiss={onDismissChatError} />
-      }
-    : undefined
+  let chatErrorBanner: ComposerBanner | undefined
+  if (chatLoadError) {
+    chatErrorBanner = {
+      tone: 'error',
+      content: <ErrorBanner error={chatLoadError} onRetry={onRetryChatLoad} />
+    }
+  } else if (chatError) {
+    chatErrorBanner = {
+      tone: 'error',
+      content: <ErrorBanner error={chatError} onDismiss={onDismissChatError} />
+    }
+  }
   const skillUpdate: ComposerBanner | undefined = skillUpdateBanner
     ? {
         tone: 'default',

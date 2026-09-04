@@ -74,12 +74,14 @@ export function useChat(address: WorkspaceTabAddress) {
   )
 
   const viewQuery = useSessionView(workspaceId, selectedSessionId)
+  const { refetch } = viewQuery
+  const retryLoad = useCallback(() => void refetch(), [refetch])
   const view = viewQuery.data ?? EMPTY
   const chatLoaded =
     sessions !== undefined && (selectedSessionId === null || viewQuery.data !== undefined)
 
   // The live streaming preview as a synthetic assistant turn, so the ChatPanel
-  // can run it through the SAME groupTurns pipeline as finalized turns — a
+  // can merge it into the trailing assistant run — a
   // thinking-only preview then folds into the current tool group instead of
   // rendering as a detached block. The selector returns the stored root-preview
   // object for THIS session (not the whole slice): deltas for other sessions
@@ -210,6 +212,8 @@ export function useChat(address: WorkspaceTabAddress) {
     sessionId: selectedSessionId,
     processing,
     error,
+    loadError: viewQuery.error?.message ?? null,
+    retryLoad,
     send,
     stop,
     selectSession,

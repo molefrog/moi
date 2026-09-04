@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises'
+import { mkdir, rename, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'path'
 
@@ -44,7 +44,23 @@ async function readRegistry(): Promise<WorkspaceEntry[]> {
 
 async function writeRegistry(entries: WorkspaceEntry[]): Promise<void> {
   await mkdir(join(_registryPath, '..'), { recursive: true })
-  await Bun.write(_registryPath, JSON.stringify(entries, null, 2))
+  const temporaryPath = `${_registryPath}.${crypto.randomUUID()}.tmp`
+  try {
+    await Bun.write(temporaryPath, JSON.stringify(entries, null, 2))
+    await rename(temporaryPath, _registryPath)
+  } finally {
+    await rm(temporaryPath, { force: true })
+  }
+}
+
+// Lock the whole read-modify-write operation, including validation. Atomic
+// replacement keeps readers safe; the queue keeps concurrent writers safe.
+let writeChain: Promise<unknown> = Promise.resolve()
+
+function locked<T>(operation: () => Promise<T>): Promise<T> {
+  const run = writeChain.then(operation)
+  writeChain = run.catch(() => {})
+  return run
 }
 
 export type RegisterOptions = {
@@ -90,26 +106,28 @@ export async function registerWorkspace(
   absPath: string,
   opts: RegisterOptions = {}
 ): Promise<WorkspaceEntry> {
-  const normalPath = resolve(absPath)
-  const entries = await readRegistry()
-  if (opts.id) {
-    const error = workspaceIdError(entries, normalPath, opts.id)
-    if (error) throw new Error(error)
-  }
-  const existing = entries.find(e => e.path === normalPath)
-  if (existing) return existing
-  const entry: WorkspaceEntry = {
-    id: opts.id ?? newWorkspaceId(),
-    path: normalPath,
-    addedAt: new Date().toISOString(),
-    ...(opts.type ? { type: opts.type } : {}),
-    ...(opts.name ? { name: opts.name } : {}),
-    ...(opts.agentId ? { agentId: opts.agentId } : {}),
-    ...(opts.isDefault ? { isDefault: opts.isDefault } : {}),
-    ...(opts.lastRunAt ? { lastRunAt: opts.lastRunAt } : {})
-  }
-  await writeRegistry([entry, ...entries])
-  return withDisplayPath(entry)
+  return locked(async () => {
+    const normalPath = resolve(absPath)
+    const entries = await readRegistry()
+    if (opts.id) {
+      const error = workspaceIdError(entries, normalPath, opts.id)
+      if (error) throw new Error(error)
+    }
+    const existing = entries.find(e => e.path === normalPath)
+    if (existing) return existing
+    const entry: WorkspaceEntry = {
+      id: opts.id ?? newWorkspaceId(),
+      path: normalPath,
+      addedAt: new Date().toISOString(),
+      ...(opts.type ? { type: opts.type } : {}),
+      ...(opts.name ? { name: opts.name } : {}),
+      ...(opts.agentId ? { agentId: opts.agentId } : {}),
+      ...(opts.isDefault ? { isDefault: opts.isDefault } : {}),
+      ...(opts.lastRunAt ? { lastRunAt: opts.lastRunAt } : {})
+    }
+    await writeRegistry([entry, ...entries])
+    return withDisplayPath(entry)
+  })
 }
 
 export async function getWorkspace(id: string): Promise<WorkspaceEntry | null> {
@@ -118,11 +136,13 @@ export async function getWorkspace(id: string): Promise<WorkspaceEntry | null> {
 }
 
 export async function removeWorkspace(id: string): Promise<boolean> {
-  const entries = await readRegistry()
-  const next = entries.filter(e => e.id !== id)
-  if (next.length === entries.length) return false
-  await writeRegistry(next)
-  return true
+  return locked(async () => {
+    const entries = await readRegistry()
+    const next = entries.filter(e => e.id !== id)
+    if (next.length === entries.length) return false
+    await writeRegistry(next)
+    return true
+  })
 }
 
 export async function listWorkspaces(): Promise<WorkspaceEntry[]> {
@@ -131,19 +151,22 @@ export async function listWorkspaces(): Promise<WorkspaceEntry[]> {
 }
 
 export async function reorderWorkspaces(ids: string[]): Promise<WorkspaceEntry[]> {
-  const entries = await readRegistry()
-  if (ids.length !== entries.length) throw new Error('Workspace order must include every workspace')
+  return locked(async () => {
+    const entries = await readRegistry()
+    if (ids.length !== entries.length)
+      throw new Error('Workspace order must include every workspace')
 
-  const unique = new Set(ids)
-  if (unique.size !== ids.length) throw new Error('Workspace order contains duplicate ids')
+    const unique = new Set(ids)
+    if (unique.size !== ids.length) throw new Error('Workspace order contains duplicate ids')
 
-  const byId = new Map(entries.map(e => [e.id, e]))
-  const next = ids.map(id => byId.get(id))
-  if (next.some(e => !e)) throw new Error('Workspace order contains unknown ids')
+    const byId = new Map(entries.map(e => [e.id, e]))
+    const next = ids.map(id => byId.get(id))
+    if (next.some(e => !e)) throw new Error('Workspace order contains unknown ids')
 
-  const ordered = next as WorkspaceEntry[]
-  await writeRegistry(ordered)
-  return ordered.map(withDisplayPath)
+    const ordered = next as WorkspaceEntry[]
+    await writeRegistry(ordered)
+    return ordered.map(withDisplayPath)
+  })
 }
 
 // Resolve a path to the registered workspace that *contains* it: the entry

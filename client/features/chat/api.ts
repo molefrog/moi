@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { applyEvents } from '@/lib/format'
-import type { SessionConfig, SessionInfo, StreamEvent, ViewState } from '@/lib/types'
+import { sessionViewOptions } from '@/client/features/chat/session-view'
+import type { SessionConfig, SessionInfo } from '@/lib/types'
 
 export function useWorkspaceSessions(workspaceId: string) {
   return useQuery<SessionInfo[]>({
@@ -42,18 +42,10 @@ export function useArchiveWorkspaceSession(workspaceId: string) {
 }
 
 export function useSessionView(workspaceId: string, sessionId: string | null) {
-  return useQuery<ViewState>({
-    queryKey: workspaceKeys.events(workspaceId, sessionId ?? ''),
-    queryFn: async () => {
-      const response = await fetch(`/api/workspaces/${workspaceId}/sessions/${sessionId}/events`)
-      const events: StreamEvent[] = response.ok ? await response.json() : []
-      return applyEvents(events)
-    },
-    enabled: Boolean(sessionId),
-    staleTime: Infinity,
-    gcTime: 5 * 60_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false
+  const client = useQueryClient()
+  return useQuery({
+    ...sessionViewOptions(client, workspaceId, sessionId ?? ''),
+    enabled: Boolean(sessionId)
   })
 }
 

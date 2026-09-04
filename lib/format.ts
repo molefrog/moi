@@ -284,5 +284,58 @@ export function applyEvent(state: ViewState, ev: StreamEvent): ViewState {
 }
 
 export function applyEvents(events: StreamEvent[]): ViewState {
-  return events.reduce(applyEvent, emptyViewState())
+  // Replay owns these arrays, so it can upsert in place instead of copying the
+  // entire transcript per event. The live single-event reducer stays immutable.
+  const state = emptyViewState()
+  const turnIndexes = new Map<string, number>()
+  const noticeIndexes = new Map<string, number>()
+  let maxSeq = -Infinity
+
+  for (const event of events) {
+    switch (event.kind) {
+      case 'snapshot':
+        state.snapshot = event.snapshot
+        break
+      case 'turn': {
+        const turn = event.turn
+        const seq = turn.seq
+        const existingIndex = turnIndexes.get(turn.id)
+        if (existingIndex !== undefined) {
+          state.turns[existingIndex] = turn
+        } else {
+          // Append is the common path, including ordered seq-bearing history.
+          // A late turn uses the same insertion rule as applyEvent.
+          const before =
+            seq !== undefined && seq < maxSeq
+              ? state.turns.findIndex(t => t.seq !== undefined && t.seq > seq)
+              : -1
+          if (before < 0) {
+            turnIndexes.set(turn.id, state.turns.length)
+            state.turns.push(turn)
+          } else {
+            state.turns.splice(before, 0, turn)
+            for (let i = before; i < state.turns.length; i++) {
+              turnIndexes.set(state.turns[i].id, i)
+            }
+          }
+        }
+        // Keep an upper bound even if an upsert lowers/removes an earlier seq.
+        if (seq !== undefined) maxSeq = Math.max(maxSeq, seq)
+        break
+      }
+      case 'notice': {
+        const index = noticeIndexes.get(event.notice.id)
+        if (index !== undefined) state.notices[index] = event.notice
+        else {
+          noticeIndexes.set(event.notice.id, state.notices.length)
+          state.notices.push(event.notice)
+        }
+        break
+      }
+      case 'result':
+        state.result = event.result
+        break
+    }
+  }
+  return state
 }

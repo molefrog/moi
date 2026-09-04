@@ -11,6 +11,7 @@ import {
   liftToWorkspaceRoot,
   listWorkspaces,
   registerWorkspace,
+  removeWorkspace,
   reorderWorkspaces,
   setRegistryPath
 } from './registry'
@@ -27,6 +28,45 @@ afterEach(async () => {
 })
 
 describe('registerWorkspace', () => {
+  test('preserves concurrent registrations', async () => {
+    const entries = await Promise.all(
+      Array.from({ length: 20 }, (_, i) => registerWorkspace(join(tmpDir, `project-${i}`)))
+    )
+    expect((await listWorkspaces()).map(entry => entry.id).sort()).toEqual(
+      entries.map(entry => entry.id).sort()
+    )
+  })
+
+  test('concurrent registrations of one path share the same id', async () => {
+    const entries = await Promise.all([
+      registerWorkspace(join(tmpDir, 'project')),
+      registerWorkspace(join(tmpDir, 'project'))
+    ])
+    expect(entries[0].id).toBe(entries[1].id)
+    expect(await listWorkspaces()).toHaveLength(1)
+  })
+
+  test('validates chosen ids inside the lock and recovers after rejection', async () => {
+    const results = await Promise.allSettled([
+      registerWorkspace(join(tmpDir, 'a'), { id: 'shared' }),
+      registerWorkspace(join(tmpDir, 'b'), { id: 'shared' }),
+      registerWorkspace(join(tmpDir, 'c'), { id: 'other' })
+    ])
+    expect(results.map(result => result.status)).toEqual(['fulfilled', 'rejected', 'fulfilled'])
+    expect((await listWorkspaces()).map(entry => entry.id)).toEqual(['other', 'shared'])
+  })
+
+  test('serializes removal and reordering with registration', async () => {
+    const a = await registerWorkspace(join(tmpDir, 'a'))
+    const b = await registerWorkspace(join(tmpDir, 'b'))
+    const [, , c] = await Promise.all([
+      reorderWorkspaces([a.id, b.id]),
+      removeWorkspace(a.id),
+      registerWorkspace(join(tmpDir, 'c'))
+    ])
+    expect((await listWorkspaces()).map(entry => entry.id)).toEqual([c.id, b.id])
+  })
+
   test('registers a new workspace and returns an entry', async () => {
     const entry = await registerWorkspace('/Users/foo/my-project')
     expect(entry.path).toBe('/Users/foo/my-project')

@@ -5,7 +5,7 @@ import { IconChevronDown, IconChevronsRight, IconX } from '@tabler/icons-react'
 import { canSubmitComposerAction, focusComposer } from '@/client/components/shared/Composer'
 import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
 import { useStickToBottom } from '@/client/features/chat/useStickToBottom'
-import { groupTurns } from '@/client/features/chat/group-turns'
+import { appendPreviewTurn, groupTurns } from '@/client/features/chat/group-turns'
 import { chatNoticeLabel, interleaveNotices } from '@/client/features/chat/interleave-notices'
 import { attachmentKey, useLive } from '@/client/features/chat/chat-store'
 import type { ChatPromptBubble } from '@/client/features/chat/ChatPromptBubbles'
@@ -45,7 +45,7 @@ type ChatPanelProps = {
   hasWorkspaceApplets: boolean
   view: ViewState
   // The live streaming preview as a synthetic assistant turn (or null). Merged
-  // into the transcript through the same groupTurns pipeline so a thinking-only
+  // into the trailing assistant run so a thinking-only
   // preview folds into the current tool group. See client/lib/preview-turn.ts.
   previewTurn?: Turn | null
   // Selected session id — used only as the scroll reset key (jump to bottom on
@@ -106,13 +106,13 @@ export function ChatPanel({
   // synthetic turn so OpenAI Codex–style traces (which serialize one
   // assistant message per agent step) don't render with the wider
   // inter-turn gap between every tool call. See `dev/turn-spacing.md`.
-  // The live preview turn is appended before grouping, so a thinking-only
-  // preview merges into the trailing tool group exactly like its finalized form.
+  // Group saved history once, then merge previews into just the trailing run.
   const effectivePreviewTurn = builderDraft ? null : previewTurn
   const notices = builderDraft ? EMPTY_NOTICES : view.notices
+  const savedGroups = useMemo(() => groupTurns(turns), [turns])
   const groupedTurns = useMemo(
-    () => groupTurns(effectivePreviewTurn ? [...turns, effectivePreviewTurn] : turns),
-    [turns, effectivePreviewTurn]
+    () => appendPreviewTurn(savedGroups, effectivePreviewTurn),
+    [savedGroups, effectivePreviewTurn]
   )
   // Grouped turns plus the renderable notices (compaction, model changes)
   // woven in at the moment they happened. Interleaving runs AFTER grouping so

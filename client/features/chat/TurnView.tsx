@@ -156,9 +156,8 @@ export function AssistantTurnParts({
 
 type TurnViewProps = { turn: Turn; processing?: boolean }
 
-// Memoized: the message list maps over grouped turns (stable identities — see
-// `groupTurns` in ChatPanel), so parent re-renders only update rows whose `turn`
-// or `processing` actually changed.
+// ChatPanel preserves completed groups during streaming, so token updates only
+// render the active row. A changed transcript still refreshes the saved groups.
 export const TurnView = memo(function TurnView({ turn, processing = false }: TurnViewProps) {
   const cwd = useWorkspaceLayoutCtx().cwd
 

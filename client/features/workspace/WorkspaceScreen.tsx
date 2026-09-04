@@ -266,6 +266,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     sessionId,
     processing,
     error,
+    loadError,
+    retryLoad,
     send,
     stop,
     selectSession,
@@ -275,7 +277,9 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     workspaceId,
     {
       chatError: error,
-      onDismissChatError: dismissError
+      onDismissChatError: dismissError,
+      chatLoadError: loadError,
+      onRetryChatLoad: retryLoad
     }
   )
 

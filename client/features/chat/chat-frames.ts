@@ -3,6 +3,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { getScratchExecutor } from '@/client/features/scratchpad/scratch-executor'
 import { liveStore } from '@/client/features/chat/chat-store'
+import { bufferSessionEvent } from '@/client/features/chat/session-view'
 import { renameSelectedSessionInCache } from '@/client/features/chat/useSelectedSession'
 import { applyEvent } from '@/lib/format'
 import type {
@@ -161,8 +162,10 @@ function patchView(
   sessionId: string,
   event: StreamEvent
 ) {
+  if (!queryClient) return
+  bufferSessionEvent(queryClient, workspaceId, sessionId, event)
   const queryKey = workspaceKeys.events(workspaceId, sessionId)
-  const existing = queryClient?.getQueryData<ViewState>(queryKey)
+  const existing = queryClient.getQueryData<ViewState>(queryKey)
   if (existing === undefined) return
-  queryClient?.setQueryData<ViewState>(queryKey, applyEvent(existing, event))
+  queryClient.setQueryData<ViewState>(queryKey, applyEvent(existing, event))
 }

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { groupTurns } from '@/client/features/chat/group-turns'
+import { appendPreviewTurn, groupTurns } from '@/client/features/chat/group-turns'
 import type { Part, Turn } from '@/lib/types'
 
 const userTurn = (id: string, timestamp?: string): Turn => ({
@@ -20,6 +20,41 @@ const assistantTurn = (id: string, parts: Part[], timestamp?: string): Turn => (
 })
 
 describe('groupTurns', () => {
+  test('preview updates preserve completed row identities and duration', () => {
+    const turns = [
+      userTurn('user-1', '2026-08-06T10:00:00.000Z'),
+      assistantTurn('work-1', [{ type: 'reasoning', text: 'Checking' }]),
+      assistantTurn('answer-1', [{ type: 'text', text: 'Done' }], '2026-08-06T10:00:10.000Z'),
+      userTurn('user-2'),
+      assistantTurn('work-2', [{ type: 'reasoning', text: 'Thinking' }])
+    ]
+    const saved = groupTurns(turns)
+    const preview = assistantTurn('preview', [{ type: 'text', text: 'Hello' }])
+    const first = appendPreviewTurn(saved, preview)
+    const second = appendPreviewTurn(saved, {
+      ...preview,
+      parts: [{ type: 'text', text: 'Hello world' }]
+    })
+    expect(first).toEqual(groupTurns([...turns, preview]))
+    for (let i = 0; i < saved.length - 1; i++) {
+      expect(first[i]).toBe(saved[i])
+      expect(second[i]).toBe(saved[i])
+    }
+    expect(second.at(-1)).not.toBe(first.at(-1))
+    expect(saved[1].meta?.durationMs).toBe(10_000)
+    expect(saved.at(-1)?.parts).toHaveLength(1)
+    expect(appendPreviewTurn(saved, null)).toBe(saved)
+  })
+
+  test('a preview after a user turn appends without changing saved rows', () => {
+    const user = userTurn('user')
+    const preview = assistantTurn('preview', [{ type: 'reasoning', text: 'Thinking' }])
+    expect(appendPreviewTurn([], preview)).toEqual([preview])
+    const grouped = appendPreviewTurn([user], preview)
+    expect(grouped).toEqual([user, preview])
+    expect(grouped[0]).toBe(user)
+  })
+
   test('merges consecutive assistant messages into one stable run', () => {
     const grouped = groupTurns([
       userTurn('user', '2026-08-06T10:00:00.000Z'),

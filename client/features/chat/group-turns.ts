@@ -22,6 +22,17 @@ function mergeAssistantTurns(first: Turn, next: Turn): Turn {
   }
 }
 
+// Saved history is already grouped. A token update only changes its trailing
+// assistant run; all completed rows keep their identities for React.memo.
+export function appendPreviewTurn(grouped: Turn[], preview: Turn | null | undefined): Turn[] {
+  if (!preview) return grouped
+  const last = grouped.at(-1)
+  if (last?.role === 'assistant') {
+    return [...grouped.slice(0, -1), mergeAssistantTurns(last, preview)]
+  }
+  return [...grouped, preview]
+}
+
 export function groupTurns(turns: Turn[]): Turn[] {
   const out: Turn[] = []
   for (const t of turns) {
