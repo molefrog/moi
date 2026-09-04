@@ -30,6 +30,8 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run lint
       - run: bun run format:check
+      - run: bun run registry:validate
+      - run: bun run typecheck:client
       - run: bun test
 
       - name: Pack and inspect the tarball

@@ -29,5 +29,11 @@ jobs:
       - name: Format check
         run: bun run format:check
 
+      - name: Validate registry
+        run: bun run registry:validate
+
+      - name: Typecheck
+        run: bun run typecheck:client
+
       - name: Test
         run: bun test
