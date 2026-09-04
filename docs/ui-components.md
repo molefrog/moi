@@ -10,10 +10,6 @@ The public catalog is every `registry:ui` and `registry:block` item in
 `registry.json`. `data-table` and `date-picker` are recipes that install their
 component dependencies. `utils` and `applet-portal` are internal support items.
 
-The standard sources are a shadcn 4.21.0 snapshot generated with Base Nova,
-Base UI, and Tabler icons. `button` is shared with the host. `drawer` is view-scoped
-and opens from the right.
-
 ## Commands
 
 - `moi ui-components` lists the catalog and installed state.
