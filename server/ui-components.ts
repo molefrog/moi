@@ -301,6 +301,8 @@ async function fetchRemoteUiComponents(registryNames: string[]): Promise<Fetched
   const tree = await resolveRegistryItems([...new Set(['utils', ...registryNames])], {
     config: ENGINE_CONFIG
   })
+  if (!tree) throw new Error(`Could not resolve registry items: ${registryNames.join(', ')}`)
+
   const files = new Map<string, string>()
   for (const file of tree.files ?? []) {
     if (file.content) files.set(uiFileName(file.path), file.content)

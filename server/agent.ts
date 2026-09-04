@@ -27,7 +27,7 @@ export type AgentUpdatedEvent = {
 // Only the fields the probe/login provider calls actually read — lets callers
 // that don't have a full registry entry on hand (e.g. a harness session
 // reacting to a mid-conversation send failure) still trigger a refresh.
-export type AgentWorkspace = Pick<WorkspaceEntry, 'id' | 'path' | 'type'>
+export type AgentWorkspace = Pick<WorkspaceEntry, 'id' | 'path' | 'type' | 'agentId'>
 
 export type AgentStoreOptions = {
   probe: (ws: AgentWorkspace) => Promise<HarnessAvailability>

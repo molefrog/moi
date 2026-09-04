@@ -18,7 +18,7 @@ import { chmod, mkdir, rename } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { parseEnv } from 'node:util'
 
-import type { WorkspaceEnvView } from '@/lib/types'
+import type { WorkspaceEnvVar, WorkspaceEnvView } from '@/lib/types'
 
 import { DATA_DIR } from './data-dir'
 
@@ -373,7 +373,8 @@ export async function getWorkspaceEnvView(
   const vars = [...keys].sort().map(key => {
     const inCustom = key in secrets
     const fromDotenv = key in dotenv
-    const source = inCustom && fromDotenv ? 'both' : inCustom ? 'custom' : 'dotenv'
+    const source: WorkspaceEnvVar['source'] =
+      inCustom && fromDotenv ? 'both' : inCustom ? 'custom' : 'dotenv'
     return {
       key,
       source,

@@ -53,7 +53,7 @@
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "registry:validate": "shadcn registry validate",
-    "typecheck:client": "tsc -p tsconfig.client.json",
+    "typecheck": "tsc -p tsconfig.json",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "prepare": "git config core.hooksPath .githooks"

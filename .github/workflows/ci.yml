@@ -33,7 +33,7 @@ jobs:
         run: bun run registry:validate
 
       - name: Typecheck
-        run: bun run typecheck:client
+        run: bun run typecheck
 
       - name: Test
         run: bun test

@@ -385,7 +385,9 @@ describe('moi registry', () => {
   test('loads Button, Drawer, and their docs without calling the remote resolver', async () => {
     let remoteCalled = false
     const originalFetch = globalThis.fetch
-    globalThis.fetch = () => Promise.reject(new Error('network access attempted'))
+    globalThis.fetch = Object.assign(() => Promise.reject(new Error('network access attempted')), {
+      preconnect: originalFetch.preconnect
+    })
 
     try {
       const fetched = await fetchUiComponents(['drawer'], {
