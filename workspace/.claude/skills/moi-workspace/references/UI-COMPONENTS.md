@@ -1,12 +1,12 @@
 # UI components
 
-Components use Base UI, Tabler icons, and workspace theme tokens. Their source and docs
-are bundled with moi and work offline.
+Use bundled components for standard controls. They use Base UI, Tabler icons, and workspace
+theme tokens. Follow [DESIGN.md](DESIGN.md) for visual decisions.
 
 ## Workflow
 
-Run these commands from the project root. Read the docs before composing an unfamiliar
-component, and pass all needed names in one `add` call.
+Run commands from the project root. Check what's available and installed, read the docs
+before using or changing a component, then add all missing components in one call.
 
 ```sh
 moi ui-components                                # catalog and installed state
@@ -15,17 +15,12 @@ moi ui-components add select date-picker --install
 moi bundle                                       # rebuild after editing applets
 ```
 
-`add` copies source into `.moi/ui/` and includes component dependencies. `--install` runs
-`bun install` in `.moi/` for npm dependencies; this may need network access. Without it,
-run the dependency command printed by `add`. If a package is missing in an older workspace,
-check `.moi/package.json` and install it there.
+`add` copies source and support files into `.moi/ui/`. Source and docs work offline;
+`--install` runs `bun install` in `.moi/` and may need network access. Without it, run the
+dependency command printed by `add`. Rebuilding with `moi bundle` is always a separate step.
 
-Recipes such as `date-picker` and `data-table` use the same `add` and `docs` commands.
-They install their building blocks; compose those using the recipe docs.
-
-Files in `.moi/ui/` are shared by every applet that imports them. Existing requested files
-are skipped unless you pass `--force`. Existing support files stay untouched even with
-`--force`; request a dependency component explicitly when you want to update it.
+Recipes use the same `add` and `docs` commands. They install their building blocks;
+follow the recipe docs to compose them.
 
 ## Imports
 
@@ -37,46 +32,50 @@ import { cn } from '../ui/utils'
 import { IconSearch } from '@tabler/icons-react'
 ```
 
-Adapt `@/components/ui/...` and utility aliases in bundled examples to these local imports.
-Applets cannot import host components or use `@/` aliases.
+Adapt aliases in examples to relative imports. Applets cannot use `@/` aliases or import host
+components. Use `moi ui-components` for installation; no `components.json` setup is needed.
 
 ## Composition
 
-Custom triggers and close controls use Base UI's `render` prop:
+Use the anatomy and props in `moi ui-components docs <name>`. Inspect the installed source
+when an example differs or a component has local edits; it defines the supported API.
+Keep required groups, labels, and titles when composing parts.
+
+Custom triggers and close controls use Base UI's `render` prop, not Radix's `asChild`:
 
 ```tsx
 <DialogTrigger render={<Button variant="outline" />}>Open</DialogTrigger>
 ```
 
-When rendering a button as a non-button element, pass `nativeButton={false}`:
-
-```tsx
-<Button render={<a href="/docs" />} nativeButton={false}>Read the docs</Button>
-```
-
-- Keep select and menu items and labels inside their matching Group component.
-- Give every dialog, alert dialog, and drawer its matching Title component.
-  Use `className="sr-only"` when the title should be visually hidden.
-- Build forms with `FieldGroup` and `Field`; use `FieldSet` and `FieldLegend` for grouped controls.
-- Put `data-invalid` on Field and `aria-invalid` on its control. For disabled fields, use
-  `data-disabled` on Field and `disabled` on the control.
-- Inside `InputGroup`, use `InputGroupInput` or `InputGroupTextarea`, with addons for buttons.
+Don't nest buttons inside triggers. When `render` replaces a button with a non-button
+element, also pass `nativeButton={false}`.
 
 ## Overlays
 
-Overlay components include `AppletPortal` to preserve applet styles when they portal outside
-the applet. Leave `applet-portal.tsx` in place and unchanged. Use the installed overlay parts
-and their built-in stacking.
+Use the installed portal and stacking behavior; don't add a second portal or z-index overrides.
+`applet-portal.tsx` preserves applet styles for portalled content. Never edit or remove it.
 
-Drawer is view-only and opens inside the current view. Put growing content in `DrawerBody`.
-From widgets, use a popover, dialog, or `focusTab` to open a view.
+Drawer is view-only and opens inside its view. Widgets must use another overlay or open a view.
 
 ## Styling and icons
 
-- Use workspace theme tokens and built-in variants. Reserve `className` for layout.
-- Prefer the default component size. Use smaller sizes when space calls for them, keeping
-  neighboring controls consistent and comfortable to use.
+- Use semantic theme tokens and built-in variants. Reserve `className` for layout;
+  avoid overriding component colors or typography and adding manual `dark:` color overrides.
+- Prefer default sizes. Use smaller controls when space calls for them, keeping neighboring
+  controls consistent and comfortable to use.
+- Prefer `gap-*` for spacing, `size-*` for equal width and height, and `truncate` for ellipsis.
 - Use `cn()` from `../ui/utils` for conditional classes.
-- Use Tabler icons. In buttons, mark their position with `data-icon="inline-start"` or
-  `data-icon="inline-end"`; let the component size them.
+- Use Tabler icons with explicit `stroke` following [the icon guidance](DESIGN.md#icons).
+  Let components size their icons; in buttons, mark position with
+  `data-icon="inline-start"` or `data-icon="inline-end"`.
 - Pass icons as component objects, such as `icon={IconSearch}`.
+
+## Customization and updates
+
+Use `moi theme` for workspace-wide appearance. When variants and layout props aren't enough,
+edit the source in `.moi/ui/`; every importing applet gets the change. Put reusable compositions
+in `_`-prefixed shared modules next to applets.
+
+Existing files are skipped by `add`. Use `--force` only for an intended reinstall, after checking
+local edits. Existing support files remain protected even with `--force`; request a dependency
+component explicitly to update it.
