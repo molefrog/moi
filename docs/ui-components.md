@@ -1,8 +1,8 @@
 # moi ui-components
 
 `moi ui-components` copies ready-to-use component source into `.moi/ui/`.
-The source registry and component docs ship with moi, so both `add` and `docs`
-work offline. Workspaces do not need `components.json` or path aliases.
+The source registry and component docs are bundled, so both `add` and `docs` work
+offline. Workspaces do not need `components.json` or path aliases.
 
 ## Catalog
 
@@ -11,8 +11,8 @@ The public catalog has 42 entries in `UI_COMPONENTS`. `data-table` and
 `utils`, and `applet-portal` are internal support items.
 
 The standard sources are a shadcn 4.21.0 snapshot generated with Base Nova,
-Base UI, and Tabler icons. `button` is shared with the moi host. `drawer` is
-view-scoped and opens from the right.
+Base UI, and Tabler icons. `button` is shared with the host. `drawer` is view-scoped
+and opens from the right.
 
 ## Commands
 
@@ -49,8 +49,8 @@ and Tabler. Keep generated APIs, markup, and styles. Only rewrite imports to
 sibling paths, apply applet portal scoping, and run repository formatting.
 Then update `registry.json`, docs, and the pinned `shadcn` dependency together.
 
-The package whitelist includes `registry.json` and `ui-components/`, which
-makes the same files available from a packed or published moi install.
+The package whitelist includes `registry.json` and `ui-components/`, which makes
+the same files available from packed or published installs.
 
 ## Build integration: the synthetic Tailwind patch (prerequisite)
 
@@ -115,7 +115,7 @@ components may contain them (upstream design, compiles fine).
 
 ## Pinning and upgrades
 
-moi pins `shadcn` to `4.21.0`. Upgrades are deliberate source refreshes:
+The repository pins `shadcn` to `4.21.0`. Upgrades are deliberate source refreshes:
 regenerate all standard components, reapply the two source adaptations, update
 the docs snapshot, and run the complete registry tests.
 

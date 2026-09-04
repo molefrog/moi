@@ -2,7 +2,7 @@
 // engine and docs/ui-components.md for the spec). Three verbs:
 //
 //   moi ui-components                → the curated catalog + installed state
-//   moi ui-components add <name…>    → copy from the local registry to .moi/ui/
+//   moi ui-components add <name…>    → copy registry components to .moi/ui/
 //   moi ui-components docs <name…>   → component docs as markdown, on stdout
 //
 // The command is deliberately not smart: add never rebuilds and never edits
@@ -38,7 +38,7 @@ function exitUnknownNames(unknown: string[]): never {
     const hints = suggestUiComponents(name)
     console.error(
       pc.red('✗') +
-        ` "${name}" is not in the moi component set.` +
+        ` "${name}" is not in the component catalog.` +
         (hints.length ? pc.dim(`  Did you mean: ${hints.join(', ')}?`) : '')
     )
   }
@@ -49,7 +49,7 @@ function exitUnknownNames(unknown: string[]): never {
 const add = defineCommand({
   meta: {
     name: 'add',
-    description: 'Add components from moi’s local registry to .moi/ui/'
+    description: 'Add components from the local registry to .moi/ui/'
   },
   args: {
     name: {
@@ -82,7 +82,7 @@ const add = defineCommand({
       console.error(
         '\n' +
           pc.red('✗') +
-          ' Could not load the requested components from moi’s local registry.\n' +
+          ' Could not load the requested components from the local registry.\n' +
           pc.dim(`  ${(err as Error).message}\n`)
       )
       process.exit(1)
@@ -211,7 +211,7 @@ const docs = defineCommand({
     if (request.unknown.length > 0) exitUnknownNames(request.unknown)
 
     console.log(
-      '> moi: Import components relatively from `../ui/<name>` and use `@tabler/icons-react` for icons.\n'
+      '> Import components relatively from `../ui/<name>` and use `@tabler/icons-react` for icons.\n'
     )
     for (const name of request.entries) {
       try {

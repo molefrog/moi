@@ -271,7 +271,7 @@ describe('local registry', () => {
 
   test('fails clearly for a missing item', async () => {
     await expect(loadUiComponents(['missing-component'])).rejects.toThrow(
-      'Registry item "missing-component" is missing from the moi package'
+      'Registry item "missing-component" is missing from the local registry'
     )
   })
 

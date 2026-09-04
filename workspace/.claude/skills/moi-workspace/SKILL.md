@@ -195,7 +195,7 @@ function cx(...classes: (string | false | undefined | null)[]) {
 ## Standard UI components
 
 Need a standard control (button, dialog, select, table, chart…)? Don't hand-roll it —
-`moi ui-components add <name…>` installs components from moi's bundled registry (Base UI + Tabler
+`moi ui-components add <name…>` installs components from the bundled registry (Base UI + Tabler
 icons, workspace theme tokens, applet-scoped overlays) into `.moi/ui/`, even offline. Pass every
 component you need in one call (`add table badge tabs`) instead of one `add` per component.
 Import relatively: `import { Button } from '../ui/button'`.

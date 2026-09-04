@@ -1,6 +1,6 @@
 # UI components cheat sheet
 
-`moi ui-components` installs controls from the registry bundled with moi. Source and docs work
+`moi ui-components` installs controls from the bundled registry. Source and docs work
 offline. Components use **Base UI**, **Tabler** icons, workspace theme tokens, relative imports,
 and applet-scoped overlays. They land in `.moi/ui/` as plain source files you own.
 

@@ -25,7 +25,7 @@ export function UiComponentsPage() {
           </p>
           <h1 className="mt-2 text-3xl font-medium tracking-tight">UI components</h1>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Interactive previews for moi components.
+            Interactive previews for registry components.
           </p>
         </header>
 

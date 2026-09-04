@@ -158,7 +158,7 @@
       "name": "button",
       "type": "registry:ui",
       "title": "Button",
-      "description": "The shared button for moi and its views.",
+      "description": "The shared button for the host and its views.",
       "dependencies": ["@base-ui/react", "class-variance-authority"],
       "registryDependencies": ["molefrog/moi/utils"],
       "files": [
@@ -386,7 +386,7 @@
       "name": "drawer",
       "type": "registry:ui",
       "title": "Drawer",
-      "description": "A Drawer scoped to moi views.",
+      "description": "A Drawer scoped to views.",
       "dependencies": ["@base-ui/react", "@tabler/icons-react"],
       "registryDependencies": ["molefrog/moi/button", "molefrog/moi/utils"],
       "files": [

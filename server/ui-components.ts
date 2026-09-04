@@ -1,5 +1,5 @@
 // The `moi ui-components` catalog and local registry loader. Component sources
-// and docs ship with moi, so installs do not depend on a remote registry.
+// and docs are bundled, so installs do not depend on a remote registry.
 import { join } from 'path'
 
 import { PACKAGE_ROOT } from './version'
@@ -233,7 +233,7 @@ function uiFileName(registryPath: string): string {
 }
 
 // Load requested items and their same-repository dependencies from the
-// registry packaged with moi. Files flatten into `.moi/ui/` so sibling imports
+// bundled registry. Files flatten into `.moi/ui/` so sibling imports
 // stay relative.
 export async function loadUiComponents(
   registryNames: string[],
@@ -255,7 +255,7 @@ export async function loadUiComponents(
     const itemName = registryItemName(address)
     if (loaded.has(itemName)) return
     if (!available.has(itemName)) {
-      throw new Error(`Registry item "${itemName}" is missing from the moi package`)
+      throw new Error(`Registry item "${itemName}" is missing from the local registry`)
     }
     loaded.add(itemName)
 

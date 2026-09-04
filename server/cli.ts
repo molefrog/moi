@@ -2951,7 +2951,7 @@ const version = defineCommand({
 const uiComponents = defineCommand({
   meta: {
     name: 'ui-components',
-    description: 'Moi UI components for applets'
+    description: 'UI components for applets'
   },
   subCommands: () => import('./cli-ui-components').then(m => m.uiComponentsSubCommands),
   async run({ rawArgs }) {
