@@ -11,6 +11,7 @@ import * as RegistrySkeleton from '@/ui-components/skeleton'
 import * as RegistrySlider from '@/ui-components/slider'
 import * as RegistrySpinner from '@/ui-components/spinner'
 import * as RegistrySwitch from '@/ui-components/switch'
+import * as RegistryTabs from '@/ui-components/tabs'
 import * as RegistryTooltip from '@/ui-components/tooltip'
 
 import * as HostButton from './button'
@@ -23,6 +24,7 @@ import * as HostSkeleton from './skeleton'
 import * as HostSlider from './slider'
 import * as HostSpinner from './spinner'
 import * as HostSwitch from './switch'
+import * as HostTabs from './tabs'
 import * as HostTooltip from './tooltip'
 
 test('host primitives re-export the shared registry implementations', () => {
@@ -44,10 +46,26 @@ test('host primitives re-export the shared registry implementations', () => {
   expect(HostSlider).toEqual(RegistrySlider)
   expect(HostSpinner.Spinner).toBe(RegistrySpinner.Spinner)
   expect(HostSwitch).toEqual(RegistrySwitch)
+  expect(HostTabs).toEqual(RegistryTabs)
   expect(HostTooltip.Tooltip).toBe(RegistryTooltip.Tooltip)
   expect(HostTooltip.TooltipProvider).toBe(RegistryTooltip.TooltipProvider)
   expect(HostTooltip.TooltipTrigger).toBe(RegistryTooltip.TooltipTrigger)
   expect(HostTooltip.TooltipContent).toBe(RegistryTooltip.TooltipContent)
+})
+
+test('shared Tabs forwards vertical orientation to Base UI', () => {
+  const html = renderToStaticMarkup(
+    <HostTabs.Tabs defaultValue="overview" orientation="vertical">
+      <HostTabs.TabsList>
+        <HostTabs.TabsTrigger value="overview">Overview</HostTabs.TabsTrigger>
+        <HostTabs.TabsTrigger value="activity">Activity</HostTabs.TabsTrigger>
+      </HostTabs.TabsList>
+      <HostTabs.TabsContent value="overview">Overview content</HostTabs.TabsContent>
+    </HostTabs.Tabs>
+  )
+
+  expect(html).toContain('data-orientation="vertical"')
+  expect(html).not.toContain('data-orientation="horizontal"')
 })
 
 test('shared Slider preserves custom content inside the control', () => {
