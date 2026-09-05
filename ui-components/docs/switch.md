@@ -179,30 +179,6 @@ export function SwitchInvalid() {
 }
 ```
 
-## Size
-
-Use the `size` prop to change the size of the switch.
-
-```tsx
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
-import { Switch } from '@/components/ui/switch'
-
-export function SwitchSizes() {
-  return (
-    <FieldGroup className="w-full max-w-[10rem]">
-      <Field orientation="horizontal">
-        <Switch id="switch-size-sm" size="sm" />
-        <FieldLabel htmlFor="switch-size-sm">Small</FieldLabel>
-      </Field>
-      <Field orientation="horizontal">
-        <Switch id="switch-size-default" size="default" />
-        <FieldLabel htmlFor="switch-size-default">Default</FieldLabel>
-      </Field>
-    </FieldGroup>
-  )
-}
-```
-
 ## RTL
 
 To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).

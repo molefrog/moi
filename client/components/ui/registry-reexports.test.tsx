@@ -9,6 +9,7 @@ import * as RegistryPopover from '@/ui-components/popover'
 import * as RegistrySkeleton from '@/ui-components/skeleton'
 import * as RegistrySlider from '@/ui-components/slider'
 import * as RegistrySpinner from '@/ui-components/spinner'
+import * as RegistrySwitch from '@/ui-components/switch'
 import * as RegistryTooltip from '@/ui-components/tooltip'
 
 import * as HostButton from './button'
@@ -19,6 +20,7 @@ import * as HostPopover from './popover'
 import * as HostSkeleton from './skeleton'
 import * as HostSlider from './slider'
 import * as HostSpinner from './spinner'
+import * as HostSwitch from './switch'
 import * as HostTooltip from './tooltip'
 
 test('host primitives re-export the shared registry implementations', () => {
@@ -38,6 +40,7 @@ test('host primitives re-export the shared registry implementations', () => {
   expect(HostSkeleton.Skeleton).toBe(RegistrySkeleton.Skeleton)
   expect(HostSlider).toEqual(RegistrySlider)
   expect(HostSpinner.Spinner).toBe(RegistrySpinner.Spinner)
+  expect(HostSwitch).toEqual(RegistrySwitch)
   expect(HostTooltip.Tooltip).toBe(RegistryTooltip.Tooltip)
   expect(HostTooltip.TooltipProvider).toBe(RegistryTooltip.TooltipProvider)
   expect(HostTooltip.TooltipTrigger).toBe(RegistryTooltip.TooltipTrigger)
