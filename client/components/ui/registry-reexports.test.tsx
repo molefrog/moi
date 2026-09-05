@@ -37,7 +37,6 @@ test('host primitives re-export the shared registry implementations', () => {
   expect(HostDialog).toEqual(RegistryDialog)
   expect(HostDropdownMenu).toEqual(RegistryDropdownMenu)
   expect(HostHoverCard).toEqual(RegistryHoverCard)
-  expect(HostInput).toEqual(RegistryInput)
   expect(HostPopover).toEqual(RegistryPopover)
   expect(HostSkeleton).toEqual(RegistrySkeleton)
   expect(HostSlider).toEqual(RegistrySlider)
@@ -46,6 +45,20 @@ test('host primitives re-export the shared registry implementations', () => {
   expect(HostTabs).toEqual(RegistryTabs)
   expect(HostTextarea).toEqual(RegistryTextarea)
   expect(HostTooltip).toEqual(RegistryTooltip)
+})
+
+test('host Input copy stays aligned with the shared registry component', () => {
+  const props = {
+    type: 'email' as const,
+    className: 'w-40',
+    disabled: true,
+    placeholder: 'Email',
+    'aria-invalid': true
+  }
+
+  expect(renderToStaticMarkup(<HostInput.Input {...props} />)).toBe(
+    renderToStaticMarkup(<RegistryInput.Input {...props} />)
+  )
 })
 
 test('shared Tabs forwards vertical orientation to Base UI', () => {
