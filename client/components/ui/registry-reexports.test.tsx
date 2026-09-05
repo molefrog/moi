@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test'
 
 import * as RegistryButton from '@/ui-components/button'
 import * as RegistryCollapsible from '@/ui-components/collapsible'
+import * as RegistryDialog from '@/ui-components/dialog'
 import * as RegistryPopover from '@/ui-components/popover'
 import * as RegistrySkeleton from '@/ui-components/skeleton'
 import * as RegistrySpinner from '@/ui-components/spinner'
@@ -10,6 +11,7 @@ import * as RegistryTooltip from '@/ui-components/tooltip'
 
 import * as HostButton from './button'
 import * as HostCollapsible from './collapsible'
+import * as HostDialog from './dialog'
 import * as HostPopover from './popover'
 import * as HostSkeleton from './skeleton'
 import * as HostSpinner from './spinner'
@@ -21,6 +23,7 @@ test('host primitives re-export the shared registry implementations', () => {
   expect(HostCollapsible.Collapsible).toBe(RegistryCollapsible.Collapsible)
   expect(HostCollapsible.CollapsibleTrigger).toBe(RegistryCollapsible.CollapsibleTrigger)
   expect(HostCollapsible.CollapsibleContent).toBe(RegistryCollapsible.CollapsibleContent)
+  expect(HostDialog).toEqual(RegistryDialog)
   expect(HostPopover.Popover).toBe(RegistryPopover.Popover)
   expect(HostPopover.PopoverContent).toBe(RegistryPopover.PopoverContent)
   expect(HostPopover.PopoverDescription).toBe(RegistryPopover.PopoverDescription)
