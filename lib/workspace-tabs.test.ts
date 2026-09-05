@@ -14,8 +14,8 @@ import {
 
 describe('isWorkspaceTabId', () => {
   test('accepts the static tabs', () => {
+    expect(isWorkspaceTabId('overview')).toBe(true)
     expect(isWorkspaceTabId('agent')).toBe(true)
-    expect(isWorkspaceTabId('widgets')).toBe(true)
     expect(isWorkspaceTabId('scratchpad')).toBe(true)
   })
 
@@ -28,6 +28,7 @@ describe('isWorkspaceTabId', () => {
 
   test('rejects everything else', () => {
     expect(isWorkspaceTabId('')).toBe(false)
+    expect(isWorkspaceTabId('widgets')).toBe(false)
     expect(isWorkspaceTabId('settings')).toBe(false)
     expect(isWorkspaceTabId('views:roadmap')).toBe(false)
     expect(isWorkspaceTabId(undefined)).toBe(false)
@@ -63,7 +64,7 @@ describe('tab id round-trips', () => {
   test('view tabs', () => {
     expect(viewTabId('orders')).toBe('view:orders')
     expect(viewIdFromTab('view:orders')).toBe('orders')
-    expect(viewIdFromTab('widgets')).toBeNull()
+    expect(viewIdFromTab('overview')).toBeNull()
     expect(viewIdFromTab('view-builder:x')).toBeNull()
   })
 

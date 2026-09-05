@@ -8,22 +8,31 @@ import { Button } from '@/client/components/ui/button'
 import { cn } from '@/client/lib/cn'
 
 type BottomPanelProps = {
+  actions?: ReactNode
   className?: string
   title: string
-  children: ReactNode
+  children?: ReactNode
   onClose: () => void
   // Forwarded to the panel element so the working area can measure its height
   // and reserve matching space below the grid.
   ref?: Ref<HTMLDivElement>
 }
 
-export function BottomPanel({ className, title, children, onClose, ref }: BottomPanelProps) {
+export function BottomPanel({
+  actions,
+  className,
+  title,
+  children,
+  onClose,
+  ref
+}: BottomPanelProps) {
   return (
     <motion.div
       ref={ref}
       className={cn(
         'absolute inset-x-4 bottom-4 no-scrollbar flex max-h-full flex-col gap-4 overflow-y-auto rounded-2xl bg-card text-card-foreground shadow-md',
-        'mx-auto max-w-[calc(var(--chat-max-container)+var(--page-pad)*2)] p-(--page-pad) pb-0',
+        'mx-auto max-w-[calc(var(--chat-max-container)+var(--page-pad)*2)] p-(--page-pad)',
+        children && 'pb-0',
         className
       )}
       variants={{
@@ -37,17 +46,20 @@ export function BottomPanel({ className, title, children, onClose, ref }: Bottom
     >
       <div className="flex shrink-0 items-center justify-between gap-4">
         <p className="text-sm font-medium">{title}</p>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={onClose}
-          aria-label="Close panel"
-        >
-          <IconX stroke={1.75} />
-        </Button>
+        <div className="flex items-center gap-2">
+          {actions}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={onClose}
+            aria-label="Close panel"
+          >
+            <IconX stroke={1.75} />
+          </Button>
+        </div>
       </div>
-      <div className="flex-1 pb-(--page-pad)">{children}</div>
+      {children && <div className="flex-1 pb-(--page-pad)">{children}</div>}
     </motion.div>
   )
 }

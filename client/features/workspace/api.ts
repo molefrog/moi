@@ -8,8 +8,6 @@ import { workspaceKeys } from '@/client/api/workspace-keys'
 import { onWorkspaceEventsReconnect, useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import type {
   HarnessLogin,
-  ViewInfo,
-  WidgetInfo,
   WorkspaceAgent,
   WorkspaceLayout,
   WorkspaceSkillsStatus,
@@ -121,30 +119,6 @@ export function useUpdateWorkspaceSkills(workspaceId: string) {
         queryClient.setQueryData(workspaceKeys.skills(workspaceId), error.status)
       }
     }
-  })
-}
-
-export function useWorkspaceWidgets(workspaceId: string) {
-  return useQuery<WidgetInfo[]>({
-    queryKey: workspaceKeys.widgets(workspaceId),
-    queryFn: async () => {
-      const data = await requestJson<{ widgets: WidgetInfo[] }>(
-        `/api/workspaces/${workspaceId}/widgets`
-      )
-      return data.widgets
-    },
-    ...WORKSPACE_RESOURCE_OPTIONS
-  })
-}
-
-export function useWorkspaceViews(workspaceId: string) {
-  return useQuery<ViewInfo[]>({
-    queryKey: workspaceKeys.views(workspaceId),
-    queryFn: async () => {
-      const data = await requestJson<{ views: ViewInfo[] }>(`/api/workspaces/${workspaceId}/views`)
-      return data.views
-    },
-    ...WORKSPACE_RESOURCE_OPTIONS
   })
 }
 

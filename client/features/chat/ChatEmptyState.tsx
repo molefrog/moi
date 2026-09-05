@@ -4,6 +4,7 @@ import {
   IconArticle,
   IconFileSearch,
   IconLayout2,
+  IconMessages,
   IconPiano,
   IconSketching,
   IconUmbrella2,
@@ -83,7 +84,7 @@ export const WORKSPACE_ANALYSIS_PROMPT = {
 } satisfies ChatPrompt
 
 export type ChatEmptyStateKind = 'view-builder' | 'welcome' | 'explore-workspace' | 'empty'
-export type WelcomeDestination = 'agent' | 'widgets' | 'views' | 'scratchpad'
+export type WelcomeDestination = 'agent' | 'overview' | 'views' | 'scratchpad'
 
 type ResolveChatEmptyStateOptions = {
   isViewBuilderDraft: boolean
@@ -194,19 +195,23 @@ function WelcomeState({
       <div className="mt-2 flex flex-col gap-4">
         <div className="prose prose-sm min-w-0 wrap-anywhere prose-inherit">
           <p>
-            moi is the visual workspace for you and your agent. It grows and adapts to the work
-            you're doing.
+            moi is the personal workspace built for you by your agent. It grows and adapts to your
+            needs.
           </p>
           <p>
-            Ask agent to build{' '}
-            <WelcomeTerm Icon={IconLayout2} destination="widgets" onNavigate={onNavigate}>
-              Widgets
+            Ask the{' '}
+            <WelcomeTerm Icon={IconMessages} destination="agent" onNavigate={onNavigate}>
+              Agent
             </WelcomeTerm>{' '}
-            that surface information and quick actions, or entire{' '}
+            to build widgets on the{' '}
+            <WelcomeTerm Icon={IconLayout2} destination="overview" onNavigate={onNavigate}>
+              Overview
+            </WelcomeTerm>{' '}
+            page, or more complex tools as separate{' '}
             <WelcomeTerm Icon={IconArticle} destination="views" onNavigate={onNavigate}>
               Views
-            </WelcomeTerm>{' '}
-            for more complex tools. Use{' '}
+            </WelcomeTerm>
+            . Use{' '}
             <WelcomeTerm Icon={IconSketching} destination="scratchpad" onNavigate={onNavigate}>
               Scratchpad
             </WelcomeTerm>{' '}
@@ -269,7 +274,7 @@ function WelcomeTerm({ Icon, children, destination, onNavigate }: WelcomeTermPro
       type="button"
       data-welcome-destination={destination}
       onClick={() => onNavigate(destination)}
-      className="-mx-0.5 inline-flex cursor-pointer items-center gap-0.5 rounded-xs px-0.5 align-bottom font-medium text-foreground hover:bg-accent focus-visible:bg-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+      className="inline-flex cursor-pointer items-center gap-0.5 align-bottom font-medium text-foreground"
     >
       <Icon size={16} stroke={1.75} aria-hidden />
       {children}

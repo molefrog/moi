@@ -101,7 +101,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
   )
 
   // Memoized so the context value keeps a stable identity across unrelated
-  // renders — otherwise every consumer (WorkspaceView, Widgets, ModelPicker,
+  // renders — otherwise every consumer (WorkspaceView, Overview, ModelPicker,
   // TurnView, …) would re-render whenever this provider re-renders. `setLayout`
   // is already stable; the rest derive from `query.data`.
   const value = useMemo<WorkspaceLayoutContextValue>(

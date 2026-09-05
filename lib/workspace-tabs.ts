@@ -7,7 +7,7 @@ import type { WorkspaceTabId } from './types'
 export function isWorkspaceTabId(value: unknown): value is WorkspaceTabId {
   return (
     value === 'agent' ||
-    value === 'widgets' ||
+    value === 'overview' ||
     value === 'scratchpad' ||
     // One path segment: a URL wildcard can span segments, a tab id never does.
     (typeof value === 'string' &&

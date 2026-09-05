@@ -23,8 +23,7 @@
 //   the field in `useMoiUserMessageContext`'s builder below.
 import { useCallback } from 'react'
 
-import { useViewBuilders } from '@/client/features/views/api'
-import { useWorkspaceViews } from '@/client/features/workspace/api'
+import { useViewBuilders, useViews } from '@/client/features/views/api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import type { MoiAppletMessage, MoiContext } from '@/lib/moi-context'
 import type { ViewBuilder, ViewInfo, WorkspaceTabId } from '@/lib/types'
@@ -112,7 +111,7 @@ export function useMoiUserMessageContext({
   appletParams
 }: WorkspaceTabAddress): (options?: MoiUserMessageOptions) => MoiContext {
   const workspaceId = useWorkspaceId()
-  const views = useWorkspaceViews(workspaceId).data
+  const views = useViews(workspaceId).data
   const builders = useViewBuilders(workspaceId).data
   return useCallback(
     (options: MoiUserMessageOptions = {}) => {

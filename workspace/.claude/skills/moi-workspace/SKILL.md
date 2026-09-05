@@ -14,8 +14,8 @@ that you and user work together in.
 
 Workspace features/pages:
 
-- "Widgets" - small reusable full-stack components displayed on the widgets page (dashboard). For
-  overview, quick info, status or quick actions.
+- "Overview" - the workspace home, where small reusable full-stack Widgets surface quick info,
+  status, and actions.
 - "Scratchpad" - a shared low-fi canvas for prototyping, working on ideas together, visualising
   concepts. Read `references/SCRATCHPAD.md` before building on or modifying it.
 - "Views" - full-stack embedded apps for bigger work, consume more space, live in their own tab.
@@ -53,7 +53,7 @@ Workspace UI.
 
 "Applet Type" (one of)
 
-- "Widgets" (live in the dashboard page)
+- "Widgets" (live on the Overview page)
 - "Views" are custom full-size pages that user can switch between.
 
 "Moi CLI" — the globally installed `moi` command that you use to build applets, customize, and send
@@ -268,7 +268,7 @@ focusTab('view:orders', { order: 'o-1024' })
 sendChatMessage('Chase order o-1024', { order: 'o-1024', carrier: 'dhl' })
 ```
 
-- `focusTab(tab, params?)` switches the workspace to a tab. Tab ids are `agent`, `widgets`,
+- `focusTab(tab, params?)` switches the workspace to a tab. Tab ids are `overview`, `agent`,
   `scratchpad`, and `view:<id>` — run `moi tabs` for the real list. `params` arrive as the target
   view's `params` prop.
 - `sendChatMessage(message, context?)` sends `message` to the active chat as if the user typed it.
@@ -348,7 +348,7 @@ export async function getForecast(city: string) {
 
 # Widgets
 
-Live cards on the dashboard grid — many visible at once. `config` sets the grid footprint:
+Live cards on the Overview grid — many visible at once. `config` sets the grid footprint:
 
 ```ts
 export const config = {
@@ -366,7 +366,7 @@ Changing `colSpan`/`rowSpan` needs `moi bundle --force`. See `references/DESIGN.
 Typical loop: check/`bun install` deps → write the applet → `moi bundle` → run any checks.
 After the final successful bundle and any checks, always make tab focus the final workspace action:
 
-- After building or editing a widget, run `moi tab focus widgets`.
+- After building or editing a widget, run `moi tab focus overview`.
 - After building or editing a view, run `moi tab focus view:<view-id>`, using its file name or claimed
   builder id.
 
@@ -441,4 +441,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.16.0" />
+<moi-skill version="0.17.0" />
