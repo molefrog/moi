@@ -279,6 +279,8 @@ function BadgePreview() {
       <Badge variant="secondary">Picking</Badge>
       <Badge variant="outline">Draft</Badge>
       <Badge variant="destructive">Blocked</Badge>
+      <Badge variant="ghost">Ghost</Badge>
+      <Badge variant="link">Link</Badge>
     </div>
   )
 }
