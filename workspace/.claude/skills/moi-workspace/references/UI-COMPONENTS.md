@@ -1,220 +1,81 @@
-# UI components cheat sheet
+# UI components
 
-`moi ui-components` installs standard controls from selected shadcn and moi registry items,
-pre-tuned for moi applets: **Base UI** primitives, **Tabler** icons, workspace theme tokens,
-relative imports, and overlays patched so applet styling survives portalling. Drawer is
-moi-authored to the same conventions. Components land in `.moi/ui/` as plain source files you own.
-
-This file is the catalog plus the essential usage rules (condensed from the official shadcn
-skill). Read it once; fetch full per-component docs with `moi ui-components docs <name>` **before
-composing a component you haven't used in this workspace** — the parts API is Base UI, not the
-Radix-era shadcn you may know.
+Use bundled components for standard controls. They use Base UI, Tabler icons, and workspace
+theme tokens. Follow [DESIGN.md](DESIGN.md) for visual decisions.
 
 ## Workflow
 
+Run commands from the project root. Check what's available and installed, read the docs
+before using or changing a component, then add all missing components in one call.
+
 ```sh
-moi ui-components                     # catalog + what's installed
-moi ui-components add select          # → .moi/ui/select.tsx (+ any support files)
-moi ui-components add table badge tabs --install   # any number of names, one call —
-                                      # always prefer this over one `add` per
-                                      # component; --install runs the bun install too
-moi ui-components docs select table   # component docs as markdown
-moi bundle                            # rebuild applets
+moi ui-components                                # catalog and installed state
+moi ui-components docs select date-picker         # usage and examples
+moi ui-components add select date-picker --install
+moi bundle                                       # rebuild after editing applets
 ```
+
+`add` copies source and support files into `.moi/ui/`. Source and docs work offline;
+`--install` runs `bun install` in `.moi/` and may need network access. Without it, run the
+dependency command printed by `add`. Rebuilding with `moi bundle` is always a separate step.
+
+Recipes use the same `add` and `docs` commands. They install their building blocks;
+follow the recipe docs to compose them.
+
+## Imports
+
+Use relative imports from applets and shared modules under `.moi/`:
 
 ```tsx
-// In an applet — always relative, never @/ aliases, never the host app's components:
 import { Button } from '../ui/button'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { cn } from '../ui/utils'
+import { IconSearch } from '@tabler/icons-react'
 ```
 
-- `add` writes source files and nothing else by default — installing the deps it prints and
-  rebuilding is your job. Pass `--install` to have it run the `bun install` in `.moi/` for you;
-  rebuilding (`moi bundle`) stays yours either way.
-- **If the build fails on a missing package** (happens in workspaces scaffolded before this
-  feature — `.moi/package.json` may lack the deps ui components need): check
-  `.moi/package.json` and install what's missing. Every ui component needs the baseline
+Adapt aliases in examples to relative imports. Applets cannot use `@/` aliases or import host
+components. Use `moi ui-components` for installation; no `components.json` setup is needed.
 
-  ```sh
-  bun install @base-ui/react class-variance-authority clsx tailwind-merge
-  ```
+## Composition
 
-  (run in `.moi/`), plus whatever `add` printed for the specific component (`recharts`,
-  `embla-carousel-react`, `react-day-picker` + `date-fns`, `react-resizable-panels`,
-  `@tanstack/react-table`).
-- Files in `.moi/ui/` are yours to customize; `add` never overwrites them without `--force` —
-  in a multi-name add, already-installed components are skipped (reported as kept) and the new
-  ones still install.
-- Support files appear without being asked for (`utils.ts` with `cn`, `applet-portal.tsx`, and
-  registry dependencies like `card` or `toggle`) — normal; use them if handy.
-  `applet-portal.tsx` is auto-generated machinery: never edit or remove it.
+Use the anatomy and props in `moi ui-components docs <name>`. Inspect the installed source
+when an example differs or a component has local edits; it defines the supported API.
+Keep required groups, labels, and titles when composing parts.
 
-## Catalog
+Custom triggers and close controls use Base UI's `render` prop, not Radix's `asChild`:
 
-Import from `../ui/<name>` (same as the component name).
+```tsx
+<DialogTrigger render={<Button variant="outline" />}>Open</DialogTrigger>
+```
 
-**Form & input:** `button` (variants, sizes, icons) · `button-group` (segmented buttons) ·
-`input` · `textarea` · `input-group` (input with addons) · `field` (label + control +
-description + error) · `label` · `checkbox` · `radio-group` · `switch` · `slider` · `select` ·
-`combobox` (type-to-filter for long lists) · `toggle-group` (2–7 option sets) · `calendar` ·
-`date-picker` (pattern: calendar in a popover — see its docs; installs `calendar` + `popover` +
-`button`)
+Don't nest buttons inside triggers. When `render` replaces a button with a non-button
+element, also pass `nativeButton={false}`.
 
-**Overlays:** `dialog` · `alert-dialog` (destructive confirm) · `popover` ·
-`dropdown-menu` · `context-menu` (right-click) · `hover-card` · `tooltip` · `drawer` (right-side
-detail panel scoped to a view — moi-authored registry item)
+## Overlays
 
-**Display & feedback:** `alert` (callouts) · `badge` · `avatar` · `skeleton` · `spinner` ·
-`progress` · `table` · `data-table` (pattern on `table` + `@tanstack/react-table` — see its
-docs) · `chart` (Recharts wired to theme tokens) · `attachment` (file/image tile) · `bubble`
-(chat message)
+Use the installed portal and stacking behavior; don't add a second portal or z-index overrides.
+`applet-portal.tsx` preserves applet styles for portalled content. Never edit or remove it.
 
-**Structure & navigation:** `accordion` · `collapsible` · `tabs` · `carousel` · `pagination` ·
-`resizable` (split panels) · `separator` (divider line)
+Drawer is view-only and opens inside its view. Widgets must use another overlay or open a view.
 
-Picking one: quick info on hover → `hover-card` or `tooltip` · contextual panel on click →
-`popover` · detail pane, filters, or a short form inside a view → `drawer` ·
-focused task that must interrupt the whole workspace → `dialog` · destructive confirmation →
-`alert-dialog` ·
-option sets of 2–7 → `toggle-group` · long searchable lists → `combobox` · boolean setting →
-`switch`, boolean in a form → `checkbox`.
+## Styling and icons
 
-## Composition rules
+- Use semantic theme tokens and built-in variants. Reserve `className` for layout;
+  avoid overriding component colors or typography and adding manual `dark:` color overrides.
+- Prefer default sizes. Use smaller controls when space calls for them, keeping neighboring
+  controls consistent and comfortable to use.
+- Prefer `gap-*` for spacing, `size-*` for equal width and height, and `truncate` for ellipsis.
+- Use `cn()` from `../ui/utils` for conditional classes.
+- Use Tabler icons with explicit `stroke` following [the icon guidance](DESIGN.md#icons).
+  Let components size their icons; in buttons, mark position with
+  `data-icon="inline-start"` or `data-icon="inline-end"`.
+- Pass icons as component objects, such as `icon={IconSearch}`.
 
-- **Custom triggers use the `render` prop** — this is Base UI, there is no `asChild`. Never wrap
-  a trigger in an extra element. Applies to every Trigger and Close part (`DialogTrigger`,
-  `PopoverTrigger`, `DropdownMenuTrigger`, `TooltipTrigger`, `CollapsibleTrigger`,
-  `DialogClose`, …).
+## Customization and updates
 
-  ```tsx
-  <DialogTrigger render={<Button variant="outline" />}>Open</DialogTrigger>
-  ```
+Use `moi theme` for workspace-wide appearance. When variants and layout props aren't enough,
+edit the source in `.moi/ui/`; every importing applet gets the change. Put reusable compositions
+in `_`-prefixed shared modules next to applets.
 
-- **`render` to a non-button element needs `nativeButton={false}`:**
-
-  ```tsx
-  <Button render={<a href="/docs" />} nativeButton={false}>Read the docs</Button>
-  ```
-
-- **Items always live inside their Group**: `SelectItem`/`SelectLabel` → `SelectGroup`;
-  `DropdownMenuItem`/`DropdownMenuLabel`/`DropdownMenuSub` → `DropdownMenuGroup`;
-  `ContextMenuItem` → `ContextMenuGroup`. A Label outside its Group **crashes the component at
-  runtime** (Base UI requires the group context); keep items grouped too.
-- **`Dialog`, `AlertDialog`, and `Drawer` always need a Title** (`DialogTitle` / `DrawerTitle` —
-  use `className="sr-only"` to hide it visually).
-- **Use `Drawer` in views** for details, filters, or short forms. It covers and dims only the
-  current view. Put growing content in `DrawerBody`; from a widget, use `focusTab`, `dialog`, or
-  `popover`. `moi ui-components docs drawer` has its usage notes.
-- **`TabsTrigger` must be inside `TabsList`**, never directly in `Tabs`.
-- **`Avatar` always needs `AvatarFallback`** for when the image fails.
-- **Button has no `isLoading`** — compose: `<Button disabled><Spinner data-icon="inline-start" />Saving…</Button>`.
-- **Use components, not custom markup**: callout → `Alert` (+`AlertTitle`/`AlertDescription`),
-  loading placeholder → `Skeleton` (no custom `animate-pulse` divs), status chip → `Badge` (no
-  styled spans), divider → `Separator` (no `<hr>`/border divs), inline loading → `Spinner`.
-
-## Base UI API gotchas
-
-The biggest source of bugs when you know Radix-era shadcn. When unsure, `moi ui-components docs
-<name>` has the real API.
-
-- **Select needs an `items` prop on the root**; the placeholder is a `{ value: null }` item, not
-  a `placeholder` prop:
-
-  ```tsx
-  const items = [
-    { label: 'Pick a fruit', value: null },
-    { label: 'Apple', value: 'apple' },
-  ]
-  <Select items={items}>
-    <SelectTrigger><SelectValue /></SelectTrigger>
-    <SelectContent>
-      <SelectGroup>
-        {items.map(item => (
-          <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-        ))}
-      </SelectGroup>
-    </SelectContent>
-  </Select>
-  ```
-
-  Extras: `multiple` + render-function `SelectValue` for multi-select; `itemToStringValue` for
-  object values; `alignItemWithTrigger={false}` to position like a plain dropdown.
-- **ToggleGroup**: no `type` prop — single-select by default, `multiple` for multi; `value`/
-  `defaultValue` is **always an array** (`defaultValue={["daily"]}`; controlled single value:
-  `value={[value]} onValueChange={v => setValue(v[0])}`).
-- **Slider**: plain number for one thumb (`defaultValue={50}`), array only for ranges.
-- **Accordion**: no `type`/`collapsible` props — `defaultValue` is **always an array**
-  (`defaultValue={["item-1"]}`), `multiple` to allow several open.
-- **`AlertAction` is absolutely positioned** in the alert's top-right corner, and the alert
-  reserves only ~4.5rem of right padding for it. Keep it to one small control (`size="sm"`
-  button or icon button); anything wider overlaps the title and description text.
-
-## Forms
-
-- Lay out forms with `FieldGroup` + `Field` — never raw `div`s with spacing utilities:
-
-  ```tsx
-  <FieldGroup>
-    <Field>
-      <FieldLabel htmlFor="email">Email</FieldLabel>
-      <Input id="email" type="email" />
-      <FieldDescription>Work email preferred.</FieldDescription>
-    </Field>
-  </FieldGroup>
-  ```
-
-  `Field orientation="horizontal"` for settings rows; `FieldSet` + `FieldLegend` for groups of
-  related checkboxes/radios/switches.
-- **Validation and disabled need both attributes**: `data-invalid` on `Field` + `aria-invalid`
-  on the control; `data-disabled` on `Field` + `disabled` on the control.
-- **Inside `InputGroup`, use `InputGroupInput`/`InputGroupTextarea`** — never raw
-  `Input`/`Textarea`. A button attached to an input is `InputGroup` + `InputGroupAddon`, never
-  absolute positioning over an `Input`.
-- **2–7 exclusive options → `ToggleGroup`**, not a loop of `Button`s with manual active state.
-- Control chooser: free text → `input`/`textarea` · predefined options → `select` · searchable →
-  `combobox` · boolean setting → `switch` · boolean consent → `checkbox` · one-of-few →
-  `radio-group` · numeric range → `slider`.
-
-## Styling
-
-- **Semantic tokens only, never raw colors**: `bg-primary`, `text-muted-foreground`,
-  `text-destructive`, `bg-popover` — not `bg-blue-500` or `text-emerald-600`. Every token pairs
-  `name`/`name-foreground` (background / text-on-it): `background`, `card`, `popover`,
-  `primary`, `secondary`, `muted`, `accent`, `destructive`, plus `border`, `input`, `ring`,
-  `chart-1…5`, and `--radius`. Status colors come from `Badge` variants or `text-destructive`.
-- **Built-in variants before custom classes**: `variant="outline"`, `size="sm"` — not
-  hand-rolled border/bg utilities on `Button`.
-- **Prefer each component's default size.** Use smaller variants such as `sm` or `xs` only when a
-  real density constraint calls for them and the reduced control remains comfortable to use. When
-  using a non-default size, compare it with neighboring controls. Controls in the same group must
-  have matching heights and compatible visual weight.
-- **`className` is for layout** (`max-w-md`, `mt-4`, `w-full`) — never for overriding a
-  component's colors or typography.
-- **`gap-*`, not `space-x-*`/`space-y-*`** (`flex flex-col gap-4`). **`size-10`, not
-  `w-10 h-10`.** **`truncate`**, not the three-class spell.
-- **`cn()` from `../ui/utils` for conditional classes** — no template-literal ternaries. The
-  same import works from `_`-prefixed shared modules next to your applets (a
-  `.moi/widgets/_utils.tsx` importing `cn` uses `../ui/utils` too) — no need to re-implement
-  it.
-- **No manual `z-index` on overlays** — dialog/popover/menu/tooltip handle their own stacking.
-
-## Icons
-
-- Tabler only: `import { IconSearch } from '@tabler/icons-react'` — every name is
-  `Icon`-prefixed. Installed components already come converted.
-- In a `Button`, mark position with `data-icon="inline-start"` / `"inline-end"`; **no sizing
-  classes on icons inside components** (Button, DropdownMenuItem, Alert size them via CSS).
-- Pass icons as component objects (`icon={IconCheck}`), never as string keys into a lookup map.
-
-## Customization
-
-Cheapest first — stop at the first level that works:
-
-1. **Workspace theme** (`moi theme`) — fonts, colors, radius flow into every component through
-   tokens.
-2. **Built-in variants + `className` layout** at the callsite (merges correctly via `cn`).
-3. **Edit the file in `.moi/ui/`** — e.g. add a `cva` variant to `button.tsx`; propagates to
-   every applet using it, and `add` won't overwrite it without `--force`.
-4. **Wrapper components** — compose primitives into app-level pieces (a `ConfirmDialog` wrapping
-   `AlertDialog` parts) in a `_`-prefixed shared module (`.moi/widgets/_utils.tsx` — see the
-   workspace layout in the skill).
+Existing files are skipped by `add`. Use `--force` only for an intended reinstall, after checking
+local edits. Existing support files remain protected even with `--force`; request a dependency
+component explicitly to update it.

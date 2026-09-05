@@ -41,7 +41,10 @@ export function WorkspaceSettings() {
       </Tooltip>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="flex h-[min(680px,90vh)] w-[880px] max-w-[94vw]">
+        <DialogContent
+          showCloseButton={false}
+          className="flex h-[min(680px,90vh)] w-[880px] max-w-[94vw] gap-0 overflow-hidden p-0 sm:max-w-[94vw]"
+        >
           <DialogTitle className="sr-only">Space settings</DialogTitle>
 
           {/* Sidebar nav — top padding lines the "Settings" label up with the

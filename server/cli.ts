@@ -2946,17 +2946,12 @@ const version = defineCommand({
   }
 })
 
-// A static shell over ./cli-ui-components, which reaches `shadcn` and
-// `ts-morph` — ~31 MB of JS that costs ~300 ms to parse and evaluate. The meta
-// is inlined here (duplicating the real command's) because it is all the root
-// help needs: both citty's usage renderer and printMainHelp read only
-// `meta.description`, so a lazily-resolved subcommand would be imported by
-// every `moi --help`. Keeping the shell static defers the module to the point
-// where a subcommand actually runs.
+// A static shell over ./cli-ui-components. The meta is inlined here because it
+// is all the root help needs; the registry loader stays lazy until used.
 const uiComponents = defineCommand({
   meta: {
     name: 'ui-components',
-    description: 'Standard UI components for applets (curated shadcn set)'
+    description: 'UI components for applets'
   },
   subCommands: () => import('./cli-ui-components').then(m => m.uiComponentsSubCommands),
   async run({ rawArgs }) {

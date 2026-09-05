@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { Button } from '@/client/components/ui/button'
-import { Dialog } from '@/client/components/ui/dialog'
+import { Dialog, DialogClose } from '@/client/components/ui/dialog'
 import { workspaceDisplayName } from '@/client/features/home/workspace-presentation'
 import type { HarnessAvailability, WorkspaceType } from '@/lib/types'
 
@@ -15,7 +15,6 @@ type ImportWorkspaceStepProps = {
   isPending: boolean
   errorMessage?: string
   onTypeChange: (type: WorkspaceType) => void
-  onCancel: () => void
   onSubmit: () => void
 }
 
@@ -25,7 +24,6 @@ function ImportWorkspaceStep({
   isPending,
   errorMessage,
   onTypeChange,
-  onCancel,
   onSubmit
 }: ImportWorkspaceStepProps) {
   return (
@@ -37,9 +35,9 @@ function ImportWorkspaceStep({
       isPending={isPending}
       errorMessage={errorMessage}
       secondaryAction={
-        <Button variant="secondary" onClick={onCancel} disabled={isPending}>
+        <DialogClose render={<Button variant="secondary" />} disabled={isPending}>
           Cancel
-        </Button>
+        </DialogClose>
       }
       primaryLabel="Add workspace"
       pendingLabel="Adding…"
@@ -49,7 +47,7 @@ function ImportWorkspaceStep({
   )
 }
 
-type ImportWorkspaceDialogProps = Omit<ImportWorkspaceStepProps, 'onCancel'> & {
+type ImportWorkspaceDialogProps = ImportWorkspaceStepProps & {
   onReset: () => void
 }
 
@@ -79,14 +77,13 @@ export function ImportWorkspaceDialog({
       onOpenChange={handleOpenChange}
       onOpenChangeComplete={handleOpenChangeComplete}
     >
-      <WorkspaceDialogContent closeDisabled={isPending}>
+      <WorkspaceDialogContent showCloseButton={!isPending}>
         <ImportWorkspaceStep
           choice={choice}
           availability={availability}
           isPending={isPending}
           errorMessage={errorMessage}
           onTypeChange={onTypeChange}
-          onCancel={() => setOpen(false)}
           onSubmit={onSubmit}
         />
       </WorkspaceDialogContent>

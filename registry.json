@@ -4,41 +4,654 @@
   "homepage": "https://moi.computer",
   "items": [
     {
+      "name": "accordion",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "@tabler/icons-react"],
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/accordion.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Accordion",
+      "description": "Vertically stacked sections that expand one at a time"
+    },
+    {
+      "name": "alert",
+      "type": "registry:ui",
+      "dependencies": ["class-variance-authority"],
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/alert.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Alert",
+      "description": "Callout box for statuses and short messages"
+    },
+    {
+      "name": "alert-dialog",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
+      "registryDependencies": [
+        "molefrog/moi/button",
+        "molefrog/moi/utils",
+        "molefrog/moi/scoped-portal"
+      ],
+      "files": [
+        {
+          "path": "ui-components/alert-dialog.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Alert Dialog",
+      "description": "Modal confirmation dialog for destructive or blocking actions"
+    },
+    {
+      "name": "scoped-portal",
+      "type": "registry:lib",
+      "files": [
+        {
+          "path": "ui-components/scoped-portal.tsx",
+          "type": "registry:lib",
+          "target": "@ui/scoped-portal.tsx"
+        }
+      ],
+      "title": "Scoped portal",
+      "description": "Preserves the surrounding CSS scope across a portal."
+    },
+    {
+      "name": "attachment",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "class-variance-authority"],
+      "registryDependencies": ["molefrog/moi/button", "molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/attachment.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Attachment",
+      "description": "File or image attachment tile with metadata and actions"
+    },
+    {
+      "name": "avatar",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/avatar.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Avatar",
+      "description": "User or entity image with fallback initials"
+    },
+    {
+      "name": "badge",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "class-variance-authority"],
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/badge.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Badge",
+      "description": "Small status or count label"
+    },
+    {
+      "name": "bubble",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "class-variance-authority"],
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/bubble.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Bubble",
+      "description": "Chat message bubble"
+    },
+    {
       "name": "button",
       "type": "registry:ui",
       "title": "Button",
-      "description": "The shared button for moi and its views.",
-      "dependencies": ["@base-ui/react", "class-variance-authority", "clsx", "tailwind-merge"],
+      "description": "The button: variants, sizes, icon support",
+      "dependencies": ["@base-ui/react", "class-variance-authority"],
+      "registryDependencies": ["molefrog/moi/utils"],
       "files": [
         {
           "path": "ui-components/button.tsx",
           "type": "registry:ui"
-        },
+        }
+      ]
+    },
+    {
+      "name": "button-group",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "class-variance-authority"],
+      "registryDependencies": ["molefrog/moi/separator", "molefrog/moi/utils"],
+      "files": [
         {
-          "path": "ui-components/utils.ts",
-          "type": "registry:lib"
+          "path": "ui-components/button-group.tsx",
+          "type": "registry:ui"
         }
       ],
-      "docs": "# Button\n\nVariants: `default`, `secondary`, `outline`, `ghost`, and `destructive`. Sizes: `xs`, `sm`, `default`, `lg`, `icon-xs`, `icon-sm`, `icon`, and `icon-lg`. Add `data-icon=\"inline-start\"` or `data-icon=\"inline-end\"` to inline icons. Use `buttonVariants` on links.\n\n```tsx\n<Button variant=\"outline\">Open</Button>\n```"
+      "title": "Button Group",
+      "description": "Buttons joined into one segmented control"
+    },
+    {
+      "name": "calendar",
+      "type": "registry:ui",
+      "dependencies": ["@tabler/icons-react", "date-fns", "react-day-picker@latest"],
+      "registryDependencies": ["molefrog/moi/button", "molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/calendar.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Calendar",
+      "description": "Month calendar for picking dates and ranges"
+    },
+    {
+      "name": "card",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/card.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Card",
+      "description": "Container with header, content, and footer"
+    },
+    {
+      "name": "carousel",
+      "type": "registry:ui",
+      "dependencies": ["@tabler/icons-react", "embla-carousel-react"],
+      "registryDependencies": ["molefrog/moi/button", "molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/carousel.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Carousel",
+      "description": "Swipeable slides with prev/next controls"
+    },
+    {
+      "name": "chart",
+      "type": "registry:ui",
+      "dependencies": ["recharts@3.8.0"],
+      "registryDependencies": ["molefrog/moi/card", "molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/chart.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Chart",
+      "description": "Recharts-based charts wired to workspace theme tokens"
+    },
+    {
+      "name": "checkbox",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "@tabler/icons-react"],
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/checkbox.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Checkbox",
+      "description": "Binary checkbox with indeterminate state"
+    },
+    {
+      "name": "collapsible",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
+      "files": [
+        {
+          "path": "ui-components/collapsible.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Collapsible",
+      "description": "Single section that expands and collapses"
+    },
+    {
+      "name": "combobox",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "@tabler/icons-react"],
+      "registryDependencies": [
+        "molefrog/moi/button",
+        "molefrog/moi/input-group",
+        "molefrog/moi/utils",
+        "molefrog/moi/scoped-portal"
+      ],
+      "files": [
+        {
+          "path": "ui-components/combobox.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Combobox",
+      "description": "Text input with a filtered dropdown of options"
+    },
+    {
+      "name": "context-menu",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "@tabler/icons-react"],
+      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/scoped-portal"],
+      "files": [
+        {
+          "path": "ui-components/context-menu.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Context Menu",
+      "description": "Right-click menu with items, submenus, and shortcuts"
+    },
+    {
+      "name": "data-table",
+      "type": "registry:block",
+      "dependencies": ["@tanstack/react-table"],
+      "registryDependencies": ["molefrog/moi/table"],
+      "title": "Data Table",
+      "description": "Sortable, filterable table pattern built on Table and TanStack Table"
+    },
+    {
+      "name": "date-picker",
+      "type": "registry:block",
+      "registryDependencies": [
+        "molefrog/moi/calendar",
+        "molefrog/moi/popover",
+        "molefrog/moi/button"
+      ],
+      "title": "Date Picker",
+      "description": "Date picker pattern built from Calendar, Popover, and Button"
+    },
+    {
+      "name": "dialog",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "@tabler/icons-react"],
+      "registryDependencies": [
+        "molefrog/moi/button",
+        "molefrog/moi/utils",
+        "molefrog/moi/scoped-portal"
+      ],
+      "files": [
+        {
+          "path": "ui-components/dialog.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Dialog",
+      "description": "Modal dialog with backdrop, header, and footer"
     },
     {
       "name": "drawer",
       "type": "registry:ui",
       "title": "Drawer",
-      "description": "A Drawer scoped to moi views.",
-      "dependencies": ["@base-ui/react", "@tabler/icons-react", "clsx", "tailwind-merge"],
-      "registryDependencies": ["molefrog/moi/button"],
+      "description": "Right-side detail panel scoped to the current view",
+      "dependencies": ["@base-ui/react", "@tabler/icons-react"],
+      "registryDependencies": ["molefrog/moi/button", "molefrog/moi/utils"],
       "files": [
         {
           "path": "ui-components/drawer.tsx",
           "type": "registry:ui"
-        },
+        }
+      ]
+    },
+    {
+      "name": "dropdown-menu",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "@tabler/icons-react"],
+      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/scoped-portal"],
+      "files": [
         {
-          "path": "ui-components/utils.ts",
-          "type": "registry:lib"
+          "path": "ui-components/dropdown-menu.tsx",
+          "type": "registry:ui"
         }
       ],
-      "docs": "# Drawer\n\nA Drawer that stays inside the moi view that opens it. It opens from the right and traps focus by default while leaving the rest of the view interactive. Pass modal={true} for a backdrop and full modal behavior. Every DrawerContent needs a DrawerTitle; use className=\"sr-only\" when the title should be visually hidden. Put growing content in DrawerBody. DrawerContent includes a close button; pass showCloseButton={false} to hide it. Set swipeDirection on Drawer to choose another edge. Other Base UI Drawer props, including snap points, pass through. Compose custom triggers and close buttons with Base UI's render prop.\n\n```tsx\n<Drawer>\n  <DrawerTrigger render={<Button variant=\"outline\" />}>Details</DrawerTrigger>\n  <DrawerContent>\n    <DrawerHeader>\n      <DrawerTitle>Order details</DrawerTitle>\n      <DrawerDescription>Placed two days ago</DrawerDescription>\n    </DrawerHeader>\n    <DrawerBody>...</DrawerBody>\n    <DrawerFooter>\n      <DrawerClose render={<Button />}>Done</DrawerClose>\n    </DrawerFooter>\n  </DrawerContent>\n</Drawer>\n```"
+      "title": "Dropdown Menu",
+      "description": "Menu opened from a trigger: items, groups, submenus"
+    },
+    {
+      "name": "field",
+      "type": "registry:ui",
+      "dependencies": ["class-variance-authority"],
+      "registryDependencies": [
+        "molefrog/moi/label",
+        "molefrog/moi/separator",
+        "molefrog/moi/utils"
+      ],
+      "files": [
+        {
+          "path": "ui-components/field.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Field",
+      "description": "Form field wrapper: label, control, description, error"
+    },
+    {
+      "name": "hover-card",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
+      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/scoped-portal"],
+      "files": [
+        {
+          "path": "ui-components/hover-card.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Hover Card",
+      "description": "Preview card shown on hover over a link or element"
+    },
+    {
+      "name": "input",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/input.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Input",
+      "description": "Single-line text input"
+    },
+    {
+      "name": "input-group",
+      "type": "registry:ui",
+      "dependencies": ["class-variance-authority"],
+      "registryDependencies": [
+        "molefrog/moi/button",
+        "molefrog/moi/input",
+        "molefrog/moi/textarea",
+        "molefrog/moi/utils"
+      ],
+      "files": [
+        {
+          "path": "ui-components/input-group.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Input Group",
+      "description": "Input with attached addons, buttons, or icons"
+    },
+    {
+      "name": "label",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/label.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Label",
+      "description": "Form control label"
+    },
+    {
+      "name": "pagination",
+      "type": "registry:ui",
+      "dependencies": ["@tabler/icons-react"],
+      "registryDependencies": ["molefrog/moi/button", "molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/pagination.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Pagination",
+      "description": "Page navigation with prev/next and page links"
+    },
+    {
+      "name": "popover",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
+      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/scoped-portal"],
+      "files": [
+        {
+          "path": "ui-components/popover.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Popover",
+      "description": "Floating panel anchored to a trigger"
+    },
+    {
+      "name": "progress",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/progress.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Progress",
+      "description": "Determinate progress bar"
+    },
+    {
+      "name": "radio-group",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/radio-group.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Radio Group",
+      "description": "Single-choice radio button set"
+    },
+    {
+      "name": "resizable",
+      "type": "registry:ui",
+      "dependencies": ["react-resizable-panels"],
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/resizable.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Resizable",
+      "description": "Resizable split panels with drag handles"
+    },
+    {
+      "name": "select",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "@tabler/icons-react"],
+      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/scoped-portal"],
+      "files": [
+        {
+          "path": "ui-components/select.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Select",
+      "description": "Native-feeling select with a styled popup"
+    },
+    {
+      "name": "separator",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/separator.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Separator",
+      "description": "Horizontal or vertical dividing line"
+    },
+    {
+      "name": "skeleton",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/skeleton.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Skeleton",
+      "description": "Loading placeholder block"
+    },
+    {
+      "name": "slider",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/slider.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Slider",
+      "description": "Range slider with one or more thumbs"
+    },
+    {
+      "name": "spinner",
+      "type": "registry:ui",
+      "dependencies": ["@tabler/icons-react"],
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/spinner.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Spinner",
+      "description": "Inline loading spinner"
+    },
+    {
+      "name": "switch",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/switch.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Switch",
+      "description": "On/off toggle switch"
+    },
+    {
+      "name": "table",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/table.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Table",
+      "description": "Styled table primitives (header, body, rows, cells)"
+    },
+    {
+      "name": "tabs",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "class-variance-authority"],
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/tabs.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Tabs",
+      "description": "Tabbed panels with a tab list"
+    },
+    {
+      "name": "textarea",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/textarea.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Textarea",
+      "description": "Multi-line text input"
+    },
+    {
+      "name": "toggle",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "class-variance-authority"],
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/toggle.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Toggle",
+      "description": "Two-state button that can be on or off"
+    },
+    {
+      "name": "toggle-group",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react", "class-variance-authority"],
+      "registryDependencies": ["molefrog/moi/toggle", "molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/toggle-group.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Toggle Group",
+      "description": "Group of two-state toggle buttons"
+    },
+    {
+      "name": "tooltip",
+      "type": "registry:ui",
+      "dependencies": ["@base-ui/react"],
+      "registryDependencies": ["molefrog/moi/utils", "molefrog/moi/scoped-portal"],
+      "files": [
+        {
+          "path": "ui-components/tooltip.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Tooltip",
+      "description": "Small label shown on hover or focus"
+    },
+    {
+      "name": "utils",
+      "type": "registry:lib",
+      "dependencies": ["clsx", "tailwind-merge"],
+      "files": [
+        {
+          "path": "ui-components/utils.ts",
+          "type": "registry:lib",
+          "target": "@ui/utils.ts"
+        }
+      ],
+      "title": "Utils",
+      "description": "Shared class name utility."
     }
   ]
 }

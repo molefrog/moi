@@ -134,7 +134,8 @@ function DemoDialogContent() {
   return (
     <DialogContent
       data-vivid
-      className="w-full max-w-md rounded-2xl bg-primary texture-checker-16 p-2 text-primary-foreground md:max-w-2xl"
+      showCloseButton={false}
+      className="block w-full max-w-md overflow-hidden rounded-2xl bg-primary texture-checker-16 p-2 text-primary-foreground sm:max-w-md md:max-w-2xl"
     >
       <div className="absolute inset-0 bg-[linear-gradient(to_right,color-mix(in_oklch,var(--background)_14%,transparent),color-mix(in_oklch,var(--background)_6%,transparent))]" />
       {/* Film grain keeps the illustration gradient from banding. */}

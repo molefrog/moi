@@ -172,7 +172,7 @@ function EffortPicker({
           />
         }
       />
-      <PopoverContent align="end" side="top" className="w-64" disableAnchorTracking>
+      <PopoverContent align="end" side="top" className="w-64">
         <PopoverHeader className="relative h-5 flex-row items-center">
           <AnimatePresence mode="popLayout" initial={false}>
             {dragging ? (
@@ -237,7 +237,7 @@ function EffortPicker({
         <label className="block">
           <span className="sr-only">Reasoning effort</span>
           <Slider
-            value={draftIndex}
+            value={[draftIndex]}
             min={0}
             max={effortLevels.length - 1}
             step={1}
@@ -252,8 +252,9 @@ function EffortPicker({
             }}
             className={cn(
               '**:data-[slot=slider-track]:h-6 **:data-[slot=slider-track]:rounded-sm',
-              '**:data-[slot=slider-thumb]:h-6 **:data-[slot=slider-thumb]:w-5 **:data-[slot=slider-thumb]:rounded-sm **:data-[slot=slider-thumb]:border-0 **:data-[slot=slider-thumb]:bg-card **:data-[slot=slider-thumb]:shadow-xs **:data-[slot=slider-thumb]:ring-0'
+              '**:data-[slot=slider-thumb]:h-6 **:data-[slot=slider-thumb]:w-5 **:data-[slot=slider-thumb]:rounded-sm **:data-[slot=slider-thumb]:ring-0'
             )}
+            animate
           >
             <span
               data-slot="slider-marks"

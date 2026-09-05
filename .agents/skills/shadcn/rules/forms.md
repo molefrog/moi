@@ -78,7 +78,7 @@ Never place a `Button` directly inside or adjacent to an `Input` with custom pos
 <div className="relative">
   <Input placeholder="Search..." className="pr-10" />
   <Button className="absolute right-0 top-0" size="icon">
-    <SearchIcon />
+    <IconSearch stroke={1.5} />
   </Button>
 </div>
 ```
@@ -92,7 +92,7 @@ import { InputGroup, InputGroupInput, InputGroupAddon } from "@/components/ui/in
   <InputGroupInput placeholder="Search..." />
   <InputGroupAddon>
     <Button size="icon">
-      <SearchIcon data-icon="inline-start" />
+      <IconSearch stroke={1.5} data-icon="inline-start" />
     </Button>
   </InputGroupAddon>
 </InputGroup>
