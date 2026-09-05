@@ -113,6 +113,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger
 } from '@/ui-components/dropdown-menu'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/ui-components/field'
@@ -501,6 +504,15 @@ function DropdownMenuPreview() {
             Open <DropdownMenuShortcut>↵</DropdownMenuShortcut>
           </DropdownMenuItem>
           <DropdownMenuItem>Duplicate</DropdownMenuItem>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>Move to</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuGroup>
+                <DropdownMenuItem>Inbox</DropdownMenuItem>
+                <DropdownMenuItem>Archive</DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
           <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>
