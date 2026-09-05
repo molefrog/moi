@@ -345,4 +345,6 @@ export function PopoverRtl() {
 
 ## API Reference
 
+`PopoverContent` also accepts `keepMounted` (default `false`), which keeps its portal content mounted while closed.
+
 See the [Base UI Popover](https://base-ui.com/react/components/popover#api-reference) documentation.

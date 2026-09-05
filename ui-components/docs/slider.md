@@ -68,6 +68,36 @@ import { Slider } from '@/components/ui/slider'
 <Slider defaultValue={[33]} max={100} step={1} />
 ```
 
+Single values can also be numbers: `<Slider defaultValue={33} />`. Thumb count uses an array `value` first, then an array `defaultValue`, otherwise one thumb. A scalar `value` combined with an array `defaultValue` therefore renders multiple thumbs at the same value.
+
+## Movement Animation and Custom Content
+
+Movement animation is off by default. Set `animate` for discrete controls to animate the thumb and filled range for 100ms, including while dragging. The initial measurement is not animated. Leave it off for continuous controls so the thumb follows the pointer directly.
+
+Children render inside the control, after the track and before the thumbs, so you can add marks:
+
+```tsx
+import { Slider } from '@/components/ui/slider'
+
+export function SliderWithMarks() {
+  return (
+    <div className="grid gap-2">
+      <span id="effort-label">Reasoning effort</span>
+      <Slider animate defaultValue={2} min={0} max={4} step={1} aria-labelledby="effort-label">
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-2 flex justify-between"
+        >
+          {[0, 1, 2, 3, 4].map(mark => (
+            <span key={mark} className="size-1 rounded-full bg-muted-foreground" />
+          ))}
+        </span>
+      </Slider>
+    </div>
+  )
+}
+```
+
 ## Range
 
 Use an array with two values for a range slider.
