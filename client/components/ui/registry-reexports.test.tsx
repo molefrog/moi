@@ -6,6 +6,7 @@ import * as RegistryCollapsible from '@/ui-components/collapsible'
 import * as RegistryDialog from '@/ui-components/dialog'
 import * as RegistryDropdownMenu from '@/ui-components/dropdown-menu'
 import * as RegistryHoverCard from '@/ui-components/hover-card'
+import * as RegistryInput from '@/ui-components/input'
 import * as RegistryPopover from '@/ui-components/popover'
 import * as RegistrySkeleton from '@/ui-components/skeleton'
 import * as RegistrySlider from '@/ui-components/slider'
@@ -20,6 +21,7 @@ import * as HostCollapsible from './collapsible'
 import * as HostDialog from './dialog'
 import * as HostDropdownMenu from './dropdown-menu'
 import * as HostHoverCard from './hover-card'
+import * as HostInput from './input'
 import * as HostPopover from './popover'
 import * as HostSkeleton from './skeleton'
 import * as HostSlider from './slider'
@@ -35,6 +37,7 @@ test('host primitives re-export the shared registry implementations', () => {
   expect(HostDialog).toEqual(RegistryDialog)
   expect(HostDropdownMenu).toEqual(RegistryDropdownMenu)
   expect(HostHoverCard).toEqual(RegistryHoverCard)
+  expect(HostInput).toEqual(RegistryInput)
   expect(HostPopover).toEqual(RegistryPopover)
   expect(HostSkeleton).toEqual(RegistrySkeleton)
   expect(HostSlider).toEqual(RegistrySlider)
