@@ -49,7 +49,7 @@ export function UiComponentsPage() {
 
           <section
             data-applet="dev:ui-components"
-            className="relative isolate flex h-[min(42rem,70dvh)] min-h-96 min-w-0 items-center justify-center overflow-hidden rounded-xl bg-background p-6 shadow-sm sm:p-10"
+            className="relative isolate flex h-[min(42rem,70dvh)] min-h-96 min-w-0 items-center justify-center overflow-hidden rounded-xl bg-muted p-6 shadow-sm sm:p-10"
           >
             {Preview && <Preview key={selectedName} />}
           </section>
