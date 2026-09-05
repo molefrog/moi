@@ -13,7 +13,7 @@ const buttonVariants = cva(
         secondary:
           'bg-accent text-accent-foreground hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_3%)]',
         outline:
-          'bg-background text-foreground ring-1 ring-border hover:bg-[color-mix(in_oklch,var(--background),var(--foreground)_3%)]',
+          'border bg-background text-foreground hover:bg-[color-mix(in_oklch,var(--background),var(--foreground)_3%)]',
         ghost: 'hover:bg-accent hover:text-accent-foreground',
         destructive:
           'bg-destructive text-white inset-shadow-[0_0_8px_color-mix(in_oklab,var(--color-white)_20%,transparent)] hover:bg-destructive/90 focus-visible:border-destructive/40 focus-visible:ring-destructive/20'
