@@ -1,19 +1,32 @@
+import { useEffect, useState } from 'react'
+
 import { Slider as SliderPrimitive } from '@base-ui/react/slider'
+
 import { cn } from './utils'
 
+type SliderProps = SliderPrimitive.Root.Props & {
+  /** Animate movement between discrete values, including while dragging. */
+  animate?: boolean
+}
+
 function Slider({
+  animate = false,
+  children,
   className,
   defaultValue,
   value,
   min = 0,
   max = 100,
   ...props
-}: SliderPrimitive.Root.Props) {
-  const _values = Array.isArray(value)
-    ? value
-    : Array.isArray(defaultValue)
-      ? defaultValue
-      : [min, max]
+}: SliderProps) {
+  const [animationReady, setAnimationReady] = useState(false)
+  const _values = Array.isArray(value) ? value : Array.isArray(defaultValue) ? defaultValue : [min]
+
+  // Let Base UI measure the initial positions before transitions are enabled.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setAnimationReady(true))
+    return () => cancelAnimationFrame(frame)
+  }, [])
 
   return (
     <SliderPrimitive.Root
@@ -33,14 +46,25 @@ function Slider({
         >
           <SliderPrimitive.Indicator
             data-slot="slider-range"
-            className="bg-primary select-none data-horizontal:h-full data-vertical:w-full"
+            className={cn(
+              'bg-primary select-none data-horizontal:h-full data-vertical:w-full',
+              animate &&
+                animationReady &&
+                'transition-[width,height,inset-inline-start,bottom] duration-100 ease-in-out'
+            )}
           />
         </SliderPrimitive.Track>
+        {children}
         {Array.from({ length: _values.length }, (_, index) => (
           <SliderPrimitive.Thumb
             data-slot="slider-thumb"
             key={index}
-            className="relative block size-3 shrink-0 rounded-full border border-ring bg-white ring-ring/50 transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50"
+            className={cn(
+              'relative block size-3 shrink-0 rounded-xs bg-primary-foreground shadow-xs ring-ring/50 select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50 data-horizontal:cursor-ew-resize data-vertical:cursor-ns-resize',
+              animate &&
+                animationReady &&
+                'transition-[inset-inline-start,bottom,color,box-shadow] duration-100 ease-in-out'
+            )}
           />
         ))}
       </SliderPrimitive.Control>

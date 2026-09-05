@@ -699,7 +699,12 @@ function SkeletonPreview() {
 }
 
 function SliderPreview() {
-  return <Slider defaultValue={[65]} className="w-full max-w-sm" />
+  return (
+    <div className="flex w-full max-w-sm flex-col gap-4">
+      <Slider defaultValue={65} className="w-full" />
+      <Slider defaultValue={[45, 65]} className="w-full" />
+    </div>
+  )
 }
 
 function SpinnerPreview() {

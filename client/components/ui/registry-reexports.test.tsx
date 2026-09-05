@@ -7,6 +7,7 @@ import * as RegistryDialog from '@/ui-components/dialog'
 import * as RegistryDropdownMenu from '@/ui-components/dropdown-menu'
 import * as RegistryPopover from '@/ui-components/popover'
 import * as RegistrySkeleton from '@/ui-components/skeleton'
+import * as RegistrySlider from '@/ui-components/slider'
 import * as RegistrySpinner from '@/ui-components/spinner'
 import * as RegistryTooltip from '@/ui-components/tooltip'
 
@@ -16,6 +17,7 @@ import * as HostDialog from './dialog'
 import * as HostDropdownMenu from './dropdown-menu'
 import * as HostPopover from './popover'
 import * as HostSkeleton from './skeleton'
+import * as HostSlider from './slider'
 import * as HostSpinner from './spinner'
 import * as HostTooltip from './tooltip'
 
@@ -34,11 +36,53 @@ test('host primitives re-export the shared registry implementations', () => {
   expect(HostPopover.PopoverTitle).toBe(RegistryPopover.PopoverTitle)
   expect(HostPopover.PopoverTrigger).toBe(RegistryPopover.PopoverTrigger)
   expect(HostSkeleton.Skeleton).toBe(RegistrySkeleton.Skeleton)
+  expect(HostSlider).toEqual(RegistrySlider)
   expect(HostSpinner.Spinner).toBe(RegistrySpinner.Spinner)
   expect(HostTooltip.Tooltip).toBe(RegistryTooltip.Tooltip)
   expect(HostTooltip.TooltipProvider).toBe(RegistryTooltip.TooltipProvider)
   expect(HostTooltip.TooltipTrigger).toBe(RegistryTooltip.TooltipTrigger)
   expect(HostTooltip.TooltipContent).toBe(RegistryTooltip.TooltipContent)
+})
+
+test('shared Slider preserves custom content inside the control', () => {
+  const html = renderToStaticMarkup(
+    <HostSlider.Slider value={[2]} max={5}>
+      <span data-slot="slider-marks">Effort marks</span>
+    </HostSlider.Slider>
+  )
+
+  expect(html).toContain('data-slot="slider-marks"')
+  expect(html).toContain('Effort marks')
+  expect(html.indexOf('data-slot="slider-marks"')).toBeGreaterThan(
+    html.indexOf('data-slot="slider-track"')
+  )
+  expect(html.indexOf('data-slot="slider-marks"')).toBeLessThan(
+    html.indexOf('data-slot="slider-thumb"')
+  )
+})
+
+test('shared Slider uses array values for thumb count and otherwise renders one thumb', () => {
+  for (const props of [
+    { value: 2 },
+    { defaultValue: 65 },
+    { min: 10 },
+    {},
+    { value: [2] },
+    { defaultValue: [2] },
+    { value: [2], defaultValue: [1, 3] }
+  ]) {
+    const html = renderToStaticMarkup(<HostSlider.Slider {...props} />)
+    expect(html.match(/data-slot="slider-thumb"/g)).toHaveLength(1)
+  }
+
+  for (const props of [
+    { value: [1, 3] },
+    { defaultValue: [1, 3] },
+    { value: 0, defaultValue: [1, 3] }
+  ]) {
+    const html = renderToStaticMarkup(<HostSlider.Slider {...props} />)
+    expect(html.match(/data-slot="slider-thumb"/g)).toHaveLength(2)
+  }
 })
 
 test('shared Spinner keeps its accessible label and accepts icon props', () => {
