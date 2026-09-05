@@ -1,1 +1,1 @@
-export { Skeleton } from '@/ui-components/skeleton'
+export * from '@/ui-components/skeleton'

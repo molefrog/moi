@@ -1,1 +1,1 @@
-export { Spinner } from '@/ui-components/spinner'
+export * from '@/ui-components/spinner'

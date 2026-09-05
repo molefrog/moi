@@ -1,1 +1,1 @@
-export { Switch } from '@/ui-components/switch'
+export * from '@/ui-components/switch'

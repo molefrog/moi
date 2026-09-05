@@ -1,1 +1,1 @@
-export { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/ui-components/collapsible'
+export * from '@/ui-components/collapsible'

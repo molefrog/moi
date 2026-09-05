@@ -1,8 +1,1 @@
-export {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger
-} from '@/ui-components/popover'
+export * from '@/ui-components/popover'
