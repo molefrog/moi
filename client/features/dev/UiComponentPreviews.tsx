@@ -647,7 +647,7 @@ function ResizablePreview() {
       <ResizablePanel defaultSize="50%">
         <div className="flex h-full items-center justify-center text-sm">Orders</div>
       </ResizablePanel>
-      <ResizableHandle withHandle />
+      <ResizableHandle />
       <ResizablePanel defaultSize="50%">
         <div className="flex h-full items-center justify-center text-sm">Details</div>
       </ResizablePanel>

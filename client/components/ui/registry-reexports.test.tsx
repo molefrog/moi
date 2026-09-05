@@ -8,6 +8,7 @@ import * as RegistryDropdownMenu from '@/ui-components/dropdown-menu'
 import * as RegistryHoverCard from '@/ui-components/hover-card'
 import * as RegistryInput from '@/ui-components/input'
 import * as RegistryPopover from '@/ui-components/popover'
+import * as RegistryResizable from '@/ui-components/resizable'
 import * as RegistrySkeleton from '@/ui-components/skeleton'
 import * as RegistrySlider from '@/ui-components/slider'
 import * as RegistrySpinner from '@/ui-components/spinner'
@@ -23,6 +24,7 @@ import * as HostDropdownMenu from './dropdown-menu'
 import * as HostHoverCard from './hover-card'
 import * as HostInput from './input'
 import * as HostPopover from './popover'
+import * as HostResizable from './resizable'
 import * as HostSkeleton from './skeleton'
 import * as HostSlider from './slider'
 import * as HostSpinner from './spinner'
@@ -38,6 +40,7 @@ test('host primitives re-export the shared registry implementations', () => {
   expect(HostDropdownMenu).toEqual(RegistryDropdownMenu)
   expect(HostHoverCard).toEqual(RegistryHoverCard)
   expect(HostPopover).toEqual(RegistryPopover)
+  expect(HostResizable).toEqual(RegistryResizable)
   expect(HostSkeleton).toEqual(RegistrySkeleton)
   expect(HostSlider).toEqual(RegistrySlider)
   expect(HostSpinner).toEqual(RegistrySpinner)

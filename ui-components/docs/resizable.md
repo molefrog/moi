@@ -19,7 +19,7 @@ export function ResizableDemo() {
           <span className="font-semibold">One</span>
         </div>
       </ResizablePanel>
-      <ResizableHandle withHandle />
+      <ResizableHandle />
       <ResizablePanel defaultSize="50%">
         <ResizablePanelGroup orientation="vertical">
           <ResizablePanel defaultSize="25%">
@@ -27,7 +27,7 @@ export function ResizableDemo() {
               <span className="font-semibold">Two</span>
             </div>
           </ResizablePanel>
-          <ResizableHandle withHandle />
+          <ResizableHandle />
           <ResizablePanel defaultSize="75%">
             <div className="flex h-full items-center justify-center p-6">
               <span className="font-semibold">Three</span>
@@ -140,14 +140,14 @@ export function ResizableVertical() {
 }
 ```
 
-## Handle
+## Invisible divider
 
-Use the `withHandle` prop on `ResizableHandle` to show a visible handle.
+The divider is visible by default. Use `showDivider={false}` to keep the resize target without showing the divider.
 
 ```tsx
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 
-export function ResizableHandleDemo() {
+export function ResizableInvisibleDividerDemo() {
   return (
     <ResizablePanelGroup
       orientation="horizontal"
@@ -158,7 +158,7 @@ export function ResizableHandleDemo() {
           <span className="font-semibold">Sidebar</span>
         </div>
       </ResizablePanel>
-      <ResizableHandle withHandle />
+      <ResizableHandle showDivider={false} />
       <ResizablePanel defaultSize="75%">
         <div className="flex h-full items-center justify-center p-6">
           <span className="font-semibold">Content</span>
@@ -218,7 +218,7 @@ export function ResizableRtl() {
           <span className="font-semibold">{t.one}</span>
         </div>
       </ResizablePanel>
-      <ResizableHandle withHandle />
+      <ResizableHandle />
       <ResizablePanel defaultSize="50%">
         <ResizablePanelGroup orientation="vertical" dir={dir}>
           <ResizablePanel defaultSize="25%">
@@ -226,7 +226,7 @@ export function ResizableRtl() {
               <span className="font-semibold">{t.two}</span>
             </div>
           </ResizablePanel>
-          <ResizableHandle withHandle />
+          <ResizableHandle />
           <ResizablePanel defaultSize="75%">
             <div className="flex h-full items-center justify-center p-6">
               <span className="font-semibold">{t.three}</span>
@@ -263,6 +263,5 @@ If you're using `react-resizable-panels` primitives directly, note the following
 | `data-panel-group-direction` | `aria-orientation`      |
 
 <Callout>
-  The shadcn/ui wrapper components (`ResizablePanelGroup`, `ResizablePanel`,
-  `ResizableHandle`) remain unchanged.
+  This wrapper uses the v4 primitive names and props shown above.
 </Callout>
