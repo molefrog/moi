@@ -12,6 +12,7 @@ import * as RegistrySlider from '@/ui-components/slider'
 import * as RegistrySpinner from '@/ui-components/spinner'
 import * as RegistrySwitch from '@/ui-components/switch'
 import * as RegistryTabs from '@/ui-components/tabs'
+import * as RegistryTextarea from '@/ui-components/textarea'
 import * as RegistryTooltip from '@/ui-components/tooltip'
 
 import * as HostButton from './button'
@@ -25,6 +26,7 @@ import * as HostSlider from './slider'
 import * as HostSpinner from './spinner'
 import * as HostSwitch from './switch'
 import * as HostTabs from './tabs'
+import * as HostTextarea from './textarea'
 import * as HostTooltip from './tooltip'
 
 test('host primitives re-export the shared registry implementations', () => {
@@ -39,6 +41,7 @@ test('host primitives re-export the shared registry implementations', () => {
   expect(HostSpinner).toEqual(RegistrySpinner)
   expect(HostSwitch).toEqual(RegistrySwitch)
   expect(HostTabs).toEqual(RegistryTabs)
+  expect(HostTextarea).toEqual(RegistryTextarea)
   expect(HostTooltip).toEqual(RegistryTooltip)
 })
 
