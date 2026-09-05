@@ -172,7 +172,7 @@ function EffortPicker({
           />
         }
       />
-      <PopoverContent align="end" side="top" className="w-64" disableAnchorTracking>
+      <PopoverContent align="end" side="top" className="w-64">
         <PopoverHeader className="relative h-5 flex-row items-center">
           <AnimatePresence mode="popLayout" initial={false}>
             {dragging ? (
