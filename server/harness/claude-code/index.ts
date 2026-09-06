@@ -9,13 +9,14 @@ import { findHarnessExecutable, pathHarnessAvailability } from '../executable'
 import { getClaudeAuthReadiness, startClaudeLogin } from './auth'
 import { isLinkedGitWorktree } from './git-worktree'
 import { getMcpStatus } from './mcp'
-import { getClaudeModels } from './models'
+import { getClaudeModels, lastProbedClaudeCli, onClaudeCliChanged } from './models'
 import {
   SESSION_LIMITS,
   getCCDebugSnapshot,
   getCCActiveSessions,
   interruptCCSession,
   killAllCCSessions,
+  restartIdleCCSessions,
   restartWorkspaceSessions,
   sendCCMessage
 } from './session'
@@ -73,6 +74,12 @@ async function discoverWorkspaces(
   }
 }
 
+// Claude Code updates itself in place while moi runs. The catalog probe is
+// the first thing to notice a new binary (see `models.ts`); when it does, idle
+// sessions are respawned so they run — and accept the models of — the CLI the
+// picker now shows. Busy sessions finish their turn on the old binary first.
+onClaudeCliChanged(() => restartIdleCCSessions())
+
 export const claudeCodeHarness: Harness = {
   id: 'claude-code',
   capabilities: {
@@ -111,7 +118,8 @@ export const claudeCodeHarness: Harness = {
     const cc = getCCDebugSnapshot()
     const busy = cc.sessions.filter(s => s.activity !== 'idle').length
     const lines = [
-      `claude executable  ${findHarnessExecutable('claude-code') ?? '(not found)'}`,
+      `claude executable  ${findHarnessExecutable('claude-code') ?? '(not found)'}` +
+        `  (${lastProbedClaudeCli()?.version ?? 'version not probed yet'})`,
       `live CC sessions  ${cc.sessions.length}/${SESSION_LIMITS.maxLive}  ` +
         `(${busy} busy, ${cc.sessions.length - busy} idle, ${cc.aliases} alias${cc.aliases === 1 ? '' : 'es'}, ` +
         `idle TTL ${fmtDuration(SESSION_LIMITS.idleTtlMs)})`

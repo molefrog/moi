@@ -38,6 +38,26 @@ and version-manager shims. There is no SDK bundled-executable fallback. If the
 command is missing, setup and existing workspaces report:
 `Run curl -fsSL https://claude.ai/install.sh | sh in your terminal to install Claude`.
 
+**In-place updates.** Claude Code replaces its own binary while moi keeps
+running (the auto-updater and `claude update` both swap the target behind the
+same `claude` path), and a new release is what brings new models. Nothing
+derived from the CLI may therefore be cached for the process lifetime:
+
+- Every spawn resolves the executable afresh, so new sessions run the new
+  binary. A live session keeps the subprocess it started with until it is torn
+  down (idle TTL, eviction, env change).
+- The model catalog (`models.ts`) is keyed by the CLI identity from `cli.ts`:
+  executable path + the first line of `claude --version` (`2.1.263 (Claude
+Code)`), a ~15ms spawn re-run on every `/agent` request. A changed identity
+  refetches the catalog; a failed probe keeps serving the cached one.
+- On a changed identity, `index.ts` respawns idle sessions
+  (`restartIdleCCSessions`). A subprocess started on the old binary keeps the
+  old lineup and rejects the new aliases on `set_model`; sessions with live
+  background tasks are left to turn over on their own.
+- The picker gets the new lineup on the client's next `/agent` refetch (window
+  focus, reconnect). `moi status` prints the version the catalog was probed
+  for next to the executable path.
+
 ---
 
 ## 1. Three layers

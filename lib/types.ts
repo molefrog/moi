@@ -680,9 +680,11 @@ export type Model = {
 
 // GET /api/workspaces/:id/agent payload — everything the client needs to know
 // about the workspace's agent backend in one request at workspace open.
-// `models` and capabilities are stable per process; `availability` and `login`
-// are the volatile part, kept fresh after load by `agent:updated` events
-// instead of refetches.
+// Capabilities are stable per process and `models` per backend release (Claude
+// Code updates in place; the server refetches its catalog when the CLI
+// changes, so a focus refetch picks a new lineup up); `availability` and
+// `login` are the volatile part, kept fresh after load by `agent:updated`
+// events instead of refetches.
 export type WorkspaceAgent = {
   // The agent backend that produced this snapshot — matches the workspace
   // provider.

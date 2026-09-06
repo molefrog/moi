@@ -37,7 +37,10 @@ export function useWorkspaceLayout(workspaceId: string) {
 // capabilities. Fetched once at workspace open; afterwards the volatile parts
 // (`availability`, `login`) are patched in place by `agent:updated` events —
 // the server owns the login watch loop, so the client never polls. Focus
-// refetch stays as a cheap safety net (the server serves its cache).
+// refetch stays as a cheap safety net (the server serves its cache) and is
+// how a model lineup change reaches the picker: the server refetches its
+// catalog when the backend CLI updates in place, so the next refetch after
+// that carries the new models.
 export function useWorkspaceAgent(workspaceId: string) {
   const queryClient = useQueryClient()
   useEffect(

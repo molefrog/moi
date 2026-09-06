@@ -872,6 +872,18 @@ export function restartWorkspaceSessions(workspacePath: string): void {
   }
 }
 
+// Tear down every idle session so the next message respawns it on the current
+// `claude` executable — for when the CLI updated in place under a running
+// server. A subprocess started on the old binary keeps the old model lineup:
+// the picker, refreshed from the new CLI, offers aliases the old process
+// rejects on `set_model`. Sessions with live background tasks are left alone,
+// same as idle eviction; they turn over once the tasks finish.
+export function restartIdleCCSessions(): void {
+  for (const s of [...sessions.values()]) {
+    if (s.activity === 'idle' && s.bgTasks.size === 0) teardown(s)
+  }
+}
+
 // Close every live session — called on server shutdown so no claude subprocess
 // is orphaned.
 export function killAllCCSessions(): void {

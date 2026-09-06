@@ -140,7 +140,9 @@ app-server protocol without moi).
 **Claude Code — shipped, primary harness.** Full chat integration: long-lived
 streaming-input sessions with mid-turn message queueing, resume after idle
 eviction/restart, interrupt, per-thread model + effort picker (backed by
-`supportedModels()`), opt-in live token streaming, image/file attachments,
+`supportedModels()`, cached per CLI version so an in-place `claude` update
+shows up without a server restart — `claude-code/NOTES.md` "Runtime
+executable"), opt-in live token streaming, image/file attachments,
 subagent lanes, MCP status probe, and session list/history replay from the
 SDK's `.jsonl` files, with per-turn token usage folded into the final
 assistant turn. The Agent SDK remains the transport, while every query is
