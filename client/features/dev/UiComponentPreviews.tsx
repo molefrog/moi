@@ -40,7 +40,6 @@ import {
 } from '@/ui-components/attachment'
 import { Avatar, AvatarBadge, AvatarFallback, AvatarGroup } from '@/ui-components/avatar'
 import { Badge } from '@/ui-components/badge'
-import { Bubble, BubbleContent, BubbleGroup, BubbleReactions } from '@/ui-components/bubble'
 import { Button } from '@/ui-components/button'
 import { ButtonGroup, ButtonGroupText } from '@/ui-components/button-group'
 import { Calendar } from '@/ui-components/calendar'
@@ -281,25 +280,6 @@ function BadgePreview() {
       <Badge variant="destructive">Blocked</Badge>
       <Badge variant="ghost">Ghost</Badge>
       <Badge variant="link">Link</Badge>
-    </div>
-  )
-}
-
-function BubblePreview() {
-  return (
-    <div className="flex w-full max-w-sm flex-col gap-5">
-      <BubbleGroup>
-        <Bubble variant="muted">
-          <BubbleContent>Can you check order #1048?</BubbleContent>
-        </Bubble>
-        <Bubble variant="muted">
-          <BubbleContent>It is packed and ready to ship.</BubbleContent>
-          <BubbleReactions>👍 2</BubbleReactions>
-        </Bubble>
-      </BubbleGroup>
-      <Bubble align="end">
-        <BubbleContent>Perfect, thanks.</BubbleContent>
-      </Bubble>
     </div>
   )
 }
@@ -816,7 +796,6 @@ export const UI_COMPONENT_PREVIEWS = {
   attachment: AttachmentPreview,
   avatar: AvatarPreview,
   badge: BadgePreview,
-  bubble: BubblePreview,
   button: ButtonPreview,
   'button-group': ButtonGroupPreview,
   calendar: CalendarPreview,

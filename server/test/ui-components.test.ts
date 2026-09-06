@@ -146,7 +146,6 @@ describe('catalog', () => {
       'attachment',
       'avatar',
       'badge',
-      'bubble',
       'button',
       'button-group',
       'calendar',
@@ -243,7 +242,7 @@ describe('local registry', () => {
     const names = new Set(registry.items.map(item => item.name))
 
     expect(registry).toMatchObject({ name: 'moi', homepage: 'https://moi.computer' })
-    expect(registry.items).toHaveLength(46)
+    expect(registry.items).toHaveLength(45)
     for (const name of UI_COMPONENT_NAMES) expect(names.has(name)).toBeTrue()
     for (const name of SUPPORT_ITEMS) expect(names.has(name)).toBeTrue()
   })
