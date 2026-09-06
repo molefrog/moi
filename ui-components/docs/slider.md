@@ -27,7 +27,7 @@ export function SliderDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add slider
+moi ui-components add slider
 ```
 
 </TabsContent>
@@ -188,8 +188,6 @@ export function SliderDisabled() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

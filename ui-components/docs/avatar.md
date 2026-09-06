@@ -61,7 +61,7 @@ export function AvatarDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add avatar
+moi ui-components add avatar
 ```
 
 </TabsContent>
@@ -368,8 +368,6 @@ export function AvatarDropdown() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

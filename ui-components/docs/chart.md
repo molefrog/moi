@@ -219,7 +219,7 @@ If you're updating older chart code to Recharts v3:
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add chart
+moi ui-components add chart
 ```
 
 </TabsContent>
@@ -1147,8 +1147,6 @@ This prop adds keyboard access and screen reader support to your charts.
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

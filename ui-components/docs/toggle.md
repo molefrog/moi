@@ -21,7 +21,7 @@ links:
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add toggle
+moi ui-components add toggle
 ```
 
 </TabsContent>
@@ -83,8 +83,6 @@ Use the `size` prop to change the size of the toggle.
 <ComponentPreview styleName="base-nova" name="toggle-disabled" />
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 <ComponentPreview styleName="base-nova" name="toggle-rtl" direction="rtl" />
 

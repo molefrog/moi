@@ -43,7 +43,7 @@ export function RadioGroupDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add radio-group
+moi ui-components add radio-group
 ```
 
 </TabsContent>
@@ -301,8 +301,6 @@ export function RadioGroupInvalid() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

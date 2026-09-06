@@ -67,7 +67,7 @@ export function CheckboxDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add checkbox
+moi ui-components add checkbox
 ```
 
 </TabsContent>
@@ -390,8 +390,6 @@ export function CheckboxInTable() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

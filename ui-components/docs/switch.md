@@ -33,7 +33,7 @@ export function SwitchDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add switch
+moi ui-components add switch
 ```
 
 </TabsContent>
@@ -180,8 +180,6 @@ export function SwitchInvalid() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

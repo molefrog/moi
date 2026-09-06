@@ -32,7 +32,7 @@ export function SkeletonDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add skeleton
+moi ui-components add skeleton
 ```
 
 </TabsContent>
@@ -165,8 +165,6 @@ export function SkeletonTable() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

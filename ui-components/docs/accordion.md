@@ -56,7 +56,7 @@ export function AccordionDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add accordion
+moi ui-components add accordion
 ```
 
 </TabsContent>
@@ -366,8 +366,6 @@ export function AccordionCard() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

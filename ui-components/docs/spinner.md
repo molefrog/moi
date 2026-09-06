@@ -39,7 +39,7 @@ export function SpinnerDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add spinner
+moi ui-components add spinner
 ```
 
 </TabsContent>
@@ -276,8 +276,6 @@ export function SpinnerEmpty() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

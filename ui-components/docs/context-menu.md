@@ -96,7 +96,7 @@ export function ContextMenuDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add context-menu
+moi ui-components add context-menu
 ```
 
 </TabsContent>
@@ -663,8 +663,6 @@ export function ContextMenuSides() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

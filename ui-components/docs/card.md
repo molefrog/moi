@@ -22,7 +22,7 @@ component: true
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add card
+moi ui-components add card
 ```
 
 </TabsContent>
@@ -130,8 +130,6 @@ Add an image before the card header to create a card with an image.
 />
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 <ComponentPreview
   styleName="base-nova"

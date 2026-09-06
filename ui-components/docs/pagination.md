@@ -57,7 +57,7 @@ export function PaginationDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add pagination
+moi ui-components add pagination
 ```
 
 </TabsContent>
@@ -266,8 +266,6 @@ const PaginationLink = ({...props }: ) => (
 </Callout>
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

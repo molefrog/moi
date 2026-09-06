@@ -103,7 +103,7 @@ The `Attachment` component displays a file or image attachment, its media, name,
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add attachment
+moi ui-components add attachment
 ```
 
 </TabsContent>
@@ -112,10 +112,10 @@ npx shadcn@latest add attachment
 
 <Steps className="mb-0 pt-2">
 
-<Step>Install the required shadcn/ui dependencies:</Step>
+<Step>Install the required moi component:</Step>
 
 ```bash
-npx shadcn@latest add button
+moi ui-components add button
 ```
 
 <Step>Copy and paste the following code into your project.</Step>

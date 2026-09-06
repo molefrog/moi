@@ -39,7 +39,7 @@ export function TooltipDemo() {
 <Step>Run the following command:</Step>
 
 ```bash
-npx shadcn@latest add tooltip
+moi ui-components add tooltip
 ```
 
 <Step>Add the `TooltipProvider` to the root of your app.</Step>
@@ -205,8 +205,6 @@ export function TooltipDisabled() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

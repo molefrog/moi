@@ -24,7 +24,7 @@ export function TextareaDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add textarea
+moi ui-components add textarea
 ```
 
 </TabsContent>
@@ -134,8 +134,6 @@ export function TextareaButton() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

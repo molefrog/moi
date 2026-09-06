@@ -31,7 +31,7 @@ export function InputDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add input
+moi ui-components add input
 ```
 
 </TabsContent>
@@ -405,8 +405,6 @@ export function InputForm() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

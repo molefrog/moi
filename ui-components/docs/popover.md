@@ -60,7 +60,7 @@ export function PopoverDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add popover
+moi ui-components add popover
 ```
 
 </TabsContent>
@@ -245,8 +245,6 @@ export function PopoverForm() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

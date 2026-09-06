@@ -59,7 +59,7 @@ The carousel component is built using the [Embla Carousel](https://www.embla-car
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add carousel
+moi ui-components add carousel
 ```
 
 </TabsContent>
@@ -523,8 +523,6 @@ export function CarouselPlugin() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

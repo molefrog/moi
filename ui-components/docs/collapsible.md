@@ -60,7 +60,7 @@ export function CollapsibleDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add collapsible
+moi ui-components add collapsible
 ```
 
 </TabsContent>
@@ -354,8 +354,6 @@ export function CollapsibleFileTree() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

@@ -124,7 +124,7 @@ export function ButtonGroupDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add button-group
+moi ui-components add button-group
 ```
 
 </TabsContent>
@@ -633,8 +633,6 @@ export function ButtonGroupPopover() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

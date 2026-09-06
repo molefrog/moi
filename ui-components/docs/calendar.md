@@ -40,7 +40,7 @@ export function CalendarDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add calendar
+moi ui-components add calendar
 ```
 
 </TabsContent>
@@ -195,7 +195,7 @@ function Calendar({
           defaultClassNames.dropdowns
         ),
         dropdown_root: cn(
-          'relative rounded-md border border-input shadow-xs has-focus:border-ring has-focus:ring-[3px] has-focus:ring-ring/50',
+          'relative rounded-md border border-border shadow-xs has-focus:border-ring has-focus:ring-[3px] has-focus:ring-ring/50',
           defaultClassNames.dropdown_root
         ),
         dropdown: cn('absolute inset-0 opacity-0', defaultClassNames.dropdown),
@@ -660,8 +660,6 @@ export function CalendarWeekNumbers() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 See also the [Hijri Guide](#persian--hijri--jalali-calendar) for enabling the Persian / Hijri / Jalali calendar.
 

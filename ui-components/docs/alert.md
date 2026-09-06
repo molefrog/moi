@@ -43,7 +43,7 @@ export function AlertDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add alert
+moi ui-components add alert
 ```
 
 </TabsContent>
@@ -190,8 +190,6 @@ export function AlertColors() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

@@ -169,7 +169,7 @@ export function FieldDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add field
+moi ui-components add field
 ```
 
 </TabsContent>
@@ -706,8 +706,6 @@ export function FieldGroupExample() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

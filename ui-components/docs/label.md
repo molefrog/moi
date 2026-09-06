@@ -38,7 +38,7 @@ export function LabelDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add label
+moi ui-components add label
 ```
 
 </TabsContent>
@@ -245,8 +245,6 @@ export function FieldDemo() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

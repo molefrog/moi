@@ -106,7 +106,7 @@ export function TableDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add table
+moi ui-components add table
 ```
 
 </TabsContent>
@@ -398,8 +398,6 @@ See the [Data Table](/docs/components/data-table) documentation for more informa
 You can also see an example of a data table in the [Tasks](/examples/tasks) demo.
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

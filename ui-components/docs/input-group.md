@@ -36,7 +36,7 @@ export function InputGroupDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add input-group
+moi ui-components add input-group
 ```
 
 </TabsContent>
@@ -650,8 +650,6 @@ export function InputGroupCustom() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

@@ -69,7 +69,7 @@ export function DialogDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add dialog
+moi ui-components add dialog
 ```
 
 </TabsContent>
@@ -313,8 +313,6 @@ export function DialogScrollableContent() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

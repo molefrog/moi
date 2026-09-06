@@ -351,7 +351,7 @@ This guide will show you how to use [TanStack Table](https://tanstack.com/table)
 1. Add the `<Table />` component to your project:
 
 ```bash
-npx shadcn@latest add table
+moi ui-components add data-table
 ```
 
 2. Add the `@tanstack/react-table` dependency. This guide uses **TanStack Table v9**:
@@ -1168,8 +1168,6 @@ A component to toggle column visibility.
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

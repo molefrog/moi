@@ -55,7 +55,7 @@ The `Resizable` component is built on top of [react-resizable-panels](https://gi
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add resizable
+moi ui-components add resizable
 ```
 
 </TabsContent>
@@ -170,8 +170,6 @@ export function ResizableInvisibleDividerDemo() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

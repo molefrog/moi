@@ -61,7 +61,7 @@ export function SelectDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add select
+moi ui-components add select
 ```
 
 </TabsContent>
@@ -493,8 +493,6 @@ export function SelectInvalid() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

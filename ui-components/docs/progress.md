@@ -38,7 +38,7 @@ export function ProgressDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add progress
+moi ui-components add progress
 ```
 
 </TabsContent>
@@ -149,8 +149,6 @@ export function ProgressControlled() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

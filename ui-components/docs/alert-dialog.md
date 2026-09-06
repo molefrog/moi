@@ -56,7 +56,7 @@ export function AlertDialogDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add alert-dialog
+moi ui-components add alert-dialog
 ```
 
 </TabsContent>
@@ -355,8 +355,6 @@ export function AlertDialogDestructive() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

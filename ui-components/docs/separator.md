@@ -38,7 +38,7 @@ export function SeparatorDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add separator
+moi ui-components add separator
 ```
 
 </TabsContent>
@@ -158,8 +158,6 @@ export function SeparatorList() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

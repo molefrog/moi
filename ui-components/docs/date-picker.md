@@ -43,9 +43,11 @@ export function DatePickerDemo() {
 
 ## Installation
 
-The Date Picker is built using a composition of the `<Popover />` and the `<Calendar />` components.
+```bash
+moi ui-components add date-picker
+```
 
-See installation instructions for the [Popover](/docs/components/base/popover#installation) and the [Calendar](/docs/components/base/calendar#installation) components.
+This recipe installs the `Popover`, `Calendar`, and `Button` components it uses.
 
 ## Usage
 
@@ -526,8 +528,6 @@ export function DatePickerNaturalLanguage() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

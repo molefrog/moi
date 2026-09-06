@@ -40,7 +40,7 @@ export function HoverCardDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add hover-card
+moi ui-components add hover-card
 ```
 
 </TabsContent>
@@ -178,8 +178,6 @@ export function HoverCardSides() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'

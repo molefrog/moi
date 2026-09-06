@@ -97,7 +97,7 @@ export function DropdownMenuDemo() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add dropdown-menu
+moi ui-components add dropdown-menu
 ```
 
 </TabsContent>

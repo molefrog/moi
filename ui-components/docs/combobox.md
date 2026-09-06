@@ -52,7 +52,7 @@ export function ComboboxBasic() {
 <TabsContent value="cli">
 
 ```bash
-npx shadcn@latest add combobox
+moi ui-components add combobox
 ```
 
 </TabsContent>
@@ -879,8 +879,6 @@ export function ComboxboxInputGroup() {
 ```
 
 ## RTL
-
-To enable RTL support in shadcn/ui, see the [RTL configuration guide](/docs/rtl).
 
 ```tsx
 'use client'
