@@ -4,11 +4,6 @@ import { codexServerRequestResponse } from './permissions'
 
 export type Json = Record<string, unknown>
 export type NotificationListener = (method: string, params: Json) => void
-export type RequestListener = (
-  method: string,
-  params: Json,
-  id: string | number
-) => Promise<Json | undefined> | undefined
 
 export class CodexRpcError extends Error {
   constructor(
@@ -25,7 +20,6 @@ export type CodexTransport = {
   rpc: <T>(method: string, params?: Json) => Promise<T>
   notify: (method: string, params?: Json) => void
   onNotification: (listener: NotificationListener) => () => void
-  onRequest: (listener: RequestListener) => () => void
   isAlive: () => boolean
   close: (error?: Error) => void
 }
@@ -42,7 +36,6 @@ export function createCodexTransport(options: TransportOptions): CodexTransport 
   let alive = true
   let nextId = 1
   const listeners = new Set<NotificationListener>()
-  const requestListeners = new Set<RequestListener>()
   const pending = new Map<
     number,
     {
@@ -75,7 +68,6 @@ export function createCodexTransport(options: TransportOptions): CodexTransport 
     pending.clear()
     fanout('__exit', { message: error.message })
     listeners.clear()
-    requestListeners.clear()
     void reader.cancel().catch(() => {})
     try {
       options.stop()
@@ -84,9 +76,9 @@ export function createCodexTransport(options: TransportOptions): CodexTransport 
     }
   }
 
-  function send(frame: Json, redact = false) {
+  function send(frame: Json) {
     if (!alive) throw new Error('Codex app-server is not running')
-    options.tap?.('send', redact ? { ...frame, result: '[user input]' } : frame)
+    options.tap?.('send', frame)
     // Bun's flush can be asynchronous; observe failures instead of leaving an
     // unhandled rejection and waiting for every RPC to time out independently.
     try {
@@ -132,33 +124,6 @@ export function createCodexTransport(options: TransportOptions): CodexTransport 
           : {}
       if ('id' in msg) {
         if (typeof msg.id !== 'string' && typeof msg.id !== 'number') return
-        for (const listener of requestListeners) {
-          let response: Promise<Json | undefined> | undefined
-          try {
-            response = listener(msg.method, params, msg.id)
-          } catch (error) {
-            response = Promise.reject(error)
-          }
-          if (!response) continue
-          const id = msg.id
-          void response.then(
-            result => {
-              if (alive && result !== undefined) send({ jsonrpc: '2.0', id, result }, true)
-            },
-            error => {
-              if (alive)
-                send({
-                  jsonrpc: '2.0',
-                  id,
-                  error: {
-                    code: -32603,
-                    message: error instanceof Error ? error.message : 'Input request failed'
-                  }
-                })
-            }
-          )
-          return
-        }
         send({ jsonrpc: '2.0', id: msg.id, ...codexServerRequestResponse(msg.method, params) })
       } else fanout(msg.method, params)
       return
@@ -211,12 +176,6 @@ export function createCodexTransport(options: TransportOptions): CodexTransport 
       listeners.add(listener)
       return () => {
         listeners.delete(listener)
-      }
-    },
-    onRequest(listener) {
-      requestListeners.add(listener)
-      return () => {
-        requestListeners.delete(listener)
       }
     },
     isAlive: () => alive,

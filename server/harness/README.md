@@ -57,8 +57,7 @@ Socket-protocol notes the layers rely on (all defined in `lib/types.ts`):
   lifecycle signal — never derived by counting sends vs results. The snapshot
   (sent on connect and re-broadcast periodically) is authoritative: the client
   rebuilds its whole activity map from it, so a lost terminal frame self-heals.
-  `requires-action` suppresses the loader; Codex's pending input notice renders
-  an answerable form in the chat.
+  `requires-action` suppresses the loader.
 - **`preview`** — live token frames, cumulative text, never persisted;
   cleared when the turn with matching `meta.apiMessageId` lands.
 
@@ -195,16 +194,16 @@ the established name is kept. See `hermes/NOTES.md`.
 **Codex — shipped, experimental.** One `codex app-server` per workspace supplies
 chat, model/session catalogs, history, steering, and interruption. The harness
 maps items into shared display events, including subagent transcripts, reasoning
-previews, usage, hook/MCP failure notices, and answerable native questions.
+previews, usage, and hook/MCP failure notices.
 Model, effort, and fast-mode choices apply on the next new turn; the sent model
 matches the picker even when Codex config names an unavailable model.
 
 Workspace env is fixed at process spawn. Executable lookup prefers PATH over
 the desktop bundle; config and credentials remain owned by Codex. Sessions use
 workspace-write access with network disabled, and moi automatically accepts
-supported permission requests. Command-approval UI and MCP elicitation are not
-implemented. See [Codex harness notes](codex/NOTES.md) for module ownership,
-ordering rules, runtime diagnostics, and boundaries.
+supported permission requests. Command-approval UI, native question forms, and
+MCP elicitation are not implemented. See [Codex harness notes](codex/NOTES.md)
+for module ownership, ordering rules, runtime diagnostics, and boundaries.
 
 Workspace availability also checks provider authentication when a workspace is
 given. Claude Code is probed with `claude auth status` under the effective

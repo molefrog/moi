@@ -99,7 +99,6 @@ export type Harness = {
     includeFirstUserMessage: boolean
   ): Promise<WorkspaceActivityPreview>
   sessionEvents(ws: WorkspaceEntry, sessionId: string): Promise<StreamEvent[]>
-  answerInput?(ws: WorkspaceEntry, sessionId: string, requestId: string, answers: unknown): void
   listModels(ws: WorkspaceEntry): Promise<Model[]>
   // MCP server status for the connectors UI; absent = backend has no MCP story.
   mcpStatus?(ws: WorkspaceEntry): Promise<McpServer[]>

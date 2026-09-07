@@ -39,8 +39,7 @@ ${CODEX_LOCAL_CONTROL_GUIDANCE}
 IMPORTANT: This context comes from moi, not from the user, and the user does not see it.
 </moi-context>`
 
-// Fallback for requests not claimed by a session (native questions are handled
-// there). Accept known approvals, decline MCP elicitation, reject unknown methods.
+// Accept known approvals, decline MCP elicitation, reject unsupported methods.
 export function codexServerRequestResponse(
   method: string,
   params: Record<string, unknown> = {}

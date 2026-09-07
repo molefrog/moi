@@ -8,19 +8,13 @@ import { addUpload } from '../../uploads'
 import * as clients from './client'
 import {
   ensureCodexSessionLive,
-  answerCodexInput,
   getCodexActiveSessions,
   getLiveCodexEvents,
   getLatestCodexSessionId,
   interruptCodexRun,
   sendCodexMessage
 } from './session'
-import {
-  CodexRpcError,
-  type Json,
-  type NotificationListener,
-  type RequestListener
-} from './transport'
+import { CodexRpcError, type Json, type NotificationListener } from './transport'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -41,7 +35,6 @@ function fixture() {
   const workspaceId = crypto.randomUUID()
   const input = { workspaceId, workspacePath: `/test/${workspaceId}`, sessionId: 'session' }
   const listeners = new Set<NotificationListener>()
-  const requestListeners = new Set<RequestListener>()
   const calls: { method: string; params: Json }[] = []
   const handlers = new Map<string, (params: Json) => unknown>()
   let nextTurn = 0
@@ -54,12 +47,6 @@ function fixture() {
       listeners.add(listener)
       return () => {
         listeners.delete(listener)
-      }
-    },
-    onRequest(listener) {
-      requestListeners.add(listener)
-      return () => {
-        requestListeners.delete(listener)
       }
     },
     async rpc<T>(method: string, params: Json = {}): Promise<T> {
@@ -93,13 +80,6 @@ function fixture() {
     handlers,
     emit,
     listeners,
-    request: (method: string, params: Json, id = 0) => {
-      for (const listener of requestListeners) {
-        const response = listener(method, { threadId: input.sessionId, ...params }, id)
-        if (response) return response
-      }
-      throw new Error('No request handler')
-    },
     frames: () => getClientFrameLog(workspaceId).map(row => row.frame as BroadcastFrame),
     active: () => getCodexActiveSessions().some(row => row.workspaceId === workspaceId),
     events: () => getLiveCodexEvents(workspaceId, input.sessionId) ?? [],
@@ -297,41 +277,6 @@ describe('Codex live session lifecycle', () => {
       }
     })
   })
-  test('native questions survive a read and resume the same turn after answering', async () => {
-    const f = fixture()
-    await f.send()
-    const response = f.request('item/tool/requestUserInput', {
-      turnId: 'turn-1',
-      isBlocking: true,
-      questions: [
-        { id: 'color', header: 'Color', question: 'Which color?', isSecret: false, options: null }
-      ]
-    })
-    expect(
-      getCodexActiveSessions().find(row => row.workspaceId === f.input.workspaceId)?.activity
-    ).toBe('requires-action')
-    const replay = await ensureCodexSessionLive(f.input)
-    expect(
-      replay.some(
-        event =>
-          event.kind === 'notice' &&
-          event.notice.kind === 'user-input' &&
-          event.notice.status === 'pending'
-      )
-    ).toBe(true)
-    const notice = replay.find(
-      event => event.kind === 'notice' && event.notice.kind === 'user-input'
-    )
-    if (notice?.kind !== 'notice') throw new Error('Missing input notice')
-    expect(() =>
-      answerCodexInput('other-workspace', 'session', notice.notice.id, { color: 'Blue' })
-    ).toThrow()
-    answerCodexInput(f.input.workspaceId, 'session', notice.notice.id, { color: 'Green' })
-    expect(await response).toEqual({ answers: { color: { answers: ['Green'] } } })
-    expect(
-      getCodexActiveSessions().find(row => row.workspaceId === f.input.workspaceId)?.activity
-    ).toBe('running')
-  })
   test('concurrent resumes subscribe once and replay frames received before the response', async () => {
     const f = fixture()
     const resumed = deferred<unknown>()
@@ -398,19 +343,14 @@ describe('Codex live session lifecycle', () => {
     expect(texts(f.events())).toContain('follow up')
   })
 
-  test('failed resume releases pending native questions and subscriptions', async () => {
+  test('failed resume releases subscriptions', async () => {
     const f = fixture()
     const resumed = deferred<unknown>()
     f.handlers.set('thread/resume', () => resumed.promise)
     const loading = ensureCodexSessionLive(f.input)
     await Bun.sleep(0)
-    const answer = f.request('item/tool/requestUserInput', {
-      turnId: 'busy',
-      questions: [{ id: 'color', question: 'Which color?' }]
-    })
     resumed.reject(new Error('History unavailable'))
     await expect(loading).rejects.toThrow('History unavailable')
-    expect(await answer).toEqual({ answers: {} })
     expect(f.listeners.size).toBe(0)
     expect(getLiveCodexEvents(f.input.workspaceId, f.input.sessionId)).toBeNull()
   })

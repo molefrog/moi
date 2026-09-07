@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
 import { CodexRpcError, createCodexTransport, type Json } from './transport'
-import { CodexInputRequests } from './input-requests'
 
 function fixture(timeoutMs = 100) {
   let controller!: ReadableStreamDefaultController<Uint8Array>
@@ -33,27 +32,6 @@ function fixture(timeoutMs = 100) {
 }
 
 describe('Codex JSON-RPC transport', () => {
-  test('a server-cleared input request produces no duplicate response on the wire', async () => {
-    const f = fixture()
-    const inputs = new CodexInputRequests(() => {})
-    f.transport.onRequest((method, params, id) =>
-      method === 'item/tool/requestUserInput' ? inputs.request(params, id) : undefined
-    )
-    f.transport.onNotification((method, params) => {
-      if (method === 'serverRequest/resolved' && typeof params.requestId === 'string')
-        inputs.resolved(params.requestId)
-    })
-    f.frame({
-      id: 'question',
-      method: 'item/tool/requestUserInput',
-      params: { questions: [{ id: 'q', question: 'Choose' }] }
-    })
-    f.frame({ method: 'serverRequest/resolved', params: { requestId: 'question' } })
-    await Bun.sleep(0)
-    expect(inputs.hasPending).toBe(false)
-    expect(f.writes).toEqual([])
-    f.transport.close()
-  })
   test('handles fragmented UTF-8, batched frames, invalid JSON and a final line without newline', async () => {
     const f = fixture()
     const seen: string[] = []

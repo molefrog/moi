@@ -18,7 +18,6 @@ import {
 import { discoverCodexWorkspaces } from './discovery'
 import {
   ensureCodexSessionLive,
-  answerCodexInput,
   getCodexActiveSessions,
   getLiveCodexEvents,
   getLatestCodexSessionId,
@@ -41,8 +40,6 @@ export const codexHarness: Harness = {
   interrupt: (workspaceId, sessionId) => interruptCodexRun({ workspaceId, sessionId }),
   archiveSession: (ws, sessionId) => archiveCodexSession(ws.path, sessionId),
   activeSessions: () => getCodexActiveSessions(),
-  answerInput: (ws, sessionId, requestId, answers) =>
-    answerCodexInput(ws.id, sessionId, requestId, answers),
 
   listSessions: ws => getCodexSessions(ws.path),
   workspacePreview: (ws, includeFirstUserMessage) =>
