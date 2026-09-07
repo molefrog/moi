@@ -36,7 +36,6 @@ function InlineInput({
 
   function handleFocus(event: InputFocusEvent) {
     valueBeforeEditRef.current = event.currentTarget.value
-    event.currentTarget.select()
     onFocus?.(event)
   }
 
