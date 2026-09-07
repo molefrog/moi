@@ -3,9 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { workspaceIconBlob, type WorkspaceIconUpdate } from '@/client/features/settings/render-icon'
+import type { WorkspaceLayoutResponse } from '@/client/features/workspace/api'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
-import type { AppSettings, WorkspaceEntry, WorkspaceEnvView } from '@/lib/types'
+import type { AppSettings, WorkspaceEntry, WorkspaceEnvView, WorkspaceIcon } from '@/lib/types'
 
 // App-wide settings (server-side settings.json, GET/PATCH /api/settings) —
 // shared by every workspace, unlike the per-workspace queries below.
@@ -79,13 +79,25 @@ export function useSaveWorkspaceName(workspaceId: string) {
   })
 }
 
+type WorkspaceIconMutation =
+  | { kind: 'set'; icon: WorkspaceIcon }
+  | { kind: 'upload'; file: Blob }
+  | { kind: 'reset' }
+
 export function useUpdateWorkspaceIcon(workspaceId: string) {
   const queryClient = useQueryClient()
-  return useMutation<void, Error, WorkspaceIconUpdate>({
+  return useMutation<void, Error, WorkspaceIconMutation>({
     scope: { id: `workspace-icon:${workspaceId}` },
     mutationFn: async update => {
-      const blob = await workspaceIconBlob(update)
-      if (blob === null) {
+      if (update.kind === 'set') {
+        await requestVoid(
+          `/api/workspaces/${workspaceId}/config`,
+          jsonRequest('PUT', { icon: update.icon }),
+          'Failed to save icon'
+        )
+        return
+      }
+      if (update.kind === 'reset') {
         await requestVoid(
           `/api/workspaces/${workspaceId}/icon`,
           { method: 'DELETE' },
@@ -95,9 +107,27 @@ export function useUpdateWorkspaceIcon(workspaceId: string) {
       }
       await requestJson(`/api/workspaces/${workspaceId}/icon`, {
         method: 'PUT',
-        headers: { 'Content-Type': blob.type || 'application/octet-stream' },
-        body: blob
+        headers: { 'Content-Type': update.file.type || 'application/octet-stream' },
+        body: update.file
       })
+    },
+    onMutate: update => {
+      if (update.kind !== 'set') return
+      const presentation = { icon: update.icon }
+      queryClient.setQueryData<WorkspaceLayoutResponse>(
+        workspaceKeys.layout(workspaceId),
+        current => (current ? { ...current, ...presentation } : current)
+      )
+      queryClient.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, current =>
+        current?.map(workspace =>
+          workspace.id === workspaceId ? { ...workspace, ...presentation } : workspace
+        )
+      )
+    },
+    onError: (_error, update) => {
+      if (update.kind !== 'set') return
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.all, exact: true })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })

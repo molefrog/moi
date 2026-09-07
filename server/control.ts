@@ -28,7 +28,11 @@ import {
   reconcileViewBuilders,
   setBuilder
 } from './view-builders'
-import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
+import {
+  getWorkspaceConfig,
+  setWorkspaceConfig,
+  type WorkspaceConfigPatch
+} from './workspace-config'
 import { VERSION } from './version'
 
 type ControlSocket = { send(data: string): void }
@@ -405,13 +409,16 @@ export const control = Bun.serve({
           }
 
           // `null` clears a field; a value sets it; `undefined` leaves it unchanged.
-          const patch: { name?: string | null; icon?: string | null } = {}
+          const patch: WorkspaceConfigPatch = {}
           if (clearName) patch.name = null
           else if (hasName) patch.name = String(data.name)
           if (clearIcon) patch.icon = null
           else if (hasIcon) {
             try {
-              patch.icon = await processIcon(String(data.iconPath))
+              patch.icon = {
+                type: 'upload',
+                value: await processIcon(String(data.iconPath))
+              }
             } catch (err) {
               const msg = err instanceof Error ? err.message : String(err)
               ws.send(JSON.stringify({ error: `Could not read image: ${msg}` }))

@@ -3,12 +3,10 @@ import { type ReactNode, useEffect } from 'react'
 import { IconCircleCheckFilled } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
+import { workspaceProviderIcon } from '@/client/components/shared/WorkspaceIcon'
 import { DialogDescription, DialogTitle } from '@/client/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
-import {
-  workspaceProviderIcon,
-  workspaceTypeLabel
-} from '@/client/features/home/workspace-presentation'
+import { workspaceTypeLabel } from '@/client/features/home/workspace-presentation'
 import { cn } from '@/client/lib/cn'
 import { useUiStore } from '@/client/store/ui'
 import { WORKSPACE_TYPE_ORDER } from '@/lib/workspace-types'

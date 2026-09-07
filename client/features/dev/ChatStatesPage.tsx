@@ -58,7 +58,6 @@ const layoutCtxValue: WorkspaceLayoutContextValue = {
   layout: createDefaultWorkspaceLayout(),
   setLayout: () => {},
   name: 'moi',
-  icon: null,
   cwd: DEV_CWD,
   provider: 'openclaw',
   workspaceId: DEV_WORKSPACE_ID,

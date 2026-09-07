@@ -21,7 +21,7 @@ import { ThemePanel } from '@/client/features/workspace/ThemePanel'
 import { useAppletEvent } from '@/client/features/applets/applet-runtime'
 import { Overview } from '@/client/features/overview/Overview'
 import { PanelHeader } from '@/client/components/shared/PanelHeader'
-import { workspaceProviderIcon } from '@/client/features/home/workspace-presentation'
+import { WorkspaceIcon } from '@/client/components/shared/WorkspaceIcon'
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { useAppletChatMessage } from '@/client/features/chat/useAppletChatMessage'
@@ -157,9 +157,8 @@ function applyVisibleTabOrder(
 }
 
 export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenProps) {
-  const { layout, setLayout, name, icon, provider, workspaceId } = useWorkspaceLayoutCtx()
+  const { layout, setLayout, name, provider, workspaceId } = useWorkspaceLayoutCtx()
   const theme = resolveWorkspaceTheme(layout.theme)
-  const workspaceIcon = icon ?? workspaceProviderIcon[provider ?? 'claude-code']
   const builderActions = useViewBuilderActions()
   const {
     ref: rowRef,
@@ -648,7 +647,12 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       <PanelHeader>
         <div className="flex min-w-0 flex-1 items-center gap-4">
           <div className="flex items-center gap-2">
-            <img src={workspaceIcon} alt="" className="size-5 shrink-0 rounded-xs" />
+            <WorkspaceIcon
+              icon={layout.icon}
+              workspaceType={provider}
+              workspaceTheme={layout.theme}
+              className="size-5 rounded-sm"
+            />
             {name && <span className="truncate text-sm font-medium text-foreground">{name}</span>}
           </div>
           <WorkspaceTabs

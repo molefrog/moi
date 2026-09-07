@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { expect, test } from 'bun:test'
 
 import * as RegistryButton from '@/ui-components/button'
+import * as RegistryCheckbox from '@/ui-components/checkbox'
 import * as RegistryCollapsible from '@/ui-components/collapsible'
 import * as RegistryDialog from '@/ui-components/dialog'
 import * as RegistryDropdownMenu from '@/ui-components/dropdown-menu'
@@ -18,6 +19,7 @@ import * as RegistryTextarea from '@/ui-components/textarea'
 import * as RegistryTooltip from '@/ui-components/tooltip'
 
 import * as HostButton from './button'
+import * as HostCheckbox from './checkbox'
 import * as HostCollapsible from './collapsible'
 import * as HostDialog from './dialog'
 import * as HostDropdownMenu from './dropdown-menu'
@@ -35,6 +37,7 @@ import * as HostTooltip from './tooltip'
 
 test('host primitives re-export the shared registry implementations', () => {
   expect(HostButton).toEqual(RegistryButton)
+  expect(HostCheckbox).toEqual(RegistryCheckbox)
   expect(HostCollapsible).toEqual(RegistryCollapsible)
   expect(HostDialog).toEqual(RegistryDialog)
   expect(HostDropdownMenu).toEqual(RegistryDropdownMenu)

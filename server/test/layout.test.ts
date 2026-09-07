@@ -192,6 +192,15 @@ describe('loadLayout', () => {
       }
     )
   })
+
+  test('normalizes legacy uploaded icons into an icon object', async () => {
+    await withWorkspaceFile({ ...base, icon: 'data:image/webp;base64,legacy' }, async dir => {
+      expect((await loadLayout(dir)).icon).toEqual({
+        type: 'upload',
+        value: 'data:image/webp;base64,legacy'
+      })
+    })
+  })
 })
 
 describe('mergeLayoutForSave', () => {
@@ -211,13 +220,25 @@ describe('mergeLayoutForSave', () => {
   })
 
   test('keeps the stored icon and ignores a stale icon in the body', () => {
-    const existing: WorkspaceLayout = { ...base, icon: 'data:image/webp;base64,NEW' }
-    const body = { ...base, icon: 'data:image/webp;base64,OLD' } as WorkspaceLayout
-    expect(mergeLayoutForSave(existing, body).icon).toBe('data:image/webp;base64,NEW')
+    const existing: WorkspaceLayout = {
+      ...base,
+      icon: { type: 'glyph', value: 'rocket', background: 'theme' }
+    }
+    const body = {
+      ...base,
+      icon: { type: 'upload', value: 'data:image/webp;base64,OLD' }
+    } as WorkspaceLayout
+    expect(mergeLayoutForSave(existing, body)).toMatchObject({
+      icon: { type: 'glyph', value: 'rocket', background: 'theme' }
+    })
   })
 
   test('emits no name/icon keys when the workspace has neither (no undefined leak)', () => {
-    const body = { ...base, name: 'x', icon: 'y' } as WorkspaceLayout
+    const body = {
+      ...base,
+      name: 'x',
+      icon: { type: 'emoji', value: '💡' }
+    } as WorkspaceLayout
     const merged = mergeLayoutForSave(base, body)
     expect('name' in merged).toBe(false)
     expect('icon' in merged).toBe(false)

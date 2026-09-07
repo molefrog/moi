@@ -2,15 +2,14 @@ import { useEffect, useState } from 'react'
 
 import { InlineInput } from '@/client/components/ui/inline-input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/client/components/ui/popover'
-import { workspaceProviderIcon } from '@/client/features/home/workspace-presentation'
+import { WorkspaceIcon } from '@/client/components/shared/WorkspaceIcon'
 import { useSaveWorkspaceName } from '@/client/features/settings/api'
 import { WorkspaceIconPicker } from '@/client/features/settings/WorkspaceIconPicker'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 
 export function WorkspaceName() {
-  const { name, icon, provider, workspaceId } = useWorkspaceLayoutCtx()
+  const { layout, name, provider, workspaceId } = useWorkspaceLayoutCtx()
   const workspaceName = name ?? 'Workspace'
-  const workspaceIcon = icon ?? workspaceProviderIcon[provider ?? 'claude-code']
   const saveName = useSaveWorkspaceName(workspaceId)
   const [nameDraft, setNameDraft] = useState(workspaceName)
 
@@ -30,9 +29,14 @@ export function WorkspaceName() {
             <button
               type="button"
               aria-label="Change workspace icon"
-              className="group shrink-0 cursor-pointer rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="group inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-lg p-0 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
             >
-              <img src={workspaceIcon} alt="" className="size-10 rounded-lg" />
+              <WorkspaceIcon
+                icon={layout.icon}
+                workspaceType={provider}
+                workspaceTheme={layout.theme}
+                className="size-full rounded-lg"
+              />
             </button>
           }
         />

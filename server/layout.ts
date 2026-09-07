@@ -2,6 +2,7 @@ import { join } from 'path'
 
 import type { AppletKind, WorkspaceLayout, WorkspacePreview } from '@/lib/types'
 import { createDefaultWorkspaceLayout, normalizeWorkspaceTabs } from '@/lib/workspace-layout'
+import { isWorkspaceIcon } from '@/lib/workspace-icon'
 
 import { getCapturedThumbnails } from './thumbnails'
 
@@ -12,6 +13,11 @@ function normalizeLayout(parsed: Record<string, unknown>): WorkspaceLayout {
     layout.layoutMode = defaults.layoutMode
   }
   layout.tabs = normalizeWorkspaceTabs(layout.tabs)
+  if (typeof layout.icon === 'string') {
+    layout.icon = { type: 'upload', value: layout.icon }
+  } else if (layout.icon !== undefined && !isWorkspaceIcon(layout.icon)) {
+    delete layout.icon
+  }
   // Legacy thumbnail caches are intentionally dropped, not migrated — images
   // now live as files under `.moi/.cache/thumbnails` (server/thumbnails.ts)
   // and applets are simply captured again there.
