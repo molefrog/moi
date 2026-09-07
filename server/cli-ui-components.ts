@@ -2,7 +2,7 @@
 // engine and docs/ui-components.md for the spec). Three verbs:
 //
 //   moi ui-components                → the curated catalog + installed state
-//   moi ui-components add <name…>    → fetch, transform, write to .moi/ui/
+//   moi ui-components add <name…>    → copy registry components to .moi/ui/
 //   moi ui-components docs <name…>   → component docs as markdown, on stdout
 //
 // The command is deliberately not smart: add never rebuilds and never edits
@@ -17,17 +17,15 @@ import pc from './cli-pc'
 import { resolveCwdWorkspace } from './cli-env'
 import { MOI_PACKAGE_JSON } from './moi-scaffold'
 import {
-  type FetchedUiComponents,
+  type LoadedUiComponents,
   UI_COMPONENTS,
   UI_COMPONENT_NAMES,
-  UI_DOCS_BASE,
-  fetchUiComponentDocs,
-  fetchUiComponents,
+  loadUiComponentDocs,
+  loadUiComponents,
   partitionUiWrites,
   planUiWrites,
   resolveUiComponentRequest,
   suggestUiComponents,
-  transformUiComponentSource,
   uiComponentFiles
 } from './ui-components'
 
@@ -40,7 +38,7 @@ function exitUnknownNames(unknown: string[]): never {
     const hints = suggestUiComponents(name)
     console.error(
       pc.red('✗') +
-        ` "${name}" is not in the moi component set.` +
+        ` "${name}" is not in the component catalog.` +
         (hints.length ? pc.dim(`  Did you mean: ${hints.join(', ')}?`) : '')
     )
   }
@@ -51,7 +49,7 @@ function exitUnknownNames(unknown: string[]): never {
 const add = defineCommand({
   meta: {
     name: 'add',
-    description: 'Fetch components from the shadcn registry into .moi/ui/'
+    description: 'Add components from the local registry to .moi/ui/'
   },
   args: {
     name: {
@@ -77,35 +75,34 @@ const add = defineCommand({
     const entry = await resolveCwdWorkspace()
     const uiDir = uiDirFor(entry.path)
 
-    let fetched: FetchedUiComponents
+    let loaded: LoadedUiComponents
     try {
-      fetched = await fetchUiComponents(request.registryItems)
+      loaded = await loadUiComponents(request.entries)
     } catch (err) {
       console.error(
         '\n' +
           pc.red('✗') +
-          ' Could not load the requested components. ' +
-          'Components bundled with moi work offline; other components need network access.\n' +
+          ' Could not load the requested components from the local registry.\n' +
           pc.dim(`  ${(err as Error).message}\n`)
       )
       process.exit(1)
     }
 
     const plans = planUiWrites({
-      files: fetched.files,
-      requestedItems: request.registryItems,
+      files: loaded.files,
+      requestedFiles: request.entries.flatMap(uiComponentFiles),
       uiDir,
       exists: existsSync
     })
 
     // Hand-customized components are never silently overwritten: without
     // --force a requested file that already exists is skipped and reported, so
-    // a bulk add still installs everything new. Only when every requested
-    // component already exists does the add fail. Existing support files
-    // (utils, applet-portal, registry deps that rode along) are kept as-is
+    // a bulk add still installs everything new. Only when nothing needs to be
+    // written does the add fail. Existing support files
+    // (utils, scoped-portal, registry deps that rode along) are kept as-is
     // either way, even under --force.
     const partition = partitionUiWrites(plans, args.force)
-    if (partition.allInstalled) {
+    if (partition.write.length === 0) {
       console.error(
         '\n' +
           pc.red('✗') +
@@ -121,11 +118,7 @@ const add = defineCommand({
     await mkdir(uiDir, { recursive: true })
     const written: string[] = []
     for (const plan of partition.write) {
-      const content =
-        plan.name.endsWith('.tsx') && !plan.verbatim
-          ? await transformUiComponentSource(plan.name, plan.content)
-          : plan.content
-      await Bun.write(plan.path, content)
+      await Bun.write(plan.path, plan.content)
       written.push(plan.name)
     }
     const kept = partition.keepSupport.map(plan => plan.name)
@@ -135,7 +128,7 @@ const add = defineCommand({
     // registry specifiers may be versioned (`recharts@3.8.0`), so compare by
     // package name.
     const baseline = new Set(Object.keys(MOI_PACKAGE_JSON.dependencies))
-    const deps = [...new Set([...fetched.dependencies, ...request.extraDeps])]
+    const deps = [...new Set(loaded.dependencies)]
       .filter(spec => !baseline.has(spec.replace(/@[^@/]+$/, '')))
       .sort()
 
@@ -217,29 +210,16 @@ const docs = defineCommand({
     const request = resolveUiComponentRequest(args._)
     if (request.unknown.length > 0) exitUnknownNames(request.unknown)
 
+    console.log(
+      '> Import components relatively from `../ui/<name>` and use `@tabler/icons-react` for icons.\n'
+    )
     for (const name of request.entries) {
-      const entry = UI_COMPONENTS[name]
-      const source =
-        entry.docs === 'registry'
-          ? entry.registryItems[0]
-          : `${UI_DOCS_BASE}/${entry.docsSlug ?? name}.md`
       try {
-        if (!source) throw new Error(`No docs source configured for "${name}"`)
-        let markdown: string
-        if (entry.docs === 'registry') {
-          markdown = await fetchUiComponentDocs(source)
-        } else {
-          const res = await fetch(source, { signal: AbortSignal.timeout(20_000) })
-          if (!res.ok) throw new Error(`HTTP ${res.status}`)
-          markdown = await res.text()
-        }
+        const markdown = await loadUiComponentDocs(name)
         if (request.entries.length > 1) console.log(`\n---\n# ${name}\n`)
         console.log(markdown)
       } catch (err) {
-        console.error(
-          pc.red('✗') +
-            ` Could not fetch docs for "${name}" (${source ?? 'missing source'}): ${(err as Error).message}`
-        )
+        console.error(pc.red('✗') + ` Could not load docs for "${name}": ${(err as Error).message}`)
         process.exitCode = 1
       }
     }

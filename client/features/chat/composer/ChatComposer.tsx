@@ -364,7 +364,11 @@ function DrawingAttachmentChip({ attachment, onRemove }: DrawingAttachmentChipPr
         <span>{label}</span>
       </HoverCardTrigger>
       {previewUrl && (
-        <HoverCardContent side="top" align="start" className="w-60 max-w-[calc(100vw-2rem)]">
+        <HoverCardContent
+          side="top"
+          align="start"
+          className="w-60 max-w-[calc(100vw-2rem)] rounded-xl"
+        >
           <img
             src={previewUrl}
             alt={`${label} preview`}

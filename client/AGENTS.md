@@ -12,7 +12,7 @@ Before editing host-app UI, read `../DESIGN.md` and the relevant rules in `../.a
 
 ## Conventions
 
-- UI components in `components/ui/` are shadcn built on Base UI React.
+- UI components in `components/ui/` are host facades over the shared moi registry components built on Base UI React. Local compatibility copies explain why they cannot re-export yet.
 - `lib/cn.ts` is `clsx` + `tailwind-merge`.
 
 ## Vendored React
@@ -28,7 +28,7 @@ React is not bundled into the app. It ships as locally-vendored ESM in `vendor/r
 
 - `app/` owns routes and the app shell. Route files load data and compose features; keep feature UI out of them.
 - `features/<name>/` owns that feature's components, hooks, state, API hooks, and nearby tests.
-- `components/ui/` contains installed shadcn primitives. `components/shared/` contains reusable app components with no feature knowledge.
+- `components/ui/` contains host facades for shared UI primitives. `components/shared/` contains reusable app components with no feature knowledge.
 - `api/` contains shared request helpers, query keys, and query policies. Feature endpoints stay in the feature's `api.ts`.
 - `runtime/` contains browser-wide lifecycle code such as HMR and shared workspace events.
 - `lib/` contains small feature-neutral utilities. Do not use it as a catch-all for components or feature state.

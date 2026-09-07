@@ -1,6 +1,6 @@
 # Icons
 
-**Always use the project's configured `iconLibrary` for imports.** Check the `iconLibrary` field from project context: `lucide` → `lucide-react`, `tabler` → `@tabler/icons-react`, etc. Never assume `lucide-react`.
+**Use Tabler in components and documentation examples.** Set `iconLibrary` to `tabler` and import `Icon`-prefixed names from `@tabler/icons-react`. Set an explicit `stroke` following the [project icon rules](../../../rules/icons.md).
 
 ---
 
@@ -12,7 +12,7 @@ Add `data-icon="inline-start"` (prefix) or `data-icon="inline-end"` (suffix) to 
 
 ```tsx
 <Button>
-  <SearchIcon className="mr-2 size-4" />
+  <IconSearch stroke={1.5} className="mr-2 size-4" />
   Search
 </Button>
 ```
@@ -21,13 +21,13 @@ Add `data-icon="inline-start"` (prefix) or `data-icon="inline-end"` (suffix) to 
 
 ```tsx
 <Button>
-  <SearchIcon data-icon="inline-start"/>
+  <IconSearch stroke={1.5} data-icon="inline-start"/>
   Search
 </Button>
 
 <Button>
   Next
-  <ArrowRightIcon data-icon="inline-end"/>
+  <IconArrowRight stroke={1.5} data-icon="inline-end"/>
 </Button>
 ```
 
@@ -41,12 +41,12 @@ Components handle icon sizing via CSS. Don't add `size-4`, `w-4 h-4`, or other s
 
 ```tsx
 <Button>
-  <SearchIcon className="size-4" data-icon="inline-start" />
+  <IconSearch stroke={1.5} className="size-4" data-icon="inline-start" />
   Search
 </Button>
 
 <DropdownMenuItem>
-  <SettingsIcon className="mr-2 size-4" />
+  <IconSettings stroke={1.75} className="mr-2 size-4" />
   Settings
 </DropdownMenuItem>
 ```
@@ -55,12 +55,12 @@ Components handle icon sizing via CSS. Don't add `size-4`, `w-4 h-4`, or other s
 
 ```tsx
 <Button>
-  <SearchIcon data-icon="inline-start" />
+  <IconSearch stroke={1.5} data-icon="inline-start" />
   Search
 </Button>
 
 <DropdownMenuItem>
-  <SettingsIcon />
+  <IconSettings stroke={1.75} />
   Settings
 </DropdownMenuItem>
 ```
@@ -69,19 +69,19 @@ Components handle icon sizing via CSS. Don't add `size-4`, `w-4 h-4`, or other s
 
 ## Pass icons as component objects, not string keys
 
-Use `icon={CheckIcon}`, not a string key to a lookup map.
+Use `icon={IconCheck}`, not a string key to a lookup map.
 
 **Incorrect:**
 
 ```tsx
 const iconMap = {
-  check: CheckIcon,
-  alert: AlertIcon,
+  check: IconCheck,
+  alert: IconAlertCircle,
 }
 
 function StatusBadge({ icon }: { icon: string }) {
   const Icon = iconMap[icon]
-  return <Icon />
+  return <Icon stroke={1.5} />
 }
 
 <StatusBadge icon="check" />
@@ -90,12 +90,14 @@ function StatusBadge({ icon }: { icon: string }) {
 **Correct:**
 
 ```tsx
-// Import from the project's configured iconLibrary (e.g. lucide-react, @tabler/icons-react).
-import { CheckIcon } from "lucide-react"
+import { IconCheck } from '@tabler/icons-react'
+import type { TablerIcon } from '@tabler/icons-react'
 
-function StatusBadge({ icon: Icon }: { icon: React.ComponentType }) {
-  return <Icon />
+type StatusBadgeProps = { icon: TablerIcon }
+
+function StatusBadge({ icon: Icon }: StatusBadgeProps) {
+  return <Icon stroke={1.5} />
 }
 
-<StatusBadge icon={CheckIcon} />
+<StatusBadge icon={IconCheck} />
 ```

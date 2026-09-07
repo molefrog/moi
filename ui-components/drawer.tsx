@@ -132,11 +132,7 @@ function DrawerContent({
               {showCloseButton && (
                 <DrawerClose
                   render={
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="absolute top-3 right-3 text-muted-foreground"
-                    />
+                    <Button variant="ghost" size="icon-sm" className="absolute top-3 right-3" />
                   }
                 >
                   <IconX stroke={1.75} />
