@@ -104,7 +104,7 @@ function Sidebar({ workspaces }: SidebarProps) {
                   className="flex flex-col gap-4"
                   onReorder={ids => reorder.mutate(ids)}
                   renderPlaceholder={() => (
-                    <div className="pointer-events-none absolute top-0 left-1 size-10 rounded-xl bg-accent" />
+                    <div className="pointer-events-none absolute top-0 left-1 size-12 rounded-xl bg-accent" />
                   )}
                   renderOverlay={ws => <WorkspaceButton workspace={ws} dragOverlay />}
                   renderItem={(ws, state) => <WorkspaceButton workspace={ws} dragState={state} />}
