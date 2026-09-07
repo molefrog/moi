@@ -13,8 +13,8 @@ function stringTokens(value: unknown): string[] {
   return Object.values(value).flatMap(stringTokens)
 }
 
-// Compile actual component classes without the applet CSS repair. The host
-// and registry consumers must not depend on that compatibility transform.
+// Check the CSS emitted by shared component classes for both the host and
+// registry consumers, including variants that might otherwise be dropped.
 test('shared components avoid universal subjects inside relational :is selectors', async () => {
   const candidates = new Set<string>()
   for await (const file of new Bun.Glob('*.tsx').scan(import.meta.dir)) {
