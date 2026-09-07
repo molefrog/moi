@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { expect, test } from 'bun:test'
 
+import * as RegistryAlertDialog from '@/ui-components/alert-dialog'
 import * as RegistryButton from '@/ui-components/button'
 import * as RegistryCheckbox from '@/ui-components/checkbox'
 import * as RegistryCollapsible from '@/ui-components/collapsible'
@@ -18,6 +19,7 @@ import * as RegistryTabs from '@/ui-components/tabs'
 import * as RegistryTextarea from '@/ui-components/textarea'
 import * as RegistryTooltip from '@/ui-components/tooltip'
 
+import * as HostAlertDialog from './alert-dialog'
 import * as HostButton from './button'
 import * as HostCheckbox from './checkbox'
 import * as HostCollapsible from './collapsible'
@@ -36,6 +38,7 @@ import * as HostTextarea from './textarea'
 import * as HostTooltip from './tooltip'
 
 test('host primitives re-export the shared registry implementations', () => {
+  expect(HostAlertDialog).toEqual(RegistryAlertDialog)
   expect(HostButton).toEqual(RegistryButton)
   expect(HostCheckbox).toEqual(RegistryCheckbox)
   expect(HostCollapsible).toEqual(RegistryCollapsible)

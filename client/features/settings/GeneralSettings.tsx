@@ -2,6 +2,17 @@ import { IconLoader2 } from '@tabler/icons-react'
 import { useLocation } from 'wouter'
 
 import { useAppConfig } from '@/client/api/app-config'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from '@/client/components/ui/alert-dialog'
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
 import { useRemoveWorkspace } from '@/client/features/home/api'
@@ -14,11 +25,9 @@ export function GeneralSettings() {
   const { name, cwd, workspaceId } = useWorkspaceLayoutCtx()
   const [, navigate] = useLocation()
   const removeWorkspace = useRemoveWorkspace()
+  const label = name ?? cwd ?? 'this space'
 
   const remove = () => {
-    const label = name ?? cwd ?? 'this space'
-    const message = `Remove "${label}" from your workspaces?\n\nThis only removes it from your list. The folder and its sessions stay on disk. You can add it back any time.`
-    if (!window.confirm(message)) return
     removeWorkspace.mutate(workspaceId, { onSuccess: () => navigate('/') })
   }
 
@@ -45,23 +54,48 @@ export function GeneralSettings() {
             title="Remove space"
             description="Remove this space from moi. Its folder and sessions stay on disk."
             control={
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                onClick={remove}
-                disabled={removeWorkspace.isPending}
-              >
-                {removeWorkspace.isPending && (
-                  <IconLoader2 data-icon="inline-start" stroke={1.75} className="animate-spin" />
-                )}
-                Remove
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger
+                  render={<Button type="button" variant="destructive" size="sm" />}
+                  disabled={removeWorkspace.isPending}
+                >
+                  Remove
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Remove “{label}” from your workspaces?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This only removes it from your list. The folder and its sessions stay on disk.
+                      You can add it back any time.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  {removeWorkspace.isError && (
+                    <p className="text-xs text-destructive">{removeWorkspace.error.message}</p>
+                  )}
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={removeWorkspace.isPending}>
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      type="button"
+                      variant="destructive"
+                      onClick={remove}
+                      disabled={removeWorkspace.isPending}
+                    >
+                      {removeWorkspace.isPending && (
+                        <IconLoader2
+                          data-icon="inline-start"
+                          stroke={1.75}
+                          className="animate-spin"
+                        />
+                      )}
+                      Remove
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             }
           />
-          {removeWorkspace.isError && (
-            <p className="px-3.5 py-3 text-xs text-destructive">{removeWorkspace.error.message}</p>
-          )}
         </SettingsSection>
       )}
     </SettingsPage>
