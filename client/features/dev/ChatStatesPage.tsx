@@ -336,7 +336,9 @@ export function ChatStatesPage() {
             </div>
 
             <details className="mt-16 border-t border-border pt-6 text-xs text-muted-foreground">
-              <summary className="cursor-pointer font-medium">Notes for designers</summary>
+              <summary className="cursor-pointer list-none font-medium marker:hidden [&::-webkit-details-marker]:hidden">
+                Notes for designers
+              </summary>
               <ul className="mt-3 flex list-disc flex-col gap-1.5 pl-4">
                 <li>
                   User bubbles render markdown verbatim (whitespace preserved, no markdown parsing)

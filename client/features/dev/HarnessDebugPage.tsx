@@ -99,7 +99,7 @@ type LogRowProps = {
 function LogRow({ time, badge, badgeClass, label, body }: LogRowProps) {
   return (
     <details className="group border-b border-border/40 px-2 py-1 text-[11px] leading-tight">
-      <summary className="flex cursor-pointer items-baseline gap-2 font-mono whitespace-nowrap">
+      <summary className="flex cursor-pointer list-none items-baseline gap-2 font-mono whitespace-nowrap marker:hidden [&::-webkit-details-marker]:hidden">
         <span className="text-muted-foreground/60 tabular-nums">{ts(time)}</span>
         <span className={cn('rounded px-1 font-semibold', badgeClass)}>{badge}</span>
         <span className="shrink-0 font-semibold">{label}</span>

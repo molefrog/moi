@@ -261,7 +261,9 @@ type DataPartProps = { name: string; data: unknown }
 function DataPart({ name, data }: DataPartProps) {
   return (
     <details>
-      <summary className="cursor-pointer text-xs text-muted-foreground">data:{name}</summary>
+      <summary className="cursor-pointer list-none text-xs text-muted-foreground marker:hidden [&::-webkit-details-marker]:hidden">
+        data:{name}
+      </summary>
       <pre className="mt-1 overflow-auto rounded bg-muted p-2 font-mono text-xs text-muted-foreground">
         {JSON.stringify(data, null, 2)}
       </pre>

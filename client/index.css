@@ -4,10 +4,8 @@
 
 @import 'highlight.js/styles/github.css';
 
-.hljs {
-  background: transparent;
-  padding: 0;
-}
+/* Theme tokens and texture utilities shared with applet bundles. */
+@import './theme.css';
 
 @plugin '@tailwindcss/typography';
 
@@ -29,7 +27,7 @@
   --primary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.64 0 0);
-  --accent: oklch(0 0 0 / 0.07);
+  --accent: oklch(0 0 0 / 0.06);
   --accent-foreground: var(--foreground);
   --success: oklch(0.527 0.154 150.069);
   --destructive: oklch(0.58 0.22 27);
@@ -100,23 +98,6 @@
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-}
-
-/* Theme tokens and texture utilities shared with applet bundles. */
-@import './theme.css';
-
-/* Dragged card floats above all others */
-.react-grid-item.react-draggable-dragging {
-  z-index: 10;
-}
-
-/* Drop placeholder shown while dragging a widget — matches card shape */
-.react-grid-item.react-grid-placeholder {
-  background: var(--muted);
-  opacity: 0.75;
-  border-radius: var(--radius-2xl);
-  corner-shape: superellipse(1.2);
-  z-index: 0;
 }
 
 @layer base {
@@ -195,13 +176,25 @@
   cursor: var(--cursor-pencil);
 }
 
-/* Tool details toggle */
-details > summary {
-  list-style: none;
+@utility squircle {
+  corner-shape: superellipse(1.2);
 }
-details > summary::-webkit-details-marker {
-  display: none;
+
+.hljs {
+  background: transparent;
+  padding: 0;
 }
-details[open] > summary .chevron {
-  transform: rotate(90deg);
+
+/* Dragged card floats above all others */
+.react-grid-item.react-draggable-dragging {
+  z-index: 10;
+}
+
+/* Drop placeholder shown while dragging a widget — matches card shape */
+.react-grid-item.react-grid-placeholder {
+  background: var(--muted);
+  opacity: 0.75;
+  border-radius: var(--radius-2xl);
+  corner-shape: superellipse(1.2);
+  z-index: 0;
 }

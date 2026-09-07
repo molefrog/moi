@@ -42,7 +42,7 @@ export function WidgetFrame({ editing, hidden, onRemove, children }: WidgetFrame
         data-vivid
         style={getWorkspaceThemeStyle(theme, 'widget')}
         className={cn(
-          'absolute inset-0 overflow-hidden rounded-2xl text-foreground [corner-shape:superellipse(1.2)]',
+          'absolute inset-0 overflow-hidden rounded-2xl text-foreground squircle',
           // Outer drop shadow on the wrapper itself.
           'shadow-[0_1px_2px_-1px_rgba(0,0,0,0.08),0_2px_4px_0_rgba(0,0,0,0.03)]',
           // 1px inset stroke painted on a pseudo so it lands ON TOP of the

@@ -5,7 +5,7 @@
 // widget renders half-styled with no build error.
 export default function ShadcnVocab() {
   return (
-    <div className="scroll-fade overflow-y-auto">
+    <div className="squircle scroll-fade overflow-y-auto">
       <div
         data-open
         className="animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-100 data-open:animate-in data-closed:animate-out"

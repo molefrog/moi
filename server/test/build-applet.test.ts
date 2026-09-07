@@ -328,6 +328,8 @@ describe('buildApplet', () => {
     ]) {
       expect(css).toContain(marker)
     }
+
+    expect(css).not.toContain('.squircle')
   })
 
   test('carries the shadcn base-layer border/outline defaults, scoped', async () => {

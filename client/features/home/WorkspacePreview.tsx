@@ -165,7 +165,7 @@ export function WorkspacePreview({ workspaceId }: WorkspacePreviewProps) {
         <div
           key={src}
           className={cn(
-            'absolute top-[12%] left-[14%] w-fit max-w-[72%] overflow-hidden rounded-[calc(var(--radius-2xl)*0.4)] bg-background shadow-xs [corner-shape:superellipse(1.2)]',
+            'absolute top-[12%] left-[14%] w-fit max-w-[72%] overflow-hidden rounded-[calc(var(--radius-2xl)*0.4)] bg-background shadow-xs squircle',
             'animate-in duration-300 ease-out fade-in',
             slots[index].frame
           )}

@@ -28,9 +28,7 @@ const EMPTY_WIDGET_ITEMS: GridItem[] = Array.from({ length: 10 }, (_, index) => 
 }))
 
 function renderEmptyWidget() {
-  return (
-    <Skeleton className="size-full animate-none rounded-2xl texture-checker [corner-shape:superellipse(1.2)]" />
-  )
+  return <Skeleton className="size-full animate-none rounded-2xl texture-checker squircle" />
 }
 
 type NoWidgetsCreatedProps = {
