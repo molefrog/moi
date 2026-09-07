@@ -57,7 +57,7 @@ function NoWidgetsCreated({ onCreateWidget, showOnboarding }: NoWidgetsCreatedPr
         variant="outline"
         className={cn(
           'absolute inset-0 m-auto h-fit w-fit',
-          'flex-col gap-1 rounded-xl border-0 py-4 pr-12 pl-12! text-xs shadow-sm transition-shadow duration-300 ease-out squircle hover:bg-background hover:shadow-lg [&_svg]:size-8'
+          'flex-col gap-1 rounded-2xl border-0 py-4 pr-12 pl-12! text-xs shadow-sm transition-shadow duration-300 ease-out squircle hover:bg-background hover:shadow-lg [&_svg]:size-8'
         )}
         onClick={onCreateWidget}
       >
