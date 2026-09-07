@@ -13,6 +13,7 @@ import {
 } from '@/client/features/chat/chat-send'
 import { attachmentKey, type ChatAttachment, liveStore } from '@/client/features/chat/chat-store'
 import type { SessionInfo, ViewState, WorkspaceAgent } from '@/lib/types'
+import { resolveSelectedModel } from './composer/model-order'
 
 const workspaceId = 'workspace-1'
 const sessionId = 'session-1'
@@ -161,6 +162,58 @@ describe('resolveChatRunOptions', () => {
 
   test('omits Fast mode when no moi preference exists', () => {
     expect(resolveChatRunOptions(models, 'sonnet', 'high')).not.toHaveProperty('fastMode')
+  })
+})
+
+describe('Codex model selection', () => {
+  const catalog: WorkspaceAgent = {
+    provider: 'codex',
+    availability: { status: 'available' },
+    models: [
+      { value: 'default', resolvedModel: 'gpt-5.6-sol', displayName: '5.6 Sol' },
+      { value: 'gpt-5.6-luna', displayName: '5.6 Luna', supportedEffortLevels: ['low', 'medium'] },
+      {
+        value: 'gpt-5.6-sol',
+        resolvedModel: 'gpt-5.6-sol',
+        displayName: '5.6 Sol',
+        supportedEffortLevels: ['low', 'xhigh'],
+        supportsFastMode: true
+      }
+    ]
+  }
+
+  for (const pick of [undefined, 'default', 'gpt-6-astra', 'gpt-5.6-sol']) {
+    test(`sends the displayed Sol model for ${pick ?? 'an implicit default'}`, () => {
+      const displayed = resolveSelectedModel(catalog.models, pick)
+      const run = resolveChatRunOptions(catalog, pick, 'xhigh', true)
+      expect(displayed?.displayName).toBe('5.6 Sol')
+      expect(run).toMatchObject({ model: displayed?.value, effort: 'xhigh', fastMode: true })
+    })
+  }
+
+  test('an explicit choice overrides the configured default and validates its capabilities', () => {
+    expect(resolveChatRunOptions(catalog, 'gpt-5.6-luna', 'xhigh', true)).toMatchObject({
+      model: 'gpt-5.6-luna',
+      effort: undefined,
+      fastMode: false
+    })
+  })
+
+  test('an unavailable default uses the same first catalog row as the picker', () => {
+    const data = { ...catalog, models: catalog.models.filter(model => model.value !== 'default') }
+    expect(resolveChatRunOptions(data, undefined, 'low').model).toBe('gpt-5.6-luna')
+  })
+
+  test('sends the native model id when it differs from the picker row id', () => {
+    const data = {
+      ...catalog,
+      models: [{ value: 'catalog-sol', resolvedModel: 'gpt-5.6-sol', displayName: '5.6 Sol' }]
+    }
+    expect(resolveChatRunOptions(data, 'catalog-sol', undefined).model).toBe('gpt-5.6-sol')
+  })
+
+  test('preserves an explicit choice while the catalog is loading', () => {
+    expect(resolveChatRunOptions(undefined, 'gpt-5.6-sol', 'low').model).toBe('gpt-5.6-sol')
   })
 })
 

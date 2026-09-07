@@ -12,6 +12,7 @@ import {
   resolveDisplayedEffort,
   resolveEffortIndex,
   resolveFastMode,
+  resolveSelectedModel,
   sortModelsByProviderOrder
 } from './model-order'
 import { Button } from '@/client/components/ui/button'
@@ -330,19 +331,8 @@ export const ModelPicker = memo(function ModelPicker({ sessionId }: ModelPickerP
     else setLayout({ selectedFastMode: value })
   }
 
-  if (models.length === 0) return null
-
-  // Show a persisted pick when it still exists. Otherwise name the concrete
-  // model behind the SDK default, or fall back to the first available model.
-  const persistedModel = models.some(model => model.value === selectedModel)
-    ? selectedModel
-    : undefined
-  const defaultModel =
-    models.find(
-      model => defaultEntry?.resolvedModel && model.resolvedModel === defaultEntry.resolvedModel
-    ) ?? models[0]
-  const currentModelValue = persistedModel ?? defaultModel.value
-  const model = models.find(item => item.value === currentModelValue) ?? models[0]
+  const model = resolveSelectedModel(models, selectedModel, defaultEntry?.resolvedModel)
+  if (!model) return null
   const effortLevels = model.supportsEffort ? (model.supportedEffortLevels ?? []) : []
   const currentEffort = resolveDisplayedEffort(effortLevels, selectedEffort, model.defaultEffort)
   const showEffort = hasEffortChoice(effortLevels) && currentEffort !== undefined
@@ -351,7 +341,7 @@ export const ModelPicker = memo(function ModelPicker({ sessionId }: ModelPickerP
   return (
     <div className="flex min-w-0 items-center gap-1">
       <ModelDropdown
-        current={currentModelValue}
+        current={model.value}
         model={model}
         models={models}
         onValueChange={setSelectedModel}

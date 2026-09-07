@@ -50,6 +50,10 @@ test('Codex picker defaults follow configured model, effort and service tier', (
     resolvedModel: 'first',
     defaultEffort: 'low'
   })
+  expect(codexModelsToModels(models, { model: 'unavailable-model' })[0]).toMatchObject({
+    value: 'default',
+    resolvedModel: 'first'
+  })
 })
 
 describe('codexItemToTurn', () => {
