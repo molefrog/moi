@@ -41,7 +41,6 @@ describe('chatNoticeLabel', () => {
   test('every other kind is skipped', () => {
     const skipped: SystemNotice[] = [
       { id: 'a', kind: 'rate-limit', at: 't' },
-      { id: 'b', kind: 'api-retry', at: 't', attempt: 1, maxRetries: 3, delayMs: 100 },
       {
         id: 'c',
         kind: 'hook',
@@ -56,6 +55,21 @@ describe('chatNoticeLabel', () => {
       { id: 'f', kind: 'elicitation', at: 't', server: 's', elicitationId: 'e1' }
     ]
     for (const notice of skipped) expect(chatNoticeLabel(notice)).toBe(null)
+  })
+
+  test('shows provider retries and pending questions', () => {
+    expect(
+      chatNoticeLabel({ id: 'retry', kind: 'api-retry', at: 't', error: 'Reconnecting' })
+    ).toBe('Retrying: Reconnecting')
+    expect(
+      chatNoticeLabel({
+        id: 'question',
+        kind: 'user-input',
+        at: 't',
+        status: 'pending',
+        questions: []
+      })
+    ).toBe('Waiting for your answer')
   })
 })
 

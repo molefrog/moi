@@ -152,7 +152,7 @@ export function resolveChatRunOptions(
     !pickedModel || !models || models.some(candidate => candidate.value === pickedModel)
       ? pickedModel
       : undefined
-  const modelInfo = models?.find(candidate => candidate.value === model)
+  const modelInfo = models?.find(candidate => candidate.value === (model ?? 'default'))
   const effort =
     pickedEffort && (!modelInfo || (modelInfo.supportedEffortLevels ?? []).includes(pickedEffort))
       ? pickedEffort

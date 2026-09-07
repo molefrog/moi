@@ -354,3 +354,55 @@ to an installed codex binary. When bumping the supported CLI version, re-run
 `generate-ts` into a scratch dir and diff the relevant definitions
 (`v2/ThreadItem`, `v2/TurnStartParams`, `ServerNotification`, `ServerRequest`)
 against the subset here.
+
+## Reliability and interactive input (CLI 0.147.0, September 2026)
+
+Validated against locally generated experimental app-server bindings and a real
+Codex session in moi. The transport now lives in `transport.ts`; `client.ts`
+owns the workspace process and discovery, while `session.ts` owns run state.
+
+- `error.willRetry` is authoritative. Retrying errors keep the run active and
+  show a retry notice. Failed steer/interrupt requests are nonterminal UI errors.
+- Serialize sends through their RPC acknowledgements. Only a native
+  no-active-turn rejection permits `turn/steer` to fall back to `turn/start`;
+  timeouts/auth failures/turn mismatches must never resubmit the message.
+- Resume subscriptions precede `thread/resume`. Buffer notifications until
+  snapshot hydration finishes, coalesce concurrent resumes, and hydrate the
+  active turn id so resumed runs can be stopped. Completion can precede a start
+  acknowledgement; completed ids prevent the late acknowledgement restarting it.
+- Stop cancels queued sends and catches starts acknowledged after Stop. Provider
+  completion remains authoritative for commands already running. Unfinished tool
+  cards are settled on completion/disconnect; idle transcript copies expire
+  after 30 minutes and resubscribe on demand.
+- `item/tool/requestUserInput` returns an asynchronous response. moi opts its
+  threads into `features.default_mode_request_user_input` (the CLI defaults it
+  off), renders native questions, and answers through the session-scoped input
+  endpoint. Pending forms survive page reloads while the server stays alive.
+  Skip, interruption, completion, disconnect and `serverRequest/resolved` settle
+  the request. Answers are neither saved in display notices nor retained in the
+  wire debug ring. A server restart cancels pending input rather than replaying
+  stale requests. MCP schema/URL elicitation remains unsupported and is declined.
+- Permission-extension approvals require `{ permissions, scope: 'turn' }`;
+  ordinary command/file approvals use `{ decision: 'accept' }`. Both legacy v1
+  approval methods use `approved`. Unknown approval families are rejected.
+- Model catalogs are paginated, cached per process for one minute, and invalidated
+  on account updates. They must not be shared across workspace-specific env/auth.
+  `config/read.model_reasoning_effort` applies even when selecting another model;
+  without that config, use the model's advertised default. A synthetic `default`
+  row makes the existing picker show the configured/default model accurately.
+- Fast mode uses `serviceTier: 'priority'`; explicit off uses JSON null, and
+  omission inherits provider config. Both on/off were observed in live turns.
+  Model/effort/tier changes take effect on the next **new turn**; the native
+  steering RPC has no fields for changing them inside the current turn.
+- Thread lists use `updated_at` ordering and all cursor pages. Child transcripts
+  load with a four-request concurrency bound. Previews coalesce at 40ms; a
+  completed item cancels its pending preview so late timers cannot resurrect it.
+- Use native turn duration even when the replay gives every item the same
+  start timestamp. Otherwise the shared grouping layer replaces a 20-second
+  run with zero seconds after a reload.
+
+Regression coverage is colocated in `transport.test.ts`, `pagination.test.ts`,
+`input-requests.test.ts`, `session.test.ts`, and `adapter.test.ts`, with UI frame
+and duration cases in `client/features/chat`. Live validation uses the dedicated
+`codex-integration-check` workspace; see
+[the validation record](../../../docs/codex-integration-validation.md).

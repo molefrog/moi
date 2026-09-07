@@ -125,6 +125,38 @@ function ModelDropdown({ current, model, models, onValueChange }: ModelDropdownP
   )
 }
 
+type FastModeToggleProps = { fastMode: boolean; onChange: (value: boolean) => void }
+
+function FastModeToggle({ fastMode, onChange }: FastModeToggleProps) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={fastMode ? 'Turn off fast mode' : 'Turn on fast mode'}
+            aria-pressed={fastMode}
+            onClick={() => onChange(!fastMode)}
+            className="-my-1 -mr-1"
+          >
+            {fastMode ? (
+              <IconBoltFilled className="text-primary" stroke={1.75} />
+            ) : (
+              <IconBolt className="text-muted-foreground" stroke={1.75} />
+            )}
+          </Button>
+        }
+      />
+      <TooltipContent align="center" className="flex-col gap-0">
+        <span>Fast mode</span>
+        <span className="font-normal text-muted-foreground">More usage</span>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 type EffortPickerProps = {
   currentEffort: string
   effortLevels: readonly string[]
@@ -203,33 +235,7 @@ function EffortPicker({
                   <span className="text-muted-foreground">Effort</span>
                   <output aria-live="polite">{displayedLabel}</output>
                 </div>
-                {showFastMode && (
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={fastMode ? 'Turn off Fast mode' : 'Turn on Fast mode'}
-                          aria-pressed={fastMode}
-                          onClick={() => onFastModeChange(!fastMode)}
-                          className="-my-1 -mr-1"
-                        >
-                          {fastMode ? (
-                            <IconBoltFilled className="text-primary" />
-                          ) : (
-                            <IconBolt className="text-muted-foreground" stroke={1.5} />
-                          )}
-                        </Button>
-                      }
-                    />
-                    <TooltipContent align="center" className="flex-col gap-0">
-                      <span>Fast mode</span>
-                      <span className="font-normal text-muted-foreground">More usage</span>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
+                {showFastMode && <FastModeToggle fastMode={fastMode} onChange={onFastModeChange} />}
               </motion.div>
             )}
           </AnimatePresence>
@@ -350,6 +356,9 @@ export const ModelPicker = memo(function ModelPicker({ sessionId }: ModelPickerP
         models={models}
         onValueChange={setSelectedModel}
       />
+      {!showEffort && model.supportsFastMode && (
+        <FastModeToggle fastMode={fastMode} onChange={setSelectedFastMode} />
+      )}
       {showEffort && (
         <EffortPicker
           key={model.value}

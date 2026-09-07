@@ -100,6 +100,16 @@ describe('groupTurns', () => {
 })
 
 describe('agent run duration', () => {
+  test('keeps native duration when replay items share a turn timestamp', () => {
+    const timestamp = '2026-09-07T12:00:00.000Z'
+    const user = { ...userTurn('user'), timestamp }
+    const answer = {
+      ...assistantTurn('answer', [{ type: 'text', text: 'Done' }]),
+      timestamp,
+      meta: { durationMs: 20_000 }
+    }
+    expect(groupTurns([user, answer])[1].meta?.durationMs).toBe(20_000)
+  })
   test('uses Codex native duration when transcript timestamps are absent', () => {
     const answer: Turn = {
       ...assistantTurn('answer', [{ type: 'text', text: 'Done' }]),
