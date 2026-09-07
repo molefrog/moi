@@ -245,7 +245,7 @@ function WorkspaceButton({ workspace, dragOverlay = false, dragState }: Workspac
         if (dragState?.isDragging) event.preventDefault()
       }}
       className={cn(
-        'group flex w-14 flex-col items-center rounded-lg outline-none',
+        'group flex w-14 flex-col items-center rounded-xl outline-none',
         dragState?.isDragging && 'invisible'
       )}
       {...dragState?.dragHandleProps}
