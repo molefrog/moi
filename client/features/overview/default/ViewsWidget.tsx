@@ -73,7 +73,7 @@ export function ViewsWidget({
     <div className="relative no-scrollbar flex size-full items-center overflow-hidden bg-muted">
       {empty && (
         <div
-          className="pointer-events-none absolute inset-0 texture-checker [mask-image:linear-gradient(to_right,transparent_40%,black)]"
+          className="pointer-events-none absolute inset-0 texture-checker [mask-image:linear-gradient(to_right,transparent_40%,black_80%)]"
           aria-hidden
         />
       )}
