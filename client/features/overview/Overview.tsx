@@ -70,9 +70,9 @@ function NoWidgetsCreated({ onCreateWidget, showOnboarding }: NoWidgetsCreatedPr
 
 type OverviewHeaderProps = {
   customizing: boolean
-  styling: boolean
+  theming: boolean
   onCustomizingChange: (customizing: boolean) => void
-  onStyle: () => void
+  onThemingChange: (theming: boolean) => void
 }
 
 type OverviewHeaderActionProps = Omit<ComponentProps<typeof Button>, 'children'> & {
@@ -119,9 +119,9 @@ function OverviewHeaderAction({
 
 function OverviewHeader({
   customizing,
-  styling,
+  theming,
   onCustomizingChange,
-  onStyle
+  onThemingChange
 }: OverviewHeaderProps) {
   return (
     <div className="flex size-full items-center gap-4">
@@ -135,9 +135,9 @@ function OverviewHeader({
         />
         <OverviewHeaderAction
           Icon={IconLetterCase}
-          label="Style"
-          active={styling}
-          onClick={onStyle}
+          label="Theme"
+          active={theming}
+          onClick={() => onThemingChange(!theming)}
         />
         <WorkspaceSettings
           renderTrigger={() => <OverviewHeaderAction Icon={IconSettings} label="Settings" />}
@@ -167,8 +167,8 @@ type OverviewProps = {
   onCreateView: () => void
   onOpenView: (viewId: string) => void
   customizing: boolean
-  styling: boolean
-  onStyle: () => void
+  theming: boolean
+  onThemingChange: (theming: boolean) => void
   onCustomizingChange: (customizing: boolean) => void
   // Authoritative widget set from useWidgets; positions come from layout.
   widgets: WidgetInfo[]
@@ -181,8 +181,8 @@ export function Overview({
   onCreateView,
   onOpenView,
   customizing,
-  styling,
-  onStyle,
+  theming,
+  onThemingChange,
   onCustomizingChange,
   widgets,
   views,
@@ -263,9 +263,9 @@ export function Overview({
           header={
             <OverviewHeader
               customizing={customizing}
-              styling={styling}
+              theming={theming}
               onCustomizingChange={onCustomizingChange}
-              onStyle={onStyle}
+              onThemingChange={onThemingChange}
             />
           }
           emptyState={

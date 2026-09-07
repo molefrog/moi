@@ -27,17 +27,17 @@ const RADIUS_OPTIONS = Object.entries(RADIUS_THEMES) as [RadiusTheme, RadiusThem
 
 const AGENT_OPTIONS = Object.entries(AGENT_THEMES) as [AgentTheme, AgentThemeConfig][]
 
-const STYLE_OPTION_CLASS =
+const THEME_OPTION_CLASS =
   'relative w-full rounded-lg text-left ring-1 ring-border transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
 
-type StyleOptionGroupProps = {
+type ThemeOptionGroupProps = {
   children: ReactNode
   className?: string
   gridClassName?: string
   label: string
 }
 
-function StyleOptionGroup({ children, className, gridClassName, label }: StyleOptionGroupProps) {
+function ThemeOptionGroup({ children, className, gridClassName, label }: ThemeOptionGroupProps) {
   return (
     <div className={cn('flex flex-col gap-2', className)}>
       <p className="text-xs font-medium">{label}</p>
@@ -52,7 +52,7 @@ function StyleOptionGroup({ children, className, gridClassName, label }: StyleOp
   )
 }
 
-type StyleOptionProps = {
+type ThemeOptionProps = {
   active: boolean
   children: ReactNode
   className?: string
@@ -60,14 +60,14 @@ type StyleOptionProps = {
   style?: CSSProperties
 }
 
-function StyleOption({ active, children, className, onSelect, style }: StyleOptionProps) {
+function ThemeOption({ active, children, className, onSelect, style }: ThemeOptionProps) {
   return (
     <button
       type="button"
       aria-pressed={active}
       onClick={onSelect}
       className={cn(
-        STYLE_OPTION_CLASS,
+        THEME_OPTION_CLASS,
         'flex items-center gap-2 p-3',
         className,
         !active && 'cursor-pointer pr-9 opacity-70 hover:opacity-100'
@@ -80,12 +80,12 @@ function StyleOption({ active, children, className, onSelect, style }: StyleOpti
   )
 }
 
-type StylePanelProps = {
+type ThemePanelProps = {
   onClose: () => void
   ref?: Ref<HTMLDivElement>
 }
 
-export function StylePanel({ onClose, ref }: StylePanelProps) {
+export function ThemePanel({ onClose, ref }: ThemePanelProps) {
   usePreloadWorkspaceFonts()
   const { layout, setLayout } = useWorkspaceLayoutCtx()
   const theme = resolveWorkspaceTheme(layout.theme)
@@ -95,30 +95,30 @@ export function StylePanel({ onClose, ref }: StylePanelProps) {
   }
 
   return (
-    <BottomPanel ref={ref} title="Style" onClose={onClose} className="@4xl/workspace:max-w-5xl">
+    <BottomPanel ref={ref} title="Theme" onClose={onClose} className="@4xl/workspace:max-w-5xl">
       <div className="grid grid-cols-1 gap-4 @4xl/workspace:grid-cols-[repeat(2,minmax(0,1fr))_0.5rem_repeat(2,minmax(0,1fr))_0.5rem_minmax(0,1fr)_0.5rem_minmax(0,1fr)] @4xl/workspace:gap-x-2">
-        <StyleOptionGroup
+        <ThemeOptionGroup
           label="Font"
           className="@4xl/workspace:col-span-2 @4xl/workspace:col-start-1"
         >
           {FONT_OPTIONS.map(([key, config]) => (
-            <StyleOption
+            <ThemeOption
               key={key}
               active={key === theme.font}
               onSelect={() => setTheme({ font: key })}
               style={{ fontFamily: config.sans }}
             >
               <span className="text-sm font-medium">{config.label}</span>
-            </StyleOption>
+            </ThemeOption>
           ))}
-        </StyleOptionGroup>
+        </ThemeOptionGroup>
 
-        <StyleOptionGroup
+        <ThemeOptionGroup
           label="Colors"
           className="@4xl/workspace:col-span-2 @4xl/workspace:col-start-4"
         >
           {COLOR_OPTIONS.map(([key, preset]) => (
-            <StyleOption
+            <ThemeOption
               key={key}
               active={key === theme.color}
               className={preset.primary && 'bg-background text-foreground'}
@@ -138,17 +138,17 @@ export function StylePanel({ onClose, ref }: StylePanelProps) {
                 </span>
                 <span className="text-sm font-medium">{preset.label}</span>
               </div>
-            </StyleOption>
+            </ThemeOption>
           ))}
-        </StyleOptionGroup>
+        </ThemeOptionGroup>
 
-        <StyleOptionGroup
+        <ThemeOptionGroup
           label="Radius"
           className="@4xl/workspace:col-start-7"
           gridClassName="@4xl/workspace:grid-cols-1"
         >
           {RADIUS_OPTIONS.map(([key, preset]) => (
-            <StyleOption
+            <ThemeOption
               key={key}
               active={key === theme.radius}
               onSelect={() => setTheme({ radius: key })}
@@ -161,17 +161,17 @@ export function StylePanel({ onClose, ref }: StylePanelProps) {
                 />
                 <span className="text-sm font-medium">{preset.label}</span>
               </div>
-            </StyleOption>
+            </ThemeOption>
           ))}
-        </StyleOptionGroup>
+        </ThemeOptionGroup>
 
-        <StyleOptionGroup
+        <ThemeOptionGroup
           label="Agent"
           className="@4xl/workspace:col-start-9"
           gridClassName="@4xl/workspace:grid-cols-1"
         >
           {AGENT_OPTIONS.map(([key, preset]) => (
-            <StyleOption
+            <ThemeOption
               key={key}
               active={key === theme.agent}
               onSelect={() => setTheme({ agent: key })}
@@ -182,9 +182,9 @@ export function StylePanel({ onClose, ref }: StylePanelProps) {
                 </span>
                 <span className="text-sm font-medium">{preset.label}</span>
               </div>
-            </StyleOption>
+            </ThemeOption>
           ))}
-        </StyleOptionGroup>
+        </ThemeOptionGroup>
       </div>
     </BottomPanel>
   )

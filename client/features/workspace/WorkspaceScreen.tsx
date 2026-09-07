@@ -17,7 +17,7 @@ import { useChatAnnotation } from '@/client/features/drawings/useChatAnnotation'
 import { ChatPanel } from '@/client/features/chat/ChatPanel'
 import type { WelcomeDestination } from '@/client/features/chat/ChatEmptyState'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
-import { StylePanel } from '@/client/features/workspace/StylePanel'
+import { ThemePanel } from '@/client/features/workspace/ThemePanel'
 import { useAppletEvent } from '@/client/features/applets/applet-runtime'
 import { Overview } from '@/client/features/overview/Overview'
 import { PanelHeader } from '@/client/components/shared/PanelHeader'
@@ -87,7 +87,7 @@ type WorkspaceScreenProps = {
   builders: ViewBuilderData[]
 }
 
-type WidgetMode = 'idle' | 'customizing' | 'styling'
+type WidgetMode = 'idle' | 'customizing' | 'theming'
 
 function tabItemFor(
   tab: WorkspaceTabId,
@@ -576,8 +576,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
           ) : activeTab === 'overview' ? (
             <Overview
               customizing={widgetMode === 'customizing'}
-              styling={widgetMode === 'styling'}
-              onStyle={() => setWidgetMode(widgetMode === 'styling' ? 'idle' : 'styling')}
+              theming={widgetMode === 'theming'}
+              onThemingChange={theming => setWidgetMode(theming ? 'theming' : 'idle')}
               onCustomizingChange={customizing =>
                 setWidgetMode(customizing ? 'customizing' : 'idle')
               }
@@ -640,8 +640,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       </div>
 
       <AnimatePresence>
-        {activeTab === 'overview' && widgetMode === 'styling' && (
-          <StylePanel onClose={() => setWidgetMode('idle')} />
+        {activeTab === 'overview' && widgetMode === 'theming' && (
+          <ThemePanel onClose={() => setWidgetMode('idle')} />
         )}
       </AnimatePresence>
 
