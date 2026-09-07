@@ -70,8 +70,9 @@ means removing its card-like padding and radius and realigning its children.
 ### Stacking and overlays
 
 Use DOM order for normal stacking: later siblings appear above earlier ones. Avoid z-index for
-ordinary layout. Use bundled overlays with their existing portal behavior; they preserve applet
-styles, and Drawer stays inside its view. For custom floating UI, portal into the closest
+ordinary layout. Use overlays from the UI components library (`moi ui-components`) with their
+existing portal behavior; they preserve applet styles and stay within their intended scope. For
+custom floating UI, portal into the closest
 `[data-applet]` root to preserve scope and theme tokens, rather than directly to `document.body`.
 
 Add a local, minimal z-index only when DOM order and a scoped portal cannot solve the stacking need.

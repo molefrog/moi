@@ -15,12 +15,12 @@ moi ui-components add select date-picker --install
 moi bundle                                       # rebuild after editing applets
 ```
 
-`add` copies source and support files into `.moi/ui/`. Source and docs work offline;
-`--install` runs `bun install` in `.moi/` and may need network access. Without it, run the
-dependency command printed by `add`. Rebuilding with `moi bundle` is always a separate step.
+`add` copies source and support files into `.moi/ui/`. `--install` runs `bun install` in `.moi/`
+and may need network access. Without it, run the dependency command printed by `add`. Rebuilding
+with `moi bundle` is always a separate step.
 
-Recipes use the same `add` and `docs` commands. They install their building blocks;
-follow the recipe docs to compose them.
+Recipes, ready-made component compositions, use the same `add` and `docs` commands. They install
+their building blocks; follow the recipe docs to compose them.
 
 ## Imports
 
@@ -41,7 +41,7 @@ Use the anatomy and props in `moi ui-components docs <name>`. Inspect the instal
 when an example differs or a component has local edits; it defines the supported API.
 Keep required groups, labels, and titles when composing parts.
 
-Custom triggers and close controls use Base UI's `render` prop, not Radix's `asChild`:
+Custom triggers and close controls use the `render` prop:
 
 ```tsx
 <DialogTrigger render={<Button variant="outline" />}>Open</DialogTrigger>
@@ -55,8 +55,6 @@ element, also pass `nativeButton={false}`.
 Use the installed portal and stacking behavior; don't add a second portal or z-index overrides.
 `applet-portal.tsx` preserves applet styles for portalled content. Never edit or remove it.
 
-Drawer is view-only and opens inside its view. Widgets must use another overlay or open a view.
-
 ## Styling and icons
 
 - Use semantic theme tokens and built-in variants. Reserve `className` for layout;
@@ -68,7 +66,6 @@ Drawer is view-only and opens inside its view. Widgets must use another overlay 
 - Use Tabler icons with explicit `stroke` following [the icon guidance](DESIGN.md#icons).
   Let components size their icons; in buttons, mark position with
   `data-icon="inline-start"` or `data-icon="inline-end"`.
-- Pass icons as component objects, such as `icon={IconSearch}`.
 
 ## Customization and updates
 
