@@ -1,16 +1,11 @@
-// Live Claude Code sessions held open in the server process.
+// One long-lived SDK query per session, with follow-ups queued in moi.
 //
-// Each (workspaceId, sessionId) gets ONE long-lived `query()` running in
-// streaming-input mode: a single agent session that consumes user messages from
-// an in-memory queue and streams output to all connected clients. Follow-up
-// messages (and messages from multiple browser tabs) are pushed into the same
-// queue — so they're *queued* instead of rejected, and there's no cold `resume`
-// between turns.
+// Dispatch waits for the preceding user turn to finish before applying the next
+// message's settings. Pending messages survive subprocess replacement; running
+// background tasks retain their process until they finish.
 //
-// Disk stays the source of truth: the SDK persists each block to the session
-// `.jsonl` incrementally, so a (re)connecting client reads /events then folds
-// live deltas. If a session is idle-evicted (or lost on a server restart), the
-// next message recreates it with `resume` — transparently.
+// The SDK persists history to disk. After eviction or a server restart, the
+// next message resumes that history in a new process.
 import {
   type Options,
   type Query,
@@ -26,7 +21,7 @@ import { claudeSessionExists } from './sessions'
 import { generateClaudeSessionTitle, renameClaudeSessionIfUnchanged } from './session-title'
 import type { Part } from '@/lib/format'
 import type { SessionActivity } from '@/lib/types'
-import { type MoiContext, moiContextSystemReminder, renderMoiContext } from '@/lib/moi-context'
+import { moiContextSystemReminder, renderMoiContext } from '@/lib/moi-context'
 
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
@@ -41,20 +36,16 @@ import {
 } from '../../view-builders'
 import { resolveWorkspaceEnv } from '../../workspace-env'
 import { requireHarnessExecutable } from '../executable'
+import type { SendMessageInput } from '../types'
 
 // Media types Claude vision accepts; uploads.ts guarantees every image upload is
 // normalized to one of these, so the cast on `media_type` below is sound.
 type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
 
-// What the SDK's streaming-input prompt accepts for one message's content:
-// a plain string or an array of Anthropic content blocks (text/image/…).
 type MessageContent = SDKUserMessage['message']['content']
 
-// Turn a typed text + resolved uploads into (a) the content the agent receives
-// and (b) the display parts we broadcast for the user's bubble. Images become
-// base64 vision blocks; other files are referenced by their temp path so the
-// agent can Read them. Display text stays the user's text (no path note).
-// Exported for unit tests.
+// Send images inline and other files by path. Keep those paths out of the
+// user's display text.
 export function buildUserMessage(
   text: string,
   uploads: StoredUpload[],
@@ -93,25 +84,51 @@ export function buildUserMessage(
   return { content: blocks, parts }
 }
 
-// Cap on concurrently-held live sessions (each = one claude subprocess). When
-// exceeded, the least-recently-active IDLE session is closed; a busy session is
-// never evicted. Idle sessions are also closed after this TTL.
+// Each live session owns a subprocess. Only idle sessions can be evicted.
 const MAX_LIVE_SESSIONS = 8
 const IDLE_TTL_MS = 5 * 60_000
 
-// SDK task types that keep running after the turn ends (background Bash,
-// workflow runs). Subagent Tasks complete within their turn, so they are
-// deliberately excluded — a leaked entry would keep the session alive forever.
-const BG_TASK_TYPES = new Set(['local_bash', 'local_workflow'])
+// Older CLIs lack background-task snapshots. These task types outlive the turn;
+// other types count only when their event explicitly marks them backgrounded.
+const LEGACY_BG_TASK_TYPES = new Set(['local_bash', 'local_workflow'])
 
 type InputQueue = {
   iterator: AsyncGenerator<SDKUserMessage>
-  push: (content: MessageContent) => void
+  push: (content: MessageContent, uuid: NonNullable<SDKUserMessage['uuid']>) => void
   clear: () => void
   close: () => void
 }
 
+type PendingMessage = {
+  input: SendMessageInput
+  content: MessageContent
+  titleSource: string
+  turnId: string
+  wireId: NonNullable<SDKUserMessage['uuid']>
+  label: string
+  resolve: () => void
+  reject: (error: Error) => void
+  completed: Promise<void>
+  complete: () => void
+}
+
+// This queue outlives its subprocess. Register it before any async setup so
+// concurrent first sends share one session, including across temp-id renames.
+type SessionMessages = {
+  workspaceId: string
+  workspacePath: string
+  sessionId: string
+  isNew: boolean
+  pending: PendingMessage[]
+  active: PendingMessage | null
+  dispatching: boolean
+  stopping: boolean
+  publishedActivity: SessionActivity
+  live?: LiveSession
+}
+
 type LiveSession = {
+  messages: SessionMessages
   workspaceId: string
   workspacePath: string
   workspaceEnv: Record<string, string>
@@ -120,47 +137,28 @@ type LiveSession = {
   adapter: ClaudeAdapter
   input: InputQueue
   abort: AbortController
-  // Session activity, mirrored from the SDK's `session_state_changed` events
-  // (authoritative — it fires `idle` only after the CLI's input queue drains,
-  // so queued messages merged into one model turn can't wedge it, unlike the
-  // old send/result counter). `sendCCMessage` flips it to 'running'
-  // optimistically so the loader doesn't wait a subprocess round-trip.
+  // SDK activity, set optimistically to running when a prompt is dispatched.
   activity: SessionActivity
-  // Whether this query has emitted `session_state_changed` at all. When it
-  // never does (older CLI), the `result` handler falls back to declaring idle.
+  // Without state events, the matching result is the turn-completion signal.
   sawStateEvents: boolean
-  // Live background tasks (background Bash, workflows) keyed by task id, fed by
-  // the SDK's typed task events. Non-empty keeps the session alive past the
-  // idle TTL — tearing down the subprocess would kill its background children.
+  turnEnded: boolean
+  // The SDK's full set of background tasks, including subagents and ambient
+  // watchers. All retain their process; none alone makes the chat busy.
   bgTasks: Set<string>
+  // Once this process emits a snapshot, task edges must never mutate its set:
+  // the SDK does not guarantee their ordering relative to snapshots.
+  sawBackgroundSnapshot: boolean
   model: string | undefined
-  // Fast mode is a live flag setting. Undefined clears moi's override and
-  // inherits the provider configuration.
+  // Live flag settings; undefined inherits provider defaults.
   fastMode: boolean | undefined
-  // Reasoning effort the query was created with. The SDK has no live setter for
-  // it (unlike setModel), so a change tears the session down and resumes.
   effort: string | undefined
-  // Effort the latest message asked for. When it diverges from `effort` while a
-  // turn is in flight (can't rebuild mid-turn), the session is torn down once it
-  // drains so the next message resumes with the requested effort.
-  desiredEffort: string | undefined
-  // Whether this query was built with `includePartialMessages` (live token
-  // streaming). Like effort, it's a construct-time option with no live setter,
-  // so a change tears the session down and resumes.
+  // `includePartialMessages` is fixed at creation, so changes require resume.
   stream: boolean
-  // Streaming mode the latest message asked for; drives the same drain-then-
-  // rebuild path as `desiredEffort` when it diverges mid-turn.
-  desiredStream: boolean
-  // The `claude` executable changed after this subprocess was spawned (see
-  // retireCCSessionsOnCliChange). Set only on sessions that were busy at the
-  // time; they are torn down once idle with no background tasks, and a send
-  // that finds one idle rebuilds it first, so a model the new CLI introduced
-  // is never handed to a subprocess that predates it.
+  // Rebuild before the next send, once this turn and background tasks finish.
   staleCli: boolean
   idleTimer: ReturnType<typeof setTimeout> | null
   closed: boolean
-  // Last turn's error text (result subtype), consumed by the view-builder
-  // status update on the idle transition.
+  // Passed to the view builder when the session becomes idle.
   lastBuilderError: string | undefined
   // Introspection only (surfaced by /status) — not load-bearing.
   createdAt: number
@@ -172,11 +170,9 @@ type LiveSession = {
 }
 
 const sessions = new Map<string, LiveSession>()
-// `${workspaceId}:${tempId}` -> real session id. A new thread is created under
-// the client's temporary id, then renamed to the SDK's real id on init. A
-// follow-up queued in the window before the client learns the new id still
-// carries the temp id; this alias re-routes it to the live session instead of
-// spawning a duplicate. Temp ids are UUIDs, so stale entries never collide.
+const messageQueues = new Map<string, SessionMessages>()
+// `${workspaceId}:${tempId}` -> real session id. Follow-ups may still use the
+// client's temporary id after the SDK has assigned the real one.
 const aliases = new Map<string, string>()
 
 function recKey(workspaceId: string, sessionId: string): string {
@@ -199,9 +195,10 @@ export function getCCActiveSessions(): {
   activity: SessionActivity
 }[] {
   const out: { workspaceId: string; sessionId: string; activity: SessionActivity }[] = []
-  for (const s of sessions.values()) {
-    if (s.activity !== 'idle') {
-      out.push({ workspaceId: s.workspaceId, sessionId: s.sessionId, activity: s.activity })
+  for (const messages of messageQueues.values()) {
+    const activity = messageActivity(messages)
+    if (activity !== 'idle') {
+      out.push({ workspaceId: messages.workspaceId, sessionId: messages.sessionId, activity })
     }
   }
   return out
@@ -216,9 +213,9 @@ export type CCDebugSession = {
   model: string | undefined
   fastMode: boolean | undefined
   effort: string | undefined
-  desiredEffort: string | undefined
   stream: boolean
-  desiredStream: boolean
+  queuedMessages: number
+  staleCli: boolean
   activity: SessionActivity
   bgTasks: number
   closed: boolean
@@ -228,8 +225,7 @@ export type CCDebugSession = {
   lastUserText: string | undefined
 }
 
-// A full snapshot of the in-memory live-session registry, for the /status page.
-// Read-only — never mutate the returned objects.
+// Session diagnostics for /status.
 export function getCCDebugSnapshot(): { sessions: CCDebugSession[]; aliases: number } {
   return {
     sessions: [...sessions.values()].map(s => ({
@@ -238,9 +234,9 @@ export function getCCDebugSnapshot(): { sessions: CCDebugSession[]; aliases: num
       model: s.model,
       fastMode: s.fastMode,
       effort: s.effort,
-      desiredEffort: s.desiredEffort,
       stream: s.stream,
-      desiredStream: s.desiredStream,
+      queuedMessages: s.messages.pending.length,
+      staleCli: s.staleCli,
       activity: s.activity,
       bgTasks: s.bgTasks.size,
       closed: s.closed,
@@ -253,9 +249,7 @@ export function getCCDebugSnapshot(): { sessions: CCDebugSession[]; aliases: num
   }
 }
 
-// A push-able async generator used as the streaming-input prompt: it yields
-// queued user messages and awaits when empty, so the session stays open between
-// turns instead of ending when the current input is consumed.
+// Waiting when empty keeps the SDK session open between prompts.
 function createInputQueue(): InputQueue {
   const buffer: SDKUserMessage[] = []
   let wake: (() => void) | null = null
@@ -276,9 +270,10 @@ function createInputQueue(): InputQueue {
 
   return {
     iterator: gen(),
-    push(content: MessageContent) {
+    push(content: MessageContent, uuid: NonNullable<SDKUserMessage['uuid']>) {
       buffer.push({
         type: 'user',
+        uuid,
         message: { role: 'user', content },
         parent_tool_use_id: null
       })
@@ -296,12 +291,22 @@ function createInputQueue(): InputQueue {
   }
 }
 
-// Set the session's activity and broadcast the transition (deduped — repeated
-// same-value events from the SDK don't re-broadcast).
 function setActivity(s: LiveSession, activity: SessionActivity) {
-  if (s.activity === activity) return
   s.activity = activity
-  broadcast(s.workspaceId, { type: 'status', sessionId: s.sessionId, activity })
+  publishMessageActivity(s.messages)
+}
+
+function messageActivity(messages: SessionMessages): SessionActivity {
+  const activity = messages.live?.activity ?? 'idle'
+  if (activity !== 'idle') return activity
+  return messages.active || messages.pending.length || messages.dispatching ? 'running' : 'idle'
+}
+
+function publishMessageActivity(messages: SessionMessages) {
+  const activity = messageActivity(messages)
+  if (messages.publishedActivity === activity) return
+  messages.publishedActivity = activity
+  broadcast(messages.workspaceId, { type: 'status', sessionId: messages.sessionId, activity })
 }
 
 function clearIdle(s: LiveSession) {
@@ -314,10 +319,9 @@ function clearIdle(s: LiveSession) {
 function armIdle(s: LiveSession) {
   clearIdle(s)
   s.idleTimer = setTimeout(() => {
-    if (s.activity === 'running') return
+    if (s.activity !== 'idle' || s.messages.active || s.messages.dispatching) return
     if (s.bgTasks.size > 0) {
-      // Tearing down would kill the subprocess and its background children
-      // (renders, watch loops). Keep the session alive until they finish.
+      // Eviction would kill the background tasks too.
       debug(
         `cc idle-keepalive ws=${s.workspaceId} session=${s.sessionId} bgTasks=${s.bgTasks.size}`
       )
@@ -348,6 +352,15 @@ function teardown(s: LiveSession) {
   if (sessions.get(recKey(s.workspaceId, s.sessionId)) === s) {
     sessions.delete(recKey(s.workspaceId, s.sessionId))
   }
+  if (s.messages.live === s) s.messages.live = undefined
+  publishMessageActivity(s.messages)
+  forgetEmptyQueue(s.messages)
+}
+
+function forgetEmptyQueue(messages: SessionMessages) {
+  if (messages.live || messages.dispatching || messages.active || messages.pending.length) return
+  const key = recKey(messages.workspaceId, messages.sessionId)
+  if (messageQueues.get(key) === messages) messageQueues.delete(key)
 }
 
 function isCurrentLiveSession(s: LiveSession, abort: AbortController): boolean {
@@ -392,46 +405,46 @@ function startClaudeSessionTitleJob(s: LiveSession) {
   })()
 }
 
-// On `system/init` the SDK reports the real session id. For a brand-new session
-// that differs from the client's temporary id, so we rekey the registry and
-// tell the client to move its optimistic state. Subsequent inits report the
-// same id and no-op.
+// Move both registries to the SDK's real id, preserving the temporary alias.
 function renameSession(s: LiveSession, realId: string): string {
   const from = s.sessionId
   sessions.delete(recKey(s.workspaceId, from))
   s.sessionId = realId
   sessions.set(recKey(s.workspaceId, realId), s)
   aliases.set(recKey(s.workspaceId, from), realId)
+  messageQueues.delete(recKey(s.workspaceId, from))
+  s.messages.sessionId = realId
+  s.messages.isNew = false
+  messageQueues.set(recKey(s.workspaceId, realId), s.messages)
   return from
 }
 
-// The session just went idle (state event, or `result` on a CLI without state
-// events): settle the view builder, then either rebuild for a deferred
-// effort/streaming change or arm the idle timer.
+// Keep the active message reserved across async bookkeeping. Sends arriving
+// here join moi's queue; they cannot race a teardown or change the live model.
 async function onSessionIdle(s: LiveSession) {
+  const active = s.messages.active
+  if (s.messages.dispatching || (active && !s.turnEnded)) return
   await markViewBuilderWaitingBySession(
     s.workspaceId,
     s.workspacePath,
     s.sessionId,
     s.lastBuilderError
   )
-  if (s.desiredEffort !== s.effort || s.desiredStream !== s.stream) teardown(s)
-  else if (s.staleCli && s.bgTasks.size === 0) teardown(s)
-  else armIdle(s)
-}
-
-// A stale session that was kept alive for its background tasks goes as soon
-// as the last one finishes (while idle — a running turn ends via onSessionIdle).
-function retireIfStale(s: LiveSession) {
-  if (s.staleCli && s.activity === 'idle' && s.bgTasks.size === 0) teardown(s)
+  if (s.closed || s.messages.dispatching || s.messages.active !== active) return
+  active?.complete()
+  s.messages.active = null
+  setActivity(s, 'idle')
+  armIdle(s)
+  void dispatchNextMessage(s.messages)
 }
 
 async function consume(s: LiveSession) {
   try {
     for await (const msg of s.q) {
-      // Raw SDK message into the debug wire ring (/playground/harness).
+      if (s.closed) break
       tapWire(s.workspaceId, 'recv', msg)
       if (msg.type === 'system' && msg.subtype === 'init') {
+        s.messages.isNew = false
         const realId = msg.session_id
         if (realId && realId !== s.sessionId) {
           const from = renameSession(s, realId)
@@ -446,10 +459,7 @@ async function consume(s: LiveSession) {
           })
         }
         startClaudeSessionTitleJob(s)
-        // Seed the session's config from what it actually ran with — but only if
-        // it has none yet, so an explicit user PUT (or a migrated temp-id edit)
-        // always wins. A default run leaves no file and falls back to the
-        // workspace defaults.
+        // Seed explicit startup settings only when no saved picker choice exists.
         if (
           (s.model || s.effort || s.fastMode !== undefined) &&
           !(await hasSessionConfig(s.workspacePath, s.sessionId))
@@ -463,8 +473,7 @@ async function consume(s: LiveSession) {
       }
       for (const ev of s.adapter.ingest(msg)) {
         if (ev.kind === 'preview') {
-          // Live-only token preview — a sibling frame, never a StreamEvent, so
-          // it never enters the persisted/replayable transcript path.
+          // Token previews are transient and stay outside transcript history.
           broadcast(s.workspaceId, {
             type: 'preview',
             sessionId: s.sessionId,
@@ -479,18 +488,12 @@ async function consume(s: LiveSession) {
       if (msg.type === 'system' && msg.subtype === 'init') {
         debug(`cc init ws=${s.workspaceId} session=${s.sessionId}`)
       }
-      // A turn is producing output while we think the session is idle: a
-      // queued message the CLI ran as its own turn after the previous result,
-      // or an SDK-initiated turn (e.g. a background-task notification waking
-      // the model). Re-assert running so the spinner tracks real activity.
+      // Background notifications can start an SDK turn without a user send.
       if ((msg.type === 'assistant' || msg.type === 'stream_event') && s.activity === 'idle') {
         setActivity(s, 'running')
       }
-      // Authoritative activity mirror. The CLI emits `idle` only once its own
-      // input queue drains, so queued messages the model merged into one turn
-      // (one `result` for N sends) still end in a clean idle here. Observed
-      // empirically: current CLIs don't emit this in streaming-input mode, so
-      // the `result` fallback below is the everyday path.
+      // Prefer explicit idle events when available; otherwise use the result
+      // fallback below. Some CLIs omit these events in streaming-input mode.
       if (msg.type === 'system' && msg.subtype === 'session_state_changed') {
         s.sawStateEvents = true
         s.lastActivityAt = Date.now()
@@ -498,36 +501,54 @@ async function consume(s: LiveSession) {
         if (msg.state === 'running') setActivity(s, 'running')
         else if (msg.state === 'requires_action') setActivity(s, 'requires-action')
         else if (msg.state === 'idle') {
-          setActivity(s, 'idle')
           await onSessionIdle(s)
         }
       }
-      // Background-task lifecycle (typed SDK events): track live background
-      // work so idle eviction doesn't kill it (armIdle keep-alive). Only task
-      // types that outlive the turn count; subagent Tasks end within it.
-      if (msg.type === 'system' && msg.subtype === 'task_started') {
-        if (BG_TASK_TYPES.has(msg.task_type ?? '')) {
-          s.bgTasks.add(msg.task_id)
-          debug(
-            `cc bg-task start ws=${s.workspaceId} session=${s.sessionId} task=${msg.task_id} type=${msg.task_type} live=${s.bgTasks.size}`
-          )
+      // Snapshots replace the entire set, healing missed starts/completions.
+      // Keep the edge-based fallback only until this process sends a snapshot.
+      if (msg.type === 'system') {
+        let tasksChanged = false
+        if (msg.subtype === 'background_tasks_changed') {
+          s.sawBackgroundSnapshot = true
+          s.bgTasks = new Set(msg.tasks.map(task => task.task_id))
+          tasksChanged = true
+        } else if (!s.sawBackgroundSnapshot) {
+          if (
+            msg.subtype === 'task_started' &&
+            (msg.is_backgrounded || LEGACY_BG_TASK_TYPES.has(msg.task_type ?? ''))
+          ) {
+            s.bgTasks.add(msg.task_id)
+          } else if (msg.subtype === 'task_notification') {
+            tasksChanged = s.bgTasks.delete(msg.task_id)
+          } else if (msg.subtype === 'task_updated') {
+            const status = msg.patch.status
+            if (
+              status === 'completed' ||
+              status === 'failed' ||
+              status === 'killed' ||
+              msg.patch.is_backgrounded === false
+            ) {
+              tasksChanged = s.bgTasks.delete(msg.task_id)
+            } else if (msg.patch.is_backgrounded) {
+              s.bgTasks.add(msg.task_id)
+            }
+          }
         }
-      }
-      if (msg.type === 'system' && msg.subtype === 'task_notification') {
-        if (s.bgTasks.delete(msg.task_id)) {
-          debug(
-            `cc bg-task end ws=${s.workspaceId} session=${s.sessionId} task=${msg.task_id} status=${msg.status} live=${s.bgTasks.size}`
-          )
-          retireIfStale(s)
-        }
-      }
-      if (msg.type === 'system' && msg.subtype === 'task_updated') {
-        const status = msg.patch?.status
-        if (status === 'completed' || status === 'failed' || status === 'killed') {
-          if (s.bgTasks.delete(msg.task_id)) retireIfStale(s)
+        if (tasksChanged) {
+          debug(`cc bg-tasks ws=${s.workspaceId} session=${s.sessionId} live=${s.bgTasks.size}`)
+          void dispatchNextMessage(s.messages)
         }
       }
       if (msg.type === 'result') {
+        // Newer CLIs identify the user messages consumed by a result. An
+        // autonomous background turn can finish while our prompt is still
+        // waiting inside the CLI; its result must not release that prompt.
+        const active = s.messages.active
+        const consumed =
+          msg.user_message_uuids ?? (msg.user_message_uuid ? [msg.user_message_uuid] : undefined)
+        const turnFinished =
+          !active || (!msg.queued_turn_count && (!consumed || consumed.includes(active.wireId)))
+        if (turnFinished) s.turnEnded = true
         s.lastActivityAt = Date.now()
         // Remembered for the idle transition — the view builder shows the last
         // turn's error once the queue drains.
@@ -540,11 +561,9 @@ async function consume(s: LiveSession) {
           s.refreshSessionsOnResult = false
           broadcast(s.workspaceId, { type: 'sessions_changed', sessionId: s.sessionId })
         }
-        // Fallback for CLIs that never emit `session_state_changed`: treat
-        // every result as turn-over. With state events, `idle` follows the
-        // result and drives the same path.
-        if (!s.sawStateEvents) {
-          setActivity(s, 'idle')
+        // Without state events, only a result that finishes the active prompt
+        // (or an autonomous turn when none is active) can release the queue.
+        if (!s.sawStateEvents && turnFinished) {
           await onSessionIdle(s)
         }
       }
@@ -563,8 +582,24 @@ async function consume(s: LiveSession) {
       await markViewBuilderWaitingBySession(s.workspaceId, s.workspacePath, s.sessionId, message)
     }
   } finally {
-    // teardown broadcasts the terminal idle status itself (deduped).
+    // An expected restart only replaces the subprocess. An unexpected exit
+    // cancels pending sends visibly rather than leaving their promises hanging.
+    if (!s.closed) {
+      const error = new Error('Agent session closed before queued messages were sent')
+      if (s.messages.pending.length)
+        broadcast(s.workspaceId, { kind: 'error', sessionId: s.sessionId, content: error.message })
+      cancelPendingMessages(s.messages, error)
+      s.messages.active?.complete()
+      s.messages.active = null
+    }
     teardown(s)
+  }
+}
+
+function cancelPendingMessages(messages: SessionMessages, error: Error) {
+  for (const message of messages.pending.splice(0)) {
+    message.reject(error)
+    message.complete()
   }
 }
 
@@ -574,7 +609,13 @@ async function consume(s: LiveSession) {
 function evictIfNeeded() {
   if (sessions.size < MAX_LIVE_SESSIONS) return
   for (const s of sessions.values()) {
-    if (s.activity === 'idle' && s.bgTasks.size === 0) {
+    if (
+      s.activity === 'idle' &&
+      s.bgTasks.size === 0 &&
+      !s.messages.dispatching &&
+      !s.messages.active &&
+      s.messages.pending.length === 0
+    ) {
       teardown(s)
       return
     }
@@ -582,6 +623,7 @@ function evictIfNeeded() {
 }
 
 function createLiveSession(input: {
+  messages: SessionMessages
   workspaceId: string
   workspacePath: string
   sessionId: string
@@ -589,11 +631,8 @@ function createLiveSession(input: {
   model: string | undefined
   effort: string | undefined
   fastMode: boolean | undefined
-  // Live token streaming (`includePartialMessages`). Only enabled when the
-  // client opts in; off leaves the query byte-for-byte as before.
   stream: boolean
-  // Resolved workspace env (.env + UI custom overrides), injected so the agent's
-  // Bash tool can use workspace secrets. Frozen at spawn — see restartWorkspaceSessions.
+  // Resolved workspace env, fixed for the lifetime of the subprocess.
   workspaceEnv: Record<string, string>
   sessionTitleSource: string | undefined
 }): LiveSession {
@@ -604,25 +643,17 @@ function createLiveSession(input: {
   const options: Options = {
     abortController: abort,
     pathToClaudeCodeExecutable: requireHarnessExecutable('claude-code'),
-    // Generous: one query() spans the whole live session (many turns). On end
-    // (limit hit / closed / error) the session is torn down and the next
-    // message recreates it via resume.
+    // One query spans many user messages.
     maxTurns: 1000,
     cwd: input.workspacePath,
-    // Current-gen models (Sonnet 5, Opus 4.7/4.8, Fable 5) default thinking
-    // display to 'omitted' — the API still emits a `thinking` block but with
-    // empty text, which the adapter drops (`if (b.thinking)`), so no
-    // "Thinking" row ever reaches the timeline. Request the summary
-    // explicitly so reasoning stays visible.
+    // Request summaries explicitly; some models otherwise omit thinking text.
     thinking: { type: 'adaptive', display: 'summarized' },
     ...(input.model ? { model: input.model } : {}),
-    // The picker only offers a model's own `supportedEffortLevels`, so the value
-    // is valid for the model; the SDK silently downgrades otherwise. Cast because
-    // the SDK under-types the union (no 'xhigh') vs our pass-through string.
+    // Harness-neutral settings are strings; the picker supplies this model's
+    // supported effort levels from the SDK catalog.
     ...(input.effort ? { effort: input.effort as Options['effort'] } : {}),
     ...(input.fastMode !== undefined ? { settings: { fastMode: input.fastMode } } : {}),
-    // Emit `stream_event` partial-message frames so the adapter can surface a
-    // live token-by-token preview. Off = unchanged behavior (whole blocks only).
+    // Partial frames enable the opt-in live preview.
     includePartialMessages: input.stream,
     permissionMode: 'auto',
     // Every tool call is approved before the permission system runs — see
@@ -639,6 +670,7 @@ function createLiveSession(input: {
   if (!input.isNew) options.resume = input.sessionId
 
   const session: LiveSession = {
+    messages: input.messages,
     workspaceId: input.workspaceId,
     workspacePath: input.workspacePath,
     workspaceEnv: input.workspaceEnv,
@@ -649,13 +681,13 @@ function createLiveSession(input: {
     abort,
     activity: 'idle',
     sawStateEvents: false,
+    turnEnded: false,
     bgTasks: new Set(),
+    sawBackgroundSnapshot: false,
     model: input.model,
     fastMode: input.fastMode,
     effort: input.effort,
-    desiredEffort: input.effort,
     stream: input.stream,
-    desiredStream: input.stream,
     staleCli: false,
     idleTimer: null,
     closed: false,
@@ -668,6 +700,7 @@ function createLiveSession(input: {
     sessionTitleAbort: null
   }
   sessions.set(recKey(session.workspaceId, session.sessionId), session)
+  input.messages.live = session
   debug(
     `cc create ${input.isNew ? 'new' : 'resume'} ws=${input.workspaceId} session=${input.sessionId} model=${input.model ?? 'default'} effort=${input.effort ?? 'default'} fast=${input.fastMode ?? 'default'} live=${sessions.size}`
   )
@@ -675,38 +708,17 @@ function createLiveSession(input: {
   return session
 }
 
-// Enqueue a user message into the thread's live session, creating it on first
-// use. Safe to call while a turn is in flight — the message is queued.
-export async function sendCCMessage(input: {
-  workspaceId: string
-  workspacePath: string
-  sessionId: string
-  isNew: boolean
-  content: string
-  // Upload ids attached to this turn (resolved from the upload store here).
-  attachments?: string[]
-  optimisticId?: string
-  model?: string
-  effort?: string
-  fastMode?: boolean
-  stream?: boolean
-  // Structured moi context (lib/moi-context.ts), rendered here and injected
-  // as a leading system-reminder text block; the display parts never see it.
-  context?: MoiContext
-}): Promise<void> {
-  // Resolve any attachments into agent content blocks + display parts. Unknown
-  // or expired ids are silently dropped (resolveUploads filters them) — if that
-  // leaves nothing to say at all, don't spin up a session for an empty turn.
+// Accept immediately, but keep the prompt and its settings in moi until its
+// turn starts. The returned promise settles when the message reaches the SDK.
+export async function sendCCMessage(input: SendMessageInput): Promise<void> {
+  // Expired uploads are omitted. Avoid starting a session if nothing remains.
   const uploads = input.attachments?.length
     ? resolveUploads(input.workspaceId, input.attachments)
     : []
   if (!input.content && uploads.length === 0) return
   const { content: userContent, parts } = buildUserMessage(input.content, uploads)
-  // The envelope goes in as its OWN leading text block, never merged into the
-  // user's string: the SDK's first-prompt extraction (session titles,
-  // home-card previews) skips tag-leading text, so a prefixed string would
-  // hide every moi message from it. On replay the adapter strips the block to
-  // empty and drops it.
+  // Keep context in its own block: the SDK skips tag-leading blocks when
+  // extracting titles and previews, and the adapter strips them on replay.
   const content: MessageContent = input.context
     ? [
         { type: 'text', text: moiContextSystemReminder(renderMoiContext(input.context)) },
@@ -716,101 +728,26 @@ export async function sendCCMessage(input: {
       ]
     : userContent
 
-  const wantStream = input.stream === true
-  let s = sessions.get(liveKey(input.workspaceId, input.sessionId))
-  // Neither effort nor streaming can be changed on a running query (both are
-  // construct-time, no SDK setter), so when either differs we tear the idle
-  // session down and recreate it via resume — the change lands on this very
-  // turn. A busy session keeps its settings until the in-flight turn ends.
-  // A subprocess spawned before a CLI update takes the same path: it may not
-  // know the model this message asks for (setModel rejects unknown ids).
-  if (
-    s &&
-    (input.effort !== s.effort || wantStream !== s.stream || s.staleCli) &&
-    s.activity === 'idle'
-  ) {
-    teardown(s)
-    s = undefined
-  }
-  if (s) {
-    clearIdle(s)
-    if (input.model !== s.model) {
-      try {
-        await s.q.setModel(input.model)
-        s.model = input.model
-      } catch (err) {
-        console.error('[cc-session] setModel failed', err)
-      }
-      // setModel is a control round-trip to the subprocess. During that await a
-      // concurrent turn `result` can drain this session to idle and — if effort
-      // or streaming diverged — tear it down (see the `result` handler). If that
-      // happened, drop the dead handle and fall through to recreate a fresh
-      // session below, rather than enqueue onto a closed input queue (which would
-      // silently lose the message and hang the spinner).
-      if (s.closed) s = undefined
-    }
-    if (s && input.fastMode !== s.fastMode) {
-      try {
-        await s.q.applyFlagSettings({ fastMode: input.fastMode ?? null })
-        s.fastMode = input.fastMode
-      } catch (err) {
-        console.error('[cc-session] applyFlagSettings failed', err)
-      }
-      if (s.closed) s = undefined
-    }
-    if (s) {
-      // Effort/streaming can't change on a running query; record the request so
-      // the session rebuilds once its turns drain (see the `result` handler).
-      // Reaching here with a divergent value means the session is busy — an idle
-      // one was torn down above.
-      s.desiredEffort = input.effort
-      s.desiredStream = wantStream
-    }
-  }
-  if (!s) {
-    // The agent only sees secrets scoped to the 'agent' sink (plus .env).
-    // Resolved before the probe below so both see the same env.
-    const workspaceEnv = await resolveWorkspaceEnv(input.workspacePath)
-    // Resuming a session with no file on disk hard-fails the CLI with "No
-    // conversation found" — and a dangling id can be selected forever (a
-    // brand-new chat whose first turn died before init persisted anything,
-    // or session files cleaned up externally), wedging the chat. Start fresh
-    // instead: the init rename then migrates this id to the real one
-    // everywhere (selected session, session config, view builders, client).
-    const isNew =
-      input.isNew ||
-      !(await claudeSessionExists(input.sessionId, input.workspacePath, workspaceEnv))
-    if (isNew !== input.isNew) {
-      debug(`cc resume-missing ws=${input.workspaceId} session=${input.sessionId} — starting fresh`)
-    }
-    s = createLiveSession({
+  const key = liveKey(input.workspaceId, input.sessionId)
+  let messages = messageQueues.get(key)
+  if (!messages) {
+    messages = {
       workspaceId: input.workspaceId,
       workspacePath: input.workspacePath,
-      sessionId: input.sessionId,
-      isNew,
-      model: input.model,
-      effort: input.effort,
-      fastMode: input.fastMode,
-      stream: wantStream,
-      sessionTitleSource: isNew
-        ? buildSessionTitleSource(
-            input.content,
-            uploads.map(upload => upload.filename)
-          )
-        : undefined,
-      workspaceEnv
-    })
+      sessionId: aliases.get(recKey(input.workspaceId, input.sessionId)) ?? input.sessionId,
+      isNew: input.isNew && !aliases.has(recKey(input.workspaceId, input.sessionId)),
+      pending: [],
+      active: null,
+      dispatching: false,
+      stopping: false,
+      publishedActivity: 'idle'
+    }
+    messageQueues.set(key, messages)
   }
-  // Streaming-input mode does NOT echo the pushed user message back in the
-  // output stream (string-prompt mode did — that's what expectUserEcho was
-  // for), so the adapter never emits a user turn. Synthesize and broadcast it
-  // ourselves so EVERY connected tab shows the user's bubble — not just the
-  // sender (which inserts it optimistically). Keyed by optimisticId, so the
-  // sender's optimistic turn upserts in place rather than duplicating.
   const turnId = input.optimisticId ?? crypto.randomUUID()
-  broadcast(s.workspaceId, {
+  broadcast(messages.workspaceId, {
     kind: 'turn',
-    sessionId: s.sessionId,
+    sessionId: messages.sessionId,
     turn: {
       id: turnId,
       role: 'user',
@@ -819,50 +756,177 @@ export async function sendCCMessage(input: {
       timestamp: new Date().toISOString()
     }
   })
-  // Safety net: if a future SDK does echo the user message, the adapter re-ids
-  // that echo to the same optimisticId so it collapses onto the turn above
-  // instead of duplicating.
-  if (input.optimisticId) s.adapter.expectUserEcho(input.optimisticId, input.content)
-
-  s.lastActivityAt = Date.now()
-  // For an attachment-only message, fall back to the filenames so the thread
-  // list / status view don't show a blank label.
   const label = input.content || uploads.map(u => u.filename).join(', ')
-  s.lastUserText = label.replace(/\s+/g, ' ').slice(0, 120)
-
-  // Optimistic flip — the authoritative `session_state_changed: running` from
-  // the subprocess confirms it moments later (setActivity dedupes).
-  if (s.activity !== 'running') {
-    await markViewBuilderBuildingBySession(s.workspaceId, s.workspacePath, s.sessionId)
-    setActivity(s, 'running')
-  }
-  clearIdle(s)
-  s.input.push(content)
-  tapWire(s.workspaceId, 'send', { type: 'user', content })
-  debug(
-    `cc enqueue ws=${s.workspaceId} session=${s.sessionId} activity=${s.activity} text=${JSON.stringify(s.lastUserText)}`
-  )
+  const completion = Promise.withResolvers<void>()
+  const accepted = new Promise<void>((resolve, reject) => {
+    messages.pending.push({
+      input,
+      content,
+      titleSource: buildSessionTitleSource(
+        input.content,
+        uploads.map(u => u.filename)
+      ),
+      turnId,
+      wireId: crypto.randomUUID(),
+      label: label.replace(/\s+/g, ' ').slice(0, 120),
+      resolve,
+      reject,
+      completed: completion.promise,
+      complete: completion.resolve
+    })
+  })
+  publishMessageActivity(messages)
+  void dispatchNextMessage(messages)
+  return accepted
 }
 
-// How long Stop waits for the SDK's interrupt round-trip before declaring the
-// subprocess wedged and tearing it down. A hung subprocess never answers, and
-// without this cap the whole interrupt path (and the user's only escape hatch
-// from a stuck spinner) hangs with it.
+// Serialize session creation, per-message settings, and prompt writes.
+// Recheck cancellation and replacement after awaits before sending the prompt.
+async function dispatchNextMessage(messages: SessionMessages): Promise<void> {
+  if (messages.dispatching || messages.stopping || messages.active) return
+  const message = messages.pending[0]
+  if (!message) {
+    forgetEmptyQueue(messages)
+    return
+  }
+  let s = messages.live
+  if (s && s.activity !== 'idle') return
+  const { input } = message
+  const stream = input.stream === true
+  const rebuild = s && (s.staleCli || stream !== s.stream)
+  // Background jobs belong to their subprocess. Retain both the job and the
+  // queued prompt until it is safe to resume with the requested configuration.
+  if (s && rebuild && s.bgTasks.size > 0) return
+
+  messages.dispatching = true
+  const cancelled = () => messages.stopping || messages.pending[0] !== message
+  try {
+    if (s && rebuild) {
+      teardown(s)
+      s = undefined
+    }
+    if (!s) {
+      const workspaceEnv = await resolveWorkspaceEnv(messages.workspacePath)
+      if (cancelled()) return
+      const isNew =
+        messages.isNew ||
+        !(await claudeSessionExists(messages.sessionId, messages.workspacePath, workspaceEnv))
+      if (cancelled()) return
+      s = createLiveSession({
+        messages,
+        workspaceId: messages.workspaceId,
+        workspacePath: messages.workspacePath,
+        sessionId: messages.sessionId,
+        isNew,
+        model: input.model,
+        effort: input.effort,
+        fastMode: input.fastMode,
+        stream,
+        workspaceEnv,
+        sessionTitleSource: isNew ? message.titleSource : undefined
+      })
+    } else {
+      clearIdle(s)
+      // A failed setter must reject this send, never silently use the previous
+      // model or flags. Later queued messages can still use the healthy query.
+      if (input.model !== s.model) {
+        await s.q.setModel(input.model)
+        // Stop cancels the prompt, not a control request already acknowledged
+        // by the CLI. Remember the applied value so the next send can reset it.
+        if (!s.closed) s.model = input.model
+        if (cancelled()) return
+        if (s.closed) throw new Error('Agent session closed before the message was sent')
+      }
+      if (input.effort !== s.effort || input.fastMode !== s.fastMode) {
+        await s.q.applyFlagSettings({
+          ...(input.effort !== s.effort
+            ? { effortLevel: (input.effort as Options['effort']) ?? null }
+            : {}),
+          ...(input.fastMode !== s.fastMode ? { fastMode: input.fastMode ?? null } : {})
+        })
+        if (!s.closed) {
+          s.effort = input.effort
+          s.fastMode = input.fastMode
+        }
+        if (cancelled()) return
+        if (s.closed) throw new Error('Agent session closed before the message was sent')
+      }
+    }
+    await markViewBuilderBuildingBySession(s.workspaceId, s.workspacePath, s.sessionId)
+    if (cancelled()) return
+    if (s.closed) throw new Error('Agent session closed before the message was sent')
+    // A catalog refresh can arrive during any of the awaits above. Retry
+    // before handing off the prompt; the queue still owns it at this point.
+    if (s.staleCli) {
+      if (s.bgTasks.size === 0) teardown(s)
+      return
+    }
+    messages.pending.shift()
+    messages.active = message
+    s.turnEnded = false
+    s.lastActivityAt = Date.now()
+    s.lastUserText = message.label
+    s.adapter.expectUserEcho(message.turnId, input.content)
+    setActivity(s, 'running')
+    clearIdle(s)
+    s.input.push(message.content, message.wireId)
+    tapWire(s.workspaceId, 'send', { type: 'user', content: message.content })
+    message.resolve()
+  } catch (error) {
+    if (!cancelled() && s?.staleCli) {
+      if (!s.closed && s.bgTasks.size === 0) teardown(s)
+      return
+    }
+    if (!cancelled()) {
+      messages.pending.shift()
+      const err = error instanceof Error ? error : new Error(String(error))
+      broadcast(messages.workspaceId, {
+        kind: 'error',
+        sessionId: messages.sessionId,
+        content: err.message
+      })
+      message.reject(err)
+      message.complete()
+    }
+  } finally {
+    messages.dispatching = false
+    publishMessageActivity(messages)
+    if (s && !s.closed && s.activity === 'idle') armIdle(s)
+    void dispatchNextMessage(messages)
+  }
+}
+
+// Bound both interrupt acknowledgement and turn completion.
 const INTERRUPT_TIMEOUT_MS = 5_000
 
-// Interrupt the current turn and drop any queued messages, keeping the session
-// alive for the next message. If the subprocess doesn't acknowledge in time it
-// is torn down instead — the next message respawns via resume.
+// Cancel queued sends and interrupt the active turn. A failed or timed-out
+// interrupt closes the process so the next send can resume in a fresh one.
 export async function interruptCCSession(workspaceId: string, sessionId: string): Promise<void> {
-  const s = sessions.get(liveKey(workspaceId, sessionId))
-  if (!s) return
+  const messages = messageQueues.get(liveKey(workspaceId, sessionId))
+  if (!messages) return
+  messages.stopping = true
+  cancelPendingMessages(messages, new Error('Message cancelled'))
+  const s = messages.live
+  if (!s) {
+    messages.stopping = false
+    publishMessageActivity(messages)
+    forgetEmptyQueue(messages)
+    broadcast(workspaceId, { kind: 'stopped', sessionId: messages.sessionId })
+    return
+  }
   debug(`cc interrupt ws=${workspaceId} session=${sessionId} activity=${s.activity}`)
   s.input.clear()
   let timer: ReturnType<typeof setTimeout> | undefined
   const timedOut = Symbol('interrupt-timeout')
+  const active = messages.active
   try {
     const outcome = await Promise.race([
-      s.q.interrupt(),
+      (async () => {
+        await s.q.interrupt()
+        // Receipt and result are separate protocol messages. Bound both so a
+        // CLI that acknowledges Stop but never finishes cannot wedge the chat.
+        await active?.completed
+      })(),
       new Promise(resolve => {
         timer = setTimeout(() => resolve(timedOut), INTERRUPT_TIMEOUT_MS)
       })
@@ -876,44 +940,49 @@ export async function interruptCCSession(workspaceId: string, sessionId: string)
     teardown(s)
   } finally {
     clearTimeout(timer)
+    if (s.closed) {
+      active?.complete()
+      messages.active = null
+    }
+    messages.stopping = false
   }
   broadcast(s.workspaceId, { kind: 'stopped', sessionId: s.sessionId })
-  setActivity(s, 'idle')
+  if (!messages.active) setActivity(s, 'idle')
   await markViewBuilderWaitingBySession(s.workspaceId, s.workspacePath, s.sessionId)
-  if (!s.closed) armIdle(s)
+  if (!s.closed && !messages.active) armIdle(s)
+  void dispatchNextMessage(messages)
 }
 
-// Tear down a workspace's IDLE sessions so the next message respawns the agent
-// with fresh env. A running claude subprocess can't pick up new env vars, and
-// mid-turn reload isn't supported — busy sessions keep their snapshot until the
-// turn ends (then idle-evict or get recreated on the next message via resume).
+// Evict idle sessions so their next send picks up fresh workspace env. Busy
+// sessions retain their environment until a later teardown.
 export function restartWorkspaceSessions(workspacePath: string): void {
   for (const s of [...sessions.values()]) {
-    if (s.workspacePath === workspacePath && s.activity === 'idle') teardown(s)
+    if (
+      s.workspacePath === workspacePath &&
+      s.activity === 'idle' &&
+      s.bgTasks.size === 0 &&
+      !s.messages.dispatching &&
+      !s.messages.active &&
+      s.messages.pending.length === 0
+    )
+      teardown(s)
   }
 }
 
-// The `claude` executable changed under a running server (an in-place CLI
-// update). A subprocess started on the old binary keeps the old model lineup:
-// the picker, refreshed from the new CLI, offers aliases the old process
-// rejects on `set_model`. Idle sessions without background tasks respawn on
-// the next message right away; the rest are flagged stale and go once their
-// turn and background tasks finish (onSessionIdle / retireIfStale), or
-// sooner if a send finds them idle (sendCCMessage rebuilds before enqueueing).
+// A CLI update may introduce models the current process cannot use. Mark it
+// for replacement at the next safe dispatch boundary.
 export function retireCCSessionsOnCliChange(): void {
-  for (const s of [...sessions.values()]) {
-    if (s.activity === 'idle' && s.bgTasks.size === 0) teardown(s)
-    else {
-      s.staleCli = true
-      debug(
-        `cc stale-cli ws=${s.workspaceId} session=${s.sessionId} activity=${s.activity} bgTasks=${s.bgTasks.size} — retiring when drained`
-      )
-    }
-  }
+  for (const s of sessions.values()) s.staleCli = true
 }
 
-// Close every live session — called on server shutdown so no claude subprocess
-// is orphaned.
+// Server shutdown must settle pending sends and close every subprocess.
 export function killAllCCSessions(): void {
+  for (const messages of messageQueues.values()) {
+    messages.stopping = true
+    cancelPendingMessages(messages, new Error('Agent sessions stopped'))
+    messages.active?.complete()
+    messages.active = null
+  }
   for (const s of [...sessions.values()]) teardown(s)
+  messageQueues.clear()
 }

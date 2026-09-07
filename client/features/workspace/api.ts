@@ -34,13 +34,8 @@ export function useWorkspaceLayout(workspaceId: string) {
 
 // The workspace's agent backend in one snapshot: availability (runtime
 // presence + auth), any in-flight login ceremony, the model catalog, and
-// capabilities. Fetched once at workspace open; afterwards the volatile parts
-// (`availability`, `login`) are patched in place by `agent:updated` events —
-// the server owns the login watch loop, so the client never polls. Focus
-// refetch stays as a cheap safety net (the server serves its cache) and is
-// how a model lineup change reaches the picker: the server refetches its
-// catalog when the backend CLI updates in place, so the next refetch after
-// that carries the new models.
+// capabilities. `agent:updated` events refresh availability and login state;
+// focus refetches pick up model changes after a CLI update.
 export function useWorkspaceAgent(workspaceId: string) {
   const queryClient = useQueryClient()
   useEffect(

@@ -6,13 +6,7 @@ import type { Model } from '@/lib/types'
 import { requireHarnessExecutable } from '../executable'
 import { type ClaudeCli, claudeCliKey, probeClaudeCli } from './cli'
 
-// Chat runs live in `session.ts` (streaming-input sessions held per thread).
-// MCP status probing lives in `mcp.ts`. This module only probes the agent
-// backend for the model list — spins up a throwaway `query()` and reads metadata.
-
-// Claude's available models come from the account/CLI, not the workspace, so
-// the list is identical everywhere. We still need a `cwd` to spin up a probe
-// query, but cache the result across workspaces.
+// The metadata query needs a cwd; its catalog is cached across workspaces.
 async function fetchClaudeModels(cwd: string, executable: string): Promise<ModelInfo[]> {
   const q = query({
     prompt: '',
@@ -26,7 +20,6 @@ async function fetchClaudeModels(cwd: string, executable: string): Promise<Model
   })
   const models = await q.supportedModels()
   await q.close()
-  // Raw SDK shape, passed through to the client as-is.
   return models
 }
 
@@ -43,13 +36,8 @@ type CatalogEntry = {
   models: Promise<ModelInfo[]>
 }
 
-// The catalog is a function of the CLI, so it is cached per CLI identity
-// (`cli.ts`) rather than per process: Claude Code updates itself in place
-// while moi runs, and a new release is what introduces new models. Every
-// lookup re-probes `claude --version` (cheap) and refetches only when the
-// identity moved; the same settled promise is shared by concurrent callers,
-// and a failed fetch is dropped so a later request can retry instead of
-// caching the rejection forever.
+// Recheck CLI identity on each lookup. Callers share the model-fetch promise
+// until the identity changes; failed fetches are dropped so they can be retried.
 export function createClaudeCatalog(options: ClaudeCatalogOptions) {
   let entry: CatalogEntry | null = null
   const listeners = new Set<ClaudeCliChangeListener>()
@@ -82,8 +70,7 @@ export function createClaudeCatalog(options: ClaudeCatalogOptions) {
     return next
   }
 
-  // Fires after the catalog was invalidated by a CLI change (never on the
-  // first fetch). Returns the unsubscribe function.
+  // Initial discovery is not a CLI change.
   function onCliChanged(listener: ClaudeCliChangeListener): () => void {
     listeners.add(listener)
     return () => {
@@ -91,8 +78,7 @@ export function createClaudeCatalog(options: ClaudeCatalogOptions) {
     }
   }
 
-  // The identity the cached catalog was fetched for; undefined before the
-  // first fetch. For status output — never a substitute for a fresh probe.
+  // Cached identity for diagnostics; model lookups still need a fresh probe.
   function current(): ClaudeCli | undefined {
     return entry?.cli
   }
