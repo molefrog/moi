@@ -144,6 +144,13 @@ export type SessionSnapshot = {
 export type SystemNotice =
   | {
       id: string
+      kind: 'user-input'
+      at: string
+      status: 'pending' | 'answered' | 'cancelled'
+      questions: AgentQuestion[]
+    }
+  | {
+      id: string
       kind: 'rate-limit'
       at: string
       info?: unknown
@@ -152,9 +159,9 @@ export type SystemNotice =
       id: string
       kind: 'api-retry'
       at: string
-      attempt: number
-      maxRetries: number
-      delayMs: number
+      attempt?: number
+      maxRetries?: number
+      delayMs?: number
       error?: string
     }
   | { id: string; kind: 'compact'; at: string; metadata?: unknown }
@@ -187,6 +194,14 @@ export type SystemNotice =
       failed: { filename: string; error: string }[]
     }
   | { id: string; kind: 'elicitation'; at: string; server: string; elicitationId: string }
+
+export type AgentQuestion = {
+  id: string
+  header: string
+  question: string
+  isSecret: boolean
+  options?: { label: string; description: string }[]
+}
 
 export type ResultSummary = {
   subtype:

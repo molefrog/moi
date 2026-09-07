@@ -492,6 +492,9 @@ export type ErrorFrame = {
   workspaceId: string
   sessionId: string
   content: string
+  // A failed steer or interrupt leaves the current run active. Older senders
+  // omit this field and retain terminal-error behavior.
+  terminal?: boolean
 }
 
 export type StoppedFrame = {

@@ -6,6 +6,7 @@ import {
   codexItemToNotice,
   codexItemToTurn,
   codexModelToModel,
+  codexModelsToModels,
   codexServiceTierForFastMode,
   codexThreadToEvents,
   codexThreadToSessionInfo,
@@ -13,6 +14,43 @@ import {
 } from './adapter'
 
 const THREAD = 'thread-1'
+
+test('Codex picker defaults follow configured model, effort and service tier', () => {
+  const models = [
+    {
+      id: 'first',
+      model: 'first',
+      displayName: 'First',
+      isDefault: true,
+      defaultReasoningEffort: 'low',
+      supportedReasoningEfforts: [{ reasoningEffort: 'low' }, { reasoningEffort: 'high' }]
+    },
+    {
+      id: 'second',
+      model: 'second',
+      displayName: 'Second',
+      defaultReasoningEffort: 'low',
+      supportedReasoningEfforts: [{ reasoningEffort: 'low' }, { reasoningEffort: 'high' }],
+      serviceTiers: [{ id: 'priority', name: 'Fast', description: 'More usage' }]
+    }
+  ]
+  const rows = codexModelsToModels(models, {
+    model: 'second',
+    model_reasoning_effort: 'high',
+    service_tier: 'priority'
+  })
+  expect(rows[0]).toMatchObject({
+    value: 'default',
+    resolvedModel: 'second',
+    defaultEffort: 'high',
+    defaultFastMode: true
+  })
+  expect(rows[1].defaultEffort).toBe('high')
+  expect(codexModelsToModels(models, {})[0]).toMatchObject({
+    resolvedModel: 'first',
+    defaultEffort: 'low'
+  })
+})
 
 describe('codexItemToTurn', () => {
   test('userMessage uses clientId as turn id when present', () => {
@@ -378,6 +416,7 @@ describe('discovery mappings', () => {
       displayName: '5.6 Sol',
       description: '5.6 Sol · Latest frontier model.',
       supportsEffort: true,
+      defaultEffort: 'low',
       supportedEffortLevels: ['low', 'high']
     })
   })

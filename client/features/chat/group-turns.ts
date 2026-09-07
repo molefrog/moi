@@ -54,6 +54,7 @@ export function groupTurns(turns: Turn[]): Turn[] {
     const previous = out[index - 1]
     if (
       turn.role !== 'assistant' ||
+      turn.meta?.durationMs !== undefined ||
       previous?.role !== 'user' ||
       previous.origin.kind !== 'user-input' ||
       !previous.timestamp ||

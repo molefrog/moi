@@ -13,7 +13,10 @@ import { isAbsolute, join } from 'node:path'
 
 import type { DiscoveredWorkspaceCandidate } from '../types'
 
-export const CODEX_SESSIONS_ROOT = join(homedir(), '.codex', 'sessions')
+export const CODEX_SESSIONS_ROOT = join(
+  process.env.CODEX_HOME || join(homedir(), '.codex'),
+  'sessions'
+)
 
 // Newest files scanned per discovery pass. Session dirs grow unboundedly; the
 // most recent rollouts cover every workspace anyone still cares about.

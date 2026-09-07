@@ -18,6 +18,7 @@ import { ChatComposer, type ComposerAnnotationControls } from './composer/ChatCo
 import { ChatEmptyState, type WelcomeDestination, resolveChatEmptyState } from './ChatEmptyState'
 import { ChatSelector } from './ChatSelector'
 import { TurnView } from './TurnView'
+import { AgentInputRequest } from './AgentInputRequest'
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { cn } from '@/client/lib/cn'
@@ -203,7 +204,16 @@ export function ChatPanel({
             {showTranscript &&
               timeline.map(item =>
                 item.kind === 'notice' ? (
-                  <ChatNoticeRow key={`notice:${item.notice.id}`} notice={item.notice} />
+                  item.notice.kind === 'user-input' && sessionId ? (
+                    <AgentInputRequest
+                      key={`notice:${item.notice.id}`}
+                      workspaceId={workspaceId}
+                      sessionId={sessionId}
+                      notice={item.notice}
+                    />
+                  ) : (
+                    <ChatNoticeRow key={`notice:${item.notice.id}`} notice={item.notice} />
+                  )
                 ) : (
                   <TurnView
                     key={item.turn.id}

@@ -45,8 +45,7 @@ describe('codexServerRequestResponse', () => {
   test('accepts v2 approval requests', () => {
     for (const method of [
       'item/commandExecution/requestApproval',
-      'item/fileChange/requestApproval',
-      'item/permissions/requestApproval'
+      'item/fileChange/requestApproval'
     ]) {
       expect(codexServerRequestResponse(method)).toEqual({ result: { decision: 'accept' } })
     }
@@ -54,11 +53,19 @@ describe('codexServerRequestResponse', () => {
 
   test('accepts legacy v1 approval requests with their decision vocabulary', () => {
     expect(codexServerRequestResponse('applyPatchApproval')).toEqual({
-      result: { decision: 'accept' }
+      result: { decision: 'approved' }
     })
     expect(codexServerRequestResponse('execCommandApproval')).toEqual({
       result: { decision: 'approved' }
     })
+  })
+
+  test('grants requested permissions for one turn using the native grant schema', () => {
+    expect(
+      codexServerRequestResponse('item/permissions/requestApproval', {
+        permissions: { network: { enabled: true }, fileSystem: null, unexpected: true }
+      })
+    ).toEqual({ result: { permissions: { network: { enabled: true } }, scope: 'turn' } })
   })
 
   test('rejects non-approval requests as unsupported', () => {

@@ -1,11 +1,15 @@
 import * as React from 'react'
 
-import { Input as InputPrimitive } from '@base-ui/react/input'
+import { Field } from '@base-ui/react/field'
 import { cn } from './utils'
 
-function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
+type InputProps = React.ComponentProps<typeof Field.Control>
+
+function Input({ className, type, ...props }: InputProps) {
+  // Base UI Input delegates to Field.Control. Import it directly because the
+  // wrapper's Field namespace was undefined in Bun's dev bundle.
   return (
-    <InputPrimitive
+    <Field.Control
       type={type}
       data-slot="input"
       className={cn(

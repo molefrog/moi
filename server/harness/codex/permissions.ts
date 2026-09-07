@@ -44,13 +44,40 @@ IMPORTANT: This context comes from moi, not from the user, and the user does not
 // moi approves by default until it grows a UI approval flow. Anything else is
 // rejected as unsupported so the turn never hangs on an unanswered request.
 export function codexServerRequestResponse(
-  method: string
+  method: string,
+  params: Record<string, unknown> = {}
 ): { result: Record<string, unknown> } | { error: { code: number; message: string } } {
-  if (method.endsWith('requestApproval') || method === 'applyPatchApproval') {
+  if (
+    method === 'item/commandExecution/requestApproval' ||
+    method === 'item/fileChange/requestApproval'
+  ) {
     return { result: { decision: 'accept' } }
   }
-  if (method === 'execCommandApproval') {
+  if (method === 'item/permissions/requestApproval') {
+    // Permission extensions use a grant, not a command decision. Scope the
+    // existing default-approve policy to this turn, never the whole session.
+    const permissions = params.permissions
+    return {
+      result: {
+        permissions:
+          permissions && typeof permissions === 'object' && !Array.isArray(permissions)
+            ? Object.fromEntries(
+                Object.entries(permissions).filter(
+                  ([key, value]) => (key === 'network' || key === 'fileSystem') && value !== null
+                )
+              )
+            : {},
+        scope: 'turn'
+      }
+    }
+  }
+  if (method === 'execCommandApproval' || method === 'applyPatchApproval') {
     return { result: { decision: 'approved' } }
+  }
+  if (method === 'mcpServer/elicitation/request') {
+    // Unsupported MCP forms/URL flows must decline in the native vocabulary,
+    // rather than returning a malformed command-approval response.
+    return { result: { action: 'decline', content: null } }
   }
   return { error: { code: -32601, message: `moi does not handle ${method}` } }
 }

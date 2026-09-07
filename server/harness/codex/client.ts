@@ -17,7 +17,8 @@ import {
   type CodexThread,
   type SubagentReplay,
   childThreadToSubagentRecord,
-  codexModelToModel,
+  codexModelsToModels,
+  type CodexConfig,
   codexThreadToEvents,
   codexThreadToSessionInfo,
   collectSubagentActivities,
@@ -25,15 +26,16 @@ import {
 } from './adapter'
 import type { WorkspaceActivityPreview } from '../types'
 import { findHarnessExecutable, requireHarnessExecutable } from '../executable'
-import { codexServerRequestResponse } from './permissions'
+import {
+  createCodexTransport,
+  type Json,
+  type NotificationListener,
+  type RequestListener
+} from './transport'
+import { readCodexPages } from './pagination'
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
 import { resolveWorkspaceEnv } from '../../workspace-env'
-
-const REQUEST_TIMEOUT_MS = 30_000
-
-type Json = Record<string, unknown>
-type NotificationListener = (method: string, params: Json) => void
 
 // Every JSON-RPC frame in either direction lands in the shared wire ring
 // (server/harness-debug.ts, scoped by workspacePath), kept OUTSIDE the client
@@ -63,6 +65,7 @@ export function getCodexProcessInfo(workspacePath: string): Promise<CodexProcess
 export type CodexClient = {
   rpc: <T>(method: string, params?: Json) => Promise<T>
   onNotification: (l: NotificationListener) => () => void
+  onRequest: (listener: RequestListener) => () => void
   isAlive: () => boolean
   workspacePath: string
   // Whether this app-server accepts `turn/start.additionalContext` (the native
@@ -119,12 +122,18 @@ export function codexSupportsAdditionalContext(userAgent: string | undefined): b
 type ClientRecord = {
   client: CodexClient
   proc: ReturnType<typeof Bun.spawn>
+  close: () => void
 }
 
 const clients = new Map<string, Promise<ClientRecord>>() // key: workspacePath
 const liveProcesses = new Map<
   string,
-  { proc: ReturnType<typeof Bun.spawn>; startedAt: number; isAlive: () => boolean }
+  {
+    proc: ReturnType<typeof Bun.spawn>
+    startedAt: number
+    isAlive: () => boolean
+    close: () => void
+  }
 >()
 
 export function getCodexProcessSnapshot(): CodexProcessSnapshot[] {
@@ -152,107 +161,24 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
     env: { ...process.env, ...workspaceEnv, MOI_AGENT: '1' }
   })
 
-  let alive = true
-  let nextId = 1
-  const pending = new Map<
-    number,
-    { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: Timer }
-  >()
-  const listeners = new Set<NotificationListener>()
-
-  function send(obj: Json) {
-    tapWire(workspacePath, 'send', obj)
-    proc.stdin.write(JSON.stringify(obj) + '\n')
-    proc.stdin.flush()
-  }
-
-  function rpc<T>(method: string, params: Json = {}): Promise<T> {
-    if (!alive) return Promise.reject(new Error('codex app-server not running'))
-    const id = nextId++
-    send({ jsonrpc: '2.0', id, method, params })
-    return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        pending.delete(id)
-        reject(new Error(`codex rpc timeout: ${method}`))
-      }, REQUEST_TIMEOUT_MS)
-      pending.set(id, { resolve: resolve as (v: unknown) => void, reject, timer })
-    })
-  }
-
-  function fanout(method: string, params: Json) {
-    for (const l of listeners) {
-      try {
-        l(method, params)
-      } catch (err) {
-        console.error('[codex] notification listener threw', err)
-      }
-    }
-  }
-
-  // Server→client requests MUST be answered or the turn hangs. moi approves
-  // approval requests by default — an interim policy until UI approvals land;
-  // non-approval requests are rejected as unsupported.
-  function answerServerRequest(msg: Json) {
-    const method = msg.method as string
-    send({ jsonrpc: '2.0', id: msg.id, ...codexServerRequestResponse(method) })
-  }
-
-  function handleLine(line: string) {
-    if (!line.trim()) return
-    let msg: Json
-    try {
-      msg = JSON.parse(line) as Json
-    } catch {
-      return
-    }
-    tapWire(workspacePath, 'recv', msg)
-    if ('id' in msg && 'method' in msg) {
-      answerServerRequest(msg)
-    } else if ('id' in msg) {
-      const p = pending.get(msg.id as number)
-      if (!p) return
-      pending.delete(msg.id as number)
-      clearTimeout(p.timer)
-      if ('error' in msg) {
-        const e = msg.error as { message?: string } | undefined
-        p.reject(new Error(e?.message ?? JSON.stringify(msg.error)))
-      } else {
-        p.resolve(msg.result)
-      }
-    } else if (typeof msg.method === 'string') {
-      fanout(msg.method, (msg.params ?? {}) as Json)
-    }
-  }
-
-  async function readLoop() {
-    const reader = (proc.stdout as ReadableStream<Uint8Array>).getReader()
-    const decoder = new TextDecoder()
-    let buf = ''
-    try {
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buf += decoder.decode(value, { stream: true })
-        let nl: number
-        while ((nl = buf.indexOf('\n')) >= 0) {
-          handleLine(buf.slice(0, nl))
-          buf = buf.slice(nl + 1)
-        }
-      }
-    } finally {
-      alive = false
-      if (clients.get(workspacePath) === recordPromise) clients.delete(workspacePath)
-      if (liveProcesses.get(workspacePath)?.proc === proc) liveProcesses.delete(workspacePath)
-      for (const [, p] of pending) {
-        clearTimeout(p.timer)
-        p.reject(new Error('codex app-server exited'))
-      }
-      pending.clear()
-      fanout('__exit', {})
-      debug(`codex app-server exited ws=${workspacePath}`)
-    }
-  }
-
+  const transport = createCodexTransport({
+    stdout: proc.stdout,
+    write: async line => {
+      proc.stdin.write(line)
+      await proc.stdin.flush()
+    },
+    stop: () => {
+      proc.kill()
+    },
+    tap: (direction, frame) => tapWire(workspacePath, direction, frame)
+  })
+  transport.onNotification(method => {
+    if (method === 'account/updated' || method === 'account/login/completed')
+      codexModelCatalogs.delete(client)
+    if (method !== '__exit') return
+    if (liveProcesses.get(workspacePath)?.proc === proc) liveProcesses.delete(workspacePath)
+    debug(`codex app-server exited ws=${workspacePath}`)
+  })
   async function drainStderr() {
     const reader = (proc.stderr as ReadableStream<Uint8Array>).getReader()
     const decoder = new TextDecoder()
@@ -264,40 +190,45 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
     }
   }
 
-  // recordPromise is referenced by readLoop's cleanup to make sure we only
-  // delete our own registry entry (not a replacement spawned after a crash).
   const client: CodexClient = {
-    rpc,
-    onNotification(l) {
-      listeners.add(l)
-      return () => listeners.delete(l)
-    },
-    isAlive: () => alive,
+    rpc: transport.rpc,
+    onNotification: transport.onNotification,
+    onRequest: transport.onRequest,
+    isAlive: transport.isAlive,
     workspacePath,
     supportsAdditionalContext: false,
     cliVersion: undefined
   }
-  const record: ClientRecord = { client, proc }
-  const recordPromise = Promise.resolve(record)
-  liveProcesses.set(workspacePath, { proc, startedAt, isAlive: client.isAlive })
-
-  void readLoop()
-  void drainStderr()
+  const record: ClientRecord = { client, proc, close: transport.close }
+  liveProcesses.set(workspacePath, {
+    proc,
+    startedAt,
+    isAlive: client.isAlive,
+    close: transport.close
+  })
+  // stdout EOF owns teardown: process exit can precede the final buffered
+  // response/notification, which still needs to reach its waiter.
+  void drainStderr().catch(() => {})
 
   // experimentalApi opts this connection into experimental fields — required
   // for `turn/start.additionalContext`; servers new enough to gate it reject
   // the field otherwise. The response's userAgent carries the CLI version.
-  const init = await rpc<{ userAgent?: string }>('initialize', {
-    clientInfo: { name: 'moi', title: 'moi', version: '0.1' },
-    capabilities: { experimentalApi: true, requestAttestation: false }
-  })
-  client.supportsAdditionalContext = codexSupportsAdditionalContext(init?.userAgent)
-  client.cliVersion = parseCodexCliVersion(init?.userAgent)
-  send({ jsonrpc: '2.0', method: 'initialized', params: {} })
-  debug(
-    `codex app-server started ws=${workspacePath} bin=${bin} ua=${init?.userAgent ?? 'unknown'} additionalContext=${client.supportsAdditionalContext}`
-  )
-  return record
+  try {
+    const init = await client.rpc<{ userAgent?: string }>('initialize', {
+      clientInfo: { name: 'moi', title: 'moi', version: '0.1' },
+      capabilities: { experimentalApi: true, requestAttestation: false }
+    })
+    client.supportsAdditionalContext = codexSupportsAdditionalContext(init?.userAgent)
+    client.cliVersion = parseCodexCliVersion(init?.userAgent)
+    transport.notify('initialized')
+    debug(
+      `codex app-server started ws=${workspacePath} bin=${bin} ua=${init?.userAgent ?? 'unknown'} additionalContext=${client.supportsAdditionalContext}`
+    )
+    return record
+  } catch (error) {
+    transport.close()
+    throw error
+  }
 }
 
 export async function getCodexClient(workspacePath: string): Promise<CodexClient> {
@@ -305,14 +236,25 @@ export async function getCodexClient(workspacePath: string): Promise<CodexClient
   if (existing) {
     const rec = await existing
     if (rec.client.isAlive()) return rec.client
+    // Another caller may already have replaced this dead process.
+    if (clients.get(workspacePath) !== existing) return getCodexClient(workspacePath)
     clients.delete(workspacePath)
   }
   const started = startClient(workspacePath)
   clients.set(workspacePath, started)
   try {
-    return (await started).client
+    const rec = await started
+    if (clients.get(workspacePath) !== started || !rec.client.isAlive()) {
+      rec.close()
+      throw new Error('Codex startup was cancelled')
+    }
+    rec.client.onNotification(method => {
+      if (method === '__exit' && clients.get(workspacePath) === started)
+        clients.delete(workspacePath)
+    })
+    return rec.client
   } catch (err) {
-    clients.delete(workspacePath)
+    if (clients.get(workspacePath) === started) clients.delete(workspacePath)
     throw err
   }
 }
@@ -338,14 +280,16 @@ export function killCodexWorkspace(workspacePath: string): void {
   const rec = clients.get(workspacePath)
   if (!rec) return
   clients.delete(workspacePath)
-  void rec.then(r => r.proc.kill()).catch(() => {})
+  liveProcesses.get(workspacePath)?.close()
+  void rec.then(r => r.close()).catch(() => {})
 }
 
 // Server shutdown: kill every app-server so no codex process is orphaned.
 export function killAllCodexClients(): void {
+  for (const process of [...liveProcesses.values()]) process.close()
   for (const [path, rec] of clients) {
     clients.delete(path)
-    void rec.then(r => r.proc.kill()).catch(() => {})
+    void rec.then(r => r.close()).catch(() => {})
   }
 }
 
@@ -355,11 +299,12 @@ export function killAllCodexClients(): void {
 export async function getCodexSessions(workspacePath: string): Promise<SessionInfo[]> {
   try {
     const client = await getCodexClient(workspacePath)
-    const res = await client.rpc<{ data?: CodexThread[] }>('thread/list', {
+    const threads = await readCodexPages<CodexThread>(client, 'thread/list', {
       cwd: workspacePath,
-      limit: 50
+      limit: 100,
+      sortKey: 'updated_at'
     })
-    return (res.data ?? []).map(codexThreadToSessionInfo)
+    return threads.map(codexThreadToSessionInfo)
   } catch (err) {
     console.error('[codex] thread/list failed', err)
     return []
@@ -396,7 +341,8 @@ export async function getCodexWorkspacePreview(
   try {
     const res = await client.rpc<{ data?: CodexThread[] }>('thread/list', {
       cwd: workspacePath,
-      limit: 50
+      limit: 50,
+      sortKey: 'updated_at'
     })
     return selectCodexWorkspacePreview(res.data ?? [], includeFirstUserMessage)
   } catch {
@@ -404,50 +350,49 @@ export async function getCodexWorkspacePreview(
   }
 }
 
-// Account-wide model catalog (identical for every workspace); cached like the
-// Claude list in agent.ts, cleared on failure so a later call can retry. Keep
-// the raw rows so internal helpers can read isDefault and effort ordering.
-// The effective service tier is cwd-scoped and applied after reading the cache.
-let codexModelCatalogPromise: Promise<CodexModel[]> | null = null
+// Cache per live client: workspace env/config can select a different account
+// or provider. Expiry, login notifications and process replacement refresh it.
+const codexModelCatalogs = new WeakMap<
+  CodexClient,
+  { expiresAt: number; promise: Promise<CodexModel[]> }
+>()
 
-export function getCodexModelCatalog(workspacePath: string): Promise<CodexModel[]> {
-  if (!codexModelCatalogPromise) {
-    codexModelCatalogPromise = (async () => {
-      const client = await getCodexClient(workspacePath)
-      const res = await client.rpc<{ data?: CodexModel[] }>('model/list', {})
-      return (res.data ?? []).filter(model => !model.hidden)
-    })().catch(err => {
-      codexModelCatalogPromise = null
+export async function getCodexModelCatalog(workspacePath: string): Promise<CodexModel[]> {
+  const client = await getCodexClient(workspacePath)
+  const cached = codexModelCatalogs.get(client)
+  if (cached && cached.expiresAt > Date.now()) return cached.promise
+  const promise = readCodexPages<CodexModel>(client, 'model/list', { limit: 100 })
+    .then(models => models.filter(model => !model.hidden))
+    .catch(err => {
+      if (codexModelCatalogs.get(client)?.promise === promise) codexModelCatalogs.delete(client)
       throw err
     })
-  }
-  return codexModelCatalogPromise
+  codexModelCatalogs.set(client, { expiresAt: Date.now() + 60_000, promise })
+  return promise
 }
 
-async function getCodexConfiguredServiceTier(
-  workspacePath: string
-): Promise<string | null | undefined> {
+async function getCodexConfig(workspacePath: string): Promise<CodexConfig> {
   try {
     const client = await getCodexClient(workspacePath)
-    const res = await client.rpc<{ config?: { service_tier?: string | null } }>('config/read', {
+    const res = await client.rpc<{ config?: CodexConfig }>('config/read', {
       cwd: workspacePath,
       includeLayers: false
     })
-    return res.config?.service_tier
+    return res.config ?? {}
   } catch (err) {
     debug(
       `codex config/read failed cwd=${workspacePath}: ${err instanceof Error ? err.message : String(err)}`
     )
-    return undefined
+    return {}
   }
 }
 
 export async function getCodexModels(workspacePath: string): Promise<Model[]> {
-  const [models, configuredServiceTier] = await Promise.all([
+  const [models, config] = await Promise.all([
     getCodexModelCatalog(workspacePath),
-    getCodexConfiguredServiceTier(workspacePath)
+    getCodexConfig(workspacePath)
   ])
-  return models.map(model => codexModelToModel(model, configuredServiceTier))
+  return codexModelsToModels(models, config)
 }
 
 // MCP servers as Codex sees them (from ~/.codex/config.toml), for the
@@ -456,11 +401,12 @@ export async function getCodexModels(workspacePath: string): Promise<Model[]> {
 export async function getCodexMcpStatus(workspacePath: string): Promise<McpServer[]> {
   try {
     const client = await getCodexClient(workspacePath)
-    const res = await client.rpc<{ data?: { name?: string; authStatus?: string }[] }>(
+    const servers = await readCodexPages<{ name?: string; authStatus?: string }>(
+      client,
       'mcpServerStatus/list',
       {}
     )
-    return (res.data ?? [])
+    return servers
       .filter((s): s is { name: string; authStatus?: string } => typeof s.name === 'string')
       .map(s => ({
         name: s.name,
@@ -481,23 +427,35 @@ export async function readSubagentRecords(
 ): Promise<Map<string, SubagentReplay>> {
   const map = new Map<string, SubagentReplay>()
   const parentTurnIds = new Set((thread.turns ?? []).map(t => t.id))
-  for (const activity of collectSubagentActivities(thread)) {
-    const childId = activity.agentThreadId
-    if (!childId) continue
-    try {
-      const res = await client.rpc<{ thread?: CodexThread }>('thread/read', {
-        threadId: childId,
-        includeTurns: true
-      })
-      if (!res.thread) continue
-      map.set(childId, {
-        toolCallId: activity.id,
-        record: childThreadToSubagentRecord(res.thread, activity, parentTurnIds)
-      })
-    } catch {
-      // child thread unreadable (deleted, other cwd) — keep the plain card
-    }
-  }
+  const activities = [
+    ...new Map(
+      collectSubagentActivities(thread)
+        .filter(activity => activity.agentThreadId)
+        .map(activity => [activity.agentThreadId, activity])
+    ).values()
+  ]
+  let index = 0
+  await Promise.all(
+    Array.from({ length: Math.min(4, activities.length) }, async () => {
+      while (index < activities.length) {
+        const activity = activities[index++]
+        const childId = activity.agentThreadId!
+        try {
+          const res = await client.rpc<{ thread?: CodexThread }>('thread/read', {
+            threadId: childId,
+            includeTurns: true
+          })
+          if (res.thread)
+            map.set(childId, {
+              toolCallId: activity.id,
+              record: childThreadToSubagentRecord(res.thread, activity, parentTurnIds)
+            })
+        } catch {
+          // A missing child leaves its activity card; siblings still load.
+        }
+      }
+    })
+  )
   return map
 }
 
@@ -506,15 +464,11 @@ export async function getCodexThreadEvents(
   workspacePath: string,
   threadId: string
 ): Promise<StreamEvent[]> {
-  try {
-    const client = await getCodexClient(workspacePath)
-    const res = await client.rpc<{ thread?: CodexThread }>('thread/read', {
-      threadId,
-      includeTurns: true
-    })
-    if (!res.thread) return []
-    return codexThreadToEvents(res.thread, await readSubagentRecords(client, res.thread))
-  } catch {
-    return []
-  }
+  const client = await getCodexClient(workspacePath)
+  const res = await client.rpc<{ thread?: CodexThread }>('thread/read', {
+    threadId,
+    includeTurns: true
+  })
+  if (!res.thread) throw new Error('Codex did not return this chat')
+  return codexThreadToEvents(res.thread, await readSubagentRecords(client, res.thread))
 }

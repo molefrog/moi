@@ -85,6 +85,8 @@ export type CodexTurn = {
   status: string
   error?: { message?: string; codexErrorInfo?: unknown } | null
   durationMs?: number | null
+  startedAt?: number | null
+  completedAt?: number | null
 }
 
 export type CodexThread = {
@@ -203,6 +205,9 @@ export function codexModelToModel(m: CodexModel, configuredServiceTier?: string 
       : { description: displayName }),
     supportsEffort: efforts.length > 0,
     ...(efforts.length > 0 ? { supportedEffortLevels: efforts } : {}),
+    ...(m.defaultReasoningEffort && efforts.includes(m.defaultReasoningEffort)
+      ? { defaultEffort: m.defaultReasoningEffort }
+      : {}),
     ...(supportsFastMode
       ? {
           supportsFastMode: true,
@@ -210,6 +215,32 @@ export function codexModelToModel(m: CodexModel, configuredServiceTier?: string 
         }
       : {})
   }
+}
+
+export type CodexConfig = {
+  model?: string
+  model_reasoning_effort?: string
+  service_tier?: string | null
+}
+
+export function codexModelsToModels(models: CodexModel[], config: CodexConfig): Model[] {
+  const mapped = models.map(model => {
+    const row = codexModelToModel(model, config.service_tier)
+    // Codex config effort applies to every model, including an explicit model
+    // override. Only fall back to the catalog when config supplies no effort.
+    if (
+      config.model_reasoning_effort &&
+      row.supportedEffortLevels?.includes(config.model_reasoning_effort)
+    ) {
+      row.defaultEffort = config.model_reasoning_effort
+    }
+    return row
+  })
+  const defaultModel =
+    mapped.find(model => model.resolvedModel === config.model || model.value === config.model) ??
+    mapped.find(model => models.find(raw => raw.id === model.value)?.isDefault) ??
+    mapped[0]
+  return defaultModel ? [{ ...defaultModel, value: 'default' }, ...mapped] : []
 }
 
 // ---- item → turn -------------------------------------------------------------
@@ -565,6 +596,8 @@ export function codexThreadToEvents(
     for (const item of turn.items ?? []) {
       const t = codexItemToTurn(item, thread.id)
       if (t) {
+        if (typeof turn.startedAt === 'number')
+          t.timestamp = new Date(turn.startedAt * 1000).toISOString()
         if (item.type === 'subAgentActivity' && item.agentThreadId) {
           const sub = subagents?.get(item.agentThreadId)
           const part = t.parts.find(p => p.type === 'tool-call')
@@ -577,7 +610,11 @@ export function codexThreadToEvents(
         continue
       }
       const n = codexItemToNotice(item, thread.id)
-      if (n) events.push({ kind: 'notice', notice: n })
+      if (n) {
+        const time = turn.completedAt ?? turn.startedAt
+        if (typeof time === 'number') n.at = new Date(time * 1000).toISOString()
+        events.push({ kind: 'notice', notice: n })
+      }
     }
   }
   return events

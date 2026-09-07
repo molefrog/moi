@@ -144,11 +144,10 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
   }
   if (kind === 'error' && typeof data.content === 'string') {
     store.setError(workspaceId, sessionId, data.content)
-    // Servers only emit `error` terminally, so it also ends the busy state —
-    // relying solely on a separate status frame left the spinner stuck when
-    // that frame was lost.
-    store.setActivity(workspaceId, sessionId, 'idle')
-    store.clearPreviewsForSession(workspaceId, sessionId)
+    if (data.terminal !== false) {
+      store.setActivity(workspaceId, sessionId, 'idle')
+      store.clearPreviewsForSession(workspaceId, sessionId)
+    }
   }
   if (kind === 'stopped') {
     store.setActivity(workspaceId, sessionId, 'idle')

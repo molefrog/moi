@@ -196,14 +196,14 @@ the established name is kept. See `hermes/NOTES.md`.
 JSON-RPC, one process per workspace so `workspaceEnv` injects at spawn —
 `codex/client.ts`): thread create/resume with temp-id rename, per-turn model +
 effort overrides (both live — no rebuild dance), opt-in token streaming from
-`item/*/delta`, reasoning summaries via `summary: 'auto'`, mid-turn sends
-steered into the running turn (`turn/steer` with `turn/start` fallback),
+`item/*/delta`, reasoning summaries via `summary: 'detailed'`, mid-turn sends
+steered into the running turn (`turn/steer` with a no-active-turn-only fallback),
 interrupt, per-turn token usage folded into `TurnMeta`, native optimistic-id
 rendezvous, session list via `thread/list` (cwd-filtered) and history replay
 via `thread/read`, subagent (collab) child threads nested as live
 SubagentRecord transcripts on the parent card, semantic exec labels from
 `commandActions`, MCP status via `mcpServerStatus/list`, and hook / failed
-MCP-startup notices. Workspace discovery scans `~/.codex/sessions` rollout
+MCP-startup notices. Workspace discovery scans `$CODEX_HOME/sessions` (default `~/.codex/sessions`) rollout
 heads for cwds (`codex/discovery.ts` — no binary needed), and `availability()`
 reports a missing `codex` executable (PATH + login-shell PATH lookup, with a
 Codex Desktop app-bundle fallback — `executable.ts`) to setup flows and the
@@ -211,9 +211,11 @@ workspace composer. Sessions use `workspace-write` with network disabled by
 default and `approvalPolicy: on-request`; server→client approval requests are
 accepted by moi at the transport — an interim default-approve policy until UI
 approvals land (`codex/permissions.ts`). The same policy is reapplied on
-thread start, resume, and every turn. Known gaps: no interactive approval flow
-yet. Per-turn application context tells Codex to request escalated localhost
-access before control-server commands. Images ride inline as data URLs only
+thread start, resume, and every turn. Native questions render as answerable
+chat forms (including Default mode); fast mode follows the model catalog and
+supports per-chat on/off overrides. Known gaps: no interactive command-approval
+or MCP elicitation UI yet. Per-turn application context tells Codex to request
+escalated localhost access before control-server commands. Images ride inline as data URLs only
 (no `localImage` path mode).
 
 Workspace availability also checks provider authentication when a workspace is

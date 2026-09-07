@@ -562,6 +562,28 @@ one.get('/sessions/:sessionId/events', async c => {
   return c.json(await harnessFor(ws).sessionEvents(ws, c.req.param('sessionId')))
 })
 
+one.post('/sessions/:sessionId/input', async c => {
+  const ws = c.get('ws')
+  const harness = harnessFor(ws)
+  if (!harness.answerInput) return c.text('This agent does not support input requests', 501)
+  const body: unknown = await c.req.json().catch(() => null)
+  if (
+    !body ||
+    typeof body !== 'object' ||
+    !('requestId' in body) ||
+    typeof body.requestId !== 'string' ||
+    !('answers' in body)
+  ) {
+    return c.text('Expected a request id and answers', 400)
+  }
+  try {
+    harness.answerInput(ws, c.req.param('sessionId'), body.requestId, body.answers)
+    return c.body(null, 204)
+  } catch (error) {
+    return c.text(error instanceof Error ? error.message : 'Could not answer this question', 409)
+  }
+})
+
 // Per-session agent settings (model, reasoning effort, and Fast mode). GET
 // returns the stored config ({} for sessions that never overrode the workspace
 // defaults); PUT patches it (a field as `null` clears it, omitted leaves it).
