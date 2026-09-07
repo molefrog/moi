@@ -20,7 +20,7 @@ and [implementation notes](../server/harness/codex/NOTES.md).
 
 ## Automated checks
 
-- `bun test`: 1,553 passed, four existing skips, zero failures across 170 files.
+- `bun test`: 1,561 passed, four existing skips, zero failures across 170 files.
 - `bun run typecheck`: passed.
 - `bun run lint`: passed.
 - `bun run build:client`: passed, producing 72 files.
@@ -77,3 +77,25 @@ and returned `RECOVERY_OK` without repeating the interrupted command.
   steering RPC cannot change those settings in an already running turn.
 - Compatibility and failure paths are covered by simulated protocol tests;
   live UI validation used the installed CLI version and account.
+
+## Model selection regression
+
+A configured model can be absent from the installed CLI's model catalog. With
+CLI 0.147.0, `config/read` returned `gpt-6-astra` while `model/list` advertised
+Sol as its default and omitted Astra. Previously, the picker displayed Sol but
+the outgoing message omitted `model`, causing Codex to inherit Astra and fail.
+
+The picker and send path now resolve the same concrete catalog row. Every
+Codex UI send carries that model explicitly, including default and stale saved
+selections. Other providers keep their existing default semantics. Changing a
+picker selection does not retry an already failed message.
+
+Verified in a fresh chat (`01a07c7a-cc02-7b02-9e5e-5d002929f463`) with the
+workspace model override absent and Codex config still set to Astra:
+
+- The picker displayed 5.6 Sol; both `thread/start` and `turn/start` carried
+  `model: "gpt-5.6-sol"`; the model replied `DEFAULT_MODEL_OK`.
+- Clicking Sol in the picker and sending another message again used Sol and
+  returned `SELECTED_SOL_OK`.
+- Eight new send-path cases cover implicit/default/stale/explicit choices,
+  capability validation, native ids, and catalog loading.

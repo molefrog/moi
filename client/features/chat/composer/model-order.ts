@@ -6,6 +6,21 @@ const ANTHROPIC_MODEL_FAMILY_ORDER = ['fable', 'opus', 'sonnet', 'haiku'] as con
 
 type ModelComparator = (a: Model, b: Model) => number
 
+// Resolve the same concrete row for the picker and the outgoing chat request.
+// An unavailable saved/default model falls back to the first catalog choice.
+export function resolveSelectedModel(
+  models: readonly Model[],
+  selectedModel: string | undefined,
+  defaultModel = models.find(model => model.value === 'default')?.resolvedModel
+): Model | undefined {
+  const choices = models.filter(model => model.value !== 'default')
+  return (
+    choices.find(model => model.value === selectedModel) ??
+    choices.find(model => (model.resolvedModel ?? model.value) === defaultModel) ??
+    choices[0]
+  )
+}
+
 function anthropicModelFamilyRank(model: Model): number | undefined {
   const key = model.resolvedModel ?? model.value
   const rank = ANTHROPIC_MODEL_FAMILY_ORDER.findIndex(
