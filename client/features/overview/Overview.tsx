@@ -43,7 +43,7 @@ function NoWidgetsCreated({ onCreateWidget, showOnboarding }: NoWidgetsCreatedPr
       </div>
       <div className="col-span-2 overflow-hidden rounded-2xl bg-muted texture-checker squircle" />
       <div className="col-span-2 overflow-hidden rounded-2xl bg-muted texture-checker squircle" />
-      <div className="col-span-3 overflow-hidden rounded-2xl bg-muted texture-checker squircle">
+      <div className="col-span-2 overflow-hidden rounded-2xl bg-muted texture-checker squircle">
         {showOnboarding && (
           <div className="flex size-full items-end justify-end">
             <span className="m-8 max-w-56 text-right text-sm text-muted-foreground">
