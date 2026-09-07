@@ -11,7 +11,7 @@ import type {
   Turn
 } from '@/lib/format'
 import { stripMoiContext, stripMoiContextLoose } from '@/lib/moi-context'
-import type { Model, SessionInfo } from '@/lib/types'
+import type { McpServer, Model, SessionInfo } from '@/lib/types'
 
 import type { WorkspaceActivityPreview } from '../types'
 
@@ -59,7 +59,13 @@ export type CodexThreadItem = {
   error?: { message?: string } | null
   // webSearch
   query?: string
-  action?: { query?: string | null; queries?: (string | null)[] | null } | null
+  action?: {
+    type?: string
+    query?: string | null
+    queries?: (string | null)[] | null
+    url?: string | null
+    pattern?: string | null
+  } | null
   // imageGeneration
   revisedPrompt?: string | null
   // collabAgentToolCall (tool reused from mcpToolCall above)
@@ -89,7 +95,7 @@ export type CodexThread = {
   createdAt?: number
   updatedAt?: number
   name?: string | null
-  status?: { type?: string }
+  status?: { type?: string; activeFlags?: string[] }
   turns?: CodexTurn[]
 }
 
@@ -106,6 +112,7 @@ export type CodexModel = {
   hidden?: boolean
   supportedReasoningEfforts?: { reasoningEffort: string; description?: string }[]
   defaultReasoningEffort?: string
+  inputModalities?: string[]
   isDefault?: boolean
   serviceTiers?: { id: string; name: string; description: string }[]
   defaultServiceTier?: string | null
@@ -178,8 +185,9 @@ export function codexModelToModel(m: CodexModel, configuredServiceTier?: string 
   const efforts = (m.supportedReasoningEfforts ?? []).map(e => e.reasoningEffort)
   const displayName = m.displayName.replace(/^GPT-/, '').replaceAll('-', ' ')
   const supportsFastMode =
-    (m.serviceTiers ?? []).some(tier => tier.id === CODEX_FAST_SERVICE_TIER) ||
-    (m.additionalSpeedTiers ?? []).includes('fast')
+    m.serviceTiers !== undefined
+      ? m.serviceTiers.some(tier => tier.id === CODEX_FAST_SERVICE_TIER)
+      : (m.additionalSpeedTiers ?? []).includes('fast')
   // The effective user/project config governs omitted wire values. A null
   // config value leaves the model catalog's default in charge.
   const defaultServiceTier = configuredServiceTier ?? m.defaultServiceTier
@@ -209,6 +217,29 @@ export type CodexConfig = {
   model?: string
   model_reasoning_effort?: string
   service_tier?: string | null
+}
+
+const mcpRuntimeStates = new Map<string, McpServer['status']>([
+  ['connected', 'connected'],
+  ['authenticationRequired', 'needs-auth'],
+  ['failed', 'failed'],
+  ['cancelled', 'failed'],
+  ['disabled', 'disabled'],
+  ['starting', 'pending'],
+  ['notStarted', 'pending']
+])
+
+export function codexMcpServerToServer(server: {
+  name: string
+  authStatus?: string
+  runtimeStatus?: string | null
+}): McpServer {
+  return {
+    name: server.name,
+    status:
+      mcpRuntimeStates.get(server.runtimeStatus ?? '') ??
+      (server.authStatus === 'notLoggedIn' ? 'needs-auth' : 'pending')
+  }
 }
 
 export function codexModelsToModels(models: CodexModel[], config: CodexConfig): Model[] {
@@ -353,7 +384,12 @@ function itemToToolCall(item: CodexThreadItem): ToolCall | null {
         provider: 'codex',
         // webSearch items have no lifecycle status; they appear when done.
         state: 'success',
-        input: { query: item.query, ...(queries.length ? { queries } : {}) }
+        input: {
+          query: item.action?.query ?? item.query,
+          ...(queries.length ? { queries } : {}),
+          ...(item.action?.url ? { url: item.action.url } : {}),
+          ...(item.action?.pattern ? { pattern: item.action.pattern } : {})
+        }
       }
     }
     case 'plan': {

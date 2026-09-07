@@ -142,6 +142,7 @@ export type SessionSnapshot = {
 }
 
 export type SystemNotice =
+  | { id: string; kind: 'warning'; at: string; message: string }
   | {
       id: string
       kind: 'user-input'
@@ -200,6 +201,7 @@ export type AgentQuestion = {
   header: string
   question: string
   isSecret: boolean
+  allowOther?: boolean
   options?: { label: string; description: string }[]
 }
 

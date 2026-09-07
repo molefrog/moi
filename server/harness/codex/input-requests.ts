@@ -6,13 +6,13 @@ type PendingInput = {
   notice: Extract<SystemNotice, { kind: 'user-input' }>
   turnId: string
   blocking: boolean
-  resolve: (response: Json) => void
+  resolve: (response: Json | undefined) => void
 }
 
 // moi's notices and debug ring retain no submitted answers. Codex receives
 // the tool response and owns its durable history.
 export class CodexInputRequests {
-  private pending = new Map<string, PendingInput>()
+  private pending = new Map<string | number, PendingInput>()
 
   constructor(private changed: (notice: SystemNotice) => void) {}
 
@@ -24,10 +24,10 @@ export class CodexInputRequests {
     return this.pending.size > 0
   }
 
-  request(params: Json, id: string | number): Promise<Json> {
+  request(params: Json, id: string | number): Promise<Json | undefined> {
     const questions = parseQuestions(params.questions)
     if (!questions.length) return Promise.reject(new Error('Codex sent an empty input request'))
-    const key = String(id)
+    const key = id
     if (this.pending.has(key))
       return Promise.reject(new Error('Codex repeated a pending input request'))
     return new Promise(resolve => {
@@ -66,6 +66,13 @@ export class CodexInputRequests {
       if (typeof answer !== 'string' || !answer.trim() || answer.length > 10_000) {
         throw new Error('Answer each question before continuing')
       }
+      if (
+        question.options?.length &&
+        question.allowOther === false &&
+        !question.options.some(option => option.label === answer)
+      ) {
+        throw new Error('Choose one of the offered options')
+      }
       answers.push([question.id, { answers: [answer] }])
     }
     this.finish(entry[0], 'answered', { answers: Object.fromEntries(answers) })
@@ -73,17 +80,27 @@ export class CodexInputRequests {
 
   cancel(id?: string | number): void {
     for (const key of [...this.pending.keys()]) {
-      if (id === undefined || key === String(id)) this.finish(key, 'cancelled', { answers: {} })
+      if (id === undefined || key === id) this.finish(key, 'cancelled', { answers: {} })
     }
   }
 
   cancelTurn(turnId: string): void {
     for (const [key, request] of this.pending) {
-      if (request.turnId === turnId) this.finish(key, 'cancelled', { answers: {} })
+      if (request.turnId === turnId) this.finish(key, 'cancelled', undefined)
     }
   }
 
-  private finish(key: string, status: 'answered' | 'cancelled', response: Json) {
+  // Codex already removed this request; retire the form without sending a
+  // second JSON-RPC response to an id that no longer has a waiter.
+  resolved(id: string | number): void {
+    this.finish(id, 'cancelled', undefined)
+  }
+
+  private finish(
+    key: string | number,
+    status: 'answered' | 'cancelled',
+    response: Json | undefined
+  ) {
     const request = this.pending.get(key)
     if (!request) return
     this.pending.delete(key)
@@ -105,6 +122,7 @@ function parseQuestions(value: unknown): AgentQuestion[] {
       header: typeof question.header === 'string' ? question.header : '',
       question: question.question,
       isSecret: question.isSecret === true,
+      allowOther: question.isOther !== false,
       ...(Array.isArray(question.options)
         ? {
             options: question.options.filter(

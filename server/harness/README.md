@@ -204,8 +204,7 @@ the desktop bundle; config and credentials remain owned by Codex. Sessions use
 workspace-write access with network disabled, and moi automatically accepts
 supported permission requests. Command-approval UI and MCP elicitation are not
 implemented. See [Codex harness notes](codex/NOTES.md) for module ownership,
-ordering rules, runtime diagnostics, and boundaries, and the
-[validation record](../../docs/codex-integration-validation.md) for tested flows.
+ordering rules, runtime diagnostics, and boundaries.
 
 Workspace availability also checks provider authentication when a workspace is
 given. Claude Code is probed with `claude auth status` under the effective
