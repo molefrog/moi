@@ -103,7 +103,10 @@ function brief(call: ToolCall, shorten: Shorten): string {
     if (Array.isArray(queries) && queries.length > 0) {
       return queries.filter((q): q is string => typeof q === 'string').join(' · ')
     }
-    return getInputValue(input, 'query')
+    return (
+      getInputValue(input, 'query') ||
+      [getInputValue(input, 'url'), getInputValue(input, 'pattern')].filter(Boolean).join(' · ')
+    )
   }
   if (tool === 'update_plan') {
     const plan = input.plan

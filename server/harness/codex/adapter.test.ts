@@ -7,6 +7,7 @@ import {
   codexItemToTurn,
   codexModelToModel,
   codexModelsToModels,
+  codexMcpServerToServer,
   codexServiceTierForFastMode,
   codexThreadToEvents,
   codexThreadToSessionInfo,
@@ -14,6 +15,46 @@ import {
 } from './adapter'
 
 const THREAD = 'thread-1'
+
+test('current service tiers take precedence over deprecated speed tiers', () => {
+  const model = { id: 'm', model: 'm', displayName: 'M', additionalSpeedTiers: ['fast'] }
+  expect(codexModelToModel(model).supportsFastMode).toBe(true)
+  expect(codexModelToModel({ ...model, serviceTiers: [] }).supportsFastMode).toBeUndefined()
+})
+
+test('MCP connection state reflects runtime health instead of merely authentication', () => {
+  for (const [runtimeStatus, expected] of Object.entries({
+    connected: 'connected',
+    failed: 'failed',
+    cancelled: 'failed',
+    disabled: 'disabled',
+    starting: 'pending',
+    notStarted: 'pending',
+    authenticationRequired: 'needs-auth'
+  } as const)) {
+    expect(codexMcpServerToServer({ name: 'mcp', authStatus: 'oAuth', runtimeStatus }).status).toBe(
+      expected
+    )
+  }
+  expect(codexMcpServerToServer({ name: 'old', authStatus: 'notLoggedIn' }).status).toBe(
+    'needs-auth'
+  )
+  expect(codexMcpServerToServer({ name: 'old', authStatus: 'oAuth' }).status).toBe('pending')
+})
+
+test('web items retain query, opened URL and in-page pattern', () => {
+  for (const [action, expected] of [
+    [{ type: 'search', query: 'protocol' }, { query: 'protocol' }],
+    [{ type: 'openPage', url: 'https://example.com' }, { url: 'https://example.com' }],
+    [
+      { type: 'findInPage', url: 'https://example.com', pattern: 'word' },
+      { url: 'https://example.com', pattern: 'word' }
+    ]
+  ] as const) {
+    const part = codexItemToTurn({ type: 'webSearch', id: 'web', action }, THREAD)?.parts[0]
+    expect(part?.type === 'tool-call' && part.call.input).toMatchObject(expected)
+  }
+})
 
 test('Codex picker defaults follow configured model, effort and service tier', () => {
   const models = [

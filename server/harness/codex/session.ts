@@ -24,7 +24,13 @@ import {
   codexThreadToEvents,
   withCodexTurnDuration
 } from './adapter'
-import { type CodexClient, getCodexClient, interruptCodexTurn, readSubagentRecords } from './client'
+import {
+  type CodexClient,
+  getCodexClient,
+  getCodexModelCatalog,
+  interruptCodexTurn,
+  readSubagentRecords
+} from './client'
 import { CodexRpcError } from './transport'
 import { CodexInputRequests } from './input-requests'
 import {
@@ -67,6 +73,9 @@ type SessionRecord = {
   view: ViewState
   activeTurnId: string | null
   processing: boolean
+  waiting: boolean
+  activity: SessionActivity
+  model?: string
   // Live token streaming opt-in from the latest chat frame. Codex always
   // streams deltas; this gates whether we forward them as preview frames.
   stream: boolean
@@ -80,6 +89,8 @@ type SessionRecord = {
   bufferedNotifications: [string, Record<string, unknown>][] | null
   previewTimer: Timer | null
   dirtyPreviews: Set<string>
+  commandOutput: Map<string, string>
+  commandOutputTimer: Timer | null
   // Child agent threads keyed by their thread id (see ChildThread).
   children: Map<string, ChildThread>
   refreshSessionsOnTurnComplete: boolean
@@ -165,22 +176,76 @@ export function getCodexActiveSessions(): CodexActiveSession[] {
         workspaceId: s.workspaceId,
         workspacePath: s.workspacePath,
         sessionId: s.sessionId,
-        activity: s.inputs.blocking ? 'requires-action' : 'running'
+        activity: sessionActivity(s)
       })
     }
   }
   return out
 }
 
+// The workspace connector panel has no selected-chat parameter. Use the most
+// recently observed loaded chat to obtain runtime health instead of auth alone.
+export function getLatestCodexSessionId(workspaceId: string): string | undefined {
+  let latest: SessionRecord | undefined
+  for (const rec of sessions.values()) {
+    if (
+      rec.workspaceId === workspaceId &&
+      !rec.bufferedNotifications &&
+      (!latest || rec.lastTouched >= latest.lastTouched)
+    )
+      latest = rec
+  }
+  return latest?.sessionId
+}
+
 function setProcessing(rec: SessionRecord, processing: boolean, turnId: string | null) {
   rec.activeTurnId = turnId
-  if (rec.processing === processing) return
   rec.processing = processing
+  if (!processing) rec.waiting = false
+  publishActivity(rec)
+}
+
+function sessionActivity(rec: SessionRecord): SessionActivity {
+  return rec.inputs.blocking || rec.waiting
+    ? 'requires-action'
+    : rec.processing
+      ? 'running'
+      : 'idle'
+}
+
+function publishActivity(rec: SessionRecord) {
+  const activity = sessionActivity(rec)
+  if (rec.activity === activity) return
+  rec.activity = activity
   broadcast(rec.workspaceId, {
     type: 'status',
     sessionId: rec.sessionId,
-    activity: rec.inputs.blocking ? 'requires-action' : processing ? 'running' : 'idle'
+    activity
   })
+}
+
+function waitingOnInput(status: CodexThread['status']): boolean {
+  return (
+    status?.type === 'active' &&
+    Boolean(
+      status.activeFlags?.some(
+        flag => flag === 'waitingOnApproval' || flag === 'waitingOnUserInput'
+      )
+    )
+  )
+}
+
+function releaseSession(rec: SessionRecord, reason: string) {
+  flushCommandOutput(rec)
+  clearPreviews(rec)
+  settleTools(rec, reason)
+  rec.inputs.cancel()
+  setProcessing(rec, false, null)
+  rec.sessionTitleAbort?.abort()
+  rec.sessionTitleAbort = null
+  rec.unsubscribe?.()
+  const key = recKey(rec.workspaceId, rec.sessionId)
+  if (sessions.get(key) === rec) sessions.delete(key)
 }
 
 function emitTurnEvent(rec: SessionRecord, ev: StreamEvent) {
@@ -314,6 +379,52 @@ function clearPreviews(rec: SessionRecord) {
   rec.previews.clear()
 }
 
+const LIVE_OUTPUT_LIMIT = 64 * 1024
+
+function flushCommandOutput(rec: SessionRecord) {
+  if (rec.commandOutputTimer) clearTimeout(rec.commandOutputTimer)
+  rec.commandOutputTimer = null
+  for (const [itemId, delta] of rec.commandOutput) {
+    const owner = rec.view.turns.find(turn =>
+      turn.parts.some(
+        part =>
+          part.type === 'tool-call' &&
+          part.call.toolCallId === itemId &&
+          part.call.name === 'exec' &&
+          part.call.state === 'running'
+      )
+    )
+    if (!owner) continue
+    const parts = owner.parts.map(part => {
+      if (
+        part.type !== 'tool-call' ||
+        part.call.toolCallId !== itemId ||
+        part.call.state !== 'running'
+      )
+        return part
+      const output = `${typeof part.call.output === 'string' ? part.call.output : ''}${delta}`
+      return {
+        ...part,
+        call: {
+          ...part.call,
+          output:
+            output.length > LIVE_OUTPUT_LIMIT
+              ? `[Earlier live output omitted]\n${output.slice(-LIVE_OUTPUT_LIMIT)}`
+              : output
+        }
+      }
+    })
+    emitTurnEvent(rec, { kind: 'turn', turn: { ...owner, parts } })
+  }
+  rec.commandOutput.clear()
+}
+
+function clearCommandOutput(rec: SessionRecord) {
+  if (rec.commandOutputTimer) clearTimeout(rec.commandOutputTimer)
+  rec.commandOutputTimer = null
+  rec.commandOutput.clear()
+}
+
 function settleTools(rec: SessionRecord, reason: string) {
   for (const turn of rec.view.turns) {
     let changed = false
@@ -380,19 +491,33 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
             ? params.message
             : 'Codex disconnected. Send another message to resume this chat.'
       })
-    clearPreviews(rec)
-    settleTools(rec, 'Codex disconnected before this tool returned a result')
-    rec.inputs.cancel()
-    setProcessing(rec, false, null)
-    rec.sessionTitleAbort?.abort()
-    rec.sessionTitleAbort = null
-    rec.unsubscribe?.()
-    if (sessions.get(recKey(rec.workspaceId, rec.sessionId)) === rec)
-      sessions.delete(recKey(rec.workspaceId, rec.sessionId))
+    releaseSession(rec, 'Codex disconnected before this tool returned a result')
     return
   }
   if (rec.bufferedNotifications) {
     rec.bufferedNotifications.push([method, params])
+    return
+  }
+  const mcpFailure = method === 'mcpServer/startupStatus/updated' && params.status === 'failed'
+  if (
+    (method === 'warning' || method === 'configWarning' || mcpFailure) &&
+    (params.threadId == null || params.threadId === rec.sessionId)
+  ) {
+    const message = mcpFailure
+      ? `MCP ${String(params.name ?? 'server')} failed to start${typeof params.error === 'string' ? `: ${params.error}` : ''}`
+      : method === 'warning'
+        ? params.message
+        : params.summary
+    if (typeof message === 'string')
+      emitTurnEvent(rec, {
+        kind: 'notice',
+        notice: {
+          id: `codex:${rec.sessionId}:warning:${message}`,
+          kind: 'warning',
+          at: new Date().toISOString(),
+          message
+        }
+      })
     return
   }
   // Child agent threads stream on the same connection under their own ids —
@@ -406,15 +531,62 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
   rec.lastTouched = Date.now()
 
   switch (method) {
+    case 'model/rerouted': {
+      if (typeof params.toModel !== 'string') return
+      rec.model = params.toModel
+      emitTurnEvent(rec, {
+        kind: 'notice',
+        notice: {
+          id: `codex:${rec.sessionId}:model:${String(params.turnId)}`,
+          kind: 'model-change',
+          at: new Date().toISOString(),
+          model: params.toModel,
+          ...(typeof params.fromModel === 'string' ? { prev: params.fromModel } : {})
+        }
+      })
+      return
+    }
+    case 'turn/plan/updated': {
+      if (!Array.isArray(params.plan) || typeof params.turnId !== 'string') return
+      const steps = params.plan.flatMap((step: unknown) => {
+        if (!step || typeof step !== 'object' || !('step' in step) || typeof step.step !== 'string')
+          return []
+        const status = 'status' in step ? step.status : undefined
+        return [
+          `${status === 'completed' ? '[x]' : status === 'inProgress' ? '[→]' : '[ ]'} ${step.step}`
+        ]
+      })
+      ingestItem(rec, {
+        type: 'plan',
+        id: `${params.turnId}:plan`,
+        text: [typeof params.explanation === 'string' ? params.explanation : '', ...steps]
+          .filter(Boolean)
+          .join('\n')
+      })
+      return
+    }
     case 'item/started':
     case 'item/completed': {
       const item = params.item as CodexThreadItem | undefined
       if (!item) return
       if (method === 'item/completed') {
+        rec.commandOutput.delete(item.id)
         rec.previews.delete(item.id)
         rec.dirtyPreviews.delete(item.id)
       }
       ingestItem(rec, item)
+      return
+    }
+    case 'item/commandExecution/outputDelta': {
+      if (typeof params.itemId !== 'string' || typeof params.delta !== 'string') return
+      const output = (rec.commandOutput.get(params.itemId) ?? '') + params.delta
+      rec.commandOutput.set(
+        params.itemId,
+        output.length > LIVE_OUTPUT_LIMIT
+          ? `[Earlier live output omitted]\n${output.slice(-LIVE_OUTPUT_LIMIT)}`
+          : output
+      )
+      rec.commandOutputTimer ??= setTimeout(() => flushCommandOutput(rec), 40)
       return
     }
     case 'item/agentMessage/delta': {
@@ -458,6 +630,7 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
       }
       // A delayed completion from an older turn must not stop a newer one.
       if (rec.activeTurnId && turn?.id && rec.activeTurnId !== turn.id) return
+      flushCommandOutput(rec)
       for (const item of turn?.items ?? []) ingestItem(rec, item)
       settleTools(
         rec,
@@ -513,31 +686,41 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
       // leave the session busy forever — the error is terminal for the turn.
       setProcessing(rec, false, null)
       clearPreviews(rec)
+      flushCommandOutput(rec)
       settleTools(rec, message || 'Codex ended the turn before this tool returned a result')
       rec.inputs.cancel()
       return
     }
     case 'thread/status/changed': {
-      const status = params.status as { type?: string } | undefined
+      const status = params.status as CodexThread['status']
+      rec.waiting = waitingOnInput(status)
       if (status?.type === 'active') setProcessing(rec, true, rec.activeTurnId)
-      else if (
-        status?.type === 'idle' ||
-        status?.type === 'systemError' ||
-        status?.type === 'notLoaded'
-      ) {
+      else if (status?.type === 'notLoaded') {
+        releaseSession(rec, 'Codex unloaded this chat')
+        broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+      } else if (status?.type === 'idle' || status?.type === 'systemError') {
+        flushCommandOutput(rec)
         setProcessing(rec, false, null)
         clearPreviews(rec)
         if (status.type !== 'idle') rec.inputs.cancel()
       }
       return
     }
+    case 'thread/closed':
+    case 'thread/archived':
+    case 'thread/deleted': {
+      releaseSession(rec, 'Codex closed this chat')
+      broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+      return
+    }
+    case 'thread/unarchived':
     case 'thread/name/updated': {
       broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
       return
     }
     case 'serverRequest/resolved': {
       if (typeof params.requestId === 'string' || typeof params.requestId === 'number')
-        rec.inputs.cancel(params.requestId)
+        rec.inputs.resolved(params.requestId)
       return
     }
     // Reuse the notice id so completion updates the hook's started row.
@@ -570,26 +753,6 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
           ...(method === 'hook/completed'
             ? { outcome: run.status === 'failed' ? ('error' as const) : ('success' as const) }
             : {})
-        }
-      })
-      return
-    }
-    // MCP startup failures reuse the hook notice shape.
-    case 'mcpServer/startupStatus/updated': {
-      if (params.status !== 'failed') return
-      const name = typeof params.name === 'string' ? params.name : 'mcp'
-      emitTurnEvent(rec, {
-        kind: 'notice',
-        notice: {
-          id: `codex:${rec.sessionId}:mcp:${name}`,
-          kind: 'hook',
-          at: new Date().toISOString(),
-          hookId: `mcp:${name}`,
-          hookName: `MCP ${name}`,
-          event: 'mcpServerStartup',
-          status: 'response',
-          outcome: 'error',
-          ...(typeof params.error === 'string' ? { output: params.error } : {})
         }
       })
       return
@@ -647,11 +810,7 @@ function createRecord(input: {
 }): SessionRecord {
   const inputs = new CodexInputRequests(notice => {
     emitTurnEvent(rec, { kind: 'notice', notice })
-    broadcast(rec.workspaceId, {
-      type: 'status',
-      sessionId: rec.sessionId,
-      activity: inputs.blocking ? 'requires-action' : rec.processing ? 'running' : 'idle'
-    })
+    publishActivity(rec)
   })
   const rec: SessionRecord = {
     client: input.client,
@@ -663,6 +822,8 @@ function createRecord(input: {
     view: emptyViewState(),
     activeTurnId: null,
     processing: false,
+    waiting: false,
+    activity: 'idle',
     stream: false,
     previews: new Map(),
     children: new Map(),
@@ -672,6 +833,8 @@ function createRecord(input: {
     bufferedNotifications: null,
     previewTimer: null,
     dirtyPreviews: new Set(),
+    commandOutput: new Map(),
+    commandOutputTimer: null,
     refreshSessionsOnTurnComplete: input.refreshSessionsOnTurnComplete === true,
     sessionTitleSource: input.sessionTitleSource,
     sessionTitleAbort: null
@@ -719,16 +882,18 @@ async function resumeSession(input: ResumeInput): Promise<SessionRecord> {
     const rec = createRecord({ ...input, client })
     rec.bufferedNotifications = []
     try {
-      const resumed = await client.rpc<{ thread: CodexThread }>('thread/resume', {
+      const resumed = await client.rpc<{ thread: CodexThread; model?: string }>('thread/resume', {
         threadId: input.sessionId,
         config: CODEX_INTERACTION_CONFIG,
         ...CODEX_THREAD_ACCESS
       })
       const subagents = await readSubagentRecords(client, resumed.thread)
+      rec.model = resumed.model
       if (!client.isAlive()) throw new Error('Codex disconnected while resuming this chat')
       for (const [childId, sub] of subagents) rec.children.set(childId, sub)
       seedFromThread(rec, resumed.thread, subagents)
       const active = resumed.thread.turns?.findLast(turn => turn.status === 'inProgress')
+      rec.waiting = waitingOnInput(resumed.thread.status)
       setProcessing(
         rec,
         Boolean(active) || resumed.thread.status?.type === 'active',
@@ -737,10 +902,12 @@ async function resumeSession(input: ResumeInput): Promise<SessionRecord> {
       const buffered = rec.bufferedNotifications
       rec.bufferedNotifications = null
       for (const [method, params] of buffered) handleNotification(rec, method, params)
+      if (sessions.get(key) !== rec) throw new Error('Codex closed this chat while resuming it')
       return rec
     } catch (error) {
       rec.inputs.cancel()
       clearPreviews(rec)
+      clearCommandOutput(rec)
       rec.unsubscribe?.()
       if (sessions.get(key) === rec) sessions.delete(key)
       throw error
@@ -838,7 +1005,7 @@ async function sendMessage(
     if (existing && !existing.bufferedNotifications) rec = existing
     else if (input.isNew && !aliases.has(recKey(input.workspaceId, input.sessionId))) {
       const client = await getCodexClient(input.workspacePath)
-      const started = await client.rpc<{ thread: CodexThread }>('thread/start', {
+      const started = await client.rpc<{ thread: CodexThread; model?: string }>('thread/start', {
         cwd: input.workspacePath,
         config: CODEX_INTERACTION_CONFIG,
         ...CODEX_THREAD_ACCESS,
@@ -872,6 +1039,7 @@ async function sendMessage(
         refreshSessionsOnTurnComplete: true,
         sessionTitleSource
       })
+      rec.model = started.model ?? input.model
       if (
         (input.model || input.effort || input.fastMode !== undefined) &&
         !(await hasSessionConfig(input.workspacePath, realId))
@@ -905,6 +1073,30 @@ async function sendMessage(
   rec.lastTouched = Date.now()
   rec.stream = input.stream === true
   if (!rec.stream) clearPreviews(rec)
+
+  if (userInput.some(item => item.type === 'image')) {
+    try {
+      // Steering keeps the running turn's model, regardless of picker changes.
+      const models = await getCodexModelCatalog(input.workspacePath)
+      const modelId = rec.activeTurnId ? rec.model : (input.model ?? rec.model)
+      const model = models.find(model => model.model === modelId || model.id === modelId)
+      if (model?.inputModalities && !model.inputModalities.includes('image')) {
+        throw new Error(
+          `${model.displayName} does not accept images. Choose a model that supports images.`
+        )
+      }
+    } catch (error) {
+      broadcast(rec.workspaceId, {
+        kind: 'error',
+        sessionId: rec.sessionId,
+        content: error instanceof Error ? error.message : 'Could not check image support',
+        terminal: !rec.activeTurnId
+      })
+      if (!rec.activeTurnId) setProcessing(rec, false, null)
+      return
+    }
+    if (lane.generation !== generation) return
+  }
 
   // Broadcast the user's bubble immediately so every connected tab shows it;
   // the Codex echo (`userMessage` item) reuses this id via `clientId` and
@@ -974,10 +1166,13 @@ async function sendMessage(
         )
           throw error
         if (lane.generation !== generation) return
+        setProcessing(rec, true, null)
+        rec.model = input.model ?? rec.model
         const res = await client.rpc<{ turn: CodexTurn }>('turn/start', turnParams)
         acceptStartedTurn(rec, res.turn)
       }
     } else {
+      rec.model = input.model ?? rec.model
       const res = await client.rpc<{ turn: CodexTurn }>('turn/start', turnParams)
       acceptStartedTurn(rec, res.turn)
     }

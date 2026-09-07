@@ -84,6 +84,9 @@ function upgrade(server: Upgradable, req: Request, data: WsData) {
 export const app = Bun.serve<WsData>({
   port: PORT,
   hostname: process.env.HOST ?? '127.0.0.1',
+  // Agent startup/discovery can outlast Bun's 10s HTTP default. Allow the
+  // harness's 30s RPC timeout to return an error before the socket closes.
+  idleTimeout: 60,
   // HMR only in dev; prod serves prebuilt static assets (no bundler).
   development: prebuilt ? false : { hmr: true },
   routes: {

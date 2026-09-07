@@ -8,7 +8,7 @@ export type RequestListener = (
   method: string,
   params: Json,
   id: string | number
-) => Promise<Json> | undefined
+) => Promise<Json | undefined> | undefined
 
 export class CodexRpcError extends Error {
   constructor(
@@ -133,7 +133,7 @@ export function createCodexTransport(options: TransportOptions): CodexTransport 
       if ('id' in msg) {
         if (typeof msg.id !== 'string' && typeof msg.id !== 'number') return
         for (const listener of requestListeners) {
-          let response: Promise<Json> | undefined
+          let response: Promise<Json | undefined> | undefined
           try {
             response = listener(msg.method, params, msg.id)
           } catch (error) {
@@ -143,7 +143,7 @@ export function createCodexTransport(options: TransportOptions): CodexTransport 
           const id = msg.id
           void response.then(
             result => {
-              if (alive) send({ jsonrpc: '2.0', id, result }, true)
+              if (alive && result !== undefined) send({ jsonrpc: '2.0', id, result }, true)
             },
             error => {
               if (alive)

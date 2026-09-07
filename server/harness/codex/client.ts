@@ -9,6 +9,7 @@ import {
   type SubagentReplay,
   childThreadToSubagentRecord,
   codexModelsToModels,
+  codexMcpServerToServer,
   type CodexConfig,
   codexThreadToEvents,
   codexThreadToSessionInfo,
@@ -369,22 +370,24 @@ export async function getCodexModels(workspacePath: string): Promise<Model[]> {
   return codexModelsToModels(models, config)
 }
 
-// Codex's effective MCP registry may include config, plugin, and account
-// sources. The UI mapping reflects auth status, not a server health check.
-export async function getCodexMcpStatus(workspacePath: string): Promise<McpServer[]> {
+// Runtime status distinguishes failed/disabled servers from authenticated ones.
+export async function getCodexMcpStatus(
+  workspacePath: string,
+  sessionId?: string
+): Promise<McpServer[]> {
   try {
     const client = await getCodexClient(workspacePath)
-    const servers = await readCodexPages<{ name?: string; authStatus?: string }>(
-      client,
-      'mcpServerStatus/list',
-      {}
-    )
+    const servers = await readCodexPages<{
+      name?: string
+      authStatus?: string
+      runtimeStatus?: string | null
+    }>(client, 'mcpServerStatus/list', {
+      detail: 'toolsAndAuthOnly',
+      ...(sessionId ? { threadId: sessionId } : {})
+    })
     return servers
       .filter((s): s is { name: string; authStatus?: string } => typeof s.name === 'string')
-      .map(s => ({
-        name: s.name,
-        status: s.authStatus === 'notLoggedIn' ? ('needs-auth' as const) : ('connected' as const)
-      }))
+      .map(codexMcpServerToServer)
   } catch (err) {
     console.error('[codex] mcpServerStatus/list failed', err)
     return []

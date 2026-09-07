@@ -73,23 +73,27 @@ export function AgentInputRequest({ workspaceId, sessionId, notice }: AgentInput
               ))}
             </div>
           ) : null}
-          <label className="sr-only" htmlFor={`${id}-${index}`}>
-            Answer: {question.question}
-          </label>
-          <Input
-            id={`${id}-${index}`}
-            type={question.isSecret ? 'password' : 'text'}
-            autoComplete="off"
-            placeholder={
-              question.options?.length ? 'Choose an option or write an answer' : 'Your answer'
-            }
-            value={answerFor(question.id)}
-            onChange={event =>
-              setAnswers(current => ({ ...current, [question.id]: event.target.value }))
-            }
-            maxLength={10_000}
-            required
-          />
+          {(!question.options?.length || question.allowOther !== false) && (
+            <>
+              <label className="sr-only" htmlFor={`${id}-${index}`}>
+                Answer: {question.question}
+              </label>
+              <Input
+                id={`${id}-${index}`}
+                type={question.isSecret ? 'password' : 'text'}
+                autoComplete="off"
+                placeholder={
+                  question.options?.length ? 'Choose an option or write an answer' : 'Your answer'
+                }
+                value={answerFor(question.id)}
+                onChange={event =>
+                  setAnswers(current => ({ ...current, [question.id]: event.target.value }))
+                }
+                maxLength={10_000}
+                required
+              />
+            </>
+          )}
         </fieldset>
       ))}
       {submit.error && (

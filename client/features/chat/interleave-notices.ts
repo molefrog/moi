@@ -1,9 +1,7 @@
 // Weaves transcript notices (context compaction, mid-session model switches)
 // into the turn list so each one reads at the moment it happened.
 //
-// Only 'compact' and 'model-change' render today. Every other SystemNotice
-// kind is claude-code-specific plumbing with no designed chat treatment yet,
-// so `chatNoticeLabel` skips it explicitly.
+// Only notices with a chat label enter the timeline.
 import type { SystemNotice, Turn } from '@/lib/types'
 
 export type ChatTimelineItem =
@@ -13,6 +11,8 @@ export type ChatTimelineItem =
 // One-line copy for a notice row; null = this kind does not render in chat.
 export function chatNoticeLabel(notice: SystemNotice): string | null {
   switch (notice.kind) {
+    case 'warning':
+      return notice.message
     case 'compact':
       return 'Context compacted'
     case 'model-change':

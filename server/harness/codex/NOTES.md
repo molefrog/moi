@@ -5,6 +5,9 @@ newline-delimited JSON-RPC over stdio. It provides native model and session
 lists, token deltas, steering, and interruption. Codex owns durable history;
 moi holds a display copy and translates native items into shared chat events.
 
+The upstream [app-server specification](https://learn.chatgpt.com/docs/app-server)
+defines the protocol; generated types from the installed CLI define its exact wire shapes.
+
 ## Module ownership
 
 | Module                                 | Responsibility                                                                                                         |
@@ -20,7 +23,6 @@ moi holds a display copy and translates native items into shared chat events.
 | `probe.ts`                             | Runs standalone protocol diagnostics without moi's session or workspace policy.                                        |
 
 The shared contract and event layers are in [../README.md](../README.md).
-Dated test evidence belongs in the [validation record](../../../docs/codex-integration-validation.md).
 
 ## Runtime and configuration
 
@@ -46,6 +48,9 @@ versions are allowed. This floor does **not** establish support for every
 feature or model. Use the running process's catalog and version when diagnosing
 model errors.
 
+The HTTP server allows 60 seconds of inactivity so discovery can finish or
+reach the harness's 30-second RPC timeout before Bun closes the connection.
+
 ## Session lifecycle
 
 - A new chat starts under a temporary moi id. `thread/start` supplies the real
@@ -60,6 +65,8 @@ model errors.
 - Native lifecycle notifications determine activity. Completion can arrive
   before the start acknowledgement; completed ids prevent late responses from
   reviving a run. Ignore stale usage and completion from older turns.
+  Active waiting flags map to `requires-action`. Closed, archived, deleted, or
+  unloaded threads release the live record; later access resumes it again.
 - `error.willRetry` keeps the turn active and emits a retry notice. Failed
   steer/interrupt RPCs keep a known active turn stoppable. A terminal error or
   disconnect clears previews, settles unfinished tool cards, and cancels input.
@@ -93,8 +100,9 @@ Changing a selection does not retry an earlier failed message.
 
 Configured reasoning effort applies when supported by the selected model;
 otherwise the adapter uses its advertised default. Fast mode is available when
-`serviceTiers` includes `priority`, or the legacy `additionalSpeedTiers` includes
-`fast`. A non-null configured tier takes precedence over the catalog default.
+`serviceTiers` includes `priority`. Only catalogs missing that field fall back
+to `additionalSpeedTiers: ["fast"]`. A non-null configured tier takes precedence
+over the catalog default.
 
 | moi fast-mode setting | Native `serviceTier`                     |
 | --------------------- | ---------------------------------------- |
@@ -128,10 +136,15 @@ and permission extensions grant the requested network/file-system fields for
 Start/resume opts into `features.default_mode_request_user_input` for moi's
 threads. Questions render in chat; answers go through the workspace/session
 input endpoint. Blocking questions set activity to `requires-action`.
+`isOther: false` hides free text for option questions and restricts submitted
+answers to those options. Questions without options still accept free text;
+`isSecret` uses a password field.
 
 Pending forms survive browser reload while the app-server and moi session
 remain alive. Skip, stop, completion, disconnect, or `serverRequest/resolved`
-settles the request. Random notice ids keep stale forms from answering a new
+settles the request. Server resolution and turn completion retire the form
+without sending another response. Numeric and string RPC ids remain distinct.
+Random notice ids keep stale forms from answering a new
 request when native request ids are reused. Submitted response payloads are
 redacted from the wire tap and excluded from input notices; this does not
 redact answers that Codex later includes in its own messages or history.
@@ -143,8 +156,10 @@ MCP schema/URL elicitation is separate and currently declined.
   as `clientId` on live user items, so the optimistic bubble is updated in place.
   Replay can change item ids and omit `clientId`; they are not durable moi ids.
 - Agent text and reasoning-summary deltas become cumulative previews, batched
-  every 40ms. Item completion removes its pending preview. Command output is
-  rendered from item payloads; output-delta notifications are not forwarded.
+  every 40ms. Item completion removes its pending preview. Command output
+  deltas are also batched; the live tail is bounded to 64K characters until the
+  completed item replaces it with authoritative output. Native plan updates
+  upsert a plan card within their turn.
 - New turns request `summary: 'detailed'`. Reasoning can still be absent for a
   trivial prompt. Replay uses native timestamps and duration when supplied,
   rather than deriving duration from items sharing a turn timestamp.
@@ -153,11 +168,16 @@ MCP schema/URL elicitation is separate and currently declined.
   their cards visible. Generated images are represented by tool cards without
   embedding the potentially large base64 result in every display event.
 - Uploads send images inline as data URLs and other files as materialized path
-  notes. Replayed `localImage` items currently show a path label.
-- Hooks and failed MCP startup events appear as notices. The connector list
-  maps `notLoggedIn` to `needs-auth` and other listed servers to `connected`;
-  that label is an auth-status approximation, not a health check. Full tool
-  definitions are not carried into connector display rows. `codex_apps` branding
+  notes. Text-only models reject image sends with an actionable error; absent
+  `inputModalities` retains the protocol's image-compatible default. Steering
+  checks the running model. Replayed `localImage` items currently show a path label.
+- Warnings, failed MCP startups, and model reroutes appear in the chat timeline.
+  Hook notices are retained but have no chat rendering. The connector list uses
+  native runtime status; older servers without it remain pending unless auth
+  is required. The status request omits resource catalogs with `toolsAndAuthOnly`.
+  It targets the workspace's most recently observed loaded chat, since an
+  app-scoped request can return null runtime states.
+  Full tool definitions are not carried into connector display rows. `codex_apps` branding
   uses the dotted tool-name prefix; connector `_meta` is not forwarded.
 
 ## Diagnostics and maintenance

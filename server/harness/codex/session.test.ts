@@ -4,12 +4,14 @@ import type { BroadcastFrame, StreamEvent } from '@/lib/types'
 
 import { getClientFrameLog } from '../debug'
 import { agentStore } from '../../agent'
+import { addUpload } from '../../uploads'
 import * as clients from './client'
 import {
   ensureCodexSessionLive,
   answerCodexInput,
   getCodexActiveSessions,
   getLiveCodexEvents,
+  getLatestCodexSessionId,
   interruptCodexRun,
   sendCodexMessage
 } from './session'
@@ -115,6 +117,186 @@ function texts(events: StreamEvent[]) {
 }
 
 describe('Codex live session lifecycle', () => {
+  test('a rejected fresh start after no-active-turn clears the obsolete active turn', async () => {
+    const f = fixture()
+    await f.send()
+    f.handlers.set('turn/steer', () => {
+      throw new CodexRpcError('No active turn', -32600)
+    })
+    f.handlers.set('turn/start', () => {
+      throw new CodexRpcError('Model unavailable', -32600)
+    })
+    await f.send('follow up')
+    expect(f.active()).toBe(false)
+    expect(f.frames().at(-1)).toMatchObject({ kind: 'error', terminal: true })
+  })
+  test('native active flags update waiting activity and survive hydration', async () => {
+    const f = fixture()
+    f.handlers.set('thread/resume', () => ({
+      thread: {
+        id: 'session',
+        status: { type: 'active', activeFlags: ['waitingOnApproval'] },
+        turns: [{ id: 'busy', status: 'inProgress', items: [] }]
+      }
+    }))
+    await ensureCodexSessionLive(f.input)
+    expect(
+      getCodexActiveSessions().find(row => row.workspaceId === f.input.workspaceId)?.activity
+    ).toBe('requires-action')
+    f.emit('thread/status/changed', { status: { type: 'active', activeFlags: [] } })
+    expect(f.frames().at(-1)).toMatchObject({ type: 'status', activity: 'running' })
+    f.emit('thread/status/changed', {
+      status: { type: 'active', activeFlags: ['waitingOnUserInput'] }
+    })
+    expect(f.frames().at(-1)).toMatchObject({ type: 'status', activity: 'requires-action' })
+    f.emit('turn/completed', { turn: { id: 'busy', status: 'completed', items: [] } })
+    expect(f.active()).toBe(false)
+    expect(f.frames().at(-1)).toMatchObject({ type: 'status', activity: 'idle' })
+  })
+
+  test('unloaded or closed chats release their subscriptions and resume on the next send', async () => {
+    for (const method of [
+      'thread/closed',
+      'thread/status/changed',
+      'thread/archived',
+      'thread/deleted'
+    ]) {
+      const f = fixture()
+      await f.send()
+      expect(getLatestCodexSessionId(f.input.workspaceId)).toBe('session')
+      f.emit(method, { status: { type: 'notLoaded' } })
+      expect(getLatestCodexSessionId(f.input.workspaceId)).toBeUndefined()
+      expect(f.active()).toBe(false)
+      expect(f.listeners.size).toBe(0)
+      expect(getLiveCodexEvents(f.input.workspaceId, f.input.sessionId)).toBeNull()
+      await f.send('after closure')
+      expect(f.calls.filter(call => call.method === 'thread/resume')).toHaveLength(2)
+      expect(f.calls.at(-1)?.method).toBe('turn/start')
+    }
+  })
+
+  test('closure during resume does not return a dead record', async () => {
+    const f = fixture()
+    f.handlers.set('thread/resume', () => {
+      f.emit('thread/closed')
+      return { thread: { id: 'session', turns: [] } }
+    })
+    await expect(ensureCodexSessionLive(f.input)).rejects.toThrow('closed this chat')
+    expect(f.listeners.size).toBe(0)
+  })
+
+  test('plans upsert and warnings/reroutes reach the chat without terminating its turn', async () => {
+    const f = fixture()
+    await f.send()
+    for (const status of ['inProgress', 'completed'])
+      f.emit('turn/plan/updated', {
+        turnId: 'turn-1',
+        explanation: null,
+        plan: [{ step: 'Audit', status }]
+      })
+    const plan = f
+      .events()
+      .filter(
+        event =>
+          event.kind === 'turn' &&
+          event.turn.parts.some(
+            part => part.type === 'tool-call' && part.call.name === 'update_plan'
+          )
+      )
+    expect(plan).toHaveLength(1)
+    expect(JSON.stringify(plan)).toContain('[x] Audit')
+    f.emit('warning', { message: 'Thread warning' })
+    f.emit('configWarning', { threadId: null, summary: 'Configuration warning' })
+    f.emit('model/rerouted', {
+      turnId: 'turn-1',
+      fromModel: 'a',
+      toModel: 'b',
+      reason: 'rateLimit'
+    })
+    const notices = f.events().flatMap(event => (event.kind === 'notice' ? [event.notice] : []))
+    expect(notices).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'warning', message: 'Thread warning' }),
+        expect.objectContaining({ kind: 'warning', message: 'Configuration warning' }),
+        expect.objectContaining({ kind: 'model-change', model: 'b', prev: 'a' })
+      ])
+    )
+    expect(f.active()).toBe(true)
+  })
+
+  test('command deltas are batched, bounded and replaced by authoritative final output', async () => {
+    const f = fixture()
+    await f.send()
+    const item = { id: 'cmd', type: 'commandExecution', command: 'build', status: 'inProgress' }
+    f.emit('item/started', { item })
+    const output = () => {
+      const event = f
+        .events()
+        .find(
+          event =>
+            event.kind === 'turn' &&
+            event.turn.parts.some(
+              part => part.type === 'tool-call' && part.call.toolCallId === 'cmd'
+            )
+        )
+      const part = event?.kind === 'turn' ? event.turn.parts[0] : null
+      return part?.type === 'tool-call' ? part.call.output : undefined
+    }
+    f.emit('item/commandExecution/outputDelta', { itemId: 'cmd', delta: 'first\n' })
+    f.emit('item/commandExecution/outputDelta', { itemId: 'cmd', delta: 'second\n' })
+    expect(output()).toBeUndefined()
+    await Bun.sleep(50)
+    expect(output()).toBe('first\nsecond\n')
+    f.emit('item/commandExecution/outputDelta', { itemId: 'cmd', delta: 'x'.repeat(100_000) })
+    await Bun.sleep(50)
+    expect(String(output()).length).toBeLessThan(66_000)
+    expect(String(output())).toStartWith('[Earlier live output omitted]')
+    f.emit('item/commandExecution/outputDelta', { itemId: 'cmd', delta: 'pending' })
+    f.emit('item/completed', { item: { ...item, status: 'completed', aggregatedOutput: 'final' } })
+    f.emit('item/commandExecution/outputDelta', { itemId: 'cmd', delta: 'late' })
+    await Bun.sleep(50)
+    expect(output()).toBe('final')
+  })
+
+  test('image validation uses the running model for steering and permits legacy catalogs', async () => {
+    const f = fixture()
+    const catalog = spyOn(clients, 'getCodexModelCatalog').mockResolvedValue([
+      { id: 'text', model: 'text', displayName: 'Text model', inputModalities: ['text'] },
+      {
+        id: 'vision',
+        model: 'vision',
+        displayName: 'Vision model',
+        inputModalities: ['text', 'image']
+      },
+      { id: 'legacy', model: 'legacy', displayName: 'Legacy' }
+    ])
+    cleanups.push(() => catalog.mockRestore())
+    const upload = await addUpload({
+      workspaceId: f.input.workspaceId,
+      filename: 'pixel.gif',
+      mediaType: 'image/gif',
+      bytes: Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64')
+    })
+    await f.send('inspect', { model: 'text', attachments: [upload.id] })
+    expect(f.calls.some(call => call.method === 'turn/start')).toBe(false)
+    expect(f.frames().at(-1)).toMatchObject({
+      kind: 'error',
+      content: expect.stringContaining('does not accept images')
+    })
+    await f.send('start text turn', { model: 'text' })
+    await f.send('switch mid-turn', { model: 'vision', attachments: [upload.id] })
+    expect(f.calls.some(call => call.method === 'turn/steer')).toBe(false)
+    expect(f.active()).toBe(true)
+    f.emit('turn/completed', { turn: { id: 'turn-1', status: 'completed', items: [] } })
+    await f.send('legacy image', { model: 'legacy', attachments: [upload.id] })
+    expect(f.calls.at(-1)).toMatchObject({
+      method: 'turn/start',
+      params: {
+        model: 'legacy',
+        input: expect.arrayContaining([expect.objectContaining({ type: 'image' })])
+      }
+    })
+  })
   test('native questions survive a read and resume the same turn after answering', async () => {
     const f = fixture()
     await f.send()
