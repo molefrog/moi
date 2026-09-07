@@ -35,15 +35,15 @@ type NoWidgetsCreatedProps = {
 
 function NoWidgetsCreated({ onCreateWidget, showOnboarding }: NoWidgetsCreatedProps) {
   return (
-    <div className="relative grid size-full grid-cols-2 grid-rows-2 gap-2 overflow-hidden">
-      <div className="overflow-hidden rounded-2xl bg-muted texture-checker squircle">
+    <div className="relative grid size-full grid-cols-4 grid-rows-2 gap-2 overflow-hidden">
+      <div className="col-span-2 overflow-hidden rounded-2xl bg-muted texture-checker squircle">
         <div className="flex size-full items-start justify-start bg-radial-[at_top_left] from-muted from-40% to-transparent p-12">
           <h2 className="text-2xl font-semibold text-foreground">Widgets</h2>
         </div>
       </div>
-      <div className="overflow-hidden rounded-2xl bg-muted texture-checker squircle" />
-      <div className="overflow-hidden rounded-2xl bg-muted texture-checker squircle" />
-      <div className="overflow-hidden rounded-2xl bg-muted texture-checker squircle">
+      <div className="col-span-2 overflow-hidden rounded-2xl bg-muted texture-checker squircle" />
+      <div className="col-span-2 overflow-hidden rounded-2xl bg-muted texture-checker squircle" />
+      <div className="col-span-3 overflow-hidden rounded-2xl bg-muted texture-checker squircle">
         {showOnboarding && (
           <div className="flex size-full items-end justify-end">
             <span className="m-8 max-w-56 text-right text-sm text-muted-foreground">
