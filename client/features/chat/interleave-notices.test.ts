@@ -57,19 +57,10 @@ describe('chatNoticeLabel', () => {
     for (const notice of skipped) expect(chatNoticeLabel(notice)).toBe(null)
   })
 
-  test('shows provider retries and pending questions', () => {
+  test('shows provider retries', () => {
     expect(
       chatNoticeLabel({ id: 'retry', kind: 'api-retry', at: 't', error: 'Reconnecting' })
     ).toBe('Retrying: Reconnecting')
-    expect(
-      chatNoticeLabel({
-        id: 'question',
-        kind: 'user-input',
-        at: 't',
-        status: 'pending',
-        questions: []
-      })
-    ).toBe('Waiting for your answer')
   })
 })
 

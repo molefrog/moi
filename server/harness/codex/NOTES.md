@@ -17,7 +17,7 @@ defines the protocol; generated types from the installed CLI define its exact wi
 | `client.ts`                            | Owns one app-server per workspace, initialization, catalogs, session/history queries, and bounded child-history reads. |
 | `session.ts`                           | Owns live session state, sends, steering, stop, replay hydration, previews, and notices.                               |
 | `adapter.ts`                           | Defines the consumed wire types and maps models, items, and history to display types.                                  |
-| `input-requests.ts`, `permissions.ts`  | Handle native questions and the default approval policy, respectively.                                                 |
+| `permissions.ts`                       | Defines sandbox access and the default approval policy; rejects unsupported requests.                                  |
 | `auth.ts`, `discovery.ts`, `status.ts` | Check login readiness, discover workspace paths from rollout heads, and report running processes.                      |
 | `session-title.ts`                     | Generates a title with a separate ephemeral `codex exec` call and applies it if the session is still unnamed.          |
 | `probe.ts`                             | Runs standalone protocol diagnostics without moi's session or workspace policy.                                        |
@@ -69,10 +69,10 @@ reach the harness's 30-second RPC timeout before Bun closes the connection.
   unloaded threads release the live record; later access resumes it again.
 - `error.willRetry` keeps the turn active and emits a retry notice. Failed
   steer/interrupt RPCs keep a known active turn stoppable. A terminal error or
-  disconnect clears previews, settles unfinished tool cards, and cancels input.
+  disconnect clears previews and settles unfinished tool cards.
 - Stop invalidates queued sends and interrupts a start acknowledged after Stop.
   For a running turn, wait for native completion before reporting it stopped.
-- Idle display records expire after 30 minutes, except during pending input,
+- Idle display records expire after 30 minutes, except during active turns,
   hydration, or title generation. Cold access resumes and subscribes again;
   `thread/read` provides a static fallback when live resume fails.
 
@@ -115,7 +115,7 @@ has no fields for changing them during an active turn. moi uses the persistent
 `serviceTier` override for chat settings; it does not use the newer
 `serviceTierForTurn` override, which affects only one turn.
 
-## Context, permissions, and questions
+## Context and permissions
 
 `additionalContext` carries the application context under `moi-context`, and
 localhost access guidance under `moi-control-access`. Values use the unwrapped
@@ -132,23 +132,10 @@ Command/file requests use `decision: 'accept'`, legacy requests use `approved`,
 and permission extensions grant the requested network/file-system fields for
 `scope: 'turn'`. Unknown request methods receive an unsupported-method error.
 
-`item/tool/requestUserInput` is handled asynchronously by the owning session.
-Start/resume opts into `features.default_mode_request_user_input` for moi's
-threads. Questions render in chat; answers go through the workspace/session
-input endpoint. Blocking questions set activity to `requires-action`.
-`isOther: false` hides free text for option questions and restricts submitted
-answers to those options. Questions without options still accept free text;
-`isSecret` uses a password field.
-
-Pending forms survive browser reload while the app-server and moi session
-remain alive. Skip, stop, completion, disconnect, or `serverRequest/resolved`
-settles the request. Server resolution and turn completion retire the form
-without sending another response. Numeric and string RPC ids remain distinct.
-Random notice ids keep stale forms from answering a new
-request when native request ids are reused. Submitted response payloads are
-redacted from the wire tap and excluded from input notices; this does not
-redact answers that Codex later includes in its own messages or history.
-MCP schema/URL elicitation is separate and currently declined.
+Native question forms (`item/tool/requestUserInput`) are not supported and
+receive the same unsupported-method error. moi does not opt into
+`features.default_mode_request_user_input`. MCP schema/URL elicitation is
+declined with `action: 'decline'`.
 
 ## Display and MCP boundaries
 
@@ -203,7 +190,7 @@ bun server/harness/codex/probe.ts rpc "$PWD" config/read '{}'
 
 The probe uses the invoking shell's PATH/environment, disables experimental
 fields, and logs raw frames. Use the running moi wire tap to verify workspace
-policy, native questions, or actual UI behavior.
+policy or actual UI behavior.
 
 Wire types are a hand-written subset, read defensively. Generate reference
 bindings into a temporary directory when changing the integration:

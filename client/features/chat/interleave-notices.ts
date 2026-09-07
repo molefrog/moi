@@ -19,12 +19,6 @@ export function chatNoticeLabel(notice: SystemNotice): string | null {
       return notice.prev
         ? `Model changed to ${notice.model} (was ${notice.prev})`
         : `Model changed to ${notice.model}`
-    case 'user-input':
-      return notice.status === 'pending'
-        ? 'Waiting for your answer'
-        : notice.status === 'answered'
-          ? 'Answer sent'
-          : 'Question cancelled'
     case 'api-retry':
       return notice.error ? `Retrying: ${notice.error}` : 'Retrying the connection'
     // Claude-code-specific notices without a designed chat treatment yet —
