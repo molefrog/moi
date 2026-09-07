@@ -160,11 +160,12 @@ export function WorkspaceIconPicker() {
         {icon && (
           <Button
             type="button"
-            variant="secondary"
+            variant="ghost"
             onClick={() => {
               setUseThemeBackground(true)
               updateIcon.mutate({ kind: 'reset' })
             }}
+            className="text-muted-foreground"
           >
             <IconArrowBack data-icon="inline-start" stroke={1.5} />
             Reset
