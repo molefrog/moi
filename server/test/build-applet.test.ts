@@ -555,7 +555,6 @@ describe('mixed widget + view build (Tailwind isolation)', () => {
       buildApplet(join(ROOT, 'widgets', 'wmix.tsx'), ROOT, 'widget').catch(() => {}),
       buildApplet(join(ROOT, 'views', 'vmix.tsx'), ROOT, 'view').catch(() => {})
     ])
-    rmSync(join(ROOT, '.build'), { recursive: true, force: true })
   })
 
   afterAll(() => {
