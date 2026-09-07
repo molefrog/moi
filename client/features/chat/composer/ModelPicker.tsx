@@ -12,7 +12,8 @@ import {
   resolveDisplayedEffort,
   resolveEffortIndex,
   resolveFastMode,
-  sortModelsByProviderOrder
+  sortModelsByProviderOrder,
+  splitModelGroup
 } from './model-order'
 import { Button } from '@/client/components/ui/button'
 import {
@@ -22,6 +23,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger
 } from '@/client/components/ui/dropdown-menu'
 import {
@@ -100,23 +104,39 @@ type ModelDropdownProps = {
 
 function ModelDropdown({ current, model, models, onValueChange }: ModelDropdownProps) {
   const label = modelLabel(model)
-  const groups = groupModels(models, 'Models')
+  const groups = groupModels(models, 'Models').map(group => splitModelGroup(group, current))
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         render={<PickerTrigger label={label} className="shrink" aria-label={`Model: ${label}`} />}
       />
-      <DropdownMenuContent align="end" side="top" className="w-max max-w-64 min-w-40">
+      <DropdownMenuContent
+        align="end"
+        side="top"
+        className="max-h-[min(24rem,var(--available-height))] w-max max-w-64 min-w-40"
+      >
         <DropdownMenuRadioGroup value={current} onValueChange={onValueChange}>
           {groups.map(group => (
             <DropdownMenuGroup key={group.label}>
               <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
-              {group.models.map(item => (
+              {group.featured.map(item => (
                 <DropdownMenuRadioItem key={item.value} value={item.value} closeOnClick>
                   {modelLabel(item)}
                 </DropdownMenuRadioItem>
               ))}
+              {group.more.length > 0 && (
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>More models</DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="max-h-[min(24rem,var(--available-height))] w-max max-w-64 min-w-40">
+                    {group.more.map(item => (
+                      <DropdownMenuRadioItem key={item.value} value={item.value} closeOnClick>
+                        {modelLabel(item)}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              )}
             </DropdownMenuGroup>
           ))}
         </DropdownMenuRadioGroup>

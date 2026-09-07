@@ -6,7 +6,8 @@ import {
   resolveDisplayedEffort,
   resolveEffortIndex,
   resolveFastMode,
-  sortModelsByProviderOrder
+  sortModelsByProviderOrder,
+  splitModelGroup
 } from '@/client/features/chat/composer/model-order'
 import type { Model } from '@/lib/types'
 
@@ -193,5 +194,102 @@ describe('groupModels', () => {
     expect(groups).toHaveLength(1)
     expect(groups[0]?.label).toBe('Models')
     expect(groups[0]?.models).toEqual(models)
+  })
+})
+
+describe('splitModelGroup', () => {
+  const group = (values: string[]) => ({
+    label: 'Nous Portal',
+    models: values.map(value => model(value))
+  })
+
+  test('shows a small group whole, with no overflow', () => {
+    const small = group(['gpt-oss:20b', 'smollm3', 'qwen3.8'])
+
+    expect(splitModelGroup(small, 'smollm3')).toEqual({
+      label: 'Nous Portal',
+      featured: small.models,
+      more: []
+    })
+  })
+
+  test('features frontier families and overflows the rest in backend order', () => {
+    const large = group([
+      'meta/llama-4-scout',
+      'anthropic/claude-opus-5',
+      'nvidia/nemotron-ultra',
+      'openai/gpt-5.4',
+      'google/gemini-3-pro',
+      'x-ai/grok-4.5',
+      'deepseek/deepseek-v4',
+      'ai21/jamba-2'
+    ])
+
+    const split = splitModelGroup(large, 'anthropic/claude-opus-5')
+    expect(split.featured.map(m => m.value)).toEqual([
+      'anthropic/claude-opus-5',
+      'openai/gpt-5.4',
+      'google/gemini-3-pro',
+      'x-ai/grok-4.5',
+      'deepseek/deepseek-v4'
+    ])
+    expect(split.more.map(m => m.value)).toEqual([
+      'meta/llama-4-scout',
+      'nvidia/nemotron-ultra',
+      'ai21/jamba-2'
+    ])
+  })
+
+  test('hoists the selected model out of the overflow', () => {
+    const large = group([
+      'anthropic/claude-opus-5',
+      'openai/gpt-5.4',
+      'google/gemini-3-pro',
+      'x-ai/grok-4.5',
+      'deepseek/deepseek-v4',
+      'nvidia/nemotron-ultra',
+      'ai21/jamba-2',
+      'microsoft/phi-5',
+      'cohere/command-a'
+    ])
+
+    const split = splitModelGroup(large, 'ai21/jamba-2')
+    expect(split.featured.map(m => m.value)).toEqual([
+      'anthropic/claude-opus-5',
+      'openai/gpt-5.4',
+      'google/gemini-3-pro',
+      'x-ai/grok-4.5',
+      'deepseek/deepseek-v4',
+      'ai21/jamba-2'
+    ])
+    expect(split.more.map(m => m.value)).toEqual([
+      'nvidia/nemotron-ultra',
+      'microsoft/phi-5',
+      'cohere/command-a'
+    ])
+  })
+
+  test('stays inline when the submenu would hide only a row or two', () => {
+    const codexLike = group([
+      '5.6-sol',
+      'gpt-5.6-terra',
+      'gpt-5.6-luna',
+      'gpt-5.5',
+      'gpt-5.4',
+      'gpt-5.4-mini',
+      'gpt-5.3-spark'
+    ])
+
+    const split = splitModelGroup(codexLike, 'gpt-5.5')
+    expect(split.featured.map(m => m.value)).toEqual(codexLike.models.map(m => m.value))
+    expect(split.more).toEqual([])
+  })
+
+  test('falls back to the first rows when nothing matches the catalog', () => {
+    const large = group(['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8'])
+
+    const split = splitModelGroup(large, 'm1')
+    expect(split.featured.map(m => m.value)).toEqual(['m1', 'm2', 'm3', 'm4', 'm5'])
+    expect(split.more.map(m => m.value)).toEqual(['m6', 'm7', 'm8'])
   })
 })
