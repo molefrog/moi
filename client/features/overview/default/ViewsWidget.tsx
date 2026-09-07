@@ -25,7 +25,7 @@ function ViewButton({ variant = 'default', Icon, label, ariaLabel, onClick }: Vi
     >
       <div
         className={cn(
-          'size-16 rounded-2xl [corner-shape:superellipse(1.2)]',
+          'size-16 rounded-2xl squircle',
           variant === 'outline' && 'shadow-xs',
           variant !== 'secondary' &&
             'transition-shadow duration-300 ease-out group-hover:shadow-2xl'
@@ -33,7 +33,7 @@ function ViewButton({ variant = 'default', Icon, label, ariaLabel, onClick }: Vi
       >
         <div
           className={cn(
-            'flex size-full items-center justify-center rounded-2xl [corner-shape:superellipse(1.2)]',
+            'flex size-full items-center justify-center rounded-2xl squircle',
             variant === 'default'
               ? 'bg-primary text-primary-foreground inset-shadow-[0_0_10px_color-mix(in_oklab,var(--color-white)_30%,transparent)]'
               : variant === 'outline'
