@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 
+import { useLatestRef } from '@/client/lib/use-latest-ref'
 import { wsUrl } from '@/client/lib/ws-url'
 import type {
   AgentLoginState,
@@ -123,8 +124,7 @@ export function onWorkspaceEventsReconnect(handler: () => void): () => void {
 }
 
 export function useWorkspaceEvent(handler: WorkspaceEventHandler) {
-  const handlerRef = useRef(handler)
-  handlerRef.current = handler
+  const handlerRef = useLatestRef(handler)
 
   useEffect(() => {
     const wrapped: WorkspaceEventHandler = e => handlerRef.current(e)
@@ -139,5 +139,5 @@ export function useWorkspaceEvent(handler: WorkspaceEventHandler) {
         ws = null
       }
     }
-  }, [])
+  }, [handlerRef])
 }

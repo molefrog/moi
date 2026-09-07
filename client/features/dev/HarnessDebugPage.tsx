@@ -5,6 +5,7 @@ import { useSearchParams } from 'wouter'
 
 import { Button } from '@/client/components/ui/button'
 import { cn } from '@/client/lib/cn'
+import { useLatestRef } from '@/client/lib/use-latest-ref'
 import { wsUrl } from '@/client/lib/ws-url'
 import type { Model, WorkspaceAgent, WorkspaceEntry } from '@/lib/types'
 
@@ -201,8 +202,7 @@ export function HarnessDebugPage() {
   const wireCursor = useRef(0)
   const wsRef = useRef<WebSocket | null>(null)
   const localSeq = useRef(0)
-  const sessionRef = useRef(sessionId)
-  sessionRef.current = sessionId
+  const sessionRef = useLatestRef(sessionId)
 
   // Every workspace is drivable — the panes adapt to its harness type.
   useEffect(() => {
@@ -294,7 +294,7 @@ export function HarnessDebugPage() {
       wsRef.current = null
       sock.close()
     }
-  }, [workspaceId])
+  }, [sessionRef, workspaceId])
 
   const send = useCallback(
     (content: string) => {
@@ -314,14 +314,14 @@ export function HarnessDebugPage() {
       )
       setIsNew(false)
     },
-    [workspaceId, isNew, model, effort, stream]
+    [workspaceId, sessionRef, isNew, model, effort, stream]
   )
 
   const stop = useCallback(() => {
     wsRef.current?.send(
       JSON.stringify({ type: 'stop', workspaceId, sessionId: sessionRef.current })
     )
-  }, [workspaceId])
+  }, [sessionRef, workspaceId])
 
   const newThread = useCallback(() => {
     setSessionId(crypto.randomUUID())
@@ -332,7 +332,7 @@ export function HarnessDebugPage() {
   const fetchEvents = useCallback(async () => {
     const r = await fetch(`/api/workspaces/${workspaceId}/sessions/${sessionRef.current}/events`)
     setEvents(r.ok ? ((await r.json()) as unknown[]) : [])
-  }, [workspaceId])
+  }, [sessionRef, workspaceId])
 
   const effortLevels = useMemo(
     () => models.find(m => m.value === model)?.supportedEffortLevels ?? [],

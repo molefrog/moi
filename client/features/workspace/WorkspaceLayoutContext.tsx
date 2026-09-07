@@ -8,6 +8,7 @@ import {
   useWorkspaceLayout
 } from '@/client/features/workspace/api'
 import { workspaceKeys } from '@/client/api/workspace-keys'
+import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { WorkspaceLayout, WorkspaceType } from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 
@@ -72,8 +73,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
 
   // `setLayout` must be referentially stable (it feeds effect deps in the grid
   // reconcile), so reach the latest mutate via a ref instead of closing over it.
-  const saveRef = useRef(save.mutate)
-  saveRef.current = save.mutate
+  const saveRef = useLatestRef(save.mutate)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const setLayout = useCallback(
@@ -97,7 +97,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
         saveRef.current(stripMeta(next))
       }, 600)
     },
-    [id, qc]
+    [id, qc, saveRef]
   )
 
   // Memoized so the context value keeps a stable identity across unrelated

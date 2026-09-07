@@ -8,7 +8,7 @@
 // applet-runtime `focusTab` subscription, and the `moi tab focus` subscription.
 // They all route through the `navigateToTab` returned here, so every origin —
 // tab click, applet, CLI — shares one code path.
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 
 import { useLocation, useParams } from 'wouter'
 import { useHistoryState } from 'wouter/use-browser-location'
@@ -20,6 +20,7 @@ import {
   resolveActiveTab
 } from '@/client/features/workspace/tab-resolution'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
+import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { ViewBuilder, ViewInfo, WorkspaceTabId, WorkspaceTabsState } from '@/lib/types'
 import {
   parseWorkspaceTab,
@@ -54,8 +55,7 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
   // Mirror for the effects below: a debounced layout PUT can still be in flight
   // when a `workspace:updated` refetch lands, so reading the render-time value
   // could persist a stale open set (and resurrect a just-closed tab).
-  const tabsStateRef = useRef(tabsState)
-  tabsStateRef.current = tabsState
+  const tabsStateRef = useLatestRef(tabsState)
 
   const requestedTab = parseWorkspaceTab(urlTab)
   const activeTab = resolveActiveTab(requestedTab, tabsState, views, builders, split)
@@ -80,7 +80,7 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
       tabsStateRef.current = tabs
       setLayout({ tabs })
     },
-    [setLayout]
+    [setLayout, tabsStateRef]
   )
 
   // Keep the URL honest. One redirect covers every case: a bare
@@ -107,7 +107,7 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
     const open = current.open.includes(activeTab) ? current.open : [...current.open, activeTab]
     if (open === current.open && current.active === activeTab) return
     setTabs({ open, active: activeTab })
-  }, [activeTab, setTabs, urlTabHonored])
+  }, [activeTab, setTabs, tabsStateRef, urlTabHonored])
 
   return { tabsState, activeTab, appletParams, navigateToTab, setTabs }
 }

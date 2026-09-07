@@ -14,12 +14,13 @@
 // — no central handlers object assembled by the screen. Applet → host only;
 // if a host → applet direction is ever added (`moi.on(...)`), `dispose` must
 // also unbind those listeners or a disposed module leaks.
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 
 import { createNanoEvents } from 'nanoevents'
 
 import { reportAppletError } from '@/client/features/applets/applet-log'
 import { createRateLimiter } from '@/client/lib/rate-limit'
+import { useLatestRef } from '@/client/lib/use-latest-ref'
 import { MAX_APPLET_CONTEXT_CHARS } from '@/lib/moi-context'
 import type { AppletKind, WorkspaceTabId } from '@/lib/types'
 import { isParamsRecord, isWorkspaceTabId } from '@/lib/workspace-tabs'
@@ -215,8 +216,7 @@ export function useAppletEvent<K extends keyof AppletEvents>(
   event: K,
   handler: AppletEvents[K]
 ): void {
-  const latest = useRef(handler)
-  latest.current = handler
+  const latest = useLatestRef(handler)
 
   useEffect(() => {
     // TS can't call a generic indexed function type with its own Parameters
@@ -224,7 +224,7 @@ export function useAppletEvent<K extends keyof AppletEvents>(
     const forward = ((...args: unknown[]) =>
       (latest.current as (...forwarded: unknown[]) => void)(...args)) as AppletEvents[K]
     return appletRuntime(workspaceId).on(event, forward)
-  }, [workspaceId, event])
+  }, [workspaceId, event, latest])
 }
 
 // The shape of the host wiring every bundle entry re-exports (see the entry

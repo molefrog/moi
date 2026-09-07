@@ -14,6 +14,7 @@ import type {
 } from 'react'
 
 import { toast } from '@/client/components/ui/toast'
+import { useLatestRef } from '@/client/lib/use-latest-ref'
 
 import type { DrawingCanvasPointerProps, DrawingLayerProps } from './DrawingLayer'
 import { captureElement, drawingCaptureScale } from './capture-element'
@@ -319,12 +320,9 @@ export function useDrawingLayer({
   const startingRef = useRef(false)
   const [finishing, setFinishing] = useState(false)
   const finishingRef = useRef(false)
-  const onChangeRef = useRef(onChange)
-  const onEditingStartRef = useRef(onEditingStart)
-  const onFinishRef = useRef(onFinish)
-  onChangeRef.current = onChange
-  onEditingStartRef.current = onEditingStart
-  onFinishRef.current = onFinish
+  const onChangeRef = useLatestRef(onChange)
+  const onEditingStartRef = useLatestRef(onEditingStart)
+  const onFinishRef = useLatestRef(onFinish)
 
   // History flags live outside React state (see DrawingHistoryState): only
   // subscribed components re-render on a stroke commit, not the host screen.
@@ -435,7 +433,7 @@ export function useDrawingLayer({
       pendingExportRef.current = { sessionId: current.id, historyVersion, promise }
       return promise
     },
-    []
+    [onChangeRef]
   )
 
   const cancelStroke = useCallback(() => {
@@ -486,7 +484,7 @@ export function useDrawingLayer({
     editingRef.current = true
     setEditing(true)
     onEditingStartRef.current?.()
-  }, [])
+  }, [onEditingStartRef])
 
   const open = useCallback(async (): Promise<boolean> => {
     const target = targetRef.current
@@ -585,7 +583,7 @@ export function useDrawingLayer({
       }
     }
     return blob
-  }, [cancelStroke, exportCommitted])
+  }, [cancelStroke, exportCommitted, onFinishRef])
 
   const undo = useCallback(() => apply({ type: 'undo' }), [apply])
   const redo = useCallback(() => apply({ type: 'redo' }), [apply])
