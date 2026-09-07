@@ -343,6 +343,19 @@ describe('buildApplet', () => {
     )
   })
 
+  // Tailwind's group-has-* / peer-has-* output is rewritten to the descendant
+  // form by the shared Tailwind plugin (tailwind-plugin.ts) before scoping, so
+  // no applet stylesheet carries the `:is(…:has(…) *)` shape that makes Chrome
+  // restyle the whole document on every DOM mutation.
+  test('rewrites group-has utilities to the descendant form before scoping', async () => {
+    const css = injectedCss((await buildApplet(join(FIXTURES, 'group-has.tsx'))).js)
+
+    expect(css).not.toMatch(/:is\(:where\(\.(?:group|peer)[^)]*\):has\(/)
+    expect(css.replace(/\s+/g, ' ').replace(/\(\s+/g, '(')).toContain(
+      String.raw`[data-applet="widget:group-has"] :where(.group\/input-group):has(> input) .group-has-\[\>input\]\/input-group\:pt-2 {`
+    )
+  })
+
   test('emits classes used only by imported modules outside the applet dir (.moi/ui/ layout)', async () => {
     // `moi ui-components` installs components in `.moi/ui/`, a SIBLING of the
     // applet source dir — outside the synthetic entry's `@source` and the

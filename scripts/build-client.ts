@@ -10,7 +10,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import externalizeReact from '../client/externalize-react'
-import tailwind from 'bun-plugin-tailwind'
+import tailwind from '../server/bundler/tailwind-plugin'
 
 const root = join(import.meta.dir, '..')
 const outdir = join(root, 'dist')

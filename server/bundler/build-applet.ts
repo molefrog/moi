@@ -1,7 +1,7 @@
 import { parse } from '@babel/parser'
 import type { ObjectProperty, StringLiteral } from '@babel/types'
 import type { BunPlugin } from 'bun'
-import tailwind from 'bun-plugin-tailwind'
+import tailwind from './tailwind-plugin'
 import { realpathSync } from 'node:fs'
 import { basename, dirname, join, relative, sep } from 'path'
 
@@ -647,8 +647,8 @@ export async function buildApplet(
       // a literal `index.js` would collide with the `.css`; we inject that CSS
       // into the JS and drop the file, keeping a clean `index.js`.
       naming: { entry: 'index.[ext]', chunk: 'chunk-[hash].[ext]' },
-      // bun-plugin-tailwind uses `build.config.root` as the auto-detect
-      // project root (`projectRoot = build.config?.root ?? process.cwd()`).
+      // bun-plugin-tailwind (behind tailwind-plugin.ts) uses `build.config.root` as the
+      // auto-detect project root (`projectRoot = build.config?.root ?? process.cwd()`).
       // Without this, oxide scans `none-computer/` (the parent server's
       // cwd) instead of the workspace's `.moi/widgets/`.
       root: sourceDir,

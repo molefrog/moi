@@ -1,7 +1,9 @@
 
 [serve.static]
 plugins = [
-  "bun-plugin-tailwind",
+  # moi's Tailwind plugin (bun-plugin-tailwind plus the :has() selector rewrite).
+  # Keep in sync with scripts/build-client.ts.
+  "./server/bundler/tailwind-plugin.ts",
   "./client/externalize-react.ts",
   "./client/accept-hmr-dependencies.ts"
 ]

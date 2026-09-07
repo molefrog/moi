@@ -68,6 +68,14 @@ styles from its own dependencies. Workspaces gain no CSS dependencies, and
 Tailwind emits only utilities used by the applet and its imported `.moi/ui/`
 files.
 
+Every stylesheet — the host app's `client/index.css` and each applet's synthetic
+entry — compiles through `server/bundler/tailwind-plugin.ts`, moi's wrapper around
+`bun-plugin-tailwind`. It rewrites Tailwind's `group-has-*` / `peer-has-*` output
+(`.util:is(:where(.group):has(…) *)`) into the equivalent descendant form, because
+the original shape makes Chrome restyle the whole document on every DOM mutation.
+Field, input-group, avatar, alert, alert-dialog, checkbox, radio-group, switch, and
+combobox rely on these variants, so never wire `bun-plugin-tailwind` directly.
+
 ## Portals
 
 Most overlays still portal to `document.body` so they can escape widget

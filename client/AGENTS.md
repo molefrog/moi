@@ -14,6 +14,7 @@ Before editing host-app UI, read `../DESIGN.md` and the relevant rules in `../.a
 
 - UI components in `components/ui/` are host facades over the shared moi registry components built on Base UI React. Local compatibility copies explain why they cannot re-export yet.
 - `lib/cn.ts` is `clsx` + `tailwind-merge`.
+- Tailwind compiles through `../server/bundler/tailwind-plugin.ts` in dev (`bunfig.toml`) and prod (`scripts/build-client.ts`). It rewrites `group-has-*` / `peer-has-*` output so the host stylesheet never carries the `:is(…:has(…) *)` shape that makes Chrome restyle the whole document on every keystroke. Never wire `bun-plugin-tailwind` directly.
 
 ## Vendored React
 

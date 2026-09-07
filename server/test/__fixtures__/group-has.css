@@ -1,0 +1,3 @@
+/* Stylesheet entry for tailwind-plugin.test.ts: only group-has.tsx feeds it. */
+@import 'tailwindcss' source(none);
+@source "./group-has.tsx";
