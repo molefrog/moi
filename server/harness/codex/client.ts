@@ -18,19 +18,11 @@ import {
 } from './adapter'
 import type { WorkspaceActivityPreview } from '../types'
 import { findHarnessExecutable, requireHarnessExecutable } from '../executable'
-import {
-  createCodexTransport,
-  type Json,
-  type NotificationListener,
-  type RequestListener
-} from './transport'
+import { createCodexTransport, type Json, type NotificationListener } from './transport'
 import { readCodexPages } from './pagination'
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
 import { resolveWorkspaceEnv } from '../../workspace-env'
-
-// The wire ring in ../debug.ts survives client restarts. Input responses are
-// redacted by transport.ts before they reach the tap.
 
 export type CodexProcessInfo = {
   running: boolean
@@ -56,7 +48,6 @@ export function getCodexProcessInfo(workspacePath: string): Promise<CodexProcess
 export type CodexClient = {
   rpc: <T>(method: string, params?: Json) => Promise<T>
   onNotification: (l: NotificationListener) => () => void
-  onRequest: (listener: RequestListener) => () => void
   isAlive: () => boolean
   workspacePath: string
   // Whether this app-server accepts `turn/start.additionalContext` (the native
@@ -174,7 +165,6 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
   const client: CodexClient = {
     rpc: transport.rpc,
     onNotification: transport.onNotification,
-    onRequest: transport.onRequest,
     isAlive: transport.isAlive,
     workspacePath,
     supportsAdditionalContext: false,
@@ -191,7 +181,7 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
   // response/notification, which still needs to reach its waiter.
   void drainStderr().catch(() => {})
 
-  // Native context and input fields require experimentalApi on this connection.
+  // Native context fields require experimentalApi on this connection.
   try {
     const init = await client.rpc<{ userAgent?: string }>('initialize', {
       clientInfo: { name: 'moi', title: 'moi', version: '0.1' },

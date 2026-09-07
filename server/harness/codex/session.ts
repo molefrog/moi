@@ -1,5 +1,5 @@
 // Live state per (workspaceId, sessionId): display history, native lifecycle,
-// pending input, and previews. client.ts owns the shared workspace process;
+// and previews. client.ts owns the shared workspace process;
 // Codex owns durable history. See NOTES.md for ordering and recovery rules.
 import { appendAttachmentNote } from '@/lib/attachment-note'
 import { buildSessionTitleSource } from '../session-title'
@@ -32,7 +32,6 @@ import {
   readSubagentRecords
 } from './client'
 import { CodexRpcError } from './transport'
-import { CodexInputRequests } from './input-requests'
 import {
   CODEX_LOCAL_CONTROL_CONTEXT,
   CODEX_LOCAL_CONTROL_FALLBACK,
@@ -66,7 +65,6 @@ type ChildThread = {
 type SessionRecord = {
   client: CodexClient
   lastTouched: number
-  inputs: CodexInputRequests
   workspaceId: string
   workspacePath: string
   sessionId: string // real Codex thread id once known (rekeyed on rename)
@@ -102,9 +100,6 @@ type SessionRecord = {
 const sessions = new Map<string, SessionRecord>() // key: `${workspaceId}:${sessionId}`
 // `${workspaceId}:${tempId}` -> native thread id after session_renamed.
 const aliases = new Map<string, string>()
-// The UI can answer native tool questions in ordinary chat, not just Plan
-// mode. Keep this override local to moi's threads; never rewrite user config.
-const CODEX_INTERACTION_CONFIG = { 'features.default_mode_request_user_input': true }
 const resumes = new Map<string, Promise<SessionRecord>>()
 type SendLane = { tail: Promise<void>; generation: number }
 const sendLanes = new Map<string, SendLane>()
@@ -118,7 +113,6 @@ const evictionTimer = setInterval(() => {
     if (
       rec.lastTouched > cutoff ||
       rec.processing ||
-      rec.inputs.hasPending ||
       rec.bufferedNotifications ||
       rec.sessionTitleAbort
     )
@@ -170,8 +164,7 @@ export type CodexActiveSession = {
 export function getCodexActiveSessions(): CodexActiveSession[] {
   const out: CodexActiveSession[] = []
   for (const s of sessions.values()) {
-    // Tool questions can block even though permission approvals are automatic.
-    if (s.processing || s.inputs.blocking) {
+    if (s.processing) {
       out.push({
         workspaceId: s.workspaceId,
         workspacePath: s.workspacePath,
@@ -206,11 +199,7 @@ function setProcessing(rec: SessionRecord, processing: boolean, turnId: string |
 }
 
 function sessionActivity(rec: SessionRecord): SessionActivity {
-  return rec.inputs.blocking || rec.waiting
-    ? 'requires-action'
-    : rec.processing
-      ? 'running'
-      : 'idle'
+  return rec.waiting ? 'requires-action' : rec.processing ? 'running' : 'idle'
 }
 
 function publishActivity(rec: SessionRecord) {
@@ -239,7 +228,6 @@ function releaseSession(rec: SessionRecord, reason: string) {
   flushCommandOutput(rec)
   clearPreviews(rec)
   settleTools(rec, reason)
-  rec.inputs.cancel()
   setProcessing(rec, false, null)
   rec.sessionTitleAbort?.abort()
   rec.sessionTitleAbort = null
@@ -623,7 +611,6 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
       const turn = params.turn as CodexTurn | undefined
       if (turn?.id && rec.completedTurns.has(turn.id)) return
       if (turn?.id) {
-        rec.inputs.cancelTurn(turn.id)
         rec.completedTurns.add(turn.id)
         if (rec.completedTurns.size > 64)
           rec.completedTurns.delete(rec.completedTurns.values().next().value!)
@@ -688,7 +675,6 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
       clearPreviews(rec)
       flushCommandOutput(rec)
       settleTools(rec, message || 'Codex ended the turn before this tool returned a result')
-      rec.inputs.cancel()
       return
     }
     case 'thread/status/changed': {
@@ -702,7 +688,6 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
         flushCommandOutput(rec)
         setProcessing(rec, false, null)
         clearPreviews(rec)
-        if (status.type !== 'idle') rec.inputs.cancel()
       }
       return
     }
@@ -716,11 +701,6 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
     case 'thread/unarchived':
     case 'thread/name/updated': {
       broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
-      return
-    }
-    case 'serverRequest/resolved': {
-      if (typeof params.requestId === 'string' || typeof params.requestId === 'number')
-        rec.inputs.resolved(params.requestId)
       return
     }
     // Reuse the notice id so completion updates the hook's started row.
@@ -808,14 +788,9 @@ function createRecord(input: {
   refreshSessionsOnTurnComplete?: boolean
   sessionTitleSource?: string
 }): SessionRecord {
-  const inputs = new CodexInputRequests(notice => {
-    emitTurnEvent(rec, { kind: 'notice', notice })
-    publishActivity(rec)
-  })
   const rec: SessionRecord = {
     client: input.client,
     lastTouched: Date.now(),
-    inputs,
     workspaceId: input.workspaceId,
     workspacePath: input.workspacePath,
     sessionId: input.sessionId,
@@ -839,18 +814,9 @@ function createRecord(input: {
     sessionTitleSource: input.sessionTitleSource,
     sessionTitleAbort: null
   }
-  const unsubscribeNotifications = input.client.onNotification((method, params) =>
+  rec.unsubscribe = input.client.onNotification((method, params) =>
     handleNotification(rec, method, params)
   )
-  const unsubscribeRequests = input.client.onRequest((method, params, id) => {
-    if (params.threadId !== rec.sessionId || method !== 'item/tool/requestUserInput')
-      return undefined
-    return inputs.request(params, id)
-  })
-  rec.unsubscribe = () => {
-    unsubscribeNotifications()
-    unsubscribeRequests()
-  }
   sessions.set(recKey(rec.workspaceId, rec.sessionId), rec)
   return rec
 }
@@ -884,7 +850,6 @@ async function resumeSession(input: ResumeInput): Promise<SessionRecord> {
     try {
       const resumed = await client.rpc<{ thread: CodexThread; model?: string }>('thread/resume', {
         threadId: input.sessionId,
-        config: CODEX_INTERACTION_CONFIG,
         ...CODEX_THREAD_ACCESS
       })
       const subagents = await readSubagentRecords(client, resumed.thread)
@@ -905,7 +870,6 @@ async function resumeSession(input: ResumeInput): Promise<SessionRecord> {
       if (sessions.get(key) !== rec) throw new Error('Codex closed this chat while resuming it')
       return rec
     } catch (error) {
-      rec.inputs.cancel()
       clearPreviews(rec)
       clearCommandOutput(rec)
       rec.unsubscribe?.()
@@ -1007,7 +971,6 @@ async function sendMessage(
       const client = await getCodexClient(input.workspacePath)
       const started = await client.rpc<{ thread: CodexThread; model?: string }>('thread/start', {
         cwd: input.workspacePath,
-        config: CODEX_INTERACTION_CONFIG,
         ...CODEX_THREAD_ACCESS,
         ...(input.model ? { model: input.model } : {}),
         ...(serviceTier !== undefined ? { serviceTier } : {})
@@ -1209,7 +1172,6 @@ export async function interruptCodexRun(input: {
   const lane = sendLane(input.workspaceId, input.sessionId)
   lane.generation++ // cancels queued sends, including a start still initializing
   const rec = sessions.get(liveKey(input.workspaceId, input.sessionId))
-  rec?.inputs.cancel()
   if (!rec?.activeTurnId) {
     broadcast(input.workspaceId, { kind: 'stopped', sessionId: rec?.sessionId ?? input.sessionId })
     if (rec) setProcessing(rec, false, null)
@@ -1230,17 +1192,6 @@ export async function interruptCodexRun(input: {
     })
     throw err
   }
-}
-
-export function answerCodexInput(
-  workspaceId: string,
-  sessionId: string,
-  requestId: string,
-  answers: unknown
-): void {
-  const rec = sessions.get(liveKey(workspaceId, sessionId))
-  if (!rec) throw new Error('This chat is no longer waiting for input')
-  rec.inputs.answer(requestId, answers)
 }
 
 export function viewAsEvents(rec: SessionRecord): StreamEvent[] {
