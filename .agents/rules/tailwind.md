@@ -12,4 +12,5 @@ alwaysApply: false
 - Prefer `scroll-fade` when a scrollable region needs an edge cue. Use `no-scrollbar` when the fade provides enough scroll affordance. Keep a visible scrollbar on primary reading surfaces.
 - Do not add manual `dark:` color overrides. Semantic color tokens handle themes.
 - Do not use `@apply` to create shorthands for combinations of utilities — compose classes directly in JSX/HTML.
+- Avoid `group-has-*` and `peer-has-*`: their compiled universal subjects cause broad style invalidation while typing. Use an explicit ancestor variant such as `[:where([class~="group/field"]):has(:disabled)_&]:opacity-50`; keep `:where()` to preserve specificity.
 - Use `cn()` from `@/client/lib/cn` with multiple arguments for conditional classes. Never use template literals with ternaries for `className` — use `cn('base', condition && 'conditional')` instead.
