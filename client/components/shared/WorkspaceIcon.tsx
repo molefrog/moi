@@ -27,6 +27,42 @@ type WorkspaceIconProps = {
   workspaceTheme?: WorkspaceLayout['theme']
 }
 
+function renderIconContent(
+  icon: WorkspaceIconValue | undefined,
+  themed: boolean,
+  providerIcon: string
+) {
+  switch (icon?.type) {
+    case 'emoji':
+      return (
+        <span
+          aria-hidden="true"
+          className={cn(
+            'flex size-full translate-y-[2cqi] items-center justify-center font-[Apple_Color_Emoji,Segoe_UI_Emoji,Noto_Color_Emoji,sans-serif] leading-none',
+            themed ? 'text-[60cqi]' : 'text-[85cqi]'
+          )}
+        >
+          {icon.value}
+        </span>
+      )
+    case 'upload':
+      return <img src={icon.value} alt="" className="size-full" />
+    case 'glyph': {
+      const Glyph = resolveAppIcon(icon.value)
+      if (Glyph) {
+        return createElement(Glyph, {
+          'aria-hidden': true,
+          stroke: 1.75,
+          className: themed ? 'size-[70%]' : 'size-[95%] text-foreground'
+        })
+      }
+      // Fall through to the default provider icon.
+    }
+    default:
+      return <img src={providerIcon} alt="" className="size-[95%]" />
+  }
+}
+
 export function WorkspaceIcon({
   className,
   icon,
@@ -34,10 +70,10 @@ export function WorkspaceIcon({
   workspaceTheme
 }: WorkspaceIconProps) {
   const themed = icon?.type !== 'upload' && icon?.background === 'theme'
-  const Glyph = icon?.type === 'glyph' ? resolveAppIcon(icon.value) : null
   const colors = themed
     ? (resolveThemeColorOverrides(workspaceTheme) ?? deriveThemeColors(DEFAULT_PRIMARY_COLOR))
     : undefined
+  const providerIcon = workspaceProviderIcon[workspaceType ?? 'claude-code']
 
   return (
     <span
@@ -50,33 +86,7 @@ export function WorkspaceIcon({
         colors ? { backgroundColor: colors.primary, color: colors.primaryForeground } : undefined
       }
     >
-      {Glyph ? (
-        createElement(Glyph, {
-          'aria-hidden': true,
-          stroke: 1.75,
-          className: cn(themed ? 'size-[70%]' : 'size-[95%] text-foreground')
-        })
-      ) : icon?.type === 'emoji' ? (
-        <span
-          aria-hidden="true"
-          className={cn(
-            'flex size-full translate-y-[2cqi] items-center justify-center font-[Apple_Color_Emoji,Segoe_UI_Emoji,Noto_Color_Emoji,sans-serif] leading-none',
-            themed ? 'text-[60cqi]' : 'text-[85cqi]'
-          )}
-        >
-          {icon.value}
-        </span>
-      ) : (
-        <img
-          src={
-            icon?.type === 'upload'
-              ? icon.value
-              : workspaceProviderIcon[workspaceType ?? 'claude-code']
-          }
-          alt=""
-          className="size-full"
-        />
-      )}
+      {renderIconContent(icon, themed, providerIcon)}
     </span>
   )
 }

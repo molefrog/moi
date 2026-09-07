@@ -24,7 +24,7 @@ test('workspace icon paints themed glyphs with primary foreground', () => {
   expect(html).toContain('<svg')
 })
 
-test('workspace icon keeps uploads and provider fallbacks plain', () => {
+test('workspace icon renders uploads and provider fallbacks as images', () => {
   const upload = renderToStaticMarkup(
     <WorkspaceIcon
       icon={{ type: 'upload', value: 'data:image/webp;base64,upload' }}
@@ -36,7 +36,8 @@ test('workspace icon keeps uploads and provider fallbacks plain', () => {
   expect(upload).not.toContain('color-mix(in_srgb')
   expect(upload).not.toContain('style=')
   expect(provider).toContain(`src="${workspaceProviderIcon.codex}"`)
-  expect(provider).not.toContain('color-mix(in_srgb')
+  expect(provider).toContain('size-[95%]')
+  expect(provider).not.toContain('mask-image')
 })
 
 test('bare glyphs use the workspace foreground', () => {
