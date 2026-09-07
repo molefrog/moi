@@ -7,7 +7,7 @@ const ANTHROPIC_MODEL_FAMILY_ORDER = ['fable', 'opus', 'sonnet', 'haiku'] as con
 type ModelComparator = (a: Model, b: Model) => number
 
 // Resolve the same concrete row for the picker and the outgoing chat request.
-// An unavailable saved/default model falls back to the first catalog choice.
+// Unavailable selections fall back to the resolved default, then the first row.
 export function resolveSelectedModel(
   models: readonly Model[],
   selectedModel: string | undefined,

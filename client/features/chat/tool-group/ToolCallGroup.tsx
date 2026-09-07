@@ -152,10 +152,7 @@ function ToolRow({ isFirst, isLast, call, leading, marker, name, brief, preview 
 // anything follows it (a text/tool row makes it no longer the last row, so
 // `inProgress` goes false and it reverts to the user's collapsed default).
 //
-// Some backends report that the model reasoned without handing over the text
-// (Anthropic `redacted_thinking`; the OpenClaw codex app-server, which sends a
-// Reasoning item with timing only). Those rows have nothing to expand, so they
-// render as a bare label — "Thought for 1.2s" — with no chevron.
+// Reasoning without visible text renders as a duration label with no chevron.
 type ReasoningRowProps = RowPosition & {
   text: string
   inProgress?: boolean

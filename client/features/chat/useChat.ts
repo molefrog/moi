@@ -66,8 +66,7 @@ export function useChat(address: WorkspaceTabAddress) {
   const activity = useLive(s =>
     selectedSessionId ? (s.activity[`${workspaceId}:${selectedSessionId}`] ?? 'idle') : 'idle'
   )
-  // Only `running` shows the loader/Stop. `requires-action` (agent blocked on
-  // user input) deliberately renders like idle until it gets its own UI.
+  // Only running shows the loader/Stop; pending input renders through notices.
   const processing = isRunningActivity(activity)
   const error = useLive(s =>
     selectedSessionId ? (s.errors[`${workspaceId}:${selectedSessionId}`] ?? null) : null

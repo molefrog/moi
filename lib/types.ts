@@ -507,8 +507,8 @@ export type StoppedFrame = {
 // lifecycle signal (CC `session_state_changed`, Codex `turn/*`, OpenClaw run
 // lifecycle) rather than derived by counting messages:
 //   running         — the agent is working; the client shows the loader/Stop
-//   requires-action — the agent is blocked on user input (permission prompt,
-//                     MCP elicitation). Not rendered yet: no loader, no Stop.
+//   requires-action — waiting for user input; no loader/Stop. Input notices
+//                     provide the answer form independently of this state.
 //   idle            — everything else, including interrupted/failed turns
 export type SessionActivity = 'idle' | 'running' | 'requires-action'
 

@@ -1,13 +1,6 @@
-// Map Codex app-server shapes into our agent-agnostic display format.
-//
-// Codex emits semantic ThreadItems (a command, a patch, an MCP call) with
-// their own lifecycle (`item/started` → `item/completed`), not raw
-// tool_use/tool_result pairs. Each item becomes one Turn: `userMessage` a
-// user turn, everything else an assistant turn; tool-shaped items carry a
-// single `tool-call` part whose state tracks the item's `status`.
-//
-// Type shapes are hand-written against `codex app-server generate-ts`
-// (CLI 0.144.5) and read defensively — see ./NOTES.md.
+// Pure Codex wire → display mapping. A rendered item becomes a Turn or notice;
+// tool items carry their native lifecycle through a tool-call part. The wire
+// types are a defensive subset; see NOTES.md for maintenance.
 import type {
   Part,
   StreamEvent,
@@ -116,7 +109,7 @@ export type CodexModel = {
   isDefault?: boolean
   serviceTiers?: { id: string; name: string; description: string }[]
   defaultServiceTier?: string | null
-  // Older app-server versions advertised Fast mode through this field.
+  // Deprecated by Codex; retained for catalogs without serviceTiers.
   additionalSpeedTiers?: string[]
 }
 
@@ -136,10 +129,7 @@ export function codexServiceTierForFastMode(
   return fastMode ? CODEX_FAST_SERVICE_TIER : null
 }
 
-// `thread/list.preview` snippets come from the raw first user message — on
-// the pre-0.135 fallback path that text carries the appended context envelope,
-// so previews strip it like transcript turns do. Loose variant: previews are
-// truncated snippets, so a mid-envelope cut must still strip.
+// Legacy context can be cut mid-envelope in a thread/list preview.
 function cleanPreview(preview: string | undefined): string {
   return preview ? stripMoiContextLoose(preview).trim() : ''
 }
@@ -197,9 +187,7 @@ export function codexModelToModel(m: CodexModel, configuredServiceTier?: string 
     value: m.id,
     resolvedModel: m.model,
     displayName,
-    // Our Model.description is a " · "-joined "<headline> · <tagline>" blurb
-    // (the picker renders the first segment as the row label), so lead with
-    // the display name and let Codex's one-liner be the tagline.
+    // The picker uses the first " · " segment as its row label.
     ...(m.description
       ? { description: `${displayName} · ${m.description}` }
       : { description: displayName }),
@@ -226,8 +214,8 @@ export type CodexConfig = {
 export function codexModelsToModels(models: CodexModel[], config: CodexConfig): Model[] {
   const mapped = models.map(model => {
     const row = codexModelToModel(model, config.service_tier)
-    // Codex config effort applies to every model, including an explicit model
-    // override. Only fall back to the catalog when config supplies no effort.
+    // Apply configured effort to every model that supports it, even with an
+    // explicit model override. Otherwise retain the catalog default.
     if (
       config.model_reasoning_effort &&
       row.supportedEffortLevels?.includes(config.model_reasoning_effort)
@@ -263,8 +251,7 @@ function statusToToolState(status: string | undefined): ToolState {
 function userInputToParts(content: CodexUserInput[] | undefined): Part[] {
   const parts: Part[] = []
   for (const c of content ?? []) {
-    // The send path appends the `<moi-context>` envelope to the agent text;
-    // the native echo and thread replays carry it back, so peel it here.
+    // Strip context from older sends that used the text-envelope fallback.
     if (c.type === 'text' && c.text) {
       const text = stripMoiContext(c.text)
       if (text) parts.push({ type: 'text', text })
@@ -276,8 +263,7 @@ function userInputToParts(content: CodexUserInput[] | undefined): Part[] {
   return parts
 }
 
-// Flatten an MCP result's content blocks into a readable string (same
-// approach as the OpenClaw adapter — text blocks joined, others tagged).
+// Prefer structured MCP output; otherwise join text and label non-text blocks.
 function flattenMcpResult(result: CodexThreadItem['result']): string {
   if (!result) return ''
   if (result.structuredContent !== undefined && result.structuredContent !== null) {
@@ -380,14 +366,9 @@ function itemToToolCall(item: CodexThreadItem): ToolCall | null {
         input: { plan: item.text }
       }
     }
-    // Codex multi-agent: the parent's collab tool invocations (`spawn_agent`,
-    // `send_input`, `resume_agent`, `wait`, `close_agent`). The child agent
-    // runs as its OWN thread whose items stream on the same connection under
-    // `agentThreadId`; its transcript nests into the `subAgentActivity` card
-    // (see session.ts), so this card only narrates the parent's side.
+    // Parent tool activity; child transcripts live in subAgentActivity cards.
     case 'collabAgentToolCall': {
-      // `wait` is the parent idling on its children — protocol noise next to
-      // the activity card that already shows the child running. Drop it.
+      // The child's activity card already shows what the parent is waiting on.
       if (item.tool === 'wait') return null
       return {
         toolCallId: item.id,
@@ -403,9 +384,7 @@ function itemToToolCall(item: CodexThreadItem): ToolCall | null {
       }
     }
     case 'subAgentActivity': {
-      // The card that carries the child agent's nested transcript: the
-      // session layer correlates the child thread (`agentThreadId`) and
-      // attaches a SubagentRecord to this call (see session.ts).
+      // session.ts attaches the child transcript using agentThreadId.
       return {
         toolCallId: item.id,
         name: 'subagent_activity',
@@ -440,9 +419,7 @@ function itemToToolCall(item: CodexThreadItem): ToolCall | null {
       }
     }
     case 'imageGeneration': {
-      // `revisedPrompt` is the model's final prompt; the item also carries
-      // `result` — the ENTIRE generated image as base64 (megabytes). Never
-      // fold that into the turn: it would ride every broadcast/replay.
+      // Keep the base64 image result out of repeated display broadcasts/replay.
       return {
         toolCallId: item.id,
         name: 'generate_image',
@@ -458,7 +435,7 @@ function itemToToolCall(item: CodexThreadItem): ToolCall | null {
 }
 
 // Build a Turn from one Codex ThreadItem, or null for item kinds we don't
-// render (contextCompaction becomes a notice — see itemToNotice).
+// render (contextCompaction becomes a notice — see codexItemToNotice).
 export function codexItemToTurn(item: CodexThreadItem, threadId: string): Turn | null {
   const turnId = `codex:${threadId}:${item.id}`
   if (item.type === 'userMessage') {
@@ -569,8 +546,7 @@ export function childThreadToSubagentRecord(
     description: activity.agentPath?.split('/').pop() || 'sub-agent',
     progress: [],
     status,
-    // Zero counts stay out: codex's child replay drops commandExecution
-    // items, and a "Took 0 steps" subline reads as broken.
+    // Replay can omit tool items; do not present missing counts as zero work.
     ...(durationMs || toolUses
       ? {
           usage: {

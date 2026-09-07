@@ -1,21 +1,18 @@
-// Standalone probe for the `codex app-server` JSON-RPC protocol — talk to the
-// raw harness without moi in the loop. Complements /playground/codex (which
-// debugs the full server → client pipeline); use this when you need to poke
-// the protocol itself: try params, watch notifications, verify a claim in
-// ./NOTES.md.
+// Raw app-server diagnostic using the invoking shell's PATH and environment.
+// For moi's workspace policy and chat integration, inspect /dev/harness.
 //
 // Usage:
-//   bun scripts/codex-probe.ts chat  [cwd] "prompt"   — thread/start + one turn
-//   bun scripts/codex-probe.ts rpc   [cwd] <method> ['params-json']
-//   bun scripts/codex-probe.ts models                 — model/list
-//   bun scripts/codex-probe.ts threads [cwd]          — thread/list for cwd
-//   bun scripts/codex-probe.ts read  [cwd] <threadId> — thread/read w/ turns
+//   bun server/harness/codex/probe.ts chat <cwd> "prompt"
+//   bun server/harness/codex/probe.ts rpc <cwd> <method> ['params-json']
+//   bun server/harness/codex/probe.ts models
+//   bun server/harness/codex/probe.ts threads [cwd]
+//   bun server/harness/codex/probe.ts read <cwd> <threadId>
 //
 // Flags: --model=<id> --effort=<level> --summary=<auto|concise|detailed|none>
 //        --timeout=<sec, default 120> --json (newline JSON, no pretty labels)
 //
-// Every frame in both directions is printed. Server→client requests
-// (approvals) are auto-accepted and logged.
+// Logs raw frames, disables experimental fields, and uses simplified approval
+// replies. The chat probe runs with full access; it does not test moi's policy.
 
 export {} // top-level await needs module context under tsc
 
@@ -106,7 +103,7 @@ async function readLoop() {
       }
       log('<<', msg)
       if ('id' in msg && 'method' in msg) {
-        // Server→client request: accept approvals, reject the rest.
+        // Diagnostic shortcut; production request handling lives in permissions.ts.
         const method = msg.method as string
         const accepts = method.endsWith('requestApproval') || method === 'applyPatchApproval'
         send(

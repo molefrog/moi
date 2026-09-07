@@ -1,4 +1,4 @@
-// Shared debug taps for the /playground/harness page.
+// Shared debug taps for /dev/harness.
 //
 // Two channels of ring buffers, kept module-global so they survive session
 // teardowns and process-client restarts:
