@@ -5,16 +5,13 @@ display abstraction (`lib/format.ts`, implemented by `adapter.ts` here).
 Originally research for the message-display abstraction; kept as the reference
 spec for the CC adapter.
 
-> **Status note.** The SDK wire-format sections (message kinds, content
-> blocks, subagent/skill mechanics) remain the reference. But the "current
-> implementation" critiques and §14's migration plan describe the
-> **pre-refactor** code and have since shipped: chat moved from
-> `models.ts` to `session.ts` (both in this folder), `state.ts`'s
-> `transformMessage` and the 7-variant `Message` union were replaced by
-> `StreamEvent`/`Turn`/`Part` in `lib/format.ts` (built by
-> `adapter.ts`), and `MessageBlock.tsx` was replaced by
-> `client/components/TurnView.tsx`. Read those sections as historical
-> context, not as descriptions of today's code.
+> **Status note.** The runtime section below describes the current lifecycle.
+> The numbered sections preserve the original display-abstraction research;
+> their wire examples are not an exhaustive list of today's SDK messages, and
+> the migration proposed in §14 has shipped. Current display types live in
+> `lib/format.ts`, mapping in `adapter.ts`, and rendering in
+> `client/features/chat/TurnView.tsx`. Use the installed `sdk.d.ts` for current
+> wire types.
 
 Evidence drawn from:
 
@@ -38,6 +35,44 @@ and version-manager shims. There is no SDK bundled-executable fallback. If the
 command is missing, setup and existing workspaces report:
 `Run curl -fsSL https://claude.ai/install.sh | sh in your terminal to install Claude`.
 
+**In-place updates.** Claude Code can replace its binary at the same path
+while moi keeps running, changing which models are available.
+
+- Every spawn resolves the executable afresh, so new sessions run the new
+  binary. A live session keeps the subprocess it started with until it is torn
+  down (idle TTL, eviction, env change).
+- The model catalog (`models.ts`) is keyed by executable path and the first
+  line of `claude --version`. Each lookup probes that identity again. Changes
+  refetch the catalog; a failed version probe at the same path retains it.
+- On a changed identity, `index.ts` marks existing subprocesses `staleCli`
+  (`retireCCSessionsOnCliChange`). Invalidation never interrupts work. Before
+  the next message, the dispatcher waits for the current turn and background
+  jobs to finish, replaces the subprocess, and resumes the same session from
+  disk. Replacement happens on demand.
+- Pending messages and their model, effort, fast-mode, and streaming settings
+  stay in moi's per-session queue. Only one user message enters the SDK per
+  turn. Matching result IDs prevent an autonomous background turn from
+  releasing a waiting user prompt. When the CLI emits lifecycle events,
+  dispatch also waits for `idle`. The queue follows session ID renames and
+  survives planned subprocess replacement.
+- Settings apply immediately before dispatch. Rejected setters fail the send.
+  Model uses `setModel`; effort and fast mode use `applyFlagSettings` together.
+  An absent effort or fast-mode value clears that flag with `null`, restoring
+  provider defaults.
+- Background jobs retain their subprocess. Messages requiring a replacement
+  wait in moi until those jobs finish, including replacements for streaming
+  changes. `background_tasks_changed` replaces the complete task set, including
+  backgrounded subagents and ambient watchers. Task start/update/completion
+  events are a fallback only until the process emits its first snapshot; their
+  ordering relative to snapshots is unspecified. A new process starts with an
+  empty set and resets that fallback. Background work alone does not make the
+  chat busy.
+- Stop cancels queued messages and waits for interrupt acknowledgement and
+  turn completion. An unexpected process exit rejects pending sends.
+- The picker gets the new lineup on the client's next `/agent` refetch (window
+  focus, reconnect). `moi status` prints the version the catalog was probed
+  for next to the executable path.
+
 ---
 
 ## 1. Three layers
@@ -55,7 +90,7 @@ Two filters between L1 and L2 are responsible for everything the UI currently ca
 
 ---
 
-## 2. Layer 1 — Full `SDKMessage` union (21 variants)
+## 2. Layer 1 — Recorded `SDKMessage` variants
 
 Discriminated primarily by `type`, then `subtype` for `'system'` and `'result'`.
 
@@ -283,7 +318,7 @@ CLOSED have since been handled; see adapter.ts / session.ts):
 - **MCP tool calls proper** (`mcp_tool_use` / `mcp_tool_result` blocks) — dropped. Regular `Task`/`Bash` MCP tools happen to survive because they wear the plain `tool_use` shape.
 - **Streaming** — CLOSED: `stream_event` drives live token previews (`preview` frames) when the client opts into streaming.
 - **Session lifecycle signals** — partially CLOSED: `system/init` feeds the session snapshot; `system/session_state_changed` mirrors into `SessionActivity` (note: current CLIs don't emit it in streaming-input mode — `result` is the everyday turn-over fallback); `requires-action` reaches the wire but has no UI yet. `system/status` (`requesting`/`compacting`) still dropped.
-- **Sub-agent nesting** — CLOSED: `task_started`/`task_progress`/`task_notification` build nested subagent records; `task_started`/`task_updated`/`task_notification` also track live background tasks for the idle-eviction keep-alive (session.ts `bgTasks`).
+- **Sub-agent nesting** — CLOSED: `task_started`/`task_progress`/`task_notification` build nested subagent records; `background_tasks_changed` snapshots track live background tasks for the idle-eviction keep-alive (session.ts `bgTasks`), with task events as the fallback for older CLIs.
 - **Hooks / rate limits / api_retry** — CLOSED: surfaced as notices.
 - **MessageBlock switch exhaustiveness** — the UI layer this referred to (`MessageBlock.tsx`) no longer exists; turns render via `TurnView`/`ToolCallGroup`.
 

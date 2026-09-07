@@ -678,11 +678,8 @@ export type Model = {
   supportsAutoMode?: boolean
 }
 
-// GET /api/workspaces/:id/agent payload — everything the client needs to know
-// about the workspace's agent backend in one request at workspace open.
-// `models` and capabilities are stable per process; `availability` and `login`
-// are the volatile part, kept fresh after load by `agent:updated` events
-// instead of refetches.
+// GET /api/workspaces/:id/agent. Model changes arrive on refetch;
+// `agent:updated` events refresh availability and login state.
 export type WorkspaceAgent = {
   // The agent backend that produced this snapshot — matches the workspace
   // provider.

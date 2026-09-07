@@ -140,7 +140,9 @@ app-server protocol without moi).
 **Claude Code — shipped, primary harness.** Full chat integration: long-lived
 streaming-input sessions with mid-turn message queueing, resume after idle
 eviction/restart, interrupt, per-thread model + effort picker (backed by
-`supportedModels()`), opt-in live token streaming, image/file attachments,
+`supportedModels()`, cached per CLI version so an in-place `claude` update
+shows up without a server restart — `claude-code/NOTES.md` "Runtime
+executable"), opt-in live token streaming, image/file attachments,
 subagent lanes, MCP status probe, and session list/history replay from the
 SDK's `.jsonl` files, with per-turn token usage folded into the final
 assistant turn. The Agent SDK remains the transport, while every query is
@@ -153,8 +155,9 @@ permission chain — settings rules, the `auto` mode classifier, and
 that reaches a prompt without passing through `PreToolUse`. This is strictly
 more access than the CLI default — the classifier's safety verdicts no longer
 apply — and is an interim policy until UI approvals land. Known gaps: no
-interactive approval flow yet, and effort/streaming changes require a
-teardown-and-resume because the SDK has no live setter for them.
+interactive approval flow yet, and streaming changes require a
+teardown-and-resume because the SDK has no live setter for them. Model, effort,
+and fast-mode changes apply live before the next message.
 
 **OpenClaw — shipped.** Chat over the local gateway's WebSocket JSON-RPC
 (wire protocol 4 — the 2026.7.x and 2026.6.x lines; protocol-3 gateways are
@@ -247,15 +250,16 @@ doubles as the evaluation rubric for new harnesses.
   `session_state_changed` when the CLI emits it; Codex: `turn/started` /
   `turn/completed`; OpenClaw: `agent` lifecycle phases). Flip to `running`
   optimistically on send; a session with live background tasks (CC
-  `task_started`/`task_notification`) must not be idle-evicted.
+  `background_tasks_changed` snapshots, with task events as an older-CLI
+  fallback) must not be idle-evicted.
 
 ### Per-request configuration
 
 - **List supported models**, including per-model metadata such as supported
   effort levels (drives the picker).
 - **Set model** — ideally live mid-session.
-- **Set reasoning effort** — CC has no live setter, so `claude-code/session.ts`
-  does a drain-then-teardown-then-resume dance; Codex takes it per turn.
+- **Set reasoning effort** — CC applies `applyFlagSettings({ effortLevel })`
+  before the next message; Codex takes it per turn.
 - **Thinking/reasoning display mode** (Codex: `summary: 'auto'` is required or
   reasoning items arrive empty).
 - **Token streaming opt-in** (CC: `includePartialMessages`, construct-time;
@@ -314,7 +318,7 @@ Legend: ✅ supported · ⚠️ partial/workaround · ❌ missing.
 | Interrupt                | ✅ `interrupt()`                                    | ✅                        | ✅ `turn/interrupt`                   | ✅ `session/cancel` → `cancelled`    |
 | List models              | ✅ `supportedModels()`                              | ✅ `models.list`          | ✅ `model/list`                       | ✅ inline on `session/new`           |
 | Live model switch        | ✅ `setModel()`                                     | ✅ `sessions.patch`       | ✅ per-turn override                  | ⚠️ drops session MCP servers         |
-| Live effort switch       | ❌ rebuild                                          | ✅ `thinkingLevel` patch  | ✅ per-turn                           | ❌ no effort concept in ACP          |
+| Live effort switch       | ✅ `applyFlagSettings`                              | ✅ `thinkingLevel` patch  | ✅ per-turn                           | ❌ no effort concept in ACP          |
 | Token deltas             | ✅ opt-in                                           | ✅ `chat` frames          | ✅ `item/*/delta`                     | ✅ always on, thinking + text        |
 | Images in input          | ✅ base64 blocks                                    | ⚠️ materialize to path    | ✅ data URL or path                   | ✅ base64 blocks                     |
 | Interactive approvals    | ⚠️ (we bypass)                                      | ✅                        | ✅ server→client requests (we bypass) | ✅ real, with diffs (we bypass)      |
@@ -326,8 +330,8 @@ Legend: ✅ supported · ⚠️ partial/workaround · ❌ missing.
 
 ## Design lessons so far
 
-- Half of `claude-code/session.ts` exists because some settings are
-  live-settable (`setModel`) and some are construct-time (effort, streaming).
+- Claude Code settings are either live-settable (`setModel`, effort/fast mode
+  via `applyFlagSettings`) or construct-time (streaming).
   Encode that distinction per-setting in the adapter interface instead of
   hardcoding the drain-then-rebuild machinery.
 - Harnesses split into two topologies: **held-open** (CC subprocess, OpenClaw
