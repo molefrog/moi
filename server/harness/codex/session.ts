@@ -1,20 +1,6 @@
-// Per-(workspaceId, sessionId) live Codex session adapter.
-//
-// One `codex app-server` process per workspace (see codex.ts) serves every
-// thread in it; this module owns the per-thread state: the durable in-memory
-// view, turn accounting for the processing spinner, and the mapping of
-// `item/*` notifications onto our `StreamEvent`s.
-//
-// Lifecycle notes:
-//   - A brand-new thread is created under the client's temporary uuid, then
-//     renamed to the Codex thread id (`session_renamed`) — same flow as the
-//     Claude Code and OpenClaw paths.
-//   - The app-server persists threads in its sessions directory. moi drops
-//     idle display copies after 30 minutes; a cold send re-seeds and
-//     subscribes via `thread/resume`.
-//   - Codex natively echoes the user message back with our
-//     `clientUserMessageId` as `clientId`, so the optimistic-id rendezvous is
-//     first-class (no text matching like OpenClaw needs).
+// Live state per (workspaceId, sessionId): display history, native lifecycle,
+// pending input, and previews. client.ts owns the shared workspace process;
+// Codex owns durable history. See NOTES.md for ordering and recovery rules.
 import { appendAttachmentNote } from '@/lib/attachment-note'
 import { buildSessionTitleSource } from '../session-title'
 import {
@@ -103,7 +89,7 @@ type SessionRecord = {
 }
 
 const sessions = new Map<string, SessionRecord>() // key: `${workspaceId}:${sessionId}`
-// `${workspaceId}:${tempId}` -> real thread id (see cc-session.ts aliases).
+// `${workspaceId}:${tempId}` -> native thread id after session_renamed.
 const aliases = new Map<string, string>()
 // The UI can answer native tool questions in ordinary chat, not just Plan
 // mode. Keep this override local to moi's threads; never rewrite user config.
@@ -173,8 +159,7 @@ export type CodexActiveSession = {
 export function getCodexActiveSessions(): CodexActiveSession[] {
   const out: CodexActiveSession[] = []
   for (const s of sessions.values()) {
-    // moi auto-accepts provider approval requests at the transport, so a
-    // native tool questions can still require user input.
+    // Tool questions can block even though permission approvals are automatic.
     if (s.processing || s.inputs.blocking) {
       out.push({
         workspaceId: s.workspaceId,
@@ -301,8 +286,7 @@ function forwardPreview(
   entry.text += delta
   rec.previews.set(itemId, entry)
   rec.dirtyPreviews.add(itemId)
-  // Cumulative previews are otherwise quadratic in wire bytes, with a full
-  // WebSocket broadcast and React update for each individual token.
+  // Coalesce tokens to reduce repeated cumulative payloads and client updates.
   rec.previewTimer ??= setTimeout(() => flushPreviews(rec), 40)
 }
 
@@ -378,11 +362,7 @@ function applyCompletionMeta(
   }
 }
 
-// A send/turn failure can mean the account was signed out from outside moi —
-// a `codex logout` in a terminal, say — which the cached availability
-// snapshot won't reflect until its TTL expires. Force a fresh probe so the
-// composer's availability banner flips right away instead of the next send
-// failing the same way.
+// A failed send may reflect an external logout. Refresh the cached banner now.
 function refreshAvailability(workspaceId: string, workspacePath: string) {
   void agentStore.refresh({ id: workspaceId, path: workspacePath, type: 'codex' })
 }
@@ -446,9 +426,7 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
       return
     }
     case 'item/reasoning/summaryPartAdded': {
-      // Each part is a new summary section; without a break the sections
-      // concatenate into one run-on paragraph. Skip the first part (no
-      // preview text yet) so the reasoning doesn't open with a blank line.
+      // Match replay's summary separator without adding a leading blank line.
       if (rec.previews.has(params.itemId as string)) {
         forwardPreview(rec, params.itemId as string, 'reasoning', '\n')
       }
@@ -562,9 +540,7 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
         rec.inputs.cancel(params.requestId)
       return
     }
-    // Codex hooks (~/.codex/hooks.json) — surface as hook notices, parity
-    // with Claude Code's. started/completed share a notice id so the row
-    // upserts from "started" to its outcome.
+    // Reuse the notice id so completion updates the hook's started row.
     case 'hook/started':
     case 'hook/completed': {
       const run = params.run as
@@ -598,9 +574,7 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
       })
       return
     }
-    // A per-thread MCP server that failed to start — surface it instead of
-    // silently dropping (reuses the hook notice shape; a dedicated notice
-    // kind isn't worth a lib/format extension yet).
+    // MCP startup failures reuse the hook notice shape.
     case 'mcpServer/startupStatus/updated': {
       if (params.status !== 'failed') return
       const name = typeof params.name === 'string' ? params.name : 'mcp'
@@ -780,10 +754,8 @@ async function resumeSession(input: ResumeInput): Promise<SessionRecord> {
   }
 }
 
-// Turn a typed text + resolved uploads into Codex input items and the display
-// parts for the user's bubble. Images ride inline as data URLs (a documented
-// Codex input mode); other files are materialized to a temp path and
-// referenced in an attachment note the agent can read.
+// Images send inline; other uploads become readable path notes. Display parts
+// retain the original attachment metadata for the user's bubble.
 async function buildUserInput(
   text: string,
   uploads: StoredUpload[]
@@ -824,10 +796,7 @@ type CodexSendInput = {
   effort?: string
   fastMode?: boolean
   stream?: boolean
-  // Structured moi context (lib/moi-context.ts), rendered here. Servers
-  // >= 0.135 take it via `additionalContext` (never enters userMessage
-  // items); older ones get it appended to the text item, stripped from
-  // echoes by the adapter.
+  // Rendered through native additionalContext or the legacy text envelope.
   context?: MoiContext
 }
 
@@ -955,10 +924,8 @@ async function sendMessage(
   setProcessing(rec, true, rec.activeTurnId)
   try {
     const client = rec.client
-    // Native context channel: diffed per key server-side (unchanged values
-    // inject nothing) and never echoed back in userMessage items. The entry
-    // key becomes the tag, so ship the unwrapped body. Older servers silently
-    // drop the field, so append to the text item there instead.
+    // Native context keys become tags, so pass unwrapped bodies. The fallback
+    // envelope is stripped from user echoes by adapter.ts.
     const additionalContext = client.supportsAdditionalContext
       ? {
           ...CODEX_LOCAL_CONTROL_CONTEXT,
@@ -982,20 +949,13 @@ async function sendMessage(
       input: userInput,
       ...CODEX_TURN_ACCESS,
       ...(additionalContext ? { additionalContext } : {}),
-      // Without an explicit summary mode Codex still reasons but emits the
-      // reasoning item with EMPTY summary/content (verified on the wire —
-      // scripts/codex-probe.ts), so no thinking ever reaches the UI. 'detailed'
-      // (vs 'auto') makes the summaries longer and stream in more frequent
-      // item/reasoning/summaryTextDelta bursts while the model is still
-      // thinking — 'auto' tends to emit one short blob near the end.
+      // Request visible reasoning summaries instead of relying on CLI defaults.
       summary: 'detailed',
       ...(input.model ? { model: input.model } : {}),
       ...(input.effort ? { effort: input.effort } : {}),
       ...(serviceTier !== undefined ? { serviceTier } : {})
     }
     if (rec.activeTurnId) {
-      // A turn is running — steer the new input into it. If the turn ended
-      // in the race window, fall back to starting a fresh turn.
       try {
         await client.rpc('turn/steer', {
           threadId: rec.sessionId,
@@ -1095,8 +1055,7 @@ export function viewAsEvents(rec: SessionRecord): StreamEvent[] {
   return evs
 }
 
-// Read-side hook for the REST events endpoint (mirrors the OpenClaw path):
-// return the live view when we hold one so REST + WS stay in agreement.
+// Serve the live display copy so REST and WebSocket events stay consistent.
 export function getLiveCodexEvents(workspaceId: string, sessionId: string): StreamEvent[] | null {
   const rec = sessions.get(liveKey(workspaceId, sessionId))
   if (rec) rec.lastTouched = Date.now()

@@ -622,7 +622,7 @@ one.get('/mcp', async c => {
   return c.json((await harnessFor(ws).mcpStatus?.(ws)) ?? [])
 })
 
-// Harness debug tap for /playground/harness: the backend's native wire frames
+// Harness debug tap for /dev/harness: the backend's native wire frames
 // (Codex: app-server JSON-RPC, both directions; Claude Code: raw SDK messages
 // + enqueued inputs) and the exact frames the server pushed to chat clients.
 // `sinceWire`/`sinceBroadcast` are seq cursors so the page can poll deltas.

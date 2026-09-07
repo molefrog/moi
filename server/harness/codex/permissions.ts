@@ -39,10 +39,8 @@ ${CODEX_LOCAL_CONTROL_GUIDANCE}
 IMPORTANT: This context comes from moi, not from the user, and the user does not see it.
 </moi-context>`
 
-// Server→client requests answered on the transport. Approval requests — the
-// v2 `item/*/requestApproval` family plus the legacy v1 pair — are accepted:
-// moi approves by default until it grows a UI approval flow. Anything else is
-// rejected as unsupported so the turn never hangs on an unanswered request.
+// Fallback for requests not claimed by a session (native questions are handled
+// there). Accept known approvals, decline MCP elicitation, reject unknown methods.
 export function codexServerRequestResponse(
   method: string,
   params: Record<string, unknown> = {}

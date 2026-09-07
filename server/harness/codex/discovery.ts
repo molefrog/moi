@@ -1,12 +1,5 @@
-// Discover directories the Codex CLI has run in, for the home page's
-// "Import from this computer" list.
-//
-// Codex persists every thread as a rollout file under
-// `~/.codex/sessions/YYYY/MM/DD/rollout-<timestamp>-<uuid>.jsonl`, whose FIRST
-// line is a `session_meta` record carrying the thread's `cwd`. Reading those
-// heads directly (no app-server spawn, no codex binary needed) mirrors how the
-// Claude Code harness scans its own session history — discovery still works
-// when the CLI has since been uninstalled.
+// Discover workspace paths from rollout metadata under $CODEX_HOME/sessions
+// (default ~/.codex/sessions), even when the CLI is no longer installed.
 import { readdir, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
@@ -18,8 +11,7 @@ export const CODEX_SESSIONS_ROOT = join(
   'sessions'
 )
 
-// Newest files scanned per discovery pass. Session dirs grow unboundedly; the
-// most recent rollouts cover every workspace anyone still cares about.
+// Bound discovery cost; workspaces present only in older rollouts may be missed.
 const SCAN_LIMIT = 400
 // The session_meta line is small (id/cwd/timestamps), but read a generous head
 // in case a Codex version inlines instructions into it.
@@ -65,11 +57,8 @@ async function readSessionMeta(file: string): Promise<SessionMeta | null> {
   return null
 }
 
-// Up to `limit` rollout files under the date-partitioned tree, newest first.
-// Directory names are zero-padded dates and filenames embed ISO timestamps,
-// so descending name order at every level IS reverse-chronological order —
-// which lets the walk stop at the cap instead of traversing (and sorting)
-// the entire unbounded history first.
+// Date-partitioned names sort chronologically, so descending traversal can
+// stop at the cap without enumerating the entire history.
 async function listRolloutFiles(root: string, limit: number): Promise<string[]> {
   const out: string[] = []
   async function walk(dir: string) {

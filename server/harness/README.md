@@ -57,8 +57,8 @@ Socket-protocol notes the layers rely on (all defined in `lib/types.ts`):
   lifecycle signal — never derived by counting sends vs results. The snapshot
   (sent on connect and re-broadcast periodically) is authoritative: the client
   rebuilds its whole activity map from it, so a lost terminal frame self-heals.
-  `requires-action` (agent blocked on user input) is tracked but not rendered
-  yet — the client shows no loader for it.
+  `requires-action` suppresses the loader; Codex's pending input notice renders
+  an answerable form in the chat.
 - **`preview`** — live token frames, cumulative text, never persisted;
   cleared when the turn with matching `meta.apiMessageId` lands.
 
@@ -75,9 +75,9 @@ server/harness/
                      hand-written wire types it consumes
     session.ts       live per-thread state machine (send/interrupt/turn
                      accounting/preview forwarding)
-    <transport>.ts   process/connection management, named for what it is:
-                     codex/client.ts, openclaw/gateway.ts (CC has none — the
-                     Agent SDK is the transport)
+    <transport>.ts   connection management: codex/client.ts owns processes and
+                     codex/transport.ts frames stdio; openclaw/gateway.ts owns
+                     the gateway connection (CC uses the Agent SDK)
     discovery.ts / models.ts / sessions.ts / mcp.ts   as needed
     NOTES.md         the backend's wire protocol, empirically verified
     *.test.ts        tests live next to the code they cover
@@ -192,31 +192,20 @@ tool calls left unsettled at turn end are closed (Hermes never completes file
 read/write calls live), and a completing `tool_call_update` carries no title, so
 the established name is kept. See `hermes/NOTES.md`.
 
-**Codex — shipped, experimental.** Chat over `codex app-server` (stdio
-JSON-RPC, one process per workspace so `workspaceEnv` injects at spawn —
-`codex/client.ts`): thread create/resume with temp-id rename, per-turn model +
-effort overrides (both live — no rebuild dance), opt-in token streaming from
-`item/*/delta`, reasoning summaries via `summary: 'detailed'`, mid-turn sends
-steered into the running turn (`turn/steer` with a no-active-turn-only fallback),
-interrupt, per-turn token usage folded into `TurnMeta`, native optimistic-id
-rendezvous, session list via `thread/list` (cwd-filtered) and history replay
-via `thread/read`, subagent (collab) child threads nested as live
-SubagentRecord transcripts on the parent card, semantic exec labels from
-`commandActions`, MCP status via `mcpServerStatus/list`, and hook / failed
-MCP-startup notices. Workspace discovery scans `$CODEX_HOME/sessions` (default `~/.codex/sessions`) rollout
-heads for cwds (`codex/discovery.ts` — no binary needed), and `availability()`
-reports a missing `codex` executable (PATH + login-shell PATH lookup, with a
-Codex Desktop app-bundle fallback — `executable.ts`) to setup flows and the
-workspace composer. Sessions use `workspace-write` with network disabled by
-default and `approvalPolicy: on-request`; server→client approval requests are
-accepted by moi at the transport — an interim default-approve policy until UI
-approvals land (`codex/permissions.ts`). The same policy is reapplied on
-thread start, resume, and every turn. Native questions render as answerable
-chat forms (including Default mode); fast mode follows the model catalog and
-supports per-chat on/off overrides. Known gaps: no interactive command-approval
-or MCP elicitation UI yet. Per-turn application context tells Codex to request
-escalated localhost access before control-server commands. Images ride inline as data URLs only
-(no `localImage` path mode).
+**Codex — shipped, experimental.** One `codex app-server` per workspace supplies
+chat, model/session catalogs, history, steering, and interruption. The harness
+maps items into shared display events, including subagent transcripts, reasoning
+previews, usage, hook/MCP failure notices, and answerable native questions.
+Model, effort, and fast-mode choices apply on the next new turn; the sent model
+matches the picker even when Codex config names an unavailable model.
+
+Workspace env is fixed at process spawn. Executable lookup prefers PATH over
+the desktop bundle; config and credentials remain owned by Codex. Sessions use
+workspace-write access with network disabled, and moi automatically accepts
+supported permission requests. Command-approval UI and MCP elicitation are not
+implemented. See [Codex harness notes](codex/NOTES.md) for module ownership,
+ordering rules, runtime diagnostics, and boundaries, and the
+[validation record](../../docs/codex-integration-validation.md) for tested flows.
 
 Workspace availability also checks provider authentication when a workspace is
 given. Claude Code is probed with `claude auth status` under the effective
@@ -262,8 +251,8 @@ doubles as the evaluation rubric for new harnesses.
 - **Set model** — ideally live mid-session.
 - **Set reasoning effort** — CC applies `applyFlagSettings({ effortLevel })`
   before the next message; Codex takes it per turn.
-- **Thinking/reasoning display mode** (Codex: `summary: 'auto'` is required or
-  reasoning items arrive empty).
+- **Thinking/reasoning display mode** (Codex requests `summary: 'detailed'`
+  so visible summaries do not depend on CLI defaults).
 - **Token streaming opt-in** (CC: `includePartialMessages`, construct-time;
   Codex: always streams, moi gates forwarding).
 - **Permissions / tool policy** — allowed tools, permission mode; backends
@@ -310,25 +299,26 @@ doubles as the evaluation rubric for new harnesses.
 
 ## Capability comparison
 
-Legend: ✅ supported · ⚠️ partial/workaround · ❌ missing.
+Legend: ✅ supported · ⚠️ partial/workaround · ❌ missing. The Codex column
+describes what moi exposes, not every RPC available in the upstream protocol.
 
 | Feature                  | Claude Agent SDK                                    | OpenClaw gateway          | Codex app-server                      | Hermes (ACP)                         |
 | ------------------------ | --------------------------------------------------- | ------------------------- | ------------------------------------- | ------------------------------------ |
 | Long-lived session       | ✅ subprocess per session                           | ✅ gateway-side           | ✅ server-side, N threads/process     | ✅ process per workspace, N sessions |
 | Queue/steer mid-turn     | ⚠️ queued next turn                                 | ⚠️                        | ✅ `turn/steer` into live turn        | ⚠️ queued (ACP has no steer)         |
-| Resume                   | ✅                                                  | ✅                        | ✅ + fork                             | ✅ `session/load` (+ fork)           |
+| Resume                   | ✅                                                  | ✅                        | ✅ `thread/resume`                    | ✅ `session/load` (+ fork)           |
 | Interrupt                | ✅ `interrupt()`                                    | ✅                        | ✅ `turn/interrupt`                   | ✅ `session/cancel` → `cancelled`    |
 | List models              | ✅ `supportedModels()`                              | ✅ `models.list`          | ✅ `model/list`                       | ✅ inline on `session/new`           |
 | Live model switch        | ✅ `setModel()`                                     | ✅ `sessions.patch`       | ✅ per-turn override                  | ⚠️ drops session MCP servers         |
 | Live effort switch       | ✅ `applyFlagSettings`                              | ✅ `thinkingLevel` patch  | ✅ per-turn                           | ❌ no effort concept in ACP          |
 | Token deltas             | ✅ opt-in                                           | ✅ `chat` frames          | ✅ `item/*/delta`                     | ✅ always on, thinking + text        |
-| Images in input          | ✅ base64 blocks                                    | ⚠️ materialize to path    | ✅ data URL or path                   | ✅ base64 blocks                     |
+| Images in input          | ✅ base64 blocks                                    | ⚠️ materialize to path    | ✅ inline data URLs                   | ✅ base64 blocks                     |
 | Interactive approvals    | ⚠️ (we bypass)                                      | ✅                        | ✅ server→client requests (we bypass) | ✅ real, with diffs (we bypass)      |
 | Session list/history API | ✅ `listSessions()` + jsonl                         | ✅ `sessions.get`         | ✅ `thread/list`/`read`               | ✅ `session/list` (cwd + cursor)     |
 | Home card preview        | ✅ session file scan                                | ✅ cached first message   | ⚠️ live app-server only               | ⚠️ live process only                 |
 | MCP status               | ✅ `mcpServerStatus()`                              | n/a                       | ✅ `mcpServerStatus/list`             | ⚠️ per-session config, no status RPC |
-| Usage reporting          | ⚠️ cost/duration on `result` (adapter drops tokens) | ✅ tokens + cost per turn | ✅ live + rate limits                 | ✅ tokens per turn                   |
-| Structured output        | ❌                                                  | ❌                        | ✅ per turn                           | ❌                                   |
+| Usage reporting          | ⚠️ cost/duration on `result` (adapter drops tokens) | ✅ tokens + cost per turn | ✅ per-turn tokens and duration       | ✅ tokens per turn                   |
+| Structured output        | ❌                                                  | ❌                        | ⚠️ title generation only              | ❌                                   |
 
 ## Design lessons so far
 
@@ -336,10 +326,9 @@ Legend: ✅ supported · ⚠️ partial/workaround · ❌ missing.
   via `applyFlagSettings`) or construct-time (streaming).
   Encode that distinction per-setting in the adapter interface instead of
   hardcoding the drain-then-rebuild machinery.
-- Harnesses split into two topologies: **held-open** (CC subprocess, OpenClaw
-  gateway, Codex app-server) and **spawn-per-turn** (Codex exec SDK — see
-  `codex/NOTES.md` §1 for why we rejected it). The session manager should
-  support both.
+- Chat harnesses keep connections open (CC subprocess, OpenClaw gateway,
+  Codex app-server). Separate one-shot work, such as Codex title generation,
+  can use a short-lived process without changing chat session ownership.
 - Event vocabularies differ in kind, not just names: CC emits raw
   tool_use/tool_result pairs; Codex emits semantic items (a patch, a command)
   with their own lifecycle. The adapter layer is where that converges on
