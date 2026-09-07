@@ -50,10 +50,14 @@ derived from the CLI may therefore be cached for the process lifetime:
   executable path + the first line of `claude --version` (`2.1.263 (Claude
 Code)`), a ~15ms spawn re-run on every `/agent` request. A changed identity
   refetches the catalog; a failed probe keeps serving the cached one.
-- On a changed identity, `index.ts` respawns idle sessions
-  (`restartIdleCCSessions`). A subprocess started on the old binary keeps the
-  old lineup and rejects the new aliases on `set_model`; sessions with live
-  background tasks are left to turn over on their own.
+- On a changed identity, `index.ts` retires live sessions
+  (`retireCCSessionsOnCliChange`). A subprocess started on the old binary
+  keeps the old lineup and rejects the new aliases on `set_model`. Idle
+  sessions without background tasks are torn down at once; the rest are
+  flagged `staleCli` and torn down as soon as their turn and background tasks
+  finish. A send that finds a stale session idle rebuilds it before
+  enqueueing, so a newly introduced model is never applied to an old
+  subprocess. Every path resumes from disk on the next message.
 - The picker gets the new lineup on the client's next `/agent` refetch (window
   focus, reconnect). `moi status` prints the version the catalog was probed
   for next to the executable path.

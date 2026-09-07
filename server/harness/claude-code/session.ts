@@ -151,6 +151,12 @@ type LiveSession = {
   // Streaming mode the latest message asked for; drives the same drain-then-
   // rebuild path as `desiredEffort` when it diverges mid-turn.
   desiredStream: boolean
+  // The `claude` executable changed after this subprocess was spawned (see
+  // retireCCSessionsOnCliChange). Set only on sessions that were busy at the
+  // time; they are torn down once idle with no background tasks, and a send
+  // that finds one idle rebuilds it first, so a model the new CLI introduced
+  // is never handed to a subprocess that predates it.
+  staleCli: boolean
   idleTimer: ReturnType<typeof setTimeout> | null
   closed: boolean
   // Last turn's error text (result subtype), consumed by the view-builder
@@ -410,7 +416,14 @@ async function onSessionIdle(s: LiveSession) {
     s.lastBuilderError
   )
   if (s.desiredEffort !== s.effort || s.desiredStream !== s.stream) teardown(s)
+  else if (s.staleCli && s.bgTasks.size === 0) teardown(s)
   else armIdle(s)
+}
+
+// A stale session that was kept alive for its background tasks goes as soon
+// as the last one finishes (while idle — a running turn ends via onSessionIdle).
+function retireIfStale(s: LiveSession) {
+  if (s.staleCli && s.activity === 'idle' && s.bgTasks.size === 0) teardown(s)
 }
 
 async function consume(s: LiveSession) {
@@ -505,12 +518,13 @@ async function consume(s: LiveSession) {
           debug(
             `cc bg-task end ws=${s.workspaceId} session=${s.sessionId} task=${msg.task_id} status=${msg.status} live=${s.bgTasks.size}`
           )
+          retireIfStale(s)
         }
       }
       if (msg.type === 'system' && msg.subtype === 'task_updated') {
         const status = msg.patch?.status
         if (status === 'completed' || status === 'failed' || status === 'killed') {
-          s.bgTasks.delete(msg.task_id)
+          if (s.bgTasks.delete(msg.task_id)) retireIfStale(s)
         }
       }
       if (msg.type === 'result') {
@@ -642,6 +656,7 @@ function createLiveSession(input: {
     desiredEffort: input.effort,
     stream: input.stream,
     desiredStream: input.stream,
+    staleCli: false,
     idleTimer: null,
     closed: false,
     lastBuilderError: undefined,
@@ -707,7 +722,13 @@ export async function sendCCMessage(input: {
   // construct-time, no SDK setter), so when either differs we tear the idle
   // session down and recreate it via resume — the change lands on this very
   // turn. A busy session keeps its settings until the in-flight turn ends.
-  if (s && (input.effort !== s.effort || wantStream !== s.stream) && s.activity === 'idle') {
+  // A subprocess spawned before a CLI update takes the same path: it may not
+  // know the model this message asks for (setModel rejects unknown ids).
+  if (
+    s &&
+    (input.effort !== s.effort || wantStream !== s.stream || s.staleCli) &&
+    s.activity === 'idle'
+  ) {
     teardown(s)
     s = undefined
   }
@@ -872,15 +893,22 @@ export function restartWorkspaceSessions(workspacePath: string): void {
   }
 }
 
-// Tear down every idle session so the next message respawns it on the current
-// `claude` executable — for when the CLI updated in place under a running
-// server. A subprocess started on the old binary keeps the old model lineup:
+// The `claude` executable changed under a running server (an in-place CLI
+// update). A subprocess started on the old binary keeps the old model lineup:
 // the picker, refreshed from the new CLI, offers aliases the old process
-// rejects on `set_model`. Sessions with live background tasks are left alone,
-// same as idle eviction; they turn over once the tasks finish.
-export function restartIdleCCSessions(): void {
+// rejects on `set_model`. Idle sessions without background tasks respawn on
+// the next message right away; the rest are flagged stale and go once their
+// turn and background tasks finish (onSessionIdle / retireIfStale), or
+// sooner if a send finds them idle (sendCCMessage rebuilds before enqueueing).
+export function retireCCSessionsOnCliChange(): void {
   for (const s of [...sessions.values()]) {
     if (s.activity === 'idle' && s.bgTasks.size === 0) teardown(s)
+    else {
+      s.staleCli = true
+      debug(
+        `cc stale-cli ws=${s.workspaceId} session=${s.sessionId} activity=${s.activity} bgTasks=${s.bgTasks.size} — retiring when drained`
+      )
+    }
   }
 }
 

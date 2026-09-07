@@ -16,8 +16,8 @@ import {
   getCCActiveSessions,
   interruptCCSession,
   killAllCCSessions,
-  restartIdleCCSessions,
   restartWorkspaceSessions,
+  retireCCSessionsOnCliChange,
   sendCCMessage
 } from './session'
 import {
@@ -75,10 +75,11 @@ async function discoverWorkspaces(
 }
 
 // Claude Code updates itself in place while moi runs. The catalog probe is
-// the first thing to notice a new binary (see `models.ts`); when it does, idle
-// sessions are respawned so they run — and accept the models of — the CLI the
-// picker now shows. Busy sessions finish their turn on the old binary first.
-onClaudeCliChanged(() => restartIdleCCSessions())
+// the first thing to notice a new binary (see `models.ts`); when it does, live
+// sessions are retired so the next message runs on — and can select the
+// models of — the CLI the picker now shows. Idle ones go immediately; busy
+// ones finish their turn on the old binary and are rebuilt after.
+onClaudeCliChanged(() => retireCCSessionsOnCliChange())
 
 export const claudeCodeHarness: Harness = {
   id: 'claude-code',
