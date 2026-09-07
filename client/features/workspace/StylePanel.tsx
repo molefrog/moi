@@ -28,7 +28,7 @@ const RADIUS_OPTIONS = Object.entries(RADIUS_THEMES) as [RadiusTheme, RadiusThem
 const AGENT_OPTIONS = Object.entries(AGENT_THEMES) as [AgentTheme, AgentThemeConfig][]
 
 const STYLE_OPTION_CLASS =
-  'relative w-full rounded-lg bg-card text-left ring-1 ring-border transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
+  'relative w-full rounded-lg text-left ring-1 ring-border transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
 
 type StyleOptionGroupProps = {
   children: ReactNode

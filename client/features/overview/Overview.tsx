@@ -55,10 +55,13 @@ function NoWidgetsCreated({ onCreateWidget, showOnboarding }: NoWidgetsCreatedPr
       <Button
         type="button"
         variant="outline"
-        className="absolute inset-0 m-auto h-fit w-fit rounded-xl p-4 pl-3! transition-shadow duration-300 ease-out hover:shadow-md"
+        className={cn(
+          'absolute inset-0 m-auto h-fit w-fit',
+          'flex-col gap-1 rounded-xl border-0 py-4 pr-12 pl-12! text-xs shadow-sm transition-shadow duration-300 ease-out hover:bg-background hover:shadow-lg [&_svg]:size-8'
+        )}
         onClick={onCreateWidget}
       >
-        <IconPlus data-icon="inline-start" stroke={1.5} />
+        <IconPlus data-icon="inline-start" stroke={1} />
         New widget
       </Button>
     </div>
