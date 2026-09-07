@@ -38,6 +38,8 @@ const PAGE_ROOT_RE = /^(:root|:host|html|body)(?![\w-])/
 // descendant form `:where(.group):has(…) .util` matches the same elements
 // with the same specificity (`:is()` takes its most specific argument), and
 // Chrome invalidates it precisely.
+// Shared ui-components use explicit ancestor variants now. Keep this fallback
+// for older installed workspace copies and third-party components.
 //
 // The rewrite is deliberately conservative, because it is only safe when it
 // cannot reorder ancestor constraints:
