@@ -3,7 +3,7 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "I'm building a Next.js app with shadcn/ui (base-nova preset, lucide icons). Create a settings form component with fields for: full name, email address, and notification preferences (email, SMS, push notifications as toggle options). Add validation states for required fields.",
+      "prompt": "I'm building a Next.js app with shadcn/ui (base-nova preset, Tabler icons). Create a settings form component with fields for: full name, email address, and notification preferences (email, SMS, push notifications as toggle options). Add validation states for required fields.",
       "expected_output": "A React component using FieldGroup, Field, ToggleGroup, data-invalid/aria-invalid validation, gap-* spacing, and semantic colors.",
       "files": [],
       "expectations": [
@@ -25,13 +25,13 @@
         "Avatar component includes AvatarFallback",
         "Icons on buttons use the data-icon attribute (data-icon=\"inline-start\" or data-icon=\"inline-end\")",
         "No sizing classes on icons inside components (no size-4, w-4, h-4, etc.)",
-        "Uses tabler icons (@tabler/icons-react) instead of lucide-react",
+        "Uses Tabler icons from @tabler/icons-react",
         "Uses asChild for custom triggers (radix preset)"
       ]
     },
     {
       "id": 3,
-      "prompt": "Create a dashboard component that shows 4 stat cards in a grid. Each card has a title, large number, percentage change badge, and a loading skeleton state. Using shadcn/ui with base-nova preset and lucide icons.",
+      "prompt": "Create a dashboard component that shows 4 stat cards in a grid. Each card has a title, large number, percentage change badge, and a loading skeleton state. Using shadcn/ui with base-nova preset and Tabler icons.",
       "expected_output": "A React component with full Card composition, Skeleton for loading, Badge for changes, semantic colors, gap-* spacing.",
       "files": [],
       "expectations": [

@@ -80,9 +80,8 @@ export function ChatPopup({
         }
       />
       <PopoverContent
-        positionMethod="fixed"
         side="top"
-        sideOffset={-56}
+        sideOffset={({ anchor }) => -anchor.height}
         align="end"
         className="flex h-[calc(100vh-2rem)] w-[min(440px,calc(100vw-1rem))] flex-col gap-0 rounded-3xl p-0 sm:h-[calc(100vh-8rem)] sm:w-[min(440px,calc(100vw-2rem))] sm:p-1"
         keepMounted

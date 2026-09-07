@@ -27,7 +27,7 @@ Use semantic color tokens by intent:
 - `accent` for hover, active, selection, and subtle highlights.
 - `success` for positive outcomes, healthy or active states, and presence or progress indicators.
 - `destructive` for destructive actions, invalid states, and errors.
-- `border`, `input`, and `ring` for structure, controls, and focus.
+- `border` for structure and control outlines, `input` for filled control states, and `ring` for focus.
 
 Do not add raw color utilities, manual `dark:` colors, or `foreground` alpha fills. Use alpha only when the semantic token already has the correct role. Do not add, rename, or redefine tokens without explicit owner approval. If no token fits, use the closest semantic role and report the limitation.
 

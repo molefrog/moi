@@ -75,7 +75,12 @@ export function WorkspaceSplitLayout({
           {workspace}
         </div>
       </ResizablePanel>
-      <ResizableHandle aria-label="Resize chat" hidden={!open} disabled={!open} />
+      <ResizableHandle
+        aria-label="Resize chat"
+        showDivider={false}
+        hidden={!open}
+        disabled={!open}
+      />
       <ResizablePanel
         id="chat"
         aria-hidden={!open}

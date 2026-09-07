@@ -4,7 +4,7 @@ globs: '*.tsx, *.jsx'
 alwaysApply: false
 ---
 
-- Use `@tabler/icons-react` for all icons. Don't install or use any other icon packages (e.g. `@heroicons/react`, `lucide-react`, `react-icons`, `@untitledui/icons`).
+- Use `@tabler/icons-react` for all icons, including documentation examples. Don't install or use other icon packages.
 - Import icons from the root: `import { IconName } from "@tabler/icons-react";`
 - All icon names use the `Icon` prefix (e.g. `IconArrowUp`, `IconX`, `IconMessage`).
 - Icons accept `size` (number) and standard SVG props including `className`.
@@ -18,4 +18,4 @@ alwaysApply: false
   | `24` | `1.5` | Empty states, large affordances, and illustrative UI moments |
 
 - Tabler's package default stroke is `2`, not the app default. Always set the `stroke` prop explicitly on every Tabler icon.
-- Inside `<Button>`: icons are sized automatically via CSS — `sm`/`icon-sm` → 16px, `default`/`icon`/`lg`/`icon-lg` → 20px. Do not set `size` on icons inside buttons; still set the `stroke` that matches the rendered button icon size.
+- Inside `<Button>`: icons are sized automatically via CSS — `xs`/`icon-xs` → 12px, `sm`/`icon-sm` → 16px, `default`/`icon`/`lg`/`icon-lg` → 20px. Do not set `size` on icons inside buttons; still set the `stroke` that matches the rendered button icon size.
