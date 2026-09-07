@@ -137,6 +137,27 @@ receive the same unsupported-method error. moi does not opt into
 `features.default_mode_request_user_input`. MCP schema/URL elicitation is
 declined with `action: 'decline'`.
 
+### TODO: restore native question forms
+
+This feature is deferred, not ruled out. It was removed in `1cfce26` because
+the question form exposed an undefined `Field` namespace in Base UI's `Input`
+wrapper in Bun's dev bundle. The earlier workaround changed every shared
+Input to `Field.Control`; the underlying bundler cause was not established.
+The removed implementation is available in that commit's parent for reference.
+
+Before restoring support:
+
+- Resolve the Input failure at its source and verify the form in both dev and
+  production builds before opting into native questions again.
+- Re-read the current app-server spec and generated types. Preserve fixed
+  choices, free-text answers, secret fields, and blocking/nonblocking semantics.
+- Restore session-scoped request handling, the answer endpoint, and chat UI.
+  Handle reload, skip, stop, disconnect, and `serverRequest/resolved` without
+  duplicate replies or stale forms answering reused request ids. Keep answers
+  out of debug logs and notice payloads.
+- Verify the full flow with browser interactions and a real Codex session,
+  including cancellation and recovery; add tests for those boundaries.
+
 ## Display and MCP boundaries
 
 - Native items become display turns or notices. `clientUserMessageId` is echoed
