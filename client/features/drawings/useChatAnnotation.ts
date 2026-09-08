@@ -4,6 +4,7 @@ import { toast } from '@/client/components/ui/toast'
 import { stageDrawing, stageDrawingDraft } from '@/client/features/chat/attachment-staging'
 import { liveStore } from '@/client/features/chat/chat-store'
 import type { ComposerAnnotationControls } from '@/client/features/chat/composer/ChatComposer'
+import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { LayoutMode, WorkspaceTabId } from '@/lib/types'
 
 import { type DrawingController, useDrawingLayer } from './useDrawingLayer'
@@ -45,10 +46,8 @@ export function useChatAnnotation({
   const draftRef = useRef<ChatAnnotationDraft | null>(null)
   const latestBlobRef = useRef<Blob | null>(null)
   const uploadRevisionsRef = useRef(new Map<string, number>())
-  const closePopupRef = useRef(closePopup)
-  const openPopupRef = useRef(openPopup)
-  closePopupRef.current = closePopup
-  openPopupRef.current = openPopup
+  const closePopupRef = useLatestRef(closePopup)
+  const openPopupRef = useLatestRef(openPopup)
 
   // While drawing, every commit only refreshes the chip's local preview. The
   // single upload happens when the session ends: finish/send (complete) or an
@@ -99,7 +98,7 @@ export function useChatAnnotation({
       if (draft && blob) await upload(draft, blob)
       if (draft?.origin === 'popup') openPopupRef.current()
     },
-    [upload]
+    [openPopupRef, upload]
   )
 
   const annotation = useDrawingLayer({ onChange: change, onFinish: complete })
@@ -131,7 +130,7 @@ export function useChatAnnotation({
         toast.add({ title: 'Couldn’t capture this page', type: 'error' })
       }
     },
-    [active, activeTab, available, open, sessionId, starting, workspaceId]
+    [active, activeTab, available, closePopupRef, open, sessionId, starting, workspaceId]
   )
 
   const cancel = useCallback(async () => {

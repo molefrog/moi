@@ -286,8 +286,8 @@ function SessionSelector() {
     <DropdownMenu onOpenChange={handleMenuOpenChange}>
       <DropdownMenuTrigger
         render={
-          <Button className="group" variant="ghost" size="sm">
-            <span className="max-w-64 truncate">{label}</span>
+          <Button className="group max-w-full min-w-0 shrink" variant="ghost" size="sm">
+            <span className="max-w-64 min-w-0 truncate">{label}</span>
             {hasRunningBackgroundChat ? (
               <Spinner className="size-4!" stroke={2} />
             ) : (

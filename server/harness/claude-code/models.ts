@@ -4,20 +4,15 @@ import type { ModelInfo } from '@anthropic-ai/claude-agent-sdk'
 import type { Model } from '@/lib/types'
 
 import { requireHarnessExecutable } from '../executable'
+import { type ClaudeCli, claudeCliKey, probeClaudeCli } from './cli'
 
-// Chat runs live in `cc-session.ts` (streaming-input sessions held per thread).
-// MCP status probing lives in `mcp.ts`. This module now only probes the agent
-// backend for the model list — spins up a throwaway `query()` and reads metadata.
-
-// Claude's available models come from the account/CLI, not the workspace, so
-// the list is identical everywhere. We still need a `cwd` to spin up a probe
-// query, but cache the result process-wide.
-async function fetchClaudeModels(cwd: string): Promise<ModelInfo[]> {
+// The metadata query needs a cwd; its catalog is cached across workspaces.
+async function fetchClaudeModels(cwd: string, executable: string): Promise<ModelInfo[]> {
   const q = query({
     prompt: '',
     options: {
       cwd,
-      pathToClaudeCodeExecutable: requireHarnessExecutable('claude-code'),
+      pathToClaudeCodeExecutable: executable,
       persistSession: false,
       settingSources: ['user', 'project'],
       env: { ...process.env, CLAUDECODE: undefined }
@@ -25,23 +20,80 @@ async function fetchClaudeModels(cwd: string): Promise<ModelInfo[]> {
   })
   const models = await q.supportedModels()
   await q.close()
-  // Raw SDK shape, passed through to the client as-is.
   return models
 }
 
-// One in-flight/settled promise shared across all callers. On failure we clear
-// it so a later request can retry instead of caching the rejection forever.
-let claudeModelsPromise: Promise<ModelInfo[]> | null = null
+export type ClaudeCliChangeListener = (next: ClaudeCli, previous: ClaudeCli) => void
 
-function getCachedClaudeModels(cwd: string): Promise<ModelInfo[]> {
-  if (!claudeModelsPromise) {
-    claudeModelsPromise = fetchClaudeModels(cwd).catch(err => {
-      claudeModelsPromise = null
+export type ClaudeCatalogOptions = {
+  probe: (executable: string) => Promise<ClaudeCli>
+  fetch: (cwd: string, executable: string) => Promise<ModelInfo[]>
+}
+
+type CatalogEntry = {
+  key: string
+  cli: ClaudeCli
+  models: Promise<ModelInfo[]>
+}
+
+// Recheck CLI identity on each lookup. Callers share the model-fetch promise
+// until the identity changes; failed fetches are dropped so they can be retried.
+export function createClaudeCatalog(options: ClaudeCatalogOptions) {
+  let entry: CatalogEntry | null = null
+  const listeners = new Set<ClaudeCliChangeListener>()
+
+  function store(cli: ClaudeCli, cwd: string): Promise<ModelInfo[]> {
+    const models = options.fetch(cwd, cli.executable).catch(err => {
+      if (entry?.models === models) entry = null
       throw err
     })
+    entry = { key: claudeCliKey(cli), cli, models }
+    return models
   }
-  return claudeModelsPromise
+
+  async function models(cwd: string, executable: string): Promise<ModelInfo[]> {
+    const cli = await options.probe(executable)
+    const current = entry
+    if (current) {
+      if (current.key === claudeCliKey(cli)) return current.models
+      // A failed version probe says nothing about the CLI. Keep serving the
+      // catalog we have instead of re-spawning a probe query per request.
+      if (cli.version === null && current.cli.executable === executable) return current.models
+    }
+    const next = store(cli, cwd)
+    if (current) {
+      console.log(
+        `[claude-code] claude changed (${describe(current.cli)} → ${describe(cli)}); refreshing the model catalog`
+      )
+      for (const listener of listeners) listener(cli, current.cli)
+    }
+    return next
+  }
+
+  // Initial discovery is not a CLI change.
+  function onCliChanged(listener: ClaudeCliChangeListener): () => void {
+    listeners.add(listener)
+    return () => {
+      listeners.delete(listener)
+    }
+  }
+
+  // Cached identity for diagnostics; model lookups still need a fresh probe.
+  function current(): ClaudeCli | undefined {
+    return entry?.cli
+  }
+
+  return { models, onCliChanged, current }
 }
+
+function describe(cli: ClaudeCli): string {
+  return `${cli.version ?? 'unknown version'} at ${cli.executable}`
+}
+
+const catalog = createClaudeCatalog({ probe: probeClaudeCli, fetch: fetchClaudeModels })
+
+export const onClaudeCliChanged = catalog.onCliChanged
+export const lastProbedClaudeCli = catalog.current
 
 export function withClaudeFastModeDefault(
   models: readonly ModelInfo[],
@@ -53,8 +105,9 @@ export function withClaudeFastModeDefault(
 }
 
 export async function getClaudeModels(cwd: string): Promise<Model[]> {
+  const executable = requireHarnessExecutable('claude-code')
   const [models, settings] = await Promise.all([
-    getCachedClaudeModels(cwd),
+    catalog.models(cwd, executable),
     resolveSettings({ cwd, settingSources: ['user', 'project'] })
   ])
   const defaultFastMode =

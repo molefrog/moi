@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { stageDrawing, stageDrawingDraft } from '@/client/features/chat/attachment-staging'
 import { attachmentKey, liveStore } from '@/client/features/chat/chat-store'
+import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { WorkspaceTabId } from '@/lib/types'
 
 import { useDrawingLayer } from './useDrawingLayer'
@@ -33,10 +34,8 @@ export function useViewBuilderSketch({
   const pendingStageRef = useRef<Promise<void> | null>(null)
   const acceptExportsRef = useRef(true)
   const [continuing, setContinuing] = useState(false)
-  const onEditingStartRef = useRef(onEditingStart)
-  const onContinueInChatRef = useRef(onContinueInChat)
-  onEditingStartRef.current = onEditingStart
-  onContinueInChatRef.current = onContinueInChat
+  const onEditingStartRef = useLatestRef(onEditingStart)
+  const onContinueInChatRef = useLatestRef(onContinueInChat)
 
   // While drawing, every commit only refreshes the chip's local preview. The
   // single upload happens when the sketching session ends: prepareForSend
@@ -122,7 +121,7 @@ export function useViewBuilderSketch({
     } finally {
       setContinuing(false)
     }
-  }, [continuing, deactivate])
+  }, [continuing, deactivate, onContinueInChatRef])
 
   const resetDocument = useCallback(async () => {
     acceptExportsRef.current = false

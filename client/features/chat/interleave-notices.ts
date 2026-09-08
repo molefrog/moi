@@ -1,9 +1,7 @@
 // Weaves transcript notices (context compaction, mid-session model switches)
 // into the turn list so each one reads at the moment it happened.
 //
-// Only 'compact' and 'model-change' render today. Every other SystemNotice
-// kind is claude-code-specific plumbing with no designed chat treatment yet,
-// so `chatNoticeLabel` skips it explicitly.
+// Only notices with a chat label enter the timeline.
 import type { SystemNotice, Turn } from '@/lib/types'
 
 export type ChatTimelineItem =
@@ -13,16 +11,19 @@ export type ChatTimelineItem =
 // One-line copy for a notice row; null = this kind does not render in chat.
 export function chatNoticeLabel(notice: SystemNotice): string | null {
   switch (notice.kind) {
+    case 'warning':
+      return notice.message
     case 'compact':
       return 'Context compacted'
     case 'model-change':
       return notice.prev
         ? `Model changed to ${notice.model} (was ${notice.prev})`
         : `Model changed to ${notice.model}`
+    case 'api-retry':
+      return notice.error ? `Retrying: ${notice.error}` : 'Retrying the connection'
     // Claude-code-specific notices without a designed chat treatment yet —
     // skipped on purpose. New kinds stay hidden until designed.
     case 'rate-limit':
-    case 'api-retry':
     case 'hook':
     case 'session-state':
     case 'files-persisted':
@@ -44,13 +45,8 @@ function parseTime(value: string | undefined): number | undefined {
 // notices never jump ahead of undated turns. Notices with no parseable `at`
 // have no comparable anchor and go after the last turn.
 //
-// Known limitation — a transcript whose turns are ALL undated gives nothing to
-// compare against, so every dated notice lands after the last turn. That is
-// right while a session is live (compaction happens at the current end of the
-// conversation) but drifts on replay: the notice follows the new end instead of
-// staying where it happened. Codex hits this today — `codexItemToTurn` sets no
-// `timestamp` and `codexItemToNotice` stamps `at` with replay-time `new Date()`
-// — so fixing it means giving those rows a real anchor, not changing the merge.
+// Entirely undated transcripts cannot anchor notices. Adapters must supply
+// native timestamps when available; otherwise dated notices follow all turns.
 export function interleaveNotices(turns: Turn[], notices: SystemNotice[]): ChatTimelineItem[] {
   const shown = notices.filter(notice => chatNoticeLabel(notice) !== null)
   if (shown.length === 0) return turns.map((turn): ChatTimelineItem => ({ kind: 'turn', turn }))

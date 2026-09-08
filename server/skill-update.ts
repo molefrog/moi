@@ -1,7 +1,7 @@
 import type { WorkspaceSkillsStatus, WorkspaceSkillStatus, WorkspaceType } from '@/lib/types'
 
 import { writeAppletEnvDts } from './moi-scaffold'
-import { isMinorBehind, skillStatuses } from './skill-version'
+import { isBehind, skillStatuses } from './skill-version'
 import { installBundledSkills } from './skills-template'
 import { skillsDirFor } from './workspace-init'
 
@@ -15,7 +15,7 @@ export type WorkspaceSkillUpdateResult = {
 export function summarizeSkillStatuses(skills: WorkspaceSkillStatus[]): WorkspaceSkillsStatus {
   return {
     skills,
-    updateAvailable: skills.some(skill => isMinorBehind(skill.installed, skill.bundled))
+    updateAvailable: skills.some(skill => isBehind(skill.installed, skill.bundled))
   }
 }
 

@@ -1,5 +1,7 @@
 import type { PreviewBlock, StreamEvent } from './format'
 import type { AppIconId } from './app-icons'
+import type { MoiContext } from './moi-context'
+import type { WorkspaceTheme } from './themes'
 
 // A custom UI unit embedded in a workspace.
 export type AppletKind = 'view' | 'widget'
@@ -241,7 +243,7 @@ export type ClientMessage =
       // snapshotted at send time, assembled by
       // client/features/workspace/moi-context.ts. The server renders it per
       // harness; display paths strip the rendered envelope from bubbles.
-      context?: import('./moi-context').MoiContext
+      context?: MoiContext
     }
   | { type: 'stop'; workspaceId: string; sessionId: string }
   // Reply to a relayed Scratchpad op (see ScratchpadOpMessage). Carries the
@@ -464,7 +466,7 @@ export type WorkspaceEntry = {
   icon?: WorkspaceIcon
   // Merged in from the layout so app-wide workspace lists can paint a themed
   // icon without inheriting the active workspace's color.
-  theme?: import('./themes').WorkspaceTheme
+  theme?: WorkspaceTheme
   // Home-relative rendering of `path` (e.g. "~/.openclaw/workspace"). Set by
   // the server on the wire — clients render it as-is.
   displayPath?: string
@@ -500,6 +502,9 @@ export type ErrorFrame = {
   workspaceId: string
   sessionId: string
   content: string
+  // A failed steer or interrupt leaves the current run active. Older senders
+  // omit this field and retain terminal-error behavior.
+  terminal?: boolean
 }
 
 export type StoppedFrame = {
@@ -512,8 +517,8 @@ export type StoppedFrame = {
 // lifecycle signal (CC `session_state_changed`, Codex `turn/*`, OpenClaw run
 // lifecycle) rather than derived by counting messages:
 //   running         — the agent is working; the client shows the loader/Stop
-//   requires-action — the agent is blocked on user input (permission prompt,
-//                     MCP elicitation). Not rendered yet: no loader, no Stop.
+//   requires-action — waiting for user input; no loader/Stop. Input notices
+//                     provide the answer form independently of this state.
 //   idle            — everything else, including interrupted/failed turns
 export type SessionActivity = 'idle' | 'running' | 'requires-action'
 
@@ -578,7 +583,7 @@ export type WorkspaceLayout = {
   selectedEffort?: string
   // Fast-mode default for new sessions. Undefined inherits the provider setting.
   selectedFastMode?: boolean
-  theme?: import('./themes').WorkspaceTheme
+  theme?: WorkspaceTheme
 }
 
 // One applet's thumbnail freshness record. Image bytes live as files in the
@@ -685,11 +690,8 @@ export type Model = {
   supportsAutoMode?: boolean
 }
 
-// GET /api/workspaces/:id/agent payload — everything the client needs to know
-// about the workspace's agent backend in one request at workspace open.
-// `models` and capabilities are stable per process; `availability` and `login`
-// are the volatile part, kept fresh after load by `agent:updated` events
-// instead of refetches.
+// GET /api/workspaces/:id/agent. Model changes arrive on refetch;
+// `agent:updated` events refresh availability and login state.
 export type WorkspaceAgent = {
   // The agent backend that produced this snapshot — matches the workspace
   // provider.

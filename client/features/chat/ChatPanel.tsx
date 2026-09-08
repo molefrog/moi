@@ -163,8 +163,10 @@ export function ChatPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col pt-2 pb-3">
-      <header className="mx-auto flex w-full max-w-[calc(var(--chat-max-container)+40px)] items-center justify-between pr-2 pb-2 pl-2">
-        <ChatSelector isViewBuilder={!!builderDraft} />
+      <header className="mx-auto flex w-full max-w-[calc(var(--chat-max-container)+40px)] min-w-0 items-center justify-between pr-2 pb-2 pl-2">
+        <div className="min-w-0 flex-1">
+          <ChatSelector isViewBuilder={!!builderDraft} />
+        </div>
         {onClose && docked && (
           <Tooltip>
             <TooltipTrigger

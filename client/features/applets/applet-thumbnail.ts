@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 
 import { useAppletThumbnailRecords, useSaveAppletThumbnails } from '@/client/features/applets/api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
+import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { AppletKind, AppletThumbnail, AppletThumbnailUpdate } from '@/lib/types'
 
 export const THUMBNAIL_MAX_EDGE = 1_000
@@ -239,12 +240,9 @@ export function useAppletThumbnails({ kind, enabled, targets }: UseAppletThumbna
   const workspaceId = useWorkspaceId()
   const records = useAppletThumbnailRecords(workspaceId).data
   const save = useSaveAppletThumbnails(workspaceId)
-  const targetsRef = useRef(targets)
-  targetsRef.current = targets
-  const recordsRef = useRef(records ?? [])
-  recordsRef.current = records ?? []
-  const saveRef = useRef(save.mutate)
-  saveRef.current = save.mutate
+  const targetsRef = useLatestRef(targets)
+  const recordsRef = useLatestRef(records ?? [])
+  const saveRef = useLatestRef(save.mutate)
   const targetKey = targets.map(target => `${target.id}@${target.revision ?? ''}`).join('\n')
   // Hold the first pass until the stored records arrive — capturing against an
   // unloaded store would re-screenshot everything on every page load.
@@ -291,5 +289,5 @@ export function useAppletThumbnails({ kind, enabled, targets }: UseAppletThumbna
       if (timer !== undefined) clearTimeout(timer)
       document.removeEventListener('visibilitychange', schedule)
     }
-  }, [enabled, kind, ready, targetKey])
+  }, [enabled, kind, ready, recordsRef, saveRef, targetKey, targetsRef])
 }

@@ -66,8 +66,7 @@ export function useChat(address: WorkspaceTabAddress) {
   const activity = useLive(s =>
     selectedSessionId ? (s.activity[`${workspaceId}:${selectedSessionId}`] ?? 'idle') : 'idle'
   )
-  // Only `running` shows the loader/Stop. `requires-action` (agent blocked on
-  // user input) deliberately renders like idle until it gets its own UI.
+  // Only running shows the loader/Stop.
   const processing = isRunningActivity(activity)
   const error = useLive(s =>
     selectedSessionId ? (s.errors[`${workspaceId}:${selectedSessionId}`] ?? null) : null
@@ -138,12 +137,10 @@ export function useChat(address: WorkspaceTabAddress) {
         parts
       })
 
-      // The session's persisted choice (workspace defaults for a new chat). Drop a
-      // model the loaded list no longer offers (stale alias) so the SDK doesn't
-      // reject model_not_found. Drop an effort the resolved model doesn't
-      // support and explicitly disable Fast mode on a known unsupported model.
-      // When the model is unknown/default we can't validate either capability,
-      // so pass the stored choices through.
+      // Resolve the session/workspace choice against the catalog. Codex sends
+      // the picker's concrete model even for an implicit or stale selection;
+      // otherwise its config or resumed thread can choose a different model.
+      // Validate effort and Fast mode against that same resolved row.
       const pickedModel = sessionConfig?.model ?? layout.selectedModel
       const pickedEffort = sessionConfig?.effort ?? layout.selectedEffort
       const pickedFastMode = sessionConfig?.fastMode ?? layout.selectedFastMode

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { IconVersions } from '@tabler/icons-react'
 import {
@@ -21,6 +21,11 @@ export type ScratchpadSkew = {
   newer: boolean
   writer?: ScratchpadWriter
   detail: string
+}
+
+type SnapshotResult = {
+  snapshot?: TLEditorSnapshot['document']
+  skew: ScratchpadSkew | null
 }
 
 let runtimeSchemaCache: TLStore['schema'] | null = null
@@ -54,35 +59,40 @@ export function useScratchpadSnapshot(workspaceId: string): {
   skew: ScratchpadSkew | null
   flagSkew: (skew: ScratchpadSkew) => void
 } {
-  const [loaded, setLoaded] = useState(false)
-  const [skew, setSkew] = useState<ScratchpadSkew | null>(null)
-  const snapshot = useRef<TLEditorSnapshot['document'] | undefined>(undefined)
+  const [result, setResult] = useState<SnapshotResult | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    setLoaded(false)
-    setSkew(null)
-    snapshot.current = undefined
     fetch(`/api/workspaces/${workspaceId}/scratchpad`)
       .then(response => response.json())
       .then((data: ScratchpadFetch) => {
         if (cancelled) return
+        let snapshot: TLEditorSnapshot['document'] | undefined
+        let skew: ScratchpadSkew | null = null
         if (data?.document) {
-          const found = detectScratchpadSkew(data.document, data.writer)
-          if (found) setSkew(found)
-          else snapshot.current = data.document
+          skew = detectScratchpadSkew(data.document, data.writer)
+          if (!skew) snapshot = data.document
         }
-        setLoaded(true)
+        setResult({ snapshot, skew })
       })
       .catch(() => {
-        if (!cancelled) setLoaded(true)
+        if (!cancelled) setResult({ skew: null })
       })
     return () => {
       cancelled = true
     }
   }, [workspaceId])
 
-  return { loaded, snapshot: snapshot.current, skew, flagSkew: setSkew }
+  const flagSkew = useCallback((skew: ScratchpadSkew) => {
+    setResult(previous => ({ snapshot: previous?.snapshot, skew }))
+  }, [])
+
+  return {
+    loaded: result !== null,
+    snapshot: result?.snapshot,
+    skew: result?.skew ?? null,
+    flagSkew
+  }
 }
 
 export function ScratchpadSkewNotice({ skew }: { skew: ScratchpadSkew }) {

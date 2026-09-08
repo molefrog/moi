@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 
 import { toast } from '@/client/components/ui/toast'
+import { useLatestRef } from '@/client/lib/use-latest-ref'
 import { useUiStore } from '@/client/store/ui'
 import type { ViewBuilder } from '@/lib/types'
 
@@ -16,10 +17,8 @@ type UseViewBuilderDraftsOptions = {
 // cleanup when a builder leaves its draft state.
 export function useViewBuilderDrafts({ builders, onSave }: UseViewBuilderDraftsOptions) {
   const timersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>())
-  const buildersRef = useRef(builders)
-  const onSaveRef = useRef(onSave)
-  buildersRef.current = builders
-  onSaveRef.current = onSave
+  const buildersRef = useLatestRef(builders)
+  const onSaveRef = useLatestRef(onSave)
 
   const clear = useCallback((builderId: string) => {
     const timer = timersRef.current.get(builderId)
@@ -28,22 +27,25 @@ export function useViewBuilderDrafts({ builders, onSave }: UseViewBuilderDraftsO
     useUiStore.getState().setViewBuilderDraft(builderId, null)
   }, [])
 
-  const change = useCallback((builderId: string, value: string) => {
-    useUiStore.getState().setViewBuilderDraft(builderId, value)
-    const existing = timersRef.current.get(builderId)
-    if (existing) clearTimeout(existing)
-    timersRef.current.set(
-      builderId,
-      setTimeout(() => {
-        timersRef.current.delete(builderId)
-        const builder = buildersRef.current.find(candidate => candidate.id === builderId)
-        if (!builder || builder.status !== 'draft') return
-        void onSaveRef.current(builderId, value).catch(() => {
-          toast.add({ title: 'Couldn’t save view description', type: 'error' })
-        })
-      }, 500)
-    )
-  }, [])
+  const change = useCallback(
+    (builderId: string, value: string) => {
+      useUiStore.getState().setViewBuilderDraft(builderId, value)
+      const existing = timersRef.current.get(builderId)
+      if (existing) clearTimeout(existing)
+      timersRef.current.set(
+        builderId,
+        setTimeout(() => {
+          timersRef.current.delete(builderId)
+          const builder = buildersRef.current.find(candidate => candidate.id === builderId)
+          if (!builder || builder.status !== 'draft') return
+          void onSaveRef.current(builderId, value).catch(() => {
+            toast.add({ title: 'Couldn’t save view description', type: 'error' })
+          })
+        }, 500)
+      )
+    },
+    [buildersRef, onSaveRef]
+  )
 
   // Drop drafts for builders that left draft status through any path (submit
   // from another surface, server-side transition). Builders absent from the

@@ -187,6 +187,10 @@ const MAX_IMAGE_DIMENSION = 2048
 // docs/moi-scratchpad.md.
 export function Scratchpad() {
   const workspaceId = useWorkspaceId()
+  return <WorkspaceScratchpad key={workspaceId} workspaceId={workspaceId} />
+}
+
+function WorkspaceScratchpad({ workspaceId }: { workspaceId: string }) {
   const editorRef = useRef<Editor | null>(null)
   // The whole scratchpad region (canvas + tool bar + style bar). Focus is driven
   // off whether a pointerdown lands inside this, so clicking a tool keeps the
@@ -201,14 +205,9 @@ export function Scratchpad() {
   // Reactive handle to the mounted editor, used to render the custom tool bar.
   const [editor, setEditor] = useState<Editor | null>(null)
   const { loaded, snapshot, skew, flagSkew } = useScratchpadSnapshot(workspaceId)
-  // Stable identity per workspace, held in a ref rather than useMemo (which React
-  // may discard): a fresh `assets` identity makes <Tldraw> rebuild its store and
-  // remount the editor, dropping unsaved edits and resetting the camera.
-  const assetStoreRef = useRef<{ id: string; store: TLAssetStore } | null>(null)
-  if (assetStoreRef.current?.id !== workspaceId) {
-    assetStoreRef.current = { id: workspaceId, store: makeAssetStore(workspaceId) }
-  }
-  const assetStore = assetStoreRef.current.store
+  // This keyed component gives each workspace one stable asset store. A fresh
+  // identity makes <Tldraw> remount the editor and drop unsaved edits.
+  const [assetStore] = useState<TLAssetStore>(() => makeAssetStore(workspaceId))
 
   const save = useCallback(() => {
     const editor = editorRef.current

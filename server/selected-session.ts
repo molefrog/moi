@@ -13,9 +13,21 @@ export type SelectedSessionUpdate = {
 export const DEFAULT_SELECTED_SESSION_PATH = join(DATA_DIR, 'selected-sessions.json')
 
 let storePath = DEFAULT_SELECTED_SESSION_PATH
+const renamedSessions = new Map<string, Map<string, string>>()
 
 export function setSelectedSessionPath(path: string): void {
   storePath = path
+  renamedSessions.clear()
+}
+
+function rememberSessionRename(workspacePath: string, from: string, to: string): void {
+  const renames = renamedSessions.get(workspacePath) ?? new Map<string, string>()
+  renames.set(from, to)
+  renamedSessions.set(workspacePath, renames)
+}
+
+function resolveRenamedSession(workspacePath: string, sessionId: string): string {
+  return renamedSessions.get(workspacePath)?.get(sessionId) ?? sessionId
 }
 
 async function readStore(): Promise<Store> {
@@ -84,14 +96,21 @@ export async function saveSelectedSession(
     const current = Object.prototype.hasOwnProperty.call(store, workspacePath)
       ? store[workspacePath]
       : undefined
-    if (previousSessionId !== undefined && current !== previousSessionId) {
+    const resolvedSessionId =
+      sessionId === null ? null : resolveRenamedSession(workspacePath, sessionId)
+    const resolvedPreviousSessionId =
+      previousSessionId == null
+        ? previousSessionId
+        : resolveRenamedSession(workspacePath, previousSessionId)
+
+    if (resolvedPreviousSessionId !== undefined && current !== resolvedPreviousSessionId) {
       return { changed: false, sessionId: current ?? null }
     }
-    if (current === sessionId) return { changed: false, sessionId }
+    if (current === resolvedSessionId) return { changed: false, sessionId: resolvedSessionId }
 
-    store[workspacePath] = sessionId
+    store[workspacePath] = resolvedSessionId
     await writeStore(store)
-    return { changed: true, sessionId }
+    return { changed: true, sessionId: resolvedSessionId }
   })
 }
 
@@ -102,6 +121,7 @@ export async function renameSelectedSession(
 ): Promise<SelectedSessionUpdate> {
   if (from === to) return { changed: false, sessionId: to }
   return locked(async () => {
+    rememberSessionRename(workspacePath, from, to)
     const store = await readStore()
     const current = Object.prototype.hasOwnProperty.call(store, workspacePath)
       ? store[workspacePath]

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
 import { AnimatePresence } from 'motion/react'
 
@@ -268,7 +268,13 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   const canAnnotate =
     widgetMode === 'idle' &&
     ((activeTab === 'overview' && hasAppletWidgets) || activeView !== undefined)
-  const annotation = useChatAnnotation({
+  const {
+    controls: annotationControls,
+    docked: dockedAnnotation,
+    layerProps: annotationLayerProps,
+    popup: popupAnnotation,
+    targetRef: annotationTargetRef
+  } = useChatAnnotation({
     workspaceId,
     sessionId,
     activeTab,
@@ -495,22 +501,37 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     }
   ]
 
+  const changeBuilderDraft = useCallback(
+    (value: string) => {
+      if (activeDraftBuilder) builderDrafts.change(activeDraftBuilder.id, value)
+    },
+    [activeDraftBuilder, builderDrafts]
+  )
+  const removeBuilderDrawing = useCallback(() => {
+    if (activeDraftBuilder) {
+      void builderRefs.current.get(activeDraftBuilder.id)?.resetSketch()
+    }
+  }, [activeDraftBuilder])
+  const submitBuilderDraft = useCallback(
+    async (value: string) => {
+      if (!activeDraftBuilder) return
+      const builderView = builderRefs.current.get(activeDraftBuilder.id)
+      await builderView?.prepareSketchForSend()
+      await builderActions.submit(activeDraftBuilder, value)
+      // Submit clears the sent attachment. Keep the canvas until the built view replaces it.
+      builderDrafts.clear(activeDraftBuilder.id)
+    },
+    [activeDraftBuilder, builderActions, builderDrafts]
+  )
+
   const builderChatDraft = activeDraftBuilder
     ? {
         sessionId: activeDraftBuilder.sessionId,
         builderId: activeDraftBuilder.id,
         initialValue: activeDraftBuilder.input.requirements,
-        onChange: (value: string) => builderDrafts.change(activeDraftBuilder.id, value),
-        onRemoveDrawing: () => {
-          void builderRefs.current.get(activeDraftBuilder.id)?.resetSketch()
-        },
-        onSubmit: async (value: string) => {
-          const builderView = builderRefs.current.get(activeDraftBuilder.id)
-          await builderView?.prepareSketchForSend()
-          await builderActions.submit(activeDraftBuilder, value)
-          // Submit clears the sent attachment. Keep the canvas until the built view replaces it.
-          builderDrafts.clear(activeDraftBuilder.id)
-        }
+        onChange: changeBuilderDraft,
+        onRemoveDrawing: removeBuilderDrawing,
+        onSubmit: submitBuilderDraft
       }
     : undefined
 
@@ -526,13 +547,13 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       previewTurn={previewTurn}
       sessionId={sessionId}
       processing={processing}
-      composerBanner={builderChatDraft ? builderComposerBanner : composerBanner}
+      composerBanner={activeDraftBuilder ? builderComposerBanner : composerBanner}
       agentAvailability={agentAvailability}
       send={send}
       stop={stop}
       onNavigateFromWelcome={navigateFromWelcome}
       onClose={() => setMode('fullscreen')}
-      annotation={annotation.docked}
+      annotation={dockedAnnotation}
       builderDraft={builderChatDraft}
       docked
     />
@@ -565,9 +586,9 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     >
       <div className="relative flex min-h-0 flex-1">
         <div
-          ref={annotation.targetRef}
-          inert={annotation.controls.active || undefined}
-          aria-hidden={annotation.controls.active || undefined}
+          ref={annotationTargetRef}
+          inert={annotationControls.active || undefined}
+          aria-hidden={annotationControls.active || undefined}
           className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background transition-colors duration-100 ease-out motion-reduce:transition-none"
         >
           {activeTab === 'agent' ? (
@@ -628,12 +649,12 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
           <ViewManager views={views} activeViewId={activeView?.id ?? null} params={appletParams} />
         </div>
 
-        <DrawingLayer {...annotation.layerProps}>
+        <DrawingLayer {...annotationLayerProps}>
           <DrawingToolbar
-            controls={annotation.controls}
+            controls={annotationControls}
             title="Draw annotation"
-            busy={annotation.controls.finishing}
-            onComplete={() => void annotation.controls.finish()}
+            busy={annotationControls.finishing}
+            onComplete={() => void annotationControls.finish()}
           />
         </DrawingLayer>
       </div>
@@ -727,13 +748,13 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
               previewTurn={previewTurn}
               sessionId={sessionId}
               processing={processing}
-              composerBanner={builderChatDraft ? builderComposerBanner : composerBanner}
+              composerBanner={activeDraftBuilder ? builderComposerBanner : composerBanner}
               agentAvailability={agentAvailability}
               send={send}
               stop={stop}
               onNavigateFromWelcome={navigateFromWelcome}
               onClose={onClose}
-              annotation={annotation.popup}
+              annotation={popupAnnotation}
               builderDraft={builderChatDraft}
             />
           )}

@@ -31,7 +31,7 @@ export function WorkspaceSplitLayout({
   const transitionFrameRef = useRef<number | null>(null)
   const [transitionsEnabled, setTransitionsEnabled] = useState(false)
   const openChatWidth = Math.min(Math.max(chatWidth, chatMinWidth), chatMaxWidth)
-  const defaultChatSize = useRef(open ? openChatWidth : 0).current
+  const [defaultChatSize] = useState(() => (open ? openChatWidth : 0))
 
   useLayoutEffect(() => {
     const chatPanel = chatPanelRef.current

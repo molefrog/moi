@@ -13,7 +13,7 @@
 // because both builds share the slot's style tag (see ViewSlot), and it is
 // worth the 200ms — it is the only signal that the thing under your cursor just
 // changed underneath you.
-import { Activity, type ComponentType, memo, useCallback, useEffect, useRef, useState } from 'react'
+import { Activity, type ComponentType, memo, useCallback, useEffect, useState } from 'react'
 
 import { Spinner } from '@/client/components/ui/spinner'
 import { appletScope, appletStyleKey } from '@/client/features/applets/applet-cache'
@@ -27,6 +27,7 @@ import {
 import { WidgetErrorBoundary } from '@/client/features/applets/WidgetErrorBoundary'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
+import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { ViewInfo } from '@/lib/types'
 
 import {
@@ -88,8 +89,7 @@ function useResidentViews(activeId: string | null, views: ViewInfo[]): ResidentV
   // A workspace refetch hands us a new array on every event; residency only
   // cares whether a view appeared or disappeared. So the effect keys off the id
   // set, and the reconcile reads the current list through the ref.
-  const viewsRef = useRef(views)
-  viewsRef.current = views
+  const viewsRef = useLatestRef(views)
   const availableIds = views.map(view => view.id).join('\n')
 
   const reconcile = useCallback(() => {
@@ -101,7 +101,7 @@ function useResidentViews(activeId: string | null, views: ViewInfo[]): ResidentV
       })
       return sameResidents(current, next) ? current : next
     })
-  }, [activeId])
+  }, [activeId, viewsRef])
 
   // Promote the view the user switched to, and release the one it replaced.
   useEffect(() => {

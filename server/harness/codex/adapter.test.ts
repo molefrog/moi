@@ -6,6 +6,8 @@ import {
   codexItemToNotice,
   codexItemToTurn,
   codexModelToModel,
+  codexModelsToModels,
+  codexMcpServerToServer,
   codexServiceTierForFastMode,
   codexThreadToEvents,
   codexThreadToSessionInfo,
@@ -13,6 +15,87 @@ import {
 } from './adapter'
 
 const THREAD = 'thread-1'
+
+test('current service tiers take precedence over deprecated speed tiers', () => {
+  const model = { id: 'm', model: 'm', displayName: 'M', additionalSpeedTiers: ['fast'] }
+  expect(codexModelToModel(model).supportsFastMode).toBe(true)
+  expect(codexModelToModel({ ...model, serviceTiers: [] }).supportsFastMode).toBeUndefined()
+})
+
+test('MCP connection state reflects runtime health instead of merely authentication', () => {
+  for (const [runtimeStatus, expected] of Object.entries({
+    connected: 'connected',
+    failed: 'failed',
+    cancelled: 'failed',
+    disabled: 'disabled',
+    starting: 'pending',
+    notStarted: 'pending',
+    authenticationRequired: 'needs-auth'
+  } as const)) {
+    expect(codexMcpServerToServer({ name: 'mcp', authStatus: 'oAuth', runtimeStatus }).status).toBe(
+      expected
+    )
+  }
+  expect(codexMcpServerToServer({ name: 'old', authStatus: 'notLoggedIn' }).status).toBe(
+    'needs-auth'
+  )
+  expect(codexMcpServerToServer({ name: 'old', authStatus: 'oAuth' }).status).toBe('pending')
+})
+
+test('web items retain query, opened URL and in-page pattern', () => {
+  for (const [action, expected] of [
+    [{ type: 'search', query: 'protocol' }, { query: 'protocol' }],
+    [{ type: 'openPage', url: 'https://example.com' }, { url: 'https://example.com' }],
+    [
+      { type: 'findInPage', url: 'https://example.com', pattern: 'word' },
+      { url: 'https://example.com', pattern: 'word' }
+    ]
+  ] as const) {
+    const part = codexItemToTurn({ type: 'webSearch', id: 'web', action }, THREAD)?.parts[0]
+    expect(part?.type === 'tool-call' && part.call.input).toMatchObject(expected)
+  }
+})
+
+test('Codex picker defaults follow configured model, effort and service tier', () => {
+  const models = [
+    {
+      id: 'first',
+      model: 'first',
+      displayName: 'First',
+      isDefault: true,
+      defaultReasoningEffort: 'low',
+      supportedReasoningEfforts: [{ reasoningEffort: 'low' }, { reasoningEffort: 'high' }]
+    },
+    {
+      id: 'second',
+      model: 'second',
+      displayName: 'Second',
+      defaultReasoningEffort: 'low',
+      supportedReasoningEfforts: [{ reasoningEffort: 'low' }, { reasoningEffort: 'high' }],
+      serviceTiers: [{ id: 'priority', name: 'Fast', description: 'More usage' }]
+    }
+  ]
+  const rows = codexModelsToModels(models, {
+    model: 'second',
+    model_reasoning_effort: 'high',
+    service_tier: 'priority'
+  })
+  expect(rows[0]).toMatchObject({
+    value: 'default',
+    resolvedModel: 'second',
+    defaultEffort: 'high',
+    defaultFastMode: true
+  })
+  expect(rows[1].defaultEffort).toBe('high')
+  expect(codexModelsToModels(models, {})[0]).toMatchObject({
+    resolvedModel: 'first',
+    defaultEffort: 'low'
+  })
+  expect(codexModelsToModels(models, { model: 'unavailable-model' })[0]).toMatchObject({
+    value: 'default',
+    resolvedModel: 'first'
+  })
+})
 
 describe('codexItemToTurn', () => {
   test('userMessage uses clientId as turn id when present', () => {
@@ -378,6 +461,7 @@ describe('discovery mappings', () => {
       displayName: '5.6 Sol',
       description: '5.6 Sol · Latest frontier model.',
       supportsEffort: true,
+      defaultEffort: 'low',
       supportedEffortLevels: ['low', 'high']
     })
   })

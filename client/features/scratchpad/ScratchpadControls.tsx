@@ -418,7 +418,6 @@ export function ScratchStyleBar({ editor }: ScratchStyleBarProps) {
   const [state, setState] = useState<StyleBarState>(() => readStyleBarState(editor))
 
   useEffect(() => {
-    setState(readStyleBarState(editor))
     return react('scratch styles', () => setState(readStyleBarState(editor)))
   }, [editor])
 

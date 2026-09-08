@@ -60,7 +60,7 @@ function Slider({
             data-slot="slider-thumb"
             key={index}
             className={cn(
-              'relative block size-3 shrink-0 rounded-xs bg-primary-foreground shadow-xs ring-ring/50 select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50 data-horizontal:cursor-ew-resize data-vertical:cursor-ns-resize',
+              'relative block size-3 shrink-0 rounded-xs bg-white shadow-xs ring-ring/50 select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50 data-horizontal:cursor-ew-resize data-vertical:cursor-ns-resize',
               animate &&
                 animationReady &&
                 'transition-[inset-inline-start,bottom,color,box-shadow] duration-100 ease-in-out'

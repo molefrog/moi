@@ -41,7 +41,6 @@ describe('chatNoticeLabel', () => {
   test('every other kind is skipped', () => {
     const skipped: SystemNotice[] = [
       { id: 'a', kind: 'rate-limit', at: 't' },
-      { id: 'b', kind: 'api-retry', at: 't', attempt: 1, maxRetries: 3, delayMs: 100 },
       {
         id: 'c',
         kind: 'hook',
@@ -56,6 +55,12 @@ describe('chatNoticeLabel', () => {
       { id: 'f', kind: 'elicitation', at: 't', server: 's', elicitationId: 'e1' }
     ]
     for (const notice of skipped) expect(chatNoticeLabel(notice)).toBe(null)
+  })
+
+  test('shows provider retries', () => {
+    expect(
+      chatNoticeLabel({ id: 'retry', kind: 'api-retry', at: 't', error: 'Reconnecting' })
+    ).toBe('Retrying: Reconnecting')
   })
 })
 
@@ -102,10 +107,7 @@ describe('interleaveNotices', () => {
     expect(keys(items)).toEqual(['t1', 't2b', 'notice:n1', 't3'])
   })
 
-  // Known limitation, not a desired property: with nothing to compare against
-  // the notice can only go last. Correct while live (compaction happens at the
-  // conversation's current end) but it drifts on replay. Codex transcripts are
-  // entirely undated today — see the note on interleaveNotices.
+  // Without timestamp anchors, chronological placement cannot be recovered.
   test('all turns undated → notices go after the last turn', () => {
     const items = interleaveNotices([turn('a'), turn('b')], [compact('n1', '2026-08-04T10:30:00Z')])
     expect(keys(items)).toEqual(['a', 'b', 'notice:n1'])

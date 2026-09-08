@@ -112,9 +112,7 @@ export type LivePreview = {
 }
 
 export type LiveStore = {
-  // Per-session activity mirrored from server `status` frames. Only `running`
-  // shows the loader/Stop; `requires-action` is tracked but not rendered yet.
-  // Missing key = idle.
+  // Per-session activity mirrored from server `status` frames. Missing key = idle.
   activity: Record<string, SessionActivity>
   errors: Record<string, string | null>
   // Live token-streaming previews, keyed by `messageId` (the API `msg_...` id)

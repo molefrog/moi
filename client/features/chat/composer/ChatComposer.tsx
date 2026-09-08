@@ -23,6 +23,7 @@ import { stageComposerFiles } from '@/client/features/chat/attachment-staging'
 import { cn } from '@/client/lib/cn'
 import type { AgentAvailability } from '@/client/lib/agent-availability'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
+import { useLatestRef } from '@/client/lib/use-latest-ref'
 import {
   type ChatAttachment,
   attachmentKey,
@@ -87,8 +88,7 @@ export function ChatComposer({
   const workspaceDraft = useUiStore(s => s.composerDrafts[workspaceId] ?? '')
   const builderDraft = useUiStore(s => (draft ? (s.viewBuilderDrafts ?? {})[draft.id] : undefined))
   const value = draft ? (builderDraft ?? draft.initialValue) : workspaceDraft
-  const valueRef = useRef(value)
-  valueRef.current = value
+  const valueRef = useLatestRef(value)
   const attachments = useLive(s => s.attachments[attachmentKey(workspaceId, sessionId)] ?? EMPTY)
   const [dragOver, setDragOver] = useState(false)
 

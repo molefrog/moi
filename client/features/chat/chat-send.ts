@@ -2,6 +2,7 @@ import type { QueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { attachmentKey, type ChatAttachment, liveStore } from '@/client/features/chat/chat-store'
+import { resolveSelectedModel } from '@/client/features/chat/composer/model-order'
 import type { MoiUserMessageOptions } from '@/client/features/workspace/moi-context'
 import { STREAM_RESPONSES } from '@/client/lib/flags'
 import { formatChatTitle } from '@/lib/chat-title'
@@ -148,11 +149,21 @@ export function resolveChatRunOptions(
   pickedFastMode?: boolean
 ): { model?: string; effort?: string; fastMode?: boolean; stream?: true } {
   const models = modelsData?.models
-  const model =
+  const savedModel =
     !pickedModel || !models || models.some(candidate => candidate.value === pickedModel)
       ? pickedModel
       : undefined
-  const modelInfo = models?.find(candidate => candidate.value === model)
+  const modelInfo =
+    modelsData?.provider === 'codex'
+      ? resolveSelectedModel(modelsData.models, pickedModel)
+      : models?.find(candidate => candidate.value === (savedModel ?? 'default'))
+  // Omitting Codex's model inherits config.toml (or the resumed thread's
+  // model), which can be unavailable even though the picker shows a supported
+  // fallback. Always send the concrete model the Codex picker displays.
+  const model =
+    modelsData?.provider === 'codex' && modelInfo
+      ? (modelInfo.resolvedModel ?? modelInfo.value)
+      : savedModel
   const effort =
     pickedEffort && (!modelInfo || (modelInfo.supportedEffortLevels ?? []).includes(pickedEffort))
       ? pickedEffort

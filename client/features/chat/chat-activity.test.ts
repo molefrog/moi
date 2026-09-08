@@ -119,6 +119,19 @@ describe('status frames', () => {
     handleFrame({ kind: 'stopped', workspaceId: WS, sessionId: SID })
     expect(activityOf()).toBe('idle')
   })
+
+  test('a failed steer records the error while keeping the current run stoppable', () => {
+    handleFrame({ type: 'status', workspaceId: WS, sessionId: SID, activity: 'running' })
+    handleFrame({
+      kind: 'error',
+      workspaceId: WS,
+      sessionId: SID,
+      content: 'Steer timed out',
+      terminal: false
+    })
+    expect(activityOf()).toBe('running')
+    expect(liveStore.getState().errors[`${WS}:${SID}`]).toBe('Steer timed out')
+  })
 })
 
 describe('status_snapshot reconcile', () => {

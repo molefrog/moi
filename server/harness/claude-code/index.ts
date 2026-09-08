@@ -9,7 +9,7 @@ import { findHarnessExecutable, pathHarnessAvailability } from '../executable'
 import { getClaudeAuthReadiness, startClaudeLogin } from './auth'
 import { isLinkedGitWorktree } from './git-worktree'
 import { getMcpStatus } from './mcp'
-import { getClaudeModels } from './models'
+import { getClaudeModels, lastProbedClaudeCli, onClaudeCliChanged } from './models'
 import {
   SESSION_LIMITS,
   getCCDebugSnapshot,
@@ -17,6 +17,7 @@ import {
   interruptCCSession,
   killAllCCSessions,
   restartWorkspaceSessions,
+  retireCCSessionsOnCliChange,
   sendCCMessage
 } from './session'
 import {
@@ -73,13 +74,17 @@ async function discoverWorkspaces(
   }
 }
 
+// Keep future sends on the CLI version that supplied the model catalog.
+// Active turns and background work finish before the dispatcher replaces it.
+onClaudeCliChanged(() => retireCCSessionsOnCliChange())
+
 export const claudeCodeHarness: Harness = {
   id: 'claude-code',
   capabilities: {
     supportsStreaming: true,
     imagesInline: 'base64',
     liveModelSwitch: true,
-    liveEffortSwitch: false, // construct-time; session.ts drains + rebuilds
+    liveEffortSwitch: true,
     nativeUserEcho: false // streaming-input never echoes; the server synthesizes the turn
   },
 
@@ -111,7 +116,8 @@ export const claudeCodeHarness: Harness = {
     const cc = getCCDebugSnapshot()
     const busy = cc.sessions.filter(s => s.activity !== 'idle').length
     const lines = [
-      `claude executable  ${findHarnessExecutable('claude-code') ?? '(not found)'}`,
+      `claude executable  ${findHarnessExecutable('claude-code') ?? '(not found)'}` +
+        `  (${lastProbedClaudeCli()?.version ?? 'version not probed yet'})`,
       `live CC sessions  ${cc.sessions.length}/${SESSION_LIMITS.maxLive}  ` +
         `(${busy} busy, ${cc.sessions.length - busy} idle, ${cc.aliases} alias${cc.aliases === 1 ? '' : 'es'}, ` +
         `idle TTL ${fmtDuration(SESSION_LIMITS.idleTtlMs)})`
@@ -146,8 +152,8 @@ export const claudeCodeHarness: Harness = {
         `lastActivity=${fmtAgo(s.lastActivityAt, now)}`
       ]
       if (s.bgTasks > 0) bits.push(`bgTasks=${s.bgTasks}`)
-      if (s.desiredEffort !== s.effort) bits.push(`desiredEffort=${s.desiredEffort ?? 'default'}`)
-      if (s.desiredStream !== s.stream) bits.push(`desiredStream=${s.desiredStream ? 'on' : 'off'}`)
+      if (s.queuedMessages > 0) bits.push(`queued=${s.queuedMessages}`)
+      if (s.staleCli) bits.push('CLI update pending')
       if (s.activity === 'idle' && !s.hasIdleTimer) bits.push('(no idle timer)')
       let line = '  ' + bits.join('  ')
       if (s.lastUserText) line += `\n      last: ${JSON.stringify(s.lastUserText)}`

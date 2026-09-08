@@ -38,9 +38,7 @@ export function codexAccountReadiness(response: unknown): HarnessAvailability {
   return CODEX_AVAILABLE
 }
 
-// Servers older than the supported floor reject every method moi calls with a
-// bare "Invalid request", which the probe would surface as a generic failure —
-// report the actionable cause instead.
+// Report a known protocol-version mismatch before making the account probe.
 export function codexOutdatedAvailability(
   cliVersion: string | undefined
 ): HarnessAvailability | undefined {

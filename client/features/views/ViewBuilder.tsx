@@ -155,14 +155,15 @@ type ViewBuilderDraftStateProps = {
 }
 
 function ViewBuilderDraftState({ chatDocked, sketch }: ViewBuilderDraftStateProps) {
-  const { hasStrokes } = useDrawingHistoryState(sketch.controls)
+  const { controls, targetRef } = sketch
+  const { hasStrokes } = useDrawingHistoryState(controls)
 
   return (
     <div
-      ref={sketch.targetRef}
+      ref={targetRef}
       className="absolute inset-0 flex items-center justify-center texture-checker-20"
     >
-      {!sketch.controls.active && !hasStrokes && (
+      {!controls.active && !hasStrokes && (
         <div
           className={cn(
             'mb-4 flex h-full flex-col items-center justify-center gap-2 p-12 text-center text-sm text-muted-foreground',

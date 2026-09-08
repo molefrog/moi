@@ -1,20 +1,6 @@
-// Per-(workspaceId, sessionId) live Codex session adapter.
-//
-// One `codex app-server` process per workspace (see codex.ts) serves every
-// thread in it; this module owns the per-thread state: the durable in-memory
-// view, turn accounting for the processing spinner, and the mapping of
-// `item/*` notifications onto our `StreamEvent`s.
-//
-// Lifecycle notes:
-//   - A brand-new thread is created under the client's temporary uuid, then
-//     renamed to the Codex thread id (`session_renamed`) — same flow as the
-//     Claude Code and OpenClaw paths.
-//   - The app-server persists threads in ~/.codex/sessions and unloads idle
-//     ones itself, so there is no eviction machinery here; a cold send
-//     re-seeds via `thread/resume`.
-//   - Codex natively echoes the user message back with our
-//     `clientUserMessageId` as `clientId`, so the optimistic-id rendezvous is
-//     first-class (no text matching like OpenClaw needs).
+// Live state per (workspaceId, sessionId): display history, native lifecycle,
+// and previews. client.ts owns the shared workspace process;
+// Codex owns durable history. See NOTES.md for ordering and recovery rules.
 import { appendAttachmentNote } from '@/lib/attachment-note'
 import { buildSessionTitleSource } from '../session-title'
 import {
@@ -38,7 +24,14 @@ import {
   codexThreadToEvents,
   withCodexTurnDuration
 } from './adapter'
-import { type CodexClient, getCodexClient, interruptCodexTurn, readSubagentRecords } from './client'
+import {
+  type CodexClient,
+  getCodexClient,
+  getCodexModelCatalog,
+  interruptCodexTurn,
+  readSubagentRecords
+} from './client'
+import { CodexRpcError } from './transport'
 import {
   CODEX_LOCAL_CONTROL_CONTEXT,
   CODEX_LOCAL_CONTROL_FALLBACK,
@@ -70,12 +63,17 @@ type ChildThread = {
 }
 
 type SessionRecord = {
+  client: CodexClient
+  lastTouched: number
   workspaceId: string
   workspacePath: string
   sessionId: string // real Codex thread id once known (rekeyed on rename)
   view: ViewState
   activeTurnId: string | null
   processing: boolean
+  waiting: boolean
+  activity: SessionActivity
+  model?: string
   // Live token streaming opt-in from the latest chat frame. Codex always
   // streams deltas; this gates whether we forward them as preview frames.
   stream: boolean
@@ -84,6 +82,13 @@ type SessionRecord = {
   // Usage from `thread/tokenUsage/updated`, folded into the last assistant
   // turn when the turn completes.
   lastUsage: CodexTokenUsage | null
+  usageTurnId: string | null
+  completedTurns: Set<string>
+  bufferedNotifications: [string, Record<string, unknown>][] | null
+  previewTimer: Timer | null
+  dirtyPreviews: Set<string>
+  commandOutput: Map<string, string>
+  commandOutputTimer: Timer | null
   // Child agent threads keyed by their thread id (see ChildThread).
   children: Map<string, ChildThread>
   refreshSessionsOnTurnComplete: boolean
@@ -93,8 +98,50 @@ type SessionRecord = {
 }
 
 const sessions = new Map<string, SessionRecord>() // key: `${workspaceId}:${sessionId}`
-// `${workspaceId}:${tempId}` -> real thread id (see cc-session.ts aliases).
+// `${workspaceId}:${tempId}` -> native thread id after session_renamed.
 const aliases = new Map<string, string>()
+const resumes = new Map<string, Promise<SessionRecord>>()
+type SendLane = { tail: Promise<void>; generation: number }
+const sendLanes = new Map<string, SendLane>()
+const SESSION_IDLE_TTL_MS = 30 * 60_000
+
+// The provider keeps durable history. Release transcript copies and listeners
+// from chats that nobody has used recently; opening one subscribes again.
+const evictionTimer = setInterval(() => {
+  const cutoff = Date.now() - SESSION_IDLE_TTL_MS
+  for (const [key, rec] of sessions) {
+    if (
+      rec.lastTouched > cutoff ||
+      rec.processing ||
+      rec.bufferedNotifications ||
+      rec.sessionTitleAbort
+    )
+      continue
+    rec.unsubscribe?.()
+    clearPreviews(rec)
+    sessions.delete(key)
+    const lane = sendLanes.get(key)
+    for (const [laneKey, candidate] of sendLanes) {
+      if (candidate === lane) sendLanes.delete(laneKey)
+    }
+    for (const [alias, sessionId] of aliases) {
+      if (recKey(rec.workspaceId, sessionId) === key && alias.startsWith(`${rec.workspaceId}:`))
+        aliases.delete(alias)
+    }
+    void rec.client.rpc('thread/unsubscribe', { threadId: rec.sessionId }).catch(() => {})
+  }
+}, 60_000)
+evictionTimer.unref()
+
+function sendLane(workspaceId: string, sessionId: string): SendLane {
+  const key = liveKey(workspaceId, sessionId)
+  let lane = sendLanes.get(key)
+  if (!lane) {
+    lane = { tail: Promise.resolve(), generation: 0 }
+    sendLanes.set(key, lane)
+  }
+  return lane
+}
 
 function recKey(workspaceId: string, sessionId: string): string {
   return `${workspaceId}:${sessionId}`
@@ -117,29 +164,76 @@ export type CodexActiveSession = {
 export function getCodexActiveSessions(): CodexActiveSession[] {
   const out: CodexActiveSession[] = []
   for (const s of sessions.values()) {
-    // moi auto-accepts provider approval requests at the transport, so a
-    // session never blocks on approvals; requires-action is not surfaced.
     if (s.processing) {
       out.push({
         workspaceId: s.workspaceId,
         workspacePath: s.workspacePath,
         sessionId: s.sessionId,
-        activity: 'running'
+        activity: sessionActivity(s)
       })
     }
   }
   return out
 }
 
+// The workspace connector panel has no selected-chat parameter. Use the most
+// recently observed loaded chat to obtain runtime health instead of auth alone.
+export function getLatestCodexSessionId(workspaceId: string): string | undefined {
+  let latest: SessionRecord | undefined
+  for (const rec of sessions.values()) {
+    if (
+      rec.workspaceId === workspaceId &&
+      !rec.bufferedNotifications &&
+      (!latest || rec.lastTouched >= latest.lastTouched)
+    )
+      latest = rec
+  }
+  return latest?.sessionId
+}
+
 function setProcessing(rec: SessionRecord, processing: boolean, turnId: string | null) {
   rec.activeTurnId = turnId
-  if (rec.processing === processing) return
   rec.processing = processing
+  if (!processing) rec.waiting = false
+  publishActivity(rec)
+}
+
+function sessionActivity(rec: SessionRecord): SessionActivity {
+  return rec.waiting ? 'requires-action' : rec.processing ? 'running' : 'idle'
+}
+
+function publishActivity(rec: SessionRecord) {
+  const activity = sessionActivity(rec)
+  if (rec.activity === activity) return
+  rec.activity = activity
   broadcast(rec.workspaceId, {
     type: 'status',
     sessionId: rec.sessionId,
-    activity: processing ? 'running' : 'idle'
+    activity
   })
+}
+
+function waitingOnInput(status: CodexThread['status']): boolean {
+  return (
+    status?.type === 'active' &&
+    Boolean(
+      status.activeFlags?.some(
+        flag => flag === 'waitingOnApproval' || flag === 'waitingOnUserInput'
+      )
+    )
+  )
+}
+
+function releaseSession(rec: SessionRecord, reason: string) {
+  flushCommandOutput(rec)
+  clearPreviews(rec)
+  settleTools(rec, reason)
+  setProcessing(rec, false, null)
+  rec.sessionTitleAbort?.abort()
+  rec.sessionTitleAbort = null
+  rec.unsubscribe?.()
+  const key = recKey(rec.workspaceId, rec.sessionId)
+  if (sessions.get(key) === rec) sessions.delete(key)
 }
 
 function emitTurnEvent(rec: SessionRecord, ev: StreamEvent) {
@@ -150,6 +244,9 @@ function emitTurnEvent(rec: SessionRecord, ev: StreamEvent) {
 function ingestItem(rec: SessionRecord, item: CodexThreadItem) {
   const turn = codexItemToTurn(item, rec.sessionId)
   if (turn) {
+    turn.timestamp =
+      rec.view.turns.find(existing => existing.id === turn.id)?.timestamp ??
+      new Date().toISOString()
     // subAgentActivity announces a child agent thread: register it so its
     // item stream (arriving under `agentThreadId`) nests into this card's
     // SubagentRecord, CC-style.
@@ -241,19 +338,105 @@ function forwardPreview(
   const entry = rec.previews.get(itemId) ?? { kind, text: '' }
   entry.text += delta
   rec.previews.set(itemId, entry)
-  broadcast(rec.workspaceId, {
-    type: 'preview',
-    sessionId: rec.sessionId,
-    messageId: itemId,
-    parentToolUseId: null,
-    blocks: [{ index: 0, kind, text: entry.text }]
-  })
+  rec.dirtyPreviews.add(itemId)
+  // Coalesce tokens to reduce repeated cumulative payloads and client updates.
+  rec.previewTimer ??= setTimeout(() => flushPreviews(rec), 40)
+}
+
+function flushPreviews(rec: SessionRecord) {
+  if (rec.previewTimer) clearTimeout(rec.previewTimer)
+  rec.previewTimer = null
+  for (const itemId of rec.dirtyPreviews) {
+    const entry = rec.previews.get(itemId)
+    if (!entry) continue
+    broadcast(rec.workspaceId, {
+      type: 'preview',
+      sessionId: rec.sessionId,
+      messageId: itemId,
+      parentToolUseId: null,
+      blocks: [{ index: 0, kind: entry.kind, text: entry.text }]
+    })
+  }
+  rec.dirtyPreviews.clear()
+}
+
+function clearPreviews(rec: SessionRecord) {
+  if (rec.previewTimer) clearTimeout(rec.previewTimer)
+  rec.previewTimer = null
+  rec.dirtyPreviews.clear()
+  rec.previews.clear()
+}
+
+const LIVE_OUTPUT_LIMIT = 64 * 1024
+
+function flushCommandOutput(rec: SessionRecord) {
+  if (rec.commandOutputTimer) clearTimeout(rec.commandOutputTimer)
+  rec.commandOutputTimer = null
+  for (const [itemId, delta] of rec.commandOutput) {
+    const owner = rec.view.turns.find(turn =>
+      turn.parts.some(
+        part =>
+          part.type === 'tool-call' &&
+          part.call.toolCallId === itemId &&
+          part.call.name === 'exec' &&
+          part.call.state === 'running'
+      )
+    )
+    if (!owner) continue
+    const parts = owner.parts.map(part => {
+      if (
+        part.type !== 'tool-call' ||
+        part.call.toolCallId !== itemId ||
+        part.call.state !== 'running'
+      )
+        return part
+      const output = `${typeof part.call.output === 'string' ? part.call.output : ''}${delta}`
+      return {
+        ...part,
+        call: {
+          ...part.call,
+          output:
+            output.length > LIVE_OUTPUT_LIMIT
+              ? `[Earlier live output omitted]\n${output.slice(-LIVE_OUTPUT_LIMIT)}`
+              : output
+        }
+      }
+    })
+    emitTurnEvent(rec, { kind: 'turn', turn: { ...owner, parts } })
+  }
+  rec.commandOutput.clear()
+}
+
+function clearCommandOutput(rec: SessionRecord) {
+  if (rec.commandOutputTimer) clearTimeout(rec.commandOutputTimer)
+  rec.commandOutputTimer = null
+  rec.commandOutput.clear()
+}
+
+function settleTools(rec: SessionRecord, reason: string) {
+  for (const turn of rec.view.turns) {
+    let changed = false
+    const parts = turn.parts.map(part => {
+      if (
+        part.type !== 'tool-call' ||
+        !['running', 'pending', 'approval-pending'].includes(part.call.state)
+      )
+        return part
+      changed = true
+      return { ...part, call: { ...part.call, state: 'error' as const, errorText: reason } }
+    })
+    if (changed) emitTurnEvent(rec, { kind: 'turn', turn: { ...turn, parts } })
+  }
 }
 
 // Fold native completion metadata into the newest assistant turn so replay and
 // live rendering use the same display shape. Re-emits that turn (upsert-by-id).
-function applyCompletionMeta(rec: SessionRecord, durationMs: number | null | undefined) {
-  const last = rec.lastUsage?.last
+function applyCompletionMeta(
+  rec: SessionRecord,
+  turnId: string | undefined,
+  durationMs: number | null | undefined
+) {
+  const last = rec.usageTurnId === turnId ? rec.lastUsage?.last : undefined
   for (let i = rec.view.turns.length - 1; i >= 0; i--) {
     const t = rec.view.turns[i]
     if (t.role === 'user' && t.origin.kind === 'user-input') return
@@ -278,11 +461,7 @@ function applyCompletionMeta(rec: SessionRecord, durationMs: number | null | und
   }
 }
 
-// A send/turn failure can mean the account was signed out from outside moi —
-// a `codex logout` in a terminal, say — which the cached availability
-// snapshot won't reflect until its TTL expires. Force a fresh probe so the
-// composer's availability banner flips right away instead of the next send
-// failing the same way.
+// A failed send may reflect an external logout. Refresh the cached banner now.
 function refreshAvailability(workspaceId: string, workspacePath: string) {
   void agentStore.refresh({ id: workspaceId, path: workspacePath, type: 'codex' })
 }
@@ -291,11 +470,42 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
   if (method === '__exit') {
     // The app-server died (crash or env-change restart). Drop the record so
     // the next message re-resumes against a fresh process.
-    setProcessing(rec, false, null)
-    rec.sessionTitleAbort?.abort()
-    rec.sessionTitleAbort = null
-    rec.unsubscribe?.()
-    sessions.delete(recKey(rec.workspaceId, rec.sessionId))
+    if (rec.processing)
+      broadcast(rec.workspaceId, {
+        kind: 'error',
+        sessionId: rec.sessionId,
+        content:
+          typeof params.message === 'string'
+            ? params.message
+            : 'Codex disconnected. Send another message to resume this chat.'
+      })
+    releaseSession(rec, 'Codex disconnected before this tool returned a result')
+    return
+  }
+  if (rec.bufferedNotifications) {
+    rec.bufferedNotifications.push([method, params])
+    return
+  }
+  const mcpFailure = method === 'mcpServer/startupStatus/updated' && params.status === 'failed'
+  if (
+    (method === 'warning' || method === 'configWarning' || mcpFailure) &&
+    (params.threadId == null || params.threadId === rec.sessionId)
+  ) {
+    const message = mcpFailure
+      ? `MCP ${String(params.name ?? 'server')} failed to start${typeof params.error === 'string' ? `: ${params.error}` : ''}`
+      : method === 'warning'
+        ? params.message
+        : params.summary
+    if (typeof message === 'string')
+      emitTurnEvent(rec, {
+        kind: 'notice',
+        notice: {
+          id: `codex:${rec.sessionId}:warning:${message}`,
+          kind: 'warning',
+          at: new Date().toISOString(),
+          message
+        }
+      })
     return
   }
   // Child agent threads stream on the same connection under their own ids —
@@ -306,14 +516,65 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
     return
   }
   if (params.threadId !== rec.sessionId) return
+  rec.lastTouched = Date.now()
 
   switch (method) {
+    case 'model/rerouted': {
+      if (typeof params.toModel !== 'string') return
+      rec.model = params.toModel
+      emitTurnEvent(rec, {
+        kind: 'notice',
+        notice: {
+          id: `codex:${rec.sessionId}:model:${String(params.turnId)}`,
+          kind: 'model-change',
+          at: new Date().toISOString(),
+          model: params.toModel,
+          ...(typeof params.fromModel === 'string' ? { prev: params.fromModel } : {})
+        }
+      })
+      return
+    }
+    case 'turn/plan/updated': {
+      if (!Array.isArray(params.plan) || typeof params.turnId !== 'string') return
+      const steps = params.plan.flatMap((step: unknown) => {
+        if (!step || typeof step !== 'object' || !('step' in step) || typeof step.step !== 'string')
+          return []
+        const status = 'status' in step ? step.status : undefined
+        return [
+          `${status === 'completed' ? '[x]' : status === 'inProgress' ? '[→]' : '[ ]'} ${step.step}`
+        ]
+      })
+      ingestItem(rec, {
+        type: 'plan',
+        id: `${params.turnId}:plan`,
+        text: [typeof params.explanation === 'string' ? params.explanation : '', ...steps]
+          .filter(Boolean)
+          .join('\n')
+      })
+      return
+    }
     case 'item/started':
     case 'item/completed': {
       const item = params.item as CodexThreadItem | undefined
       if (!item) return
-      if (method === 'item/completed') rec.previews.delete(item.id)
+      if (method === 'item/completed') {
+        rec.commandOutput.delete(item.id)
+        rec.previews.delete(item.id)
+        rec.dirtyPreviews.delete(item.id)
+      }
       ingestItem(rec, item)
+      return
+    }
+    case 'item/commandExecution/outputDelta': {
+      if (typeof params.itemId !== 'string' || typeof params.delta !== 'string') return
+      const output = (rec.commandOutput.get(params.itemId) ?? '') + params.delta
+      rec.commandOutput.set(
+        params.itemId,
+        output.length > LIVE_OUTPUT_LIMIT
+          ? `[Earlier live output omitted]\n${output.slice(-LIVE_OUTPUT_LIMIT)}`
+          : output
+      )
+      rec.commandOutputTimer ??= setTimeout(() => flushCommandOutput(rec), 40)
       return
     }
     case 'item/agentMessage/delta': {
@@ -325,9 +586,7 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
       return
     }
     case 'item/reasoning/summaryPartAdded': {
-      // Each part is a new summary section; without a break the sections
-      // concatenate into one run-on paragraph. Skip the first part (no
-      // preview text yet) so the reasoning doesn't open with a blank line.
+      // Match replay's summary separator without adding a leading blank line.
       if (rec.previews.has(params.itemId as string)) {
         forwardPreview(rec, params.itemId as string, 'reasoning', '\n')
       }
@@ -335,17 +594,39 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
     }
     case 'thread/tokenUsage/updated': {
       rec.lastUsage = (params.tokenUsage ?? null) as CodexTokenUsage | null
+      rec.usageTurnId = typeof params.turnId === 'string' ? params.turnId : rec.activeTurnId
       return
     }
     case 'turn/started': {
       const turn = params.turn as CodexTurn | undefined
+      if (turn?.id && rec.completedTurns.has(turn.id)) return
+      if (rec.activeTurnId !== turn?.id) {
+        rec.lastUsage = null
+        rec.usageTurnId = null
+      }
       setProcessing(rec, true, turn?.id ?? rec.activeTurnId)
       return
     }
     case 'turn/completed': {
       const turn = params.turn as CodexTurn | undefined
-      rec.previews.clear()
-      applyCompletionMeta(rec, turn?.durationMs)
+      if (turn?.id && rec.completedTurns.has(turn.id)) return
+      if (turn?.id) {
+        rec.completedTurns.add(turn.id)
+        if (rec.completedTurns.size > 64)
+          rec.completedTurns.delete(rec.completedTurns.values().next().value!)
+      }
+      // A delayed completion from an older turn must not stop a newer one.
+      if (rec.activeTurnId && turn?.id && rec.activeTurnId !== turn.id) return
+      flushCommandOutput(rec)
+      for (const item of turn?.items ?? []) ingestItem(rec, item)
+      settleTools(
+        rec,
+        turn?.status === 'interrupted'
+          ? 'Stopped'
+          : 'Codex ended the turn before this tool returned a result'
+      )
+      clearPreviews(rec)
+      applyCompletionMeta(rec, turn?.id, turn?.durationMs)
       setProcessing(rec, false, null)
       if (rec.refreshSessionsOnTurnComplete) {
         rec.refreshSessionsOnTurnComplete = false
@@ -369,6 +650,21 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
     case 'error': {
       const err = params.error as { message?: string } | undefined
       const message = err?.message ?? (typeof params.message === 'string' ? params.message : '')
+      if (params.willRetry === true) {
+        // The provider still owns a running turn and will retry it. Do not
+        // expose a Retry button that would submit the user's message again.
+        emitTurnEvent(rec, {
+          kind: 'notice',
+          notice: {
+            id: `codex:${rec.sessionId}:retry:${String(params.turnId ?? rec.activeTurnId)}`,
+            kind: 'api-retry',
+            at: new Date().toISOString(),
+            error: message
+          }
+        })
+        return
+      }
+      if (params.turnId && rec.activeTurnId && params.turnId !== rec.activeTurnId) return
       if (message) {
         broadcast(rec.workspaceId, { kind: 'error', sessionId: rec.sessionId, content: message })
         refreshAvailability(rec.workspaceId, rec.workspacePath)
@@ -376,11 +672,38 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
       // A top-level error without a following turn/completed would otherwise
       // leave the session busy forever — the error is terminal for the turn.
       setProcessing(rec, false, null)
+      clearPreviews(rec)
+      flushCommandOutput(rec)
+      settleTools(rec, message || 'Codex ended the turn before this tool returned a result')
       return
     }
-    // Codex hooks (~/.codex/hooks.json) — surface as hook notices, parity
-    // with Claude Code's. started/completed share a notice id so the row
-    // upserts from "started" to its outcome.
+    case 'thread/status/changed': {
+      const status = params.status as CodexThread['status']
+      rec.waiting = waitingOnInput(status)
+      if (status?.type === 'active') setProcessing(rec, true, rec.activeTurnId)
+      else if (status?.type === 'notLoaded') {
+        releaseSession(rec, 'Codex unloaded this chat')
+        broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+      } else if (status?.type === 'idle' || status?.type === 'systemError') {
+        flushCommandOutput(rec)
+        setProcessing(rec, false, null)
+        clearPreviews(rec)
+      }
+      return
+    }
+    case 'thread/closed':
+    case 'thread/archived':
+    case 'thread/deleted': {
+      releaseSession(rec, 'Codex closed this chat')
+      broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+      return
+    }
+    case 'thread/unarchived':
+    case 'thread/name/updated': {
+      broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+      return
+    }
+    // Reuse the notice id so completion updates the hook's started row.
     case 'hook/started':
     case 'hook/completed': {
       const run = params.run as
@@ -410,28 +733,6 @@ function handleNotification(rec: SessionRecord, method: string, params: Record<s
           ...(method === 'hook/completed'
             ? { outcome: run.status === 'failed' ? ('error' as const) : ('success' as const) }
             : {})
-        }
-      })
-      return
-    }
-    // A per-thread MCP server that failed to start — surface it instead of
-    // silently dropping (reuses the hook notice shape; a dedicated notice
-    // kind isn't worth a lib/format extension yet).
-    case 'mcpServer/startupStatus/updated': {
-      if (params.status !== 'failed') return
-      const name = typeof params.name === 'string' ? params.name : 'mcp'
-      emitTurnEvent(rec, {
-        kind: 'notice',
-        notice: {
-          id: `codex:${rec.sessionId}:mcp:${name}`,
-          kind: 'hook',
-          at: new Date().toISOString(),
-          hookId: `mcp:${name}`,
-          hookName: `MCP ${name}`,
-          event: 'mcpServerStartup',
-          status: 'response',
-          outcome: 'error',
-          ...(typeof params.error === 'string' ? { output: params.error } : {})
         }
       })
       return
@@ -488,16 +789,27 @@ function createRecord(input: {
   sessionTitleSource?: string
 }): SessionRecord {
   const rec: SessionRecord = {
+    client: input.client,
+    lastTouched: Date.now(),
     workspaceId: input.workspaceId,
     workspacePath: input.workspacePath,
     sessionId: input.sessionId,
     view: emptyViewState(),
     activeTurnId: null,
     processing: false,
+    waiting: false,
+    activity: 'idle',
     stream: false,
     previews: new Map(),
     children: new Map(),
     lastUsage: null,
+    usageTurnId: null,
+    completedTurns: new Set(),
+    bufferedNotifications: null,
+    previewTimer: null,
+    dirtyPreviews: new Set(),
+    commandOutput: new Map(),
+    commandOutputTimer: null,
     refreshSessionsOnTurnComplete: input.refreshSessionsOnTurnComplete === true,
     sessionTitleSource: input.sessionTitleSource,
     sessionTitleAbort: null
@@ -517,35 +829,64 @@ function seedFromThread(
 ) {
   let view = emptyViewState()
   for (const ev of codexThreadToEvents(thread, subagents)) view = applyEvent(view, ev)
+  for (const notice of rec.view.notices) view = applyEvent(view, { kind: 'notice', notice })
   rec.view = view
 }
 
-async function resumeSession(input: {
-  workspaceId: string
-  workspacePath: string
-  sessionId: string
-}): Promise<SessionRecord> {
-  const existing = sessions.get(liveKey(input.workspaceId, input.sessionId))
+type ResumeInput = { workspaceId: string; workspacePath: string; sessionId: string }
+
+async function resumeSession(input: ResumeInput): Promise<SessionRecord> {
+  const key = liveKey(input.workspaceId, input.sessionId)
+  const pending = resumes.get(key)
+  if (pending) return pending
+  const existing = sessions.get(key)
   if (existing) return existing
-  const client = await getCodexClient(input.workspacePath)
-  const resumed = await client.rpc<{ thread: CodexThread }>('thread/resume', {
-    threadId: input.sessionId,
-    ...CODEX_THREAD_ACCESS
-  })
-  const rec = createRecord({ ...input, sessionId: resumed.thread.id, client })
-  // Rebuild child-agent transcripts from their own threads and register them
-  // as live children, so a mid-run resume keeps routing child frames into
-  // the same records the replay attached.
-  const subagents = await readSubagentRecords(client, resumed.thread)
-  for (const [childId, sub] of subagents) rec.children.set(childId, sub)
-  seedFromThread(rec, resumed.thread, subagents)
-  return rec
+  const loading = (async () => {
+    const client = await getCodexClient(input.workspacePath)
+    // Subscribe before resuming. Live frames may arrive before the RPC reply,
+    // or while child transcripts are loading; replay them after the snapshot.
+    const rec = createRecord({ ...input, client })
+    rec.bufferedNotifications = []
+    try {
+      const resumed = await client.rpc<{ thread: CodexThread; model?: string }>('thread/resume', {
+        threadId: input.sessionId,
+        ...CODEX_THREAD_ACCESS
+      })
+      const subagents = await readSubagentRecords(client, resumed.thread)
+      rec.model = resumed.model
+      if (!client.isAlive()) throw new Error('Codex disconnected while resuming this chat')
+      for (const [childId, sub] of subagents) rec.children.set(childId, sub)
+      seedFromThread(rec, resumed.thread, subagents)
+      const active = resumed.thread.turns?.findLast(turn => turn.status === 'inProgress')
+      rec.waiting = waitingOnInput(resumed.thread.status)
+      setProcessing(
+        rec,
+        Boolean(active) || resumed.thread.status?.type === 'active',
+        active?.id ?? null
+      )
+      const buffered = rec.bufferedNotifications
+      rec.bufferedNotifications = null
+      for (const [method, params] of buffered) handleNotification(rec, method, params)
+      if (sessions.get(key) !== rec) throw new Error('Codex closed this chat while resuming it')
+      return rec
+    } catch (error) {
+      clearPreviews(rec)
+      clearCommandOutput(rec)
+      rec.unsubscribe?.()
+      if (sessions.get(key) === rec) sessions.delete(key)
+      throw error
+    }
+  })()
+  resumes.set(key, loading)
+  try {
+    return await loading
+  } finally {
+    if (resumes.get(key) === loading) resumes.delete(key)
+  }
 }
 
-// Turn a typed text + resolved uploads into Codex input items and the display
-// parts for the user's bubble. Images ride inline as data URLs (a documented
-// Codex input mode); other files are materialized to a temp path and
-// referenced in an attachment note the agent can read.
+// Images send inline; other uploads become readable path notes. Display parts
+// retain the original attachment metadata for the user's bubble.
 async function buildUserInput(
   text: string,
   uploads: StoredUpload[]
@@ -574,7 +915,7 @@ async function buildUserInput(
   return { input, parts }
 }
 
-export async function sendCodexMessage(input: {
+type CodexSendInput = {
   workspaceId: string
   workspacePath: string
   sessionId: string
@@ -586,12 +927,28 @@ export async function sendCodexMessage(input: {
   effort?: string
   fastMode?: boolean
   stream?: boolean
-  // Structured moi context (lib/moi-context.ts), rendered here. Servers
-  // >= 0.135 take it via `additionalContext` (never enters userMessage
-  // items); older ones get it appended to the text item, stripped from
-  // echoes by the adapter.
+  // Rendered through native additionalContext or the legacy text envelope.
   context?: MoiContext
-}): Promise<void> {
+}
+
+export function sendCodexMessage(input: CodexSendInput): Promise<void> {
+  const lane = sendLane(input.workspaceId, input.sessionId)
+  const generation = lane.generation
+  const sent = lane.tail.then(async () => {
+    if (lane.generation !== generation) return
+    await sendMessage(input, lane, generation)
+  })
+  // Serialise acceptance, not entire model turns. A second send can steer as
+  // soon as the first start is acknowledged, and failures never poison a lane.
+  lane.tail = sent.catch(() => {})
+  return sent
+}
+
+async function sendMessage(
+  input: CodexSendInput,
+  lane: SendLane,
+  generation: number
+): Promise<void> {
   const uploads = input.attachments?.length
     ? resolveUploads(input.workspaceId, input.attachments)
     : []
@@ -608,9 +965,11 @@ export async function sendCodexMessage(input: {
 
   let rec: SessionRecord
   try {
-    if (input.isNew) {
+    const existing = sessions.get(liveKey(input.workspaceId, input.sessionId))
+    if (existing && !existing.bufferedNotifications) rec = existing
+    else if (input.isNew && !aliases.has(recKey(input.workspaceId, input.sessionId))) {
       const client = await getCodexClient(input.workspacePath)
-      const started = await client.rpc<{ thread: CodexThread }>('thread/start', {
+      const started = await client.rpc<{ thread: CodexThread; model?: string }>('thread/start', {
         cwd: input.workspacePath,
         ...CODEX_THREAD_ACCESS,
         ...(input.model ? { model: input.model } : {}),
@@ -619,6 +978,7 @@ export async function sendCodexMessage(input: {
       const realId = started.thread.id
       if (realId !== input.sessionId) {
         aliases.set(recKey(input.workspaceId, input.sessionId), realId)
+        sendLanes.set(recKey(input.workspaceId, realId), lane)
         await renameSessionConfig(input.workspacePath, input.sessionId, realId)
         await renameSelectedSession(input.workspacePath, input.sessionId, realId)
         // Builder tabs follow the same temporary-to-real session rename.
@@ -642,6 +1002,7 @@ export async function sendCodexMessage(input: {
         refreshSessionsOnTurnComplete: true,
         sessionTitleSource
       })
+      rec.model = started.model ?? input.model
       if (
         (input.model || input.effort || input.fastMode !== undefined) &&
         !(await hasSessionConfig(input.workspacePath, realId))
@@ -653,7 +1014,10 @@ export async function sendCodexMessage(input: {
         })
       }
     } else {
-      rec = await resumeSession(input)
+      rec = await resumeSession({
+        ...input,
+        sessionId: aliases.get(recKey(input.workspaceId, input.sessionId)) ?? input.sessionId
+      })
     }
   } catch (err) {
     // No session record exists to run setProcessing through — clear the
@@ -668,7 +1032,34 @@ export async function sendCodexMessage(input: {
     return
   }
 
+  if (lane.generation !== generation) return
+  rec.lastTouched = Date.now()
   rec.stream = input.stream === true
+  if (!rec.stream) clearPreviews(rec)
+
+  if (userInput.some(item => item.type === 'image')) {
+    try {
+      // Steering keeps the running turn's model, regardless of picker changes.
+      const models = await getCodexModelCatalog(input.workspacePath)
+      const modelId = rec.activeTurnId ? rec.model : (input.model ?? rec.model)
+      const model = models.find(model => model.model === modelId || model.id === modelId)
+      if (model?.inputModalities && !model.inputModalities.includes('image')) {
+        throw new Error(
+          `${model.displayName} does not accept images. Choose a model that supports images.`
+        )
+      }
+    } catch (error) {
+      broadcast(rec.workspaceId, {
+        kind: 'error',
+        sessionId: rec.sessionId,
+        content: error instanceof Error ? error.message : 'Could not check image support',
+        terminal: !rec.activeTurnId
+      })
+      if (!rec.activeTurnId) setProcessing(rec, false, null)
+      return
+    }
+    if (lane.generation !== generation) return
+  }
 
   // Broadcast the user's bubble immediately so every connected tab shows it;
   // the Codex echo (`userMessage` item) reuses this id via `clientId` and
@@ -687,11 +1078,9 @@ export async function sendCodexMessage(input: {
 
   setProcessing(rec, true, rec.activeTurnId)
   try {
-    const client = await getCodexClient(input.workspacePath)
-    // Native context channel: diffed per key server-side (unchanged values
-    // inject nothing) and never echoed back in userMessage items. The entry
-    // key becomes the tag, so ship the unwrapped body. Older servers silently
-    // drop the field, so append to the text item there instead.
+    const client = rec.client
+    // Native context keys become tags, so pass unwrapped bodies. The fallback
+    // envelope is stripped from user echoes by adapter.ts.
     const additionalContext = client.supportsAdditionalContext
       ? {
           ...CODEX_LOCAL_CONTROL_CONTEXT,
@@ -715,20 +1104,13 @@ export async function sendCodexMessage(input: {
       input: userInput,
       ...CODEX_TURN_ACCESS,
       ...(additionalContext ? { additionalContext } : {}),
-      // Without an explicit summary mode Codex still reasons but emits the
-      // reasoning item with EMPTY summary/content (verified on the wire —
-      // scripts/codex-probe.ts), so no thinking ever reaches the UI. 'detailed'
-      // (vs 'auto') makes the summaries longer and stream in more frequent
-      // item/reasoning/summaryTextDelta bursts while the model is still
-      // thinking — 'auto' tends to emit one short blob near the end.
+      // Request visible reasoning summaries instead of relying on CLI defaults.
       summary: 'detailed',
       ...(input.model ? { model: input.model } : {}),
       ...(input.effort ? { effort: input.effort } : {}),
       ...(serviceTier !== undefined ? { serviceTier } : {})
     }
     if (rec.activeTurnId) {
-      // A turn is running — steer the new input into it. If the turn ended
-      // in the race window, fall back to starting a fresh turn.
       try {
         await client.rpc('turn/steer', {
           threadId: rec.sessionId,
@@ -737,45 +1119,76 @@ export async function sendCodexMessage(input: {
           ...(additionalContext ? { additionalContext } : {}),
           expectedTurnId: rec.activeTurnId
         })
-      } catch {
+      } catch (error) {
+        // Only a definitive no-active-turn rejection makes a fresh start safe.
+        // Timeouts, auth failures and turn-id mismatches may have accepted the
+        // input already, or refer to another active turn.
+        if (
+          !(error instanceof CodexRpcError) ||
+          !/no active turn|not running|no turn in progress/i.test(error.message)
+        )
+          throw error
+        if (lane.generation !== generation) return
+        setProcessing(rec, true, null)
+        rec.model = input.model ?? rec.model
         const res = await client.rpc<{ turn: CodexTurn }>('turn/start', turnParams)
-        setProcessing(rec, true, res.turn.id)
+        acceptStartedTurn(rec, res.turn)
       }
     } else {
+      rec.model = input.model ?? rec.model
       const res = await client.rpc<{ turn: CodexTurn }>('turn/start', turnParams)
-      setProcessing(rec, true, res.turn.id)
+      acceptStartedTurn(rec, res.turn)
     }
-    if (input.isNew) startCodexSessionTitleJob(rec, client)
+    if (lane.generation !== generation && rec.activeTurnId) {
+      await interruptCodexTurn(client, rec.sessionId, rec.activeTurnId)
+    }
+    if (input.isNew && lane.generation === generation) startCodexSessionTitleJob(rec, client)
     debug(`codex send ws=${rec.workspaceId} thread=${rec.sessionId} turn=${rec.activeTurnId}`)
   } catch (err) {
-    setProcessing(rec, false, null)
+    // A failed steer does not terminate the turn it was trying to modify.
+    // Likewise, a timed-out start can still produce authoritative lifecycle
+    // notifications later. Keep a known active turn stoppable.
+    if (!rec.activeTurnId) setProcessing(rec, false, null)
     broadcast(rec.workspaceId, {
       kind: 'error',
       sessionId: rec.sessionId,
-      content: err instanceof Error ? err.message : 'send failed'
+      content: err instanceof Error ? err.message : 'send failed',
+      terminal: !rec.activeTurnId
     })
     refreshAvailability(rec.workspaceId, rec.workspacePath)
   }
+}
+
+function acceptStartedTurn(rec: SessionRecord, turn: CodexTurn) {
+  if (rec.completedTurns.has(turn.id)) return
+  if (turn.status === 'inProgress') setProcessing(rec, true, turn.id)
+  else handleNotification(rec, 'turn/completed', { threadId: rec.sessionId, turn })
 }
 
 export async function interruptCodexRun(input: {
   workspaceId: string
   sessionId: string
 }): Promise<void> {
+  const lane = sendLane(input.workspaceId, input.sessionId)
+  lane.generation++ // cancels queued sends, including a start still initializing
   const rec = sessions.get(liveKey(input.workspaceId, input.sessionId))
-  if (!rec) return
+  if (!rec?.activeTurnId) {
+    broadcast(input.workspaceId, { kind: 'stopped', sessionId: rec?.sessionId ?? input.sessionId })
+    if (rec) setProcessing(rec, false, null)
+    else
+      broadcast(input.workspaceId, { type: 'status', sessionId: input.sessionId, activity: 'idle' })
+    return
+  }
   try {
-    if (rec.activeTurnId) {
-      const client = await getCodexClient(rec.workspacePath)
-      await interruptCodexTurn(client, rec.sessionId, rec.activeTurnId)
-    }
-    broadcast(rec.workspaceId, { kind: 'stopped', sessionId: rec.sessionId })
-    setProcessing(rec, false, null)
+    await interruptCodexTurn(rec.client, rec.sessionId, rec.activeTurnId)
+    // turn/completed is authoritative. In particular, don't emit a second
+    // stopped frame or claim idle while the command is still shutting down.
   } catch (err) {
     broadcast(rec.workspaceId, {
       kind: 'error',
       sessionId: rec.sessionId,
-      content: err instanceof Error ? err.message : 'interrupt failed'
+      content: err instanceof Error ? err.message : 'Interrupt failed',
+      terminal: !rec.activeTurnId
     })
     throw err
   }
@@ -788,11 +1201,11 @@ export function viewAsEvents(rec: SessionRecord): StreamEvent[] {
   return evs
 }
 
-// Read-side hook for the REST events endpoint (mirrors the OpenClaw path):
-// return the live view when we hold one so REST + WS stay in agreement.
+// Serve the live display copy so REST and WebSocket events stay consistent.
 export function getLiveCodexEvents(workspaceId: string, sessionId: string): StreamEvent[] | null {
   const rec = sessions.get(liveKey(workspaceId, sessionId))
-  return rec ? viewAsEvents(rec) : null
+  if (rec) rec.lastTouched = Date.now()
+  return rec && !rec.bufferedNotifications ? viewAsEvents(rec) : null
 }
 
 // Cold-load: resume the thread (also subscribing it on our connection) and

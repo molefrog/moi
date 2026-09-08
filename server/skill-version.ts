@@ -1,9 +1,6 @@
-// Skill versioning for Case 1: a workspace's installed skill copy drifting
-// behind the version this CLI ships. The CLI is "stupid" — it only reads the
-// version marker stamped in each skill's `SKILL.md`, compares the workspace
-// copy against the bundled copy, and reports drift. Updating is never
-// automatic: the agent (which reads command output) sees the notice and runs
-// `moi skill update`. See `moi skill` in `cli.ts`.
+// Skill versioning for a workspace's installed skill copy drifting behind the
+// version this moi installation ships. The marker in each skill's `SKILL.md`
+// drives both the CLI status and the frontend's automatic update check.
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -70,7 +67,7 @@ export const isMinorBehind = (installed: string | null, bundled: string | null):
   compare(installed, bundled).minorBehind
 
 // Any difference at all, patch included — decides whether `moi skill update`
-// would change anything, for status display.
+// would change anything and whether the frontend should offer or run it.
 export const isBehind = (installed: string | null, bundled: string | null): boolean =>
   compare(installed, bundled).behind
 

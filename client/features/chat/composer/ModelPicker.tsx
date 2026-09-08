@@ -12,6 +12,7 @@ import {
   resolveDisplayedEffort,
   resolveEffortIndex,
   resolveFastMode,
+  resolveSelectedModel,
   sortModelsByProviderOrder
 } from './model-order'
 import { Button } from '@/client/components/ui/button'
@@ -125,6 +126,38 @@ function ModelDropdown({ current, model, models, onValueChange }: ModelDropdownP
   )
 }
 
+type FastModeToggleProps = { fastMode: boolean; onChange: (value: boolean) => void }
+
+function FastModeToggle({ fastMode, onChange }: FastModeToggleProps) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={fastMode ? 'Turn off fast mode' : 'Turn on fast mode'}
+            aria-pressed={fastMode}
+            onClick={() => onChange(!fastMode)}
+            className="-my-1 -mr-1"
+          >
+            {fastMode ? (
+              <IconBoltFilled className="text-primary" stroke={1.75} />
+            ) : (
+              <IconBolt className="text-muted-foreground" stroke={1.75} />
+            )}
+          </Button>
+        }
+      />
+      <TooltipContent align="center" className="flex-col gap-0">
+        <span>Fast mode</span>
+        <span className="font-normal text-muted-foreground">More usage</span>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 type EffortPickerProps = {
   currentEffort: string
   effortLevels: readonly string[]
@@ -203,33 +236,7 @@ function EffortPicker({
                   <span className="text-muted-foreground">Effort</span>
                   <output aria-live="polite">{displayedLabel}</output>
                 </div>
-                {showFastMode && (
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={fastMode ? 'Turn off Fast mode' : 'Turn on Fast mode'}
-                          aria-pressed={fastMode}
-                          onClick={() => onFastModeChange(!fastMode)}
-                          className="-my-1 -mr-1"
-                        >
-                          {fastMode ? (
-                            <IconBoltFilled className="text-primary" />
-                          ) : (
-                            <IconBolt className="text-muted-foreground" stroke={1.5} />
-                          )}
-                        </Button>
-                      }
-                    />
-                    <TooltipContent align="center" className="flex-col gap-0">
-                      <span>Fast mode</span>
-                      <span className="font-normal text-muted-foreground">More usage</span>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
+                {showFastMode && <FastModeToggle fastMode={fastMode} onChange={onFastModeChange} />}
               </motion.div>
             )}
           </AnimatePresence>
@@ -324,19 +331,8 @@ export const ModelPicker = memo(function ModelPicker({ sessionId }: ModelPickerP
     else setLayout({ selectedFastMode: value })
   }
 
-  if (models.length === 0) return null
-
-  // Show a persisted pick when it still exists. Otherwise name the concrete
-  // model behind the SDK default, or fall back to the first available model.
-  const persistedModel = models.some(model => model.value === selectedModel)
-    ? selectedModel
-    : undefined
-  const defaultModel =
-    models.find(
-      model => defaultEntry?.resolvedModel && model.resolvedModel === defaultEntry.resolvedModel
-    ) ?? models[0]
-  const currentModelValue = persistedModel ?? defaultModel.value
-  const model = models.find(item => item.value === currentModelValue) ?? models[0]
+  const model = resolveSelectedModel(models, selectedModel, defaultEntry?.resolvedModel)
+  if (!model) return null
   const effortLevels = model.supportsEffort ? (model.supportedEffortLevels ?? []) : []
   const currentEffort = resolveDisplayedEffort(effortLevels, selectedEffort, model.defaultEffort)
   const showEffort = hasEffortChoice(effortLevels) && currentEffort !== undefined
@@ -345,11 +341,14 @@ export const ModelPicker = memo(function ModelPicker({ sessionId }: ModelPickerP
   return (
     <div className="flex min-w-0 items-center gap-1">
       <ModelDropdown
-        current={currentModelValue}
+        current={model.value}
         model={model}
         models={models}
         onValueChange={setSelectedModel}
       />
+      {!showEffort && model.supportsFastMode && (
+        <FastModeToggle fastMode={fastMode} onChange={setSelectedFastMode} />
+      )}
       {showEffort && (
         <EffortPicker
           key={model.value}

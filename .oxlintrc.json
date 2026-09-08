@@ -12,8 +12,10 @@
   ],
   "rules": {
     "typescript/no-explicit-any": "error",
+    "typescript/consistent-type-imports": "error",
     "no-empty": ["error", { "allowEmptyCatch": true }],
     "react-hooks/exhaustive-deps": "warn",
+    "react/set-state-in-effect": "warn",
     "react/no-did-update-set-state": "off"
   }
 }

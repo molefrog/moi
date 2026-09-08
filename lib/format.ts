@@ -97,8 +97,8 @@ export type TurnMeta = {
   model?: string
   provider?: string
   stopReason?: string
-  // Agent-run duration. Derived from transcript timestamps when available;
-  // Codex supplies its native duration because its transcript items lack them.
+  // Agent-run duration. Prefer native duration when item timestamps cannot
+  // measure the run (Codex replay items can share one start timestamp).
   durationMs?: number
   usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number; costUsd?: number }
   // The API message id (`msg_...`) that produced this assistant turn, when the
@@ -142,6 +142,7 @@ export type SessionSnapshot = {
 }
 
 export type SystemNotice =
+  | { id: string; kind: 'warning'; at: string; message: string }
   | {
       id: string
       kind: 'rate-limit'
@@ -152,9 +153,9 @@ export type SystemNotice =
       id: string
       kind: 'api-retry'
       at: string
-      attempt: number
-      maxRetries: number
-      delayMs: number
+      attempt?: number
+      maxRetries?: number
+      delayMs?: number
       error?: string
     }
   | { id: string; kind: 'compact'; at: string; metadata?: unknown }

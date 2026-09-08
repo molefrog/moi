@@ -20,6 +20,7 @@ import {
   ensureCodexSessionLive,
   getCodexActiveSessions,
   getLiveCodexEvents,
+  getLatestCodexSessionId,
   interruptCodexRun,
   sendCodexMessage
 } from './session'
@@ -60,7 +61,7 @@ export const codexHarness: Harness = {
     }
   },
   listModels: ws => getCodexModels(ws.path),
-  mcpStatus: ws => getCodexMcpStatus(ws.path),
+  mcpStatus: ws => getCodexMcpStatus(ws.path, getLatestCodexSessionId(ws.id)),
   discoverWorkspaces: registeredPaths => discoverCodexWorkspaces(registeredPaths),
   availability: async ws => {
     const runtime = await pathHarnessAvailability('codex')
