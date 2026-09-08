@@ -16,6 +16,7 @@ import {
   getCCActiveSessions,
   interruptCCSession,
   killAllCCSessions,
+  killWorkspaceSessions,
   restartWorkspaceSessions,
   retireCCSessionsOnCliChange,
   sendCCMessage
@@ -109,6 +110,7 @@ export const claudeCodeHarness: Harness = {
   startLogin: ws => startClaudeLogin(ws.path),
 
   onEnvChanged: workspacePath => restartWorkspaceSessions(workspacePath),
+  stopWorkspace: workspacePath => killWorkspaceSessions(workspacePath),
   shutdown: () => killAllCCSessions(),
   skillsDir: workspaceRoot => join(workspaceRoot, '.claude', 'skills'),
 

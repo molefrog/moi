@@ -969,6 +969,23 @@ export function restartWorkspaceSessions(workspacePath: string): void {
   }
 }
 
+// Stop every queued message and subprocess for a workspace being removed.
+export function killWorkspaceSessions(workspacePath: string): void {
+  for (const messages of messageQueues.values()) {
+    if (messages.workspacePath !== workspacePath) continue
+    messages.stopping = true
+    cancelPendingMessages(messages, new Error('Workspace removed'))
+    messages.active?.complete()
+    messages.active = null
+  }
+  for (const s of [...sessions.values()]) {
+    if (s.workspacePath === workspacePath) teardown(s)
+  }
+  for (const [key, messages] of messageQueues) {
+    if (messages.workspacePath === workspacePath) messageQueues.delete(key)
+  }
+}
+
 // A CLI update may introduce models the current process cannot use. Mark it
 // for replacement at the next safe dispatch boundary.
 export function retireCCSessionsOnCliChange(): void {
