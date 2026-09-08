@@ -119,15 +119,20 @@ documentation. Run all `moi` commands from the **project root** — the folder t
 never from inside `.moi/` itself. You don't pass paths; moi resolves the workspace from where it's run.
 
 - `moi bundle` — compile changed applets
-- `moi bundle --force` — rebuild all applets (use after changing `config`)
+- `moi bundle --force` — rebuild applets even when their source looks unchanged (use after changing
+  `config`)
+- `moi check` — run supported applet checks
 - `moi refresh` — re-fetch widget and view data without rebuilding (use after you mutated data the
-  applets read — DB rows, files, external API records — so the displayed values catch up);
-  `--only widgets` / `--only views` narrows the refresh to one kind
+  applets read — DB rows, files, external API records — so the displayed values catch up)
 - `moi call-server-fn <module>/<fn> '[args]'` — invoke a `.server.ts` function directly (smoke test)
 - `moi tabs` — list the workspace's tabs, their ids and the default tab
 - `moi tab focus <tab-id> [--params '<json-object>']` — switch to a tab, with optional params for
   the target view (see Driving the workspace)
 - `moi debug logs` — applet runtime errors on record (experimental)
+
+`moi check`, `moi bundle`, `moi refresh`, and `moi debug logs` share one optional selector. Omit
+`--only` for all applets. Use `--only widgets` or `--only views` for a kind, and
+`--only widgets/<id>` or `--only views/<id>` for one applet.
 - `moi theme --font=<key>` — change font theme (omit `--font` to list options)
 - `moi theme --color=<key>` — change color preset (omit `--color` to list options)
 - `moi theme --radius=<key>` — change corner-radius preset (omit `--radius` to list options)
@@ -340,6 +345,35 @@ export async function getForecast(city: string) {
 }
 ```
 
+# Verifying applets
+
+Use `moi check --only views/<id>` or `moi check --only widgets/<id>` for the applet you changed. Use
+the kind alone only when the work spans several applets. The command owns the supported applet
+TypeScript setup and can gain more checks later. Do not create `.moi/tsconfig.json`, invoke `tsc`
+directly, or retry with ad hoc compiler flags and missing type packages.
+
+For a frontend rebuild, use this stopping point:
+
+1. Run `moi check --only <kind>/<id>` once after source edits, then
+   `moi bundle --only <kind>/<id>`.
+2. In the browser, exercise the changed interaction, such as reveal and rating, and check one
+   narrow layout.
+3. Inspect `moi debug logs --only <kind>/<id> --json` for runtime errors.
+
+Stop when these checks pass. Expand verification only when a check fails or the changed behavior
+needs another focused check. Do not search for repo tests by default. Run an existing applet test or
+`moi call-server-fn` only when the change touches the behavior it covers. If native-app inspection is
+unavailable, keep verification in the browser instead of retrying the unsupported tool.
+
+After the final successful checks, always make tab focus the final workspace action:
+
+- After building or editing a widget, run `moi tab focus widgets`.
+- After building or editing a view, run `moi tab focus view:<view-id>`, using its file name or claimed
+  builder id.
+
+The focused applet is the handoff. Keep the final reply brief and user-facing. Do not include file
+or storage links, file paths, or bundle, test, and runtime-log summaries.
+
 # Widgets
 
 Live cards on the dashboard grid — many visible at once. `config` sets the grid footprint:
@@ -356,16 +390,6 @@ Render **content only**: a plain `h-full w-full` region with no card chrome (`ro
 `shadow-*`, or outer `border`) — the dashboard owns the shell, spacing, and elevation. It does not
 own the fill, so the widget must set its own opaque background.
 Changing `colSpan`/`rowSpan` needs `moi bundle --force`. See `references/DESIGN.md`.
-
-Typical loop: check/`bun install` deps → write the applet → `moi bundle` → run any checks.
-After the final successful bundle and any checks, always make tab focus the final workspace action:
-
-- After building or editing a widget, run `moi tab focus widgets`.
-- After building or editing a view, run `moi tab focus view:<view-id>`, using its file name or claimed
-  builder id.
-
-The focused applet is the handoff. Keep the final reply brief and user-facing. Do not include file
-or storage links, file paths, or bundle, test, and runtime-log summaries.
 
 # Debugging applets
 

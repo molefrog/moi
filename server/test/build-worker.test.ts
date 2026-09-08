@@ -111,6 +111,23 @@ describe('buildApplets compiles out of process', () => {
     expect(existsSync(join(WS, '.moi', '.build', 'widgets', 'broken'))).toBe(false)
   })
 
+  test('an exact target skips unrelated applets', async () => {
+    seed('.moi/widgets/selected.tsx', `export default function Selected() { return null }`)
+    seed(
+      '.moi/widgets/unrelated.tsx',
+      `import { x } from 'not-installed'\nexport default function Unrelated() { return x }`
+    )
+
+    const { results } = await buildApplets(WS, 'widget', true, 'selected')
+
+    expect(Object.fromEntries(results.map(result => [result.name, result]))).toEqual({
+      selected: { name: 'selected', status: 'built', serverModules: [], config: null },
+      unrelated: { name: 'unrelated', status: 'skipped' }
+    })
+    expect(existsSync(join(WS, '.moi', '.build', 'widgets', 'selected', 'index.js'))).toBe(true)
+    expect(existsSync(join(WS, '.moi', '.build', 'widgets', 'unrelated'))).toBe(false)
+  })
+
   test('server modules and config still come back through the child', async () => {
     seed('.moi/widgets/clock.server.ts', `export async function now() { return Date.now() }`)
     seed(
