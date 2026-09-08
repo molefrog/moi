@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, statSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -39,6 +39,19 @@ describe('installBundledSkills', () => {
     })
   })
 
+  test('leaves identical skill files untouched', async () => {
+    await withTempDir(async dir => {
+      expect(await installBundledSkills(dir)).toEqual(['moi-workspace'])
+      const skillMd = join(dir, SKILL_MD)
+      const fixedTime = new Date('2000-01-01T00:00:00.000Z')
+      utimesSync(skillMd, fixedTime, fixedTime)
+      const before = statSync(skillMd).mtimeMs
+
+      expect(await installBundledSkills(dir)).toEqual([])
+      expect(statSync(skillMd).mtimeMs).toBe(before)
+    })
+  })
+
   test('moi skill update restores the section for a workspace installed before the flag went away', async () => {
     // Skills live under <workspace>/.claude/skills for the default backend —
     // updateWorkspaceSkills re-derives that from the workspace root.
@@ -52,8 +65,9 @@ describe('installBundledSkills', () => {
       await Bun.write(skillMd, stripped)
       rmSync(join(skillsDir, CHEAT_SHEET), { force: true })
 
-      await updateWorkspaceSkills(workspace)
+      const result = await updateWorkspaceSkills(workspace)
 
+      expect(result.changedSkills).toEqual(['moi-workspace'])
       expect(await Bun.file(skillMd).text()).toContain('Standard UI components')
       expect(await Bun.file(join(skillsDir, CHEAT_SHEET)).exists()).toBe(true)
     })

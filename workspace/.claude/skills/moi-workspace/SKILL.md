@@ -428,10 +428,11 @@ The inverse of a widget: a view **owns its whole page** — its own `h-full w-fu
 This skill is installed with moi (via the CLI or the UI) and can fall behind when the moi CLI updates.
 
 - **You'll know** — `moi` commands warn you when this skill is behind.
-- **To update** — run `moi skill update`. Never mid-task: finish first, or do it at the end.
-- **Re-read after updating** — `moi skill update` rewrites `SKILL.md` and everything in
-  `references/` on disk, so the copy already in your context is stale. Re-read this `SKILL.md`
-  before you rely on it again — don't act on the old version.
+- **To update** — if the user asks for current or updated guidance, run `moi skill update` before
+  applet work. Otherwise, update at the end of the task.
+- **Reload selectively** — the command reports which skills changed. Re-read this `SKILL.md` only
+  when it reports that `moi-workspace` changed. If it did not change, keep using the copy already
+  in context.
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->

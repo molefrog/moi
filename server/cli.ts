@@ -2376,14 +2376,15 @@ async function runSkillUpdate(cwd: string): Promise<void> {
   // Type-aware: an OpenClaw workspace keeps its skills in `skills/`, so the
   // update must target the same dir the agent actually loads from.
   const { root, type } = await resolveWorkspace(cwd)
-  const { before, status, appletTypesWritten } = await updateWorkspaceSkills(
+  const { before, status, changedSkills, appletTypesWritten } = await updateWorkspaceSkills(
     root,
     type ?? 'claude-code'
   )
   const after = status.skills
+  const heading = changedSkills.length > 0 ? 'Skills updated in ' : 'Skills unchanged in '
 
-  console.log('\n' + pc.green('✓') + ' Skills updated in ' + pc.bold(root) + '\n')
-  printSkillUpdateTable(before, after)
+  console.log('\n' + pc.green('✓') + ' ' + heading + pc.bold(root) + '\n')
+  printSkillUpdateTable(before, after, changedSkills)
   if (appletTypesWritten) {
     console.log(pc.dim('  Ambient applet types regenerated: ') + pc.bold('.moi/applet-env.d.ts\n'))
   }
@@ -2391,29 +2392,34 @@ async function runSkillUpdate(cwd: string): Promise<void> {
 
 function printSkillUpdateTable(
   before: WorkspaceSkillStatus[],
-  after: WorkspaceSkillStatus[]
+  after: WorkspaceSkillStatus[],
+  changedSkills: string[]
 ): void {
+  const changedSkillNames = new Set(changedSkills)
   console.log(
     columns(
       ['skill', 'from', 'to'].map(h => pc.dim(h)),
       after.map(s => {
         const prev = before.find(b => b.name === s.name)?.installed ?? null
-        const changed = prev !== s.installed
+        const versionChanged = prev !== s.installed
+        const filesChanged = changedSkillNames.has(s.name)
         return [
           s.name,
           prev ?? pc.dim('none'),
-          changed ? pc.green(s.installed ?? '?') : pc.dim((s.installed ?? '?') + ' (no change)')
+          versionChanged
+            ? pc.green(s.installed ?? '?')
+            : filesChanged
+              ? pc.green((s.installed ?? '?') + ' (files changed)')
+              : pc.dim((s.installed ?? '?') + ' (no change)')
         ]
       })
     )
   )
-  console.log(
-    '\n' +
-      pc.dim(
-        '  Changes apply when the skill is next loaded (new session or next skill invocation).'
-      ) +
-      '\n'
-  )
+  const nextStep =
+    changedSkills.length > 0
+      ? `  Reload changed skills before using them again: ${changedSkills.join(', ')}.`
+      : '  No skill files changed. Keep using the copies already in context.'
+  console.log('\n' + pc.dim(nextStep) + '\n')
 }
 
 // Colored status label for one skill row: minor+ behind is actionable, a patch

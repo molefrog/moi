@@ -12,7 +12,7 @@ import {
   summarizeSkillStatuses,
   updateWorkspaceSkills
 } from '../skill-update'
-import { BUNDLED_SKILLS_DIR } from '../skills-template'
+import { BUNDLED_SKILLS_DIR, installBundledSkills } from '../skills-template'
 import { skillsDirFor } from '../workspace-init'
 
 let tempRoot = ''
@@ -67,7 +67,17 @@ describe('workspace skill update service', () => {
 
     expect(result.before.find(skill => skill.name === 'moi-workspace')?.installed).toBe('0.7.1')
     expect(result.status.updateAvailable).toBe(false)
+    expect(result.changedSkills).toEqual(['moi-workspace'])
     expect(await Bun.file(customSkill).text()).toBe('custom\n')
+  })
+
+  test('reports no skill changes when installed files already match', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'moi-skill-unchanged-'))
+    await installBundledSkills(skillsDirFor(tempRoot, 'codex'))
+
+    const result = await updateWorkspaceSkills(tempRoot, 'codex')
+
+    expect(result.changedSkills).toEqual([])
   })
 
   // The ambient applet types are the other agent-facing contract the CLI ships,

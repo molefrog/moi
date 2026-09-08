@@ -152,7 +152,7 @@ function describeTab(tab: WorkspaceTabId, rawTitle?: string): string {
 export function renderMoiContextBody(ctx: MoiContext): string {
   const preamble = [
     `${MOI_CONTEXT_MARKER} — a shared UI the user chats with you from, which you can extend and customize.`,
-    'Read the **`moi-workspace` skill** before responding — even to a simple question — unless you already read it in this chat.'
+    'Read the **`moi-workspace` skill** once when this context first appears in a chat, before responding. Reuse that copy while it remains in context. Re-read only if it changed on disk or dropped out of context. If a read is truncated, continue from the first unread section instead of restarting.'
   ].join('\n')
   const tabLines = [describeTab(ctx.activeTab, ctx.tabTitle)]
   const tabParams = ctx.tabParams ? renderAppletJson(ctx.tabParams) : null
