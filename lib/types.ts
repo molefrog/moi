@@ -1,4 +1,6 @@
 import type { PreviewBlock, StreamEvent } from './format'
+import type { MoiContext } from './moi-context'
+import type { WorkspaceTheme } from './themes'
 
 // A custom UI unit embedded in a workspace.
 export type AppletKind = 'view' | 'widget'
@@ -240,7 +242,7 @@ export type ClientMessage =
       // snapshotted at send time, assembled by
       // client/features/workspace/moi-context.ts. The server renders it per
       // harness; display paths strip the rendered envelope from bubbles.
-      context?: import('./moi-context').MoiContext
+      context?: MoiContext
     }
   | { type: 'stop'; workspaceId: string; sessionId: string }
   // Reply to a relayed Scratchpad op (see ScratchpadOpMessage). Carries the
@@ -574,7 +576,7 @@ export type WorkspaceLayout = {
   selectedEffort?: string
   // Fast-mode default for new sessions. Undefined inherits the provider setting.
   selectedFastMode?: boolean
-  theme?: import('./themes').WorkspaceTheme
+  theme?: WorkspaceTheme
 }
 
 // One applet's thumbnail freshness record. Image bytes live as files in the

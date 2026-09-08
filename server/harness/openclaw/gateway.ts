@@ -17,6 +17,8 @@ import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
+import type { GatewayClient as OpenClawGatewayClient } from 'openclaw/plugin-sdk/gateway-runtime'
+
 import { type GatewayFailure, type GatewayInfo, classifyGatewayError, parseHelloOk } from './compat'
 import { tapWire } from '../debug'
 
@@ -41,7 +43,7 @@ export function getOpenClawGatewayStatus(): {
   return { connected: current !== null, info: lastInfo, failure: lastFailure }
 }
 
-type ClientCtor = typeof import('openclaw/plugin-sdk/gateway-runtime').GatewayClient
+type ClientCtor = typeof OpenClawGatewayClient
 type GatewayInstance = InstanceType<ClientCtor>
 
 const CONNECT_TIMEOUT_MS = 5_000
@@ -238,7 +240,7 @@ function fanout(event: string, payload: Record<string, unknown>) {
 async function startClient(): Promise<{ handle: GatewayHandle; client: GatewayInstance }> {
   const cfg = await readGatewayConfig()
   if (!cfg) throw new Error('openclaw config missing or invalid')
-  let GatewayClient: typeof import('openclaw/plugin-sdk/gateway-runtime').GatewayClient
+  let GatewayClient: ClientCtor
   try {
     ;({ GatewayClient } = await import('openclaw/plugin-sdk/gateway-runtime'))
   } catch {
@@ -415,7 +417,7 @@ export async function withOneShotGateway<T>(fn: (rpc: Rpc) => Promise<T>): Promi
   if (!cfg) return null
   // `openclaw` is an optionalDependency — a missing package must degrade to
   // the silent-null path (no agents discovered), never a rejected promise.
-  let GatewayClient: typeof import('openclaw/plugin-sdk/gateway-runtime').GatewayClient
+  let GatewayClient: ClientCtor
   try {
     ;({ GatewayClient } = await import('openclaw/plugin-sdk/gateway-runtime'))
   } catch {

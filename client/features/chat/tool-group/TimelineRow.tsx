@@ -5,7 +5,7 @@
 // can build on them without a cycle.
 import type { ReactNode } from 'react'
 
-import { IconChevronRight, IconLoader2, IconPackage } from '@tabler/icons-react'
+import { IconChevronRight, IconLoader2, type TablerIcon } from '@tabler/icons-react'
 import { motion } from 'motion/react'
 
 import { IconMcp } from '@/client/features/connectors/IconMcp'
@@ -131,7 +131,7 @@ export function IconMarker({
   size = 12,
   stroke = 1.75
 }: {
-  icon: typeof IconPackage
+  icon: TablerIcon
   size?: number
   stroke?: number
 }) {
