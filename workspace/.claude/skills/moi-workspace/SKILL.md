@@ -118,30 +118,31 @@ documented subcommands (`moi bundle`, `moi bundle --force`, etc.). Call `moi hel
 documentation. Run all `moi` commands from the **project root** — the folder that contains `.moi/`,
 never from inside `.moi/` itself. You don't pass paths; moi resolves the workspace from where it's run.
 
-- `moi bundle` — compile changed applets
-- `moi bundle --force` — rebuild applets even when their source looks unchanged (use after changing
-  `config`)
+## Applet commands
+
 - `moi check` — run supported applet checks
-- `moi refresh` — re-fetch widget and view data without rebuilding (use after you mutated data the
-  applets read — DB rows, files, external API records — so the displayed values catch up)
-- `moi call-server-fn <module>/<fn> '[args]'` — invoke a `.server.ts` function directly (smoke test)
-- `moi tabs` — list the workspace's tabs, their ids and the default tab
-- `moi tab focus <tab-id> [--params '<json-object>']` — switch to a tab, with optional params for
-  the target view (see Driving the workspace)
-- `moi debug logs` — applet runtime errors on record (experimental)
+- `moi bundle` — compile changed applets
+- `moi bundle --force` — rebuild applets even when their source looks unchanged
+- `moi refresh` — re-fetch applet data without rebuilding
+- `moi debug logs` — show applet runtime errors
+- `moi call-server-fn <module>/<fn> '[args]'` — invoke a `.server.ts` function
 
-`moi check`, `moi bundle`, `moi refresh`, and `moi debug logs` share one optional selector. Omit
-`--only` for all applets. Use `--only widgets` or `--only views` for a kind, and
-`--only widgets/<id>` or `--only views/<id>` for one applet.
-- `moi theme --font=<key>` — change font theme (omit `--font` to list options)
-- `moi theme --color=<key>` — change color preset (omit `--color` to list options)
-- `moi theme --radius=<key>` — change corner-radius preset (omit `--radius` to list options)
-- `moi config` — set the workspace name & icon (`moi config --help` for usage)
-- `moi env` — list available env keys and where they come from (never values);
-  `moi env exec -- <cmd>` runs a command with the workspace env (see Environment & secrets)
-- `moi skill` — show installed vs bundled skill versions; `moi skill update` to refresh
+`moi check`, `moi bundle`, `moi refresh`, and `moi debug logs` accept `--only`:
 
-For more options, commands, use `moi help`.
+- Omit it for all applets.
+- Use `--only widgets` or `--only views` for one kind.
+- Use `--only widgets/<id>` or `--only views/<id>` for one applet.
+
+## Workspace commands
+
+- `moi tabs` — list workspace tabs
+- `moi tab focus <tab-id> [--params '<json-object>']` — switch tabs
+- `moi theme` — change the workspace theme
+- `moi config` — set the workspace name and icon
+- `moi env` — inspect available environment keys
+- `moi skill` — inspect or update the workspace skill
+
+For more commands and options, use `moi help`.
 
 # Critical constraints when interacting with moi
 
