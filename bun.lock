@@ -68,7 +68,7 @@
         "date-fns": "^4.4.0",
         "embla-carousel-react": "^8.6.0",
         "oxfmt": "^0.54.0",
-        "oxlint": "^1.69.0",
+        "oxlint": "^1.82.0",
         "react-day-picker": "^10.0.1",
         "recharts": "3.8.0",
         "typescript": "^5.9.3",
