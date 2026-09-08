@@ -7,7 +7,11 @@ import type { WorkspaceType } from '@/lib/types'
 
 import { APPLET_ENV_DTS } from '../moi-scaffold'
 import { readSkillVersion } from '../skill-version'
-import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from '../skill-update'
+import {
+  getWorkspaceSkillsStatus,
+  summarizeSkillStatuses,
+  updateWorkspaceSkills
+} from '../skill-update'
 import { BUNDLED_SKILLS_DIR } from '../skills-template'
 import { skillsDirFor } from '../workspace-init'
 
@@ -30,6 +34,12 @@ async function writeInstalledVersion(
 }
 
 describe('workspace skill update service', () => {
+  test('reports patch-only bundled versions as available updates', () => {
+    const skills = [{ name: 'moi-workspace', installed: '0.17.0', bundled: '0.17.1' }]
+
+    expect(summarizeSkillStatuses(skills)).toEqual({ skills, updateAvailable: true })
+  })
+
   for (const type of ['claude-code', 'codex', 'openclaw'] as const) {
     test(`reads ${type} skills from the agent-specific directory`, async () => {
       tempRoot = await mkdtemp(join(tmpdir(), `moi-skill-status-${type}-`))
