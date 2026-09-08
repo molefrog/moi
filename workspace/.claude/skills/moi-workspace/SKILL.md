@@ -199,11 +199,14 @@ Use bundled components for standard controls. Read the
 
 - `moi ui-components` lists available components and recipes with installed state.
 - `moi ui-components docs <name…>` prints bundled usage docs. Read them before using an
-  unfamiliar component.
+  unfamiliar component or when its API may have changed.
 - `moi ui-components add <name…> --install` copies source into `.moi/ui/` and installs npm
   dependencies. Pass all needed names in one call.
 - Import relatively, e.g. `import { Button } from '../ui/button'`, then run `moi bundle`
   after editing applets.
+
+Reuse familiar installed components without rereading their catalog entries, docs, or source.
+Inspect source only for local customizations, doc conflicts, or concrete build issues.
 
 ## Server functions — `<name>.server.ts`
 
