@@ -3,7 +3,9 @@ name: moi-workspace
 description: The moi workspace — the web UI the user chats from, extended with agent-authored applets (widgets, views) plus theme & config. Read this FIRST when a message carries a hidden moi-context envelope or the user uses moi vocab such as workspace, applet, widget, view, scratchpad, dashboard, or a `moi` command, or asks to build, edit, customize, or theme the workspace UI or its layout.
 ---
 
-# Workspace
+# moi workspace
+
+## Workspace
 
 You are working inside a **moi workspace**. It is a web UI that the user communicates with you
 through. It has regular chat (this one), as well as custom UI elements that you can define, write,
@@ -30,7 +32,7 @@ Workspace settings and customisation:
 - "Theme": customize workspace fonts, colors, visual appearance. User can modify these from the UI
   and you can do it via the `moi theme` command. Call `moi theme --help` for further docs.
 
-# Glossary
+## Glossary
 
 "Workspace" or "Moi Workspace" — the web UI that the user works in, talks/collaborates with you,
 sees and interacts with "Applets".
@@ -59,7 +61,7 @@ Workspace UI.
 "Moi CLI" — the globally installed `moi` command that you use to build applets, customize, and send
 events to "Workspace".
 
-# Where moi lives in filesystem
+## Where moi lives in filesystem
 
 Source of truth - `.moi` folder in the root of "Project" folder. Contains source code of all
 Applets, bundled code, settings, etc. Can be committed to version control. Folder is partially
@@ -99,7 +101,7 @@ scaffolded `.moi/.gitignore` already excludes the machine-local entries (`.build
 with the repo — commit them as-is, just never hand-edit them. Your surface is the non-dot files:
 `widgets/`, `views/`, `package.json`, and code you place under `.moi/` yourself.
 
-# Build environment
+## Build environment
 
 - Bun is the required dependency of moi, so it must be installed
 - For package management **always** use bun
@@ -111,14 +113,14 @@ with the repo — commit them as-is, just never hand-edit them. Your surface is 
   text, etc.) — see the Bun docs. Only the moi-specific imports (covered under **Developing
   Applets**) differ.
 
-# `moi` CLI
+## `moi` CLI
 
 Treat `moi` as an external command — you cannot inspect or modify its sources. Use only the
 documented subcommands (`moi bundle`, `moi bundle --force`, etc.). Call `moi help` for
 documentation. Run all `moi` commands from the **project root** — the folder that contains `.moi/`,
 never from inside `.moi/` itself. You don't pass paths; moi resolves the workspace from where it's run.
 
-## Applet commands
+### Applet commands
 
 - `moi check` — run supported applet checks
 - `moi bundle` — compile changed applets
@@ -133,7 +135,7 @@ never from inside `.moi/` itself. You don't pass paths; moi resolves the workspa
 - Use `--only widgets` or `--only views` for one kind.
 - Use `--only widgets/<id>` or `--only views/<id>` for one applet.
 
-## Workspace commands
+### Workspace commands
 
 - `moi tabs` — list workspace tabs
 - `moi tab focus <tab-id> [--params '<json-object>']` — switch tabs
@@ -144,20 +146,20 @@ never from inside `.moi/` itself. You don't pass paths; moi resolves the workspa
 
 For more commands and options, use `moi help`.
 
-# Critical constraints when interacting with moi
+## Critical constraints when interacting with moi
 
 - Never read or modify files outside the `.moi` directory, unless the user explicitly asks. If you
   do need it -> ask for permission.
 - Do **not** start, stop, or inspect the Workspace web server — it is managed externally.
 
-# Developing Applets
+## Developing Applets
 
 Every applet — a **Widget** or a **View** — is a default-exported React component in
 `.moi/<type>/<name>.tsx`, optionally paired with a `<name>.server.ts`. `moi bundle` compiles each
 into a live module the browser loads (edits hot-reload). Read `references/DESIGN.md` first.
 Write normal React + Tailwind — below is only what's **moi-specific**.
 
-## Anatomy
+### Anatomy
 
 ```tsx
 // .moi/widgets/hello.tsx
@@ -181,7 +183,7 @@ from `.moi/package.json` deps — no `@/` aliases. Files starting with `_` (e.g.
 `widgets/` and `views/` are never applet entry points — put code shared between applets there.
 `moi bundle` tracks these local imports: editing a shared module rebuilds every applet using it.
 
-## Applet styling
+### Applet styling
 
 - Use Tailwind for static styling. Do not add custom CSS, `@apply`, or static `style={{}}` values.
 - Use `style={{}}` only for computed data such as chart geometry, progress, per-item delays, or
@@ -198,7 +200,7 @@ function cx(...classes: (string | false | undefined | null)[]) {
 }
 ```
 
-## Standard UI components
+### Standard UI components
 
 Use bundled components for standard controls. Read the
 [shared usage rules](references/UI-COMPONENTS.md) before composing them.
@@ -214,7 +216,7 @@ Use bundled components for standard controls. Read the
 Reuse familiar installed components without rereading their catalog entries, docs, or source.
 Inspect source only for local customizations, doc conflicts, or concrete build issues.
 
-## Server functions — `<name>.server.ts`
+### Server functions — `<name>.server.ts`
 
 Export named `async function`s (only — no `const`, sync, or class) and call them from the component
 like ordinary async functions; arguments and return values are auto-serialized (`Date`, `Map`,
@@ -235,7 +237,7 @@ The component fetches on mount; after you change underlying data a server fn rea
 It's plain Bun — every Bun API is available with no setup: `bun:sqlite`, `Bun.redis`, `Bun.s3`,
 `Bun.file`, `fetch`, …
 
-## Workspace files & assets
+### Workspace files & assets
 
 - **Bundled asset** — `import logo from './logo.png'` resolves to a URL at build time (images &
   fonts: `png jpg gif svg webp avif ico woff woff2 ttf otf`). For small art shipped beside the
@@ -255,7 +257,7 @@ It's plain Bun — every Bun API is available with no setup: `bun:sqlite`, `Bun.
 Rule of thumb: small own art → `import`; structured data → `.server.ts` returns it; large/streamable
 media → `.server.ts` returns the **path**, render with `fileUrl()`.
 
-## Driving the workspace — `focusTab` & `sendChatMessage`
+### Driving the workspace — `focusTab` & `sendChatMessage`
 
 An applet can move the user to another tab and talk to you, through two functions from the **`moi`**
 package.
@@ -277,7 +279,7 @@ sendChatMessage('Chase order o-1024', { order: 'o-1024', carrier: 'dhl' })
   the task should be done.
 - `params` and `context` accept JSON serializable values only.
 
-### Params: the type is the contract
+#### Params: the type is the contract
 
 A view with addressable state declares a local `Params` type in its own file. Every field is
 optional and carries a comment, because the view must render sensibly with `{}` — a fresh mount, a
@@ -303,7 +305,7 @@ target view's source, mirror the shape you find there, and note where you read i
 contract; the type is documentation, not a shared module. Widgets are never navigation targets —
 their `params` is always `{}`.
 
-## Environment & secrets
+### Environment & secrets
 
 Each workspace has an effective env: keys from the project's `.env` / `.env.local` (when
 inheritance is enabled in settings) plus **custom secrets** the user manages in the workspace env
@@ -346,7 +348,7 @@ export async function getForecast(city: string) {
 }
 ```
 
-# Verifying applets
+## Verifying applets
 
 Use `moi check --only views/<id>` or `moi check --only widgets/<id>` for the applet you changed. Use
 the kind alone only when the work spans several applets. The command owns the supported applet
@@ -375,7 +377,7 @@ After the final successful checks, always make tab focus the final workspace act
 The focused applet is the handoff. Keep the final reply brief and user-facing. Do not include file
 or storage links, file paths, or bundle, test, and runtime-log summaries.
 
-# Widgets
+## Widgets
 
 Live cards on the dashboard grid — many visible at once. `config` sets the grid footprint:
 
@@ -392,7 +394,7 @@ Render **content only**: a plain `h-full w-full` region with no card chrome (`ro
 own the fill, so the widget must set its own opaque background.
 Changing `colSpan`/`rowSpan` needs `moi bundle --force`. See `references/DESIGN.md`.
 
-# Debugging applets
+## Debugging applets
 
 `moi bundle` only proves an applet compiles — it can still fail to load in the browser, crash on
 render, or throw in its server functions. Two feedback channels exist for what happens after the
@@ -414,12 +416,12 @@ build; reach for them when they'd help (smoke-testing something new, or investig
 `moi bundle`'s footer also mentions when runtime errors are on record, so standing breakage
 surfaces on its own.
 
-# Views
+## Views
 
 Full-screen apps, one per nav tab — the user switches tabs. A view has no router of its own, but it
 can be addressed: see Driving the workspace for `focusTab` and the `params` prop.
 
-## View builder requests
+### View builder requests
 
 When the message's hidden `<moi-context>` envelope is marked `View builder request`, this chat is
 linked to a pending view tab. Before reading files, planning, or writing code, infer a short stable
@@ -448,7 +450,7 @@ export const config = {
 The inverse of a widget: a view **owns its whole page** — its own `h-full w-full` layout, scrolling
 (`overflow-auto`), padding, and chrome. Build it to read like an app screen. See `references/DESIGN.md`.
 
-# Keeping this skill current
+## Keeping this skill current
 
 This skill is installed with moi (via the CLI or the UI) and can fall behind when the moi CLI updates.
 
