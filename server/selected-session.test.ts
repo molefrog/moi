@@ -69,6 +69,20 @@ describe('selected session persistence', () => {
     expect(await getSelectedSession('/workspace')).toBe('real')
   })
 
+  test('resolves a temporary selection saved after its session was renamed', async () => {
+    await initializeSelectedSession('/workspace', null)
+
+    expect(await renameSelectedSession('/workspace', 'temporary', 'real')).toEqual({
+      changed: false,
+      sessionId: null
+    })
+    expect(await saveSelectedSession('/workspace', 'temporary', null)).toEqual({
+      changed: true,
+      sessionId: 'real'
+    })
+    expect(await getSelectedSession('/workspace')).toBe('real')
+  })
+
   test('clears only the matching selected session', async () => {
     await saveSelectedSession('/workspace', 'selected')
     expect(await clearSelectedSession('/workspace', 'other')).toEqual({
