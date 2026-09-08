@@ -191,6 +191,7 @@ export function HarnessDebugPage() {
   const [wire, setWire] = useState<WireFrame[]>([])
   const [clientFrames, setClientFrames] = useState<BroadcastFrame[]>([])
   const [events, setEvents] = useState<unknown[] | null>(null)
+  const [eventsLoadedAt, setEventsLoadedAt] = useState(0)
   const [hidePreviews, setHidePreviews] = useState(false)
   const [rightTab, setRightTab] = useState<'frames' | 'events'>('frames')
   // Split position of the wire pane, as % of the row. Wire frames are the
@@ -327,11 +328,13 @@ export function HarnessDebugPage() {
     setSessionId(crypto.randomUUID())
     setIsNew(true)
     setEvents(null)
+    setEventsLoadedAt(0)
   }, [])
 
   const fetchEvents = useCallback(async () => {
     const r = await fetch(`/api/workspaces/${workspaceId}/sessions/${sessionRef.current}/events`)
     setEvents(r.ok ? ((await r.json()) as unknown[]) : [])
+    setEventsLoadedAt(Date.now())
   }, [sessionRef, workspaceId])
 
   const effortLevels = useMemo(
@@ -585,7 +588,7 @@ export function HarnessDebugPage() {
               {events?.map((ev, i) => (
                 <LogRow
                   key={i}
-                  time={Date.now()}
+                  time={eventsLoadedAt}
                   badge="ev"
                   badgeClass="bg-teal-500/15 text-teal-600"
                   label={frameLabel(ev)}

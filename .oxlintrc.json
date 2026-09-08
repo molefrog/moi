@@ -14,6 +14,7 @@
     "typescript/no-explicit-any": "error",
     "no-empty": ["error", { "allowEmptyCatch": true }],
     "react-hooks/exhaustive-deps": "warn",
+    "react/set-state-in-effect": "warn",
     "react/no-did-update-set-state": "off"
   }
 }
