@@ -151,6 +151,7 @@ For more commands and options, use `moi help`.
 - Never read or modify files outside the `.moi` directory, unless the user explicitly asks. If you
   do need it -> ask for permission.
 - Do **not** start, stop, or inspect the Workspace web server — it is managed externally.
+- Do not run Git commands while building or verifying applets unless the user asks for Git work.
 
 ## Developing Applets
 
