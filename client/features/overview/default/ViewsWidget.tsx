@@ -150,7 +150,7 @@ function ViewItem({ view, Icon, onOpen }: ViewItemProps) {
                 variant="outline"
                 size="icon-xs"
                 aria-label={`View actions for ${label}`}
-                className="absolute -top-2 right-0 border-0 opacity-0 shadow-xs transition-opacity group-hover/item:opacity-100 group-hover/item:delay-100 group-hover/item:duration-0 focus-visible:opacity-100 data-popup-open:opacity-100"
+                className="absolute -top-2 right-0 border-0 opacity-0 shadow-xs transition-opacity group-hover/item:opacity-100 group-hover/item:delay-50 group-hover/item:duration-0 focus-visible:opacity-100 data-popup-open:opacity-100"
               >
                 <IconDots stroke={1.75} />
               </Button>
