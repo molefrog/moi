@@ -15,7 +15,7 @@ Follow generic design guidance only where it agrees with this guide.
 
 **Give expression a clear focus.** Use typography, composition, color, imagery, texture, or a small content-linked metaphor to give the applet character. A visual detail may support the subject or mood without carrying data or enabling an action. Keep the treatment focused so the content remains easy to scan. Expand a focal region only when added working space helps the task.
 
-**Group through spacing and alignment.** Start with an open layout. Use surfaces only for interactive objects, independent scrolling regions, distinct states, or a dedicated work area. Keep ordinary headings, tabs, summaries, metrics, and sections unboxed. Avoid large rounded page frames and decorative rows of cards or nested cards.
+**Group through spacing and alignment.** Start with an open layout. Prefer spacing and alignment over separators. Add a divider only when adjacent regions need a visible boundary. Use surfaces only for interactive objects, independent scrolling regions, distinct states, or a dedicated work area. Keep ordinary headings, tabs, summaries, metrics, and sections unboxed. Avoid large rounded page frames and decorative rows of cards or nested cards.
 
 **Keep a consistent rhythm.** Use a 4 px spacing rhythm, with smaller gaps inside groups and larger gaps between them. Apply outer padding once. Align repeated values and actions so content changes do not move them around. When removing a container, remove its unnecessary padding and radius and realign its contents.
 
