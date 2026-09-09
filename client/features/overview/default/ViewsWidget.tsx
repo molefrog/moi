@@ -42,7 +42,7 @@ function ViewButton({ variant = 'default', Icon, label, ariaLabel, onClick }: Vi
           )}
           data-vivid={variant === 'default' || undefined}
         >
-          <Icon size={32} stroke={1} />
+          <Icon size={32} stroke={1.5} />
         </div>
       </div>
       <span className="line-clamp-2 w-full text-xs leading-snug font-medium text-ellipsis">
