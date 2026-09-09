@@ -156,7 +156,8 @@ For more commands and options, use `moi help`.
 
 Every applet — a **Widget** or a **View** — is a default-exported React component in
 `.moi/<type>/<name>.tsx`, optionally paired with a `<name>.server.ts`. `moi bundle` compiles each
-into a live module the browser loads (edits hot-reload). Read `references/DESIGN.md` first.
+into a live module and reloads it in the browser. Run it after source edits. Read
+`references/DESIGN.md` first.
 Write normal React + Tailwind — below is only what's **moi-specific**.
 
 ### Anatomy
@@ -392,13 +393,15 @@ export const config = {
 Render **content only**: a plain `h-full w-full` region with no card chrome (`rounded-*`,
 `shadow-*`, or outer `border`) — the dashboard owns the shell, spacing, and elevation. It does not
 own the fill, so the widget must set its own opaque background.
-Changing `colSpan`/`rowSpan` needs `moi bundle --force`. See `references/DESIGN.md`.
+Changing `colSpan`/`rowSpan` needs `moi bundle --force --only widgets/<id>`. See
+`references/DESIGN.md`.
 
 ## Debugging applets
 
 `moi bundle` only proves an applet compiles — it can still fail to load in the browser, crash on
-render, or throw in its server functions. Two feedback channels exist for what happens after the
-build; reach for them when they'd help (smoke-testing something new, or investigating a problem):
+render, or throw in its server functions. For frontend rebuilds, check runtime logs as required
+above. For other work, use these channels when smoke-testing new behavior or investigating a
+problem:
 
 - `moi call-server-fn widgets/hello/getGreeting` /
   `moi call-server-fn views/crm/searchUsers '["ann", 10]'` — run one `.server.ts` function
@@ -435,9 +438,9 @@ moi builder set <view-id> --builder <builder-id> --kind view --title "<title>" -
 Choose the icon id from the available view icons in the hidden context. The id must use lowercase
 letters, numbers, `_`, or `-`. The first call locks the id; running the same command again may update
 its title and icon. After claiming, write `.moi/views/<view-id>.tsx`, use the same icon id in its
-config, and build it with `moi bundle --only views`. The tab uses the claimed title and icon while you
-work and changes into the built view after a successful bundle. (Bundling marks the view ready; the
-build state is otherwise server-managed, so you never set it to done by hand.)
+config, and build it with `moi bundle --only views/<view-id>`. The tab uses the claimed title and icon
+while you work and changes into the built view after a successful bundle. (Bundling marks the view
+ready; the build state is otherwise server-managed, so you never set it to done by hand.)
 
 ```ts
 export const config = {
