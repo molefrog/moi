@@ -381,6 +381,12 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   useWorkspaceEvent(event => {
     if (event.type === 'tab:focus' && event.workspaceId === workspaceId) {
       openTab(event.tab, event.params)
+    } else if (
+      event.type === 'view:deleted' &&
+      event.workspaceId === workspaceId &&
+      activeTab === viewTabId(event.name)
+    ) {
+      openTab('overview')
     }
   })
 

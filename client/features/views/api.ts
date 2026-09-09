@@ -18,6 +18,28 @@ export function useViews(workspaceId: string) {
   })
 }
 
+export function useRenameView(workspaceId: string) {
+  return useMutation<ViewInfo, Error, { viewId: string; title: string }>({
+    mutationFn: ({ viewId, title }) =>
+      requestJson(
+        `/api/workspaces/${workspaceId}/views/${encodeURIComponent(viewId)}`,
+        jsonRequest('PATCH', { title }),
+        'Failed to rename view'
+      )
+  })
+}
+
+export function useDeleteView(workspaceId: string) {
+  return useMutation<void, Error, string>({
+    mutationFn: viewId =>
+      requestVoid(
+        `/api/workspaces/${workspaceId}/views/${encodeURIComponent(viewId)}`,
+        { method: 'DELETE' },
+        'Failed to delete view'
+      )
+  })
+}
+
 function upsertBuilder(builders: ViewBuilder[] | undefined, builder: ViewBuilder): ViewBuilder[] {
   const current = builders ?? []
   const index = current.findIndex(candidate => candidate.id === builder.id)

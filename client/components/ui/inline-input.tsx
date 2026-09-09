@@ -12,6 +12,7 @@ type InputKeyboardEvent = Parameters<NonNullable<InputPrimitiveProps['onKeyDown'
 type InlineInputProps = Omit<InputPrimitiveProps, 'onChange'> & {
   onValueChange?: (value: string) => void
   onValueCommit?: (value: string) => void
+  selectOnFocus?: boolean
 }
 
 function InlineInput({
@@ -21,6 +22,7 @@ function InlineInput({
   onKeyDown,
   onValueChange,
   onValueCommit,
+  selectOnFocus,
   ...props
 }: InlineInputProps) {
   const valueBeforeEditRef = useRef<string | null>(null)
@@ -36,6 +38,13 @@ function InlineInput({
 
   function handleFocus(event: InputFocusEvent) {
     valueBeforeEditRef.current = event.currentTarget.value
+    if (selectOnFocus) {
+      const input = event.currentTarget
+      input.select()
+      requestAnimationFrame(() => {
+        input.scrollLeft = 0
+      })
+    }
     onFocus?.(event)
   }
 

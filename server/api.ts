@@ -66,7 +66,14 @@ import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from './skill-update'
 import { serveWorkspaceImagePreview } from './preview'
 import { MAX_UPLOAD_BYTES, addUpload, getUpload } from './uploads'
 import { requiredEnvFor } from './required-env'
-import { getViewList, listViews, serveView } from './views'
+import {
+  deleteView,
+  getViewList,
+  listViews,
+  serveView,
+  updateViewTitle,
+  ViewMutationError
+} from './views'
 import {
   ViewBuilderError,
   beginViewBuilder,
@@ -193,6 +200,31 @@ one.get('/widgets/*', c => {
 // Views — full-screen agent apps. Mirrors the widget pair above: the exact path
 // lists (in manifest/nav order), `/*` serves one bundle file.
 one.get('/views', c => listViews(c.get('ws').path))
+
+one.patch('/views/:viewId', async c => {
+  const ws = c.get('ws')
+  const body = await c.req.json().catch(() => null)
+  const title = typeof body?.title === 'string' ? body.title.trim() : ''
+  if (!title) return c.text('Expected { title: string }', 400)
+
+  try {
+    return c.json(await updateViewTitle(publishEvent, ws.id, ws.path, c.req.param('viewId'), title))
+  } catch (error) {
+    if (error instanceof ViewMutationError) return c.text(error.message, error.status)
+    throw error
+  }
+})
+
+one.delete('/views/:viewId', async c => {
+  const ws = c.get('ws')
+  try {
+    await deleteView(publishEvent, ws.id, ws.path, c.req.param('viewId'))
+    return c.body(null, 204)
+  } catch (error) {
+    if (error instanceof ViewMutationError) return c.text(error.message, error.status)
+    throw error
+  }
+})
 
 one.get('/views/*', c => {
   const ws = c.get('ws')
