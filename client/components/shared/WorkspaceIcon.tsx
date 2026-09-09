@@ -52,7 +52,7 @@ function renderIconContent(
       if (Glyph) {
         return createElement(Glyph, {
           'aria-hidden': true,
-          stroke: 1.6,
+          stroke: 1.75,
           className: themed ? 'size-[70%]' : 'size-[95%] text-foreground'
         })
       }
