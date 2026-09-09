@@ -78,7 +78,7 @@ export function WorkspaceIcon({
   return (
     <span
       className={cn(
-        '[container-type:inline-size] inline-flex shrink-0 items-center justify-center overflow-hidden',
+        '@container inline-flex shrink-0 items-center justify-center overflow-hidden',
         themed && 'shadow-[inset_0_0_1rem_rgba(255,255,255,0.3)]',
         className
       )}
