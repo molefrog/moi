@@ -174,3 +174,26 @@ describe('sameResidents', () => {
     expect(sameResidents(residents, [residents[0], { id: 'orders', releasedAt: 2001 }])).toBe(false)
   })
 })
+
+test('an in-flight tool holds its view without resetting the retention deadline', () => {
+  const resident = [{ id: 'orders', releasedAt: 1000 }]
+  const now = 1000 + VIEW_RETENTION_MS
+  const options = { activeId: null, available: availability('orders'), now }
+  const pinned = new Set(['orders'])
+  expect(reconcileResidents(resident, { ...options, pinned })).toEqual(resident)
+  expect(nextEvictionDelay(resident, now, pinned)).toBeNull()
+  expect(reconcileResidents(resident, options)).toEqual([])
+  expect(reconcileResidents(resident, { ...options, pinned, available: new Set() })).toEqual([])
+})
+
+test('the capacity limit evicts an idle view before an older running tool', () => {
+  const residents = ['a', 'b', 'c', 'd'].map(id => ({ id, releasedAt: 1000 }))
+  expect(
+    reconcileResidents(residents, {
+      activeId: 'e',
+      available: availability('a', 'b', 'c', 'd', 'e'),
+      now: 2000,
+      pinned: new Set(['d'])
+    }).map(view => view.id)
+  ).toEqual(['e', 'a', 'b', 'd'])
+})

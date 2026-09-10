@@ -84,8 +84,8 @@ Invoke one exported `.server.ts` function directly. Server functions only — th
 general script runner (that's `moi env exec`).
 
 ```
-moi call-server-fn widgets/hello/getGreeting              # no arguments
-moi call-server-fn views/crm/searchUsers '["ann", 10]'    # args as one JSON array
+moi call-server-fn widget:hello/getGreeting              # no arguments
+moi call-server-fn view:crm/searchUsers '["ann", 10]'    # args as one JSON array
 ```
 
 - **Ephemeral, isolated execution.** Each invocation spawns a **fresh one-shot worker
@@ -151,3 +151,11 @@ always on, opting in is only about _reading_ it.
 - Slow-call warnings: record `rpc` entries for calls that succeed but take >5s.
 - Console capture: attribute applet `console.error` output the way window errors are.
 - More `moi debug` subcommands: worker-pool state, recent RPC traces, env diagnostics.
+
+## Live view tools
+
+`moi call-tool view:orders/set_filter '{"status":"overdue"}'` invokes a WebMCP-shaped
+tool in a resident browser view. Read that view's source for names and input schemas.
+Use this for live selections, filters and drafts; use `call-server-fn` for backend operations.
+The view can be parked within the existing retention window; eviction produces an error.
+Native WebMCP is optional for CLI calls. See the workspace skill's live view tools section.

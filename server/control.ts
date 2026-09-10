@@ -1,6 +1,9 @@
 import { stringify as devalueStringify } from 'devalue'
 import { resolve } from 'path'
 
+import { normalizeFunctionAddress, parseToolAddress } from '@/lib/call-address'
+import { isRecord, isJsonValue } from '@/lib/view-tools'
+
 import { resolveWorkspaceTheme } from '@/lib/themes'
 import type { WorkspaceEntry } from '@/lib/types'
 import { isParamsRecord } from '@/lib/workspace-tabs'
@@ -30,6 +33,7 @@ import {
 } from './view-builders'
 import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
 import { VERSION } from './version'
+import { viewToolRelay } from './view-tool-relay'
 
 type ControlSocket = { send(data: string): void }
 
@@ -61,6 +65,8 @@ async function resolveWorkspace(
   return match
 }
 
+const toolCalls = new Map<ControlSocket, Set<AbortController>>()
+
 export const control = Bun.serve({
   port: CONTROL_PORT,
   hostname: CONTROL_HOST,
@@ -70,6 +76,10 @@ export const control = Bun.serve({
       : new Response('Control WebSocket only', { status: 426 })
   },
   websocket: {
+    close(ws) {
+      for (const call of toolCalls.get(ws) ?? []) call.abort()
+      toolCalls.delete(ws)
+    },
     async message(ws, message) {
       try {
         const data = JSON.parse(String(message))
@@ -167,7 +177,42 @@ export const control = Bun.serve({
           return
         }
 
-        // Direct server-function invocation — `moi call-server-fn <module>/<fn>`.
+        if (data.type === 'call-tool') {
+          const match = await resolveWorkspace(ws, data.path)
+          if (!match) return
+          const address = parseToolAddress(String(data.tool ?? ''))
+          if (!address) {
+            ws.send(
+              JSON.stringify({ error: 'Use view:<name>/<tool>, e.g. view:orders/set_filter.' })
+            )
+            return
+          }
+          const args = JSON.parse(String(data.args ?? '{}'))
+          if (!isRecord(args) || !isJsonValue(args)) {
+            ws.send(JSON.stringify({ error: 'Tool arguments must be a JSON object.' }))
+            return
+          }
+          const controller = new AbortController()
+          const calls = toolCalls.get(ws) ?? new Set<AbortController>()
+          toolCalls.set(ws, calls)
+          calls.add(controller)
+          const start = performance.now()
+          try {
+            const result = await viewToolRelay.call(
+              match.id,
+              address.viewId,
+              address.name,
+              args,
+              controller.signal
+            )
+            ws.send(JSON.stringify({ ok: true, result, ms: Math.round(performance.now() - start) }))
+          } finally {
+            calls.delete(controller)
+            if (!calls.size) toolCalls.delete(ws)
+          }
+          return
+        }
+        // Direct server-function invocation — `moi call-server-fn <target>/<fn>`.
         // Runs in an EPHEMERAL worker: a fresh process spawned for this one call
         // and killed after, so a debug invocation is fully isolated from the
         // warm pool the widgets use (same env/timeout/wire format otherwise).
@@ -177,11 +222,11 @@ export const control = Bun.serve({
         if (data.type === 'call-server-fn') {
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
-          const parsed = parseFunctionPath(String(data.fn ?? ''))
+          const parsed = parseFunctionPath(normalizeFunctionAddress(String(data.fn ?? '')))
           if (!parsed) {
             ws.send(
               JSON.stringify({
-                error: `Invalid function path "${data.fn}". Use <module>/<fn>, e.g. widgets/hello/getGreeting.`
+                error: `Invalid function path "${data.fn}". Use <target>/<fn>, e.g. view:orders/listOrders or widget:hello/getGreeting.`
               })
             )
             return

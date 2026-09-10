@@ -13,7 +13,15 @@
 // because both builds share the slot's style tag (see ViewSlot), and it is
 // worth the 200ms — it is the only signal that the thing under your cursor just
 // changed underneath you.
-import { Activity, type ComponentType, memo, useCallback, useEffect, useState } from 'react'
+import {
+  Activity,
+  type ComponentType,
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useState
+} from 'react'
 
 import { Spinner } from '@/client/components/ui/spinner'
 import { appletScope, appletStyleKey } from '@/client/features/applets/applet-cache'
@@ -30,6 +38,7 @@ import { cn } from '@/client/lib/cn'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { ViewInfo } from '@/lib/types'
 
+import { useViewTools } from './useViewTools'
 import {
   nextEvictionDelay,
   reconcileResidents,
@@ -61,7 +70,12 @@ export const ViewManager = memo(function ViewManager({
   activeViewId,
   params
 }: ViewManagerProps) {
-  const residents = useResidentViews(activeViewId, views)
+  const workspaceId = useWorkspaceId()
+  const { busyViews, updateResidents, ready } = useViewTools(workspaceId)
+  const residents = useResidentViews(activeViewId, views, busyViews)
+  useLayoutEffect(() => {
+    updateResidents(residents)
+  }, [residents, updateResidents])
   // Render in workspace order, not residency order: the policy ranks views by
   // recency, and reordering the children would make React move live DOM around
   // on every switch. The slots are stacked absolutely with one visible, so
@@ -76,7 +90,14 @@ export const ViewManager = memo(function ViewManager({
       {views
         .filter(view => resident.has(view.id))
         .map(view => (
-          <ViewSlot key={view.id} view={view} active={view.id === activeViewId} params={params} />
+          <ViewSlot
+            key={view.id}
+            view={view}
+            active={view.id === activeViewId}
+            params={params}
+            running={busyViews.has(view.id)}
+            onToolReady={ready}
+          />
         ))}
     </div>
   )
@@ -84,7 +105,11 @@ export const ViewManager = memo(function ViewManager({
 
 // The views mounted right now: the active one, plus the recently-visited ones
 // parked offscreen. The policy (and its timing) lives in view-residency.ts.
-function useResidentViews(activeId: string | null, views: ViewInfo[]): ResidentView[] {
+function useResidentViews(
+  activeId: string | null,
+  views: ViewInfo[],
+  pinned: ReadonlySet<string>
+): ResidentView[] {
   const [residents, setResidents] = useState<ResidentView[]>([])
   // A workspace refetch hands us a new array on every event; residency only
   // cares whether a view appeared or disappeared. So the effect keys off the id
@@ -97,11 +122,12 @@ function useResidentViews(activeId: string | null, views: ViewInfo[]): ResidentV
       const next = reconcileResidents(current, {
         activeId,
         available: new Set(viewsRef.current.map(view => view.id)),
-        now: Date.now()
+        now: Date.now(),
+        pinned
       })
       return sameResidents(current, next) ? current : next
     })
-  }, [activeId, viewsRef])
+  }, [activeId, viewsRef, pinned])
 
   // Promote the view the user switched to, and release the one it replaced.
   useEffect(() => {
@@ -110,16 +136,18 @@ function useResidentViews(activeId: string | null, views: ViewInfo[]): ResidentV
 
   // Then evict on the retention deadline — one timer, for the nearest one.
   useEffect(() => {
-    const delay = nextEvictionDelay(residents, Date.now())
+    const delay = nextEvictionDelay(residents, Date.now(), pinned)
     if (delay === null) return
     const timer = setTimeout(reconcile, delay)
     return () => clearTimeout(timer)
-  }, [reconcile, residents])
+  }, [reconcile, residents, pinned])
 
   return residents
 }
 
 type ViewSlotProps = {
+  running: boolean
+  onToolReady: (viewId: string) => void
   view: ViewInfo
   active: boolean
   params: Record<string, unknown>
@@ -128,7 +156,7 @@ type ViewSlotProps = {
 // One resident view. The bundle it holds is loaded and kept fresh for as long
 // as the slot lives — a view rebuilt while parked picks the new build up in
 // place, so it is current the moment the user comes back to it.
-function ViewSlot({ view, active, params }: ViewSlotProps) {
+function ViewSlot({ view, active, params, running, onToolReady }: ViewSlotProps) {
   const workspaceId = useWorkspaceId()
   const bundle = useView(view.id)
   const { current, outgoing } = useLoadedBundle(bundle, active)
@@ -151,6 +179,10 @@ function ViewSlot({ view, active, params }: ViewSlotProps) {
     active
   )
 
+  useEffect(() => {
+    if (running && current && bundle.status === 'ready') onToolReady(view.id)
+  }, [running, current, bundle.status, view.id, onToolReady])
+
   const failed = bundle.status === 'error'
   useAppletThumbnails({
     kind: 'view',
@@ -171,21 +203,27 @@ function ViewSlot({ view, active, params }: ViewSlotProps) {
       {active && !failed && !current && <ViewSplash />}
       {current &&
         !failed && (
-          // React hides these nodes with `display: none` while the Activity is
-          // hidden, so a parked view neither paints nor swallows clicks.
-          <Activity mode={active ? 'visible' : 'hidden'}>
-            {outgoing && (
-              <ViewFrame key={outgoing.version} view={view} build={outgoing} params={shownParams} />
-            )}
-            <ViewFrame
-              key={current.version}
-              view={view}
-              build={current}
-              params={shownParams}
-              entering={outgoing !== null}
-              thumbnailTarget
-            />
-          </Activity>
+          // Keep parked views visually hidden even while a tool wakes their effects.
+          <div className={cn('contents', !active && 'hidden')}>
+            <Activity mode={active || running ? 'visible' : 'hidden'}>
+              {outgoing && (
+                <ViewFrame
+                  key={outgoing.version}
+                  view={view}
+                  build={outgoing}
+                  params={shownParams}
+                />
+              )}
+              <ViewFrame
+                key={current.version}
+                view={view}
+                build={current}
+                params={shownParams}
+                entering={outgoing !== null}
+                thumbnailTarget
+              />
+            </Activity>
+          </div>
         )}
     </>
   )

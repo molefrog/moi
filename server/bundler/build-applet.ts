@@ -256,6 +256,7 @@ export function rpc(module, name) {
 // surfaced from the bundle entry below — they are deliberately NOT part of the
 // author-facing `declare module 'moi'` ambient types (server/moi-scaffold.ts).
 const MOI_MODULE_SOURCE = `
+import { useEffect, useLayoutEffect, useRef } from "react";
 const BASE = ${JSON.stringify(APPLET_API_BASE_SENTINEL)};
 
 let bridge = null;
@@ -266,6 +267,19 @@ export function __attachBridge(next) {
 
 export function __getBridge() {
   return bridge;
+}
+
+export function useTool(tool) {
+  const latest = useRef(tool);
+  useLayoutEffect(() => { latest.current = tool; });
+  const schema = JSON.stringify(tool.inputSchema);
+  const annotations = JSON.stringify(tool.annotations);
+  useEffect(() => {
+    return bridge?.registerTool({
+      ...tool,
+      execute: (args, options) => latest.current.execute(args, options)
+    });
+  }, [tool.name, tool.description, schema, annotations]);
 }
 
 export function fileUrl(path) {

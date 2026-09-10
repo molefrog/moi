@@ -29,13 +29,14 @@ type ReconcileInput = {
   // bundle is gone and its parked DOM would only hold dead styles.
   available: ReadonlySet<string>
   now: number
+  pinned?: ReadonlySet<string>
 }
 
 // The resident set after promoting the active view and expiring the rest.
 // Ordered most-recently-active first, so the cap drops the coldest view.
 export function reconcileResidents(
   residents: readonly ResidentView[],
-  { activeId, available, now }: ReconcileInput
+  { activeId, available, now, pinned }: ReconcileInput
 ): ResidentView[] {
   const next: ResidentView[] = []
   if (activeId !== null && available.has(activeId)) next.push({ id: activeId, releasedAt: null })
@@ -43,20 +44,28 @@ export function reconcileResidents(
   for (const resident of residents) {
     if (resident.id === activeId || !available.has(resident.id)) continue
     const releasedAt = resident.releasedAt ?? now
-    if (now - releasedAt >= VIEW_RETENTION_MS) continue
-    if (next.length >= MAX_RESIDENT_VIEWS) break
+    if (!pinned?.has(resident.id) && now - releasedAt >= VIEW_RETENTION_MS) continue
     next.push({ id: resident.id, releasedAt })
   }
 
+  // Make room by evicting the coldest idle view, never a running tool or the active view.
+  for (let i = next.length - 1; next.length > MAX_RESIDENT_VIEWS && i >= 0; i--) {
+    if (next[i].id !== activeId && !pinned?.has(next[i].id)) next.splice(i, 1)
+  }
   return next
 }
 
 // Milliseconds until the next resident falls out of the retention window, or
 // null when nothing is on the clock (every resident is active). ViewManager
 // arms a single timer on this instead of one timer per view.
-export function nextEvictionDelay(residents: readonly ResidentView[], now: number): number | null {
+export function nextEvictionDelay(
+  residents: readonly ResidentView[],
+  now: number,
+  pinned?: ReadonlySet<string>
+): number | null {
   let earliest: number | null = null
-  for (const { releasedAt } of residents) {
+  for (const { id, releasedAt } of residents) {
+    if (pinned?.has(id)) continue
     if (releasedAt === null) continue
     const deadline = releasedAt + VIEW_RETENTION_MS
     if (earliest === null || deadline < earliest) earliest = deadline

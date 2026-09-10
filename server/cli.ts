@@ -1793,8 +1793,28 @@ function sendControl(
   onResult: (res: Record<string, unknown>) => void | Promise<void>
 ) {
   const ws = new WebSocket(CONTROL_URL)
+  let received = false
+  const timer =
+    payload.type === 'call-tool'
+      ? setTimeout(() => {
+          console.error(
+            'Tool connection timed out. State may already have changed; do not retry automatically.'
+          )
+          ws.close()
+          process.exit(1)
+        }, 32_000)
+      : undefined
+  ws.onclose = () => {
+    if (timer) clearTimeout(timer)
+    if (payload.type === 'call-tool' && !received) {
+      console.error('Tool connection closed before a result. State may already have changed.')
+      process.exit(1)
+    }
+  }
   ws.onopen = () => ws.send(JSON.stringify(payload))
   ws.onmessage = async event => {
+    received = true
+    if (timer) clearTimeout(timer)
     const res = JSON.parse(String(event.data))
     if (res.error) {
       console.error('\n' + pc.red('✗') + ' ' + res.error + '\n')
@@ -2150,6 +2170,37 @@ const scratch = defineCommand({
 
 // ---- self-correction commands (docs/self-correction.md) ---------------------
 
+const callTool = defineCommand({
+  meta: {
+    name: 'call-tool',
+    description: 'Call a live view WebMCP tool (requires a resident view in one browser)'
+  },
+  args: {
+    tool: {
+      type: 'positional',
+      required: true,
+      description: 'Tool address: view:<name>/<tool>, e.g. view:orders/set_filter'
+    },
+    args: {
+      type: 'positional',
+      required: false,
+      description: 'Named arguments as a JSON object (default {})'
+    },
+    dir: dirArg
+  },
+  run({ args }) {
+    const path = resolve(args.dir)
+    sendControl(
+      path,
+      { type: 'call-tool', path, tool: args.tool, args: args.args ?? '{}' },
+      res => {
+        console.log(JSON.stringify(res.result, null, 2))
+        console.error(pc.dim(`↩ ${res.ms}ms`))
+      }
+    )
+  }
+})
+
 const callServerFn = defineCommand({
   meta: {
     name: 'call-server-fn',
@@ -2159,7 +2210,8 @@ const callServerFn = defineCommand({
     fn: {
       type: 'positional',
       required: true,
-      description: 'Function path: <module>/<fn>, e.g. widgets/hello/getGreeting'
+      description:
+        'Function address: <target>/<fn>, e.g. view:orders/listOrders or widget:hello/getGreeting'
     },
     args: {
       type: 'positional',
@@ -2968,6 +3020,7 @@ const workspaceCommands = {
   refresh,
   builder,
   'call-server-fn': callServerFn,
+  'call-tool': callTool,
   debug,
   theme,
   config,

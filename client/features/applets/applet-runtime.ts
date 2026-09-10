@@ -16,6 +16,9 @@
 // also unbind those listeners or a disposed module leaks.
 import { useEffect } from 'react'
 
+import type { ViewTool } from '@/lib/view-tools'
+import { registerViewTool } from './view-tools'
+
 import { createNanoEvents } from 'nanoevents'
 
 import { reportAppletError } from '@/client/features/applets/applet-log'
@@ -54,6 +57,7 @@ export type AppletEvents = {
 // cross the trust boundary from agent-authored code, and the runtime narrows
 // them before emitting.
 export type AppletBridge = {
+  registerTool: (tool: ViewTool) => () => void
   focusTab: (tab: unknown, params?: unknown) => void
   sendChatMessage: (message: unknown, context?: unknown) => void
 }
@@ -122,8 +126,22 @@ function createRuntime(workspaceId: string) {
     // (workspace screen unmounted) is a no-op by nanoevents semantics.
     connect(identity: AppletIdentity) {
       let alive = true
+      const tools = new Set<() => void>()
       const source = appletSource(identity)
       const bridge: AppletBridge = {
+        registerTool(tool) {
+          if (!alive) return () => {}
+          if (identity.kind !== 'view') throw new Error('useTool is available in views only.')
+          const unregister = registerViewTool(workspaceId, identity.name, tool, message =>
+            drop(identity, message)
+          )
+          const disposeTool = () => {
+            unregister()
+            tools.delete(disposeTool)
+          }
+          tools.add(disposeTool)
+          return disposeTool
+        },
         focusTab(tab, params) {
           if (!alive) return
           if (!isWorkspaceTabId(tab)) return
@@ -155,6 +173,7 @@ function createRuntime(workspaceId: string) {
         bridge,
         dispose: () => {
           alive = false
+          for (const disposeTool of tools) disposeTool()
         }
       }
     }
