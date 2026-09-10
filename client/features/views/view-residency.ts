@@ -47,7 +47,6 @@ export function reconcileResidents(
     if (next.length >= MAX_RESIDENT_VIEWS) break
     next.push({ id: resident.id, releasedAt })
   }
-
   return next
 }
 

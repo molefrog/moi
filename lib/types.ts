@@ -104,27 +104,27 @@ export type AppletClientError = {
   stack?: string
 }
 
-// A Scratchpad draw/view operation issued by `moi scratch`. Mutations run
-// server-side against a headless tldraw store; `view` relays to a live tab. The
-// server assigns each add op a `name` (the `--id`, or a generated one) so the
-// derived tldraw shape id is deterministic and addressable later. Arrow endpoints
-// bind to a shape (by name) or sit at a free point. See docs/moi-scratchpad.md.
+// A Scratchpad draw/render operation issued through the `scratchpad` tool target.
+// Mutations run server-side against a headless tldraw store; `view` relays to a
+// live tab. The tool provider assigns each add op an `id` when one is omitted so
+// the derived tldraw shape id is deterministic and addressable later. Arrow
+// endpoints bind to a shape by id or sit at a free point. See docs/moi-scratchpad.md.
 export type ScratchPoint = { x: number; y: number }
-export type ScratchArrowEnd = { name: string } | ScratchPoint
+export type ScratchArrowEnd = { id: string } | ScratchPoint
 
 // The Scratchpad's color palette — the same six swatches the UI toolbar offers,
-// so the agent can only paint what the user can. The CLI also accepts an arbitrary
+// so the agent can only paint what the user can. The tool also accepts an arbitrary
 // hex and snaps it to the nearest of these (tldraw shapes hold a palette color, not
 // free hex).
 export type ScratchColor = 'black' | 'grey' | 'blue' | 'green' | 'yellow' | 'red'
 
-// tldraw's DefaultSizeStyle, exposed under two friendlier CLI names for the two
-// shapes that use it: arrows take `--stroke small|large` (line weight), text &
-// notes take `--font-size regular|big` (label size). Both map onto the same
+// tldraw's DefaultSizeStyle, exposed under friendlier tool arguments for the two
+// shapes that use it: arrows take `stroke: small|large` (line weight), text and
+// notes take `fontSize: regular|big` (label size). Both map onto the same
 // underlying tldraw size — `small`/`regular` → 'm', `large`/`big` → 'xl'.
 export type ScratchSize = 'm' | 'xl'
 
-// Fill style for rectangles — the UI toolbar's four options. The CLI takes
+// Fill style for rectangles — the UI toolbar's four options. The tool takes
 // `none|semi|pattern|solid`; ops carry the tldraw DefaultFillStyle value. Note the
 // tldraw quirk (see defaultFills / FILL_OPTIONS in client/components/Scratchpad.tsx):
 // fill value 'solid' paints the lighter "semi" color, while 'fill' paints the true
@@ -132,32 +132,32 @@ export type ScratchSize = 'm' | 'xl'
 export type ScratchFill = 'none' | 'solid' | 'pattern' | 'fill'
 
 // Optional styling carried by every add op. Omitted fields fall back to the
-// shape's tldraw default. `size` is set from `--stroke` (arrows) or `--font-size`
-// (text/notes); `fill` from `--fill` (rectangles).
+// shape's tldraw default. `size` is set from `stroke` (arrows) or `fontSize`
+// (text/notes); `fill` comes from the rectangle's `fill` argument.
 export type ScratchStyle = { color?: ScratchColor; size?: ScratchSize; fill?: ScratchFill }
 
-// Resize preset for `add image`: 'lo' caps the long side smaller (default, keeps
+// Resize preset for `add_image`: 'lo' caps the long side smaller (default, keeps
 // the canvas light), 'hi' allows more pixels when detail matters.
 export type ScratchImageQuality = 'lo' | 'hi'
 
 export type ScratchOp =
-  | ({ kind: 'add-text'; name: string; x: number; y: number; text: string } & ScratchStyle)
+  | ({ kind: 'add-text'; id: string; x: number; y: number; text: string } & ScratchStyle)
   | ({
       kind: 'add-rect'
-      name: string
+      id: string
       x: number
       y: number
       w: number
       h: number
       text?: string
     } & ScratchStyle)
-  | ({ kind: 'add-note'; name: string; x: number; y: number; text: string } & ScratchStyle)
+  | ({ kind: 'add-note'; id: string; x: number; y: number; text: string } & ScratchStyle)
   // Add an image from a local file `path` — the server resizes it to fit the
   // canvas and embeds it (color/stroke don't apply, so no ScratchStyle).
   // `quality` picks the resize preset: 'lo' (default, smaller) or 'hi' (sharper).
   | {
       kind: 'add-image'
-      name: string
+      id: string
       x: number
       y: number
       path: string
@@ -165,21 +165,21 @@ export type ScratchOp =
     }
   | ({
       kind: 'add-arrow'
-      name: string
+      id: string
       from: ScratchArrowEnd
       to: ScratchArrowEnd
       // Right-angle (orthogonal) routing for clean diagrams; default is a curved arc.
       elbow?: boolean
     } & ScratchStyle)
-  | { kind: 'move'; name: string; x: number; y: number }
-  | { kind: 'set'; name: string; text: string }
-  | { kind: 'delete'; name: string }
+  | { kind: 'move'; id: string; x: number; y: number }
+  | { kind: 'set'; id: string; text: string }
+  | { kind: 'delete'; id: string }
   | { kind: 'clear' }
   | { kind: 'view' }
 
-// What a tab returns after running an op: a shape's `name` for add ops, a PNG
+// What an executor returns after running an op: a shape's `id` for add ops, a PNG
 // data URL for `view`, or a bare ack for mutations.
-export type ScratchOpResult = { name: string } | { image: string } | { ok: true }
+export type ScratchOpResult = { id: string } | { image: string } | { ok: true }
 
 // The process that last persisted `.moi/.scratchpad.json` (always the server —
 // browser saves funnel through it). Stamped on save so an older reader hitting
@@ -246,7 +246,7 @@ export type ClientMessage =
     }
   | { type: 'stop'; workspaceId: string; sessionId: string }
   // Reply to a relayed Scratchpad op (see ScratchpadOpMessage). Carries the
-  // op's correlation id so the server settles the right pending CLI request.
+  // op's correlation id so the server settles the right pending tool call.
   | { type: 'scratchpad:op-result'; opId: string; result?: ScratchOpResult; error?: string }
 
 // Session info returned by list endpoint

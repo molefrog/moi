@@ -1,4 +1,3 @@
-import { stringify as devalueStringify } from 'devalue'
 import { resolve } from 'path'
 
 import { resolveWorkspaceTheme } from '@/lib/themes'
@@ -9,14 +8,10 @@ import { clearAppletLog, getAppletLog, getAppletLogCount } from './applet-log'
 import { serializeWorkspaceBundle } from './bundle-queue'
 import { CONTROL_HOST, CONTROL_PORT, PORT } from './constants'
 import { applyEnvChanged } from './env-apply'
-import { callFunctionEphemeral, parseFunctionPath } from './functions'
 import { processIcon } from './icon'
 import { loadLayout, saveLayout } from './layout'
 import { publishEvent } from './events'
 import { findWorkspaceForPath, listWorkspaces, registerWorkspace } from './registry'
-import { executeScratchOp } from './scratchpad-executor'
-import { readScratchpadImage, readScratchpadShapes } from './scratchpad'
-import { relayScratchOp } from './scratchpad-relay'
 import { broadcastAll } from './state'
 import { assembleTabRows, resolveFocusTab } from './tabs'
 import { applyThemeUpdate } from './theme'
@@ -30,12 +25,13 @@ import {
 } from './view-builders'
 import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
 import { VERSION } from './version'
+import { callTool, listTools } from './tools'
 
 type ControlSocket = { send(data: string): void }
 
 // Resolve a control request's `path` to the registered workspace that contains
 // it — the entry itself or its nearest registered ancestor — so every
-// workspace-scoped command (bundle/theme/config/scratch) works from `.moi/` or
+// workspace-scoped command (bundle/theme/config/tools/call) works from `.moi/` or
 // any subdirectory instead of operating on a phantom nested path. Sends a clear
 // error and returns null when nothing is registered, or the path is outside
 // every workspace.
@@ -61,6 +57,8 @@ async function resolveWorkspace(
   return match
 }
 
+const toolCalls = new Map<ControlSocket, Set<AbortController>>()
+
 export const control = Bun.serve({
   port: CONTROL_PORT,
   hostname: CONTROL_HOST,
@@ -70,6 +68,10 @@ export const control = Bun.serve({
       : new Response('Control WebSocket only', { status: 426 })
   },
   websocket: {
+    close(ws) {
+      for (const call of toolCalls.get(ws) ?? []) call.abort()
+      toolCalls.delete(ws)
+    },
     async message(ws, message) {
       try {
         const data = JSON.parse(String(message))
@@ -167,62 +169,33 @@ export const control = Bun.serve({
           return
         }
 
-        // Direct server-function invocation — `moi call-server-fn <module>/<fn>`.
-        // Runs in an EPHEMERAL worker: a fresh process spawned for this one call
-        // and killed after, so a debug invocation is fully isolated from the
-        // warm pool the widgets use (same env/timeout/wire format otherwise).
-        // Args arrive as plain JSON (easier to hand-write than devalue's wire
-        // format) and are re-encoded for the worker; the result goes back
-        // devalue-encoded for the CLI to render.
-        if (data.type === 'call-server-fn') {
+        if (data.type === 'tools' || data.type === 'call') {
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
-          const parsed = parseFunctionPath(String(data.fn ?? ''))
-          if (!parsed) {
-            ws.send(
-              JSON.stringify({
-                error: `Invalid function path "${data.fn}". Use <module>/<fn>, e.g. widgets/hello/getGreeting.`
-              })
-            )
-            return
-          }
-          let args: unknown
+          if (ws.readyState !== 1) return
+          const controller = new AbortController()
+          const calls = toolCalls.get(ws) ?? new Set<AbortController>()
+          toolCalls.set(ws, calls)
+          calls.add(controller)
+          const start = performance.now()
           try {
-            args = JSON.parse(String(data.args ?? '[]'))
-          } catch (err) {
-            ws.send(
-              JSON.stringify({
-                error: `Arguments must be valid JSON: ${err instanceof Error ? err.message : String(err)}`
-              })
-            )
-            return
-          }
-          if (!Array.isArray(args)) {
-            ws.send(
-              JSON.stringify({ error: 'Arguments must be a JSON array, e.g. \'["ann", 10]\'' })
-            )
-            return
-          }
-          const t0 = performance.now()
-          try {
-            const result = await callFunctionEphemeral(
-              parsed.module,
-              parsed.name,
-              devalueStringify(args),
-              match.path
-            )
-            ws.send(JSON.stringify({ ok: true, result, ms: Math.round(performance.now() - t0) }))
-          } catch (err) {
-            ws.send(
-              JSON.stringify({
-                error: err instanceof Error ? err.message : String(err),
-                ms: Math.round(performance.now() - t0)
-              })
-            )
+            const result =
+              data.type === 'tools'
+                ? await listTools(match, String(data.target ?? ''), controller.signal)
+                : await callTool(
+                    match,
+                    String(data.target ?? ''),
+                    String(data.tool ?? ''),
+                    JSON.parse(String(data.args ?? '{}')),
+                    controller.signal
+                  )
+            ws.send(JSON.stringify({ ok: true, result, ms: Math.round(performance.now() - start) }))
+          } finally {
+            calls.delete(controller)
+            if (!calls.size) toolCalls.delete(ws)
           }
           return
         }
-
         if (data.type === 'builder:set') {
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
@@ -430,51 +403,6 @@ export const control = Bun.serve({
               clearedIcon: clearIcon
             })
           )
-          return
-        }
-
-        if (data.type === 'scratch') {
-          const op = data.op
-          if (!op || typeof op.kind !== 'string') {
-            ws.send(JSON.stringify({ error: 'Missing scratch op' }))
-            return
-          }
-          // Resolve to the real workspace root (subdir-safe) — both the on-disk
-          // read and the live relay use it.
-          const match = await resolveWorkspace(ws, data.path)
-          if (!match) return
-
-          // `read` is served straight off the disk snapshot — no live tab needed.
-          if (op.kind === 'read') {
-            ws.send(JSON.stringify({ shapes: await readScratchpadShapes(match.path) }))
-            return
-          }
-
-          // `read-image` resolves one image shape's data off disk too — `read`
-          // omits the blob, so this is how the agent pulls a specific image.
-          if (op.kind === 'read-image') {
-            ws.send(JSON.stringify(await readScratchpadImage(match.path, String(op.name))))
-            return
-          }
-
-          // Assign add ops a stable name when the caller didn't (`--id`), so the
-          // derived tldraw shape id is deterministic and addressable later.
-          if (op.kind.startsWith('add-') && !op.name) {
-            op.name = `s_${crypto.randomUUID().slice(0, 8)}`
-          }
-
-          try {
-            // `view` renders pixels — only the browser can do that, so it relays to
-            // a live tab (and fails if none is open). Every mutation runs headlessly
-            // against the disk snapshot, so drawing never needs an open canvas.
-            const result =
-              op.kind === 'view'
-                ? await relayScratchOp(match.id, op)
-                : await executeScratchOp(match.path, match.id, op)
-            ws.send(JSON.stringify({ ok: true, result }))
-          } catch (err) {
-            ws.send(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }))
-          }
           return
         }
       } catch (err) {

@@ -72,6 +72,7 @@
     "@tldraw/tlschema": "5.2.3",
     "@tldraw/utils": "5.2.3",
     "agentation": "^2.3.3",
+    "ajv": "^8.20.0",
     "blobatar": "^2.2.0",
     "bun-plugin-tailwind": "^0.1.2",
     "citty": "^0.2.1",

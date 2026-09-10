@@ -186,7 +186,12 @@ export async function handleBundleViews(
     [...beforeBuilt].some(n => !afterBuilt.has(n)) ||
     [...afterBuilt].some(n => !beforeBuilt.has(n))
 
-  const changedServerModules = new Set<string>()
+  // A companion is part of its view's dependency graph, including when the
+  // component never imports it. Recycle only after an actual rebuild/removal;
+  // a no-op bundle must not reset warm backend state.
+  if (membershipChanged || results.some(result => result.status === 'built')) {
+    reloadModules(['view tools'], workspacePath)
+  }
   for (const r of results) {
     if (r.status === 'built') {
       publish({ type: 'view:updated', name: r.name, config: r.config ?? null })
@@ -199,12 +204,7 @@ export async function handleBundleViews(
           r.config?.icon
         )
       }
-      for (const m of r.serverModules ?? []) changedServerModules.add(m)
     }
-  }
-
-  if (changedServerModules.size > 0) {
-    reloadModules([...changedServerModules], workspacePath)
   }
 
   const views = await getViewList(workspacePath)

@@ -186,7 +186,9 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-async function validateServerExports(filePath: string): Promise<string[]> {
+async function validateServerExports(
+  filePath: string
+): Promise<{ functions: string[]; hasTools: boolean }> {
   const source = await Bun.file(filePath).text()
   const transpiler = new Bun.Transpiler({ loader: 'ts' })
   const { exports } = transpiler.scan(source)
@@ -197,6 +199,8 @@ async function validateServerExports(filePath: string): Promise<string[]> {
     return !typePattern.test(source)
   })
 
+  const functions: string[] = []
+  let hasTools = false
   for (const name of runtimeExports) {
     const escaped = escapeRegex(name)
     const asyncFnPattern = new RegExp(
@@ -205,21 +209,26 @@ async function validateServerExports(filePath: string): Promise<string[]> {
         `export\\s+const\\s+${escaped}\\s*=\\s*async\\s*[\\(]`
     )
     if (!asyncFnPattern.test(source)) {
+      if (name === 'tools') {
+        hasTools = true
+        continue
+      }
       throw new Error(
         `"${name}" in ${basename(filePath)} is not an async function. ` +
-          `.server.ts files can only export async functions.`
+          `.server.ts files can export tools and legacy async functions.`
       )
     }
+    functions.push(name)
   }
 
-  return runtimeExports
+  return { functions, hasTools }
 }
 
-// The mei:rpc virtual module — contains the RPC call logic with devalue
-// serialization. Bundled into the applet output once, shared by all server
-// function stubs. The base is the sentinel the serve route rewrites to
+// The mei:rpc virtual module contains legacy devalue RPC and JSON tool calls.
+// Bundled into the applet output once, shared by all server proxies.
+// The base is the sentinel the serve route rewrites to
 // `/api/workspaces/<id>`, so a bundle carries no workspace id of its own.
-const RPC_MODULE_SOURCE = `
+export const RPC_MODULE_SOURCE = `
 import { stringify, parse } from "devalue";
 
 const BASE = ${JSON.stringify(APPLET_API_BASE_SENTINEL)};
@@ -234,6 +243,31 @@ export function rpc(module, name) {
     if (!res.ok) throw new Error(await res.text());
     return parse(await res.text());
   };
+}
+
+// Browser imports keep the server tool's execute(args) shape. Descriptors are
+// discovered through the catalog; no server implementation is bundled here.
+export function toolProxy(viewId) {
+  const target = "view:" + viewId;
+  const cache = new Map();
+  return new Proxy(Object.create(null), {
+    get(_target, name) {
+      if (typeof name !== "string") return undefined;
+      if (!cache.has(name)) cache.set(name, {
+        async execute(args, options) {
+          const res = await fetch(BASE + "/tools/" + encodeURIComponent(target) + "/" + encodeURIComponent(name), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(args),
+            signal: options?.signal,
+          });
+          if (!res.ok) throw new Error(await res.text());
+          return await res.json();
+        }
+      });
+      return cache.get(name);
+    }
+  });
 }
 `
 
@@ -256,6 +290,7 @@ export function rpc(module, name) {
 // surfaced from the bundle entry below — they are deliberately NOT part of the
 // author-facing `declare module 'moi'` ambient types (server/moi-scaffold.ts).
 const MOI_MODULE_SOURCE = `
+import { useEffect, useLayoutEffect, useRef } from "react";
 const BASE = ${JSON.stringify(APPLET_API_BASE_SENTINEL)};
 
 let bridge = null;
@@ -266,6 +301,19 @@ export function __attachBridge(next) {
 
 export function __getBridge() {
   return bridge;
+}
+
+export function useTool(tool) {
+  const latest = useRef(tool);
+  useLayoutEffect(() => { latest.current = tool; });
+  const schema = JSON.stringify(tool.inputSchema);
+  const annotations = JSON.stringify(tool.annotations);
+  useEffect(() => {
+    return bridge?.registerTool({
+      ...tool,
+      execute: (args, options) => latest.current.execute(args, options)
+    });
+  }, [tool.name, tool.description, schema, annotations]);
 }
 
 export function fileUrl(path) {
@@ -389,18 +437,23 @@ function appletRuntimePlugin(
 
       // Generate proxy stubs using mei:rpc
       build.onLoad({ filter: /.*/, namespace: 'server-proxy' }, async args => {
-        const exports = await validateServerExports(args.path)
+        const { functions: exports, hasTools } = await validateServerExports(args.path)
         const moduleName = serverModuleKey(args.path, moiRoot)
 
         serverModules.push({ name: moduleName, exports })
 
         const lines = [
-          `import { rpc } from "mei:rpc";`,
+          `import { rpc, toolProxy } from "mei:rpc";`,
           ...exports.map(
             name =>
               `export const ${name} = rpc(${JSON.stringify(moduleName)}, ${JSON.stringify(name)});`
           )
         ]
+        if (hasTools) {
+          const view = /^views\/([A-Za-z0-9_$-]+)$/.exec(moduleName)
+          if (!view) throw new Error('Browser tool imports must come from views/<id>.server.ts')
+          lines.push(`export const tools = /* @__PURE__ */ toolProxy(${JSON.stringify(view[1])});`)
+        }
 
         return { contents: lines.join('\n'), loader: 'js' }
       })
@@ -698,5 +751,17 @@ export async function buildApplet(
 
   const config =
     kind === 'view' ? await extractViewConfig(entrypoint) : await extractWidgetConfig(entrypoint)
+  if (kind === 'view') {
+    const companion = join(sourceDir, `${widgetName}.server.ts`)
+    const exists = await Bun.file(companion).exists()
+    if (exists) {
+      const name = serverModuleKey(companion, moiRoot)
+      const { functions: exports } = await validateServerExports(companion)
+      if (!serverModules.some(module => module.name === name)) serverModules.push({ name, exports })
+    }
+    // Record presence as well as imports: removing a tool-only companion must
+    // invalidate the old worker/catalog even though the view never imports it.
+    files.push({ name: 'server-companion.json', kind: 'asset', data: JSON.stringify({ exists }) })
+  }
   return { js, files, serverModules, config }
 }

@@ -86,8 +86,8 @@ my-agent-folder/
       ...
     package.json              <- Applet dependencies that you manage
     .workspace.json           <- Auto-generated. Do NOT read, edit, or `cat` this file. Use Moi CLI instead.
-    .scratchpad.json          <- Scratchpad canvas snapshot. Internal — inspect only via `moi scratch read`, never open it.
-    .scratchpad/              <- Scratchpad image files. Internal — pull pixels via `moi scratch read-image`, never open it.
+    .scratchpad.json          <- Scratchpad canvas snapshot. Internal — inspect only via `moi call scratchpad read_canvas`, never open it.
+    .scratchpad/              <- Scratchpad image files. Internal — pull pixels via `moi call scratchpad read_image`, never open it.
 ```
 
 Every dot-prefixed file or folder inside `.moi/` (`.build/`, `.cache/`, `.workspace.json`,
@@ -123,10 +123,11 @@ never from inside `.moi/` itself. You don't pass paths; moi resolves the workspa
 - `moi refresh` — re-fetch widget and view data without rebuilding (use after you mutated data the
   applets read — DB rows, files, external API records — so the displayed values catch up);
   `--only widgets` / `--only views` narrows the refresh to one kind
-- `moi call-server-fn <module>/<fn> '[args]'` — invoke a `.server.ts` function directly (smoke test)
 - `moi tabs` — list the workspace's tabs, their ids and the default tab
 - `moi tab focus <tab-id> [--params '<json-object>']` — switch to a tab, with optional params for
   the target view (see Driving the workspace)
+- `moi tools view:<id>` — discover that view's server and live UI tools
+- `moi call view:<id> <tool> '{args}'` — call a tool; named JSON arguments default to `{}`
 - `moi debug logs` — applet runtime errors on record (experimental)
 - `moi theme --font=<key>` — change font theme (omit `--font` to list options)
 - `moi theme --color=<key>` — change color preset (omit `--color` to list options)
@@ -208,26 +209,20 @@ Use bundled components for standard controls. Read the
 Reuse familiar installed components without rereading their catalog entries, docs, or source.
 Inspect source only for local customizations, doc conflicts, or concrete build issues.
 
-## Server functions — `<name>.server.ts`
+## Backend code — `<name>.server.ts`
 
-Export named `async function`s (only — no `const`, sync, or class) and call them from the component
-like ordinary async functions; arguments and return values are auto-serialized (`Date`, `Map`,
-`Set`, … work). They run on the Bun server with `process.env` and full filesystem access, at
-`cwd = <workspace root>` (the parent of `.moi/`, where you operate) — so workspace files are plain
-relative paths:
+For new views, export a `tools` object as the public backend interface (see Tools below).
+Keep implementation helpers private, or import them from ordinary backend modules. React code
+and agents call the same server tools.
 
-```ts
-// hello.server.ts — read files, call APIs, query DBs…
-export async function getGreeting(): Promise<string> {
-  return (await Bun.file('./notes.md').text()).split('\n')[0]
-}
-```
+Backend code runs on Bun with `process.env` and full filesystem access, at
+`cwd = <workspace root>` (the parent of `.moi/`). Workspace files use plain relative paths,
+such as `Bun.file('./notes.md')`. Every Bun API is available: `bun:sqlite`, `Bun.redis`,
+`Bun.s3`, `Bun.file`, `fetch`, …
 
-The component fetches on mount; after you change underlying data a server fn reads, run
-`moi refresh` to re-pull it without a rebuild.
-
-It's plain Bun — every Bun API is available with no setup: `bun:sqlite`, `Bun.redis`, `Bun.s3`,
-`Bun.file`, `fetch`, …
+Existing views and widgets can keep their named async function exports and imports.
+Those calls retain positional arguments and rich serialization (`Date`, `Map`, `Set`, …),
+including after rebuilding. See Existing views and migration below.
 
 ## Workspace files & assets
 
@@ -271,7 +266,165 @@ sendChatMessage('Chase order o-1024', { order: 'o-1024', carrier: 'dhl' })
   the task should be done.
 - `params` and `context` accept JSON serializable values only.
 
-### Params: the type is the contract
+## Tools — one interface for agents
+
+Use `moi tools <target>` to discover one target's tools, then
+`moi call <target> <tool> '{"named":"arguments"}'` to call one. Targets are `view:<id>` or
+`scratchpad`; the tool name is a separate positional argument. Tools accept a JSON object (default
+`{}`), validate it against their schema, and return JSON on stdout. Errors exit nonzero. The tool's
+definition selects its execution location, so there is no runtime flag or global tool list.
+
+| Need | Use |
+| --- | --- |
+| Perform a published backend operation, with no browser required | A server tool in `.moi/views/<id>.server.ts`; `moi call` |
+| Read or change selection, filters, unsaved drafts or other live React state | A UI tool registered with `useTool`; `moi call` |
+| Read or edit the shared canvas | A built-in Scratchpad tool; read `references/SCRATCHPAD.md` |
+| Implement reusable files, database, secrets or API logic | Private backend functions, called by server tools |
+| Open a view with navigation state | `focusTab`; `moi tab focus view:<id> --params '{...}'` |
+| Ask the agent to act from applet UI | `sendChatMessage` |
+
+Publish useful backend operations as server tools; helpers do not need their own public exports.
+A UI tool can call a server tool and then refresh the view or clear a draft. A server tool that
+changes persisted data does not itself update React state; use the view's refresh/subscription
+mechanism or `moi refresh --only views` when needed. Reuse the handlers behind the view's controls.
+
+### Server tools
+
+Export a `tools` object from the matching `.moi/views/<id>.server.ts`. Keys are the public tool
+names; descriptors contain `description`, `inputSchema`, `execute`, and optional `annotations`.
+The server loads these in the same worker used by applet RPC. It sends only metadata and results
+to the browser. Keep `moi` imports in server files **type-only**.
+
+```ts
+// .moi/views/orders.server.ts
+import type { ServerTool } from 'moi'
+
+async function archiveOrder(id: string) {
+  // Perform the existing database operation here.
+  return { id, archived: true }
+}
+
+export const tools = {
+  archive_order: {
+    description: 'Archive an order by ID',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+      additionalProperties: false
+    },
+    execute: ({ id }) => archiveOrder(id)
+  } satisfies ServerTool<{ id: string }>
+}
+```
+
+A matching React component or open browser is unnecessary for server calls. Shared backend modules
+can stay where they are; expose their operations through the view's `tools` object. After editing a
+view or its server companion, run `moi bundle --only views` to update the bundle and worker code.
+
+### Calling server tools from React
+
+Import `tools` from the view's server module. The bundler creates browser proxies; backend
+code stays on the server. Always await `execute`, even if the backend handler is synchronous.
+
+```tsx
+// .moi/views/orders.tsx
+import { tools } from './orders.server'
+
+async function onArchive(id: string) {
+  const result = await tools.archive_order.execute({ id })
+  // Refresh local data or clear a draft here.
+  return result
+}
+```
+
+Use this same handler for a button and for a UI tool that should also update local state.
+Browser imports expose each tool's `execute(args)`; discover descriptions and schemas with
+`moi tools view:orders`. Browser requests and CLI calls use the same server validation and worker.
+Pass only JSON arguments and return JSON results. Represent dates as ISO strings and maps/sets
+as JSON objects or arrays. Browser tool imports must come from `views/<id>.server.ts`; expose
+shared backend logic through that view's tools.
+
+### Existing views and migration
+
+Do not rewrite existing views just to adopt tools. Their named server function imports, positional
+arguments, rich results and RPC URLs remain supported in existing bundles and after a rebuild.
+Legacy functions are not automatically exposed through tool discovery or WebMCP.
+
+When a view needs to migrate:
+
+1. Extract shared implementation into private backend helpers.
+2. Add explicit server tools with descriptions and JSON schemas. Keep legacy function exports as
+   thin wrappers around the same helpers, preserving their names, arguments and return values.
+3. Switch React callers to `tools.<name>.execute({...})` and agents to `moi call`.
+4. Keep legacy wrappers while old bundles may still be open. A successful rebuild alone does not
+   prove every browser has reloaded. Remove wrappers only after those clients are gone.
+
+For example, if `getOrder(id)` used to return a `Date`, retain that result for the legacy wrapper.
+The new `get_order` tool can call the same helper and explicitly convert the date to an ISO string.
+Do not guess schemas or automatically turn every legacy function into a tool. Widgets keep their
+existing function imports. Scratchpad tools are built into moi rather than authored in a view.
+
+### UI tools
+
+Call `useTool` inside the React view. It adds a `name` to the same descriptor shape and handles
+registration cleanup and current state closures.
+
+```tsx
+import { useState } from 'react'
+import { useTool } from 'moi'
+
+export default function Orders() {
+  const [status, setStatus] = useState('all')
+  useTool<{ status: string }>({
+    name: 'set_filter',
+    description: 'Change the order status filter',
+    inputSchema: {
+      type: 'object',
+      properties: { status: { type: 'string', enum: ['all', 'overdue'] } },
+      required: ['status'],
+      additionalProperties: false
+    },
+    execute: async ({ status }) => {
+      setStatus(status)
+      return { status }
+    }
+  })
+  return <p>Current filter: {status}</p>
+}
+```
+
+After bundling, discover with `moi tools view:orders`, then call
+`moi call view:orders set_filter '{"status":"overdue"}'`.
+Discovery includes server tools and the UI tools in the active view. Its `ui` field
+reports `available`, `unavailable`, or `ambiguous`; unavailable UI does not prevent server calls.
+
+UI tools require a connected browser with that view active. Switching tabs, leaving the workspace,
+or closing the browser makes them unavailable. Open it explicitly with
+`moi tab focus view:orders` when that navigation fits the task. Multiple browser clients with the
+same view active make UI calls ambiguous. Server calls still run once on the server.
+
+### Shared contract and browser access
+
+Names use letters, digits, underscores, hyphens or dots and must be unique across the view's server and
+UI tools. Duplicate names are errors. Use an explicit argument type and a JSON Schema 2020-12
+`inputSchema`. Optional annotation hints are `readOnlyHint`, `untrustedContentHint` and
+`consequentialHint`. Return JSON-serializable data; convert rich server values such as dates in the
+tool adapter. Ordinary server functions retain their existing rich serialization.
+
+Handlers receive `{ signal }` as their second argument; pass it to cancellable work. Await the
+loading or persistence you claim is complete. A state setter schedules a render, not a completed
+paint. UI tools can read visible layout, though state updates may not have painted when the call
+returns. Timeouts and disconnects do not
+undo effects; inspect state before retrying a mutation. Execution errors never trigger a fallback
+to another location.
+
+CLI calls need no native browser WebMCP support. When `document.modelContext` exists, moi exposes
+the active view's tools or the active Scratchpad's built-in tools to browser agents with their
+declared names. Server tools use thin browser request wrappers; their implementation stays on the
+server. Authors need no polyfill, browser flags or separate MCP server for the CLI workflow.
+
+## Params: the type is the contract
 
 A view with addressable state declares a local `Params` type in its own file. Every field is
 optional and carries a comment, because the view must render sensibly with `{}` — a fresh mount, a
@@ -328,8 +481,8 @@ keys there. Either source may be absent, so always handle a missing key. List ex
 enforced).
 
 ```ts
-// forecast.server.ts
-export async function getForecast(city: string) {
+// forecast.server.ts — helper called by a server tool
+async function getForecast(city: string) {
   const key = process.env.WEATHER_API_KEY // always current — env changes respawn the worker
   if (!key) return { error: 'Add WEATHER_API_KEY to your env' }
   const res = await fetch(`https://api.example.com/forecast?city=${encodeURIComponent(city)}`, {
@@ -373,12 +526,11 @@ or storage links, file paths, or bundle, test, and runtime-log summaries.
 render, or throw in its server functions. Two feedback channels exist for what happens after the
 build; reach for them when they'd help (smoke-testing something new, or investigating a problem):
 
-- `moi call-server-fn widgets/hello/getGreeting` /
-  `moi call-server-fn views/crm/searchUsers '["ann", 10]'` — run one `.server.ts` function
-  directly (args are one JSON array). Each invocation runs in a fresh, isolated one-shot process
-  with the same env, module loading, and timeout as the browser's calls, so a pass means the real
-  path works — handy for trying a function without touching the UI. Server functions only; for
-  arbitrary scripts use `moi env exec`.
+- `moi tools view:orders`, then `moi call view:orders <tool> '{"named":"arguments"}'` —
+  exercise a published operation. Server calls use the same warm worker and validation as the UI;
+  UI tools need the active view. Calls perform real operations, so choose inputs appropriate to
+  the task. Check legacy function paths through the existing applet UI. For arbitrary scripts
+  use `moi env exec`.
 - `moi debug logs` — the applet errors the workspace has seen since each applet's last good
   build: browser-side load failures and render crashes, plus server-function (rpc) errors. The
   user's tab reports these automatically, so when the user says something is broken, what
@@ -435,4 +587,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.17.1" />
+<moi-skill version="0.22.0" />

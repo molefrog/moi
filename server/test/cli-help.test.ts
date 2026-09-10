@@ -22,8 +22,11 @@ describe('isAgentCaller', () => {
   })
 })
 
-async function runHelp(envPatch: Record<string, string | undefined>): Promise<string> {
-  const proc = Bun.spawn(['bun', CLI, '--help'], {
+async function runHelp(
+  envPatch: Record<string, string | undefined>,
+  command?: string
+): Promise<string> {
+  const proc = Bun.spawn(['bun', CLI, ...(command ? [command] : []), '--help'], {
     stdin: 'ignore',
     stdout: 'pipe',
     stderr: 'ignore',
@@ -63,5 +66,18 @@ describe('moi --help (e2e)', () => {
   test('third-party markers hide it too', async () => {
     const out = await runHelp({ CLAUDECODE: '1' })
     expect(out).not.toContain('System commands:')
+  }, 30_000)
+
+  test('tool discovery and execution have separate fixed grammars', async () => {
+    const [root, tools, call] = await Promise.all([
+      runHelp({}),
+      runHelp({}, 'tools'),
+      runHelp({}, 'call')
+    ])
+    expect(root).not.toMatch(/^\s+scratch\s/m)
+    expect(tools).toContain('USAGE moi tools [OPTIONS] <TARGET>')
+    expect(tools).toContain('scratchpad or view:orders')
+    expect(call).toContain('USAGE moi call [OPTIONS] <TARGET> <TOOL> [ARGS]')
+    expect(call).toContain('scratchpad or view:orders')
   }, 30_000)
 })

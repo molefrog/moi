@@ -93,7 +93,7 @@ function styleProps(style: ScratchStyle): Record<string, unknown> {
 
 // Run a synchronous load with tldraw's own logging held back. On a failed
 // migration `StoreSchema` prints `Error migrating store Incompatible schema?`
-// itself, which reaches the `moi scratch` caller ahead of — and contradicting —
+// itself, which reaches the tool caller ahead of — and contradicting —
 // the actionable error we throw below ("the file is intact"). Whatever it says
 // is replayed if the load actually succeeds, so only the swallowed-by-a-throw
 // case is lost. Safe to swap `console.error` around: `loadStoreSnapshot` is sync.
@@ -116,7 +116,7 @@ function loadQuietly(load: () => void): void {
 // A failed load is inspected for version skew: tldraw has no down-migrations,
 // so a snapshot written by a newer tldraw is unreadable here — but intact.
 // That gets a loud, actionable error instead of tldraw's bare `migration-error`
-// (which surfaces verbatim through the control port to the `moi scratch` CLI).
+// (which surfaces verbatim through the control port to `moi call`).
 function buildStore(
   doc: ScratchpadDoc | null,
   writer: ScratchpadWriter | undefined
@@ -261,7 +261,7 @@ async function applyAddImage(
   const pageId = firstPageId(store)
   // Re-adding under an existing id replaces that shape; note its current asset so
   // we can drop it below once nothing else references it (else its file leaks).
-  const prev = store.get(createShapeId(op.name)) as unknown as
+  const prev = store.get(createShapeId(op.id)) as unknown as
     | { props?: { assetId?: unknown } }
     | undefined
   const prevAssetId = typeof prev?.props?.assetId === 'string' ? prev.props.assetId : undefined
@@ -279,7 +279,7 @@ async function applyAddImage(
   ])
   store.put([
     shapeRecord({
-      id: createShapeId(op.name),
+      id: createShapeId(op.id),
       type: 'image',
       x: op.x,
       y: op.y,
@@ -293,16 +293,16 @@ async function applyAddImage(
   if (prevAssetId && prevAssetId !== assetId && !anyShapeUsesAsset(store, prevAssetId)) {
     store.remove([prevAssetId as unknown as TLRecord['id']])
   }
-  return { name: op.name }
+  return { id: op.id }
 }
 
-// Apply one mutating op to the store. `read` and `view` are handled elsewhere
-// (disk / browser) and never reach here. Returns the op's result.
+// Apply one mutating op to the store. `view` is handled in the browser and
+// never reaches here. Returns the op's result.
 function applyOp(store: HeadlessStore, op: ScratchOp): ScratchOpResult {
   const pageId = firstPageId(store)
-  const requireShape = (name: string) => {
-    const shape = store.get(createShapeId(name))
-    if (!shape || shape.typeName !== 'shape') throw new Error(`No shape named "${name}"`)
+  const requireShape = (id: string) => {
+    const shape = store.get(createShapeId(id))
+    if (!shape || shape.typeName !== 'shape') throw new Error(`No shape named "${id}"`)
     return shape
   }
 
@@ -310,7 +310,7 @@ function applyOp(store: HeadlessStore, op: ScratchOp): ScratchOpResult {
     case 'add-rect': {
       store.put([
         shapeRecord({
-          id: createShapeId(op.name),
+          id: createShapeId(op.id),
           type: 'geo',
           x: op.x,
           y: op.y,
@@ -326,12 +326,12 @@ function applyOp(store: HeadlessStore, op: ScratchOp): ScratchOpResult {
           }
         })
       ])
-      return { name: op.name }
+      return { id: op.id }
     }
     case 'add-text': {
       store.put([
         shapeRecord({
-          id: createShapeId(op.name),
+          id: createShapeId(op.id),
           type: 'text',
           x: op.x,
           y: op.y,
@@ -340,12 +340,12 @@ function applyOp(store: HeadlessStore, op: ScratchOp): ScratchOpResult {
           props: { ...defaultProps('text'), richText: toRichText(op.text), ...styleProps(op) }
         })
       ])
-      return { name: op.name }
+      return { id: op.id }
     }
     case 'add-note': {
       store.put([
         shapeRecord({
-          id: createShapeId(op.name),
+          id: createShapeId(op.id),
           type: 'note',
           x: op.x,
           y: op.y,
@@ -354,14 +354,14 @@ function applyOp(store: HeadlessStore, op: ScratchOp): ScratchOpResult {
           props: { ...defaultProps('note'), richText: toRichText(op.text), ...styleProps(op) }
         })
       ])
-      return { name: op.name }
+      return { id: op.id }
     }
     case 'add-arrow': {
       // Validate named endpoints up front — better a clear error than a dangling
       // binding that corrupts the snapshot.
-      if ('name' in op.from) requireShape(op.from.name)
-      if ('name' in op.to) requireShape(op.to.name)
-      const arrowId = createShapeId(op.name)
+      if ('id' in op.from) requireShape(op.from.id)
+      if ('id' in op.to) requireShape(op.to.id)
+      const arrowId = createShapeId(op.id)
       // Point endpoints carry absolute coords; bound endpoints get placeholders the
       // binding then drives. `elbow` routes with right angles; default is a curved arc.
       store.put([
@@ -376,37 +376,36 @@ function applyOp(store: HeadlessStore, op: ScratchOp): ScratchOpResult {
             ...defaultProps('arrow'),
             ...styleProps(op),
             ...(op.elbow ? { kind: 'elbow' } : {}),
-            start: 'name' in op.from ? { x: 0, y: 0 } : { x: op.from.x, y: op.from.y },
-            end: 'name' in op.to ? { x: 100, y: 0 } : { x: op.to.x, y: op.to.y }
+            start: 'id' in op.from ? { x: 0, y: 0 } : { x: op.from.x, y: op.from.y },
+            end: 'id' in op.to ? { x: 100, y: 0 } : { x: op.to.x, y: op.to.y }
           }
         })
       ])
       const bindings: TLRecord[] = []
-      if ('name' in op.from)
-        bindings.push(arrowBinding(arrowId, createShapeId(op.from.name), 'start'))
-      if ('name' in op.to) bindings.push(arrowBinding(arrowId, createShapeId(op.to.name), 'end'))
+      if ('id' in op.from) bindings.push(arrowBinding(arrowId, createShapeId(op.from.id), 'start'))
+      if ('id' in op.to) bindings.push(arrowBinding(arrowId, createShapeId(op.to.id), 'end'))
       if (bindings.length > 0) store.put(bindings)
-      return { name: op.name }
+      return { id: op.id }
     }
     case 'move': {
-      const shape = requireShape(op.name)
+      const shape = requireShape(op.id)
       store.put([{ ...shape, x: op.x, y: op.y }])
       return { ok: true }
     }
     case 'set': {
-      const shape = requireShape(op.name)
+      const shape = requireShape(op.id)
       store.put([
         { ...shape, props: { ...shape.props, richText: toRichText(op.text) } } as TLRecord
       ])
       return { ok: true }
     }
     case 'delete': {
-      const id = createShapeId(op.name)
+      const id = createShapeId(op.id)
       const shape = store.get(id) as unknown as { props?: { assetId?: unknown } } | undefined
       const assetId = typeof shape?.props?.assetId === 'string' ? shape.props.assetId : undefined
       // Remove the shape plus any binding that references it, or the leftover
       // binding would dangle and invalidate the snapshot.
-      const ids = [id, ...bindingsTouching(store, op.name)]
+      const ids = [id, ...bindingsTouching(store, op.id)]
       store.remove(ids)
       // If that was the last shape using the image's asset, drop the asset record
       // too so the post-save sweep can reclaim its file (mirrors `clear`).
@@ -444,9 +443,9 @@ function anyShapeUsesAsset(store: HeadlessStore, assetId: string): boolean {
   return false
 }
 
-// Ids of bindings whose start/end is the named shape.
-function bindingsTouching(store: HeadlessStore, name: string): TLRecord['id'][] {
-  const target = createShapeId(name)
+// Ids of bindings whose start/end is the identified shape.
+function bindingsTouching(store: HeadlessStore, id: string): TLRecord['id'][] {
+  const target = createShapeId(id)
   const ids: TLRecord['id'][] = []
   for (const record of store.allRecords()) {
     if (record.typeName !== 'binding') continue

@@ -18,6 +18,7 @@ import { startServiceLogMaintenance } from './service'
 import { distShell, prebuilt } from './static'
 import { renderStatus } from './status'
 import { serveVendorEmojibase, serveVendorReact } from './vendor'
+import { viewToolRelay } from './view-tool-relay'
 
 type WsData = { channel: 'chat' | 'events'; workspaceId: string }
 
@@ -138,7 +139,12 @@ export const app = Bun.serve<WsData>({
       }
     },
     async message(ws, message) {
-      if (ws.data.channel !== 'chat') return
+      if (ws.data.channel === 'events') {
+        try {
+          viewToolRelay.message(ws, JSON.parse(String(message)))
+        } catch {}
+        return
+      }
       try {
         const data = JSON.parse(String(message))
         if (!isClientMessage(data)) return
@@ -183,8 +189,8 @@ export const app = Bun.serve<WsData>({
             .interrupt(data.workspaceId, data.sessionId)
             .catch(() => {})
         }
-        // A tab's reply to a relayed Scratchpad op — settle the pending CLI
-        // request (first reply wins; later/duplicate replies are ignored).
+        // A tab's reply to a relayed Scratchpad op — settle the pending tool
+        // call (first reply wins; later/duplicate replies are ignored).
         if (data.type === 'scratchpad:op-result') {
           resolveScratchOp(data.opId, data.result, data.error)
         }
@@ -192,7 +198,10 @@ export const app = Bun.serve<WsData>({
     },
     close(ws) {
       if (ws.data.channel === 'chat') removeClient(ws)
-      else ws.unsubscribe(EVENTS_TOPIC)
+      else {
+        viewToolRelay.disconnect(ws)
+        ws.unsubscribe(EVENTS_TOPIC)
+      }
     }
   }
 })

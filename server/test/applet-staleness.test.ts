@@ -292,3 +292,23 @@ describe('dependency staleness', () => {
     expect((await build())[0]).toMatchObject({ status: 'built' })
   })
 })
+
+test('tool-only view companions and their dependencies participate in rebuilds', async () => {
+  seed('.moi/views/orders.tsx', 'export default function Orders() { return null }')
+  const run = async () => (await buildApplets(WS, 'view', false)).results[0]
+  expect(await run()).toMatchObject({ status: 'built' })
+  expect(await run()).toMatchObject({ status: 'skipped' })
+  const server = seed(
+    '.moi/views/orders.server.ts',
+    `import { value } from '../lib/value'; export const tools = { read: { description: 'Read value', inputSchema: { type: 'object' }, execute: async () => value } }`
+  )
+  seed('.moi/lib/value.ts', 'export const value = 1')
+  expect(await run()).toMatchObject({ status: 'built', serverModules: ['views/orders'] })
+  expect(await run()).toMatchObject({ status: 'skipped' })
+  seed('.moi/lib/value.ts', 'export const value = 2')
+  expect(await run()).toMatchObject({ status: 'built' })
+  expect(await run()).toMatchObject({ status: 'skipped' })
+  rmSync(server)
+  expect(await run()).toMatchObject({ status: 'built' })
+  expect(await run()).toMatchObject({ status: 'skipped' })
+})

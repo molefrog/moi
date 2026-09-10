@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import { wsUrl } from '@/client/lib/ws-url'
+import type { ViewToolEvent } from '@/lib/view-tools'
 import type {
   AgentLoginState,
   AppSettings,
@@ -13,6 +14,7 @@ import type {
 } from '@/lib/types'
 
 export type WorkspaceEvent =
+  | ViewToolEvent
   | { type: 'widget:updated'; name: string }
   | { type: 'widget-layout:updated'; widgets: WidgetInfo[] }
   // `moi refresh` — cache-bust and re-fetch applets without a rebuild. `only`
@@ -61,6 +63,21 @@ const listeners = new Set<WorkspaceEventHandler>()
 // server restarted (it holds the connection for its whole lifetime), so
 // restart-scoped state such as the startup config can refetch.
 const reconnectListeners = new Set<() => void>()
+const openListeners = new Set<() => void>()
+const disconnectListeners = new Set<() => void>()
+
+export function sendWorkspaceMessage(message: unknown): void {
+  if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message))
+}
+
+export function onWorkspaceConnection(open: () => void, close: () => void): () => void {
+  openListeners.add(open)
+  disconnectListeners.add(close)
+  return () => {
+    openListeners.delete(open)
+    disconnectListeners.delete(close)
+  }
+}
 let everConnected = false
 let ws: WebSocket | null = null
 let connecting = false
@@ -90,6 +107,7 @@ function ensureConnection() {
     reconnectAttempt = 0
     if (everConnected) for (const handler of reconnectListeners) handler()
     everConnected = true
+    for (const handler of openListeners) handler()
   }
 
   socket.onmessage = event => {
@@ -100,6 +118,7 @@ function ensureConnection() {
   }
 
   socket.onclose = () => {
+    for (const handler of disconnectListeners) handler()
     ws = null
     connecting = false
     // Reconnect with backoff if there are still listeners

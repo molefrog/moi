@@ -12,7 +12,7 @@ import type { ScratchpadDoc } from './scratchpad'
 // `.moi/.scratchpad/` (a hidden sidecar dir next to `.moi/.scratchpad.json`,
 // moi-internal like the snapshot itself). The browser uploads/resolves through
 // the `/scratchpad/assets` routes (see its TLAssetStore in Scratchpad.tsx); the
-// server's `add image` writes files directly; `read-image` reads them back.
+// server's `add_image` tool writes files directly; `read_image` reads them back.
 //
 // Content addressing (the file name is the sha256 of the bytes) buys dedup —
 // the same image pasted twice is one file — and makes every write idempotent,
@@ -39,6 +39,7 @@ const ASSET_FILE_RE = new RegExp(`^${ASSET_NAME_PATTERN}$`)
 const MIME_EXT: Record<string, string> = {
   'image/png': 'png',
   'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
   'image/webp': 'webp',
   'image/gif': 'gif',
   'image/svg+xml': 'svg',
@@ -60,7 +61,7 @@ export function assetSrcFileName(src: string): string | null {
   return ASSET_FILE_RE.test(name) ? name : null
 }
 
-// A served asset file by (validated) name — the GET route and `read-image`
+// A served asset file by (validated) name — the GET route and `read_image`
 // resolve through this. Null for a name we'd never have written.
 export function scratchpadAssetFile(
   workspacePath: string,
@@ -74,6 +75,10 @@ export function scratchpadAssetFile(
   }
 }
 
+export function scratchpadAssetExtension(mimeType: string): string {
+  return MIME_EXT[mimeType.split(';')[0].trim().toLowerCase()] ?? 'bin'
+}
+
 // Persist one asset's bytes and return the `asset:` src to store on the record.
 // Idempotent: identical bytes land on the same file. (Bun.write creates the
 // directory tree as needed.)
@@ -84,7 +89,7 @@ export async function storeScratchpadAsset(
 ): Promise<{ src: string }> {
   const hasher = new Bun.CryptoHasher('sha256')
   hasher.update(bytes)
-  const ext = MIME_EXT[mimeType.split(';')[0].trim().toLowerCase()] ?? 'bin'
+  const ext = scratchpadAssetExtension(mimeType)
   const fileName = `asset-${hasher.digest('hex')}.${ext}`
   const dir = getScratchpadAssetsDir(workspacePath)
   const path = join(dir, fileName)

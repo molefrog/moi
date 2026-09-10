@@ -19,7 +19,7 @@ import {
 // *document* snapshot here (the per-tab `session` is intentionally dropped). Two
 // writers: the browser autosaves on user edits, and the server writes on agent
 // draws (see scratchpad-executor.ts). This module owns the on-disk shape: load,
-// save, and the `moi scratch read` parser. Image bytes live beside the snapshot
+// save, and the `read_canvas` tool's parser. Image bytes live beside the snapshot
 // as files, not inside it (see scratchpad-assets.ts). See docs/moi-scratchpad.md.
 
 // A tldraw document snapshot: `getSnapshot(store).document`. Opaque to us apart
@@ -37,7 +37,7 @@ export const SCRATCHPAD_WRITER: ScratchpadWriter = {
   tldraw: tldrawPkg.version
 }
 
-// One shape as surfaced by `moi scratch read` — a compact, agent-friendly view.
+// One shape as surfaced by `read_canvas` — a compact, agent-friendly view.
 export type ScratchShape = {
   id: string
   type: string
@@ -48,17 +48,17 @@ export type ScratchShape = {
   text?: string
   // Image/asset src: an `asset:` file reference or an https URL, passed through
   // as-is. A legacy inline base64 blob is omitted (see omitBase64) — the agent
-  // calls `moi scratch read-image`/`view` to actually see pixels.
+  // calls `read_image`/`render_canvas` to actually see pixels.
   src?: string
   // True when the shape references an asset that can't be resolved to pixels: an
   // `asset:` file gone from .moi/.scratchpad (sidecar dir lost or pruned), or the
-  // asset record absent entirely — `read-image` will error and the canvas shows a
+  // asset record absent entirely — `read_image` will error and the canvas shows a
   // broken image. Absent otherwise.
   missing?: true
 }
 
 // The snapshot is a hidden dotfile (like `.moi/.workspace.json`): it's moi-internal
-// state, and the agent must read it only through `moi scratch read`, never by
+// state, and the agent must read it only through `read_canvas`, never by
 // opening the file.
 export function getScratchpadPath(workspacePath: string): string {
   return join(workspacePath, '.moi', '.scratchpad.json')
@@ -111,7 +111,7 @@ export async function saveScratchpadDoc(
 // asset files cost one readdir per tick.
 export async function sweepAllWorkspaces(): Promise<void> {
   // Lazy: the registry pulls in the harness adapters, which this module's
-  // other consumers (CLI reads, tests) shouldn't load just to parse a snapshot.
+  // other consumers (tool reads, tests) shouldn't load just to parse a snapshot.
   const { listWorkspaces } = await import('./registry')
   for (const ws of await listWorkspaces()) {
     try {
@@ -147,7 +147,7 @@ async function backupOnSchemaChange(path: string, document: ScratchpadDoc): Prom
 // scratchpad-assets.ts), but base64 data URLs can still appear — in a legacy
 // snapshot not yet re-saved, or inline in rich text. Those blobs are huge and
 // useless for reasoning about structure, so we replace each one with a short
-// marker — the agent calls `moi scratch read-image`/`view` when it actually
+// marker — the agent calls `read_image`/`render_canvas` when it actually
 // needs the pixels. Every other src (`asset:`, https) passes through untouched.
 const BASE64_DATA_URL_RE = /data:[\w.+-]*\/?[\w.+-]*;base64,[A-Za-z0-9+/=]+/g
 function omitBase64(text: string): string {
@@ -179,9 +179,9 @@ function extractText(props: unknown): string | undefined {
 // Resolve a single image shape's source by id, straight off the disk snapshot —
 // no browser. The shape references an `asset` record by `props.assetId`; that
 // asset's `src` is an `asset:` file reference (read back off disk and returned
-// as a `data:` URL so the CLI's decoding keeps working), an `https:` URL
+// as a `data:` URL so the tool can materialize it), an `https:` URL
 // (returned as-is), or — in a legacy snapshot — an inline `data:` URL.
-// `moi scratch read` never carries the pixels, so this is how the agent pulls
+// `read_canvas` never carries the pixels, so this is how the agent pulls
 // them for one image. Ids match with or without the `shape:` prefix (read
 // surfaces them stripped).
 export async function readScratchpadImage(
@@ -224,7 +224,7 @@ export async function readScratchpadImage(
 }
 
 // no browser needed. Ids are reported without tldraw's `shape:` prefix so they
-// round-trip with `createShapeId(name)` on the draw side.
+// round-trip with `createShapeId(id)` on the draw side.
 export async function readScratchpadShapes(workspacePath: string): Promise<ScratchShape[]> {
   const { document } = await loadScratchpadDoc(workspacePath)
   const store = document?.store
@@ -234,7 +234,7 @@ export async function readScratchpadShapes(workspacePath: string): Promise<Scrat
   // `props.assetId`. Index asset src first so we can surface it on the shape —
   // with base64 blobs omitted — without dumping the asset record itself. A
   // file-backed src whose file is gone is flagged so the agent learns it's
-  // dangling from `read` instead of from a failing `read-image` later.
+  // dangling from `read_canvas` instead of from a failing `read_image` later.
   const assetSrc = new Map<string, string>()
   const assetGone = new Set<string>()
   for (const record of Object.values(store)) {
@@ -269,8 +269,8 @@ export async function readScratchpadShapes(workspacePath: string): Promise<Scrat
     const rawSrc = assetId !== undefined ? assetSrc.get(assetId) : undefined
     // Flag `missing` when a shape references an asset we can't resolve to pixels:
     // its backing file is gone (assetGone), or the asset record is absent / has a
-    // non-string src (rawSrc undefined). Either way `read-image` can't return
-    // bytes, so warn from `read` rather than let it fail later.
+    // non-string src (rawSrc undefined). Either way `read_image` can't return
+    // bytes, so warn from `read_canvas` rather than let it fail later.
     const missing = assetId !== undefined && (assetGone.has(assetId) || rawSrc === undefined)
     shapes.push({
       id: (r.id ?? '').replace(/^shape:/, ''),

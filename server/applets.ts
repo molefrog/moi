@@ -118,12 +118,28 @@ const TS_ONLY_FILE_RE = /\.[mc]?ts$/
 // the old code with nothing to dislodge it. The redundant rebuild is the price
 // of that signal; the alternative is a second staleness channel threaded
 // through the build results.
-async function needsRebuild(buildDir: string, name: string, srcPath: string): Promise<boolean> {
+async function needsRebuild(
+  buildDir: string,
+  name: string,
+  srcPath: string,
+  kind: AppletKind
+): Promise<boolean> {
   const built = Bun.file(join(buildDir, name, 'index.js'))
   if (!(await built.exists())) return true
   const builtMtime = built.lastModified
 
   const queue = [srcPath]
+  if (kind === 'view') {
+    const companion = join(dirname(srcPath), `${name}.server.ts`)
+    const exists = await Bun.file(companion).exists()
+    try {
+      const previous = await Bun.file(join(buildDir, name, 'server-companion.json')).json()
+      if (previous.exists !== exists) return true
+    } catch {
+      return true
+    }
+    if (exists) queue.push(companion)
+  }
   const visited = new Set<string>()
   while (queue.length > 0) {
     const path = queue.pop()!
@@ -602,7 +618,7 @@ export async function buildApplets<C>(
     names.map(async name => {
       const srcPath = await resolveSource(sourceDir, name)
       if (!srcPath) return { name, status: 'failed' as const, error: 'Source file not found' }
-      if (!force && !(await needsRebuild(buildDir, name, srcPath))) {
+      if (!force && !(await needsRebuild(buildDir, name, srcPath, kind))) {
         return { name, status: 'skipped' as const }
       }
       return { name, srcPath, status: 'pending' as const }

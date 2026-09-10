@@ -19,9 +19,11 @@ import {
 } from 'tldraw'
 import 'tldraw/tldraw.css'
 
+import { reportAppletError } from '@/client/features/applets/applet-log'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { setScratchExecutor } from '@/client/features/scratchpad/scratch-executor'
 import { persistScratchSession } from '@/client/features/scratchpad/scratch-session'
+import { useServerWebMcpTools } from '@/client/runtime/useServerWebMcpTools'
 import { type WorkspaceEvent, useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import type { ScratchOp, ScratchOpResult } from '@/lib/types'
 import {
@@ -47,7 +49,7 @@ const AUTOSAVE_MS = 500
 // launcher defaults it (server/cli.ts); a bare ref here throws in the browser.
 const LICENSE_KEY = process.env.PUBLIC_TLDRAW_LICENSE_KEY || undefined
 
-// Execute a relayed op in this tab. Only `view` is relayed now — rasterizing the
+// Execute a relayed op in this tab. Only `view` is relayed — rasterizing the
 // canvas to a PNG needs the browser (`editor.toImageDataUrl`); every mutation runs
 // server-side against the disk snapshot (see server/scratchpad-executor.ts), so a
 // non-view op arriving here is unexpected.
@@ -176,14 +178,14 @@ const SCRATCH_OPTIONS = { maxPages: 1 }
 // accept larger drops and rescale big images to fit so a phone-sized photo lands
 // as a lightweight asset instead of bloating the snapshot's sidecar files. The
 // size check runs BEFORE the rescale, so a 32MB drop is admitted and then shrunk.
-// (The agent's `moi scratch add image` path has its own presets — see the
+// (The agent's `add_image` tool has its own presets — see the
 // executor's IMAGE_PRESETS; this only governs what the browser accepts.)
 const MAX_DROP_BYTES = 32 * 1024 * 1024
 const MAX_IMAGE_DIMENSION = 2048
 
 // The Scratchpad surface: a real tldraw editor, hydrated from and autosaved to
-// `.moi/.scratchpad.json` via REST. One canvas shared by the user and the agent —
-// the agent reaches it through `moi scratch` (relayed ops execute here). See
+// `.moi/.scratchpad.json` via REST. One canvas shared by the user and the agent;
+// the agent reaches it through the `scratchpad` tool target. See
 // docs/moi-scratchpad.md.
 export function Scratchpad() {
   const workspaceId = useWorkspaceId()
@@ -208,6 +210,12 @@ function WorkspaceScratchpad({ workspaceId }: { workspaceId: string }) {
   // This keyed component gives each workspace one stable asset store. A fresh
   // identity makes <Tldraw> remount the editor and drop unsaved edits.
   const [assetStore] = useState<TLAssetStore>(() => makeAssetStore(workspaceId))
+  const reportServerTools = useCallback(
+    (message: string) =>
+      reportAppletError(workspaceId, { source: 'runtime', name: 'scratchpad', message }),
+    [workspaceId]
+  )
+  useServerWebMcpTools(workspaceId, 'scratchpad', undefined, reportServerTools)
 
   const save = useCallback(() => {
     const editor = editorRef.current

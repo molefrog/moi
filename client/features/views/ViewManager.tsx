@@ -30,6 +30,7 @@ import { cn } from '@/client/lib/cn'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { ViewInfo } from '@/lib/types'
 
+import { useViewTools } from './useViewTools'
 import {
   nextEvictionDelay,
   reconcileResidents,
@@ -61,6 +62,8 @@ export const ViewManager = memo(function ViewManager({
   activeViewId,
   params
 }: ViewManagerProps) {
+  const workspaceId = useWorkspaceId()
+  useViewTools(workspaceId, activeViewId, views.find(view => view.id === activeViewId)?.revision)
   const residents = useResidentViews(activeViewId, views)
   // Render in workspace order, not residency order: the policy ranks views by
   // recency, and reordering the children would make React move live DOM around
