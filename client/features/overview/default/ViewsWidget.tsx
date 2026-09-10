@@ -156,22 +156,21 @@ function ViewItem({ view, Icon, onOpen }: ViewItemProps) {
               </Button>
             }
           />
-          <DropdownMenuContent align="start" className="min-w-32">
+          <DropdownMenuContent align="end" className="min-w-32">
             <DropdownMenuItem onClick={startRename} disabled={renameView.isPending}>
               <IconEdit stroke={1.75} />
               Rename
             </DropdownMenuItem>
-            <AlertDialogTrigger
-              render={
-                <DropdownMenuItem
-                  disabled={deleteView.isPending}
-                  onClick={() => deleteView.reset()}
-                />
-              }
+            <DropdownMenuItem
+              nativeButton
+              render={<AlertDialogTrigger />}
+              disabled={deleteView.isPending}
+              onClick={() => deleteView.reset()}
+              className="w-full"
             >
               <IconTrash stroke={1.75} />
               Delete
-            </AlertDialogTrigger>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
