@@ -19,7 +19,7 @@ export type ToolDescriptor = {
 }
 
 export type Tool<T extends Record<string, unknown> = Record<string, unknown>> = ToolDescriptor & {
-  execute: (args: T, options: { signal: AbortSignal }) => JsonValue | Promise<JsonValue>
+  execute: (args: T, options?: { signal: AbortSignal }) => JsonValue | Promise<JsonValue>
 }
 export type ServerTool<T extends Record<string, unknown> = Record<string, unknown>> = Omit<
   Tool<T>,
@@ -41,6 +41,14 @@ export function isJsonValue(value: unknown, seen = new Set<unknown>()): value is
   if (typeof value === 'number') return Number.isFinite(value)
   if (typeof value !== 'object' || seen.has(value)) return false
   if (!Array.isArray(value) && Object.getPrototypeOf(value) !== Object.prototype) return false
+  if (Object.getOwnPropertySymbols(value).length > 0) return false
+  if (
+    Array.isArray(value) &&
+    !Object.keys(value).every(
+      (key, index, keys) => keys.length === value.length && key === `${index}`
+    )
+  )
+    return false
   seen.add(value)
   const valid = Object.values(value).every(item => isJsonValue(item, seen))
   seen.delete(value)

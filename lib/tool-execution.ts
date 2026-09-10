@@ -19,7 +19,8 @@ export function prepareTool(value: unknown) {
   if (
     !isRecord(value) ||
     typeof value.name !== 'string' ||
-    !/^[A-Za-z0-9_-]+$/.test(value.name) ||
+    value.name.length > 128 ||
+    !/^[A-Za-z0-9_.-]+$/.test(value.name) ||
     typeof value.description !== 'string' ||
     !value.description.trim() ||
     !isRecord(value.inputSchema) ||

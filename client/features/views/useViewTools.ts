@@ -1,59 +1,41 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { reportAppletError } from '@/client/features/applets/applet-log'
 import {
-  abortable,
   callViewTool,
+  hasWebMcp,
   listViewTools,
-  viewToolNames,
-  onViewToolsChanged
+  onViewToolsChanged,
+  registerWebMcpTool
 } from '@/client/features/applets/view-tools'
-import { useLatestRef } from '@/client/lib/use-latest-ref'
 import {
   onWorkspaceConnection,
+  onWorkspaceEventsReconnect,
   sendWorkspaceMessage,
   useWorkspaceEvent
 } from '@/client/runtime/useWorkspaceEvents'
+import { readToolDescriptors } from '@/lib/tool-execution'
 import { VIEW_TOOL_TIMEOUT_MS, type ViewToolRequest } from '@/lib/view-tools'
 
-import { VIEW_RETENTION_MS, type ResidentView } from './view-residency'
-
-type Operation = { viewId: string; controller: AbortController; ready: () => void }
-
-// Lives above Activity: it can wake a resident view whose registration effects are parked.
-export function useViewTools(workspaceId: string) {
-  const residents = useRef(new Map<string, number | null>())
-  const operations = useRef(new Map<string, Operation>())
-  const [busyViews, setBusyViews] = useState<ReadonlySet<string>>(new Set())
-  const workspaceRef = useLatestRef(workspaceId)
-  const syncBusy = useCallback(() => {
-    setBusyViews(new Set([...operations.current.values()].map(op => op.viewId)))
-  }, [])
+// The CLI relay mirrors WebMCP's natural lifetime: only the visible view
+// publishes UI tools, and parking that view makes them unavailable.
+export function useViewTools(
+  workspaceId: string,
+  activeViewId: string | null,
+  revision: string | undefined
+) {
+  const operations = useRef(new Map<string, AbortController>())
   const publish = useCallback(() => {
+    const tools = activeViewId ? listViewTools(workspaceId, activeViewId) : []
     sendWorkspaceMessage({
       type: 'view-tool:presence',
-      workspaceId: workspaceRef.current,
-      views: [...residents.current.keys()],
-      tools: Object.fromEntries(
-        [...residents.current.keys()].map(id => [id, viewToolNames(workspaceRef.current, id)])
-      )
+      workspaceId,
+      viewId: activeViewId,
+      tools
     })
-  }, [workspaceRef])
-  const updateResidents = useCallback(
-    (views: ResidentView[]) => {
-      residents.current = new Map(views.map(view => [view.id, view.releasedAt]))
-      for (const op of operations.current.values()) {
-        if (!residents.current.has(op.viewId)) op.controller.abort()
-      }
-      publish()
-    },
-    [publish]
-  )
-  const ready = useCallback((viewId: string) => {
-    for (const op of operations.current.values()) if (op.viewId === viewId) op.ready()
-  }, [])
-
+  }, [workspaceId, activeViewId])
   const cancelAll = useCallback(() => {
-    for (const op of operations.current.values()) op.controller.abort()
+    for (const controller of operations.current.values()) controller.abort()
   }, [])
 
   useEffect(() => {
@@ -64,18 +46,14 @@ export function useViewTools(workspaceId: string) {
       unsubscribe()
       unsubscribeTools()
       cancelAll()
-      sendWorkspaceMessage({ type: 'view-tool:presence', workspaceId, views: [] })
+      sendWorkspaceMessage({ type: 'view-tool:presence', workspaceId, viewId: null, tools: [] })
     }
   }, [workspaceId, publish, cancelAll])
 
   async function execute(request: ViewToolRequest) {
     const { requestId, viewId } = request
     if (operations.current.has(requestId)) return
-    const releasedAt = residents.current.get(viewId)
-    if (
-      releasedAt === undefined ||
-      (releasedAt !== null && Date.now() - releasedAt >= VIEW_RETENTION_MS)
-    ) {
+    if (viewId !== activeViewId) {
       sendWorkspaceMessage({
         type: 'view-tool:result',
         requestId,
@@ -83,26 +61,17 @@ export function useViewTools(workspaceId: string) {
       })
       return
     }
-    if ([...operations.current.values()].some(op => op.viewId === viewId)) {
-      sendWorkspaceMessage({
-        type: 'view-tool:result',
-        requestId,
-        error: `A tool is already running in view:${viewId}. Wait for it to finish.`
-      })
-      return
-    }
     const controller = new AbortController()
-    const mounted = new Promise<void>(resolve => {
-      operations.current.set(requestId, { viewId, controller, ready: resolve })
-    })
+    operations.current.set(requestId, controller)
     const timer = setTimeout(() => controller.abort(), VIEW_TOOL_TIMEOUT_MS)
-    syncBusy()
     try {
-      await abortable(mounted, controller.signal)
-      const result =
-        request.type === 'view-tool:list'
-          ? listViewTools(workspaceId, viewId)
-          : await callViewTool(workspaceId, viewId, request.name, request.args, controller.signal)
+      const result = await callViewTool(
+        workspaceId,
+        viewId,
+        request.name,
+        request.args,
+        controller.signal
+      )
       sendWorkspaceMessage({ type: 'view-tool:result', requestId, result })
     } catch (error) {
       sendWorkspaceMessage({
@@ -113,19 +82,68 @@ export function useViewTools(workspaceId: string) {
     } finally {
       clearTimeout(timer)
       operations.current.delete(requestId)
-      syncBusy()
     }
   }
 
   useWorkspaceEvent(event => {
-    if (event.type === 'view-tool:cancel')
-      operations.current.get(event.requestId)?.controller.abort()
-    if (
-      (event.type === 'view-tool:call' || event.type === 'view-tool:list') &&
-      event.workspaceId === workspaceId
-    )
-      void execute(event)
+    if (event.type === 'view-tool:cancel') operations.current.get(event.requestId)?.abort()
+    if (event.type === 'view-tool:call' && event.workspaceId === workspaceId) void execute(event)
   })
 
-  return { busyViews, updateResidents, ready }
+  useServerWebMcpTools(workspaceId, activeViewId, revision)
+}
+
+function useServerWebMcpTools(
+  workspaceId: string,
+  viewId: string | null,
+  revision: string | undefined
+) {
+  const [refresh, setRefresh] = useState(0)
+  useEffect(() => onWorkspaceEventsReconnect(() => setRefresh(value => value + 1)), [])
+  useWorkspaceEvent(event => {
+    if (event.type === 'env:updated' && event.workspaceId === workspaceId)
+      setRefresh(value => value + 1)
+  })
+  useEffect(() => {
+    if (!viewId || !hasWebMcp()) return
+    const controller = new AbortController()
+    const cleanups: (() => void)[] = []
+    const base = `/api/workspaces/${encodeURIComponent(workspaceId)}/tools/${encodeURIComponent(viewId)}`
+    const report = (message: string) =>
+      reportAppletError(workspaceId, { source: 'runtime', kind: 'view', name: viewId, message })
+    void fetch(base, { signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error(await response.text())
+        return readToolDescriptors(await response.json())
+      })
+      .then(tools => {
+        if (controller.signal.aborted) return
+        for (const tool of tools)
+          cleanups.push(
+            registerWebMcpTool(
+              {
+                ...tool,
+                execute: async (args, options) => {
+                  const response = await fetch(`${base}/${encodeURIComponent(tool.name)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(args),
+                    signal: options?.signal
+                  })
+                  if (!response.ok) throw new Error(await response.text())
+                  return response.json()
+                }
+              },
+              report
+            )
+          )
+      })
+      .catch(error => {
+        if (!controller.signal.aborted) report(`Server tools: ${String(error)}`)
+      })
+    return () => {
+      controller.abort()
+      for (const cleanup of cleanups) cleanup()
+    }
+  }, [workspaceId, viewId, revision, refresh])
 }

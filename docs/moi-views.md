@@ -14,7 +14,7 @@ live, the config shape, and how they mount.
 
 ```
 .moi/views/<name>.tsx          # default export = the view's root React component
-.moi/views/<name>.server.ts    # optional async server functions (same as widgets)
+.moi/views/<name>.server.ts    # server tools; legacy async functions also supported
 ```
 
 ```tsx
@@ -48,10 +48,11 @@ No sizing fields. (Reuses the same `export const config` AST-parse path as widge
 
 ## Server functions
 
-Identical to widgets. RPC module keys are path-relative, so `.moi/views/crm.server.ts`
-is addressed as `views/crm` and routed through the existing
-`POST /_rpc/<id>/fn/views/crm/<fn>` — **no backend changes needed**. Same worker pool,
-IPC, timeout, and idle-evict.
+New views publish backend operations through a `tools` export and live React
+operations through `useTool`. Agents discover and call both with `moi call`.
+Existing named async server functions keep their positional RPC transport and
+rich results. See [Tools, WebMCP and server functions](tools.md) for authoring,
+execution paths and migration.
 
 ## Build
 

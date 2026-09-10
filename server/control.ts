@@ -172,7 +172,7 @@ export const control = Bun.serve({
           return
         }
 
-        if (data.type === 'call' || data.type === 'call-tool') {
+        if (data.type === 'call') {
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
           const args = JSON.parse(String(data.args ?? '{}'))

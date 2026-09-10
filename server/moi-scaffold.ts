@@ -115,7 +115,7 @@ declare module 'moi' {
     description: string
     inputSchema: Record<string, unknown>
     annotations?: { readOnlyHint?: boolean; untrustedContentHint?: boolean; consequentialHint?: boolean }
-    execute: (args: T, options: { signal: AbortSignal }) => ToolResult | Promise<ToolResult>
+    execute: (args: T, options?: { signal: AbortSignal }) => ToolResult | Promise<ToolResult>
   }
   export type ServerTool<T extends Record<string, unknown> = Record<string, unknown>> = Omit<Tool<T>, 'name'>
   // Views only. Register a handler that reads or changes current React state.

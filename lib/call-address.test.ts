@@ -7,6 +7,10 @@ test('call addresses discover a view or invoke one named operation', () => {
     viewId: 'orders',
     name: 'set_filter'
   })
+  expect(parseCallAddress('view:orders/order.archive')).toEqual({
+    viewId: 'orders',
+    name: 'order.archive'
+  })
   for (const address of [
     'views/orders/set_filter',
     'widget:orders/x',

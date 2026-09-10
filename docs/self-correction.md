@@ -91,9 +91,9 @@ Server tools use the same warm worker, validation, workspace environment and bac
 browser calls. They work without an open browser. Calls perform real operations and can change
 data; choose a read or an appropriate test input when investigating.
 
-UI tools operate on live React state. They require one connected browser with the view resident.
-A parked view remains callable within its retention window; after eviction, explicitly open the
-view if that fits the task. Multiple clients holding the view make UI calls ambiguous.
+UI tools operate on live React state. They require one connected browser with the view active.
+Switching tabs makes them unavailable. Multiple clients with the same view active make UI calls
+ambiguous.
 
 Tool-call errors are returned directly to the caller. They do not automatically create journal
 entries; an unhandled browser error can still be reported by the normal window error reporter.
@@ -159,7 +159,6 @@ Migrate views individually. Add explicit tools around shared helpers, switch cur
 and retain thin legacy exports while old bundles may remain open. Keep the wrappers' names,
 arguments and results intact, even if a new tool uses different JSON shapes. Do not automatically
 expose legacy functions as tools or infer schemas. Widget function imports remain supported.
-`call-tool` remains a compatibility alias for `call`.
 
 Native WebMCP is optional for CLI calls. In supporting browsers, moi publishes the view's UI tools
 and server request wrappers from the same descriptors. See the workspace skill's Tools section.

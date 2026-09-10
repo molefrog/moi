@@ -1,8 +1,9 @@
-import { isJsonValue, isRecord, type JsonValue } from '@/lib/tools'
+import { readToolDescriptors } from '@/lib/tool-execution'
+import { isJsonValue, isRecord, type JsonValue, type ToolDescriptor } from '@/lib/tools'
 import { VIEW_TOOL_TIMEOUT_MS } from '@/lib/view-tools'
 
 type Socket = { send(data: string): unknown }
-type Presence = { workspaceId: string; views: string[]; tools: Record<string, string[]> }
+type Presence = { workspaceId: string; viewId: string; tools: ToolDescriptor[] }
 type Pending = {
   socket: Socket
   finish: (error?: string, result?: JsonValue) => void
@@ -13,30 +14,33 @@ export function createViewToolRelay(timeoutMs = VIEW_TOOL_TIMEOUT_MS) {
   const pending = new Map<string, Pending>()
 
   const matchesFor = (workspaceId: string, viewId: string) =>
-    [...clients].filter(([, p]) => p.workspaceId === workspaceId && p.views.includes(viewId))
+    [...clients].filter(([, p]) => p.workspaceId === workspaceId && p.viewId === viewId)
   return {
     availability(workspaceId: string, viewId: string): 'available' | 'unavailable' | 'ambiguous' {
       const count = matchesFor(workspaceId, viewId).length
       return count === 0 ? 'unavailable' : count === 1 ? 'available' : 'ambiguous'
     },
     hasTool(workspaceId: string, viewId: string, name: string) {
-      return matchesFor(workspaceId, viewId).some(([, p]) => p.tools[viewId]?.includes(name))
+      return matchesFor(workspaceId, viewId).some(([, p]) =>
+        p.tools.some(tool => tool.name === name)
+      )
     },
-    list(workspaceId: string, viewId: string, signal?: AbortSignal) {
-      return this.call(workspaceId, viewId, null, {}, signal)
+    list(workspaceId: string, viewId: string): ToolDescriptor[] {
+      const matches = matchesFor(workspaceId, viewId)
+      return matches.length === 1 ? matches[0][1].tools : []
     },
     message(socket: Socket, value: unknown) {
       if (!isRecord(value)) return
       if (value.type === 'view-tool:presence') {
-        if (typeof value.workspaceId !== 'string' || !Array.isArray(value.views)) return
-        if (!value.views.every(id => typeof id === 'string')) return
-        const tools: Record<string, string[]> = {}
-        if (isRecord(value.tools))
-          for (const [id, names] of Object.entries(value.tools)) {
-            if (Array.isArray(names) && names.every(name => typeof name === 'string'))
-              tools[id] = names
-          }
-        clients.set(socket, { workspaceId: value.workspaceId, views: value.views, tools })
+        clients.delete(socket)
+        if (typeof value.workspaceId !== 'string' || typeof value.viewId !== 'string') return
+        try {
+          clients.set(socket, {
+            workspaceId: value.workspaceId,
+            viewId: value.viewId,
+            tools: readToolDescriptors(value.tools)
+          })
+        } catch {}
       }
       if (value.type === 'view-tool:result' && typeof value.requestId === 'string') {
         const op = pending.get(value.requestId)
@@ -58,7 +62,7 @@ export function createViewToolRelay(timeoutMs = VIEW_TOOL_TIMEOUT_MS) {
     call(
       workspaceId: string,
       viewId: string,
-      name: string | null,
+      name: string,
       args: Record<string, unknown>,
       signal?: AbortSignal
     ): Promise<JsonValue> {
@@ -100,11 +104,7 @@ export function createViewToolRelay(timeoutMs = VIEW_TOOL_TIMEOUT_MS) {
         if (signal?.aborted) return cancel()
         try {
           socket.send(
-            JSON.stringify(
-              name === null
-                ? { type: 'view-tool:list', requestId, workspaceId, viewId }
-                : { type: 'view-tool:call', requestId, workspaceId, viewId, name, args }
-            )
+            JSON.stringify({ type: 'view-tool:call', requestId, workspaceId, viewId, name, args })
           )
         } catch {
           finish('Browser disconnected before the tool could be dispatched.')

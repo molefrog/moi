@@ -66,7 +66,8 @@ test('server calls work with multiple browser clients and never fall back on fai
     viewToolRelay.message(socket, {
       type: 'view-tool:presence',
       workspaceId: workspace.id,
-      views: ['tool-demo']
+      viewId: 'tool-demo',
+      tools: []
     })
   try {
     expect(await callTool(workspace, 'view:tool-demo/read_saved')).toHaveProperty('saved')
@@ -76,8 +77,8 @@ test('server calls work with multiple browser clients and never fall back on fai
     viewToolRelay.message(a, {
       type: 'view-tool:presence',
       workspaceId: workspace.id,
-      views: ['tool-demo'],
-      tools: { 'tool-demo': ['read_saved'] }
+      viewId: 'tool-demo',
+      tools: [{ name: 'read_saved', description: 'Read saved', inputSchema: { type: 'object' } }]
     })
     await expect(callTool(workspace, 'view:tool-demo/read_saved')).rejects.toThrow('Duplicate tool')
   } finally {
@@ -96,16 +97,7 @@ test('unified UI discovery and calls use the selected browser', async () => {
         viewToolRelay.message(socket, {
           type: 'view-tool:result',
           requestId: request.requestId,
-          result:
-            request.type === 'view-tool:list'
-              ? [
-                  {
-                    name: 'set_filter',
-                    description: 'Filter orders',
-                    inputSchema: { type: 'object' }
-                  }
-                ]
-              : { filter: 'all' }
+          result: { filter: 'all' }
         })
       )
     }
@@ -113,13 +105,20 @@ test('unified UI discovery and calls use the selected browser', async () => {
   viewToolRelay.message(socket, {
     type: 'view-tool:presence',
     workspaceId: workspace.id,
-    views: ['tool-demo']
+    viewId: 'tool-demo',
+    tools: [
+      {
+        name: 'set_filter',
+        description: 'Filter orders',
+        inputSchema: { type: 'object' }
+      }
+    ]
   })
   try {
     const catalog = await callTool(workspace, 'view:tool-demo')
     expect(JSON.stringify(catalog)).toContain('"requiresLiveView":true')
     expect(await callTool(workspace, 'view:tool-demo/set_filter', {})).toEqual({ filter: 'all' })
-    expect(messages.map(message => message.type)).toEqual(['view-tool:list', 'view-tool:call'])
+    expect(messages.map(message => message.type)).toEqual(['view-tool:call'])
   } finally {
     viewToolRelay.disconnect(socket)
   }
@@ -143,23 +142,42 @@ test('rejects malformed addresses and non-object arguments', async () => {
   await expect(callTool(workspace, 'view:missing/nope')).rejects.toThrow('View unavailable')
 })
 
-test('bundling refreshes server-only tools and their imported backend code', async () => {
+test('bundling a view refreshes its server tools and imported backend code', async () => {
   const { mkdtemp, rm } = await import('node:fs/promises')
-  const { tmpdir } = await import('node:os')
   const { handleBundleViews } = await import('./views')
-  const path = await mkdtemp(join(tmpdir(), 'moi-headless-tools-'))
+  const path = await mkdtemp(join(import.meta.dir, 'tool-bundle-'))
   const previous = process.env.MEI_FUNCTIONS_DIR
   process.env.MEI_FUNCTIONS_DIR = join(path, '.moi')
   try {
     await Bun.write(
       join(path, '.moi/views/headless.server.ts'),
-      `import { value } from '../shared'; export const tools = { read: { description: 'Read value', inputSchema: { type: 'object' }, execute: async () => value } }`
+      `import { value } from '../shared'; let calls = 0; export const tools = { read: { description: 'Read value', inputSchema: { type: 'object' }, execute: async () => ({ value, calls: ++calls }) } }`
+    )
+    await Bun.write(
+      join(path, '.moi/views/headless.tsx'),
+      `export default function Headless() { return null }`
     )
     await Bun.write(join(path, '.moi/shared.ts'), 'export const value = 1')
-    expect(await callTool({ id: 'headless', path }, 'view:headless/read')).toBe(1)
+    expect(await callTool({ id: 'headless', path }, 'view:headless/read')).toEqual({
+      value: 1,
+      calls: 1
+    })
+    await handleBundleViews(() => {}, 'headless', path)
+    expect(await callTool({ id: 'headless', path }, 'view:headless/read')).toEqual({
+      value: 1,
+      calls: 1
+    })
+    await handleBundleViews(() => {}, 'headless', path)
+    expect(await callTool({ id: 'headless', path }, 'view:headless/read')).toEqual({
+      value: 1,
+      calls: 2
+    })
     await Bun.write(join(path, '.moi/shared.ts'), 'export const value = 2')
     await handleBundleViews(() => {}, 'headless', path)
-    expect(await callTool({ id: 'headless', path }, 'view:headless/read')).toBe(2)
+    expect(await callTool({ id: 'headless', path }, 'view:headless/read')).toEqual({
+      value: 2,
+      calls: 1
+    })
   } finally {
     restartWorker(path)
     process.env.MEI_FUNCTIONS_DIR = previous

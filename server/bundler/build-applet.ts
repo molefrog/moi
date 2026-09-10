@@ -251,7 +251,7 @@ export function toolProxy(viewId) {
   const cache = new Map();
   return new Proxy(Object.create(null), {
     get(_target, name) {
-      if (typeof name !== "string" || name === "then") return undefined;
+      if (typeof name !== "string") return undefined;
       if (!cache.has(name)) cache.set(name, {
         async execute(args, options) {
           const res = await fetch(BASE + "/tools/" + encodeURIComponent(viewId) + "/" + encodeURIComponent(name), {

@@ -14,6 +14,7 @@ import {
   attachAppletBridge,
   disposeAppletBridge
 } from './applet-runtime'
+import { callViewTool } from './view-tools'
 
 // The runtime is the trust boundary between agent-authored applet bundles and
 // the host: every bridge call arrives with `unknown` args and must be narrowed
@@ -233,6 +234,24 @@ describe('disposal', () => {
     dispose()
     bridge.focusTab('agent')
     expect(calls).toEqual([['agent', undefined]])
+  })
+
+  test('a view connection owns its tools and disposes them with the bundle', async () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const { bridge, dispose } = appletRuntime(ws).connect(VIEW)
+    bridge.registerTool({
+      name: 'select',
+      description: 'Select a row',
+      inputSchema: { type: 'object' },
+      execute: async () => ({ selected: true })
+    })
+    expect(await callViewTool(ws, VIEW.name, 'select', {}, new AbortController().signal)).toEqual({
+      selected: true
+    })
+    dispose()
+    await expect(
+      callViewTool(ws, VIEW.name, 'select', {}, new AbortController().signal)
+    ).rejects.toThrow('unavailable')
   })
 })
 

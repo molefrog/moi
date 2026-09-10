@@ -1794,7 +1794,7 @@ function sendControl(
   const ws = new WebSocket(CONTROL_URL)
   let received = false
   const timer =
-    payload.type === 'call' || payload.type === 'call-tool'
+    payload.type === 'call'
       ? setTimeout(() => {
           console.error(
             'Tool connection timed out. State may already have changed; do not retry automatically.'
@@ -1805,7 +1805,7 @@ function sendControl(
       : undefined
   ws.onclose = () => {
     if (timer) clearTimeout(timer)
-    if ((payload.type === 'call' || payload.type === 'call-tool') && !received) {
+    if (payload.type === 'call' && !received) {
       console.error('Tool connection closed before a result. State may already have changed.')
       process.exit(1)
     }
@@ -3009,8 +3009,7 @@ const main = defineCommand({
     description: 'moi — local AI workspace',
     version: versionWithCommit()
   }),
-  // Keep the earlier name callable without advertising a second tool interface.
-  subCommands: { ...workspaceCommands, ...systemCommands, 'call-tool': call }
+  subCommands: { ...workspaceCommands, ...systemCommands }
 })
 
 // Cloud demo: system commands manage moi itself (service, updates, agent

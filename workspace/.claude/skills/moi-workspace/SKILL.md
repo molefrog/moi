@@ -396,20 +396,17 @@ export default function Orders() {
 
 After bundling, discover with `moi call view:orders`, then call
 `moi call view:orders/set_filter '{"status":"overdue"}'`.
-Discovery includes server tools and the UI tools in the currently resident view. Its `ui` field
+Discovery includes server tools and the UI tools in the active view. Its `ui` field
 reports `available`, `unavailable`, or `ambiguous`; unavailable UI does not prevent server calls.
-Discovery of UI tools wakes a parked view's effects without changing the selected tab.
 
-UI tools require a connected browser holding the view. Views are retained for 60 seconds after
-switching away, with at most four resident views. Calls within that window wake the view without
-changing tabs. After eviction, deletion, leaving the workspace or closing the browser, UI calls
-report unavailable. Open it explicitly with `moi tab focus view:orders` when that navigation fits
-the task; lost unsaved state is not restored. Multiple browser clients holding the view make UI
-calls ambiguous. Server calls still run once on the server.
+UI tools require a connected browser with that view active. Switching tabs, leaving the workspace,
+or closing the browser makes them unavailable. Open it explicitly with
+`moi tab focus view:orders` when that navigation fits the task. Multiple browser clients with the
+same view active make UI calls ambiguous. Server calls still run once on the server.
 
 ### Shared contract and browser access
 
-Names use letters, digits, underscores or hyphens and must be unique across the view's server and
+Names use letters, digits, underscores, hyphens or dots and must be unique across the view's server and
 UI tools. Duplicate names are errors. Use an explicit argument type and a JSON Schema 2020-12
 `inputSchema`. Optional annotation hints are `readOnlyHint`, `untrustedContentHint` and
 `consequentialHint`. Return JSON-serializable data; convert rich server values such as dates in the
@@ -417,12 +414,13 @@ tool adapter. Ordinary server functions retain their existing rich serialization
 
 Handlers receive `{ signal }` as their second argument; pass it to cancellable work. Await the
 loading or persistence you claim is complete. A state setter schedules a render, not a completed
-paint. Background UI tools cannot rely on visible layout or focus. Timeouts and disconnects do not
+paint. UI tools can read visible layout, though state updates may not have painted when the call
+returns. Timeouts and disconnects do not
 undo effects; inspect state before retrying a mutation. Execution errors never trigger a fallback
 to another location.
 
 CLI calls need no native browser WebMCP support. When `document.modelContext` exists, moi exposes
-the view's tools to browser agents with scoped names. Server tools use thin browser request
+the active view's tools to browser agents with their declared names. Server tools use thin browser request
 wrappers; their implementation stays on the server. Authors need no polyfill, browser flags or
 separate MCP server for the CLI workflow. Tools currently support views only.
 
@@ -530,7 +528,7 @@ build; reach for them when they'd help (smoke-testing something new, or investig
 
 - `moi call view:orders`, then `moi call view:orders/<tool> '{"named":"arguments"}'` —
   exercise a published operation. Server calls use the same warm worker and validation as the UI;
-  UI tools need a resident view. Calls perform real operations, so choose inputs appropriate to
+  UI tools need the active view. Calls perform real operations, so choose inputs appropriate to
   the task. Check legacy function paths through the existing applet UI. For arbitrary scripts
   use `moi env exec`.
 - `moi debug logs` — the applet errors the workspace has seen since each applet's last good

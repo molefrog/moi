@@ -67,10 +67,7 @@ export async function callTool(
     return viewToolRelay.call(workspace.id, viewId, name, args, signal)
   }
   const ui = viewToolRelay.availability(workspace.id, viewId)
-  const uiTools =
-    ui === 'available'
-      ? readToolDescriptors(await viewToolRelay.list(workspace.id, viewId, signal))
-      : []
+  const uiTools = ui === 'available' ? viewToolRelay.list(workspace.id, viewId) : []
   for (const tool of uiTools)
     if (serverTools.some(server => server.name === tool.name)) throw duplicate(tool.name)
   return {
@@ -81,7 +78,7 @@ export async function callTool(
     ui,
     ...(ui === 'unavailable'
       ? {
-          message: `UI tools require an open view. Use moi tab focus view:${viewId}, then discover again.`
+          message: `UI tools require the active view. Use moi tab focus view:${viewId}, then discover again.`
         }
       : {}),
     ...(ui === 'ambiguous'

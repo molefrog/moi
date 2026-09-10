@@ -1,14 +1,7 @@
 import { expect, test } from 'bun:test'
 
-import {
-  callViewTool,
-  registerViewTool,
-  setServerToolCatalog,
-  listViewTools,
-  rememberViewTool,
-  forgetViewTools,
-  viewToolNames
-} from './view-tools'
+import { callViewTool, registerViewTool, listViewTools } from './view-tools'
+import { isJsonValue } from '@/lib/tools'
 
 const signal = () => new AbortController().signal
 const report = () => {}
@@ -83,6 +76,21 @@ test('handler errors and non-JSON results are returned as errors', async () => {
   invalid()
 })
 
+test('accepts WebMCP names and rejects values that change during JSON transport', () => {
+  const dotted = registerViewTool('json', 'orders', { ...tool, name: 'order.archive' }, report)
+  expect(listViewTools('json', 'orders')[0]?.name).toBe('order.archive')
+  dotted()
+
+  expect(() =>
+    registerViewTool('json', 'orders', { ...tool, name: 'x'.repeat(129) }, report)
+  ).toThrow('valid name')
+
+  const sparse: unknown[] & { extra?: string } = new Array(2)
+  sparse[1] = 'kept'
+  sparse.extra = 'dropped'
+  expect(isJsonValue(sparse)).toBe(false)
+})
+
 test('native registration shares validation and handler, and failure leaves CLI callable', async () => {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'document')
   const native: { tool?: typeof tool; signal?: AbortSignal } = {}
@@ -106,8 +114,7 @@ test('native registration shares validation and handler, and failure leaves CLI 
   try {
     dispose = registerViewTool('native', 'orders', tool, report)
     await ready
-    expect(native.tool?.name.length).toBeLessThanOrEqual(128)
-    expect(native.tool?.name.startsWith('moi_')).toBe(true)
+    expect(native.tool?.name).toBe(tool.name)
     expect(await native.tool?.execute({ status: 'overdue' })).toEqual({ status: 'overdue' })
     await expect(native.tool!.execute({})).rejects.toThrow('Invalid tool arguments')
     dispose()
@@ -141,57 +148,4 @@ test('native registration shares validation and handler, and failure leaves CLI 
     if (previous) Object.defineProperty(globalThis, 'document', previous)
     else Reflect.deleteProperty(globalThis, 'document')
   }
-})
-
-test('server/UI name collisions block UI execution even when metadata arrives later', async () => {
-  let called = false
-  const dispose = registerViewTool(
-    'collision',
-    'orders',
-    {
-      ...tool,
-      execute: async () => {
-        called = true
-        return null
-      }
-    },
-    report
-  )
-  const clear = setServerToolCatalog(
-    'collision',
-    'orders',
-    Promise.resolve([
-      { name: tool.name, description: tool.description, inputSchema: tool.inputSchema }
-    ])
-  )
-  try {
-    await expect(
-      callViewTool('collision', 'orders', tool.name, { status: 'all' }, signal())
-    ).rejects.toThrow('Duplicate tool')
-    expect(called).toBe(false)
-    expect(listViewTools('collision', 'orders')).toHaveLength(1)
-  } finally {
-    clear()
-    dispose()
-  }
-})
-
-test('server proxies are excluded from live UI discovery', () => {
-  const dispose = registerViewTool('server-proxy', 'orders', tool, report, 'server')
-  try {
-    expect(listViewTools('server-proxy', 'orders')).toEqual([])
-  } finally {
-    dispose()
-  }
-})
-
-test('parked view declarations keep their namespace until their bundle is disposed', () => {
-  const owner = {}
-  const dispose = registerViewTool('parked', 'orders', tool, report)
-  rememberViewTool(owner, 'parked', 'orders', tool.name)
-  dispose()
-  expect(listViewTools('parked', 'orders')).toEqual([])
-  expect(viewToolNames('parked', 'orders')).toEqual([tool.name])
-  forgetViewTools(owner)
-  expect(viewToolNames('parked', 'orders')).toEqual([])
 })
