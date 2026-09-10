@@ -60,9 +60,15 @@ export type ViewBuildResult = {
 
 export async function buildAllViews(
   workspacePath: string,
-  force = false
+  force = false,
+  target?: string
 ): Promise<ViewBuildResult[]> {
-  const { names, results, ms } = await buildApplets<ViewConfig>(workspacePath, 'view', force)
+  const { names, results, ms } = await buildApplets<ViewConfig>(
+    workspacePath,
+    'view',
+    force,
+    target
+  )
 
   const manifest = await readManifest(workspacePath)
   for (const r of results) {
@@ -162,11 +168,12 @@ export async function handleBundleViews(
   force = false,
   // When set, compile without advancing any view builder to `ready` (the
   // `moi bundle --no-status` opt-out). The build still publishes `view:updated`.
-  skipStatus = false
+  skipStatus = false,
+  target?: string
 ) {
   const before = await readManifest(workspacePath)
   const beforeBuilt = new Set(await listBuiltViews(workspacePath))
-  const results = await buildAllViews(workspacePath, force)
+  const results = await buildAllViews(workspacePath, force, target)
   const after = await readManifest(workspacePath)
   const afterBuilt = new Set(await listBuiltViews(workspacePath))
 

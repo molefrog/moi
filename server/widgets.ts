@@ -40,9 +40,15 @@ export type WidgetBuildResult = {
 
 export async function buildAllWidgets(
   workspacePath: string,
-  force = false
+  force = false,
+  target?: string
 ): Promise<WidgetBuildResult[]> {
-  const { names, results, ms } = await buildApplets<WidgetConfig>(workspacePath, 'widget', force)
+  const { names, results, ms } = await buildApplets<WidgetConfig>(
+    workspacePath,
+    'widget',
+    force,
+    target
+  )
 
   const manifest = await readManifest(workspacePath)
   for (const r of results) {
@@ -118,11 +124,12 @@ export async function listWidgets(workspacePath: string): Promise<Response> {
 export async function handleBundle(
   publish: (msg: unknown) => void,
   workspacePath: string,
-  force = false
+  force = false,
+  target?: string
 ) {
   const before = new Set(await listBuiltWidgets(workspacePath))
   const manifestBefore = await readManifest(workspacePath)
-  const results = await buildAllWidgets(workspacePath, force)
+  const results = await buildAllWidgets(workspacePath, force, target)
   const after = new Set(await listBuiltWidgets(workspacePath))
 
   // Keep the applet error journal honest: record build failures, clear entries

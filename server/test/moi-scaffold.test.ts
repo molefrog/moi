@@ -1,8 +1,16 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync
+} from 'node:fs'
 import { join } from 'path'
 
-import { ensureMoiGitignore, scaffoldMoiDir } from '../moi-scaffold'
+import { ensureMoiGitignore, scaffoldMoiDir, writeAppletEnvDts } from '../moi-scaffold'
 import { silenceConsole } from './quiet'
 
 // The scaffold backstop: `scaffoldMoiDir` must refuse to create a `.moi/` inside
@@ -102,5 +110,19 @@ describe('ensureMoiGitignore', () => {
   test('does nothing when the workspace has no .moi directory', async () => {
     await ensureMoiGitignore(WS)
     expect(existsSync(join(WS, '.moi'))).toBe(false)
+  })
+})
+
+describe('writeAppletEnvDts', () => {
+  test('leaves a current ambient type file untouched', async () => {
+    mkdirSync(join(WS, '.moi'), { recursive: true })
+    expect(await writeAppletEnvDts(WS)).toBe(true)
+    const path = join(WS, '.moi', 'applet-env.d.ts')
+    const fixedTime = new Date('2000-01-01T00:00:00.000Z')
+    utimesSync(path, fixedTime, fixedTime)
+    const before = statSync(path).mtimeMs
+
+    expect(await writeAppletEnvDts(WS)).toBe(false)
+    expect(statSync(path).mtimeMs).toBe(before)
   })
 })
