@@ -1794,7 +1794,8 @@ function sendControl(
   const ws = new WebSocket(CONTROL_URL)
   let received = false
   const toolCommand = payload.type === 'call' || payload.type === 'tools'
-  const uncertain = payload.type === 'call' ? ' State may already have changed.' : ''
+  const uncertain =
+    payload.type === 'call' ? ' State may already have changed; do not retry automatically.' : ''
   const timer = toolCommand
     ? setTimeout(() => {
         console.error(`Tool connection timed out.${uncertain}`)
