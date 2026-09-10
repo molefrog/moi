@@ -44,7 +44,7 @@ type ViewManagerProps = {
   // agent or widgets tab instant too.
   activeViewId: string | null
   // The active view's addressable state, read from navigation state (focusTab /
-  // `moi tab focus`). `{}` on a fresh mount, a new browser tab, or a plain
+  // `moi tabs focus`). `{}` on a fresh mount, a new browser tab, or a plain
   // tab-bar click — a view must render sensibly with that.
   params: Record<string, unknown>
 }

@@ -5,7 +5,7 @@
 //
 // Everything that merely reacts to navigation stays with the screen: tab-bar
 // policy (close, reorder, availability pruning), view-builder lifecycle, the
-// applet-runtime `focusTab` subscription, and the `moi tab focus` subscription.
+// applet-runtime `focusTab` subscription, and the `moi tabs focus` subscription.
 // They all route through the `navigateToTab` returned here, so every origin —
 // tab click, applet, CLI — shares one code path.
 import { useCallback, useEffect, useMemo } from 'react'
