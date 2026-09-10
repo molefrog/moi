@@ -120,31 +120,28 @@ documented subcommands (`moi bundle`, `moi bundle --force`, etc.). Call `moi hel
 documentation. Run all `moi` commands from the **project root** — the folder that contains `.moi/`,
 never from inside `.moi/` itself. You don't pass paths; moi resolves the workspace from where it's run.
 
-### Applet commands
+Use the task-specific sections below for workflow guidance. The CLI will grow over time, so run
+`moi help` to discover commands and `<command> --help` before using an unfamiliar command or option.
 
-- `moi check` — run supported applet checks
-- `moi bundle` — compile changed applets
-- `moi bundle --force` — rebuild applets even when their source looks unchanged
-- `moi refresh` — re-fetch applet data without rebuilding
-- `moi debug logs` — show applet runtime errors
-- `moi call-server-fn <module>/<fn> '[args]'` — invoke a `.server.ts` function
+- **Develop applets:** `moi check`, `moi bundle`, and `moi refresh`.
+- **Call actions:** `moi call-server-fn`.
+- **Debug applets:** `moi debug logs` (see Debugging applets).
+- **Navigate the workspace:** `moi tabs` and `moi tab focus` (see Driving the workspace).
+- **Customize the workspace:** `moi theme` and `moi config` (see Customizing workspace appearance).
+- **Use workspace env:** `moi env` and `moi env exec` (see Environment & secrets).
+- **Maintain workspace guidance:** `moi skill` (see Keeping this skill current).
 
-`moi check`, `moi bundle`, `moi refresh`, and `moi debug logs` accept `--only`:
+## Customizing workspace appearance
 
-- Omit it for all applets.
-- Use `--only widgets` or `--only views` for one kind.
-- Use `--only widgets/<id>` or `--only views/<id>` for one applet.
+`moi theme` shows the current font, color, radius, and agent appearance plus the available keys.
+Set one or several dimensions in a single command:
 
-### Workspace commands
+```sh
+moi theme --font=<key> --color=<key> --radius=<key> --agent=<key>
+```
 
-- `moi tabs` — list workspace tabs
-- `moi tab focus <tab-id> [--params '<json-object>']` — switch tabs
-- `moi theme` — change the workspace theme
-- `moi config` — set the workspace name and icon
-- `moi env` — inspect available environment keys
-- `moi skill` — inspect or update the workspace skill
-
-For more commands and options, use `moi help`.
+Omit dimensions you do not want to change. Inspect with `moi theme` first instead of guessing keys;
+use `moi theme --help` if its options change.
 
 ## Critical constraints when interacting with moi
 
@@ -331,6 +328,20 @@ Rules:
   If the user pastes a value in chat, store it with `moi env set KEY=value`
   (`moi env unset KEY` removes it).
 - **Never print secret values** — not in chat, not in logs. Refer to keys by name only.
+
+### Running commands with workspace env
+
+Use `moi env exec -- <command> [args...]` for an arbitrary script or tool that needs the effective
+workspace env. The `--` separator is required, and the env is resolved again on every invocation,
+so this also sees values added or changed during the chat.
+
+```sh
+moi env exec -- bun script.ts
+moi env exec -- bun test integration.test.ts
+```
+
+Use `moi call-server-fn` instead when exercising an exported applet server function through its
+real runtime path.
 
 `process.env` is readable **only** inside `.server.ts` (the `.tsx` runs in the browser) — keep API
 keys there. Either source may be absent, so always handle a missing key. List expected keys in

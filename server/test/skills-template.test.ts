@@ -26,6 +26,10 @@ describe('installBundledSkills', () => {
       const skillMd = await Bun.file(join(dir, SKILL_MD)).text()
       expect(skillMd).toContain('Standard UI components')
       expect(skillMd).toContain('moi ui-components add')
+      expect(skillMd).toContain('## Customizing workspace appearance')
+      expect(skillMd).toContain('moi theme --font=<key> --color=<key>')
+      expect(skillMd).toContain('### Running commands with workspace env')
+      expect(skillMd).toContain('moi env exec -- bun script.ts')
       expect(await Bun.file(join(dir, CHEAT_SHEET)).exists()).toBe(true)
       // The rest of the skill installs normally.
       expect(skillMd).toContain('# Workspace')
