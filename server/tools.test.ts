@@ -26,7 +26,7 @@ test('discovers explicit server tools without a browser and strips handlers', as
   const text = JSON.stringify(result)
   expect(text).toContain('"name":"save_order"')
   expect(text).not.toContain('"address"')
-  expect(text).toContain('"requiresLiveView":false')
+  expect(text).toContain('"runtime":"server"')
   expect(text).not.toContain('execute')
   expect(text).not.toContain('server-only-tool-implementation')
   expect(text).not.toContain('saveOrder')
@@ -91,6 +91,7 @@ test('server calls work with multiple browser clients and never fall back on fai
 })
 
 test('unified UI discovery and calls use the selected browser', async () => {
+  const viewId = 'tool-demo.v2'
   const messages: Record<string, unknown>[] = []
   const socket = {
     send(message: string) {
@@ -108,7 +109,7 @@ test('unified UI discovery and calls use the selected browser', async () => {
   viewToolRelay.message(socket, {
     type: 'view-tool:presence',
     workspaceId: workspace.id,
-    viewId: 'tool-demo',
+    viewId,
     tools: [
       {
         name: 'set_filter',
@@ -118,9 +119,9 @@ test('unified UI discovery and calls use the selected browser', async () => {
     ]
   })
   try {
-    const catalog = await listTools(workspace, 'view:tool-demo')
-    expect(JSON.stringify(catalog)).toContain('"requiresLiveView":true')
-    expect(await callTool(workspace, 'view:tool-demo', 'set_filter', {})).toEqual({ filter: 'all' })
+    const catalog = await listTools(workspace, `view:${viewId}`)
+    expect(JSON.stringify(catalog)).toContain('"runtime":"ui"')
+    expect(await callTool(workspace, `view:${viewId}`, 'set_filter', {})).toEqual({ filter: 'all' })
     expect(messages.map(message => message.type)).toEqual(['view-tool:call'])
   } finally {
     viewToolRelay.disconnect(socket)

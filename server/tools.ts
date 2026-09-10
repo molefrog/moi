@@ -1,29 +1,21 @@
 import { parse, stringify } from 'devalue'
 import { readToolDescriptors } from '@/lib/tool-execution'
-import { parseToolTarget } from '@/lib/tool-target'
-import {
-  isRecord,
-  isJsonValue,
-  isToolName,
-  toolInfo,
-  type ToolDescriptor,
-  type JsonValue
-} from '@/lib/tools'
+import { isRecord, isJsonValue, isToolName, type ToolDescriptor, type JsonValue } from '@/lib/tools'
+import { parseWorkspaceTab, viewIdFromTab } from '@/lib/workspace-tabs'
 import { callToolWorker } from './functions'
 import { viewToolRelay } from './view-tool-relay'
 
-function moduleFor(viewId: string) {
-  if (!parseToolTarget(`view:${viewId}`)) throw new Error('Invalid view ID.')
-  return `views/${viewId}`
-}
+const moduleFor = (viewId: string) => (/^[A-Za-z0-9_$-]+$/.test(viewId) ? `views/${viewId}` : null)
 
 export async function listServerTools(
   workspacePath: string,
   viewId: string,
   signal?: AbortSignal
 ): Promise<ToolDescriptor[]> {
+  const module = moduleFor(viewId)
+  if (!module) return []
   return readToolDescriptors(
-    parse(await callToolWorker(workspacePath, moduleFor(viewId), 'list-tools', '', '', signal))
+    parse(await callToolWorker(workspacePath, module, 'list-tools', '', '', signal))
   )
 }
 
@@ -34,22 +26,18 @@ export async function callServerTool(
   args: unknown,
   signal?: AbortSignal
 ): Promise<JsonValue> {
+  const module = moduleFor(viewId)
+  if (!module) throw new Error('Invalid server-tool view ID.')
   return parse(
-    await callToolWorker(
-      workspacePath,
-      moduleFor(viewId),
-      'call-tool',
-      name,
-      stringify(args),
-      signal
-    )
+    await callToolWorker(workspacePath, module, 'call-tool', name, stringify(args), signal)
   ) as JsonValue
 }
 
 function viewIdFor(target: string): string {
-  const parsed = parseToolTarget(target)
-  if (!parsed) throw new Error('Use a view target such as view:orders.')
-  return parsed.viewId
+  const tab = parseWorkspaceTab(target)
+  const viewId = tab ? viewIdFromTab(tab) : null
+  if (!viewId) throw new Error('Use a view target such as view:orders.')
+  return viewId
 }
 
 export async function listTools(
@@ -59,17 +47,16 @@ export async function listTools(
 ) {
   const viewId = viewIdFor(target)
   const serverTools = await listServerTools(workspace.path, viewId, signal)
-  const duplicate = (toolName: string) =>
-    new Error(`Duplicate tool "${toolName}" for view:${viewId}: defined on the server and UI.`)
   const ui = viewToolRelay.availability(workspace.id, viewId)
   const uiTools = ui === 'available' ? viewToolRelay.list(workspace.id, viewId) : []
   for (const tool of uiTools)
-    if (serverTools.some(server => server.name === tool.name)) throw duplicate(tool.name)
+    if (serverTools.some(server => server.name === tool.name))
+      throw new Error(`Duplicate tool "${tool.name}" for ${target}: defined on the server and UI.`)
   return {
     target,
     tools: [
-      ...serverTools.map(tool => toolInfo(tool, 'server')),
-      ...uiTools.map(tool => toolInfo(tool, 'ui'))
+      ...serverTools.map(tool => ({ ...tool, runtime: 'server' as const })),
+      ...uiTools.map(tool => ({ ...tool, runtime: 'ui' as const }))
     ],
     ui,
     ...(ui === 'unavailable'

@@ -1793,20 +1793,19 @@ function sendControl(
 ) {
   const ws = new WebSocket(CONTROL_URL)
   let received = false
-  const timer =
-    payload.type === 'call' || payload.type === 'tools'
-      ? setTimeout(() => {
-          console.error(
-            'Tool connection timed out. State may already have changed; do not retry automatically.'
-          )
-          ws.close()
-          process.exit(1)
-        }, 32_000)
-      : undefined
+  const toolCommand = payload.type === 'call' || payload.type === 'tools'
+  const uncertain = payload.type === 'call' ? ' State may already have changed.' : ''
+  const timer = toolCommand
+    ? setTimeout(() => {
+        console.error(`Tool connection timed out.${uncertain}`)
+        ws.close()
+        process.exit(1)
+      }, 32_000)
+    : undefined
   ws.onclose = () => {
     if (timer) clearTimeout(timer)
-    if ((payload.type === 'call' || payload.type === 'tools') && !received) {
-      console.error('Tool connection closed before a result. State may already have changed.')
+    if (toolCommand && !received) {
+      console.error(`Tool connection closed before a result.${uncertain}`)
       process.exit(1)
     }
   }
@@ -2169,25 +2168,28 @@ const scratch = defineCommand({
 
 // ---- self-correction commands (docs/self-correction.md) ---------------------
 
+const toolTargetArg = {
+  type: 'positional',
+  required: true,
+  description: 'View target; e.g. view:orders'
+} as const
+const printToolResult = (res: Record<string, unknown>) => {
+  console.log(JSON.stringify(res.result, null, 2))
+  console.error(pc.dim(`↩ ${res.ms}ms`))
+}
+
 const tools = defineCommand({
   meta: {
     name: 'tools',
     description: 'List the server and live UI tools exposed by a view'
   },
   args: {
-    target: {
-      type: 'positional',
-      required: true,
-      description: 'View target; e.g. view:orders'
-    },
+    target: toolTargetArg,
     dir: dirArg
   },
   run({ args }) {
     const path = resolve(args.dir)
-    sendControl(path, { type: 'tools', path, target: args.target }, res => {
-      console.log(JSON.stringify(res.result, null, 2))
-      console.error(pc.dim(`↩ ${res.ms}ms`))
-    })
+    sendControl(path, { type: 'tools', path, target: args.target }, printToolResult)
   }
 })
 
@@ -2197,11 +2199,7 @@ const call = defineCommand({
     description: 'Call a view tool on the server or live UI'
   },
   args: {
-    target: {
-      type: 'positional',
-      required: true,
-      description: 'View target; e.g. view:orders'
-    },
+    target: toolTargetArg,
     tool: {
       type: 'positional',
       required: true,
@@ -2218,17 +2216,8 @@ const call = defineCommand({
     const path = resolve(args.dir)
     sendControl(
       path,
-      {
-        type: 'call',
-        path,
-        target: args.target,
-        tool: args.tool,
-        args: args.args ?? '{}'
-      },
-      res => {
-        console.log(JSON.stringify(res.result, null, 2))
-        console.error(pc.dim(`↩ ${res.ms}ms`))
-      }
+      { type: 'call', path, target: args.target, tool: args.tool, args: args.args ?? '{}' },
+      printToolResult
     )
   }
 })

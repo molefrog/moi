@@ -37,8 +37,8 @@ operations for that target. `moi call` takes the target and tool name as separat
 positional arguments. There is no global catalog or execution-location flag.
 
 Discovery returns `tools`, plus a `ui` availability field. Each tool includes its
-name, description, input schema, optional annotations, `runtime` (`server` or
-`ui`) and `requiresLiveView` flag. The result also echoes the requested `target`.
+name, description, input schema, optional annotations and `runtime` (`server` or
+`ui`). The result also echoes the requested `target`.
 
 Arguments are one JSON object, defaulting to `{}`. Results are JSON on stdout;
 duration and errors go to stderr. Errors exit nonzero. The public
