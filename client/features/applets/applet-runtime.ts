@@ -132,9 +132,7 @@ function createRuntime(workspaceId: string) {
         registerTool(tool) {
           if (!alive) return () => {}
           if (identity.kind !== 'view') throw new Error('useTool is available in views only.')
-          const unregister = registerViewTool(workspaceId, identity.name, tool, message =>
-            drop(identity, message)
-          )
+          const unregister = registerViewTool(workspaceId, identity.name, tool)
           const disposeTool = () => {
             unregister()
             tools.delete(disposeTool)

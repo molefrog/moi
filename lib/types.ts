@@ -113,18 +113,18 @@ export type ScratchPoint = { x: number; y: number }
 export type ScratchArrowEnd = { id: string } | ScratchPoint
 
 // The Scratchpad's color palette — the same six swatches the UI toolbar offers,
-// so the agent can only paint what the user can. The CLI also accepts an arbitrary
+// so the agent can only paint what the user can. The tool also accepts an arbitrary
 // hex and snaps it to the nearest of these (tldraw shapes hold a palette color, not
 // free hex).
 export type ScratchColor = 'black' | 'grey' | 'blue' | 'green' | 'yellow' | 'red'
 
-// tldraw's DefaultSizeStyle, exposed under two friendlier CLI names for the two
-// shapes that use it: arrows take `--stroke small|large` (line weight), text &
-// notes take `--font-size regular|big` (label size). Both map onto the same
+// tldraw's DefaultSizeStyle, exposed under friendlier tool arguments for the two
+// shapes that use it: arrows take `stroke: small|large` (line weight), text and
+// notes take `fontSize: regular|big` (label size). Both map onto the same
 // underlying tldraw size — `small`/`regular` → 'm', `large`/`big` → 'xl'.
 export type ScratchSize = 'm' | 'xl'
 
-// Fill style for rectangles — the UI toolbar's four options. The CLI takes
+// Fill style for rectangles — the UI toolbar's four options. The tool takes
 // `none|semi|pattern|solid`; ops carry the tldraw DefaultFillStyle value. Note the
 // tldraw quirk (see defaultFills / FILL_OPTIONS in client/components/Scratchpad.tsx):
 // fill value 'solid' paints the lighter "semi" color, while 'fill' paints the true
@@ -132,11 +132,11 @@ export type ScratchSize = 'm' | 'xl'
 export type ScratchFill = 'none' | 'solid' | 'pattern' | 'fill'
 
 // Optional styling carried by every add op. Omitted fields fall back to the
-// shape's tldraw default. `size` is set from `--stroke` (arrows) or `--font-size`
-// (text/notes); `fill` from `--fill` (rectangles).
+// shape's tldraw default. `size` is set from `stroke` (arrows) or `fontSize`
+// (text/notes); `fill` comes from the rectangle's `fill` argument.
 export type ScratchStyle = { color?: ScratchColor; size?: ScratchSize; fill?: ScratchFill }
 
-// Resize preset for `add image`: 'lo' caps the long side smaller (default, keeps
+// Resize preset for `add_image`: 'lo' caps the long side smaller (default, keeps
 // the canvas light), 'hi' allows more pixels when detail matters.
 export type ScratchImageQuality = 'lo' | 'hi'
 

@@ -111,7 +111,7 @@ export async function saveScratchpadDoc(
 // asset files cost one readdir per tick.
 export async function sweepAllWorkspaces(): Promise<void> {
   // Lazy: the registry pulls in the harness adapters, which this module's
-  // other consumers (CLI reads, tests) shouldn't load just to parse a snapshot.
+  // other consumers (tool reads, tests) shouldn't load just to parse a snapshot.
   const { listWorkspaces } = await import('./registry')
   for (const ws of await listWorkspaces()) {
     try {
@@ -179,7 +179,7 @@ function extractText(props: unknown): string | undefined {
 // Resolve a single image shape's source by id, straight off the disk snapshot —
 // no browser. The shape references an `asset` record by `props.assetId`; that
 // asset's `src` is an `asset:` file reference (read back off disk and returned
-// as a `data:` URL so the CLI's decoding keeps working), an `https:` URL
+// as a `data:` URL so the tool can materialize it), an `https:` URL
 // (returned as-is), or — in a legacy snapshot — an inline `data:` URL.
 // `read_canvas` never carries the pixels, so this is how the agent pulls
 // them for one image. Ids match with or without the `shape:` prefix (read

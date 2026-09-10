@@ -15,6 +15,7 @@ import type {
 } from '@/lib/types'
 
 import { readScratchpadImage, readScratchpadShapes } from './scratchpad'
+import { scratchpadAssetExtension } from './scratchpad-assets'
 import { executeScratchOp } from './scratchpad-executor'
 import { relayScratchOp } from './scratchpad-relay'
 
@@ -70,20 +71,6 @@ const FILLS: Record<NonNullable<AddRectangleArgs['fill']>, ScratchFill> = {
   pattern: 'pattern',
   solid: 'fill'
 }
-const MIME_EXT: Record<string, string> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/jpg': 'jpg',
-  'image/webp': 'webp',
-  'image/gif': 'gif',
-  'image/svg+xml': 'svg',
-  'image/avif': 'avif',
-  'image/apng': 'apng',
-  'video/mp4': 'mp4',
-  'video/webm': 'webm',
-  'video/quicktime': 'mov'
-}
-
 const idProperty = { type: 'string', minLength: 1 }
 const numberProperty = { type: 'number' }
 const colorProperty = {
@@ -170,17 +157,12 @@ function outputPath(
   return requested ? resolve(workspacePath, requested) : join(tmpdir(), fallback)
 }
 
-async function writeDataUrl(src: string, path: string): Promise<void> {
+function decodeDataUrl(src: string): { bytes: Buffer; mimeType: string } {
   const match = src.match(/^data:([^;,]+)(;base64)?,(.*)$/s)
   if (!match) throw new Error('Unrecognized image source.')
-  const [, , base64, data] = match
+  const [, mimeType, base64, data] = match
   const bytes = base64 ? Buffer.from(data, 'base64') : Buffer.from(decodeURIComponent(data), 'utf8')
-  await Bun.write(path, bytes)
-}
-
-function dataUrlExtension(src: string): string {
-  const mime = src.match(/^data:([^;,]+)/)?.[1]
-  return mime ? (MIME_EXT[mime] ?? 'bin') : 'bin'
+  return { bytes, mimeType }
 }
 
 function definitions(workspace: ScratchpadWorkspace): Tool[] {
@@ -208,12 +190,13 @@ function definitions(workspace: ScratchpadWorkspace): Tool[] {
         const image = await readScratchpadImage(workspace.path, id)
         if ('error' in image) throw new Error(image.error)
         if (/^https?:\/\//i.test(image.src)) return { url: image.src }
+        const { bytes, mimeType } = decodeDataUrl(image.src)
         const path = outputPath(
           workspace.path,
           requested,
-          `moi-scratch-${id.replace(/[^a-zA-Z0-9_-]/g, '_')}-${Date.now()}.${dataUrlExtension(image.src)}`
+          `moi-scratch-${id.replace(/[^a-zA-Z0-9_-]/g, '_')}-${Date.now()}.${scratchpadAssetExtension(mimeType)}`
         )
-        await writeDataUrl(image.src, path)
+        await Bun.write(path, bytes)
         return { path }
       }
     }),
@@ -226,7 +209,7 @@ function definitions(workspace: ScratchpadWorkspace): Tool[] {
         const result = await relayScratchOp(workspace.id, { kind: 'view' }, options?.signal)
         if (!('image' in result)) throw new Error('No image returned.')
         const path = outputPath(workspace.path, requested, `moi-scratch-${Date.now()}.png`)
-        await writeDataUrl(result.image, path)
+        await Bun.write(path, decodeDataUrl(result.image).bytes)
         return { path }
       }
     }),

@@ -111,9 +111,15 @@ describe('scratchpad tools', () => {
     await expect(call('add_rectangle', { x: 0, y: 0, width: 20 })).rejects.toThrow(
       'Invalid tool arguments'
     )
-    await expect(call('add_text', { x: 0, y: 0, text: 'x', color: 'purple' })).rejects.toThrow(
-      'Invalid tool arguments'
-    )
+    for (const [name, args] of [
+      ['add_text', { x: 0, y: 0, text: 'x', color: 'purple' }],
+      ['add_note', { x: 0, y: 0, text: 'x', fontSize: 'small' }],
+      ['add_rectangle', { x: 0, y: 0, width: 20, height: 20, fill: 'rough' }],
+      ['add_arrow', { from: 'a', to: 'b', stroke: 'medium' }],
+      ['add_image', { path: 'image.png', quality: 'medium' }]
+    ] as const) {
+      await expect(call(name, args)).rejects.toThrow('Invalid tool arguments')
+    }
     await expect(call('add_arrow', { from: { x: 0 }, to: { x: 1, y: 2 } })).rejects.toThrow(
       'Invalid tool arguments'
     )

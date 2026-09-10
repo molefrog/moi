@@ -296,8 +296,8 @@ async function applyAddImage(
   return { id: op.id }
 }
 
-// Apply one mutating op to the store. `read` and `view` are handled elsewhere
-// (disk / browser) and never reach here. Returns the op's result.
+// Apply one mutating op to the store. `view` is handled in the browser and
+// never reaches here. Returns the op's result.
 function applyOp(store: HeadlessStore, op: ScratchOp): ScratchOpResult {
   const pageId = firstPageId(store)
   const requireShape = (id: string) => {
@@ -443,9 +443,9 @@ function anyShapeUsesAsset(store: HeadlessStore, assetId: string): boolean {
   return false
 }
 
-// Ids of bindings whose start/end is the named shape.
-function bindingsTouching(store: HeadlessStore, name: string): TLRecord['id'][] {
-  const target = createShapeId(name)
+// Ids of bindings whose start/end is the identified shape.
+function bindingsTouching(store: HeadlessStore, id: string): TLRecord['id'][] {
+  const target = createShapeId(id)
   const ids: TLRecord['id'][] = []
   for (const record of store.allRecords()) {
     if (record.typeName !== 'binding') continue

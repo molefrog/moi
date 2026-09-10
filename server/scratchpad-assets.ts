@@ -39,6 +39,7 @@ const ASSET_FILE_RE = new RegExp(`^${ASSET_NAME_PATTERN}$`)
 const MIME_EXT: Record<string, string> = {
   'image/png': 'png',
   'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
   'image/webp': 'webp',
   'image/gif': 'gif',
   'image/svg+xml': 'svg',
@@ -74,6 +75,10 @@ export function scratchpadAssetFile(
   }
 }
 
+export function scratchpadAssetExtension(mimeType: string): string {
+  return MIME_EXT[mimeType.split(';')[0].trim().toLowerCase()] ?? 'bin'
+}
+
 // Persist one asset's bytes and return the `asset:` src to store on the record.
 // Idempotent: identical bytes land on the same file. (Bun.write creates the
 // directory tree as needed.)
@@ -84,7 +89,7 @@ export async function storeScratchpadAsset(
 ): Promise<{ src: string }> {
   const hasher = new Bun.CryptoHasher('sha256')
   hasher.update(bytes)
-  const ext = MIME_EXT[mimeType.split(';')[0].trim().toLowerCase()] ?? 'bin'
+  const ext = scratchpadAssetExtension(mimeType)
   const fileName = `asset-${hasher.digest('hex')}.${ext}`
   const dir = getScratchpadAssetsDir(workspacePath)
   const path = join(dir, fileName)

@@ -23,12 +23,38 @@ export function listViewTools(workspaceId: string, viewId: string): ToolDescript
     .map(entry => entry.descriptor)
 }
 
-export function registerViewTool(
+// Views stay mounted briefly after they are parked, so native browser tools
+// cannot follow component lifetime. The active-view owner calls this instead.
+export function registerViewWebMcpTools(
   workspaceId: string,
   viewId: string,
-  tool: Tool,
   report: (message: string) => void
 ): () => void {
+  const lifetime = new AbortController()
+  const cleanups = [...entries.values()]
+    .filter(entry => entry.workspaceId === workspaceId && entry.viewId === viewId)
+    .map(entry =>
+      registerWebMcpTool(
+        {
+          ...entry.descriptor,
+          execute: (args, options) =>
+            entry.call(
+              args,
+              AbortSignal.any(
+                options?.signal ? [options.signal, lifetime.signal] : [lifetime.signal]
+              )
+            )
+        },
+        report
+      )
+    )
+  return () => {
+    lifetime.abort()
+    for (const cleanup of cleanups) cleanup()
+  }
+}
+
+export function registerViewTool(workspaceId: string, viewId: string, tool: Tool): () => void {
   const key = keyFor(workspaceId, viewId, tool.name)
   if (entries.has(key)) throw new Error(`Duplicate tool "${tool.name}" for view:${viewId}.`)
   const prepared = prepareTool(tool)
@@ -41,20 +67,12 @@ export function registerViewTool(
   }
   entries.set(key, entry)
   changed()
-  const unregisterWebMcp = registerWebMcpTool(
-    {
-      ...prepared.descriptor,
-      execute: (args, options) => entry.call(args, options?.signal ?? lifetime.signal)
-    },
-    report
-  )
   return () => {
     if (entries.get(key) === entry) {
       entries.delete(key)
       changed()
     }
     lifetime.abort()
-    unregisterWebMcp()
   }
 }
 

@@ -4,7 +4,8 @@ import { reportAppletError } from '@/client/features/applets/applet-log'
 import {
   callViewTool,
   listViewTools,
-  onViewToolsChanged
+  onViewToolsChanged,
+  registerViewWebMcpTools
 } from '@/client/features/applets/view-tools'
 import {
   onWorkspaceConnection,
@@ -22,20 +23,37 @@ export function useViewTools(
   revision: string | undefined
 ) {
   const operations = useRef(new Map<string, AbortController>())
-  const publish = useCallback(() => {
-    const tools = activeViewId ? listViewTools(workspaceId, activeViewId) : []
-    sendWorkspaceMessage({
-      type: 'view-tool:presence',
-      workspaceId,
-      viewId: activeViewId,
-      tools
-    })
-  }, [workspaceId, activeViewId])
   const cancelAll = useCallback(() => {
     for (const controller of operations.current.values()) controller.abort()
   }, [])
+  const reportTools = useCallback(
+    (message: string) => {
+      if (activeViewId)
+        reportAppletError(workspaceId, {
+          source: 'runtime',
+          kind: 'view',
+          name: activeViewId,
+          message
+        })
+    },
+    [workspaceId, activeViewId]
+  )
 
   useEffect(() => {
+    let disposeWebMcp = () => {}
+    const publish = () => {
+      const tools = activeViewId ? listViewTools(workspaceId, activeViewId) : []
+      sendWorkspaceMessage({
+        type: 'view-tool:presence',
+        workspaceId,
+        viewId: activeViewId,
+        tools
+      })
+      disposeWebMcp()
+      disposeWebMcp = activeViewId
+        ? registerViewWebMcpTools(workspaceId, activeViewId, reportTools)
+        : () => {}
+    }
     const unsubscribe = onWorkspaceConnection(publish, cancelAll)
     const unsubscribeTools = onViewToolsChanged(publish)
     publish()
@@ -43,9 +61,10 @@ export function useViewTools(
       unsubscribe()
       unsubscribeTools()
       cancelAll()
+      disposeWebMcp()
       sendWorkspaceMessage({ type: 'view-tool:presence', workspaceId, viewId: null, tools: [] })
     }
-  }, [workspaceId, publish, cancelAll])
+  }, [workspaceId, activeViewId, cancelAll, reportTools])
 
   async function execute(request: ViewToolRequest) {
     const { requestId, viewId } = request
@@ -87,22 +106,10 @@ export function useViewTools(
     if (event.type === 'view-tool:call' && event.workspaceId === workspaceId) void execute(event)
   })
 
-  const reportServerTools = useCallback(
-    (message: string) => {
-      if (activeViewId)
-        reportAppletError(workspaceId, {
-          source: 'runtime',
-          kind: 'view',
-          name: activeViewId,
-          message
-        })
-    },
-    [workspaceId, activeViewId]
-  )
   useServerWebMcpTools(
     workspaceId,
     activeViewId ? `view:${activeViewId}` : null,
     revision,
-    reportServerTools
+    reportTools
   )
 }

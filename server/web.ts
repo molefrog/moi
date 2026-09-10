@@ -189,8 +189,8 @@ export const app = Bun.serve<WsData>({
             .interrupt(data.workspaceId, data.sessionId)
             .catch(() => {})
         }
-        // A tab's reply to a relayed Scratchpad op — settle the pending CLI
-        // request (first reply wins; later/duplicate replies are ignored).
+        // A tab's reply to a relayed Scratchpad op — settle the pending tool
+        // call (first reply wins; later/duplicate replies are ignored).
         if (data.type === 'scratchpad:op-result') {
           resolveScratchOp(data.opId, data.result, data.error)
         }

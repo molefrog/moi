@@ -1,6 +1,11 @@
 import { expect, test } from 'bun:test'
 
-import { callViewTool, registerViewTool, listViewTools } from './view-tools'
+import {
+  callViewTool,
+  registerViewTool,
+  listViewTools,
+  registerViewWebMcpTools
+} from './view-tools'
 import { isJsonValue } from '@/lib/tools'
 
 const signal = () => new AbortController().signal
@@ -13,7 +18,7 @@ const tool = {
 }
 
 test('validates inputs and returns handler results without native WebMCP', async () => {
-  const dispose = registerViewTool('test', 'orders', tool, report)
+  const dispose = registerViewTool('test', 'orders', tool)
   try {
     await expect(callViewTool('test', 'orders', tool.name, {}, signal())).rejects.toThrow(
       'Invalid tool arguments'
@@ -30,10 +35,10 @@ test('validates inputs and returns handler results without native WebMCP', async
 })
 
 test('duplicate registration fails and stale cleanup cannot erase replacement', async () => {
-  const old = registerViewTool('duplicate', 'orders', tool, report)
-  expect(() => registerViewTool('duplicate', 'orders', tool, report)).toThrow('Duplicate')
+  const old = registerViewTool('duplicate', 'orders', tool)
+  expect(() => registerViewTool('duplicate', 'orders', tool)).toThrow('Duplicate')
   old()
-  const next = registerViewTool('duplicate', 'orders', tool, report)
+  const next = registerViewTool('duplicate', 'orders', tool)
   old()
   expect(await callViewTool('duplicate', 'orders', tool.name, { status: 'all' }, signal())).toEqual(
     { status: 'all' }
@@ -42,34 +47,27 @@ test('duplicate registration fails and stale cleanup cannot erase replacement', 
 })
 
 test('disposal cancels in-flight handlers even if they ignore the signal', async () => {
-  const dispose = registerViewTool(
-    'cancel',
-    'orders',
-    { ...tool, execute: () => new Promise(() => {}) },
-    report
-  )
+  const dispose = registerViewTool('cancel', 'orders', {
+    ...tool,
+    execute: () => new Promise(() => {})
+  })
   const result = callViewTool('cancel', 'orders', tool.name, { status: 'all' }, signal())
   dispose()
   await expect(result).rejects.toThrow('cancelled')
 })
 
 test('handler errors and non-JSON results are returned as errors', async () => {
-  const dispose = registerViewTool(
-    'error',
-    'orders',
-    {
-      ...tool,
-      execute: async () => {
-        throw new Error('failed to load')
-      }
-    },
-    report
-  )
+  const dispose = registerViewTool('error', 'orders', {
+    ...tool,
+    execute: async () => {
+      throw new Error('failed to load')
+    }
+  })
   await expect(
     callViewTool('error', 'orders', tool.name, { status: 'all' }, signal())
   ).rejects.toThrow('failed to load')
   dispose()
-  const invalid = registerViewTool('error', 'orders', { ...tool, execute: async () => NaN }, report)
+  const invalid = registerViewTool('error', 'orders', { ...tool, execute: async () => NaN })
   await expect(
     callViewTool('error', 'orders', tool.name, { status: 'all' }, signal())
   ).rejects.toThrow('JSON-serializable')
@@ -77,13 +75,13 @@ test('handler errors and non-JSON results are returned as errors', async () => {
 })
 
 test('accepts WebMCP names and rejects values that change during JSON transport', () => {
-  const dotted = registerViewTool('json', 'orders', { ...tool, name: 'order.archive' }, report)
+  const dotted = registerViewTool('json', 'orders', { ...tool, name: 'order.archive' })
   expect(listViewTools('json', 'orders')[0]?.name).toBe('order.archive')
   dotted()
 
-  expect(() =>
-    registerViewTool('json', 'orders', { ...tool, name: 'x'.repeat(129) }, report)
-  ).toThrow('valid name')
+  expect(() => registerViewTool('json', 'orders', { ...tool, name: 'x'.repeat(129) })).toThrow(
+    'valid name'
+  )
 
   const sparse: unknown[] & { extra?: string } = new Array(2)
   sparse[1] = 'kept'
@@ -91,7 +89,7 @@ test('accepts WebMCP names and rejects values that change during JSON transport'
   expect(isJsonValue(sparse)).toBe(false)
 })
 
-test('native registration shares validation and handler, and failure leaves CLI callable', async () => {
+test('native registration exposes only the selected view and shares its handler', async () => {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'document')
   const native: { tool?: typeof tool; signal?: AbortSignal } = {}
   let registered: () => void = () => {}
@@ -110,15 +108,19 @@ test('native registration shares validation and handler, and failure leaves CLI 
       }
     }
   })
-  let dispose = () => {}
+  let disposeTool = () => {}
+  let disposeWebMcp = () => {}
   try {
-    dispose = registerViewTool('native', 'orders', tool, report)
+    disposeTool = registerViewTool('native', 'orders', tool)
+    const hidden = registerViewTool('native', 'hidden', { ...tool, name: 'hidden_tool' })
+    disposeWebMcp = registerViewWebMcpTools('native', 'orders', report)
     await ready
     expect(native.tool?.name).toBe(tool.name)
     expect(await native.tool?.execute({ status: 'overdue' })).toEqual({ status: 'overdue' })
     await expect(native.tool!.execute({})).rejects.toThrow('Invalid tool arguments')
-    dispose()
+    disposeWebMcp()
     expect(native.signal?.aborted).toBe(true)
+    hidden()
     Object.defineProperty(globalThis, 'document', {
       configurable: true,
       value: {
@@ -134,7 +136,7 @@ test('native registration shares validation and handler, and failure leaves CLI 
     const failed = new Promise<void>(resolve => {
       reported = resolve
     })
-    dispose = registerViewTool('native', 'orders', tool, error => {
+    disposeWebMcp = registerViewWebMcpTools('native', 'orders', error => {
       errors.push(error)
       reported()
     })
@@ -144,7 +146,8 @@ test('native registration shares validation and handler, and failure leaves CLI 
       status: 'all'
     })
   } finally {
-    dispose()
+    disposeWebMcp()
+    disposeTool()
     if (previous) Object.defineProperty(globalThis, 'document', previous)
     else Reflect.deleteProperty(globalThis, 'document')
   }
