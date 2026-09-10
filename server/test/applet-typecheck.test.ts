@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { typecheckApplets } from '../applet-typecheck'
+import { resolvePackageTypeRoot, typecheckApplets } from '../applet-typecheck'
 
 let workspaceRoot = ''
 
@@ -36,6 +36,28 @@ export default function Notes() { return null }
 
     expect(result.files).toHaveLength(2)
     expect(result.diagnostics).toEqual([])
+  })
+
+  test('uses the @types/bun shipped with moi, not one installed in the workspace', async () => {
+    const shadow = join(workspaceRoot, '.moi', 'node_modules', '@types', 'bun')
+    await mkdir(shadow, { recursive: true })
+    await Bun.write(
+      join(shadow, 'package.json'),
+      '{ "name": "@types/bun", "types": "index.d.ts" }\n'
+    )
+    await Bun.write(join(shadow, 'index.d.ts'), 'export {}\n')
+    await Bun.write(
+      join(workspaceRoot, '.moi', 'views', 'notes.server.ts'),
+      `export async function readNotes() { return Bun.file('notes.md').text() }
+`
+    )
+    await Bun.write(
+      join(workspaceRoot, '.moi', 'views', 'notes.tsx'),
+      `export default function Notes() { return null }
+`
+    )
+
+    expect((await typecheckApplets(workspaceRoot, 'views')).diagnostics).toEqual([])
   })
 
   test('reports source errors and respects the applet-kind scope', async () => {
@@ -86,5 +108,25 @@ export default function Unrelated() { return count }
         ['_shared.ts', 'notes.server.ts'].some(file => diagnostic.file?.fileName.endsWith(file))
       )
     ).toBe(true)
+  })
+})
+
+describe('resolvePackageTypeRoot', () => {
+  test('finds @types/bun hoisted beside the package, as `bun install -g` lays it out', async () => {
+    const typesDir = join(workspaceRoot, 'node_modules', '@types', 'bun')
+    const serverDir = join(workspaceRoot, 'node_modules', 'moi-computer', 'server')
+    await mkdir(typesDir, { recursive: true })
+    await mkdir(serverDir, { recursive: true })
+    await Bun.write(join(typesDir, 'package.json'), '{ "name": "@types/bun" }\n')
+
+    const [actual, expected] = await Promise.all([
+      realpath(resolvePackageTypeRoot(serverDir)),
+      realpath(join(workspaceRoot, 'node_modules', '@types'))
+    ])
+    expect(actual).toBe(expected)
+  })
+
+  test('resolves the shipped types from this checkout', () => {
+    expect(resolvePackageTypeRoot()).toEndWith(join('node_modules', '@types'))
   })
 })

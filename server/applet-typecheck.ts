@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import ts from 'typescript'
 
 import type { AppletSelector } from '@/lib/applet-selector'
@@ -11,7 +11,23 @@ export type AppletTypecheckResult = {
   diagnostics: readonly ts.Diagnostic[]
 }
 
-const PACKAGE_TYPE_ROOT = join(import.meta.dir, '..', 'node_modules', '@types')
+// Bun's ambient types come from the `@types/bun` moi itself depends on — the
+// version moi was tested with, present wherever moi runs. It is found through
+// Bun's resolver from moi's own location rather than a fixed path: `bun
+// install -g` hoists moi's dependencies beside the package, so
+// `../node_modules/@types` only exists in a dev checkout, and TypeScript never
+// falls back to node_modules for `types` entries once `typeRoots` is set. The
+// same root serves the `bun-types` and `@types/node` references inside, so
+// the workspace's own `node_modules` never takes part. `from` is injectable
+// for tests.
+export function resolvePackageTypeRoot(from: string = import.meta.dir): string {
+  try {
+    return dirname(dirname(Bun.resolveSync('@types/bun/package.json', from)))
+  } catch {
+    throw new Error("moi's bundled @types/bun is missing — reinstall moi-computer")
+  }
+}
+
 const TYPESCRIPT_FILES = new Bun.Glob('**/*.{ts,tsx}')
 
 async function collectTypeScriptFiles(directory: string): Promise<string[]> {
@@ -62,7 +78,7 @@ export async function typecheckApplets(
       skipLibCheck: true,
       strict: true,
       target: ts.ScriptTarget.ESNext,
-      typeRoots: [join(moiRoot, 'node_modules', '@types'), PACKAGE_TYPE_ROOT],
+      typeRoots: [resolvePackageTypeRoot()],
       types: ['bun']
     }
   })
