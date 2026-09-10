@@ -80,9 +80,12 @@ logs` whenever the buffer is non-empty after the rebuild, so the agent is pointe
 moi tools view:orders
 moi call view:orders archive_order '{"id":"o-1024"}'
 moi call view:orders set_filter '{"status":"overdue"}'
+moi tools scratchpad
+moi call scratchpad read_canvas
 ```
 
-Discovery is view-scoped and returns descriptors with schemas and execution location.
+Discovery is scoped to a `view:<id>` or `scratchpad` target and returns descriptors with schemas
+and execution location.
 Arguments are one JSON object, defaulting to `{}`; results are JSON on stdout, duration on stderr,
 and errors exit nonzero. The definition selects the execution location; a failed operation is
 never retried elsewhere.
@@ -110,7 +113,7 @@ always on, opting in is only about _reading_ it.
 ## How it works
 
 - **Control port.** `debug:logs`, `tools` and `call` are control-socket message types next
-  to `bundle`/`theme`/`scratch`, workspace-resolved the same way (subdir-safe, loud errors
+  to `bundle` and `theme`, workspace-resolved the same way (subdir-safe, loud errors
   outside a registered workspace).
 - **Journal.** `server/applet-log.ts` owns the ring buffer; producers call `record` from the
   RPC route, the bundle pipeline, and the `POST /applet-log` route. The client reporter is a
@@ -118,9 +121,10 @@ always on, opting in is only about _reading_ it.
   `error`/`unhandledrejection` hook that attributes by bundle-URL stack match — unattributed
   page errors are never recorded (the host app's bugs are not the applet journal's business).
 - **Server worker.** `server/functions.ts` owns the warm worker pool shared by legacy RPC
-  and server tools. `server/tools.ts` resolves tool names; `server/view-tool-relay.ts` routes
-  UI calls to one browser. The CLI uses the control socket; browser imports use the JSON tool
-  routes in `server/api.ts`.
+  and view server tools. `server/tools.ts` resolves targets and tool names;
+  `server/scratchpad-tools.ts` owns the built-in Scratchpad catalog; and
+  `server/view-tool-relay.ts` routes UI calls to one browser. The CLI uses the control socket;
+  browser imports and WebMCP wrappers use the JSON tool routes in `server/api.ts`.
 - **Validation.** The POST route accepts only the browser-side sources
   (`load`/`render`/`window`), whitelists `kind`, pattern-checks `name`, caps message/stack
   lengths and events per request — it's an unauthenticated localhost route and is treated
@@ -160,5 +164,6 @@ and retain thin legacy exports while old bundles may remain open. Keep the wrapp
 arguments and results intact, even if a new tool uses different JSON shapes. Do not automatically
 expose legacy functions as tools or infer schemas. Widget function imports remain supported.
 
-Native WebMCP is optional for CLI calls. In supporting browsers, moi publishes the view's UI tools
-and server request wrappers from the same descriptors. See the workspace skill's Tools section.
+Native WebMCP is optional for CLI calls. In supporting browsers, moi publishes the active view's
+tools or the active Scratchpad's built-in tools from the same descriptors. See the workspace
+skill's Tools section.

@@ -12,9 +12,6 @@ import { processIcon } from './icon'
 import { loadLayout, saveLayout } from './layout'
 import { publishEvent } from './events'
 import { findWorkspaceForPath, listWorkspaces, registerWorkspace } from './registry'
-import { executeScratchOp } from './scratchpad-executor'
-import { readScratchpadImage, readScratchpadShapes } from './scratchpad'
-import { relayScratchOp } from './scratchpad-relay'
 import { broadcastAll } from './state'
 import { assembleTabRows, resolveFocusTab } from './tabs'
 import { applyThemeUpdate } from './theme'
@@ -34,7 +31,7 @@ type ControlSocket = { send(data: string): void }
 
 // Resolve a control request's `path` to the registered workspace that contains
 // it — the entry itself or its nearest registered ancestor — so every
-// workspace-scoped command (bundle/theme/config/scratch) works from `.moi/` or
+// workspace-scoped command (bundle/theme/config/tools/call) works from `.moi/` or
 // any subdirectory instead of operating on a phantom nested path. Sends a clear
 // error and returns null when nothing is registered, or the path is outside
 // every workspace.
@@ -406,51 +403,6 @@ export const control = Bun.serve({
               clearedIcon: clearIcon
             })
           )
-          return
-        }
-
-        if (data.type === 'scratch') {
-          const op = data.op
-          if (!op || typeof op.kind !== 'string') {
-            ws.send(JSON.stringify({ error: 'Missing scratch op' }))
-            return
-          }
-          // Resolve to the real workspace root (subdir-safe) — both the on-disk
-          // read and the live relay use it.
-          const match = await resolveWorkspace(ws, data.path)
-          if (!match) return
-
-          // `read` is served straight off the disk snapshot — no live tab needed.
-          if (op.kind === 'read') {
-            ws.send(JSON.stringify({ shapes: await readScratchpadShapes(match.path) }))
-            return
-          }
-
-          // `read-image` resolves one image shape's data off disk too — `read`
-          // omits the blob, so this is how the agent pulls a specific image.
-          if (op.kind === 'read-image') {
-            ws.send(JSON.stringify(await readScratchpadImage(match.path, String(op.name))))
-            return
-          }
-
-          // Assign add ops a stable name when the caller didn't (`--id`), so the
-          // derived tldraw shape id is deterministic and addressable later.
-          if (op.kind.startsWith('add-') && !op.name) {
-            op.name = `s_${crypto.randomUUID().slice(0, 8)}`
-          }
-
-          try {
-            // `view` renders pixels — only the browser can do that, so it relays to
-            // a live tab (and fails if none is open). Every mutation runs headlessly
-            // against the disk snapshot, so drawing never needs an open canvas.
-            const result =
-              op.kind === 'view'
-                ? await relayScratchOp(match.id, op)
-                : await executeScratchOp(match.path, match.id, op)
-            ws.send(JSON.stringify({ ok: true, result }))
-          } catch (err) {
-            ws.send(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }))
-          }
           return
         }
       } catch (err) {

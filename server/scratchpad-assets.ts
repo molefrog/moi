@@ -12,7 +12,7 @@ import type { ScratchpadDoc } from './scratchpad'
 // `.moi/.scratchpad/` (a hidden sidecar dir next to `.moi/.scratchpad.json`,
 // moi-internal like the snapshot itself). The browser uploads/resolves through
 // the `/scratchpad/assets` routes (see its TLAssetStore in Scratchpad.tsx); the
-// server's `add image` writes files directly; `read-image` reads them back.
+// server's `add_image` tool writes files directly; `read_image` reads them back.
 //
 // Content addressing (the file name is the sha256 of the bytes) buys dedup —
 // the same image pasted twice is one file — and makes every write idempotent,
@@ -60,7 +60,7 @@ export function assetSrcFileName(src: string): string | null {
   return ASSET_FILE_RE.test(name) ? name : null
 }
 
-// A served asset file by (validated) name — the GET route and `read-image`
+// A served asset file by (validated) name — the GET route and `read_image`
 // resolve through this. Null for a name we'd never have written.
 export function scratchpadAssetFile(
   workspacePath: string,

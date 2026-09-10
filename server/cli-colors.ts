@@ -1,5 +1,5 @@
 // Disable ANSI color when stdout is not a TTY — e.g. an agent capturing
-// `moi scratch --help` through a pipe.
+// `moi --help` through a pipe.
 //
 // citty colors its usage and error output *unconditionally*: its color helper
 // keys off env vars (`NO_COLOR`/`TERM`/`CI`/`TEST`) and never checks `isTTY`, so

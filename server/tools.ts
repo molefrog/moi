@@ -3,9 +3,12 @@ import { readToolDescriptors } from '@/lib/tool-execution'
 import { isRecord, isJsonValue, isToolName, type ToolDescriptor, type JsonValue } from '@/lib/tools'
 import { parseWorkspaceTab, viewIdFromTab } from '@/lib/workspace-tabs'
 import { callToolWorker } from './functions'
+import { callScratchpadTool, listScratchpadTools } from './scratchpad-tools'
 import { viewToolRelay } from './view-tool-relay'
 
 const moduleFor = (viewId: string) => (/^[A-Za-z0-9_$-]+$/.test(viewId) ? `views/${viewId}` : null)
+type ToolWorkspace = { id: string; path: string }
+type ToolTarget = { kind: 'scratchpad' } | { kind: 'view'; viewId: string }
 
 export async function listServerTools(
   workspacePath: string,
@@ -33,19 +36,47 @@ export async function callServerTool(
   ) as JsonValue
 }
 
-function viewIdFor(target: string): string {
+function parseToolTarget(target: string): ToolTarget {
   const tab = parseWorkspaceTab(target)
+  if (tab === 'scratchpad') return { kind: 'scratchpad' }
   const viewId = tab ? viewIdFromTab(tab) : null
-  if (!viewId) throw new Error('Use a view target such as view:orders.')
-  return viewId
+  if (!viewId) throw new Error('Use a tool target such as scratchpad or view:orders.')
+  return { kind: 'view', viewId }
 }
 
-export async function listTools(
-  workspace: { id: string; path: string },
+export async function listTargetServerTools(
+  workspace: ToolWorkspace,
   target: string,
   signal?: AbortSignal
-) {
-  const viewId = viewIdFor(target)
+): Promise<ToolDescriptor[]> {
+  const parsed = parseToolTarget(target)
+  return parsed.kind === 'scratchpad'
+    ? listScratchpadTools(workspace)
+    : listServerTools(workspace.path, parsed.viewId, signal)
+}
+
+export async function callTargetServerTool(
+  workspace: ToolWorkspace,
+  target: string,
+  name: string,
+  args: unknown,
+  signal?: AbortSignal
+): Promise<JsonValue> {
+  const parsed = parseToolTarget(target)
+  return parsed.kind === 'scratchpad'
+    ? callScratchpadTool(workspace, name, args, signal)
+    : callServerTool(workspace.path, parsed.viewId, name, args, signal)
+}
+
+export async function listTools(workspace: ToolWorkspace, target: string, signal?: AbortSignal) {
+  const parsed = parseToolTarget(target)
+  if (parsed.kind === 'scratchpad') {
+    return {
+      target,
+      tools: listScratchpadTools(workspace).map(tool => ({ ...tool, runtime: 'server' as const }))
+    }
+  }
+  const { viewId } = parsed
   const serverTools = await listServerTools(workspace.path, viewId, signal)
   const ui = viewToolRelay.availability(workspace.id, viewId)
   const uiTools = ui === 'available' ? viewToolRelay.list(workspace.id, viewId) : []
@@ -76,17 +107,19 @@ export async function listTools(
 // Resolve once. A failure at the selected location is returned without retrying
 // the operation elsewhere. Raw server functions are deliberately outside this API.
 export async function callTool(
-  workspace: { id: string; path: string },
+  workspace: ToolWorkspace,
   target: string,
   name: string,
   args: unknown = {},
   signal?: AbortSignal
 ) {
-  const viewId = viewIdFor(target)
   if (!isToolName(name))
     throw new Error('Use a tool name containing only letters, numbers, "_", "-", or ".".')
   if (!isRecord(args) || !isJsonValue(args))
     throw new Error('Tool arguments must be a JSON object.')
+  const parsed = parseToolTarget(target)
+  if (parsed.kind === 'scratchpad') return callScratchpadTool(workspace, name, args, signal)
+  const { viewId } = parsed
   const serverTools = await listServerTools(workspace.path, viewId, signal)
   if (serverTools.some(tool => tool.name === name)) {
     if (viewToolRelay.hasTool(workspace.id, viewId, name))

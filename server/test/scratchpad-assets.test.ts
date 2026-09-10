@@ -121,7 +121,7 @@ describe('extractInlineAssets', () => {
 })
 
 describe('saveScratchpadDoc migration', () => {
-  test('a legacy inline snapshot is extracted on save and read-image still works', async () => {
+  test('a legacy inline snapshot is extracted on save and read_image still works', async () => {
     await saveScratchpadDoc(legacyDoc(), WS)
 
     // On disk: no base64 left in the JSON, one sidecar file.
@@ -133,7 +133,7 @@ describe('saveScratchpadDoc migration', () => {
     const asset = (document?.store?.['asset:a1'] ?? {}) as { props?: { src?: string } }
     expect(asset.props?.src).toMatch(/^asset:asset-[0-9a-f]{64}\.png$/)
 
-    // The agent's read-image path resolves the file back to a data URL.
+    // The agent's read_image path resolves the file back to a data URL.
     expect(await readScratchpadImage(WS, 'pic')).toEqual({
       src: `data:image/png;base64,${PNG_B64}`
     })
@@ -141,7 +141,7 @@ describe('saveScratchpadDoc migration', () => {
 })
 
 describe('missing asset files (dangling references)', () => {
-  test('read flags the shape, read-image errors clearly, intact shapes unflagged', async () => {
+  test('read flags the shape, read_image errors clearly, intact shapes unflagged', async () => {
     await saveScratchpadDoc(legacyDoc(), WS)
     const dir = getScratchpadAssetsDir(WS)
 

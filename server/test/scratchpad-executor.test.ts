@@ -73,15 +73,15 @@ test('SHAPE_DEFAULTS match the tldraw shape utils', () => {
 
 describe('executeScratchOp (headless)', () => {
   test('draws to disk with no browser, and the snapshot is browser-loadable', async () => {
-    await run({ kind: 'add-rect', name: 'box1', x: 10, y: 20, w: 100, h: 80, text: 'hello' })
-    await run({ kind: 'add-text', name: 'label', x: 200, y: 20, text: 'a label' })
-    await run({ kind: 'add-note', name: 'note1', x: 300, y: 20, text: 'a note' })
-    await run({ kind: 'add-rect', name: 'box2', x: 400, y: 200, w: 60, h: 60 })
+    await run({ kind: 'add-rect', id: 'box1', x: 10, y: 20, w: 100, h: 80, text: 'hello' })
+    await run({ kind: 'add-text', id: 'label', x: 200, y: 20, text: 'a label' })
+    await run({ kind: 'add-note', id: 'note1', x: 300, y: 20, text: 'a note' })
+    await run({ kind: 'add-rect', id: 'box2', x: 400, y: 200, w: 60, h: 60 })
     await run({
       kind: 'add-arrow',
-      name: 'arr',
-      from: { name: 'box1' },
-      to: { name: 'box2' },
+      id: 'arr',
+      from: { id: 'box1' },
+      to: { id: 'box2' },
       elbow: true
     })
 
@@ -96,18 +96,18 @@ describe('executeScratchOp (headless)', () => {
   })
 
   test('move / set / delete / clear mutate the snapshot', async () => {
-    await run({ kind: 'add-rect', name: 'box', x: 0, y: 0, w: 50, h: 50, text: 'old' })
+    await run({ kind: 'add-rect', id: 'box', x: 0, y: 0, w: 50, h: 50, text: 'old' })
 
-    await run({ kind: 'move', name: 'box', x: 123, y: 456 })
-    await run({ kind: 'set', name: 'box', text: 'new' })
+    await run({ kind: 'move', id: 'box', x: 123, y: 456 })
+    await run({ kind: 'set', id: 'box', text: 'new' })
     let box = (await readScratchpadShapes(WS)).find(s => s.id === 'box')
     expect(box).toMatchObject({ x: 123, y: 456, text: 'new' })
 
-    await run({ kind: 'delete', name: 'box' })
+    await run({ kind: 'delete', id: 'box' })
     expect((await readScratchpadShapes(WS)).some(s => s.id === 'box')).toBe(false)
 
-    await run({ kind: 'add-rect', name: 'a', x: 0, y: 0, w: 10, h: 10 })
-    await run({ kind: 'add-rect', name: 'b', x: 20, y: 0, w: 10, h: 10 })
+    await run({ kind: 'add-rect', id: 'a', x: 0, y: 0, w: 10, h: 10 })
+    await run({ kind: 'add-rect', id: 'b', x: 20, y: 0, w: 10, h: 10 })
     await run({ kind: 'clear' })
     expect(await readScratchpadShapes(WS)).toHaveLength(0)
     // An empty canvas still persists a valid (loadable) document.
@@ -115,29 +115,29 @@ describe('executeScratchOp (headless)', () => {
   })
 
   test('deleting an arrow endpoint removes the dangling binding too', async () => {
-    await run({ kind: 'add-rect', name: 'from', x: 0, y: 0, w: 10, h: 10 })
-    await run({ kind: 'add-rect', name: 'to', x: 100, y: 0, w: 10, h: 10 })
-    await run({ kind: 'add-arrow', name: 'arr', from: { name: 'from' }, to: { name: 'to' } })
+    await run({ kind: 'add-rect', id: 'from', x: 0, y: 0, w: 10, h: 10 })
+    await run({ kind: 'add-rect', id: 'to', x: 100, y: 0, w: 10, h: 10 })
+    await run({ kind: 'add-arrow', id: 'arr', from: { id: 'from' }, to: { id: 'to' } })
 
-    await run({ kind: 'delete', name: 'to' })
+    await run({ kind: 'delete', id: 'to' })
     // Arrow remains, 'to' is gone, and the snapshot is still browser-loadable
     // (a leftover binding to a missing shape would throw on load).
     expect(await assertLoadable()).toBe(2)
   })
 
   test('addressing a missing shape throws a clear error', async () => {
-    await expect(run({ kind: 'move', name: 'ghost', x: 0, y: 0 })).rejects.toThrow(/ghost/)
+    await expect(run({ kind: 'move', id: 'ghost', x: 0, y: 0 })).rejects.toThrow(/ghost/)
     await expect(
-      run({ kind: 'add-arrow', name: 'a', from: { name: 'ghost' }, to: { x: 0, y: 0 } })
+      run({ kind: 'add-arrow', id: 'a', from: { id: 'ghost' }, to: { x: 0, y: 0 } })
     ).rejects.toThrow(/ghost/)
   })
 
   test('persists nothing but a single .scratchpad.json under .moi', async () => {
-    await run({ kind: 'add-rect', name: 'box', x: 0, y: 0, w: 10, h: 10 })
+    await run({ kind: 'add-rect', id: 'box', x: 0, y: 0, w: 10, h: 10 })
     expect(await Bun.file(getScratchpadPath(WS)).exists()).toBe(true)
   })
 
-  test('add-image resizes to fit, stores a file asset, and read-image pulls it back', async () => {
+  test('add_image resizes to fit, stores a file asset, and read_image pulls it back', async () => {
     // A 4000×2000 source — larger than both presets, so it's always scaled down.
     const file = join(WS, 'big.png')
     await sharp({
@@ -146,7 +146,7 @@ describe('executeScratchOp (headless)', () => {
       .png()
       .toFile(file)
 
-    await run({ kind: 'add-image', name: 'pic', x: 40, y: 50, path: file })
+    await run({ kind: 'add-image', id: 'pic', x: 40, y: 50, path: file })
 
     expect(await assertLoadable()).toBe(1)
     const shape = (await readScratchpadShapes(WS)).find(s => s.id === 'pic')
@@ -159,7 +159,7 @@ describe('executeScratchOp (headless)', () => {
     expect(files).toHaveLength(1)
     expect(`asset:${files[0]}`).toBe(shape?.src ?? '')
     expect(await Bun.file(getScratchpadPath(WS)).text()).not.toInclude(';base64,')
-    // read-image resolves the file back into the (re-encoded webp) data URL.
+    // read_image resolves the file back into the (re-encoded webp) data URL.
     const img = await readScratchpadImage(WS, 'pic')
     expect(img).toEqual({ src: expect.stringMatching(/^data:image\/webp;base64,/) })
   })
@@ -171,7 +171,7 @@ describe('executeScratchOp (headless)', () => {
     })
       .png()
       .toFile(file)
-    await run({ kind: 'add-image', name: 'pic', x: 0, y: 0, path: file })
+    await run({ kind: 'add-image', id: 'pic', x: 0, y: 0, path: file })
 
     await run({ kind: 'clear' })
     const { document } = await loadScratchpadDoc(WS)
@@ -189,10 +189,10 @@ describe('executeScratchOp (headless)', () => {
     })
       .png()
       .toFile(file)
-    await run({ kind: 'add-image', name: 'pic', x: 0, y: 0, path: file })
+    await run({ kind: 'add-image', id: 'pic', x: 0, y: 0, path: file })
     expect(await readdir(getScratchpadAssetsDir(WS))).toHaveLength(1)
 
-    await run({ kind: 'delete', name: 'pic' })
+    await run({ kind: 'delete', id: 'pic' })
     // The shape's asset record goes with it (no other shape used it), so the
     // sweep is free to reclaim the file — nothing pins it anymore.
     const { document } = await loadScratchpadDoc(WS)
@@ -202,7 +202,7 @@ describe('executeScratchOp (headless)', () => {
     expect(assets).toHaveLength(0)
   })
 
-  test('add-image --quality hi keeps more pixels', async () => {
+  test('add_image quality hi keeps more pixels', async () => {
     const file = join(WS, 'big.png')
     await sharp({
       create: { width: 4000, height: 2000, channels: 3, background: { r: 200, g: 40, b: 90 } }
@@ -210,14 +210,14 @@ describe('executeScratchOp (headless)', () => {
       .png()
       .toFile(file)
 
-    await run({ kind: 'add-image', name: 'sharp', x: 0, y: 0, path: file, quality: 'hi' })
+    await run({ kind: 'add-image', id: 'sharp', x: 0, y: 0, path: file, quality: 'hi' })
     // 'hi' caps the long side at 2048 (2:1 → 2048×1024).
     const shape = (await readScratchpadShapes(WS)).find(s => s.id === 'sharp')
     expect(shape).toMatchObject({ type: 'image', w: 2048, h: 1024 })
   })
 
-  test('read-image errors clearly for a missing or non-image shape', async () => {
-    await run({ kind: 'add-rect', name: 'box', x: 0, y: 0, w: 10, h: 10 })
+  test('read_image errors clearly for a missing or non-image shape', async () => {
+    await run({ kind: 'add-rect', id: 'box', x: 0, y: 0, w: 10, h: 10 })
     expect(await readScratchpadImage(WS, 'nope')).toEqual({ error: expect.stringMatching(/nope/) })
     expect(await readScratchpadImage(WS, 'box')).toEqual({
       error: expect.stringMatching(/not an image/)

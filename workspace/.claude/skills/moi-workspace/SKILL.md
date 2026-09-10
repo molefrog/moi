@@ -86,8 +86,8 @@ my-agent-folder/
       ...
     package.json              <- Applet dependencies that you manage
     .workspace.json           <- Auto-generated. Do NOT read, edit, or `cat` this file. Use Moi CLI instead.
-    .scratchpad.json          <- Scratchpad canvas snapshot. Internal — inspect only via `moi scratch read`, never open it.
-    .scratchpad/              <- Scratchpad image files. Internal — pull pixels via `moi scratch read-image`, never open it.
+    .scratchpad.json          <- Scratchpad canvas snapshot. Internal — inspect only via `moi call scratchpad read_canvas`, never open it.
+    .scratchpad/              <- Scratchpad image files. Internal — pull pixels via `moi call scratchpad read_image`, never open it.
 ```
 
 Every dot-prefixed file or folder inside `.moi/` (`.build/`, `.cache/`, `.workspace.json`,
@@ -268,17 +268,17 @@ sendChatMessage('Chase order o-1024', { order: 'o-1024', carrier: 'dhl' })
 
 ## Tools — one interface for agents
 
-Use `moi tools view:orders` to discover the specific view's tools, then
-`moi call view:orders <tool> '{"named":"arguments"}'` to call one. Both server and UI tools
-accept a JSON object (default `{}`), validate it against their schema, and return JSON on stdout.
-Errors exit nonzero. The tool's definition selects its execution location; no runtime flag is needed.
-Targets use the same `view:<id>` form as tabs. The tool name is a separate positional argument.
-There is no global tool list. Read the view's source when you need implementation details.
+Use `moi tools <target>` to discover one target's tools, then
+`moi call <target> <tool> '{"named":"arguments"}'` to call one. Targets are `view:<id>` or
+`scratchpad`; the tool name is a separate positional argument. Tools accept a JSON object (default
+`{}`), validate it against their schema, and return JSON on stdout. Errors exit nonzero. The tool's
+definition selects its execution location, so there is no runtime flag or global tool list.
 
 | Need | Use |
 | --- | --- |
 | Perform a published backend operation, with no browser required | A server tool in `.moi/views/<id>.server.ts`; `moi call` |
 | Read or change selection, filters, unsaved drafts or other live React state | A UI tool registered with `useTool`; `moi call` |
+| Read or edit the shared canvas | A built-in Scratchpad tool; read `references/SCRATCHPAD.md` |
 | Implement reusable files, database, secrets or API logic | Private backend functions, called by server tools |
 | Open a view with navigation state | `focusTab`; `moi tab focus view:<id> --params '{...}'` |
 | Ask the agent to act from applet UI | `sendChatMessage` |
@@ -363,7 +363,7 @@ When a view needs to migrate:
 For example, if `getOrder(id)` used to return a `Date`, retain that result for the legacy wrapper.
 The new `get_order` tool can call the same helper and explicitly convert the date to an ISO string.
 Do not guess schemas or automatically turn every legacy function into a tool. Widgets keep their
-existing function imports; tools currently target views.
+existing function imports. Scratchpad tools are built into moi rather than authored in a view.
 
 ### UI tools
 
@@ -420,9 +420,9 @@ undo effects; inspect state before retrying a mutation. Execution errors never t
 to another location.
 
 CLI calls need no native browser WebMCP support. When `document.modelContext` exists, moi exposes
-the active view's tools to browser agents with their declared names. Server tools use thin browser request
-wrappers; their implementation stays on the server. Authors need no polyfill, browser flags or
-separate MCP server for the CLI workflow. Tools currently support views only.
+the active view's tools or the active Scratchpad's built-in tools to browser agents with their
+declared names. Server tools use thin browser request wrappers; their implementation stays on the
+server. Authors need no polyfill, browser flags or separate MCP server for the CLI workflow.
 
 ## Params: the type is the contract
 
@@ -587,4 +587,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.21.0" />
+<moi-skill version="0.22.0" />

@@ -69,8 +69,15 @@ describe('moi --help (e2e)', () => {
   }, 30_000)
 
   test('tool discovery and execution have separate fixed grammars', async () => {
-    const [tools, call] = await Promise.all([runHelp({}, 'tools'), runHelp({}, 'call')])
+    const [root, tools, call] = await Promise.all([
+      runHelp({}),
+      runHelp({}, 'tools'),
+      runHelp({}, 'call')
+    ])
+    expect(root).not.toMatch(/^\s+scratch\s/m)
     expect(tools).toContain('USAGE moi tools [OPTIONS] <TARGET>')
+    expect(tools).toContain('scratchpad or view:orders')
     expect(call).toContain('USAGE moi call [OPTIONS] <TARGET> <TOOL> [ARGS]')
+    expect(call).toContain('scratchpad or view:orders')
   }, 30_000)
 })

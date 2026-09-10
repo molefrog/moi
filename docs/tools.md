@@ -1,8 +1,8 @@
 # Tools, WebMCP and server functions
 
-A tool is a named view operation with a description, an input schema and an
-`execute` handler. It can run on the Bun server or inside the view's React
-component. Agents discover them with `moi tools` and call them with `moi call`.
+A tool is a named operation on a target, with a description, an input schema and
+an `execute` handler. It can run on the Bun server or inside a view's React
+component. Agents discover tools with `moi tools` and call them with `moi call`.
 
 WebMCP gives browser agents access to those same operations. Existing server
 functions keep their RPC path so already-built views continue to work.
@@ -19,8 +19,8 @@ functions keep their RPC path so already-built views continue to work.
 | Keep an existing applet working                                           | Its existing named server functions | Bun function worker |
 
 For new view backends, publish operations through a `tools` export. Helpers can
-stay private or live in ordinary backend modules. Tools currently target views;
-widgets and overview keep their existing interfaces.
+stay private or live in ordinary backend modules. Scratchpad has a built-in tool
+catalog. Widgets and overview keep their existing interfaces.
 
 ## CLI
 
@@ -30,11 +30,14 @@ Run from the workspace root, or pass `--dir <workspace>`:
 moi tools view:orders
 moi call view:orders archive_order '{"id":"o-1024"}'
 moi call view:orders set_filter '{"status":"overdue"}'
+moi tools scratchpad
+moi call scratchpad read_canvas
 ```
 
-`view:<id>` is the same target used by `moi tab focus`. `moi tools` lists the
-operations for that target. `moi call` takes the target and tool name as separate
-positional arguments. There is no global catalog or execution-location flag.
+Targets are either `view:<id>` or `scratchpad`. A view target uses the same ID as
+`moi tab focus`. `moi tools` lists the operations for one target. `moi call`
+takes the target and tool name as separate positional arguments. There is no
+global catalog or execution-location flag.
 
 Discovery returns `tools`, plus a `ui` availability field. Each tool includes its
 name, description, input schema, optional annotations and `runtime` (`server` or
@@ -42,7 +45,17 @@ name, description, input schema, optional annotations and `runtime` (`server` or
 
 Arguments are one JSON object, defaulting to `{}`. Results are JSON on stdout;
 duration and errors go to stderr. Errors exit nonzero. The public
-`call-server-fn` and `call-tool` commands have been removed.
+`call-server-fn`, `call-tool` and `scratch` commands have been removed.
+
+## Scratchpad tools
+
+Scratchpad exposes twelve built-in server tools for reading, drawing and editing
+the shared canvas. Discover them with `moi tools scratchpad`. Most work from the
+persisted canvas without an open browser. `render_canvas` needs an open
+Scratchpad tab because it uses the live canvas renderer.
+
+See [Scratchpad](moi-scratchpad.md) for the complete catalog, argument shapes and
+image path behavior.
 
 ## Server tools
 
@@ -154,10 +167,11 @@ browser holding the active view:
 ```text
 Agent process → moi tools / moi call → host control socket → tool resolver
                                                   │
-                            server tool ──────────┤→ Bun function worker
+                   view server tool ──────────────┤→ Bun function worker
+                   Scratchpad tool ───────────────┤→ host-owned provider
                                                   │
-                            UI tool ──────────────┘→ browser events socket
-                                                       → registered React handler
+                   view UI tool ──────────────────┘→ browser events socket
+                                                        → registered React handler
 ```
 
 The browser publishes `{ workspaceId, viewId, tools }` when its active view or
@@ -176,7 +190,7 @@ never retries the operation in another location or another browser.
 
 moi's adapter targets `document.modelContext.registerTool(tool, { signal })` from
 the [WebMCP draft](https://webmachinelearning.github.io/webmcp/). It feature-detects
-the API and publishes the active view's tools using their declared names:
+the API and publishes the active target's tools using their declared names:
 
 - UI registrations invoke the same validated handler used by CLI calls.
 - Server registrations use thin HTTP wrappers around the server tool endpoint.
@@ -185,6 +199,10 @@ the API and publishes the active view's tools using their declared names:
 The server catalog is fetched for browser registration only when native WebMCP
 is present. A native registration failure is reported through applet runtime
 logging; the CLI's own registration and relay path remain usable.
+
+The active Scratchpad registers its built-in server tools through the same hook.
+Unmounting Scratchpad removes them. Scratchpad has no UI-authored tools in this
+version.
 
 | Agent access path                            | Browser requirement                                               |
 | -------------------------------------------- | ----------------------------------------------------------------- |
@@ -261,18 +279,22 @@ view for that workflow.
 | Code                                                         | Responsibility                                                  |
 | ------------------------------------------------------------ | --------------------------------------------------------------- |
 | `lib/tools.ts`, `lib/tool-execution.ts`                      | Shared types, descriptors, JSON/schema validation and execution |
-| `server/cli.ts`, `server/control.ts`, `server/tools.ts`      | CLI, workspace resolution and server/UI routing                 |
-| `server/view-tool-relay.ts`                                  | Browser presence, discovery and pending UI calls                |
-| `client/features/views/useViewTools.ts`                      | Active-view presence, CLI execution and server WebMCP wrappers  |
+| `server/cli.ts`, `server/control.ts`, `server/tools.ts`      | CLI, workspace resolution and target routing                    |
+| `server/scratchpad-tools.ts`                                 | Built-in Scratchpad catalog and execution                       |
+| `server/view-tool-relay.ts`                                  | Browser presence, discovery and pending view UI calls           |
+| `client/runtime/useServerWebMcpTools.ts`, `webmcp.ts`        | Server-tool WebMCP registration for the active target           |
+| `client/features/views/useViewTools.ts`                      | Active-view presence and CLI execution                          |
 | `client/features/applets/view-tools.ts`, `applet-runtime.ts` | UI registry, native registration and bundle lifetime            |
-| `server/functions.ts`, `server/functions-worker.ts`          | Shared warm workers for tools and legacy RPC                    |
+| `server/functions.ts`, `server/functions-worker.ts`          | Shared warm workers for view tools and legacy RPC               |
 | `server/api.ts`                                              | JSON tool catalog/call routes and legacy RPC route              |
 | `server/bundler/build-applet.ts`, `server/applets.ts`        | Browser proxies, `useTool` runtime and dependency tracking      |
 | `server/moi-scaffold.ts`                                     | Applet-facing TypeScript declarations                           |
 
-Server HTTP routes are `GET /api/workspaces/:id/tools/:viewId` for descriptors and
-`POST /api/workspaces/:id/tools/:viewId/:name` for execution. These routes expose
-server tools; `moi tools` combines their catalog with live UI presence.
+Server HTTP routes are `GET /api/workspaces/:id/tools/:target` for descriptors
+and `POST /api/workspaces/:id/tools/:target/:name` for execution. The target is
+the encoded canonical target, such as `view%3Aorders` or `scratchpad`. These
+routes expose server tools; `moi tools` combines view server tools with live UI
+presence and returns the built-in Scratchpad catalog directly.
 
 See [self-correction](self-correction.md) for runtime checks and the
 [workspace skill](../workspace/.claude/skills/moi-workspace/SKILL.md) for the

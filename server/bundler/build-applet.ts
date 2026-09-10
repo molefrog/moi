@@ -248,13 +248,14 @@ export function rpc(module, name) {
 // Browser imports keep the server tool's execute(args) shape. Descriptors are
 // discovered through the catalog; no server implementation is bundled here.
 export function toolProxy(viewId) {
+  const target = "view:" + viewId;
   const cache = new Map();
   return new Proxy(Object.create(null), {
     get(_target, name) {
       if (typeof name !== "string") return undefined;
       if (!cache.has(name)) cache.set(name, {
         async execute(args, options) {
-          const res = await fetch(BASE + "/tools/" + encodeURIComponent(viewId) + "/" + encodeURIComponent(name), {
+          const res = await fetch(BASE + "/tools/" + encodeURIComponent(target) + "/" + encodeURIComponent(name), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(args),

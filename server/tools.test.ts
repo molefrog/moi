@@ -137,8 +137,16 @@ test('cancels server tools and keeps the warm worker usable', async () => {
 })
 
 test('rejects malformed targets, tool names and non-object arguments', async () => {
-  for (const target of ['widget:orders', 'views:orders', 'view:../orders', 'view:orders/a']) {
-    await expect(listTools(workspace, target)).rejects.toThrow('view target')
+  for (const target of [
+    'agent',
+    'widgets',
+    'view-builder:draft',
+    'widget:orders',
+    'views:orders',
+    'view:../orders',
+    'view:orders/a'
+  ]) {
+    await expect(listTools(workspace, target)).rejects.toThrow('tool target')
   }
   for (const name of ['', 'save/order']) {
     await expect(callTool(workspace, 'view:tool-demo', name)).rejects.toThrow('tool name')

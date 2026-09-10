@@ -1,10 +1,8 @@
 import { prepareTool } from '@/lib/tool-execution'
 import type { JsonValue, Tool, ToolDescriptor } from '@/lib/tools'
+import { registerWebMcpTool } from '@/client/runtime/webmcp'
 
 type Entry = ReturnType<typeof prepareTool> & { workspaceId: string; viewId: string }
-type NativeContext = {
-  registerTool: (tool: Tool, options: { signal: AbortSignal }) => Promise<void> | void
-}
 
 const entries = new Map<string, Entry>()
 const listeners = new Set<() => void>()
@@ -12,16 +10,6 @@ const keyFor = (workspaceId: string, viewId: string, name: string) =>
   `${workspaceId}\0${viewId}\0${name}`
 const changed = () => {
   for (const listener of listeners) listener()
-}
-
-function modelContext(): NativeContext | undefined {
-  return typeof document === 'undefined'
-    ? undefined
-    : (document as Document & { modelContext?: NativeContext }).modelContext
-}
-
-export function hasWebMcp(): boolean {
-  return typeof modelContext()?.registerTool === 'function'
 }
 
 export function onViewToolsChanged(listener: () => void) {
@@ -33,23 +21,6 @@ export function listViewTools(workspaceId: string, viewId: string): ToolDescript
   return [...entries.values()]
     .filter(entry => entry.workspaceId === workspaceId && entry.viewId === viewId)
     .map(entry => entry.descriptor)
-}
-
-// WebMCP naturally follows the active view: React aborts this registration
-// when the view is parked or replaced. The browser handles discovery and calls.
-export function registerWebMcpTool(tool: Tool, report: (message: string) => void): () => void {
-  const lifetime = new AbortController()
-  const context = modelContext()
-  if (context?.registerTool) {
-    try {
-      void Promise.resolve(context.registerTool(tool, { signal: lifetime.signal })).catch(error => {
-        if (!lifetime.signal.aborted) report(`WebMCP registration failed: ${String(error)}`)
-      })
-    } catch (error) {
-      report(`WebMCP registration failed: ${String(error)}`)
-    }
-  }
-  return () => lifetime.abort()
 }
 
 export function registerViewTool(

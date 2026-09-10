@@ -40,7 +40,7 @@ async function readFile(): Promise<FileShape> {
 // A real current-schema snapshot with one sequence bumped past this runtime —
 // exactly what a newer tldraw leaves behind.
 async function writeSkewedFixture(writer?: ScratchpadWriter): Promise<string> {
-  await run({ kind: 'add-note', name: 'n1', x: 0, y: 0, text: 'hello' })
+  await run({ kind: 'add-note', id: 'n1', x: 0, y: 0, text: 'hello' })
   const file = await readFile()
   file.document.schema.sequences['com.tldraw.shape.note'] += 1
   if (writer) file.writer = writer
@@ -52,19 +52,19 @@ async function writeSkewedFixture(writer?: ScratchpadWriter): Promise<string> {
 
 describe('scratchpad version skew', () => {
   test('saves are stamped with the writing moi + tldraw, and load surfaces it', async () => {
-    await run({ kind: 'add-rect', name: 'box', x: 0, y: 0, w: 10, h: 10 })
+    await run({ kind: 'add-rect', id: 'box', x: 0, y: 0, w: 10, h: 10 })
     expect((await readFile()).writer).toEqual(SCRATCHPAD_WRITER)
     expect(SCRATCHPAD_WRITER.tldraw).toMatch(/^\d+\.\d+\.\d+/)
     expect((await loadScratchpadDoc(WS)).writer).toEqual(SCRATCHPAD_WRITER)
   })
 
   test('an unstamped legacy file still loads (writer just absent)', async () => {
-    await run({ kind: 'add-rect', name: 'box', x: 0, y: 0, w: 10, h: 10 })
+    await run({ kind: 'add-rect', id: 'box', x: 0, y: 0, w: 10, h: 10 })
     const file = await readFile()
     delete file.writer
     await Bun.write(getScratchpadPath(WS), JSON.stringify(file))
     expect((await loadScratchpadDoc(WS)).writer).toBeUndefined()
-    await run({ kind: 'add-rect', name: 'box2', x: 20, y: 0, w: 10, h: 10 })
+    await run({ kind: 'add-rect', id: 'box2', x: 20, y: 0, w: 10, h: 10 })
     expect(await readScratchpadShapes(WS)).toHaveLength(2)
   })
 
@@ -75,7 +75,7 @@ describe('scratchpad version skew', () => {
     // corruption. Muted here too, so a regression fails instead of printing.
     const logged = spyOn(console, 'error').mockImplementation(() => {})
 
-    const err = await run({ kind: 'add-rect', name: 'box', x: 0, y: 0, w: 10, h: 10 }).then(
+    const err = await run({ kind: 'add-rect', id: 'box', x: 0, y: 0, w: 10, h: 10 }).then(
       () => null,
       (e: Error) => e
     )
@@ -102,14 +102,14 @@ describe('scratchpad version skew', () => {
     expect(err?.message).toContain('com.tldraw.shape.note')
   })
 
-  test('moi scratch read still works under skew (raw JSON, no migration)', async () => {
+  test('read_canvas still works under skew (raw JSON, no migration)', async () => {
     await writeSkewedFixture({ moi: '9.9.9', tldraw: '99.0.0' })
     const shapes = await readScratchpadShapes(WS)
     expect(shapes).toEqual([expect.objectContaining({ id: 'n1', type: 'note', text: 'hello' })])
   })
 
   test('a corrupt (non-skew) snapshot fails differently, keeping the cause', async () => {
-    await run({ kind: 'add-rect', name: 'box', x: 0, y: 0, w: 10, h: 10 })
+    await run({ kind: 'add-rect', id: 'box', x: 0, y: 0, w: 10, h: 10 })
     const file = await readFile()
     // Same schema, mangled record — genuine corruption, not version skew.
     file.document.store['shape:box'] = { typeName: 'shape', id: 'shape:box', type: 'geo' }
@@ -123,12 +123,12 @@ describe('scratchpad version skew', () => {
   })
 
   test('the first save after a schema change backs up the old file as .bak', async () => {
-    await run({ kind: 'add-rect', name: 'box', x: 0, y: 0, w: 10, h: 10 })
+    await run({ kind: 'add-rect', id: 'box', x: 0, y: 0, w: 10, h: 10 })
     const path = getScratchpadPath(WS)
 
     // Same-schema saves: no backup. (Fresh Bun.file handles each time — a
     // handle that has observed a missing file keeps reporting it empty.)
-    await run({ kind: 'add-rect', name: 'box2', x: 20, y: 0, w: 10, h: 10 })
+    await run({ kind: 'add-rect', id: 'box2', x: 20, y: 0, w: 10, h: 10 })
     expect(await Bun.file(`${path}.bak`).exists()).toBe(false)
 
     // Simulate the on-disk file predating a schema bump, then save over it.
@@ -144,7 +144,7 @@ describe('scratchpad version skew', () => {
       }
     })
     await Bun.write(path, oldText)
-    await run({ kind: 'add-rect', name: 'box3', x: 40, y: 0, w: 10, h: 10 })
+    await run({ kind: 'add-rect', id: 'box3', x: 40, y: 0, w: 10, h: 10 })
     expect(await Bun.file(`${path}.bak`).text()).toBe(oldText)
   })
 })
