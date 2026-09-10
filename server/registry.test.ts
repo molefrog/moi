@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'path'
 
@@ -211,6 +211,16 @@ describe('listWorkspaces', () => {
     expect(list).toHaveLength(2)
     expect(list.map(e => e.path)).toContain('/Users/foo/project-a')
     expect(list.map(e => e.path)).toContain('/Users/foo/project-b')
+  })
+})
+
+describe('readRegistry', () => {
+  test('creates the parent directory on first read, before any write', async () => {
+    // Regression test for a Windows-only hang when the parent dir is missing.
+    const dataDir = join(tmpDir, 'nested', 'deeper')
+    setRegistryPath(join(dataDir, 'workspaces.json'))
+    expect(await listWorkspaces()).toEqual([])
+    expect((await stat(dataDir)).isDirectory()).toBe(true)
   })
 })
 

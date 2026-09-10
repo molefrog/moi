@@ -1,6 +1,6 @@
-import { rename, rm } from 'node:fs/promises'
+import { mkdir, rename, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join, resolve, sep } from 'path'
+import { dirname, join, resolve, sep } from 'path'
 
 import { newWorkspaceId, validateWorkspaceId } from '@/lib/ids'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
@@ -35,6 +35,9 @@ export function setRegistryPath(p: string) {
 
 async function readRegistry(): Promise<WorkspaceEntry[]> {
   try {
+    // On some Windows/Bun setups, Bun.file(...).text() never settles when the
+    // parent directory is missing (instead of rejecting with ENOENT).
+    await mkdir(dirname(_registryPath), { recursive: true })
     const text = await Bun.file(_registryPath).text()
     return JSON.parse(text) as WorkspaceEntry[]
   } catch {
