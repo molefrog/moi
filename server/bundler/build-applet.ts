@@ -192,6 +192,8 @@ async function validateServerExports(filePath: string): Promise<string[]> {
   const { exports } = transpiler.scan(source)
 
   const runtimeExports = exports.filter(name => {
+    // Explicit agent tools are metadata plus handlers, never browser RPC exports.
+    if (name === 'tools') return false
     const escaped = escapeRegex(name)
     const typePattern = new RegExp(`export\\s+(type|interface)\\s+${escaped}\\b`)
     return !typePattern.test(source)
@@ -712,5 +714,17 @@ export async function buildApplet(
 
   const config =
     kind === 'view' ? await extractViewConfig(entrypoint) : await extractWidgetConfig(entrypoint)
+  if (kind === 'view') {
+    const companion = join(sourceDir, `${widgetName}.server.ts`)
+    const exists = await Bun.file(companion).exists()
+    if (exists) {
+      const name = serverModuleKey(companion, moiRoot)
+      const exports = await validateServerExports(companion)
+      if (!serverModules.some(module => module.name === name)) serverModules.push({ name, exports })
+    }
+    // Record presence as well as imports: removing a tool-only companion must
+    // invalidate the old worker/catalog even though the view never imports it.
+    files.push({ name: 'server-companion.json', kind: 'asset', data: JSON.stringify({ exists }) })
+  }
   return { js, files, serverModules, config }
 }

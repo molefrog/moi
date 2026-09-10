@@ -39,6 +39,7 @@ import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { ViewInfo } from '@/lib/types'
 
 import { useViewTools } from './useViewTools'
+import { useServerTools } from './useServerTools'
 import {
   nextEvictionDelay,
   reconcileResidents,
@@ -158,6 +159,7 @@ type ViewSlotProps = {
 // place, so it is current the moment the user comes back to it.
 function ViewSlot({ view, active, params, running, onToolReady }: ViewSlotProps) {
   const workspaceId = useWorkspaceId()
+  useServerTools(workspaceId, view.id, view.revision, active)
   const bundle = useView(view.id)
   const { current, outgoing } = useLoadedBundle(bundle, active)
   // A parked view keeps rendering with the params it was last shown with: the

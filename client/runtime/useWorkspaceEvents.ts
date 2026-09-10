@@ -15,6 +15,7 @@ import type {
 
 export type WorkspaceEvent =
   | ViewToolEvent
+  | { type: 'tools:updated'; workspaceId: string }
   | { type: 'widget:updated'; name: string }
   | { type: 'widget-layout:updated'; widgets: WidgetInfo[] }
   // `moi refresh` — cache-bust and re-fetch applets without a rebuild. `only`

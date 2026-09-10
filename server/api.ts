@@ -94,6 +94,8 @@ import {
   updateInProgress
 } from './update'
 
+import { callServerTool, listServerTools } from './tools'
+
 // The resolved workspace is stashed on the context by `withWorkspace`, so every
 // `/api/workspaces/:id/*` handler can read it without re-querying the registry.
 type ApiEnv = { Variables: { ws: WorkspaceEntry } }
@@ -371,6 +373,33 @@ one.post('/rpc/*', c => {
   const ws = c.get('ws')
   const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${ws.id}/rpc/`)[1] ?? ''
   return handleFunctionCall(c.req.raw, tail, ws.path)
+})
+
+// WebMCP uses these thin server adapters; only descriptors and JSON results
+// reach the page. Server modules are loaded in the existing function worker.
+one.get('/tools/:viewId', async c => {
+  try {
+    return c.json(await listServerTools(c.get('ws').path, c.req.param('viewId'), c.req.raw.signal))
+  } catch (error) {
+    return c.text(error instanceof Error ? error.message : String(error), 400)
+  }
+})
+one.post('/tools/:viewId/:name', async c => {
+  if (c.req.header('content-type')?.split(';')[0].trim() !== 'application/json')
+    return c.text('Tool calls require application/json.', 415)
+  try {
+    return Response.json(
+      await callServerTool(
+        c.get('ws').path,
+        c.req.param('viewId'),
+        c.req.param('name'),
+        await c.req.json(),
+        c.req.raw.signal
+      )
+    )
+  } catch (error) {
+    return c.text(error instanceof Error ? error.message : String(error), 400)
+  }
 })
 
 // Browser-side applet errors (module load failures, render crashes, window

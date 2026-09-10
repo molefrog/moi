@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 
-import { normalizeFunctionAddress, parseToolAddress } from './call-address'
+import { normalizeFunctionAddress, parseCallAddress } from './call-address'
 import { parseFunctionPath } from '../server/functions'
 
 test('canonical and legacy server addresses resolve to identical modules', () => {
@@ -14,8 +14,9 @@ test('canonical and legacy server addresses resolve to identical modules', () =>
     )
 })
 
-test('tool addresses require a view and a single named operation', () => {
-  expect(parseToolAddress('view:orders/set_filter')).toEqual({
+test('call addresses discover a view or invoke one named operation', () => {
+  expect(parseCallAddress('view:orders')).toEqual({ viewId: 'orders' })
+  expect(parseCallAddress('view:orders/set_filter')).toEqual({
     viewId: 'orders',
     name: 'set_filter'
   })
@@ -26,6 +27,6 @@ test('tool addresses require a view and a single named operation', () => {
     'view:orders/x/y',
     'view:orders/'
   ]) {
-    expect(parseToolAddress(address)).toBeNull()
+    expect(parseCallAddress(address)).toBeNull()
   }
 })

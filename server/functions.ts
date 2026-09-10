@@ -21,6 +21,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'path'
 
 import { resolveWorkspaceEnv } from './workspace-env'
+import { abortable } from '@/lib/tool-execution'
 
 const WORKER_PATH = join(import.meta.dir, 'functions-worker.ts')
 const CALL_TIMEOUT_MS = 30_000
@@ -31,6 +32,7 @@ type Pending = {
   resolve: (data: string) => void
   reject: (err: Error) => void
   timer: ReturnType<typeof setTimeout>
+  cleanup: () => void
 }
 
 type Slot = {
@@ -52,8 +54,9 @@ type Slot = {
 }
 
 function rejectAndClearPending(slot: Slot, reason: string) {
-  for (const { reject, timer } of slot.pending.values()) {
+  for (const { reject, timer, cleanup } of slot.pending.values()) {
     clearTimeout(timer)
+    cleanup()
     reject(new Error(reason))
   }
   slot.pending.clear()
@@ -183,6 +186,7 @@ function spawnSlot(workspacePath: string, workspaceEnv: Record<string, string>):
         if (!p) return
         slot.pending.delete(msg.id)
         clearTimeout(p.timer)
+        p.cleanup()
 
         if (msg.type === 'result') {
           p.resolve(msg.data!)
@@ -224,28 +228,72 @@ export function parseFunctionPath(tail: string): { module: string; name: string 
 // Issue one call against a live slot: register a pending entry, send the IPC
 // frame, settle from the worker's reply (or the timeout). Shared by the warm
 // pool path (callFunction) and the ephemeral path (callFunctionEphemeral).
-function callInSlot(slot: Slot, module: string, name: string, args: string): Promise<string> {
+function callInSlot(
+  slot: Slot,
+  module: string,
+  name: string,
+  args: string,
+  type: 'call' | 'list-tools' | 'call-tool' = 'call',
+  signal?: AbortSignal
+): Promise<string> {
+  signal?.throwIfAborted()
   slot.calls++
   slot.lastCallAt = Date.now()
-
   const id = crypto.randomUUID()
   return new Promise((resolve, reject) => {
+    const cleanup = () => signal?.removeEventListener('abort', cancel)
+    const cancel = () => {
+      if (!slot.pending.delete(id)) return
+      clearTimeout(timer)
+      cleanup()
+      if (type !== 'call') {
+        try {
+          slot.worker.send({ type: 'cancel-tool', id })
+        } catch {
+          /* worker exited */
+        }
+      }
+      reject(
+        new Error(
+          'Tool call cancelled or timed out. State may already have changed; do not retry automatically.'
+        )
+      )
+    }
     const timer = setTimeout(() => {
-      slot.pending.delete(id)
       slot.timeouts++
+      if (type !== 'call') return cancel()
+      slot.pending.delete(id)
+      cleanup()
       reject(new Error(`Function call timed out: ${module}/${name}`))
     }, CALL_TIMEOUT_MS)
-
-    slot.pending.set(id, { resolve, reject, timer })
-
+    slot.pending.set(id, { resolve, reject, timer, cleanup })
+    signal?.addEventListener('abort', cancel, { once: true })
     try {
-      slot.worker.send({ id, type: 'call', module, name, args })
+      slot.worker.send({ id, type, module, name, args })
     } catch (err) {
       slot.pending.delete(id)
       clearTimeout(timer)
+      cleanup()
       reject(err instanceof Error ? err : new Error('Failed to send to worker'))
     }
   })
+}
+
+// Tool metadata and execution use the same warm worker as browser RPC. Server
+// code and secrets never need to be evaluated in the host or sent to the page.
+export async function callToolWorker(
+  workspacePath: string,
+  module: string,
+  type: 'list-tools' | 'call-tool',
+  name = '',
+  args = '',
+  signal?: AbortSignal
+): Promise<string> {
+  const workspaceEnv = await resolveWorkspaceEnv(workspacePath)
+  signal?.throwIfAborted()
+  const slot = getOrSpawn(workspacePath, workspaceEnv)
+  await (signal ? abortable(slot.readyPromise, signal) : slot.readyPromise)
+  return callInSlot(slot, module, name, args, type, signal)
 }
 
 export async function callFunction(

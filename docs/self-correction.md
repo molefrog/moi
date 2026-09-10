@@ -152,10 +152,17 @@ always on, opting in is only about _reading_ it.
 - Console capture: attribute applet `console.error` output the way window errors are.
 - More `moi debug` subcommands: worker-pool state, recent RPC traces, env diagnostics.
 
-## Live view tools
+## Tools
 
-`moi call-tool view:orders/set_filter '{"status":"overdue"}'` invokes a WebMCP-shaped
-tool in a resident browser view. Read that view's source for names and input schemas.
-Use this for live selections, filters and drafts; use `call-server-fn` for backend operations.
-The view can be parked within the existing retention window; eviction produces an error.
-Native WebMCP is optional for CLI calls. See the workspace skill's live view tools section.
+`moi call view:orders` discovers a view's server tools and currently resident UI tools.
+`moi call view:orders/set_filter '{"status":"overdue"}'` invokes one, using named JSON arguments.
+The definition selects the server worker or live browser; errors never trigger a fallback.
+
+Server tools are explicit entries in the matching `.server.ts` module's `tools` export. They use
+normal backend functions and work without a browser. UI tools use `useTool` for live selections,
+filters and drafts; a parked view is callable within its retention window. Raw `call-server-fn`
+remains a developer smoke test for ordinary functions, with positional array arguments and a fresh
+worker. `call-tool` remains a compatibility alias for `call`.
+
+Native WebMCP is optional for CLI calls. In supporting browsers, moi publishes the view's UI tools
+and server request wrappers from the same descriptors. See the workspace skill's Tools section.

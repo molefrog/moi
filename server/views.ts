@@ -186,7 +186,10 @@ export async function handleBundleViews(
     [...beforeBuilt].some(n => !afterBuilt.has(n)) ||
     [...afterBuilt].some(n => !beforeBuilt.has(n))
 
-  const changedServerModules = new Set<string>()
+  // Bundling is also the publication boundary for server-only tools: a view
+  // module may have no React component/import graph to produce a build result.
+  // Recycle before publishing events so native adapters never fetch old metadata.
+  reloadModules(['view tools'], workspacePath)
   for (const r of results) {
     if (r.status === 'built') {
       publish({ type: 'view:updated', name: r.name, config: r.config ?? null })
@@ -199,14 +202,10 @@ export async function handleBundleViews(
           r.config?.icon
         )
       }
-      for (const m of r.serverModules ?? []) changedServerModules.add(m)
     }
   }
 
-  if (changedServerModules.size > 0) {
-    reloadModules([...changedServerModules], workspacePath)
-  }
-
+  publish({ type: 'tools:updated', workspaceId })
   const views = await getViewList(workspacePath)
   if (identityChanged || orderChanged || membershipChanged) {
     publish({ type: 'view-layout:updated', views })

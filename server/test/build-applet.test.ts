@@ -581,3 +581,15 @@ describe('mixed widget + view build (Tailwind isolation)', () => {
     expect(view.js).not.toContain('.tabular-nums')
   })
 })
+
+test('server tool declarations stay out of RPC exports and browser bundles', async () => {
+  const result = await buildApplet(join(FIXTURES, 'views/tool-demo.tsx'), FIXTURES, 'view')
+  expect(result.serverModules).toEqual([
+    { name: 'views/tool-demo', exports: ['getSaved', 'saveOrder'] }
+  ])
+  expect(result.js).not.toContain('server-only-tool-implementation')
+  expect(result.js).not.toContain('Save one order')
+  expect(result.files.find(file => file.name === 'server-companion.json')?.data).toBe(
+    '{"exists":true}'
+  )
+})

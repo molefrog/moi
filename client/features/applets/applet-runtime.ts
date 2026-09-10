@@ -16,8 +16,8 @@
 // also unbind those listeners or a disposed module leaks.
 import { useEffect } from 'react'
 
-import type { ViewTool } from '@/lib/view-tools'
-import { registerViewTool } from './view-tools'
+import type { Tool } from '@/lib/tools'
+import { registerViewTool, rememberViewTool, forgetViewTools } from './view-tools'
 
 import { createNanoEvents } from 'nanoevents'
 
@@ -57,7 +57,7 @@ export type AppletEvents = {
 // cross the trust boundary from agent-authored code, and the runtime narrows
 // them before emitting.
 export type AppletBridge = {
-  registerTool: (tool: ViewTool) => () => void
+  registerTool: (tool: Tool) => () => void
   focusTab: (tab: unknown, params?: unknown) => void
   sendChatMessage: (message: unknown, context?: unknown) => void
 }
@@ -135,6 +135,7 @@ function createRuntime(workspaceId: string) {
           const unregister = registerViewTool(workspaceId, identity.name, tool, message =>
             drop(identity, message)
           )
+          rememberViewTool(tools, workspaceId, identity.name, tool.name)
           const disposeTool = () => {
             unregister()
             tools.delete(disposeTool)
@@ -174,6 +175,7 @@ function createRuntime(workspaceId: string) {
         dispose: () => {
           alive = false
           for (const disposeTool of tools) disposeTool()
+          forgetViewTools(tools)
         }
       }
     }

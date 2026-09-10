@@ -2,6 +2,8 @@
 // Spawned by the main process with IPC. Receives call/reload messages.
 import { parse, stringify } from 'devalue'
 import { join, resolve, sep } from 'path'
+import { prepareTool } from '../lib/tool-execution'
+import { isRecord } from '../lib/tools'
 
 const MEI_DIR =
   process.env.MEI_FUNCTIONS_DIR ?? join(import.meta.dir, '..', 'test-workspace', '.moi')
@@ -26,10 +28,7 @@ function send(msg: unknown) {
   }
 }
 
-async function loadModule(name: string): Promise<Record<string, unknown>> {
-  const cached = moduleCache.get(name)
-  if (cached) return cached
-
+async function loadModule(name: string, optional = false): Promise<Record<string, unknown>> {
   // Module keys are paths relative to MEI_DIR (the workspace's `.moi/`),
   // e.g. "widgets/hello". Defense-in-depth: the route already rejects `..`
   // segments, but never load a file that resolves outside MEI_DIR.
@@ -40,8 +39,15 @@ async function loadModule(name: string): Promise<Record<string, unknown>> {
   const file = Bun.file(filePath)
 
   if (!(await file.exists())) {
+    if (optional) {
+      await evictModule(name)
+      return {}
+    }
     throw new Error(`Server module "${name}" not found`)
   }
+
+  const cached = moduleCache.get(name)
+  if (cached) return cached
 
   const mod = (await import(filePath + `?t=${file.lastModified}`)) as Record<string, unknown>
   moduleCache.set(name, mod)
@@ -68,9 +74,63 @@ async function evictModule(name: string) {
 type CallMessage = { id: string; type: 'call'; module: string; name: string; args: string }
 type ReloadMessage = { type: 'reload'; modules: string[] }
 type ShutdownMessage = { type: 'shutdown' }
-type IncomingMessage = CallMessage | ReloadMessage | ShutdownMessage
+type ToolMessage = {
+  id: string
+  type: 'list-tools' | 'call-tool'
+  module: string
+  name: string
+  args: string
+}
+type IncomingMessage =
+  | CallMessage
+  | ReloadMessage
+  | ShutdownMessage
+  | ToolMessage
+  | { type: 'cancel-tool'; id: string }
+const toolCalls = new Map<string, AbortController>()
 
 process.on('message', async (raw: IncomingMessage) => {
+  if (raw.type === 'cancel-tool') {
+    toolCalls.get(raw.id)?.abort()
+    return
+  }
+  if (raw.type === 'list-tools' || raw.type === 'call-tool') {
+    const controller = new AbortController()
+    toolCalls.set(raw.id, controller)
+    try {
+      const mod = await loadModule(raw.module, raw.type === 'list-tools')
+      if (mod.tools !== undefined && !isRecord(mod.tools))
+        throw new Error('The tools export must be an object.')
+      const tools = new Map(
+        Object.entries(mod.tools ?? {}).map(([name, value]) => {
+          if (!isRecord(value)) throw new Error(`Invalid server tool: ${name}`)
+          return [name, prepareTool({ ...value, name })] as const
+        })
+      )
+      if (raw.type === 'list-tools') {
+        send({
+          id: raw.id,
+          type: 'result',
+          data: stringify([...tools.values()].map(tool => tool.descriptor))
+        })
+      } else {
+        const tool = tools.get(raw.name)
+        if (!tool) throw new Error(`Unknown server tool: ${raw.name}`)
+        const result = await tool.call(parse(raw.args), controller.signal)
+        send({ id: raw.id, type: 'result', data: stringify(result) })
+      }
+    } catch (error) {
+      send({
+        id: raw.id,
+        type: 'error',
+        message: error instanceof Error ? error.message : String(error)
+      })
+    } finally {
+      toolCalls.delete(raw.id)
+    }
+    return
+  }
+
   if (raw.type === 'reload') {
     for (const name of raw.modules) {
       await evictModule(name)

@@ -1,8 +1,7 @@
 import { stringify as devalueStringify } from 'devalue'
 import { resolve } from 'path'
 
-import { normalizeFunctionAddress, parseToolAddress } from '@/lib/call-address'
-import { isRecord, isJsonValue } from '@/lib/view-tools'
+import { normalizeFunctionAddress } from '@/lib/call-address'
 
 import { resolveWorkspaceTheme } from '@/lib/themes'
 import type { WorkspaceEntry } from '@/lib/types'
@@ -33,7 +32,7 @@ import {
 } from './view-builders'
 import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
 import { VERSION } from './version'
-import { viewToolRelay } from './view-tool-relay'
+import { callTool } from './tools'
 
 type ControlSocket = { send(data: string): void }
 
@@ -177,34 +176,18 @@ export const control = Bun.serve({
           return
         }
 
-        if (data.type === 'call-tool') {
+        if (data.type === 'call' || data.type === 'call-tool') {
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
-          const address = parseToolAddress(String(data.tool ?? ''))
-          if (!address) {
-            ws.send(
-              JSON.stringify({ error: 'Use view:<name>/<tool>, e.g. view:orders/set_filter.' })
-            )
-            return
-          }
           const args = JSON.parse(String(data.args ?? '{}'))
-          if (!isRecord(args) || !isJsonValue(args)) {
-            ws.send(JSON.stringify({ error: 'Tool arguments must be a JSON object.' }))
-            return
-          }
+          if (ws.readyState !== 1) return
           const controller = new AbortController()
           const calls = toolCalls.get(ws) ?? new Set<AbortController>()
           toolCalls.set(ws, calls)
           calls.add(controller)
           const start = performance.now()
           try {
-            const result = await viewToolRelay.call(
-              match.id,
-              address.viewId,
-              address.name,
-              args,
-              controller.signal
-            )
+            const result = await callTool(match, String(data.tool ?? ''), args, controller.signal)
             ws.send(JSON.stringify({ ok: true, result, ms: Math.round(performance.now() - start) }))
           } finally {
             calls.delete(controller)

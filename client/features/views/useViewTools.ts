@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { abortable, callViewTool } from '@/client/features/applets/view-tools'
+import {
+  abortable,
+  callViewTool,
+  listViewTools,
+  viewToolNames,
+  onViewToolsChanged
+} from '@/client/features/applets/view-tools'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import {
   onWorkspaceConnection,
@@ -26,7 +32,10 @@ export function useViewTools(workspaceId: string) {
     sendWorkspaceMessage({
       type: 'view-tool:presence',
       workspaceId: workspaceRef.current,
-      views: [...residents.current.keys()]
+      views: [...residents.current.keys()],
+      tools: Object.fromEntries(
+        [...residents.current.keys()].map(id => [id, viewToolNames(workspaceRef.current, id)])
+      )
     })
   }, [workspaceRef])
   const updateResidents = useCallback(
@@ -49,9 +58,11 @@ export function useViewTools(workspaceId: string) {
 
   useEffect(() => {
     const unsubscribe = onWorkspaceConnection(publish, cancelAll)
+    const unsubscribeTools = onViewToolsChanged(publish)
     publish()
     return () => {
       unsubscribe()
+      unsubscribeTools()
       cancelAll()
       sendWorkspaceMessage({ type: 'view-tool:presence', workspaceId, views: [] })
     }
@@ -88,13 +99,10 @@ export function useViewTools(workspaceId: string) {
     syncBusy()
     try {
       await abortable(mounted, controller.signal)
-      const result = await callViewTool(
-        workspaceId,
-        viewId,
-        request.name,
-        request.args,
-        controller.signal
-      )
+      const result =
+        request.type === 'view-tool:list'
+          ? listViewTools(workspaceId, viewId)
+          : await callViewTool(workspaceId, viewId, request.name, request.args, controller.signal)
       sendWorkspaceMessage({ type: 'view-tool:result', requestId, result })
     } catch (error) {
       sendWorkspaceMessage({
@@ -112,7 +120,11 @@ export function useViewTools(workspaceId: string) {
   useWorkspaceEvent(event => {
     if (event.type === 'view-tool:cancel')
       operations.current.get(event.requestId)?.controller.abort()
-    if (event.type === 'view-tool:call' && event.workspaceId === workspaceId) void execute(event)
+    if (
+      (event.type === 'view-tool:call' || event.type === 'view-tool:list') &&
+      event.workspaceId === workspaceId
+    )
+      void execute(event)
   })
 
   return { busyViews, updateResidents, ready }

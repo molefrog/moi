@@ -108,7 +108,7 @@ declare module 'moi' {
   // never during render: each call starts an agent run, and repeats are
   // rate-limited.
   export function sendChatMessage(message: string, context?: Record<string, unknown>): void
-  // Views only. Standard WebMCP tool descriptor; CLI calls work without native WebMCP.
+  // One tool contract for server exports and live UI; CLI needs no native WebMCP.
   export type ToolResult = null | boolean | number | string | ToolResult[] | { [key: string]: ToolResult }
   export type Tool<T extends Record<string, unknown> = Record<string, unknown>> = {
     name: string
@@ -117,6 +117,8 @@ declare module 'moi' {
     annotations?: { readOnlyHint?: boolean; untrustedContentHint?: boolean; consequentialHint?: boolean }
     execute: (args: T, options: { signal: AbortSignal }) => ToolResult | Promise<ToolResult>
   }
+  export type ServerTool<T extends Record<string, unknown> = Record<string, unknown>> = Omit<Tool<T>, 'name'>
+  // Views only. Register a handler that reads or changes current React state.
   export function useTool<T extends Record<string, unknown> = Record<string, unknown>>(tool: Tool<T>): void
   export type WidgetConfig = {
     rowSpan: 1 | 2 | 3 | 4
