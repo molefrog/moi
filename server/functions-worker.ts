@@ -99,10 +99,12 @@ process.on('message', async (raw: IncomingMessage) => {
     toolCalls.set(raw.id, controller)
     try {
       const mod = await loadModule(raw.module, raw.type === 'list-tools')
-      if (mod.tools !== undefined && !isRecord(mod.tools))
+      // A legacy async RPC function may itself be called "tools".
+      const declaredTools = typeof mod.tools === 'function' ? undefined : mod.tools
+      if (declaredTools !== undefined && !isRecord(declaredTools))
         throw new Error('The tools export must be an object.')
       const tools = new Map(
-        Object.entries(mod.tools ?? {}).map(([name, value]) => {
+        Object.entries(declaredTools ?? {}).map(([name, value]) => {
           if (!isRecord(value)) throw new Error(`Invalid server tool: ${name}`)
           return [name, prepareTool({ ...value, name })] as const
         })

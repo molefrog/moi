@@ -1,16 +1,15 @@
 # Self-correction
 
 **Key idea:** the agent that builds applets should also be able to _tell when they're broken_
-— without waiting for the user to complain. Today the feedback loop ends at `moi bundle`: a
-widget can compile fine, then fail to load in the browser, crash on render, or call a server
-function that throws — and the agent learns none of it.
+— without waiting for the user to complain. A successful `moi bundle` only proves compilation.
+Loading, rendering and backend calls still need runtime feedback.
 
 Self-correction closes the loop with two legs:
 
-| leg      | command              | what it answers                                     |
-| -------- | -------------------- | --------------------------------------------------- |
-| **feel** | `moi debug logs`     | "did anything break at runtime since I last built?" |
-| **poke** | `moi call-server-fn` | "does this server function actually work?"          |
+| leg      | command                             | what it answers                                     |
+| -------- | ----------------------------------- | --------------------------------------------------- |
+| **feel** | `moi debug logs`                    | "did anything break at runtime since I last built?" |
+| **poke** | `moi call view:<id>/<tool> '{...}'` | "does this view operation work?"                    |
 
 Both ride the existing plumbing: the control port for CLI round-trips and the functions
 worker for direct invocation. Nothing new is invented — the loop is wired out of parts that
@@ -30,7 +29,7 @@ Where an applet can go wrong after `moi bundle` succeeds, and which leg catches 
    stack frames against its bundle URL. → **logs** (`window`).
 4. **Server-function failure** — `.server.ts` throws (or times out) behind the RPC route; the
    server returns 500 and only the browser sees the message. → **logs** (`rpc`), and
-   preventable up front with **call-server-fn**.
+   testable through the applet UI. New backend operations can be checked with **moi call**.
 5. **Build failure** — already reported by `moi bundle`, but an old failure is easy to lose
    track of turns later. → **logs** (`build`) keeps it on record until a good build.
 
@@ -75,37 +74,29 @@ moi debug logs --clear    # wipe the buffer
 logs` whenever the buffer is non-empty after the rebuild, so the agent is pointed at
   standing breakage exactly when it's paying attention.
 
-`moi call-server-fn` invocations deliberately do **not** record — a failing smoke test is
-feedback the agent already has in hand.
+## `moi call` — exercise a view operation
 
-## `moi call-server-fn` — poke a server function
-
-Invoke one exported `.server.ts` function directly. Server functions only — this is not a
-general script runner (that's `moi env exec`).
-
-```
-moi call-server-fn widget:hello/getGreeting              # no arguments
-moi call-server-fn view:crm/searchUsers '["ann", 10]'    # args as one JSON array
+```sh
+moi call view:orders
+moi call view:orders/archive_order '{"id":"o-1024"}'
+moi call view:orders/set_filter '{"status":"overdue"}'
 ```
 
-- **Ephemeral, isolated execution.** Each invocation spawns a **fresh one-shot worker
-  process**, runs the single call, and kills the process. A debug invocation therefore never
-  touches the warm worker pool the widgets use: no shared module-level state in either
-  direction, and a call that wedges its process takes the throwaway worker down with it, not
-  the pool. Everything else — env resolution (`.env` + custom secrets, widgets sink), module
-  loading, the 30s timeout, the devalue wire format — is identical to the browser RPC path,
-  so a pass here means the production machinery works. (The one deliberate difference from a
-  warm-pool call: module-level state starts clean, e.g. a fresh DB connection.)
-- The module key is the same path-relative key the RPC uses (`widgets/hello`, `views/crm`,
-  `lib/db`), plus the function name: `<module>/<fn>` — split on the last slash.
-- Arguments are a **plain JSON array** (friendlier to write than devalue's wire format); the
-  server converts to the devalue encoding the worker expects. JSON-expressible values only —
-  enough for smoke tests.
-- Prints the returned value (inspected, so `Map`/`Set`/`Date` render readably) and the call
-  duration; a thrown error prints the message and exits 1.
-- Duration matters: the RPC timeout is 30s, so a smoke test that takes 8s is a warning sign
-  the agent can act on. (Expect a few hundred ms of process-spawn overhead on top of the
-  function's own time — the isolation costs a fork.)
+Discovery is view-scoped and returns descriptors with schemas and execution location.
+Arguments are one JSON object, defaulting to `{}`; results are JSON on stdout, duration on stderr,
+and errors exit nonzero. The definition selects the execution location; a failed operation is
+never retried elsewhere.
+
+Server tools use the same warm worker, validation, workspace environment and backend state as
+browser calls. They work without an open browser. Calls perform real operations and can change
+data; choose a read or an appropriate test input when investigating.
+
+UI tools operate on live React state. They require one connected browser with the view resident.
+A parked view remains callable within its retention window; after eviction, explicitly open the
+view if that fits the task. Multiple clients holding the view make UI calls ambiguous.
+
+Tool-call errors are returned directly to the caller. They do not automatically create journal
+entries; an unhandled browser error can still be reported by the normal window error reporter.
 
 ## How the skill presents it
 
@@ -118,7 +109,7 @@ always on, opting in is only about _reading_ it.
 
 ## How it works
 
-- **Control port.** `debug:logs` and `call-server-fn` are control-socket message types next
+- **Control port.** `debug:logs` and `call` are control-socket message types next
   to `bundle`/`theme`/`scratch`, workspace-resolved the same way (subdir-safe, loud errors
   outside a registered workspace).
 - **Journal.** `server/applet-log.ts` owns the ring buffer; producers call `record` from the
@@ -126,9 +117,10 @@ always on, opting in is only about _reading_ it.
   tiny fire-and-forget module wired into `useApplet`, `WidgetErrorBoundary`, and a global
   `error`/`unhandledrejection` hook that attributes by bundle-URL stack match — unattributed
   page errors are never recorded (the host app's bugs are not the applet journal's business).
-- **Ephemeral worker.** `callFunctionEphemeral` (server/functions.ts) shares the spawn and
-  per-call IPC mechanics with the warm pool but skips the LRU cache: spawn → ready → one call
-  → kill, with the same env injection and cwd contract.
+- **Server worker.** `server/functions.ts` owns the warm worker pool shared by legacy RPC
+  and server tools. `server/tools.ts` resolves tool names; `server/view-tool-relay.ts` routes
+  UI calls to one browser. The CLI uses the control socket; browser imports use the JSON tool
+  routes in `server/api.ts`.
 - **Validation.** The POST route accepts only the browser-side sources
   (`load`/`render`/`window`), whitelists `kind`, pattern-checks `name`, caps message/stack
   lengths and events per request — it's an unauthenticated localhost route and is treated
@@ -138,8 +130,8 @@ always on, opting in is only about _reading_ it.
 
 - **The journal is not observability.** No persistence, no levels, no tracing — it answers
   exactly one question: "what's broken right now that I'd otherwise not know about?"
-- **`moi call-server-fn` args are JSON.** Values that need devalue's richer encoding (`Map`
-  args, etc.) can't be expressed — acceptable for smoke tests, revisit if it ever bites.
+- **Tools use JSON.** Descriptions and schemas are explicit. Dates must be converted to strings
+  and rich collections to JSON objects or arrays at the tool boundary.
 - **`moi debug` is experimental.** Output format and flags may change; scripts should not
   parse the human output (use `--json`).
 
@@ -152,17 +144,22 @@ always on, opting in is only about _reading_ it.
 - Console capture: attribute applet `console.error` output the way window errors are.
 - More `moi debug` subcommands: worker-pool state, recent RPC traces, env diagnostics.
 
-## Tools
+## Existing applets and migration
 
-`moi call view:orders` discovers a view's server tools and currently resident UI tools.
-`moi call view:orders/set_filter '{"status":"overdue"}'` invokes one, using named JSON arguments.
-The definition selects the server worker or live browser; errors never trigger a fallback.
+New view backend operations are entries in `views/<id>.server.ts`'s `tools` export. Helpers
+are private functions or imports from ordinary backend modules. React imports `tools` from the
+server module and awaits `tools.<name>.execute(args)`; the bundler emits request proxies.
 
-Server tools are explicit entries in the matching `.server.ts` module's `tools` export. They use
-normal backend functions and work without a browser. UI tools use `useTool` for live selections,
-filters and drafts; a parked view is callable within its retention window. Raw `call-server-fn`
-remains a developer smoke test for ordinary functions, with positional array arguments and a fresh
-worker. `call-tool` remains a compatibility alias for `call`.
+Existing named async function imports still compile to the same positional, devalue RPC calls.
+Already-built bundles keep their `/rpc/<module>/<fn>` endpoint and rich argument/result behavior.
+The old `call-server-fn` CLI, control handler and throwaway worker path have been removed;
+browser compatibility uses the warm worker independently.
+
+Migrate views individually. Add explicit tools around shared helpers, switch current callers,
+and retain thin legacy exports while old bundles may remain open. Keep the wrappers' names,
+arguments and results intact, even if a new tool uses different JSON shapes. Do not automatically
+expose legacy functions as tools or infer schemas. Widget function imports remain supported.
+`call-tool` remains a compatibility alias for `call`.
 
 Native WebMCP is optional for CLI calls. In supporting browsers, moi publishes the view's UI tools
 and server request wrappers from the same descriptors. See the workspace skill's Tools section.

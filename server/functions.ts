@@ -226,8 +226,8 @@ export function parseFunctionPath(tail: string): { module: string; name: string 
 }
 
 // Issue one call against a live slot: register a pending entry, send the IPC
-// frame, settle from the worker's reply (or the timeout). Shared by the warm
-// pool path (callFunction) and the ephemeral path (callFunctionEphemeral).
+// frame, settle from the worker's reply (or the timeout). Shared by legacy RPC
+// and server tool calls in the warm pool.
 function callInSlot(
   slot: Slot,
   module: string,
@@ -310,30 +310,6 @@ export async function callFunction(
   const slot = getOrSpawn(workspacePath, workspaceEnv)
   await slot.readyPromise
   return callInSlot(slot, module, name, args)
-}
-
-// One-shot, isolated invocation — `moi call-server-fn`'s path. Spawns a fresh
-// worker just for this call and kills it afterwards, so a debug invocation
-// never touches the warm pool the widgets use: no shared module-level state in
-// either direction, and a call that wedges the process takes the throwaway
-// worker with it, not the pool. Same env resolution, module loading, timeout,
-// and devalue wire format as the pool path — only the process lifetime differs.
-// The slot is never registered in the LRU cache; its onExit cache-cleanup guard
-// no-ops for an uncached slot.
-export async function callFunctionEphemeral(
-  module: string,
-  name: string,
-  args: string,
-  workspacePath: string
-): Promise<string> {
-  const workspaceEnv = await resolveWorkspaceEnv(workspacePath)
-  const slot = spawnSlot(workspacePath, workspaceEnv)
-  try {
-    await slot.readyPromise
-    return await callInSlot(slot, module, name, args)
-  } finally {
-    killSlot(slot, 'Ephemeral call finished')
-  }
 }
 
 // Kill every live worker. Called from the server's shutdown handler so a

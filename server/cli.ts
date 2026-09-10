@@ -2,7 +2,6 @@
 import './cli-colors' // must precede citty: sets NO_COLOR before its color flag is computed
 import { defineCommand, runMain, showUsage } from 'citty'
 import { formatHex } from 'culori'
-import { parse as devalueParse } from 'devalue'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'path'
@@ -1786,7 +1785,7 @@ type ScratchCliOp = ScratchOp | { kind: 'read' } | { kind: 'read-image'; name: s
 
 // Round-trip one request through the control port and hand the reply to
 // `onResult`. Mirrors the `bundle`/`theme` commands: one socket per invocation,
-// print, exit. Shared by `scratch`, `call-server-fn`, and `debug logs`.
+// print, exit. Shared by `scratch`, `call`, and `debug logs`.
 function sendControl(
   path: string,
   payload: Record<string, unknown>,
@@ -2195,43 +2194,6 @@ const call = defineCommand({
       console.log(JSON.stringify(res.result, null, 2))
       console.error(pc.dim(`↩ ${res.ms}ms`))
     })
-  }
-})
-
-const callServerFn = defineCommand({
-  meta: {
-    name: 'call-server-fn',
-    description: 'Invoke an applet .server.ts function in an isolated one-shot worker (smoke test)'
-  },
-  args: {
-    fn: {
-      type: 'positional',
-      required: true,
-      description:
-        'Function address: <target>/<fn>, e.g. view:orders/listOrders or widget:hello/getGreeting'
-    },
-    args: {
-      type: 'positional',
-      required: false,
-      description: 'Arguments as one JSON array, e.g. \'["ann", 10]\' (default [])'
-    },
-    dir: dirArg
-  },
-  run({ args }) {
-    const path = resolve(args.dir)
-    sendControl(
-      path,
-      { type: 'call-server-fn', path, fn: args.fn, args: args.args ?? '[]' },
-      res => {
-        // The worker replies devalue-encoded (same wire format the browser RPC
-        // parses), so Map/Set/Date render readably through Bun.inspect.
-        const value = devalueParse(String(res.result))
-        console.log(Bun.inspect(value, { depth: 8, colors: process.stdout.isTTY }))
-        // Duration on stderr: stdout stays clean data, and a slow call is a
-        // warning sign worth surfacing (browser RPC times out at 30s).
-        console.error(pc.dim(`↩ ${res.ms}ms`))
-      }
-    )
   }
 })
 
@@ -3016,9 +2978,7 @@ const workspaceCommands = {
   bundle,
   refresh,
   builder,
-  'call-server-fn': callServerFn,
   call,
-  'call-tool': call,
   debug,
   theme,
   config,
@@ -3049,7 +3009,8 @@ const main = defineCommand({
     description: 'moi — local AI workspace',
     version: versionWithCommit()
   }),
-  subCommands: { ...workspaceCommands, ...systemCommands }
+  // Keep the earlier name callable without advertising a second tool interface.
+  subCommands: { ...workspaceCommands, ...systemCommands, 'call-tool': call }
 })
 
 // Cloud demo: system commands manage moi itself (service, updates, agent

@@ -209,27 +209,20 @@ Use bundled components for standard controls. Read the
 Reuse familiar installed components without rereading their catalog entries, docs, or source.
 Inspect source only for local customizations, doc conflicts, or concrete build issues.
 
-## Server functions — `<name>.server.ts`
+## Backend code — `<name>.server.ts`
 
-Export named `async function`s and call them from the component
-like ordinary async functions. The reserved `tools` object is the only non-function runtime export
-(see Tools below). Function arguments and return values are auto-serialized (`Date`, `Map`,
-`Set`, … work). They run on the Bun server with `process.env` and full filesystem access, at
-`cwd = <workspace root>` (the parent of `.moi/`, where you operate) — so workspace files are plain
-relative paths:
+For new views, export a `tools` object as the public backend interface (see Tools below).
+Keep implementation helpers private, or import them from ordinary backend modules. React code
+and agents call the same server tools.
 
-```ts
-// hello.server.ts — read files, call APIs, query DBs…
-export async function getGreeting(): Promise<string> {
-  return (await Bun.file('./notes.md').text()).split('\n')[0]
-}
-```
+Backend code runs on Bun with `process.env` and full filesystem access, at
+`cwd = <workspace root>` (the parent of `.moi/`). Workspace files use plain relative paths,
+such as `Bun.file('./notes.md')`. Every Bun API is available: `bun:sqlite`, `Bun.redis`,
+`Bun.s3`, `Bun.file`, `fetch`, …
 
-The component fetches on mount; after you change underlying data a server fn reads, run
-`moi refresh` to re-pull it without a rebuild.
-
-It's plain Bun — every Bun API is available with no setup: `bun:sqlite`, `Bun.redis`, `Bun.s3`,
-`Bun.file`, `fetch`, …
+Existing views and widgets can keep their named async function exports and imports.
+Those calls retain positional arguments and rich serialization (`Date`, `Map`, `Set`, …),
+including after rebuilding. See Existing views and migration below.
 
 ## Workspace files & assets
 
@@ -286,16 +279,14 @@ There is no global tool list. Read the view's source when you need implementatio
 | --- | --- |
 | Perform a published backend operation, with no browser required | A server tool in `.moi/views/<id>.server.ts`; `moi call` |
 | Read or change selection, filters, unsaved drafts or other live React state | A UI tool registered with `useTool`; `moi call` |
-| Implement reusable files, database, secrets or API logic | Ordinary async server functions, called from applet code |
-| Smoke-test an individual server function while developing | `moi call-server-fn view:<id>/<fn> '[positional, args]'` |
+| Implement reusable files, database, secrets or API logic | Private backend functions, called by server tools |
 | Open a view with navigation state | `focusTab`; `moi tab focus view:<id> --params '{...}'` |
 | Ask the agent to act from applet UI | `sendChatMessage` |
 
-Publish only useful operations as tools. Ordinary server function exports remain reusable
-application code; they do not automatically appear in discovery or WebMCP. A UI tool can reuse a
-server function and then refresh the view or clear a draft. A server tool that changes persisted
-data does not itself update React state; use the view's refresh/subscription mechanism or
-`moi refresh --only views` when needed. Reuse the handlers behind the view's controls.
+Publish useful backend operations as server tools; helpers do not need their own public exports.
+A UI tool can call a server tool and then refresh the view or clear a draft. A server tool that
+changes persisted data does not itself update React state; use the view's refresh/subscription
+mechanism or `moi refresh --only views` when needed. Reuse the handlers behind the view's controls.
 
 ### Server tools
 
@@ -308,7 +299,7 @@ to the browser. Keep `moi` imports in server files **type-only**.
 // .moi/views/orders.server.ts
 import type { ServerTool } from 'moi'
 
-export async function archiveOrder(id: string) {
+async function archiveOrder(id: string) {
   // Perform the existing database operation here.
   return { id, archived: true }
 }
@@ -330,6 +321,49 @@ export const tools = {
 A matching React component or open browser is unnecessary for server calls. Shared backend modules
 can stay where they are; expose their operations through the view's `tools` object. After editing a
 view or its server companion, run `moi bundle --only views` to update the bundle and worker code.
+
+### Calling server tools from React
+
+Import `tools` from the view's server module. The bundler creates browser proxies; backend
+code stays on the server. Always await `execute`, even if the backend handler is synchronous.
+
+```tsx
+// .moi/views/orders.tsx
+import { tools } from './orders.server'
+
+async function onArchive(id: string) {
+  const result = await tools.archive_order.execute({ id })
+  // Refresh local data or clear a draft here.
+  return result
+}
+```
+
+Use this same handler for a button and for a UI tool that should also update local state.
+Browser imports expose each tool's `execute(args)`; discover descriptions and schemas with
+`moi call view:orders`. Browser requests and CLI calls use the same server validation and worker.
+Pass only JSON arguments and return JSON results. Represent dates as ISO strings and maps/sets
+as JSON objects or arrays. Browser tool imports must come from `views/<id>.server.ts`; expose
+shared backend logic through that view's tools.
+
+### Existing views and migration
+
+Do not rewrite existing views just to adopt tools. Their named server function imports, positional
+arguments, rich results and RPC URLs remain supported in existing bundles and after a rebuild.
+Legacy functions are not automatically exposed through tool discovery or WebMCP.
+
+When a view needs to migrate:
+
+1. Extract shared implementation into private backend helpers.
+2. Add explicit server tools with descriptions and JSON schemas. Keep legacy function exports as
+   thin wrappers around the same helpers, preserving their names, arguments and return values.
+3. Switch React callers to `tools.<name>.execute({...})` and agents to `moi call`.
+4. Keep legacy wrappers while old bundles may still be open. A successful rebuild alone does not
+   prove every browser has reloaded. Remove wrappers only after those clients are gone.
+
+For example, if `getOrder(id)` used to return a `Date`, retain that result for the legacy wrapper.
+The new `get_order` tool can call the same helper and explicitly convert the date to an ISO string.
+Do not guess schemas or automatically turn every legacy function into a tool. Widgets keep their
+existing function imports; tools currently target views.
 
 ### UI tools
 
@@ -449,8 +483,8 @@ keys there. Either source may be absent, so always handle a missing key. List ex
 enforced).
 
 ```ts
-// forecast.server.ts
-export async function getForecast(city: string) {
+// forecast.server.ts — helper called by a server tool
+async function getForecast(city: string) {
   const key = process.env.WEATHER_API_KEY // always current — env changes respawn the worker
   if (!key) return { error: 'Add WEATHER_API_KEY to your env' }
   const res = await fetch(`https://api.example.com/forecast?city=${encodeURIComponent(city)}`, {
@@ -494,12 +528,11 @@ or storage links, file paths, or bundle, test, and runtime-log summaries.
 render, or throw in its server functions. Two feedback channels exist for what happens after the
 build; reach for them when they'd help (smoke-testing something new, or investigating a problem):
 
-- `moi call-server-fn widget:hello/getGreeting` /
-  `moi call-server-fn view:crm/searchUsers '["ann", 10]'` — run one `.server.ts` function
-  directly (args are one JSON array). Each invocation runs in a fresh, isolated one-shot process
-  with the same env, module loading, and timeout as the browser's calls, so a pass means the real
-  path works — handy for trying a function without touching the UI. Server functions only; for
-  arbitrary scripts use `moi env exec`.
+- `moi call view:orders`, then `moi call view:orders/<tool> '{"named":"arguments"}'` —
+  exercise a published operation. Server calls use the same warm worker and validation as the UI;
+  UI tools need a resident view. Calls perform real operations, so choose inputs appropriate to
+  the task. Check legacy function paths through the existing applet UI. For arbitrary scripts
+  use `moi env exec`.
 - `moi debug logs` — the applet errors the workspace has seen since each applet's last good
   build: browser-side load failures and render crashes, plus server-function (rpc) errors. The
   user's tab reports these automatically, so when the user says something is broken, what
@@ -556,4 +589,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.19.0" />
+<moi-skill version="0.20.0" />

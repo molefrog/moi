@@ -589,7 +589,25 @@ test('server tool declarations stay out of RPC exports and browser bundles', asy
   ])
   expect(result.js).not.toContain('server-only-tool-implementation')
   expect(result.js).not.toContain('Save one order')
+  expect(result.js).toContain('rpc("views/tool-demo", "getSaved")')
+  expect(result.js).not.toContain('"/tools/"')
   expect(result.files.find(file => file.name === 'server-companion.json')?.data).toBe(
     '{"exists":true}'
   )
+})
+
+test('browser imports expose server tools through JSON proxies without backend code', async () => {
+  const result = await buildApplet(join(FIXTURES, 'views/import-tools.tsx'), FIXTURES, 'view')
+  expect(result.js).toContain('toolProxy("tool-demo")')
+  expect(result.js).toContain('"/tools/"')
+  expect(result.js).toContain('save_order.execute')
+  expect(result.js).not.toContain('server-only-tool-implementation')
+  expect(result.js).not.toContain('Save one order')
+})
+
+test('a legacy async function named tools still rebuilds as positional RPC', async () => {
+  const result = await buildApplet(join(FIXTURES, 'views/legacy-tools.tsx'), FIXTURES, 'view')
+  expect(result.serverModules).toEqual([{ name: 'views/legacy-tools', exports: ['tools'] }])
+  expect(result.js).toContain('rpc("views/legacy-tools", "tools")')
+  expect(result.js).not.toContain('"/tools/"')
 })

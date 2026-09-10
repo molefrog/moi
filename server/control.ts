@@ -1,7 +1,4 @@
-import { stringify as devalueStringify } from 'devalue'
 import { resolve } from 'path'
-
-import { normalizeFunctionAddress } from '@/lib/call-address'
 
 import { resolveWorkspaceTheme } from '@/lib/themes'
 import type { WorkspaceEntry } from '@/lib/types'
@@ -11,7 +8,6 @@ import { clearAppletLog, getAppletLog, getAppletLogCount } from './applet-log'
 import { serializeWorkspaceBundle } from './bundle-queue'
 import { CONTROL_HOST, CONTROL_PORT, PORT } from './constants'
 import { applyEnvChanged } from './env-apply'
-import { callFunctionEphemeral, parseFunctionPath } from './functions'
 import { processIcon } from './icon'
 import { loadLayout, saveLayout } from './layout'
 import { publishEvent } from './events'
@@ -195,62 +191,6 @@ export const control = Bun.serve({
           }
           return
         }
-        // Direct server-function invocation — `moi call-server-fn <target>/<fn>`.
-        // Runs in an EPHEMERAL worker: a fresh process spawned for this one call
-        // and killed after, so a debug invocation is fully isolated from the
-        // warm pool the widgets use (same env/timeout/wire format otherwise).
-        // Args arrive as plain JSON (easier to hand-write than devalue's wire
-        // format) and are re-encoded for the worker; the result goes back
-        // devalue-encoded for the CLI to render.
-        if (data.type === 'call-server-fn') {
-          const match = await resolveWorkspace(ws, data.path)
-          if (!match) return
-          const parsed = parseFunctionPath(normalizeFunctionAddress(String(data.fn ?? '')))
-          if (!parsed) {
-            ws.send(
-              JSON.stringify({
-                error: `Invalid function path "${data.fn}". Use <target>/<fn>, e.g. view:orders/listOrders or widget:hello/getGreeting.`
-              })
-            )
-            return
-          }
-          let args: unknown
-          try {
-            args = JSON.parse(String(data.args ?? '[]'))
-          } catch (err) {
-            ws.send(
-              JSON.stringify({
-                error: `Arguments must be valid JSON: ${err instanceof Error ? err.message : String(err)}`
-              })
-            )
-            return
-          }
-          if (!Array.isArray(args)) {
-            ws.send(
-              JSON.stringify({ error: 'Arguments must be a JSON array, e.g. \'["ann", 10]\'' })
-            )
-            return
-          }
-          const t0 = performance.now()
-          try {
-            const result = await callFunctionEphemeral(
-              parsed.module,
-              parsed.name,
-              devalueStringify(args),
-              match.path
-            )
-            ws.send(JSON.stringify({ ok: true, result, ms: Math.round(performance.now() - t0) }))
-          } catch (err) {
-            ws.send(
-              JSON.stringify({
-                error: err instanceof Error ? err.message : String(err),
-                ms: Math.round(performance.now() - t0)
-              })
-            )
-          }
-          return
-        }
-
         if (data.type === 'builder:set') {
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return

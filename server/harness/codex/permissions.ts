@@ -19,7 +19,7 @@ export const CODEX_TURN_ACCESS = {
 } as const
 
 const CODEX_LOCAL_CONTROL_GUIDANCE =
-  'Commands that contact the moi control server, including moi tabs, bundle, tab, debug, call-server-fn, theme, and config, need localhost network access. Run them with sandbox_permissions set to require_escalated on the first attempt so moi can approve the escalated request. A connection failure from a sandboxed attempt does not prove the control server is offline.'
+  'Commands that contact the moi control server, including moi tabs, bundle, tab, debug, call, theme, and config, need localhost network access. Run them with sandbox_permissions set to require_escalated on the first attempt so moi can approve the escalated request. A connection failure from a sandboxed attempt does not prove the control server is offline.'
 
 export const CODEX_LOCAL_CONTROL_CONTEXT = {
   'moi-control-access': {

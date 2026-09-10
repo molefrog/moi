@@ -10,6 +10,16 @@ process.env.MEI_FUNCTIONS_DIR = fixture
 const workspace = { id: 'tool-tests', path: fixture }
 afterAll(() => restartWorker(fixture))
 
+test('legacy functions named tools stay callable without becoming a catalog', async () => {
+  expect(await listServerTools(fixture, 'legacy-tools')).toEqual([])
+  expect(
+    parse(await callFunction('views/legacy-tools', 'tools', stringify(['a']), fixture))
+  ).toEqual({
+    id: 'a',
+    updated: new Date('2026-01-01T00:00:00Z')
+  })
+})
+
 test('discovers explicit server tools without a browser and strips handlers', async () => {
   const result = await callTool(workspace, 'view:tool-demo')
   expect(result).toMatchObject({ ui: 'unavailable' })
