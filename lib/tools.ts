@@ -26,9 +26,12 @@ export type ServerTool<T extends Record<string, unknown> = Record<string, unknow
   'name'
 >
 export type ToolInfo = ToolDescriptor & {
-  address: string
   runtime: 'server' | 'ui'
   requiresLiveView: boolean
+}
+
+export function isToolName(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= 128 && /^[A-Za-z0-9_.-]+$/.test(value)
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -55,14 +58,9 @@ export function isJsonValue(value: unknown, seen = new Set<unknown>()): value is
   return valid
 }
 
-export function toolInfo(
-  viewId: string,
-  descriptor: ToolDescriptor,
-  runtime: ToolInfo['runtime']
-): ToolInfo {
+export function toolInfo(descriptor: ToolDescriptor, runtime: ToolInfo['runtime']): ToolInfo {
   return {
     ...descriptor,
-    address: `view:${viewId}/${descriptor.name}`,
     runtime,
     requiresLiveView: runtime === 'ui'
   }

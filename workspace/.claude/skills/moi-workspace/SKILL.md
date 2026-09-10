@@ -126,8 +126,8 @@ never from inside `.moi/` itself. You don't pass paths; moi resolves the workspa
 - `moi tabs` — list the workspace's tabs, their ids and the default tab
 - `moi tab focus <tab-id> [--params '<json-object>']` — switch to a tab, with optional params for
   the target view (see Driving the workspace)
-- `moi call view:<id>` — discover that view's server and live UI tools
-- `moi call view:<id>/<tool> '{args}'` — call a tool; named JSON arguments default to `{}`
+- `moi tools view:<id>` — discover that view's server and live UI tools
+- `moi call view:<id> <tool> '{args}'` — call a tool; named JSON arguments default to `{}`
 - `moi debug logs` — applet runtime errors on record (experimental)
 - `moi theme --font=<key>` — change font theme (omit `--font` to list options)
 - `moi theme --color=<key>` — change color preset (omit `--color` to list options)
@@ -268,11 +268,11 @@ sendChatMessage('Chase order o-1024', { order: 'o-1024', carrier: 'dhl' })
 
 ## Tools — one interface for agents
 
-Use `moi call view:orders` to discover the specific view's tools, then
-`moi call view:orders/<tool> '{"named":"arguments"}'` to call one. Both server and UI tools
+Use `moi tools view:orders` to discover the specific view's tools, then
+`moi call view:orders <tool> '{"named":"arguments"}'` to call one. Both server and UI tools
 accept a JSON object (default `{}`), validate it against their schema, and return JSON on stdout.
 Errors exit nonzero. The tool's definition selects its execution location; no runtime flag is needed.
-Addresses use the same `view:<id>` target as tabs, followed by `/tool_name` for an operation.
+Targets use the same `view:<id>` form as tabs. The tool name is a separate positional argument.
 There is no global tool list. Read the view's source when you need implementation details.
 
 | Need | Use |
@@ -340,7 +340,7 @@ async function onArchive(id: string) {
 
 Use this same handler for a button and for a UI tool that should also update local state.
 Browser imports expose each tool's `execute(args)`; discover descriptions and schemas with
-`moi call view:orders`. Browser requests and CLI calls use the same server validation and worker.
+`moi tools view:orders`. Browser requests and CLI calls use the same server validation and worker.
 Pass only JSON arguments and return JSON results. Represent dates as ISO strings and maps/sets
 as JSON objects or arrays. Browser tool imports must come from `views/<id>.server.ts`; expose
 shared backend logic through that view's tools.
@@ -394,8 +394,8 @@ export default function Orders() {
 }
 ```
 
-After bundling, discover with `moi call view:orders`, then call
-`moi call view:orders/set_filter '{"status":"overdue"}'`.
+After bundling, discover with `moi tools view:orders`, then call
+`moi call view:orders set_filter '{"status":"overdue"}'`.
 Discovery includes server tools and the UI tools in the active view. Its `ui` field
 reports `available`, `unavailable`, or `ambiguous`; unavailable UI does not prevent server calls.
 
@@ -526,7 +526,7 @@ or storage links, file paths, or bundle, test, and runtime-log summaries.
 render, or throw in its server functions. Two feedback channels exist for what happens after the
 build; reach for them when they'd help (smoke-testing something new, or investigating a problem):
 
-- `moi call view:orders`, then `moi call view:orders/<tool> '{"named":"arguments"}'` —
+- `moi tools view:orders`, then `moi call view:orders <tool> '{"named":"arguments"}'` —
   exercise a published operation. Server calls use the same warm worker and validation as the UI;
   UI tools need the active view. Calls perform real operations, so choose inputs appropriate to
   the task. Check legacy function paths through the existing applet UI. For arbitrary scripts
@@ -587,4 +587,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.20.0" />
+<moi-skill version="0.21.0" />

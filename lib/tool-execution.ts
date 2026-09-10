@@ -1,5 +1,5 @@
 import Ajv from 'ajv/dist/2020'
-import { isJsonValue, isRecord, type Tool, type ToolDescriptor } from './tools'
+import { isJsonValue, isRecord, isToolName, type Tool, type ToolDescriptor } from './tools'
 
 const ajv = new Ajv({ strict: false, allErrors: true, validateFormats: false })
 
@@ -18,9 +18,7 @@ export function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<
 export function prepareTool(value: unknown) {
   if (
     !isRecord(value) ||
-    typeof value.name !== 'string' ||
-    value.name.length > 128 ||
-    !/^[A-Za-z0-9_.-]+$/.test(value.name) ||
+    !isToolName(value.name) ||
     typeof value.description !== 'string' ||
     !value.description.trim() ||
     !isRecord(value.inputSchema) ||

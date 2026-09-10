@@ -59,7 +59,7 @@ export function registerViewTool(
   report: (message: string) => void
 ): () => void {
   const key = keyFor(workspaceId, viewId, tool.name)
-  if (entries.has(key)) throw new Error(`Duplicate tool: view:${viewId}/${tool.name}`)
+  if (entries.has(key)) throw new Error(`Duplicate tool "${tool.name}" for view:${viewId}.`)
   const prepared = prepareTool(tool)
   const lifetime = new AbortController()
   const entry: Entry = {
@@ -98,7 +98,7 @@ export function callViewTool(
   if (!entry)
     return Promise.reject(
       new Error(
-        `Tool view:${viewId}/${name} is unavailable. Run moi call view:${viewId} to discover its tools.`
+        `Tool "${name}" is unavailable for view:${viewId}. Run moi tools view:${viewId} to discover its tools.`
       )
     )
   return entry.call(args, signal)

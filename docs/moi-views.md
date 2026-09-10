@@ -49,7 +49,8 @@ No sizing fields. (Reuses the same `export const config` AST-parse path as widge
 ## Server functions
 
 New views publish backend operations through a `tools` export and live React
-operations through `useTool`. Agents discover and call both with `moi call`.
+operations through `useTool`. Agents discover them with `moi tools` and call them
+with `moi call`.
 Existing named async server functions keep their positional RPC transport and
 rich results. See [Tools, WebMCP and server functions](tools.md) for authoring,
 execution paths and migration.

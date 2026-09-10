@@ -28,7 +28,7 @@ import {
 } from './view-builders'
 import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
 import { VERSION } from './version'
-import { callTool } from './tools'
+import { callTool, listTools } from './tools'
 
 type ControlSocket = { send(data: string): void }
 
@@ -172,10 +172,9 @@ export const control = Bun.serve({
           return
         }
 
-        if (data.type === 'call') {
+        if (data.type === 'tools' || data.type === 'call') {
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
-          const args = JSON.parse(String(data.args ?? '{}'))
           if (ws.readyState !== 1) return
           const controller = new AbortController()
           const calls = toolCalls.get(ws) ?? new Set<AbortController>()
@@ -183,7 +182,16 @@ export const control = Bun.serve({
           calls.add(controller)
           const start = performance.now()
           try {
-            const result = await callTool(match, String(data.tool ?? ''), args, controller.signal)
+            const result =
+              data.type === 'tools'
+                ? await listTools(match, String(data.target ?? ''), controller.signal)
+                : await callTool(
+                    match,
+                    String(data.target ?? ''),
+                    String(data.tool ?? ''),
+                    JSON.parse(String(data.args ?? '{}')),
+                    controller.signal
+                  )
             ws.send(JSON.stringify({ ok: true, result, ms: Math.round(performance.now() - start) }))
           } finally {
             calls.delete(controller)

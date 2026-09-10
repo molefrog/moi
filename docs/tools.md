@@ -2,43 +2,43 @@
 
 A tool is a named view operation with a description, an input schema and an
 `execute` handler. It can run on the Bun server or inside the view's React
-component. Agents discover and call both through `moi call`.
+component. Agents discover them with `moi tools` and call them with `moi call`.
 
 WebMCP gives browser agents access to those same operations. Existing server
 functions keep their RPC path so already-built views continue to work.
 
 ## Choosing an interface
 
-| Need | Use | Where it runs |
-| --- | --- | --- |
-| Read or update persisted data, use secrets, access files or APIs | Server tool | Bun function worker |
-| Change filters, selection, an unsaved draft or other live component state | UI tool | Active React view |
-| Share backend implementation between operations | Ordinary backend helper | Bun function worker |
-| Open a view with navigation parameters | `focusTab` or `moi tab focus` | Host navigation |
-| Ask the agent to do something from an applet | `sendChatMessage` | Host chat |
-| Keep an existing applet working | Its existing named server functions | Bun function worker |
+| Need                                                                      | Use                                 | Where it runs       |
+| ------------------------------------------------------------------------- | ----------------------------------- | ------------------- |
+| Read or update persisted data, use secrets, access files or APIs          | Server tool                         | Bun function worker |
+| Change filters, selection, an unsaved draft or other live component state | UI tool                             | Active React view   |
+| Share backend implementation between operations                           | Ordinary backend helper             | Bun function worker |
+| Open a view with navigation parameters                                    | `focusTab` or `moi tab focus`       | Host navigation     |
+| Ask the agent to do something from an applet                              | `sendChatMessage`                   | Host chat           |
+| Keep an existing applet working                                           | Its existing named server functions | Bun function worker |
 
 For new view backends, publish operations through a `tools` export. Helpers can
 stay private or live in ordinary backend modules. Tools currently target views;
 widgets and overview keep their existing interfaces.
 
-## One CLI command
+## CLI
 
 Run from the workspace root, or pass `--dir <workspace>`:
 
 ```sh
-moi call view:orders
-moi call view:orders/archive_order '{"id":"o-1024"}'
-moi call view:orders/set_filter '{"status":"overdue"}'
+moi tools view:orders
+moi call view:orders archive_order '{"id":"o-1024"}'
+moi call view:orders set_filter '{"status":"overdue"}'
 ```
 
-`view:<id>` is the same target used by `moi tab focus`. Appending `/tool_name`
-calls an operation. The bare target discovers tools for that view. There is no
-global catalog or execution-location flag.
+`view:<id>` is the same target used by `moi tab focus`. `moi tools` lists the
+operations for that target. `moi call` takes the target and tool name as separate
+positional arguments. There is no global catalog or execution-location flag.
 
 Discovery returns `tools`, plus a `ui` availability field. Each tool includes its
-name, description, input schema, optional annotations, full `address`, `runtime`
-(`server` or `ui`) and `requiresLiveView` flag.
+name, description, input schema, optional annotations, `runtime` (`server` or
+`ui`) and `requiresLiveView` flag. The result also echoes the requested `target`.
 
 Arguments are one JSON object, defaulting to `{}`. Results are JSON on stdout;
 duration and errors go to stderr. Errors exit nonzero. The public
@@ -152,7 +152,7 @@ The agent runs a shell command. The CLI and host forward the request to the
 browser holding the active view:
 
 ```text
-Agent process → moi call → host control socket → tool resolver
+Agent process → moi tools / moi call → host control socket → tool resolver
                                                   │
                             server tool ──────────┤→ Bun function worker
                                                   │
@@ -186,11 +186,11 @@ The server catalog is fetched for browser registration only when native WebMCP
 is present. A native registration failure is reported through applet runtime
 logging; the CLI's own registration and relay path remain usable.
 
-| Agent access path | Browser requirement |
-| --- | --- |
-| Agent runs `moi call` for a server tool | No open browser required |
-| Agent runs `moi call` for a UI tool | Connected browser with the view active; native WebMCP unnecessary |
-| Browser agent discovers tools through WebMCP | Browser and agent integration supporting the targeted WebMCP API |
+| Agent access path                            | Browser requirement                                               |
+| -------------------------------------------- | ----------------------------------------------------------------- |
+| Agent runs `moi call` for a server tool      | No open browser required                                          |
+| Agent runs `moi call` for a UI tool          | Connected browser with the view active; native WebMCP unnecessary |
+| Browser agent discovers tools through WebMCP | Browser and agent integration supporting the targeted WebMCP API  |
 
 The same CLI path works for an agent launched by moi or an external agent with
 access to the CLI and control socket. An external agent does not automatically
@@ -258,21 +258,21 @@ removal recycles the workspace worker; a no-op bundle preserves warm state.
 This uses view builds as the reload trigger, so keep server tools alongside a
 view for that workflow.
 
-| Code | Responsibility |
-| --- | --- |
-| `lib/tools.ts`, `lib/tool-execution.ts` | Shared types, descriptors, JSON/schema validation and execution |
-| `server/cli.ts`, `server/control.ts`, `server/tools.ts` | CLI, workspace resolution and server/UI routing |
-| `server/view-tool-relay.ts` | Browser presence, discovery and pending UI calls |
-| `client/features/views/useViewTools.ts` | Active-view presence, CLI execution and server WebMCP wrappers |
-| `client/features/applets/view-tools.ts`, `applet-runtime.ts` | UI registry, native registration and bundle lifetime |
-| `server/functions.ts`, `server/functions-worker.ts` | Shared warm workers for tools and legacy RPC |
-| `server/api.ts` | JSON tool catalog/call routes and legacy RPC route |
-| `server/bundler/build-applet.ts`, `server/applets.ts` | Browser proxies, `useTool` runtime and dependency tracking |
-| `server/moi-scaffold.ts` | Applet-facing TypeScript declarations |
+| Code                                                         | Responsibility                                                  |
+| ------------------------------------------------------------ | --------------------------------------------------------------- |
+| `lib/tools.ts`, `lib/tool-execution.ts`                      | Shared types, descriptors, JSON/schema validation and execution |
+| `server/cli.ts`, `server/control.ts`, `server/tools.ts`      | CLI, workspace resolution and server/UI routing                 |
+| `server/view-tool-relay.ts`                                  | Browser presence, discovery and pending UI calls                |
+| `client/features/views/useViewTools.ts`                      | Active-view presence, CLI execution and server WebMCP wrappers  |
+| `client/features/applets/view-tools.ts`, `applet-runtime.ts` | UI registry, native registration and bundle lifetime            |
+| `server/functions.ts`, `server/functions-worker.ts`          | Shared warm workers for tools and legacy RPC                    |
+| `server/api.ts`                                              | JSON tool catalog/call routes and legacy RPC route              |
+| `server/bundler/build-applet.ts`, `server/applets.ts`        | Browser proxies, `useTool` runtime and dependency tracking      |
+| `server/moi-scaffold.ts`                                     | Applet-facing TypeScript declarations                           |
 
 Server HTTP routes are `GET /api/workspaces/:id/tools/:viewId` for descriptors and
 `POST /api/workspaces/:id/tools/:viewId/:name` for execution. These routes expose
-server tools; CLI discovery combines their catalog with live UI presence.
+server tools; `moi tools` combines their catalog with live UI presence.
 
 See [self-correction](self-correction.md) for runtime checks and the
 [workspace skill](../workspace/.claude/skills/moi-workspace/SKILL.md) for the

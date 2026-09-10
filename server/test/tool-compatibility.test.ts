@@ -7,7 +7,7 @@ import { api } from '../api'
 import { APPLET_API_BASE_SENTINEL, RPC_MODULE_SOURCE } from '../bundler/build-applet'
 import { restartWorker } from '../functions'
 import { DEFAULT_REGISTRY_PATH, setRegistryPath } from '../registry'
-import { callTool } from '../tools'
+import { callTool, listTools } from '../tools'
 import {
   resetWorkspaceEnvForTest,
   setSecretStoreBackend,
@@ -99,12 +99,14 @@ test('old bundle RPC, browser tools and CLI tools share the migrated backend', a
     expect(await oldCall()).toEqual({ id: 'a', date, tags, count: 1 })
     const args = { id: 'a', date: date.toISOString(), tags: ['urgent'] }
     expect(await browserTools.save_order.execute(args)).toEqual({ ...args, count: 2 })
-    expect(await callTool({ id: 'compat', path: root }, 'view:orders/save_order', args)).toEqual({
-      ...args,
-      count: 3
-    })
+    expect(await callTool({ id: 'compat', path: root }, 'view:orders', 'save_order', args)).toEqual(
+      {
+        ...args,
+        count: 3
+      }
+    )
     expect(await oldCall()).toEqual({ id: 'a', date, tags, count: 4 })
-    const catalog = await callTool({ id: 'compat', path: root }, 'view:orders')
+    const catalog = await listTools({ id: 'compat', path: root }, 'view:orders')
     expect(JSON.stringify(catalog)).toContain('save_order')
     expect(JSON.stringify(catalog)).not.toContain('saveOrder')
   } finally {

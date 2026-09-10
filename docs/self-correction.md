@@ -6,10 +6,10 @@ Loading, rendering and backend calls still need runtime feedback.
 
 Self-correction closes the loop with two legs:
 
-| leg      | command                             | what it answers                                     |
-| -------- | ----------------------------------- | --------------------------------------------------- |
-| **feel** | `moi debug logs`                    | "did anything break at runtime since I last built?" |
-| **poke** | `moi call view:<id>/<tool> '{...}'` | "does this view operation work?"                    |
+| leg      | command                                                    | what it answers                                     |
+| -------- | ---------------------------------------------------------- | --------------------------------------------------- |
+| **feel** | `moi debug logs`                                           | "did anything break at runtime since I last built?" |
+| **poke** | `moi tools view:<id>`; `moi call view:<id> <tool> '{...}'` | "does this view operation work?"                    |
 
 Both ride the existing plumbing: the control port for CLI round-trips and the functions
 worker for direct invocation. Nothing new is invented — the loop is wired out of parts that
@@ -74,12 +74,12 @@ moi debug logs --clear    # wipe the buffer
 logs` whenever the buffer is non-empty after the rebuild, so the agent is pointed at
   standing breakage exactly when it's paying attention.
 
-## `moi call` — exercise a view operation
+## `moi tools` and `moi call` — exercise a view operation
 
 ```sh
-moi call view:orders
-moi call view:orders/archive_order '{"id":"o-1024"}'
-moi call view:orders/set_filter '{"status":"overdue"}'
+moi tools view:orders
+moi call view:orders archive_order '{"id":"o-1024"}'
+moi call view:orders set_filter '{"status":"overdue"}'
 ```
 
 Discovery is view-scoped and returns descriptors with schemas and execution location.
@@ -109,7 +109,7 @@ always on, opting in is only about _reading_ it.
 
 ## How it works
 
-- **Control port.** `debug:logs` and `call` are control-socket message types next
+- **Control port.** `debug:logs`, `tools` and `call` are control-socket message types next
   to `bundle`/`theme`/`scratch`, workspace-resolved the same way (subdir-safe, loud errors
   outside a registered workspace).
 - **Journal.** `server/applet-log.ts` owns the ring buffer; producers call `record` from the
