@@ -906,8 +906,10 @@ one.put('/', async c => {
 })
 
 one.delete('/', async c => {
-  const ok = await removeWorkspace(c.get('ws').id)
+  const ws = c.get('ws')
+  const ok = await removeWorkspace(ws.id)
   if (!ok) return c.text('Workspace not found', 404)
+  harnessFor(ws).stopWorkspace?.(ws.path)
   return c.body(null, 204)
 })
 

@@ -138,6 +138,10 @@ export const hermesHarness: Harness = {
     forgetAcpWorkspaceSessions(workspacePath)
     killAcpWorkspace(workspacePath)
   },
+  stopWorkspace: workspacePath => {
+    forgetAcpWorkspaceSessions(workspacePath)
+    killAcpWorkspace(workspacePath)
+  },
   shutdown: () => {
     forgetAllAcpSessions()
     killAllAcpClients()

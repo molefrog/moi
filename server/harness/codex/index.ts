@@ -70,6 +70,7 @@ export const codexHarness: Harness = {
   startLogin: ws => startCodexLogin(ws.path),
 
   onEnvChanged: workspacePath => killCodexWorkspace(workspacePath),
+  stopWorkspace: workspacePath => killCodexWorkspace(workspacePath),
   shutdown: () => killAllCodexClients(),
   skillsDir: workspaceRoot => `${workspaceRoot}/.agents/skills`,
   debugInfo: ws => getCodexProcessInfo(ws.path),
