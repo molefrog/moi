@@ -236,21 +236,27 @@ function emitTurnEvent(rec: SessionRecord, ev: StreamEvent) {
 
 function forwardPreview(rec: SessionRecord) {
   if (!rec.stream || rec.replaying) return
+  let blocks = rec.acc.previewBlocks()
   if (rec.config.isOperationalMessage) {
     // Keep a diagnostic prefix buffered until it can be classified. fx's
     // longest prefix is 24 characters; a split '[con' must not leak a preview.
-    const text = rec.acc
-      .previewBlocks()
+    // Thought chunks have their own channel and must never be classified as
+    // operational prose or hidden behind that text buffer.
+    const text = blocks
+      .filter(b => b.kind === 'text')
       .map(b => b.text)
       .join('')
-    if (text.length < 24 || rec.config.isOperationalMessage(text)) return
+    if (text.length < 24 || rec.config.isOperationalMessage(text)) {
+      blocks = blocks.filter(b => b.kind !== 'text')
+    }
   }
+  if (!blocks.length) return
   broadcast(rec.workspaceId, {
     type: 'preview',
     sessionId: rec.sessionId,
     messageId: rec.acc.currentId,
     parentToolUseId: null,
-    blocks: rec.acc.previewBlocks()
+    blocks
   })
 }
 
@@ -271,6 +277,11 @@ function flushAssistant(
           message: text
         }
       })
+      // A provider can omit message ids on thought chunks, leaving genuine
+      // reasoning beside operational text. Classify only the text: preserve
+      // the remaining parts as a turn (and clear its live preview normally).
+      const parts = turn.parts.filter(part => part.type !== 'text')
+      if (parts.length) emitTurnEvent(rec, { kind: 'turn', turn: { ...turn, parts } })
     } else emitTurnEvent(rec, { kind: 'turn', turn })
   }
   if (meta && rec.lastAssistantTurnId) {
@@ -390,6 +401,17 @@ function handleSessionUpdate(rec: SessionRecord, update: SessionUpdate, provider
     }
     case 'agent_thought_chunk': {
       flushUserChunk(rec)
+      // fx warnings have message ids, while its thought chunks may have none.
+      // End the warning before appending thoughts so a later answer id cannot
+      // turn the entire reasoning run into a warning notice.
+      if (rec.config.isOperationalMessage) {
+        const text = rec.acc
+          .previewBlocks()
+          .filter(block => block.kind === 'text')
+          .map(block => block.text)
+          .join('')
+        if (rec.config.isOperationalMessage(text)) flushAssistant(rec)
+      }
       const block = (update as { content?: { text?: string } }).content
       rec.acc.append('reasoning', block?.text ?? '')
       forwardPreview(rec)

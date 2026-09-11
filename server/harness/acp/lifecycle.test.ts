@@ -81,6 +81,14 @@ process.stdin.on('data', chunk => {
       prompt=msg
       const text=msg.params.prompt.find(p=>p.type==='text')?.text || ''
       if(text==='crash') {setTimeout(()=>process.exit(1),60);continue}
+      if(process.env.PROMPT_UPDATES) {
+        for(const event of JSON.parse(process.env.PROMPT_UPDATES)) update(event)
+        timer=setTimeout(()=>{
+          if(text!=='unfinished') update({sessionUpdate:'agent_message_chunk',messageId:'reply-'+msg.id,content:{type:'text',text:model+':'+text}})
+          result({stopReason:'end_turn',usage:{inputTokens:2,outputTokens:3,totalTokens:5}});prompt=undefined
+        },100)
+        continue
+      }
       if(process.env.DIAGNOSTIC_CHUNKS) {
         for(const text of JSON.parse(process.env.DIAGNOSTIC_CHUNKS)) {
           update({sessionUpdate:'agent_message_chunk',messageId:'diagnostic-'+msg.id,content:{type:'text',text}})
@@ -106,6 +114,7 @@ type FixtureOptions = {
   persistModel?: boolean
   loadedModel?: string
   replayUpdates?: Record<string, unknown>[]
+  promptUpdates?: Record<string, unknown>[]
   diagnosticChunks?: string[]
 }
 async function fixture(options: FixtureOptions = {}) {
@@ -131,6 +140,7 @@ async function fixture(options: FixtureOptions = {}) {
         ...(options.persistModel ? { MODEL_FILE: join(dir, 'model') } : {}),
         ...(options.loadedModel ? { LOADED_MODEL: options.loadedModel } : {}),
         ...(options.replayUpdates ? { REPLAY_UPDATES: JSON.stringify(options.replayUpdates) } : {}),
+        ...(options.promptUpdates ? { PROMPT_UPDATES: JSON.stringify(options.promptUpdates) } : {}),
         ...(options.diagnosticChunks
           ? { DIAGNOSTIC_CHUNKS: JSON.stringify(options.diagnosticChunks) }
           : {})
@@ -490,6 +500,133 @@ describe('ACP chat lifecycle', () => {
     const finalized = new Set(turns(agent.events('one')).map(turn => turn.meta?.apiMessageId))
     expect(previews.every(frame => finalized.has(frame.messageId))).toBe(true)
   })
+
+  test('an identified warning cannot swallow unlabelled thoughts before the answer', async () => {
+    // Captured fx order: a skill warning has a messageId, thought chunks omit
+    // it entirely, and the final answer introduces a different messageId.
+    const warning = 'skill discovery warning: a fixture skill was skipped'
+    const reasoning = 'Need to compute the answer carefully.'
+    const agent = await fixture({
+      promptUpdates: [
+        {
+          sessionUpdate: 'agent_message_chunk',
+          messageId: 'warning',
+          content: { type: 'text', text: warning }
+        },
+        { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'Need' } },
+        {
+          sessionUpdate: 'agent_thought_chunk',
+          content: { type: 'text', text: reasoning.slice(4) }
+        }
+      ]
+    })
+    agent.config.isOperationalMessage = isFxOperationalMessage
+    await sendAcpMessage(agent.config, {
+      ...agent.ctx,
+      sessionId: 'one',
+      isNew: false,
+      content: 'the final answer',
+      stream: true
+    })
+    const frames = getClientFrameLog(agent.ctx.workspaceId).map(
+      entry => entry.frame as ServerMessage
+    )
+    const previews = frames.flatMap(frame =>
+      'type' in frame && frame.type === 'preview' ? [frame] : []
+    )
+    // Even the first short thought streams immediately, without trailing
+    // warning text that would make the UI collapse its Thinking row.
+    expect(previews[0]?.blocks).toEqual([{ index: 0, kind: 'reasoning', text: 'Need' }])
+    expect(
+      previews.every(frame => frame.blocks.every(block => !block.text.includes(warning)))
+    ).toBe(true)
+    const completed = turns(agent.events('one')).at(-1)!
+    expect(completed.parts).toEqual([
+      { type: 'reasoning', text: reasoning },
+      { type: 'text', text: 'model-a:the final answer' }
+    ])
+    const warnings = agent
+      .events('one')
+      .flatMap(event =>
+        event.kind === 'notice' && event.notice.kind === 'warning' ? [event.notice.message] : []
+      )
+    expect(warnings).toEqual([warning])
+    expect(previews.every(frame => frame.messageId === completed.meta?.apiMessageId)).toBe(true)
+  })
+
+  test('classifying a later warning preserves thoughts already in the accumulator', async () => {
+    const reasoning = 'This is a genuine thought before the operational warning.'
+    const warning = 'skill discovery warning: the next skill was skipped'
+    const agent = await fixture({
+      promptUpdates: [
+        { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: reasoning } },
+        {
+          sessionUpdate: 'agent_message_chunk',
+          messageId: 'warning',
+          content: { type: 'text', text: warning }
+        }
+      ]
+    })
+    agent.config.isOperationalMessage = isFxOperationalMessage
+    await sendAcpMessage(agent.config, {
+      ...agent.ctx,
+      sessionId: 'one',
+      isNew: false,
+      content: 'answer',
+      stream: true
+    })
+    const assistantParts = turns(agent.events('one'))
+      .filter(turn => turn.role === 'assistant')
+      .flatMap(turn => turn.parts)
+    expect(assistantParts).toContainEqual({ type: 'reasoning', text: reasoning })
+    expect(assistantParts).not.toContainEqual({ type: 'text', text: warning })
+    const previews = getClientFrameLog(agent.ctx.workspaceId).flatMap(entry => {
+      const frame = entry.frame as ServerMessage
+      return 'type' in frame && frame.type === 'preview' ? [frame] : []
+    })
+    expect(
+      previews.every(frame => frame.blocks.every(block => !block.text.includes(warning)))
+    ).toBe(true)
+  })
+
+  test.each([false, true])(
+    'thought-only output survives without an answer (cancel=%s)',
+    async cancel => {
+      const reasoning = 'Need'
+      const agent = await fixture({
+        promptUpdates: [
+          { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: reasoning } }
+        ]
+      })
+      agent.config.isOperationalMessage = isFxOperationalMessage
+      const send = sendAcpMessage(agent.config, {
+        ...agent.ctx,
+        sessionId: 'one',
+        isNew: false,
+        content: 'unfinished',
+        stream: true
+      })
+      await until(() =>
+        getClientFrameLog(agent.ctx.workspaceId).some(entry => {
+          const frame = entry.frame as ServerMessage
+          return (
+            'type' in frame &&
+            frame.type === 'preview' &&
+            frame.blocks.some(block => block.kind === 'reasoning')
+          )
+        })
+      )
+      if (cancel)
+        await interruptAcpRun(agent.config, {
+          workspaceId: agent.ctx.workspaceId,
+          sessionId: 'one'
+        })
+      await send
+      const completed = turns(agent.events('one')).at(-1)!
+      expect(completed.parts).toEqual([{ type: 'reasoning', text: reasoning }])
+      expect(completed.meta?.stopReason).toBe(cancel ? 'cancelled' : 'end_turn')
+    }
+  )
 
   test('cold resume can discover the provider default without displacing its loaded chat', async () => {
     const agent = await fixture({ loadedModel: 'model-b' })

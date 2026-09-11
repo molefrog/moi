@@ -40,6 +40,10 @@ unchanged. An expired but refreshable login worked without signing in again.
   streamed output and execution metadata. Other tool outputs retain ACP's
   replacement semantics, including explicit empty content.
 - Context/skill discovery warnings remain visible as operational notices.
+- Live `agent_thought_chunk` updates become reasoning parts. fx can omit
+  their `messageId` immediately after a diagnostic that has one; moi closes
+  the diagnostic before accumulating reasoning so the warning cannot swallow
+  the model's thinking or contaminate its live preview.
 - Archiving hides a chat in moi and releases its owned work. It does not
   delete fx history. Workspace skills live in `.agents/skills`.
 - Model discovery archives only its newly created empty session through
@@ -94,6 +98,36 @@ specific prefix, preserves live stdout, and retains the incomplete envelope
 as metadata. The regression is covered by the 14 fx unit tests. Cold shell
 replay has no stdout deltas; its explicit output-limit notice is verified.
 
+### Real thinking models
+
+`PROBE_CATALOG=/path/to/agent-catalog.json bun scripts/probe-fx-thinking.ts`
+checks the selected models against a saved `GET /api/workspaces/:id/agent`
+catalog and runs each through the real authenticated Gateway. It saves
+complete wire/client captures and live versus cold summaries under
+`~/.cache/moi-fx-thinking-*/`. Optional positional model ids limit the run.
+It uses the same probability problem for each model and asks for a short
+answer without tools; reasoning is whatever the provider independently emits.
+
+| Catalog model                      | Confirmed effort       | Live thought chunks | Reasoning characters in moi | Cold reasoning characters |
+| ---------------------------------- | ---------------------- | ------------------: | --------------------------: | ------------------------: |
+| `anthropic/claude-sonnet-5`        | High                   |                   0 |                           0 |                         0 |
+| `openai/gpt-5.6-luna`              | High                   |                   0 |                           0 |                         0 |
+| `deepseek/deepseek-v3.2-thinking`  | No selector advertised |                   0 |                           0 |                         0 |
+| `alibaba/qwen3-235b-a22b-thinking` | No selector advertised |               4,301 |                       9,346 |                         0 |
+| `zai/glm-5.3-flash`                | High                   |                 395 |                       2,453 |                         0 |
+
+All five completed without harness errors, tools, or capture truncation;
+every final answer survived cold replay. Four returned the expected fraction;
+DeepSeek returned a different answer. This checks stream delivery, not general
+model accuracy or a guarantee that a model always exposes thinking.
+
+A separate browser GLM/High run exposed and verified the diagnostic isolation
+fix: before it, 279 thought chunks (1,549 characters) were swallowed by a
+preceding skill warning. After it, all 401 chunks (2,269 characters) remained
+in the completed turn and were readable under **Worked for… → Thought**.
+The captured order is covered by ACP lifecycle regression tests, including
+short live thoughts, later warnings, thought-only completion, and cancellation.
+
 ## Remaining limits
 
 - Terminal tool updates are clipped upstream to a 200-byte preview in live
@@ -108,9 +142,15 @@ replay has no stdout deltas; its explicit output-limit notice is verified.
   moi restores its own measured run durations only when recorded and replayed
   run counts match; imported histories have no such measurements. Historical
   usage/timestamp enrichment needs another source, not inferred replay times.
-- Thought replay was not tested. The pinned replay path emits assistant text
-  and tool frames with no explicit thought-replay emission, so reasoning
-  retention is not guaranteed. This does not establish what fx stores privately.
+- Thinking text is model-dependent even when High effort is confirmed. The
+  live GLM 5.3 Flash run emitted thinking, while Sonnet 5 and Luna did not
+  emit thought chunks in the tested Gateway runs. Effort selection does not
+  guarantee visible thinking.
+- Cold ACP replay omits thinking. For the verified GLM run, fx stored a
+  1,549-character reasoning part in its private provider replay events, but
+  both `session/load` and `fx session --id <id> --json` omit it. Restoring
+  thoughts needs an upstream replay change or a separate moi history cache;
+  this integration does not read fx's private history format.
 - Cancellation can leave a tool without a terminal update. The shared ACP
   layer preserves an interrupted outcome rather than inventing success.
 - A model's effort choices become available after fx first advertises them
