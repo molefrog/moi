@@ -16,11 +16,11 @@ that you and user work together in.
 
 Workspace features/pages:
 
-- "Widgets" - small reusable full-stack components displayed on the widgets page (dashboard). For
-  overview, quick info, status or quick actions.
+- "Widgets" - show quick information or an immediate action on the dashboard.
 - "Scratchpad" - a shared low-fi canvas for prototyping, working on ideas together, visualising
   concepts. Read `references/SCRATCHPAD.md` before building on or modifying it.
-- "Views" - full-stack embedded apps for bigger work, consume more space, live in their own tab.
+- "Views" - provide a dedicated tab for sustained work, such as exploring data, filtering a table,
+  or completing a multi-step task.
 
 User can switch between these, but can access the chat (this conversation and other chats) from
 **any place in the app** (copilot mode), or on a dedicated page.
