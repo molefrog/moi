@@ -22,6 +22,24 @@ Workspace features/pages:
   concepts. Read `references/SCRATCHPAD.md` before building on or modifying it.
 - "Views" - full-stack embedded apps for bigger work, consume more space, live in their own tab.
 
+Which applet? Pick before you write code — rebuilding a cramped widget as a view is the common
+first-request mistake.
+
+| Build a widget when | Build a view when |
+| --- | --- |
+| It is glanceable — one number, a status, a short list | It is a page someone would bookmark and return to |
+| Several of them make sense side by side on the dashboard | It needs a table, a chart, filters, or more than ~3 numbers |
+| It fits a fixed 160 px row and at most 640 px of width | It owns the full frame: its own layout, scrolling, and chrome |
+| Nothing navigates to it — widgets are never a target | It gets its own tab and can be addressed with `focusTab` |
+
+- Widget: "today's visitor count", "build status for the current branch", "a button that runs the
+  nightly import".
+- View: "a status page with tiles, a chart, and per-service rows", "traffic for my three sites with
+  a date filter", "a table of beta signups I can sort and search".
+
+A widget may link into a view for the detail — that pairing is normal, and the view is where the
+detail lives.
+
 User can switch between these, but can access the chat (this conversation and other chats) from
 **any place in the app** (copilot mode), or on a dedicated page.
 
@@ -462,6 +480,15 @@ export const config = {
 } as const
 ```
 
+Valid `icon` ids (same set for the builder request and `config.icon`): `rocket`, `sparkles`, `bolt`,
+`flame`, `star`, `heart`, `diamond`, `trophy`, `target`, `bulb`, `brain`, `robot`, `wand`, `atom`,
+`flask`, `cpu`, `code`, `terminal`, `api`, `database`, `cube`, `hexagon`, `plug`, `tool`, `settings`,
+`bug`, `activity`, `chart`, `briefcase`, `folder`, `file`, `book`, `message`, `mail`, `bell`,
+`paperclip`, `key`, `shield`, `user`, `home`, `globe`, `world`, `planet`, `compass`, `map`,
+`calendar`, `cloud`, `sun`, `moon`, `snowflake`, `leaf`, `mountain`, `feather`, `ghost`, `music`,
+`piano`, `camera`, `photo`, `palette`, `gamepad`, `gift`, `cart`, `chef`. Anything else fails the
+bundle — pick the closest id rather than inventing one such as `chart-bar`.
+
 The inverse of a widget: a view **owns its whole page** — its own `h-full w-full` layout, scrolling
 (`overflow-auto`), padding, and chrome. Build it to read like an app screen. See `references/DESIGN.md`.
 
@@ -478,4 +505,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.18.0" />
+<moi-skill version="0.18.1" />

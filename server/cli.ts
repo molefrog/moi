@@ -426,7 +426,7 @@ const init = defineCommand({
         pc.dim(skillsDir) +
         ' — ask ' +
         (type === 'claude-code' ? 'Claude' : 'your agent') +
-        ' to build a widget to get started\n'
+        ' to build a widget or a view to get started\n'
     )
 
     // If --web and server not running, start it (stay alive as wrapper)
