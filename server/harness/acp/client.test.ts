@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -18,7 +18,7 @@ import {
 // Use an actual child and pipes so initialization, shutdown, malformed stdout,
 // and request failure exercise the same transport used by installed providers.
 const AGENT_SOURCE = `
-const { closeSync, writeFileSync } = require('node:fs')
+const { writeFileSync } = require('node:fs')
 const send = value => process.stdout.write(JSON.stringify(value) + '\\n')
 if (process.env.STARTED_PATH) writeFileSync(process.env.STARTED_PATH, String(process.pid))
 if (process.env.DELAY_EXIT) process.on('SIGTERM', () => setTimeout(() => process.exit(0), 100))
@@ -45,10 +45,6 @@ process.stdin.on('data', chunk => {
       send({ jsonrpc: '2.0', method: 'session/update', params: 42 })
       send({ jsonrpc: '2.0', method: 'session/update', params: { marker: 'valid' } })
       send({ jsonrpc: '2.0', id: msg.id, result: { ok: true } })
-    } else if (msg.method === 'fixture/close_stdin') {
-      process.stdin.pause()
-      closeSync(0)
-      send({ jsonrpc: '2.0', id: msg.id, result: {} })
     } else if (msg.method === 'fixture/exit') {
       process.exit(0)
     } else if (msg.method !== 'session/prompt' && msg.id !== undefined) {
@@ -240,15 +236,45 @@ describe('ACP JSON-RPC framing', () => {
     expect(client.isAlive()).toBe(true)
   })
 
-  test('a broken stdin rejects pending calls and terminates the unusable process', async () => {
-    const client = await start(await spec())
-    const pid = (await client.rpc<{ pid: number }>('fixture/info')).pid
-    const prompt = client.rpc('session/prompt').catch(error => error)
-    await client.rpc('fixture/close_stdin')
-    const failure = client.rpc('fixture/info').catch(error => error)
-    expect(await failure).toBeInstanceOf(Error)
-    expect(await prompt).toBeInstanceOf(Error)
-    expect(client.isAlive()).toBe(false)
-    await waitFor(() => !processAlive(pid))
-  }, 5_000)
+  for (const operation of ['write', 'flush'] as const) {
+    test(`a failed stdin ${operation} rejects pending calls and terminates the process`, async () => {
+      const spawnSpec = await spec()
+      const spawned = spyOn(Bun, 'spawn')
+      let client: AcpClient
+      let proc: ReturnType<typeof Bun.spawn> | undefined
+      try {
+        client = await start(spawnSpec)
+        proc = spawned.mock.results.find(result => result.type === 'return')?.value
+      } finally {
+        spawned.mockRestore()
+      }
+      if (!proc?.stdin || typeof proc.stdin === 'number')
+        throw new Error('Expected a piped child stdin')
+      const pid = (await client.rpc<{ pid: number }>('fixture/info')).pid
+      const prompt = client.rpc('session/prompt').catch(error => error)
+      // Ensure the unbounded prompt reached the real child before its writer
+      // fails. Closing fd 0 in a Bun child is not portable: Linux Bun 1.3
+      // retains that stdin pipe even after closeSync/destroy, so no EPIPE occurs.
+      await client.rpc('fixture/info')
+      const brokenPipe = new Error(`EPIPE: fixture ${operation} failed`)
+      const sink =
+        operation === 'write'
+          ? spyOn(proc.stdin, 'write').mockImplementation(() => {
+              throw brokenPipe
+            })
+          : spyOn(proc.stdin, 'flush').mockImplementation(() => Promise.reject(brokenPipe))
+      try {
+        const failure = client.rpc('fixture/info').catch(error => error)
+        const error = await failure
+        expect(error).toBeInstanceOf(Error)
+        if (!(error instanceof Error)) throw new Error('Expected a transport error')
+        expect(error.message).toContain(brokenPipe.message)
+        expect(await prompt).toBe(error)
+        expect(client.isAlive()).toBe(false)
+        await waitFor(() => !processAlive(pid))
+      } finally {
+        sink.mockRestore()
+      }
+    })
+  }
 })

@@ -52,6 +52,13 @@ Desktop browser verification created an fx workspace, selected Sonnet 5,
 wrote and read `fx-ready.txt`, switched effort to High, and ran a follow-up.
 After a full moi server restart, both answers and the structured file results
 returned, and the composer restored Sonnet 5 with High effort.
+A second chat completed with `openai/gpt-5.6-luna` and Auto effort; returning
+to the already-open Sonnet chat retained High and its file results. The chat
+list contained only these two user-created chats after discovery cleanup.
+
+This machine's existing `react-pdf` skill produced an `unsupported_multiline`
+metadata warning from fx. The integration surfaced it without interrupting
+the run; the user's global skill was left unchanged.
 
 `bun test server/harness/fx` covers selector ambiguity, grouped options,
 unsupported selections, confirmation failures, effort changes after model
