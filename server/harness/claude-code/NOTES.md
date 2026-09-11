@@ -58,6 +58,16 @@ while moi keeps running, changing which models are available.
 - The model catalog (`models.ts`) is keyed by executable path and the first
   line of `claude --version`. Each lookup probes that identity again. Changes
   refetch the catalog; a failed version probe at the same path retains it.
+- Capabilities are asked of the CLI, not of its version number. Every session
+  runs `permissionMode: 'auto'`, and a CLI that doesn't accept it kills the
+  first message with `option '--permission-mode <mode>' argument 'auto' is
+invalid`. `capabilities.ts` parses the accepted choices out of
+  `claude --help` — one spawn per CLI identity, cached beside the catalog's —
+  and `availability` reports `Claude Code <version> doesn't support auto
+permissions. Run claude update` before the auth probe, so the composer shows
+  one reason. There is no version floor: the changelog does not date when
+  `auto` arrived and the Agent SDK declares no minimum. A failed or unreadable
+  probe is unknown and never blocks, same as a failed version probe.
 - On a changed identity, `index.ts` marks existing subprocesses `staleCli`
   (`retireCCSessionsOnCliChange`). Invalidation never interrupts work. Before
   the next message, the dispatcher waits for the current turn and background
