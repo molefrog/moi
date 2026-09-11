@@ -1,0 +1,141 @@
+# fx over ACP
+
+Verified on 2026-09-11 with the official dev build
+`f4ea28b23764a67b9054b357b2e3ac81a12b9138` (reports version `0.0.8`).
+The stable `0.0.8` release, revision `43c11dcc34a9`, predates structured
+history replay; version alone cannot distinguish these builds.
+
+## Installation
+
+Install fx using its [official instructions](https://fx.sh/docs), then run
+`fx upgrade --channel dev` while these changes remain unreleased. Check
+`fx status` for `build_revision`. Sign in with `fx login`, `fx login codex`,
+or `fx login grok` before opening a chat in moi. The selected provider and
+credentials stay owned by fx; moi does not change profile settings.
+
+For this verification, the immutable [macOS arm64 artifact](https://releases.fx.sh/dev/f4ea28b23764a67b9054b357b2e3ac81a12b9138/fx-macos-aarch64.tar.gz)
+passed its published SHA-256 checksum. The previous local executable was
+preserved at `~/.local/bin/fx.backup-v0.0.8`. The update channel was left
+unchanged. An expired but refreshable login worked without signing in again.
+
+## Integration
+
+- One owned ACP process per chat. Discovery uses a separate process: fx has
+  only one active session per process, and creating/loading another replaces it.
+- `session/load` restores the actual model context and replays structured
+  tool cards. Load errors propagate rather than appearing as an empty chat.
+- `code` mode is reapplied after creation/load. It automatically reviews
+  unresolved sensitive actions and can hold them; it is not full access.
+- Model selection uses `configId: model`, never the first `category: model`
+  option: fx gives its separate provider selector the same category.
+- Reasoning effort uses `configId: effort`, category `thought_level`.
+  Changes are validated against the returned options, confirmed, persisted
+  with the session, and applied before the next prompt. No global settings
+  file is rewritten. The picker retains each model's advertised effort
+  options once discovered; switching models refreshes that knowledge.
+- Native tool names identify cards; wrapped inputs and file paths are kept.
+  fx's generic titles such as `Running` and `Reading` are replaced with the
+  native tool identity, so both live and replayed cards remain identifiable.
+  Shell progress deltas accumulate. A final execution envelope preserves
+  streamed output and execution metadata. Other tool outputs retain ACP's
+  replacement semantics, including explicit empty content.
+- Context/skill discovery warnings remain visible as operational notices.
+- Archiving hides a chat in moi and releases its owned work. It does not
+  delete fx history. Workspace skills live in `.agents/skills`.
+- Model discovery archives only its newly created empty session through
+  moi's existing archive store, keeping the chat list clean. That empty
+  history remains in fx itself and can still appear in the fx CLI.
+
+## Verification
+
+Desktop browser verification created an fx workspace, selected Sonnet 5,
+wrote and read `fx-ready.txt`, switched effort to High, and ran a follow-up.
+After a full moi server restart, both answers and the structured file results
+returned, and the composer restored Sonnet 5 with High effort.
+
+`bun test server/harness/fx` covers selector ambiguity, grouped options,
+unsupported selections, confirmation failures, effort changes after model
+switches, shell output, ordinary final text, and explicit empty output.
+
+`PROBE_EFFORT=high bun scripts/probe-fx-acp.ts --fake` drives the real binary
+through moi's actual ACP client/session/adapter. The fake gateway advertises
+effort levels, verifies `reasoning: high` reached the model request, executes
+a real file read, and checks session discovery and cold replay.
+
+`PROBE_EFFORT=high bun scripts/probe-fx-acp.ts --real` uses the existing fx
+login in a disposable workspace. The real Vercel AI Gateway model
+`anthropic/claude-sonnet-5` advertised `auto`, `low`, `medium`, `high`, and
+`xhigh`; `high` was confirmed, the read completed, and cold replay preserved
+the tool name, input, successful status, and output. These probes save no moi
+workspace. Real-login probes leave their disposable test chats in fx history.
+
+Temporary workspace paths are canonicalized: macOS `/var` is a symlink to
+`/private/var`, and fx's exact cwd filter otherwise misses the saved chat.
+
+`bun scripts/probe-fx-lifecycle.ts` exercises the real model in a disposable
+workspace under the user's home. All 16 checks passed: two chats active at
+once; cancellation acknowledged in 77 ms with a failed shell result and no
+false success; the other chat's shell completed; the stopped chat accepted a
+follow-up; all three chats were discovered and cold-loaded. A 327-byte shell
+stdout survived live completion. A generated PNG held six random digits that
+were absent from the prompt and any readable file; the model returned the
+digits exactly without calling tools, and the image and answer survived replay.
+
+This probe exposed a completion bug: the shell result envelope is clipped
+inside its JSON string at 200 bytes. The fx normalizer now recognizes that
+specific prefix, preserves live stdout, and retains the incomplete envelope
+as metadata. The regression is covered by the 14 fx unit tests. Cold shell
+replay has no stdout deltas; its explicit output-limit notice is verified.
+
+## Remaining limits
+
+- Terminal tool updates are clipped upstream to a 200-byte preview in live
+  and replay streams. Live shell stdout arrives separately and is retained;
+  cold shell replay can contain only a clipped execution envelope, so moi
+  explicitly reports that command output is unavailable. Permission/review
+  failures preserve their text; binary
+  output becomes a notice. Full output/diffs remain accessible via
+  `fx session --id <id> --json`, but this integration does not enrich cards
+  from that command yet.
+- ACP replay supplies no original message timestamps or per-turn token usage.
+  moi restores its own measured run durations only when recorded and replayed
+  run counts match; imported histories have no such measurements. Historical
+  usage/timestamp enrichment needs another source, not inferred replay times.
+- Thought replay was not tested. The pinned replay path emits assistant text
+  and tool frames with no explicit thought-replay emission, so reasoning
+  retention is not guaranteed. This does not establish what fx stores privately.
+- Cancellation can leave a tool without a terminal update. The shared ACP
+  layer preserves an interrupted outcome rather than inventing success.
+- A model's effort choices become available after fx first advertises them
+  during creation, restoration, or a model switch. moi retains known choices
+  across chats but does not guess support for models that have not been used.
+- Native fx chats imported into moi keep their backend model/effort until
+  overridden, but the picker does not automatically adopt native settings
+  into moi's saved chat preferences. Select the intended model and effort
+  explicitly for these chats. Workspace-wide effort defaults use `auto`;
+  another chat's selected effort is not treated as a provider default.
+- Chat list titles can remain `Untitled session` when fx omits a saved title;
+  moi does not generate titles. Better naming, full-output enrichment, nested
+  subagent views, a provider picker, fast mode, and fork UI are v1
+  omissions, not claims that the protocol makes them impossible.
+- Native fx does not implement ACP `session/remove`: the parsed method is
+  implemented only in its WASM runtime; native dispatch returns `-32601`.
+  `session/close` flushes and releases the session without deleting it, and
+  the installed `fx session` CLI has no delete operation. Model discovery's
+  empty saved sessions therefore cannot be removed through those interfaces.
+- moi queues follow-ups. No working ACP steering method was established;
+  native interactive fx steering does not prove ACP support.
+- fx supports inline images up to 3.75 MiB each and embedded resources;
+  audio is unsupported. Inline vision and image replay were verified with
+  Sonnet 5; other models and MCP image results were not exercised.
+- ACP excludes `~/.fx/mcp.json`. It accepts client-supplied servers and
+  approved workspace `.mcp.json` servers; moi currently supplies no extra
+  servers. Project MCP trust remains managed in fx.
+- Instruction discovery may omit instructions outside the user's home;
+  the resulting warnings remain visible.
+
+Sources: [ACP documentation](https://fx.sh/docs/using-fx/acp),
+[structured replay #788](https://github.com/vercel-labs/fx/pull/788),
+[effort support](https://github.com/vercel-labs/fx/commit/32f3dc9ee07b9649ce10d6b24d1e30af0e20302a),
+[effort catalog consistency](https://github.com/vercel-labs/fx/commit/726cea85953b38317cdb200ac06cf8cf6ecdc705),
+and [pinned session implementation](https://github.com/vercel-labs/fx/blob/f4ea28b23764a67b9054b357b2e3ac81a12b9138/src/acp/sessions.zig).

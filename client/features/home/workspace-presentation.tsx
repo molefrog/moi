@@ -5,7 +5,8 @@ export const workspaceTypeLabel: Record<WorkspaceType, string> = {
   'claude-code': 'Claude Code',
   openclaw: 'OpenClaw',
   codex: 'Codex',
-  hermes: 'Hermes'
+  hermes: 'Hermes',
+  fx: 'fx'
 }
 
 type WorkspaceAgentIconsProps = {

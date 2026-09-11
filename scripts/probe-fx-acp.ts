@@ -5,17 +5,18 @@
 // server/harness/acp/NOTES.md §4.
 //
 // Usage:
-//   bun scripts/probe-fx-acp.ts          # real Vercel AI Gateway (needs a key)
+//   bun scripts/probe-fx-acp.ts          # gateway key when set, fake otherwise
 //   bun scripts/probe-fx-acp.ts --fake   # fx's fake-gateway shape, no key
+//   bun scripts/probe-fx-acp.ts --real   # existing fx login; saves a test chat
 //
 // Env: FX_BIN (default `fx` on PATH), AI_GATEWAY_API_KEY (real gateway),
-//      PROBE_MODEL (default anthropic/claude-sonnet-5). Without a key the
-//      probe falls back to --fake. Every run uses an isolated HOME and workspace
-//      under tmp, so nothing lands in ~/.fx or the local moi data dir.
+//      PROBE_MODEL (default anthropic/claude-sonnet-5), PROBE_EFFORT (optional).
+//      Fake/key runs isolate HOME. --real uses the existing fx profile and a
+//      disposable workspace, without changing its provider or settings.
 //
 // Exit code 1 when the replayed view lost the tool call.
 
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -31,6 +32,7 @@ const { killAllAcpClients } = await import('../server/harness/acp/client')
 const { listAcpSessions } = await import('../server/harness/acp/discovery')
 const { ensureAcpSessionLive, forgetAllAcpSessions, getLiveAcpEvents, sendAcpMessage } =
   await import('../server/harness/acp/session')
+const { fxConfig } = await import('../server/harness/fx')
 
 const FX_BIN = process.env.FX_BIN ?? Bun.which('fx')
 if (!FX_BIN) {
@@ -38,7 +40,8 @@ if (!FX_BIN) {
   process.exit(1)
 }
 const realKey = process.env.AI_GATEWAY_API_KEY
-const useFake = process.argv.includes('--fake') || !realKey
+const useLogin = process.argv.includes('--real') && !realKey
+const useFake = process.argv.includes('--fake') || (!realKey && !useLogin)
 
 const NOTE = 'ACP_LOAD_REPLAY_CONTENT'
 const ANSWER = 'ACP_LOAD_REPLAY_ANSWER'
@@ -63,6 +66,7 @@ function toolCall(toolCallId: string, toolName: string, input: Record<string, un
 // a models catalog, the coding-agent chat endpoint answering from a queue, and
 // the permission classifier always clearing the call.
 function startFakeGateway() {
+  const requests: string[] = []
   const completions = [
     () => toolCall('replay_call_1', 'read_file', { path: 'replay-note.txt' }),
     () =>
@@ -81,10 +85,20 @@ function startFakeGateway() {
     async fetch(req) {
       const { pathname } = new URL(req.url)
       if (req.method === 'GET' && pathname === '/coding-agent/v1/models') {
-        return Response.json({ data: [{ id: FAKE_MODEL, type: 'language', tags: ['tool-use'] }] })
+        return Response.json({
+          data: [
+            {
+              id: FAKE_MODEL,
+              type: 'language',
+              tags: ['tool-use'],
+              reasoning_options: [{ type: 'effort', values: ['low', 'high'] }]
+            }
+          ]
+        })
       }
       if (req.method !== 'POST') return new Response('not found', { status: 404 })
       const body = await req.text()
+      requests.push(body)
       if (body.includes('"permission_decision"')) {
         return toolCall('permission_decision_1', 'permission_decision', {
           risk: 'low',
@@ -99,6 +113,7 @@ function startFakeGateway() {
   const baseUrl = `http://127.0.0.1:${server.port}`
   return {
     baseUrl,
+    requests,
     env: {
       AI_GATEWAY_API_KEY: 'fake-probe-key',
       VERCEL_OIDC_TOKEN: '',
@@ -150,8 +165,8 @@ function isToolPart(p: PartSummary): p is Extract<PartSummary, { part: 'tool-cal
   return 'part' in p && p.part === 'tool-call'
 }
 
-const root = await mkdtemp(join(tmpdir(), 'fx-probe-'))
-const home = join(root, 'home')
+const root = await realpath(await mkdtemp(join(tmpdir(), 'fx-probe-')))
+const home = useLogin ? process.env.HOME! : join(root, 'home')
 const workspacePath = join(root, 'workspace')
 await mkdir(join(home, '.fx'), { recursive: true })
 await mkdir(workspacePath, { recursive: true })
@@ -161,26 +176,34 @@ const gateway = useFake ? startFakeGateway() : null
 const gatewayEnv: Record<string, string> = gateway
   ? gateway.env
   : {
-      AI_GATEWAY_API_KEY: realKey ?? '',
+      ...(realKey ? { AI_GATEWAY_API_KEY: realKey } : {}),
       FX_MODEL: process.env.PROBE_MODEL ?? 'anthropic/claude-sonnet-5'
     }
 
-// The probe borrows Hermes' ids: moi has no fx workspace type yet and the ACP
-// layer only uses them for labels. `code` is fx's no-prompt mode.
 const config: AcpProviderConfig = {
-  id: 'hermes',
-  provider: 'hermes',
-  noPromptModeId: 'code',
-  supportsImages: true,
+  ...fxConfig,
+  modelStateFingerprint: undefined,
+  async applySettings(client, sessionId, settings, state) {
+    const options = state.configOptions?.filter(option => option.id === 'effort')
+    console.log('advertised effort:', JSON.stringify(options ?? []))
+    const confirmed = await fxConfig.applySettings!(client, sessionId, settings, state)
+    console.log('confirmed model:', confirmed.currentModelId)
+    console.log(
+      'confirmed effort:',
+      confirmed.configOptions?.find(option => option.id === 'effort')?.currentValue ??
+        '(unavailable)'
+    )
+    return confirmed
+  },
   spawn: async () => ({
-    provider: 'hermes',
+    provider: 'fx',
     command: FX_BIN,
     args: ['acp'],
     workspacePath,
     env: {
       HOME: home,
       FX_AUTO_UPGRADE: '0',
-      FX_DISABLE_KEYCHAIN: '1',
+      ...(!useLogin ? { FX_DISABLE_KEYCHAIN: '1' } : {}),
       FX_SKIP_ONBOARDING: '1',
       NO_COLOR: '1',
       ...gatewayEnv
@@ -199,7 +222,7 @@ console.log(`fx revision ${revision}`)
 console.log(
   gateway
     ? `gateway     fake (${gateway.baseUrl})${realKey ? '' : ' — no AI_GATEWAY_API_KEY in env'}`
-    : `gateway     Vercel AI Gateway, model ${gatewayEnv.FX_MODEL}`
+    : `gateway     ${useLogin ? 'existing fx login' : 'Vercel AI Gateway'}, model ${gatewayEnv.FX_MODEL}`
 )
 
 let lossy = true
@@ -211,7 +234,8 @@ try {
     workspacePath,
     sessionId: tmpId,
     isNew: true,
-    content: PROMPT
+    content: PROMPT,
+    ...(process.env.PROBE_EFFORT ? { effort: process.env.PROBE_EFFORT } : {})
   })
   const frames = getClientFrameLog(workspaceId).map(f => f.frame as Record<string, unknown>)
   const renamed = frames.find(f => f.type === 'session_renamed')
@@ -227,6 +251,7 @@ try {
   killAllAcpClients()
   await Bun.sleep(300)
   const listed = await listAcpSessions(config, { workspaceId, workspacePath })
+  const discovered = listed.some(session => session.sessionId === realId)
   console.log(
     `session/list: ${listed.map(s => `${s.sessionId} "${s.summary}"`).join(', ') || '(none)'}`
   )
@@ -254,10 +279,30 @@ try {
   console.log(`live tool-call turns      ${liveTools.length}`)
   console.log(`replayed tool-call turns  ${replayTools.length}`)
   console.log(`flattened tool text       ${flattened}`)
+  console.log(`saved session discovered ${discovered}`)
+  const requestedEffort = process.env.PROBE_EFFORT
+  const loadedEffort = getWireLog(workspacePath, wireStart)
+    .flatMap(frame => {
+      const message = frame.frame as {
+        result?: { configOptions?: { id: string; currentValue: unknown }[] }
+      }
+      return frame.dir === 'recv' ? (message.result?.configOptions ?? []) : []
+    })
+    .find(option => option.id === 'effort')?.currentValue
+  const effortPersisted = !requestedEffort || loadedEffort === requestedEffort
+  if (requestedEffort) console.log(`effort retained after cold load ${effortPersisted}`)
+  const effortSent =
+    !gateway ||
+    !requestedEffort ||
+    gateway.requests.some(body => body.includes(`"reasoning":"${requestedEffort}"`))
+  if (gateway && requestedEffort) console.log(`requested effort reached model ${effortSent}`)
   lossy =
     liveTools.length === 0 ||
     replayTools.length !== liveTools.length ||
     flattened ||
+    !discovered ||
+    !effortSent ||
+    !effortPersisted ||
     !replayTools.every(t => t.state === 'success' && (t.output ?? '').includes(NOTE))
   console.log(lossy ? 'RESULT: replay is lossy' : 'RESULT: replay keeps structured tool calls')
 } finally {

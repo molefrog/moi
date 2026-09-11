@@ -32,8 +32,8 @@ export function useWorkspaceLayout(workspaceId: string) {
 
 // The workspace's agent backend in one snapshot: availability (runtime
 // presence + auth), any in-flight login ceremony, the model catalog, and
-// capabilities. `agent:updated` events refresh availability and login state;
-// focus refetches pick up model changes after a CLI update.
+// capabilities. `agent:updated` patches availability immediately and refetches
+// model capabilities, which can change when an ACP session switches models.
 export function useWorkspaceAgent(workspaceId: string) {
   const queryClient = useQueryClient()
   useEffect(
@@ -48,6 +48,7 @@ export function useWorkspaceAgent(workspaceId: string) {
       queryClient.setQueryData<WorkspaceAgent>(workspaceKeys.agent(workspaceId), prev =>
         prev ? { ...prev, availability: event.availability, login: event.login } : prev
       )
+      void queryClient.invalidateQueries({ queryKey: workspaceKeys.agent(workspaceId) })
     }
     // Env can swap credentials; the server dropped its cache — refetch.
     if (event.type === 'env:updated' && event.workspaceId === workspaceId) {

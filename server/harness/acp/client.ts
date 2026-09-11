@@ -1,14 +1,12 @@
-// Long-lived ACP client, one process per workspace.
+// Long-lived ACP clients, shared by spawn configuration and optional scope.
 //
 // ACP agents are JSON-RPC 2.0 servers over stdio (newline-delimited JSON) that
-// serve every session of one workspace: sessions carry their own cwd, but env
-// is process-level, so per-workspace env injection (moi's `workspaceEnv`)
-// forces one process per workspace — same frozen-at-spawn semantics as the
-// Codex app-server and the Claude Code subprocess.
+// may serve several sessions. Env is process-level and frozen at spawn. Agents
+// with only one active session use a dedicated scope per chat or discovery run.
 //
 // Provider-agnostic: `AcpSpawnSpec` says what to spawn, everything else here
 // is protocol. See ./wire.ts for the message shapes.
-import type { InitializeResponse, RequestPermissionRequest } from './wire'
+import type { InitializeResponse } from './wire'
 
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
@@ -41,6 +39,20 @@ export type AcpSpawnSpec = {
   workspacePath: string
   // Extra env layered over process env + the workspace env.
   env?: Record<string, string>
+  // Omit to share a workspace process. Session/discovery owners use distinct ids.
+  scope?: string
+}
+
+export class AcpRpcError extends Error {
+  readonly code: number
+  readonly data: unknown
+
+  constructor(message: string, code: number, data?: unknown) {
+    super(message)
+    this.name = 'AcpRpcError'
+    this.code = code
+    this.data = data
+  }
 }
 
 export type AcpClient = {
@@ -63,9 +75,34 @@ export type AcpProcessInfo = {
 type ClientRecord = {
   client: AcpClient
   proc: ReturnType<typeof Bun.spawn>
+  stop: () => void
 }
 
-const clients = new Map<string, Promise<ClientRecord>>() // key: workspacePath
+type PoolEntry = {
+  key: string
+  spec: AcpSpawnSpec
+  promise?: Promise<ClientRecord>
+  record?: ClientRecord
+  cancelled: boolean
+}
+
+const clients = new Map<string, PoolEntry>()
+const records = new WeakMap<AcpClient, ClientRecord>()
+
+function poolKey(spec: AcpSpawnSpec): string {
+  return JSON.stringify([
+    spec.provider,
+    spec.workspacePath,
+    spec.command,
+    spec.args,
+    Object.entries(spec.env ?? {}).sort(([a], [b]) => a.localeCompare(b)),
+    spec.scope ?? null
+  ])
+}
+
+function isJson(value: unknown): value is Json {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
 
 // Client capabilities moi actually honours. We do NOT advertise fs access:
 // ACP agents that can't read files themselves would delegate to us, and moi's
@@ -73,9 +110,10 @@ const clients = new Map<string, Promise<ClientRecord>>() // key: workspacePath
 // agent's own business.
 const CLIENT_CAPABILITIES = { fs: { readTextFile: false, writeTextFile: false } }
 
-async function startClient(spec: AcpSpawnSpec): Promise<ClientRecord> {
+async function startClient(spec: AcpSpawnSpec, entry: PoolEntry): Promise<ClientRecord> {
   const { provider, command, args, workspacePath } = spec
   const workspaceEnv = await resolveWorkspaceEnv(workspacePath)
+  if (entry.cancelled) throw new Error(`${provider} agent startup cancelled`)
   const proc = Bun.spawn([command, ...args], {
     cwd: workspacePath,
     stdin: 'pipe',
@@ -93,17 +131,54 @@ async function startClient(spec: AcpSpawnSpec): Promise<ClientRecord> {
     { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: Timer | null }
   >()
   const listeners = new Set<NotificationListener>()
+  let killTimer: Timer | null = null
+
+  // Close the transport immediately, including callers waiting on initialize.
+  // A provider that ignores SIGTERM still cannot outlive its released lease.
+  function finish(error: Error) {
+    if (!alive) return
+    alive = false
+    if (clients.get(entry.key) === entry) clients.delete(entry.key)
+    for (const p of pending.values()) {
+      if (p.timer) clearTimeout(p.timer)
+      p.reject(error)
+    }
+    pending.clear()
+    try {
+      proc.kill()
+      killTimer = setTimeout(() => {
+        try {
+          proc.kill('SIGKILL')
+        } catch {}
+      }, 1_000)
+      killTimer.unref()
+    } catch {}
+    fanout('__exit', {})
+    debug(`${provider} acp exited ws=${workspacePath}`)
+  }
+
+  function transportError(error: unknown) {
+    finish(
+      new Error(
+        `${provider} ACP transport failed: ${error instanceof Error ? error.message : String(error)}`
+      )
+    )
+  }
 
   function send(obj: Json) {
-    tapWire(workspacePath, 'send', obj)
-    proc.stdin.write(JSON.stringify(obj) + '\n')
-    proc.stdin.flush()
+    if (!alive) return
+    try {
+      tapWire(workspacePath, 'send', obj)
+      proc.stdin.write(JSON.stringify(obj) + '\n')
+      void Promise.resolve(proc.stdin.flush()).catch(transportError)
+    } catch (error) {
+      transportError(error)
+    }
   }
 
   function rpc<T>(method: string, params: Json = {}): Promise<T> {
     if (!alive) return Promise.reject(new Error(`${provider} agent not running`))
     const id = nextId++
-    send({ jsonrpc: '2.0', id, method, params })
     return new Promise<T>((resolve, reject) => {
       const timeoutMs = rpcTimeoutMs(method)
       const timer =
@@ -114,6 +189,9 @@ async function startClient(spec: AcpSpawnSpec): Promise<ClientRecord> {
               reject(new Error(`${provider} rpc timeout: ${method}`))
             }, timeoutMs)
       pending.set(id, { resolve: resolve as (v: unknown) => void, reject, timer })
+      // Register first: both a synchronous write failure and a fast response
+      // must find the request and settle it.
+      send({ jsonrpc: '2.0', id, method, params })
     })
   }
 
@@ -134,15 +212,16 @@ async function startClient(spec: AcpSpawnSpec): Promise<ClientRecord> {
   function answerServerRequest(msg: Json) {
     const method = msg.method as string
     if (method === 'session/request_permission') {
-      const params = (msg.params ?? {}) as RequestPermissionRequest
-      const options = params.options ?? []
-      const allow = options.find(o => o.kind?.startsWith('allow')) ?? options[0]
+      const params = isJson(msg.params) ? msg.params : {}
+      const options = Array.isArray(params.options) ? params.options.filter(isJson) : []
+      const allow = options.find(o => typeof o.kind === 'string' && o.kind.startsWith('allow'))
       send({
         jsonrpc: '2.0',
         id: msg.id,
-        result: allow
-          ? { outcome: { outcome: 'selected', optionId: allow.optionId } }
-          : { outcome: { outcome: 'cancelled' } }
+        result:
+          allow && typeof allow.optionId === 'string'
+            ? { outcome: { outcome: 'selected', optionId: allow.optionId } }
+            : { outcome: { outcome: 'cancelled' } }
       })
       return
     }
@@ -155,30 +234,39 @@ async function startClient(spec: AcpSpawnSpec): Promise<ClientRecord> {
 
   function handleLine(line: string) {
     if (!line.trim()) return
-    let msg: Json
+    let parsed: unknown
     try {
-      msg = JSON.parse(line) as Json
+      parsed = JSON.parse(line)
     } catch {
       // ACP reserves stdout for JSON-RPC, but a misbehaving agent can still
       // print — drop the line rather than killing the connection.
       return
     }
+    // stdout can contain valid JSON that is not a JSON-RPC object (including
+    // null); never let it tear down the reader or reach application listeners.
+    if (!isJson(parsed) || parsed.jsonrpc !== '2.0') return
+    const msg = parsed
     tapWire(workspacePath, 'recv', msg)
-    if ('id' in msg && 'method' in msg) {
+    if ('id' in msg && typeof msg.method === 'string') {
       answerServerRequest(msg)
-    } else if ('id' in msg) {
-      const p = pending.get(msg.id as number)
+    } else if (typeof msg.id === 'number' && ('result' in msg || 'error' in msg)) {
+      const p = pending.get(msg.id)
       if (!p) return
-      pending.delete(msg.id as number)
+      pending.delete(msg.id)
       if (p.timer) clearTimeout(p.timer)
       if ('error' in msg) {
-        const e = msg.error as { message?: string } | undefined
-        p.reject(new Error(e?.message ?? JSON.stringify(msg.error)))
+        const e = isJson(msg.error) ? msg.error : {}
+        const message = typeof e.message === 'string' ? e.message : JSON.stringify(msg.error)
+        p.reject(
+          typeof e.code === 'number' ? new AcpRpcError(message, e.code, e.data) : new Error(message)
+        )
       } else {
         p.resolve(msg.result)
       }
     } else if (typeof msg.method === 'string') {
-      fanout(msg.method, (msg.params ?? {}) as Json)
+      if (msg.params === undefined || msg.params === null || isJson(msg.params)) {
+        fanout(msg.method, msg.params ?? {})
+      }
     }
   }
 
@@ -197,29 +285,32 @@ async function startClient(spec: AcpSpawnSpec): Promise<ClientRecord> {
           buf = buf.slice(nl + 1)
         }
       }
+      buf += decoder.decode()
+      if (buf) handleLine(buf)
+    } catch (error) {
+      transportError(error)
     } finally {
-      alive = false
-      if (clients.get(workspacePath) === recordPromise) clients.delete(workspacePath)
-      for (const [, p] of pending) {
-        if (p.timer) clearTimeout(p.timer)
-        p.reject(new Error(`${provider} agent exited`))
-      }
-      pending.clear()
-      fanout('__exit', {})
-      debug(`${provider} acp exited ws=${workspacePath}`)
+      reader.releaseLock()
+      finish(new Error(`${provider} agent exited`))
     }
   }
 
   async function drainStderr() {
     const reader = (proc.stderr as ReadableStream<Uint8Array>).getReader()
     const decoder = new TextDecoder()
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      const text = decoder.decode(value).trim()
-      // ACP agents log operational INFO/WARNING to stderr by design; only
-      // surface it under debug so a normal run stays quiet.
-      if (text) debug(`[${provider} stderr] ${text}`)
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const text = decoder.decode(value, { stream: true }).trim()
+        // ACP agents log operational INFO/WARNING to stderr by design; only
+        // surface it under debug so a normal run stays quiet.
+        if (text) debug(`[${provider} stderr] ${text}`)
+      }
+    } catch (error) {
+      transportError(error)
+    } finally {
+      reader.releaseLock()
     }
   }
 
@@ -234,11 +325,20 @@ async function startClient(spec: AcpSpawnSpec): Promise<ClientRecord> {
     workspacePath,
     initializeResult: null
   }
-  const record: ClientRecord = { client, proc }
-  const recordPromise = Promise.resolve(record)
+  const record: ClientRecord = {
+    client,
+    proc,
+    stop: () => finish(new Error(`${provider} agent released`))
+  }
+  entry.record = record
+  records.set(client, record)
 
-  void readLoop()
-  void drainStderr()
+  void readLoop().catch(transportError)
+  void drainStderr().catch(transportError)
+  void proc.exited.then(() => {
+    finish(new Error(`${provider} agent exited`))
+    if (killTimer) clearTimeout(killTimer)
+  }, transportError)
 
   // A failed handshake leaves a live subprocess behind unless we kill it: the
   // caller only drops the registry entry, so the next request would spawn a
@@ -249,7 +349,7 @@ async function startClient(spec: AcpSpawnSpec): Promise<ClientRecord> {
       clientCapabilities: CLIENT_CAPABILITIES
     })
   } catch (err) {
-    proc.kill()
+    record.stop()
     throw err
   }
   const info = client.initializeResult?.agentInfo
@@ -260,69 +360,100 @@ async function startClient(spec: AcpSpawnSpec): Promise<ClientRecord> {
 }
 
 export async function getAcpClient(spec: AcpSpawnSpec): Promise<AcpClient> {
-  const existing = clients.get(spec.workspacePath)
-  if (existing) {
-    const rec = await existing
+  const key = poolKey(spec)
+  const existing = clients.get(key)
+  if (existing?.promise) {
+    const rec = await existing.promise
     if (rec.client.isAlive()) return rec.client
-    clients.delete(spec.workspacePath)
+    // An exit/release may have replaced this entry while initialize settled.
+    if (clients.get(key) !== existing) return getAcpClient(spec)
+    clients.delete(key)
   }
-  const started = startClient(spec)
-  clients.set(spec.workspacePath, started)
+  const entry: PoolEntry = { key, spec, cancelled: false }
+  clients.set(key, entry)
+  const started = startClient(spec, entry)
+  entry.promise = started
   try {
-    return (await started).client
+    const rec = await started
+    if (!rec.client.isAlive()) throw new Error(`${spec.provider} agent exited during startup`)
+    return rec.client
   } catch (err) {
-    clients.delete(spec.workspacePath)
+    if (clients.get(key) === entry) clients.delete(key)
     throw err
   }
+}
+
+// Release the exact process owned by a session or short-lived discovery run.
+// A stale client cannot stop a newer process with the same spawn spec.
+export function releaseAcpClient(client: AcpClient): void {
+  records.get(client)?.stop()
+}
+
+async function findRecord(workspacePath: string, provider?: string): Promise<ClientRecord | null> {
+  const candidates = [...clients.values()].filter(
+    entry =>
+      entry.spec.workspacePath === workspacePath && (!provider || entry.spec.provider === provider)
+  )
+  for (const entry of candidates) {
+    if (entry.record?.client.isAlive() && entry.record.client.initializeResult) return entry.record
+  }
+  for (const entry of candidates) {
+    try {
+      const rec = await entry.promise
+      if (rec?.client.isAlive()) return rec
+    } catch {}
+  }
+  return null
 }
 
 // Preview reads must not spawn an agent — home-page cards render for every
 // workspace, and ACP agents are slow to start (Hermes takes seconds). Returns
 // the workspace's client only if one is already running.
-export async function peekAcpClient(workspacePath: string): Promise<AcpClient | null> {
-  const existing = clients.get(workspacePath)
-  if (!existing) return null
-  try {
-    const rec = await existing
-    return rec.client.isAlive() ? rec.client : null
-  } catch {
-    return null
-  }
+export async function peekAcpClient(
+  workspacePath: string,
+  provider?: string
+): Promise<AcpClient | null> {
+  return (await findRecord(workspacePath, provider))?.client ?? null
 }
 
 export async function getAcpProcessInfo(
   workspacePath: string,
-  binary: string | null
+  binary: string | null,
+  provider?: string
 ): Promise<AcpProcessInfo> {
-  const rec = clients.get(workspacePath)
+  const rec = await findRecord(workspacePath, provider)
   if (!rec) return { running: false, binary }
-  try {
-    const r = await rec
-    const info = r.client.initializeResult?.agentInfo
-    return {
-      running: r.client.isAlive(),
-      pid: r.proc.pid,
-      binary,
-      agent: info ? `${info.name ?? '?'}/${info.version ?? '?'}` : undefined
-    }
-  } catch {
-    return { running: false, binary }
+  const info = rec.client.initializeResult?.agentInfo
+  return {
+    running: rec.client.isAlive(),
+    pid: rec.proc.pid,
+    binary,
+    agent: info ? `${info.name ?? '?'}/${info.version ?? '?'}` : undefined
   }
+}
+
+function stopEntry(entry: PoolEntry) {
+  if (clients.get(entry.key) === entry) clients.delete(entry.key)
+  entry.cancelled = true
+  entry.record?.stop()
 }
 
 // Kill a workspace's agent so the next message respawns it with fresh env (env
 // is process-level and frozen at spawn). In-flight turns are lost.
-export function killAcpWorkspace(workspacePath: string): void {
-  const rec = clients.get(workspacePath)
-  if (!rec) return
-  clients.delete(workspacePath)
-  void rec.then(r => r.proc.kill()).catch(() => {})
+export function killAcpWorkspace(workspacePath: string, provider?: string): void {
+  for (const entry of clients.values()) {
+    if (
+      entry.spec.workspacePath === workspacePath &&
+      (!provider || entry.spec.provider === provider)
+    ) {
+      stopEntry(entry)
+    }
+  }
 }
 
 // Server shutdown: kill every agent so nothing is orphaned.
-export function killAllAcpClients(): void {
-  for (const [path, rec] of clients) {
-    clients.delete(path)
-    void rec.then(r => r.proc.kill()).catch(() => {})
+export function killAllAcpClients(provider?: string): void {
+  for (const entry of clients.values()) {
+    if (!provider || entry.spec.provider === provider) stopEntry(entry)
   }
 }

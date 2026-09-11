@@ -20,6 +20,10 @@ describe('skillsDirFor', () => {
   test('codex workspaces load skills from .agents/skills', () => {
     expect(skillsDirFor('/ws', 'codex')).toBe(join('/ws', '.agents', 'skills'))
   })
+
+  test('fx workspaces load skills from .agents/skills', () => {
+    expect(skillsDirFor('/ws', 'fx')).toBe(join('/ws', '.agents', 'skills'))
+  })
 })
 
 describe('validateWorkspaceFolderName', () => {
