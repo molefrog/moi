@@ -35,13 +35,13 @@ describe('WelcomeState', () => {
     const html = renderWelcome()
 
     expect(renderedParagraphs(html)).toEqual([
-      "moi is the visual workspace for you and your agent. It grows and adapts to the work you're doing.",
-      'Ask agent to build Widgets that surface information and quick actions, or entire Views for more complex tools. Use Scratchpad for exploring and shaping ideas with your agent.',
+      'moi is the personal workspace built for you by your agent. It grows and adapts to your needs.',
+      'Ask the Agent to build widgets on the Overview page, or more complex tools as separate Views. Use Scratchpad for exploring and shaping ideas with your agent.',
       'Try an example:'
     ])
   })
 
-  test('renders three inline tab actions and three prompt bubbles with icons', () => {
+  test('renders four inline tab actions and three prompt bubbles with icons', () => {
     const html = renderWelcome()
 
     const welcomeTerms = [...html.matchAll(/<button[^>]+data-welcome-destination.*?<\/button>/gs)]
@@ -49,9 +49,10 @@ describe('WelcomeState', () => {
       ...html.matchAll(/<button(?![^>]+data-welcome-destination).*?<\/button>/gs)
     ]
 
-    expect(welcomeTerms).toHaveLength(3)
+    expect(welcomeTerms).toHaveLength(4)
     expect(welcomeTerms.every(([term]) => term.includes('<svg'))).toBe(true)
-    expect(html).toContain('data-welcome-destination="widgets"')
+    expect(html).toContain('data-welcome-destination="agent"')
+    expect(html).toContain('data-welcome-destination="overview"')
     expect(html).toContain('data-welcome-destination="views"')
     expect(html).toContain('data-welcome-destination="scratchpad"')
     expect(promptButtons).toHaveLength(3)

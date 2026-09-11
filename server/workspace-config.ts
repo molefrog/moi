@@ -1,13 +1,17 @@
-import type { WorkspaceLayout } from '@/lib/types'
+import type { WorkspaceIcon, WorkspaceLayout } from '@/lib/types'
 
 import { loadLayout, saveLayout } from './layout'
 
-// Workspace identity stored in the layout: a display-name override and an icon
-// (base64 data URL). Both optional; absent values fall back to provider/folder
-// defaults at the API layer.
+// Workspace identity stored in the layout: a display-name override, an icon,
+// and its optional host-painted background.
 export type WorkspaceConfig = {
   name?: string
-  icon?: string
+  icon?: WorkspaceIcon
+}
+
+export type WorkspaceConfigPatch = {
+  name?: string | null
+  icon?: WorkspaceIcon | null
 }
 
 export async function getWorkspaceConfig(workspacePath: string): Promise<WorkspaceConfig> {
@@ -15,12 +19,12 @@ export async function getWorkspaceConfig(workspacePath: string): Promise<Workspa
   return { name: layout.name, icon: layout.icon }
 }
 
-// Apply a name/icon patch to the workspace layout. For each field: a value
-// sets it, `null` clears it, and `undefined` leaves it unchanged. Callers
-// broadcast `workspace:updated` afterwards to refresh connected clients.
+// Apply an identity patch to the workspace layout. For each field: a value sets
+// it, `null` clears it, and `undefined` leaves it unchanged. Clearing the icon
+// always clears its presentation metadata too.
 export async function setWorkspaceConfig(
   workspacePath: string,
-  patch: { name?: string | null; icon?: string | null }
+  patch: WorkspaceConfigPatch
 ): Promise<WorkspaceLayout> {
   const layout = await loadLayout(workspacePath)
   const next: WorkspaceLayout = { ...layout }

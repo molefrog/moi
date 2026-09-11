@@ -5,6 +5,8 @@ import { existsSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 
 import { UPDATE_ACTIVE_AGENT_MESSAGE } from '@/lib/update'
+import { resolveWorkspaceTheme } from '@/lib/themes'
+import { isWorkspaceIcon } from '@/lib/workspace-icon'
 import type {
   AppletKind,
   AppletThumbnailBatch,
@@ -64,7 +66,14 @@ import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from './skill-update'
 import { serveWorkspaceImagePreview } from './preview'
 import { MAX_UPLOAD_BYTES, addUpload, getUpload } from './uploads'
 import { requiredEnvFor } from './required-env'
-import { getViewList, listViews, serveView } from './views'
+import {
+  deleteView,
+  getViewList,
+  listViews,
+  serveView,
+  updateViewTitle,
+  ViewMutationError
+} from './views'
 import {
   ViewBuilderError,
   beginViewBuilder,
@@ -191,6 +200,31 @@ one.get('/widgets/*', c => {
 // Views — full-screen agent apps. Mirrors the widget pair above: the exact path
 // lists (in manifest/nav order), `/*` serves one bundle file.
 one.get('/views', c => listViews(c.get('ws').path))
+
+one.patch('/views/:viewId', async c => {
+  const ws = c.get('ws')
+  const body = await c.req.json().catch(() => null)
+  const title = typeof body?.title === 'string' ? body.title.trim() : ''
+  if (!title) return c.text('Expected { title: string }', 400)
+
+  try {
+    return c.json(await updateViewTitle(publishEvent, ws.id, ws.path, c.req.param('viewId'), title))
+  } catch (error) {
+    if (error instanceof ViewMutationError) return c.text(error.message, error.status)
+    throw error
+  }
+})
+
+one.delete('/views/:viewId', async c => {
+  const ws = c.get('ws')
+  try {
+    await deleteView(publishEvent, ws.id, ws.path, c.req.param('viewId'))
+    return c.body(null, 204)
+  } catch (error) {
+    if (error instanceof ViewMutationError) return c.text(error.message, error.status)
+    throw error
+  }
+})
 
 one.get('/views/*', c => {
   const ws = c.get('ws')
@@ -729,21 +763,30 @@ one.get('/agent', async c => {
   } satisfies WorkspaceAgent)
 })
 
-// Workspace identity (name). GET returns the current {name, icon}; PUT a JSON
-// `{ name }` sets it (or `null` clears it). Broadcasts so the sidebar and header
-// update live. Icon is handled by the binary route below.
+// Workspace identity. Uploads use the image route below.
 one.get('/config', async c => {
   return c.json(await getWorkspaceConfig(c.get('ws').path))
 })
 
 one.put('/config', async c => {
   const ws = c.get('ws')
-  const body = await c.req.json().catch(() => null)
-  const name = body?.name
-  if (name !== null && typeof name !== 'string') {
+  const parsed: unknown = await c.req.json().catch(() => null)
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return c.text('Expected a workspace config object', 400)
+  }
+  const body = parsed as Record<string, unknown>
+  const name = body.name
+  const icon = body.icon
+  if (name !== undefined && name !== null && typeof name !== 'string') {
     return c.text('Expected { name: string | null }', 400)
   }
-  await setWorkspaceConfig(ws.path, { name })
+  if (icon !== undefined && icon !== null && (!isWorkspaceIcon(icon) || icon.type === 'upload')) {
+    return c.text('Invalid icon', 400)
+  }
+  if (name === undefined && icon === undefined) {
+    return c.text('Expected a workspace config field', 400)
+  }
+  await setWorkspaceConfig(ws.path, { name, icon })
   publishEvent({ type: 'workspace:updated' })
   return c.json(await getWorkspaceConfig(ws.path))
 })
@@ -810,9 +853,8 @@ one.get('/scratchpad/assets/:file', async c => {
   })
 })
 
-// Workspace icon. PUT a raw image body (png/jpg/gif/webp) — the server resizes
-// it to a 128×128 transparent WebP and stores it as base64. DELETE resets to the
-// provider default. Both broadcast for a live refresh.
+// Workspace upload. PUT resizes an image to a 128×128 WebP. DELETE resets any
+// custom icon to the provider default. Both broadcast for a live refresh.
 one.put('/icon', async c => {
   const ws = c.get('ws')
   const bytes = new Uint8Array(await c.req.arrayBuffer())
@@ -824,9 +866,10 @@ one.put('/icon', async c => {
     const msg = err instanceof Error ? err.message : String(err)
     return c.text(`Invalid image: ${msg}`, 400)
   }
-  await setWorkspaceConfig(ws.path, { icon })
+  const workspaceIcon = { type: 'upload', value: icon } as const
+  await setWorkspaceConfig(ws.path, { icon: workspaceIcon })
   publishEvent({ type: 'workspace:updated' })
-  return c.json({ icon })
+  return c.json({ icon: workspaceIcon })
 })
 
 one.delete('/icon', async c => {
@@ -901,7 +944,14 @@ one.put('/', async c => {
   // Preserve server-owned identity (name/icon) across a grid/theme save so the
   // client's PUT can't erase a `moi config`-set name. See mergeLayoutForSave.
   const existing = await loadLayout(ws.path)
-  await saveLayout(mergeLayoutForSave(existing, body), ws.path)
+  const next = mergeLayoutForSave(existing, body)
+  await saveLayout(next, ws.path)
+  if (
+    JSON.stringify(resolveWorkspaceTheme(existing.theme)) !==
+    JSON.stringify(resolveWorkspaceTheme(next.theme))
+  ) {
+    publishEvent({ type: 'theme:updated' })
+  }
   return c.body(null, 204)
 })
 
@@ -920,14 +970,19 @@ async function mergeWorkspaceList(entries: WorkspaceEntry[]) {
   return Promise.all(
     entries.map(async e => {
       const layout = await loadLayout(e.path)
-      return { ...e, name: layout.name ?? e.name, icon: layout.icon }
+      return {
+        ...e,
+        name: layout.name ?? e.name,
+        icon: layout.icon,
+        theme: layout.theme
+      }
     })
   )
 }
 
 workspaces.get('/', async c => {
-  // Merge each workspace's live layout name/icon over the registry snapshot so
-  // the sidebar reflects `moi config` changes immediately.
+  // Merge each workspace's live identity and theme over the registry snapshot
+  // so app-wide workspace lists render the same presentation as the workspace.
   const entries = await listWorkspaces()
   return c.json(await mergeWorkspaceList(entries))
 })

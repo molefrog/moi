@@ -24,7 +24,7 @@ describe('drawing draft staging', () => {
       sessionId,
       localId: 'annotation-1',
       purpose: 'annotation',
-      sourceTab: 'widgets',
+      sourceTab: 'overview',
       blob: new Blob(['first'], { type: 'image/png' })
     })
     const first = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)][0]
@@ -36,7 +36,7 @@ describe('drawing draft staging', () => {
       sessionId,
       localId: 'annotation-1',
       purpose: 'annotation',
-      sourceTab: 'widgets',
+      sourceTab: 'overview',
       blob: new Blob(['second'], { type: 'image/png' })
     })
     const list = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)]
@@ -59,7 +59,7 @@ describe('drawing draft staging', () => {
       sessionId,
       localId: 'annotation-1',
       purpose: 'annotation',
-      sourceTab: 'widgets',
+      sourceTab: 'overview',
       blob: new Blob(['drawing'], { type: 'image/png' })
     })
     await stageDrawing({
@@ -67,7 +67,7 @@ describe('drawing draft staging', () => {
       sessionId,
       localId: 'annotation-1',
       purpose: 'annotation',
-      sourceTab: 'widgets',
+      sourceTab: 'overview',
       blob: new Blob(['drawing'], { type: 'image/png' }),
       isCurrent: () => true
     })
@@ -93,7 +93,7 @@ describe('drawing attachment staging', () => {
       sessionId,
       localId: 'annotation-1',
       purpose: 'annotation',
-      sourceTab: 'widgets',
+      sourceTab: 'overview',
       blob: new Blob(['first'], { type: 'image/png' }),
       isCurrent: () => revision === 1
     })
@@ -106,7 +106,7 @@ describe('drawing attachment staging', () => {
       sessionId,
       localId: 'annotation-1',
       purpose: 'annotation',
-      sourceTab: 'widgets',
+      sourceTab: 'overview',
       blob: new Blob(['second'], { type: 'image/png' }),
       isCurrent: () => revision === 2
     })

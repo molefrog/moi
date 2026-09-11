@@ -100,7 +100,7 @@ declare module 'moi' {
   export function fileUrl(path: string): string
   // Switch the workspace to a tab (replace navigation). \`params\` reach the
   // target view as its \`params\` prop — JSON-plain values only. No-ops outside
-  // the moi host. Tab ids: 'agent' | 'widgets' | 'scratchpad' | 'view:<id>'.
+  // the moi host. Tab ids: 'overview' | 'agent' | 'scratchpad' | 'view:<id>'.
   export function focusTab(tab: string, params?: Record<string, unknown>): void
   // Send a chat message to the workspace's active chat, as if the user typed
   // \`message\`. \`context\` rides along as structured data the agent sees but

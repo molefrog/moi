@@ -21,8 +21,6 @@ export type WorkspaceLayoutContextValue = {
   setLayout: (update: Partial<WorkspaceLayout>) => void
   // Workspace metadata that rides along on the layout endpoint.
   name: string | null
-  // Custom workspace icon (base64 data URL), or null to use the provider icon.
-  icon: string | null
   cwd: string | null
   // The agent backend (claude-code / openclaw …). Exposed here so descendants
   // can reuse the shared layout query instead of spawning another observer
@@ -101,7 +99,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
   )
 
   // Memoized so the context value keeps a stable identity across unrelated
-  // renders — otherwise every consumer (WorkspaceView, Widgets, ModelPicker,
+  // renders — otherwise every consumer (WorkspaceView, Overview, ModelPicker,
   // TurnView, …) would re-render whenever this provider re-renders. `setLayout`
   // is already stable; the rest derive from `query.data`.
   const value = useMemo<WorkspaceLayoutContextValue>(
@@ -109,7 +107,6 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       layout: query.data ? stripMeta(query.data) : createDefaultWorkspaceLayout(),
       setLayout,
       name: query.data?.name ?? null,
-      icon: query.data?.icon ?? null,
       cwd: query.data?.cwd ?? null,
       provider: query.data?.provider ?? null,
       workspaceId: id,

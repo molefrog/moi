@@ -59,7 +59,7 @@ export function ChatPopup({
             >
               <button
                 type="button"
-                className="group block cursor-pointer rounded-xl p-0 drop-shadow-[0_0_4px_var(--background)] outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="group block cursor-pointer p-0 drop-shadow-[0_0_4px_var(--background)] outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
                 aria-label="Agent"
               >
                 <AgentBlobatar

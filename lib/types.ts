@@ -1,4 +1,5 @@
 import type { PreviewBlock, StreamEvent } from './format'
+import type { AppIconId } from './app-icons'
 import type { MoiContext } from './moi-context'
 import type { WorkspaceTheme } from './themes'
 
@@ -438,6 +439,11 @@ export type AgentLoginState =
   | { state: 'pending'; url?: string }
   | { state: 'failed'; reason: string }
 
+export type WorkspaceIcon =
+  | { type: 'emoji'; value: string; background?: 'theme' }
+  | { type: 'glyph'; value: AppIconId; background?: 'theme' }
+  | { type: 'upload'; value: string }
+
 // One MCP server's connection status, as surfaced by GET /api/workspaces/:id/mcp
 // (a subset of the agent SDK's McpServerStatus — only what the UI renders).
 export type McpServerState = 'connected' | 'failed' | 'needs-auth' | 'pending' | 'disabled'
@@ -456,9 +462,11 @@ export type WorkspaceEntry = {
   // basename). Persisted so we don't re-probe the gateway for each listing.
   // The list endpoint overrides this with the live layout `name` when set.
   name?: string
-  // Workspace icon override (base64 data URL), merged in from the layout by the
-  // list endpoint. Undefined → the sidebar uses the provider icon.
-  icon?: string
+  // Workspace icon override. Undefined uses the provider icon.
+  icon?: WorkspaceIcon
+  // Merged in from the layout so app-wide workspace lists can paint a themed
+  // icon without inheriting the active workspace's color.
+  theme?: WorkspaceTheme
   // Home-relative rendering of `path` (e.g. "~/.openclaw/workspace"). Set by
   // the server on the wire — clients render it as-is.
   displayPath?: string
@@ -531,7 +539,7 @@ export type LayoutMode = 'fullscreen' | 'split'
 
 export type WorkspaceTabId =
   | 'agent'
-  | 'widgets'
+  | 'overview'
   | 'scratchpad'
   | `view:${string}`
   | `view-builder:${string}`
@@ -558,9 +566,8 @@ export type WorkspaceLayout = {
   // User-set display-name override. When empty/undefined the API falls back to
   // the workspace folder name, so the resolved name always comes from the API.
   name?: string
-  // Workspace icon override — a base64 data URL (128×128 transparent WebP,
-  // produced by the server). Undefined falls back to the provider icon.
-  icon?: string
+  // Workspace icon override. Emoji and glyphs may use a themed background.
+  icon?: WorkspaceIcon
   // Model id chosen in the composer picker (`supportedModels()` `value`, an
   // alias like `sonnet`). Persisted so the choice survives a reload. Sent with
   // each chat frame; undefined means the agent runs on the SDK default. Note

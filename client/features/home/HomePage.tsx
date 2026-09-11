@@ -16,6 +16,7 @@ import { useWorkspaceImport } from './workspace-setup/useWorkspaceImport'
 import { HomeLogo } from './HomeLogo'
 import { useAppConfig } from '@/client/api/app-config'
 import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
+import { WorkspaceIcon } from '@/client/components/shared/WorkspaceIcon'
 import { Button } from '@/client/components/ui/button'
 import {
   Collapsible,
@@ -29,8 +30,7 @@ import { getWorkspaceThemeStyle, usePreloadWorkspaceFonts } from '@/client/runti
 import { useUiStore } from '@/client/store/ui'
 import {
   WorkspaceAgentIcons,
-  workspaceDisplayName,
-  workspaceProviderIcon
+  workspaceDisplayName
 } from '@/client/features/home/workspace-presentation'
 import { resolveWorkspaceTheme } from '@/lib/themes'
 import type { DiscoveredWorkspace, WorkspaceEntry } from '@/lib/types'
@@ -178,7 +178,7 @@ type WorkspaceCardProps = {
 function WorkspaceCard({ workspace }: WorkspaceCardProps) {
   const name = workspaceDisplayName(workspace)
   const previewQuery = useWorkspacePreview(workspace.id)
-  const theme = previewQuery.data?.theme
+  const theme = workspace.theme ?? previewQuery.data?.theme
   const agent = resolveWorkspaceTheme(theme).agent
   const running = useLive(state => hasRunningWorkspaceActivity(state.activity, workspace.id))
   const updatedAt = previewQuery.data?.updatedAt ?? new Date(workspace.addedAt).getTime()
@@ -226,9 +226,10 @@ function WorkspaceCard({ workspace }: WorkspaceCardProps) {
           className="flex min-w-0 items-center gap-1.5 font-sans"
           style={getWorkspaceThemeStyle(theme)}
         >
-          <img
-            src={workspace.icon ?? workspaceProviderIcon[workspace.type ?? 'claude-code']}
-            alt=""
+          <WorkspaceIcon
+            icon={workspace.icon}
+            workspaceType={workspace.type}
+            workspaceTheme={theme}
             className="size-4 shrink-0 rounded-xs"
           />
           <span className="truncate text-sm font-medium text-foreground">{name}</span>

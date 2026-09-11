@@ -5,7 +5,40 @@ import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { APP_ICON_IDS } from '@/client/lib/app-icon-registry'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
-import type { ViewBuilder } from '@/lib/types'
+import type { ViewBuilder, ViewInfo } from '@/lib/types'
+
+export function useViews(workspaceId: string) {
+  return useQuery<ViewInfo[]>({
+    queryKey: workspaceKeys.views(workspaceId),
+    queryFn: async () => {
+      const data = await requestJson<{ views: ViewInfo[] }>(`/api/workspaces/${workspaceId}/views`)
+      return data.views
+    },
+    ...WORKSPACE_RESOURCE_OPTIONS
+  })
+}
+
+export function useRenameView(workspaceId: string) {
+  return useMutation<ViewInfo, Error, { viewId: string; title: string }>({
+    mutationFn: ({ viewId, title }) =>
+      requestJson(
+        `/api/workspaces/${workspaceId}/views/${encodeURIComponent(viewId)}`,
+        jsonRequest('PATCH', { title }),
+        'Failed to rename view'
+      )
+  })
+}
+
+export function useDeleteView(workspaceId: string) {
+  return useMutation<void, Error, string>({
+    mutationFn: viewId =>
+      requestVoid(
+        `/api/workspaces/${workspaceId}/views/${encodeURIComponent(viewId)}`,
+        { method: 'DELETE' },
+        'Failed to delete view'
+      )
+  })
+}
 
 function upsertBuilder(builders: ViewBuilder[] | undefined, builder: ViewBuilder): ViewBuilder[] {
   const current = builders ?? []

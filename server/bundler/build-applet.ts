@@ -1,5 +1,5 @@
 import { parse } from '@babel/parser'
-import type { ObjectProperty, StringLiteral } from '@babel/types'
+import type { ObjectExpression, ObjectProperty, StringLiteral } from '@babel/types'
 import type { BunPlugin } from 'bun'
 import tailwind from 'bun-plugin-tailwind'
 import { realpathSync } from 'node:fs'
@@ -77,7 +77,7 @@ const VALID_SPANS = [1, 2, 3, 4] as const
 // it always resolves from moi's own tree. A parser that peer-depends on
 // `typescript` breaks under bun's shared global tree, where another globally
 // installed package controls which `typescript` sits at the hoisted root.
-function findConfigProperties(source: string) {
+export function findConfigObject(source: string): ObjectExpression | null | undefined {
   const ast = parse(source, { sourceType: 'module', plugins: ['typescript', 'jsx'] })
 
   for (const node of ast.program.body) {
@@ -91,11 +91,14 @@ function findConfigProperties(source: string) {
     const rawInit = decl.init
     // Unwrap `as const` — AST wraps the object in TSAsExpression
     const init = rawInit?.type === 'TSAsExpression' ? rawInit.expression : rawInit
-    if (init?.type !== 'ObjectExpression') return null
-    return init.properties
+    return init?.type === 'ObjectExpression' ? init : null
   }
 
-  return null
+  return undefined
+}
+
+function findConfigProperties(source: string) {
+  return findConfigObject(source)?.properties ?? null
 }
 
 // `requiredEnv`: an array of string literals naming env vars the bundle needs.

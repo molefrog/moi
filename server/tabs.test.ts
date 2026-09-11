@@ -13,8 +13,8 @@ describe('assembleTabRows', () => {
   test('lists static tabs then views, marking the saved default', () => {
     const rows = assembleTabRows(views, 'view:roadmap')
     expect(rows.map(r => r.id)).toEqual([
+      'overview',
       'agent',
-      'widgets',
       'scratchpad',
       'view:roadmap',
       'view:orders'
@@ -41,6 +41,7 @@ describe('resolveFocusTab', () => {
   }
 
   test('accepts static tab ids', async () => {
+    expect(await resolveFocusTab('overview', deps)).toEqual({ ok: true, tab: 'overview' })
     expect(await resolveFocusTab('agent', deps)).toEqual({ ok: true, tab: 'agent' })
     expect(await resolveFocusTab('scratchpad', deps)).toEqual({ ok: true, tab: 'scratchpad' })
   })
@@ -54,8 +55,12 @@ describe('resolveFocusTab', () => {
     expect(result.ok).toBe(false)
     if (!result.ok) {
       expect(result.error).toContain('view:nope')
-      expect(result.error).toContain('agent, widgets, scratchpad, view:roadmap, view:orders')
+      expect(result.error).toContain('overview, agent, scratchpad, view:roadmap, view:orders')
     }
+  })
+
+  test('rejects the old Widgets tab id', async () => {
+    expect((await resolveFocusTab('widgets', deps)).ok).toBe(false)
   })
 
   test('rejects view-builder tabs and garbage', async () => {

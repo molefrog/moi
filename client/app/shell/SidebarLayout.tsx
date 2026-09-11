@@ -18,6 +18,7 @@ import { CreateWorkspaceDialog } from '@/client/features/home/workspace-setup/Cr
 import { DemoDialog } from '@/client/features/home/workspace-setup/DemoDialog'
 import { ReorderableList } from '@/client/components/shared/ReorderableList'
 import type { ReorderableRenderState } from '@/client/components/shared/ReorderableList'
+import { WorkspaceIcon } from '@/client/components/shared/WorkspaceIcon'
 import { Button, buttonVariants } from '@/client/components/ui/button'
 import {
   Tooltip,
@@ -25,10 +26,7 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from '@/client/components/ui/tooltip'
-import {
-  workspaceDisplayName,
-  workspaceProviderIcon
-} from '@/client/features/home/workspace-presentation'
+import { workspaceDisplayName } from '@/client/features/home/workspace-presentation'
 import { cn } from '@/client/lib/cn'
 import type { WorkspaceEntry } from '@/lib/types'
 
@@ -53,14 +51,18 @@ type SidebarLayoutProps = {
 export function SidebarLayout({ children, showWorkspaces = true }: SidebarLayoutProps) {
   const { data: workspaces } = useWorkspaces()
 
-  // `moi config` / the settings modal broadcast `workspace:updated` (identity
-  // changes) and reorder/create broadcast `workspaces-list:updated`; refetch the
-  // list so the sidebar reflects it live. Exact: `workspaceKeys.all` is the
+  // Identity, theme, and registry changes can all alter a workspace's sidebar
+  // presentation. Refetch the list so the sidebar reflects them live. Exact:
+  // `workspaceKeys.all` is the
   // prefix of every workspace query — a prefix invalidation would refetch
   // transcripts, widgets, and MCP probes in every connected client.
   const qc = useQueryClient()
   useWorkspaceEvent(e => {
-    if (e.type === 'workspace:updated' || e.type === 'workspaces-list:updated') {
+    if (
+      e.type === 'workspace:updated' ||
+      e.type === 'theme:updated' ||
+      e.type === 'workspaces-list:updated'
+    ) {
       qc.invalidateQueries({ queryKey: workspaceKeys.all, exact: true })
     }
   })
@@ -212,10 +214,11 @@ function WorkspaceButton({ workspace, dragOverlay = false, dragState }: Workspac
         active && !dragOverlay && 'bg-accent text-accent-foreground'
       )}
     >
-      <img
-        src={workspace.icon ?? workspaceProviderIcon[workspace.type ?? 'claude-code']}
-        alt=""
-        className="size-7 shrink-0 rounded-xs transition-[border-radius] duration-100 ease-out motion-reduce:transition-none"
+      <WorkspaceIcon
+        icon={workspace.icon}
+        workspaceType={workspace.type}
+        workspaceTheme={workspace.theme}
+        className="size-7 shrink-0 rounded-md transition-[border-radius] duration-100 ease-out motion-reduce:transition-none"
       />
     </div>
   )
@@ -242,7 +245,7 @@ function WorkspaceButton({ workspace, dragOverlay = false, dragState }: Workspac
         if (dragState?.isDragging) event.preventDefault()
       }}
       className={cn(
-        'group flex w-14 flex-col items-center rounded-lg outline-none',
+        'group flex w-14 flex-col items-center rounded-xl outline-none',
         dragState?.isDragging && 'invisible'
       )}
       {...dragState?.dragHandleProps}

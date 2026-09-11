@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 
+import { DEFAULT_VIEWS_WIDGET } from '@/lib/default-widgets'
 import type { AppletKind, WorkspaceLayout } from '@/lib/types'
 
 import { getLayoutPath, getWorkspacePreview, loadLayout, mergeLayoutForSave } from '../layout'
@@ -17,7 +18,7 @@ const base: WorkspaceLayout = {
   version: 1,
   widgetGrid: [],
   layoutMode: 'fullscreen',
-  tabs: { open: ['agent', 'widgets'], active: 'agent' }
+  tabs: { open: ['overview', 'agent'], active: 'overview' }
 }
 
 async function withWorkspaceFile<T>(
@@ -68,9 +69,10 @@ describe('loadLayout', () => {
     try {
       const loaded = await loadLayout(dir)
       expect(loaded.layoutMode).toBe('split')
+      expect(loaded.widgetGrid).toEqual([{ i: DEFAULT_VIEWS_WIDGET.id, x: 0, y: 0 }])
       expect(loaded.tabs).toEqual({
-        open: ['agent', 'widgets', 'scratchpad'],
-        active: 'agent'
+        open: ['overview', 'agent', 'scratchpad'],
+        active: 'overview'
       })
     } finally {
       await rm(dir, { recursive: true, force: true })
@@ -82,9 +84,15 @@ describe('loadLayout', () => {
       const loaded = await loadLayout(dir)
       expect(loaded.layoutMode).toBe('split')
       expect(loaded.tabs).toEqual({
-        open: ['agent', 'widgets', 'scratchpad'],
-        active: 'agent'
+        open: ['overview', 'agent', 'scratchpad'],
+        active: 'overview'
       })
+    })
+  })
+
+  test('keeps an existing saved empty grid empty', async () => {
+    await withWorkspaceFile({ ...base, widgetGrid: [] }, async dir => {
+      expect((await loadLayout(dir)).widgetGrid).toEqual([])
     })
   })
 
@@ -115,14 +123,14 @@ describe('loadLayout', () => {
       async dir => {
         const loaded = await loadLayout(dir)
         expect(loaded.tabs).toEqual({
-          open: ['agent', 'widgets', 'scratchpad'],
-          active: 'agent'
+          open: ['overview', 'agent', 'scratchpad'],
+          active: 'overview'
         })
       }
     )
   })
 
-  test('normalizes tabs and drops invalid tab ids', async () => {
+  test('pins Overview first and silently drops old and invalid tab ids', async () => {
     await withWorkspaceFile(
       {
         version: 1,
@@ -142,8 +150,27 @@ describe('loadLayout', () => {
       async dir => {
         const loaded = await loadLayout(dir)
         expect(loaded.tabs).toEqual({
-          open: ['widgets', 'view:dashboard', 'view-builder:builder-1', 'scratchpad'],
-          active: 'widgets'
+          open: ['overview', 'view:dashboard', 'view-builder:builder-1', 'scratchpad'],
+          active: 'overview'
+        })
+      }
+    )
+  })
+
+  test('preserves saved tab order and a valid active tab after Overview', async () => {
+    await withWorkspaceFile(
+      {
+        version: 1,
+        widgetGrid: [],
+        tabs: {
+          open: ['agent', 'view:dashboard', 'overview', 'scratchpad'],
+          active: 'view:dashboard'
+        }
+      },
+      async dir => {
+        expect((await loadLayout(dir)).tabs).toEqual({
+          open: ['overview', 'agent', 'view:dashboard', 'scratchpad'],
+          active: 'view:dashboard'
         })
       }
     )
@@ -165,6 +192,15 @@ describe('loadLayout', () => {
       }
     )
   })
+
+  test('normalizes legacy uploaded icons into an icon object', async () => {
+    await withWorkspaceFile({ ...base, icon: 'data:image/webp;base64,legacy' }, async dir => {
+      expect((await loadLayout(dir)).icon).toEqual({
+        type: 'upload',
+        value: 'data:image/webp;base64,legacy'
+      })
+    })
+  })
 })
 
 describe('mergeLayoutForSave', () => {
@@ -184,13 +220,25 @@ describe('mergeLayoutForSave', () => {
   })
 
   test('keeps the stored icon and ignores a stale icon in the body', () => {
-    const existing: WorkspaceLayout = { ...base, icon: 'data:image/webp;base64,NEW' }
-    const body = { ...base, icon: 'data:image/webp;base64,OLD' } as WorkspaceLayout
-    expect(mergeLayoutForSave(existing, body).icon).toBe('data:image/webp;base64,NEW')
+    const existing: WorkspaceLayout = {
+      ...base,
+      icon: { type: 'glyph', value: 'rocket', background: 'theme' }
+    }
+    const body = {
+      ...base,
+      icon: { type: 'upload', value: 'data:image/webp;base64,OLD' }
+    } as WorkspaceLayout
+    expect(mergeLayoutForSave(existing, body)).toMatchObject({
+      icon: { type: 'glyph', value: 'rocket', background: 'theme' }
+    })
   })
 
   test('emits no name/icon keys when the workspace has neither (no undefined leak)', () => {
-    const body = { ...base, name: 'x', icon: 'y' } as WorkspaceLayout
+    const body = {
+      ...base,
+      name: 'x',
+      icon: { type: 'emoji', value: '💡' }
+    } as WorkspaceLayout
     const merged = mergeLayoutForSave(base, body)
     expect('name' in merged).toBe(false)
     expect('icon' in merged).toBe(false)
@@ -199,7 +247,7 @@ describe('mergeLayoutForSave', () => {
       version: 1,
       widgetGrid: [],
       layoutMode: 'fullscreen',
-      tabs: { open: ['agent', 'widgets'], active: 'agent' }
+      tabs: { open: ['overview', 'agent'], active: 'overview' }
     })
   })
 
@@ -209,14 +257,14 @@ describe('mergeLayoutForSave', () => {
       version: 1,
       widgetGrid: [{ i: 'w', x: 1, y: 2 }],
       layoutMode: 'split',
-      tabs: { open: ['agent', 'widgets'], active: 'widgets' },
+      tabs: { open: ['agent', 'overview'], active: 'agent' },
       selectedModel: 'sonnet',
       selectedFastMode: false,
       theme: { font: 'sans', color: 'rose', radius: 'square', agent: 'dorito' }
     }
     const merged = mergeLayoutForSave(existing, body)
     expect(merged.layoutMode).toBe('split')
-    expect(merged.tabs).toEqual({ open: ['agent', 'widgets'], active: 'widgets' })
+    expect(merged.tabs).toEqual({ open: ['overview', 'agent'], active: 'agent' })
     expect(merged.selectedModel).toBe('sonnet')
     expect(merged.selectedFastMode).toBe(false)
     expect(merged.theme).toEqual({
@@ -226,6 +274,18 @@ describe('mergeLayoutForSave', () => {
       agent: 'dorito'
     })
     expect(merged.name).toBe('Keep')
+  })
+
+  test('drops the old Widgets tab id from stale client saves', () => {
+    const body = {
+      ...base,
+      tabs: { open: ['agent', 'widgets', 'scratchpad'], active: 'widgets' }
+    } as unknown as WorkspaceLayout
+
+    expect(mergeLayoutForSave(base, body).tabs).toEqual({
+      open: ['overview', 'agent', 'scratchpad'],
+      active: 'overview'
+    })
   })
 
   test('never lets a stale client write thumbnail records back into the layout', () => {

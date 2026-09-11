@@ -20,6 +20,7 @@ export type WorkspaceEvent =
   | { type: 'applets:refresh'; only?: 'widgets' | 'views' }
   | { type: 'view:updated'; name: string }
   | { type: 'view-layout:updated'; views: ViewInfo[] }
+  | { type: 'view:deleted'; workspaceId: string; name: string }
   | { type: 'view-builder:updated'; workspaceId: string; builder: ViewBuilder }
   | { type: 'view-builder:deleted'; workspaceId: string; builderId: string }
   | { type: 'selected-session:updated'; workspaceId: string; sessionId: string | null }

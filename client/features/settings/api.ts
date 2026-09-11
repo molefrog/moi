@@ -3,8 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
+import type { WorkspaceLayoutResponse } from '@/client/features/workspace/api'
 import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
-import type { AppSettings, WorkspaceEntry, WorkspaceEnvView } from '@/lib/types'
+import type { AppSettings, WorkspaceEntry, WorkspaceEnvView, WorkspaceIcon } from '@/lib/types'
 
 // App-wide settings (server-side settings.json, GET/PATCH /api/settings) —
 // shared by every workspace, unlike the per-workspace queries below.
@@ -78,33 +79,56 @@ export function useSaveWorkspaceName(workspaceId: string) {
   })
 }
 
-export function useSaveWorkspaceIcon(workspaceId: string) {
-  const queryClient = useQueryClient()
-  return useMutation<{ icon: string }, Error, Blob>({
-    scope: { id: `workspace-icon:${workspaceId}` },
-    mutationFn: blob =>
-      requestJson(`/api/workspaces/${workspaceId}/icon`, {
-        method: 'PUT',
-        headers: { 'Content-Type': blob.type || 'application/octet-stream' },
-        body: blob
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.all })
-    }
-  })
-}
+type WorkspaceIconMutation =
+  | { kind: 'set'; icon: WorkspaceIcon }
+  | { kind: 'upload'; file: Blob }
+  | { kind: 'reset' }
 
-export function useResetWorkspaceIcon(workspaceId: string) {
+export function useUpdateWorkspaceIcon(workspaceId: string) {
   const queryClient = useQueryClient()
-  return useMutation<void, Error, void>({
+  return useMutation<void, Error, WorkspaceIconMutation>({
     scope: { id: `workspace-icon:${workspaceId}` },
-    mutationFn: () =>
-      requestVoid(
-        `/api/workspaces/${workspaceId}/icon`,
-        { method: 'DELETE' },
-        'Failed to reset icon'
-      ),
+    mutationFn: async update => {
+      if (update.kind === 'set') {
+        await requestVoid(
+          `/api/workspaces/${workspaceId}/config`,
+          jsonRequest('PUT', { icon: update.icon }),
+          'Failed to save icon'
+        )
+        return
+      }
+      if (update.kind === 'reset') {
+        await requestVoid(
+          `/api/workspaces/${workspaceId}/icon`,
+          { method: 'DELETE' },
+          'Failed to reset icon'
+        )
+        return
+      }
+      await requestJson(`/api/workspaces/${workspaceId}/icon`, {
+        method: 'PUT',
+        headers: { 'Content-Type': update.file.type || 'application/octet-stream' },
+        body: update.file
+      })
+    },
+    onMutate: update => {
+      if (update.kind !== 'set') return
+      const presentation = { icon: update.icon }
+      queryClient.setQueryData<WorkspaceLayoutResponse>(
+        workspaceKeys.layout(workspaceId),
+        current => (current ? { ...current, ...presentation } : current)
+      )
+      queryClient.setQueryData<WorkspaceEntry[]>(workspaceKeys.all, current =>
+        current?.map(workspace =>
+          workspace.id === workspaceId ? { ...workspace, ...presentation } : workspace
+        )
+      )
+    },
+    onError: (_error, update) => {
+      if (update.kind !== 'set') return
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.all, exact: true })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })
       queryClient.invalidateQueries({ queryKey: workspaceKeys.all })

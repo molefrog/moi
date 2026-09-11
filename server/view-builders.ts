@@ -434,3 +434,20 @@ export async function deleteViewBuilder(
   })
   publishEvent({ type: 'view-builder:deleted', workspaceId, builderId })
 }
+
+export async function deleteViewBuilderForView(
+  workspaceId: string,
+  workspacePath: string,
+  viewId: string
+): Promise<void> {
+  const deleted = await mutateBuilders(workspacePath, builders => {
+    const index = builders.findIndex(
+      builder => builder.viewId === viewId && (builder.kind ?? 'view') === 'view'
+    )
+    if (index === -1) return null
+    return builders.splice(index, 1)[0]
+  })
+  if (deleted) {
+    publishEvent({ type: 'view-builder:deleted', workspaceId, builderId: deleted.id })
+  }
+}

@@ -65,7 +65,7 @@ describe('resolveChatEmptyState', () => {
 
 describe('ChatEmptyState', () => {
   test('renders the selected empty state', () => {
-    expect(renderState('welcome')).toContain('moi is the visual workspace')
+    expect(renderState('welcome')).toContain('moi is the personal workspace')
     expect(renderState('welcome')).toContain('Try an example:')
     expect(renderState('explore-workspace')).toContain(
       'Your agent can explore this workspace and suggest useful widgets and views based on'
@@ -100,7 +100,7 @@ describe('ChatEmptyState', () => {
   test('hides examples when the workspace already has applets', () => {
     const html = renderState('welcome', true)
 
-    expect(html).toContain('moi is the visual workspace')
+    expect(html).toContain('moi is the personal workspace')
     expect(html).not.toContain('Try an example:')
     expect(html).not.toContain('Check the weather')
     expect(html).not.toContain('Track my finances')

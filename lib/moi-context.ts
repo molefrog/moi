@@ -59,7 +59,7 @@ export type MoiContext = {
   // The params the active view is rendering with right now, straight from
   // navigation state. The emitter side of the same contract (`focusTab`) sets
   // them, so the agent sees a view's addressable state in both directions.
-  // Absent for tabs that take no params (widgets, scratchpad, agent).
+  // Absent for tabs that take no params (overview, scratchpad, agent).
   tabParams?: Record<string, unknown>
   // Set when this message came from applet UI instead of the composer.
   applet?: MoiAppletMessage
@@ -128,7 +128,7 @@ function describeTab(tab: WorkspaceTabId, rawTitle?: string): string {
   // other applet-authored string in here.
   const title = rawTitle === undefined ? undefined : escapeTags(rawTitle)
   if (tab === 'agent') return 'The user is on the "Agent" tab (full page chat).'
-  if (tab === 'widgets') return 'The user is on the "Widgets" tab.'
+  if (tab === 'overview') return 'The user is on the "Overview" tab.'
   if (tab === 'scratchpad') return 'The user is on the "Scratchpad" tab.'
   if (tab.startsWith('view-builder:')) {
     const id = tab.slice('view-builder:'.length)

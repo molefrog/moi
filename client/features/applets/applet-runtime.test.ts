@@ -44,14 +44,14 @@ describe('bridge validation', () => {
     const { bridge } = appletRuntime(ws).connect(VIEW)
 
     bridge.focusTab('view:orders', { order: 'o-1' })
-    bridge.focusTab('widgets')
+    bridge.focusTab('overview')
     // Valid JSON, wrong shape — params must degrade, not leak through.
     bridge.focusTab('view:orders', ['not', 'a', 'record'])
     bridge.focusTab('view:orders', null)
 
     expect(calls).toEqual([
       ['view:orders', { order: 'o-1' }],
-      ['widgets', undefined],
+      ['overview', undefined],
       ['view:orders', undefined],
       ['view:orders', undefined]
     ])
@@ -84,12 +84,12 @@ describe('bridge validation', () => {
 
     bridge.focusTab('agent')
     first.unbind()
-    bridge.focusTab('widgets')
+    bridge.focusTab('overview')
 
     expect(first.calls).toEqual([['agent', undefined]])
     expect(second.calls).toEqual([
       ['agent', undefined],
-      ['widgets', undefined]
+      ['overview', undefined]
     ])
   })
 })
@@ -275,7 +275,7 @@ describe('attachAppletBridge', () => {
     setCachedApplet(key, Promise.resolve(mod))
     attachAppletBridge(mod, ws, key, WIDGET)
     invalidateAppletSegment('widgets')
-    mod.focusTab('widgets')
+    mod.focusTab('overview')
     expect(calls).toEqual([])
   })
 
@@ -296,8 +296,8 @@ describe('attachAppletBridge', () => {
     attachAppletBridge(newMod, ws, key, VIEW)
 
     oldMod.focusTab('agent')
-    newMod.focusTab('widgets')
-    expect(calls).toEqual([['widgets', undefined]])
+    newMod.focusTab('overview')
+    expect(calls).toEqual([['overview', undefined]])
   })
 })
 
