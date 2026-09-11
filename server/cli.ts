@@ -2350,8 +2350,8 @@ const debug = defineCommand({
 
 // ---- workspace tabs ----------------------------------------------------------
 
-// The shared listing behind `moi tabs` and bare `moi tab`: every tab (static +
-// views), one per row, the saved default (`layout.tabs.active`) marked. The
+// The listing behind `moi tabs`: every tab (static + views), one per row, the
+// saved default (`layout.tabs.active`) marked. The
 // output shape is documented in docs/rfc-intents-v2.md §3 — keep them in sync.
 function runTabsList(dir: string) {
   const path = resolve(dir)
@@ -2372,7 +2372,7 @@ function runTabsList(dir: string) {
       )
     )
     console.log(
-      '\n' + pc.dim('  Focus one: moi tab focus <tab-id> [--params \'{"k":"v"}\']') + '\n'
+      '\n' + pc.dim('  Focus one: moi tabs focus <tab-id> [--params \'{"k":"v"}\']') + '\n'
     )
   })
 }
@@ -2416,25 +2416,20 @@ const tabFocus = defineCommand({
   }
 })
 
-const tabSubCommands = { focus: tabFocus }
+const tabsSubCommands = { focus: tabFocus }
 
-const tab = defineCommand({
-  meta: { name: 'tab', description: 'List workspace tabs, or focus one: `moi tab focus <tab-id>`' },
-  subCommands: tabSubCommands,
+const tabs = defineCommand({
+  meta: {
+    name: 'tabs',
+    description: 'List workspace tabs, or focus one: `moi tabs focus <tab-id>`'
+  },
+  subCommands: tabsSubCommands,
   args: { dir: dirArg },
   run({ args, rawArgs }) {
     // citty invokes the parent run even after dispatching a subcommand — only
     // list when none ran (same pattern as `moi env` / `moi skill`).
     const sub = rawArgs.find(a => !a.startsWith('-'))
-    if (sub && Object.hasOwn(tabSubCommands, sub)) return
-    runTabsList(args.dir)
-  }
-})
-
-const tabs = defineCommand({
-  meta: { name: 'tabs', description: 'List workspace tabs (alias for `moi tab`)' },
-  args: { dir: dirArg },
-  run({ args }) {
+    if (sub && Object.hasOwn(tabsSubCommands, sub)) return
     runTabsList(args.dir)
   }
 })
@@ -2828,7 +2823,7 @@ const service = defineCommand({
   subCommands: serviceSubCommands,
   async run({ rawArgs }) {
     // citty invokes the parent run even after dispatching a subcommand — only
-    // show status when none ran (same pattern as `moi env` / `moi tab`).
+    // show status when none ran (same pattern as `moi env` / `moi tabs`).
     const sub = rawArgs.find(a => !a.startsWith('-'))
     if (sub && Object.hasOwn(serviceSubCommands, sub)) return
     await runServiceStatus()
@@ -3051,7 +3046,6 @@ const workspaceCommands = {
   env,
   scratch,
   skill,
-  tab,
   tabs,
   'ui-components': uiComponents
 }

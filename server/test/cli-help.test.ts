@@ -22,8 +22,11 @@ describe('isAgentCaller', () => {
   })
 })
 
-async function runHelp(envPatch: Record<string, string | undefined>): Promise<string> {
-  const proc = Bun.spawn(['bun', CLI, '--help'], {
+async function runHelp(
+  envPatch: Record<string, string | undefined>,
+  command?: string
+): Promise<string> {
+  const proc = Bun.spawn(['bun', CLI, ...(command ? [command] : []), '--help'], {
     stdin: 'ignore',
     stdout: 'pipe',
     stderr: 'ignore',
@@ -63,5 +66,15 @@ describe('moi --help (e2e)', () => {
   test('third-party markers hide it too', async () => {
     const out = await runHelp({ CLAUDECODE: '1' })
     expect(out).not.toContain('System commands:')
+  }, 30_000)
+
+  test('tabs owns the focus subcommand without a singular alias', async () => {
+    const rootHelp = await runHelp({})
+    const tabsHelp = await runHelp({}, 'tabs')
+
+    expect(rootHelp).toContain('moi tabs focus <tab-id>')
+    expect(rootHelp).not.toMatch(/^\s+tab\s/m)
+    expect(tabsHelp).toContain('focus    Focus a workspace tab in every open client')
+    expect(tabsHelp).toContain('Use moi tabs <command> --help')
   }, 30_000)
 })

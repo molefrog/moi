@@ -17,7 +17,7 @@ import { type WorkspaceEvent, useWorkspaceEvent } from '@/client/runtime/useWork
 import type { AppletKind } from '@/lib/types'
 
 // The props the host passes to a mounted applet component. Views receive
-// `params` from navigation state (focusTab / `moi tab focus` → the URL's
+// `params` from navigation state (focusTab / `moi tabs focus` → the URL's
 // history entry — see ViewApp in WorkspaceScreen.tsx); widgets are mounted
 // bare, so the applet must render sensibly with `params` absent.
 export type AppletComponentProps = {

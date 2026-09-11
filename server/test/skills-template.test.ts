@@ -30,6 +30,8 @@ describe('installBundledSkills', () => {
       expect(skillMd).toContain('moi theme --font=<key> --color=<key>')
       expect(skillMd).toContain('### Running commands with workspace env')
       expect(skillMd).toContain('moi env exec -- bun script.ts')
+      expect(skillMd).toContain('moi tabs focus')
+      expect(skillMd).not.toContain('moi tab focus')
       expect(await Bun.file(join(dir, CHEAT_SHEET)).exists()).toBe(true)
       // The rest of the skill installs normally.
       expect(skillMd).toContain('# Workspace')

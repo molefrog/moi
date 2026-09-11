@@ -126,7 +126,7 @@ Use the task-specific sections below for workflow guidance. The CLI will grow ov
 - **Develop applets:** `moi check`, `moi bundle`, and `moi refresh`.
 - **Call actions:** `moi call-server-fn`.
 - **Debug applets:** `moi debug logs` (see Debugging applets).
-- **Navigate the workspace:** `moi tabs` and `moi tab focus` (see Driving the workspace).
+- **Navigate the workspace:** `moi tabs` and `moi tabs focus` (see Driving the workspace).
 - **Customize the workspace:** `moi theme` and `moi config` (see Customizing workspace appearance).
 - **Use workspace env:** `moi env` and `moi env exec` (see Environment & secrets).
 - **Maintain workspace guidance:** `moi skill` (see Keeping this skill current).
@@ -383,8 +383,8 @@ unavailable, keep verification in the browser instead of retrying the unsupporte
 
 After the final successful checks, always make tab focus the final workspace action:
 
-- After building or editing a widget, run `moi tab focus widgets`.
-- After building or editing a view, run `moi tab focus view:<view-id>`, using its file name or claimed
+- After building or editing a widget, run `moi tabs focus widgets`.
+- After building or editing a view, run `moi tabs focus view:<view-id>`, using its file name or claimed
   builder id.
 
 The focused applet is the handoff. Keep the final reply brief and user-facing. Do not include file
@@ -478,4 +478,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.17.1" />
+<moi-skill version="0.18.0" />

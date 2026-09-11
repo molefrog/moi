@@ -295,7 +295,7 @@ export const control = Bun.serve({
           return
         }
 
-        // The workspace tab listing — `moi tabs` (and bare `moi tab`).
+        // The workspace tab listing — `moi tabs`.
         if (data.type === 'tabs') {
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
@@ -307,7 +307,7 @@ export const control = Bun.serve({
           return
         }
 
-        // `moi tab focus <tab-id>` — validate the target, then publish a
+        // `moi tabs focus <tab-id>` — validate the target, then publish a
         // workspace-scoped `tab:focus` event. Every connected client of that
         // workspace navigates (replace) with the params in navigation state.
         if (data.type === 'tab:focus') {
