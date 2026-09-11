@@ -580,7 +580,8 @@ export type AppletBuildResult<C> = {
 export async function buildApplets<C>(
   workspacePath: string,
   kind: AppletKind,
-  force: boolean
+  force: boolean,
+  target?: string
 ): Promise<{ names: string[]; results: AppletBuildResult<C>[]; ms: number }> {
   const t0 = performance.now()
   const { sourceDir, buildDir, moiRoot } = getAppletPaths(workspacePath, kind)
@@ -600,6 +601,7 @@ export async function buildApplets<C>(
 
   const jobs = await Promise.all(
     names.map(async name => {
+      if (target && name !== target) return { name, status: 'skipped' as const }
       const srcPath = await resolveSource(sourceDir, name)
       if (!srcPath) return { name, status: 'failed' as const, error: 'Source file not found' }
       if (!force && !(await needsRebuild(buildDir, name, srcPath))) {

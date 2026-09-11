@@ -2,7 +2,8 @@
 
 Applets should feel useful, clear, and at home in the workspace. Let their content give them character while keeping familiar typography, colors, and interactions.
 
-This guide covers widgets and views inside a moi workspace.
+This guide is the highest-priority visual contract for widgets and views inside a moi workspace.
+Follow generic design guidance only where it agrees with this guide.
 
 ## Content and layout
 
@@ -14,7 +15,7 @@ This guide covers widgets and views inside a moi workspace.
 
 **Give expression a clear focus.** Use typography, composition, color, imagery, texture, or a small content-linked metaphor to give the applet character. A visual detail may support the subject or mood without carrying data or enabling an action. Keep the treatment focused so the content remains easy to scan. Expand a focal region only when added working space helps the task.
 
-**Group through spacing and alignment.** Start with an open layout. Use surfaces only for interactive objects, independent scrolling regions, distinct states, or a dedicated work area. Keep ordinary headings, tabs, summaries, metrics, and sections unboxed. Avoid large rounded page frames and decorative rows of cards or nested cards.
+**Group through spacing and alignment.** Start with an open layout. Prefer spacing and alignment over separators. Add a divider only when adjacent regions need a visible boundary. Use surfaces only for interactive objects, independent scrolling regions, distinct states, or a dedicated work area. Keep ordinary headings, tabs, summaries, metrics, and sections unboxed. Avoid large rounded page frames and decorative rows of cards or nested cards.
 
 **Keep a consistent rhythm.** Use a 4 px spacing rhythm, with smaller gaps inside groups and larger gaps between them. Apply outer padding once. Align repeated values and actions so content changes do not move them around. When removing a container, remove its unnecessary padding and radius and realign its contents.
 
@@ -109,15 +110,41 @@ Prefer one main scroller. Add bounded internal scrolling only when independent s
 
 ## UI copy
 
-**Keep language direct.** Use clear labels and specific action names. On repeated-use screens, omit coaching, encouragement, and instructions for expected behavior. State necessary help once, near the relevant interaction. Headings, labels, controls, and helper text must not repeat the same meaning.
+Words appear in a design for one reason: to make it easier to understand and use. They are design
+content, not decoration. Bring the same intentionality and minimalism to copywriting that you would
+bring to spacing and color. Before writing anything, ask what the design needs to say, and how it can
+best be said to help the person navigate the experience.
 
-Omit terminal periods in headings, labels, metadata, and short standalone UI lines. Use sentence punctuation for paragraphs or multiple complete sentences.
+Write from the end user's perspective. Name things in simple language people understand, not by how
+the system is built. Describe what something is or does in plain terms rather than selling it.
+Prefer specific, clear wording over clever wording.
+
+Use active voice by default. An action says exactly what will happen: "Save changes," not "Submit."
+Keep the same action name through the whole flow, so a button labeled "Publish" produces a
+confirmation that says "Published." Interface vocabulary helps people find their way around, and
+consistency helps them learn it.
+
+Treat failure and empty states as moments for direction, not mood. Explain what went wrong and how
+to fix it in the interface's voice. Errors do not apologize, and they are never vague. An empty state
+is an invitation to act.
+
+Keep the tone conversational: plain verbs, sentence case, no filler. Let each written element do
+exactly one job.
+
+Omit terminal periods in headings, labels, metadata, and short standalone UI lines. Use sentence
+punctuation for paragraphs or multiple complete sentences.
 
 ## Design slop
 
 Design slop is a repeated visual shortcut that makes an interface feel generic or agent-made. Avoid decorative patterns added by habit instead of because they suit the content.
 
 - **Decorative accent lines:** Do not place short colored lines, partial borders, or a single colored edge beside headings, prompts, or values as generic decoration. Choose a visual treatment connected to the content, or leave the area open.
+- **SaaS card kit:** Use repeated cards when they represent a real repeated unit, such as comparable
+  metrics, records, or actions. Avoid turning unrelated sections into identical rounded containers
+  with the same radius, border, and shadow. Surface treatment should reflect hierarchy and function.
+- **Template chrome:** Avoid stock decoration: all-caps eyebrows, middle-dot metadata,
+  `LABEL — fragment` headings, monospace labels, and arrows on every action. Use these patterns only
+  when they clarify hierarchy, state, or sequence.
 
 ## Final review
 

@@ -16,6 +16,7 @@ import {
   getCCDebugSnapshot,
   interruptCCSession,
   killAllCCSessions,
+  killWorkspaceSessions,
   retireCCSessionsOnCliChange,
   sendCCMessage
 } from './session'
@@ -138,6 +139,22 @@ afterEach(async () => {
 })
 
 describe('Claude session message queue', () => {
+  test('removing a workspace stops only its sessions and queued messages', async () => {
+    await send()
+    await send({ workspaceId: 'other', workspacePath: '/fake/other', sessionId: 'other' })
+    const queued = send({ content: 'second' })
+    await settle()
+
+    killWorkspaceSessions(input.workspacePath)
+
+    await expect(queued).rejects.toThrow('Workspace removed')
+    expect(drivers[0]?.closed).toBe(true)
+    expect(drivers[1]?.closed).toBe(false)
+    expect(getCCActiveSessions()).toEqual([
+      { workspaceId: 'other', sessionId: 'other', activity: 'running' }
+    ])
+  })
+
   test('keeps follow-ups in moi until each preceding result, without state events', async () => {
     await send()
     const d = drivers[0]!

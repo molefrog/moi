@@ -32,7 +32,7 @@ export const viewBuilderTabId = (builderId: string): WorkspaceTabId => `view-bui
 export const viewBuilderIdFromTab = (tab: WorkspaceTabId): string | null =>
   tab.startsWith('view-builder:') ? tab.slice('view-builder:'.length) : null
 
-// The only params shape focusTab / `moi tab focus` carry: one JSON-plain
+// The only params shape focusTab / `moi tabs focus` carry: one JSON-plain
 // object. Arrays and null are valid JSON but not a params record.
 export function isParamsRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)

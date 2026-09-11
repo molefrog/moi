@@ -48,8 +48,8 @@ workspace's **default tab**, not live focus state.
 ## 3. Commands
 
 ```
-moi tabs            # alias: moi tab — all tabs, one per row, the default one marked
-moi tab focus <tab-id> [--params '<json-object>']
+moi tabs            # all tabs, one per row, the default one marked
+moi tabs focus <tab-id> [--params '<json-object>']
 ```
 
 `moi tabs` output (colors omitted):
@@ -64,11 +64,11 @@ moi tabs — workspace tabs, the default one marked
      view:orders  Orders
      view:shop    Shop
 
-  Focus one: moi tab focus <tab-id> [--params '{"k":"v"}']
+  Focus one: moi tabs focus <tab-id> [--params '{"k":"v"}']
 ```
 
 - `moi tabs` prints tab id + title; the marked row is the saved default (`layout.tabs.active`).
-- `moi tab focus` validates the tab id server-side (unknown id fails listing the valid ids), then
+- `moi tabs focus` validates the tab id server-side (unknown id fails listing the valid ids), then
   publishes a workspace-scoped `tab:focus` event; every connected client of that workspace
   navigates (replace) with the params in navigation state. Addressing is by **tab id**, never by
   title — titles are ambiguous and rename.
@@ -213,7 +213,7 @@ The word "intent" stays out of the API: the focus event is `tab:focus`, the enve
 
 - **MVP 1 — tab foundation (first PR):** the working end-to-end core and nothing else. URL-routed
   tabs with replace-only navigation and the default redirect; the `params` prop delivered to
-  views from navigation state; `focusTab` in the `moi` module; `moi tabs` / `moi tab focus` CLI
+  views from navigation state; `focusTab` in the `moi` module; `moi tabs` / `moi tabs focus` CLI
   with the `tab:focus` event. Explicitly out: skill changes, `sendChatMessage`, envelope changes,
   dead-URL journaling.
 - **MVP 2 — chat messaging (implemented):** `sendChatMessage` + the `# Applet message` envelope
@@ -224,6 +224,6 @@ The word "intent" stays out of the API: the focus event is `tab:focus`, the enve
 - **MVP 3 — authoring (skill guidance done):** the workspace skill now documents the API —
   `SKILL.md` gained a "Driving the workspace" section (`focusTab`, `sendChatMessage`, the render-time
   ban and rate limits, the `Params` type convention with the read-the-source rule) plus `moi tabs` /
-  `moi tab focus` in its CLI list, and the skill version marker moved to `0.9.0` so installed
+  `moi tabs focus` in its CLI list, and the skill version marker moved to `0.9.0` so installed
   workspace copies are prompted to update. Still open: folding the surviving parts of this RFC into
   permanent docs.

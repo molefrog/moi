@@ -1,4 +1,4 @@
-// `moi tabs` / `moi tab focus` server logic: assemble the tab listing and
+// `moi tabs` / `moi tabs focus` server logic: assemble the tab listing and
 // validate a focus target. Pure given its inputs — the control handler wires
 // in the workspace lookups (see control.ts), tests pass fakes.
 import type { ViewInfo, WorkspaceTabId } from '@/lib/types'
@@ -38,7 +38,7 @@ type FocusTabDeps = {
 
 export type FocusTabResult = { ok: true; tab: WorkspaceTabId } | { ok: false; error: string }
 
-// Validate a `moi tab focus` target: static ids pass as-is, `view:<id>` must
+// Validate a `moi tabs focus` target: static ids pass as-is, `view:<id>` must
 // name a real view. Anything else — including view-builder tabs — fails with
 // the list of valid ids. Addressing is by tab id, never by title.
 export async function resolveFocusTab(raw: unknown, deps: FocusTabDeps): Promise<FocusTabResult> {

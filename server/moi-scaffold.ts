@@ -138,7 +138,10 @@ declare module '*.svg' { const s: string; export default s }
 export async function writeAppletEnvDts(workspacePath: string): Promise<boolean> {
   const moiDir = join(workspacePath, '.moi')
   if (!(await isDirectory(moiDir))) return false
-  await Bun.write(join(moiDir, 'applet-env.d.ts'), APPLET_ENV_DTS)
+  const path = join(moiDir, 'applet-env.d.ts')
+  const file = Bun.file(path)
+  if ((await file.exists()) && (await file.text()) === APPLET_ENV_DTS) return false
+  await Bun.write(path, APPLET_ENV_DTS)
   return true
 }
 

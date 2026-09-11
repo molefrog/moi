@@ -46,7 +46,7 @@ export type WorkspaceEvent =
   // App settings changed (PATCH /api/settings from any client) — carries the
   // new value so caches update without a refetch.
   | { type: 'settings:updated'; settings: AppSettings }
-  // `moi tab focus` — every open client of `workspaceId` navigates (replace)
+  // `moi tabs focus` — every open client of `workspaceId` navigates (replace)
   // to `tab`, delivering `params` to the target view via navigation state.
   | {
       type: 'tab:focus'

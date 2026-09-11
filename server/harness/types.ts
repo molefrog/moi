@@ -114,6 +114,8 @@ export type Harness = {
   // Env is frozen at spawn everywhere; this reaps idle sessions/processes so
   // the next message picks up fresh env.
   onEnvChanged?(workspacePath: string): void
+  // Workspace removal: stop every child process owned by that workspace.
+  stopWorkspace?(workspacePath: string): void
   // Server shutdown: kill child processes so nothing is orphaned.
   shutdown?(): void
   // Where this backend loads workspace skills from (workspace provisioning).

@@ -376,7 +376,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   // resolves to the default like any dead URL.
   useAppletEvent(workspaceId, 'focusTab', openTab)
 
-  // `moi tab focus` — a workspace event, not an applet call: the control
+  // `moi tabs focus` — a workspace event, not an applet call: the control
   // server validated the target and params before publishing.
   useWorkspaceEvent(event => {
     if (event.type === 'tab:focus' && event.workspaceId === workspaceId) {

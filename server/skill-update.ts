@@ -8,6 +8,7 @@ import { skillsDirFor } from './workspace-init'
 export type WorkspaceSkillUpdateResult = {
   before: WorkspaceSkillStatus[]
   status: WorkspaceSkillsStatus
+  changedSkills: string[]
   // False when the workspace has no `.moi/` to refresh — nothing was written.
   appletTypesWritten: boolean
 }
@@ -31,7 +32,7 @@ export async function updateWorkspaceSkills(
   type: WorkspaceType = 'claude-code'
 ): Promise<WorkspaceSkillUpdateResult> {
   const before = await skillStatuses(workspaceRoot, type)
-  await installBundledSkills(skillsDirFor(workspaceRoot, type))
+  const changedSkills = await installBundledSkills(skillsDirFor(workspaceRoot, type))
   // The ambient applet types ship with the CLI just like the skills do, and go
   // stale the same way — refresh both in one operation so `moi skill update`
   // (and the UI's update button) leaves nothing behind. Skipped when the
@@ -42,6 +43,7 @@ export async function updateWorkspaceSkills(
   return {
     before,
     status: summarizeSkillStatuses(skills),
+    changedSkills,
     appletTypesWritten
   }
 }

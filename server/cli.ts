@@ -11,6 +11,8 @@ import pc from './cli-pc'
 import { isAgentCaller } from './agent-caller'
 import { getAppConfig } from './app-config'
 
+import { appletSelectorMatches, parseAppletSelector } from '@/lib/applet-selector'
+import type { AppletSelector } from '@/lib/applet-selector'
 import {
   AGENT_THEMES,
   COLOR_THEMES,
@@ -572,6 +574,22 @@ function colorStatus(status: string) {
   return pc.dim(status)
 }
 
+const appletOnlyArg = {
+  type: 'string' as const,
+  description: 'Limit to "widgets", "views", "widgets/<id>", or "views/<id>"'
+}
+
+function readAppletSelector(value: string | undefined): AppletSelector | undefined {
+  if (value === undefined) return undefined
+  if (parseAppletSelector(value)) return value as AppletSelector
+  console.error(
+    '\n' +
+      pc.red('✗') +
+      ` Invalid --only value "${value}" — use "widgets", "views", "widgets/<id>", or "views/<id>".\n`
+  )
+  process.exit(1)
+}
+
 const bundle = defineCommand({
   meta: { name: 'bundle', description: 'Rebuild changed widgets and views' },
   args: {
@@ -582,13 +600,10 @@ const bundle = defineCommand({
     },
     force: {
       type: 'boolean',
-      description: 'Rebuild everything, ignoring file modification times',
+      description: 'Rebuild the selected applets, ignoring file modification times',
       default: false
     },
-    only: {
-      type: 'string',
-      description: 'Narrow the build to "widgets" or "views" (default: both)'
-    },
+    only: appletOnlyArg,
     status: {
       type: 'boolean',
       description: 'Advance a view builder to ready on success (use --no-status to skip)',
@@ -596,6 +611,7 @@ const bundle = defineCommand({
     }
   },
   async run({ args }) {
+    const only = readAppletSelector(args.only)
     const path = resolve(args.dir)
     // Computed locally up front so it can ride along in the success output; the
     // agent reads this and knows to run `moi skill update`.
@@ -608,7 +624,7 @@ const bundle = defineCommand({
           type: 'bundle',
           path,
           force: args.force,
-          only: args.only,
+          only,
           noStatus: !args.status
         })
       )
@@ -685,6 +701,53 @@ const bundle = defineCommand({
   }
 })
 
+const check = defineCommand({
+  meta: { name: 'check', description: 'Run applet checks' },
+  args: {
+    dir: {
+      type: 'positional',
+      default: '.',
+      description: 'Workspace directory (default: current)'
+    },
+    only: appletOnlyArg
+  },
+  async run({ args }) {
+    const only = readAppletSelector(args.only)
+    const { root } = await resolveWorkspace(resolve(args.dir))
+    if (!existsSync(join(root, '.moi'))) {
+      console.error('\n' + pc.red('✗') + ` No moi workspace found at ${root}\n`)
+      process.exit(1)
+    }
+    const { formatAppletTypecheckDiagnostics, typecheckApplets } =
+      await import('./applet-typecheck')
+    const result = await typecheckApplets(root, only)
+
+    if (only?.includes('/') && result.files.length === 0) {
+      console.error('\n' + pc.red('✗') + ` Applet "${only}" not found.\n`)
+      process.exit(1)
+    }
+
+    if (result.diagnostics.length > 0) {
+      console.error('\n' + pc.red('✗') + ' Applet check failed: TypeScript\n')
+      console.error(formatAppletTypecheckDiagnostics(result.diagnostics))
+      process.exit(1)
+    }
+
+    if (result.files.length === 0) {
+      const scope = args.only ? `.moi/${args.only}` : '.moi/widgets or .moi/views'
+      console.log('\n' + pc.green('✓') + ` No applet source files found in ${scope}\n`)
+      return
+    }
+
+    const suffix = only ? ` (${only})` : ''
+    console.log(
+      '\n' +
+        pc.green('✓') +
+        ` Applet checks passed: TypeScript · ${result.files.length} file${result.files.length === 1 ? '' : 's'}${suffix}\n`
+    )
+  }
+})
+
 const builderSet = defineCommand({
   meta: { name: 'set', description: 'Set a view or widget builder id, status, title, and icon' },
   args: {
@@ -752,24 +815,14 @@ const refresh = defineCommand({
       'Refresh widget and view data without rebuilding. Use after the agent mutates underlying data.'
   },
   args: {
-    only: {
-      type: 'string',
-      description: 'Narrow the refresh to "widgets" or "views" (default: both)'
-    }
+    only: appletOnlyArg
   },
   async run({ args }) {
-    // Validate up front: a typo'd filter silently refreshing everything would
-    // read as "my filter worked".
-    if (args.only && args.only !== 'widgets' && args.only !== 'views') {
-      console.error(
-        '\n' + pc.red('✗') + ` Unknown --only value "${args.only}" — use "widgets" or "views".\n`
-      )
-      process.exit(1)
-    }
+    const only = readAppletSelector(args.only)
     const notice = await staleSkillNotice(process.cwd())
     const ws = new WebSocket(CONTROL_URL)
 
-    ws.onopen = () => ws.send(JSON.stringify({ type: 'applets:refresh', only: args.only }))
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'applets:refresh', only }))
 
     ws.onmessage = event => {
       const data = JSON.parse(String(event.data))
@@ -778,9 +831,7 @@ const refresh = defineCommand({
         ws.close()
         process.exit(1)
       }
-      console.log(
-        '\n' + pc.green('✓') + ' Refresh signal sent' + (args.only ? ` (${args.only})` : '') + '\n'
-      )
+      console.log('\n' + pc.green('✓') + ' Refresh signal sent' + (only ? ` (${only})` : '') + '\n')
       if (notice) console.log(pc.yellow(notice) + '\n')
       ws.close()
       process.exit(0)
@@ -2217,6 +2268,7 @@ const debugLogs = defineCommand({
   },
   args: {
     dir: dirArg,
+    only: appletOnlyArg,
     json: {
       type: 'boolean',
       default: false,
@@ -2225,27 +2277,45 @@ const debugLogs = defineCommand({
     clear: { type: 'boolean', default: false, description: 'Wipe the journal' }
   },
   run({ args }) {
+    const only = readAppletSelector(args.only)
     const path = resolve(args.dir)
     if (args.clear) {
+      if (only) {
+        console.error('\n' + pc.red('✗') + ' Cannot combine --only with --clear.\n')
+        process.exit(1)
+      }
       sendControl(path, { type: 'debug:logs', path, clear: true }, res => {
         console.log('\n' + pc.green('✓') + ` cleared ${res.cleared ?? 0} entries\n`)
       })
       return
     }
     sendControl(path, { type: 'debug:logs', path }, res => {
-      const entries = (Array.isArray(res.entries) ? res.entries : []) as AppletLogEntry[]
+      let entries = (Array.isArray(res.entries) ? res.entries : []) as AppletLogEntry[]
+      if (only) {
+        entries = entries.filter(
+          entry =>
+            entry.kind &&
+            entry.name &&
+            appletSelectorMatches(only, entry.kind === 'widget' ? 'widgets' : 'views', entry.name)
+        )
+      }
       if (args.json) {
         console.log(JSON.stringify(entries, null, 2))
         return
       }
       if (entries.length === 0) {
+        const suffix = only ? ` for ${only}` : ''
         console.log(
-          '\n' + pc.bold('moi debug logs') + pc.dim(' — no applet errors on record') + '\n'
+          '\n' + pc.bold('moi debug logs') + pc.dim(` — no applet errors on record${suffix}`) + '\n'
         )
         return
       }
+      const suffix = only ? ` for ${only}` : ''
       console.log(
-        '\n' + pc.bold('moi debug logs') + pc.dim(` — ${entries.length} error(s) on record`) + '\n'
+        '\n' +
+          pc.bold('moi debug logs') +
+          pc.dim(` — ${entries.length} error(s) on record${suffix}`) +
+          '\n'
       )
       for (const e of entries) {
         const count = e.count > 1 ? pc.dim(` ×${e.count}`) : ''
@@ -2280,8 +2350,8 @@ const debug = defineCommand({
 
 // ---- workspace tabs ----------------------------------------------------------
 
-// The shared listing behind `moi tabs` and bare `moi tab`: every tab (static +
-// views), one per row, the saved default (`layout.tabs.active`) marked. The
+// The listing behind `moi tabs`: every tab (static + views), one per row, the
+// saved default (`layout.tabs.active`) marked. The
 // output shape is documented in docs/rfc-intents-v2.md §3 — keep them in sync.
 function runTabsList(dir: string) {
   const path = resolve(dir)
@@ -2302,7 +2372,7 @@ function runTabsList(dir: string) {
       )
     )
     console.log(
-      '\n' + pc.dim('  Focus one: moi tab focus <tab-id> [--params \'{"k":"v"}\']') + '\n'
+      '\n' + pc.dim('  Focus one: moi tabs focus <tab-id> [--params \'{"k":"v"}\']') + '\n'
     )
   })
 }
@@ -2346,25 +2416,20 @@ const tabFocus = defineCommand({
   }
 })
 
-const tabSubCommands = { focus: tabFocus }
+const tabsSubCommands = { focus: tabFocus }
 
-const tab = defineCommand({
-  meta: { name: 'tab', description: 'List workspace tabs, or focus one: `moi tab focus <tab-id>`' },
-  subCommands: tabSubCommands,
+const tabs = defineCommand({
+  meta: {
+    name: 'tabs',
+    description: 'List workspace tabs, or focus one: `moi tabs focus <tab-id>`'
+  },
+  subCommands: tabsSubCommands,
   args: { dir: dirArg },
   run({ args, rawArgs }) {
     // citty invokes the parent run even after dispatching a subcommand — only
     // list when none ran (same pattern as `moi env` / `moi skill`).
     const sub = rawArgs.find(a => !a.startsWith('-'))
-    if (sub && Object.hasOwn(tabSubCommands, sub)) return
-    runTabsList(args.dir)
-  }
-})
-
-const tabs = defineCommand({
-  meta: { name: 'tabs', description: 'List workspace tabs (alias for `moi tab`)' },
-  args: { dir: dirArg },
-  run({ args }) {
+    if (sub && Object.hasOwn(tabsSubCommands, sub)) return
     runTabsList(args.dir)
   }
 })
@@ -2376,14 +2441,15 @@ async function runSkillUpdate(cwd: string): Promise<void> {
   // Type-aware: an OpenClaw workspace keeps its skills in `skills/`, so the
   // update must target the same dir the agent actually loads from.
   const { root, type } = await resolveWorkspace(cwd)
-  const { before, status, appletTypesWritten } = await updateWorkspaceSkills(
+  const { before, status, changedSkills, appletTypesWritten } = await updateWorkspaceSkills(
     root,
     type ?? 'claude-code'
   )
   const after = status.skills
+  const heading = changedSkills.length > 0 ? 'Skills updated in ' : 'Skills unchanged in '
 
-  console.log('\n' + pc.green('✓') + ' Skills updated in ' + pc.bold(root) + '\n')
-  printSkillUpdateTable(before, after)
+  console.log('\n' + pc.green('✓') + ' ' + heading + pc.bold(root) + '\n')
+  printSkillUpdateTable(before, after, changedSkills)
   if (appletTypesWritten) {
     console.log(pc.dim('  Ambient applet types regenerated: ') + pc.bold('.moi/applet-env.d.ts\n'))
   }
@@ -2391,29 +2457,34 @@ async function runSkillUpdate(cwd: string): Promise<void> {
 
 function printSkillUpdateTable(
   before: WorkspaceSkillStatus[],
-  after: WorkspaceSkillStatus[]
+  after: WorkspaceSkillStatus[],
+  changedSkills: string[]
 ): void {
+  const changedSkillNames = new Set(changedSkills)
   console.log(
     columns(
       ['skill', 'from', 'to'].map(h => pc.dim(h)),
       after.map(s => {
         const prev = before.find(b => b.name === s.name)?.installed ?? null
-        const changed = prev !== s.installed
+        const versionChanged = prev !== s.installed
+        const filesChanged = changedSkillNames.has(s.name)
         return [
           s.name,
           prev ?? pc.dim('none'),
-          changed ? pc.green(s.installed ?? '?') : pc.dim((s.installed ?? '?') + ' (no change)')
+          versionChanged
+            ? pc.green(s.installed ?? '?')
+            : filesChanged
+              ? pc.green((s.installed ?? '?') + ' (files changed)')
+              : pc.dim((s.installed ?? '?') + ' (no change)')
         ]
       })
     )
   )
-  console.log(
-    '\n' +
-      pc.dim(
-        '  Changes apply when the skill is next loaded (new session or next skill invocation).'
-      ) +
-      '\n'
-  )
+  const nextStep =
+    changedSkills.length > 0
+      ? `  Reload changed skills before using them again: ${changedSkills.join(', ')}.`
+      : '  No skill files changed. Keep using the copies already in context.'
+  console.log('\n' + pc.dim(nextStep) + '\n')
 }
 
 // Colored status label for one skill row: minor+ behind is actionable, a patch
@@ -2752,7 +2823,7 @@ const service = defineCommand({
   subCommands: serviceSubCommands,
   async run({ rawArgs }) {
     // citty invokes the parent run even after dispatching a subcommand — only
-    // show status when none ran (same pattern as `moi env` / `moi tab`).
+    // show status when none ran (same pattern as `moi env` / `moi tabs`).
     const sub = rawArgs.find(a => !a.startsWith('-'))
     if (sub && Object.hasOwn(serviceSubCommands, sub)) return
     await runServiceStatus()
@@ -2965,6 +3036,7 @@ const uiComponents = defineCommand({
 // manage moi itself and are for the human at the keyboard.
 const workspaceCommands = {
   bundle,
+  check,
   refresh,
   builder,
   'call-server-fn': callServerFn,
@@ -2974,7 +3046,6 @@ const workspaceCommands = {
   env,
   scratch,
   skill,
-  tab,
   tabs,
   'ui-components': uiComponents
 }

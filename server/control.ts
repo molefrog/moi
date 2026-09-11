@@ -1,6 +1,7 @@
 import { stringify as devalueStringify } from 'devalue'
 import { resolve } from 'path'
 
+import { parseAppletSelector } from '@/lib/applet-selector'
 import { resolveWorkspaceTheme } from '@/lib/themes'
 import type { WorkspaceEntry } from '@/lib/types'
 import { isParamsRecord } from '@/lib/workspace-tabs'
@@ -119,9 +120,11 @@ export const control = Bun.serve({
           // `--no-status`: compile without advancing any view builder to `ready`
           // (status stays whatever the agent last reported).
           const skipStatus = data.noStatus === true
-          // `only` narrows to one kind; default builds both. Results carry a
-          // `kind` so the CLI can label each row.
-          const only = data.only === 'widgets' || data.only === 'views' ? data.only : undefined
+          const only = typeof data.only === 'string' ? parseAppletSelector(data.only) : undefined
+          if (data.only && !only) {
+            ws.send(JSON.stringify({ error: `Invalid applet selector "${data.only}"` }))
+            return
+          }
           const results: {
             kind: 'widget' | 'view'
             name: string
@@ -129,23 +132,32 @@ export const control = Bun.serve({
             error?: string
           }[] = []
           await serializeWorkspaceBundle(workspacePath, async () => {
-            if (only !== 'views') {
-              for (const r of await handleBundle(publishEvent, workspacePath, force)) {
-                results.push({ kind: 'widget', name: r.name, status: r.status, error: r.error })
+            if (only?.segment !== 'views') {
+              for (const r of await handleBundle(publishEvent, workspacePath, force, only?.id)) {
+                if (!only?.id || r.name === only.id) {
+                  results.push({ kind: 'widget', name: r.name, status: r.status, error: r.error })
+                }
               }
             }
-            if (only !== 'widgets') {
+            if (only?.segment !== 'widgets') {
               for (const r of await handleBundleViews(
                 publishEvent,
                 match.id,
                 workspacePath,
                 force,
-                skipStatus
+                skipStatus,
+                only?.id
               )) {
-                results.push({ kind: 'view', name: r.name, status: r.status, error: r.error })
+                if (!only?.id || r.name === only.id) {
+                  results.push({ kind: 'view', name: r.name, status: r.status, error: r.error })
+                }
               }
             }
           })
+          if (only?.id && results.length === 0) {
+            ws.send(JSON.stringify({ error: `Applet "${only.segment}/${only.id}" not found` }))
+            return
+          }
           // Entries still standing after the rebuild's clear-on-success sweep —
           // the CLI nudges the agent toward `moi debug logs` when non-zero.
           ws.send(
@@ -287,7 +299,7 @@ export const control = Bun.serve({
           return
         }
 
-        // The workspace tab listing — `moi tabs` (and bare `moi tab`).
+        // The workspace tab listing — `moi tabs`.
         if (data.type === 'tabs') {
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
@@ -299,7 +311,7 @@ export const control = Bun.serve({
           return
         }
 
-        // `moi tab focus <tab-id>` — validate the target, then publish a
+        // `moi tabs focus <tab-id>` — validate the target, then publish a
         // workspace-scoped `tab:focus` event. Every connected client of that
         // workspace navigates (replace) with the params in navigation state.
         if (data.type === 'tab:focus') {
@@ -332,11 +344,22 @@ export const control = Bun.serve({
         // Tell every connected applet to re-import its module (cache-bust) and
         // re-run its data fetches. No rebuild, no page reload — `useApplet`
         // handles `applets:refresh` like `*:updated` (invalidate + reload).
-        // `only` narrows to one kind; default is both widgets and views.
+        // `only` narrows to one kind or applet; default is both kinds.
         // `widget:refresh` is the pre-filter message name older CLIs send.
         if (data.type === 'applets:refresh' || data.type === 'widget:refresh') {
-          const only = data.only === 'widgets' || data.only === 'views' ? data.only : undefined
-          publishEvent({ type: 'applets:refresh', only })
+          const only = typeof data.only === 'string' ? parseAppletSelector(data.only) : undefined
+          if (data.only && !only) {
+            ws.send(JSON.stringify({ error: `Invalid applet selector "${data.only}"` }))
+            return
+          }
+          if (only?.id) {
+            publishEvent({
+              type: only.segment === 'widgets' ? 'widget:updated' : 'view:updated',
+              name: only.id
+            })
+          } else {
+            publishEvent({ type: 'applets:refresh', ...(data.only ? { only: data.only } : {}) })
+          }
           ws.send(JSON.stringify({ ok: true }))
           return
         }
