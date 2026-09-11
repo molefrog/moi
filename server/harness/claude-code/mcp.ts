@@ -3,6 +3,7 @@ import type { McpServerStatus, SDKUserMessage } from '@anthropic-ai/claude-agent
 
 import { debugEnabled } from '../../debug'
 import { requireHarnessExecutable } from '../executable'
+import { claudeSpawnEnv } from './spawn-env'
 
 // MCP server status probing. Intentionally decoupled from agent chat runs
 // (cc-session.ts): connecting to MCP servers and reading their status is a
@@ -64,7 +65,7 @@ async function probeMcpStatus(workspacePath: string): Promise<McpServerStatus[]>
       pathToClaudeCodeExecutable: requireHarnessExecutable('claude-code'),
       persistSession: false,
       settingSources: ['user', 'project'],
-      env: { ...process.env, CLAUDECODE: undefined }
+      env: claudeSpawnEnv()
     }
   })
 

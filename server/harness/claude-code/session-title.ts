@@ -10,6 +10,7 @@ import {
   runSessionTitleCommand
 } from '../session-title'
 import { requireHarnessExecutable } from '../executable'
+import { claudeSpawnEnv } from './spawn-env'
 
 export function claudeSessionTitleCommand(executable: string): string[] {
   return [
@@ -67,7 +68,7 @@ export async function generateClaudeSessionTitle(input: {
       cwd: tempDir,
       stdin: JSON.stringify({ sessionTitleSource: input.source }),
       signal: input.abortController.signal,
-      env: { ...process.env, CLAUDECODE: undefined, DISABLE_AUTOUPDATER: '1' }
+      env: claudeSpawnEnv({ DISABLE_AUTOUPDATER: '1' })
     })
     return output ? parseClaudeSessionTitleOutput(output) : null
   } finally {
