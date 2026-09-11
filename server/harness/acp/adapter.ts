@@ -70,7 +70,16 @@ export function acpToolCallToTurn(input: {
     previous?.parts.find((p): p is Extract<Part, { type: 'tool-call' }> => p.type === 'tool-call')
       ?.call ?? undefined
 
-  const text = toolContentToText(update.content)
+  const sidecar = { ...prevCall?.sidecar }
+  // ACP updates are patches: absent fields preserve the previous value, but
+  // supplied collections replace it (including an empty array). Keep the
+  // structured content as well as its readable preview so diffs and non-text
+  // results survive subsequent status-only updates.
+  if (update.content != null) sidecar.content = update.content
+  if (update.locations != null) sidecar.locations = update.locations.map(l => l.path)
+  if (update.rawOutput !== undefined) sidecar.rawOutput = update.rawOutput
+  if (update.name != null) sidecar.name = update.name
+  if (update.kind != null) sidecar.kind = update.kind
   const locations = update.locations?.map(l => l.path).filter(Boolean) ?? []
   const call: ToolCall = {
     toolCallId: update.toolCallId,
@@ -78,18 +87,28 @@ export function acpToolCallToTurn(input: {
     caller: 'model',
     provider,
     state: update.status ? toolStatusToState(update.status) : (prevCall?.state ?? 'running'),
-    input: update.rawInput ?? prevCall?.input ?? (locations.length ? { path: locations[0] } : {}),
-    ...(locations.length
-      ? { sidecar: { locations } }
-      : prevCall?.sidecar
-        ? { sidecar: prevCall.sidecar }
-        : {})
+    input:
+      update.rawInput !== undefined
+        ? update.rawInput
+        : prevCall
+          ? prevCall.input
+          : locations.length
+            ? { path: locations[0] }
+            : {},
+    ...(Object.keys(sidecar).length ? { sidecar } : {})
   }
-  // `tool_call` announces with a preview blurb and `tool_call_update` carries
-  // the result; keep whichever text we have most recently seen.
-  const output = text || (typeof prevCall?.output === 'string' ? prevCall.output : '')
-  if (output) call.output = output
-  if (call.state === 'error' && output) call.errorText = output
+  // Visible content takes precedence over raw output. An explicit content
+  // clear is still a value; never revive the previous preview or raw result.
+  const output =
+    update.content != null
+      ? toolContentToText(update.content)
+      : 'content' in sidecar
+        ? prevCall?.output
+        : 'rawOutput' in sidecar
+          ? sidecar.rawOutput
+          : prevCall?.output
+  if (output !== undefined) call.output = output
+  if (call.state === 'error' && typeof output === 'string' && output) call.errorText = output
 
   return {
     id: toolTurnId(sessionId, update.toolCallId),

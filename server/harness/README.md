@@ -93,23 +93,24 @@ server/harness/
 
 Current harnesses:
 
-| Harness                 | Session module           | Adapter                  | Status                |
-| ----------------------- | ------------------------ | ------------------------ | --------------------- |
-| Claude Code (Agent SDK) | `claude-code/session.ts` | `claude-code/adapter.ts` | shipped, primary      |
-| OpenClaw (gateway)      | `openclaw/session.ts`    | `openclaw/adapter.ts`    | shipped, experimental |
-| Codex (app-server)      | `codex/session.ts`       | `codex/adapter.ts`       | shipped, experimental |
-| Hermes (ACP)            | `acp/session.ts`         | `acp/adapter.ts`         | shipped, experimental |
+| Harness                 | Session module           | Adapter                            | Status                      |
+| ----------------------- | ------------------------ | ---------------------------------- | --------------------------- |
+| Claude Code (Agent SDK) | `claude-code/session.ts` | `claude-code/adapter.ts`           | shipped, primary            |
+| OpenClaw (gateway)      | `openclaw/session.ts`    | `openclaw/adapter.ts`              | shipped, experimental       |
+| Codex (app-server)      | `codex/session.ts`       | `codex/adapter.ts`                 | shipped, experimental       |
+| Hermes (ACP)            | `acp/session.ts`         | `acp/adapter.ts`                   | shipped, experimental       |
+| fx (ACP)                | `acp/session.ts`         | `acp/adapter.ts` + `fx/adapter.ts` | first version, experimental |
 
 `acp/` is the odd one out: it is **not** a harness, it is the shared
-implementation of the Agent Client Protocol (stdio JSON-RPC), and `hermes/`
-is the first provider built on it. Any other ACP-speaking agent (Gemini CLI,
+implementation of the Agent Client Protocol (stdio JSON-RPC). `hermes/` and
+`fx/` supply provider behavior. Any other ACP-speaking agent (Gemini CLI,
 opencode, Zed's agents) should become another thin folder next to `hermes/`
 rather than a copy of the protocol. The split is:
 
 ```
 acp/                  provider-agnostic protocol
   wire.ts             ACP message types (re-exported from the official SDK)
-  client.ts           spawn + stdio JSON-RPC framing, one process per workspace
+  client.ts           spawn + stdio JSON-RPC framing, owned workspace/chat leases
   adapter.ts          session/update → Turn/ToolCall (+ chunk accumulation)
   session.ts          per-session state machine, driven by AcpProviderConfig
   discovery.ts        session/list, model catalog, home-card preview
@@ -117,10 +118,18 @@ hermes/               provider specifics only
   discovery.ts        profile discovery (the importable "agents")
   index.ts            the Harness object + AcpProviderConfig
   NOTES.md            protocol research + backend quirks
+fx/                   provider specifics only
+  index.ts            Harness, chat process scope, availability, workspace skills
+  models.ts           config-option model/effort selection and validation
+  adapter.ts          native tool names, shell deltas, operational notices
+  NOTES.md            pinned build, verification, and remaining limits
 ```
 
-A new ACP provider supplies an `AcpProviderConfig`: an id, the spawn spec
-(binary + args), the no-prompt mode id, and whether images ride inline.
+A new ACP provider supplies an `AcpProviderConfig`: an id, spawn spec,
+process scope, session mode, and image support. Optional hooks normalize
+provider updates and apply model/effort settings. fx needs one process per
+chat plus separate discovery because it supports only one active session
+per process; Hermes shares a workspace process.
 
 `wire.ts` re-exports the schema-generated types from
 `@agentclientprotocol/sdk` — a **types-only, dev-only** dependency, since
@@ -190,6 +199,23 @@ servers upstream. Two backend quirks are worked around in `acp/session.ts`:
 tool calls left unsettled at turn end are closed (Hermes never completes file
 read/write calls live), and a completing `tool_call_update` carries no title, so
 the established name is kept. See `hermes/NOTES.md`.
+
+**fx — first version, experimental.** Create/import an fx workspace from
+the UI or run `moi init --harness=fx`. The harness drives `fx acp` with one
+owned process per chat, separate discovery, structured `session/load` replay,
+streaming, interruption, queued follow-ups, local archive, and workspace skills
+in `.agents/skills`. Model and reasoning-effort choices use validated ACP
+config options and apply before the next prompt. Effort is exposed only when
+the selected model advertises it. `code` mode is reapplied after load and
+retains fx's automatic action review; held actions remain visible failures.
+
+Verified with official dev revision
+`f4ea28b23764a67b9054b357b2e3ac81a12b9138` (version `0.0.8`), including a
+real gateway file read, effort selection, and cold replay. Stable `0.0.8`
+predates structured replay: use the dev build described in [fx notes](fx/NOTES.md).
+Known limits: normal tool output is clipped upstream, rich image/MCP results
+are not yet rendered, and provider switching, subagent lanes, fast mode, and
+interactive approvals are not exposed. Sign-in remains in the fx CLI.
 
 **Codex — shipped, experimental.** One `codex app-server` per workspace supplies
 chat, model/session catalogs, history, steering, and interruption. The harness
@@ -308,7 +334,7 @@ describes what moi exposes, not every RPC available in the upstream protocol.
 | Interrupt                | ✅ `interrupt()`                                    | ✅                        | ✅ `turn/interrupt`                   | ✅ `session/cancel` → `cancelled`    |
 | List models              | ✅ `supportedModels()`                              | ✅ `models.list`          | ✅ `model/list`                       | ✅ inline on `session/new`           |
 | Live model switch        | ✅ `setModel()`                                     | ✅ `sessions.patch`       | ✅ per-turn override                  | ⚠️ drops session MCP servers         |
-| Live effort switch       | ✅ `applyFlagSettings`                              | ✅ `thinkingLevel` patch  | ✅ per-turn                           | ❌ no effort concept in ACP          |
+| Live effort switch       | ✅ `applyFlagSettings`                              | ✅ `thinkingLevel` patch  | ✅ per-turn                           | ❌ Hermes exposes no working option  |
 | Token deltas             | ✅ opt-in                                           | ✅ `chat` frames          | ✅ `item/*/delta`                     | ✅ always on, thinking + text        |
 | Images in input          | ✅ base64 blocks                                    | ⚠️ materialize to path    | ✅ inline data URLs                   | ✅ base64 blocks                     |
 | Interactive approvals    | ⚠️ (we bypass)                                      | ✅                        | ✅ server→client requests (we bypass) | ✅ real, with diffs (we bypass)      |
@@ -317,6 +343,12 @@ describes what moi exposes, not every RPC available in the upstream protocol.
 | MCP status               | ✅ `mcpServerStatus()`                              | n/a                       | ✅ `mcpServerStatus/list`             | ⚠️ per-session config, no status RPC |
 | Usage reporting          | ⚠️ cost/duration on `result` (adapter drops tokens) | ✅ tokens + cost per turn | ✅ per-turn tokens and duration       | ✅ tokens per turn                   |
 | Structured output        | ❌                                                  | ❌                        | ⚠️ title generation only              | ❌                                   |
+
+fx uses the shared ACP lifecycle, with chat-scoped processes and config-option
+model/effort selection. It supports structured history, live text/tool updates,
+local archive, and live usage; replay does not restore thoughts or usage. Inline
+image transport is enabled but was not covered by the file-read probe. See the
+[fx verification and limits](fx/NOTES.md) for the current first-version surface.
 
 ## Design lessons so far
 

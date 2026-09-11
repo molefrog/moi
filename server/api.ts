@@ -993,7 +993,7 @@ workspaces.get('/discover', async c => c.json(await discoverWorkspaces()))
 
 // Backends the create dialog can provision from scratch. OpenClaw workspaces
 // belong to their agents and arrive via discovery.
-const CREATABLE_TYPES = new Set<WorkspaceType>(['claude-code', 'codex'])
+const CREATABLE_TYPES = new Set<WorkspaceType>(['claude-code', 'codex', 'fx'])
 
 async function workspaceTypeAvailability(type: WorkspaceType): Promise<HarnessAvailability> {
   return (await harnessFor(type).availability?.()) ?? { status: 'available' }

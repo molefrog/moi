@@ -2,11 +2,36 @@
 
 Updated 2026-09-05 (Asia/Nicosia). These notes replace the original conformance
 report and its implementation plan. Findings, verification limits, and proposed
-solutions are consolidated here. The fixes below are not implemented.
+solutions are consolidated here. The original findings below describe the
+September 5/10 audit; the September 11 implementation supersedes the items
+listed in the addendum below.
 Addendum 2026-09-10: fx's lossy `session/load` (tracker #1) is fixed upstream
 and re-verified through moi's ACP layer; see §4 fx and `scripts/probe-fx-acp.ts`.
 
-**Fix moi's session lifecycle and protocol mapping before adding providers.**
+## September 11 implementation addendum
+
+fx is now a creatable workspace harness, verified with official dev revision
+`f4ea28b23764a67b9054b357b2e3ac81a12b9138`. See [fx notes](../fx/NOTES.md)
+for installation, real-gateway evidence, and remaining limitations.
+
+The shared ACP layer now deduplicates pending loads, waits for readiness,
+retains concrete process ownership, isolates fx chats/discovery, applies queued
+settings at dequeue, preserves RPC error codes/data, and prevents archived or
+crashed runners from sending queued work through replacement processes. Idle
+chats are released after ten minutes. Cancellation and missing completion
+records no longer turn unfinished tools into successful calls.
+
+Adapter updates retain explicit empty collections, raw output and structured
+diffs, respect message IDs, and attach usage to tool-only runs. fx handles
+shell deltas and diagnostic prefixes locally. Listing deduplicates IDs/cursors
+and filters cwd (including canonical macOS paths). Pagination remains bounded;
+there is no user-facing truncation indicator yet.
+
+Today's upstream build also adds validated, persisted session-local effort
+(`configId: effort`, category `thought_level`). Tracker #12 and the September
+10 observation of no effort option are historical, not current limitations.
+
+**Original implementation priority: fix lifecycle and mapping before adding providers.**
 The independent host probe exposed twelve failed behavior checks despite all
 42 existing ACP tests passing. Provider compatibility then needs a few focused
 hooks: fx process isolation and history retrieval, Hermes completion/usage
@@ -252,10 +277,9 @@ prompt errors, but returning an error is not implementing the associated feature
   model value; other providers have different validation paths. Prefer its
   known `model` option ID and preserve the separate provider selector. Verify
   returned state and fail the send when a required switch fails.
-- **Do not swap global settings for effort:** separate processes still race
-  on `~/.fx/settings.json`, crashes can leave a temporary value installed, and
-  unrelated CLI launches can observe it. Expose a validated session-local
-  `thought_level` option upstream and persist effort with the session.
+- **Use session-local effort:** the September 11 dev build exposes validated
+  `configId: effort` with category `thought_level`, persisted per session.
+  moi now uses it; global `~/.fx/settings.json` swaps remain unsafe.
 - **Keep measured run durations:** all four observed CLI tool results had the
   same `created_at_ms`; the turn had no start/end fields. Those timestamps do
   not establish per-tool duration and do not replace `run-durations.ts`.
@@ -470,7 +494,7 @@ linked existing upstream issue is #1; no new reports were sent in this audit.
 | 9   | Cursor | Shell approvals confirmed; MCP/force historical. Existing permission callback supports current moi policy.                                                                                                                                           |
 | 10  | Cursor | Usage absent in tested paths. Display unavailable and accept future standard updates.                                                                                                                                                                |
 | 11  | All    | Universal mode reset disproved. Cursor preserves plan; Hermes preserves warm mode; moi already reapplies mode after load.                                                                                                                            |
-| 12  | fx     | Effort option inert; still no effort/thought config option on `main` (2026-09-10). No global settings swap; upstream session-local option and persistence.                                                                                           |
+| 12  | fx     | Fixed upstream on 2026-09-11: `effort` / `thought_level` is validated and persisted per session. Implemented in moi and verified on the real gateway with high effort; no global settings swap.                                                      |
 | 13  | Hermes | Effort config not passed through constructor path. Resolve/pass session reasoning upstream; keep picker unavailable meanwhile.                                                                                                                       |
 | 14  | Cursor | Exact catalog variants work; separate effort override not established. Do not invent IDs or claim impossibility.                                                                                                                                     |
 | 15  | All    | Flat subagent cards have historical evidence. Optional private-history enrichment remains separate work.                                                                                                                                             |

@@ -5,6 +5,7 @@ import type { ToolCall } from '@/lib/types'
 
 import { claudeFormatter } from './claude'
 import { codexFormatter } from './codex'
+import { fxFormatter } from './fx'
 import { hermesFormatter } from './hermes'
 import { openclawFormatter } from './openclaw'
 import { makeShortenPaths, type ToolFormatter } from './shared'
@@ -16,7 +17,8 @@ const FORMATTERS: Record<NonNullable<ToolCall['provider']>, ToolFormatter> = {
   'claude-code': claudeFormatter,
   openclaw: openclawFormatter,
   codex: codexFormatter,
-  hermes: hermesFormatter
+  hermes: hermesFormatter,
+  fx: fxFormatter
 }
 
 // Calls persisted before the provider field existed carry none — they came

@@ -81,7 +81,7 @@ export const hermesHarness: Harness = {
     // `session/set_model` works mid-session, but drops session-scoped MCP
     // servers (NOTES.md §3.10). Safe today because moi attaches none.
     liveModelSwitch: true,
-    liveEffortSwitch: false, // ACP has no reasoning-effort concept
+    liveEffortSwitch: false, // Hermes does not expose a working session effort option
     nativeUserEcho: false // ACP never echoes the send; moi synthesizes the turn
   },
 
@@ -94,7 +94,7 @@ export const hermesHarness: Harness = {
     await archiveAcpSession(ws.path, sessionId)
     forgetAcpSession(ws.id, sessionId)
   },
-  activeSessions: () => getAcpActiveSessions(),
+  activeSessions: () => getAcpActiveSessions('hermes'),
 
   listSessions: ws => listAcpSessions(config, ctxOf(ws)),
   workspacePreview: (ws, includeFirstUserMessage) =>
@@ -157,7 +157,7 @@ export const hermesHarness: Harness = {
   wireScope: ws => ws.path,
 
   statusLines: () => {
-    const active = getAcpActiveSessions()
+    const active = getAcpActiveSessions('hermes')
     return [
       `hermes executable  ${findHarnessExecutable('hermes') ?? '(not found)'}`,
       `live Hermes runs  ${active.length}`,
