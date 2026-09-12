@@ -120,7 +120,7 @@ export const fxHarness: Harness = {
         return {
           status: 'unavailable',
           reason:
-            'This fx build cannot restore tool history. Run fx upgrade --channel dev to update it.'
+            'This fx build cannot restore tool history. Run fx upgrade to install version 0.0.9 or later.'
         }
       }
       if (
