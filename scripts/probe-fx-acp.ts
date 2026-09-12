@@ -64,9 +64,9 @@ function toolCall(toolCallId: string, toolName: string, input: Record<string, un
 
 // The gateway shape fx's own e2e suite fakes (tests/e2e/tmux-helpers.ts):
 // a models catalog, the coding-agent chat endpoint answering from a queue, and
-// the permission classifier always clearing the call.
+// separate background title generation and permission-classifier responses.
 function startFakeGateway() {
-  const requests: string[] = []
+  const chatRequests: Record<string, unknown>[] = []
   const completions = [
     () => toolCall('replay_call_1', 'read_file', { path: 'replay-note.txt' }),
     () =>
@@ -98,7 +98,16 @@ function startFakeGateway() {
       }
       if (req.method !== 'POST') return new Response('not found', { status: 404 })
       const body = await req.text()
-      requests.push(body)
+      if (
+        body.includes(
+          'Generate a short title for a conversation that begins with the user message below.'
+        )
+      ) {
+        return sse([
+          { type: 'text-delta', id: 'title_1', delta: 'Read replay note' },
+          { type: 'finish', finishReason: { unified: 'stop', raw: 'stop' } }
+        ])
+      }
       if (body.includes('"permission_decision"')) {
         return toolCall('permission_decision_1', 'permission_decision', {
           risk: 'low',
@@ -106,6 +115,7 @@ function startFakeGateway() {
           rationale: 'probe fixture'
         })
       }
+      chatRequests.push(JSON.parse(body) as Record<string, unknown>)
       const next = completions.shift()
       return next ? next() : new Response('unexpected request', { status: 500 })
     }
@@ -113,12 +123,12 @@ function startFakeGateway() {
   const baseUrl = `http://127.0.0.1:${server.port}`
   return {
     baseUrl,
-    requests,
+    chatRequests,
     env: {
       AI_GATEWAY_API_KEY: 'fake-probe-key',
       VERCEL_OIDC_TOKEN: '',
       FX_GATEWAY_BASE_URL: baseUrl,
-      FX_GATEWAY_CHAT_URL: `${baseUrl}/v3/ai/language-model`,
+      FX_GATEWAY_CHAT_URL: `${baseUrl}/v4/ai/language-model`,
       FX_MODEL: FAKE_MODEL
     },
     stop: () => server.stop(true)
@@ -294,8 +304,14 @@ try {
   const effortSent =
     !gateway ||
     !requestedEffort ||
-    gateway.requests.some(body => body.includes(`"reasoning":"${requestedEffort}"`))
-  if (gateway && requestedEffort) console.log(`requested effort reached model ${effortSent}`)
+    (gateway.chatRequests.length > 0 &&
+      gateway.chatRequests.every(body => body.reasoning === requestedEffort))
+  if (gateway && requestedEffort) {
+    console.log(
+      `chat request reasoning   ${JSON.stringify(gateway.chatRequests.map(body => body.reasoning))}`
+    )
+    console.log(`requested effort reached model ${effortSent}`)
+  }
   lossy =
     liveTools.length === 0 ||
     replayTools.length !== liveTools.length ||

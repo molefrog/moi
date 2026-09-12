@@ -210,9 +210,10 @@ the selected model advertises it. `code` mode is reapplied after load and
 retains fx's automatic action review; held actions remain visible failures.
 
 Verified with official dev revision
-`f4ea28b23764a67b9054b357b2e3ac81a12b9138` (version `0.0.8`), including a
-real gateway file read, effort selection, and cold replay. Stable `0.0.8`
-predates structured replay: use the dev build described in [fx notes](fx/NOTES.md).
+`50252617707bcd7ba961d938f82a0c3c85a60230` (version `0.0.9`), including
+real Gateway file reads, effort selection, live thinking, generated titles,
+and cold replay. Stable `0.0.9` now includes effort and structured replay;
+stable `0.0.8` predates them. See [fx notes](fx/NOTES.md).
 Known limits: normal tool output is clipped upstream, rich image/MCP results
 are not yet rendered, and provider switching, subagent lanes, fast mode, and
 interactive approvals are not exposed. Sign-in remains in the fx CLI.

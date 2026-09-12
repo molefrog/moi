@@ -1,22 +1,24 @@
 # fx over ACP
 
-Verified on 2026-09-11 with the official dev build
-`f4ea28b23764a67b9054b357b2e3ac81a12b9138` (reports version `0.0.8`).
-The stable `0.0.8` release, revision `43c11dcc34a9`, predates structured
-history replay; version alone cannot distinguish these builds.
+Verified again on 2026-09-12 with official dev `0.0.9`, revision
+`50252617707bcd7ba961d938f82a0c3c85a60230`. Stable `0.0.9`, revision
+`e26e97ec4040827b86a1c70c62273e0a8546d3e5`, now includes ACP effort and
+structured history replay. Stable `0.0.8`, revision `43c11dcc34a9`, predates
+those features; the earlier dev `0.0.8` pin below already included them.
 
 ## Installation
 
-Install fx using its [official instructions](https://fx.sh/docs), then run
-`fx upgrade --channel dev` while these changes remain unreleased. Check
+Install fx using its [official instructions](https://fx.sh/docs), or run
+`fx upgrade` on an existing installation. Use version `0.0.9` and check
 `fx status` for `build_revision`. Sign in with `fx login`, `fx login codex`,
 or `fx login grok` before opening a chat in moi. The selected provider and
 credentials stay owned by fx; moi does not change profile settings.
 
-For this verification, the immutable [macOS arm64 artifact](https://releases.fx.sh/dev/f4ea28b23764a67b9054b357b2e3ac81a12b9138/fx-macos-aarch64.tar.gz)
-passed its published SHA-256 checksum. The previous local executable was
-preserved at `~/.local/bin/fx.backup-v0.0.8`. The update channel was left
-unchanged. An expired but refreshable login worked without signing in again.
+The immutable [macOS arm64 artifact](https://releases.fx.sh/dev/50252617707bcd7ba961d938f82a0c3c85a60230/fx-macos-aarch64.tar.gz)
+passed its published SHA-256 checksum. The previous dev executable is
+preserved at `~/.local/bin/fx.backup-f4ea28b23764`; the original stable backup
+remains at `~/.local/bin/fx.backup-v0.0.8`. The update channel and login were
+left unchanged.
 
 ## Integration
 
@@ -51,6 +53,46 @@ unchanged. An expired but refreshable login worked without signing in again.
   history remains in fx itself and can still appear in the fx CLI.
 
 ## Verification
+
+### September 12, version 0.0.9
+
+The ACP effort selector, model-switch consistency fix, and Gateway v4 effort
+fix in the 0.0.9 release were already present in the September 11 dev pin
+`f4ea28b23764a67b9054b357b2e3ac81a12b9138`. New changes since that pin include
+first-prompt generated chat titles and preserving tool-result bytes for model
+processing/storage. The ACP thought/replay protocol itself is unchanged.
+
+Real Sonnet file reads retained structured tool input/output after a cold load,
+and High effort persisted. The fake Gateway probe now answers background title
+generation separately so it cannot consume the chat's queued tool response.
+It parses chat requests separately from titles/classification and verifies
+`reasoning: high` on every chat request, including the tool continuation.
+
+The browser created a chat using GLM/Low; the wire confirmed `effort: low`,
+the model answered, and the header updated to its generated title,
+`Exact Token Response Request`.
+A separate real chat switched GLM/Low to Luna/High. The wire confirmed the
+model change, then effort, before the second prompt. A cold load through the
+ordinary provider configuration restored Luna/High and both replies.
+
+The real thinking probe used a fresh 247-model catalog and the same probability
+problem as the baseline. All incoming thinking characters reached moi intact;
+all final answers and explicit High settings survived cold loading.
+
+| Catalog model                      | Effort                 | Live thought chunks | Reasoning characters in moi | Cold reasoning characters |
+| ---------------------------------- | ---------------------- | ------------------: | --------------------------: | ------------------------: |
+| `anthropic/claude-sonnet-5`        | High                   |                   0 |                           0 |                         0 |
+| `openai/gpt-5.6-luna`              | High                   |                 187 |                         935 |                         0 |
+| `zai/glm-5.3-flash`                | High                   |                 576 |                       3,754 |                         0 |
+| `alibaba/qwen3-235b-a22b-thinking` | No selector advertised |               4,604 |                       9,929 |                         0 |
+
+No harness errors, tool calls, or capture truncation occurred. GLM answered
+`20/61` instead of `20/51`; the other three answered correctly. Luna emitted
+thinking today after emitting none yesterday. Since the upstream thought
+transport did not change, this observation alone does not attribute the
+difference to the binary update.
+
+### September 11 baseline
 
 Desktop browser verification created an fx workspace, selected Sonnet 5,
 wrote and read `fx-ready.txt`, switched effort to High, and ran a follow-up.
@@ -98,7 +140,7 @@ specific prefix, preserves live stdout, and retains the incomplete envelope
 as metadata. The regression is covered by the 14 fx unit tests. Cold shell
 replay has no stdout deltas; its explicit output-limit notice is verified.
 
-### Real thinking models
+### Real thinking models, September 11 baseline
 
 `PROBE_CATALOG=/path/to/agent-catalog.json bun scripts/probe-fx-thinking.ts`
 checks the selected models against a saved `GET /api/workspaces/:id/agent`
@@ -142,10 +184,10 @@ short live thoughts, later warnings, thought-only completion, and cancellation.
   moi restores its own measured run durations only when recorded and replayed
   run counts match; imported histories have no such measurements. Historical
   usage/timestamp enrichment needs another source, not inferred replay times.
-- Thinking text is model-dependent even when High effort is confirmed. The
-  live GLM 5.3 Flash run emitted thinking, while Sonnet 5 and Luna did not
-  emit thought chunks in the tested Gateway runs. Effort selection does not
-  guarantee visible thinking.
+- Thinking text is model-dependent even when High effort is confirmed.
+  GLM and Qwen emitted thinking on both dates; Luna did so only in the
+  September 12 run, and Sonnet did not in either run. Effort selection does
+  not guarantee visible thinking.
 - Cold ACP replay omits thinking. For the verified GLM run, fx stored a
   1,549-character reasoning part in its private provider replay events, but
   both `session/load` and `fx session --id <id> --json` omit it. Restoring
@@ -161,9 +203,10 @@ short live thoughts, later warnings, thought-only completion, and cancellation.
   into moi's saved chat preferences. Select the intended model and effort
   explicitly for these chats. Workspace-wide effort defaults use `auto`;
   another chat's selected effort is not treated as a provider default.
-- Chat list titles can remain `Untitled session` when fx omits a saved title;
-  moi does not generate titles. Better naming, full-output enrichment, nested
-  subagent views, a provider picker, fast mode, and fork UI are v1
+- fx 0.0.9 generates titles from the first prompt and moi reflects them.
+  Older/imported chats can remain `Untitled session` when fx has no saved
+  title. Full-output enrichment, nested subagent views, a provider picker,
+  fast mode, and fork UI are v1
   omissions, not claims that the protocol makes them impossible.
 - Native fx does not implement ACP `session/remove`: the parsed method is
   implemented only in its WASM runtime; native dispatch returns `-32601`.
@@ -181,8 +224,9 @@ short live thoughts, later warnings, thought-only completion, and cancellation.
 - Instruction discovery may omit instructions outside the user's home;
   the resulting warnings remain visible.
 
-Sources: [ACP documentation](https://fx.sh/docs/using-fx/acp),
+Sources: [0.0.9 release](https://github.com/vercel-labs/fx/releases/tag/v0.0.9),
+[ACP documentation](https://fx.sh/docs/using-fx/acp),
 [structured replay #788](https://github.com/vercel-labs/fx/pull/788),
 [effort support](https://github.com/vercel-labs/fx/commit/32f3dc9ee07b9649ce10d6b24d1e30af0e20302a),
 [effort catalog consistency](https://github.com/vercel-labs/fx/commit/726cea85953b38317cdb200ac06cf8cf6ecdc705),
-and [pinned session implementation](https://github.com/vercel-labs/fx/blob/f4ea28b23764a67b9054b357b2e3ac81a12b9138/src/acp/sessions.zig).
+and [pinned session implementation](https://github.com/vercel-labs/fx/blob/50252617707bcd7ba961d938f82a0c3c85a60230/src/acp/sessions.zig).
