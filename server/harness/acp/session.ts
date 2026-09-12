@@ -1,7 +1,7 @@
 // Per-(workspaceId, sessionId) live ACP session adapter.
 //
-// One agent process per workspace (see ./client.ts) serves every session in
-// it; this module owns the per-session state: the durable in-memory view, turn
+// Providers choose a workspace or session process scope (see ./client.ts).
+// This module owns the per-session state: the durable in-memory view, turn
 // accounting for the processing spinner, and the mapping of `session/update`
 // notifications onto moi's `StreamEvent`s.
 //
@@ -13,14 +13,14 @@
 //   - A brand-new session is created under the client's temporary uuid, then
 //     renamed to the agent's real session id (`session_renamed`) — same flow
 //     as the Claude Code, OpenClaw and Codex paths.
-//   - ACP has no steer: a send that lands mid-turn is queued and flushed when
+//   - moi queues a send that lands mid-turn and flushes it when
 //     the running turn resolves.
 //   - `session/prompt` is a long-running request that resolves at end of turn,
 //     so its promise IS the turn's lifetime — activity is mirrored from it,
 //     never derived by counting frames.
 import { appendAttachmentNote } from '@/lib/attachment-note'
 import { type MoiContext, appendMoiContext, renderMoiContext } from '@/lib/moi-context'
-import { type Part, applyEvent, emptyViewState } from '@/lib/format'
+import { type Part, type Turn, applyEvent, emptyViewState } from '@/lib/format'
 import type { Model, SessionActivity, StreamEvent, ViewState, WorkspaceType } from '@/lib/types'
 
 import {
@@ -31,7 +31,7 @@ import {
   replayedUserParts,
   toolTurnId
 } from './adapter'
-import { type AcpClient, type AcpSpawnSpec, getAcpClient } from './client'
+import { type AcpClient, type AcpSpawnSpec, getAcpClient, releaseAcpClient } from './client'
 import { cacheAcpModelState } from './model-state'
 import { appendRunDuration, runDurations } from './run-durations'
 import {
@@ -67,8 +67,22 @@ export type AcpProviderConfig = {
   id: WorkspaceType
   provider: AcpProviderId
   spawn: (ctx: AcpSpawnContext) => Promise<AcpSpawnSpec>
-  // Session mode that disables approval prompts, matching moi's
-  // bypass-permissions trust model. Applied to every new and resumed session.
+  processScope?: 'workspace' | 'session'
+  // Providers that persist their settings natively expose those via the
+  // harness's sessionConfig hook instead of creating implicit moi overrides.
+  persistSessionModel?: boolean
+  modelState?: (result: AcpNewSessionResult) => AcpModelState
+  defaultModel?: (ctx: AcpSpawnContext, config: AcpProviderConfig) => Promise<string | undefined>
+  applySettings?: (
+    client: AcpClient,
+    sessionId: string,
+    settings: { model?: string; effort?: string },
+    state: AcpModelState
+  ) => Promise<AcpModelState>
+  normalizeToolUpdate?: (update: ToolCallUpdate, previous?: Turn) => ToolCallUpdate
+  isOperationalMessage?: (text: string) => boolean
+  // Provider mode that handles approvals without an interactive moi prompt.
+  // It may still review or hold actions. Applied to new and resumed sessions.
   noPromptModeId?: string
   // Does the backend send images as base64 content blocks?
   supportsImages?: boolean
@@ -86,9 +100,28 @@ export type AcpProviderConfig = {
   modelStateFingerprint?: (ctx: AcpSpawnContext) => Promise<string | undefined>
 }
 
-type QueuedSend = { blocks: AcpPromptBlock[]; turnId: string }
+type QueuedSend = {
+  blocks: AcpPromptBlock[]
+  turnId: string
+  parts: Part[]
+  model?: string
+  effort?: string
+  stream?: boolean
+}
 
 type SessionRecord = {
+  client: AcpClient
+  config: AcpProviderConfig
+  ready: boolean
+  disposed: boolean
+  cancelled: boolean
+  lastUsed: number
+  modelState: AcpModelState
+  settingsReady?: Promise<void>
+  defaultModel?: string
+  messageId?: string
+  userMessageId?: string
+  lastAssistantTurnId?: string
   workspaceId: string
   workspacePath: string
   agentId?: string
@@ -128,6 +161,25 @@ type SessionRecord = {
 
 const sessions = new Map<string, SessionRecord>() // key: `${workspaceId}:${sessionId}`
 const aliases = new Map<string, string>() // `${workspaceId}:${tempId}` -> real id
+type Initialization = {
+  workspacePath: string
+  provider: WorkspaceType
+  cancelled: boolean
+  promise: Promise<SessionRecord>
+}
+const initializing = new Map<string, Initialization>()
+const cancellations = new Map<string, number>()
+
+// Opened fx histories each own a process. Release idle chats after ten minutes;
+// a later send cold-loads the same durable session. Never evict a busy run.
+const idleCleanup = setInterval(() => {
+  for (const rec of sessions.values()) {
+    if (rec.ready && !rec.processing && Date.now() - rec.lastUsed > 10 * 60_000) {
+      forgetAcpSession(rec.workspaceId, rec.sessionId)
+    }
+  }
+}, 60_000)
+idleCleanup.unref()
 
 function recKey(workspaceId: string, sessionId: string): string {
   return `${workspaceId}:${sessionId}`
@@ -140,13 +192,14 @@ function liveKey(workspaceId: string, sessionId: string): string {
   return real ? recKey(workspaceId, real) : direct
 }
 
-export function getAcpActiveSessions(): {
+export function getAcpActiveSessions(provider?: WorkspaceType): {
   workspaceId: string
   sessionId: string
   activity: SessionActivity
 }[] {
   const out: { workspaceId: string; sessionId: string; activity: SessionActivity }[] = []
   for (const s of sessions.values()) {
+    if (provider && s.config.id !== provider) continue
     // ACP approvals are designed out (no-prompt mode + transport auto-approve
     // in client.ts), so `requires-action` never occurs. If that policy is
     // relaxed, `session/request_permission` is the signal to map to it.
@@ -168,6 +221,8 @@ function setProcessing(rec: SessionRecord, processing: boolean) {
 }
 
 function emitTurnEvent(rec: SessionRecord, ev: StreamEvent) {
+  if (rec.disposed) return
+  if (ev.kind === 'turn' && ev.turn.role === 'assistant') rec.lastAssistantTurnId = ev.turn.id
   // ACP replay updates carry no timestamps, so replayed turns would get
   // stamped with replay-time `new Date()`s — and the client's duration label
   // (groupTurns: assistant timestamp minus the preceding user turn's) would
@@ -185,12 +240,27 @@ function emitTurnEvent(rec: SessionRecord, ev: StreamEvent) {
 
 function forwardPreview(rec: SessionRecord) {
   if (!rec.stream || rec.replaying) return
+  let blocks = rec.acc.previewBlocks()
+  if (rec.config.isOperationalMessage) {
+    // Keep a diagnostic prefix buffered until it can be classified. fx's
+    // longest prefix is 24 characters; a split '[con' must not leak a preview.
+    // Thought chunks have their own channel and must never be classified as
+    // operational prose or hidden behind that text buffer.
+    const text = blocks
+      .filter(b => b.kind === 'text')
+      .map(b => b.text)
+      .join('')
+    if (text.length < 24 || rec.config.isOperationalMessage(text)) {
+      blocks = blocks.filter(b => b.kind !== 'text')
+    }
+  }
+  if (!blocks.length) return
   broadcast(rec.workspaceId, {
     type: 'preview',
     sessionId: rec.sessionId,
     messageId: rec.acc.currentId,
     parentToolUseId: null,
-    blocks: rec.acc.previewBlocks()
+    blocks
   })
 }
 
@@ -199,7 +269,31 @@ function flushAssistant(
   meta?: Parameters<AssistantTurnAccumulator['flush']>[0]
 ) {
   const turn = rec.acc.flush(meta)
-  if (turn) emitTurnEvent(rec, { kind: 'turn', turn })
+  if (turn) {
+    const text = turn.parts.flatMap(p => (p.type === 'text' ? [p.text] : [])).join('')
+    if (rec.config.isOperationalMessage?.(text)) {
+      emitTurnEvent(rec, {
+        kind: 'notice',
+        notice: {
+          id: turn.id,
+          kind: 'warning',
+          at: turn.timestamp ?? new Date().toISOString(),
+          message: text
+        }
+      })
+      // A provider can omit message ids on thought chunks, leaving genuine
+      // reasoning beside operational text. Classify only the text: preserve
+      // the remaining parts as a turn (and clear its live preview normally).
+      const parts = turn.parts.filter(part => part.type !== 'text')
+      if (parts.length) emitTurnEvent(rec, { kind: 'turn', turn: { ...turn, parts } })
+    } else emitTurnEvent(rec, { kind: 'turn', turn })
+  }
+  if (meta && rec.lastAssistantTurnId) {
+    const last = rec.view.turns.find(t => t.id === rec.lastAssistantTurnId)
+    if (last)
+      emitTurnEvent(rec, { kind: 'turn', turn: { ...last, meta: { ...last.meta, ...meta } } })
+  }
+  rec.messageId = undefined
 }
 
 function flushUserChunk(rec: SessionRecord) {
@@ -244,7 +338,13 @@ function ingestToolCall(
   const aliased = aliasedId === update.toolCallId ? update : { ...update, toolCallId: aliasedId }
   const id = toolTurnId(rec.sessionId, aliasedId)
   const previous = rec.view.turns.find(t => t.id === id)
-  const turn = acpToolCallToTurn({ update: aliased, sessionId: rec.sessionId, provider, previous })
+  const normalized = rec.config.normalizeToolUpdate?.(aliased, previous) ?? aliased
+  const turn = acpToolCallToTurn({
+    update: normalized,
+    sessionId: rec.sessionId,
+    provider,
+    previous
+  })
   const state = turn.parts.find(p => p.type === 'tool-call')
   const settled =
     state?.type === 'tool-call' && (state.call.state === 'success' || state.call.state === 'error')
@@ -253,10 +353,12 @@ function ingestToolCall(
   emitTurnEvent(rec, { kind: 'turn', turn })
 }
 
-// Some backends never send a terminal `tool_call_update` for certain tools
-// (Hermes drops it for file read/write — NOTES.md §3.4), which would leave the
-// card spinning forever. The turn ending is proof the call finished.
-function closeOpenToolCalls(rec: SessionRecord) {
+// Some backends omit terminal updates. Stop the spinner at turn end while
+// keeping the outcome unknown: absence of a result is not proof of success.
+function closeOpenToolCalls(
+  rec: SessionRecord,
+  reason = 'The agent ended without reporting a tool result.'
+) {
   for (const toolCallId of rec.openToolCalls) {
     const id = toolTurnId(rec.sessionId, toolCallId)
     const turn = rec.view.turns.find(t => t.id === id)
@@ -274,7 +376,9 @@ function closeOpenToolCalls(rec: SessionRecord) {
       turn: {
         ...turn,
         parts: turn.parts.map(p =>
-          p.type === 'tool-call' ? { ...p, call: { ...p.call, state: 'success' as const } } : p
+          p.type === 'tool-call'
+            ? { ...p, call: { ...p.call, state: 'error' as const, errorText: reason } }
+            : p
         )
       }
     })
@@ -283,6 +387,14 @@ function closeOpenToolCalls(rec: SessionRecord) {
 }
 
 function handleSessionUpdate(rec: SessionRecord, update: SessionUpdate, provider: AcpProviderId) {
+  const messageId = (update as SessionUpdate & { messageId?: string }).messageId
+  if (
+    update.sessionUpdate === 'agent_message_chunk' ||
+    update.sessionUpdate === 'agent_thought_chunk'
+  ) {
+    if (messageId && rec.messageId && messageId !== rec.messageId) flushAssistant(rec)
+    if (messageId) rec.messageId = messageId
+  }
   switch (update.sessionUpdate) {
     case 'agent_message_chunk': {
       flushUserChunk(rec)
@@ -293,6 +405,17 @@ function handleSessionUpdate(rec: SessionRecord, update: SessionUpdate, provider
     }
     case 'agent_thought_chunk': {
       flushUserChunk(rec)
+      // fx warnings have message ids, while its thought chunks may have none.
+      // End the warning before appending thoughts so a later answer id cannot
+      // turn the entire reasoning run into a warning notice.
+      if (rec.config.isOperationalMessage) {
+        const text = rec.acc
+          .previewBlocks()
+          .filter(block => block.kind === 'text')
+          .map(block => block.text)
+          .join('')
+        if (rec.config.isOperationalMessage(text)) flushAssistant(rec)
+      }
       const block = (update as { content?: { text?: string } }).content
       rec.acc.append('reasoning', block?.text ?? '')
       forwardPreview(rec)
@@ -301,6 +424,8 @@ function handleSessionUpdate(rec: SessionRecord, update: SessionUpdate, provider
     case 'user_message_chunk': {
       // Replay only — live sends are echoed by moi itself.
       flushAssistant(rec)
+      if (messageId && rec.userMessageId && messageId !== rec.userMessageId) flushUserChunk(rec)
+      rec.userMessageId = messageId
       const content = (update as Partial<ContentChunk>).content
       if (isTextBlock(content)) {
         rec.userChunk += content.text
@@ -348,12 +473,13 @@ function handleNotification(
   method: string,
   params: Record<string, unknown>
 ) {
+  if (rec.disposed) return
   if (method === '__exit') {
     // The agent died (crash or env-change restart). Drop the record so the
     // next message re-resumes against a fresh process.
-    setProcessing(rec, false)
-    rec.unsubscribe?.()
-    sessions.delete(recKey(rec.workspaceId, rec.sessionId))
+    closeOpenToolCalls(rec, 'The agent exited before reporting a tool result.')
+    flushAssistant(rec)
+    disposeRecord(rec)
     return
   }
   if (method !== 'session/update') return
@@ -383,6 +509,13 @@ function createRecord(input: {
   model?: string
 }): SessionRecord {
   const rec: SessionRecord = {
+    client: input.client,
+    config: input.config,
+    ready: false,
+    disposed: false,
+    cancelled: false,
+    lastUsed: Date.now(),
+    modelState: {},
     workspaceId: input.workspaceId,
     workspacePath: input.workspacePath,
     agentId: input.agentId,
@@ -406,51 +539,134 @@ function createRecord(input: {
   return rec
 }
 
-// Apply the no-prompt mode so tool approvals never block a turn.
+// Apply the provider's policy for handling approvals without a moi prompt.
 async function applyNoPromptMode(client: AcpClient, config: AcpProviderConfig, sessionId: string) {
   if (!config.noPromptModeId) return
-  try {
-    await client.rpc('session/set_mode', { sessionId, modeId: config.noPromptModeId })
-  } catch (err) {
-    debug(
-      `${config.id} set_mode failed session=${sessionId}: ${err instanceof Error ? err.message : err}`
-    )
-  }
+  await client.rpc('session/set_mode', { sessionId, modeId: config.noPromptModeId })
 }
 
-async function resumeSession(
-  config: AcpProviderConfig,
-  input: AcpSpawnContext & { sessionId: string }
-): Promise<SessionRecord> {
-  const existing = sessions.get(liveKey(input.workspaceId, input.sessionId))
-  if (existing) return existing
-  const client = await getAcpClient(await config.spawn(input))
-  const rec = createRecord({ ...input, client, config })
-  // `session/load` replays the whole transcript as session/update
-  // notifications on this connection — they flow through the same handler,
-  // so flag the record as replaying to suppress previews and title events.
-  rec.replaying = true
-  try {
-    await client.rpc('session/load', {
-      sessionId: input.sessionId,
-      cwd: input.workspacePath,
-      mcpServers: []
-    })
-  } catch (err) {
-    // The record is already registered, and a live record makes every later
-    // send skip `session/load` and prompt a session this process never
-    // resumed. Drop it so the next send retries the replay.
-    rec.unsubscribe?.()
-    sessions.delete(recKey(rec.workspaceId, rec.sessionId))
-    throw err
-  } finally {
-    flushAssistant(rec)
-    flushUserChunk(rec)
-    rec.replaying = false
+function disposeRecord(rec: SessionRecord) {
+  if (rec.disposed) return
+  rec.queue.length = 0
+  rec.cancelled = true
+  if (rec.processing && rec.client.isAlive()) {
+    try {
+      rec.client.notify('session/cancel', { sessionId: rec.sessionId })
+    } catch {}
   }
-  await attachReplayDurations(rec)
-  await applyNoPromptMode(client, config, input.sessionId)
-  return rec
+  setProcessing(rec, false)
+  rec.disposed = true
+  rec.unsubscribe?.()
+  const key = recKey(rec.workspaceId, rec.sessionId)
+  if (sessions.get(key) === rec) sessions.delete(key)
+  if (rec.config.processScope === 'session') releaseAcpClient(rec.client)
+}
+
+function initializeSession(
+  config: AcpProviderConfig,
+  input: AcpSpawnContext & { sessionId: string; isNew?: boolean }
+): Promise<SessionRecord> {
+  const canonicalId = aliases.get(recKey(input.workspaceId, input.sessionId))
+  if (canonicalId) input = { ...input, sessionId: canonicalId, isNew: false }
+  const key = liveKey(input.workspaceId, input.sessionId)
+  const pending = initializing.get(key)
+  if (pending) return pending.promise
+  const existing = sessions.get(key)
+  if (existing?.ready && !existing.disposed && existing.config.id === config.id) {
+    existing.lastUsed = Date.now()
+    return Promise.resolve(existing)
+  }
+  const init: Initialization = {
+    workspacePath: input.workspacePath,
+    provider: config.id,
+    cancelled: false,
+    promise: Promise.resolve(undefined as unknown as SessionRecord)
+  }
+  // Publish the initialization before any asynchronous work, including spawn.
+  initializing.set(key, init)
+  init.promise = (async () => {
+    const spec = await config.spawn(input)
+    const client = await getAcpClient({
+      ...spec,
+      ...(config.processScope === 'session' ? { scope: `chat:${input.sessionId}` } : {})
+    })
+    let rec: SessionRecord | undefined
+    try {
+      if (init.cancelled) throw new Error('Chat was closed while connecting')
+      // Install the receiver before load: it emits history before its response.
+      if (!input.isNew) {
+        rec = createRecord({ ...input, client, config })
+        rec.replaying = true
+      }
+      const result = await client.rpc<AcpNewSessionResult>(
+        input.isNew ? 'session/new' : 'session/load',
+        {
+          ...(input.isNew ? {} : { sessionId: input.sessionId }),
+          cwd: input.workspacePath,
+          mcpServers: []
+        }
+      )
+      if (init.cancelled || rec?.disposed) throw new Error('Chat was closed while connecting')
+      const realId = input.isNew ? result.sessionId : input.sessionId
+      if (!realId) throw new Error(`${config.id} returned no session id`)
+      initializing.set(recKey(input.workspaceId, realId), init)
+      if (!rec) rec = createRecord({ ...input, sessionId: realId, client, config })
+      const state = config.modelState?.(result) ?? result.models ?? {}
+      if (!input.isNew && config.defaultModel) {
+        state.defaultModelId = await config.defaultModel(input, config)
+      }
+      rec.modelState = state
+      rec.model = state.currentModelId
+      rec.defaultModel = state.defaultModelId ?? state.currentModelId
+      flushAssistant(rec)
+      flushUserChunk(rec)
+      closeOpenToolCalls(rec, 'No tool completion was recorded in this chat.')
+      rec.replaying = false
+      rec.acc.setModel(rec.model)
+      if (!input.isNew) await attachReplayDurations(rec)
+      await applyNoPromptMode(client, config, realId)
+      // Restored selectors describe the active chat, including its effort
+      // options. Cache them only when the provider's actual default has been
+      // resolved separately, so a saved model cannot become the default row.
+      const cacheModelState =
+        input.isNew || (config.defaultModel !== undefined && state.defaultModelId !== undefined)
+      if (cacheModelState) {
+        const fingerprint = await config.modelStateFingerprint?.(input)
+        cacheAcpModelState(input.workspacePath, state, fingerprint, config.id)
+      }
+      if (realId !== input.sessionId) {
+        // Both ids share the initialization until policy and persistence finish.
+        aliases.set(recKey(input.workspaceId, input.sessionId), realId)
+        initializing.set(recKey(input.workspaceId, realId), init)
+        await renameSessionConfig(input.workspacePath, input.sessionId, realId)
+        await renameSelectedSession(input.workspacePath, input.sessionId, realId)
+        await renameViewBuilderSession(
+          input.workspaceId,
+          input.workspacePath,
+          input.sessionId,
+          realId
+        )
+        broadcast(input.workspaceId, { type: 'session_renamed', from: input.sessionId, to: realId })
+      }
+      if (init.cancelled || rec.disposed) throw new Error('Chat was closed while connecting')
+      rec.ready = true
+      if (!input.isNew && cacheModelState) refreshAvailability(rec, config.id)
+      return rec
+    } catch (error) {
+      if (rec) disposeRecord(rec)
+      else if (config.processScope === 'session') releaseAcpClient(client)
+      throw error
+    }
+  })().finally(() => {
+    for (const [pendingKey, entry] of initializing) {
+      if (entry === init) initializing.delete(pendingKey)
+    }
+  })
+  return init.promise
+}
+
+function resumeSession(config: AcpProviderConfig, input: AcpSpawnContext & { sessionId: string }) {
+  return initializeSession(config, input)
 }
 
 // Re-attach the live-recorded run durations to a replayed transcript: split
@@ -523,53 +739,117 @@ async function buildPrompt(
 async function runPrompt(
   config: AcpProviderConfig,
   rec: SessionRecord,
-  blocks: AcpPromptBlock[]
+  send: QueuedSend
 ): Promise<void> {
+  if (rec.disposed) return
   setProcessing(rec, true)
-  // The prompt promise IS the run, so its wall time is the "Worked for Xs"
-  // duration — recorded (settled or errored) for replay, which has no
-  // timestamps of its own (see ./run-durations.ts).
+  rec.cancelled = false
+  rec.stream = send.stream === true
+  rec.lastAssistantTurnId = undefined
   const startedAt = Date.now()
+  let prompted = false
+  const settings = Promise.withResolvers<void>()
+  rec.settingsReady = settings.promise
+  const finishSettings = () => {
+    if (rec.settingsReady === settings.promise) rec.settingsReady = undefined
+    settings.resolve()
+  }
   try {
-    const client = await getAcpClient(
-      await config.spawn({
-        workspaceId: rec.workspaceId,
-        workspacePath: rec.workspacePath,
-        agentId: rec.agentId
-      })
-    )
-    const res = await client.rpc<PromptResponse>('session/prompt', {
-      sessionId: rec.sessionId,
-      prompt: blocks
+    if (config.applySettings) {
+      const previousState = rec.modelState
+      rec.modelState = await config.applySettings(
+        rec.client,
+        rec.sessionId,
+        {
+          model: send.model === 'default' ? rec.defaultModel : send.model,
+          effort: send.effort
+        },
+        rec.modelState
+      )
+      if (rec.modelState !== previousState) {
+        const fingerprint = await config.modelStateFingerprint?.(rec)
+        cacheAcpModelState(rec.workspacePath, rec.modelState, fingerprint, config.id)
+        refreshAvailability(rec, config.id)
+        broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
+      }
+      rec.model = rec.modelState.currentModelId
+      rec.acc.setModel(rec.model)
+    } else {
+      const model = send.model === 'default' ? rec.defaultModel : send.model
+      if (model && model !== rec.model) await setSessionModel(rec, model)
+    }
+    finishSettings()
+    if (rec.disposed || rec.cancelled) return
+    if (
+      send.model &&
+      config.persistSessionModel !== false &&
+      !(await hasSessionConfig(rec.workspacePath, rec.sessionId))
+    ) {
+      await saveSessionConfig(rec.workspacePath, rec.sessionId, { model: send.model })
+    }
+    if (rec.disposed || rec.cancelled) return
+    emitTurnEvent(rec, {
+      kind: 'turn',
+      turn: {
+        id: send.turnId,
+        role: 'user',
+        origin: { kind: 'user-input' },
+        parts: send.parts,
+        timestamp: new Date().toISOString()
+      }
     })
-    closeOpenToolCalls(rec)
+    prompted = true
+    const res = await rec.client.rpc<PromptResponse>('session/prompt', {
+      sessionId: rec.sessionId,
+      prompt: send.blocks
+    })
+    if (rec.disposed) return
+    closeOpenToolCalls(
+      rec,
+      res.stopReason === 'cancelled'
+        ? 'The run was stopped before the tool reported a result.'
+        : undefined
+    )
     flushAssistant(rec, {
+      ...(rec.model ? { model: rec.model } : {}),
+      provider: config.id,
+      durationMs: Date.now() - startedAt,
       ...(res.stopReason ? { stopReason: res.stopReason } : {}),
       ...(acpUsageToTurnMeta(res.usage) ? { usage: acpUsageToTurnMeta(res.usage) } : {})
     })
     if (res.stopReason === 'cancelled') {
       broadcast(rec.workspaceId, { kind: 'stopped', sessionId: rec.sessionId })
     }
-    debug(
-      `${config.id} turn done ws=${rec.workspaceId} session=${rec.sessionId} stop=${res.stopReason}`
-    )
+    broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
   } catch (err) {
-    closeOpenToolCalls(rec)
-    flushAssistant(rec)
+    if (!rec.disposed) {
+      closeOpenToolCalls(rec, 'The run failed before the tool reported a result.')
+      flushAssistant(rec)
+    }
     broadcast(rec.workspaceId, {
       kind: 'error',
       sessionId: rec.sessionId,
       content: err instanceof Error ? err.message : 'send failed'
     })
+    // A failed turn must not silently send queued requests in a replacement process.
+    rec.queue.length = 0
+    // A multi-step settings operation can change the model before a later
+    // effort change fails. Reload on the next send to recover confirmed state.
+    if (!prompted && config.applySettings) disposeRecord(rec)
     refreshAvailability(rec, config.id)
   } finally {
-    void appendRunDuration(rec.workspacePath, rec.sessionId, Date.now() - startedAt)
-    const next = rec.queue.shift()
-    if (next) {
-      void runPrompt(config, rec, next.blocks)
-    } else {
-      setProcessing(rec, false)
+    finishSettings()
+    if (prompted) {
+      await appendRunDuration(rec.workspacePath, rec.sessionId, Date.now() - startedAt).catch(
+        error => {
+          debug(`${config.id} run duration could not be saved: ${String(error)}`)
+        }
+      )
     }
+    rec.lastUsed = Date.now()
+    const next = !rec.disposed && rec.client.isAlive() ? rec.queue.shift() : undefined
+    if (next) void runPrompt(config, rec, next)
+    else setProcessing(rec, false)
   }
 }
 
@@ -585,10 +865,13 @@ export async function sendAcpMessage(
     attachments?: string[]
     optimisticId?: string
     model?: string
+    effort?: string
     stream?: boolean
     context?: MoiContext
   }
 ): Promise<void> {
+  const sendKey = liveKey(input.workspaceId, input.sessionId)
+  const cancellation = cancellations.get(sendKey) ?? 0
   const uploads = input.attachments?.length
     ? resolveUploads(input.workspaceId, input.attachments)
     : []
@@ -611,53 +894,13 @@ export async function sendAcpMessage(
     else blocks.unshift({ type: 'text', text: envelope })
   }
 
+  if ((cancellations.get(sendKey) ?? 0) !== cancellation) {
+    broadcast(input.workspaceId, { type: 'status', sessionId: input.sessionId, activity: 'idle' })
+    return
+  }
   let rec: SessionRecord
   try {
-    if (input.isNew) {
-      const client = await getAcpClient(await config.spawn(input))
-      const fingerprint = await config.modelStateFingerprint?.(input)
-      const created = await client.rpc<AcpNewSessionResult>('session/new', {
-        cwd: input.workspacePath,
-        mcpServers: []
-      })
-      // A real session start carries the same model state the picker would
-      // otherwise open a throwaway session for — keep the cache current.
-      cacheAcpModelState(input.workspacePath, created.models, fingerprint)
-      const realId = created.sessionId
-      const model = input.model ?? created.models?.currentModelId
-      if (realId !== input.sessionId) {
-        aliases.set(recKey(input.workspaceId, input.sessionId), realId)
-        await renameSessionConfig(input.workspacePath, input.sessionId, realId)
-        await renameSelectedSession(input.workspacePath, input.sessionId, realId)
-        await renameViewBuilderSession(
-          input.workspaceId,
-          input.workspacePath,
-          input.sessionId,
-          realId
-        )
-        broadcast(input.workspaceId, { type: 'session_renamed', from: input.sessionId, to: realId })
-      }
-      rec = createRecord({
-        workspaceId: input.workspaceId,
-        workspacePath: input.workspacePath,
-        agentId: input.agentId,
-        sessionId: realId,
-        client,
-        config,
-        model
-      })
-      await applyNoPromptMode(client, config, realId)
-      if (input.model) await setSessionModel(config, rec, client, input.model)
-      if (input.model && !(await hasSessionConfig(input.workspacePath, realId))) {
-        await saveSessionConfig(input.workspacePath, realId, { model: input.model })
-      }
-    } else {
-      rec = await resumeSession(config, input)
-      if (input.model && input.model !== rec.model) {
-        const client = await getAcpClient(await config.spawn(input))
-        await setSessionModel(config, rec, client, input.model)
-      }
-    }
+    rec = await initializeSession(config, input)
   } catch (err) {
     broadcast(input.workspaceId, { type: 'status', sessionId: input.sessionId, activity: 'idle' })
     broadcast(input.workspaceId, {
@@ -672,69 +915,48 @@ export async function sendAcpMessage(
     return
   }
 
-  rec.stream = input.stream === true
-
-  // Broadcast the user's bubble immediately so every connected tab shows it.
-  // ACP never echoes the send back, so this turn is the only record of it —
-  // same as the Claude Code path.
-  const turnId = input.optimisticId ?? crypto.randomUUID()
-  emitTurnEvent(rec, {
-    kind: 'turn',
-    turn: {
-      id: turnId,
-      role: 'user',
-      origin: { kind: 'user-input' },
-      parts,
-      timestamp: new Date().toISOString()
-    }
-  })
-
-  // No steer in ACP: queue behind a running turn instead of racing it.
+  const send: QueuedSend = {
+    blocks,
+    parts,
+    turnId: input.optimisticId ?? crypto.randomUUID(),
+    model: input.model,
+    effort: input.effort,
+    stream: input.stream
+  }
   if (rec.processing) {
-    rec.queue.push({ blocks, turnId })
-    debug(`${config.id} queued send ws=${rec.workspaceId} session=${rec.sessionId}`)
+    rec.queue.push(send)
     return
   }
-  await runPrompt(config, rec, blocks)
+  await runPrompt(config, rec, send)
 }
 
-// Model switches rebuild the agent on some backends; providers that need a
-// post-switch fixup (e.g. re-registering MCP servers) do it in their own
-// folder by wrapping this.
-async function setSessionModel(
-  config: AcpProviderConfig,
-  rec: SessionRecord,
-  client: AcpClient,
-  modelId: string
-): Promise<void> {
-  try {
-    await client.rpc('session/set_model', { sessionId: rec.sessionId, modelId })
-    rec.model = modelId
-    rec.acc.setModel(modelId)
-  } catch (err) {
-    debug(
-      `${config.id} set_model failed session=${rec.sessionId}: ${err instanceof Error ? err.message : err}`
-    )
-  }
+async function setSessionModel(rec: SessionRecord, modelId: string): Promise<void> {
+  await rec.client.rpc('session/set_model', { sessionId: rec.sessionId, modelId })
+  rec.model = modelId
+  rec.modelState = { ...rec.modelState, currentModelId: modelId }
+  rec.acc.setModel(modelId)
 }
 
 export async function interruptAcpRun(
   config: AcpProviderConfig,
   input: { workspaceId: string; sessionId: string }
 ): Promise<void> {
-  const rec = sessions.get(liveKey(input.workspaceId, input.sessionId))
+  const key = liveKey(input.workspaceId, input.sessionId)
+  cancellations.set(key, (cancellations.get(key) ?? 0) + 1)
+  const pending = initializing.get(key)
+  if (pending) pending.cancelled = true
+  const rec = sessions.get(key)
   if (!rec) return
+  if (!rec.ready) {
+    disposeRecord(rec)
+    return
+  }
   // Drop anything queued behind the running turn — an interrupt means "stop",
   // not "skip to the next message".
   rec.queue.length = 0
   try {
-    const client = await getAcpClient(
-      await config.spawn({
-        workspaceId: rec.workspaceId,
-        workspacePath: rec.workspacePath,
-        agentId: rec.agentId
-      })
-    )
+    rec.cancelled = true
+    const client = rec.client
     // `session/cancel` is a notification: the in-flight `session/prompt`
     // resolves with stopReason "cancelled", which is where the stop is
     // broadcast from (runPrompt).
@@ -760,7 +982,8 @@ export function viewAsEvents(rec: SessionRecord): StreamEvent[] {
 // hold one so REST + WS stay in agreement.
 export function getLiveAcpEvents(workspaceId: string, sessionId: string): StreamEvent[] | null {
   const rec = sessions.get(liveKey(workspaceId, sessionId))
-  return rec ? viewAsEvents(rec) : null
+  if (rec) rec.lastUsed = Date.now()
+  return rec?.ready && !rec.disposed ? viewAsEvents(rec) : null
 }
 
 // Cold-load: resume the session (also subscribing it on our connection) and
@@ -773,28 +996,52 @@ export async function ensureAcpSessionLive(
   return viewAsEvents(rec)
 }
 
+// Use the same initialization as history reads: selectors must describe this
+// fully loaded chat, never the workspace's shared discovery snapshot.
+export async function getAcpSessionModelState(
+  config: AcpProviderConfig,
+  input: AcpSpawnContext & { sessionId: string }
+): Promise<AcpModelState> {
+  const rec = await resumeSession(config, input)
+  while (rec.settingsReady) await rec.settingsReady
+  if (rec.disposed) throw new Error('Chat was closed while updating its settings')
+  return rec.modelState
+}
+
 // Drop one live session record — used when a chat is archived, so its view and
 // notification subscription go away instead of lingering for the process's life.
 export function forgetAcpSession(workspaceId: string, sessionId: string): void {
   const key = liveKey(workspaceId, sessionId)
+  const pending = initializing.get(key)
+  if (pending) pending.cancelled = true
   const rec = sessions.get(key)
-  if (!rec) return
-  rec.unsubscribe?.()
-  sessions.delete(key)
-}
-
-// Drop every in-memory session for a workspace (its process is going away).
-export function forgetAcpWorkspaceSessions(workspacePath: string): void {
-  for (const [key, rec] of sessions) {
-    if (rec.workspacePath !== workspacePath) continue
-    rec.unsubscribe?.()
-    sessions.delete(key)
+  if (rec) disposeRecord(rec)
+  for (const [alias, real] of aliases) {
+    if (alias === recKey(workspaceId, sessionId) || recKey(workspaceId, real) === key)
+      aliases.delete(alias)
   }
 }
 
-export function forgetAllAcpSessions(): void {
-  for (const [key, rec] of sessions) {
-    rec.unsubscribe?.()
-    sessions.delete(key)
+export function forgetAcpWorkspaceSessions(workspacePath: string, provider?: WorkspaceType): void {
+  for (const pending of initializing.values()) {
+    if (pending.workspacePath === workspacePath && (!provider || pending.provider === provider))
+      pending.cancelled = true
+  }
+  for (const rec of sessions.values()) {
+    if (rec.workspacePath === workspacePath && (!provider || rec.config.id === provider))
+      forgetAcpSession(rec.workspaceId, rec.sessionId)
+  }
+}
+
+export function forgetAllAcpSessions(provider?: WorkspaceType): void {
+  for (const pending of initializing.values()) {
+    if (!provider || pending.provider === provider) pending.cancelled = true
+  }
+  for (const rec of sessions.values()) {
+    if (!provider || rec.config.id === provider) forgetAcpSession(rec.workspaceId, rec.sessionId)
+  }
+  if (!provider) {
+    aliases.clear()
+    cancellations.clear()
   }
 }

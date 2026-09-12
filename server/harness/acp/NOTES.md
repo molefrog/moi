@@ -2,9 +2,36 @@
 
 Updated 2026-09-05 (Asia/Nicosia). These notes replace the original conformance
 report and its implementation plan. Findings, verification limits, and proposed
-solutions are consolidated here. The fixes below are not implemented.
+solutions are consolidated here. The original findings below describe the
+September 5/10 audit; the September 11 implementation supersedes the items
+listed in the addendum below.
+Addendum 2026-09-10: fx's lossy `session/load` (tracker #1) is fixed upstream
+and re-verified through moi's ACP layer; see §4 fx and `scripts/probe-fx-acp.ts`.
 
-**Fix moi's session lifecycle and protocol mapping before adding providers.**
+## September 11 implementation addendum
+
+fx is now a creatable workspace harness, verified with official dev revision
+`f4ea28b23764a67b9054b357b2e3ac81a12b9138`. See [fx notes](../fx/NOTES.md)
+for installation, real-gateway evidence, and remaining limitations.
+
+The shared ACP layer now deduplicates pending loads, waits for readiness,
+retains concrete process ownership, isolates fx chats/discovery, applies queued
+settings at dequeue, preserves RPC error codes/data, and prevents archived or
+crashed runners from sending queued work through replacement processes. Idle
+chats are released after ten minutes. Cancellation and missing completion
+records no longer turn unfinished tools into successful calls.
+
+Adapter updates retain explicit empty collections, raw output and structured
+diffs, respect message IDs, and attach usage to tool-only runs. fx handles
+shell deltas and diagnostic prefixes locally. Listing deduplicates IDs/cursors
+and filters cwd (including canonical macOS paths). Pagination remains bounded;
+there is no user-facing truncation indicator yet.
+
+Today's upstream build also adds validated, persisted session-local effort
+(`configId: effort`, category `thought_level`). Tracker #12 and the September
+10 observation of no effort option are historical, not current limitations.
+
+**Original implementation priority: fix lifecycle and mapping before adding providers.**
 The independent host probe exposed twelve failed behavior checks despite all
 42 existing ACP tests passing. Provider compatibility then needs a few focused
 hooks: fx process isolation and history retrieval, Hermes completion/usage
@@ -24,6 +51,15 @@ Fresh tests ran against moi `9bfd2ed` and `@agentclientprotocol/sdk@1.3.0`:
 fx source was inspected at `7e02f32f7fca`; the installed binary reports only
 `0.0.7`, so that commit is corroborating source, not a proven binary identity.
 Hermes source was inspected in the installed checkout at the revision above.
+On 2026-09-10 fx was re-tested through moi's real ACP client/session/adapter
+(`scripts/probe-fx-acp.ts`) on two binaries: the `0.0.8` release (`fx status`
+→ `build_revision=43c11dcc34a9`) and a `main` build (`6fdbe1f83029`, Zig
+0.16.0), each against both fx's fake-gateway fixture (a scripted `read_file`
+call, then a final answer) and the real Vercel AI Gateway with
+`anthropic/claude-sonnet-5`, with identical outcomes. The other fx findings
+below were re-checked the same day on the `main` build only, over raw JSON-RPC
+against the real gateway (`anthropic/claude-sonnet-5`, plus `openai/gpt-5` for
+the thought check); that one-off script is not retained.
 
 Fresh independent JSON-RPC probes exercised creation, config rejection, real
 shell/write/read operations, injected environment values checked against the
@@ -67,7 +103,7 @@ limitations and solutions.
 | Model configuration                           | Legacy `models` / `session/set_model`   | `configOptions`; distinct provider and model selectors | `models` and `configOptions`; exact parameterized model IDs |
 | Independently settable effort                 | Not verified; current path omits config | Unknown effort option is inert                         | No separate override established; use catalog variants      |
 | Live tool completion                          | File calls remain unsettled             | Output deltas and final shell envelope                 | Paired updates; inputs/output may arrive after start        |
-| Cold `session/load`                           | Structured replay                       | Tool history flattened into assistant prose            | Structured replay                                           |
+| Cold `session/load`                           | Structured replay                       | Flattened into prose in `0.0.8`; structured since #788 | Structured replay                                           |
 | `session/resume`                              | Supported, also replays                 | Attaches without replay                                | Method not found in tested build; use load                  |
 | Load nonexistent session                      | Returns `{}`                            | Error                                                  | Error                                                       |
 | Changed mode after warm load                  | `dont_ask` preserved                    | `code` resets to `ask`                                 | `plan` preserved                                            |
@@ -200,13 +236,25 @@ prompt errors, but returning an error is not implementing the associated feature
   first. Source can cancel/reap current work, so serialize neither discovery nor
   unrelated chats through an active chat process. Use one owned lease per open
   chat and a separate short-lived discovery process when needed.
-- **Prefer supported history retrieval:**
-  `fx session --id <id> --json` returned tool inputs/results and a complete file
-  presentation/diff. Adapt that for cold display; attach through
-  `session/resume`. `session/load` remains a visibly lossy fallback. This is
-  simpler than building readers for private events/checkpoints or introducing
-  a generic journal first. [Issue #624](https://github.com/vercel-labs/fx/issues/624)
-  was open when checked on 2026-09-05; no new issue was filed.
+- **`session/load` replays structured tool calls since fx#788:**
+  [Issue #624](https://github.com/vercel-labs/fx/issues/624) (lossy load) is
+  fixed by [PR #788](https://github.com/vercel-labs/fx/pull/788), merged to
+  `main` and verified on 2026-09-10 with `bun scripts/probe-fx-acp.ts` against
+  a `main` build (`6fdbe1f83029`), on the real gateway and on the fake
+  fixture. Replay now walks the persisted execution
+  memory and emits, per recorded call, a `tool_call` (`name`, `title`, `kind`,
+  `rawInput`) followed by one terminal `tool_call_update` (`status`,
+  `content`); a call without a recorded result stays `pending`. moi's ACP layer
+  rendered the cold-loaded view identically to the live one — same tool card
+  name, state, input, and output — with no adapter change. Two caveats: replay
+  and live share one content rule (binary output becomes a notice,
+  permission-denied and review-held failures keep their full text, everything
+  else is clipped to a 200-byte preview), and the released `0.0.8` binary
+  (`43c11dcc34a9`) predates the fix — it still folds the turn into one
+  `agent_message_chunk` starting `Previous tool execution:` with no tool
+  frames. Gate on `build_revision` from `fx status`, not the version string
+  (both builds report `0.0.8`). `fx session --id <id> --json` remains a
+  supported path to the complete file presentation/diff that the preview clips.
 - **Normalize shell deltas locally:** accumulate incremental `in_progress`
   text into a snapshot; recognize the final shell envelope and retain useful
   `command_result` metadata. File writes can finish with ordinary prose and
@@ -229,10 +277,9 @@ prompt errors, but returning an error is not implementing the associated feature
   model value; other providers have different validation paths. Prefer its
   known `model` option ID and preserve the separate provider selector. Verify
   returned state and fail the send when a required switch fails.
-- **Do not swap global settings for effort:** separate processes still race
-  on `~/.fx/settings.json`, crashes can leave a temporary value installed, and
-  unrelated CLI launches can observe it. Expose a validated session-local
-  `thought_level` option upstream and persist effort with the session.
+- **Use session-local effort:** the September 11 dev build exposes validated
+  `configId: effort` with category `thought_level`, persisted per session.
+  moi now uses it; global `~/.fx/settings.json` swaps remain unsafe.
 - **Keep measured run durations:** all four observed CLI tool results had the
   same `created_at_ms`; the turn had no start/end fields. Those timestamps do
   not establish per-tool duration and do not replace `run-durations.ts`.
@@ -252,6 +299,57 @@ Historical captures/source also describe yielded shell calls whose invocation
 finishes while their process remains running, followed by late output. Preserve
 that distinction: a completed tool invocation does not prove the underlying
 background command exited. Test this path before implementing late-output rules.
+
+`session/load` frames from the `main` build (`6fdbe1f83029`) for a session
+whose only turn read one file, as received by moi's client on 2026-09-10:
+
+```json
+{"sessionUpdate":"user_message_chunk","messageId":"9799e60f…","content":{"type":"text","text":"Read replay-note.txt with the read_file tool and quote its content back to me."}}
+{"sessionUpdate":"tool_call","toolCallId":"replay_call_1","name":"read_file","title":"Reading","kind":"read","status":"pending","rawInput":{"path":"replay-note.txt"}}
+{"sessionUpdate":"tool_call_update","toolCallId":"replay_call_1","status":"completed","content":[{"type":"content","content":{"type":"text","text":"<path>replay-note.txt</path>\n<content>\n1\tACP_LOAD_REPLAY_CONTENT\n</content>"}}]}
+{"sessionUpdate":"agent_message_chunk","messageId":"9269fe07…","content":{"type":"text","text":"ACP_LOAD_REPLAY_ANSWER"}}
+{"sessionUpdate":"session_info_update","title":"Read replay-note.txt with the read_file tool and quote","updatedAt":"2026-09-10T22:31:05Z"}
+```
+
+The `0.0.8` release replays the same session as `user_message_chunk`, one
+`agent_message_chunk` whose text starts `Previous tool execution:\n\nTool
+read_file (success):` and carries the file content inline, then the answer
+chunk — no `tool_call` frames, so the card is lost and the tool output lands
+in an assistant bubble.
+
+The rest of this section was re-checked on the same `main` build over raw
+JSON-RPC against the real gateway (2026-09-10). #788 changes none of it:
+
+- **One active session per process** still holds: after a second
+  `session/new`, prompting the first session fails with `-32602 Session is
+not active`.
+- **Mode resets on load** still holds: after `session/set_mode` `code`, both
+  a warm `session/load` (same process) and a cold one report
+  `modes.currentModeId: "ask"`, and no `current_mode_update` is sent live or
+  on replay.
+- **Titles stay generic**: the live and replayed `tool_call` both carry
+  `title: "Reading"` with identity only in `name`, `kind`, and `rawInput`.
+  #788 makes replay carry those same fields; it does not add descriptive
+  titles or `locations`.
+- **Invalid models are still accepted**: `session/set_config_option`
+  `model: "nope/does-not-exist"` returns the option with that `currentValue`.
+- **No effort option**: `configOptions` are still `provider`, `model`, and
+  `mode` only (`provider` and `model` both category `model`); `modes` are
+  `code` and `ask`; `authMethods` is still empty.
+- **`session/resume` still attaches without replay** (one
+  `session_info_update`); a nonexistent id fails `session/load` with
+  `-32602 Session not found`.
+- **Replay still carries no timestamps and no usage**: the live turn sends a
+  `usage_update` and returns `usage` on the prompt result; `session/load`
+  sends neither, so `run-durations.ts` stays necessary.
+- **Thoughts on replay are unverified**: neither `anthropic/claude-sonnet-5`
+  nor `openai/gpt-5` produced a live `agent_thought_chunk` through this build
+  even with `effort: "high"` in `~/.fx/settings.json`. By construction the
+  replay planner emits only assistant text and tool frames, and execution
+  memory keeps reasoning as an opaque provider replay part, so do not expect
+  thoughts back from `session/load`.
+- **`fx session --id <id> --json`** still returns `history[].execution.tool_steps`
+  with the tool call, arguments, and full result.
 
 ### Cursor
 
@@ -335,7 +433,8 @@ restore display but cannot make an agent without load/resume remember previous
 context. Never silently replace a failed resume with a new empty conversation.
 See [session setup](https://agentclientprotocol.com/protocol/v1/session-setup).
 
-Use Hermes/Cursor load and fx's supported history CLI first. If a journal is
+Use Hermes/Cursor/fx load first (fx from the #788 build on; older fx builds
+fall back to its supported history CLI). If a journal is
 still needed, define versioned records, run IDs, sequence numbers, begin/end
 markers, and coverage/freshness before making it authoritative. “Journal if
 present” hides external CLI/editor changes and partial recordings. Appending
@@ -364,7 +463,8 @@ and preserve error codes for fallback.
    structured output/diffs, honest final status, and tool-only completion data.
    Keep fx delta/envelope/diagnostic handling in a small provider hook.
 3. **Add fx.** Dedicated chat processes, separate discovery, known selectors,
-   supported CLI history adapter, and `session/resume`; make fallback loss clear.
+   and `session/load` replay (structured since fx#788). Older builds need the
+   supported CLI history adapter or a visible fallback-loss notice.
 4. **Add Cursor.** Reuse config/replay and the current permission callback.
    Show usage as unavailable; implement/test plan requests before enabling plan.
 5. **Add user-defined agents only when that product surface is wanted.** Grow
@@ -381,28 +481,28 @@ Original IDs are retained so earlier references remain meaningful. “Confirmed�
 means observed or source-confirmed as specified above, not fixed. The only
 linked existing upstream issue is #1; no new reports were sent in this audit.
 
-| #   | Agent  | Finding and disposition                                                                                                                        |
-| --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | fx     | Lossy load confirmed. [Issue #624](https://github.com/vercel-labs/fx/issues/624) open as of 2026-09-05; use supported CLI history plus resume. |
-| 2   | fx     | Diagnostics confirmed. Buffer/classify within fx and surface relevant notices; upstream should use a distinct notification.                    |
-| 3   | fx     | One active session confirmed. Dedicated chat leases, separate discovery, explicit cleanup.                                                     |
-| 4   | fx     | Mode reset confirmed; effective policy is distinct from its label. Apply/test explicit policy.                                                 |
-| 5   | fx     | Generic titles confirmed. Use name/kind/inputs for identity and display.                                                                       |
-| 6   | fx     | Invalid model accepted on the tested gateway. Validate picker values and confirmed state; do not generalize to every backend.                  |
-| 7   | Hermes | Missing file-tool completions confirmed. Honest unresolved outcomes locally; invocation-ID pairing upstream.                                   |
-| 8   | Hermes | Model rebuild omits MCP config in source. Retain/reattach specs and isolate conflicting registries.                                            |
-| 9   | Cursor | Shell approvals confirmed; MCP/force historical. Existing permission callback supports current moi policy.                                     |
-| 10  | Cursor | Usage absent in tested paths. Display unavailable and accept future standard updates.                                                          |
-| 11  | All    | Universal mode reset disproved. Cursor preserves plan; Hermes preserves warm mode; moi already reapplies mode after load.                      |
-| 12  | fx     | Effort option inert. No global settings swap; upstream session-local option and persistence.                                                   |
-| 13  | Hermes | Effort config not passed through constructor path. Resolve/pass session reasoning upstream; keep picker unavailable meanwhile.                 |
-| 14  | Cursor | Exact catalog variants work; separate effort override not established. Do not invent IDs or claim impossibility.                               |
-| 15  | All    | Flat subagent cards have historical evidence. Optional private-history enrichment remains separate work.                                       |
-| 16  | Hermes | Newly found cancellation finalizer crash. Normalize optional response text upstream; preserve stop intent and errors locally.                  |
-| 17  | Hermes | Newly found cumulative prompt usage. Delta only within a known agent instance and preserve unknown baselines.                                  |
-| 18  | Hermes | Newly found nonexistent load returns `{}`. Explicit error upstream; cautious membership checks locally.                                        |
-| 19  | Cursor | Newly found empty session cannot cold-load before its first prompt. Retain live ownership.                                                     |
-| 20  | moi    | Twelve failed host checks plus source-confirmed lifecycle gaps. Fix and regress before adding providers (§5–7).                                |
+| #   | Agent  | Finding and disposition                                                                                                                                                                                                                              |
+| --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | fx     | Lossy load fixed upstream by [PR #788](https://github.com/vercel-labs/fx/pull/788) (merged 2026-09-10, verified via `scripts/probe-fx-acp.ts` on the real gateway). Not in the `0.0.8` release: require the fixed build or fall back to CLI history. |
+| 2   | fx     | Diagnostics confirmed. Buffer/classify within fx and surface relevant notices; upstream should use a distinct notification.                                                                                                                          |
+| 3   | fx     | One active session confirmed; re-confirmed on `main` `6fdbe1f83029` (2026-09-10). Dedicated chat leases, separate discovery, explicit cleanup.                                                                                                       |
+| 4   | fx     | Mode reset confirmed; re-confirmed on `main` (2026-09-10). Effective policy is distinct from its label. Apply/test explicit policy.                                                                                                                  |
+| 5   | fx     | Generic titles confirmed; re-confirmed on `main` (2026-09-10), now on replay too. Use name/kind/inputs for identity and display.                                                                                                                     |
+| 6   | fx     | Invalid model accepted on the tested gateway; re-confirmed on `main` (2026-09-10). Validate picker values and confirmed state; do not generalize to every backend.                                                                                   |
+| 7   | Hermes | Missing file-tool completions confirmed. Honest unresolved outcomes locally; invocation-ID pairing upstream.                                                                                                                                         |
+| 8   | Hermes | Model rebuild omits MCP config in source. Retain/reattach specs and isolate conflicting registries.                                                                                                                                                  |
+| 9   | Cursor | Shell approvals confirmed; MCP/force historical. Existing permission callback supports current moi policy.                                                                                                                                           |
+| 10  | Cursor | Usage absent in tested paths. Display unavailable and accept future standard updates.                                                                                                                                                                |
+| 11  | All    | Universal mode reset disproved. Cursor preserves plan; Hermes preserves warm mode; moi already reapplies mode after load.                                                                                                                            |
+| 12  | fx     | Fixed upstream on 2026-09-11: `effort` / `thought_level` is validated and persisted per session. Implemented in moi and verified on the real gateway with high effort; no global settings swap.                                                      |
+| 13  | Hermes | Effort config not passed through constructor path. Resolve/pass session reasoning upstream; keep picker unavailable meanwhile.                                                                                                                       |
+| 14  | Cursor | Exact catalog variants work; separate effort override not established. Do not invent IDs or claim impossibility.                                                                                                                                     |
+| 15  | All    | Flat subagent cards have historical evidence. Optional private-history enrichment remains separate work.                                                                                                                                             |
+| 16  | Hermes | Newly found cancellation finalizer crash. Normalize optional response text upstream; preserve stop intent and errors locally.                                                                                                                        |
+| 17  | Hermes | Newly found cumulative prompt usage. Delta only within a known agent instance and preserve unknown baselines.                                                                                                                                        |
+| 18  | Hermes | Newly found nonexistent load returns `{}`. Explicit error upstream; cautious membership checks locally.                                                                                                                                              |
+| 19  | Cursor | Newly found empty session cannot cold-load before its first prompt. Retain live ownership.                                                                                                                                                           |
+| 20  | moi    | Twelve failed host checks plus source-confirmed lifecycle gaps. Fix and regress before adding providers (§5–7).                                                                                                                                      |
 
 ## 9. Sources and remaining uncertainty
 

@@ -403,7 +403,7 @@ export type WorkspaceSwitchMessage = {
   workspaceId: string
 }
 
-export type WorkspaceType = 'claude-code' | 'openclaw' | 'codex' | 'hermes'
+export type WorkspaceType = 'claude-code' | 'openclaw' | 'codex' | 'hermes' | 'fx'
 
 export type WorkspaceSkillStatus = {
   name: string

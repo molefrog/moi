@@ -73,11 +73,17 @@ export function useChat(address: WorkspaceTabAddress) {
   )
 
   const viewQuery = useSessionView(workspaceId, selectedSessionId)
+  const configQuery = useSessionConfig(workspaceId, selectedSessionId)
   const { refetch } = viewQuery
-  const retryLoad = useCallback(() => void refetch(), [refetch])
+  const { refetch: refetchConfig } = configQuery
+  const retryLoad = useCallback(() => {
+    void refetch()
+    void refetchConfig()
+  }, [refetch, refetchConfig])
   const view = viewQuery.data ?? EMPTY
   const chatLoaded =
-    sessions !== undefined && (selectedSessionId === null || viewQuery.data !== undefined)
+    sessions !== undefined &&
+    (selectedSessionId === null || (viewQuery.data !== undefined && configQuery.data !== undefined))
 
   // The live streaming preview as a synthetic assistant turn, so the ChatPanel
   // can merge it into the trailing assistant run — a
@@ -90,9 +96,9 @@ export function useChat(address: WorkspaceTabAddress) {
   const rootPreview = useLive(s => selectPreviews(s.previews, workspaceId, selectedSessionId).root)
   const previewTurn = useMemo(() => buildPreviewTurn(rootPreview), [rootPreview])
 
-  // The selected session's persisted model/effort. For a brand-new chat (no
-  // session yet) this is empty and `send` falls back to workspace defaults.
-  const sessionConfig = useSessionConfig(workspaceId, selectedSessionId).data
+  // Effective backend settings plus explicit moi choices. New chats inherit
+  // the workspace; existing chats wait for their own settings before sending.
+  const sessionConfig = configQuery.data
 
   // The composer owns the workspace draft in the persisted UI store and hands
   // the text in, so a keystroke re-renders only the composer.
@@ -107,6 +113,7 @@ export function useChat(address: WorkspaceTabAddress) {
       // No `processing` guard: sending while a turn is in flight QUEUES the
       // message into the same live server session (streaming-input mode).
       if (!text && ready.length === 0) return
+      if (selectedSessionId && sessionConfig === undefined) return
 
       let sid = selectedSessionId
       let isNew = false
@@ -119,6 +126,11 @@ export function useChat(address: WorkspaceTabAddress) {
           workspaceId,
           sessionId: sid,
           text,
+          config: {
+            model: layout.selectedModel,
+            effort: layout.selectedEffort,
+            fastMode: layout.selectedFastMode
+          },
           filenames: ready.map(attachment => attachment.name)
         })
       }
@@ -184,9 +196,7 @@ export function useChat(address: WorkspaceTabAddress) {
       layout.selectedEffort,
       layout.selectedFastMode,
       buildMoiContext,
-      sessionConfig?.model,
-      sessionConfig?.effort,
-      sessionConfig?.fastMode,
+      sessionConfig,
       selectSession,
       modelsData
     ]
@@ -209,7 +219,7 @@ export function useChat(address: WorkspaceTabAddress) {
     sessionId: selectedSessionId,
     processing,
     error,
-    loadError: viewQuery.error?.message ?? null,
+    loadError: viewQuery.error?.message ?? configQuery.error?.message ?? null,
     retryLoad,
     send,
     stop,

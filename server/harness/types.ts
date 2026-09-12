@@ -9,6 +9,7 @@ import type {
   McpServer,
   Model,
   SessionActivity,
+  SessionConfig,
   SessionInfo,
   StreamEvent,
   WorkspaceEntry,
@@ -99,6 +100,8 @@ export type Harness = {
     includeFirstUserMessage: boolean
   ): Promise<WorkspaceActivityPreview>
   sessionEvents(ws: WorkspaceEntry, sessionId: string): Promise<StreamEvent[]>
+  // Settings reported by this chat's backend, before explicit moi overrides.
+  sessionConfig?(ws: WorkspaceEntry, sessionId: string): Promise<SessionConfig>
   listModels(ws: WorkspaceEntry): Promise<Model[]>
   // MCP server status for the connectors UI; absent = backend has no MCP story.
   mcpStatus?(ws: WorkspaceEntry): Promise<McpServer[]>

@@ -4,7 +4,8 @@ export const WORKSPACE_TYPE_ORDER = [
   'claude-code',
   'codex',
   'openclaw',
-  'hermes'
+  'hermes',
+  'fx'
 ] as const satisfies readonly WorkspaceType[]
 
 export function orderWorkspaceTypes(types: Iterable<WorkspaceType>): WorkspaceType[] {

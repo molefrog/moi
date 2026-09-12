@@ -106,6 +106,11 @@ export function reduceChatFrame(data: Record<string, unknown>, context: ChatFram
     const sessionsKey = workspaceKeys.sessions(workspaceId)
     queryClient?.invalidateQueries({ queryKey: sessionsKey })
     queryClient?.invalidateQueries({ queryKey: workspaceKeys.preview(workspaceId) })
+    if (typeof data.sessionId === 'string') {
+      queryClient?.invalidateQueries({
+        queryKey: workspaceKeys.sessionConfig(workspaceId, data.sessionId)
+      })
+    }
     return
   }
   if (data.type === 'workspace:switch') {

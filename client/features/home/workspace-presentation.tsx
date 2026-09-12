@@ -1,4 +1,5 @@
 import claudeIcon from '@/client/assets/claude.svg'
+import fxIcon from '@/client/assets/fx.svg'
 import hermesIcon from '@/client/assets/hermes.png'
 import openaiIcon from '@/client/assets/openai.svg'
 import openclawIcon from '@/client/assets/openclaw.svg'
@@ -8,14 +9,16 @@ export const workspaceProviderIcon: Record<WorkspaceType, string> = {
   'claude-code': claudeIcon,
   openclaw: openclawIcon,
   codex: openaiIcon,
-  hermes: hermesIcon
+  hermes: hermesIcon,
+  fx: fxIcon
 }
 
 export const workspaceTypeLabel: Record<WorkspaceType, string> = {
   'claude-code': 'Claude Code',
   openclaw: 'OpenClaw',
   codex: 'Codex',
-  hermes: 'Hermes'
+  hermes: 'Hermes',
+  fx: 'fx'
 }
 
 type WorkspaceAgentIconsProps = {

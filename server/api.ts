@@ -10,6 +10,7 @@ import type {
   AppletThumbnailBatch,
   AppSettings,
   HarnessAvailability,
+  SessionConfig,
   SessionInfo,
   UploadInfo,
   ViewBuilderInput,
@@ -563,11 +564,31 @@ one.get('/sessions/:sessionId/events', async c => {
 })
 
 // Per-session agent settings (model, reasoning effort, and Fast mode). GET
-// returns the stored config ({} for sessions that never overrode the workspace
-// defaults); PUT patches it (a field as `null` clears it, omitted leaves it).
+// returns backend settings with explicit moi overrides; PUT patches only the
+// overrides (a field as `null` clears it, omitted leaves it).
 // The change takes effect on the session's next message.
+async function effectiveSessionConfig(
+  ws: WorkspaceEntry,
+  sessionId: string
+): Promise<SessionConfig> {
+  const reported = (await harnessFor(ws).sessionConfig?.(ws, sessionId)) ?? {}
+  // Read after loading so a choice saved during the load is never replaced.
+  const stored = await getSessionConfig(ws.path, sessionId)
+  const sameModel = stored.model === undefined || stored.model === reported.model
+  return {
+    ...reported,
+    // A native effort belongs to its model, not a different pending moi pick.
+    ...(!sameModel ? { effort: undefined } : {}),
+    ...stored
+  }
+}
+
 one.get('/sessions/:sessionId/config', async c => {
-  return c.json(await getSessionConfig(c.get('ws').path, c.req.param('sessionId')))
+  try {
+    return c.json(await effectiveSessionConfig(c.get('ws'), c.req.param('sessionId')))
+  } catch (error) {
+    return c.text(error instanceof Error ? error.message : 'Couldn’t load chat settings', 500)
+  }
 })
 
 one.put('/sessions/:sessionId/config', async c => {
@@ -592,7 +613,16 @@ one.put('/sessions/:sessionId/config', async c => {
     }
     patch.fastMode = value
   }
-  return c.json(await saveSessionConfig(c.get('ws').path, c.req.param('sessionId'), patch))
+  const ws = c.get('ws')
+  const sessionId = c.req.param('sessionId')
+  await saveSessionConfig(ws.path, sessionId, patch)
+  try {
+    return c.json(await effectiveSessionConfig(ws, sessionId))
+  } catch {
+    // A temporary id or an offline backend must not prevent saving a choice.
+    // The next native load fills in defaults; only this explicit patch is stored.
+    return c.json(await getSessionConfig(ws.path, sessionId))
+  }
 })
 
 one.get('/mcp', async c => {
@@ -993,7 +1023,7 @@ workspaces.get('/discover', async c => c.json(await discoverWorkspaces()))
 
 // Backends the create dialog can provision from scratch. OpenClaw workspaces
 // belong to their agents and arrive via discovery.
-const CREATABLE_TYPES = new Set<WorkspaceType>(['claude-code', 'codex'])
+const CREATABLE_TYPES = new Set<WorkspaceType>(['claude-code', 'codex', 'fx'])
 
 async function workspaceTypeAvailability(type: WorkspaceType): Promise<HarnessAvailability> {
   return (await harnessFor(type).availability?.()) ?? { status: 'available' }

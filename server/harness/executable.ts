@@ -4,7 +4,7 @@ import type { HarnessAvailability, WorkspaceType } from '@/lib/types'
 
 import { cachedLoginShellPath, loginShellPath, mergeSearchPaths } from './shell-path'
 
-type PathWorkspaceType = Extract<WorkspaceType, 'claude-code' | 'codex' | 'hermes'>
+type PathWorkspaceType = Extract<WorkspaceType, 'claude-code' | 'codex' | 'hermes' | 'fx'>
 
 type ExecutableConfig = {
   command: string
@@ -31,6 +31,11 @@ const executableConfig: Record<PathWorkspaceType, ExecutableConfig> = {
     ],
     unavailableReason:
       'Run curl -fsSL https://chatgpt.com/codex/install.sh | sh in your terminal to install Codex'
+  },
+  fx: {
+    command: 'fx',
+    fallbackPaths: [`${process.env.HOME ?? ''}/.local/bin/fx`],
+    unavailableReason: 'Run curl -fsSL https://fx.sh/setup.sh | bash in your terminal to install fx'
   },
   hermes: {
     command: 'hermes',

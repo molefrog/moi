@@ -12,7 +12,7 @@ import {
   withAttachmentDirectives
 } from '@/client/features/chat/chat-send'
 import { attachmentKey, type ChatAttachment, liveStore } from '@/client/features/chat/chat-store'
-import type { SessionInfo, ViewState, WorkspaceAgent } from '@/lib/types'
+import type { SessionConfig, SessionInfo, ViewState, WorkspaceAgent } from '@/lib/types'
 import { resolveSelectedModel } from './composer/model-order'
 
 const workspaceId = 'workspace-1'
@@ -46,7 +46,8 @@ describe('startOptimisticSession', () => {
       queryClient,
       workspaceId,
       sessionId,
-      text: 'Build a customer dashboard with useful charts'
+      text: 'Build a customer dashboard with useful charts',
+      config: { model: 'glm', effort: 'low' }
     })
 
     expect(
@@ -57,6 +58,12 @@ describe('startOptimisticSession', () => {
         summary: 'Build a customer dashboard with useful charts'
       }
     ])
+    expect(
+      queryClient.getQueryData<SessionConfig>(workspaceKeys.sessionConfig(workspaceId, sessionId))
+    ).toEqual({
+      model: 'glm',
+      effort: 'low'
+    })
   })
 
   test('uses filenames for an attachment-only chat', () => {

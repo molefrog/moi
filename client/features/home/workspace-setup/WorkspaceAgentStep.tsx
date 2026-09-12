@@ -30,7 +30,8 @@ const workspaceAgentDescription: Record<WorkspaceType, string> = {
   'claude-code': 'Anthropic',
   codex: 'OpenAI',
   openclaw: 'Open-source',
-  hermes: 'Nous Research'
+  hermes: 'Nous Research',
+  fx: 'Vercel Labs'
 }
 
 export type WorkspaceAgentOption = {
@@ -169,7 +170,10 @@ function WorkspaceAgentSelector({
     <div
       role="group"
       aria-label="Agent"
-      className={cn('grid gap-2', options.length > 2 ? 'grid-cols-4' : 'grid-cols-2')}
+      className={cn(
+        'grid grid-cols-2 gap-2',
+        options.length > 4 ? 'sm:grid-cols-5' : 'sm:grid-cols-4'
+      )}
     >
       {options.map(option => (
         <WorkspaceAgentOptionButton

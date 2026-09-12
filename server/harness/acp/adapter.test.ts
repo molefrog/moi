@@ -5,7 +5,7 @@ import type { Turn } from '@/lib/format'
 import { appendMoiContext, renderMoiContext } from '@/lib/moi-context'
 
 import { rpcTimeoutMs } from './client'
-import type { AcpSessionListEntry } from './wire'
+import type { AcpSessionListEntry, ToolCallUpdate } from './wire'
 
 import {
   AssistantTurnAccumulator,
@@ -21,6 +21,10 @@ function toolCall(turn: Turn) {
   const part = turn.parts.find(p => p.type === 'tool-call')
   if (part?.type !== 'tool-call') throw new Error('expected a tool-call part')
   return part.call
+}
+
+function updateTool(update: ToolCallUpdate, previous?: Turn): Turn {
+  return acpToolCallToTurn({ update, previous, sessionId: SESSION, provider: 'fx' })
 }
 
 describe('toolStatusToState', () => {
@@ -103,7 +107,7 @@ describe('acpToolCallToTurn', () => {
     const call = toolCall(turn)
     expect(call.state).toBe('error')
     expect(call.errorText).toBe('permission denied')
-    expect(call.sidecar).toEqual({ locations: ['a.txt'] })
+    expect(call.sidecar).toMatchObject({ locations: ['a.txt'] })
   })
 
   test('keeps the original timestamp across updates', () => {
@@ -121,6 +125,84 @@ describe('acpToolCallToTurn', () => {
     })
 
     expect(completed.timestamp).toBe('2026-01-01T00:00:00.000Z')
+  })
+
+  test('explicit empty collections clear previous content and locations', () => {
+    const first = updateTool({
+      toolCallId: 'clear',
+      locations: [{ path: '/ws/old.txt' }],
+      content: [{ type: 'content', content: { type: 'text', text: 'old output' } }],
+      rawOutput: { old: true }
+    })
+    const cleared = updateTool({ toolCallId: 'clear', content: [], locations: [] }, first)
+    expect(toolCall(cleared).output).toBe('')
+    expect(toolCall(cleared).sidecar).toMatchObject({ content: [], locations: [] })
+    const finished = updateTool({ toolCallId: 'clear', status: 'completed' }, cleared)
+    expect(toolCall(finished).output).toBe('')
+    expect(toolCall(finished).sidecar?.locations).toEqual([])
+  })
+
+  test('preserves structured diffs and raw output when a later update omits them', () => {
+    const content: ToolCallUpdate['content'] = [
+      { type: 'diff', path: '/ws/file.txt', oldText: 'old', newText: 'new' }
+    ]
+    const first = updateTool({
+      toolCallId: 'diff',
+      name: 'write_file',
+      kind: 'edit',
+      content,
+      rawInput: { path: '/ws/file.txt' },
+      rawOutput: { bytes: 3 }
+    })
+    const completed = updateTool({ toolCallId: 'diff', status: 'completed' }, first)
+    expect(toolCall(completed)).toMatchObject({
+      input: { path: '/ws/file.txt' },
+      output: 'new',
+      sidecar: { content, rawOutput: { bytes: 3 }, name: 'write_file', kind: 'edit' }
+    })
+  })
+
+  test('an update containing only raw output preserves its structured value', () => {
+    const first = updateTool({ toolCallId: 'raw', rawOutput: { nested: { result: [1, 2] } } })
+    const completed = updateTool({ toolCallId: 'raw', status: 'completed' }, first)
+    expect(toolCall(completed).output).toEqual({ nested: { result: [1, 2] } })
+    expect(toolCall(completed).sidecar?.rawOutput).toEqual({ nested: { result: [1, 2] } })
+    const replaced = updateTool({ toolCallId: 'raw', rawOutput: { replacement: true } }, completed)
+    expect(toolCall(replaced).output).toEqual({ replacement: true })
+  })
+
+  test('explicit null raw input and output replace their prior values', () => {
+    const first = updateTool({
+      toolCallId: 'nulls',
+      rawInput: { path: 'a' },
+      rawOutput: { ok: true }
+    })
+    const cleared = updateTool({ toolCallId: 'nulls', rawInput: null, rawOutput: null }, first)
+    const completed = updateTool({ toolCallId: 'nulls', status: 'completed' }, cleared)
+    expect(toolCall(completed).input).toBeNull()
+    expect(toolCall(completed).output).toBeNull()
+    expect(toolCall(completed).sidecar?.rawOutput).toBeNull()
+  })
+
+  test('non-text content replaces stale text and remains available in the sidecar', () => {
+    const first = updateTool({
+      toolCallId: 'image',
+      content: [{ type: 'content', content: { type: 'text', text: 'Rendering image' } }]
+    })
+    const content: ToolCallUpdate['content'] = [
+      { type: 'content', content: { type: 'image', data: 'aW1hZ2U=', mimeType: 'image/png' } }
+    ]
+    const image = updateTool({ toolCallId: 'image', content }, first)
+    const completed = updateTool({ toolCallId: 'image', status: 'completed' }, image)
+    expect(toolCall(completed).output).toBe('')
+    expect(toolCall(completed).sidecar?.content).toEqual(content)
+  })
+
+  test('preserves legacy structured output through a status-only update', () => {
+    const previous = updateTool({ toolCallId: 'legacy' })
+    toolCall(previous).output = { result: ['existing data'] }
+    const completed = updateTool({ toolCallId: 'legacy', status: 'completed' }, previous)
+    expect(toolCall(completed).output).toEqual({ result: ['existing data'] })
   })
 })
 
