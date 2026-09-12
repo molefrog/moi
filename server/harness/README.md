@@ -208,12 +208,15 @@ in `.agents/skills`. Model and reasoning-effort choices use validated ACP
 config options and apply before the next prompt. Effort is exposed only when
 the selected model advertises it. `code` mode is reapplied after load and
 retains fx's automatic action review; held actions remain visible failures.
+Imported chats restore their native model and effort in the composer; explicit
+moi settings take precedence without overwriting defaults on load.
 
-Verified with official dev revision
-`50252617707bcd7ba961d938f82a0c3c85a60230` (version `0.0.9`), including
-real Gateway file reads, effort selection, live thinking, generated titles,
-and cold replay. Stable `0.0.9` now includes effort and structured replay;
-stable `0.0.8` predates them. See [fx notes](fx/NOTES.md).
+**fx 0.0.9 is the minimum supported version.** Availability and ACP launches
+reject older versions with upgrade instructions. Verified with the exact
+stable release `e26e97ec4040827b86a1c70c62273e0a8546d3e5` and official dev
+revision `50252617707bcd7ba961d938f82a0c3c85a60230`, including real Gateway
+file reads, effort persistence, generated titles, concurrent chats,
+cancellation, images, and cold replay. See [fx notes](fx/NOTES.md).
 Known limits: normal tool output is clipped upstream, rich image/MCP results
 are not yet rendered, and provider switching, subagent lanes, fast mode, and
 interactive approvals are not exposed. Sign-in remains in the fx CLI.
@@ -348,7 +351,7 @@ describes what moi exposes, not every RPC available in the upstream protocol.
 fx uses the shared ACP lifecycle, with chat-scoped processes and config-option
 model/effort selection. It supports structured history, live text/tool updates,
 local archive, and live usage; replay does not restore thoughts or usage. Inline
-image transport is enabled but was not covered by the file-read probe. See the
+image input and replay were verified with a real vision model. See the
 [fx verification and limits](fx/NOTES.md) for the current first-version surface.
 
 ## Design lessons so far

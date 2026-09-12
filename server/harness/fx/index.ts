@@ -15,6 +15,7 @@ import {
   forgetAcpWorkspaceSessions,
   forgetAllAcpSessions,
   getAcpActiveSessions,
+  getAcpSessionModelState,
   getLiveAcpEvents,
   interruptAcpRun,
   sendAcpMessage
@@ -22,7 +23,8 @@ import {
 import { findHarnessExecutable, pathHarnessAvailability } from '../executable'
 import type { Harness } from '../types'
 import { isFxOperationalMessage, normalizeFxToolUpdate } from './adapter'
-import { applyFxSettings, fxModels, fxModelState } from './models'
+import { checkFxVersion } from './compat'
+import { applyFxSettings, fxModels, fxModelState, fxSessionConfig } from './models'
 
 export const fxConfig: AcpProviderConfig = {
   id: 'fx',
@@ -31,6 +33,7 @@ export const fxConfig: AcpProviderConfig = {
   // `code` uses fx's automatic action review; it does not disable review.
   noPromptModeId: 'code',
   supportsImages: true,
+  persistSessionModel: false,
   modelState: fxModelState,
   mapModels: fxModels,
   defaultModel: async (ctx, config) =>
@@ -54,6 +57,11 @@ export const fxConfig: AcpProviderConfig = {
   async spawn(ctx) {
     const command = findHarnessExecutable('fx')
     if (!command) throw new Error('fx executable not found')
+    const runtime = await checkFxVersion(command, {
+      cwd: ctx.workspacePath,
+      env: await resolveWorkspaceEnv(ctx.workspacePath)
+    })
+    if (runtime.status !== 'available') throw new Error(runtime.reason)
     return {
       provider: 'fx',
       command,
@@ -91,13 +99,17 @@ export const fxHarness: Harness = {
   sessionEvents: async (ws, sessionId) =>
     getLiveAcpEvents(ws.id, sessionId) ??
     (await ensureAcpSessionLive(fxConfig, { ...ctxOf(ws), sessionId })),
+  sessionConfig: async (ws, sessionId) =>
+    fxSessionConfig(await getAcpSessionModelState(fxConfig, { ...ctxOf(ws), sessionId })),
   listModels: ws => listAcpModels(fxConfig, ctxOf(ws)),
   async availability(ws): Promise<HarnessAvailability> {
     const runtime = await pathHarnessAvailability('fx')
-    if (runtime.status !== 'available' || !ws) return runtime
+    if (runtime.status !== 'available') return runtime
     const command = findHarnessExecutable('fx')
     if (!command) return runtime
-    const workspaceEnv = await resolveWorkspaceEnv(ws.path)
+    const workspaceEnv = ws ? await resolveWorkspaceEnv(ws.path) : {}
+    const version = await checkFxVersion(command, { cwd: ws?.path, env: workspaceEnv })
+    if (version.status !== 'available' || !ws) return version
     const proc = Bun.spawn([command, 'status'], {
       cwd: ws.path,
       env: { ...process.env, ...workspaceEnv, FX_AUTO_UPGRADE: '0' },
@@ -116,13 +128,6 @@ export const fxHarness: Harness = {
           status: 'unavailable',
           reason: 'fx status failed. Run fx status in this workspace to check its setup.'
         }
-      if (/build_revision=43c11dcc34a9\b/.test(output)) {
-        return {
-          status: 'unavailable',
-          reason:
-            'This fx build cannot restore tool history. Run fx upgrade to install version 0.0.9 or later.'
-        }
-      }
       if (
         /\bauth=(?:none|missing|not configured)\s*$/m.test(output) ||
         (/auth_expired=true/.test(output) && !/auth_refreshable=true/.test(output))

@@ -332,6 +332,7 @@ export const ModelPicker = memo(function ModelPicker({ sessionId }: ModelPickerP
   }
 
   const model = resolveSelectedModel(models, selectedModel, defaultEntry?.resolvedModel)
+  if (sessionId && sessionConfig === undefined) return null
   if (!model) return null
   const effortLevels = model.supportsEffort ? (model.supportedEffortLevels ?? []) : []
   const currentEffort = resolveDisplayedEffort(effortLevels, selectedEffort, model.defaultEffort)

@@ -68,6 +68,9 @@ export type AcpProviderConfig = {
   provider: AcpProviderId
   spawn: (ctx: AcpSpawnContext) => Promise<AcpSpawnSpec>
   processScope?: 'workspace' | 'session'
+  // Providers that persist their settings natively expose those via the
+  // harness's sessionConfig hook instead of creating implicit moi overrides.
+  persistSessionModel?: boolean
   modelState?: (result: AcpNewSessionResult) => AcpModelState
   defaultModel?: (ctx: AcpSpawnContext, config: AcpProviderConfig) => Promise<string | undefined>
   applySettings?: (
@@ -114,6 +117,7 @@ type SessionRecord = {
   cancelled: boolean
   lastUsed: number
   modelState: AcpModelState
+  settingsReady?: Promise<void>
   defaultModel?: string
   messageId?: string
   userMessageId?: string
@@ -744,6 +748,12 @@ async function runPrompt(
   rec.lastAssistantTurnId = undefined
   const startedAt = Date.now()
   let prompted = false
+  const settings = Promise.withResolvers<void>()
+  rec.settingsReady = settings.promise
+  const finishSettings = () => {
+    if (rec.settingsReady === settings.promise) rec.settingsReady = undefined
+    settings.resolve()
+  }
   try {
     if (config.applySettings) {
       const previousState = rec.modelState
@@ -760,6 +770,7 @@ async function runPrompt(
         const fingerprint = await config.modelStateFingerprint?.(rec)
         cacheAcpModelState(rec.workspacePath, rec.modelState, fingerprint, config.id)
         refreshAvailability(rec, config.id)
+        broadcast(rec.workspaceId, { type: 'sessions_changed', sessionId: rec.sessionId })
       }
       rec.model = rec.modelState.currentModelId
       rec.acc.setModel(rec.model)
@@ -767,8 +778,13 @@ async function runPrompt(
       const model = send.model === 'default' ? rec.defaultModel : send.model
       if (model && model !== rec.model) await setSessionModel(rec, model)
     }
+    finishSettings()
     if (rec.disposed || rec.cancelled) return
-    if (send.model && !(await hasSessionConfig(rec.workspacePath, rec.sessionId))) {
+    if (
+      send.model &&
+      config.persistSessionModel !== false &&
+      !(await hasSessionConfig(rec.workspacePath, rec.sessionId))
+    ) {
       await saveSessionConfig(rec.workspacePath, rec.sessionId, { model: send.model })
     }
     if (rec.disposed || rec.cancelled) return
@@ -822,6 +838,7 @@ async function runPrompt(
     if (!prompted && config.applySettings) disposeRecord(rec)
     refreshAvailability(rec, config.id)
   } finally {
+    finishSettings()
     if (prompted) {
       await appendRunDuration(rec.workspacePath, rec.sessionId, Date.now() - startedAt).catch(
         error => {
@@ -977,6 +994,18 @@ export async function ensureAcpSessionLive(
 ): Promise<StreamEvent[]> {
   const rec = await resumeSession(config, input)
   return viewAsEvents(rec)
+}
+
+// Use the same initialization as history reads: selectors must describe this
+// fully loaded chat, never the workspace's shared discovery snapshot.
+export async function getAcpSessionModelState(
+  config: AcpProviderConfig,
+  input: AcpSpawnContext & { sessionId: string }
+): Promise<AcpModelState> {
+  const rec = await resumeSession(config, input)
+  while (rec.settingsReady) await rec.settingsReady
+  if (rec.disposed) throw new Error('Chat was closed while updating its settings')
+  return rec.modelState
 }
 
 // Drop one live session record — used when a chat is archived, so its view and

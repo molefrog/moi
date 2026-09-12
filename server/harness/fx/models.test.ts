@@ -3,7 +3,7 @@ import type { SessionConfigOption } from '@agentclientprotocol/sdk'
 
 import type { AcpClient } from '../acp/client'
 import { cacheAcpModelState, clearAcpModelCache, peekAcpModelState } from '../acp/model-state'
-import { applyFxSettings, fxModels, fxModelState } from './models'
+import { applyFxSettings, fxModels, fxModelState, fxSessionConfig } from './models'
 
 function options(model = 'openai/gpt-5', effort = 'auto'): SessionConfigOption[] {
   return [
@@ -55,6 +55,19 @@ function clientWith(
 }
 
 describe('fx model configuration', () => {
+  test('session settings preserve reported effort including auto without inventing support', () => {
+    expect(
+      fxSessionConfig(fxModelState({ configOptions: options('openai/gpt-5', 'high') }))
+    ).toEqual({ model: 'openai/gpt-5', effort: 'high' })
+    expect(
+      fxSessionConfig(fxModelState({ configOptions: options('openai/gpt-5', 'auto') }))
+    ).toEqual({ model: 'openai/gpt-5', effort: 'auto' })
+    expect(
+      fxSessionConfig(
+        fxModelState({ configOptions: options().filter(option => option.id !== 'effort') })
+      )
+    ).toEqual({ model: 'openai/gpt-5' })
+  })
   test('uses the exact model selector despite provider sharing its category', () => {
     const state = fxModelState({ configOptions: options() })
     expect(state.currentModelId).toBe('openai/gpt-5')

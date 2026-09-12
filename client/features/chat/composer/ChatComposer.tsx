@@ -33,6 +33,7 @@ import {
 import { useUiStore } from '@/client/store/ui'
 
 import { ModelPicker } from './ModelPicker'
+import { useSessionConfig } from '../api'
 
 export type ComposerAnnotationControls = {
   active: boolean
@@ -85,6 +86,8 @@ export function ChatComposer({
 }: ChatComposerProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const workspaceId = useWorkspaceId()
+  const sessionConfig = useSessionConfig(workspaceId, modelSessionId)
+  const loadingSettings = modelSessionId !== null && sessionConfig.data === undefined
   const workspaceDraft = useUiStore(s => s.composerDrafts[workspaceId] ?? '')
   const builderDraft = useUiStore(s => (draft ? (s.viewBuilderDrafts ?? {})[draft.id] : undefined))
   const value = draft ? (builderDraft ?? draft.initialValue) : workspaceDraft
@@ -97,7 +100,7 @@ export function ChatComposer({
   // first, which uploads it before the message goes out.
   const hasSendable = attachments.some(a => a.status === 'ready' || a.status === 'draft')
   const hasContent = value.trim().length > 0 || hasSendable
-  const canSend = canSubmitComposerAction(hasContent, uploading, availability)
+  const canSend = !loadingSettings && canSubmitComposerAction(hasContent, uploading, availability)
 
   const onChange = (next: string) => {
     valueRef.current = next
@@ -262,7 +265,7 @@ export function ChatComposer({
           <ComposerSubmitButton
             label="Send message"
             hasContent={hasContent}
-            busy={uploading}
+            busy={uploading || loadingSettings}
             availability={availability}
           />
         )}

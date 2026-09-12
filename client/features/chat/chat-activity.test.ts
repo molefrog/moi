@@ -162,6 +162,23 @@ describe('status_snapshot reconcile', () => {
 })
 
 describe('session rename', () => {
+  test('keeps initial picks until confirmed settings arrive after the rename', () => {
+    const queryClient = new QueryClient()
+    __setQueryClientForTests(queryClient)
+    const choices = { model: 'luna', effort: 'high' }
+    queryClient.setQueryData(workspaceKeys.sessionConfig(WS, 'temporary'), choices)
+    handleFrame({ type: 'session_renamed', workspaceId: WS, from: 'temporary', to: SID })
+    expect(
+      queryClient.getQueryData<Record<string, string>>(workspaceKeys.sessionConfig(WS, SID))
+    ).toEqual(choices)
+    expect(queryClient.getQueryState(workspaceKeys.sessionConfig(WS, SID))?.isInvalidated).toBe(
+      false
+    )
+    handleFrame({ type: 'sessions_changed', workspaceId: WS, sessionId: SID })
+    expect(queryClient.getQueryState(workspaceKeys.sessionConfig(WS, SID))?.isInvalidated).toBe(
+      true
+    )
+  })
   test('activity migrates from the temp id to the real id', () => {
     handleFrame({ type: 'status', workspaceId: WS, sessionId: 'temp-1', activity: 'running' })
     handleFrame({ type: 'session_renamed', workspaceId: WS, from: 'temp-1', to: 'real-1' })
@@ -283,10 +300,21 @@ describe('session list changes', () => {
     __setQueryClientForTests(queryClient)
     queryClient.setQueryData(workspaceKeys.sessions(WS), [])
     queryClient.setQueryData(workspaceKeys.preview(WS), {})
+    queryClient.setQueryData(workspaceKeys.sessionConfig(WS, SID), { model: 'glm', effort: 'auto' })
+    queryClient.setQueryData(workspaceKeys.sessionConfig(WS, 'another'), {
+      model: 'luna',
+      effort: 'high'
+    })
 
     handleFrame({ type: 'sessions_changed', workspaceId: WS, sessionId: SID })
 
     expect(queryClient.getQueryState(workspaceKeys.sessions(WS))?.isInvalidated).toBe(true)
     expect(queryClient.getQueryState(workspaceKeys.preview(WS))?.isInvalidated).toBe(true)
+    expect(queryClient.getQueryState(workspaceKeys.sessionConfig(WS, SID))?.isInvalidated).toBe(
+      true
+    )
+    expect(
+      queryClient.getQueryState(workspaceKeys.sessionConfig(WS, 'another'))?.isInvalidated
+    ).toBe(false)
   })
 })
