@@ -51,7 +51,12 @@ export function useSessionView(workspaceId: string, sessionId: string | null) {
 export function useSessionConfig(workspaceId: string, sessionId: string | null) {
   return useQuery<SessionConfig>({
     queryKey: workspaceKeys.sessionConfig(workspaceId, sessionId ?? ''),
-    queryFn: () => requestJson(`/api/workspaces/${workspaceId}/sessions/${sessionId}/config`),
+    queryFn: () =>
+      requestJson(
+        `/api/workspaces/${workspaceId}/sessions/${sessionId}/config`,
+        undefined,
+        'Couldn’t load chat settings'
+      ),
     enabled: Boolean(sessionId),
     staleTime: Infinity,
     gcTime: 5 * 60_000,

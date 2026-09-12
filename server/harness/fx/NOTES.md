@@ -1,16 +1,15 @@
 # fx over ACP
 
-Verified again on 2026-09-12 with official dev `0.0.9`, revision
-`50252617707bcd7ba961d938f82a0c3c85a60230`. Stable `0.0.9`, revision
-`e26e97ec4040827b86a1c70c62273e0a8546d3e5`, now includes ACP effort and
-structured history replay. Stable `0.0.8`, revision `43c11dcc34a9`, predates
-those features; the earlier dev `0.0.8` pin below already included them.
+The minimum supported fx version is **0.0.9**. Verified on 2026-09-12 with
+the exact stable `0.0.9`, revision `e26e97ec4040827b86a1c70c62273e0a8546d3e5`,
+and official dev `0.0.9`, revision `50252617707bcd7ba961d938f82a0c3c85a60230`.
+Older builds, including the earlier dev `0.0.8` pin below, are unsupported.
 
 ## Installation
 
 Install fx using its [official instructions](https://fx.sh/docs), or run
-`fx upgrade` on an existing installation. Use version `0.0.9` and check
-`fx status` for `build_revision`. Sign in with `fx login`, `fx login codex`,
+`fx upgrade` on an existing installation. Check `fx --version` for `0.0.9`
+or later and `fx status` for `build_revision`. Sign in with `fx login`, `fx login codex`,
 or `fx login grok` before opening a chat in moi. The selected provider and
 credentials stay owned by fx; moi does not change profile settings.
 
@@ -22,6 +21,10 @@ left unchanged.
 
 ## Integration
 
+- Availability and every ACP launch check the resolved executable's version,
+  including discovery and history loading. Older versions show upgrade
+  instructions; failed or unrecognized checks report a separate setup error.
+  Checks are bounded and repeated so replacing the executable takes effect.
 - One owned ACP process per chat. Discovery uses a separate process: fx has
   only one active session per process, and creating/loading another replaces it.
 - `session/load` restores the actual model context and replays structured
@@ -35,6 +38,11 @@ left unchanged.
   with the session, and applied before the next prompt. No global settings
   file is rewritten. The picker retains each model's advertised effort
   options once discovered; switching models refreshes that knowledge.
+- Imported chats report their native model and effort to the composer.
+  Explicit moi chat preferences take precedence; loading or sending with
+  native defaults does not save new overrides. A native effort is not carried
+  to a different pending model selection. Sending waits for settings to load,
+  and failed loads expose the existing retry action.
 - Native tool names identify cards; wrapped inputs and file paths are kept.
   fx's generic titles such as `Running` and `Reading` are replaced with the
   native tool identity, so both live and replayed cards remain identifiable.
@@ -55,6 +63,24 @@ left unchanged.
 ## Verification
 
 ### September 12, version 0.0.9
+
+The exact stable release artifact passed its official SHA-256 check. Real
+Sonnet/High file execution, structured cold replay, generated titles, and
+effort persistence passed. The stable lifecycle probe passed all 16 checks:
+concurrent chats, cancellation (40 ms acknowledgement), continued messaging,
+live shell output, inline image recognition, discovery, and cold history.
+Both installed backups reporting `0.0.8` were rejected by the version gate;
+the stable and dev `0.0.9` binaries were accepted.
+
+A native chat created directly with stable fx and Luna/High was imported into
+the running app, whose workspace default was GLM. The browser showed Luna/High,
+sent a real follow-up with those settings, and retained both after a page
+reload. The wire contained no model/effort changes, and moi's stored overrides
+remained empty. Tests cover settings loading, explicit overrides, load errors,
+new-chat initialization, and queued sends during settings confirmation.
+The browser also queued a second message during a new GLM/High run. The wire
+confirmed `high` before the first prompt; both prompts completed without
+settings reverting or harness errors, and the composer retained GLM/High.
 
 The ACP effort selector, model-switch consistency fix, and Gateway v4 effort
 fix in the 0.0.9 release were already present in the September 11 dev pin
@@ -198,11 +224,9 @@ short live thoughts, later warnings, thought-only completion, and cancellation.
 - A model's effort choices become available after fx first advertises them
   during creation, restoration, or a model switch. moi retains known choices
   across chats but does not guess support for models that have not been used.
-- Native fx chats imported into moi keep their backend model/effort until
-  overridden, but the picker does not automatically adopt native settings
-  into moi's saved chat preferences. Select the intended model and effort
-  explicitly for these chats. Workspace-wide effort defaults use `auto`;
-  another chat's selected effort is not treated as a provider default.
+- Workspace-wide effort defaults use `auto`; another chat's selected effort
+  is not treated as a provider default. Imported chats use their own native
+  model and effort unless explicitly overridden in moi.
 - fx 0.0.9 generates titles from the first prompt and moi reflects them.
   Older/imported chats can remain `Untitled session` when fx has no saved
   title. Full-output enrichment, nested subagent views, a provider picker,

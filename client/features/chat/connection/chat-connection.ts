@@ -60,6 +60,7 @@ function connect() {
     // Heal any deltas missed while disconnected: refetch every live transcript.
     // No-op on the first connect (nothing cached yet).
     qc?.invalidateQueries({ queryKey: ['workspaces', 'events'] })
+    qc?.invalidateQueries({ queryKey: ['workspaces', 'sessionConfig'] })
     // Any in-flight preview from before the drop is superseded by that refetch
     // (which returns the authoritative disk state) — drop them all so a frozen
     // half-streamed preview can't linger over the healed transcript.

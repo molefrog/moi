@@ -4,7 +4,7 @@ import type {
   SetSessionConfigOptionResponse
 } from '@agentclientprotocol/sdk'
 
-import type { Model } from '@/lib/types'
+import type { Model, SessionConfig } from '@/lib/types'
 
 import type { AcpClient } from '../acp/client'
 import type { AcpModelState, AcpNewSessionResult } from '../acp/wire'
@@ -78,6 +78,14 @@ export function fxModels(state: AcpModelState): Model[] {
         ...models
       ]
     : models
+}
+
+export function fxSessionConfig(state: AcpModelState): SessionConfig {
+  const effort = selectOption(state.configOptions, 'effort')
+  return {
+    ...(state.currentModelId ? { model: state.currentModelId } : {}),
+    ...(effort ? { effort: effort.currentValue } : {})
+  }
 }
 
 export async function applyFxSettings(

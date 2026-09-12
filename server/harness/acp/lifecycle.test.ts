@@ -6,9 +6,15 @@ import { join } from 'node:path'
 import type { ServerMessage, StreamEvent, Turn } from '@/lib/types'
 
 import { agentStore } from '../../agent'
+import {
+  DEFAULT_SESSION_CONFIG_PATH,
+  getSessionConfig,
+  saveSessionConfig,
+  setSessionConfigPath
+} from '../../session-config'
 import { getClientFrameLog } from '../debug'
 import { isFxOperationalMessage } from '../fx/adapter'
-import { fxModels } from '../fx/models'
+import { fxModels, fxSessionConfig } from '../fx/models'
 import { getAcpClient, killAcpWorkspace, killAllAcpClients } from './client'
 import { listAcpModels } from './discovery'
 import { setRunDurationsPath } from './run-durations'
@@ -18,6 +24,7 @@ import {
   forgetAcpSession,
   forgetAllAcpSessions,
   getAcpActiveSessions,
+  getAcpSessionModelState,
   getLiveAcpEvents,
   interruptAcpRun,
   sendAcpMessage
@@ -189,13 +196,140 @@ describe('ACP chat lifecycle', () => {
     await until(async () => (await agent.calls()).some(c => c.method === 'session/load'))
     expect(getLiveAcpEvents(agent.ctx.workspaceId, 'one')).toBeNull()
     const second = agent.load('one')
-    const [a, b] = await Promise.all([first, second])
+    const config = getAcpSessionModelState(agent.config, { ...agent.ctx, sessionId: 'one' })
+    const [a, b, state] = await Promise.all([first, second, config])
     expect(a).toEqual(b)
+    expect(state.currentModelId).toBe('model-a')
     expect(turns(a).map(t => t.parts[0])).toEqual([
       { type: 'text', text: 'earlier' },
       { type: 'text', text: 'history' }
     ])
     expect((await agent.calls()).filter(c => c.method === 'session/load')).toHaveLength(1)
+  })
+
+  test('session settings are isolated from other chats and rediscovered after a cold load', async () => {
+    const agent = await fixture({ loadedModel: 'model-b' })
+    const first = await getAcpSessionModelState(agent.config, { ...agent.ctx, sessionId: 'one' })
+    expect(first.currentModelId).toBe('model-b')
+    await agent.send('two', 'different model', 'model-a')
+    expect(
+      (await getAcpSessionModelState(agent.config, { ...agent.ctx, sessionId: 'one' }))
+        .currentModelId
+    ).toBe('model-b')
+    forgetAcpSession(agent.ctx.workspaceId, 'one')
+    expect(
+      (await getAcpSessionModelState(agent.config, { ...agent.ctx, sessionId: 'one' }))
+        .currentModelId
+    ).toBe('model-b')
+    expect(
+      (await agent.calls()).filter(
+        call => call.method === 'session/load' && call.params.sessionId === 'one'
+      )
+    ).toHaveLength(2)
+  })
+
+  test('native settings do not become implicit moi overrides after sending', async () => {
+    const agent = await fixture({ loadedModel: 'model-b' })
+    agent.config.persistSessionModel = false
+    setSessionConfigPath(join(agent.dir, 'settings.json'))
+    try {
+      await agent.send('native', 'keep native model', 'model-b')
+      expect(await getSessionConfig(agent.dir, 'native')).toEqual({})
+      await saveSessionConfig(agent.dir, 'native', { effort: 'auto' })
+      await agent.send('native', 'keep explicit preference', 'model-b')
+      expect(await getSessionConfig(agent.dir, 'native')).toEqual({ effort: 'auto' })
+    } finally {
+      setSessionConfigPath(DEFAULT_SESSION_CONFIG_PATH)
+    }
+  })
+
+  test('new-chat config reads await model and effort confirmation before a queued follow-up', async () => {
+    const agent = await fixture()
+    agent.config.persistSessionModel = false
+    const applying = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    agent.config.applySettings = async (client, sessionId, requested, state) => {
+      applying.resolve()
+      await release.promise
+      if (requested.model && requested.model !== state.currentModelId) {
+        await client.rpc('session/set_model', { sessionId, modelId: requested.model })
+      }
+      return {
+        ...state,
+        currentModelId: requested.model ?? state.currentModelId,
+        configOptions: [
+          {
+            id: 'effort',
+            name: 'Effort',
+            type: 'select',
+            currentValue: requested.effort ?? 'auto',
+            options: [
+              { value: 'auto', name: 'Default' },
+              { value: 'high', name: 'High' }
+            ]
+          }
+        ]
+      }
+    }
+    const first = sendAcpMessage(agent.config, {
+      ...agent.ctx,
+      sessionId: 'temporary',
+      isNew: true,
+      content: 'first',
+      model: 'model-b',
+      effort: 'high'
+    })
+    await applying.promise
+    const rename = getClientFrameLog(agent.ctx.workspaceId)
+      .map(frame => frame.frame as ServerMessage)
+      .find(frame => 'type' in frame && frame.type === 'session_renamed')
+    if (!rename || !('to' in rename)) throw new Error('Expected new-chat rename')
+    const sessionId = rename.to
+    let configResolved = false
+    const reading = getAcpSessionModelState(agent.config, { ...agent.ctx, sessionId }).then(
+      state => {
+        configResolved = true
+        return fxSessionConfig(state)
+      }
+    )
+    await Bun.sleep(20)
+    expect(configResolved).toBe(false)
+    expect((await agent.calls()).some(call => call.method === 'session/prompt')).toBe(false)
+    release.resolve()
+    const confirmed = await reading
+    expect(confirmed).toEqual({ model: 'model-b', effort: 'high' })
+    expect(
+      getClientFrameLog(agent.ctx.workspaceId).some(frame => {
+        const value = frame.frame as ServerMessage
+        return 'type' in value && value.type === 'sessions_changed'
+      })
+    ).toBe(true)
+    await sendAcpMessage(agent.config, {
+      ...agent.ctx,
+      sessionId,
+      isNew: false,
+      content: 'queued',
+      ...confirmed
+    })
+    await first
+    await until(
+      () =>
+        !getAcpActiveSessions('fx').some(session => session.workspaceId === agent.ctx.workspaceId)
+    )
+    expect(
+      (await agent.calls())
+        .filter(call => call.method === 'session/set_model')
+        .map(call => call.params.modelId)
+    ).toEqual(['model-b'])
+    expect(
+      turns(agent.events(sessionId))
+        .filter(turn => turn.role === 'assistant')
+        .flatMap(turn => turn.parts)
+        .filter(part => part.type === 'text')
+    ).toEqual([
+      { type: 'text', text: 'model-b:first' },
+      { type: 'text', text: 'model-b:queued' }
+    ])
   })
 
   test('a send waits for replay and retains the confirmed loaded model', async () => {

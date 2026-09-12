@@ -19,7 +19,7 @@ import { STREAM_RESPONSES } from '@/client/lib/flags'
 import { formatChatTitle } from '@/lib/chat-title'
 import { applyEvent, emptyViewState } from '@/lib/format'
 import { messageAttachmentLimitError } from '@/lib/message-attachments'
-import type { Part, SessionInfo, ViewState, WorkspaceAgent } from '@/lib/types'
+import type { Part, SessionConfig, SessionInfo, ViewState, WorkspaceAgent } from '@/lib/types'
 
 // Explicit attachments belong to this send, independently of the user's draft.
 export type PreparedAttachments = {
@@ -166,6 +166,7 @@ type StartOptimisticSessionInput = {
   sessionId: string
   text: string
   filenames?: readonly string[]
+  config?: SessionConfig
 }
 
 export function startOptimisticSession({
@@ -173,10 +174,14 @@ export function startOptimisticSession({
   workspaceId,
   sessionId,
   text,
-  filenames = []
+  filenames = [],
+  config = {}
 }: StartOptimisticSessionInput): void {
   const summary = formatChatTitle(text, filenames)
   if (!summary) return
+  // The backend does not know this temporary id yet. Keep its initial picks
+  // available locally until session_renamed can load the confirmed settings.
+  queryClient.setQueryData(workspaceKeys.sessionConfig(workspaceId, sessionId), config)
   queryClient.setQueryData<SessionInfo[]>(workspaceKeys.sessions(workspaceId), current => [
     { sessionId, summary, lastModified: Date.now() },
     ...(current ?? []).filter(session => session.sessionId !== sessionId)
