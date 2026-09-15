@@ -25,7 +25,6 @@ export function AttachmentChip({
 }: AttachmentChipProps) {
   return (
     <div
-      title={label}
       {...props}
       className={cn(
         'group relative flex max-w-full min-w-0 cursor-default items-center rounded-md bg-background text-sm whitespace-nowrap text-foreground ring-1 ring-border outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
