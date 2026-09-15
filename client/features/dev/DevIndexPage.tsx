@@ -8,6 +8,11 @@ type DevRouteEntry = {
 
 const DEV_ROUTES: DevRouteEntry[] = [
   {
+    path: '/dev/collab',
+    title: 'Collab',
+    description: 'Give this tab a collab identity: a name, a color, and a generated avatar.'
+  },
+  {
     path: '/dev/blobatar-shapes',
     title: 'Blobatar shape builder',
     description: 'Tune all 10 shape families and their geometry traits for the agent.'
