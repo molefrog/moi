@@ -102,12 +102,14 @@ declare module 'moi' {
   // target view as its \`params\` prop — JSON-plain values only. No-ops outside
   // the moi host. Tab ids: 'overview' | 'agent' | 'scratchpad' | 'view:<id>'.
   export function focusTab(tab: string, params?: Record<string, unknown>): void
+  // Stage context in the current chat draft; does not send a message.
+  export function addChatContext(input: { label: string; context: Record<string, unknown> }): void
   // Send a chat message to the workspace's active chat, as if the user typed
   // \`message\`. \`context\` rides along as structured data the agent sees but
   // the user does not — JSON-plain values only. Call it from event handlers,
   // never during render: each call starts an agent run, and repeats are
   // rate-limited.
-  export function sendChatMessage(message: string, context?: Record<string, unknown>): void
+  export function sendChatMessage(input: { message: string; context?: Record<string, unknown> }): void
   export type WidgetConfig = {
     rowSpan: 1 | 2 | 3 | 4
     colSpan: 1 | 2 | 3 | 4

@@ -1,3 +1,4 @@
+import { isMessageAttachments } from '@/lib/message-attachments'
 import type { ClientMessage, StatusSnapshotMessage } from '@/lib/types'
 import { isMoiContext } from '@/lib/moi-context'
 
@@ -50,8 +51,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
       (v.fastMode === undefined || typeof v.fastMode === 'boolean') &&
       (v.stream === undefined || typeof v.stream === 'boolean') &&
       (v.context === undefined || isMoiContext(v.context)) &&
-      (v.attachments === undefined ||
-        (Array.isArray(v.attachments) && v.attachments.every(a => typeof a === 'string')))
+      (v.attachments === undefined || isMessageAttachments(v.attachments))
     )
   if (v.type === 'stop') return typeof v.workspaceId === 'string' && typeof v.sessionId === 'string'
   if (v.type === 'scratchpad:op-result') return typeof v.opId === 'string'

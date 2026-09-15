@@ -1,3 +1,4 @@
+import { isMessageAttachments } from '@/lib/message-attachments'
 import { Hono } from 'hono'
 import { serveStatic } from 'hono/bun'
 import { createMiddleware } from 'hono/factory'
@@ -313,15 +314,12 @@ one.post('/view-builders/:builderId/submit', async c => {
   const availableIcons = parseAvailableViewIcons(body.availableIcons)
   if (!availableIcons) return c.text('Available view icons are required', 400)
   const attachments = body.attachments ?? []
-  if (
-    !Array.isArray(attachments) ||
-    attachments.length > 1 ||
-    !attachments.every(id => typeof id === 'string' && /^[a-f0-9]{64}$/.test(id))
-  ) {
-    return c.text('Invalid sketch attachment', 400)
-  }
-  if (attachments.some(id => getUpload(ws.id, id)?.kind !== 'image')) {
-    return c.text('Sketch attachment not found or expired', 400)
+  if (!isMessageAttachments(attachments)) return c.text('Invalid attachments', 400)
+  for (const attachment of attachments) {
+    if (attachment.type !== 'upload') continue
+    if (!/^[a-f0-9]{64}$/.test(attachment.uploadId)) return c.text('Invalid upload id', 400)
+    if (!getUpload(ws.id, attachment.uploadId))
+      return c.text('Attachment not found or expired', 400)
   }
   const availability = await workspaceTypeAvailability(ws.type ?? 'claude-code')
   if (availability.status !== 'available') return c.text(availability.reason, 400)
@@ -341,7 +339,7 @@ one.post('/view-builders/:builderId/submit', async c => {
       directives: [
         ...viewBuilderDirectives(builder.id, availableIcons),
         ...(attachments.length > 0
-          ? ["The attached image is the user's sketch of the intended view layout."]
+          ? ['Use the attachments as reference material for the intended view.']
           : [])
       ]
     }

@@ -1,3 +1,5 @@
+import type { ContextAttachment } from './types'
+
 // Display-only conversation format. Agent-agnostic.
 // Source: server/harness/README.md (format section; formerly claude-code-messages.md §14) (and the research PDF under dev/report).
 // Built at ingest time from an agent's raw stream (today: Claude Agent SDK).
@@ -50,6 +52,7 @@ export type ToolCall = {
 export type Citation = { url?: string; title?: string; quote?: string }
 
 export type Part =
+  | ({ type: 'context' } & ContextAttachment)
   | { type: 'text'; text: string; citations?: Citation[] }
   // `redacted` marks reasoning the backend acknowledges but won't hand over:
   // Anthropic's `redacted_thinking`, and the codex app-server's `Reasoning`
