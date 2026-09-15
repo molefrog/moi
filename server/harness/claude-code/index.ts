@@ -7,6 +7,7 @@ import type { McpServer } from '@/lib/types'
 import type { DiscoveredWorkspaceCandidate, Harness } from '../types'
 import { findHarnessExecutable, pathHarnessAvailability } from '../executable'
 import { getClaudeAuthReadiness, startClaudeLogin } from './auth'
+import { getClaudeAutoPermissionsReadiness, lastProbedClaudeCapabilities } from './capabilities'
 import { isLinkedGitWorktree } from './git-worktree'
 import { getMcpStatus } from './mcp'
 import { getClaudeModels, lastProbedClaudeCli, onClaudeCliChanged } from './models'
@@ -105,7 +106,13 @@ export const claudeCodeHarness: Harness = {
   discoverWorkspaces,
   availability: async ws => {
     const runtime = await pathHarnessAvailability('claude-code')
-    return runtime.status === 'available' && ws ? getClaudeAuthReadiness(ws.path) : runtime
+    if (runtime.status !== 'available') return runtime
+    // Every session runs with `permissionMode: 'auto'`. A CLI that rejects it
+    // fails on the first message, so report it here instead — before the auth
+    // probe, so there is one reason to act on.
+    const permissions = await getClaudeAutoPermissionsReadiness()
+    if (permissions) return permissions
+    return ws ? getClaudeAuthReadiness(ws.path) : runtime
   },
   startLogin: ws => startClaudeLogin(ws.path),
 
@@ -119,7 +126,8 @@ export const claudeCodeHarness: Harness = {
     const busy = cc.sessions.filter(s => s.activity !== 'idle').length
     const lines = [
       `claude executable  ${findHarnessExecutable('claude-code') ?? '(not found)'}` +
-        `  (${lastProbedClaudeCli()?.version ?? 'version not probed yet'})`,
+        `  (${lastProbedClaudeCli()?.version ?? 'version not probed yet'}` +
+        `${lastProbedClaudeCapabilities()?.autoPermissionMode === false ? ', no auto permission mode' : ''})`,
       `live CC sessions  ${cc.sessions.length}/${SESSION_LIMITS.maxLive}  ` +
         `(${busy} busy, ${cc.sessions.length - busy} idle, ${cc.aliases} alias${cc.aliases === 1 ? '' : 'es'}, ` +
         `idle TTL ${fmtDuration(SESSION_LIMITS.idleTtlMs)})`
