@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { unlinkSync, writeFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -96,6 +97,92 @@ test('restores the source when the renamed view does not build', async () => {
     updateViewTitle(() => {}, workspaceId, workspaceDir, 'cards', 'Study cards')
   ).rejects.toMatchObject({ status: 422 })
   expect(await Bun.file(sourcePath).text()).toBe(broken)
+})
+
+test('renaming rebuilds only the selected view and preserves builder status', async () => {
+  await Bun.write(
+    join(workspaceDir, '.moi', 'views', 'draft.tsx'),
+    'export default function Draft() { return <div>Draft</div> }'
+  )
+  await setBuilder(workspaceId, workspaceDir, 'draft', {
+    kind: 'view',
+    status: 'building',
+    title: 'Draft'
+  })
+  const buildersBefore = await listViewBuilders(workspaceDir)
+  const tabsBefore = (await loadLayout(workspaceDir)).tabs
+
+  const response = await api.request(`/api/workspaces/${workspaceId}/views/cards`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: 'Study cards' })
+  })
+
+  expect(response.status).toBe(200)
+  expect(await response.json()).toMatchObject({ id: 'cards', config: { title: 'Study cards' } })
+  expect(
+    await Bun.file(join(workspaceDir, '.moi', '.build', 'views', 'draft', 'index.js')).exists()
+  ).toBe(false)
+  expect(await listViewBuilders(workspaceDir)).toEqual(buildersBefore)
+  expect((await loadLayout(workspaceDir)).tabs).toEqual(tabsBefore)
+  expect(published).not.toContainEqual(
+    expect.objectContaining({ type: 'view:updated', name: 'draft' })
+  )
+})
+
+test('renames a view whose config uses title shorthand', async () => {
+  await Bun.write(
+    sourcePath,
+    "const title = 'Cards'\nexport const config = { title }\nexport default function Cards() { return <div>Cards</div> }\n"
+  )
+
+  const response = await api.request(`/api/workspaces/${workspaceId}/views/cards`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: 'Study cards' })
+  })
+
+  expect(response.status).toBe(200)
+  expect(await response.json()).toMatchObject({ id: 'cards', config: { title: 'Study cards' } })
+  expect(await Bun.file(sourcePath).text()).toContain('title: "Study cards"')
+})
+
+test('a failed rename leaves source edits made during the rebuild intact', async () => {
+  const newer =
+    "export const config = { title: 'Agent edit' }\nexport default function Cards() { return null }\n"
+  await expect(
+    updateViewTitle(
+      () => {
+        // Publishing happens after compilation; simulate an agent edit followed by
+        // a failure to finish the rename, without racing timers or the filesystem.
+        writeFileSync(sourcePath, newer)
+        throw new Error('Publish failed')
+      },
+      workspaceId,
+      workspaceDir,
+      'cards',
+      'Study cards'
+    )
+  ).rejects.toThrow('Publish failed')
+
+  expect(await Bun.file(sourcePath).text()).toBe(newer)
+})
+
+test('a failed rename does not recreate a source removed during the rebuild', async () => {
+  await expect(
+    updateViewTitle(
+      () => {
+        unlinkSync(sourcePath)
+        throw new Error('Publish failed')
+      },
+      workspaceId,
+      workspaceDir,
+      'cards',
+      'Study cards'
+    )
+  ).rejects.toThrow('Publish failed')
+
+  expect(await Bun.file(sourcePath).exists()).toBe(false)
 })
 
 test('deletes a view and its owned state while preserving shared files and data', async () => {

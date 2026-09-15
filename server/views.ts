@@ -16,12 +16,8 @@ import { serializeWorkspaceBundle } from './bundle-queue'
 import { reloadModules } from './functions'
 import { loadLayout, saveLayout } from './layout'
 import { deleteViewBuilderForView, markViewBuilderReady } from './view-builders'
-import {
-  deleteViewSourceFiles,
-  readViewSource,
-  setViewSourceTitle,
-  ViewSourceInUseError
-} from './applets/view-source'
+import { setViewSourceTitle } from './applets/config'
+import { deleteViewSourceFiles, readViewSource, ViewSourceInUseError } from './applets/view-source'
 
 // The view applet kind. Sources in `.moi/views/`, compiled output + manifest in
 // `.moi/.build/views/`; the shared mechanics live in `applets/index.ts`. Manifest
@@ -269,9 +265,16 @@ export async function updateViewTitle(
 
     await Bun.write(source.path, updated)
     try {
-      const result = (await handleBundleViews(publish, workspaceId, workspacePath)).find(
-        candidate => candidate.name === viewId
+      // A rename changed this entry; rebuild only it and preserve builder status.
+      const results = await handleBundleViews(
+        publish,
+        workspaceId,
+        workspacePath,
+        true,
+        true,
+        viewId
       )
+      const result = results.find(candidate => candidate.name === viewId)
       if (result?.status !== 'built') {
         throw new ViewMutationError(result?.error ?? 'Could not rebuild the renamed view', 422)
       }
@@ -282,7 +285,14 @@ export async function updateViewTitle(
       }
       return renamed
     } catch (error) {
-      await Bun.write(source.path, source.source)
+      // An agent may have edited or removed the source while the build ran.
+      if (
+        (await Bun.file(source.path)
+          .text()
+          .catch(() => null)) === updated
+      ) {
+        await Bun.write(source.path, source.source)
+      }
       throw error
     }
   })

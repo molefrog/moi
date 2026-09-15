@@ -2,7 +2,8 @@ import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test'
 import { rmSync } from 'node:fs'
 import { join } from 'path'
 
-import { buildApplet, extractViewConfig, extractWidgetConfig } from '../applets/build-applet'
+import { buildApplet } from '../applets/build-applet'
+import { extractViewConfig, extractWidgetConfig } from '../applets/config'
 
 const FIXTURES = join(import.meta.dir, '__fixtures__')
 
