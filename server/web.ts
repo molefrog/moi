@@ -1,10 +1,12 @@
 import type { ClientMessage, StatusSnapshotMessage } from '@/lib/types'
-import { isMoiContext } from '@/lib/moi-context'
+import { isMoiContext, type MoiContext } from '@/lib/moi-context'
 
 import index from '../client/index.html'
 import { api } from './api'
 import { PORT } from './constants'
 import { control } from './control'
+import { getCollabCapability, isCollabEnabled } from './collab/config'
+import { collabManager } from './collab/manager'
 import { EVENTS_TOPIC, publishEvent, setEventServer } from './events'
 import { killBuildWorkers } from './applets/build-worker'
 import { killAllWorkers } from './functions'
@@ -19,7 +21,11 @@ import { distShell, prebuilt } from './static'
 import { renderStatus } from './status'
 import { serveVendorEmojibase, serveVendorReact } from './vendor'
 
-type WsData = { channel: 'chat' | 'events'; workspaceId: string }
+type WsData = {
+  channel: 'chat' | 'events' | 'collab'
+  workspaceId: string
+  workspacePath?: string
+}
 
 function isClientMessage(value: unknown): value is ClientMessage {
   if (typeof value !== 'object' || value === null || !('type' in value)) return false
@@ -120,14 +126,31 @@ export const app = Bun.serve<WsData>({
     // routes it ahead of the Hono-served `/api/workspaces/:id`; the upgrade
     // happens in-handler via the route's `server` argument.
     '/api/workspaces/ws': (req: Request, server: Bun.Server<WsData>) =>
-      upgrade(server, req, { channel: 'events', workspaceId: '' })
+      upgrade(server, req, { channel: 'events', workspaceId: '' }),
+
+    '/api/workspaces/:id/collab/ws': async (req: Request, server: Bun.Server<WsData>) => {
+      const workspaceId = decodeURIComponent(new URL(req.url).pathname.split('/')[3] ?? '')
+      const workspace = await getWorkspace(workspaceId)
+      if (!workspace) return new Response('Workspace not found', { status: 404 })
+      if (!isCollabEnabled()) {
+        return new Response('Collab is not enabled for this workspace', { status: 403 })
+      }
+      return upgrade(server, req, {
+        channel: 'collab',
+        workspaceId,
+        workspacePath: workspace.path
+      })
+    }
   },
   // Anything not matched above (the whole HTTP API + prod static assets + 404)
   // is handled by Hono.
   fetch: req => api.fetch(req),
   websocket: {
     open(ws) {
-      if (ws.data.channel === 'chat') {
+      if (ws.data.channel === 'collab') {
+        if (ws.data.workspacePath) collabManager.open(ws, ws.data.workspacePath)
+        else ws.close(1008, 'Missing workspace')
+      } else if (ws.data.channel === 'chat') {
         addClient(ws)
         // Authoritative snapshot of every non-idle session across all
         // harnesses so the client can light/clear spinners correctly even for
@@ -138,6 +161,10 @@ export const app = Bun.serve<WsData>({
       }
     },
     async message(ws, message) {
+      if (ws.data.channel === 'collab') {
+        collabManager.message(ws, message)
+        return
+      }
       if (ws.data.channel !== 'chat') return
       try {
         const data = JSON.parse(String(message))
@@ -147,6 +174,14 @@ export const app = Bun.serve<WsData>({
         if (data.type === 'chat' && (data.content?.trim() || data.attachments?.length)) {
           const workspace = await getWorkspace(data.workspaceId)
           if (!workspace) return
+          const collab = await getCollabCapability(workspace.path, workspace.type)
+          const context: MoiContext | undefined =
+            data.context || collab.referencePath
+              ? {
+                  ...(data.context ?? { activeTab: 'agent' }),
+                  collabReference: collab.referencePath
+                }
+              : undefined
           if (data.isNew) {
             const selection = await saveSelectedSession(workspace.path, data.sessionId, null)
             if (selection.changed) {
@@ -172,7 +207,7 @@ export const app = Bun.serve<WsData>({
               effort: data.effort,
               fastMode: data.fastMode,
               stream: data.stream,
-              context: data.context,
+              context,
               agentId: workspace.agentId
             })
             .catch(() => {})
@@ -191,7 +226,8 @@ export const app = Bun.serve<WsData>({
       } catch {}
     },
     close(ws) {
-      if (ws.data.channel === 'chat') removeClient(ws)
+      if (ws.data.channel === 'collab') collabManager.close(ws)
+      else if (ws.data.channel === 'chat') removeClient(ws)
       else ws.unsubscribe(EVENTS_TOPIC)
     }
   }
@@ -222,7 +258,10 @@ startServiceLogMaintenance()
 // changes; in any context Ctrl-C sends SIGINT. Close both servers and kill the
 // per-workspace function workers and any in-flight applet build child so no
 // child processes are orphaned.
-function shutdown() {
+let shuttingDown = false
+async function shutdown() {
+  if (shuttingDown) return
+  shuttingDown = true
   try {
     app.stop(true)
   } catch {}
@@ -232,6 +271,7 @@ function shutdown() {
   for (const h of allHarnesses()) h.shutdown?.()
   killAllWorkers()
   killBuildWorkers()
+  await collabManager.shutdown()
   process.exit()
 }
 process.on('SIGTERM', shutdown)
