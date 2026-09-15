@@ -1,3 +1,4 @@
+import { WorkspaceLayoutContext } from './WorkspaceLayoutContext'
 // Central assembly of the moi context sent with every chat message — the one
 // place that snapshots the workspace's primary UI state (active tab, view
 // titles) and drains queued one-shot directives. The structured `MoiContext`
@@ -21,7 +22,7 @@
 //   Adding a new ambient field (e.g. scratchpad selection): extend the
 //   `MoiContext` type and its renderer in lib/moi-context.ts, then supply
 //   the field in `useMoiUserMessageContext`'s builder below.
-import { useCallback } from 'react'
+import { useCallback, useContext } from 'react'
 
 import { useViewBuilders, useViews } from '@/client/features/views/api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
@@ -111,6 +112,7 @@ export function useMoiUserMessageContext({
   appletParams
 }: WorkspaceTabAddress): (options?: MoiUserMessageOptions) => MoiContext {
   const workspaceId = useWorkspaceId()
+  const collab = useContext(WorkspaceLayoutContext)?.collab
   const views = useViews(workspaceId).data
   const builders = useViewBuilders(workspaceId).data
   return useCallback(
@@ -119,12 +121,15 @@ export function useMoiUserMessageContext({
       const tabParams = envelopeTabParams(activeTab, appletParams)
       return {
         activeTab,
+        ...(collab?.enabled && collab.referencePath
+          ? { collabReference: collab.referencePath }
+          : {}),
         tabTitle: activeTabTitle(activeTab, views, builders),
         ...(tabParams ? { tabParams } : {}),
         ...(options.applet ? { applet: options.applet } : {}),
         ...(directives.length > 0 ? { directives } : {})
       }
     },
-    [workspaceId, activeTab, appletParams, views, builders]
+    [workspaceId, activeTab, appletParams, views, builders, collab]
   )
 }

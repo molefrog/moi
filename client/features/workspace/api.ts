@@ -10,12 +10,16 @@ import type {
   HarnessLogin,
   WorkspaceAgent,
   WorkspaceLayout,
+  WorkspaceLayoutSave,
   WorkspaceSkillsStatus,
   WorkspaceSkillsUpdateFailure,
   WorkspaceType
 } from '@/lib/types'
 
+import type { CollabCapability } from '@/lib/collab/types'
+
 export type WorkspaceLayoutResponse = WorkspaceLayout & {
+  collab?: CollabCapability
   cwd: string
   name: string
   provider?: WorkspaceType
@@ -23,6 +27,14 @@ export type WorkspaceLayoutResponse = WorkspaceLayout & {
 }
 
 export function useWorkspaceLayout(workspaceId: string) {
+  const queryClient = useQueryClient()
+  useEffect(
+    () =>
+      onWorkspaceEventsReconnect(() => {
+        void queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })
+      }),
+    [queryClient, workspaceId]
+  )
   return useQuery<WorkspaceLayoutResponse>({
     queryKey: workspaceKeys.layout(workspaceId),
     queryFn: () => requestJson(`/api/workspaces/${workspaceId}`),
@@ -122,7 +134,7 @@ export function useUpdateWorkspaceSkills(workspaceId: string) {
 
 export function useSaveLayout(workspaceId: string) {
   const queryClient = useQueryClient()
-  return useMutation<void, Error, WorkspaceLayout>({
+  return useMutation<void, Error, WorkspaceLayoutSave>({
     mutationFn: layout =>
       requestVoid(
         `/api/workspaces/${workspaceId}`,

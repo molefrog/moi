@@ -1,3 +1,4 @@
+import { CollabGate, useCollabIdentityEnabled } from '@/client/features/collab/entry'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
@@ -24,11 +25,33 @@ type WorkspaceRouteProps = {
 export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
   return (
     <Workspace id={id}>
-      <WorkspaceLayoutProvider id={id}>
-        <WorkspaceLoader id={id} />
+      <WorkspaceLayoutProvider key={id} id={id}>
+        <WorkspaceFeatures id={id} />
       </WorkspaceLayoutProvider>
     </Workspace>
   )
+}
+
+function WorkspaceFeatures({ id }: WorkspaceRouteProps) {
+  const { collab, isLoading } = useWorkspaceLayoutCtx()
+  if (isLoading)
+    return (
+      <SidebarLayout>
+        <div className="flex h-full items-center justify-center">
+          <LedLogo sprite="moi" effect="chaos" />
+        </div>
+      </SidebarLayout>
+    )
+  return (
+    <CollabGate workspaceId={id} enabled={collab?.enabled === true}>
+      <WorkspaceIdentity id={id} />
+    </CollabGate>
+  )
+}
+
+function WorkspaceIdentity({ id }: WorkspaceRouteProps) {
+  const personal = useCollabIdentityEnabled()
+  return <WorkspaceLoader key={`${id}:${personal}`} id={id} />
 }
 
 function WorkspaceLoader({ id }: WorkspaceRouteProps) {

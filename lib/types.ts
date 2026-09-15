@@ -556,6 +556,8 @@ export type WorkspaceTabsState = {
 
 export type { AgentTheme, ColorTheme, FontTheme, RadiusTheme, WorkspaceTheme } from './themes'
 
+export type WorkspaceLayoutSave = Omit<WorkspaceLayout, 'tabs'> & { tabs?: WorkspaceTabsState }
+
 export type WorkspaceLayout = {
   version: 1
   widgetGrid: LayoutGridItem[]

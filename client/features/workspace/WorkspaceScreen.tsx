@@ -22,6 +22,7 @@ import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { ThemePanel } from '@/client/features/workspace/ThemePanel'
 import { useAppletEvent } from '@/client/features/applets/applet-runtime'
 import { Overview } from '@/client/features/overview/Overview'
+import { CollabControls, useCollabIdentityEnabled } from '@/client/features/collab/entry'
 import { PanelHeader } from '@/client/components/shared/PanelHeader'
 import { WorkspaceIcon } from '@/client/components/shared/WorkspaceIcon'
 import { Button } from '@/client/components/ui/button'
@@ -217,6 +218,7 @@ function WorkspaceMenu({ onOpenTheme }: WorkspaceMenuProps) {
 
 export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenProps) {
   const { layout, setLayout, workspaceId } = useWorkspaceLayoutCtx()
+  const collabIdentityEnabled = useCollabIdentityEnabled()
   const theme = resolveWorkspaceTheme(layout.theme)
   const builderActions = useViewBuilderActions()
   const {
@@ -242,9 +244,11 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   // Split needs the open set to decide whether it's available at all, and the
   // navigation hook needs split to resolve the active tab — so the open set is
   // derived from the raw layout here, before either.
-  const openTabIds = effectiveOpenTabs(normalizeTabsState(layout.tabs), views, builders)
-  const nonAgentOpenTabs = openTabIds.filter(tab => tab !== 'agent')
-  const hasWorkspaceContent = nonAgentOpenTabs.length > 0
+  const hasWorkspaceContent = effectiveOpenTabs(
+    normalizeTabsState(layout.tabs),
+    views,
+    builders
+  ).some(tab => tab !== 'agent')
   const hasAppletWidgets = widgets.some(widget => !isDefaultWidget(widget.id))
   const hasWorkspaceApplets = hasAppletWidgets || views.length > 0
 
@@ -289,6 +293,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     }
   )
 
+  const openTabIds = effectiveOpenTabs(tabsState, views, builders)
+  const nonAgentOpenTabs = openTabIds.filter(tab => tab !== 'agent')
   const openSet = new Set(tabsState.open)
 
   // Entering split with the agent tab on screen needs no special-casing
@@ -347,13 +353,11 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     const open = tabsState.open.filter(tab => tabAvailable(tab, views, builders))
     if (open.length === tabsState.open.length) return
     const nextOpen = effectiveOpenTabs(tabsState, views, builders)
-    setLayout({
-      tabs: {
-        open: nextOpen,
-        active: nextOpen.includes(tabsState.active) ? tabsState.active : nextOpen[0]
-      }
+    setTabs({
+      open: nextOpen,
+      active: nextOpen.includes(tabsState.active) ? tabsState.active : nextOpen[0]
     })
-  }, [builders, setLayout, tabsState, views])
+  }, [builders, setTabs, tabsState, views])
 
   useEffect(() => {
     const replacements = new Map<WorkspaceTabId, WorkspaceTabId>()
@@ -387,8 +391,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
     }
     if (!changed) return
     const active = replacements.get(tabsState.active) ?? tabsState.active
-    setLayout({ tabs: { open: open.length > 0 ? open : ['overview'], active } })
-  }, [activeTab, builders, navigateToTab, setLayout, tabsState, views])
+    setTabs({ open: open.length > 0 ? open : ['overview'], active })
+  }, [activeTab, builders, navigateToTab, setTabs, tabsState, views])
 
   useEffect(() => {
     if (mode !== 'fullscreen' || activeTab === 'agent') {
@@ -438,7 +442,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   // `moi tabs focus` — a workspace event, not an applet call: the control
   // server validated the target and params before publishing.
   useWorkspaceEvent(event => {
-    if (event.type === 'tab:focus' && event.workspaceId === workspaceId) {
+    if (event.type === 'tab:focus' && event.workspaceId === workspaceId && !collabIdentityEnabled) {
       openTab(event.tab, event.params)
     } else if (
       event.type === 'view:deleted' &&
@@ -740,6 +744,11 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
             onReorder={reorderTabs}
           />
         </div>
+        <CollabControls
+          workspaceId={workspaceId}
+          describeTab={tab => tabItemFor(tab, views, builders, false, false, () => false)}
+          onOpenTab={openTab}
+        />
         {hasWorkspaceContent && canUseSplit && mode === 'fullscreen' && (
           <Tooltip>
             <TooltipTrigger
