@@ -257,53 +257,11 @@ It's plain Bun — every Bun API is available with no setup: `bun:sqlite`, `Bun.
 Rule of thumb: small own art → `import`; structured data → `.server.ts` returns it; large/streamable
 media → `.server.ts` returns the **path**, render with `fileUrl()`.
 
-### Driving the workspace — `focusTab` & `sendChatMessage`
+### Applet intents
 
-An applet can move the user to another tab and talk to you, through two functions from the **`moi`**
-package.
-
-```tsx
-import { focusTab, sendChatMessage } from 'moi'
-
-// A widget row drilling into a view, and a button that asks you to do something.
-focusTab('view:orders', { order: 'o-1024' })
-sendChatMessage('Chase order o-1024', { order: 'o-1024', carrier: 'dhl' })
-```
-
-- `focusTab(tab, params?)` switches the workspace to a tab. Tab ids are `overview`, `agent`,
-  `scratchpad`, and `view:<id>` — run `moi tabs` for the real list. `params` arrive as the target
-  view's `params` prop.
-- `sendChatMessage(message, context?)` sends `message` to the active chat as if the user typed it.
-  `context` is structured data you see and the user does not. Call it from event handlers, never
-  during render. Context can contain additional instructions not visible to the user, describing how
-  the task should be done.
-- `params` and `context` accept JSON serializable values only.
-
-#### Params: the type is the contract
-
-A view with addressable state declares a local `Params` type in its own file. Every field is
-optional and carries a comment, because the view must render sensibly with `{}` — a fresh mount, a
-plain tab-bar click, or a new browser tab all deliver nothing.
-
-```tsx
-// .moi/views/orders.tsx
-// The view's addressable state — what `focusTab('view:orders', …)` can set.
-type Params = {
-  // Order id to open in the detail pane; omit to show the list.
-  order?: string
-}
-
-export default function Orders({ params = {} }: { params?: Params }) {
-  // Values arrive from navigation state, so narrow before trusting them.
-  const openOrder = typeof params.order === 'string' ? params.order : null
-  …
-}
-```
-
-**Applets never import from each other, not even types.** Before wiring a `focusTab` call, read the
-target view's source, mirror the shape you find there, and note where you read it. That file is the
-contract; the type is documentation, not a shared module. Widgets are never navigation targets —
-their `params` is always `{}`.
+Intents connect applet interactions to other views and the wider workspace through the host API.
+When building applet interactions, read [Applet intents](references/INTENTS.md) to see which
+behaviors the host supports and when to use them.
 
 ### Environment & secrets
 
@@ -479,4 +437,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.18.1" />
+<moi-skill version="0.19.0" />
