@@ -1,6 +1,7 @@
-import { mkdir, rename, rm } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { rename, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { dirname, join, resolve, sep } from 'path'
+import { join, resolve, sep } from 'path'
 
 import { newWorkspaceId, validateWorkspaceId } from '@/lib/ids'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
@@ -34,10 +35,14 @@ export function setRegistryPath(p: string) {
 }
 
 async function readRegistry(): Promise<WorkspaceEntry[]> {
+  // A fresh install reads the registry before anything has written it. Skip
+  // the read while the file is missing: on Windows, a Bun.file() read under a
+  // not-yet-created data dir can exit the CLI before its ENOENT rejection is
+  // delivered (the silent `moi init` no-op from #136). existsSync is a plain
+  // synchronous stat, so it cannot leave the event loop empty, and the read
+  // path stays free of side effects: the first write creates the directory.
+  if (!existsSync(_registryPath)) return []
   try {
-    // On some Windows/Bun setups, Bun.file(...).text() never settles when the
-    // parent directory is missing (instead of rejecting with ENOENT).
-    await mkdir(dirname(_registryPath), { recursive: true })
     const text = await Bun.file(_registryPath).text()
     return JSON.parse(text) as WorkspaceEntry[]
   } catch {

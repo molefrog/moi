@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdtemp, rm, stat } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'path'
 
@@ -215,12 +216,20 @@ describe('listWorkspaces', () => {
 })
 
 describe('readRegistry', () => {
-  test('creates the parent directory on first read, before any write', async () => {
-    // Regression test for a Windows-only hang when the parent dir is missing.
+  test('reads an unwritten registry as empty without creating its directory', async () => {
+    // A fresh install reads before it writes. The read must succeed under a
+    // data dir that does not exist yet, and must not create it: the first
+    // write does that. (Windows: a Bun.file() read under a missing directory
+    // can exit the CLI early, so the read is skipped while the file is missing.)
     const dataDir = join(tmpDir, 'nested', 'deeper')
     setRegistryPath(join(dataDir, 'workspaces.json'))
     expect(await listWorkspaces()).toEqual([])
-    expect((await stat(dataDir)).isDirectory()).toBe(true)
+    expect(existsSync(dataDir)).toBe(false)
+
+    const project = join(tmpDir, 'project')
+    await registerWorkspace(project)
+    expect(existsSync(join(dataDir, 'workspaces.json'))).toBe(true)
+    expect((await listWorkspaces()).map(entry => entry.path)).toEqual([project])
   })
 })
 
