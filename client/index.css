@@ -102,7 +102,7 @@
 
 @layer base {
   /* Mirrored into the synthetic applet Tailwind entry (writeSyntheticTailwindCss
-     in server/bundler/build-applet.ts): this file never reaches applet builds,
+     in server/applets/build-applet.ts): this file never reaches applet builds,
      and without the rule their bare `border` renders preflight black. Keep the
      two copies in sync. */
   * {

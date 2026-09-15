@@ -36,7 +36,7 @@ export function appletVersion(segment: AppletSegment, workspaceId: string, name:
 // zone's Browser Cache TTL — 4 hours by default — gets stamped over the server's
 // `no-cache`, pinning a stale bundle in the browser with no way to revalidate it
 // away. Extensionless keeps the server's headers intact. `parseAppletTail` in
-// `server/applets.ts` maps this back to `index.js`; the two must agree.
+// `server/applets/index.ts` maps this back to `index.js`; the two must agree.
 const ENTRY_ROUTE = 'module'
 
 // The cache-busting import URL for an applet's entry at its current version.
@@ -48,14 +48,14 @@ export function appletUrl(segment: AppletSegment, workspaceId: string, name: str
 
 // The key an applet bundle registers its CSS under (`window.__moiAppletCss`):
 // the bundle-dir path, which the bundle derives from its own import.meta.url
-// (see injectCss in server/bundler/build-applet.ts). Workspace-qualified so two
+// (see injectCss in server/applets/build-applet.ts). Workspace-qualified so two
 // workspaces sharing an applet name never read each other's styles.
 export function appletStyleKey(segment: AppletSegment, workspaceId: string, name: string): string {
   return `/api/workspaces/${workspaceId}/${segment}/${name}`
 }
 
 // The `data-applet` value the bundle's scoped CSS selectors key off (see
-// server/bundler/applet-css.ts). It goes on the container wrapping a mounted
+// server/applets/applet-css.ts). It goes on the container wrapping a mounted
 // applet — AppletMount for widgets, the view slot for views.
 export function appletScope(segment: AppletSegment, name: string): string {
   return `${segment === 'widgets' ? 'widget' : 'view'}:${name}`

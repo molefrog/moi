@@ -5,7 +5,7 @@ import { useInsertionEffect } from 'react'
 // re-evaluated, let alone disposed). Instead its module side effect registers
 // the compiled, container-scoped CSS on `window.__moiAppletCss`, keyed by the
 // bundle-dir path (`/api/workspaces/<id>/<segment>/<name>` — see injectCss in
-// server/bundler/build-applet.ts and `appletStyleKey`). The host injects a <style> for
+// server/applets/build-applet.ts and `appletStyleKey`). The host injects a <style> for
 // that key while at least one instance of the applet is mounted, and removes it
 // when the last one unmounts.
 declare global {
@@ -55,7 +55,7 @@ export function acquireAppletStyle(key: string): () => void {
 // Move an applet's <style> to the end of <head>. Everything in an applet sheet
 // is scoped to its `[data-applet]` container and so can't collide — except the
 // names of global at-rules (`@keyframes`, `@property`, `@font-face`), which the
-// scoper leaves alone because they aren't selectors (server/bundler/applet-css.ts).
+// scoper leaves alone because they aren't selectors (server/applets/applet-css.ts).
 // Two applets defining `@keyframes pulse` differently therefore share one
 // document-global name, and the last definition wins for both. Raising the
 // applet the user is looking at makes the winner the one on screen.

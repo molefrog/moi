@@ -1,6 +1,6 @@
 /*
  * Shared Tailwind theme and utilities for both the host app (client/index.css)
- * and applet bundles (server/bundler/build-applet.ts inlines this file into the
+ * and applet bundles (server/applets/build-applet.ts inlines this file into the
  * applet's synthetic CSS).
  *
  * The actual CSS variables (`--sans`, `--mono`, `--background`, etc.)

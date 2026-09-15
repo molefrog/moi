@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'path'
 
-import { buildApplet } from '../bundler/build-applet'
+import { buildApplet } from '../applets/build-applet'
 import {
   UI_COMPONENTS,
   UI_COMPONENT_NAMES,

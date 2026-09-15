@@ -1,7 +1,7 @@
 // The workspace applet runtime — the host side of the applet `moi` module.
 //
 // Every applet bundle inlines its own copy of the `moi` virtual module (see
-// MOI_MODULE_SOURCE in server/bundler/build-applet.ts), so each loaded module
+// MOI_MODULE_SOURCE in server/applets/build-applet.ts), so each loaded module
 // instance holds a private `bridge` slot. Right after the dynamic import, the
 // host connects that instance to the workspace's runtime by attaching a thin
 // bridge (`attachAppletBridge`); invalidation disposes it (`disposeAppletBridge`),
@@ -228,7 +228,7 @@ export function useAppletEvent<K extends keyof AppletEvents>(
 }
 
 // The shape of the host wiring every bundle entry re-exports (see the entry
-// plugin in server/bundler/build-applet.ts).
+// plugin in server/applets/build-applet.ts).
 type BridgeModule = {
   __attachBridge?: (bridge: AppletBridge) => void
 }

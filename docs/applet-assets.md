@@ -2,7 +2,7 @@
 
 > Implemented. How an applet (widget/view) reaches the outside: bundled assets
 > it imports, server functions, and workspace files. One base, three transports.
-> Compiler: `server/bundler/build-applet.ts`; serve/guards: `server/applets.ts`; routes:
+> Compiler: `server/applets/build-applet.ts`; serve/guards: `server/applets/index.ts`; routes:
 > `server/web.ts`.
 
 ## One base, swapped at serve
@@ -79,7 +79,7 @@ and _want_ the edge cache.
 
 Consequences to keep in mind when touching this:
 
-- `parseAppletTail` (`server/applets.ts`) maps `module` → `index.js` **before**
+- `parseAppletTail` (`server/applets/index.ts`) maps `module` → `index.js` **before**
   `serveApplet` runs, so content-type and the sentinel swap keep keying off the
   real `.js` name. Deciding those from the requested url would ship the entry as
   `application/octet-stream` and fail the browser's module MIME check.
@@ -167,12 +167,12 @@ declare module '*.png' {
   `index.js`, `chunk-*.js`, assets). `naming.entry` must be `index.[ext]` — bun
   emits the entry's CSS sibling as an "entry" output too, so a literal `index.js`
   collides; we inject that CSS and drop the file.
-- **Serve** (`applets.ts` `serveApplet`): the `…/widgets/*` / `…/views/*` routes
+- **Serve** (`server/applets/index.ts` `serveApplet`): the `…/widgets/*` / `…/views/*` routes
   (literal kind) parse the tail as `<name>/<file>`, resolving the entry alias
   `module` to `index.js`; `.js` is sentinel-swapped and sent as `text/javascript`,
   anything else streams raw (`Bun.file` infers content-type).
   `…/<id>/rpc/<module>/<fn>` reuses the existing worker call.
-- **`/fs`** (`applets.ts` `serveWorkspaceFile`): reject empty/`.`/`..`/dotfile
+- **`/fs`** (`server/applets/index.ts` `serveWorkspaceFile`): reject empty/`.`/`..`/dotfile
   segments and anything resolving outside the root, allowlist media extensions —
   the secret-leak guard, not the localhost bind. Range is handled **explicitly**
   (slice the BunFile → 206 + `Content-Range`): bun's implicit range handling

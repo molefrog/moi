@@ -237,7 +237,7 @@ describe('disposal', () => {
 })
 
 // A stand-in for a loaded bundle's module namespace: the entry re-exports
-// `__attachBridge` (see server/bundler/build-applet.ts).
+// `__attachBridge` (see server/applets/build-applet.ts).
 function fakeModule() {
   let bridge: AppletBridge | null = null
   return {

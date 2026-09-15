@@ -3,8 +3,8 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-import { extractViewConfig } from '../bundler/build-applet'
-import { setViewSourceTitle } from '../view-source'
+import { extractViewConfig } from '../applets/build-applet'
+import { setViewSourceTitle } from '../applets/view-source'
 
 const directory = await mkdtemp(join(tmpdir(), 'moi-view-source-'))
 const sourcePath = join(directory, 'view.tsx')

@@ -11,7 +11,7 @@ const VALID_SPANS = [1, 2, 3, 4]
 
 // The widget applet kind. Sources in `.moi/widgets/`, compiled output +
 // manifest in `.moi/.build/widgets/`; the shared mechanics live in
-// `applets.ts`. Manifest shape: `{ config: { <name>: WidgetConfig } }`.
+// `applets/index.ts`. Manifest shape: `{ config: { <name>: WidgetConfig } }`.
 async function readManifest(workspacePath: string): Promise<Record<string, WidgetConfig>> {
   const { manifestPath } = getAppletPaths(workspacePath, 'widget')
   try {

@@ -15,15 +15,14 @@
 // workspace-agnostic.
 import { realpathSync, statSync } from 'node:fs'
 import { mkdir, readdir, rm } from 'node:fs/promises'
-import { dirname, join, resolve, sep } from 'path'
+import { join, resolve, sep } from 'path'
 
-import {
-  APPLET_API_BASE_SENTINEL,
-  type AppletKind,
-  scanRelativeImports
-} from './bundler/build-applet'
-import { buildAppletsInChild } from './bundler/build-worker'
-import { pruneAppletThumbnails } from './thumbnails'
+import { analyzeDependencies, resolveSource, scanSources } from './dependencies'
+import { APPLET_API_BASE_SENTINEL, type AppletKind } from './build-applet'
+import { buildAppletsInChild } from './build-worker'
+import { pruneAppletThumbnails } from '../thumbnails'
+
+export { scanSources } from './dependencies'
 
 export type AppletPaths = {
   moiRoot: string
@@ -55,161 +54,13 @@ export function getAppletRevision(
   }
 }
 
-// Source module names in a kind's directory: `*.tsx`/`*.ts` minus `.server.ts`
-// and minus `_`-prefixed files (`_utils.tsx`) — those are shared modules for
-// entries to import, never entry points themselves.
-export async function scanSources(sourceDir: string): Promise<string[]> {
-  try {
-    const entries = await readdir(sourceDir)
-    return entries
-      .filter(f => /\.(tsx|ts)$/.test(f) && !f.startsWith('_') && !f.endsWith('.server.ts'))
-      .map(f => f.replace(/\.tsx?$/, ''))
-  } catch {
-    return []
-  }
-}
-
-async function resolveSource(sourceDir: string, name: string): Promise<string | null> {
-  for (const ext of ['.tsx', '.ts']) {
-    const path = join(sourceDir, `${name}${ext}`)
-    if (await Bun.file(path).exists()) return path
-  }
-  return null
-}
-
-// Backstop for pathological graphs: an applet wiring more distinct files than
-// this is reported stale without walking further — stale-but-rebuilt is the
-// safe degradation, and the cap keeps the per-bundle check bounded no matter
-// what the imports look like. Counts every input, images and JSON included, so
-// it sits well above what an asset-heavy applet reaches (the walk never enters
-// node_modules); hitting it means something is off anyway.
-const MAX_GRAPH_FILES = 256
-
-// Files the walk keeps descending through — anything Bun treats as a module
-// (`.ts`, `.mjs`, `.cts`, …). Everything else (`.json`, `.css`, images) is a
-// leaf.
-const MODULE_FILE_RE = /\.[mc]?[jt]sx?$/
-// Which transpiler loader lexes a module's imports. Only `.ts`/`.mts`/`.cts`
-// take the `ts` loader: angle-bracket casts (`<string>x`) parse there and are
-// JSX everywhere else. `.js`/`.mjs`/`.cjs` go through `tsx`, which accepts both
-// plain JS and the JSX some of them contain.
-const TS_ONLY_FILE_RE = /\.[mc]?ts$/
-
-// A bundle is stale if its entry `index.js` is missing, any file in its local
-// import graph has an mtime >= the built entry's, or one of those imports no
-// longer resolves to a file at all.
-//
-// The graph is one uniform walk over every RELATIVE import the entry reaches:
-// shared `_utils.tsx`, `../lib/*.ts`, `./data.json`, `./logo.png`,
-// `./db.server`. Each is resolved to a real path, mtime-checked, and descended
-// into when it's a module — so an imported image and a transitively imported
-// helper are the same case, not two mechanisms. Bare specifiers (node_modules)
-// are not walked: after a dependency bump, `moi bundle --force`. The bundle
-// itself is React-mode-agnostic (see buildApplet), so it needs no rebuild when
-// the server switches between the development and production React.
-//
-// `.server.ts` modules are walked like anything else, which is deliberately
-// MORE than the bundle needs: their code never ships to the client (only the
-// export list, inlined as RPC stubs), so editing one — or anything it imports
-// — cannot change a byte of `index.js`. We report stale anyway because 'built'
-// is what drives the worker recycle downstream (see `reloadModules`, called
-// from widgets.ts/views.ts for every rebuilt applet). Without it, editing a
-// helper that only a server module imports would leave a live worker serving
-// the old code with nothing to dislodge it. The redundant rebuild is the price
-// of that signal; the alternative is a second staleness channel threaded
-// through the build results.
+// Server dependencies also trigger rebuilds so their function worker is
+// recycled, even when the client bundle's RPC stubs would remain identical.
 async function needsRebuild(buildDir: string, name: string, srcPath: string): Promise<boolean> {
   const built = Bun.file(join(buildDir, name, 'index.js'))
   if (!(await built.exists())) return true
-  const builtMtime = built.lastModified
-
-  const queue = [srcPath]
-  const visited = new Set<string>()
-  while (queue.length > 0) {
-    const path = queue.pop()!
-    if (visited.has(path)) continue
-    visited.add(path)
-    if (visited.size > MAX_GRAPH_FILES) return true
-    const file = Bun.file(path)
-    if (!(await file.exists())) continue
-    if (file.lastModified >= builtMtime) return true
-    // Leaves stop at the mtime check above — an asset, JSON, or CSS file can't
-    // import anything.
-    if (!MODULE_FILE_RE.test(path)) continue
-    const source = await file.text()
-    const dir = dirname(path)
-    for (const specifier of scanRelativeImports(
-      source,
-      TS_ONLY_FILE_RE.test(path) ? 'ts' : 'tsx'
-    )) {
-      const resolved = await resolveModuleImport(dir, specifier)
-      // Nothing on disk answers this import, so the next build will fail on it.
-      // Report stale rather than skip: a helper deleted since the last build
-      // would otherwise leave `moi bundle` serving the last good bundle and
-      // never surfacing the missing-import error.
-      if (!resolved) return true
-      queue.push(resolved)
-    }
-  }
-  return false
-}
-
-// Extensions Bun appends to an extensionless import, in its own preference
-// order (`./data` finds `data.tsx` before `data.ts` before … `data.json`).
-// Doubles as the directory-index set: `./helpers` → `helpers/index.jsx`.
-const RESOLVE_EXTENSIONS = ['.tsx', '.ts', '.jsx', '.js', '.mjs', '.cjs', '.json', '.mts', '.cts']
-
-// TypeScript's output-extension rewrite: an import written against the emitted
-// file name resolves to the source that produces it. (`.cjs` → `.cts` is
-// deliberately absent — Bun doesn't do that one.)
-const TS_EXTENSION_REWRITES: Record<string, string[]> = {
-  '.js': ['.ts', '.tsx'],
-  '.jsx': ['.tsx'],
-  '.mjs': ['.mts']
-}
-
-// Resolve a relative import to the file the bundler will actually read. This
-// mirrors Bun's resolution rather than delegating to `Bun.resolveSync`, which
-// memoizes results for the life of the process: in the long-running server it
-// keeps handing back the path of a dependency that has since been deleted or
-// renamed, which is exactly the case this check has to catch. Every candidate
-// is probed against the filesystem, in Bun's order — literal path, TS
-// extension rewrite, appended extension, then directory (`package.json` main,
-// else `index.*`). Returns null when nothing on disk answers the specifier.
-async function resolveModuleImport(dir: string, specifier: string): Promise<string | null> {
-  const base = join(dir, specifier)
-  const candidates = [base]
-
-  // Extension of the final segment only — a dot in a directory name (`./v1.2/x`)
-  // is not one.
-  const ext = /\.[^./\\]+$/.exec(base)?.[0] ?? ''
-  for (const rewrite of TS_EXTENSION_REWRITES[ext] ?? []) {
-    candidates.push(base.slice(0, base.length - ext.length) + rewrite)
-  }
-  for (const e of RESOLVE_EXTENSIONS) candidates.push(base + e)
-
-  for (const candidate of candidates) {
-    if (await Bun.file(candidate).exists()) return candidate
-  }
-
-  // Directory import. `package.json` main wins over `index.*`, matching Bun;
-  // an unreadable or `main`-less manifest just falls through to the indexes.
-  const pkg: unknown = await Bun.file(join(base, 'package.json'))
-    .json()
-    .catch(() => null)
-  const main =
-    typeof pkg === 'object' && pkg !== null && 'main' in pkg && typeof pkg.main === 'string'
-      ? pkg.main
-      : null
-  if (main) {
-    const mainPath = join(base, main)
-    if (await Bun.file(mainPath).exists()) return mainPath
-  }
-  for (const e of RESOLVE_EXTENSIONS) {
-    const index = join(base, `index${e}`)
-    if (await Bun.file(index).exists()) return index
-  }
-  return null
+  const graph = await analyzeDependencies([srcPath], built.lastModified)
+  return !graph.complete
 }
 
 // Built applet names: subdirectories of `buildDir` that hold an `index.js`

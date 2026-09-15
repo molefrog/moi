@@ -3,7 +3,8 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { dirname, join } from 'path'
 
 import { buildApplets, scanSources } from '../applets'
-import { buildApplet, scanRelativeImports } from '../bundler/build-applet'
+import { scanRelativeImports } from '../applets/dependencies'
+import { buildApplet } from '../applets/build-applet'
 
 // Entry-point and staleness rules for the applet build loop: `_`-prefixed
 // files are shared modules (never entries), and a bundle goes stale when
@@ -112,8 +113,8 @@ describe('scanRelativeImports', () => {
     expect(scanRelativeImports(src)).toEqual(['./real'])
   })
 
-  test('a file that fails to lex contributes no imports', () => {
-    expect(scanRelativeImports(`import { from`)).toEqual([])
+  test('a file that fails to lex reports unknown imports', () => {
+    expect(scanRelativeImports(`import { from`)).toBeNull()
   })
 
   test('the ts loader handles angle-bracket casts tsx cannot', () => {

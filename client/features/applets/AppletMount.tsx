@@ -13,7 +13,7 @@ type AppletMountProps = {
 }
 
 // The style scope for one mounted applet: puts the `data-applet` attribute the
-// bundle's scoped CSS selectors key off (see server/bundler/applet-css.ts) on a
+// bundle's scoped CSS selectors key off (see server/applets/applet-css.ts) on a
 // wrapper filling the parent box, and keeps the applet's <style> tag mounted
 // exactly as long as the applet is — unmounting removes the styles from the
 // page. This is the widget path. Views don't use it: ViewManager parks a view's

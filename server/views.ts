@@ -16,10 +16,15 @@ import { serializeWorkspaceBundle } from './bundle-queue'
 import { reloadModules } from './functions'
 import { loadLayout, saveLayout } from './layout'
 import { deleteViewBuilderForView, markViewBuilderReady } from './view-builders'
-import { deleteViewSourceFiles, readViewSource, setViewSourceTitle } from './view-source'
+import {
+  deleteViewSourceFiles,
+  readViewSource,
+  setViewSourceTitle,
+  ViewSourceInUseError
+} from './applets/view-source'
 
 // The view applet kind. Sources in `.moi/views/`, compiled output + manifest in
-// `.moi/.build/views/`; the shared mechanics live in `applets.ts`. Manifest
+// `.moi/.build/views/`; the shared mechanics live in `applets/index.ts`. Manifest
 // shape: `{ config: { <name>: ViewConfig }, order: [<name>, …] }`. `order` is the nav
 // tab order — first-seen (creation) order, persisted so it's stable across
 // rebuilds (the filesystem can't recover creation order).
@@ -293,7 +298,12 @@ export async function deleteView(
     const current = (await getViewList(workspacePath)).some(view => view.id === viewId)
     if (!current) throw new ViewMutationError('View not found', 404)
 
-    await deleteViewSourceFiles(workspacePath, viewId)
+    try {
+      await deleteViewSourceFiles(workspacePath, viewId)
+    } catch (error) {
+      if (error instanceof ViewSourceInUseError) throw new ViewMutationError(error.message, 409)
+      throw error
+    }
     reloadModules([`views/${viewId}`], workspacePath)
     await deleteViewBuilderForView(workspaceId, workspacePath, viewId)
     const layout = await loadLayout(workspacePath)
@@ -311,7 +321,7 @@ export async function deleteView(
 
     publish({ type: 'view:deleted', workspaceId, name: viewId })
     publish({ type: 'workspace:updated' })
-    await handleBundleViews(publish, workspaceId, workspacePath)
+    await handleBundleViews(publish, workspaceId, workspacePath, false, false, viewId)
   })
 }
 

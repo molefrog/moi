@@ -136,3 +136,64 @@ test('deletes a view and its owned state while preserving shared files and data'
   expect(rpcAfterDelete.status).toBe(500)
   expect(published).toContainEqual({ type: 'view:deleted', workspaceId, name: 'cards' })
 })
+
+test('deleting a view keeps a shared server module callable and the remaining view buildable', async () => {
+  await Bun.write(
+    join(workspaceDir, '.moi', 'views', 'summary.tsx'),
+    "import { load } from './cards.server'\nexport default function Summary() { return <button onClick={() => load()}>Load</button> }"
+  )
+  await buildAllViews(workspaceDir)
+  const rpc = `/api/workspaces/${workspaceId}/rpc/views/cards/load`
+  expect((await api.request(rpc, { method: 'POST', body: stringify([]) })).status).toBe(200)
+
+  const response = await api.request(`/api/workspaces/${workspaceId}/views/cards`, {
+    method: 'DELETE'
+  })
+
+  expect(response.status).toBe(204)
+  expect(await Bun.file(serverPath).exists()).toBe(true)
+  expect((await api.request(rpc, { method: 'POST', body: stringify([]) })).status).toBe(200)
+  expect(await buildAllViews(workspaceDir, true)).toEqual([
+    expect.objectContaining({ name: 'summary', status: 'built' })
+  ])
+})
+
+test('deleting a view does not build or complete an unfinished sibling', async () => {
+  const draftPath = join(workspaceDir, '.moi', 'views', 'draft.tsx')
+  await Bun.write(draftPath, 'export default function Draft() { return <div>Draft</div> }')
+  await setBuilder(workspaceId, workspaceDir, 'draft', {
+    kind: 'view',
+    status: 'building',
+    title: 'Draft'
+  })
+
+  const response = await api.request(`/api/workspaces/${workspaceId}/views/cards`, {
+    method: 'DELETE'
+  })
+
+  expect(response.status).toBe(204)
+  expect(
+    await Bun.file(join(workspaceDir, '.moi', '.build', 'views', 'draft', 'index.js')).exists()
+  ).toBe(false)
+  expect(await listViewBuilders(workspaceDir)).toEqual([
+    expect.objectContaining({ viewId: 'draft', status: 'building' })
+  ])
+  expect(published).not.toContainEqual(
+    expect.objectContaining({ type: 'view:updated', name: 'draft' })
+  )
+})
+
+test('rejects deleting a source imported by another applet before removing any files', async () => {
+  await Bun.write(
+    join(workspaceDir, '.moi', 'views', 'summary.tsx'),
+    "export { default } from './cards'"
+  )
+
+  const response = await api.request(`/api/workspaces/${workspaceId}/views/cards`, {
+    method: 'DELETE'
+  })
+
+  expect(response.status).toBe(409)
+  expect(await Bun.file(sourcePath).exists()).toBe(true)
+  expect(await Bun.file(serverPath).exists()).toBe(true)
+})

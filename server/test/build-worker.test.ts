@@ -7,7 +7,7 @@ import {
   buildAppletsInChild,
   killBuildWorkers,
   liveBuildWorkerCount
-} from '../bundler/build-worker'
+} from '../applets/build-worker'
 
 // The applet build loop compiles in a fresh child process per batch because
 // Bun's resolver cache is process-wide and permanent: a failed bare-specifier

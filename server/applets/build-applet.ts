@@ -566,30 +566,6 @@ export function scanServerImports(source: string): string[] {
   return specifiers
 }
 
-// Every relative import specifier in an applet source — modules (`./_utils`,
-// `../lib/data`), assets (`./logo.png`), `.server` stubs, JSON, CSS alike, in
-// static, re-export, side-effect, and dynamic form. Lexed by Bun's own
-// transpiler, so comments and string literals can't false-positive. Type-only
-// imports are erased by the lexer — correct here, since they never affect the
-// emitted bundle. Bare specifiers (node_modules) are filtered out: the
-// staleness check doesn't walk them. A file that fails to lex contributes no
-// imports — the build itself surfaces the syntax error. Used by the rebuild
-// staleness check to walk the applet's local import graph, so editing anything
-// it (transitively) pulls in marks every applet using it stale.
-const IMPORT_SCANNERS = {
-  ts: new Bun.Transpiler({ loader: 'ts' }),
-  tsx: new Bun.Transpiler({ loader: 'tsx' })
-}
-export function scanRelativeImports(source: string, loader: 'ts' | 'tsx' = 'tsx'): string[] {
-  let imports: { path: string }[]
-  try {
-    imports = IMPORT_SCANNERS[loader].scanImports(source)
-  } catch {
-    return []
-  }
-  return imports.map(i => i.path).filter(p => /^\.\.?\//.test(p))
-}
-
 async function prevalidateServerFiles(entrypoint: string): Promise<void> {
   const sourceDir = dirname(entrypoint)
   const source = await Bun.file(entrypoint).text()
