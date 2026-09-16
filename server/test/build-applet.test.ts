@@ -512,9 +512,9 @@ describe('moi fileUrl module', () => {
     expect(result.js).toContain('"/fs/"')
   })
 
-  test('bundles focusTab forwarding to the per-bundle bridge, not a global', async () => {
-    const result = await buildApplet(join(FIXTURES, 'with-focustab.tsx'), undefined, 'view')
-    expect(result.js).toContain('function focusTab')
+  test('bundles navigate forwarding to the per-bundle bridge, not a global', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-navigation.tsx'), undefined, 'view')
+    expect(result.js).toContain('function navigate')
     // Optional-chained so calls no-op before the host attaches (and outside
     // the moi host). The compiled form may or may not keep the `?.` sugar.
     expect(result.js).toMatch(/bridge\s*(\?\.|&&|==)/)
@@ -540,7 +540,7 @@ describe('moi fileUrl module', () => {
   test('every bundle entry exports the bridge wiring, even without a moi import', async () => {
     // `hello` never imports moi at all — the entry still re-exports the host
     // wiring so attach works uniformly across bundles.
-    for (const fixture of ['with-focustab.tsx', 'hello.tsx']) {
+    for (const fixture of ['with-navigation.tsx', 'hello.tsx']) {
       const result = await buildApplet(join(FIXTURES, fixture), undefined, 'view')
       expect(result.js).toContain('__attachBridge')
       expect(result.js).toContain('__getBridge')

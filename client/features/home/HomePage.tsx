@@ -34,7 +34,7 @@ import {
 } from '@/client/features/home/workspace-presentation'
 import { resolveWorkspaceTheme } from '@/lib/themes'
 import type { DiscoveredWorkspace, WorkspaceEntry } from '@/lib/types'
-import { workspaceTabPath } from '@/lib/workspace-tabs'
+import { workspaceTabPath } from '@/lib/navigation'
 
 import { WorkspacePreview } from './WorkspacePreview'
 

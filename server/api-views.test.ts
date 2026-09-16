@@ -189,7 +189,7 @@ test('deletes a view and its owned state while preserving shared files and data'
   await saveLayout(
     {
       ...(await loadLayout(workspaceDir)),
-      tabs: { open: ['overview', 'view:cards'], active: 'view:cards' }
+      tabs: { open: ['overview', 'views/cards'], active: 'views/cards' }
     },
     workspaceDir
   )

@@ -98,10 +98,11 @@ declare module 'moi' {
   // Absolute URL to a workspace file, streamed by the server. Pass a
   // workspace-relative path (e.g. 'clips/001.mp4'). Media/asset files only.
   export function fileUrl(path: string): string
-  // Switch the workspace to a tab (replace navigation). \`params\` reach the
-  // target view as its \`params\` prop — JSON-plain values only. No-ops outside
-  // the moi host. Tab ids: 'overview' | 'agent' | 'scratchpad' | 'view:<id>'.
-  export function focusTab(tab: string, params?: Record<string, unknown>): void
+  // Navigate within this workspace. Query strings are delivered as view params.
+  // Navigation adds a browser history entry. Include view params in the URL.
+  export function navigate(href: string): void
+  // Resolve a portable moi:/ address to a real browser href for an anchor.
+  export function resolveHref(href: string): string
   export type ChatAttachmentInput =
     | { type: 'text'; label: string; text: string }
     | { type: 'file'; file: File; path?: never }
@@ -133,7 +134,7 @@ declare module '*.svg' { const s: string; export default s }
 // Write `.moi/applet-env.d.ts` from the template this CLI ships, overwriting
 // whatever is there. The file is auto-generated and declares the `moi` module's
 // public API, so it drifts the moment the CLI grows an applet-facing function
-// (`focusTab`, `sendChatMessage`) while a workspace keeps the copy written at
+// (`navigate`, `sendChatMessage`) while a workspace keeps the copy written at
 // `moi init` time — leaving the agent's editor and `tsc` insisting a real API
 // doesn't exist. Regenerated alongside skills, the other agent-facing contract
 // moi ships. Refreshes an existing `.moi/` only — never creates one, so a

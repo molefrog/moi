@@ -1,79 +1,57 @@
-// The workspace's tab address: which tab the URL names, how to navigate
-// elsewhere, and the persistence that keeps a bare `/workspace/:id` landing
-// somewhere sensible. The URL is the live truth for the active tab; the
-// persisted layout keeps the open set and the saved DEFAULT (`tabs.active`).
-//
-// Everything that merely reacts to navigation stays with the screen: tab-bar
-// policy (close, reorder, availability pruning), view-builder lifecycle, the
-// applet-runtime `focusTab` subscription, and the `moi tabs focus` subscription.
-// They all route through the `navigateToTab` returned here, so every origin —
-// tab click, applet, CLI — shares one code path.
 import { useCallback, useEffect, useMemo } from 'react'
+import type { MouseEvent } from 'react'
+import { useLocation, useRouter } from 'wouter'
+import { usePathname, useSearch } from 'wouter/use-browser-location'
 
-import { useLocation, useParams } from 'wouter'
-import { useHistoryState } from 'wouter/use-browser-location'
-
+import { toast } from '@/client/components/ui/toast'
 import { reportAppletError } from '@/client/features/applets/applet-log'
-import {
-  isStaleTabLink,
-  normalizeTabsState,
-  resolveActiveTab
-} from '@/client/features/workspace/tab-resolution'
-import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
+import { useAppletEvent } from '@/client/features/applets/applet-runtime'
+import { normalizeTabsState, resolveActiveTab, tabAvailable } from './tab-resolution'
+import { useWorkspaceLayoutCtx } from './WorkspaceLayoutContext'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
+import { useNavigationClient } from '@/client/runtime/useWorkspaceEvents'
 import type { ViewBuilder, ViewInfo, WorkspaceTabId, WorkspaceTabsState } from '@/lib/types'
 import {
-  parseWorkspaceTab,
-  readAppletParams,
-  viewIdFromTab,
-  workspaceTabPath
-} from '@/lib/workspace-tabs'
+  addressPath,
+  canonicalSearch,
+  legacyTabFromPath,
+  parseMoiHref,
+  readViewParams,
+  resolveWorkspaceHref,
+  tabFromPath,
+  workspacePath
+} from '@/lib/navigation'
+type NavigationOptions = { replace?: boolean }
 
-type UseWorkspaceNavigationOptions = {
-  // What exists right now — a URL naming anything else falls back to the
-  // default, the same way a stale bookmark does.
-  views: ViewInfo[]
-  builders: ViewBuilder[]
-  // Split mode docks the chat in its own column, so the agent tab is not a
-  // navigable tab there.
-  split: boolean
-}
+// A convenience for returning to tabs, never a second source of active state.
+// Memory-only, and scoped by workspace so switching workspaces cannot leak params.
+const rememberedAddresses = new Map<string, Map<WorkspaceTabId, string>>()
+
+type UseWorkspaceNavigationOptions = { views: ViewInfo[]; builders: ViewBuilder[]; split: boolean }
 
 export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceNavigationOptions) {
   const { layout, setLayout, workspaceId } = useWorkspaceLayoutCtx()
   const [, navigate] = useLocation()
-  // The tab id is the route's wildcard segment, read from the matched route
-  // instead of threaded down as a prop — so the pattern stays in AppRouter and
-  // can't drift from a second copy here.
-  const urlTab = useParams()['*'] ?? null
-  // Applet params ride navigation state; anything malformed reads as {}. A
-  // stateless navigation (plain tab click) clears it, so views mount empty.
-  const historyState = useHistoryState<unknown>()
-  const appletParams = useMemo(() => readAppletParams(historyState), [historyState])
-
+  const router = useRouter()
+  const { base } = router
+  // wouter's public route/search hooks decode URI escapes already. Read raw
+  // browser values so tabFromPath and URLSearchParams each decode only once.
+  const path = usePathname(router).slice(workspacePath(workspaceId, base).length + 1)
+  const search = canonicalSearch(useSearch(router))
+  const appletParams = useMemo(() => readViewParams(search), [search])
   const tabsState = normalizeTabsState(layout.tabs)
-  // Mirror for the effects below: a debounced layout PUT can still be in flight
-  // when a `workspace:updated` refetch lands, so reading the render-time value
-  // could persist a stale open set (and resurrect a just-closed tab).
   const tabsStateRef = useLatestRef(tabsState)
-
-  const requestedTab = parseWorkspaceTab(urlTab)
-  const activeTab = resolveActiveTab(requestedTab, tabsState, views, builders, split)
-  const urlTabHonored = requestedTab !== null && requestedTab === activeTab
-
-  // Every tab switch is a replace-navigation — never push, so Back leaves the
-  // workspace instead of walking tab history.
-  const navigateToTab = useCallback(
-    (tab: WorkspaceTabId, params?: Record<string, unknown>) => {
-      navigate(workspaceTabPath(workspaceId, tab), {
-        replace: true,
-        // Only a focus navigation carries params; omitting the key clears
-        // history state, which is how a plain tab click resets them.
-        ...(params ? { state: { appletParams: params } } : {})
-      })
-    },
-    [navigate, workspaceId]
-  )
+  const remembered = useMemo(() => {
+    let entries = rememberedAddresses.get(workspaceId)
+    if (!entries) rememberedAddresses.set(workspaceId, (entries = new Map()))
+    return entries
+  }, [workspaceId])
+  const requestedTab = tabFromPath(path)
+  const legacyTab = requestedTab ? null : legacyTabFromPath(path)
+  const activeTab = resolveActiveTab(requestedTab ?? legacyTab, tabsState, views, builders, split)
+  const isUnavailable =
+    Boolean(path) && !legacyTab && (!requestedTab || !tabAvailable(requestedTab, views, builders))
+  const honored = requestedTab === activeTab && !isUnavailable
 
   const setTabs = useCallback(
     (tabs: WorkspaceTabsState) => {
@@ -83,46 +61,131 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
     [setLayout, tabsStateRef]
   )
 
-  // Keep the URL honest. One redirect covers every case: a bare
-  // /workspace/:id, an unknown or dead tab, and the agent tab while split mode
-  // hides it.
-  useEffect(() => {
-    if (urlTab === activeTab) return
-    // A URL that named a view and didn't get it is a stale link — a deleted
-    // view, an old bookmark, a `focusTab` the agent wrote against a view it
-    // later renamed. The agent can't see the redirect happen, so journal it
-    // for `moi debug logs`.
-    if (isStaleTabLink(urlTab)) reportDeadTab(workspaceId, urlTab, activeTab)
-    navigateToTab(activeTab)
-  }, [activeTab, navigateToTab, urlTab, workspaceId])
+  const go = useCallback(
+    (target: string, options: NavigationOptions = {}) => {
+      const current = window.location.pathname + canonicalSearch(window.location.search)
+      const absolute = `${base}${target}`
+      if (current !== absolute || window.location.hash) navigate(target, options)
+    },
+    [base, navigate]
+  )
 
-  // Navigating IS the tab switch, so persist its effects through the same write
-  // path as before: the saved default follows the URL, and a URL-navigated tab
-  // missing from the open set is auto-added. Only an honored URL writes —
-  // redirects settle into an honored URL first, which is what stops this and
-  // the redirect effect above from ping-ponging.
+  const navigateToTab = useCallback(
+    (tab: WorkspaceTabId, options: NavigationOptions = {}) => {
+      go(remembered.get(tab) ?? addressPath(workspaceId, { tab, search: '' }), options)
+    },
+    [go, remembered, workspaceId]
+  )
+
+  const navigateHref = useCallback(
+    (href: string) => {
+      if (!href.startsWith('moi:')) {
+        const target = resolveWorkspaceHref(workspaceId, href, base)
+        window.location.assign(target)
+        return
+      }
+      const address = parseMoiHref(href)
+      if (!tabAvailable(address.tab, views, builders))
+        throw new Error('This destination is unavailable in this workspace')
+      go(addressPath(workspaceId, address))
+    },
+    [base, builders, go, views, workspaceId]
+  )
+
+  const reportError = useCallback(
+    (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Navigation failed'
+      toast.add({ type: 'error', title: 'Could not navigate', description: message })
+      reportAppletError(workspaceId, { source: 'runtime', message })
+    },
+    [workspaceId]
+  )
+
+  useAppletEvent(workspaceId, 'navigate', href => {
+    try {
+      navigateHref(href)
+    } catch (error) {
+      reportError(error)
+    }
+  })
+  useNavigationClient(workspaceId, navigateHref)
+
+  // Bare workspace URLs, old bookmarks, and hidden singleton chat routes are
+  // the only redirects. Missing destinations keep their URL and show recovery.
   useEffect(() => {
-    if (!urlTabHonored) return
+    if (isUnavailable) return
+    if (legacyTab) {
+      go(addressPath(workspaceId, { tab: legacyTab, search }), { replace: true })
+    } else if (!path || (requestedTab === 'agent' && split)) {
+      navigateToTab(activeTab, { replace: true })
+    }
+  }, [
+    activeTab,
+    go,
+    legacyTab,
+    navigateToTab,
+    path,
+    requestedTab,
+    search,
+    split,
+    isUnavailable,
+    workspaceId
+  ])
+
+  useEffect(() => {
+    if (!honored) return
+    remembered.set(activeTab, addressPath(workspaceId, { tab: activeTab, search }))
     const current = tabsStateRef.current
     const open = current.open.includes(activeTab) ? current.open : [...current.open, activeTab]
-    if (open === current.open && current.active === activeTab) return
-    setTabs({ open, active: activeTab })
-  }, [activeTab, setTabs, tabsStateRef, urlTabHonored])
+    if (open !== current.open || current.active !== activeTab) setTabs({ open, active: activeTab })
+  }, [activeTab, honored, remembered, search, setTabs, tabsStateRef, workspaceId])
 
-  return { tabsState, activeTab, appletParams, navigateToTab, setTabs }
-}
+  // React bubbling includes applet/chat portals. Native modified clicks and
+  // downloads keep a real href, so the browser can handle them normally.
+  const onNavigationClick = useCallback(
+    (event: MouseEvent<HTMLElement>) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.shiftKey
+      )
+        return
+      const anchor = event.target instanceof Element ? event.target.closest('a[href]') : null
+      if (
+        !(anchor instanceof HTMLAnchorElement) ||
+        anchor.hasAttribute('download') ||
+        (anchor.target && anchor.target !== '_self')
+      )
+        return
+      const url = new URL(anchor.href)
+      const prefix = workspacePath(workspaceId, base) + '/'
+      if (url.origin !== window.location.origin || !url.pathname.startsWith(prefix)) return
+      // In-page fragments continue using native browser behavior.
+      if (url.hash) return
+      const tab = tabFromPath(url.pathname.slice(prefix.length))
+      if (!tab) return
+      event.preventDefault()
+      try {
+        if (!tabAvailable(tab, views, builders))
+          throw new Error('This destination is unavailable in this workspace')
+        go(addressPath(workspaceId, { tab, search: canonicalSearch(url.search) }))
+      } catch (error) {
+        reportError(error)
+      }
+    },
+    [base, builders, go, reportError, views, workspaceId]
+  )
 
-// Journal a stale link (see `isStaleTabLink` for which URLs qualify).
-// Attributed to the view when the dead id names one — that's the file the agent
-// would fix, and the entry then clears the moment a view by that name builds.
-// A malformed segment names no applet and lands unattributed. The journal's own
-// dedup keeps a redirect loop to a single line.
-function reportDeadTab(workspaceId: string, urlTab: string, activeTab: WorkspaceTabId): void {
-  const requested = parseWorkspaceTab(urlTab)
-  const viewId = requested ? viewIdFromTab(requested) : null
-  reportAppletError(workspaceId, {
-    source: 'runtime',
-    ...(viewId ? { kind: 'view' as const, name: viewId } : {}),
-    message: `Tab "${urlTab}" does not exist in this workspace — the URL redirected to "${activeTab}". A link, bookmark, or focusTab call is pointing at a tab that was deleted or renamed.`
-  })
+  return {
+    tabsState,
+    activeTab,
+    appletParams,
+    navigateToTab,
+    setTabs,
+    isUnavailable,
+    onNavigationClick
+  }
 }

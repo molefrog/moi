@@ -24,11 +24,9 @@ import {
 const VIEW: AppletIdentity = { kind: 'view', name: 'board' }
 const WIDGET: AppletIdentity = { kind: 'widget', name: 'clock' }
 
-function subscribeFocus(workspaceId: string) {
-  const calls: [string, Record<string, unknown> | undefined][] = []
-  const unbind = appletRuntime(workspaceId).on('focusTab', (tab, params) =>
-    calls.push([tab, params])
-  )
+function subscribeNavigation(workspaceId: string) {
+  const calls: string[] = []
+  const unbind = appletRuntime(workspaceId).on('navigate', href => calls.push(href))
   return { calls, unbind }
 }
 
@@ -39,34 +37,45 @@ function subscribeChat(workspaceId: string) {
 }
 
 describe('bridge validation', () => {
-  test('emits a well-formed call and narrows malformed params to undefined', () => {
+  test('emits URL navigation and rejects malformed addresses', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    const { calls } = subscribeFocus(ws)
+    const { calls } = subscribeNavigation(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
-
-    bridge.focusTab('view:orders', { order: 'o-1' })
-    bridge.focusTab('overview')
-    // Valid JSON, wrong shape — params must degrade, not leak through.
-    bridge.focusTab('view:orders', ['not', 'a', 'record'])
-    bridge.focusTab('view:orders', null)
-
-    expect(calls).toEqual([
-      ['view:orders', { order: 'o-1' }],
-      ['overview', undefined],
-      ['view:orders', undefined],
-      ['view:orders', undefined]
-    ])
+    const log = spyOn(appletLog, 'reportAppletError').mockImplementation(() => {})
+    bridge.navigate('moi:/views/orders?order=o-1')
+    bridge.navigate('moi:/overview')
+    bridge.navigate(['invalid'])
+    bridge.navigate('javascript:alert(1)')
+    expect(calls).toEqual(['moi:/views/orders?order=o-1', 'moi:/overview'])
+    expect(log).toHaveBeenCalledTimes(2)
+    log.mockRestore()
   })
 
-  test('drops calls with a malformed tab id instead of emitting', () => {
+  test('resolves native anchor hrefs in the source workspace and disposes safely', () => {
+    const { bridge, dispose } = appletRuntime('ws-1').connect(VIEW)
+    expect(bridge.resolveHref('moi:/views/orders?order=o-1')).toBe(
+      '/workspace/ws-1/views/orders?order=o-1'
+    )
+    expect(bridge.resolveHref('https://example.com/')).toBe('https://example.com/')
+    expect(() => bridge.resolveHref('javascript:alert(1)')).toThrow()
+    dispose()
+    expect(bridge.resolveHref('moi:/overview')).toBe('')
+  })
+
+  test('resolves applet links with the host router base', () => {
+    const { bridge } = appletRuntime('prefixed').connect(VIEW, '/prefix')
+    expect(bridge.resolveHref('moi:/views/orders')).toBe('/prefix/workspace/prefixed/views/orders')
+  })
+
+  test('drops calls with malformed addresses instead of emitting', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    const { calls } = subscribeFocus(ws)
+    const { calls } = subscribeNavigation(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
 
-    bridge.focusTab('not-a-tab')
-    bridge.focusTab('view:multi/segment')
-    bridge.focusTab(42)
-    bridge.focusTab({ toString: () => 'agent' })
+    bridge.navigate('not-a-tab')
+    bridge.navigate('view:multi/segment')
+    bridge.navigate(42)
+    bridge.navigate({ toString: () => 'moi:/scratchpad' })
 
     expect(calls).toEqual([])
   })
@@ -74,24 +83,21 @@ describe('bridge validation', () => {
   test('emitting with no subscribers (screen unmounted) is a no-op', () => {
     const ws = `ws-${crypto.randomUUID()}`
     const { bridge } = appletRuntime(ws).connect(VIEW)
-    expect(() => bridge.focusTab('agent')).not.toThrow()
+    expect(() => bridge.navigate('moi:/scratchpad')).not.toThrow()
   })
 
   test('an unbound subscriber stops receiving; others keep receiving', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    const first = subscribeFocus(ws)
-    const second = subscribeFocus(ws)
+    const first = subscribeNavigation(ws)
+    const second = subscribeNavigation(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
 
-    bridge.focusTab('agent')
+    bridge.navigate('moi:/scratchpad')
     first.unbind()
-    bridge.focusTab('overview')
+    bridge.navigate('moi:/overview')
 
-    expect(first.calls).toEqual([['agent', undefined]])
-    expect(second.calls).toEqual([
-      ['agent', undefined],
-      ['overview', undefined]
-    ])
+    expect(first.calls).toEqual(['moi:/scratchpad'])
+    expect(second.calls).toEqual(['moi:/scratchpad', 'moi:/overview'])
   })
 })
 
@@ -314,13 +320,13 @@ describe('sendChatMessage rate limiting', () => {
 describe('disposal', () => {
   test('a disposed connection is inert even while subscribers are live', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    const { calls } = subscribeFocus(ws)
+    const { calls } = subscribeNavigation(ws)
 
     const { bridge, dispose } = appletRuntime(ws).connect(VIEW)
-    bridge.focusTab('agent')
+    bridge.navigate('moi:/scratchpad')
     dispose()
-    bridge.focusTab('agent')
-    expect(calls).toEqual([['agent', undefined]])
+    bridge.navigate('moi:/scratchpad')
+    expect(calls).toEqual(['moi:/scratchpad'])
   })
 })
 
@@ -332,29 +338,29 @@ function fakeModule() {
     __attachBridge: (next: AppletBridge) => {
       bridge = next
     },
-    focusTab: (tab: unknown, params?: unknown) => bridge?.focusTab(tab, params)
+    navigate: (href: unknown) => bridge?.navigate(href)
   }
 }
 
 describe('attachAppletBridge', () => {
   test('wires a module to its workspace runtime; invalidateApplet neuters it', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    const { calls } = subscribeFocus(ws)
+    const { calls } = subscribeNavigation(ws)
 
     const mod = fakeModule()
     attachAppletBridge(mod, ws, appletKey('views', ws, 'board'), VIEW)
-    mod.focusTab('view:board')
-    expect(calls).toEqual([['view:board', undefined]])
+    mod.navigate('moi:/views/board')
+    expect(calls).toEqual(['moi:/views/board'])
 
     // The rebuild path: invalidation must leave the OLD module instance inert.
     invalidateApplet('views', ws, 'board')
-    mod.focusTab('view:board')
-    expect(calls).toEqual([['view:board', undefined]])
+    mod.navigate('moi:/views/board')
+    expect(calls).toEqual(['moi:/views/board'])
   })
 
   test('invalidateAppletSegment disposes bridges kind-wide', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    const { calls } = subscribeFocus(ws)
+    const { calls } = subscribeNavigation(ws)
 
     const mod = fakeModule()
     const key = appletKey('widgets', ws, 'clock')
@@ -363,7 +369,7 @@ describe('attachAppletBridge', () => {
     setCachedApplet(key, Promise.resolve(mod))
     attachAppletBridge(mod, ws, key, WIDGET)
     invalidateAppletSegment('widgets')
-    mod.focusTab('overview')
+    mod.navigate('moi:/overview')
     expect(calls).toEqual([])
   })
 
@@ -375,7 +381,7 @@ describe('attachAppletBridge', () => {
 
   test('re-attaching under a key disposes the previous connection', () => {
     const ws = `ws-${crypto.randomUUID()}`
-    const { calls } = subscribeFocus(ws)
+    const { calls } = subscribeNavigation(ws)
     const key = appletKey('views', ws, 'board')
 
     const oldMod = fakeModule()
@@ -383,9 +389,9 @@ describe('attachAppletBridge', () => {
     const newMod = fakeModule()
     attachAppletBridge(newMod, ws, key, VIEW)
 
-    oldMod.focusTab('agent')
-    newMod.focusTab('overview')
-    expect(calls).toEqual([['overview', undefined]])
+    oldMod.navigate('moi:/scratchpad')
+    newMod.navigate('moi:/overview')
+    expect(calls).toEqual(['moi:/overview'])
   })
 })
 
@@ -393,11 +399,11 @@ describe('workspace isolation', () => {
   test('bridges reach only their own workspace runtime', () => {
     const wsA = `ws-${crypto.randomUUID()}`
     const wsB = `ws-${crypto.randomUUID()}`
-    const a = subscribeFocus(wsA)
-    const b = subscribeFocus(wsB)
+    const a = subscribeNavigation(wsA)
+    const b = subscribeNavigation(wsB)
 
-    appletRuntime(wsA).connect(VIEW).bridge.focusTab('agent')
-    expect(a.calls).toEqual([['agent', undefined]])
+    appletRuntime(wsA).connect(VIEW).bridge.navigate('moi:/scratchpad')
+    expect(a.calls).toEqual(['moi:/scratchpad'])
     expect(b.calls).toEqual([])
   })
 })

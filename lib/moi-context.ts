@@ -46,15 +46,15 @@ export type MoiAppletMessage = {
 // `renderMoiContext`) when new ambient fields land.
 export type MoiContext = {
   // The workspace tab the user is on when they hit send — for a view-builder
-  // request that's the builder's own tab (`view-builder:<id>`).
+  // request that's the builder's own tab (`view-builders/<id>`).
   activeTab: WorkspaceTabId
   // UI label of the active tab when it differs from the id — a view's
-  // configured title (e.g. "Grading review" for `view:color-studio`), or a
+  // configured title (e.g. "Grading review" for `views/color-studio`), or a
   // view builder's claimed title while the build runs. The tab bar falls
   // back to the id when unset; so does the envelope.
   tabTitle?: string
   // The params the active view is rendering with right now, straight from
-  // navigation state. The emitter side of the same contract (`focusTab`) sets
+  // URL query strings. The emitter side of the same contract (`navigate`) sets
   // them, so the agent sees a view's addressable state in both directions.
   // Absent for tabs that take no params (overview, scratchpad, agent).
   tabParams?: Record<string, unknown>
@@ -123,14 +123,14 @@ function describeTab(tab: WorkspaceTabId, rawTitle?: string): string {
   if (tab === 'agent') return 'The user is on the "Agent" tab (full page chat).'
   if (tab === 'overview') return 'The user is on the "Overview" tab.'
   if (tab === 'scratchpad') return 'The user is on the "Scratchpad" tab.'
-  if (tab.startsWith('view-builder:')) {
-    const id = tab.slice('view-builder:'.length)
+  if (tab.startsWith('view-builders/')) {
+    const id = tab.slice('view-builders/'.length)
     return title
       ? `The user is building a new view "${title}". Builder id "${id}".`
       : `The user is building a new view. Builder id "${id}".`
   }
-  if (tab.startsWith('view:')) {
-    const id = tab.slice('view:'.length)
+  if (tab.startsWith('views/')) {
+    const id = tab.slice('views/'.length)
     return `The user is on the "${title ?? id}" view tab (.moi/views/${id}.tsx).`
   }
   return `The user is on the "${tab}" tab.`

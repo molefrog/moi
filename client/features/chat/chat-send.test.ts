@@ -302,7 +302,7 @@ describe('composer attachments', () => {
         localId: 'annotation-2',
         name: 'Annotation.png',
         mediaType: 'image/png',
-        sourceTab: 'view:roadmap',
+        sourceTab: 'views/roadmap',
         status: 'ready',
         upload: { id: 'up-annotation-2', kind: 'image' } as UploadedChatAttachment['upload']
       }
@@ -311,7 +311,7 @@ describe('composer attachments', () => {
     expect(withAttachmentDirectives({ directives: ['Keep this concise.'] }, annotations)).toEqual({
       directives: [
         'Keep this concise.',
-        'Annotation attachment sources in attachment order: 2. "overview"; 3. "view:roadmap".'
+        'Annotation attachment sources in attachment order: 2. "overview"; 3. "views/roadmap".'
       ]
     })
   })
@@ -338,14 +338,14 @@ describe('composer attachments', () => {
       localId: 'sketch-1',
       name: 'Sketch.png',
       mediaType: 'image/png',
-      sourceTab: 'view-builder:draft-1',
+      sourceTab: 'view-builders/draft-1',
       status: 'ready',
       upload: { id: 'up-sketch', kind: 'image' } as UploadedChatAttachment['upload']
     }
 
     expect(withAttachmentDirectives(undefined, [sketch])).toEqual({
       directives: [
-        'Sketch attachment sources in attachment order: 1. "view-builder:draft-1". Each sketch shows the intended layout of a new view.'
+        'Sketch attachment sources in attachment order: 1. "view-builders/draft-1". Each sketch shows the intended layout of a new view.'
       ]
     })
   })
