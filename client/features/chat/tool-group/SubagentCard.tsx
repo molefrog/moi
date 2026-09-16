@@ -10,7 +10,7 @@ import { type ReactNode, useEffect, useState } from 'react'
 
 import { IconPlayBasketball, IconPlayFootball, IconPlayVolleyball } from '@tabler/icons-react'
 
-import { ShimmerText } from '@/client/features/chat/ShimmerText'
+import { ShimmerText } from '@/client/features/chat/messages/ShimmerText'
 import { cn } from '@/client/lib/cn'
 import type { Part, ToolCall } from '@/lib/types'
 

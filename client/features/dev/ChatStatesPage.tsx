@@ -24,12 +24,12 @@ import {
 import { Switch } from '@/client/components/ui/switch'
 import { ChatNoticeRow } from '@/client/features/chat/ChatPanel'
 import { ErrorBanner } from '@/client/features/chat/composer/banners/ErrorBanner'
-import { ChatSessionItem } from '@/client/features/chat/ChatSelector'
-import { TurnView } from '@/client/features/chat/TurnView'
+import { ChatSessionItem } from '@/client/features/chat/sessions/ChatSelector'
+import { TurnView } from '@/client/features/chat/messages/TurnView'
 import { isSessionRunning, liveStore } from '@/client/features/chat/chat-store'
-import { groupTurns } from '@/client/features/chat/group-turns'
-import { interleaveNotices } from '@/client/features/chat/interleave-notices'
-import { buildPreviewTurn } from '@/client/features/chat/preview-turn'
+import { groupTurns } from '@/client/features/chat/messages/group-turns'
+import { interleaveNotices } from '@/client/features/chat/messages/interleave-notices'
+import { buildPreviewTurn } from '@/client/features/chat/messages/preview-turn'
 import {
   WorkspaceLayoutContext,
   type WorkspaceLayoutContextValue

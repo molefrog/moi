@@ -15,7 +15,7 @@ import { type ReactNode, useState } from 'react'
 import { IconLoader2, IconPackage } from '@tabler/icons-react'
 
 import { cn } from '@/client/lib/cn'
-import { PlainMarkdownText } from '@/client/features/chat/MarkdownContent'
+import { PlainMarkdownText } from '@/client/features/chat/messages/MarkdownContent'
 import { formatMcpServerName, getMcpIcon } from '@/client/features/connectors/mcp-icons'
 import type { Part, ToolCall } from '@/lib/types'
 

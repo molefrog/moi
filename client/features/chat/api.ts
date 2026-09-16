@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { sessionViewOptions } from '@/client/features/chat/session-view'
+import { sessionViewOptions } from '@/client/features/chat/sessions/session-view'
 import type { SessionConfig, SessionInfo } from '@/lib/types'
 
 export function useWorkspaceSessions(workspaceId: string) {

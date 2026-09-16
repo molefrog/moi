@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { stageDrawing, stageDrawingDraft } from '@/client/features/chat/attachment-staging'
+import { stageDrawing, stageDrawingDraft } from '@/client/features/chat/composer/attachments/attachment-staging'
 import { attachmentKey, liveStore } from '@/client/features/chat/chat-store'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { WorkspaceTabId } from '@/lib/types'

@@ -5,14 +5,14 @@ import { useQueryClient } from '@tanstack/react-query'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useSessionConfig, useSessionView, useWorkspaceSessions } from '@/client/features/chat/api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
-import { useSelectedSession } from '@/client/features/chat/useSelectedSession'
+import { useSelectedSession } from '@/client/features/chat/sessions/useSelectedSession'
 import {
   type WorkspaceTabAddress,
   useMoiUserMessageContext
 } from '@/client/features/workspace/moi-context'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
-import { sendMessage } from '@/client/features/chat/chat-connection'
+import { sendMessage } from '@/client/features/chat/connection/chat-connection'
 import {
   type ChatSendOptions,
   attachmentPartsForOptimisticTurn,
@@ -23,7 +23,7 @@ import {
   startOptimisticTurn,
   withAttachmentDirectives
 } from '@/client/features/chat/chat-send'
-import { buildPreviewTurn } from '@/client/features/chat/preview-turn'
+import { buildPreviewTurn } from '@/client/features/chat/messages/preview-turn'
 import {
   isRunningActivity,
   liveStore,

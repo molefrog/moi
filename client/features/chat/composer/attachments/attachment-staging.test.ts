@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test'
 
 import { stageDrawing, stageDrawingDraft } from './attachment-staging'
-import { attachmentKey, liveStore } from './chat-store'
+import { attachmentKey, liveStore } from '../../chat-store'
 
 const workspaceId = 'workspace-1'
 const sessionId = 'session-1'

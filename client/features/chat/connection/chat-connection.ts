@@ -2,7 +2,7 @@ import type { QueryClient } from '@tanstack/react-query'
 
 import { wsUrl } from '@/client/lib/ws-url'
 import { liveStore } from '@/client/features/chat/chat-store'
-import { reduceChatFrame } from '@/client/features/chat/chat-frames'
+import { reduceChatFrame } from '@/client/features/chat/connection/chat-frames'
 import type { ClientMessage } from '@/lib/types'
 
 // App-wide chat connection: ONE WebSocket for the whole client, opened once at

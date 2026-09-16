@@ -2,12 +2,12 @@
 // root preview into the current assistant run, whether it is thinking or text.
 import { describe, expect, test } from 'bun:test'
 
-import { groupTurns } from '@/client/features/chat/group-turns'
+import { groupTurns } from '@/client/features/chat/messages/group-turns'
 import {
   LIVE_PREVIEW_TURN_ID,
   buildPreviewTurn,
   previewBlocksToParts
-} from '@/client/features/chat/preview-turn'
+} from '@/client/features/chat/messages/preview-turn'
 import { type LivePreview, liveStore, selectPreviews } from '@/client/features/chat/chat-store'
 import type { Part, PreviewBlock, Turn, ToolCall } from '@/lib/types'
 

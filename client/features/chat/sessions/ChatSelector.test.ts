@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { SessionInfo } from '@/lib/types'
 
-import { removeArchivedSession } from './api'
+import { removeArchivedSession } from '../api'
 import { groupSessionsByDate, sessionBadge } from './ChatSelector'
 
 function session(sessionId: string, summary: string, lastModified: string): SessionInfo {

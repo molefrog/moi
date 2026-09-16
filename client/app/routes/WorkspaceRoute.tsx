@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { LedLogo } from '@/client/components/shared/LedLogo'
 import { SidebarLayout } from '@/client/app/shell/SidebarLayout'
-import { useSelectedSession } from '@/client/features/chat/useSelectedSession'
+import { useSelectedSession } from '@/client/features/chat/sessions/useSelectedSession'
 import { useAppletCacheInvalidation } from '@/client/features/applets/useApplet'
 import { Workspace } from '@/client/features/workspace/WorkspaceContext'
 import {

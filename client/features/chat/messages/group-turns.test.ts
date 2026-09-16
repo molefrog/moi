@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { appendPreviewTurn, groupTurns } from '@/client/features/chat/group-turns'
+import { appendPreviewTurn, groupTurns } from '@/client/features/chat/messages/group-turns'
 import type { Part, Turn } from '@/lib/types'
 
 const userTurn = (id: string, timestamp?: string): Turn => ({

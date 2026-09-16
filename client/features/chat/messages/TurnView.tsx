@@ -9,7 +9,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger
 } from '@/client/components/ui/collapsible'
-import { MarkdownContent } from '@/client/features/chat/MarkdownContent'
+import { MarkdownContent } from '@/client/features/chat/messages/MarkdownContent'
 import { ToolCallGroup } from '@/client/features/chat/tool-group/ToolCallGroup'
 import { formatDuration } from '@/client/features/chat/tool-group/format'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'

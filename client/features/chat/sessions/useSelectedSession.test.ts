@@ -6,7 +6,7 @@ import {
   applySelectedSessionEvent,
   optimisticallySetSelectedSession,
   settleSelectedSessionSave
-} from '@/client/features/chat/useSelectedSession'
+} from '@/client/features/chat/sessions/useSelectedSession'
 import type { SelectedSessionState } from '@/lib/types'
 
 const WORKSPACE_ID = 'workspace-1'

@@ -1,6 +1,6 @@
 import type { WorkspaceTabId } from '@/lib/types'
 
-import { attachmentKey, type ChatAttachment, type DrawingPurpose, liveStore } from './chat-store'
+import { attachmentKey, type ChatAttachment, type DrawingPurpose, liveStore } from '../../chat-store'
 import { uploadFiles } from './uploads'
 
 type ComposerTarget = {

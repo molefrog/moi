@@ -19,7 +19,7 @@ import {
 import { Button } from '@/client/components/ui/button'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/client/components/ui/hover-card'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
-import { stageComposerFiles } from '@/client/features/chat/attachment-staging'
+import { stageComposerFiles } from '@/client/features/chat/composer/attachments/attachment-staging'
 import { cn } from '@/client/lib/cn'
 import type { AgentAvailability } from '@/client/lib/agent-availability'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
