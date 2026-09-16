@@ -99,13 +99,8 @@ export type LiveStore = {
   ) => void
   setError: (workspaceId: string, sessionId: string, message: string | null) => void
   addAttachments: (workspaceId: string, sessionId: string | null, items: ChatAttachment[]) => void
-  updateAttachment: (
-    workspaceId: string,
-    sessionId: string | null,
-    localId: string,
-    patch: ChatAttachmentPatch
-  ) => void
-  removeAttachment: (workspaceId: string, sessionId: string | null, localId: string) => void
+  updateAttachment: (workspaceId: string, localId: string, patch: ChatAttachmentPatch) => void
+  removeAttachment: (workspaceId: string, localId: string) => void
   clearAttachments: (workspaceId: string, sessionId: string | null) => void
   // `null` assigns the new-chat draft its first session id.
   renameSession: (workspaceId: string, from: string | null, to: string) => void
@@ -192,15 +187,18 @@ export const liveStore = createStore<LiveStore>()(set => ({
       return { attachments: { ...s.attachments, [k]: [...(s.attachments[k] ?? []), ...items] } }
     }),
 
-  updateAttachment: (workspaceId, sessionId, localId, patch) =>
+  updateAttachment: (workspaceId, localId, patch) =>
     set(s => {
-      const k = attachmentKey(workspaceId, sessionId)
+      const k = Object.keys(s.attachments).find(
+        k => k.startsWith(`${workspaceId}:`) && s.attachments[k].some(a => a.localId === localId)
+      )
+      if (!k) return {}
       const list = s.attachments[k]
       if (!list) return {}
       const target = list.find(attachment => attachment.localId === localId)
       if (
         target &&
-        target.kind !== 'context' &&
+        target.kind !== 'text' &&
         target.previewUrl &&
         'previewUrl' in patch &&
         patch.previewUrl !== target.previewUrl
@@ -210,20 +208,21 @@ export const liveStore = createStore<LiveStore>()(set => ({
       return {
         attachments: {
           ...s.attachments,
-          [k]: list.map(a =>
-            a.localId === localId && a.kind !== 'context' ? { ...a, ...patch } : a
-          )
+          [k]: list.map(a => (a.localId === localId && a.kind !== 'text' ? { ...a, ...patch } : a))
         }
       }
     }),
 
-  removeAttachment: (workspaceId, sessionId, localId) =>
+  removeAttachment: (workspaceId, localId) =>
     set(s => {
-      const k = attachmentKey(workspaceId, sessionId)
+      const k = Object.keys(s.attachments).find(
+        k => k.startsWith(`${workspaceId}:`) && s.attachments[k].some(a => a.localId === localId)
+      )
+      if (!k) return {}
       const list = s.attachments[k]
       if (!list) return {}
       const target = list.find(a => a.localId === localId)
-      if (target && target.kind !== 'context' && target.previewUrl)
+      if (target && target.kind !== 'text' && target.previewUrl)
         URL.revokeObjectURL(target.previewUrl)
       return { attachments: { ...s.attachments, [k]: list.filter(a => a.localId !== localId) } }
     }),
@@ -232,7 +231,7 @@ export const liveStore = createStore<LiveStore>()(set => ({
     set(s => {
       const k = attachmentKey(workspaceId, sessionId)
       for (const a of s.attachments[k] ?? []) {
-        if (a.kind !== 'context' && a.previewUrl) URL.revokeObjectURL(a.previewUrl)
+        if (a.kind !== 'text' && a.previewUrl) URL.revokeObjectURL(a.previewUrl)
       }
       const next = { ...s.attachments }
       delete next[k]
@@ -266,16 +265,15 @@ export const liveStore = createStore<LiveStore>()(set => ({
           previews[id] = { ...p, sessionId: to }
         }
       }
-      // Context can follow session id changes immediately. Upload callbacks
-      // still target their original session id, so leave uploads in place.
+      // Upload completions use stable attachment IDs, so every draft item can
+      // follow the chat through both temporary and provider session IDs.
       let attachments = s.attachments
-      const contexts = attachments[fromKey]?.filter(a => a.kind === 'context') ?? []
-      if (fromKey !== toKey && contexts.length) {
+      if (fromKey !== toKey && attachments[fromKey]) {
         attachments = {
           ...attachments,
-          [fromKey]: attachments[fromKey].filter(a => a.kind !== 'context'),
-          [toKey]: [...(attachments[toKey] ?? []), ...contexts]
+          [toKey]: [...(attachments[toKey] ?? []), ...attachments[fromKey]]
         }
+        delete attachments[fromKey]
       }
       return { activity, errors, previews, attachments }
     })

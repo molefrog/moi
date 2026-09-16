@@ -1,4 +1,4 @@
-import type { ContextAttachment, UploadInfo, WorkspaceTabId } from '@/lib/types'
+import type { TextAttachment, UploadInfo, WorkspaceTabId } from '@/lib/types'
 
 // One composer attachment, tracked per session until the message is sent. A
 // file uploads as soon as it's added (drop/paste/pick); an annotation stays a
@@ -26,7 +26,7 @@ export type UploadedChatAttachment = UploadAttachmentBase &
 
 export type ChatAttachment =
   | UploadedChatAttachment
-  | { kind: 'context'; localId: string; name: string; attachment: ContextAttachment }
+  | { kind: 'text'; localId: string; name: string; attachment: TextAttachment }
 
 export type ChatAttachmentPatch = Partial<
   Pick<UploadAttachmentBase, 'name' | 'mediaType' | 'previewUrl' | 'status' | 'upload' | 'error'>

@@ -1,8 +1,8 @@
-// Connect validated applet intents to the active chat: stage context in the
+// Connect validated applet intents to the active chat: stage attachments in the
 // draft or send a message immediately, then reveal and focus chat.
 // The runtime owns argument validation, source attribution, and send rate limits;
 // these hooks own draft staging and agent availability checks for immediate sends.
-import { stageChatContext } from './composer/attachments/draft-attachments'
+import { stageChatAttachment } from './composer/attachments/draft-attachments'
 import { reportAppletError } from '@/client/features/applets/applet-log'
 import { type AppletChatMessage, useAppletEvent } from '@/client/features/applets/applet-runtime'
 import type { ChatSendOptions } from '@/client/features/chat/chat-send'
@@ -60,10 +60,10 @@ export function useAppletChatMessage({
   })
 }
 
-export function useAppletChatContext(sessionId: string | null, revealChat: () => void): void {
+export function useAppletChatAttachment(sessionId: string | null, revealChat: () => void): void {
   const workspaceId = useWorkspaceId()
-  useAppletEvent(workspaceId, 'addChatContext', attachment => {
-    stageChatContext({ workspaceId, sessionId }, attachment)
+  useAppletEvent(workspaceId, 'addChatAttachment', attachment => {
+    void stageChatAttachment({ workspaceId, sessionId }, attachment)
     revealChat()
   })
 }

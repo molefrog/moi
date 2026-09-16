@@ -1,49 +1,74 @@
-import type { ContextAttachment } from '@/lib/types'
+import type { TextAttachment } from '@/lib/types'
 import type { WorkspaceTabId } from '@/lib/types'
 
 import { attachmentKey, liveStore } from '../../chat-store'
-import type {
-  ChatAttachment,
-  DrawingPurpose
-} from '@/client/features/chat/composer/attachments/types'
-import { uploadFiles } from './uploads'
+import type { DrawingPurpose } from './types'
+import { uploadFiles, uploadWorkspaceFile } from './uploads'
+import type { AppletChatAttachment } from '@/client/features/applets/applet-runtime'
+import { reportAppletError } from '@/client/features/applets/applet-log'
 
 type ComposerTarget = {
   workspaceId: string
   sessionId: string | null
 }
 
-export function stageComposerFiles(
+export function stageComposerFiles(target: ComposerTarget, files: File[]): void {
+  for (const file of files) void stageFile(target, file)
+}
+
+// Both file sources enter the same draft lifecycle and become ordinary uploads.
+async function stageFile(
   { workspaceId, sessionId }: ComposerTarget,
-  files: File[]
-): void {
-  if (files.length === 0) return
+  input: File | string,
+  onError?: (message: string) => void
+): Promise<void> {
+  const file = typeof input === 'string' ? null : input
+  const localId = crypto.randomUUID()
+  liveStore.getState().addAttachments(workspaceId, sessionId, [
+    {
+      kind: 'file',
+      localId,
+      name: typeof input === 'string' ? input.split('/').at(-1)! : input.name || 'file',
+      mediaType: file?.type || 'application/octet-stream',
+      previewUrl: file?.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
+      status: 'uploading'
+    }
+  ])
+  try {
+    const upload =
+      typeof input === 'string'
+        ? await uploadWorkspaceFile(workspaceId, input)
+        : (await uploadFiles(workspaceId, [input]))[0]
+    liveStore.getState().updateAttachment(workspaceId, localId, {
+      status: 'ready',
+      upload,
+      name: upload.filename,
+      mediaType: upload.mediaType,
+      ...(upload.kind === 'image' && !file?.type.startsWith('image/')
+        ? { previewUrl: `/api/workspaces/${workspaceId}/uploads/${upload.id}` }
+        : {})
+    })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Upload failed'
+    liveStore.getState().updateAttachment(workspaceId, localId, { status: 'error', error: message })
+    onError?.(message)
+  }
+}
 
-  const items: ChatAttachment[] = files.map(file => ({
-    kind: 'file',
-    localId: crypto.randomUUID(),
-    name: file.name || 'file',
-    mediaType: file.type || 'application/octet-stream',
-    previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
-    status: 'uploading'
-  }))
-  liveStore.getState().addAttachments(workspaceId, sessionId, items)
-
-  items.forEach((item, index) => {
-    uploadFiles(workspaceId, [files[index]])
-      .then(([upload]) => {
-        liveStore.getState().updateAttachment(workspaceId, sessionId, item.localId, {
-          status: 'ready',
-          upload,
-          mediaType: upload.mediaType
-        })
-      })
-      .catch((error: unknown) => {
-        liveStore.getState().updateAttachment(workspaceId, sessionId, item.localId, {
-          status: 'error',
-          error: error instanceof Error ? error.message : 'Upload failed'
-        })
-      })
+export function stageChatAttachment(
+  target: ComposerTarget,
+  input: AppletChatAttachment
+): Promise<void> {
+  if (input.type === 'text') {
+    const { source, label, text } = input
+    stageTextAttachment(target, { source, label, text })
+    return Promise.resolve()
+  }
+  return stageFile(target, input.file ?? input.path, message => {
+    reportAppletError(target.workspaceId, {
+      source: 'runtime',
+      message: `addChatAttachment() from ${input.source}: ${message}`
+    })
   })
 }
 
@@ -68,12 +93,14 @@ export function stageDrawingDraft({
   const label = purpose === 'sketch' ? 'Sketch' : 'Annotation'
   const previewUrl = URL.createObjectURL(blob)
   const store = liveStore.getState()
-  const existing = store.attachments[attachmentKey(workspaceId, sessionId)]?.some(
-    attachment => attachment.localId === localId
+  const existing = Object.entries(store.attachments).some(
+    ([key, attachments]) =>
+      key.startsWith(`${workspaceId}:`) &&
+      attachments.some(attachment => attachment.localId === localId)
   )
 
   if (existing) {
-    store.updateAttachment(workspaceId, sessionId, localId, {
+    store.updateAttachment(workspaceId, localId, {
       previewUrl,
       status: 'draft',
       upload: undefined,
@@ -114,12 +141,14 @@ export async function stageDrawing({
   const label = purpose === 'sketch' ? 'Sketch' : 'Annotation'
   const previewUrl = URL.createObjectURL(blob)
   const store = liveStore.getState()
-  const existing = store.attachments[attachmentKey(workspaceId, sessionId)]?.some(
-    attachment => attachment.localId === localId
+  const existing = Object.entries(store.attachments).some(
+    ([key, attachments]) =>
+      key.startsWith(`${workspaceId}:`) &&
+      attachments.some(attachment => attachment.localId === localId)
   )
 
   if (existing) {
-    store.updateAttachment(workspaceId, sessionId, localId, {
+    store.updateAttachment(workspaceId, localId, {
       previewUrl,
       status: 'uploading',
       upload: undefined,
@@ -145,7 +174,7 @@ export async function stageDrawing({
       new File([blob], `${label}.png`, { type: 'image/png' })
     ])
     if (!isCurrent()) return
-    liveStore.getState().updateAttachment(workspaceId, sessionId, localId, {
+    liveStore.getState().updateAttachment(workspaceId, localId, {
       status: 'ready',
       upload,
       mediaType: upload.mediaType,
@@ -153,30 +182,29 @@ export async function stageDrawing({
     })
   } catch {
     if (!isCurrent()) return
-    liveStore.getState().removeAttachment(workspaceId, sessionId, localId)
+    liveStore.getState().removeAttachment(workspaceId, localId)
   }
 }
 
-// Duplicate context is ignored; the caller still reveals chat.
-export function stageChatContext(
+// Duplicate text is ignored; the caller still reveals chat.
+export function stageTextAttachment(
   { workspaceId, sessionId }: ComposerTarget,
-  attachment: ContextAttachment
+  attachment: TextAttachment
 ): void {
   const store = liveStore.getState()
   const pending = (store.attachments[attachmentKey(workspaceId, sessionId)] ?? []).filter(
-    item => item.kind === 'context'
+    item => item.kind === 'text'
   )
-  const json = JSON.stringify(attachment.context)
   if (
     pending.some(
       item =>
         item.attachment.source === attachment.source &&
         item.attachment.label === attachment.label &&
-        JSON.stringify(item.attachment.context) === json
+        item.attachment.text === attachment.text
     )
   )
     return
   store.addAttachments(workspaceId, sessionId, [
-    { kind: 'context', localId: crypto.randomUUID(), name: attachment.label, attachment }
+    { kind: 'text', localId: crypto.randomUUID(), name: attachment.label, attachment }
   ])
 }

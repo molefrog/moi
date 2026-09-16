@@ -158,8 +158,8 @@ export function focusTab(tab, params) {
   bridge?.focusTab(tab, params);
 }
 
-export function addChatContext(input) {
-  bridge?.addChatContext(input);
+export function addChatAttachment(input) {
+  bridge?.addChatAttachment(input);
 }
 
 export function sendChatMessage(input, context) {

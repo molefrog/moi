@@ -102,8 +102,12 @@ declare module 'moi' {
   // target view as its \`params\` prop — JSON-plain values only. No-ops outside
   // the moi host. Tab ids: 'overview' | 'agent' | 'scratchpad' | 'view:<id>'.
   export function focusTab(tab: string, params?: Record<string, unknown>): void
-  // Stage context in the current chat draft; does not send a message.
-  export function addChatContext(input: { label: string; context: Record<string, unknown> }): void
+  export type ChatAttachmentInput =
+    | { type: 'text'; label: string; text: string }
+    | { type: 'file'; file: File; path?: never }
+    | { type: 'file'; path: string; file?: never }
+  // Stage an attachment in the current chat draft; does not send a message.
+  export function addChatAttachment(input: ChatAttachmentInput): void
   // Send a chat message to the workspace's active chat, as if the user typed
   // \`message\`. \`context\` rides along as structured data the agent sees but
   // the user does not — JSON-plain values only. Call it from event handlers,

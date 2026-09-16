@@ -1,4 +1,4 @@
-import { ContextAttachmentChip } from '../composer/attachments/ContextAttachmentChip'
+import { TextAttachmentChip } from '../composer/attachments/TextAttachmentChip'
 import { memo } from 'react'
 
 import { IconChevronRight, IconFile } from '@tabler/icons-react'
@@ -166,18 +166,18 @@ export const TurnView = memo(function TurnView({ turn, processing = false }: Tur
     // Plain user input — right-aligned. Attachments (images/files) stack above
     // the text bubble.
     const fileParts = turn.parts.filter(
-      (p): p is Extract<Part, { type: 'file' }> => p.type === 'file'
+      (p): p is Extract<Part, { type: 'file-attachment' }> => p.type === 'file-attachment'
     )
-    const contextParts = turn.parts.filter(p => p.type === 'context')
+    const textAttachmentParts = turn.parts.filter(p => p.type === 'text-attachment')
     const text = turn.parts
       .filter(p => p.type === 'text')
       .map(p => (p.type === 'text' ? p.text : ''))
       .join('\n')
-    if (!text && fileParts.length === 0 && contextParts.length === 0) return null
+    if (!text && fileParts.length === 0 && textAttachmentParts.length === 0) return null
     return (
       <div className="flex w-full min-w-0 flex-col items-end gap-1.5 pl-8">
-        {contextParts.map((p, i) => (
-          <ContextAttachmentChip key={`context:${i}`} label={p.label} />
+        {textAttachmentParts.map((p, i) => (
+          <TextAttachmentChip key={`text-attachment:${i}`} label={p.label} />
         ))}
         {fileParts.map((p, i) => (
           <FilePart key={i} mediaType={p.mediaType} url={p.url} filename={p.filename} />
@@ -212,15 +212,15 @@ type PartRendererProps = { part: Part }
 // folded into a <ToolCallGroup> run by buildSegments.
 function PartRenderer({ part }: PartRendererProps) {
   switch (part.type) {
-    case 'context':
-      return <ContextAttachmentChip label={part.label} />
+    case 'text-attachment':
+      return <TextAttachmentChip label={part.label} />
     case 'text':
       return <MarkdownContent content={part.text} />
     case 'tool-call':
       // Tool calls normally fold into a run; this is a defensive fallback for a
       // lone tool-call segment, rendered as a one-row group.
       return <ToolCallGroup parts={[part]} cwd={null} />
-    case 'file':
+    case 'file-attachment':
       return <FilePart mediaType={part.mediaType} url={part.url} filename={part.filename} />
     case 'source-url':
       return <SourceLink url={part.url} title={part.title} />

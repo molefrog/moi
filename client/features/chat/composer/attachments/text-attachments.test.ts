@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { appletRuntime } from '../../../applets/applet-runtime'
-import { stageChatContext } from './draft-attachments'
+import { stageTextAttachment, stageChatAttachment } from './draft-attachments'
 import { attachmentKey, liveStore } from '../../chat-store'
 import {
   attachmentsForSend,
@@ -10,44 +10,46 @@ import {
 
 const workspaceId = 'context-test'
 const target = { workspaceId, sessionId: null }
-const attachment = { source: 'view:orders', label: 'Order #1042', context: { orderId: '1042' } }
+const attachment = { source: 'view:orders', label: 'Order #1042', text: 'Order ID: 1042' }
 afterEach(() => liveStore.setState({ attachments: {} }))
 
-describe('context staging and sends', () => {
+describe('text staging and sends', () => {
   test('stamps source, snapshots at the bridge and ignores disposed connections', () => {
     const runtime = appletRuntime(workspaceId)
-    const off = runtime.on('addChatContext', value => {
-      stageChatContext(target, value)
+    const off = runtime.on('addChatAttachment', value => {
+      void stageChatAttachment(target, value)
     })
     const { bridge, dispose } = runtime.connect({ kind: 'view', name: 'orders' })
-    const input = { label: 'Order', context: { status: 'pending' }, source: 'widget:forged' }
-    bridge.addChatContext(input)
-    input.context.status = 'done'
+    const input = { type: 'text', label: 'Order', text: 'Status: pending', source: 'widget:forged' }
+    bridge.addChatAttachment(input)
+    input.text = 'Status: done'
     dispose()
-    bridge.addChatContext({ label: 'Another', context: {} })
+    bridge.addChatAttachment({ type: 'text', label: 'Another', text: 'Order' })
     off()
     expect(attachmentsForSend(workspaceId, null)).toMatchObject([
       {
-        kind: 'context',
-        attachment: { source: 'view:orders', label: 'Order', context: { status: 'pending' } }
+        kind: 'text',
+        attachment: { source: 'view:orders', label: 'Order', text: 'Status: pending' }
       }
     ])
   })
 
   test('skips identical repeats and stages more than ten different payloads', () => {
-    stageChatContext(target, attachment)
-    stageChatContext(target, structuredClone(attachment))
+    stageTextAttachment(target, attachment)
+    stageTextAttachment(target, structuredClone(attachment))
     expect(attachmentsForSend(workspaceId, null)).toHaveLength(1)
-    for (let i = 1; i < 20; i++)
-      stageChatContext(target, { ...attachment, context: { orderId: String(i) } })
+    for (let i = 1; i < 20; i++) stageTextAttachment(target, { ...attachment, text: String(i) })
     expect(attachmentsForSend(workspaceId, null)).toHaveLength(20)
-    stageChatContext(target, attachment)
+    stageTextAttachment(target, attachment)
     expect(attachmentsForSend(workspaceId, null)).toHaveLength(20)
   })
 
   test('keeps chats isolated and follows session renames', () => {
-    stageChatContext(target, attachment)
-    stageChatContext({ workspaceId, sessionId: 'existing' }, { ...attachment, label: 'Existing' })
+    stageTextAttachment(target, attachment)
+    stageTextAttachment(
+      { workspaceId, sessionId: 'existing' },
+      { ...attachment, label: 'Existing' }
+    )
     expect(attachmentsForSend(workspaceId, 'different')).toEqual([])
     liveStore.getState().renameSession(workspaceId, 'existing', 'renamed')
     expect(attachmentsForSend(workspaceId, 'renamed')[0].name).toBe('Existing')
@@ -56,10 +58,10 @@ describe('context staging and sends', () => {
     expect(attachmentsForSend(workspaceId, 'renamed')).toHaveLength(1)
   })
 
-  test('an immediate send keeps new-chat context staged through both session id changes', () => {
-    stageChatContext(target, attachment)
-    stageChatContext(target, { ...attachment, label: 'Another order' })
-    stageChatContext({ workspaceId, sessionId: 'other' }, { ...attachment, label: 'Other chat' })
+  test('an immediate send keeps new-chat text staged through both session id changes', () => {
+    stageTextAttachment(target, attachment)
+    stageTextAttachment(target, { ...attachment, label: 'Another order' })
+    stageTextAttachment({ workspaceId, sessionId: 'other' }, { ...attachment, label: 'Other chat' })
     const staged = attachmentsForSend(workspaceId, null)
     const options = { applet: { source: 'view:orders' } }
 
@@ -77,8 +79,8 @@ describe('context staging and sends', () => {
     expect(attachmentsForSend(workspaceId, 'other')[0].name).toBe('Other chat')
   })
 
-  test('sends context with uploads without changing annotation image positions', () => {
-    stageChatContext(target, attachment)
+  test('sends text with uploads without changing annotation image positions', () => {
+    stageTextAttachment(target, attachment)
     liveStore.getState().addAttachments(workspaceId, null, [
       {
         kind: 'drawing',
@@ -99,7 +101,10 @@ describe('context staging and sends', () => {
     ])
     const ready = attachmentsForSend(workspaceId, null)
     expect(ready).toHaveLength(2)
-    expect(attachmentPartsForOptimisticTurn(ready)[0]).toEqual({ type: 'context', ...attachment })
+    expect(attachmentPartsForOptimisticTurn(ready)[0]).toEqual({
+      type: 'text-attachment',
+      ...attachment
+    })
     expect(withAttachmentDirectives(undefined, ready)?.directives).toEqual([
       'Annotation attachment sources in attachment order: 1. "view:orders".'
     ])

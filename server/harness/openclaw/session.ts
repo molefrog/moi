@@ -1,5 +1,5 @@
 import { partitionMessageAttachments } from '@/lib/message-attachments'
-import type { ContextAttachment, MessageAttachment } from '@/lib/types'
+import type { TextAttachment, MessageAttachment } from '@/lib/types'
 // Per-(workspaceId, sessionId) live OpenClaw session.
 //
 // Holds the in-memory view for one session and keeps it current from the
@@ -13,9 +13,9 @@ import type { ContextAttachment, MessageAttachment } from '@/lib/types'
 // §6; the rules that follow from it (who owns a tool card, why identity is
 // decided once) are worth reading before changing anything here.
 import {
-  appendContextAttachments,
-  splitContextAttachments,
-  contextAttachmentParts
+  appendTextAttachments,
+  splitTextAttachments,
+  textAttachmentParts
 } from '@/lib/moi-attachments'
 import { appendAttachmentNote } from '@/lib/attachment-note'
 import {
@@ -497,16 +497,16 @@ function previewMessageId(sessionKey: string, runId: string): string {
 // between what we sent and what the gateway stored can't defeat the match.
 export function normalizeEchoText(text: string | undefined): string {
   if (typeof text !== 'string') return ''
-  const attached = splitContextAttachments(stripMoiContext(text))
+  const attached = splitTextAttachments(stripMoiContext(text))
   return userEchoKey(attached.text, attached.attachments)
 }
 
-export function userEchoKey(text: string, attachments: readonly ContextAttachment[] = []): string {
+export function userEchoKey(text: string, attachments: readonly TextAttachment[] = []): string {
   const visible = text.replace(/\s+/g, ' ').trim()
-  // Include attachments in the fallback key: context-only messages have no
+  // Include attachments in the fallback key: text-attachment-only messages have no
   // visible text, and two identical prompts may refer to different records.
   return attachments.length
-    ? `${visible}\n${JSON.stringify(contextAttachmentParts(attachments))}`
+    ? `${visible}\n${JSON.stringify(textAttachmentParts(attachments))}`
     : visible
 }
 
@@ -545,7 +545,7 @@ function emitTurn(rec: SessionRecord, msg: OpenClawMessage, idx: number): void {
     if (at < 0) {
       const text = userEchoKey(
         turn.parts.find(p => p.type === 'text')?.text ?? '',
-        turn.parts.filter(p => p.type === 'context')
+        turn.parts.filter(p => p.type === 'text-attachment')
       )
       if (text) at = rec.pendingUserEchoes.findIndex(e => normalizeEchoText(e.text) === text)
     }
@@ -1250,9 +1250,9 @@ export async function sendOpenClawMessage(input: {
   context?: MoiContext
 }): Promise<void> {
   // Fold any attachments into the message text as file-path references.
-  const { uploadIds, contextAttachments } = partitionMessageAttachments(input.attachments)
+  const { uploadIds, textAttachments } = partitionMessageAttachments(input.attachments)
   const uploads = resolveUploads(input.workspaceId, uploadIds)
-  let content = appendContextAttachments(input.content, contextAttachments)
+  let content = appendTextAttachments(input.content, textAttachments)
   if (uploads.length > 0) {
     const files: { filename: string; path: string }[] = []
     for (const u of uploads) {

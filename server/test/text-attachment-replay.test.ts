@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { appendContextAttachments, contextAttachmentParts } from '@/lib/moi-attachments'
+import { appendTextAttachments, textAttachmentParts } from '@/lib/moi-attachments'
 import { appendMoiContext, renderMoiContext, moiContextSystemReminder } from '@/lib/moi-context'
 import { ClaudeAdapter } from '../harness/claude-code/adapter'
 import { codexItemToTurn } from '../harness/codex/adapter'
@@ -7,15 +7,15 @@ import { messageToTurn } from '../harness/openclaw/adapter'
 import { replayedUserParts } from '../harness/acp/adapter'
 import { buildUserMessage } from '../harness/claude-code/session'
 
-const attachments = [{ source: 'view:orders', label: 'Order #1042', context: { orderId: '1042' } }]
+const attachments = [{ source: 'view:orders', label: 'Order #1042', text: 'Order ID: 1042' }]
 const ambient = renderMoiContext({ activeTab: 'view:orders' })
 
-describe('durable context attachments', () => {
+describe('durable text attachments', () => {
   for (const text of ['Review this order', '', 'What does <moi-attachments> mean?']) {
-    test(`replays the same display parts across all harnesses: ${text || 'context only'}`, () => {
-      const raw = appendContextAttachments(text, attachments)
+    test(`replays the same display parts across all harnesses: ${text || 'attachment only'}`, () => {
+      const raw = appendTextAttachments(text, attachments)
       const expected = [
-        ...contextAttachmentParts(attachments),
+        ...textAttachmentParts(attachments),
         ...(text ? [{ type: 'text' as const, text }] : [])
       ]
       const cc = new ClaudeAdapter()

@@ -338,3 +338,61 @@ describe('workspace isolation', () => {
     expect(b.calls).toEqual([])
   })
 })
+
+describe('addChatAttachment', () => {
+  test('accepts text and both file sources, stamps source, and ignores disposed bridges', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const received: unknown[] = []
+    const runtime = appletRuntime(ws)
+    const off = runtime.on('addChatAttachment', value => received.push(value))
+    const { bridge, dispose } = runtime.connect(VIEW)
+    const file = new File(['hello'], 'notes.txt')
+    bridge.addChatAttachment({
+      type: 'text',
+      label: ' Notes ',
+      text: '  hello\n',
+      source: 'forged'
+    })
+    bridge.addChatAttachment({ type: 'file', file })
+    const pathInput = { type: 'file', path: 'reports/september.pdf' }
+    bridge.addChatAttachment(pathInput)
+    pathInput.path = 'changed.pdf'
+    dispose()
+    bridge.addChatAttachment({ type: 'file', file })
+    expect(received).toEqual([
+      { type: 'text', label: 'Notes', text: '  hello\n', source: 'view:board' },
+      { type: 'file', file, source: 'view:board' },
+      { type: 'file', path: 'reports/september.pdf', source: 'view:board' }
+    ])
+    off()
+  })
+
+  test('rejects invalid text, file shapes, sizes and unsafe paths without emitting', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const received: unknown[] = []
+    const runtime = appletRuntime(ws)
+    const off = runtime.on('addChatAttachment', value => received.push(value))
+    const { bridge } = runtime.connect(VIEW)
+    const file = new File(['hello'], 'notes.txt')
+    const oversized = new File([new Uint8Array(32 * 1024 * 1024 + 1)], 'large.bin')
+    for (const input of [
+      null,
+      {},
+      { type: 'text', label: '', text: 'hello' },
+      { type: 'text', label: 'Notes', text: ' ' },
+      { type: 'text', label: 'Notes', text: 'x'.repeat(5001) },
+      { type: 'file' },
+      { type: 'file', file: {} },
+      { type: 'file', file: new Blob(['x']) },
+      { type: 'file', file, path: 'notes.txt' },
+      { type: 'file', file: oversized },
+      ...['', '/etc/passwd', '../outside.txt', '.env', 'a/.hidden/b', 'C:\\file.txt'].map(path => ({
+        type: 'file',
+        path
+      }))
+    ])
+      bridge.addChatAttachment(input)
+    expect(received).toEqual([])
+    off()
+  })
+})

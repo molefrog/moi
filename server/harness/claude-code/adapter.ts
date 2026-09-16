@@ -1,4 +1,4 @@
-import { splitContextAttachments, contextAttachmentParts } from '@/lib/moi-attachments'
+import { splitTextAttachments, textAttachmentParts } from '@/lib/moi-attachments'
 import type {
   AdapterEmit,
   Part,
@@ -550,8 +550,8 @@ export class ClaudeAdapter {
               // SDK persists that appended text, so fold the note back into
               // file chips here — a reloaded bubble matches the live one
               // instead of leaking temp paths into it.
-              const attached = splitContextAttachments(text)
-              parts.push(...contextAttachmentParts(attached.attachments))
+              const attached = splitTextAttachments(text)
+              parts.push(...textAttachmentParts(attached.attachments))
               const split = splitAttachmentNote(attached.text)
               // moi's own context envelope strips precisely (marker-guarded);
               // other embedded machinery — system reminders, hook output —
@@ -559,7 +559,7 @@ export class ClaudeAdapter {
               text = filterSystemText(stripMoiContext(split.text)).text
               for (const f of split.files) {
                 parts.push({
-                  type: 'file',
+                  type: 'file-attachment',
                   mediaType: 'application/octet-stream',
                   url: f.path,
                   filename: f.filename
@@ -567,7 +567,7 @@ export class ClaudeAdapter {
               }
               // An attachment-only message carries a synthesized placeholder
               // prompt; the bubble should show just the attachments.
-              if (isAttachmentOnlyPlaceholder(text) && parts.some(p => p.type === 'file')) {
+              if (isAttachmentOnlyPlaceholder(text) && parts.some(p => p.type === 'file-attachment')) {
                 text = ''
               }
             }
@@ -622,7 +622,7 @@ export class ClaudeAdapter {
             }
           }
           if (url) {
-            parts.push({ type: 'file', mediaType, url, filename: b.filename })
+            parts.push({ type: 'file-attachment', mediaType, url, filename: b.filename })
           }
           break
         }

@@ -1,4 +1,4 @@
-import { splitContextAttachments } from '@/lib/moi-attachments'
+import { splitTextAttachments } from '@/lib/moi-attachments'
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import * as sdk from '@anthropic-ai/claude-agent-sdk'
 import type { Options, Query, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
@@ -680,19 +680,19 @@ describe('Claude session message queue', () => {
   }, 7000)
 })
 
-test('context-only sends reach Claude and publish a labelled chip', async () => {
-  const contextAttachments = [{ source: 'view:orders', label: 'Order', context: { id: '1' } }]
+test('text-attachment-only sends reach Claude and publish a labelled chip', async () => {
+  const textAttachments = [{ source: 'view:orders', label: 'Order', text: 'Order ID: 1' }]
   await send({
     content: '',
-    attachments: contextAttachments.map(a => ({ type: 'context' as const, ...a }))
+    attachments: textAttachments.map(a => ({ type: 'text' as const, ...a }))
   })
   const content = drivers[0]!.inputs[0].message.content
   expect(typeof content).toBe('string')
-  expect(splitContextAttachments(content as string).attachments).toEqual(contextAttachments)
+  expect(splitTextAttachments(content as string).attachments).toEqual(textAttachments)
   expect(frames).toContainEqual(
     expect.objectContaining({
       kind: 'turn',
-      turn: expect.objectContaining({ parts: [{ type: 'context', ...contextAttachments[0] }] })
+      turn: expect.objectContaining({ parts: [{ type: 'text-attachment', ...textAttachments[0] }] })
     })
   )
 })

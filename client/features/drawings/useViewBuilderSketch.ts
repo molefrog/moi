@@ -50,7 +50,7 @@ export function useViewBuilderSketch({
         uploadRevisionRef.current += 1
         uploadedBlobRef.current = null
         pendingStageRef.current = null
-        liveStore.getState().removeAttachment(workspaceId, sessionId, attachmentIdRef.current)
+        liveStore.getState().removeAttachment(workspaceId, attachmentIdRef.current)
         return
       }
 
@@ -79,7 +79,7 @@ export function useViewBuilderSketch({
           .attachments[attachmentKey(workspaceId, sessionId)]?.some(
             attachment =>
               attachment.localId === attachmentIdRef.current &&
-              attachment.kind !== 'context' &&
+              attachment.kind !== 'text' &&
               (attachment.status === 'ready' || attachment.status === 'uploading')
           )
         if (staged) return pendingStageRef.current ?? Promise.resolve()
@@ -132,13 +132,13 @@ export function useViewBuilderSketch({
     uploadRevisionRef.current += 1
     uploadedBlobRef.current = null
     pendingStageRef.current = null
-    liveStore.getState().removeAttachment(workspaceId, sessionId, attachmentIdRef.current)
+    liveStore.getState().removeAttachment(workspaceId, attachmentIdRef.current)
     try {
       await controls.cancel()
     } finally {
       acceptExportsRef.current = true
     }
-  }, [controls, sessionId, workspaceId])
+  }, [controls, workspaceId])
 
   useEffect(() => {
     if (!active && controls.active) void deactivate()

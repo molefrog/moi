@@ -90,7 +90,7 @@ describe('view builder sketch submission', () => {
     })
     const draft = (await created.json()) as ViewBuilder
     const attachments: NonNullable<SendMessageInput['attachments']> = [
-      { type: 'context', source: 'view:orders', label: 'Order', context: { id: '1042' } }
+      { type: 'text', source: 'view:orders', label: 'Order', text: 'Order ID: 1042' }
     ]
     if (withUpload) {
       for (const filename of ['requirements.txt', 'notes.txt']) {

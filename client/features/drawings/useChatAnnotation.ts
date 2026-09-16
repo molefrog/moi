@@ -61,9 +61,7 @@ export function useChatAnnotation({
 
     latestBlobRef.current = blob
     if (!blob) {
-      liveStore
-        .getState()
-        .removeAttachment(draft.workspaceId, draft.sourceSessionId, draft.attachmentId)
+      liveStore.getState().removeAttachment(draft.workspaceId, draft.attachmentId)
       return
     }
 
@@ -152,14 +150,14 @@ export function useChatAnnotation({
     (localId: string) => {
       const revision = (uploadRevisionsRef.current.get(localId) ?? 0) + 1
       uploadRevisionsRef.current.set(localId, revision)
-      liveStore.getState().removeAttachment(workspaceId, sessionId, localId)
+      liveStore.getState().removeAttachment(workspaceId, localId)
       if (draftRef.current?.attachmentId === localId) {
         draftRef.current = null
         latestBlobRef.current = null
         void cancelLayer()
       }
     },
-    [cancelLayer, sessionId, workspaceId]
+    [cancelLayer, workspaceId]
   )
 
   const finishDrawing = useCallback(async () => {

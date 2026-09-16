@@ -208,12 +208,16 @@ export type UploadInfo = {
 // Client → Server messages.
 // The chat WebSocket is app-wide (one socket for the whole client, not scoped to
 // a workspace), so every message carries the `workspaceId` it targets.
-export type ChatContextInput = { label: string; context: Record<string, unknown> }
-export type ContextAttachment = ChatContextInput & { source: string }
+export type TextAttachmentInput = { label: string; text: string }
+export type ChatAttachmentInput =
+  | ({ type: 'text' } & TextAttachmentInput)
+  | { type: 'file'; file: File; path?: never }
+  | { type: 'file'; path: string; file?: never }
+export type TextAttachment = TextAttachmentInput & { source: string }
 
 export type MessageAttachment =
   | { type: 'upload'; uploadId: string }
-  | ({ type: 'context' } & ContextAttachment)
+  | ({ type: 'text' } & TextAttachment)
 
 export type ClientMessage =
   | {

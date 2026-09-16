@@ -56,48 +56,62 @@ export default function Orders({ params = {} }: { params?: Params }) {
 target view's source, mirror the shape you find there, and note where you read it. That file is the
 contract; the type is documentation, not a shared module.
 
-## `addChatContext({ label, context })`
+## `addChatAttachment(input)`
 
 Use this when the action may need the user's input or modification before sending. It adds
-a removable chip to the current draft, opens chat, and focuses the composer, keeping existing
-text intact. The user can write or revise their message, add more attachments, remove chips,
-or send context on its own.
+an attachment to the current draft, opens chat, and focuses the composer, keeping existing
+text intact. The user can revise their message, add or remove attachments, or send attachments
+on their own. Staging works while the agent is busy or unavailable.
 
 ### API
 
 ```ts
-function addChatContext(input: {
-  label: string
-  context: Record<string, unknown>
-}): void
+type ChatAttachmentInput =
+  | { type: 'text'; label: string; text: string }
+  | { type: 'file'; file: File; path?: never }
+  | { type: 'file'; path: string; file?: never }
+
+function addChatAttachment(input: ChatAttachmentInput): void
 ```
 
-- `label`: required non-empty label, up to 120 characters, shown on the attachment chip.
-- `context`: required plain JSON object, up to 5,000 serialized characters. Include the data the
-  agent needs to understand the item.
+- Text requires a non-empty `label` (up to 120 characters) and non-blank `text` (up to 5,000
+  characters). Text is preserved exactly and can contain prose, Markdown, or formatted JSON.
+- Files accept exactly one browser `File` or workspace-root-relative `path`. The filename is
+  the label. The existing upload limit is 32 MB; images use the existing image processing.
+- Paths must point to regular files inside the workspace. Absolute paths, traversal, hidden
+  path segments, and symlinks escaping the workspace are rejected.
 
-### Example
+### Examples
 
 ```tsx
-import { addChatContext } from 'moi'
+import { addChatAttachment } from 'moi'
 
-<button onClick={() => addChatContext({
+// Capture selected applet data as text.
+addChatAttachment({
+  type: 'text',
   label: 'Order #1042',
-  context: { orderId: '1042', status: 'delayed' }
-})}>
-  Add to chat
-</button>
+  text: 'Order: 1042\nStatus: delayed'
+})
+
+// Attach an existing workspace document.
+addChatAttachment({ type: 'file', path: 'reports/september.pdf' })
+
+// Attach a browser-generated file, including an exported drawing.
+addChatAttachment({ type: 'file', file: generatedFile })
 ```
 
 ### Limits
 
-Data is validated and copied at click time. The snapshot cannot be edited in the composer,
-and later applet changes do not affect it.
-Invalid data rejects the whole call. Identical source, label, and JSON payloads are skipped.
-Context items can be staged alongside files and drawings.
+Call from user event handlers. Text is captured immediately; workspace files are copied when
+the server reads them during staging. Later changes do not update the attachment. Text appears
+as a labelled chip; files use the existing file or image representation.
 
-Staging works while the agent is busy or unavailable. Draft attachments stay with their chat
-in memory and are lost on page reload. No file is uploaded.
+Invalid arguments reject the call without staging anything. File preparation failures show a
+removable error chip. File loading blocks sending until it finishes. Errors are recorded in
+`moi debug logs`.
+
+Identical text from the same applet with the same label is skipped. Attachments stay with their
+chat in memory and are lost on page reload. Text attachments have no preview or editing UI.
 
 ## `sendChatMessage({ message, context? })`
 

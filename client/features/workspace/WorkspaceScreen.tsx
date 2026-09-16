@@ -26,7 +26,7 @@ import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import {
   useAppletChatMessage,
-  useAppletChatContext
+  useAppletChatAttachment
 } from '@/client/features/chat/applet-chat-intents'
 import { useChat } from '@/client/features/chat/useChat'
 import { ViewBuilder, type ViewBuilderHandle } from '@/client/features/views/ViewBuilder'
@@ -457,7 +457,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   // in full-screen mode the chat is a closed popover, and a run the user can't
   // see is worse than a panel that opens itself.
   useAppletChatMessage({ send, revealChat: openChat, agentAvailability })
-  useAppletChatContext(sessionId, openChat)
+  useAppletChatAttachment(sessionId, openChat)
 
   const createItems: CreateWorkspaceTabItem[] = [
     ...(!dockedSplit && !openSet.has('agent')

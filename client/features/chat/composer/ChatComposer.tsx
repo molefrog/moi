@@ -1,4 +1,4 @@
-import { ContextAttachmentChip } from './attachments/ContextAttachmentChip'
+import { TextAttachmentChip } from './attachments/TextAttachmentChip'
 import { DrawingAttachmentChip } from './attachments/DrawingAttachmentChip'
 import { FileAttachmentChip } from './attachments/FileAttachmentChip'
 import { type RefObject, useRef, useState } from 'react'
@@ -83,11 +83,11 @@ export function ChatComposer({
   const attachments = useLive(s => s.attachments[attachmentKey(workspaceId, sessionId)] ?? EMPTY)
   const [dragOver, setDragOver] = useState(false)
 
-  const uploading = attachments.some(a => a.kind !== 'context' && a.status === 'uploading')
+  const uploading = attachments.some(a => a.kind !== 'text' && a.status === 'uploading')
   // A draft annotation counts as sendable content: send() finishes the drawing
   // first, which uploads it before the message goes out.
   const hasSendable = attachments.some(
-    a => a.kind === 'context' || a.status === 'ready' || a.status === 'draft'
+    a => a.kind === 'text' || a.status === 'ready' || a.status === 'draft'
   )
   const hasContent = value.trim().length > 0 || hasSendable
   const canSend = canSubmitComposerAction(hasContent, uploading, availability)
@@ -112,7 +112,7 @@ export function ChatComposer({
       onRemoveDrawing(attachment.localId)
       return
     }
-    liveStore.getState().removeAttachment(workspaceId, sessionId, attachment.localId)
+    liveStore.getState().removeAttachment(workspaceId, attachment.localId)
   }
 
   const send = async () => {
@@ -161,8 +161,8 @@ export function ChatComposer({
           {attachments
             .toSorted((a, b) => ATTACHMENT_ORDER[a.kind] - ATTACHMENT_ORDER[b.kind])
             .map(a =>
-              a.kind === 'context' ? (
-                <ContextAttachmentChip
+              a.kind === 'text' ? (
+                <TextAttachmentChip
                   key={a.localId}
                   label={a.name}
                   onRemove={() => removeAttachment(a)}
@@ -288,5 +288,5 @@ const EMPTY: ChatAttachment[] = []
 const ATTACHMENT_ORDER: Record<ChatAttachment['kind'], number> = {
   file: 0,
   drawing: 1,
-  context: 2
+  text: 2
 }

@@ -1,11 +1,11 @@
 import { IconLibrary } from '@tabler/icons-react'
 import { AttachmentChip } from './AttachmentChip'
 
-type ContextAttachmentChipProps = {
+type TextAttachmentChipProps = {
   label: string
   onRemove?: () => void
 }
 
-export function ContextAttachmentChip({ label, onRemove }: ContextAttachmentChipProps) {
+export function TextAttachmentChip({ label, onRemove }: TextAttachmentChipProps) {
   return <AttachmentChip label={label} icon={IconLibrary} onRemove={onRemove} />
 }

@@ -118,7 +118,7 @@ export function useChat(address: WorkspaceTabAddress) {
       if (!sid) {
         sid = crypto.randomUUID()
         isNew = true
-        // An immediate applet send leaves the user's context staged in this chat.
+        // An immediate applet send leaves the user's attachments staged in this chat.
         if (!ownsComposerAttachments(options)) {
           liveStore.getState().renameSession(workspaceId, selectedSessionId, sid)
         }

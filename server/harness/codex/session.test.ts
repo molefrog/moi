@@ -1,4 +1,4 @@
-import { splitContextAttachments } from '@/lib/moi-attachments'
+import { splitTextAttachments } from '@/lib/moi-attachments'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 
 import type { BroadcastFrame, StreamEvent } from '@/lib/types'
@@ -523,22 +523,22 @@ describe('Codex live session lifecycle', () => {
 })
 
 for (const native of [true, false]) {
-  test(`context-only sends are durable with native context ${native}`, async () => {
+  test(`text-attachment-only sends are durable with native context ${native}`, async () => {
     const f = fixture()
     f.client.supportsAdditionalContext = native
-    const contextAttachments = [{ source: 'view:orders', label: 'Order', context: { id: '1' } }]
+    const textAttachments = [{ source: 'view:orders', label: 'Order', text: 'Order ID: 1' }]
     await f.send('', {
-      attachments: contextAttachments.map(a => ({ type: 'context' as const, ...a })),
+      attachments: textAttachments.map(a => ({ type: 'text' as const, ...a })),
       optimisticId: 'context-turn',
       context: { activeTab: 'view:orders' }
     })
     const start = f.calls.find(call => call.method === 'turn/start')!
     const sent = start.params.input as Array<{ type: string; text?: string }>
     const raw = sent.find(item => item.type === 'text')!.text!
-    expect(splitContextAttachments(raw).attachments).toEqual(contextAttachments)
+    expect(splitTextAttachments(raw).attachments).toEqual(textAttachments)
     const event = f.events().find(event => event.kind === 'turn' && event.turn.role === 'user')
     expect(event?.kind === 'turn' ? event.turn.parts : null).toEqual([
-      { type: 'context', ...contextAttachments[0] }
+      { type: 'text-attachment', ...textAttachments[0] }
     ])
   })
 }

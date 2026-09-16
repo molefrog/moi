@@ -14,8 +14,9 @@
 // — no central handlers object assembled by the screen. Applet → host only;
 // if a host → applet direction is ever added (`moi.on(...)`), `dispose` must
 // also unbind those listeners or a disposed module leaks.
-import { snapshotChatContext } from '@/lib/moi-attachments'
-import type { ContextAttachment } from '@/lib/types'
+import { snapshotTextAttachment } from '@/lib/moi-attachments'
+import type { ChatAttachmentInput } from '@/lib/types'
+import { isWorkspaceAttachmentPath, MAX_UPLOAD_BYTES } from '@/lib/message-attachments'
 import { useEffect } from 'react'
 
 import { createNanoEvents } from 'nanoevents'
@@ -41,9 +42,11 @@ export type AppletChatMessage = {
   context?: Record<string, unknown>
 }
 
+export type AppletChatAttachment = ChatAttachmentInput & { source: string }
+
 // Events a workspace runtime emits — already validated, typed for host code.
 export type AppletEvents = {
-  addChatContext: (attachment: ContextAttachment) => void
+  addChatAttachment: (attachment: AppletChatAttachment) => void
   // Client-local replace-navigation to a workspace tab. `params` reach the
   // target view as its `params` prop via navigation state — JSON-plain only
   // (history state is structured-cloned).
@@ -57,7 +60,7 @@ export type AppletEvents = {
 // cross the trust boundary from agent-authored code, and the runtime narrows
 // them before emitting.
 export type AppletBridge = {
-  addChatContext: (input: unknown) => void
+  addChatAttachment: (input: unknown) => void
   focusTab: (tab: unknown, params?: unknown) => void
   sendChatMessage: (input: unknown, context?: unknown) => void
 }
@@ -128,17 +131,34 @@ function createRuntime(workspaceId: string) {
       let alive = true
       const source = appletSource(identity)
       const bridge: AppletBridge = {
-        addChatContext(input) {
+        addChatAttachment(input) {
           if (!alive) return
-          const snapshot = snapshotChatContext(input)
-          if (!snapshot) {
-            drop(
-              identity,
-              'addChatContext() was dropped: provide a non-empty label (max 120 characters) and a plain JSON context object (max 5000 characters).'
-            )
-            return
+          if (isParamsRecord(input)) {
+            if (input.type === 'text') {
+              const snapshot = snapshotTextAttachment(input)
+              if (snapshot) {
+                emitter.emit('addChatAttachment', { type: 'text', ...snapshot, source })
+                return
+              }
+            } else if (input.type === 'file') {
+              if (
+                input.file instanceof File &&
+                input.path === undefined &&
+                input.file.size <= MAX_UPLOAD_BYTES
+              ) {
+                emitter.emit('addChatAttachment', { type: 'file', file: input.file, source })
+                return
+              }
+              if (isWorkspaceAttachmentPath(input.path) && input.file === undefined) {
+                emitter.emit('addChatAttachment', { type: 'file', path: input.path, source })
+                return
+              }
+            }
           }
-          emitter.emit('addChatContext', { ...snapshot, source })
+          drop(
+            identity,
+            'addChatAttachment() was dropped: provide labelled text (label max 120 characters, text max 5000), or exactly one File (max 32 MB) or workspace-relative path. Hidden paths are not allowed.'
+          )
         },
         focusTab(tab, params) {
           if (!alive) return

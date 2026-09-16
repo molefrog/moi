@@ -65,7 +65,7 @@ import type { SessionConfigPatch } from './session-config'
 import { DIST_DIR, prebuilt } from './static'
 import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from './skill-update'
 import { serveWorkspaceImagePreview } from './preview'
-import { MAX_UPLOAD_BYTES, addUpload, getUpload } from './uploads'
+import { MAX_UPLOAD_BYTES, addUpload, addWorkspaceFileUpload, getUpload } from './uploads'
 import { requiredEnvFor } from './required-env'
 import {
   deleteView,
@@ -499,6 +499,25 @@ one.post('/uploads', async c => {
     }
   }
   return c.json(out)
+})
+
+// Existing workspace documents enter the same upload pipeline without a browser round trip.
+one.post('/uploads/from-path', async c => {
+  const body: unknown = await c.req.json().catch(() => null)
+  if (!body || typeof body !== 'object' || !('path' in body) || typeof body.path !== 'string') {
+    return c.text('Expected a workspace-relative path', 400)
+  }
+  const ws = c.get('ws')
+  try {
+    return c.json(await addWorkspaceFileUpload(ws.id, ws.path, body.path))
+  } catch (error) {
+    if (error instanceof Error && 'code' in error) {
+      if (error.code === 'ENOENT') return c.text('File not found', 400)
+      if (error.code === 'EACCES' || error.code === 'EPERM')
+        return c.text('Cannot read this file', 400)
+    }
+    return c.text(error instanceof Error ? error.message : 'Failed to attach file', 400)
+  }
 })
 
 // Serve an upload's bytes back. Display parts reference this URL instead of a

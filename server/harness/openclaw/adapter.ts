@@ -9,9 +9,9 @@
 // `toStreamEvents` is the cold path (REST replay); `messageToTurn` is the
 // per-frame path the live session uses.
 import {
-  splitContextAttachments,
-  contextAttachmentParts,
-  stripContextAttachmentsLoose
+  splitTextAttachments,
+  textAttachmentParts,
+  stripTextAttachmentsLoose
 } from '@/lib/moi-attachments'
 import type { Part, StreamEvent, ToolCall, ToolState, Turn, TurnMeta } from '@/lib/format'
 import type { SessionInfo } from '@/lib/types'
@@ -34,7 +34,7 @@ import { stripSubagentEnvelope, stripUserMessageMetadata } from './strip'
 // A no-op on channel/cron labels that never contain it.
 function cleanTitle(text: string | undefined): string {
   return stripSubagentEnvelope(
-    stripContextAttachmentsLoose(stripMoiContextLoose(text?.trim() ?? ''))
+    stripTextAttachmentsLoose(stripMoiContextLoose(text?.trim() ?? ''))
   ).trim()
 }
 
@@ -234,9 +234,9 @@ export function messageToTurn(
   const parts = blocks
     .flatMap(b => {
       if (msg.role === 'user' && b.type === 'text' && typeof b.text === 'string') {
-        const attached = splitContextAttachments(stripUserMessageMetadata(b.text))
+        const attached = splitTextAttachments(stripUserMessageMetadata(b.text))
         return [
-          ...contextAttachmentParts(attached.attachments),
+          ...textAttachmentParts(attached.attachments),
           blockToPart({ ...b, text: attached.text }, msg.role, results, omitToolCallIds)
         ]
       }

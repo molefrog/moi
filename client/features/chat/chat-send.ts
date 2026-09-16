@@ -1,5 +1,5 @@
 import type { MessageAttachment } from '@/lib/types'
-import { contextAttachmentParts } from '@/lib/moi-attachments'
+import { textAttachmentParts } from '@/lib/moi-attachments'
 import type { QueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
@@ -33,22 +33,22 @@ export function attachmentsForSend(
 ): ChatAttachment[] {
   if (!ownsComposerAttachments(options)) return []
   const pending = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)] ?? []
-  return pending.filter(a => a.kind === 'context' || (a.status === 'ready' && a.upload))
+  return pending.filter(a => a.kind === 'text' || (a.status === 'ready' && a.upload))
 }
 
 export function attachmentPartsForOptimisticTurn(attachments: readonly ChatAttachment[]): Part[] {
   return attachments.map(attachment => {
-    if (attachment.kind === 'context') return contextAttachmentParts([attachment.attachment])[0]
+    if (attachment.kind === 'text') return textAttachmentParts([attachment.attachment])[0]
     if (attachment.upload?.kind === 'image' && attachment.previewUrl) {
       return {
-        type: 'file',
+        type: 'file-attachment',
         mediaType: attachment.mediaType,
         url: attachment.previewUrl,
         filename: attachment.name
       }
     }
     return {
-      type: 'file',
+      type: 'file-attachment',
       mediaType: attachment.mediaType,
       url: '',
       filename: attachment.name
@@ -65,7 +65,7 @@ export function withAttachmentDirectives(
   const sketches: string[] = []
   let imagePosition = 0
   for (const attachment of attachments) {
-    if (attachment.kind === 'context' || attachment.upload?.kind !== 'image') continue
+    if (attachment.kind === 'text' || attachment.upload?.kind !== 'image') continue
     imagePosition += 1
     if (attachment.kind === 'drawing' && attachment.purpose === 'annotation') {
       annotations.push(`${imagePosition}. ${JSON.stringify(attachment.sourceTab)}`)
@@ -189,7 +189,7 @@ export function messageAttachmentsForSend(
   attachments: readonly ChatAttachment[]
 ): MessageAttachment[] {
   return attachments.flatMap<MessageAttachment>(attachment => {
-    if (attachment.kind === 'context') return [{ type: 'context', ...attachment.attachment }]
+    if (attachment.kind === 'text') return [{ type: 'text', ...attachment.attachment }]
     return attachment.upload ? [{ type: 'upload', uploadId: attachment.upload.id }] : []
   })
 }

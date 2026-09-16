@@ -27,7 +27,7 @@ describe('installBundledSkills', () => {
       expect(skillMd).toContain('Standard UI components')
       expect(skillMd).toContain('references/INTENTS.md')
       const intents = await Bun.file(join(dir, 'moi-workspace', 'references', 'INTENTS.md')).text()
-      expect(intents).toContain('function addChatContext(input:')
+      expect(intents).toContain('function addChatAttachment(input:')
       expect(intents).toContain('function sendChatMessage(input:')
       expect(intents).toContain('function focusTab(tab:')
       expect(skillMd).toContain('moi ui-components add')

@@ -20,8 +20,8 @@ import type { MessageAttachment } from '@/lib/types'
 //   - `session/prompt` is a long-running request that resolves at end of turn,
 //     so its promise IS the turn's lifetime — activity is mirrored from it,
 //     never derived by counting frames.
-import { appendContextAttachments, contextAttachmentParts } from '@/lib/moi-attachments'
-import type { ContextAttachment } from '@/lib/types'
+import { appendTextAttachments, textAttachmentParts } from '@/lib/moi-attachments'
+import type { TextAttachment } from '@/lib/types'
 import { appendAttachmentNote } from '@/lib/attachment-note'
 import { type MoiContext, appendMoiContext, renderMoiContext } from '@/lib/moi-context'
 import { type Part, applyEvent, emptyViewState } from '@/lib/format'
@@ -312,7 +312,7 @@ function handleSessionUpdate(rec: SessionRecord, update: SessionUpdate, provider
         // Rebuilt as a data URL — the cold-reload fallback (live bubbles point
         // at moi's served upload URL, but that store is gone after a restart).
         rec.userImageParts.push({
-          type: 'file',
+          type: 'file-attachment',
           mediaType: content.mimeType,
           url: `data:${content.mimeType};base64,${content.data}`
         })
@@ -500,16 +500,16 @@ async function buildPrompt(
   text: string,
   uploads: StoredUpload[],
   supportsImages: boolean,
-  contextAttachments: readonly ContextAttachment[] = []
+  textAttachments: readonly TextAttachment[] = []
 ): Promise<{ blocks: AcpPromptBlock[]; parts: Part[] }> {
   const parts: Part[] = []
   for (const u of uploads) {
     const part = uploadToDisplayPart(u)
     if (part) parts.push(part)
   }
-  parts.push(...contextAttachmentParts(contextAttachments))
+  parts.push(...textAttachmentParts(textAttachments))
   if (text) parts.push({ type: 'text', text })
-  text = appendContextAttachments(text, contextAttachments)
+  text = appendTextAttachments(text, textAttachments)
 
   const blocks: AcpPromptBlock[] = []
   const files: { filename: string; path: string }[] = []
@@ -596,14 +596,14 @@ export async function sendAcpMessage(
     context?: MoiContext
   }
 ): Promise<void> {
-  const { uploadIds, contextAttachments } = partitionMessageAttachments(input.attachments)
+  const { uploadIds, textAttachments } = partitionMessageAttachments(input.attachments)
   const uploads = resolveUploads(input.workspaceId, uploadIds)
-  if (!input.content && uploads.length === 0 && contextAttachments.length === 0) return
+  if (!input.content && uploads.length === 0 && textAttachments.length === 0) return
   const { blocks, parts } = await buildPrompt(
     input.content,
     uploads,
     config.supportsImages !== false,
-    contextAttachments
+    textAttachments
   )
   if (blocks.length === 0) return
 

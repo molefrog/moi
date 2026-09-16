@@ -16,3 +16,13 @@ export async function uploadFiles(workspaceId: string, files: File[]): Promise<U
   }
   return res.json()
 }
+
+export async function uploadWorkspaceFile(workspaceId: string, path: string): Promise<UploadInfo> {
+  const res = await fetch(`/api/workspaces/${workspaceId}/uploads/from-path`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path })
+  })
+  if (!res.ok) throw new Error(await res.text().catch(() => `Upload failed (${res.status})`))
+  return res.json()
+}

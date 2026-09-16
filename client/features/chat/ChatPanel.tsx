@@ -105,7 +105,7 @@ export function ChatPanel({
   )
   const attachmentsUploading = useLive(state =>
     (state.attachments[attachmentKey(workspaceId, effectiveSessionId)] ?? []).some(
-      attachment => attachment.kind !== 'context' && attachment.status === 'uploading'
+      attachment => attachment.kind !== 'text' && attachment.status === 'uploading'
     )
   )
   const promptDisabled = !canSubmitComposerAction(true, attachmentsUploading, agentAvailability)

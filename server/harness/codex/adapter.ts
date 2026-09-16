@@ -2,9 +2,9 @@
 // tool items carry their native lifecycle through a tool-call part. The wire
 // types are a defensive subset; see NOTES.md for maintenance.
 import {
-  splitContextAttachments,
-  contextAttachmentParts,
-  stripContextAttachmentsLoose
+  splitTextAttachments,
+  textAttachmentParts,
+  stripTextAttachmentsLoose
 } from '@/lib/moi-attachments'
 import type {
   Part,
@@ -143,7 +143,7 @@ export function codexServiceTierForFastMode(
 
 // Legacy context can be cut mid-envelope in a thread/list preview.
 function cleanPreview(preview: string | undefined): string {
-  return preview ? stripContextAttachmentsLoose(stripMoiContextLoose(preview)).trim() : ''
+  return preview ? stripTextAttachmentsLoose(stripMoiContextLoose(preview)).trim() : ''
 }
 
 export function codexThreadToSessionInfo(t: CodexThread): SessionInfo {
@@ -289,12 +289,12 @@ function userInputToParts(content: CodexUserInput[] | undefined): Part[] {
   for (const c of content ?? []) {
     // Strip context from older sends that used the text-envelope fallback.
     if (c.type === 'text' && c.text) {
-      const attached = splitContextAttachments(stripMoiContext(c.text))
-      parts.push(...contextAttachmentParts(attached.attachments))
+      const attached = splitTextAttachments(stripMoiContext(c.text))
+      parts.push(...textAttachmentParts(attached.attachments))
       const text = attached.text
       if (text) parts.push({ type: 'text', text })
     } else if (c.type === 'image' && c.url)
-      parts.push({ type: 'file', mediaType: 'image/*', url: c.url })
+      parts.push({ type: 'file-attachment', mediaType: 'image/*', url: c.url })
     else if (c.type === 'localImage' && c.path)
       parts.push({ type: 'text', text: `[image: ${c.path}]` })
   }

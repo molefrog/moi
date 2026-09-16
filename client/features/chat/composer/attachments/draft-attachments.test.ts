@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test'
 
-import { stageDrawing, stageDrawingDraft } from './draft-attachments'
+import {
+  stageDrawing,
+  stageDrawingDraft,
+  stageChatAttachment,
+  stageTextAttachment
+} from './draft-attachments'
+import { attachmentsForSend } from '../../chat-send'
+import * as appletLog from '../../../applets/applet-log'
 import { attachmentKey, liveStore } from '../../chat-store'
 
 const workspaceId = 'workspace-1'
@@ -9,7 +16,7 @@ const originalFetch = globalThis.fetch
 
 function drawingAttachments() {
   return (liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)] ?? []).filter(
-    a => a.kind !== 'context'
+    a => a.kind !== 'text'
   )
 }
 
@@ -186,4 +193,157 @@ describe('drawing attachment staging', () => {
     expect(attachment.name).toBe('Sketch.png')
     expect(attachment.kind === 'drawing' ? attachment.purpose : null).toBe('sketch')
   })
+})
+
+describe('applet file staging', () => {
+  test.each(['browser', 'path'] as const)(
+    '%s uploads follow both renames and keep their original chat',
+    async source => {
+      const requests: Array<{
+        url: string
+        init?: RequestInit
+        resolve: (response: Response) => void
+      }> = []
+      globalThis.fetch = mock(
+        (url: string, init?: RequestInit) =>
+          new Promise<Response>(resolve => {
+            requests.push({ url, init, resolve })
+          })
+      ) as unknown as typeof fetch
+      const input =
+        source === 'browser'
+          ? {
+              type: 'file' as const,
+              file: new File(['snapshot'], 'notes.txt', { type: 'text/plain' }),
+              source: 'view:files'
+            }
+          : { type: 'file' as const, path: 'reports/notes.txt', source: 'view:files' }
+      const pending = stageChatAttachment({ workspaceId, sessionId: null }, input)
+      expect(attachmentsForSend(workspaceId, null)).toEqual([])
+      expect(liveStore.getState().attachments[attachmentKey(workspaceId, null)][0]).toMatchObject({
+        name: 'notes.txt',
+        status: 'uploading'
+      })
+      if (source === 'path') {
+        expect(requests[0].url).toEndWith('/uploads/from-path')
+        expect(JSON.parse(requests[0].init?.body as string)).toEqual({ path: 'reports/notes.txt' })
+      } else {
+        const form = requests[0].init?.body as FormData
+        expect(await (form.get('files') as File).text()).toBe('snapshot')
+      }
+      liveStore.getState().renameSession(workspaceId, null, 'temporary')
+      liveStore.getState().renameSession(workspaceId, 'temporary', 'real')
+      stageTextAttachment(
+        { workspaceId, sessionId: 'other' },
+        { label: 'Other', text: 'Other chat', source: 'view:files' }
+      )
+      const info = {
+        id: 'upload',
+        filename: 'notes.txt',
+        kind: 'file',
+        mediaType: 'text/plain',
+        size: 8
+      }
+      requests[0].resolve(Response.json(source === 'browser' ? [info] : info))
+      await pending
+      expect(attachmentsForSend(workspaceId, 'real')).toMatchObject([
+        { kind: 'file', status: 'ready', upload: info }
+      ])
+      expect(attachmentsForSend(workspaceId, 'other')).toHaveLength(1)
+      expect(attachmentsForSend(workspaceId, null)).toEqual([])
+      expect(attachmentsForSend(workspaceId, 'real', { applet: { source: 'view:files' } })).toEqual(
+        []
+      )
+    }
+  )
+
+  test('a removed upload never returns, even after the chat is renamed', async () => {
+    let complete!: (response: Response) => void
+    globalThis.fetch = mock(
+      () =>
+        new Promise<Response>(resolve => {
+          complete = resolve
+        })
+    ) as unknown as typeof fetch
+    const pending = stageChatAttachment(
+      { workspaceId, sessionId },
+      { type: 'file', path: 'image.png', source: 'view:files' }
+    )
+    const id = drawingAttachments()[0].localId
+    liveStore.getState().renameSession(workspaceId, sessionId, 'real')
+    liveStore.getState().removeAttachment(workspaceId, id)
+    complete(
+      Response.json({
+        id: 'upload',
+        filename: 'image.png',
+        kind: 'image',
+        mediaType: 'image/png',
+        size: 1
+      })
+    )
+    await pending
+    expect(attachmentsForSend(workspaceId, 'real')).toEqual([])
+    expect(attachmentsForSend(workspaceId, sessionId)).toEqual([])
+  })
+
+  test('path images get an upload preview and failures get a removable error chip and log', async () => {
+    const log = spyOn(appletLog, 'reportAppletError').mockImplementation(() => {})
+    const requests: string[] = []
+    globalThis.fetch = mock((url: string) => {
+      requests.push(url)
+      return Promise.resolve(
+        url.endsWith('/applet-log')
+          ? new Response(null, { status: 204 })
+          : new Response('Missing file', { status: 400 })
+      )
+    }) as unknown as typeof fetch
+    await stageChatAttachment(
+      { workspaceId, sessionId },
+      { type: 'file', path: 'missing.pdf', source: 'view:files' }
+    )
+    const failed = drawingAttachments()[0]
+    expect(failed).toMatchObject({ status: 'error', error: 'Missing file' })
+    expect(log).toHaveBeenCalledWith(workspaceId, {
+      source: 'runtime',
+      message: 'addChatAttachment() from view:files: Missing file'
+    })
+    log.mockRestore()
+    liveStore.getState().removeAttachment(workspaceId, failed.localId)
+    expect(drawingAttachments()).toEqual([])
+    globalThis.fetch = mock(() =>
+      Promise.resolve(
+        Response.json({ id: 'img', filename: 'image.png', kind: 'image', mediaType: 'image/png' })
+      )
+    ) as unknown as typeof fetch
+    await stageChatAttachment(
+      { workspaceId, sessionId },
+      { type: 'file', path: 'image.png', source: 'view:files' }
+    )
+    expect(drawingAttachments()[0].previewUrl).toBe(`/api/workspaces/${workspaceId}/uploads/img`)
+  })
+})
+
+test('drawing edits and final upload reuse the moved draft after a session rename', async () => {
+  globalThis.fetch = mock(() =>
+    Promise.resolve(
+      Response.json([{ id: 'drawing-upload', kind: 'image', mediaType: 'image/png' }])
+    )
+  ) as unknown as typeof fetch
+  const draft = {
+    workspaceId,
+    sessionId: null,
+    localId: 'renamed-drawing',
+    purpose: 'annotation' as const,
+    sourceTab: 'overview' as const,
+    blob: new Blob(['drawing'], { type: 'image/png' })
+  }
+  stageDrawingDraft(draft)
+  liveStore.getState().renameSession(workspaceId, null, 'temporary')
+  stageDrawingDraft({ ...draft, blob: new Blob(['edited'], { type: 'image/png' }) })
+  liveStore.getState().renameSession(workspaceId, 'temporary', 'real')
+  await stageDrawing({ ...draft, isCurrent: () => true })
+  expect(attachmentsForSend(workspaceId, null)).toEqual([])
+  expect(attachmentsForSend(workspaceId, 'real')).toMatchObject([
+    { kind: 'drawing', localId: draft.localId, status: 'ready' }
+  ])
 })

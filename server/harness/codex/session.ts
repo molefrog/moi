@@ -3,8 +3,8 @@ import type { MessageAttachment } from '@/lib/types'
 // Live state per (workspaceId, sessionId): display history, native lifecycle,
 // and previews. client.ts owns the shared workspace process;
 // Codex owns durable history. See NOTES.md for ordering and recovery rules.
-import { appendContextAttachments, contextAttachmentParts } from '@/lib/moi-attachments'
-import type { ContextAttachment } from '@/lib/types'
+import { appendTextAttachments, textAttachmentParts } from '@/lib/moi-attachments'
+import type { TextAttachment } from '@/lib/types'
 import { appendAttachmentNote } from '@/lib/attachment-note'
 import { buildSessionTitleSource } from '../session-title'
 import {
@@ -894,16 +894,16 @@ async function resumeSession(input: ResumeInput): Promise<SessionRecord> {
 async function buildUserInput(
   text: string,
   uploads: StoredUpload[],
-  contextAttachments: readonly ContextAttachment[] = []
+  textAttachments: readonly TextAttachment[] = []
 ): Promise<{ input: CodexUserInputItem[]; parts: Part[] }> {
   const parts: Part[] = []
   for (const u of uploads) {
     const part = uploadToDisplayPart(u)
     if (part) parts.push(part)
   }
-  parts.push(...contextAttachmentParts(contextAttachments))
+  parts.push(...textAttachmentParts(textAttachments))
   if (text) parts.push({ type: 'text', text })
-  text = appendContextAttachments(text, contextAttachments)
+  text = appendTextAttachments(text, textAttachments)
 
   const input: CodexUserInputItem[] = []
   for (const u of uploads) {
@@ -956,20 +956,16 @@ async function sendMessage(
   lane: SendLane,
   generation: number
 ): Promise<void> {
-  const { uploadIds, contextAttachments } = partitionMessageAttachments(input.attachments)
+  const { uploadIds, textAttachments } = partitionMessageAttachments(input.attachments)
   const uploads = resolveUploads(input.workspaceId, uploadIds)
-  if (!input.content && uploads.length === 0 && contextAttachments.length === 0) return
+  if (!input.content && uploads.length === 0 && textAttachments.length === 0) return
   const sessionTitleSource = input.isNew
     ? buildSessionTitleSource(input.content, [
         ...uploads.map(upload => upload.filename),
-        ...contextAttachments.map(a => a.label)
+        ...textAttachments.map(a => a.label)
       ])
     : undefined
-  const { input: userInput, parts } = await buildUserInput(
-    input.content,
-    uploads,
-    contextAttachments
-  )
+  const { input: userInput, parts } = await buildUserInput(input.content, uploads, textAttachments)
   if (userInput.length === 0) return
   const serviceTier = codexServiceTierForFastMode(input.fastMode)
 

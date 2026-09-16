@@ -531,10 +531,10 @@ describe('moi fileUrl module', () => {
     expect(result.js).toContain('sendChatMessage(input, context)')
   })
 
-  test('bundles addChatContext through the applet bridge', async () => {
-    const result = await buildApplet(join(FIXTURES, 'with-chatcontext.tsx'), undefined, 'view')
-    expect(result.js).toContain('function addChatContext')
-    expect(result.js).toContain('addChatContext(input)')
+  test('bundles addChatAttachment through the applet bridge', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-chatattachment.tsx'), undefined, 'view')
+    expect(result.js).toContain('function addChatAttachment')
+    expect(result.js).toContain('addChatAttachment(input)')
   })
 
   test('every bundle entry exports the bridge wiring, even without a moi import', async () => {
