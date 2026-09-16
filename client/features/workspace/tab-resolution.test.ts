@@ -4,7 +4,6 @@ import type { ViewBuilder, ViewInfo, WorkspaceTabsState } from '@/lib/types'
 
 import {
   effectiveOpenTabs,
-  isStaleTabLink,
   normalizeTabsState,
   resolveActiveTab,
   tabAvailable
@@ -83,9 +82,9 @@ describe('resolveActiveTab', () => {
     expect(resolveActiveTab('scratchpad', state, views, [], false)).toBe('scratchpad')
   })
 
-  test('an unavailable URL tab falls back to the default', () => {
-    expect(resolveActiveTab('view:gone', state, views, [], false)).toBe('overview')
-    expect(resolveActiveTab('view-builder:b2', state, views, [], false)).toBe('overview')
+  test('an unavailable explicit destination stays selected for recovery', () => {
+    expect(resolveActiveTab('view:gone', state, views, [], false)).toBe('view:gone')
+    expect(resolveActiveTab('view-builder:b2', state, views, [], false)).toBe('view-builder:b2')
   })
 
   test('an unavailable saved default falls back to the first surviving tab', () => {
@@ -106,34 +105,5 @@ describe('resolveActiveTab', () => {
 
   test('split mode: non-agent URL tabs still win', () => {
     expect(resolveActiveTab('view:orders', state, views, [], true)).toBe('view:orders')
-  })
-})
-
-// Which lost redirects are worth a line in `moi debug logs`. The cost of a
-// false positive is an agent chasing a link that was never broken.
-describe('isStaleTabLink', () => {
-  test('a view tab that lost its redirect is stale — the view is gone', () => {
-    expect(isStaleTabLink('view:gone')).toBe(true)
-  })
-
-  test('a segment that is not a tab id at all is stale', () => {
-    expect(isStaleTabLink('nonsense')).toBe(true)
-    expect(isStaleTabLink('view:multi/segment')).toBe(true)
-  })
-
-  test('a bare workspace URL names nothing, so it is not a broken link', () => {
-    expect(isStaleTabLink('')).toBe(false)
-    expect(isStaleTabLink(null)).toBe(false)
-    expect(isStaleTabLink(undefined)).toBe(false)
-  })
-
-  test('the agent tab is never stale — split mode redirects it by design', () => {
-    expect(isStaleTabLink('agent')).toBe(false)
-    expect(isStaleTabLink('overview')).toBe(false)
-    expect(isStaleTabLink('scratchpad')).toBe(false)
-  })
-
-  test('a builder tab is never stale — it is swapped for its view when built', () => {
-    expect(isStaleTabLink('view-builder:b1')).toBe(false)
   })
 })

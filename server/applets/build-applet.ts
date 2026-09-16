@@ -125,11 +125,8 @@ export function rpc(module, name) {
 // per-segment URL-encoded so spaces / unicode in filenames survive. A leading
 // slash is stripped so both `clips/a.mp4` and `/clips/a.mp4` work.
 //
-// `focusTab(tab, params?)` and `sendChatMessage({ message, attachments? })` forward to
-// this bundle's host-attached bridge — client-local replace-navigation to a
-// workspace tab (params delivered to the target view via navigation state),
-// and a chat message sent to the workspace's active chat as if the user had
-// typed it. This virtual module is INLINED PER BUNDLE,
+// Navigation, href resolution, and chat intents forward to the bundle's
+// host-attached bridge. This virtual module is inlined per bundle,
 // so `bridge` is private to one applet: the host attaches it right after the
 // dynamic import and neuters it on invalidation (see
 // client/features/applets/applet-runtime.ts). Optional-chained so calls no-op
@@ -154,8 +151,12 @@ export function fileUrl(path) {
   return BASE + "/fs/" + clean.split("/").map(encodeURIComponent).join("/");
 }
 
-export function focusTab(tab, params) {
-  bridge?.focusTab(tab, params);
+export function navigate(href) {
+  bridge?.navigate(href);
+}
+
+export function resolveHref(href) {
+  return bridge?.resolveHref(href) ?? '';
 }
 
 export function addChatAttachment(input) {
@@ -396,8 +397,8 @@ function widgetEntryPlugin(widgetPath: string, syntheticCssPath: string): BunPlu
           // Surface the bridge wiring on every bundle's `index.js` so the host
           // can attach after dynamic import. Bun dedupes the `moi` virtual
           // module within a bundle, so this re-export and the applet's own
-          // `import { focusTab } from 'moi'` share one module instance — the
-          // attached bridge is the one focusTab reads.
+          // `import { navigate } from 'moi'` share one module instance — the
+          // attached bridge is the one navigate reads.
           `export { __attachBridge, __getBridge } from "moi";`
         ].join('\n'),
         loader: 'js'

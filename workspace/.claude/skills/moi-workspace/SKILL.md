@@ -127,10 +127,39 @@ Use the task-specific sections below for workflow guidance. The CLI will grow ov
 - **Develop applets:** `moi check`, `moi bundle`, and `moi refresh`.
 - **Call actions:** `moi call-server-fn`.
 - **Debug applets:** `moi debug logs` (see Debugging applets).
-- **Navigate the workspace:** `moi tabs` and `moi tabs focus` (see Driving the workspace).
+- **Navigate the workspace:** `moi tabs` and `moi navigate <address>` (see Workspace navigation).
 - **Customize the workspace:** `moi theme` and `moi config` (see Customizing workspace appearance).
 - **Use workspace env:** `moi env` and `moi env exec` (see Environment & secrets).
 - **Maintain workspace guidance:** `moi skill` (see Keeping this skill current).
+
+## Workspace navigation
+
+Use `moi:/` addresses in chat, CLI commands, and applets. They refer to the current workspace,
+independently of its domain and deployment path.
+
+Supported destinations: `moi:/overview`, `moi:/scratchpad`, and `moi:/views/<id>`.
+Run `moi tabs` to discover views and their addresses. Widgets are not navigation destinations.
+
+Put view params in the query string. Values are strings; read the target view's `Params` type
+for supported keys and use `URLSearchParams` to encode dynamic values.
+
+Link in chat:
+
+```md
+[Open order](moi:/views/orders?order=o-1024)
+```
+
+Navigate from the CLI:
+
+```sh
+moi navigate 'moi:/views/orders?order=o-1024'
+```
+
+The CLI moves the most recently focused browser showing this workspace and waits for its URL
+acknowledgement. A timeout may mean navigation happened; inspect the browser before retrying.
+
+For applet `navigate(href)` and `resolveHref(href)` usage, see
+[Applet intents](references/INTENTS.md#navigation-navigatehref-and-resolvehrefhref).
 
 ## Customizing workspace appearance
 
@@ -259,9 +288,7 @@ media → `.server.ts` returns the **path**, render with `fileUrl()`.
 
 ### Applet intents
 
-Intents connect applet interactions to other views and the wider workspace through the host API.
-When building applet interactions, read [Applet intents](references/INTENTS.md) to see which
-behaviors the host supports and when to use them.
+Read [Applet intents](references/INTENTS.md) when adding navigation or chat actions to an applet.
 
 ### Environment & secrets
 
@@ -340,10 +367,10 @@ needs another focused check. Do not search for repo tests by default. Run an exi
 `moi call-server-fn` only when the change touches the behavior it covers. If native-app inspection is
 unavailable, keep verification in the browser instead of retrying the unsupported tool.
 
-After the final successful checks, always make tab focus the final workspace action:
+After the final successful checks, always make navigation to the result the final workspace action:
 
-- After building or editing a widget, run `moi tabs focus widgets`.
-- After building or editing a view, run `moi tabs focus view:<view-id>`, using its file name or claimed
+- After building or editing a widget, run `moi navigate 'moi:/overview'`.
+- After building or editing a view, run `moi navigate 'moi:/views/<view-id>'`, using its file name or claimed
   builder id.
 
 The focused applet is the handoff. Keep the final reply brief and user-facing. Do not include file
@@ -392,8 +419,12 @@ surfaces on its own.
 
 ## Views
 
-Full-screen apps, one per nav tab — the user switches tabs. A view has no router of its own, but it
-can be addressed: see Driving the workspace for `focusTab` and the `params` prop.
+Views are full-screen apps, one per tab. moi handles their routing.
+
+Use URL query params for state that should survive reloads or be shareable, such as the selected
+event. Render it directly from the `params` prop and call `navigate()` when it changes, including
+when opening or closing details inside the view. Keep temporary state, such as drafts and hover,
+in React. See the [view params example](references/INTENTS.md#view-params-and-history).
 
 ### View builder requests
 
@@ -437,4 +468,4 @@ This skill is installed with moi (via the CLI or the UI) and can fall behind whe
 - **Then** — if you updated, mention it.
 
 <!-- moi skill version marker — read by `moi skill` to detect drift; do not edit by hand -->
-<moi-skill version="0.19.0" />
+<moi-skill version="0.20.0" />

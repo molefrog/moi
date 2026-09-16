@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react'
+import { useRouter } from 'wouter'
 import { useCallback, useEffect, useState } from 'react'
 
 import {
@@ -16,12 +17,10 @@ import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { type WorkspaceEvent, useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
 import type { AppletKind } from '@/lib/types'
 
-// The props the host passes to a mounted applet component. Views receive
-// `params` from navigation state (focusTab / `moi tabs focus` → the URL's
-// history entry — see ViewApp in WorkspaceScreen.tsx); widgets are mounted
-// bare, so the applet must render sensibly with `params` absent.
+// Views receive URL query params. Widgets mount without params; applets must
+// render sensibly with missing fields.
 export type AppletComponentProps = {
-  params?: Record<string, unknown>
+  params?: Record<string, string>
 }
 
 export type AppletState =
@@ -59,7 +58,8 @@ const VIEW_KIND: AppletKindSpec = {
 function loadApplet(
   kind: AppletKindSpec,
   workspaceId: string,
-  name: string
+  name: string,
+  base: string
 ): Promise<ComponentType<AppletComponentProps>> {
   const { segment } = kind
   const key = appletKey(segment, workspaceId, name)
@@ -75,7 +75,7 @@ function loadApplet(
     // runtime — the only moment the namespace is in hand, before React renders
     // the component. Disposal rides invalidateApplet (same key). The identity
     // passed here is what the applet's chat messages are attributed to.
-    attachAppletBridge(mod, workspaceId, key, { kind: kind.kind, name })
+    attachAppletBridge(mod, workspaceId, key, { kind: kind.kind, name }, base)
     return mod.default as ComponentType<AppletComponentProps>
   })
 
@@ -85,11 +85,12 @@ function loadApplet(
 
 function useApplet(kind: AppletKindSpec, name: string): AppletState {
   const workspaceId = useWorkspaceId()
+  const { base } = useRouter()
   const [state, setState] = useState<AppletState>({ status: 'loading', version: 0 })
 
   const load = useCallback(() => {
     setState(prev => ({ status: 'loading', version: prev.version }))
-    loadApplet(kind, workspaceId, name)
+    loadApplet(kind, workspaceId, name, base)
       .then(Component =>
         setState(prev => ({ status: 'ready', Component, version: prev.version + 1 }))
       )
@@ -105,7 +106,7 @@ function useApplet(kind: AppletKindSpec, name: string): AppletState {
         })
         setState(prev => ({ status: 'error', error: String(err), version: prev.version + 1 }))
       })
-  }, [kind, workspaceId, name])
+  }, [base, kind, workspaceId, name])
 
   useEffect(() => {
     load()

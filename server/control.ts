@@ -4,7 +4,7 @@ import { resolve } from 'path'
 import { parseAppletSelector } from '@/lib/applet-selector'
 import { resolveWorkspaceTheme } from '@/lib/themes'
 import type { WorkspaceEntry } from '@/lib/types'
-import { isParamsRecord } from '@/lib/workspace-tabs'
+import { navigationRelay } from './navigation-relay'
 
 import { clearAppletLog, getAppletLog, getAppletLogCount } from './applet-log'
 import { serializeWorkspaceBundle } from './bundle-queue'
@@ -19,7 +19,7 @@ import { executeScratchOp } from './scratchpad-executor'
 import { readScratchpadImage, readScratchpadShapes } from './scratchpad'
 import { relayScratchOp } from './scratchpad-relay'
 import { broadcastAll } from './state'
-import { assembleTabRows, resolveFocusTab } from './tabs'
+import { assembleTabRows, resolveNavigation } from './tabs'
 import { applyThemeUpdate } from './theme'
 import { handleBundle } from './widgets'
 import { getViewList, handleBundleViews, hasViewId } from './views'
@@ -311,33 +311,27 @@ export const control = Bun.serve({
           return
         }
 
-        // `moi tabs focus <tab-id>` — validate the target, then publish a
-        // workspace-scoped `tab:focus` event. Every connected client of that
-        // workspace navigates (replace) with the params in navigation state.
-        if (data.type === 'tab:focus') {
+        // CLI navigation is addressed to one live browser and acknowledged.
+        if (data.type === 'navigate') {
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
-          const resolved = await resolveFocusTab(data.tab, {
-            hasView: viewId => hasViewId(match.path, viewId),
-            viewList: () => getViewList(match.path)
+          const resolved = await resolveNavigation(data.href, {
+            hasView: viewId => hasViewId(match.path, viewId)
           })
           if (!resolved.ok) {
             ws.send(JSON.stringify({ error: resolved.error }))
             return
           }
-          // The CLI already validated --params as one JSON object; re-check the
-          // shape here so a hand-rolled control client can't publish garbage.
-          if (data.params !== undefined && !isParamsRecord(data.params)) {
-            ws.send(JSON.stringify({ error: 'Params must be one JSON object' }))
-            return
+          try {
+            await navigationRelay.navigate(match.id, resolved.href)
+            ws.send(JSON.stringify({ ok: true, href: resolved.href }))
+          } catch (error) {
+            ws.send(
+              JSON.stringify({
+                error: error instanceof Error ? error.message : 'Navigation failed'
+              })
+            )
           }
-          publishEvent({
-            type: 'tab:focus',
-            workspaceId: match.id,
-            tab: resolved.tab,
-            ...(data.params !== undefined ? { params: data.params } : {})
-          })
-          ws.send(JSON.stringify({ ok: true, tab: resolved.tab }))
           return
         }
 

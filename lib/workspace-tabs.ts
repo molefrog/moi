@@ -1,8 +1,6 @@
-// Workspace tab addressing, shared by the client router, the control server,
-// and the CLI. A tab id doubles as the URL suffix of `/workspace/:id/<tab>` —
-// ids are URL-safe as-is (`:` is a legal path character), so building a path
-// is plain concatenation and parsing is plain validation.
+// Internal tab identifiers stay separate from public navigation addresses.
 import type { WorkspaceTabId } from './types'
+import { addressPath } from './navigation'
 
 export function isWorkspaceTabId(value: unknown): value is WorkspaceTabId {
   return (
@@ -22,7 +20,7 @@ export function parseWorkspaceTab(segment: string | null | undefined): Workspace
 }
 
 export function workspaceTabPath(workspaceId: string, tab: WorkspaceTabId): string {
-  return `/workspace/${workspaceId}/${tab}`
+  return addressPath(workspaceId, { tab, search: '' })
 }
 
 export const viewTabId = (viewId: string): WorkspaceTabId => `view:${viewId}`
@@ -32,17 +30,7 @@ export const viewBuilderTabId = (builderId: string): WorkspaceTabId => `view-bui
 export const viewBuilderIdFromTab = (tab: WorkspaceTabId): string | null =>
   tab.startsWith('view-builder:') ? tab.slice('view-builder:'.length) : null
 
-// The only params shape focusTab / `moi tabs focus` carry: one JSON-plain
-// object. Arrays and null are valid JSON but not a params record.
+// A record check shared by JSON boundary validators.
 export function isParamsRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-// Applet params as read back from navigation state (`state.appletParams`).
-// Anything malformed degrades to `{}` — a view must render with empty params
-// anyway (fresh mount, new browser tab, plain tab-bar click).
-export function readAppletParams(state: unknown): Record<string, unknown> {
-  if (!isParamsRecord(state)) return {}
-  const params = (state as { appletParams?: unknown }).appletParams
-  return isParamsRecord(params) ? params : {}
 }

@@ -61,7 +61,7 @@ export function takeChatDirectives(
 
 // The workspace's live tab address, owned by useWorkspaceNavigation and passed
 // down through useChat. The URL is the truth for which tab is active, and
-// navigation state is the truth for what the view is rendering with.
+// query strings are the truth for what the view is rendering with.
 export type WorkspaceTabAddress = {
   activeTab: WorkspaceTabId
   appletParams: Record<string, unknown>

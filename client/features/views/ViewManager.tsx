@@ -43,10 +43,8 @@ type ViewManagerProps = {
   // manager stays mounted either way — that is what makes coming back from the
   // agent or Overview tab instant too.
   activeViewId: string | null
-  // The active view's addressable state, read from navigation state (focusTab /
-  // `moi tabs focus`). `{}` on a fresh mount, a new browser tab, or a plain
-  // tab-bar click — a view must render sensibly with that.
-  params: Record<string, unknown>
+  // The active view's URL query params. Parked views retain their last values.
+  params: Record<string, string>
 }
 
 // Memoized against the workspace screen's own churn: the screen re-renders on
@@ -55,7 +53,7 @@ type ViewManagerProps = {
 // resident view — typing next to a streaming agent then janks on a big view.
 // All three props are identity-stable outside real changes: `views` comes from
 // the workspace query cache, `activeViewId` is a string, and `params` is
-// memoized by navigation state.
+// memoized by the query string.
 export const ViewManager = memo(function ViewManager({
   views,
   activeViewId,
@@ -122,7 +120,7 @@ function useResidentViews(activeId: string | null, views: ViewInfo[]): ResidentV
 type ViewSlotProps = {
   view: ViewInfo
   active: boolean
-  params: Record<string, unknown>
+  params: Record<string, string>
 }
 
 // One resident view. The bundle it holds is loaded and kept fresh for as long
@@ -133,7 +131,7 @@ function ViewSlot({ view, active, params }: ViewSlotProps) {
   const bundle = useView(view.id)
   const { current, outgoing } = useLoadedBundle(bundle, active)
   // A parked view keeps rendering with the params it was last shown with: the
-  // active view's `focusTab` state is not its to render.
+  // active view's URL state is not its to render.
   const [shownParams, setShownParams] = useState(params)
   if (active && shownParams !== params) setShownParams(params)
 
@@ -194,7 +192,7 @@ function ViewSlot({ view, active, params }: ViewSlotProps) {
 type ViewFrameProps = {
   view: ViewInfo
   build: ViewBuild
-  params: Record<string, unknown>
+  params: Record<string, string>
   // Play the rebuild dissolve. Set on the incoming build only, and only while
   // the build it replaced is still rendered underneath it.
   entering?: boolean
