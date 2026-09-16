@@ -74,7 +74,7 @@ export function envelopeTabParams(
   activeTab: WorkspaceTabId,
   appletParams: Record<string, unknown>
 ): Record<string, unknown> | undefined {
-  if (!activeTab.startsWith('view:')) return undefined
+  if (!activeTab.startsWith('views/')) return undefined
   return Object.keys(appletParams).length > 0 ? appletParams : undefined
 }
 
@@ -87,10 +87,10 @@ export function activeTabTitle(
   views: ViewInfo[] | undefined,
   builders: ViewBuilder[] | undefined
 ): string | undefined {
-  if (tab.startsWith('view:'))
-    return views?.find(v => v.id === tab.slice('view:'.length))?.config.title || undefined
-  if (tab.startsWith('view-builder:'))
-    return builders?.find(b => b.id === tab.slice('view-builder:'.length))?.title || undefined
+  if (tab.startsWith('views/'))
+    return views?.find(v => v.id === tab.slice('views/'.length))?.config.title || undefined
+  if (tab.startsWith('view-builders/'))
+    return builders?.find(b => b.id === tab.slice('view-builders/'.length))?.title || undefined
   return undefined
 }
 

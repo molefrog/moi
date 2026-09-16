@@ -1,4 +1,5 @@
 import type { WorkspaceTabId } from './types'
+import { isWorkspaceTabId } from './workspace-tabs'
 
 export type ViewParams = Record<string, string>
 export type WorkspaceAddress = { tab: WorkspaceTabId; search: string }
@@ -12,7 +13,7 @@ export function parseMoiHref(href: unknown): WorkspaceAddress {
   const path = href.slice(5).split(/[?#]/, 1)[0]
   if (href.includes('#') || /[\s\\]/.test(path)) throw new Error('Invalid workspace address')
   const tab = tabFromPath(path)
-  if (!tab || tab === 'agent' || tab.startsWith('view-builder:')) {
+  if (!tab || tab === 'agent' || tab.startsWith('view-builders/')) {
     throw new Error(`Unsupported workspace destination: ${path}`)
   }
   const query = href.indexOf('?')
@@ -33,26 +34,23 @@ export function readViewParams(search: string): ViewParams {
   return Object.fromEntries(Array.from(params.keys(), key => [key, params.get(key)!]))
 }
 
-export function tabPath(tab: WorkspaceTabId): string {
-  if (tab.startsWith('view:')) return `views/${encodeURIComponent(tab.slice(5))}`
-  if (tab.startsWith('view-builder:')) return `view-builders/${encodeURIComponent(tab.slice(13))}`
-  return tab
-}
-
 export function tabFromPath(path: string): WorkspaceTabId | null {
-  if (path === 'overview' || path === 'scratchpad' || path === 'agent') return path
   try {
-    // Match the applet IDs accepted by the server's module routes.
-    const match = /^(views|view-builders)\/([a-zA-Z0-9_-]+)$/.exec(decodeURIComponent(path))
-    if (!match) return null
-    return match[1] === 'views' ? `view:${match[2]}` : `view-builder:${match[2]}`
+    const tab = decodeURIComponent(path)
+    return isWorkspaceTabId(tab) ? tab : null
   } catch {
     return null
   }
 }
 
+// Compatibility for old browser bookmarks only; saved tab state uses paths.
+export function legacyTabFromPath(path: string): WorkspaceTabId | null {
+  const match = /^(view|view-builder):(.+)$/.exec(path)
+  return match ? tabFromPath(`${match[1]}s/${match[2]}`) : null
+}
+
 export function moiHref(tab: WorkspaceTabId, search = ''): string {
-  return `moi:/${tabPath(tab)}${canonicalSearch(search)}`
+  return `moi:/${tab}${canonicalSearch(search)}`
 }
 
 // Deployment-specific addressing is confined to this host adapter. Callers
@@ -62,7 +60,11 @@ export function workspacePath(workspaceId: string, base = ''): string {
 }
 
 export function addressPath(workspaceId: string, address: WorkspaceAddress, base = ''): string {
-  return `${workspacePath(workspaceId, base)}/${tabPath(address.tab)}${address.search}`
+  return `${workspacePath(workspaceId, base)}/${address.tab}${address.search}`
+}
+
+export function workspaceTabPath(workspaceId: string, tab: WorkspaceTabId): string {
+  return addressPath(workspaceId, { tab, search: '' })
 }
 
 export function resolveWorkspaceHref(workspaceId: string, href: string, base = ''): string {

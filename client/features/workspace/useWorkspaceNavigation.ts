@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import type { MouseEvent } from 'react'
-import { useLocation, useParams, useRouter } from 'wouter'
+import { useLocation, useRouter } from 'wouter'
 import { usePathname, useSearch } from 'wouter/use-browser-location'
 
 import { toast } from '@/client/components/ui/toast'
@@ -11,10 +11,10 @@ import { useWorkspaceLayoutCtx } from './WorkspaceLayoutContext'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import { useNavigationClient } from '@/client/runtime/useWorkspaceEvents'
 import type { ViewBuilder, ViewInfo, WorkspaceTabId, WorkspaceTabsState } from '@/lib/types'
-import { parseWorkspaceTab } from '@/lib/workspace-tabs'
 import {
   addressPath,
   canonicalSearch,
+  legacyTabFromPath,
   parseMoiHref,
   readViewParams,
   resolveWorkspaceHref,
@@ -38,7 +38,6 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
   // browser values so tabFromPath and URLSearchParams each decode only once.
   const path = usePathname(router).slice(workspacePath(workspaceId, base).length + 1)
   const search = canonicalSearch(useSearch(router))
-  const legacyPath = useParams()['*']
   const appletParams = useMemo(() => readViewParams(search), [search])
   const tabsState = normalizeTabsState(layout.tabs)
   const tabsStateRef = useLatestRef(tabsState)
@@ -48,7 +47,7 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
     return entries
   }, [workspaceId])
   const requestedTab = tabFromPath(path)
-  const legacyTab = requestedTab ? null : parseWorkspaceTab(legacyPath)
+  const legacyTab = requestedTab ? null : legacyTabFromPath(path)
   const activeTab = resolveActiveTab(requestedTab ?? legacyTab, tabsState, views, builders, split)
   const isUnavailable =
     Boolean(path) && !legacyTab && (!requestedTab || !tabAvailable(requestedTab, views, builders))

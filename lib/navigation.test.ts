@@ -2,15 +2,31 @@ import { describe, expect, test } from 'bun:test'
 import {
   addressPath,
   canonicalSearch,
+  legacyTabFromPath,
   moiHref,
   parseMoiHref,
   readViewParams,
   resolveWorkspaceHref,
   tabFromPath,
-  tabPath
+  workspaceTabPath
 } from './navigation'
 
 describe('workspace addresses', () => {
+  test('tab IDs are the workspace-relative paths', () => {
+    expect(parseMoiHref('moi:/views/events?eventId=123').tab).toBe('views/events')
+    expect(workspaceTabPath('ws1', 'views/events')).toBe('/workspace/ws1/views/events')
+  })
+
+  test('old browser bookmarks resolve without accepting legacy tab IDs in new addresses', () => {
+    expect(legacyTabFromPath('view:orders')).toBe('views/orders')
+    expect(legacyTabFromPath('view-builder:abc')).toBe('view-builders/abc')
+    expect(legacyTabFromPath('view:%65vents')).toBe('views/events')
+    expect(legacyTabFromPath('view:%2565vents')).toBeNull()
+    expect(legacyTabFromPath('view:a/b')).toBeNull()
+    expect(legacyTabFromPath('views/orders')).toBeNull()
+    expect(() => parseMoiHref('moi:/view:orders')).toThrow()
+  })
+
   test('round trips a destination independently of workspace, origin, and deployment prefix', () => {
     const href = 'moi:/views/events?eventId=123'
     const address = parseMoiHref(href)
@@ -22,7 +38,7 @@ describe('workspace addresses', () => {
     expect(resolveWorkspaceHref('abc', href)).toBe('/workspace/abc/views/events?eventId=123')
   })
   test('accepts encoded IDs supported by the applet server', () => {
-    expect(parseMoiHref('moi:/views/%65vents_2026-09').tab).toBe('view:events_2026-09')
+    expect(parseMoiHref('moi:/views/%65vents_2026-09').tab).toBe('views/events_2026-09')
   })
 
   test('query values remain strings and follow URLSearchParams.get semantics', () => {
@@ -66,10 +82,10 @@ describe('workspace addresses', () => {
       'agent',
       'overview',
       'scratchpad',
-      'view:events',
-      'view-builder:abc'
+      'views/events',
+      'view-builders/abc'
     ] as const) {
-      expect(tabFromPath(tabPath(tab))).toBe(tab)
+      expect(tabFromPath(tab)).toBe(tab)
     }
   })
   test('web hrefs stay web hrefs; executable protocols cannot use the API', () => {

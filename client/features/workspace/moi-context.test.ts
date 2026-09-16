@@ -54,13 +54,13 @@ describe('moi context assembly', () => {
         updatedAt: 0
       }
     ]
-    expect(activeTabTitle('view:color-studio', views, builders)).toBe('Grading review')
-    expect(activeTabTitle('view:untitled', views, builders)).toBeUndefined()
-    expect(activeTabTitle('view:missing', views, builders)).toBeUndefined()
-    expect(activeTabTitle('view-builder:b-42', views, builders)).toBe('Customer overview')
-    expect(activeTabTitle('view-builder:b-draft', views, builders)).toBeUndefined()
+    expect(activeTabTitle('views/color-studio', views, builders)).toBe('Grading review')
+    expect(activeTabTitle('views/untitled', views, builders)).toBeUndefined()
+    expect(activeTabTitle('views/missing', views, builders)).toBeUndefined()
+    expect(activeTabTitle('view-builders/b-42', views, builders)).toBe('Customer overview')
+    expect(activeTabTitle('view-builders/b-draft', views, builders)).toBeUndefined()
     expect(activeTabTitle('scratchpad', views, builders)).toBeUndefined()
-    expect(activeTabTitle('view:color-studio', undefined, undefined)).toBeUndefined()
+    expect(activeTabTitle('views/color-studio', undefined, undefined)).toBeUndefined()
   })
 })
 
@@ -68,11 +68,11 @@ describe('envelopeTabParams', () => {
   const params = { order: 'A-1042' }
 
   test('a view reports what it is rendering with', () => {
-    expect(envelopeTabParams('view:orders', params)).toEqual(params)
+    expect(envelopeTabParams('views/orders', params)).toEqual(params)
   })
 
   test('a view with nothing addressable reports nothing', () => {
-    expect(envelopeTabParams('view:orders', {})).toBeUndefined()
+    expect(envelopeTabParams('views/orders', {})).toBeUndefined()
   })
 
   test('tabs without addressable state report nothing, params or not', () => {
@@ -81,6 +81,6 @@ describe('envelopeTabParams', () => {
     expect(envelopeTabParams('overview', params)).toBeUndefined()
     expect(envelopeTabParams('agent', params)).toBeUndefined()
     expect(envelopeTabParams('scratchpad', params)).toBeUndefined()
-    expect(envelopeTabParams('view-builder:b-42', params)).toBeUndefined()
+    expect(envelopeTabParams('view-builders/b-42', params)).toBeUndefined()
   })
 })

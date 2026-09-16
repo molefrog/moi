@@ -56,13 +56,22 @@ test('view params decode exactly once through the real router', () => {
 
 test('encoded IDs resolve under a deployment base without decoding nested escapes', () => {
   const views = [{ id: 'events', config: {} }]
-  expect(readNavigation('views/%65vents', '', views, '/prefix').activeTab).toBe('view:events')
+  expect(readNavigation('views/%65vents', '', views, '/prefix').activeTab).toBe('views/events')
   expect(readNavigation('views/%2565vents', '', views, '/prefix').isUnavailable).toBe(true)
 })
 
 test('missing views keep their destination without becoming the default tab', () => {
   const result = readNavigation('views/missing', '?eventId=123', [])
-  expect(result.activeTab).toBe('view:missing')
+  expect(result.activeTab).toBe('views/missing')
   expect(result.isUnavailable).toBe(true)
   expect(result.appletParams).toEqual({ eventId: '123' })
+})
+
+test('legacy browser paths select the same view under a deployment base', () => {
+  const views = [{ id: 'events', config: {} }]
+  const result = readNavigation('view:%65vents', 'eventId=123', views, '/prefix')
+  expect(result.activeTab).toBe('views/events')
+  expect(result.isUnavailable).toBe(false)
+  expect(result.appletParams).toEqual({ eventId: '123' })
+  expect(readNavigation('view:%2565vents', '', views).isUnavailable).toBe(true)
 })

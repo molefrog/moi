@@ -47,22 +47,22 @@ describe('tabAvailable', () => {
   })
 
   test('view and builder tabs track their backing lists', () => {
-    expect(tabAvailable('view:orders', views, [])).toBe(true)
-    expect(tabAvailable('view:gone', views, [])).toBe(false)
-    expect(tabAvailable('view-builder:b1', [], builders)).toBe(true)
-    expect(tabAvailable('view-builder:b2', [], builders)).toBe(false)
+    expect(tabAvailable('views/orders', views, [])).toBe(true)
+    expect(tabAvailable('views/gone', views, [])).toBe(false)
+    expect(tabAvailable('view-builders/b1', [], builders)).toBe(true)
+    expect(tabAvailable('view-builders/b2', [], builders)).toBe(false)
   })
 })
 
 describe('effectiveOpenTabs', () => {
   test('filters unavailable tabs and keeps order', () => {
     expect(
-      effectiveOpenTabs(tabs(['view:gone', 'agent', 'view:orders'], 'agent'), views, [])
-    ).toEqual(['agent', 'view:orders'])
+      effectiveOpenTabs(tabs(['views/gone', 'agent', 'views/orders'], 'agent'), views, [])
+    ).toEqual(['agent', 'views/orders'])
   })
 
   test('falls back to the default open set when nothing survives', () => {
-    expect(effectiveOpenTabs(tabs(['view:gone'], 'view:gone'), [], [])).toEqual([
+    expect(effectiveOpenTabs(tabs(['views/gone'], 'views/gone'), [], [])).toEqual([
       'overview',
       'agent',
       'scratchpad'
@@ -71,39 +71,39 @@ describe('effectiveOpenTabs', () => {
 })
 
 describe('resolveActiveTab', () => {
-  const state = tabs(['overview', 'agent', 'view:orders'], 'overview')
+  const state = tabs(['overview', 'agent', 'views/orders'], 'overview')
 
   test('a bare URL resolves to the saved default', () => {
     expect(resolveActiveTab(null, state, views, [], false)).toBe('overview')
   })
 
   test('a valid URL tab wins, even when not in the open set', () => {
-    expect(resolveActiveTab('view:orders', state, views, [], false)).toBe('view:orders')
+    expect(resolveActiveTab('views/orders', state, views, [], false)).toBe('views/orders')
     expect(resolveActiveTab('scratchpad', state, views, [], false)).toBe('scratchpad')
   })
 
   test('an unavailable explicit destination stays selected for recovery', () => {
-    expect(resolveActiveTab('view:gone', state, views, [], false)).toBe('view:gone')
-    expect(resolveActiveTab('view-builder:b2', state, views, [], false)).toBe('view-builder:b2')
+    expect(resolveActiveTab('views/gone', state, views, [], false)).toBe('views/gone')
+    expect(resolveActiveTab('view-builders/b2', state, views, [], false)).toBe('view-builders/b2')
   })
 
   test('an unavailable saved default falls back to the first surviving tab', () => {
-    const stale = tabs(['view:gone', 'view:orders'], 'view:gone')
-    expect(resolveActiveTab(null, stale, views, [], false)).toBe('view:orders')
+    const stale = tabs(['views/gone', 'views/orders'], 'views/gone')
+    expect(resolveActiveTab(null, stale, views, [], false)).toBe('views/orders')
   })
 
   test('when nothing survives, the default open set answers', () => {
-    const dead = tabs(['view:gone'], 'view:gone')
+    const dead = tabs(['views/gone'], 'views/gone')
     expect(resolveActiveTab(null, dead, [], [], false)).toBe('overview')
   })
 
   test('split mode: agent is not a workspace tab, a visible tab is derived', () => {
     expect(resolveActiveTab('agent', state, views, [], true)).toBe('overview')
-    const agentDefault = tabs(['agent', 'view:orders'], 'agent')
-    expect(resolveActiveTab(null, agentDefault, views, [], true)).toBe('view:orders')
+    const agentDefault = tabs(['agent', 'views/orders'], 'agent')
+    expect(resolveActiveTab(null, agentDefault, views, [], true)).toBe('views/orders')
   })
 
   test('split mode: non-agent URL tabs still win', () => {
-    expect(resolveActiveTab('view:orders', state, views, [], true)).toBe('view:orders')
+    expect(resolveActiveTab('views/orders', state, views, [], true)).toBe('views/orders')
   })
 })

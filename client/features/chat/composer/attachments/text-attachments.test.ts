@@ -85,7 +85,7 @@ describe('text staging and sends', () => {
       {
         kind: 'drawing',
         purpose: 'annotation',
-        sourceTab: 'view:orders',
+        sourceTab: 'views/orders',
         localId: 'image',
         name: 'Annotation.png',
         mediaType: 'image/png',
@@ -118,7 +118,7 @@ describe('text staging and sends', () => {
       ]
     })
     expect(withAttachmentDirectives(undefined, ready)?.directives).toEqual([
-      'Annotation attachment sources in attachment order: 1. "view:orders".'
+      'Annotation attachment sources in attachment order: 1. "views/orders".'
     ])
     expect(attachmentsForSend(workspaceId, null, { applet: { source: 'widget:clock' } })).toEqual(
       []

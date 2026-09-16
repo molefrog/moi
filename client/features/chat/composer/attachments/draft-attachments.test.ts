@@ -161,7 +161,7 @@ describe('drawing attachment staging', () => {
       sessionId,
       localId: 'annotation-1',
       purpose: 'annotation',
-      sourceTab: 'view:roadmap',
+      sourceTab: 'views/roadmap',
       blob: new Blob(['drawing'], { type: 'image/png' }),
       isCurrent: () => true
     })
@@ -190,7 +190,7 @@ describe('drawing attachment staging', () => {
       sessionId,
       localId: 'sketch-1',
       purpose: 'sketch',
-      sourceTab: 'view-builder:draft-1',
+      sourceTab: 'view-builders/draft-1',
       blob: new Blob(['drawing'], { type: 'image/png' }),
       isCurrent: () => true
     })
