@@ -567,7 +567,10 @@ export class ClaudeAdapter {
               }
               // An attachment-only message carries a synthesized placeholder
               // prompt; the bubble should show just the attachments.
-              if (isAttachmentOnlyPlaceholder(text) && parts.some(p => p.type === 'file-attachment')) {
+              if (
+                isAttachmentOnlyPlaceholder(text) &&
+                parts.some(p => p.type === 'file-attachment')
+              ) {
                 text = ''
               }
             }

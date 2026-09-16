@@ -531,7 +531,12 @@ const attachmentsTurn = turn('user', 23, 26, [
     label: 'Selected board items',
     text: 'Selected items: item-1, item-2'
   },
-  { type: 'file-attachment', mediaType: 'image/png', url: CHECKERBOARD_PNG, filename: 'pattern.png' },
+  {
+    type: 'file-attachment',
+    mediaType: 'image/png',
+    url: CHECKERBOARD_PNG,
+    filename: 'pattern.png'
+  },
   { type: 'file-attachment', mediaType: 'application/pdf', url: '', filename: 'report.pdf' },
   text(
     'back to work — mole says the report draft is done. recreate this dither pattern in the scratchpad later, and let him know we got it'

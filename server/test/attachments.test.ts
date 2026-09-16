@@ -36,7 +36,9 @@ async function addImage(workspaceId: string, name = 'shot.png') {
 }
 
 function fileParts(parts: Part[]) {
-  return parts.filter((p): p is Extract<Part, { type: 'file-attachment' }> => p.type === 'file-attachment')
+  return parts.filter(
+    (p): p is Extract<Part, { type: 'file-attachment' }> => p.type === 'file-attachment'
+  )
 }
 function textPart(parts: Part[]) {
   return parts.find((p): p is Extract<Part, { type: 'text' }> => p.type === 'text')
