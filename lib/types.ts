@@ -578,8 +578,8 @@ export type WorkspaceTabId =
   | 'agent'
   | 'overview'
   | 'scratchpad'
-  | `view:${string}`
-  | `view-builder:${string}`
+  | `views/${string}`
+  | `view-builders/${string}`
 
 // Open tabs plus the workspace's saved DEFAULT tab. `active` is not live focus
 // state — the live active tab is each browser tab's URL (`/workspace/:id/<tab>`).

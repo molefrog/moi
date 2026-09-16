@@ -139,8 +139,10 @@ describe('loadLayout', () => {
           open: [
             'widgets',
             'bad',
-            'view:dashboard',
-            'view-builder:builder-1',
+            'view:old',
+            'view-builder:old-builder',
+            'views/dashboard',
+            'view-builders/builder-1',
             'widgets',
             'scratchpad'
           ],
@@ -150,7 +152,23 @@ describe('loadLayout', () => {
       async dir => {
         const loaded = await loadLayout(dir)
         expect(loaded.tabs).toEqual({
-          open: ['overview', 'view:dashboard', 'view-builder:builder-1', 'scratchpad'],
+          open: ['overview', 'views/dashboard', 'view-builders/builder-1', 'scratchpad'],
+          active: 'overview'
+        })
+      }
+    )
+  })
+
+  test('falls back to default tabs when only colon-style tabs were saved', async () => {
+    await withWorkspaceFile(
+      {
+        version: 1,
+        widgetGrid: [],
+        tabs: { open: ['view:dashboard', 'view-builder:old'], active: 'view:dashboard' }
+      },
+      async dir => {
+        expect((await loadLayout(dir)).tabs).toEqual({
+          open: ['overview', 'agent', 'scratchpad'],
           active: 'overview'
         })
       }
@@ -163,14 +181,14 @@ describe('loadLayout', () => {
         version: 1,
         widgetGrid: [],
         tabs: {
-          open: ['agent', 'view:dashboard', 'overview', 'scratchpad'],
-          active: 'view:dashboard'
+          open: ['agent', 'views/dashboard', 'overview', 'scratchpad'],
+          active: 'views/dashboard'
         }
       },
       async dir => {
         expect((await loadLayout(dir)).tabs).toEqual({
-          open: ['overview', 'agent', 'view:dashboard', 'scratchpad'],
-          active: 'view:dashboard'
+          open: ['overview', 'agent', 'views/dashboard', 'scratchpad'],
+          active: 'views/dashboard'
         })
       }
     )

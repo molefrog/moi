@@ -315,7 +315,7 @@ describe('composer attachments', () => {
         localId: 'annotation-2',
         label: 'Annotation.png',
         mediaType: 'image/png',
-        source: 'view:roadmap',
+        source: 'views/roadmap',
         status: 'ready',
         upload: { id: 'up-annotation-2', kind: 'image' } as UploadInfo
       }
@@ -327,7 +327,7 @@ describe('composer attachments', () => {
       {
         type: 'upload',
         uploadId: 'up-annotation-2',
-        source: 'view:roadmap',
+        source: 'views/roadmap',
         purpose: 'annotation'
       }
     ])
@@ -340,7 +340,7 @@ describe('composer attachments', () => {
       localId: 'sketch-1',
       label: 'Sketch.png',
       mediaType: 'image/png',
-      source: 'view-builder:draft-1',
+      source: 'view-builders/draft-1',
       status: 'ready',
       upload: { id: 'up-sketch', kind: 'image' } as UploadInfo
     }
@@ -349,7 +349,7 @@ describe('composer attachments', () => {
       {
         type: 'upload',
         uploadId: 'up-sketch',
-        source: 'view-builder:draft-1',
+        source: 'view-builders/draft-1',
         purpose: 'sketch'
       }
     ])

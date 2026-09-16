@@ -7,8 +7,8 @@ Portable addresses identify destinations inside the current workspace:
 - `moi:/views/events?eventId=123`
 
 The host resolves these to `/workspace/<id>/views/events?eventId=123`. Domain and deployment
-prefix belong to the host adapter in `lib/navigation.ts`. Internal tab IDs (`view:events`) and
-persisted layouts are unchanged. Old browser view URLs replace-redirect to the new paths.
+prefix belong to the host adapter in `lib/navigation.ts`. Tab IDs use those same workspace-relative
+paths (`views/events`, `view-builders/abc`), without query strings, including in saved layouts.
 The singleton agent and view-builder tabs remain host-internal routes.
 
 ## One controller

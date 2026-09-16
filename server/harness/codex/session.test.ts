@@ -530,7 +530,7 @@ for (const native of [true, false]) {
     await f.send('', {
       attachments: textAttachments.map(a => ({ type: 'text' as const, ...a })),
       optimisticId: 'context-turn',
-      context: { activeTab: 'view:orders' }
+      context: { activeTab: 'views/orders' }
     })
     const start = f.calls.find(call => call.method === 'turn/start')!
     const sent = start.params.input as Array<{ type: string; text?: string }>

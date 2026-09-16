@@ -12,7 +12,7 @@ const attachments = [
   { source: 'view:orders', label: 'Order #1042', text: 'Order ID: 1042' },
   { label: 'Note', text: 'Context without an applet origin' }
 ]
-const ambient = renderMoiContext({ activeTab: 'view:orders' })
+const ambient = renderMoiContext({ activeTab: 'views/orders' })
 
 describe('durable text attachments', () => {
   for (const text of ['Review this order', '', 'What does <moi-attachments> mean?']) {

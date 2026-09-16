@@ -97,7 +97,7 @@ describe('text staging and sends', () => {
       {
         kind: 'drawing',
         purpose: 'annotation',
-        source: 'view:orders',
+        source: 'views/orders',
         localId: 'image',
         label: 'Annotation.png',
         mediaType: 'image/png',
@@ -117,7 +117,7 @@ describe('text staging and sends', () => {
     expect(prepareDraftAttachments(ready)).toEqual({
       attachments: [
         { type: 'text', ...attachment },
-        { type: 'upload', uploadId: 'up', source: 'view:orders', purpose: 'annotation' }
+        { type: 'upload', uploadId: 'up', source: 'views/orders', purpose: 'annotation' }
       ],
       parts: [
         { type: 'text-attachment', ...attachment },
@@ -126,7 +126,7 @@ describe('text staging and sends', () => {
           label: 'Annotation.png',
           mediaType: 'image/png',
           previewUrl: 'blob:annotation',
-          source: 'view:orders',
+          source: 'views/orders',
           purpose: 'annotation'
         }
       ]
