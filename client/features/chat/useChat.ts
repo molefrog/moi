@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { useSessionConfig, useSessionView, useWorkspaceSessions } from '@/client/features/chat/api'
+import { useSessionConfig, useSessionView, useWorkspaceSessions } from '@/client/features/chat/sessions/api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { useSelectedSession } from '@/client/features/chat/sessions/useSelectedSession'
 import {

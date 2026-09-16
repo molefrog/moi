@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
 import { canSubmitComposerAction } from '@/client/components/shared/Composer'
-import { appletSendBlockedReason } from '@/client/features/chat/useAppletChatMessage'
+import { appletSendBlockedReason } from '@/client/features/chat/applet-chat-intents'
 import type { AgentAvailability } from '@/client/lib/agent-availability'
 
 // An applet message must not start a run the composer's own send button would

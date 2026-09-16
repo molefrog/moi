@@ -10,8 +10,8 @@ import {
   CollapsibleTrigger
 } from '@/client/components/ui/collapsible'
 import { MarkdownContent } from '@/client/features/chat/messages/MarkdownContent'
-import { ToolCallGroup } from '@/client/features/chat/tool-group/ToolCallGroup'
-import { formatDuration } from '@/client/features/chat/tool-group/format'
+import { ToolCallGroup } from '@/client/features/chat/messages/tool-group/ToolCallGroup'
+import { formatDuration } from '@/client/features/chat/messages/tool-group/format'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { cn } from '@/client/lib/cn'
 
