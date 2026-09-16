@@ -22,7 +22,7 @@ import {
   deriveThemeColors
 } from '@/lib/themes'
 import type { AgentTheme, ColorTheme, FontTheme, RadiusTheme } from '@/lib/themes'
-import { isParamsRecord } from '@/lib/workspace-tabs'
+import { parseMoiHref } from '@/lib/navigation'
 import type {
   AppletLogEntry,
   ScratchArrowEnd,
@@ -1844,8 +1844,14 @@ function sendControl(
   onResult: (res: Record<string, unknown>) => void | Promise<void>
 ) {
   const ws = new WebSocket(CONTROL_URL)
-  ws.onopen = () => ws.send(JSON.stringify(payload))
+  let connected = false
+  let responded = false
+  ws.onopen = () => {
+    connected = true
+    ws.send(JSON.stringify(payload))
+  }
   ws.onmessage = async event => {
+    responded = true
     const res = JSON.parse(String(event.data))
     if (res.error) {
       console.error('\n' + pc.red('✗') + ' ' + res.error + '\n')
@@ -1859,6 +1865,14 @@ function sendControl(
     if (notice) console.error('\n' + pc.yellow(notice) + '\n')
     ws.close()
     process.exit(0)
+  }
+  ws.onclose = () => {
+    if (connected && !responded) {
+      console.error(
+        'The server disconnected before acknowledging the command. Check the browser before retrying.'
+      )
+      process.exit(1)
+    }
   }
   ws.onerror = () => void exitControlUnreachable()
 }
@@ -2352,84 +2366,64 @@ const debug = defineCommand({
 
 // The listing behind `moi tabs`: every tab (static + views), one per row, the
 // saved default (`layout.tabs.active`) marked. The
-// output shape is documented in docs/rfc-intents-v2.md §3 — keep them in sync.
+// addresses are documented in docs/navigation.md.
 function runTabsList(dir: string) {
   const path = resolve(dir)
   sendControl(path, { type: 'tabs', path }, res => {
-    type Row = { id: string; title: string; isDefault: boolean }
+    type Row = { title: string; isDefault: boolean; href?: string }
     const rows: Row[] = Array.isArray(res.tabs) ? (res.tabs as Row[]) : []
     console.log(
       '\n' + pc.bold('moi tabs') + pc.dim(' — workspace tabs, the default one marked') + '\n'
     )
     console.log(
       columns(
-        ['', 'tab', 'title'].map(h => pc.dim(h)),
+        ['', 'title', 'address'].map(h => pc.dim(h)),
         rows.map(row => [
           row.isDefault ? pc.green('●') : ' ',
-          row.isDefault ? pc.bold(row.id) : row.id,
-          row.title
+          row.isDefault ? pc.bold(row.title) : row.title,
+          row.href ?? '—'
         ])
       )
     )
-    console.log(
-      '\n' + pc.dim('  Focus one: moi tabs focus <tab-id> [--params \'{"k":"v"}\']') + '\n'
-    )
+    console.log('\n' + pc.dim('  Open one: moi navigate <address>') + '\n')
   })
 }
 
-const tabFocus = defineCommand({
-  meta: { name: 'focus', description: 'Focus a workspace tab in every open client' },
+const navigate = defineCommand({
+  meta: {
+    name: 'navigate',
+    description: 'Navigate the last active browser showing this workspace'
+  },
   args: {
-    tab: {
+    href: {
       type: 'positional',
       required: true,
-      description: 'Tab id from `moi tabs`, e.g. view:orders'
-    },
-    params: {
-      type: 'string',
-      description: 'One JSON object delivered to the view as its params, e.g. \'{"order":"o-1"}\''
+      description: 'Workspace address, e.g. moi:/views/events?eventId=123'
     },
     dir: dirArg
   },
   run({ args }) {
-    const path = resolve(args.dir)
-    let params: Record<string, unknown> | undefined
-    if (args.params !== undefined) {
-      try {
-        const parsed: unknown = JSON.parse(args.params)
-        if (!isParamsRecord(parsed)) throw new Error('not a JSON object')
-        params = parsed
-      } catch {
-        console.error(
-          '\n' + pc.red('✗') + ' --params must be one JSON object, e.g. \'{"order":"o-1"}\'\n'
-        )
-        process.exit(1)
-      }
+    try {
+      parseMoiHref(args.href)
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : 'Invalid workspace address')
+      process.exit(1)
     }
-    sendControl(
-      path,
-      { type: 'tab:focus', path, tab: args.tab, ...(params ? { params } : {}) },
-      res => {
-        console.log('\n' + pc.green('✓') + ' Focused ' + pc.bold(String(res.tab)) + '\n')
-      }
-    )
+    const path = resolve(args.dir)
+    sendControl(path, { type: 'navigate', path, href: args.href }, res => {
+      console.log('\n' + pc.green('✓') + ' Navigated to ' + pc.bold(String(res.href)) + '\n')
+    })
   }
 })
 
-const tabsSubCommands = { focus: tabFocus }
-
 const tabs = defineCommand({
-  meta: {
-    name: 'tabs',
-    description: 'List workspace tabs, or focus one: `moi tabs focus <tab-id>`'
-  },
-  subCommands: tabsSubCommands,
+  meta: { name: 'tabs', description: 'List workspace tabs and their navigation addresses' },
   args: { dir: dirArg },
-  run({ args, rawArgs }) {
-    // citty invokes the parent run even after dispatching a subcommand — only
-    // list when none ran (same pattern as `moi env` / `moi skill`).
-    const sub = rawArgs.find(a => !a.startsWith('-'))
-    if (sub && Object.hasOwn(tabsSubCommands, sub)) return
+  run({ args }) {
+    if (args._.length) {
+      console.error('moi tabs only lists tabs. Use moi navigate <address> to navigate.')
+      process.exit(1)
+    }
     runTabsList(args.dir)
   }
 })
@@ -3047,6 +3041,7 @@ const workspaceCommands = {
   scratch,
   skill,
   tabs,
+  navigate,
   'ui-components': uiComponents
 }
 

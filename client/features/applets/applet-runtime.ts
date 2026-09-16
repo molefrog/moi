@@ -10,7 +10,7 @@
 //
 // Applet calls surface as runtime EVENTS: the bridge validates the untrusted
 // args, then emits, and each host feature subscribes to its own concern with
-// `useAppletEvent` (navigation owns `focusTab`; chat will own `sendChatMessage`)
+// `useAppletEvent` (navigation owns `navigate`; chat will own `sendChatMessage`)
 // — no central handlers object assembled by the screen. Applet → host only;
 // if a host → applet direction is ever added (`moi.on(...)`), `dispose` must
 // also unbind those listeners or a disposed module leaks.
@@ -29,8 +29,9 @@ import { reportAppletError } from '@/client/features/applets/applet-log'
 import { toast } from '@/client/components/ui/toast'
 import { createRateLimiter, type RateLimiter } from '@/client/lib/rate-limit'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
-import type { AppletKind, WorkspaceTabId } from '@/lib/types'
-import { isParamsRecord, isWorkspaceTabId } from '@/lib/workspace-tabs'
+import type { AppletKind } from '@/lib/types'
+import { isParamsRecord } from '@/lib/workspace-tabs'
+import { resolveWorkspaceHref } from '@/lib/navigation'
 
 // Which applet a bridge belongs to, supplied by the host at attach time.
 export type AppletIdentity = { kind: AppletKind; name: string }
@@ -49,10 +50,7 @@ export type AppletChatMessage = {
 // Events a workspace runtime emits — already validated, typed for host code.
 export type AppletEvents = {
   addChatAttachment: (attachment: AttachmentInput & AttachmentOrigin) => void
-  // Client-local replace-navigation to a workspace tab. `params` reach the
-  // target view as its `params` prop via navigation state — JSON-plain only
-  // (history state is structured-cloned).
-  focusTab: (tab: WorkspaceTabId, params?: Record<string, unknown>) => void
+  navigate: (href: string) => void
   // A message for the workspace's active chat, sent as if the user typed
   // `message`, with attachments prepared before the send.
   sendChatMessage: (message: AppletChatMessage) => void
@@ -63,7 +61,8 @@ export type AppletEvents = {
 // them before emitting.
 export type AppletBridge = {
   addChatAttachment: (input: unknown) => void
-  focusTab: (tab: unknown, params?: unknown) => void
+  navigate: (href: unknown) => void
+  resolveHref: (href: unknown) => string
   sendChatMessage: (input: unknown, context?: unknown) => void
 }
 
@@ -125,7 +124,7 @@ function createRuntime(workspaceId: string) {
     // call instead of being emitted — and `dispose` flips the connection dead
     // so a disposed module can never act again. Emitting with no subscribers
     // (workspace screen unmounted) is a no-op by nanoevents semantics.
-    connect(identity: AppletIdentity) {
+    connect(identity: AppletIdentity, base = '') {
       let alive = true
       const source = appletSource(identity)
       const bridge: AppletBridge = {
@@ -140,10 +139,20 @@ function createRuntime(workspaceId: string) {
             drop(identity, `addChatAttachment() was dropped: ${message}`)
           }
         },
-        focusTab(tab, params) {
+        navigate(href) {
           if (!alive) return
-          if (!isWorkspaceTabId(tab)) return
-          emitter.emit('focusTab', tab, isParamsRecord(params) ? params : undefined)
+          try {
+            if (typeof href !== 'string') throw new Error('Navigation requires a URL string')
+            resolveWorkspaceHref(workspaceId, href, base)
+            emitter.emit('navigate', href)
+          } catch (error) {
+            drop(identity, `navigate() was dropped: ${errorMessage(error)}`)
+          }
+        },
+        resolveHref(href) {
+          if (!alive) return ''
+          if (typeof href !== 'string') throw new Error('resolveHref requires a URL string')
+          return resolveWorkspaceHref(workspaceId, href, base)
         },
         sendChatMessage(input, legacyContext) {
           if (!alive) return
@@ -287,14 +296,15 @@ export function attachAppletBridge(
   mod: unknown,
   workspaceId: string,
   key: string,
-  identity: AppletIdentity
+  identity: AppletIdentity,
+  base = ''
 ): void {
   const attach = (mod as BridgeModule).__attachBridge
   if (typeof attach !== 'function') return
   // A key is re-attached only after invalidation disposed it, but never leave
   // a live orphan connection behind if that ordering ever changes.
   connections.get(key)?.()
-  const { bridge, dispose } = appletRuntime(workspaceId).connect(identity)
+  const { bridge, dispose } = appletRuntime(workspaceId).connect(identity, base)
   connections.set(key, dispose)
   attach(bridge)
 }

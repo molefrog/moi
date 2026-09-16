@@ -11,6 +11,7 @@ import { EVENTS_TOPIC, publishEvent, setEventServer } from './events'
 import { killBuildWorkers } from './applets/build-worker'
 import { killAllWorkers } from './functions'
 import { startScratchpadSweeper } from './scratchpad'
+import { navigationRelay } from './navigation-relay'
 import { resolveScratchOp } from './scratchpad-relay'
 import { allHarnesses, harnessFor } from './harness/registry'
 import { getWorkspace } from './registry'
@@ -146,7 +147,12 @@ export const app = Bun.serve<WsData>({
       }
     },
     async message(ws, message) {
-      if (ws.data.channel !== 'chat') return
+      if (ws.data.channel === 'events') {
+        try {
+          navigationRelay.receive(ws, JSON.parse(String(message)))
+        } catch {}
+        return
+      }
       try {
         const data = JSON.parse(String(message))
         if (!isClientMessage(data)) return
@@ -209,7 +215,10 @@ export const app = Bun.serve<WsData>({
     },
     close(ws) {
       if (ws.data.channel === 'chat') removeClient(ws)
-      else ws.unsubscribe(EVENTS_TOPIC)
+      else {
+        navigationRelay.remove(ws)
+        ws.unsubscribe(EVENTS_TOPIC)
+      }
     }
   }
 })

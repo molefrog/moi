@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import type { NavigationRequest } from '@/lib/navigation'
 
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import { wsUrl } from '@/client/lib/ws-url'
@@ -8,8 +9,7 @@ import type {
   HarnessAvailability,
   ViewBuilder,
   ViewInfo,
-  WidgetInfo,
-  WorkspaceTabId
+  WidgetInfo
 } from '@/lib/types'
 
 export type WorkspaceEvent =
@@ -46,14 +46,7 @@ export type WorkspaceEvent =
   // App settings changed (PATCH /api/settings from any client) — carries the
   // new value so caches update without a refetch.
   | { type: 'settings:updated'; settings: AppSettings }
-  // `moi tabs focus` — every open client of `workspaceId` navigates (replace)
-  // to `tab`, delivering `params` to the target view via navigation state.
-  | {
-      type: 'tab:focus'
-      workspaceId: string
-      tab: WorkspaceTabId
-      params?: Record<string, unknown>
-    }
+  | NavigationRequest
 
 type WorkspaceEventHandler = (event: WorkspaceEvent) => void
 
@@ -89,6 +82,7 @@ function ensureConnection() {
     ws = socket
     connecting = false
     reconnectAttempt = 0
+    sendNavigationPresence()
     if (everConnected) for (const handler of reconnectListeners) handler()
     everConnected = true
   }
@@ -141,4 +135,54 @@ export function useWorkspaceEvent(handler: WorkspaceEventHandler) {
       }
     }
   }, [handlerRef])
+}
+
+let navigationWorkspace: string | null = null
+
+function sendNavigationPresence() {
+  if (ws?.readyState !== WebSocket.OPEN) return
+  ws.send(
+    JSON.stringify({
+      type: 'navigation:presence',
+      workspaceId: navigationWorkspace,
+      focused: document.visibilityState === 'visible' && document.hasFocus()
+    })
+  )
+}
+
+// This hook owns presence for the displayed workspace, including reconnects.
+// Requests received after a workspace switch never act on the new workspace.
+export function useNavigationClient(workspaceId: string, navigate: (href: string) => void) {
+  useEffect(() => {
+    navigationWorkspace = workspaceId
+    sendNavigationPresence()
+    window.addEventListener('focus', sendNavigationPresence)
+    document.addEventListener('visibilitychange', sendNavigationPresence)
+    return () => {
+      navigationWorkspace = null
+      sendNavigationPresence()
+      window.removeEventListener('focus', sendNavigationPresence)
+      document.removeEventListener('visibilitychange', sendNavigationPresence)
+    }
+  }, [workspaceId])
+
+  useWorkspaceEvent(event => {
+    if (event.type !== 'navigation:request' || event.workspaceId !== workspaceId) return
+    const socket = ws
+    try {
+      if (navigationWorkspace !== workspaceId) throw new Error('The browser switched workspaces.')
+      navigate(event.href)
+      socket?.send(
+        JSON.stringify({ type: 'navigation:result', requestId: event.requestId, ok: true })
+      )
+    } catch (error) {
+      socket?.send(
+        JSON.stringify({
+          type: 'navigation:result',
+          requestId: event.requestId,
+          error: error instanceof Error ? error.message : 'Navigation failed'
+        })
+      )
+    }
+  })
 }

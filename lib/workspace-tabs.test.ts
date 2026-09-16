@@ -4,7 +4,6 @@ import {
   isParamsRecord,
   isWorkspaceTabId,
   parseWorkspaceTab,
-  readAppletParams,
   viewBuilderIdFromTab,
   viewBuilderTabId,
   viewIdFromTab,
@@ -55,7 +54,7 @@ describe('parseWorkspaceTab', () => {
 
 describe('workspaceTabPath', () => {
   test('builds the tab URL', () => {
-    expect(workspaceTabPath('ws1', 'view:roadmap')).toBe('/workspace/ws1/view:roadmap')
+    expect(workspaceTabPath('ws1', 'view:roadmap')).toBe('/workspace/ws1/views/roadmap')
     expect(workspaceTabPath('ws1', 'agent')).toBe('/workspace/ws1/agent')
   })
 })
@@ -87,20 +86,5 @@ describe('isParamsRecord', () => {
     expect(isParamsRecord('str')).toBe(false)
     expect(isParamsRecord(7)).toBe(false)
     expect(isParamsRecord(undefined)).toBe(false)
-  })
-})
-
-describe('readAppletParams', () => {
-  test('reads params out of navigation state', () => {
-    expect(readAppletParams({ appletParams: { order: 'o-1' } })).toEqual({ order: 'o-1' })
-  })
-
-  test('degrades to {} for anything malformed', () => {
-    expect(readAppletParams(null)).toEqual({})
-    expect(readAppletParams(undefined)).toEqual({})
-    expect(readAppletParams({})).toEqual({})
-    expect(readAppletParams({ appletParams: [1] })).toEqual({})
-    expect(readAppletParams({ appletParams: 'x' })).toEqual({})
-    expect(readAppletParams('state')).toEqual({})
   })
 })

@@ -3,57 +3,59 @@
 Intents let an applet act beyond its own UI: open another view, add context to chat, or ask the
 agent to do something. Import these functions from `moi` and call them from user event handlers,
 such as a button click; moi handles the action in the workspace.
+Action functions return `void`; `resolveHref` returns a browser href. moi identifies the source
+applet automatically for chat actions. For rejected chat intents, inspect `moi debug logs`.
 
-## `focusTab(tab, params?)`
+## Navigation: `navigate(href)` and `resolveHref(href)`
 
-Use this to take the user to another workspace tab or view, optionally passing params.
-No chat message is sent. Widgets cannot be navigation targets; their `params` is always `{}`.
-
-### API
+Use the shared [workspace navigation convention](../SKILL.md#workspace-navigation) for addresses
+and query params. Applets navigate through these functions:
 
 ```ts
-function focusTab(tab: string, params?: Record<string, unknown>): void
+function navigate(href: string): void
+function resolveHref(href: string): string
 ```
 
-- `tab`: required workspace tab id. Use `overview`, `scratchpad`, or `view:<id>`.
-  Run `moi tabs` to discover available tabs.
-- `params`: optional JSON object describing the target view's addressable state. It arrives
-  through that view's `params` prop.
-
-### Example
-
 ```tsx
-import { focusTab } from 'moi'
+import { navigate, resolveHref } from 'moi'
 
-<button onClick={() => focusTab('view:orders', { order: 'o-1024' })}>
-  Open order
-</button>
+const query = new URLSearchParams({ order: 'o-1024' })
+const href = `moi:/views/orders?${query}`
+
+// Prefer anchors for links: copy, middle-click, and new browser tabs work.
+<a href={resolveHref(href)}>Open order</a>
+
+// Use the same address from an event handler.
+<button onClick={() => navigate(href)}>Open order</button>
 ```
 
-### View params contract
+### View params and history
 
-A view with addressable state declares a local `Params` type in its own file. Every field is
-optional and carries a comment, because the view must render sensibly with `{}` — a fresh mount, a
-plain tab-bar click, or a new browser tab all deliver nothing. Keep `params` small and JSON-serializable, since browser history copies them without preserving object identity.
+The host passes query values to the view's `params` prop. Missing keys are absent. Decode numbers
+and booleans explicitly, and render sensibly with empty params.
 
 ```tsx
-// .moi/views/orders.tsx
-// The view's addressable state — what `focusTab('view:orders', …)` can set.
 type Params = {
-  // Order id to open in the detail pane; omit to show the list.
+  // Order id to open; omit to show the list.
   order?: string
 }
+type OrdersProps = { params?: Params }
 
-export default function Orders({ params = {} }: { params?: Params }) {
-  // Values arrive from navigation state, so narrow before trusting them.
-  const openOrder = typeof params.order === 'string' ? params.order : null
-  …
+export default function Orders({ params = {} }: OrdersProps) {
+  const selectedOrder = params.order ?? null
+  return <button onClick={() => navigate('moi:/views/orders')}>Close order</button>
 }
 ```
 
-**Applets never import from each other, not even types.** Before wiring a `focusTab` call, read the
-target view's source, mirror the shape you find there, and note where you read it. That file is the
-contract; the type is documentation, not a shared module.
+See [Views](../SKILL.md#views) for which state belongs in the URL.
+
+Normal navigation adds browser history. Back, Forward, reload, and copied links restore the address.
+Tab clicks restore each tab's last address in browser memory. An explicit root link clears params.
+Inactive views keep their own params. Widgets receive no params.
+
+**Applets never import from each other, not even types.**
+
+`resolveHref` preserves HTTP(S) URLs. Native external links keep their normal browser behavior.
 
 ## `addChatAttachment(input)`
 

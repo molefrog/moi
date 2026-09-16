@@ -54,7 +54,7 @@ export type MoiContext = {
   // back to the id when unset; so does the envelope.
   tabTitle?: string
   // The params the active view is rendering with right now, straight from
-  // navigation state. The emitter side of the same contract (`focusTab`) sets
+  // URL query strings. The emitter side of the same contract (`navigate`) sets
   // them, so the agent sees a view's addressable state in both directions.
   // Absent for tabs that take no params (overview, scratchpad, agent).
   tabParams?: Record<string, unknown>

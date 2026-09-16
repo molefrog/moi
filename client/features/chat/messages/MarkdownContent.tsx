@@ -1,9 +1,12 @@
 import type { ComponentProps } from 'react'
+import { useRouter } from 'wouter'
 
-import ReactMarkdown, { type ExtraProps } from 'react-markdown'
+import ReactMarkdown, { defaultUrlTransform, type ExtraProps } from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 
+import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
+import { resolveWorkspaceHref } from '@/lib/navigation'
 import { cn } from '@/client/lib/cn'
 
 const remarkPlugins = [remarkGfm]
@@ -44,6 +47,8 @@ type PlainMarkdownTextProps = {
 }
 
 export function MarkdownContent({ size = 'sm', content }: MarkdownContentProps) {
+  const workspaceId = useWorkspaceId()
+  const { base } = useRouter()
   return (
     <div
       className={cn(
@@ -55,6 +60,16 @@ export function MarkdownContent({ size = 'sm', content }: MarkdownContentProps) 
         remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePlugins}
         components={components}
+        urlTransform={(url, key, node) => {
+          if (node.tagName === 'a' && key === 'href' && url.startsWith('moi:')) {
+            try {
+              return resolveWorkspaceHref(workspaceId, url, base)
+            } catch {
+              return ''
+            }
+          }
+          return defaultUrlTransform(url)
+        }}
       >
         {content}
       </ReactMarkdown>
