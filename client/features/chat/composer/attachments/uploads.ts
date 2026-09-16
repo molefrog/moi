@@ -1,41 +1,26 @@
+import { jsonRequest, requestJson } from '@/client/api/http'
 import type { UploadInfo } from '@/lib/types'
 
-// POST one or more files to a workspace's upload endpoint and return the server's
-// `UploadInfo` for each (in request order). The chat composer calls this as soon
-// as files are added (drop/paste/pick) so the upload ids are ready by send time.
-export async function uploadFiles(workspaceId: string, files: File[]): Promise<UploadInfo[]> {
-  const form = new FormData()
-  for (const f of files) form.append('files', f)
-  const res = await fetch(`/api/workspaces/${workspaceId}/uploads`, {
-    method: 'POST',
-    body: form
-  })
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '')
-    throw new Error(detail || `Upload failed (${res.status})`)
-  }
-  return res.json()
-}
-
-export async function uploadWorkspaceFile(workspaceId: string, path: string): Promise<UploadInfo> {
-  const res = await fetch(`/api/workspaces/${workspaceId}/uploads/from-path`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path })
-  })
-  if (!res.ok) throw new Error(await res.text().catch(() => `Upload failed (${res.status})`))
-  return res.json()
-}
-
-// Shared preparation for draft attachments and immediate applet sends.
+// Shared single-file preparation for drafts, drawings, and immediate sends.
 export async function uploadChatFile(
   workspaceId: string,
   input: File | string
 ): Promise<UploadInfo> {
-  const upload =
-    typeof input === 'string'
-      ? await uploadWorkspaceFile(workspaceId, input)
-      : (await uploadFiles(workspaceId, [input]))[0]
+  const url = `/api/workspaces/${workspaceId}/uploads`
+  if (typeof input === 'string') {
+    return requestJson<UploadInfo>(
+      `${url}/from-path`,
+      jsonRequest('POST', { path: input }),
+      'Upload failed'
+    )
+  }
+  const form = new FormData()
+  form.append('files', input)
+  const [upload] = await requestJson<UploadInfo[]>(
+    url,
+    { method: 'POST', body: form },
+    'Upload failed'
+  )
   if (!upload) throw new Error('Upload returned no file')
   return upload
 }

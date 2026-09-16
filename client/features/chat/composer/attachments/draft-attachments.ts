@@ -1,9 +1,9 @@
 import type { TextAttachment } from '@/lib/types'
 import type { WorkspaceTabId } from '@/lib/types'
 
-import { attachmentKey, liveStore } from '../../chat-store'
+import { attachmentKey, findAttachment, liveStore } from '../../chat-store'
 import type { DrawingPurpose } from './types'
-import { uploadFiles, uploadChatFile } from './uploads'
+import { uploadChatFile } from './uploads'
 import type { AppletChatAttachment } from '@/client/features/applets/applet-runtime'
 import { reportAppletError } from '@/client/features/applets/applet-log'
 import { toast } from '@/client/components/ui/toast'
@@ -93,11 +93,7 @@ export function stageDrawingDraft({
   const label = purpose === 'sketch' ? 'Sketch' : 'Annotation'
   const previewUrl = URL.createObjectURL(blob)
   const store = liveStore.getState()
-  const existing = Object.entries(store.attachments).some(
-    ([key, attachments]) =>
-      key.startsWith(`${workspaceId}:`) &&
-      attachments.some(attachment => attachment.localId === localId)
-  )
+  const existing = findAttachment(store.attachments, workspaceId, localId)
 
   if (existing) {
     store.updateAttachment(workspaceId, localId, {
@@ -128,49 +124,17 @@ type StageDrawingInput = StageDrawingDraftInput & {
 // Upload a drawing once its editing session ends (finish, send, or an
 // implicit cancel that keeps the attachment). `isCurrent` guards the result:
 // a stale upload must not resurrect an attachment the user has removed.
-export async function stageDrawing({
-  workspaceId,
-  sessionId,
-  localId,
-  purpose,
-  sourceTab,
-  blob,
-  isCurrent
-}: StageDrawingInput): Promise<void> {
+export async function stageDrawing(input: StageDrawingInput): Promise<void> {
+  const { workspaceId, localId, purpose, blob, isCurrent } = input
   const label = purpose === 'sketch' ? 'Sketch' : 'Annotation'
-  const previewUrl = URL.createObjectURL(blob)
-  const store = liveStore.getState()
-  const existing = Object.entries(store.attachments).some(
-    ([key, attachments]) =>
-      key.startsWith(`${workspaceId}:`) &&
-      attachments.some(attachment => attachment.localId === localId)
-  )
-
-  if (existing) {
-    store.updateAttachment(workspaceId, localId, {
-      previewUrl,
-      status: 'uploading',
-      upload: undefined
-    })
-  } else {
-    store.addAttachments(workspaceId, sessionId, [
-      {
-        kind: 'drawing',
-        purpose,
-        localId,
-        sourceTab,
-        name: `${label}.png`,
-        mediaType: 'image/png',
-        previewUrl,
-        status: 'uploading'
-      }
-    ])
-  }
+  stageDrawingDraft(input)
+  liveStore.getState().updateAttachment(workspaceId, localId, { status: 'uploading' })
 
   try {
-    const [upload] = await uploadFiles(workspaceId, [
+    const upload = await uploadChatFile(
+      workspaceId,
       new File([blob], `${label}.png`, { type: 'image/png' })
-    ])
+    )
     if (!isCurrent()) return
     liveStore.getState().updateAttachment(workspaceId, localId, {
       status: 'ready',

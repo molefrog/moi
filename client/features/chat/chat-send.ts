@@ -1,4 +1,4 @@
-import type { MessageAttachment } from '@/lib/types'
+import type { MessageAttachment, TextAttachment, UploadInfo } from '@/lib/types'
 import type { AppletChatAttachment } from '@/client/features/applets/applet-runtime'
 import { uploadChatFile } from './composer/attachments/uploads'
 import { textAttachmentParts } from '@/lib/moi-attachments'
@@ -24,32 +24,68 @@ export type ChatSendOptions = MoiUserMessageOptions & {
   preparedAttachments?: PreparedChatAttachments
 }
 
+// Both send paths derive the wire reference and optimistic display together.
+function prepareAttachment(
+  input: TextAttachment | UploadInfo,
+  previewUrl = ''
+): { attachment: MessageAttachment; part: Part } {
+  if ('id' in input) {
+    return {
+      attachment: { type: 'upload', uploadId: input.id },
+      part: {
+        type: 'file-attachment',
+        mediaType: input.mediaType,
+        filename: input.filename,
+        url: input.kind === 'image' ? previewUrl : ''
+      }
+    }
+  }
+  const { source, label, text } = input
+  return {
+    attachment: { type: 'text', source, label, text },
+    part: textAttachmentParts([input])[0]
+  }
+}
+
+function collectPreparedAttachments(
+  items: ReturnType<typeof prepareAttachment>[]
+): PreparedChatAttachments {
+  return {
+    attachments: items.map(item => item.attachment),
+    parts: items.map(item => item.part)
+  }
+}
+
 export async function prepareChatAttachments(
   workspaceId: string,
   inputs: readonly AppletChatAttachment[]
 ): Promise<PreparedChatAttachments> {
-  const prepared = await Promise.all(
-    inputs.map(async input => {
-      if (input.type === 'text') {
-        const { source, label, text } = input
-        const attachment: MessageAttachment = { type: 'text', source, label, text }
-        return { attachment, part: textAttachmentParts([attachment])[0] }
-      }
-      const upload = await uploadChatFile(workspaceId, input.file ?? input.path)
-      const attachment: MessageAttachment = { type: 'upload', uploadId: upload.id }
-      const part: Part = {
-        type: 'file-attachment',
-        mediaType: upload.mediaType,
-        filename: upload.filename,
-        url: upload.kind === 'image' ? `/api/workspaces/${workspaceId}/uploads/${upload.id}` : ''
-      }
-      return { attachment, part }
+  return collectPreparedAttachments(
+    await Promise.all(
+      inputs.map(async input => {
+        if (input.type === 'text') return prepareAttachment(input)
+        const upload = await uploadChatFile(workspaceId, input.file ?? input.path)
+        return prepareAttachment(upload, `/api/workspaces/${workspaceId}/uploads/${upload.id}`)
+      })
+    )
+  )
+}
+
+export function prepareDraftAttachments(
+  attachments: readonly ChatAttachment[]
+): PreparedChatAttachments {
+  return collectPreparedAttachments(
+    attachments.flatMap(attachment => {
+      if (attachment.kind === 'text') return [prepareAttachment(attachment.attachment)]
+      if (!attachment.upload) return []
+      return [
+        prepareAttachment(
+          { ...attachment.upload, filename: attachment.name, mediaType: attachment.mediaType },
+          attachment.previewUrl
+        )
+      ]
     })
   )
-  return {
-    attachments: prepared.map(item => item.attachment),
-    parts: prepared.map(item => item.part)
-  }
 }
 
 // Whether this send owns what the user has staged in the composer. Only a send
@@ -70,26 +106,6 @@ export function attachmentsForSend(
   if (!ownsComposerAttachments(options)) return []
   const pending = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)] ?? []
   return pending.filter(a => a.kind === 'text' || (a.status === 'ready' && a.upload))
-}
-
-export function attachmentPartsForOptimisticTurn(attachments: readonly ChatAttachment[]): Part[] {
-  return attachments.map(attachment => {
-    if (attachment.kind === 'text') return textAttachmentParts([attachment.attachment])[0]
-    if (attachment.upload?.kind === 'image' && attachment.previewUrl) {
-      return {
-        type: 'file-attachment',
-        mediaType: attachment.mediaType,
-        url: attachment.previewUrl,
-        filename: attachment.name
-      }
-    }
-    return {
-      type: 'file-attachment',
-      mediaType: attachment.mediaType,
-      url: '',
-      filename: attachment.name
-    }
-  })
 }
 
 export function withAttachmentDirectives(
@@ -219,13 +235,4 @@ export function resolveChatRunOptions(
     ...(fastMode !== undefined ? { fastMode } : {}),
     stream
   }
-}
-
-export function messageAttachmentsForSend(
-  attachments: readonly ChatAttachment[]
-): MessageAttachment[] {
-  return attachments.flatMap<MessageAttachment>(attachment => {
-    if (attachment.kind === 'text') return [{ type: 'text', ...attachment.attachment }]
-    return attachment.upload ? [{ type: 'upload', uploadId: attachment.upload.id }] : []
-  })
 }

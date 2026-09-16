@@ -14,7 +14,7 @@ export function FileAttachmentChip({ attachment, onRemove }: FileAttachmentChipP
       icon={IconFile}
       onRemove={onRemove}
       previewUrl={attachment.previewUrl}
-      status={attachment.status}
+      loading={attachment.status === 'uploading'}
       title={attachment.name}
       className="max-w-52"
     />

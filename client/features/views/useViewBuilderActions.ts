@@ -1,9 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query'
 
 import {
-  attachmentPartsForOptimisticTurn,
+  prepareDraftAttachments,
   attachmentsForSend,
-  messageAttachmentsForSend,
   resolveChatRunOptions,
   startOptimisticSession,
   startOptimisticTurn
@@ -47,7 +46,8 @@ export function useViewBuilderActions() {
       text,
       filenames: attachments.map(attachment => attachment.name)
     })
-    const parts = attachmentPartsForOptimisticTurn(attachments)
+    const prepared = prepareDraftAttachments(attachments)
+    const parts = [...prepared.parts]
     if (text) parts.push({ type: 'text', text })
 
     const optimisticId = startOptimisticTurn({
@@ -72,7 +72,7 @@ export function useViewBuilderActions() {
         optimisticId,
         ...(attachments.length > 0
           ? {
-              attachments: messageAttachmentsForSend(attachments)
+              attachments: prepared.attachments
             }
           : {}),
         model,

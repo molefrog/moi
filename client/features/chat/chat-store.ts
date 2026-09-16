@@ -119,6 +119,19 @@ export type LiveStore = {
   sweepPreviews: (maxAgeMs: number, now: number) => void
 }
 
+// Stable IDs keep asynchronous attachment work attached to a renamed session.
+export function findAttachment(
+  attachments: LiveStore['attachments'],
+  workspaceId: string,
+  localId: string
+) {
+  for (const [key, items] of Object.entries(attachments)) {
+    if (!key.startsWith(`${workspaceId}:`)) continue
+    const attachment = items.find(item => item.localId === localId)
+    if (attachment) return { key, attachment }
+  }
+}
+
 export const liveStore = createStore<LiveStore>()(set => ({
   activity: {},
   errors: {},
@@ -189,15 +202,11 @@ export const liveStore = createStore<LiveStore>()(set => ({
 
   updateAttachment: (workspaceId, localId, patch) =>
     set(s => {
-      const k = Object.keys(s.attachments).find(
-        k => k.startsWith(`${workspaceId}:`) && s.attachments[k].some(a => a.localId === localId)
-      )
-      if (!k) return {}
+      const found = findAttachment(s.attachments, workspaceId, localId)
+      if (!found) return {}
+      const { key: k, attachment: target } = found
       const list = s.attachments[k]
-      if (!list) return {}
-      const target = list.find(attachment => attachment.localId === localId)
       if (
-        target &&
         target.kind !== 'text' &&
         target.previewUrl &&
         'previewUrl' in patch &&
@@ -215,15 +224,11 @@ export const liveStore = createStore<LiveStore>()(set => ({
 
   removeAttachment: (workspaceId, localId) =>
     set(s => {
-      const k = Object.keys(s.attachments).find(
-        k => k.startsWith(`${workspaceId}:`) && s.attachments[k].some(a => a.localId === localId)
-      )
-      if (!k) return {}
+      const found = findAttachment(s.attachments, workspaceId, localId)
+      if (!found) return {}
+      const { key: k, attachment: target } = found
       const list = s.attachments[k]
-      if (!list) return {}
-      const target = list.find(a => a.localId === localId)
-      if (target && target.kind !== 'text' && target.previewUrl)
-        URL.revokeObjectURL(target.previewUrl)
+      if (target.kind !== 'text' && target.previewUrl) URL.revokeObjectURL(target.previewUrl)
       return { attachments: { ...s.attachments, [k]: list.filter(a => a.localId !== localId) } }
     }),
 

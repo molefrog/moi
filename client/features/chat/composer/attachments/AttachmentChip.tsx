@@ -8,7 +8,7 @@ type AttachmentChipProps = ComponentPropsWithRef<'div'> & {
   icon: Icon
   onRemove?: () => void
   previewUrl?: string
-  status?: 'draft' | 'uploading' | 'ready'
+  loading?: boolean
 }
 
 // Two layouts share one frame: a labelled chip or an image thumbnail.
@@ -18,7 +18,7 @@ export function AttachmentChip({
   icon,
   onRemove,
   previewUrl,
-  status,
+  loading,
   className,
   children,
   ...props
@@ -32,24 +32,24 @@ export function AttachmentChip({
         className
       )}
     >
+      {loading && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-background/70">
+          <IconLoader2 size={16} stroke={1.75} className="animate-spin text-muted-foreground" />
+        </div>
+      )}
       {previewUrl ? (
-        <ImageChipContent
-          label={label}
-          previewUrl={previewUrl}
-          onRemove={onRemove}
-          status={status}
-        />
+        <ImageChipContent label={label} previewUrl={previewUrl} onRemove={onRemove} />
       ) : (
-        <LabelChipContent label={label} icon={icon} onRemove={onRemove} status={status} />
+        <LabelChipContent label={label} icon={icon} onRemove={onRemove} />
       )}
       {children}
     </div>
   )
 }
 
-type LabelChipContentProps = Pick<AttachmentChipProps, 'label' | 'icon' | 'onRemove' | 'status'>
+type LabelChipContentProps = Pick<AttachmentChipProps, 'label' | 'icon' | 'onRemove'>
 
-function LabelChipContent({ label, icon: IconComponent, onRemove, status }: LabelChipContentProps) {
+function LabelChipContent({ label, icon: IconComponent, onRemove }: LabelChipContentProps) {
   return (
     <>
       {onRemove ? (
@@ -70,20 +70,18 @@ function LabelChipContent({ label, icon: IconComponent, onRemove, status }: Labe
         </span>
       )}
       <span className="truncate">{label}</span>
-      <ChipUploadStatus status={status} />
     </>
   )
 }
 
-type ImageChipContentProps = Pick<AttachmentChipProps, 'label' | 'onRemove' | 'status'> & {
+type ImageChipContentProps = Pick<AttachmentChipProps, 'label' | 'onRemove'> & {
   previewUrl: string
 }
 
-function ImageChipContent({ label, previewUrl, onRemove, status }: ImageChipContentProps) {
+function ImageChipContent({ label, previewUrl, onRemove }: ImageChipContentProps) {
   return (
     <>
       <img src={previewUrl} alt={label} className="size-full object-cover" />
-      <ChipUploadStatus status={status} />
       {onRemove && (
         <Button
           type="button"
@@ -98,17 +96,4 @@ function ImageChipContent({ label, previewUrl, onRemove, status }: ImageChipCont
       )}
     </>
   )
-}
-
-type ChipUploadStatusProps = Pick<AttachmentChipProps, 'status'>
-
-function ChipUploadStatus({ status }: ChipUploadStatusProps) {
-  if (status === 'uploading') {
-    return (
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-background/70">
-        <IconLoader2 size={16} stroke={1.75} className="animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-  return null
 }

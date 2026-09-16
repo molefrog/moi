@@ -1,4 +1,3 @@
-import { messageAttachmentsForSend } from './chat-send'
 import { useCallback, useEffect, useMemo } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
@@ -20,7 +19,7 @@ import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayo
 import { sendMessage } from '@/client/features/chat/connection/chat-connection'
 import {
   type ChatSendOptions,
-  attachmentPartsForOptimisticTurn,
+  prepareDraftAttachments,
   attachmentsForSend,
   ownsComposerAttachments,
   resolveChatRunOptions,
@@ -137,9 +136,8 @@ export function useChat(address: WorkspaceTabAddress) {
       // upserts in place rather than duplicating. Image attachments render from
       // their local object URL until the server's broadcast (with a data URL)
       // upserts in place.
-      const parts: Part[] = options?.preparedAttachments
-        ? [...options.preparedAttachments.parts]
-        : attachmentPartsForOptimisticTurn(ready)
+      const prepared = options?.preparedAttachments ?? prepareDraftAttachments(ready)
+      const parts: Part[] = [...prepared.parts]
       if (text) parts.push({ type: 'text', text })
       const optimisticId = startOptimisticTurn({
         queryClient: qc,
@@ -161,8 +159,7 @@ export function useChat(address: WorkspaceTabAddress) {
         pickedEffort,
         pickedFastMode
       )
-      const attachments =
-        options?.preparedAttachments?.attachments ?? messageAttachmentsForSend(ready)
+      const { attachments } = prepared
       sendMessage({
         type: 'chat',
         workspaceId,
