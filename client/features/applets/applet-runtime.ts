@@ -120,7 +120,7 @@ function createRuntime(workspaceId: string) {
       return emitter.on(event, cb)
     },
     // One connection per loaded module instance. The bridge validates every
-    // call — a malformed tab id or params shape from applet code drops the
+    // call — a malformed address or chat input from applet code drops the
     // call instead of being emitted — and `dispose` flips the connection dead
     // so a disposed module can never act again. Emitting with no subscribers
     // (workspace screen unmounted) is a no-op by nanoevents semantics.

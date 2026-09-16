@@ -4,6 +4,7 @@ import { resolve } from 'path'
 import { parseAppletSelector } from '@/lib/applet-selector'
 import { resolveWorkspaceTheme } from '@/lib/themes'
 import type { WorkspaceEntry } from '@/lib/types'
+import { moiHref, parseMoiHref } from '@/lib/navigation'
 import { navigationRelay } from './navigation-relay'
 
 import { clearAppletLog, getAppletLog, getAppletLogCount } from './applet-log'
@@ -19,7 +20,7 @@ import { executeScratchOp } from './scratchpad-executor'
 import { readScratchpadImage, readScratchpadShapes } from './scratchpad'
 import { relayScratchOp } from './scratchpad-relay'
 import { broadcastAll } from './state'
-import { assembleTabRows, resolveNavigation } from './tabs'
+import { assembleTabRows } from './tabs'
 import { applyThemeUpdate } from './theme'
 import { handleBundle } from './widgets'
 import { getViewList, handleBundleViews, hasViewId } from './views'
@@ -315,16 +316,11 @@ export const control = Bun.serve({
         if (data.type === 'navigate') {
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
-          const resolved = await resolveNavigation(data.href, {
-            hasView: viewId => hasViewId(match.path, viewId)
-          })
-          if (!resolved.ok) {
-            ws.send(JSON.stringify({ error: resolved.error }))
-            return
-          }
           try {
-            await navigationRelay.navigate(match.id, resolved.href)
-            ws.send(JSON.stringify({ ok: true, href: resolved.href }))
+            const address = parseMoiHref(data.href)
+            const href = moiHref(address.tab, address.search)
+            await navigationRelay.navigate(match.id, href)
+            ws.send(JSON.stringify({ ok: true, href }))
           } catch (error) {
             ws.send(
               JSON.stringify({
