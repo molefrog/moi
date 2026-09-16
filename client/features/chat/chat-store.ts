@@ -107,7 +107,8 @@ export type LiveStore = {
   ) => void
   removeAttachment: (workspaceId: string, sessionId: string | null, localId: string) => void
   clearAttachments: (workspaceId: string, sessionId: string | null) => void
-  renameSession: (workspaceId: string, from: string, to: string) => void
+  // `null` assigns the new-chat draft its first session id.
+  renameSession: (workspaceId: string, from: string | null, to: string) => void
 
   // Upsert a preview snapshot (last write wins — blocks are cumulative).
   setPreview: (frame: Omit<PreviewFrame, 'type'>) => void
@@ -240,7 +241,7 @@ export const liveStore = createStore<LiveStore>()(set => ({
 
   renameSession: (workspaceId, from, to) =>
     set(s => {
-      const fromKey = key(workspaceId, from)
+      const fromKey = attachmentKey(workspaceId, from)
       const toKey = key(workspaceId, to)
       const activity = { ...s.activity }
       const errors = { ...s.errors }
@@ -265,15 +266,15 @@ export const liveStore = createStore<LiveStore>()(set => ({
           previews[id] = { ...p, sessionId: to }
         }
       }
-      // Context has no in-flight upload callbacks bound to the old id.
-      // Move staged context when the provider assigns the chat its real id.
+      // Context can follow session id changes immediately. Upload callbacks
+      // still target their original session id, so leave uploads in place.
       let attachments = s.attachments
-      const contexts = s.attachments[fromKey]?.filter(a => a.kind === 'context') ?? []
+      const contexts = attachments[fromKey]?.filter(a => a.kind === 'context') ?? []
       if (fromKey !== toKey && contexts.length) {
         attachments = {
-          ...s.attachments,
-          [fromKey]: s.attachments[fromKey].filter(a => a.kind !== 'context'),
-          [toKey]: [...(s.attachments[toKey] ?? []), ...contexts]
+          ...attachments,
+          [fromKey]: attachments[fromKey].filter(a => a.kind !== 'context'),
+          [toKey]: [...(attachments[toKey] ?? []), ...contexts]
         }
       }
       return { activity, errors, previews, attachments }

@@ -118,6 +118,10 @@ export function useChat(address: WorkspaceTabAddress) {
       if (!sid) {
         sid = crypto.randomUUID()
         isNew = true
+        // An immediate applet send leaves the user's context staged in this chat.
+        if (!ownsComposerAttachments(options)) {
+          liveStore.getState().renameSession(workspaceId, selectedSessionId, sid)
+        }
         selectSession(sid)
         startOptimisticSession({
           queryClient: qc,

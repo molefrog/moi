@@ -11,7 +11,7 @@ const attachments = [{ source: 'view:orders', label: 'Order #1042', context: { o
 const ambient = renderMoiContext({ activeTab: 'view:orders' })
 
 describe('durable context attachments', () => {
-  for (const text of ['Review this order', '']) {
+  for (const text of ['Review this order', '', 'What does <moi-attachments> mean?']) {
     test(`replays the same display parts across all harnesses: ${text || 'context only'}`, () => {
       const raw = appendContextAttachments(text, attachments)
       const expected = [

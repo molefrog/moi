@@ -87,8 +87,10 @@ export function splitContextAttachments(text: string): {
   attachments: ContextAttachment[]
 } {
   const attachments: ContextAttachment[] = []
+  // Serialized JSON escapes '<', so a candidate cannot span another opening
+  // tag. A literal tag in the user's text must not swallow the saved block.
   const cleaned = text.replace(
-    /<moi-attachments>\s*([\s\S]*?)\s*<\/moi-attachments>/g,
+    /<moi-attachments>([^<]*)<\/moi-attachments>/g,
     (block: string, json: string) => {
       try {
         const parsed: unknown = JSON.parse(json)

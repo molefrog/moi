@@ -56,6 +56,27 @@ describe('context staging and sends', () => {
     expect(attachmentsForSend(workspaceId, 'renamed')).toHaveLength(1)
   })
 
+  test('an immediate send keeps new-chat context staged through both session id changes', () => {
+    stageChatContext(target, attachment)
+    stageChatContext(target, { ...attachment, label: 'Another order' })
+    stageChatContext({ workspaceId, sessionId: 'other' }, { ...attachment, label: 'Other chat' })
+    const staged = attachmentsForSend(workspaceId, null)
+    const options = { applet: { source: 'view:orders' } }
+
+    expect(attachmentsForSend(workspaceId, null, options)).toEqual([])
+    liveStore.getState().renameSession(workspaceId, null, 'temporary')
+    expect(attachmentsForSend(workspaceId, null)).toEqual([])
+    expect(attachmentsForSend(workspaceId, 'temporary')).toEqual(staged)
+    expect(attachmentsForSend(workspaceId, 'temporary', options)).toEqual([])
+
+    liveStore.getState().renameSession(workspaceId, 'temporary', 'real')
+    expect(attachmentsForSend(workspaceId, 'temporary')).toEqual([])
+    expect(attachmentsForSend(workspaceId, 'real')).toEqual(staged)
+    liveStore.getState().clearAttachments(workspaceId, 'real')
+    expect(attachmentsForSend(workspaceId, 'real')).toEqual([])
+    expect(attachmentsForSend(workspaceId, 'other')[0].name).toBe('Other chat')
+  })
+
   test('sends context with uploads without changing annotation image positions', () => {
     stageChatContext(target, attachment)
     liveStore.getState().addAttachments(workspaceId, null, [

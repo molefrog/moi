@@ -78,6 +78,20 @@ describe('context attachments', () => {
     }
   })
 
+  test('a literal or malformed opening tag does not hide a later attachment block', () => {
+    for (const text of [
+      'What does <moi-attachments> mean?',
+      '<moi-attachments>broken',
+      '<moi-attachments>broken</moi-attachments>',
+      '<moi-attachments>{"version":2,"attachments":[]}</moi-attachments>'
+    ]) {
+      expect(splitContextAttachments(appendContextAttachments(text, [attachment]))).toEqual({
+        text,
+        attachments: [attachment]
+      })
+    }
+  })
+
   test('coexists with file notes and hides metadata from truncated previews', () => {
     const files = [{ filename: 'notes.txt', path: '/tmp/notes.txt' }]
     const wire = appendAttachmentNote(appendContextAttachments('Review', [attachment]), files)
