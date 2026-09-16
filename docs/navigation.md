@@ -34,14 +34,15 @@ and shows recovery to Overview. `fileUrl()` remains the resource URL API.
 
 ## CLI transport
 
-`moi tabs` lists addresses. `moi navigate <address>` validates the destination, then
+`moi tabs` lists addresses. `moi navigate <address>` validates the address format, then
 uses the existing events WebSocket to address one browser. Each browser reports its displayed
 workspace and focus. Server arrival order chooses the most recently focused connected browser
 showing that workspace, even after focus moves to a terminal. A sole client needs no focus record;
 multiple clients without a focus record require the user to focus one first.
 
-The browser acknowledges after applying the URL, without waiting for view data. Only the addressed
-socket may settle its request. Disconnects and workspace switches fail pending requests. The
+The browser checks that the destination exists and acknowledges after applying the URL, without
+waiting for view data. Only the addressed socket may settle its request.
+Disconnects and workspace switches fail pending requests. The
 five-second timeout does not retry: navigation may already have happened.
 
 ## Migration

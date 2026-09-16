@@ -21,10 +21,8 @@ describe('workspace addresses', () => {
     )
     expect(resolveWorkspaceHref('abc', href)).toBe('/workspace/abc/views/events?eventId=123')
   })
-  test('view filenames with dots, Unicode, and encoded spaces remain addressable', () => {
-    expect(parseMoiHref('moi:/views/my.events').tab).toBe('view:my.events')
-    expect(parseMoiHref('moi:/views/Gr%C3%BC%C3%9Fe%20events').tab).toBe('view:Grüße events')
-    expect(tabPath('view:Grüße events')).toBe('views/Gr%C3%BC%C3%9Fe%20events')
+  test('accepts encoded IDs supported by the applet server', () => {
+    expect(parseMoiHref('moi:/views/%65vents_2026-09').tab).toBe('view:events_2026-09')
   })
 
   test('query values remain strings and follow URLSearchParams.get semantics', () => {
@@ -50,6 +48,9 @@ describe('workspace addresses', () => {
       'moi:/views/a/b',
       'moi:/views/%2f',
       'moi:/views/%',
+      'moi:/views/100%25',
+      'moi:/views/my.events',
+      'moi:/views/Gr%C3%BC%C3%9Fe%20events',
       'moi:/views/../overview',
       'moi:/views/a#part',
       'moi:/agent',

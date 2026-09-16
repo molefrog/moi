@@ -41,13 +41,11 @@ export function tabPath(tab: WorkspaceTabId): string {
 
 export function tabFromPath(path: string): WorkspaceTabId | null {
   if (path === 'overview' || path === 'scratchpad' || path === 'agent') return path
-  const match = /^(views|view-builders)\/([^/]+)$/.exec(path)
-  if (!match) return null
   try {
-    const id = decodeURIComponent(match[2])
-    // eslint-disable-next-line no-control-regex -- URL path IDs must reject control characters.
-    if (id === '.' || id === '..' || /[/\\\u0000-\u001f\u007f]/.test(id)) return null
-    return match[1] === 'views' ? `view:${id}` : `view-builder:${id}`
+    // Match the applet IDs accepted by the server's module routes.
+    const match = /^(views|view-builders)\/([a-zA-Z0-9_-]+)$/.exec(decodeURIComponent(path))
+    if (!match) return null
+    return match[1] === 'views' ? `view:${match[2]}` : `view-builder:${match[2]}`
   } catch {
     return null
   }
