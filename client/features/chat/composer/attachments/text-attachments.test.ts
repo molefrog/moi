@@ -4,7 +4,7 @@ import { stageTextAttachment, stageChatAttachment } from './draft-attachments'
 import { attachmentKey, liveStore } from '../../chat-store'
 import {
   attachmentsForSend,
-  attachmentPartsForOptimisticTurn,
+  prepareDraftAttachments,
   withAttachmentDirectives
 } from '../../chat-send'
 
@@ -89,6 +89,7 @@ describe('text staging and sends', () => {
         localId: 'image',
         name: 'Annotation.png',
         mediaType: 'image/png',
+        previewUrl: 'blob:annotation',
         status: 'ready',
         upload: {
           id: 'up',
@@ -101,9 +102,20 @@ describe('text staging and sends', () => {
     ])
     const ready = attachmentsForSend(workspaceId, null)
     expect(ready).toHaveLength(2)
-    expect(attachmentPartsForOptimisticTurn(ready)[0]).toEqual({
-      type: 'text-attachment',
-      ...attachment
+    expect(prepareDraftAttachments(ready)).toEqual({
+      attachments: [
+        { type: 'text', ...attachment },
+        { type: 'upload', uploadId: 'up' }
+      ],
+      parts: [
+        { type: 'text-attachment', ...attachment },
+        {
+          type: 'file-attachment',
+          filename: 'Annotation.png',
+          mediaType: 'image/png',
+          url: 'blob:annotation'
+        }
+      ]
     })
     expect(withAttachmentDirectives(undefined, ready)?.directives).toEqual([
       'Annotation attachment sources in attachment order: 1. "view:orders".'
