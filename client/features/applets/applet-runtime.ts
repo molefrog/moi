@@ -14,6 +14,8 @@
 // — no central handlers object assembled by the screen. Applet → host only;
 // if a host → applet direction is ever added (`moi.on(...)`), `dispose` must
 // also unbind those listeners or a disposed module leaks.
+import { snapshotChatContext } from '@/lib/moi-attachments'
+import type { ContextAttachment } from '@/lib/types'
 import { useEffect } from 'react'
 
 import { createNanoEvents } from 'nanoevents'
@@ -41,6 +43,7 @@ export type AppletChatMessage = {
 
 // Events a workspace runtime emits — already validated, typed for host code.
 export type AppletEvents = {
+  addChatContext: (attachment: ContextAttachment) => void
   // Client-local replace-navigation to a workspace tab. `params` reach the
   // target view as its `params` prop via navigation state — JSON-plain only
   // (history state is structured-cloned).
@@ -54,8 +57,9 @@ export type AppletEvents = {
 // cross the trust boundary from agent-authored code, and the runtime narrows
 // them before emitting.
 export type AppletBridge = {
+  addChatContext: (input: unknown) => void
   focusTab: (tab: unknown, params?: unknown) => void
-  sendChatMessage: (message: unknown, context?: unknown) => void
+  sendChatMessage: (input: unknown, context?: unknown) => void
 }
 
 // A message longer than this is a bug, not a chat message — it would land in
@@ -97,14 +101,14 @@ function createRuntime(workspaceId: string) {
     if (verdict === 'cooldown') {
       drop(
         identity,
-        `sendChatMessage("${text}") was dropped: the same message was already sent less than ${CHAT_LIMITS.cooldownMs / 1000}s ago. Call it from an event handler, not during render.`
+        `sendChatMessage() for "${text}" was dropped: the same message was already sent less than ${CHAT_LIMITS.cooldownMs / 1000}s ago. Call it from an event handler, not during render.`
       )
       return false
     }
     if (verdict === 'window') {
       drop(
         identity,
-        `sendChatMessage("${text}") was dropped: more than ${CHAT_LIMITS.maxPerWindow} messages in a minute from this workspace. Each one starts an agent run, so send only on a real user action.`
+        `sendChatMessage() for "${text}" was dropped: more than ${CHAT_LIMITS.maxPerWindow} messages in a minute from this workspace. Each one starts an agent run, so send only on a real user action.`
       )
       return false
     }
@@ -124,20 +128,36 @@ function createRuntime(workspaceId: string) {
       let alive = true
       const source = appletSource(identity)
       const bridge: AppletBridge = {
+        addChatContext(input) {
+          if (!alive) return
+          const snapshot = snapshotChatContext(input)
+          if (!snapshot) {
+            drop(
+              identity,
+              'addChatContext() was dropped: provide a non-empty label (max 120 characters) and a plain JSON context object (max 5000 characters).'
+            )
+            return
+          }
+          emitter.emit('addChatContext', { ...snapshot, source })
+        },
         focusTab(tab, params) {
           if (!alive) return
           if (!isWorkspaceTabId(tab)) return
           emitter.emit('focusTab', tab, isParamsRecord(params) ? params : undefined)
         },
-        sendChatMessage(message, context) {
+        sendChatMessage(input, legacyContext) {
           if (!alive) return
-          if (typeof message !== 'string') return
+          // Older applets pass (message, context?). Normalize to the object form
+          // so both APIs share validation and rate limits.
+          if (typeof input === 'string') input = { message: input, context: legacyContext }
+          if (!isParamsRecord(input) || typeof input.message !== 'string') return
+          const { message, context } = input
           const text = message.trim()
           if (!text) return
           if (text.length > MAX_MESSAGE_CHARS) {
             drop(
               identity,
-              `sendChatMessage() was dropped: the message is ${text.length} characters (max ${MAX_MESSAGE_CHARS}). Put long content in the context argument, not the message.`
+              `sendChatMessage() was dropped: the message is ${text.length} characters (max ${MAX_MESSAGE_CHARS}). Put long content in the context field, not the message.`
             )
             return
           }
@@ -171,7 +191,7 @@ function narrowChatContext(
   drop: (identity: AppletIdentity, message: string) => void
 ): Record<string, unknown> | undefined {
   if (!isParamsRecord(context)) {
-    drop(identity, 'sendChatMessage() ignored its context argument: it must be a plain object.')
+    drop(identity, 'sendChatMessage() ignored its context field: it must be a plain object.')
     return undefined
   }
   let json: string
@@ -180,14 +200,14 @@ function narrowChatContext(
   } catch {
     drop(
       identity,
-      'sendChatMessage() ignored its context argument: it is not JSON-serializable (cycles, functions, or BigInt).'
+      'sendChatMessage() ignored its context field: it is not JSON-serializable (cycles, functions, or BigInt).'
     )
     return undefined
   }
   if (json.length > MAX_APPLET_CONTEXT_CHARS) {
     drop(
       identity,
-      `sendChatMessage() ignored its context argument: ${json.length} characters serialized (max ${MAX_APPLET_CONTEXT_CHARS}). Send an id the agent can look up instead of the whole payload.`
+      `sendChatMessage() ignored its context field: ${json.length} characters serialized (max ${MAX_APPLET_CONTEXT_CHARS}). Send an id the agent can look up instead of the whole payload.`
     )
     return undefined
   }

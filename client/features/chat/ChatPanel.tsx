@@ -6,7 +6,10 @@ import { canSubmitComposerAction, focusComposer } from '@/client/components/shar
 import { AgentBlobatar } from '@/client/components/shared/AgentBlobatar'
 import { useStickToBottom } from '@/client/features/chat/messages/useStickToBottom'
 import { appendPreviewTurn, groupTurns } from '@/client/features/chat/messages/group-turns'
-import { chatNoticeLabel, interleaveNotices } from '@/client/features/chat/messages/interleave-notices'
+import {
+  chatNoticeLabel,
+  interleaveNotices
+} from '@/client/features/chat/messages/interleave-notices'
 import { attachmentKey, useLive } from '@/client/features/chat/chat-store'
 import type { ChatPromptBubble } from '@/client/features/chat/messages/ChatPromptBubbles'
 import type { ChatSendOptions } from '@/client/features/chat/chat-send'
@@ -15,7 +18,11 @@ import type { AgentTheme, SystemNotice, Turn, ViewState } from '@/lib/types'
 
 import type { ComposerBanner } from './composer/banners/ComposerBanner'
 import { ChatComposer, type ComposerAnnotationControls } from './composer/ChatComposer'
-import { ChatEmptyState, type WelcomeDestination, resolveChatEmptyState } from './messages/ChatEmptyState'
+import {
+  ChatEmptyState,
+  type WelcomeDestination,
+  resolveChatEmptyState
+} from './messages/ChatEmptyState'
 import { ChatSelector } from './sessions/ChatSelector'
 import { TurnView } from './messages/TurnView'
 import { Button } from '@/client/components/ui/button'
@@ -98,7 +105,7 @@ export function ChatPanel({
   )
   const attachmentsUploading = useLive(state =>
     (state.attachments[attachmentKey(workspaceId, effectiveSessionId)] ?? []).some(
-      attachment => attachment.status === 'uploading'
+      attachment => attachment.kind !== 'context' && attachment.status === 'uploading'
     )
   )
   const promptDisabled = !canSubmitComposerAction(true, attachmentsUploading, agentAvailability)

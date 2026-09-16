@@ -6,7 +6,10 @@ import { QueryClient } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test } from 'bun:test'
 
 import { appUiKeys } from '@/client/api/app-ui-keys'
-import { __setQueryClientForTests, handleFrame } from '@/client/features/chat/connection/chat-connection'
+import {
+  __setQueryClientForTests,
+  handleFrame
+} from '@/client/features/chat/connection/chat-connection'
 import {
   hasRunningActivity,
   hasRunningBackgroundSession,

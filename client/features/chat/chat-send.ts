@@ -1,7 +1,10 @@
+import type { MessageAttachment } from '@/lib/types'
+import { contextAttachmentParts } from '@/lib/moi-attachments'
 import type { QueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { attachmentKey, type ChatAttachment, liveStore } from '@/client/features/chat/chat-store'
+import { attachmentKey, liveStore } from '@/client/features/chat/chat-store'
+import type { ChatAttachment } from '@/client/features/chat/composer/attachments/types'
 import { resolveSelectedModel } from '@/client/features/chat/composer/model-order'
 import type { MoiUserMessageOptions } from '@/client/features/workspace/moi-context'
 import { STREAM_RESPONSES } from '@/client/lib/flags'
@@ -30,11 +33,12 @@ export function attachmentsForSend(
 ): ChatAttachment[] {
   if (!ownsComposerAttachments(options)) return []
   const pending = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)] ?? []
-  return pending.filter(a => a.status === 'ready' && a.upload)
+  return pending.filter(a => a.kind === 'context' || (a.status === 'ready' && a.upload))
 }
 
 export function attachmentPartsForOptimisticTurn(attachments: readonly ChatAttachment[]): Part[] {
   return attachments.map(attachment => {
+    if (attachment.kind === 'context') return contextAttachmentParts([attachment.attachment])[0]
     if (attachment.upload?.kind === 'image' && attachment.previewUrl) {
       return {
         type: 'file',
@@ -61,7 +65,7 @@ export function withAttachmentDirectives(
   const sketches: string[] = []
   let imagePosition = 0
   for (const attachment of attachments) {
-    if (attachment.upload?.kind !== 'image') continue
+    if (attachment.kind === 'context' || attachment.upload?.kind !== 'image') continue
     imagePosition += 1
     if (attachment.kind === 'drawing' && attachment.purpose === 'annotation') {
       annotations.push(`${imagePosition}. ${JSON.stringify(attachment.sourceTab)}`)
@@ -179,4 +183,13 @@ export function resolveChatRunOptions(
     ...(fastMode !== undefined ? { fastMode } : {}),
     stream
   }
+}
+
+export function messageAttachmentsForSend(
+  attachments: readonly ChatAttachment[]
+): MessageAttachment[] {
+  return attachments.flatMap<MessageAttachment>(attachment => {
+    if (attachment.kind === 'context') return [{ type: 'context', ...attachment.attachment }]
+    return attachment.upload ? [{ type: 'upload', uploadId: attachment.upload.id }] : []
+  })
 }

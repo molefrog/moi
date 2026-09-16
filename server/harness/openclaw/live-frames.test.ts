@@ -1,3 +1,4 @@
+import { appendContextAttachments } from '@/lib/moi-attachments'
 // Wire-fixture tests for the live protocol-v4 layer: chat delta previews,
 // session.tool result flattening, and durable-row → Turn mapping. Fixtures are
 // real frames captured from live gateways (2026.7.1 events-v2/events-tool runs,
@@ -12,7 +13,7 @@ import {
   messageToTurn,
   toStreamEvents
 } from './adapter'
-import { chatPreviewBlocks, claimPreviewSource, normalizeEchoText } from './session'
+import { chatPreviewBlocks, claimPreviewSource, normalizeEchoText, userEchoKey } from './session'
 
 describe('chatPreviewBlocks', () => {
   test('maps a real first chat delta onto one text block', () => {
@@ -314,4 +315,35 @@ describe('claimPreviewSource', () => {
     expect(claimPreviewSource(rec, 'r2', 'chat')).toBe(true)
     expect(claimPreviewSource(rec, 'r2', 'agent')).toBe(false)
   })
+})
+
+test('context-only echo keys are non-empty and distinguish attached records', () => {
+  const first = { source: 'view:orders', label: 'Order', context: { id: '1' } }
+  const wire = appendContextAttachments('', [first])
+  expect(normalizeEchoText(wire)).not.toBe('')
+  expect(normalizeEchoText(wire)).toBe(
+    normalizeEchoText(
+      appendContextAttachments('', [
+        { context: first.context, label: first.label, source: first.source }
+      ])
+    )
+  )
+  expect(normalizeEchoText(wire)).not.toBe(
+    normalizeEchoText(appendContextAttachments('', [{ ...first, context: { id: '2' } }]))
+  )
+})
+
+test('parsed user turns match serialized echo keys with and without message text', () => {
+  const attachments = [{ source: 'view:orders', label: 'Order', context: { id: '1' } }]
+  for (const text of ['', 'Review  this\norder']) {
+    const wire = appendContextAttachments(text, attachments)
+    const turn = messageToTurn({ role: 'user', content: wire }, 'test-session', 0, new Map())
+    expect(turn).not.toBeNull()
+    expect(
+      userEchoKey(
+        turn!.parts.find(p => p.type === 'text')?.text ?? '',
+        turn!.parts.filter(p => p.type === 'context')
+      )
+    ).toBe(normalizeEchoText(wire))
+  }
 })

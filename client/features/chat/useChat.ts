@@ -1,9 +1,14 @@
+import { messageAttachmentsForSend } from './chat-send'
 import { useCallback, useEffect, useMemo } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { useSessionConfig, useSessionView, useWorkspaceSessions } from '@/client/features/chat/sessions/api'
+import {
+  useSessionConfig,
+  useSessionView,
+  useWorkspaceSessions
+} from '@/client/features/chat/sessions/api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { useSelectedSession } from '@/client/features/chat/sessions/useSelectedSession'
 import {
@@ -150,6 +155,7 @@ export function useChat(address: WorkspaceTabAddress) {
         pickedEffort,
         pickedFastMode
       )
+      const attachments = messageAttachmentsForSend(ready)
       sendMessage({
         type: 'chat',
         workspaceId,
@@ -162,7 +168,7 @@ export function useChat(address: WorkspaceTabAddress) {
         fastMode,
         stream,
         context: buildMoiContext(withAttachmentDirectives(options, ready)),
-        ...(ready.length > 0 ? { attachments: ready.map(a => a.upload!.id) } : {})
+        ...(attachments.length > 0 ? { attachments } : {})
       })
       useUiStore.getState().markMessageSentFromMoi(workspaceId)
       if (isNew) {

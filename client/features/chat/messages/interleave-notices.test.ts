@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 
-import { chatNoticeLabel, interleaveNotices } from '@/client/features/chat/messages/interleave-notices'
+import {
+  chatNoticeLabel,
+  interleaveNotices
+} from '@/client/features/chat/messages/interleave-notices'
 import type { SystemNotice, Turn } from '@/lib/types'
 
 function turn(id: string, timestamp?: string): Turn {

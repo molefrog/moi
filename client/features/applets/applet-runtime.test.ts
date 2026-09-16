@@ -100,10 +100,30 @@ describe('sendChatMessage validation', () => {
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(WIDGET)
 
-    bridge.sendChatMessage('  Chase order A-1042  ', { order: 'A-1042' })
+    bridge.sendChatMessage({ message: '  Chase order A-1042  ', context: { order: 'A-1042' } })
 
     expect(calls).toEqual([
       { message: 'Chase order A-1042', source: 'widget:clock', context: { order: 'A-1042' } }
+    ])
+  })
+
+  test('normalizes legacy calls through the same validation and rate limiter', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const { calls } = subscribeChat(ws)
+    const { bridge } = appletRuntime(ws).connect(WIDGET)
+
+    bridge.sendChatMessage('  Legacy  ', { order: '1042' })
+    bridge.sendChatMessage({ message: 'Legacy', context: { order: '1042' } })
+    bridge.sendChatMessage('Message only')
+    bridge.sendChatMessage('Bad context', [])
+    bridge.sendChatMessage('x'.repeat(1001))
+    bridge.sendChatMessage({ message: 'Object', context: { own: true } }, { ignored: true })
+
+    expect(calls).toEqual([
+      { message: 'Legacy', source: 'widget:clock', context: { order: '1042' } },
+      { message: 'Message only', source: 'widget:clock', context: undefined },
+      { message: 'Bad context', source: 'widget:clock', context: undefined },
+      { message: 'Object', source: 'widget:clock', context: { own: true } }
     ])
   })
 
@@ -112,11 +132,14 @@ describe('sendChatMessage validation', () => {
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
 
-    bridge.sendChatMessage('')
-    bridge.sendChatMessage('   ')
-    bridge.sendChatMessage(42)
+    bridge.sendChatMessage({ message: '' })
+    bridge.sendChatMessage({ message: '   ' })
+    bridge.sendChatMessage({ message: 42 })
+    bridge.sendChatMessage({ message: null })
     bridge.sendChatMessage(null)
-    bridge.sendChatMessage({ toString: () => 'Do a thing' })
+    bridge.sendChatMessage('   ')
+    bridge.sendChatMessage({ context: {} })
+    bridge.sendChatMessage({ message: { toString: () => 'Do a thing' } })
 
     expect(calls).toEqual([])
   })
@@ -126,7 +149,7 @@ describe('sendChatMessage validation', () => {
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
 
-    bridge.sendChatMessage('x'.repeat(1001))
+    bridge.sendChatMessage({ message: 'x'.repeat(1001) })
 
     expect(calls).toEqual([])
   })
@@ -139,9 +162,9 @@ describe('sendChatMessage validation', () => {
     const cyclic: Record<string, unknown> = {}
     cyclic.self = cyclic
 
-    bridge.sendChatMessage('array context', ['not', 'a', 'record'])
-    bridge.sendChatMessage('cyclic context', cyclic)
-    bridge.sendChatMessage('huge context', { blob: 'x'.repeat(2001) })
+    bridge.sendChatMessage({ message: 'array context', context: ['not', 'a', 'record'] })
+    bridge.sendChatMessage({ message: 'cyclic context', context: cyclic })
+    bridge.sendChatMessage({ message: 'huge context', context: { blob: 'x'.repeat(2001) } })
 
     // The message carries the user's intent, so a bad payload must not lose it.
     expect(calls.map(c => [c.message, c.context])).toEqual([
@@ -156,9 +179,9 @@ describe('sendChatMessage validation', () => {
     const { calls } = subscribeChat(ws)
     const { bridge, dispose } = appletRuntime(ws).connect(VIEW)
 
-    bridge.sendChatMessage('before')
+    bridge.sendChatMessage({ message: 'before' })
     dispose()
-    bridge.sendChatMessage('after')
+    bridge.sendChatMessage({ message: 'after' })
 
     expect(calls.map(c => c.message)).toEqual(['before'])
   })
@@ -172,9 +195,9 @@ describe('sendChatMessage rate limiting', () => {
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(WIDGET)
 
-    bridge.sendChatMessage('Sync now')
-    bridge.sendChatMessage('Sync now')
-    bridge.sendChatMessage('Sync now')
+    bridge.sendChatMessage({ message: 'Sync now' })
+    bridge.sendChatMessage({ message: 'Sync now' })
+    bridge.sendChatMessage({ message: 'Sync now' })
 
     expect(calls.map(c => c.message)).toEqual(['Sync now'])
   })
@@ -185,10 +208,10 @@ describe('sendChatMessage rate limiting', () => {
     const widget = appletRuntime(ws).connect(WIDGET)
     const view = appletRuntime(ws).connect(VIEW)
 
-    widget.bridge.sendChatMessage('Sync now')
+    widget.bridge.sendChatMessage({ message: 'Sync now' })
     // Same text, different applet — a real second message.
-    view.bridge.sendChatMessage('Sync now')
-    widget.bridge.sendChatMessage('Something else')
+    view.bridge.sendChatMessage({ message: 'Sync now' })
+    widget.bridge.sendChatMessage({ message: 'Something else' })
 
     expect(calls.map(c => [c.source, c.message])).toEqual([
       ['widget:clock', 'Sync now'],
@@ -202,7 +225,7 @@ describe('sendChatMessage rate limiting', () => {
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(WIDGET)
 
-    for (let i = 0; i < 25; i++) bridge.sendChatMessage(`message ${i}`)
+    for (let i = 0; i < 25; i++) bridge.sendChatMessage({ message: `message ${i}` })
 
     expect(calls).toHaveLength(10)
   })
@@ -214,9 +237,11 @@ describe('sendChatMessage rate limiting', () => {
     const b = subscribeChat(wsB)
 
     for (let i = 0; i < 25; i++) {
-      appletRuntime(wsA).connect(WIDGET).bridge.sendChatMessage(`a ${i}`)
+      appletRuntime(wsA)
+        .connect(WIDGET)
+        .bridge.sendChatMessage({ message: `a ${i}` })
     }
-    appletRuntime(wsB).connect(WIDGET).bridge.sendChatMessage('b 0')
+    appletRuntime(wsB).connect(WIDGET).bridge.sendChatMessage({ message: 'b 0' })
 
     expect(a.calls).toHaveLength(10)
     expect(b.calls.map(c => c.message)).toEqual(['b 0'])

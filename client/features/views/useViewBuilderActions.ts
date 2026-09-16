@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import {
   attachmentPartsForOptimisticTurn,
   attachmentsForSend,
+  messageAttachmentsForSend,
   resolveChatRunOptions,
   startOptimisticSession,
   startOptimisticTurn
@@ -70,7 +71,9 @@ export function useViewBuilderActions() {
         requirements: text,
         optimisticId,
         ...(attachments.length > 0
-          ? { attachments: attachments.map(attachment => attachment.upload!.id) }
+          ? {
+              attachments: messageAttachmentsForSend(attachments)
+            }
           : {}),
         model,
         effort,

@@ -7,6 +7,12 @@ const workspaceId = 'workspace-1'
 const sessionId = 'session-1'
 const originalFetch = globalThis.fetch
 
+function drawingAttachments() {
+  return (liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)] ?? []).filter(
+    a => a.kind !== 'context'
+  )
+}
+
 afterEach(() => {
   globalThis.fetch = originalFetch
   liveStore.getState().clearAttachments(workspaceId, sessionId)
@@ -27,7 +33,7 @@ describe('drawing draft staging', () => {
       sourceTab: 'overview',
       blob: new Blob(['first'], { type: 'image/png' })
     })
-    const first = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)][0]
+    const first = drawingAttachments()[0]
     expect(first.status).toBe('draft')
     expect(first.previewUrl).toStartWith('blob:')
 
@@ -39,7 +45,7 @@ describe('drawing draft staging', () => {
       sourceTab: 'overview',
       blob: new Blob(['second'], { type: 'image/png' })
     })
-    const list = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)]
+    const list = drawingAttachments()
     expect(list).toHaveLength(1)
     expect(list[0].previewUrl).not.toBe(first.previewUrl)
     expect(revokeSpy).toHaveBeenCalledWith(first.previewUrl)
@@ -72,7 +78,7 @@ describe('drawing draft staging', () => {
       isCurrent: () => true
     })
 
-    const list = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)]
+    const list = drawingAttachments()
     expect(list).toHaveLength(1)
     expect(list[0].status).toBe('ready')
     expect(list[0].upload?.id).toBe('upload-1')
@@ -97,8 +103,7 @@ describe('drawing attachment staging', () => {
       blob: new Blob(['first'], { type: 'image/png' }),
       isCurrent: () => revision === 1
     })
-    const firstPreview =
-      liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)][0].previewUrl
+    const firstPreview = drawingAttachments()[0].previewUrl
 
     revision = 2
     const second = stageDrawing({
@@ -110,14 +115,11 @@ describe('drawing attachment staging', () => {
       blob: new Blob(['second'], { type: 'image/png' }),
       isCurrent: () => revision === 2
     })
-    const secondPreview =
-      liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)][0].previewUrl
+    const secondPreview = drawingAttachments()[0].previewUrl
 
     expect(secondPreview).not.toBe(firstPreview)
     expect(revokeSpy).toHaveBeenCalledWith(firstPreview)
-    expect(liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)][0].status).toBe(
-      'uploading'
-    )
+    expect(drawingAttachments()[0].status).toBe('uploading')
 
     requests[1](
       Response.json([{ id: 'upload-2', kind: 'image', mediaType: 'image/png' }], { status: 200 })
@@ -128,7 +130,7 @@ describe('drawing attachment staging', () => {
     )
     await first
 
-    const attachment = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)][0]
+    const attachment = drawingAttachments()[0]
     expect(attachment.status).toBe('ready')
     expect(attachment.upload?.id).toBe('upload-2')
     revokeSpy.mockRestore()
@@ -150,14 +152,13 @@ describe('drawing attachment staging', () => {
       isCurrent: () => true
     })
 
-    const optimisticAttachment =
-      liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)][0]
+    const optimisticAttachment = drawingAttachments()[0]
     expect(optimisticAttachment.status).toBe('uploading')
     expect(optimisticAttachment.previewUrl).toStartWith('blob:')
 
     await upload
 
-    const attachment = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)][0]
+    const attachment = drawingAttachments()[0]
     expect(attachment).toBeUndefined()
     expect(revokeSpy).toHaveBeenCalledWith(optimisticAttachment.previewUrl)
     revokeSpy.mockRestore()
@@ -180,7 +181,7 @@ describe('drawing attachment staging', () => {
       isCurrent: () => true
     })
 
-    const attachment = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)][0]
+    const attachment = drawingAttachments()[0]
     expect(attachment.kind).toBe('drawing')
     expect(attachment.name).toBe('Sketch.png')
     expect(attachment.kind === 'drawing' ? attachment.purpose : null).toBe('sketch')

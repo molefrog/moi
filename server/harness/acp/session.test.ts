@@ -1,3 +1,4 @@
+import { splitContextAttachments } from '@/lib/moi-attachments'
 // Tests for the ACP session layer against a mock ACP agent (a tiny
 // newline-JSON-RPC script), exercising the REAL client transport + session
 // record + adapter — everything except a live backend. Covers the replay path
@@ -374,4 +375,21 @@ describe('ACP model state', () => {
     ])
     expect(calls[3].params).toEqual({ sessionId: agent.sessionId, modelId: 'model-b' })
   })
+})
+
+test('context-only sends reach the ACP prompt and retain display parts', async () => {
+  const agent = await mockAgent()
+  const contextAttachments = [{ source: 'view:orders', label: 'Order', context: { id: '1' } }]
+  await sendAcpMessage(agent.config, {
+    ...agent.ctx,
+    sessionId: agent.sessionId,
+    isNew: false,
+    content: '',
+    attachments: contextAttachments.map(a => ({ type: 'context' as const, ...a }))
+  })
+  const prompt = (await agent.calls()).find(call => call.method === 'session/prompt')!
+  const params = prompt.params as { prompt: Array<{ type: string; text?: string }> }
+  expect(
+    splitContextAttachments(params.prompt.find(b => b.type === 'text')!.text!).attachments
+  ).toEqual(contextAttachments)
 })

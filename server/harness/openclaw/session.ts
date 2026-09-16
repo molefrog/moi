@@ -1,3 +1,5 @@
+import { partitionMessageAttachments } from '@/lib/message-attachments'
+import type { ContextAttachment, MessageAttachment } from '@/lib/types'
 // Per-(workspaceId, sessionId) live OpenClaw session.
 //
 // Holds the in-memory view for one session and keeps it current from the
@@ -10,6 +12,11 @@
 // The frame families and the order they arrive in are documented in NOTES.md
 // §6; the rules that follow from it (who owns a tool card, why identity is
 // decided once) are worth reading before changing anything here.
+import {
+  appendContextAttachments,
+  splitContextAttachments,
+  contextAttachmentParts
+} from '@/lib/moi-attachments'
 import { appendAttachmentNote } from '@/lib/attachment-note'
 import {
   type MoiContext,
@@ -490,7 +497,17 @@ function previewMessageId(sessionKey: string, runId: string): string {
 // between what we sent and what the gateway stored can't defeat the match.
 export function normalizeEchoText(text: string | undefined): string {
   if (typeof text !== 'string') return ''
-  return stripMoiContext(text).replace(/\s+/g, ' ').trim()
+  const attached = splitContextAttachments(stripMoiContext(text))
+  return userEchoKey(attached.text, attached.attachments)
+}
+
+export function userEchoKey(text: string, attachments: readonly ContextAttachment[] = []): string {
+  const visible = text.replace(/\s+/g, ' ').trim()
+  // Include attachments in the fallback key: context-only messages have no
+  // visible text, and two identical prompts may refer to different records.
+  return attachments.length
+    ? `${visible}\n${JSON.stringify(contextAttachmentParts(attachments))}`
+    : visible
 }
 
 // Synthetic turns (live tool cards, live thinking spans) have no transcript
@@ -526,7 +543,10 @@ function emitTurn(rec: SessionRecord, msg: OpenClawMessage, idx: number): void {
         )
       : -1
     if (at < 0) {
-      const text = normalizeEchoText(turn.parts.find(p => p.type === 'text')?.text)
+      const text = userEchoKey(
+        turn.parts.find(p => p.type === 'text')?.text ?? '',
+        turn.parts.filter(p => p.type === 'context')
+      )
       if (text) at = rec.pendingUserEchoes.findIndex(e => normalizeEchoText(e.text) === text)
     }
     if (at >= 0) {
@@ -1216,7 +1236,7 @@ export async function sendOpenClawMessage(input: {
   // message, so we materialize each upload to a temp file and append the paths
   // for the agent to read. Rich vision blocks await a gateway content-block API
   // (see dev/file-uploads.md).
-  attachments?: string[]
+  attachments?: MessageAttachment[]
   optimisticId?: string
   // Picker selections, applied to the gateway session via `sessions.patch`
   // before the send (see applySessionSettings).
@@ -1230,17 +1250,16 @@ export async function sendOpenClawMessage(input: {
   context?: MoiContext
 }): Promise<void> {
   // Fold any attachments into the message text as file-path references.
-  const uploads = input.attachments?.length
-    ? resolveUploads(input.workspaceId, input.attachments)
-    : []
-  let content = input.content
+  const { uploadIds, contextAttachments } = partitionMessageAttachments(input.attachments)
+  const uploads = resolveUploads(input.workspaceId, uploadIds)
+  let content = appendContextAttachments(input.content, contextAttachments)
   if (uploads.length > 0) {
     const files: { filename: string; path: string }[] = []
     for (const u of uploads) {
       const p = await materializeToPath(u)
       if (p) files.push({ filename: u.filename, path: p })
     }
-    content = appendAttachmentNote(input.content, files)
+    content = appendAttachmentNote(content, files)
   }
   // Attachment-only send whose ids all expired → nothing to say; don't open a
   // session for an empty message.

@@ -1,5 +1,6 @@
 // Session discovery + history replay for Claude Code workspaces, backed by
 // the Agent SDK's persisted `.jsonl` session files.
+import { splitContextAttachments, stripContextAttachmentsLoose } from '@/lib/moi-attachments'
 import {
   getSessionInfo,
   getSessionMessages,
@@ -35,12 +36,13 @@ export function claudeSessionSummary(
   session: Pick<SDKSessionInfo, 'customTitle' | 'firstPrompt' | 'summary'>
 ): string {
   if (session.customTitle || !session.firstPrompt || session.summary !== session.firstPrompt) {
-    return session.summary
+    return stripContextAttachmentsLoose(session.summary)
   }
-  const split = splitAttachmentNote(session.firstPrompt)
+  const attached = splitContextAttachments(session.firstPrompt)
+  const split = splitAttachmentNote(attached.text)
   return isAttachmentOnlyPlaceholder(split.text)
     ? attachmentOnlyFilenames(split.text).join(', ')
-    : session.summary
+    : stripContextAttachmentsLoose(split.text) || attached.attachments.map(a => a.label).join(', ')
 }
 
 export function visibleClaudeSessions<T extends Pick<SDKSessionInfo, 'tag'>>(sessions: T[]): T[] {
@@ -67,7 +69,7 @@ export function selectOldestSessionFirstUserMessage(
         (a.createdAt ?? a.lastModified) - (b.createdAt ?? b.lastModified) ||
         a.sessionId.localeCompare(b.sessionId)
     )[0]
-  return oldest?.firstPrompt
+  return oldest?.firstPrompt ? stripContextAttachmentsLoose(oldest.firstPrompt) : undefined
 }
 
 export function selectLatestSessionUpdatedAt(

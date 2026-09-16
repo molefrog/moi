@@ -1,6 +1,11 @@
 // Pure Codex wire → display mapping. A rendered item becomes a Turn or notice;
 // tool items carry their native lifecycle through a tool-call part. The wire
 // types are a defensive subset; see NOTES.md for maintenance.
+import {
+  splitContextAttachments,
+  contextAttachmentParts,
+  stripContextAttachmentsLoose
+} from '@/lib/moi-attachments'
 import type {
   Part,
   StreamEvent,
@@ -138,7 +143,7 @@ export function codexServiceTierForFastMode(
 
 // Legacy context can be cut mid-envelope in a thread/list preview.
 function cleanPreview(preview: string | undefined): string {
-  return preview ? stripMoiContextLoose(preview).trim() : ''
+  return preview ? stripContextAttachmentsLoose(stripMoiContextLoose(preview)).trim() : ''
 }
 
 export function codexThreadToSessionInfo(t: CodexThread): SessionInfo {
@@ -284,7 +289,9 @@ function userInputToParts(content: CodexUserInput[] | undefined): Part[] {
   for (const c of content ?? []) {
     // Strip context from older sends that used the text-envelope fallback.
     if (c.type === 'text' && c.text) {
-      const text = stripMoiContext(c.text)
+      const attached = splitContextAttachments(stripMoiContext(c.text))
+      parts.push(...contextAttachmentParts(attached.attachments))
+      const text = attached.text
       if (text) parts.push({ type: 'text', text })
     } else if (c.type === 'image' && c.url)
       parts.push({ type: 'file', mediaType: 'image/*', url: c.url })

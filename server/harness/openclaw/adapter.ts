@@ -8,6 +8,11 @@
 //
 // `toStreamEvents` is the cold path (REST replay); `messageToTurn` is the
 // per-frame path the live session uses.
+import {
+  splitContextAttachments,
+  contextAttachmentParts,
+  stripContextAttachmentsLoose
+} from '@/lib/moi-attachments'
 import type { Part, StreamEvent, ToolCall, ToolState, Turn, TurnMeta } from '@/lib/format'
 import type { SessionInfo } from '@/lib/types'
 
@@ -28,7 +33,9 @@ import { stripSubagentEnvelope, stripUserMessageMetadata } from './strip'
 // every title source, not just the preview, so no title shows the envelope.
 // A no-op on channel/cron labels that never contain it.
 function cleanTitle(text: string | undefined): string {
-  return stripSubagentEnvelope(stripMoiContextLoose(text?.trim() ?? '')).trim()
+  return stripSubagentEnvelope(
+    stripContextAttachmentsLoose(stripMoiContextLoose(text?.trim() ?? ''))
+  ).trim()
 }
 
 export function toSessionInfo(row: OpenClawSessionRow, cwd: string): SessionInfo {
@@ -225,7 +232,16 @@ export function messageToTurn(
       ? [{ type: 'text', text: msg.content }]
       : []
   const parts = blocks
-    .map(b => blockToPart(b, msg.role, results, omitToolCallIds))
+    .flatMap(b => {
+      if (msg.role === 'user' && b.type === 'text' && typeof b.text === 'string') {
+        const attached = splitContextAttachments(stripUserMessageMetadata(b.text))
+        return [
+          ...contextAttachmentParts(attached.attachments),
+          blockToPart({ ...b, text: attached.text }, msg.role, results, omitToolCallIds)
+        ]
+      }
+      return [blockToPart(b, msg.role, results, omitToolCallIds)]
+    })
     .filter((p): p is Part => p !== null)
   if (parts.length === 0) return null
   const ocId = msg.__openclaw?.id

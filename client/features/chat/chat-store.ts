@@ -1,41 +1,8 @@
+import type { ChatAttachment, ChatAttachmentPatch } from './composer/attachments/types'
 import { useStore } from 'zustand'
 import { createStore } from 'zustand/vanilla'
 
-import type {
-  PreviewBlock,
-  PreviewFrame,
-  SessionActivity,
-  UploadInfo,
-  WorkspaceTabId
-} from '@/lib/types'
-
-// One composer attachment, tracked per session until the message is sent. A
-// file uploads as soon as it's added (drop/paste/pick); an annotation stays a
-// local `draft` while it's being drawn and uploads once when the drawing
-// session ends. `status` reflects that lifecycle, and `upload` holds the server
-// handle once ready. `previewUrl` is a local object URL for image thumbnails
-// (revoked on remove/clear).
-type ChatAttachmentBase = {
-  localId: string
-  name: string
-  mediaType: string
-  previewUrl?: string
-  status: 'draft' | 'uploading' | 'ready' | 'error'
-  upload?: UploadInfo
-  error?: string
-}
-
-export type DrawingPurpose = 'annotation' | 'sketch'
-
-export type ChatAttachment = ChatAttachmentBase &
-  (
-    | { kind: 'file'; purpose?: never; sourceTab?: never }
-    | { kind: 'drawing'; purpose: DrawingPurpose; sourceTab: WorkspaceTabId }
-  )
-
-type ChatAttachmentPatch = Partial<
-  Pick<ChatAttachmentBase, 'name' | 'mediaType' | 'previewUrl' | 'status' | 'upload' | 'error'>
->
+import type { PreviewBlock, PreviewFrame, SessionActivity } from '@/lib/types'
 
 // App-level ephemeral chat state — the bits that are *pushed* from the server
 // over the WebSocket and can't be re-fetched as request/response data:
@@ -230,13 +197,21 @@ export const liveStore = createStore<LiveStore>()(set => ({
       const list = s.attachments[k]
       if (!list) return {}
       const target = list.find(attachment => attachment.localId === localId)
-      if (target?.previewUrl && 'previewUrl' in patch && patch.previewUrl !== target.previewUrl) {
+      if (
+        target &&
+        target.kind !== 'context' &&
+        target.previewUrl &&
+        'previewUrl' in patch &&
+        patch.previewUrl !== target.previewUrl
+      ) {
         URL.revokeObjectURL(target.previewUrl)
       }
       return {
         attachments: {
           ...s.attachments,
-          [k]: list.map(a => (a.localId === localId ? { ...a, ...patch } : a))
+          [k]: list.map(a =>
+            a.localId === localId && a.kind !== 'context' ? { ...a, ...patch } : a
+          )
         }
       }
     }),
@@ -247,7 +222,8 @@ export const liveStore = createStore<LiveStore>()(set => ({
       const list = s.attachments[k]
       if (!list) return {}
       const target = list.find(a => a.localId === localId)
-      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl)
+      if (target && target.kind !== 'context' && target.previewUrl)
+        URL.revokeObjectURL(target.previewUrl)
       return { attachments: { ...s.attachments, [k]: list.filter(a => a.localId !== localId) } }
     }),
 
@@ -255,7 +231,7 @@ export const liveStore = createStore<LiveStore>()(set => ({
     set(s => {
       const k = attachmentKey(workspaceId, sessionId)
       for (const a of s.attachments[k] ?? []) {
-        if (a.previewUrl) URL.revokeObjectURL(a.previewUrl)
+        if (a.kind !== 'context' && a.previewUrl) URL.revokeObjectURL(a.previewUrl)
       }
       const next = { ...s.attachments }
       delete next[k]
@@ -289,7 +265,18 @@ export const liveStore = createStore<LiveStore>()(set => ({
           previews[id] = { ...p, sessionId: to }
         }
       }
-      return { activity, errors, previews }
+      // Context has no in-flight upload callbacks bound to the old id.
+      // Move staged context when the provider assigns the chat its real id.
+      let attachments = s.attachments
+      const contexts = s.attachments[fromKey]?.filter(a => a.kind === 'context') ?? []
+      if (fromKey !== toKey && contexts.length) {
+        attachments = {
+          ...s.attachments,
+          [fromKey]: s.attachments[fromKey].filter(a => a.kind !== 'context'),
+          [toKey]: [...(s.attachments[toKey] ?? []), ...contexts]
+        }
+      }
+      return { activity, errors, previews, attachments }
     })
 }))
 

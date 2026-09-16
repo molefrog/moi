@@ -1,15 +1,8 @@
-// Chat's half of the applet `sendChatMessage` API: turn a validated runtime
-// event into a real send on the active chat.
-//
-// The runtime already did the untrusted work — narrowed the args, stamped the
-// applet's `<kind>:<name>` as `source`, and rate-limited repeats
-// (applet-runtime.ts). What's left is chat policy: reveal the chat, then send
-// the text as an ordinary user message with the applet attribution riding the
-// `<moi-context>` envelope.
-//
-// Sending while a turn is running is fine and deliberate — the composer offers
-// the same ("Queue a follow-up"), and the harness queues the message into the
-// live session rather than rejecting it.
+// Connect validated applet intents to the active chat: stage context in the
+// draft or send a message immediately, then reveal and focus chat.
+// The runtime owns argument validation, source attribution, and send rate limits;
+// these hooks own draft staging and agent availability checks for immediate sends.
+import { stageChatContext } from './composer/attachments/draft-attachments'
 import { reportAppletError } from '@/client/features/applets/applet-log'
 import { type AppletChatMessage, useAppletEvent } from '@/client/features/applets/applet-runtime'
 import type { ChatSendOptions } from '@/client/features/chat/chat-send'
@@ -55,7 +48,7 @@ export function useAppletChatMessage({
       // button did nothing, and this is the only place that says why.
       reportAppletError(workspaceId, {
         source: 'runtime',
-        message: `sendChatMessage("${event.message}") was dropped: ${blocked}.`
+        message: `sendChatMessage() for "${event.message}" was dropped: ${blocked}.`
       })
       return
     }
@@ -64,5 +57,13 @@ export function useAppletChatMessage({
     const { message, ...applet } = event
     revealChat()
     send(message, { applet })
+  })
+}
+
+export function useAppletChatContext(sessionId: string | null, revealChat: () => void): void {
+  const workspaceId = useWorkspaceId()
+  useAppletEvent(workspaceId, 'addChatContext', attachment => {
+    stageChatContext({ workspaceId, sessionId }, attachment)
+    revealChat()
   })
 }

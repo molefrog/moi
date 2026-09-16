@@ -1,6 +1,10 @@
+import { partitionMessageAttachments } from '@/lib/message-attachments'
+import type { MessageAttachment } from '@/lib/types'
 // Live state per (workspaceId, sessionId): display history, native lifecycle,
 // and previews. client.ts owns the shared workspace process;
 // Codex owns durable history. See NOTES.md for ordering and recovery rules.
+import { appendContextAttachments, contextAttachmentParts } from '@/lib/moi-attachments'
+import type { ContextAttachment } from '@/lib/types'
 import { appendAttachmentNote } from '@/lib/attachment-note'
 import { buildSessionTitleSource } from '../session-title'
 import {
@@ -889,14 +893,17 @@ async function resumeSession(input: ResumeInput): Promise<SessionRecord> {
 // retain the original attachment metadata for the user's bubble.
 async function buildUserInput(
   text: string,
-  uploads: StoredUpload[]
+  uploads: StoredUpload[],
+  contextAttachments: readonly ContextAttachment[] = []
 ): Promise<{ input: CodexUserInputItem[]; parts: Part[] }> {
   const parts: Part[] = []
   for (const u of uploads) {
     const part = uploadToDisplayPart(u)
     if (part) parts.push(part)
   }
+  parts.push(...contextAttachmentParts(contextAttachments))
   if (text) parts.push({ type: 'text', text })
+  text = appendContextAttachments(text, contextAttachments)
 
   const input: CodexUserInputItem[] = []
   for (const u of uploads) {
@@ -921,7 +928,7 @@ type CodexSendInput = {
   sessionId: string
   isNew: boolean
   content: string
-  attachments?: string[]
+  attachments?: MessageAttachment[]
   optimisticId?: string
   model?: string
   effort?: string
@@ -949,17 +956,20 @@ async function sendMessage(
   lane: SendLane,
   generation: number
 ): Promise<void> {
-  const uploads = input.attachments?.length
-    ? resolveUploads(input.workspaceId, input.attachments)
-    : []
-  if (!input.content && uploads.length === 0) return
+  const { uploadIds, contextAttachments } = partitionMessageAttachments(input.attachments)
+  const uploads = resolveUploads(input.workspaceId, uploadIds)
+  if (!input.content && uploads.length === 0 && contextAttachments.length === 0) return
   const sessionTitleSource = input.isNew
-    ? buildSessionTitleSource(
-        input.content,
-        uploads.map(upload => upload.filename)
-      )
+    ? buildSessionTitleSource(input.content, [
+        ...uploads.map(upload => upload.filename),
+        ...contextAttachments.map(a => a.label)
+      ])
     : undefined
-  const { input: userInput, parts } = await buildUserInput(input.content, uploads)
+  const { input: userInput, parts } = await buildUserInput(
+    input.content,
+    uploads,
+    contextAttachments
+  )
   if (userInput.length === 0) return
   const serviceTier = codexServiceTierForFastMode(input.fastMode)
 

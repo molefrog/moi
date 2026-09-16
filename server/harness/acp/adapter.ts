@@ -7,6 +7,11 @@
 // call both closes the open assistant turn and becomes a turn of its own —
 // the same item-per-turn model the Codex adapter produces.
 
+import {
+  splitContextAttachments,
+  contextAttachmentParts,
+  stripContextAttachmentsLoose
+} from '@/lib/moi-attachments'
 import { splitAttachmentNote } from '@/lib/attachment-note'
 import type { Part, ToolCall, ToolState, Turn, TurnMeta } from '@/lib/format'
 import { stripMoiContext } from '@/lib/moi-context'
@@ -118,13 +123,15 @@ export function acpUsageToTurnMeta(usage: Usage | null | undefined): TurnMeta['u
 // carries the envelope as its lone text) folds to no parts — the caller skips
 // the bubble entirely.
 export function replayedUserParts(raw: string): Part[] {
-  const split = splitAttachmentNote(stripMoiContext(raw))
+  const attached = splitContextAttachments(stripMoiContext(raw))
+  const split = splitAttachmentNote(attached.text)
   const parts: Part[] = split.files.map(f => ({
     type: 'file',
     mediaType: 'application/octet-stream',
     url: f.path,
     filename: f.filename
   }))
+  parts.push(...contextAttachmentParts(attached.attachments))
   if (split.text.trim()) parts.push({ type: 'text', text: split.text })
   return parts
 }
@@ -133,7 +140,7 @@ export function acpSessionToSessionInfo(entry: AcpSessionListEntry): SessionInfo
   const updated = entry.updatedAt ? Date.parse(entry.updatedAt) : NaN
   return {
     sessionId: entry.sessionId,
-    summary: entry.title?.trim() || 'Untitled session',
+    summary: stripContextAttachmentsLoose(entry.title?.trim() ?? '') || 'Untitled session',
     lastModified: Number.isNaN(updated) ? 0 : updated,
     ...(entry.cwd ? { cwd: entry.cwd } : {})
   }

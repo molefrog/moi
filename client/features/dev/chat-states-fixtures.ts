@@ -525,6 +525,12 @@ const moonReplyWithMeta: Turn = {
 
 // Beat 12 — attachments: image thumbnail + non-image file chip on one user turn.
 const attachmentsTurn = turn('user', 23, 26, [
+  {
+    type: 'context',
+    source: 'view:board',
+    label: 'Selected board items',
+    context: { itemIds: ['item-1', 'item-2'] }
+  },
   { type: 'file', mediaType: 'image/png', url: CHECKERBOARD_PNG, filename: 'pattern.png' },
   { type: 'file', mediaType: 'application/pdf', url: '', filename: 'report.pdf' },
   text(

@@ -11,7 +11,11 @@ import {
   startOptimisticTurn,
   withAttachmentDirectives
 } from '@/client/features/chat/chat-send'
-import { attachmentKey, type ChatAttachment, liveStore } from '@/client/features/chat/chat-store'
+import { attachmentKey, liveStore } from '@/client/features/chat/chat-store'
+import type {
+  ChatAttachment,
+  UploadedChatAttachment
+} from '@/client/features/chat/composer/attachments/types'
 import type { SessionInfo, ViewState, WorkspaceAgent } from '@/lib/types'
 import { resolveSelectedModel } from './composer/model-order'
 
@@ -228,7 +232,7 @@ describe('composer attachments', () => {
       name: 'report.pdf',
       mediaType: 'application/pdf',
       status: 'ready',
-      upload: { id: 'up-1', kind: 'file' } as ChatAttachment['upload']
+      upload: { id: 'up-1', kind: 'file' } as UploadedChatAttachment['upload']
     },
     {
       kind: 'file',
@@ -280,7 +284,7 @@ describe('composer attachments', () => {
         name: 'Reference.png',
         mediaType: 'image/png',
         status: 'ready',
-        upload: { id: 'up-image', kind: 'image' } as ChatAttachment['upload']
+        upload: { id: 'up-image', kind: 'image' } as UploadedChatAttachment['upload']
       },
       {
         kind: 'drawing',
@@ -290,7 +294,7 @@ describe('composer attachments', () => {
         mediaType: 'image/png',
         sourceTab: 'overview',
         status: 'ready',
-        upload: { id: 'up-annotation', kind: 'image' } as ChatAttachment['upload']
+        upload: { id: 'up-annotation', kind: 'image' } as UploadedChatAttachment['upload']
       },
       {
         kind: 'drawing',
@@ -300,7 +304,7 @@ describe('composer attachments', () => {
         mediaType: 'image/png',
         sourceTab: 'view:roadmap',
         status: 'ready',
-        upload: { id: 'up-annotation-2', kind: 'image' } as ChatAttachment['upload']
+        upload: { id: 'up-annotation-2', kind: 'image' } as UploadedChatAttachment['upload']
       }
     ]
 
@@ -321,7 +325,7 @@ describe('composer attachments', () => {
       mediaType: 'image/png',
       sourceTab: 'overview',
       status: 'ready',
-      upload: { id: 'up-annotation', kind: 'image' } as ChatAttachment['upload']
+      upload: { id: 'up-annotation', kind: 'image' } as UploadedChatAttachment['upload']
     }
     const options = { applet: { source: 'widget:late-orders' } }
     expect(withAttachmentDirectives(options, [annotation])).toBe(options)
@@ -336,7 +340,7 @@ describe('composer attachments', () => {
       mediaType: 'image/png',
       sourceTab: 'view-builder:draft-1',
       status: 'ready',
-      upload: { id: 'up-sketch', kind: 'image' } as ChatAttachment['upload']
+      upload: { id: 'up-sketch', kind: 'image' } as UploadedChatAttachment['upload']
     }
 
     expect(withAttachmentDirectives(undefined, [sketch])).toEqual({

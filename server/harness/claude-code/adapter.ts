@@ -1,3 +1,4 @@
+import { splitContextAttachments, contextAttachmentParts } from '@/lib/moi-attachments'
 import type {
   AdapterEmit,
   Part,
@@ -549,7 +550,9 @@ export class ClaudeAdapter {
               // SDK persists that appended text, so fold the note back into
               // file chips here — a reloaded bubble matches the live one
               // instead of leaking temp paths into it.
-              const split = splitAttachmentNote(text)
+              const attached = splitContextAttachments(text)
+              parts.push(...contextAttachmentParts(attached.attachments))
+              const split = splitAttachmentNote(attached.text)
               // moi's own context envelope strips precisely (marker-guarded);
               // other embedded machinery — system reminders, hook output —
               // strips by the shared rules, keeping the typed text.

@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { toast } from '@/client/components/ui/toast'
-import { stageDrawing, stageDrawingDraft } from '@/client/features/chat/composer/attachments/draft-attachments'
+import {
+  stageDrawing,
+  stageDrawingDraft
+} from '@/client/features/chat/composer/attachments/draft-attachments'
 import { liveStore } from '@/client/features/chat/chat-store'
 import type { ComposerAnnotationControls } from '@/client/features/chat/composer/ChatComposer'
 import { useLatestRef } from '@/client/lib/use-latest-ref'

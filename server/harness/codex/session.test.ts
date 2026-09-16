@@ -1,3 +1,4 @@
+import { splitContextAttachments } from '@/lib/moi-attachments'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 
 import type { BroadcastFrame, StreamEvent } from '@/lib/types'
@@ -257,18 +258,27 @@ describe('Codex live session lifecycle', () => {
       mediaType: 'image/gif',
       bytes: Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64')
     })
-    await f.send('inspect', { model: 'text', attachments: [upload.id] })
+    await f.send('inspect', {
+      model: 'text',
+      attachments: [{ type: 'upload', uploadId: upload.id }]
+    })
     expect(f.calls.some(call => call.method === 'turn/start')).toBe(false)
     expect(f.frames().at(-1)).toMatchObject({
       kind: 'error',
       content: expect.stringContaining('does not accept images')
     })
     await f.send('start text turn', { model: 'text' })
-    await f.send('switch mid-turn', { model: 'vision', attachments: [upload.id] })
+    await f.send('switch mid-turn', {
+      model: 'vision',
+      attachments: [{ type: 'upload', uploadId: upload.id }]
+    })
     expect(f.calls.some(call => call.method === 'turn/steer')).toBe(false)
     expect(f.active()).toBe(true)
     f.emit('turn/completed', { turn: { id: 'turn-1', status: 'completed', items: [] } })
-    await f.send('legacy image', { model: 'legacy', attachments: [upload.id] })
+    await f.send('legacy image', {
+      model: 'legacy',
+      attachments: [{ type: 'upload', uploadId: upload.id }]
+    })
     expect(f.calls.at(-1)).toMatchObject({
       method: 'turn/start',
       params: {
@@ -511,3 +521,24 @@ describe('Codex live session lifecycle', () => {
     expect(f.calls.filter(call => call.method === 'thread/resume')).toHaveLength(2)
   })
 })
+
+for (const native of [true, false]) {
+  test(`context-only sends are durable with native context ${native}`, async () => {
+    const f = fixture()
+    f.client.supportsAdditionalContext = native
+    const contextAttachments = [{ source: 'view:orders', label: 'Order', context: { id: '1' } }]
+    await f.send('', {
+      attachments: contextAttachments.map(a => ({ type: 'context' as const, ...a })),
+      optimisticId: 'context-turn',
+      context: { activeTab: 'view:orders' }
+    })
+    const start = f.calls.find(call => call.method === 'turn/start')!
+    const sent = start.params.input as Array<{ type: string; text?: string }>
+    const raw = sent.find(item => item.type === 'text')!.text!
+    expect(splitContextAttachments(raw).attachments).toEqual(contextAttachments)
+    const event = f.events().find(event => event.kind === 'turn' && event.turn.role === 'user')
+    expect(event?.kind === 'turn' ? event.turn.parts : null).toEqual([
+      { type: 'context', ...contextAttachments[0] }
+    ])
+  })
+}

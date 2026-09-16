@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { stageDrawing, stageDrawingDraft } from '@/client/features/chat/composer/attachments/draft-attachments'
+import {
+  stageDrawing,
+  stageDrawingDraft
+} from '@/client/features/chat/composer/attachments/draft-attachments'
 import { attachmentKey, liveStore } from '@/client/features/chat/chat-store'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { WorkspaceTabId } from '@/lib/types'
@@ -76,6 +79,7 @@ export function useViewBuilderSketch({
           .attachments[attachmentKey(workspaceId, sessionId)]?.some(
             attachment =>
               attachment.localId === attachmentIdRef.current &&
+              attachment.kind !== 'context' &&
               (attachment.status === 'ready' || attachment.status === 'uploading')
           )
         if (staged) return pendingStageRef.current ?? Promise.resolve()

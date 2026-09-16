@@ -1,6 +1,11 @@
+import type { ContextAttachment } from '@/lib/types'
 import type { WorkspaceTabId } from '@/lib/types'
 
-import { attachmentKey, type ChatAttachment, type DrawingPurpose, liveStore } from '../../chat-store'
+import { attachmentKey, liveStore } from '../../chat-store'
+import type {
+  ChatAttachment,
+  DrawingPurpose
+} from '@/client/features/chat/composer/attachments/types'
 import { uploadFiles } from './uploads'
 
 type ComposerTarget = {
@@ -150,4 +155,28 @@ export async function stageDrawing({
     if (!isCurrent()) return
     liveStore.getState().removeAttachment(workspaceId, sessionId, localId)
   }
+}
+
+// Duplicate context is ignored; the caller still reveals chat.
+export function stageChatContext(
+  { workspaceId, sessionId }: ComposerTarget,
+  attachment: ContextAttachment
+): void {
+  const store = liveStore.getState()
+  const pending = (store.attachments[attachmentKey(workspaceId, sessionId)] ?? []).filter(
+    item => item.kind === 'context'
+  )
+  const json = JSON.stringify(attachment.context)
+  if (
+    pending.some(
+      item =>
+        item.attachment.source === attachment.source &&
+        item.attachment.label === attachment.label &&
+        JSON.stringify(item.attachment.context) === json
+    )
+  )
+    return
+  store.addAttachments(workspaceId, sessionId, [
+    { kind: 'context', localId: crypto.randomUUID(), name: attachment.label, attachment }
+  ])
 }

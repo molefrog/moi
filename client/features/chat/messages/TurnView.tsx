@@ -1,3 +1,4 @@
+import { ContextAttachmentChip } from '../composer/attachments/ContextAttachmentChip'
 import { memo } from 'react'
 
 import { IconChevronRight, IconFile } from '@tabler/icons-react'
@@ -167,13 +168,17 @@ export const TurnView = memo(function TurnView({ turn, processing = false }: Tur
     const fileParts = turn.parts.filter(
       (p): p is Extract<Part, { type: 'file' }> => p.type === 'file'
     )
+    const contextParts = turn.parts.filter(p => p.type === 'context')
     const text = turn.parts
       .filter(p => p.type === 'text')
       .map(p => (p.type === 'text' ? p.text : ''))
       .join('\n')
-    if (!text && fileParts.length === 0) return null
+    if (!text && fileParts.length === 0 && contextParts.length === 0) return null
     return (
       <div className="flex w-full min-w-0 flex-col items-end gap-1.5 pl-8">
+        {contextParts.map((p, i) => (
+          <ContextAttachmentChip key={`context:${i}`} label={p.label} />
+        ))}
         {fileParts.map((p, i) => (
           <FilePart key={i} mediaType={p.mediaType} url={p.url} filename={p.filename} />
         ))}
@@ -207,6 +212,8 @@ type PartRendererProps = { part: Part }
 // folded into a <ToolCallGroup> run by buildSegments.
 function PartRenderer({ part }: PartRendererProps) {
   switch (part.type) {
+    case 'context':
+      return <ContextAttachmentChip label={part.label} />
     case 'text':
       return <MarkdownContent content={part.text} />
     case 'tool-call':
