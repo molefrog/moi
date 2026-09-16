@@ -8,7 +8,7 @@ type AttachmentChipProps = ComponentPropsWithRef<'div'> & {
   icon: Icon
   onRemove?: () => void
   previewUrl?: string
-  status?: 'draft' | 'uploading' | 'ready' | 'error'
+  status?: 'draft' | 'uploading' | 'ready'
 }
 
 // Two layouts share one frame: a labelled chip or an image thumbnail.
@@ -29,7 +29,6 @@ export function AttachmentChip({
       className={cn(
         'group relative flex max-w-full min-w-0 cursor-default items-center rounded-md bg-background text-sm whitespace-nowrap text-foreground ring-1 ring-border outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
         previewUrl ? 'size-14 overflow-hidden' : 'h-7 pr-2 pl-0.5',
-        status === 'error' && 'ring-destructive/50',
         className
       )}
     >
@@ -108,13 +107,6 @@ function ChipUploadStatus({ status }: ChipUploadStatusProps) {
     return (
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-background/70">
         <IconLoader2 size={16} stroke={1.75} className="animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-  if (status === 'error') {
-    return (
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-destructive/10 text-[10px] text-destructive">
-        Failed
       </div>
     )
   }

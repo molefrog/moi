@@ -6,6 +6,7 @@ import type { DrawingPurpose } from './types'
 import { uploadFiles, uploadChatFile } from './uploads'
 import type { AppletChatAttachment } from '@/client/features/applets/applet-runtime'
 import { reportAppletError } from '@/client/features/applets/applet-log'
+import { toast } from '@/client/components/ui/toast'
 
 type ComposerTarget = {
   workspaceId: string
@@ -23,12 +24,13 @@ async function stageFile(
   onError?: (message: string) => void
 ): Promise<void> {
   const file = typeof input === 'string' ? null : input
+  const name = typeof input === 'string' ? input.split('/').at(-1)! : input.name || 'file'
   const localId = crypto.randomUUID()
   liveStore.getState().addAttachments(workspaceId, sessionId, [
     {
       kind: 'file',
       localId,
-      name: typeof input === 'string' ? input.split('/').at(-1)! : input.name || 'file',
+      name,
       mediaType: file?.type || 'application/octet-stream',
       previewUrl: file?.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
       status: 'uploading'
@@ -47,7 +49,8 @@ async function stageFile(
     })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Upload failed'
-    liveStore.getState().updateAttachment(workspaceId, localId, { status: 'error', error: message })
+    liveStore.getState().removeAttachment(workspaceId, localId)
+    toast.add({ title: `Couldn’t add ${name}`, description: message, type: 'error' })
     onError?.(message)
   }
 }
@@ -100,8 +103,7 @@ export function stageDrawingDraft({
     store.updateAttachment(workspaceId, localId, {
       previewUrl,
       status: 'draft',
-      upload: undefined,
-      error: undefined
+      upload: undefined
     })
   } else {
     store.addAttachments(workspaceId, sessionId, [
@@ -148,8 +150,7 @@ export async function stageDrawing({
     store.updateAttachment(workspaceId, localId, {
       previewUrl,
       status: 'uploading',
-      upload: undefined,
-      error: undefined
+      upload: undefined
     })
   } else {
     store.addAttachments(workspaceId, sessionId, [
@@ -174,8 +175,7 @@ export async function stageDrawing({
     liveStore.getState().updateAttachment(workspaceId, localId, {
       status: 'ready',
       upload,
-      mediaType: upload.mediaType,
-      error: undefined
+      mediaType: upload.mediaType
     })
   } catch {
     if (!isCurrent()) return

@@ -106,8 +106,8 @@ Call from user event handlers. Text is captured immediately; workspace files are
 the server reads them during staging. Later changes do not update the attachment. Text appears
 as a labelled chip; files use the existing file or image representation.
 
-Invalid arguments reject the call without staging anything. File preparation failures show a
-removable error chip. File loading blocks sending until it finishes. Errors are recorded in
+Invalid arguments reject the call without staging anything. File preparation failures remove
+the attachment and show an error toast. File loading blocks sending until it finishes. Errors are recorded in
 `moi debug logs`.
 
 Identical text from the same applet with the same label is skipped. Attachments stay with their

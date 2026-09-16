@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
+import { toast } from '@/client/components/ui/toast'
 
 import {
   stageDrawing,
@@ -13,6 +14,11 @@ import { attachmentKey, liveStore } from '../../chat-store'
 const workspaceId = 'workspace-1'
 const sessionId = 'session-1'
 const originalFetch = globalThis.fetch
+let notices: ReturnType<typeof spyOn<typeof toast, 'add'>>
+
+beforeEach(() => {
+  notices = spyOn(toast, 'add').mockImplementation(() => crypto.randomUUID())
+})
 
 function drawingAttachments() {
   return (liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)] ?? []).filter(
@@ -21,6 +27,7 @@ function drawingAttachments() {
 }
 
 afterEach(() => {
+  notices.mockRestore()
   globalThis.fetch = originalFetch
   liveStore.getState().clearAttachments(workspaceId, sessionId)
   liveStore.setState({ attachments: {} })
@@ -286,30 +293,50 @@ describe('applet file staging', () => {
     expect(attachmentsForSend(workspaceId, sessionId)).toEqual([])
   })
 
-  test('path images get an upload preview and failures get a removable error chip and log', async () => {
-    const log = spyOn(appletLog, 'reportAppletError').mockImplementation(() => {})
-    const requests: string[] = []
-    globalThis.fetch = mock((url: string) => {
-      requests.push(url)
-      return Promise.resolve(
-        url.endsWith('/applet-log')
-          ? new Response(null, { status: 204 })
-          : new Response('Missing file', { status: 400 })
+  test.each(['browser', 'path'] as const)(
+    '%s failures remove only the failed upload and show a toast',
+    async source => {
+      const log = spyOn(appletLog, 'reportAppletError').mockImplementation(() => {})
+      const revoke = spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+      const response = Promise.withResolvers<Response>()
+      globalThis.fetch = mock(() => response.promise) as unknown as typeof fetch
+      stageTextAttachment(
+        { workspaceId, sessionId },
+        { label: 'Keep', text: 'Keep this attachment', source: 'view:files' }
       )
-    }) as unknown as typeof fetch
-    await stageChatAttachment(
-      { workspaceId, sessionId },
-      { type: 'file', path: 'missing.pdf', source: 'view:files' }
-    )
-    const failed = drawingAttachments()[0]
-    expect(failed).toMatchObject({ status: 'error', error: 'Missing file' })
-    expect(log).toHaveBeenCalledWith(workspaceId, {
-      source: 'runtime',
-      message: 'addChatAttachment() from view:files: Missing file'
-    })
-    log.mockRestore()
-    liveStore.getState().removeAttachment(workspaceId, failed.localId)
-    expect(drawingAttachments()).toEqual([])
+      const kept = attachmentsForSend(workspaceId, sessionId)
+      const pending = stageChatAttachment(
+        { workspaceId, sessionId },
+        source === 'browser'
+          ? {
+              type: 'file',
+              file: new File(['image'], 'image.png', { type: 'image/png' }),
+              source: 'view:files'
+            }
+          : { type: 'file', path: 'missing.pdf', source: 'view:files' }
+      )
+      const failed = drawingAttachments()[0]
+      expect(failed.status).toBe('uploading')
+      liveStore.getState().renameSession(workspaceId, sessionId, 'real')
+      response.resolve(new Response('Upload failed', { status: 400 }))
+      await pending
+      expect(liveStore.getState().attachments[attachmentKey(workspaceId, 'real')]).toEqual(kept)
+      expect(notices).toHaveBeenCalledWith({
+        title: `Couldn’t add ${failed.name}`,
+        description: 'Upload failed',
+        type: 'error'
+      })
+      if (failed.previewUrl) expect(revoke).toHaveBeenCalledWith(failed.previewUrl)
+      expect(log).toHaveBeenCalledWith(workspaceId, {
+        source: 'runtime',
+        message: 'addChatAttachment() from view:files: Upload failed'
+      })
+      log.mockRestore()
+      revoke.mockRestore()
+    }
+  )
+
+  test('path images get an upload preview', async () => {
     globalThis.fetch = mock(() =>
       Promise.resolve(
         Response.json({ id: 'img', filename: 'image.png', kind: 'image', mediaType: 'image/png' })

@@ -11,9 +11,8 @@ type UploadAttachmentBase = {
   name: string
   mediaType: string
   previewUrl?: string
-  status: 'draft' | 'uploading' | 'ready' | 'error'
+  status: 'draft' | 'uploading' | 'ready'
   upload?: UploadInfo
-  error?: string
 }
 
 export type DrawingPurpose = 'annotation' | 'sketch'
@@ -29,5 +28,5 @@ export type ChatAttachment =
   | { kind: 'text'; localId: string; name: string; attachment: TextAttachment }
 
 export type ChatAttachmentPatch = Partial<
-  Pick<UploadAttachmentBase, 'name' | 'mediaType' | 'previewUrl' | 'status' | 'upload' | 'error'>
+  Pick<UploadAttachmentBase, 'name' | 'mediaType' | 'previewUrl' | 'status' | 'upload'>
 >

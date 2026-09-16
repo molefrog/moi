@@ -15,7 +15,7 @@ export function FileAttachmentChip({ attachment, onRemove }: FileAttachmentChipP
       onRemove={onRemove}
       previewUrl={attachment.previewUrl}
       status={attachment.status}
-      title={attachment.error ?? attachment.name}
+      title={attachment.name}
       className="max-w-52"
     />
   )
