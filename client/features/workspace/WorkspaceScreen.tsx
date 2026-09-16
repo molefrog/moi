@@ -456,7 +456,7 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   // Chat messages fired from applet UI. `openChat` is the reveal: on a view tab
   // in full-screen mode the chat is a closed popover, and a run the user can't
   // see is worse than a panel that opens itself.
-  useAppletChatMessage({ send, revealChat: openChat, agentAvailability })
+  useAppletChatMessage({ sessionId, send, revealChat: openChat, agentAvailability })
   useAppletChatAttachment(sessionId, openChat)
 
   const createItems: CreateWorkspaceTabItem[] = [

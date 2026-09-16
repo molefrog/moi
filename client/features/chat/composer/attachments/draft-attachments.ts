@@ -3,7 +3,7 @@ import type { WorkspaceTabId } from '@/lib/types'
 
 import { attachmentKey, liveStore } from '../../chat-store'
 import type { DrawingPurpose } from './types'
-import { uploadFiles, uploadWorkspaceFile } from './uploads'
+import { uploadFiles, uploadChatFile } from './uploads'
 import type { AppletChatAttachment } from '@/client/features/applets/applet-runtime'
 import { reportAppletError } from '@/client/features/applets/applet-log'
 
@@ -35,10 +35,7 @@ async function stageFile(
     }
   ])
   try {
-    const upload =
-      typeof input === 'string'
-        ? await uploadWorkspaceFile(workspaceId, input)
-        : (await uploadFiles(workspaceId, [input]))[0]
+    const upload = await uploadChatFile(workspaceId, input)
     liveStore.getState().updateAttachment(workspaceId, localId, {
       status: 'ready',
       upload,

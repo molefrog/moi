@@ -1,4 +1,6 @@
 import type { MessageAttachment } from '@/lib/types'
+import type { AppletChatAttachment } from '@/client/features/applets/applet-runtime'
+import { uploadChatFile } from './composer/attachments/uploads'
 import { textAttachmentParts } from '@/lib/moi-attachments'
 import type { QueryClient } from '@tanstack/react-query'
 
@@ -12,16 +14,50 @@ import { formatChatTitle } from '@/lib/chat-title'
 import { applyEvent, emptyViewState } from '@/lib/format'
 import type { Part, SessionInfo, ViewState, WorkspaceAgent } from '@/lib/types'
 
-// What a caller may attach to one message beyond its text. All of it is
-// envelope material — the agent sees it, the chat bubble does not.
-export type ChatSendOptions = MoiUserMessageOptions
+// Explicit attachments belong to this send, independently of the user's draft.
+export type PreparedChatAttachments = {
+  attachments: MessageAttachment[]
+  parts: Part[]
+}
+
+export type ChatSendOptions = MoiUserMessageOptions & {
+  preparedAttachments?: PreparedChatAttachments
+}
+
+export async function prepareChatAttachments(
+  workspaceId: string,
+  inputs: readonly AppletChatAttachment[]
+): Promise<PreparedChatAttachments> {
+  const prepared = await Promise.all(
+    inputs.map(async input => {
+      if (input.type === 'text') {
+        const { source, label, text } = input
+        const attachment: MessageAttachment = { type: 'text', source, label, text }
+        return { attachment, part: textAttachmentParts([attachment])[0] }
+      }
+      const upload = await uploadChatFile(workspaceId, input.file ?? input.path)
+      const attachment: MessageAttachment = { type: 'upload', uploadId: upload.id }
+      const part: Part = {
+        type: 'file-attachment',
+        mediaType: upload.mediaType,
+        filename: upload.filename,
+        url: upload.kind === 'image' ? `/api/workspaces/${workspaceId}/uploads/${upload.id}` : ''
+      }
+      return { attachment, part }
+    })
+  )
+  return {
+    attachments: prepared.map(item => item.attachment),
+    parts: prepared.map(item => item.part)
+  }
+}
 
 // Whether this send owns what the user has staged in the composer. Only a send
 // FROM the composer does. An applet's message is not the message the user is
 // building, so it must neither carry files they staged for their own message
 // nor clear ones still uploading out from under them.
 export function ownsComposerAttachments(options?: ChatSendOptions): boolean {
-  return !options?.applet
+  return !options?.applet && !options?.preparedAttachments
 }
 
 // The fully-uploaded attachments this send should carry — none for a send that

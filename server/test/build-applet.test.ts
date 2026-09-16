@@ -528,7 +528,7 @@ describe('moi fileUrl module', () => {
     // Two args only: the applet cannot pass a source, because attribution is
     // stamped host-side (applet-runtime.ts) from the identity the bridge was
     // attached with.
-    expect(result.js).toContain('sendChatMessage(input, context)')
+    expect(result.js).toContain('sendChatMessage(input, legacyContext)')
   })
 
   test('bundles addChatAttachment through the applet bridge', async () => {

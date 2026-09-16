@@ -24,7 +24,6 @@ import { createNanoEvents } from 'nanoevents'
 import { reportAppletError } from '@/client/features/applets/applet-log'
 import { createRateLimiter } from '@/client/lib/rate-limit'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
-import { MAX_APPLET_CONTEXT_CHARS } from '@/lib/moi-context'
 import type { AppletKind, WorkspaceTabId } from '@/lib/types'
 import { isParamsRecord, isWorkspaceTabId } from '@/lib/workspace-tabs'
 
@@ -39,7 +38,7 @@ export const appletSource = ({ kind, name }: AppletIdentity): string => `${kind}
 export type AppletChatMessage = {
   message: string
   source: string
-  context?: Record<string, unknown>
+  attachments: AppletChatAttachment[]
 }
 
 export type AppletChatAttachment = ChatAttachmentInput & { source: string }
@@ -52,7 +51,7 @@ export type AppletEvents = {
   // (history state is structured-cloned).
   focusTab: (tab: WorkspaceTabId, params?: Record<string, unknown>) => void
   // A message for the workspace's active chat, sent as if the user typed
-  // `message`. `context` rides the `<moi-context>` envelope, not the bubble.
+  // `message`, with attachments prepared before the send.
   sendChatMessage: (message: AppletChatMessage) => void
 }
 
@@ -133,32 +132,11 @@ function createRuntime(workspaceId: string) {
       const bridge: AppletBridge = {
         addChatAttachment(input) {
           if (!alive) return
-          if (isParamsRecord(input)) {
-            if (input.type === 'text') {
-              const snapshot = snapshotTextAttachment(input)
-              if (snapshot) {
-                emitter.emit('addChatAttachment', { type: 'text', ...snapshot, source })
-                return
-              }
-            } else if (input.type === 'file') {
-              if (
-                input.file instanceof File &&
-                input.path === undefined &&
-                input.file.size <= MAX_UPLOAD_BYTES
-              ) {
-                emitter.emit('addChatAttachment', { type: 'file', file: input.file, source })
-                return
-              }
-              if (isWorkspaceAttachmentPath(input.path) && input.file === undefined) {
-                emitter.emit('addChatAttachment', { type: 'file', path: input.path, source })
-                return
-              }
-            }
+          try {
+            emitter.emit('addChatAttachment', snapshotAttachmentInput(input, source))
+          } catch (error) {
+            drop(identity, `addChatAttachment() was dropped: ${errorMessage(error)}`)
           }
-          drop(
-            identity,
-            'addChatAttachment() was dropped: provide labelled text (label max 120 characters, text max 5000), or exactly one File (max 32 MB) or workspace-relative path. Hidden paths are not allowed.'
-          )
         },
         focusTab(tab, params) {
           if (!alive) return
@@ -167,28 +145,41 @@ function createRuntime(workspaceId: string) {
         },
         sendChatMessage(input, legacyContext) {
           if (!alive) return
-          // Older applets pass (message, context?). Normalize to the object form
-          // so both APIs share validation and rate limits.
-          if (typeof input === 'string') input = { message: input, context: legacyContext }
-          if (!isParamsRecord(input) || typeof input.message !== 'string') return
-          const { message, context } = input
-          const text = message.trim()
-          if (!text) return
-          if (text.length > MAX_MESSAGE_CHARS) {
-            drop(
-              identity,
-              `sendChatMessage() was dropped: the message is ${text.length} characters (max ${MAX_MESSAGE_CHARS}). Put long content in the context field, not the message.`
+          try {
+            // Runtime compatibility for older bundles. Both forms use the same
+            // attachment validation and send path; only the object API is public.
+            if (typeof input === 'string') {
+              input = {
+                message: input,
+                attachments:
+                  legacyContext === undefined
+                    ? []
+                    : [{ type: 'text', label: 'Context', text: JSON.stringify(legacyContext) }]
+              }
+            }
+            if (!isParamsRecord(input) || typeof input.message !== 'string') {
+              throw new Error('provide an object with a message string and optional attachments.')
+            }
+            if ('context' in input) {
+              throw new Error('the context field is no longer supported. Use attachments instead.')
+            }
+            const message = input.message.trim()
+            if (!message || message.length > MAX_MESSAGE_CHARS) {
+              throw new Error(
+                `message must be non-empty and at most ${MAX_MESSAGE_CHARS} characters. Put longer content in a text attachment.`
+              )
+            }
+            if (input.attachments !== undefined && !Array.isArray(input.attachments)) {
+              throw new Error('attachments must be an array.')
+            }
+            const attachments = Array.from(input.attachments ?? [], item =>
+              snapshotAttachmentInput(item, source)
             )
-            return
+            if (!admitChatMessage(identity, source, message)) return
+            emitter.emit('sendChatMessage', { message, source, attachments })
+          } catch (error) {
+            drop(identity, `sendChatMessage() was dropped: ${errorMessage(error)}`)
           }
-          if (!admitChatMessage(identity, source, text)) return
-          emitter.emit('sendChatMessage', {
-            message: text,
-            source,
-            ...(context !== undefined
-              ? { context: narrowChatContext(identity, context, drop) }
-              : {})
-          })
         }
       }
       return {
@@ -201,37 +192,33 @@ function createRuntime(workspaceId: string) {
   }
 }
 
-// The message carries the user's intent, so a bad `context` drops the payload
-// and keeps the message rather than losing the whole call. Returns undefined
-// for anything that can't ride the envelope: a non-record, something that
-// won't serialize (cycles, functions, BigInt), or an oversized blob.
-function narrowChatContext(
-  identity: AppletIdentity,
-  context: unknown,
-  drop: (identity: AppletIdentity, message: string) => void
-): Record<string, unknown> | undefined {
-  if (!isParamsRecord(context)) {
-    drop(identity, 'sendChatMessage() ignored its context field: it must be a plain object.')
-    return undefined
+// Copy the caller's fields now so later applet mutations cannot change a send
+// or staged attachment. File contents are immutable and can be retained as-is.
+function snapshotAttachmentInput(input: unknown, source: string): AppletChatAttachment {
+  if (isParamsRecord(input)) {
+    if (input.type === 'text') {
+      const snapshot = snapshotTextAttachment(input)
+      if (snapshot) return { type: 'text', ...snapshot, source }
+    } else if (input.type === 'file') {
+      if (
+        input.file instanceof File &&
+        input.path === undefined &&
+        input.file.size <= MAX_UPLOAD_BYTES
+      ) {
+        return { type: 'file', file: input.file, source }
+      }
+      if (isWorkspaceAttachmentPath(input.path) && input.file === undefined) {
+        return { type: 'file', path: input.path, source }
+      }
+    }
   }
-  let json: string
-  try {
-    json = JSON.stringify(context)
-  } catch {
-    drop(
-      identity,
-      'sendChatMessage() ignored its context field: it is not JSON-serializable (cycles, functions, or BigInt).'
-    )
-    return undefined
-  }
-  if (json.length > MAX_APPLET_CONTEXT_CHARS) {
-    drop(
-      identity,
-      `sendChatMessage() ignored its context field: ${json.length} characters serialized (max ${MAX_APPLET_CONTEXT_CHARS}). Send an id the agent can look up instead of the whole payload.`
-    )
-    return undefined
-  }
-  return context
+  throw new Error(
+    'provide labelled text (label max 120 characters, text max 5000), or exactly one File (max 32 MB) or workspace-relative path. Hidden paths are not allowed.'
+  )
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 type AppletRuntime = ReturnType<typeof createRuntime>

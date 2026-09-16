@@ -106,12 +106,12 @@ export function useChat(address: WorkspaceTabAddress) {
       const text = draft.trim()
       // Attachments stay with the selected session. Only fully-uploaded ones are
       // sent; the composer disables send while any are still uploading, so in
-      // practice they're all ready here. An applet send gets none — the staged
-      // files are the user's, not the widget's.
+      // practice they're all ready here. Applet sends supply their own prepared
+      // attachments and leave the user's staged files alone.
       const ready = attachmentsForSend(workspaceId, selectedSessionId, options)
       // No `processing` guard: sending while a turn is in flight QUEUES the
       // message into the same live server session (streaming-input mode).
-      if (!text && ready.length === 0) return
+      if (!text && ready.length === 0 && !options?.preparedAttachments?.attachments.length) return
 
       let sid = selectedSessionId
       let isNew = false
@@ -137,7 +137,9 @@ export function useChat(address: WorkspaceTabAddress) {
       // upserts in place rather than duplicating. Image attachments render from
       // their local object URL until the server's broadcast (with a data URL)
       // upserts in place.
-      const parts: Part[] = attachmentPartsForOptimisticTurn(ready)
+      const parts: Part[] = options?.preparedAttachments
+        ? [...options.preparedAttachments.parts]
+        : attachmentPartsForOptimisticTurn(ready)
       if (text) parts.push({ type: 'text', text })
       const optimisticId = startOptimisticTurn({
         queryClient: qc,
@@ -159,7 +161,8 @@ export function useChat(address: WorkspaceTabAddress) {
         pickedEffort,
         pickedFastMode
       )
-      const attachments = messageAttachmentsForSend(ready)
+      const attachments =
+        options?.preparedAttachments?.attachments ?? messageAttachmentsForSend(ready)
       sendMessage({
         type: 'chat',
         workspaceId,
@@ -180,7 +183,7 @@ export function useChat(address: WorkspaceTabAddress) {
       }
       // Drop the session's attachments now that they've been sent (revokes the
       // preview object URLs). Keyed by the pre-mint id, matching where they were
-      // stored by the composer. Skipped for an applet send, which carried none:
+      // stored by the composer. Skipped for an applet send:
       // clearing here would discard the user's staged (and in-flight) files.
       if (ownsComposerAttachments(options)) {
         liveStore.getState().clearAttachments(workspaceId, selectedSessionId)

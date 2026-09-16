@@ -113,22 +113,25 @@ removable error chip. File loading blocks sending until it finishes. Errors are 
 Identical text from the same applet with the same label is skipped. Attachments stay with their
 chat in memory and are lost on page reload. Text attachments have no preview or editing UI.
 
-## `sendChatMessage({ message, context? })`
+## `sendChatMessage({ message, attachments? })`
 
 Use this for a complete, ready-to-run action when the user is not expected to add or change
-anything before it starts. It opens chat and sends immediately to the active chat without
-consuming staged draft attachments. Use action message copy that makes the immediate send clear.
+anything before it starts. It opens chat, prepares its attachments, and sends automatically.
+The user's draft text and staged attachments stay untouched. Use action copy that makes the
+immediate send clear.
 
 ### API
 
 ```ts
-function sendChatMessage(input: { message: string; context?: Record<string, unknown> }): void
+function sendChatMessage(input: {
+  message: string
+  attachments?: ChatAttachmentInput[]
+}): void
 ```
 
-- `message`: required user-visible message. Whitespace is trimmed; empty messages are ignored.
-  Maximum length: 1,000 characters.
-- `context`: optional JSON object with data or task instructions for the agent, hidden from the
-  visible message text. Maximum serialized length: 2,000 characters.
+- `message`: required user-visible message, trimmed, non-empty, and at most 1,000 characters.
+- `attachments`: optional list of `ChatAttachmentInput` values, defined above under
+  `addChatAttachment`. The same limits and snapshot behavior apply. Supplied order is preserved.
 
 ### Example
 
@@ -136,16 +139,22 @@ function sendChatMessage(input: { message: string; context?: Record<string, unkn
 import { sendChatMessage } from 'moi'
 
 <button onClick={() => sendChatMessage({
-  message: 'Chase order o-1024',
-  context: { order: 'o-1024', carrier: 'dhl' }
+  message: 'Review this order',
+  attachments: [
+    { type: 'text', label: 'Order #1042', text: 'Status: delayed' },
+    { type: 'file', path: 'reports/order-1042.pdf' }
+  ]
 })}>
-  Chase order
+  Review order
 </button>
 ```
 
 ### Limits
 
-An oversized message is rejected. Invalid or oversized context is omitted while the message
-still sends. Identical messages from the same applet within two seconds are dropped; the
-workspace allows up to 10 applet sends per minute. Calls are also dropped when the agent is
-unavailable.
+Invalid arguments or a failed attachment reject the entire send. File preparation shows a
+loading notice; failures show an error and are recorded in `moi debug logs`. Switching chats
+or workspaces while files are preparing cancels the send, even if the user switches back.
+
+Identical messages from the same applet within two seconds are dropped; the workspace allows
+up to 10 applet sends per minute. Calls are dropped when the agent is unavailable, including
+if it becomes unavailable during preparation.

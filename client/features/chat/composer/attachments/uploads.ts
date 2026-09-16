@@ -26,3 +26,16 @@ export async function uploadWorkspaceFile(workspaceId: string, path: string): Pr
   if (!res.ok) throw new Error(await res.text().catch(() => `Upload failed (${res.status})`))
   return res.json()
 }
+
+// Shared preparation for draft attachments and immediate applet sends.
+export async function uploadChatFile(
+  workspaceId: string,
+  input: File | string
+): Promise<UploadInfo> {
+  const upload =
+    typeof input === 'string'
+      ? await uploadWorkspaceFile(workspaceId, input)
+      : (await uploadFiles(workspaceId, [input]))[0]
+  if (!upload) throw new Error('Upload returned no file')
+  return upload
+}
