@@ -10,7 +10,7 @@ spec for the CC adapter.
 > their wire examples are not an exhaustive list of today's SDK messages, and
 > the migration proposed in §14 has shipped. Current display types live in
 > `lib/format.ts`, mapping in `adapter.ts`, and rendering in
-> `client/features/chat/TurnView.tsx`. Use the installed `sdk.d.ts` for current
+> `client/features/chat/messages/TurnView.tsx`. Use the installed `sdk.d.ts` for current
 > wire types.
 
 Evidence drawn from:

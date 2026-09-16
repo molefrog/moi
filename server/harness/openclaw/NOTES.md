@@ -570,7 +570,7 @@ So there is no Read card on a codex-backed run: the model reads by shelling out
 records. Nothing is being dropped.
 
 The client's tool-card labels and briefs live in
-`client/features/chat/tool-group/format.ts`; the OpenClaw path falls back to the
+`client/features/chat/messages/tool-group/format/index.ts`; the OpenClaw path falls back to the
 Claude Code vocabulary for the `claude-cli` case.
 
 **`agent`/`item` frames are not a second source of tool cards.** They carry

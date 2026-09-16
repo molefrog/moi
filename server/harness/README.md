@@ -22,7 +22,7 @@ Message types flow through four layers; each has one home:
    │           REST payloads (SessionInfo, Models, …)    re-exports it)
    ▼
 4. client      React Query cache of StreamEvents +      client/features/chat/*
-               ephemeral preview store → ViewState →     (tool-group/format.ts holds the
+               ephemeral preview store → ViewState →     (messages/tool-group/format/ holds the
                TurnView rendering                         per-provider labels/briefs)
 ```
 

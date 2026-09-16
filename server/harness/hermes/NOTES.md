@@ -582,7 +582,7 @@ precedent: `lib/types.ts` (`WorkspaceType` union), `lib/workspace-types.ts`
 (ordering), `lib/format.ts` (`provider` union), `server/harness/registry.ts`,
 `server/harness/executable.ts` (PATH lookup), `server/api.ts`
 (`CREATABLE_TYPES`), and a handful of client files that branch on provider
-(`client/features/chat/tool-group/format.ts`,
+(`client/features/chat/messages/tool-group/format/index.ts`,
 `client/features/home/workspace-setup/WorkspaceAgentStep.tsx`,
 `client/features/dev/HarnessDebugPage.tsx`).
 
