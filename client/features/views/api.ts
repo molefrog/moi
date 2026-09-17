@@ -1,3 +1,4 @@
+import type { MessageAttachment } from '@/lib/types'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
@@ -113,7 +114,7 @@ export type SubmitViewBuilderInput = {
   builderId: string
   requirements: string
   optimisticId: string
-  attachments?: string[]
+  attachments?: MessageAttachment[]
   model?: string
   effort?: string
   fastMode?: boolean

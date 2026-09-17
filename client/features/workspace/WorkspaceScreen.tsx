@@ -17,7 +17,7 @@ import { DrawingLayer } from '@/client/features/drawings/DrawingLayer'
 import { DrawingToolbar } from '@/client/features/drawings/DrawingToolbar'
 import { useChatAnnotation } from '@/client/features/drawings/useChatAnnotation'
 import { ChatPanel } from '@/client/features/chat/ChatPanel'
-import type { WelcomeDestination } from '@/client/features/chat/ChatEmptyState'
+import type { WelcomeDestination } from '@/client/features/chat/messages/ChatEmptyState'
 import { ChatPopup } from '@/client/features/chat/ChatPopup'
 import { ThemePanel } from '@/client/features/workspace/ThemePanel'
 import { useAppletEvent } from '@/client/features/applets/applet-runtime'
@@ -33,7 +33,10 @@ import {
   DropdownMenuTrigger
 } from '@/client/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
-import { useAppletChatMessage } from '@/client/features/chat/useAppletChatMessage'
+import {
+  useAppletChatMessage,
+  useAppletChatAttachment
+} from '@/client/features/chat/applet-chat-intents'
 import { useChat } from '@/client/features/chat/useChat'
 import {
   WorkspaceSettingsDialog,
@@ -512,7 +515,8 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
   // Chat messages fired from applet UI. `openChat` is the reveal: on a view tab
   // in full-screen mode the chat is a closed popover, and a run the user can't
   // see is worse than a panel that opens itself.
-  useAppletChatMessage({ send, revealChat: openChat, agentAvailability })
+  useAppletChatMessage({ sessionId, send, revealChat: openChat, agentAvailability })
+  useAppletChatAttachment(sessionId, openChat)
 
   const createItems: CreateWorkspaceTabItem[] = [
     ...(!dockedSplit && !openSet.has('agent')

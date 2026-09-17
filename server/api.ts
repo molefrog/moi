@@ -1,3 +1,4 @@
+import { isMessageAttachments } from '@/lib/message-attachments'
 import { Hono } from 'hono'
 import { serveStatic } from 'hono/bun'
 import { createMiddleware } from 'hono/factory'
@@ -64,7 +65,7 @@ import type { SessionConfigPatch } from './session-config'
 import { DIST_DIR, prebuilt } from './static'
 import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from './skill-update'
 import { serveWorkspaceImagePreview } from './preview'
-import { MAX_UPLOAD_BYTES, addUpload, getUpload } from './uploads'
+import { MAX_UPLOAD_BYTES, addUpload, addWorkspaceFileUpload, getUpload } from './uploads'
 import { requiredEnvFor } from './required-env'
 import {
   deleteView,
@@ -313,15 +314,12 @@ one.post('/view-builders/:builderId/submit', async c => {
   const availableIcons = parseAvailableViewIcons(body.availableIcons)
   if (!availableIcons) return c.text('Available view icons are required', 400)
   const attachments = body.attachments ?? []
-  if (
-    !Array.isArray(attachments) ||
-    attachments.length > 1 ||
-    !attachments.every(id => typeof id === 'string' && /^[a-f0-9]{64}$/.test(id))
-  ) {
-    return c.text('Invalid sketch attachment', 400)
-  }
-  if (attachments.some(id => getUpload(ws.id, id)?.kind !== 'image')) {
-    return c.text('Sketch attachment not found or expired', 400)
+  if (!isMessageAttachments(attachments)) return c.text('Invalid attachments', 400)
+  for (const attachment of attachments) {
+    if (attachment.type !== 'upload') continue
+    if (!/^[a-f0-9]{64}$/.test(attachment.uploadId)) return c.text('Invalid upload id', 400)
+    if (!getUpload(ws.id, attachment.uploadId))
+      return c.text('Attachment not found or expired', 400)
   }
   const availability = await workspaceTypeAvailability(ws.type ?? 'claude-code')
   if (availability.status !== 'available') return c.text(availability.reason, 400)
@@ -341,7 +339,7 @@ one.post('/view-builders/:builderId/submit', async c => {
       directives: [
         ...viewBuilderDirectives(builder.id, availableIcons),
         ...(attachments.length > 0
-          ? ["The attached image is the user's sketch of the intended view layout."]
+          ? ['Use the attachments as reference material for the intended view.']
           : [])
       ]
     }
@@ -501,6 +499,25 @@ one.post('/uploads', async c => {
     }
   }
   return c.json(out)
+})
+
+// Existing workspace documents enter the same upload pipeline without a browser round trip.
+one.post('/uploads/from-path', async c => {
+  const body: unknown = await c.req.json().catch(() => null)
+  if (!body || typeof body !== 'object' || !('path' in body) || typeof body.path !== 'string') {
+    return c.text('Expected a workspace-relative path', 400)
+  }
+  const ws = c.get('ws')
+  try {
+    return c.json(await addWorkspaceFileUpload(ws.id, ws.path, body.path))
+  } catch (error) {
+    if (error instanceof Error && 'code' in error) {
+      if (error.code === 'ENOENT') return c.text('File not found', 400)
+      if (error.code === 'EACCES' || error.code === 'EPERM')
+        return c.text('Cannot read this file', 400)
+    }
+    return c.text(error instanceof Error ? error.message : 'Failed to attach file', 400)
+  }
 })
 
 // Serve an upload's bytes back. Display parts reference this URL instead of a

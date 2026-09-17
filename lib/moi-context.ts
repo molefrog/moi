@@ -39,9 +39,6 @@ const SYSTEM_REMINDER_CLOSE = '</system-reminder>'
 // claim to be another one.
 export type MoiAppletMessage = {
   source: string
-  // The structured payload the applet attached to the call. JSON-plain, and
-  // dropped entirely when it doesn't survive serialization.
-  context?: Record<string, unknown>
 }
 
 // The structured form built at send time — by the client for chat sends, by
@@ -68,14 +65,10 @@ export type MoiContext = {
   directives?: string[]
 }
 
-// Cap on applet-authored JSON rendered into the envelope. Shared with the
-// client applet runtime, which drops an oversized `context` at the trust
-// boundary rather than letting it ride the wire — the renderer's truncation is
-// the backstop for anything that still gets through (e.g. a server-built
-// context).
-export const MAX_APPLET_CONTEXT_CHARS = 2000
+// Cap on ambient view params rendered into the workspace envelope.
+const MAX_TAB_PARAMS_CHARS = 2000
 
-// Applet-authored strings (view titles, applet names, attached context) get
+// Applet-authored strings (view titles, applet names, view params) get
 // interpolated into the envelope, and applet code is agent-authored — a
 // crafted value containing `</moi-context>` would otherwise close the envelope
 // early and forge sections the host never wrote. Escaping `<` defuses every
@@ -88,7 +81,7 @@ function escapeTags(text: string): string {
 // Render an applet-authored record for the envelope, or null when there's
 // nothing worth printing. Non-serializable values (cycles, BigInt) drop rather
 // than throw mid-send.
-function renderAppletJson(value: Record<string, unknown>): string | null {
+function renderTabParams(value: Record<string, unknown>): string | null {
   let json: string
   try {
     json = JSON.stringify(value)
@@ -97,8 +90,8 @@ function renderAppletJson(value: Record<string, unknown>): string | null {
   }
   if (!json || json === '{}') return null
   const capped =
-    json.length > MAX_APPLET_CONTEXT_CHARS
-      ? `${json.slice(0, MAX_APPLET_CONTEXT_CHARS)}… (truncated)`
+    json.length > MAX_TAB_PARAMS_CHARS
+      ? `${json.slice(0, MAX_TAB_PARAMS_CHARS)}… (truncated)`
       : json
   return escapeTags(capped)
 }
@@ -155,16 +148,13 @@ export function renderMoiContextBody(ctx: MoiContext): string {
     'Read the **`moi-workspace` skill** before responding — even to a simple question — unless you already read it in this chat.'
   ].join('\n')
   const tabLines = [describeTab(ctx.activeTab, ctx.tabTitle)]
-  const tabParams = ctx.tabParams ? renderAppletJson(ctx.tabParams) : null
+  const tabParams = ctx.tabParams ? renderTabParams(ctx.tabParams) : null
   if (tabParams) tabLines.push(`Params it is rendering with right now: ${tabParams}`)
   const sections = [`# Active tab\n${tabLines.join('\n')}`]
   if (ctx.applet) {
-    const appletLines = [
-      `The message above was not typed by the user — the ${describeAppletSource(ctx.applet.source)} sent it when the user acted in its UI.`
-    ]
-    const context = ctx.applet.context ? renderAppletJson(ctx.applet.context) : null
-    if (context) appletLines.push(`It attached this context: ${context}`)
-    sections.push(`# Applet message\n${appletLines.join('\n')}`)
+    sections.push(
+      `# Applet message\nThe message above was not typed by the user — the ${describeAppletSource(ctx.applet.source)} sent it when the user acted in its UI.`
+    )
   }
   if (ctx.directives?.length) {
     sections.push(`# This message only\n${ctx.directives.join('\n')}`)
@@ -202,12 +192,7 @@ export function isMoiContext(value: unknown): value is MoiContext {
 
 function isMoiAppletMessage(value: unknown): value is MoiAppletMessage {
   if (!isParamsRecord(value)) return false
-  const v = value as { source?: unknown; context?: unknown }
-  return (
-    typeof v.source === 'string' &&
-    v.source.length > 0 &&
-    (v.context === undefined || isParamsRecord(v.context))
-  )
+  return typeof value.source === 'string' && value.source.length > 0
 }
 
 // Claude Code: the envelope rides as its OWN text block wrapped in

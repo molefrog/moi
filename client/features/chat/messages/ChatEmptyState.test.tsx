@@ -7,7 +7,7 @@ import {
   ChatEmptyState,
   type ChatEmptyStateKind,
   resolveChatEmptyState
-} from '@/client/features/chat/ChatEmptyState'
+} from '@/client/features/chat/messages/ChatEmptyState'
 
 function renderState(kind: ChatEmptyStateKind, hasWorkspaceApplets = false): string {
   return renderToStaticMarkup(

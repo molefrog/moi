@@ -66,7 +66,7 @@ describe('view builder sketch submission', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           input: { requirements: '' },
-          attachments: [upload.id],
+          attachments: [{ type: 'upload', uploadId: upload.id }],
           availableIcons: ['chart']
         })
       }
@@ -74,11 +74,54 @@ describe('view builder sketch submission', () => {
 
     if (!response.ok) throw new Error(await response.text())
     expect(response.status).toBe(200)
-    expect(sent[0]?.attachments).toEqual([upload.id])
+    expect(sent[0]?.attachments).toEqual([{ type: 'upload', uploadId: upload.id }])
     expect(sent[0]?.content).toBe('')
     expect(sent[0]?.context?.directives).toContain(
-      "The attached image is the user's sketch of the intended view layout."
+      'Use the attachments as reference material for the intended view.'
     )
+  })
+
+  test.each([false, true])('forwards context with optional file uploads: %s', async withUpload => {
+    const workspacePath = join(tempDir, 'workspace')
+    await mkdir(workspacePath)
+    const workspace = await registerWorkspace(workspacePath, { type: 'codex' })
+    const created = await api.request(`/api/workspaces/${workspace.id}/view-builders`, {
+      method: 'POST'
+    })
+    const draft = (await created.json()) as ViewBuilder
+    const attachments: NonNullable<SendMessageInput['attachments']> = [
+      { type: 'text', source: 'view:orders', label: 'Order', text: 'Order ID: 1042' }
+    ]
+    if (withUpload) {
+      for (const filename of ['requirements.txt', 'notes.txt']) {
+        const upload = await addUpload({
+          workspaceId: workspace.id,
+          filename,
+          mediaType: 'text/plain',
+          bytes: Buffer.from('Reference material')
+        })
+        attachments.push({ type: 'upload', uploadId: upload.id })
+      }
+    }
+    const sent: SendMessageInput[] = []
+    codexHarness.sendMessage = async input => {
+      sent.push(input)
+    }
+    const response = await api.request(
+      `/api/workspaces/${workspace.id}/view-builders/${draft.id}/submit`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input: { requirements: '' },
+          attachments,
+          availableIcons: ['chart']
+        })
+      }
+    )
+    expect(response.status).toBe(200)
+    expect(sent[0]?.attachments).toEqual(attachments)
+    expect(sent[0]?.content).toBe('')
   })
 
   test('rejects a first message with neither text nor a sketch', async () => {
@@ -98,7 +141,7 @@ describe('view builder sketch submission', () => {
     )
 
     expect(response.status).toBe(400)
-    expect(await response.text()).toBe('View requirements or a sketch are required')
+    expect(await response.text()).toBe('View requirements or an attachment are required')
   })
 
   test('rejects malformed sketch upload ids', async () => {
@@ -122,7 +165,7 @@ describe('view builder sketch submission', () => {
     )
 
     expect(response.status).toBe(400)
-    expect(await response.text()).toBe('Invalid sketch attachment')
+    expect(await response.text()).toBe('Invalid attachments')
   })
 })
 

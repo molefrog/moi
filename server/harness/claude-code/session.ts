@@ -1,3 +1,4 @@
+import { partitionMessageAttachments } from '@/lib/message-attachments'
 // One long-lived SDK query per session, with follow-ups queued in moi.
 //
 // Dispatch waits for the preceding user turn to finish before applying the next
@@ -6,6 +7,8 @@
 //
 // The SDK persists history to disk. After eviction or a server restart, the
 // next message resumes that history in a new process.
+import { appendTextAttachments, textAttachmentParts } from '@/lib/moi-attachments'
+import type { TextAttachment } from '@/lib/types'
 import {
   type Options,
   type Query,
@@ -49,14 +52,16 @@ type MessageContent = SDKUserMessage['message']['content']
 export function buildUserMessage(
   text: string,
   uploads: StoredUpload[],
-  displayText = text
+  textAttachments: readonly TextAttachment[] = []
 ): { content: MessageContent; parts: Part[] } {
   const parts: Part[] = []
   for (const u of uploads) {
     const part = uploadToDisplayPart(u)
     if (part) parts.push(part)
   }
-  if (displayText) parts.push({ type: 'text', text: displayText })
+  parts.push(...textAttachmentParts(textAttachments))
+  if (text) parts.push({ type: 'text', text })
+  text = appendTextAttachments(text, textAttachments)
 
   if (uploads.length === 0) return { content: text, parts }
 
@@ -712,11 +717,10 @@ function createLiveSession(input: {
 // turn starts. The returned promise settles when the message reaches the SDK.
 export async function sendCCMessage(input: SendMessageInput): Promise<void> {
   // Expired uploads are omitted. Avoid starting a session if nothing remains.
-  const uploads = input.attachments?.length
-    ? resolveUploads(input.workspaceId, input.attachments)
-    : []
-  if (!input.content && uploads.length === 0) return
-  const { content: userContent, parts } = buildUserMessage(input.content, uploads)
+  const { uploadIds, textAttachments } = partitionMessageAttachments(input.attachments)
+  const uploads = resolveUploads(input.workspaceId, uploadIds)
+  if (!input.content && uploads.length === 0 && textAttachments.length === 0) return
+  const { content: userContent, parts } = buildUserMessage(input.content, uploads, textAttachments)
   // Keep context in its own block: the SDK skips tag-leading blocks when
   // extracting titles and previews, and the adapter strips them on replay.
   const content: MessageContent = input.context
@@ -756,16 +760,18 @@ export async function sendCCMessage(input: SendMessageInput): Promise<void> {
       timestamp: new Date().toISOString()
     }
   })
-  const label = input.content || uploads.map(u => u.filename).join(', ')
+  const label =
+    input.content ||
+    [...uploads.map(u => u.filename), ...textAttachments.map(a => a.label)].join(', ')
   const completion = Promise.withResolvers<void>()
   const accepted = new Promise<void>((resolve, reject) => {
     messages.pending.push({
       input,
       content,
-      titleSource: buildSessionTitleSource(
-        input.content,
-        uploads.map(u => u.filename)
-      ),
+      titleSource: buildSessionTitleSource(input.content, [
+        ...uploads.map(u => u.filename),
+        ...textAttachments.map(a => a.label)
+      ]),
       turnId,
       wireId: crypto.randomUUID(),
       label: label.replace(/\s+/g, ' ').slice(0, 120),

@@ -3,7 +3,10 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, test } from 'bun:test'
 
-import { ChatEmptyState, WORKSPACE_ANALYSIS_PROMPT } from '@/client/features/chat/ChatEmptyState'
+import {
+  ChatEmptyState,
+  WORKSPACE_ANALYSIS_PROMPT
+} from '@/client/features/chat/messages/ChatEmptyState'
 import { renderMoiContext } from '@/lib/moi-context'
 
 function renderExploreWorkspace(disabled = false): string {

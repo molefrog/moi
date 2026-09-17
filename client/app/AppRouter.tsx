@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect } from 'react'
 
 import { Redirect, Route, Switch, useLocation } from 'wouter'
 
-import { setWorkspaceSwitchHandler } from '@/client/features/chat/chat-connection'
+import { setWorkspaceSwitchHandler } from '@/client/features/chat/connection/chat-connection'
 
 import { HomeRoute } from './routes/HomeRoute'
 import { WorkspaceRoute } from './routes/WorkspaceRoute'

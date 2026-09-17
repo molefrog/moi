@@ -6,7 +6,7 @@ import { describe, expect, mock, test } from 'bun:test'
 import {
   ChatPromptBubble,
   type ChatPromptBubble as ChatPrompt
-} from '@/client/features/chat/ChatPromptBubbles'
+} from '@/client/features/chat/messages/ChatPromptBubbles'
 
 const prompt: ChatPrompt = {
   label: 'Build a synthesizer',

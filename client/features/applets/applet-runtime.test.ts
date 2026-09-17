@@ -1,4 +1,5 @@
-import { describe, expect, test } from 'bun:test'
+import * as appletLog from './applet-log'
+import { describe, expect, test, spyOn } from 'bun:test'
 
 import {
   appletKey,
@@ -100,10 +101,47 @@ describe('sendChatMessage validation', () => {
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(WIDGET)
 
-    bridge.sendChatMessage('  Chase order A-1042  ', { order: 'A-1042' })
+    bridge.sendChatMessage({
+      message: '  Chase order A-1042  ',
+      attachments: [{ type: 'text', label: 'Order', text: 'A-1042', source: 'forged' }]
+    })
 
     expect(calls).toEqual([
-      { message: 'Chase order A-1042', source: 'widget:clock', context: { order: 'A-1042' } }
+      {
+        message: 'Chase order A-1042',
+        source: 'widget:clock',
+        attachments: [{ type: 'text', label: 'Order', text: 'A-1042', source: 'widget:clock' }]
+      }
+    ])
+  })
+
+  test('normalizes legacy calls through the same validation and rate limiter', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const { calls } = subscribeChat(ws)
+    const { bridge } = appletRuntime(ws).connect(WIDGET)
+
+    bridge.sendChatMessage('  Legacy  ', { order: '1042' })
+    bridge.sendChatMessage({ message: 'Legacy', attachments: [] })
+    bridge.sendChatMessage('Message only')
+    bridge.sendChatMessage('Array context', [])
+    bridge.sendChatMessage('x'.repeat(1001))
+    bridge.sendChatMessage({ message: 'Object' }, { ignored: true })
+
+    expect(calls).toEqual([
+      {
+        message: 'Legacy',
+        source: 'widget:clock',
+        attachments: [
+          { type: 'text', label: 'Context', text: '{"order":"1042"}', source: 'widget:clock' }
+        ]
+      },
+      { message: 'Message only', source: 'widget:clock', attachments: [] },
+      {
+        message: 'Array context',
+        source: 'widget:clock',
+        attachments: [{ type: 'text', label: 'Context', text: '[]', source: 'widget:clock' }]
+      },
+      { message: 'Object', source: 'widget:clock', attachments: [] }
     ])
   })
 
@@ -112,11 +150,14 @@ describe('sendChatMessage validation', () => {
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
 
-    bridge.sendChatMessage('')
-    bridge.sendChatMessage('   ')
-    bridge.sendChatMessage(42)
+    bridge.sendChatMessage({ message: '' })
+    bridge.sendChatMessage({ message: '   ' })
+    bridge.sendChatMessage({ message: 42 })
+    bridge.sendChatMessage({ message: null })
     bridge.sendChatMessage(null)
-    bridge.sendChatMessage({ toString: () => 'Do a thing' })
+    bridge.sendChatMessage('   ')
+    bridge.sendChatMessage({ context: {} })
+    bridge.sendChatMessage({ message: { toString: () => 'Do a thing' } })
 
     expect(calls).toEqual([])
   })
@@ -126,28 +167,73 @@ describe('sendChatMessage validation', () => {
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
 
-    bridge.sendChatMessage('x'.repeat(1001))
+    bridge.sendChatMessage({ message: 'x'.repeat(1001) })
 
     expect(calls).toEqual([])
   })
 
-  test('keeps the message but drops a context that cannot ride the envelope', () => {
+  test('legacy serialization failures reject the entire call', () => {
     const ws = `ws-${crypto.randomUUID()}`
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
-
     const cyclic: Record<string, unknown> = {}
     cyclic.self = cyclic
+    for (const context of [cyclic, 1n, () => {}, { blob: 'x'.repeat(5000) }]) {
+      bridge.sendChatMessage('Invalid legacy', context)
+    }
+    expect(calls).toEqual([])
+    // Rejected arguments do not consume the message cooldown.
+    bridge.sendChatMessage('Invalid legacy', 'x'.repeat(4998))
+    expect(calls[0].attachments[0]).toMatchObject({
+      label: 'Context',
+      text: JSON.stringify('x'.repeat(4998))
+    })
+  })
 
-    bridge.sendChatMessage('array context', ['not', 'a', 'record'])
-    bridge.sendChatMessage('cyclic context', cyclic)
-    bridge.sendChatMessage('huge context', { blob: 'x'.repeat(2001) })
+  test('rejects the removed object context field with a clear error', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const { calls } = subscribeChat(ws)
+    const { bridge } = appletRuntime(ws).connect(VIEW)
+    const log = spyOn(appletLog, 'reportAppletError').mockImplementation(() => {})
+    try {
+      bridge.sendChatMessage({ message: 'Review', context: undefined })
+      expect(calls).toEqual([])
+      expect(log.mock.calls[0][1].message).toContain('Use attachments instead')
+    } finally {
+      log.mockRestore()
+    }
+  })
 
-    // The message carries the user's intent, so a bad payload must not lose it.
-    expect(calls.map(c => [c.message, c.context])).toEqual([
-      ['array context', undefined],
-      ['cyclic context', undefined],
-      ['huge context', undefined]
+  test('validates all attachments before emitting and snapshots all input fields', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const { calls } = subscribeChat(ws)
+    const { bridge } = appletRuntime(ws).connect(VIEW)
+    const file = new File(['hello'], 'hello.txt')
+    const text = { type: 'text', label: 'Order', text: '  snapshot  ' }
+    const path = { type: 'file', path: 'reports/order.pdf' }
+    const attachments = [text, { type: 'file', file }, path]
+    for (const invalid of [
+      null,
+      {},
+      { type: 'text', label: '', text: 'x' },
+      { type: 'text', label: 'x'.repeat(121), text: 'x' },
+      { type: 'text', label: 'x', text: 'x'.repeat(5001) },
+      { type: 'file', path: '../secret' },
+      { type: 'file', path: 'x', file },
+      { type: 'file', file: new File([new Uint8Array(32 * 1024 * 1024 + 1)], 'big') }
+    ]) {
+      bridge.sendChatMessage({ message: 'Review', attachments: [...attachments, invalid] })
+    }
+    bridge.sendChatMessage({ message: 'Review', attachments: {} })
+    expect(calls).toEqual([])
+    bridge.sendChatMessage({ message: 'Review', attachments })
+    text.text = 'changed'
+    path.path = 'changed.txt'
+    attachments.length = 0
+    expect(calls[0].attachments).toEqual([
+      { type: 'text', label: 'Order', text: '  snapshot  ', source: 'view:board' },
+      { type: 'file', file, source: 'view:board' },
+      { type: 'file', path: 'reports/order.pdf', source: 'view:board' }
     ])
   })
 
@@ -156,9 +242,9 @@ describe('sendChatMessage validation', () => {
     const { calls } = subscribeChat(ws)
     const { bridge, dispose } = appletRuntime(ws).connect(VIEW)
 
-    bridge.sendChatMessage('before')
+    bridge.sendChatMessage({ message: 'before' })
     dispose()
-    bridge.sendChatMessage('after')
+    bridge.sendChatMessage({ message: 'after' })
 
     expect(calls.map(c => c.message)).toEqual(['before'])
   })
@@ -172,9 +258,9 @@ describe('sendChatMessage rate limiting', () => {
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(WIDGET)
 
-    bridge.sendChatMessage('Sync now')
-    bridge.sendChatMessage('Sync now')
-    bridge.sendChatMessage('Sync now')
+    bridge.sendChatMessage({ message: 'Sync now' })
+    bridge.sendChatMessage({ message: 'Sync now' })
+    bridge.sendChatMessage({ message: 'Sync now' })
 
     expect(calls.map(c => c.message)).toEqual(['Sync now'])
   })
@@ -185,10 +271,10 @@ describe('sendChatMessage rate limiting', () => {
     const widget = appletRuntime(ws).connect(WIDGET)
     const view = appletRuntime(ws).connect(VIEW)
 
-    widget.bridge.sendChatMessage('Sync now')
+    widget.bridge.sendChatMessage({ message: 'Sync now' })
     // Same text, different applet — a real second message.
-    view.bridge.sendChatMessage('Sync now')
-    widget.bridge.sendChatMessage('Something else')
+    view.bridge.sendChatMessage({ message: 'Sync now' })
+    widget.bridge.sendChatMessage({ message: 'Something else' })
 
     expect(calls.map(c => [c.source, c.message])).toEqual([
       ['widget:clock', 'Sync now'],
@@ -202,7 +288,7 @@ describe('sendChatMessage rate limiting', () => {
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(WIDGET)
 
-    for (let i = 0; i < 25; i++) bridge.sendChatMessage(`message ${i}`)
+    for (let i = 0; i < 25; i++) bridge.sendChatMessage({ message: `message ${i}` })
 
     expect(calls).toHaveLength(10)
   })
@@ -214,9 +300,11 @@ describe('sendChatMessage rate limiting', () => {
     const b = subscribeChat(wsB)
 
     for (let i = 0; i < 25; i++) {
-      appletRuntime(wsA).connect(WIDGET).bridge.sendChatMessage(`a ${i}`)
+      appletRuntime(wsA)
+        .connect(WIDGET)
+        .bridge.sendChatMessage({ message: `a ${i}` })
     }
-    appletRuntime(wsB).connect(WIDGET).bridge.sendChatMessage('b 0')
+    appletRuntime(wsB).connect(WIDGET).bridge.sendChatMessage({ message: 'b 0' })
 
     expect(a.calls).toHaveLength(10)
     expect(b.calls.map(c => c.message)).toEqual(['b 0'])
@@ -311,5 +399,63 @@ describe('workspace isolation', () => {
     appletRuntime(wsA).connect(VIEW).bridge.focusTab('agent')
     expect(a.calls).toEqual([['agent', undefined]])
     expect(b.calls).toEqual([])
+  })
+})
+
+describe('addChatAttachment', () => {
+  test('accepts text and both file sources, stamps source, and ignores disposed bridges', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const received: unknown[] = []
+    const runtime = appletRuntime(ws)
+    const off = runtime.on('addChatAttachment', value => received.push(value))
+    const { bridge, dispose } = runtime.connect(VIEW)
+    const file = new File(['hello'], 'notes.txt')
+    bridge.addChatAttachment({
+      type: 'text',
+      label: ' Notes ',
+      text: '  hello\n',
+      source: 'forged'
+    })
+    bridge.addChatAttachment({ type: 'file', file })
+    const pathInput = { type: 'file', path: 'reports/september.pdf' }
+    bridge.addChatAttachment(pathInput)
+    pathInput.path = 'changed.pdf'
+    dispose()
+    bridge.addChatAttachment({ type: 'file', file })
+    expect(received).toEqual([
+      { type: 'text', label: 'Notes', text: '  hello\n', source: 'view:board' },
+      { type: 'file', file, source: 'view:board' },
+      { type: 'file', path: 'reports/september.pdf', source: 'view:board' }
+    ])
+    off()
+  })
+
+  test('rejects invalid text, file shapes, sizes and unsafe paths without emitting', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const received: unknown[] = []
+    const runtime = appletRuntime(ws)
+    const off = runtime.on('addChatAttachment', value => received.push(value))
+    const { bridge } = runtime.connect(VIEW)
+    const file = new File(['hello'], 'notes.txt')
+    const oversized = new File([new Uint8Array(32 * 1024 * 1024 + 1)], 'large.bin')
+    for (const input of [
+      null,
+      {},
+      { type: 'text', label: '', text: 'hello' },
+      { type: 'text', label: 'Notes', text: ' ' },
+      { type: 'text', label: 'Notes', text: 'x'.repeat(5001) },
+      { type: 'file' },
+      { type: 'file', file: {} },
+      { type: 'file', file: new Blob(['x']) },
+      { type: 'file', file, path: 'notes.txt' },
+      { type: 'file', file: oversized },
+      ...['', '/etc/passwd', '../outside.txt', '.env', 'a/.hidden/b', 'C:\\file.txt'].map(path => ({
+        type: 'file',
+        path
+      }))
+    ])
+      bridge.addChatAttachment(input)
+    expect(received).toEqual([])
+    off()
   })
 })

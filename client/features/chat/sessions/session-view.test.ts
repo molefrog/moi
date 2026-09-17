@@ -5,7 +5,7 @@ import { workspaceKeys } from '@/client/api/workspace-keys'
 import { applyEvents, emptyViewState } from '@/lib/format'
 import type { StreamEvent, ViewState } from '@/lib/types'
 
-import { reduceChatFrame } from './chat-frames'
+import { reduceChatFrame } from '../connection/chat-frames'
 import { sessionViewOptions } from './session-view'
 
 const workspaceId = 'workspace'

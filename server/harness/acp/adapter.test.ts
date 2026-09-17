@@ -267,7 +267,7 @@ describe('replayedUserParts', () => {
     const stored = appendMoiContext(noted, envelope)
     expect(replayedUserParts(stored)).toEqual([
       {
-        type: 'file',
+        type: 'file-attachment',
         mediaType: 'application/octet-stream',
         url: '/tmp/up/report.pdf',
         filename: 'report.pdf'

@@ -208,6 +208,17 @@ export type UploadInfo = {
 // Client → Server messages.
 // The chat WebSocket is app-wide (one socket for the whole client, not scoped to
 // a workspace), so every message carries the `workspaceId` it targets.
+export type TextAttachmentInput = { label: string; text: string }
+export type ChatAttachmentInput =
+  | ({ type: 'text' } & TextAttachmentInput)
+  | { type: 'file'; file: File; path?: never }
+  | { type: 'file'; path: string; file?: never }
+export type TextAttachment = TextAttachmentInput & { source: string }
+
+export type MessageAttachment =
+  | { type: 'upload'; uploadId: string }
+  | ({ type: 'text' } & TextAttachment)
+
 export type ClientMessage =
   | {
       type: 'chat'
@@ -218,7 +229,7 @@ export type ClientMessage =
       // Upload ids (from POST .../uploads) to attach to this turn. The server
       // resolves each from its upload store and turns it into a vision block
       // (image) or a temp-file path reference (other files). Order is preserved.
-      attachments?: string[]
+      attachments?: MessageAttachment[]
       // Client-chosen stable id for the user's turn. The server tells the
       // adapter to use this id when the SDK echoes the user input back, so
       // the optimistic bubble the client rendered gets upserted in place.

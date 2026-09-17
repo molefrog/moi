@@ -36,7 +36,9 @@ async function addImage(workspaceId: string, name = 'shot.png') {
 }
 
 function fileParts(parts: Part[]) {
-  return parts.filter((p): p is Extract<Part, { type: 'file' }> => p.type === 'file')
+  return parts.filter(
+    (p): p is Extract<Part, { type: 'file-attachment' }> => p.type === 'file-attachment'
+  )
 }
 function textPart(parts: Part[]) {
   return parts.find((p): p is Extract<Part, { type: 'text' }> => p.type === 'text')
@@ -275,8 +277,8 @@ describe('uploads: resolve + display helpers', () => {
   test('uploadToDisplayPart points at the served URL, never a data URL', async () => {
     const img = await addImage('wsp')
     const imgPart = uploadToDisplayPart(img)
-    expect(imgPart?.type).toBe('file')
-    if (imgPart?.type === 'file') {
+    expect(imgPart?.type).toBe('file-attachment')
+    if (imgPart?.type === 'file-attachment') {
       expect(imgPart.mediaType).toBe('image/png')
       expect(imgPart.url).toBe(`/api/workspaces/wsp/uploads/${img.id}`)
     }
@@ -289,7 +291,7 @@ describe('uploads: resolve + display helpers', () => {
     })
     const [file] = resolveUploads('wsp', [fileInfo.id])
     const filePart = uploadToDisplayPart(file)
-    if (filePart?.type === 'file') {
+    if (filePart?.type === 'file-attachment') {
       expect(filePart.filename).toBe('doc.txt')
       expect(filePart.url).toBe(`/api/workspaces/wsp/uploads/${file.id}`)
     }
@@ -340,7 +342,7 @@ describe('buildUserMessage', () => {
     expect(blocks[1].text).toBe('describe')
 
     // Display parts: attachment first, then text.
-    expect(parts[0].type).toBe('file')
+    expect(parts[0].type).toBe('file-attachment')
     expect(parts[1].type).toBe('text')
   })
 

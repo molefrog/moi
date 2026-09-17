@@ -1,13 +1,9 @@
+import { TextAttachmentChip } from './attachments/TextAttachmentChip'
+import { DrawingAttachmentChip } from './attachments/DrawingAttachmentChip'
+import { FileAttachmentChip } from './attachments/FileAttachmentChip'
 import { type RefObject, useRef, useState } from 'react'
 
-import {
-  IconFile,
-  IconLoader2,
-  IconPaperclip,
-  IconPlayerStopFilled,
-  IconScribble,
-  IconX
-} from '@tabler/icons-react'
+import { IconPaperclip, IconPlayerStopFilled, IconScribble } from '@tabler/icons-react'
 
 import {
   canSubmitComposerAction,
@@ -17,19 +13,14 @@ import {
   ComposerTextarea
 } from '@/client/components/shared/Composer'
 import { Button } from '@/client/components/ui/button'
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/client/components/ui/hover-card'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
-import { stageComposerFiles } from '@/client/features/chat/attachment-staging'
+import { stageComposerFiles } from '@/client/features/chat/composer/attachments/draft-attachments'
 import { cn } from '@/client/lib/cn'
 import type { AgentAvailability } from '@/client/lib/agent-availability'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
-import {
-  type ChatAttachment,
-  attachmentKey,
-  liveStore,
-  useLive
-} from '@/client/features/chat/chat-store'
+import { attachmentKey, liveStore, useLive } from '@/client/features/chat/chat-store'
+import type { ChatAttachment } from '@/client/features/chat/composer/attachments/types'
 import { useUiStore } from '@/client/store/ui'
 
 import { ModelPicker } from './ModelPicker'
@@ -92,10 +83,12 @@ export function ChatComposer({
   const attachments = useLive(s => s.attachments[attachmentKey(workspaceId, sessionId)] ?? EMPTY)
   const [dragOver, setDragOver] = useState(false)
 
-  const uploading = attachments.some(a => a.status === 'uploading')
+  const uploading = attachments.some(a => a.kind !== 'text' && a.status === 'uploading')
   // A draft annotation counts as sendable content: send() finishes the drawing
   // first, which uploads it before the message goes out.
-  const hasSendable = attachments.some(a => a.status === 'ready' || a.status === 'draft')
+  const hasSendable = attachments.some(
+    a => a.kind === 'text' || a.status === 'ready' || a.status === 'draft'
+  )
   const hasContent = value.trim().length > 0 || hasSendable
   const canSend = canSubmitComposerAction(hasContent, uploading, availability)
 
@@ -119,7 +112,7 @@ export function ChatComposer({
       onRemoveDrawing(attachment.localId)
       return
     }
-    liveStore.getState().removeAttachment(workspaceId, sessionId, attachment.localId)
+    liveStore.getState().removeAttachment(workspaceId, attachment.localId)
   }
 
   const send = async () => {
@@ -165,9 +158,29 @@ export function ChatComposer({
     >
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 px-1 pt-1 pb-1">
-          {attachments.map(a => (
-            <AttachmentChip key={a.localId} attachment={a} onRemove={() => removeAttachment(a)} />
-          ))}
+          {attachments
+            .toSorted((a, b) => ATTACHMENT_ORDER[a.kind] - ATTACHMENT_ORDER[b.kind])
+            .map(a =>
+              a.kind === 'text' ? (
+                <TextAttachmentChip
+                  key={a.localId}
+                  label={a.name}
+                  onRemove={() => removeAttachment(a)}
+                />
+              ) : a.kind === 'drawing' ? (
+                <DrawingAttachmentChip
+                  key={a.localId}
+                  attachment={a}
+                  onRemove={() => removeAttachment(a)}
+                />
+              ) : (
+                <FileAttachmentChip
+                  key={a.localId}
+                  attachment={a}
+                  onRemove={() => removeAttachment(a)}
+                />
+              )
+            )}
         </div>
       )}
 
@@ -272,110 +285,8 @@ export function ChatComposer({
 }
 
 const EMPTY: ChatAttachment[] = []
-
-type AttachmentChipProps = {
-  attachment: ChatAttachment
-  onRemove: () => void
-}
-
-// A composer attachment preview: an image thumbnail or a labelled file chip,
-// with an upload spinner / error overlay and a remove button.
-function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
-  if (attachment.kind === 'drawing') {
-    return <DrawingAttachmentChip attachment={attachment} onRemove={onRemove} />
-  }
-
-  const { name, previewUrl, status, error } = attachment
-  const isImage = !!previewUrl
-
-  return (
-    <div
-      className={cn(
-        'group relative flex items-center gap-2 overflow-hidden rounded-lg bg-accent text-accent-foreground ring-1 ring-border',
-        isImage ? 'size-14' : 'h-10 max-w-52 pr-2 pl-2',
-        status === 'error' && 'border-destructive/50'
-      )}
-      title={error ?? name}
-    >
-      {isImage ? (
-        <img src={previewUrl} alt={name} className="size-full object-cover" />
-      ) : (
-        <>
-          <IconFile size={16} stroke={1.75} className="shrink-0 text-muted-foreground" />
-          <span className="truncate text-xs">{name}</span>
-        </>
-      )}
-
-      {status === 'uploading' && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/70">
-          <IconLoader2 size={16} stroke={1.75} className="animate-spin text-muted-foreground" />
-        </div>
-      )}
-      {status === 'error' && (
-        <div className="absolute inset-0 flex items-center justify-center bg-destructive/10 text-[10px] text-destructive">
-          Failed
-        </div>
-      )}
-
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        onClick={onRemove}
-        aria-label={`Remove ${name}`}
-        className="absolute top-0.5 right-0.5 size-4 rounded-full bg-primary/70 text-primary-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-primary/80 [&_svg]:size-3"
-      >
-        <IconX stroke={1.75} />
-      </Button>
-    </div>
-  )
-}
-
-type DrawingAttachmentChipProps = {
-  attachment: Extract<ChatAttachment, { kind: 'drawing' }>
-  onRemove: () => void
-}
-
-function DrawingAttachmentChip({ attachment, onRemove }: DrawingAttachmentChipProps) {
-  const { previewUrl, purpose } = attachment
-  const label = purpose === 'sketch' ? 'Sketch' : 'Annotation'
-
-  return (
-    <HoverCard>
-      <HoverCardTrigger
-        render={
-          <div
-            tabIndex={0}
-            className="group flex h-7 cursor-default items-center rounded-md bg-background pr-2 pl-0.5 text-sm whitespace-nowrap text-foreground ring-1 ring-border outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-          />
-        }
-      >
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={onRemove}
-          aria-label={`Remove ${label.toLowerCase()}`}
-          className="size-6 shrink-0 hover:bg-transparent hover:text-current"
-        >
-          <IconScribble stroke={1.75} className="group-focus-within:hidden group-hover:hidden" />
-          <IconX stroke={1.75} className="hidden group-focus-within:block group-hover:block" />
-        </Button>
-        <span>{label}</span>
-      </HoverCardTrigger>
-      {previewUrl && (
-        <HoverCardContent
-          side="top"
-          align="start"
-          className="w-60 max-w-[calc(100vw-2rem)] rounded-xl"
-        >
-          <img
-            src={previewUrl}
-            alt={`${label} preview`}
-            className="max-h-72 w-full rounded-md object-contain"
-          />
-        </HoverCardContent>
-      )}
-    </HoverCard>
-  )
+const ATTACHMENT_ORDER: Record<ChatAttachment['kind'], number> = {
+  file: 0,
+  drawing: 1,
+  text: 2
 }

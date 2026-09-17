@@ -1,14 +1,14 @@
 import { useQueryClient } from '@tanstack/react-query'
 
 import {
-  attachmentPartsForOptimisticTurn,
+  prepareDraftAttachments,
   attachmentsForSend,
   resolveChatRunOptions,
   startOptimisticSession,
   startOptimisticTurn
 } from '@/client/features/chat/chat-send'
 import { liveStore } from '@/client/features/chat/chat-store'
-import { useSelectedSession } from '@/client/features/chat/useSelectedSession'
+import { useSelectedSession } from '@/client/features/chat/sessions/useSelectedSession'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import {
@@ -46,7 +46,8 @@ export function useViewBuilderActions() {
       text,
       filenames: attachments.map(attachment => attachment.name)
     })
-    const parts = attachmentPartsForOptimisticTurn(attachments)
+    const prepared = prepareDraftAttachments(attachments)
+    const parts = [...prepared.parts]
     if (text) parts.push({ type: 'text', text })
 
     const optimisticId = startOptimisticTurn({
@@ -70,7 +71,9 @@ export function useViewBuilderActions() {
         requirements: text,
         optimisticId,
         ...(attachments.length > 0
-          ? { attachments: attachments.map(attachment => attachment.upload!.id) }
+          ? {
+              attachments: prepared.attachments
+            }
           : {}),
         model,
         effort,

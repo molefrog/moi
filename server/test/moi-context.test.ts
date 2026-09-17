@@ -97,7 +97,7 @@ describe('moi context envelope', () => {
       isMoiContext({
         activeTab: 'view:crm',
         tabParams: { deal: 'd-1' },
-        applet: { source: 'widget:pipeline', context: { deal: 'd-1' } }
+        applet: { source: 'widget:pipeline' }
       })
     ).toBe(true)
     expect(isMoiContext(undefined)).toBe(false)
@@ -107,24 +107,20 @@ describe('moi context envelope', () => {
     expect(isMoiContext({ activeTab: 'agent', tabParams: ['a'] })).toBe(false)
     expect(isMoiContext({ activeTab: 'agent', applet: { source: '' } })).toBe(false)
     expect(isMoiContext({ activeTab: 'agent', applet: { context: { a: 1 } } })).toBe(false)
-    expect(
-      isMoiContext({ activeTab: 'agent', applet: { source: 'widget:x', context: 'no' } })
-    ).toBe(false)
   })
 
-  test('an applet-sent message names the applet and its file, and carries its context', () => {
+  test('an applet-sent message names the applet and its file', () => {
     const rendered = renderMoiContext({
       activeTab: 'view:orders',
       tabTitle: 'Orders',
-      applet: { source: 'widget:late-orders', context: { order: 'A-1042', carrier: 'dhl' } }
+      applet: { source: 'widget:late-orders' }
     })
     expect(rendered).toContain(
       '# Applet message\nThe message above was not typed by the user — the "late-orders" widget (.moi/widgets/late-orders.tsx) sent it when the user acted in its UI.'
     )
-    expect(rendered).toContain('It attached this context: {"order":"A-1042","carrier":"dhl"}')
   })
 
-  test('an applet message with no context renders without a context line', () => {
+  test('applet attribution adds no JSON context line', () => {
     const rendered = renderMoiContext({
       activeTab: 'overview',
       applet: { source: 'view:board' }
@@ -158,7 +154,7 @@ describe('moi context envelope', () => {
       activeTab: 'view:orders',
       tabTitle: escape,
       tabParams: { note: escape },
-      applet: { source: `widget:${escape}`, context: { note: escape } }
+      applet: { source: `widget:${escape}` }
     })
     // Exactly one envelope: the open tag at the start, the close tag at the end.
     expect(rendered.indexOf('</moi-context>')).toBe(rendered.length - '</moi-context>'.length)
@@ -168,10 +164,10 @@ describe('moi context envelope', () => {
     expect(stripMoiContext(appendMoiContext('Fix the header', rendered))).toBe('Fix the header')
   })
 
-  test('an oversized applet context is truncated, not sent whole', () => {
+  test('oversized ambient tab params are still truncated', () => {
     const rendered = renderMoiContext({
       activeTab: 'overview',
-      applet: { source: 'widget:noisy', context: { blob: 'x'.repeat(5000) } }
+      tabParams: { blob: 'x'.repeat(5000) }
     })
     expect(rendered).toContain('… (truncated)')
     expect(rendered.length).toBeLessThan(3000)

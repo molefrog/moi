@@ -125,7 +125,7 @@ export function rpc(module, name) {
 // per-segment URL-encoded so spaces / unicode in filenames survive. A leading
 // slash is stripped so both `clips/a.mp4` and `/clips/a.mp4` work.
 //
-// `focusTab(tab, params?)` and `sendChatMessage(message, context?)` forward to
+// `focusTab(tab, params?)` and `sendChatMessage({ message, attachments? })` forward to
 // this bundle's host-attached bridge — client-local replace-navigation to a
 // workspace tab (params delivered to the target view via navigation state),
 // and a chat message sent to the workspace's active chat as if the user had
@@ -158,8 +158,13 @@ export function focusTab(tab, params) {
   bridge?.focusTab(tab, params);
 }
 
-export function sendChatMessage(message, context) {
-  bridge?.sendChatMessage(message, context);
+export function addChatAttachment(input) {
+  bridge?.addChatAttachment(input);
+}
+
+// Keep positional calls working for previously built applets.
+export function sendChatMessage(input, legacyContext) {
+  bridge?.sendChatMessage(input, legacyContext);
 }
 `
 

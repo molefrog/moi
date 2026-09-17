@@ -17,7 +17,7 @@ import {
   ChatPromptBubble,
   ChatPromptBubbles,
   type ChatPromptBubble as ChatPrompt
-} from '@/client/features/chat/ChatPromptBubbles'
+} from '@/client/features/chat/messages/ChatPromptBubbles'
 import { cn } from '@/client/lib/cn'
 import type { AgentTheme } from '@/lib/types'
 

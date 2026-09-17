@@ -4,7 +4,7 @@ import { IconArchive, IconChevronDown, IconEdit } from '@tabler/icons-react'
 import { useArchiveWorkspaceSession, useWorkspaceSessions } from './api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
-import { useSelectedSession } from '@/client/features/chat/useSelectedSession'
+import { useSelectedSession } from '@/client/features/chat/sessions/useSelectedSession'
 import { cn } from '@/client/lib/cn'
 import {
   hasRunningBackgroundSession,

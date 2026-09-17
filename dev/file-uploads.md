@@ -150,7 +150,7 @@ affordance.
 
 ## Part 5 — Adding a new adapter
 
-The display format is agent-agnostic: a `Part` of `{ type: 'file', mediaType,
+The display format is agent-agnostic: a `Part` of `{ type: 'file-attachment', mediaType,
 url, filename }` (url = served URL preferred, data URL only as a reload
 fallback). For a new backend: (1) convert resolved uploads into the backend's
 message shape (base64 blocks preferred; path/file-id otherwise — `StoredUpload`

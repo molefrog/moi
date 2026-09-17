@@ -39,15 +39,27 @@ Use `font-sans` for UI, including paths, ids, and numbers. Reserve `font-mono` f
 
 ## Layout and Hierarchy
 
-Build hierarchy with type weight, spacing, tonal surfaces, and subtle shadow-defined edges. Use the Tailwind scale and component sizes instead of copying numeric geometry into feature code.
-
-Use subtle shadows instead of borders for standalone contained blocks and outline-style controls. Keep nested elements flat unless they represent a separate contained object. For interactive elements, let the shadow become one step darker or deeper on hover using the existing shadow scale. Use CSS borders only for separators and hard structural boundaries, and keep them subtle with the semantic `border` token. Do not use black or high-contrast 1px outlines around containers, including dashed outlines.
+Build hierarchy with type weight, spacing, and tonal surfaces. Use the Tailwind scale and component sizes instead of copying numeric geometry into feature code.
 
 Respect the layout variables in `client/index.css`; do not hardcode equivalent page or chat dimensions. Make layouts work at narrow and wide widths without clipped controls, overlapping text, or large dead areas.
 
 Repeated rows must form stable lanes. Give leading icons, status markers, counters, and trailing actions fixed slots so changing content does not shift alignment. Keep component trees shallow and split components for state, data flow, repeated structure, or meaningful sub-surfaces.
 
 Use container borders sparingly. Avoid cards inside cards and chains of bordered, padded wrappers. A section should usually have at most one framed surface. Inside it, create hierarchy with spacing, typography, tonal surfaces, dividers, or flat rows. Add another frame only when it contains a genuinely separate object, preview, dialog, or tool.
+
+## Edges and Elevation
+
+Start with no outline or shadow. Add an edge when a boundary needs to be visible. For installed components, keep the treatment built into the chosen variant. For new custom surfaces, use these rules:
+
+- **Flat, self-contained surface:** use `ring-1 ring-border`. This is the default for a complete outline around an object that sits in the normal layout. The ring follows the radius without taking space from the content or changing its dimensions.
+- **Structural edge:** use `border` with the `border` color token. Use side-specific borders for dividers and shared edges, and a full border for dashed boundaries or an edge that must stay inside the element's box. Adjacent regions should share one dividing line. Keep the built-in borders on form controls.
+- **Raised surface:** use `shadow-xs` for a slight lift and `shadow-sm` for a more pronounced lift. Use this only when the surface is meant to sit above its surroundings. An ordinary outlined object defaults to `ring-1 ring-border`.
+- **Floating surface:** use `shadow-md` for a local overlay, `shadow-lg` for a higher overlay layer, and `shadow-xl` for a modal layer. Follow the installed overlay primitive's level. Size or importance alone does not justify a stronger shadow.
+- **Keyboard focus:** preserve the component's focus treatment. For custom controls, use `focus-visible:ring-3 focus-visible:ring-ring/50`. `ring-border` is a quiet resting outline; `ring-ring` uses the focus color. A resting outline does not replace a visible focus state.
+
+moi's `shadow-*` tokens already include a thin edge as well as blur and offset. Adding a shadow therefore adds elevation even at `shadow-xs`. Do not use shadows just to make an outline visible, or stack a border and resting ring on the same edge. A raised surface normally needs only its shadow; retain combinations already defined by installed primitives.
+
+Use the same edge treatment for elements with the same role. Isolated existing usages, custom shadows, and decorative inset effects are exceptions, not defaults for new UI. Keep token values in the theme and avoid custom shadow formulas in feature code.
 
 ## Components and Accessibility
 

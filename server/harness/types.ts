@@ -2,6 +2,7 @@
 // by moi. See README.md in this folder for the full checklist and the
 // message-type layers; each harness's index.ts exports one Harness object
 // wrapping its session/adapter/transport modules.
+import type { MessageAttachment } from '@/lib/types'
 import type { MoiContext } from '@/lib/moi-context'
 import type {
   HarnessAvailability,
@@ -26,9 +27,8 @@ export type SendMessageInput = {
   sessionId: string
   isNew: boolean
   content: string
-  // Upload ids from POST .../uploads, resolved by the harness into its input
-  // capability (base64 blocks / data URLs / temp-file path notes).
-  attachments?: string[]
+  // Uploaded files and drawings, or structured context from applets.
+  attachments?: MessageAttachment[]
   optimisticId?: string
   model?: string
   effort?: string

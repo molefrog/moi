@@ -1,3 +1,5 @@
+import { partitionMessageAttachments } from '@/lib/message-attachments'
+import type { MessageAttachment } from '@/lib/types'
 // Per-(workspaceId, sessionId) live ACP session adapter.
 //
 // One agent process per workspace (see ./client.ts) serves every session in
@@ -18,6 +20,8 @@
 //   - `session/prompt` is a long-running request that resolves at end of turn,
 //     so its promise IS the turn's lifetime — activity is mirrored from it,
 //     never derived by counting frames.
+import { appendTextAttachments, textAttachmentParts } from '@/lib/moi-attachments'
+import type { TextAttachment } from '@/lib/types'
 import { appendAttachmentNote } from '@/lib/attachment-note'
 import { type MoiContext, appendMoiContext, renderMoiContext } from '@/lib/moi-context'
 import { type Part, applyEvent, emptyViewState } from '@/lib/format'
@@ -308,7 +312,7 @@ function handleSessionUpdate(rec: SessionRecord, update: SessionUpdate, provider
         // Rebuilt as a data URL — the cold-reload fallback (live bubbles point
         // at moi's served upload URL, but that store is gone after a restart).
         rec.userImageParts.push({
-          type: 'file',
+          type: 'file-attachment',
           mediaType: content.mimeType,
           url: `data:${content.mimeType};base64,${content.data}`
         })
@@ -495,14 +499,17 @@ async function attachReplayDurations(rec: SessionRecord): Promise<void> {
 async function buildPrompt(
   text: string,
   uploads: StoredUpload[],
-  supportsImages: boolean
+  supportsImages: boolean,
+  textAttachments: readonly TextAttachment[] = []
 ): Promise<{ blocks: AcpPromptBlock[]; parts: Part[] }> {
   const parts: Part[] = []
   for (const u of uploads) {
     const part = uploadToDisplayPart(u)
     if (part) parts.push(part)
   }
+  parts.push(...textAttachmentParts(textAttachments))
   if (text) parts.push({ type: 'text', text })
+  text = appendTextAttachments(text, textAttachments)
 
   const blocks: AcpPromptBlock[] = []
   const files: { filename: string; path: string }[] = []
@@ -582,21 +589,21 @@ export async function sendAcpMessage(
     sessionId: string
     isNew: boolean
     content: string
-    attachments?: string[]
+    attachments?: MessageAttachment[]
     optimisticId?: string
     model?: string
     stream?: boolean
     context?: MoiContext
   }
 ): Promise<void> {
-  const uploads = input.attachments?.length
-    ? resolveUploads(input.workspaceId, input.attachments)
-    : []
-  if (!input.content && uploads.length === 0) return
+  const { uploadIds, textAttachments } = partitionMessageAttachments(input.attachments)
+  const uploads = resolveUploads(input.workspaceId, uploadIds)
+  if (!input.content && uploads.length === 0 && textAttachments.length === 0) return
   const { blocks, parts } = await buildPrompt(
     input.content,
     uploads,
-    config.supportsImages !== false
+    config.supportsImages !== false,
+    textAttachments
   )
   if (blocks.length === 0) return
 

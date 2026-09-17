@@ -528,7 +528,13 @@ describe('moi fileUrl module', () => {
     // Two args only: the applet cannot pass a source, because attribution is
     // stamped host-side (applet-runtime.ts) from the identity the bridge was
     // attached with.
-    expect(result.js).toContain('sendChatMessage(message, context)')
+    expect(result.js).toContain('sendChatMessage(input, legacyContext)')
+  })
+
+  test('bundles addChatAttachment through the applet bridge', async () => {
+    const result = await buildApplet(join(FIXTURES, 'with-chatattachment.tsx'), undefined, 'view')
+    expect(result.js).toContain('function addChatAttachment')
+    expect(result.js).toContain('addChatAttachment(input)')
   })
 
   test('every bundle entry exports the bridge wiring, even without a moi import', async () => {

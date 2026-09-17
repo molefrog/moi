@@ -3,19 +3,23 @@ import { useCallback, useEffect, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { useSessionConfig, useSessionView, useWorkspaceSessions } from '@/client/features/chat/api'
+import {
+  useSessionConfig,
+  useSessionView,
+  useWorkspaceSessions
+} from '@/client/features/chat/sessions/api'
 import { useWorkspaceAgent } from '@/client/features/workspace/api'
-import { useSelectedSession } from '@/client/features/chat/useSelectedSession'
+import { useSelectedSession } from '@/client/features/chat/sessions/useSelectedSession'
 import {
   type WorkspaceTabAddress,
   useMoiUserMessageContext
 } from '@/client/features/workspace/moi-context'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
-import { sendMessage } from '@/client/features/chat/chat-connection'
+import { sendMessage } from '@/client/features/chat/connection/chat-connection'
 import {
   type ChatSendOptions,
-  attachmentPartsForOptimisticTurn,
+  prepareDraftAttachments,
   attachmentsForSend,
   ownsComposerAttachments,
   resolveChatRunOptions,
@@ -23,7 +27,7 @@ import {
   startOptimisticTurn,
   withAttachmentDirectives
 } from '@/client/features/chat/chat-send'
-import { buildPreviewTurn } from '@/client/features/chat/preview-turn'
+import { buildPreviewTurn } from '@/client/features/chat/messages/preview-turn'
 import {
   isRunningActivity,
   liveStore,
@@ -101,18 +105,22 @@ export function useChat(address: WorkspaceTabAddress) {
       const text = draft.trim()
       // Attachments stay with the selected session. Only fully-uploaded ones are
       // sent; the composer disables send while any are still uploading, so in
-      // practice they're all ready here. An applet send gets none — the staged
-      // files are the user's, not the widget's.
+      // practice they're all ready here. Applet sends supply their own prepared
+      // attachments and leave the user's staged files alone.
       const ready = attachmentsForSend(workspaceId, selectedSessionId, options)
       // No `processing` guard: sending while a turn is in flight QUEUES the
       // message into the same live server session (streaming-input mode).
-      if (!text && ready.length === 0) return
+      if (!text && ready.length === 0 && !options?.preparedAttachments?.attachments.length) return
 
       let sid = selectedSessionId
       let isNew = false
       if (!sid) {
         sid = crypto.randomUUID()
         isNew = true
+        // An immediate applet send leaves the user's attachments staged in this chat.
+        if (!ownsComposerAttachments(options)) {
+          liveStore.getState().renameSession(workspaceId, selectedSessionId, sid)
+        }
         selectSession(sid)
         startOptimisticSession({
           queryClient: qc,
@@ -128,7 +136,8 @@ export function useChat(address: WorkspaceTabAddress) {
       // upserts in place rather than duplicating. Image attachments render from
       // their local object URL until the server's broadcast (with a data URL)
       // upserts in place.
-      const parts: Part[] = attachmentPartsForOptimisticTurn(ready)
+      const prepared = options?.preparedAttachments ?? prepareDraftAttachments(ready)
+      const parts: Part[] = [...prepared.parts]
       if (text) parts.push({ type: 'text', text })
       const optimisticId = startOptimisticTurn({
         queryClient: qc,
@@ -150,6 +159,7 @@ export function useChat(address: WorkspaceTabAddress) {
         pickedEffort,
         pickedFastMode
       )
+      const { attachments } = prepared
       sendMessage({
         type: 'chat',
         workspaceId,
@@ -162,7 +172,7 @@ export function useChat(address: WorkspaceTabAddress) {
         fastMode,
         stream,
         context: buildMoiContext(withAttachmentDirectives(options, ready)),
-        ...(ready.length > 0 ? { attachments: ready.map(a => a.upload!.id) } : {})
+        ...(attachments.length > 0 ? { attachments } : {})
       })
       useUiStore.getState().markMessageSentFromMoi(workspaceId)
       if (isNew) {
@@ -170,7 +180,7 @@ export function useChat(address: WorkspaceTabAddress) {
       }
       // Drop the session's attachments now that they've been sent (revokes the
       // preview object URLs). Keyed by the pre-mint id, matching where they were
-      // stored by the composer. Skipped for an applet send, which carried none:
+      // stored by the composer. Skipped for an applet send:
       // clearing here would discard the user's staged (and in-flight) files.
       if (ownsComposerAttachments(options)) {
         liveStore.getState().clearAttachments(workspaceId, selectedSessionId)

@@ -3,8 +3,8 @@ import type { QueryClient } from '@tanstack/react-query'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { getScratchExecutor } from '@/client/features/scratchpad/scratch-executor'
 import { liveStore } from '@/client/features/chat/chat-store'
-import { bufferSessionEvent } from '@/client/features/chat/session-view'
-import { renameSelectedSessionInCache } from '@/client/features/chat/useSelectedSession'
+import { bufferSessionEvent } from '@/client/features/chat/sessions/session-view'
+import { renameSelectedSessionInCache } from '@/client/features/chat/sessions/useSelectedSession'
 import { applyEvent } from '@/lib/format'
 import type {
   ClientMessage,
