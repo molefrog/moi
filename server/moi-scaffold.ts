@@ -100,7 +100,7 @@ declare module 'moi' {
   export function fileUrl(path: string): string
   // Switch the workspace to a tab (replace navigation). \`params\` reach the
   // target view as its \`params\` prop — JSON-plain values only. No-ops outside
-  // the moi host. Tab ids: 'overview' | 'agent' | 'scratchpad' | 'view:<id>'.
+  // the moi host. Tab ids: 'overview' | 'scratchpad' | 'view:<id>'.
   export function focusTab(tab: string, params?: Record<string, unknown>): void
   export type AttachmentInput =
     | { type: 'text'; label: string; text: string }
