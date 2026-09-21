@@ -6,7 +6,7 @@ import type {
   WorkspaceTabId
 } from '@/lib/types'
 
-import { attachmentKey, findAttachment, liveStore } from '../../chat-store'
+import { findAttachment, liveStore } from '../../chat-store'
 import { uploadChatFile } from './uploads'
 import { reportAppletError } from '@/client/features/applets/applet-log'
 import { toast } from '@/client/components/ui/toast'
@@ -53,7 +53,7 @@ async function stageFile(
         : {})
     })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Upload failed'
+    const message = error instanceof Error ? error.message : 'The file couldn’t be uploaded'
     liveStore.getState().removeAttachment(workspaceId, localId)
     toast.add({ title: `Couldn’t add ${label}`, description: message, type: 'error' })
     onError?.(message)
@@ -157,24 +157,11 @@ export async function stageDrawing(input: StageDrawingInput): Promise<void> {
   }
 }
 
-// Duplicate text is ignored; the caller still reveals chat.
 export function stageTextAttachment(
   { workspaceId, sessionId }: ComposerTarget,
   attachment: TextAttachment
 ): void {
   const store = liveStore.getState()
-  const pending = (store.attachments[attachmentKey(workspaceId, sessionId)] ?? []).filter(
-    item => item.kind === 'text'
-  )
-  if (
-    pending.some(
-      item =>
-        item.source === attachment.source &&
-        item.label === attachment.label &&
-        item.text === attachment.text
-    )
-  )
-    return
   store.addAttachments(workspaceId, sessionId, [
     { kind: 'text', localId: crypto.randomUUID(), ...attachment }
   ])

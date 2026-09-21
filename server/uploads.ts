@@ -176,18 +176,17 @@ export async function addWorkspaceFileUpload(
   workspaceRoot: string,
   path: string
 ): Promise<UploadInfo> {
-  if (!isWorkspaceAttachmentPath(path)) throw new Error('Invalid workspace file path')
+  if (!isWorkspaceAttachmentPath(path)) throw new Error('Choose a file from this workspace')
   const root = await realpath(workspaceRoot)
   const target = await realpath(resolve(root, path))
   const rel = relative(root, target).split(sep).join('/')
   // Check the resolved path too: aliases must not expose hidden files or escape.
-  if (!isWorkspaceAttachmentPath(rel))
-    throw new Error('File must be inside the workspace and outside hidden folders')
+  if (!isWorkspaceAttachmentPath(rel)) throw new Error('Choose a file from this workspace')
   const file = await open(target, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
   try {
     const stat = await file.stat()
-    if (!stat.isFile()) throw new Error('Expected a regular file')
-    if (stat.size > MAX_UPLOAD_BYTES) throw new Error('File is too large (max 32 MB)')
+    if (!stat.isFile()) throw new Error('Choose a file, not a folder')
+    if (stat.size > MAX_UPLOAD_BYTES) throw new Error('Files can be up to 32 MB')
     // Bound the read even if the file grows after stat. One extra byte detects overflow.
     const bytes = Buffer.alloc(Math.min(stat.size + 1, MAX_UPLOAD_BYTES + 1))
     let size = 0
@@ -196,13 +195,17 @@ export async function addWorkspaceFileUpload(
       if (read.bytesRead === 0) break
       size += read.bytesRead
     }
-    if (size > stat.size) throw new Error('File changed while attaching; try again')
-    return await addUpload({
-      workspaceId,
-      filename: basename(path),
-      mediaType: Bun.file(path).type || 'application/octet-stream',
-      bytes: bytes.subarray(0, size)
-    })
+    if (size > stat.size) throw new Error('The file changed while it was being added, so try again')
+    try {
+      return await addUpload({
+        workspaceId,
+        filename: basename(path),
+        mediaType: Bun.file(path).type || 'application/octet-stream',
+        bytes: bytes.subarray(0, size)
+      })
+    } catch {
+      throw new Error(`Couldn’t process "${basename(path)}"`)
+    }
   } finally {
     await file.close()
   }

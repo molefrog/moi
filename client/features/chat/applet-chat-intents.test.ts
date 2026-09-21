@@ -26,26 +26,24 @@ describe('appletSendBlockedReason', () => {
 
   test('an unavailable workspace is reported without server details', () => {
     expect(appletSendBlockedReason({ status: 'unavailable', reason: 'Runtime missing' })).toBe(
-      "this workspace's agent is unavailable"
+      'The agent is unavailable in this workspace'
     )
   })
 
   test('reports disconnected and login-required workspaces precisely', () => {
     expect(appletSendBlockedReason({ status: 'disconnected' })).toBe(
-      'this workspace is disconnected from moi'
+      'This workspace is disconnected from moi'
     )
     expect(
       appletSendBlockedReason({
         status: 'login-required',
         reason: 'Sign in'
       })
-    ).toBe("this workspace's agent needs a login")
+    ).toBe('Sign in to the agent to send this message')
   })
 
   test('an unresolved availability query blocks', () => {
-    expect(appletSendBlockedReason({ status: 'checking' })).toBe(
-      "this workspace's agent availability has not resolved yet"
-    )
+    expect(appletSendBlockedReason({ status: 'checking' })).toBe('The agent is still connecting')
   })
 
   test('agrees with the composer button on every availability state', () => {
@@ -218,7 +216,7 @@ describe('immediate applet sends', () => {
     globalThis.fetch = mock((url: string, init?: RequestInit) =>
       Promise.resolve(
         String(init?.body).includes('missing')
-          ? new Response('File not found', { status: 404 })
+          ? new Response('This file no longer exists', { status: 404 })
           : Response.json(upload)
       )
     ) as unknown as typeof fetch
@@ -232,9 +230,9 @@ describe('immediate applet sends', () => {
     expect(send).not.toHaveBeenCalled()
     expect(notices.mock.calls.at(-1)?.[0]).toMatchObject({
       type: 'error',
-      description: 'File not found'
+      description: 'This file no longer exists'
     })
-    expect(log.mock.calls[0][1].message).toContain('view:orders: File not found')
+    expect(log.mock.calls[0][1].message).toContain('view:orders: This file no longer exists')
     expect(close).toHaveBeenCalledTimes(1)
   })
 
@@ -278,7 +276,7 @@ describe('immediate applet sends', () => {
     expect(send).not.toHaveBeenCalled()
     expect(notices.mock.calls.at(-1)?.[0]).toMatchObject({
       type: 'error',
-      description: 'this workspace is disconnected from moi'
+      description: 'This workspace is disconnected from moi'
     })
   })
 

@@ -14,7 +14,11 @@
 // — no central handlers object assembled by the screen. Applet → host only;
 // if a host → applet direction is ever added (`moi.on(...)`), `dispose` must
 // also unbind those listeners or a disposed module leaks.
-import { snapshotTextAttachment } from '@/lib/moi-attachments'
+import {
+  MAX_ATTACHMENT_LABEL_CHARS,
+  MAX_TEXT_ATTACHMENT_CHARS,
+  snapshotTextAttachment
+} from '@/lib/moi-attachments'
 import type { AttachmentInput, AttachmentOrigin } from '@/lib/types'
 import { isWorkspaceAttachmentPath, MAX_UPLOAD_BYTES } from '@/lib/message-attachments'
 import { useEffect } from 'react'
@@ -22,6 +26,7 @@ import { useEffect } from 'react'
 import { createNanoEvents } from 'nanoevents'
 
 import { reportAppletError } from '@/client/features/applets/applet-log'
+import { toast } from '@/client/components/ui/toast'
 import { createRateLimiter, type RateLimiter } from '@/client/lib/rate-limit'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { AppletKind, WorkspaceTabId } from '@/lib/types'
@@ -66,19 +71,14 @@ export type AppletBridge = {
 // a bubble verbatim.
 const MAX_MESSAGE_CHARS = 1000
 
-// Chat intents can be expensive: `sendChatMessage` starts an agent run, while
-// `addChatAttachment` can upload or read a 32 MB file. Calling either during
-// render fires once per render, and the bridge is per BUNDLE, so simultaneous
-// mounts double every call. The cooldown collapses identical calls; the window
-// cap bounds loops that vary their payload. Each intent gets its own budget,
-// scoped to one workspace runtime.
+// Chat messages start an agent run. The cooldown collapses identical calls and
+// the window cap bounds loops that vary their payload.
 const CHAT_LIMITS = { cooldownMs: 2_000, windowMs: 60_000, maxPerWindow: 10, maxKeys: 64 }
 
 function createRuntime(workspaceId: string) {
   const emitter = createNanoEvents<AppletEvents>()
   // Keyed by `${source}\0${text}` — same applet, same message.
   const chatLimiter = createRateLimiter(CHAT_LIMITS)
-  const attachmentLimiter = createRateLimiter(CHAT_LIMITS)
 
   // Drops are journaled, never silent: a message the agent never received has
   // to be discoverable in `moi debug logs`, or the applet author sees a dead
@@ -116,19 +116,6 @@ function createRuntime(workspaceId: string) {
     )
   }
 
-  const admitChatAttachment = (
-    identity: AppletIdentity,
-    attachment: AttachmentInput & AttachmentOrigin
-  ): boolean => {
-    return admit(
-      attachmentLimiter,
-      identity,
-      attachmentLimitKey(attachment),
-      `addChatAttachment() was dropped: the same attachment was staged less than ${CHAT_LIMITS.cooldownMs / 1000}s ago. Call it from an event handler, not during render.`,
-      `addChatAttachment() was dropped: more than ${CHAT_LIMITS.maxPerWindow} attachments were staged in a minute from this workspace. Stage attachments only on a real user action.`
-    )
-  }
-
   return {
     on<K extends keyof AppletEvents>(event: K, cb: AppletEvents[K]) {
       return emitter.on(event, cb)
@@ -146,10 +133,11 @@ function createRuntime(workspaceId: string) {
           if (!alive) return
           try {
             const attachment = snapshotAttachmentInput(input, source)
-            if (!admitChatAttachment(identity, attachment)) return
             emitter.emit('addChatAttachment', attachment)
           } catch (error) {
-            drop(identity, `addChatAttachment() was dropped: ${errorMessage(error)}`)
+            const message = errorMessage(error)
+            toast.add({ title: 'Couldn’t add attachment', description: message, type: 'error' })
+            drop(identity, `addChatAttachment() was dropped: ${message}`)
           }
         },
         focusTab(tab, params) {
@@ -172,19 +160,17 @@ function createRuntime(workspaceId: string) {
               }
             }
             if (!isParamsRecord(input) || typeof input.message !== 'string') {
-              throw new Error('provide an object with a message string and optional attachments.')
+              throw new Error('This message uses an unsupported format')
             }
             if ('context' in input) {
-              throw new Error('the context field is no longer supported. Use attachments instead.')
+              throw new Error('This message uses an outdated format')
             }
             const message = input.message.trim()
-            if (!message || message.length > MAX_MESSAGE_CHARS) {
-              throw new Error(
-                `message must be non-empty and at most ${MAX_MESSAGE_CHARS} characters. Put longer content in a text attachment.`
-              )
-            }
+            if (!message) throw new Error('The message is empty')
+            if (message.length > MAX_MESSAGE_CHARS)
+              throw new Error('Messages can be up to 1,000 characters')
             if (input.attachments !== undefined && !Array.isArray(input.attachments)) {
-              throw new Error('attachments must be an array.')
+              throw new Error('The attachments use an unsupported format')
             }
             const attachments = Array.from(input.attachments ?? [], item =>
               snapshotAttachmentInput(item, source)
@@ -192,7 +178,9 @@ function createRuntime(workspaceId: string) {
             if (!admitChatMessage(identity, source, message)) return
             emitter.emit('sendChatMessage', { message, source, attachments })
           } catch (error) {
-            drop(identity, `sendChatMessage() was dropped: ${errorMessage(error)}`)
+            const message = errorMessage(error)
+            toast.add({ title: 'Couldn’t send message', description: message, type: 'error' })
+            drop(identity, `sendChatMessage() was dropped: ${message}`)
           }
         }
       }
@@ -206,43 +194,38 @@ function createRuntime(workspaceId: string) {
   }
 }
 
-function attachmentLimitKey(attachment: AttachmentInput & AttachmentOrigin): string {
-  if (attachment.type === 'text') {
-    return `${attachment.source}\0text\0${attachment.label}\0${attachment.text}`
-  }
-  if (attachment.file) {
-    const { name, type, size, lastModified } = attachment.file
-    return `${attachment.source}\0file\0${name}\0${type}\0${size}\0${lastModified}`
-  }
-  return `${attachment.source}\0path\0${attachment.path}`
-}
-
 // Copy the caller's fields now so later applet mutations cannot change a send
 // or staged attachment. File contents are immutable and can be retained as-is.
 function snapshotAttachmentInput(
   input: unknown,
   source: string
 ): AttachmentInput & AttachmentOrigin {
-  if (isParamsRecord(input)) {
-    if (input.type === 'text') {
-      const snapshot = snapshotTextAttachment(input)
-      if (snapshot) return { type: 'text', ...snapshot, source }
-    } else if (input.type === 'file') {
-      if (
-        input.file instanceof File &&
-        input.path === undefined &&
-        input.file.size <= MAX_UPLOAD_BYTES
-      ) {
-        return { type: 'file', file: input.file, source }
-      }
-      if (isWorkspaceAttachmentPath(input.path) && input.file === undefined) {
-        return { type: 'file', path: input.path, source }
-      }
+  if (!isParamsRecord(input)) throw new Error('This attachment isn’t supported')
+  if (input.type === 'text') {
+    const snapshot = snapshotTextAttachment(input)
+    if (snapshot) return { type: 'text', ...snapshot, source }
+    if (typeof input.label !== 'string' || !input.label.trim())
+      throw new Error('Add a label to this text attachment')
+    if (input.label.trim().length > MAX_ATTACHMENT_LABEL_CHARS)
+      throw new Error(`Attachment labels can be up to ${MAX_ATTACHMENT_LABEL_CHARS} characters`)
+    if (typeof input.text !== 'string' || !input.text.trim())
+      throw new Error('Add some text to this attachment')
+    if (input.text.length > MAX_TEXT_ATTACHMENT_CHARS)
+      throw new Error(
+        `Text attachments can be up to ${MAX_TEXT_ATTACHMENT_CHARS.toLocaleString('en-US')} characters`
+      )
+  } else if (input.type === 'file') {
+    if (input.file instanceof File && input.path === undefined) {
+      if (input.file.size > MAX_UPLOAD_BYTES) throw new Error('Files can be up to 32 MB')
+      return { type: 'file', file: input.file, source }
+    }
+    if (typeof input.path === 'string' && input.file === undefined) {
+      if (!isWorkspaceAttachmentPath(input.path))
+        throw new Error('Choose a file from this workspace')
+      return { type: 'file', path: input.path, source }
     }
   }
-  throw new Error(
-    'provide labelled text (label max 120 characters, text max 5000), or exactly one File (max 32 MB) or workspace-relative path. Hidden paths are not allowed.'
-  )
+  throw new Error('This attachment isn’t supported')
 }
 
 function errorMessage(error: unknown): string {

@@ -1,5 +1,6 @@
 import * as appletLog from './applet-log'
 import { describe, expect, test, spyOn } from 'bun:test'
+import { toast } from '@/client/components/ui/toast'
 
 import {
   appletKey,
@@ -149,6 +150,7 @@ describe('sendChatMessage validation', () => {
     const ws = `ws-${crypto.randomUUID()}`
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
+    const notices = spyOn(toast, 'add').mockImplementation(() => crypto.randomUUID())
 
     bridge.sendChatMessage({ message: '' })
     bridge.sendChatMessage({ message: '   ' })
@@ -160,16 +162,30 @@ describe('sendChatMessage validation', () => {
     bridge.sendChatMessage({ message: { toString: () => 'Do a thing' } })
 
     expect(calls).toEqual([])
+    expect(notices).toHaveBeenCalledTimes(8)
+    expect(notices).toHaveBeenLastCalledWith({
+      title: 'Couldn’t send message',
+      description: 'This message uses an unsupported format',
+      type: 'error'
+    })
+    notices.mockRestore()
   })
 
   test('drops a message too long to be a chat bubble', () => {
     const ws = `ws-${crypto.randomUUID()}`
     const { calls } = subscribeChat(ws)
     const { bridge } = appletRuntime(ws).connect(VIEW)
+    const notices = spyOn(toast, 'add').mockImplementation(() => crypto.randomUUID())
 
     bridge.sendChatMessage({ message: 'x'.repeat(1001) })
 
     expect(calls).toEqual([])
+    expect(notices).toHaveBeenCalledWith({
+      title: 'Couldn’t send message',
+      description: 'Messages can be up to 1,000 characters',
+      type: 'error'
+    })
+    notices.mockRestore()
   })
 
   test('legacy serialization failures reject the entire call', () => {
@@ -198,7 +214,7 @@ describe('sendChatMessage validation', () => {
     try {
       bridge.sendChatMessage({ message: 'Review', context: undefined })
       expect(calls).toEqual([])
-      expect(log.mock.calls[0][1].message).toContain('Use attachments instead')
+      expect(log.mock.calls[0][1].message).toContain('This message uses an outdated format')
     } finally {
       log.mockRestore()
     }
@@ -430,18 +446,20 @@ describe('addChatAttachment', () => {
     off()
   })
 
-  test('rejects invalid text, file shapes, sizes and unsafe paths without emitting', () => {
+  test('rejects invalid attachments with a toast and without emitting', () => {
     const ws = `ws-${crypto.randomUUID()}`
     const received: unknown[] = []
     const runtime = appletRuntime(ws)
     const off = runtime.on('addChatAttachment', value => received.push(value))
     const { bridge } = runtime.connect(VIEW)
+    const notices = spyOn(toast, 'add').mockImplementation(() => crypto.randomUUID())
     const file = new File(['hello'], 'notes.txt')
     const oversized = new File([new Uint8Array(32 * 1024 * 1024 + 1)], 'large.bin')
     for (const input of [
       null,
       {},
       { type: 'text', label: '', text: 'hello' },
+      { type: 'text', label: 'x'.repeat(121), text: 'hello' },
       { type: 'text', label: 'Notes', text: ' ' },
       { type: 'text', label: 'Notes', text: 'x'.repeat(5001) },
       { type: 'file' },
@@ -456,10 +474,23 @@ describe('addChatAttachment', () => {
     ])
       bridge.addChatAttachment(input)
     expect(received).toEqual([])
+    expect(notices).toHaveBeenCalledTimes(17)
+    expect(new Set(notices.mock.calls.map(([notice]) => notice.description))).toEqual(
+      new Set([
+        'This attachment isn’t supported',
+        'Add a label to this text attachment',
+        'Attachment labels can be up to 120 characters',
+        'Add some text to this attachment',
+        'Text attachments can be up to 5,000 characters',
+        'Files can be up to 32 MB',
+        'Choose a file from this workspace'
+      ])
+    )
+    notices.mockRestore()
     off()
   })
 
-  test('collapses repeated text, browser files and workspace paths inside the cooldown', () => {
+  test('does not cooldown repeated attachment intents', () => {
     const ws = `ws-${crypto.randomUUID()}`
     const received: unknown[] = []
     const runtime = appletRuntime(ws)
@@ -475,22 +506,7 @@ describe('addChatAttachment', () => {
     bridge.addChatAttachment({ type: 'file', path: 'reports/september.pdf' })
     bridge.addChatAttachment({ type: 'file', path: 'reports/september.pdf' })
 
-    expect(received).toHaveLength(3)
-    off()
-  })
-
-  test('caps a render loop that varies the attachment every call', () => {
-    const ws = `ws-${crypto.randomUUID()}`
-    const received: unknown[] = []
-    const runtime = appletRuntime(ws)
-    const off = runtime.on('addChatAttachment', value => received.push(value))
-    const { bridge } = runtime.connect(WIDGET)
-
-    for (let i = 0; i < 25; i++) {
-      bridge.addChatAttachment({ type: 'text', label: 'Clock', text: `Tick ${i}` })
-    }
-
-    expect(received).toHaveLength(10)
+    expect(received).toHaveLength(6)
     off()
   })
 })

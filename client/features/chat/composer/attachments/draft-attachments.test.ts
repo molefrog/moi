@@ -318,18 +318,18 @@ describe('applet file staging', () => {
       const failed = drawingAttachments()[0]
       expect(failed.status).toBe('uploading')
       liveStore.getState().renameSession(workspaceId, sessionId, 'real')
-      response.resolve(new Response('Upload failed', { status: 400 }))
+      response.resolve(new Response('The file couldn’t be uploaded', { status: 400 }))
       await pending
       expect(liveStore.getState().attachments[attachmentKey(workspaceId, 'real')]).toEqual(kept)
       expect(notices).toHaveBeenCalledWith({
         title: `Couldn’t add ${failed.label}`,
-        description: 'Upload failed',
+        description: 'The file couldn’t be uploaded',
         type: 'error'
       })
       if (failed.previewUrl) expect(revoke).toHaveBeenCalledWith(failed.previewUrl)
       expect(log).toHaveBeenCalledWith(workspaceId, {
         source: 'runtime',
-        message: 'addChatAttachment() from view:files: Upload failed'
+        message: 'addChatAttachment() from view:files: The file couldn’t be uploaded'
       })
       log.mockRestore()
       revoke.mockRestore()

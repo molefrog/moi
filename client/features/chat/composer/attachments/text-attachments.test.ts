@@ -37,14 +37,14 @@ describe('text staging and sends', () => {
     ])
   })
 
-  test('skips identical repeats and stages more than ten different payloads', () => {
+  test('stages repeated text attachments without a limit', () => {
     stageTextAttachment(target, attachment)
     stageTextAttachment(target, structuredClone(attachment))
-    expect(attachmentsForSend(workspaceId, null)).toHaveLength(1)
+    expect(attachmentsForSend(workspaceId, null)).toHaveLength(2)
     for (let i = 1; i < 20; i++) stageTextAttachment(target, { ...attachment, text: String(i) })
-    expect(attachmentsForSend(workspaceId, null)).toHaveLength(20)
+    expect(attachmentsForSend(workspaceId, null)).toHaveLength(21)
     stageTextAttachment(target, attachment)
-    expect(attachmentsForSend(workspaceId, null)).toHaveLength(20)
+    expect(attachmentsForSend(workspaceId, null)).toHaveLength(22)
   })
 
   test('keeps chats isolated and follows session renames', () => {

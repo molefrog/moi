@@ -87,13 +87,16 @@ test('rejects unsafe paths, missing files, directories, symlink escapes and hidd
   ]) {
     expect((await attach(path)).status).toBe(400)
   }
+  expect(await (await attach('/etc/passwd')).text()).toBe('Choose a file from this workspace')
+  expect(await (await attach('missing.txt')).text()).toBe('This file no longer exists')
+  expect(await (await attach('folder')).text()).toBe('Choose a file, not a folder')
 })
 
 test('rejects oversized files before reading their bytes and invalid images during processing', async () => {
   const path = join(root, 'large.bin')
   await Bun.write(path, '')
   await truncate(path, MAX_UPLOAD_BYTES + 1)
-  expect(await (await attach('large.bin')).text()).toContain('max 32 MB')
+  expect(await (await attach('large.bin')).text()).toBe('Files can be up to 32 MB')
   await Bun.write(join(root, 'bad.png'), 'not an image')
-  expect((await attach('bad.png')).status).toBe(400)
+  expect(await (await attach('bad.png')).text()).toBe('Couldn’t process "bad.png"')
 })

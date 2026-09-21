@@ -36,13 +36,13 @@ type UseAppletChatMessageOptions = {
 export function appletSendBlockedReason(availability: AgentAvailability): string | null {
   if (availability.status === 'available') return null
   if (availability.status === 'checking') {
-    return "this workspace's agent availability has not resolved yet"
+    return 'The agent is still connecting'
   }
-  if (availability.status === 'disconnected') return 'this workspace is disconnected from moi'
+  if (availability.status === 'disconnected') return 'This workspace is disconnected from moi'
   if (availability.status === 'login-required') {
-    return "this workspace's agent needs a login"
+    return 'Sign in to the agent to send this message'
   }
-  return "this workspace's agent is unavailable"
+  return 'The agent is unavailable in this workspace'
 }
 
 // One handler lifetime belongs to one workspace screen. Listen to selection
@@ -88,7 +88,7 @@ export function createAppletMessageHandler(
       finish()
       toast.add({
         title: 'Message canceled',
-        description: 'The active chat changed before attachments were ready.',
+        description: 'The active chat changed before attachments were ready',
         type: 'info'
       })
     }
@@ -121,7 +121,7 @@ export function createAppletMessageHandler(
     } catch (error) {
       if (active) {
         finish()
-        reportFailure(error instanceof Error ? error.message : 'Attachment preparation failed')
+        reportFailure(error instanceof Error ? error.message : 'Couldn’t prepare the attachments')
       }
       return
     }
@@ -130,7 +130,9 @@ export function createAppletMessageHandler(
     try {
       getOptions().send(event.message, { applet: { source: event.source }, preparedAttachments })
     } catch (error) {
-      reportFailure(error instanceof Error ? error.message : 'Message send failed')
+      reportFailure(
+        error instanceof Error ? error.message : 'Something went wrong while sending this message'
+      )
     }
   }
 

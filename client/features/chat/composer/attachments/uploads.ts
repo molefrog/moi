@@ -11,7 +11,7 @@ export async function uploadChatFile(
     return requestJson<UploadInfo>(
       `${url}/from-path`,
       jsonRequest('POST', { path: input }),
-      'Upload failed'
+      'The file couldn’t be uploaded'
     )
   }
   const form = new FormData()
@@ -19,8 +19,8 @@ export async function uploadChatFile(
   const [upload] = await requestJson<UploadInfo[]>(
     url,
     { method: 'POST', body: form },
-    'Upload failed'
+    'The file couldn’t be uploaded'
   )
-  if (!upload) throw new Error('Upload returned no file')
+  if (!upload) throw new Error('The upload didn’t finish')
   return upload
 }
