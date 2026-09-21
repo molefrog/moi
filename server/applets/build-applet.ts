@@ -152,20 +152,20 @@ export function fileUrl(path) {
 }
 
 export function navigate(href) {
-  bridge?.navigate(href);
+  bridge?.navigate?.(href);
 }
 
 export function resolveHref(href) {
-  return bridge?.resolveHref(href) ?? '';
+  return bridge?.resolveHref?.(href) ?? '';
 }
 
 export function addChatAttachment(input) {
-  bridge?.addChatAttachment(input);
+  bridge?.addChatAttachment?.(input);
 }
 
 // Keep positional calls working for previously built applets.
 export function sendChatMessage(input, legacyContext) {
-  bridge?.sendChatMessage(input, legacyContext);
+  bridge?.sendChatMessage?.(input, legacyContext);
 }
 `
 
