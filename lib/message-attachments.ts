@@ -2,8 +2,16 @@ import { isDrawingPurpose, isTextAttachments } from './moi-attachments'
 
 import type { MessageAttachment } from './types'
 
+export const MAX_MESSAGE_ATTACHMENTS = 10
+
+export function messageAttachmentLimitError(value: readonly unknown[]): string | null {
+  return value.length > MAX_MESSAGE_ATTACHMENTS
+    ? `A message can have at most ${MAX_MESSAGE_ATTACHMENTS} attachments.`
+    : null
+}
+
 export function isMessageAttachments(value: unknown): value is MessageAttachment[] {
-  if (!Array.isArray(value)) return false
+  if (!Array.isArray(value) || messageAttachmentLimitError(value)) return false
   const texts: unknown[] = []
   for (const item of value) {
     if (!item || typeof item !== 'object') return false

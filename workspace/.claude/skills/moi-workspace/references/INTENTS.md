@@ -79,6 +79,7 @@ function addChatAttachment(input: AttachmentInput): void
   the label. The existing upload limit is 32 MB; images use the existing image processing.
 - Paths must point to regular files inside the workspace. Absolute paths, traversal, hidden
   path segments, and symlinks escaping the workspace are rejected.
+- A message can contain up to 10 attachments.
 
 ### Examples
 

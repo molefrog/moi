@@ -34,7 +34,9 @@ import {
   useLive
 } from '@/client/features/chat/chat-store'
 import { useUiStore } from '@/client/store/ui'
+import { toast } from '@/client/components/ui/toast'
 import { emptyViewState } from '@/lib/format'
+import { messageAttachmentLimitError } from '@/lib/message-attachments'
 import type { Part, ViewState } from '@/lib/types'
 
 const EMPTY: ViewState = emptyViewState()
@@ -111,6 +113,13 @@ export function useChat(address: WorkspaceTabAddress) {
       // message into the same live server session (streaming-input mode).
       if (!text && ready.length === 0 && !options?.preparedAttachments?.attachments.length) return
 
+      const prepared = options?.preparedAttachments ?? prepareDraftAttachments(ready)
+      const limitError = messageAttachmentLimitError(prepared.attachments)
+      if (limitError) {
+        toast.add({ title: 'Couldn’t send message', description: limitError, type: 'error' })
+        return
+      }
+
       let sid = selectedSessionId
       let isNew = false
       if (!sid) {
@@ -135,7 +144,6 @@ export function useChat(address: WorkspaceTabAddress) {
       // upserts in place rather than duplicating. Image attachments render from
       // their local object URL until the server's broadcast (with a data URL)
       // upserts in place.
-      const prepared = options?.preparedAttachments ?? prepareDraftAttachments(ready)
       const parts: Part[] = [...prepared.parts]
       if (text) parts.push({ type: 'text', text })
       const optimisticId = startOptimisticTurn({

@@ -22,7 +22,7 @@ import { useEffect } from 'react'
 import { createNanoEvents } from 'nanoevents'
 
 import { reportAppletError } from '@/client/features/applets/applet-log'
-import { createRateLimiter } from '@/client/lib/rate-limit'
+import { createRateLimiter, type RateLimiter } from '@/client/lib/rate-limit'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { AppletKind, WorkspaceTabId } from '@/lib/types'
 import { isParamsRecord, isWorkspaceTabId } from '@/lib/workspace-tabs'
@@ -66,19 +66,19 @@ export type AppletBridge = {
 // a bubble verbatim.
 const MAX_MESSAGE_CHARS = 1000
 
-// `sendChatMessage` starts an agent run, which makes a stuck applet expensive
-// in a way `focusTab` is not: a widget calling it during render fires once per
-// render, and the bridge is per BUNDLE, so two simultaneous mounts of one
-// applet double every call. The cooldown collapses identical messages (which
-// also absorbs the double-mount); the window cap bounds everything else,
-// including a loop that varies its text. Limits are per workspace runtime, so
-// one runaway applet can't mute another workspace.
+// Chat intents can be expensive: `sendChatMessage` starts an agent run, while
+// `addChatAttachment` can upload or read a 32 MB file. Calling either during
+// render fires once per render, and the bridge is per BUNDLE, so simultaneous
+// mounts double every call. The cooldown collapses identical calls; the window
+// cap bounds loops that vary their payload. Each intent gets its own budget,
+// scoped to one workspace runtime.
 const CHAT_LIMITS = { cooldownMs: 2_000, windowMs: 60_000, maxPerWindow: 10, maxKeys: 64 }
 
 function createRuntime(workspaceId: string) {
   const emitter = createNanoEvents<AppletEvents>()
   // Keyed by `${source}\0${text}` — same applet, same message.
   const chatLimiter = createRateLimiter(CHAT_LIMITS)
+  const attachmentLimiter = createRateLimiter(CHAT_LIMITS)
 
   // Drops are journaled, never silent: a message the agent never received has
   // to be discoverable in `moi debug logs`, or the applet author sees a dead
@@ -93,26 +93,40 @@ function createRuntime(workspaceId: string) {
     })
   }
 
-  // True when this message may go out; records the send as a side effect. Each
-  // tier gets its own explanation — "you called this in render" and "you are
-  // sending too much" need different fixes.
+  const admit = (
+    limiter: RateLimiter,
+    identity: AppletIdentity,
+    key: string,
+    cooldownReason: string,
+    windowReason: string
+  ): boolean => {
+    const verdict = limiter.admit(key)
+    if (verdict === 'ok') return true
+    drop(identity, verdict === 'cooldown' ? cooldownReason : windowReason)
+    return false
+  }
+
   const admitChatMessage = (identity: AppletIdentity, source: string, text: string): boolean => {
-    const verdict = chatLimiter.admit(`${source}\0${text}`)
-    if (verdict === 'cooldown') {
-      drop(
-        identity,
-        `sendChatMessage() for "${text}" was dropped: the same message was already sent less than ${CHAT_LIMITS.cooldownMs / 1000}s ago. Call it from an event handler, not during render.`
-      )
-      return false
-    }
-    if (verdict === 'window') {
-      drop(
-        identity,
-        `sendChatMessage() for "${text}" was dropped: more than ${CHAT_LIMITS.maxPerWindow} messages in a minute from this workspace. Each one starts an agent run, so send only on a real user action.`
-      )
-      return false
-    }
-    return true
+    return admit(
+      chatLimiter,
+      identity,
+      `${source}\0${text}`,
+      `sendChatMessage() for "${text}" was dropped: the same message was already sent less than ${CHAT_LIMITS.cooldownMs / 1000}s ago. Call it from an event handler, not during render.`,
+      `sendChatMessage() for "${text}" was dropped: more than ${CHAT_LIMITS.maxPerWindow} messages in a minute from this workspace. Each one starts an agent run, so send only on a real user action.`
+    )
+  }
+
+  const admitChatAttachment = (
+    identity: AppletIdentity,
+    attachment: AttachmentInput & AttachmentOrigin
+  ): boolean => {
+    return admit(
+      attachmentLimiter,
+      identity,
+      attachmentLimitKey(attachment),
+      `addChatAttachment() was dropped: the same attachment was staged less than ${CHAT_LIMITS.cooldownMs / 1000}s ago. Call it from an event handler, not during render.`,
+      `addChatAttachment() was dropped: more than ${CHAT_LIMITS.maxPerWindow} attachments were staged in a minute from this workspace. Stage attachments only on a real user action.`
+    )
   }
 
   return {
@@ -131,7 +145,9 @@ function createRuntime(workspaceId: string) {
         addChatAttachment(input) {
           if (!alive) return
           try {
-            emitter.emit('addChatAttachment', snapshotAttachmentInput(input, source))
+            const attachment = snapshotAttachmentInput(input, source)
+            if (!admitChatAttachment(identity, attachment)) return
+            emitter.emit('addChatAttachment', attachment)
           } catch (error) {
             drop(identity, `addChatAttachment() was dropped: ${errorMessage(error)}`)
           }
@@ -188,6 +204,17 @@ function createRuntime(workspaceId: string) {
       }
     }
   }
+}
+
+function attachmentLimitKey(attachment: AttachmentInput & AttachmentOrigin): string {
+  if (attachment.type === 'text') {
+    return `${attachment.source}\0text\0${attachment.label}\0${attachment.text}`
+  }
+  if (attachment.file) {
+    const { name, type, size, lastModified } = attachment.file
+    return `${attachment.source}\0file\0${name}\0${type}\0${size}\0${lastModified}`
+  }
+  return `${attachment.source}\0path\0${attachment.path}`
 }
 
 // Copy the caller's fields now so later applet mutations cannot change a send

@@ -6,6 +6,7 @@ import { workspaceKeys } from '@/client/api/workspace-keys'
 import {
   attachmentsForSend,
   ownsComposerAttachments,
+  prepareChatAttachments,
   resolveChatRunOptions,
   startOptimisticSession,
   startOptimisticTurn,
@@ -13,6 +14,7 @@ import {
 } from '@/client/features/chat/chat-send'
 import { attachmentKey, liveStore } from '@/client/features/chat/chat-store'
 import type { StagedAttachment } from '@/client/features/chat/composer/attachments/types'
+import { MAX_MESSAGE_ATTACHMENTS } from '@/lib/message-attachments'
 import type { SessionInfo, UploadInfo, ViewState, WorkspaceAgent } from '@/lib/types'
 import { resolveSelectedModel } from './composer/model-order'
 
@@ -38,6 +40,20 @@ describe('startOptimisticTurn', () => {
     expect(view?.turns[0]?.parts).toEqual([{ type: 'text', text: 'Build a dashboard' }])
     expect(liveStore.getState().activity[`${workspaceId}:${sessionId}`]).toBe('running')
   })
+})
+
+test('prepareChatAttachments rejects oversized batches before preparation', async () => {
+  await expect(
+    prepareChatAttachments(
+      workspaceId,
+      Array.from({ length: MAX_MESSAGE_ATTACHMENTS + 1 }, (_, index) => ({
+        type: 'text' as const,
+        source: 'view:orders',
+        label: `Row ${index}`,
+        text: String(index)
+      }))
+    )
+  ).rejects.toThrow(`at most ${MAX_MESSAGE_ATTACHMENTS} attachments`)
 })
 
 describe('startOptimisticSession', () => {

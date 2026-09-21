@@ -18,6 +18,7 @@ import type { MoiUserMessageOptions } from '@/client/features/workspace/moi-cont
 import { STREAM_RESPONSES } from '@/client/lib/flags'
 import { formatChatTitle } from '@/lib/chat-title'
 import { applyEvent, emptyViewState } from '@/lib/format'
+import { messageAttachmentLimitError } from '@/lib/message-attachments'
 import type { Part, SessionInfo, ViewState, WorkspaceAgent } from '@/lib/types'
 
 // Explicit attachments belong to this send, independently of the user's draft.
@@ -72,6 +73,8 @@ export async function prepareChatAttachments(
   workspaceId: string,
   inputs: readonly (AttachmentInput & AttachmentOrigin)[]
 ): Promise<PreparedAttachments> {
+  const limitError = messageAttachmentLimitError(inputs)
+  if (limitError) throw new Error(limitError)
   return collectPreparedAttachments(
     await Promise.all(
       inputs.map(async input => {

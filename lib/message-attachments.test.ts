@@ -1,6 +1,6 @@
 import type { MessageAttachment } from './types'
 import { expect, test } from 'bun:test'
-import { isMessageAttachments } from './message-attachments'
+import { MAX_MESSAGE_ATTACHMENTS, isMessageAttachments } from './message-attachments'
 
 test('accepts mixed attachment references', () => {
   const context = { source: 'view:orders', label: 'Order', text: 'Order ID: 1042' }
@@ -36,7 +36,8 @@ test('rejects invalid variants, legacy ids, and invalid context in mixed request
     true
   )
   const item = { type: 'text', source: 'view:orders', label: 'Order', text: 'Order' }
-  expect(isMessageAttachments(Array(20).fill(item))).toBe(true)
+  expect(isMessageAttachments(Array(MAX_MESSAGE_ATTACHMENTS).fill(item))).toBe(true)
+  expect(isMessageAttachments(Array(MAX_MESSAGE_ATTACHMENTS + 1).fill(item))).toBe(false)
   expect(isMessageAttachments([{ ...item, text: 'x'.repeat(5001) }])).toBe(false)
   expect(isMessageAttachments([{ ...item, purpose: 'sketch' }])).toBe(false)
   expect(isMessageAttachments([])).toBe(true)

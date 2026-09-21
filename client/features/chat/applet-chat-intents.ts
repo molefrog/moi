@@ -1,6 +1,6 @@
 // Connect validated applet intents to the active chat: stage attachments in the
 // draft or send a message immediately, then reveal and focus chat.
-// The runtime owns argument validation, source attribution, and send rate limits;
+// The runtime owns argument validation, source attribution, and intent rate limits;
 // these handlers own draft staging, preparation, and cancellation of immediate sends.
 import { stageChatAttachment } from './composer/attachments/draft-attachments'
 import { reportAppletError } from '@/client/features/applets/applet-log'

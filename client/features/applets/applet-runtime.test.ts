@@ -458,4 +458,39 @@ describe('addChatAttachment', () => {
     expect(received).toEqual([])
     off()
   })
+
+  test('collapses repeated text, browser files and workspace paths inside the cooldown', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const received: unknown[] = []
+    const runtime = appletRuntime(ws)
+    const off = runtime.on('addChatAttachment', value => received.push(value))
+    const { bridge } = runtime.connect(VIEW)
+    const text = { type: 'text', label: 'Order', text: 'Order #1042' }
+    const file = () => new File(['hello'], 'notes.txt', { type: 'text/plain', lastModified: 1_000 })
+
+    bridge.addChatAttachment(text)
+    bridge.addChatAttachment(structuredClone(text))
+    bridge.addChatAttachment({ type: 'file', file: file() })
+    bridge.addChatAttachment({ type: 'file', file: file() })
+    bridge.addChatAttachment({ type: 'file', path: 'reports/september.pdf' })
+    bridge.addChatAttachment({ type: 'file', path: 'reports/september.pdf' })
+
+    expect(received).toHaveLength(3)
+    off()
+  })
+
+  test('caps a render loop that varies the attachment every call', () => {
+    const ws = `ws-${crypto.randomUUID()}`
+    const received: unknown[] = []
+    const runtime = appletRuntime(ws)
+    const off = runtime.on('addChatAttachment', value => received.push(value))
+    const { bridge } = runtime.connect(WIDGET)
+
+    for (let i = 0; i < 25; i++) {
+      bridge.addChatAttachment({ type: 'text', label: 'Clock', text: `Tick ${i}` })
+    }
+
+    expect(received).toHaveLength(10)
+    off()
+  })
 })
