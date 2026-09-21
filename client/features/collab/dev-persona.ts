@@ -2,7 +2,7 @@ import type { CollabIdentity } from '@/lib/collab/types'
 
 import { facehashDataUrl } from './facehash-avatar'
 
-// Test people are created only by explicit setup on /dev/collab.
+// Test profiles are activated only by explicit setup on /dev/collab.
 
 // Backgrounds that keep the black face readable and still work as a cursor
 // color on light and dark surfaces.

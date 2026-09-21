@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Route, Switch } from 'wouter'
+import { Redirect, Route, Switch } from 'wouter'
 
 import { ChatStatesPage } from './ChatStatesPage'
 import { BlobatarShapesPage } from './BlobatarShapesPage'
@@ -13,9 +13,6 @@ import { UiComponentsPage } from './UiComponentsPage'
 // (and its dependencies) lives in this folder and loads as one lazy chunk —
 // see the dynamic import in AppRouter. /dev itself is the index; list new
 // routes there too.
-const DevCollabKitPage = lazy(() =>
-  import('../collab/DevCollabKitPage').then(module => ({ default: module.DevCollabKitPage }))
-)
 const DevCollabPage = lazy(() =>
   import('../collab/DevCollabPage').then(module => ({ default: module.DevCollabPage }))
 )
@@ -24,9 +21,7 @@ export default function DevRoutes() {
   return (
     <Switch>
       <Route path="/dev/collab-kit">
-        <Suspense fallback={null}>
-          <DevCollabKitPage />
-        </Suspense>
+        <Redirect to="/dev/collab" />
       </Route>
       <Route path="/dev/collab">
         <Suspense fallback={null}>

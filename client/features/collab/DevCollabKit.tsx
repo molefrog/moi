@@ -8,7 +8,6 @@ import {
   IconPlus,
   IconPointer
 } from '@tabler/icons-react'
-import { Link } from 'wouter'
 
 import { Button } from '@/client/components/ui/button'
 import { Checkbox } from '@/client/components/ui/checkbox'
@@ -844,7 +843,7 @@ function HooksDemo({ room }: HooksDemoProps) {
   )
 }
 
-export function DevCollabKitPage() {
+export function DevCollabKit() {
   const [room] = useState(() =>
     createFakeBackend({
       self: you,
@@ -859,21 +858,16 @@ export function DevCollabKitPage() {
   return (
     <CollabBackendProvider backend={room}>
       <AppletCollabProvider workspaceId="preview" applet={APPLET}>
-        <main className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-6 py-10">
-          <div>
-            <Link href="/dev" className="text-sm text-muted-foreground hover:text-foreground">
-              ← Dev pages
-            </Link>
-            <header className="mt-5">
-              <h1 className="text-xl font-medium">Collab kit</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Everything applets get from moi/collab, running on an in-memory room instead of a
-                server. The people are made up: Fig and Alex are on this page, Pierre is elsewhere
-                in the workspace, Andrea is away, and the rest exist only in the directory. The
-                first part is what it looks like, the second part is how it behaves.
-              </p>
-            </header>
-          </div>
+        <div className="flex flex-col gap-10 border-t border-border pt-8">
+          <header>
+            <h2 className="text-base font-medium">Playground</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Everything applets get from moi/collab, running on an in-memory room instead of a
+              server. The people are made up: Fig and Alex are on this page, Pierre is elsewhere in
+              the workspace, Andrea is away, and the rest exist only in the directory. The first
+              part is what it looks like, the second part is how it behaves.
+            </p>
+          </header>
 
           <Section
             title="Person"
@@ -944,7 +938,7 @@ export function DevCollabKitPage() {
           >
             <HooksDemo room={room} />
           </Section>
-        </main>
+        </div>
       </AppletCollabProvider>
     </CollabBackendProvider>
   )

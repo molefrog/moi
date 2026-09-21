@@ -10,13 +10,7 @@ const DEV_ROUTES: DevRouteEntry[] = [
   {
     path: '/dev/collab',
     title: 'Collab',
-    description: 'Give this tab a collab identity: a name, a color, and a generated avatar.'
-  },
-  {
-    path: '/dev/collab-kit',
-    title: 'Collab kit',
-    description:
-      'Everything applets get from moi/collab on an in-memory room: components, connected components, and live hooks.'
+    description: 'Collaboration components, live hook previews, and optional dev identity setup.'
   },
   {
     path: '/dev/blobatar-shapes',

@@ -35,8 +35,10 @@ export function getIdentity(): CollabIdentity | null {
 }
 
 export function setIdentity(next: CollabIdentity | null): void {
-  identitySource = next === null ? null : 'external'
-  identity = next === null ? null : normalizeIdentity(next)
+  const normalized = next === null ? null : normalizeIdentity(next)
+  // Signing out still leaves the outer provider in charge of identity.
+  identitySource = 'external'
+  identity = normalized
   listeners.forEach(listener => listener())
 }
 
@@ -65,8 +67,11 @@ function persistDevIdentity(): void {
 }
 
 export function setDevIdentity(next: CollabIdentity): void {
+  // A provider may take over between rendering the dev form and handling input.
+  if (identitySource === 'external') return
+  const normalized = normalizeIdentity(next)
   identitySource = 'dev'
-  identity = normalizeIdentity(next)
+  identity = normalized
   persistDevIdentity()
   listeners.forEach(listener => listener())
 }
@@ -95,14 +100,15 @@ export function installIdentityApi(): void {
   }
   const previous = host.moi?.collab
   if (previous?.getIdentity) {
+    identitySource = 'external'
+    identity = null
     try {
       const initial = previous.getIdentity()
       identity = initial === null ? null : normalizeIdentity(initial)
-      identitySource = 'external'
     } catch {
-      /* Use the local profile. */
+      /* The provider still owns identity while unavailable or signed out. */
     }
-  } else {
+  } else if (identitySource !== 'external') {
     try {
       const saved = sessionStorage.getItem(PROFILE_KEY)
       if (saved) {

@@ -17,6 +17,11 @@ do not appear in presence. `useSelf()` stays `null` until identity is supplied t
 or the outer host bridge. Applets must not create an identity to read or write shared data.
 Workspace Share/people controls and personal navigation require an explicit identity.
 
+The combined `/dev/collab` page contains the component playground and optional **Dev identity**
+setup. Select **Use dev identity** to enable a local profile; opening the page alone does not create
+one. Identity controls are hidden when an external provider is configured, including when signed
+out. The playground always uses its own in-memory room and sample people.
+
 ```tsx
 import {
   Activity,
