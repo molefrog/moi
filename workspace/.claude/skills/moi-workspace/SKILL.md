@@ -261,6 +261,7 @@ Imports resolve relatively (same folder, or elsewhere under `.moi/` — e.g. `..
 from `.moi/package.json` deps — no `@/` aliases. Files starting with `_` (e.g. `_utils.tsx`) in
 `widgets/` and `views/` are never applet entry points — put code shared between applets there.
 `moi bundle` tracks these local imports: editing a shared module rebuilds every applet using it.
+**Applets never import from each other, not even types.**
 
 ### Widgets
 
@@ -282,14 +283,7 @@ Changing `colSpan`/`rowSpan` needs `moi bundle --force --only widgets/<id>`. See
 
 ### Views
 
-Full-screen apps, one per nav tab — the user switches tabs. A view has no router of its own, but it
-can be addressed: see [Applet intents](references/INTENTS.md) for `navigate`, `resolveHref`, and the
-`params` prop.
-
-Use URL query params for state that should survive reloads or be shareable, such as the selected
-event. Render it directly from the `params` prop and call `navigate()` when it changes, including
-when opening or closing details inside the view. Keep temporary state, such as drafts and hover,
-in React. See the [view params example](references/INTENTS.md#view-params-and-history).
+Views are full-screen apps, one per tab.
 
 ```ts
 export const config = {
@@ -301,6 +295,10 @@ export const config = {
 
 A view **owns its whole page** — its own `h-full w-full` layout, scrolling
 (`overflow-auto`), padding, and chrome. Build it to read like an app screen. See `references/DESIGN.md`.
+
+Keep shareable or reload-safe state in URL query params,
+read it from `params`, and update it with `navigate()`. Keep temporary state, such as drafts and
+hover, in React. See [Applet intents](references/INTENTS.md#view-params-and-history).
 
 #### View builder requests
 

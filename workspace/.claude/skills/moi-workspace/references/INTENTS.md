@@ -3,8 +3,6 @@
 Intents let an applet act beyond its own UI: open another view, add context to chat, or ask the
 agent to do something. Import these functions from `moi` and call them from user event handlers,
 such as a button click; moi handles the action in the workspace.
-Action functions return `void`; `resolveHref` returns a browser href. moi identifies the source
-applet automatically for chat actions. For rejected chat intents, inspect `moi debug logs`.
 
 ## Navigation: `navigate(href)` and `resolveHref(href)`
 
@@ -52,10 +50,6 @@ See [Views](../SKILL.md#views) for which state belongs in the URL.
 Normal navigation adds browser history. Back, Forward, reload, and copied links restore the address.
 Tab clicks restore each tab's last address in browser memory. An explicit root link clears params.
 Inactive views keep their own params. Widgets receive no params.
-
-**Applets never import from each other, not even types.**
-
-`resolveHref` preserves HTTP(S) URLs. Native external links keep their normal browser behavior.
 
 ## `addChatAttachment(input)`
 
@@ -125,10 +119,7 @@ immediate send clear.
 ### API
 
 ```ts
-function sendChatMessage(input: {
-  message: string
-  attachments?: AttachmentInput[]
-}): void
+function sendChatMessage(input: { message: string; attachments?: AttachmentInput[] }): void
 ```
 
 - `message`: required user-visible message, trimmed, non-empty, and at most 1,000 characters.
@@ -139,14 +130,17 @@ function sendChatMessage(input: {
 
 ```tsx
 import { sendChatMessage } from 'moi'
-
-<button onClick={() => sendChatMessage({
-  message: 'Review this order',
-  attachments: [
-    { type: 'text', label: 'Order #1042', text: 'Status: delayed' },
-    { type: 'file', path: 'reports/order-1042.pdf' }
-  ]
-})}>
+;<button
+  onClick={() =>
+    sendChatMessage({
+      message: 'Review this order',
+      attachments: [
+        { type: 'text', label: 'Order #1042', text: 'Status: delayed' },
+        { type: 'file', path: 'reports/order-1042.pdf' }
+      ]
+    })
+  }
+>
   Review order
 </button>
 ```
