@@ -54,6 +54,14 @@ export class CollabService {
     for (const id of this.clients.keys()) this.emit(id, message)
   }
 
+  // Remembers a profile in the people directory and tells everyone else when
+  // it is new or changed, so ids keep resolving after the person leaves.
+  private rememberPerson(identity: CollabIdentity, except?: string) {
+    if (!this.storage.upsertPerson(identity)) return
+    const message: CollabServerMessage = { type: 'people', people: [identity] }
+    for (const id of this.clients.keys()) if (id !== except) this.emit(id, message)
+  }
+
   private scheduleParticipants() {
     this.presenceTimer ??= setTimeout(() => this.publishParticipants(), 50)
   }
@@ -77,12 +85,14 @@ export class CollabService {
           : null,
         subscriptions: new Map()
       })
+      if (identity) this.rememberPerson(identity, connectionId)
       this.emit(connectionId, {
         type: 'welcome',
         version: 1,
         connectionId,
         identity,
-        participants: this.participants()
+        participants: this.participants(),
+        people: this.storage.listPeople()
       })
       this.publishParticipants()
       return
@@ -96,6 +106,7 @@ export class CollabService {
         if (!participant || message.identity.id !== actor.id)
           throw new Error('Reconnect to change identity')
         participant.identity = cleanIdentity(message.identity)
+        this.rememberPerson(participant.identity)
         this.publishParticipants()
         return
       }

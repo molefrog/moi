@@ -13,11 +13,6 @@ export type CollabIdentity = {
   color: string
 }
 
-export type CollabCapability = {
-  enabled: boolean
-  referencePath?: string
-}
-
 export type CollabLocation = { page: string; title?: string }
 export type CollabActor = { id: string; kind: 'user' | 'agent' | 'system'; onBehalfOf?: string }
 
@@ -77,8 +72,12 @@ export type CollabServerMessage =
       connectionId: string
       identity: CollabIdentity | null
       participants: CollabParticipant[]
+      // Everyone who has joined this workspace, so an id still resolves to a
+      // name and face after that person has left.
+      people: CollabIdentity[]
     }
   | { type: 'participants'; participants: CollabParticipant[] }
+  | { type: 'people'; people: CollabIdentity[] }
   | ({ type: 'snapshot'; subscriptionId: string } & CollabScopeSnapshot)
   | {
       type: 'update'

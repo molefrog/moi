@@ -17,6 +17,8 @@ export type CollabConnectionState = {
   status: 'connecting' | 'connected' | 'disconnected'
   connectionId: string | null
   participants: CollabParticipant[]
+  // The people directory by id: everyone who has joined, online or not.
+  people: Readonly<Record<string, CollabIdentity>>
   pendingCount: number
   error: string | null
 }
@@ -64,6 +66,16 @@ function applyOperations(
   return next
 }
 
+function mergePeople(
+  current: Readonly<Record<string, CollabIdentity>>,
+  identities: readonly CollabIdentity[]
+): Readonly<Record<string, CollabIdentity>> {
+  if (!identities.length) return current
+  const next = { ...current }
+  for (const identity of identities) next[identity.id] = identity
+  return next
+}
+
 function isJson(value: unknown): value is CollabJsonValue {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return true
   if (typeof value === 'number') return Number.isFinite(value)
@@ -80,6 +92,7 @@ export class CollabStore {
     status: 'connecting',
     connectionId: null,
     participants: [],
+    people: {},
     pendingCount: 0,
     error: null
   }
@@ -222,6 +235,11 @@ export class CollabStore {
           status: 'connected',
           connectionId: message.connectionId,
           participants: message.participants,
+          // An older server sends no directory; live profiles still resolve.
+          people: mergePeople(this.state.people, [
+            ...(message.people ?? []),
+            ...message.participants.map(participant => participant.identity)
+          ]),
           error: null
         })
         for (const [name, scope] of this.scopes) {
@@ -238,7 +256,16 @@ export class CollabStore {
         break
       }
       case 'participants':
-        this.publish({ participants: message.participants })
+        this.publish({
+          participants: message.participants,
+          people: mergePeople(
+            this.state.people,
+            message.participants.map(participant => participant.identity)
+          )
+        })
+        break
+      case 'people':
+        this.publish({ people: mergePeople(this.state.people, message.people) })
         break
       case 'snapshot': {
         const scope = this.scope(message.scope)

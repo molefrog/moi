@@ -17,7 +17,8 @@ function fixture(entries: Record<string, CollabJsonValue> = {}) {
       version: 1,
       connectionId: crypto.randomUUID(),
       identity: IDENTITY,
-      participants: []
+      participants: [],
+      people: []
     })
   welcome()
   const release = store.acquireScope(SCOPE)
@@ -284,5 +285,26 @@ describe('collab client state', () => {
       duplicate: false
     })
     await result
+  })
+
+  test('the people directory merges welcome, live profiles and later announcements, and survives a disconnect', () => {
+    const store = new CollabStore()
+    const ada = { id: 'ada', name: 'Ada', color: '#f59e0b' }
+    const ken = { id: 'ken', name: 'Ken', color: '#3b82f6' }
+    store.receive({
+      type: 'welcome',
+      version: 1,
+      connectionId: 'c1',
+      identity: null,
+      participants: [{ connectionId: 'c2', identity: ken, location: null, presence: [] }],
+      people: [ada]
+    })
+    expect(store.getSnapshot().people).toEqual({ ada, ken })
+    const renamed = { ...ada, name: 'Ada L' }
+    store.receive({ type: 'people', people: [renamed] })
+    expect(store.getSnapshot().people.ada).toEqual(renamed)
+    store.disconnect()
+    expect(store.getSnapshot().participants).toEqual([])
+    expect(store.getSnapshot().people).toEqual({ ada: renamed, ken })
   })
 })

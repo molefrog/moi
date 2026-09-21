@@ -206,4 +206,58 @@ describe('collab service', () => {
     ).toThrow('Reconnect')
     expect(() => service.receive('missing', { type: 'ping' })).toThrow('Join')
   })
+
+  test('the people directory outlives presence and announces new or changed profiles', () => {
+    const ada = { id: 'ada', name: 'ada', color: '#336699' }
+    const ken = { id: 'ken', name: 'ken', color: '#336699' }
+    const announced = () =>
+      messages.flatMap(item =>
+        item.message.type === 'people'
+          ? [{ to: item.connectionId, people: item.message.people }]
+          : []
+      )
+    const welcome = (connectionId: string) => {
+      const found = messages.find(
+        item => item.connectionId === connectionId && item.message.type === 'welcome'
+      )?.message
+      if (found?.type !== 'welcome') throw new Error('No welcome')
+      return found
+    }
+    join('a', 'ada')
+    expect(welcome('a').people).toEqual([ada])
+    expect(announced()).toEqual([])
+
+    messages.length = 0
+    join('b', 'ken')
+    expect(announced()).toEqual([{ to: 'a', people: [ken] }])
+    expect(
+      welcome('b')
+        .people.map(person => person.id)
+        .sort()
+    ).toEqual(['ada', 'ken'])
+
+    // Leaving removes presence, not the directory entry; anonymous readers get it too.
+    service.leave('a')
+    messages.length = 0
+    service.receive('anon', { type: 'join', version: 1, identity: null, anonymousId: 'tab' })
+    expect(welcome('anon').participants.map(person => person.identity.id)).toEqual(['ken'])
+    expect(
+      welcome('anon')
+        .people.map(person => person.id)
+        .sort()
+    ).toEqual(['ada', 'ken'])
+
+    // The same profile rejoining announces nothing; a changed profile reaches everyone.
+    messages.length = 0
+    join('c', 'ada')
+    expect(announced()).toEqual([])
+    const renamed = { ...ada, name: 'Ada L' }
+    service.receive('c', { type: 'identity', identity: renamed })
+    expect(
+      announced()
+        .map(item => item.to)
+        .sort()
+    ).toEqual(['anon', 'b', 'c'])
+    expect(announced()[0]?.people).toEqual([renamed])
+  })
 })

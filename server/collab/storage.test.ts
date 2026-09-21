@@ -292,9 +292,59 @@ describe('collab storage', () => {
     ).toBe('delete')
     expect(
       inspection.query<{ user_version: number }, []>('PRAGMA user_version').get()?.user_version
-    ).toBe(1)
-    inspection.exec('PRAGMA user_version = 2')
+    ).toBe(2)
+    inspection.exec('PRAGMA user_version = 3')
     inspection.close()
     expect(() => openCollabStorage(path)).toThrow('newer version')
+  })
+
+  test('the people directory keeps the latest profile per person and survives reopening', () => {
+    expect(storage.listPeople()).toEqual([])
+    const ada = { id: 'ada', name: 'Ada', color: '#f59e0b' }
+    const ken = { id: 'ken', name: 'Ken', color: '#3b82f6' }
+    expect(storage.upsertPerson(ada)).toBe(true)
+    expect(storage.upsertPerson(ada)).toBe(false)
+    timestamp += 1000
+    expect(storage.upsertPerson(ken)).toBe(true)
+    timestamp += 1000
+    const renamed = { ...ada, name: 'Ada L', avatar: 'data:image/png;base64,AAAA' }
+    expect(storage.upsertPerson(renamed)).toBe(true)
+    storage.close()
+    storage = openCollabStorage(path, { now: () => timestamp })
+    expect(storage.listPeople()).toEqual([renamed, ken])
+    expect(() => storage.upsertPerson({ ...ada, avatar: 'x'.repeat(9000) })).toThrow('8 KiB')
+    expect(storage.listPeople()).toEqual([renamed, ken])
+  })
+
+  test('a version 1 database gains the people directory and keeps its data', () => {
+    const legacyPath = join(directory, 'legacy.sqlite')
+    const legacy = new Database(legacyPath, { create: true })
+    legacy.exec(`
+      CREATE TABLE scopes (scope TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 0);
+      CREATE TABLE entries (
+        scope TEXT NOT NULL, key TEXT NOT NULL, value_json TEXT NOT NULL, PRIMARY KEY (scope, key)
+      );
+      CREATE TABLE receipts (
+        actor_id TEXT NOT NULL, operation_id TEXT NOT NULL, request_hash TEXT NOT NULL,
+        scope TEXT NOT NULL, revision INTEGER NOT NULL, committed_at INTEGER NOT NULL,
+        PRIMARY KEY (actor_id, operation_id)
+      );
+      INSERT INTO scopes(scope, revision) VALUES ('shared:tasks', 3);
+      INSERT INTO entries(scope, key, value_json) VALUES ('shared:tasks', 'task/1/title', '"Ship"');
+      PRAGMA user_version = 1;
+    `)
+    legacy.close()
+    const upgraded = openCollabStorage(legacyPath)
+    try {
+      expect(upgraded.snapshot('shared:tasks')).toEqual({
+        scope: 'shared:tasks',
+        revision: 3,
+        entries: { 'task/1/title': 'Ship' }
+      })
+      expect(upgraded.listPeople()).toEqual([])
+      expect(upgraded.upsertPerson({ id: 'ada', name: 'Ada', color: '#f59e0b' })).toBe(true)
+    } finally {
+      upgraded.close()
+    }
   })
 })

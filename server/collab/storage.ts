@@ -2,7 +2,9 @@ import { Database } from 'bun:sqlite'
 import { existsSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 
+import { COLLAB_MAX_AVATAR_BYTES } from '@/lib/collab/protocol'
 import type {
+  CollabIdentity,
   CollabJsonValue,
   CollabMutationResult,
   CollabOperation,
@@ -19,11 +21,12 @@ export const COLLAB_STORAGE_LIMITS = {
   identifierBytes: 256,
   keyBytes: 1024,
   jsonDepth: 32,
-  receiptTtlMs: 24 * 60 * 60 * 1000
+  receiptTtlMs: 24 * 60 * 60 * 1000,
+  people: 500
 } as const
 
 const PRUNE_INTERVAL_MS = 60_000
-const SCHEMA_VERSION = 1
+const SCHEMA_VERSION = 2
 
 export class CollabStorageError extends Error {
   constructor(
@@ -44,6 +47,10 @@ export type CollabStorage = {
     operations: readonly CollabOperation[]
   ) => CollabMutationResult
   lookupReceipts: (actorId: string, operationIds: readonly string[]) => CollabReceipt[]
+  // The people directory: the latest profile of everyone who has joined.
+  // Returns whether the stored profile changed.
+  upsertPerson: (identity: CollabIdentity) => boolean
+  listPeople: () => CollabIdentity[]
   pruneReceipts: () => void
   exportTo: (path: string) => void
   close: () => void
@@ -182,6 +189,20 @@ export function openCollabStorage(path: string, options: CollabStorageOptions = 
         `)
       })()
     }
+    if (version < 2) {
+      db.transaction(() => {
+        db.exec(`
+          CREATE TABLE people (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            color TEXT NOT NULL,
+            avatar TEXT,
+            updated_at INTEGER NOT NULL
+          );
+          PRAGMA user_version = 2;
+        `)
+      })()
+    }
   } catch (error) {
     db.close()
     throw error
@@ -212,6 +233,17 @@ export function openCollabStorage(path: string, options: CollabStorageOptions = 
   const insertReceipt = db.query(`INSERT INTO receipts
     (actor_id, operation_id, request_hash, scope, revision, committed_at) VALUES (?, ?, ?, ?, ?, ?)`)
   const deleteExpired = db.query('DELETE FROM receipts WHERE committed_at <= ?')
+  const selectPerson = db.query<{ name: string; color: string; avatar: string | null }, [string]>(
+    'SELECT name, color, avatar FROM people WHERE id = ?'
+  )
+  const writePerson = db.query(`INSERT INTO people(id, name, color, avatar, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET name = excluded.name, color = excluded.color,
+      avatar = excluded.avatar, updated_at = excluded.updated_at`)
+  const recentPeople = db.query<
+    { id: string; name: string; color: string; avatar: string | null },
+    [number]
+  >('SELECT id, name, color, avatar FROM people ORDER BY updated_at DESC, id LIMIT ?')
   let closed = false
 
   function pruneReceipts() {
@@ -309,6 +341,37 @@ export function openCollabStorage(path: string, options: CollabStorageOptions = 
           ? { operationId, status: 'committed', scope: found.scope, revision: found.revision }
           : { operationId, status: 'unknown' }
       })
+    },
+    upsertPerson(identity) {
+      identifier(identity.id, 'person id', COLLAB_STORAGE_LIMITS.identifierBytes)
+      identifier(identity.name, 'person name', COLLAB_STORAGE_LIMITS.identifierBytes)
+      identifier(identity.color, 'person color', 64)
+      const avatar = identity.avatar ?? null
+      if (
+        avatar !== null &&
+        (typeof avatar !== 'string' || Buffer.byteLength(avatar) > COLLAB_MAX_AVATAR_BYTES)
+      ) {
+        fail('LIMIT_EXCEEDED', 'Avatar exceeds 8 KiB')
+      }
+      const known = selectPerson.get(identity.id)
+      if (
+        known &&
+        known.name === identity.name &&
+        known.color === identity.color &&
+        known.avatar === avatar
+      ) {
+        return false
+      }
+      writePerson.run(identity.id, identity.name, identity.color, avatar, now())
+      return true
+    },
+    listPeople() {
+      return recentPeople.all(COLLAB_STORAGE_LIMITS.people).map(row => ({
+        id: row.id,
+        name: row.name,
+        color: row.color,
+        ...(row.avatar ? { avatar: row.avatar } : {})
+      }))
     },
     pruneReceipts,
     exportTo(destination) {
