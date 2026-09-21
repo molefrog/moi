@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { ViewInfo } from '@/lib/types'
 
-import { assembleTabRows } from './tabs'
+import { assembleTabRows, assertNavigableTab } from './tabs'
 
 const views: ViewInfo[] = [
   { id: 'roadmap', config: { title: 'Roadmap' } },
@@ -38,4 +38,18 @@ test('discovery includes portable links but no singleton chat contract', () => {
   const rows = assembleTabRows(views, 'overview')
   expect(rows.find(row => row.id === 'views/orders')?.href).toBe('moi:/views/orders')
   expect(rows.find(row => row.id === 'agent')?.href).toBeUndefined()
+})
+
+describe('assertNavigableTab', () => {
+  test('accepts built-in destinations and built views', () => {
+    expect(() => assertNavigableTab('overview', views)).not.toThrow()
+    expect(() => assertNavigableTab('scratchpad', views)).not.toThrow()
+    expect(() => assertNavigableTab('views/orders', views)).not.toThrow()
+  })
+
+  test('lists the current addresses when a view is missing', () => {
+    expect(() => assertNavigableTab('views/order', views)).toThrow(
+      'Unknown destination "moi:/views/order". Valid addresses: moi:/overview, moi:/scratchpad, moi:/views/roadmap, moi:/views/orders'
+    )
+  })
 })

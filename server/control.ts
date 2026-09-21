@@ -20,7 +20,7 @@ import { executeScratchOp } from './scratchpad-executor'
 import { readScratchpadImage, readScratchpadShapes } from './scratchpad'
 import { relayScratchOp } from './scratchpad-relay'
 import { broadcastAll } from './state'
-import { assembleTabRows } from './tabs'
+import { assembleTabRows, assertNavigableTab } from './tabs'
 import { applyThemeUpdate } from './theme'
 import { handleBundle } from './widgets'
 import { getViewList, handleBundleViews, hasViewId } from './views'
@@ -319,6 +319,7 @@ export const control = Bun.serve({
           try {
             const address = parseMoiHref(data.href)
             const href = moiHref(address.tab, address.search)
+            assertNavigableTab(address.tab, await getViewList(match.path))
             await navigationRelay.navigate(match.id, href)
             ws.send(JSON.stringify({ ok: true, href }))
           } catch (error) {

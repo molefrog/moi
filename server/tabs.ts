@@ -32,3 +32,14 @@ export function assembleTabRows(views: ViewInfo[], defaultTab: WorkspaceTabId): 
     ...(row.id === 'agent' ? {} : { href: moiHref(row.id) })
   }))
 }
+
+// CLI navigation checks the server's current built-view list before asking a
+// browser to move. The browser repeats the availability check in case its view
+// list is stale in either direction.
+export function assertNavigableTab(tab: WorkspaceTabId, views: ViewInfo[]): void {
+  const rows = assembleTabRows(views, 'agent').filter(row => row.href)
+  if (rows.some(row => row.id === tab)) return
+  throw new Error(
+    `Unknown destination "${moiHref(tab)}". Valid addresses: ${rows.map(row => row.href).join(', ')}`
+  )
+}
