@@ -2,9 +2,11 @@
 // transport load only when the server runtime is enabled.
 import { Component, Suspense, createContext, lazy, useContext, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
-import type { Icon as TabIcon } from '@tabler/icons-react'
 import type { AppletKind, WorkspaceTabId } from '@/lib/types'
 import type * as CollabModuleNamespace from './index'
+import type { CollabTabInfo } from './WorkspaceCollabControls'
+
+export type { CollabTabInfo } from './WorkspaceCollabControls'
 
 type CollabModule = typeof CollabModuleNamespace
 let loaded: CollabModule | undefined
@@ -85,7 +87,6 @@ export function AppletCollabMount(props: AppletCollabMountProps) {
   return <loaded.AppletCollabProvider {...props} />
 }
 
-export type CollabTabInfo = { label: string; Icon: TabIcon }
 export type CollabControlsProps = {
   workspaceId: string
   // Resolves a participant's tab to the label and icon the tab strip uses.

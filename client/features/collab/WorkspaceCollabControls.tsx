@@ -24,12 +24,12 @@ import { parseWorkspaceTab } from '@/lib/workspace-tabs'
 import { Avatar, AvatarFallback } from '@/ui-components/avatar'
 
 import { Person } from './primitives'
-import type { CollabTabInfo } from './entry'
 import { pageFromPath, useConnection } from './hooks'
 import { getIdentity, getIdentitySource, shareWorkspace, subscribeIdentityStore } from './identity'
 import { groupPeople } from './people'
 import type { PresentPerson } from './people'
 
+export type CollabTabInfo = { label: string; Icon: TabIcon }
 type DescribeTab = (tab: WorkspaceTabId) => CollabTabInfo | null
 
 export type WorkspaceCollabControlsProps = {
