@@ -5,7 +5,29 @@ description: The moi workspace — the web UI the user chats from, extended with
 
 # moi workspace
 
-## Workspace
+## Glossary
+
+"Workspace" or "Moi Workspace" — the web UI that the user works in, talks/collaborates with you,
+sees and interacts with "Applets".
+
+"Project" - the primary working folder _you_ (as an agent) work in. Managed by your harness; moi
+does not have a clear definition, but assumes this is the root folder in which it stores its state
+files.
+
+"Chat" — a conversation between the user and an agent in the workspace.
+
+"Applets" are standalone full-stack components that _you_ write and maintain. They extend the
+Workspace UI.
+
+"Applet Type" (one of)
+
+- "Widgets" (live on the Overview page)
+- "Views" are custom full-size pages that user can switch between.
+
+"Moi CLI" — the globally installed `moi` command that you use to build applets, customize, and send
+events to "Workspace".
+
+## Overview
 
 You are working inside a **moi workspace**. It is a web UI that the user communicates with you
 through. It has regular chat (this one), as well as custom UI elements that you can define, write,
@@ -26,43 +48,16 @@ Workspace features/pages:
 User can switch between these, but can access the chat (this conversation and other chats) from
 **any place in the app** (copilot mode), or on a dedicated page.
 
-Workspace settings and customisation:
+## Working in the workspace
 
-- "Config": set name, icon, change other settings. User can modify these from the UI and you can do
-  it via the `moi config` command. Call `moi config --help` for further docs.
-- "Theme": customize workspace fonts, colors, visual appearance. User can modify these from the UI
-  and you can do it via the `moi theme` command. Call `moi theme --help` for further docs.
+### Boundaries
 
-## Glossary
+- Never read or modify files outside the `.moi` directory, unless the user explicitly asks. If you
+  do need it -> ask for permission.
+- Do **not** start, stop, or inspect the Workspace web server — it is managed externally.
+- Do not run Git commands while building or verifying applets unless the user asks for Git work.
 
-"Workspace" or "Moi Workspace" — the web UI that the user works in, talks/collaborates with you,
-sees and interacts with "Applets".
-
-"Project" - the primary working folder _you_ (as an agent) work in. Managed by your harness; moi
-does not have a clear definition, but assumes this is the root folder in which it stores its state
-files.
-
-"Chat" — a workspace is driven through agent conversations (this chat is one). Depending on your
-harness (Claude Code, openclaw, others differ in the details) there can be **multiple chats**, but
-they all share **one** workspace **and one Project folder** — the same filesystem, the same `.moi`
-folder, applets, config, and theme. Anything you build is visible to every chat, and another chat
-may have changed the workspace or the Project files since you last looked. Treat `.moi` and the
-Project folder as shared state, not yours alone. Internally, "chats" are sometimes aliased as
-"threads" — "chat" is product language, while "thread" is reserved for internal SDK, session, and
-persistence concepts.
-
-"Applets" are standalone full-stack components that _you_ write and maintain. They extend the
-Workspace UI.
-
-"Applet Type" (one of)
-
-- "Widgets" (live on the Overview page)
-- "Views" are custom full-size pages that user can switch between.
-
-"Moi CLI" — the globally installed `moi` command that you use to build applets, customize, and send
-events to "Workspace".
-
-## Where moi lives in filesystem
+### Files and folders
 
 Source of truth - `.moi` folder in the root of "Project" folder. Contains source code of all
 Applets, bundled code, settings, etc. Can be committed to version control. Folder is partially
@@ -102,19 +97,7 @@ scaffolded `.moi/.gitignore` already excludes the machine-local entries (`.build
 with the repo — commit them as-is, just never hand-edit them. Your surface is the non-dot files:
 `widgets/`, `views/`, `package.json`, and code you place under `.moi/` yourself.
 
-## Build environment
-
-- Bun is the required dependency of moi, so it must be installed
-- For package management **always** use bun
-- package.json is scaffolded during init. You are free to install/remove/do whatever with packages.
-- if packages aren't installed, it's your responsibility to call `bun install`
-- `react` and `react-dom` are stubs — they're provided by moi at runtime via the browser importmap.
-  They're listed only so editors pick up the correct types.
-- `moi bundle` runs **Bun's bundler**, so standard Bun imports, loaders, and tricks apply (JSON,
-  text, etc.) — see the Bun docs. Only the moi-specific imports (covered under **Developing
-  Applets**) differ.
-
-## `moi` CLI
+### Using the moi CLI
 
 Treat `moi` as an external command — you cannot inspect or modify its sources. Use only the
 documented subcommands (`moi bundle`, `moi bundle --force`, etc.). Call `moi help` for
@@ -126,13 +109,24 @@ Use the task-specific sections below for workflow guidance. The CLI will grow ov
 
 - **Develop applets:** `moi check`, `moi bundle`, and `moi refresh`.
 - **Call actions:** `moi call-server-fn`.
-- **Debug applets:** `moi debug logs` (see Debugging applets).
-- **Navigate the workspace:** `moi tabs` and `moi tabs focus` (see Driving the workspace).
-- **Customize the workspace:** `moi theme` and `moi config` (see Customizing workspace appearance).
-- **Use workspace env:** `moi env` and `moi env exec` (see Environment & secrets).
+- **Debug applets:** `moi debug logs` (see Debugging).
+- **Navigate the workspace:** `moi tabs` and `moi tabs focus` (see Navigating the workspace).
+- **Customize the workspace:** `moi theme` and `moi config` (see Appearance and settings).
+- **Use workspace env:** `moi env` and `moi env exec` (see Environment and secrets).
 - **Maintain workspace guidance:** `moi skill` (see Keeping this skill current).
 
-## Customizing workspace appearance
+### Navigating the workspace
+
+Run `moi tabs` to discover available tabs and `moi tabs focus <tab-id>` to show one to the user.
+For navigation triggered inside an applet, use `focusTab`; see [Applet intents](references/INTENTS.md).
+After building or editing an applet, follow [Verification and handoff](#verification-and-handoff).
+
+### Appearance and settings
+
+- "Config": set name, icon, change other settings. User can modify these from the UI and you can do
+  it via the `moi config` command. Call `moi config --help` for further docs.
+- "Theme": customize workspace fonts, colors, visual appearance. User can modify these from the UI
+  and you can do it via the `moi theme` command. Call `moi theme --help` for further docs.
 
 `moi theme` shows the current font, color, radius, and agent appearance plus the available keys.
 Set one or several dimensions in a single command:
@@ -144,128 +138,7 @@ moi theme --font=<key> --color=<key> --radius=<key> --agent=<key>
 Omit dimensions you do not want to change. Inspect with `moi theme` first instead of guessing keys;
 use `moi theme --help` if its options change.
 
-## Critical constraints when interacting with moi
-
-- Never read or modify files outside the `.moi` directory, unless the user explicitly asks. If you
-  do need it -> ask for permission.
-- Do **not** start, stop, or inspect the Workspace web server — it is managed externally.
-- Do not run Git commands while building or verifying applets unless the user asks for Git work.
-
-## Developing Applets
-
-Every applet — a **Widget** or a **View** — is a default-exported React component in
-`.moi/<type>/<name>.tsx`, optionally paired with a `<name>.server.ts`. `moi bundle` compiles each
-into a live module and reloads it in the browser. Run it after source edits. Read
-`references/DESIGN.md` first.
-Write normal React + Tailwind — below is only what's **moi-specific**.
-
-### Anatomy
-
-```tsx
-// .moi/widgets/hello.tsx
-import { useEffect, useState } from 'react'
-import { getGreeting } from './hello.server' // optional server fn — see below
-
-// Optional config — fields are per type (see Widgets / Views below). requiredEnv is shared.
-export const config = { requiredEnv: ['API_KEY'] }
-
-export default function Hello() {
-  const [msg, setMsg] = useState('')
-  useEffect(() => {
-    getGreeting().then(setMsg) // call server fns like any async function
-  }, [])
-  return <div className="h-full w-full p-4">{msg}</div>
-}
-```
-
-Imports resolve relatively (same folder, or elsewhere under `.moi/` — e.g. `../lib/format`) or
-from `.moi/package.json` deps — no `@/` aliases. Files starting with `_` (e.g. `_utils.tsx`) in
-`widgets/` and `views/` are never applet entry points — put code shared between applets there.
-`moi bundle` tracks these local imports: editing a shared module rebuilds every applet using it.
-
-### Applet styling
-
-- Use Tailwind for static styling. Do not add custom CSS, `@apply`, or static `style={{}}` values.
-- Use `style={{}}` only for computed data such as chart geometry, progress, per-item delays, or
-  per-frame transforms.
-- Use icons from `@tabler/icons-react`. Do not add raw SVG icons or another icon pack. When the
-  project provides `.agents/rules/icons.md`, follow its size and stroke policy.
-- Applets cannot import the host project's `cn`. If `.moi/ui/utils.ts` exists, import `cn` from
-  `../ui/utils`; otherwise use a local `cx()` when classes are conditional. Never build class
-  names with template-literal ternaries.
-
-```tsx
-function cx(...classes: (string | false | undefined | null)[]) {
-  return classes.filter(Boolean).join(' ')
-}
-```
-
-### Standard UI components
-
-Use bundled components for standard controls. Read the
-[shared usage rules](references/UI-COMPONENTS.md) before composing them.
-
-- `moi ui-components` lists available components and recipes with installed state.
-- `moi ui-components docs <name…>` prints bundled usage docs. Read them before using an
-  unfamiliar component or when its API may have changed.
-- `moi ui-components add <name…> --install` copies source into `.moi/ui/` and installs npm
-  dependencies. Pass all needed names in one call.
-- Import relatively, e.g. `import { Button } from '../ui/button'`, then run `moi bundle`
-  after editing applets.
-
-Reuse familiar installed components without rereading their catalog entries, docs, or source.
-Inspect source only for local customizations, doc conflicts, or concrete build issues.
-
-### Server functions — `<name>.server.ts`
-
-Export named `async function`s (only — no `const`, sync, or class) and call them from the component
-like ordinary async functions; arguments and return values are auto-serialized (`Date`, `Map`,
-`Set`, … work). They run on the Bun server with `process.env` and full filesystem access, at
-`cwd = <workspace root>` (the parent of `.moi/`, where you operate) — so workspace files are plain
-relative paths:
-
-```ts
-// hello.server.ts — read files, call APIs, query DBs…
-export async function getGreeting(): Promise<string> {
-  return (await Bun.file('./notes.md').text()).split('\n')[0]
-}
-```
-
-The component fetches on mount; after you change underlying data a server fn reads, run
-`moi refresh` to re-pull it without a rebuild.
-
-It's plain Bun — every Bun API is available with no setup: `bun:sqlite`, `Bun.redis`, `Bun.s3`,
-`Bun.file`, `fetch`, …
-
-### Workspace files & assets
-
-- **Bundled asset** — `import logo from './logo.png'` resolves to a URL at build time (images &
-  fonts: `png jpg gif svg webp avif ico woff woff2 ttf otf`). For small art shipped beside the
-  `.tsx`.
-- **Workspace file** — stream a file from the workspace via `fileUrl` from the **`moi`** package:
-
-  ```tsx
-  import { fileUrl } from 'moi'
-  ;<video src={fileUrl('clips/intro.mp4')} controls />
-  ```
-
-  `fileUrl(path)` maps a **workspace-root-relative** path to a streaming URL (HTTP range — media
-  seeks, nothing is base64-inlined). Media/asset extensions only; `.env`, source, JSON and dotfiles
-  are rejected. The path is plain data, so a `.server.ts` can return it and the component renders
-  `fileUrl(clip.file)`.
-
-Rule of thumb: small own art → `import`; structured data → `.server.ts` returns it; large/streamable
-media → `.server.ts` returns the **path**, render with `fileUrl()`.
-
-### Applet intents
-
-Use intents to make applets feel like part of the wider workspace: navigate between tabs, open
-another view with a specific item selected, add context to chat, or send a message on the user's
-behalf when they click a button. For example, a chart can open a detailed view, or an order card
-can ask the agent to investigate a delay. Read [Applet intents](references/INTENTS.md) for the
-available functions and when to use them.
-
-### Environment & secrets
+### Environment and secrets
 
 Each workspace has an effective env: keys from the project's `.env` / `.env.local` (when
 inheritance is enabled in settings) plus **custom secrets** the user manages in the workspace env
@@ -277,6 +150,7 @@ settings. moi injects this env into:
   verify the key is visible first, or just use `moi env exec`, which works everywhere.
 
 Rules:
+
 - **Check before you assume.** When a task needs a key or token — an API pull, a widget calling a
   service — run `moi env` first. It lists key names with their source (`.env` / custom) and flags
   declared `requiredEnv` keys that are missing. Values are never shown.
@@ -289,8 +163,6 @@ Rules:
   If the user pastes a value in chat, store it with `moi env set KEY=value`
   (`moi env unset KEY` removes it).
 - **Never print secret values** — not in chat, not in logs. Refer to keys by name only.
-
-### Running commands with workspace env
 
 Use `moi env exec -- <command> [args...]` for an arbitrary script or tool that needs the effective
 workspace env. The `--` separator is required, and the env is resolved again on every invocation,
@@ -322,7 +194,182 @@ export async function getForecast(city: string) {
 }
 ```
 
-## Verifying applets
+## Developing applets
+
+Every applet — a **Widget** or a **View** — is a default-exported React component in
+`.moi/<type>/<name>.tsx`, optionally paired with a `<name>.server.ts`. `moi bundle` compiles each
+into a live module and reloads it in the browser. Run it after source edits. Read
+`references/DESIGN.md` first.
+Write normal React + Tailwind — below is only what's **moi-specific**.
+
+### Build environment
+
+- Bun is the required dependency of moi, so it must be installed
+- For package management **always** use bun
+- package.json is scaffolded during init. You are free to install/remove/do whatever with packages.
+- if packages aren't installed, it's your responsibility to call `bun install`
+- `react` and `react-dom` are stubs — they're provided by moi at runtime via the browser importmap.
+  They're listed only so editors pick up the correct types.
+- `moi bundle` runs **Bun's bundler**, so standard Bun imports, loaders, and tricks apply (JSON,
+  text, etc.) — see the Bun docs. The moi-specific imports are covered below.
+
+### Anatomy and imports
+
+```tsx
+// .moi/widgets/hello.tsx
+import { useEffect, useState } from 'react'
+import { getGreeting } from './hello.server' // optional server fn — see below
+
+// Optional config — fields are per type (see Widgets / Views below). requiredEnv is shared.
+export const config = { requiredEnv: ['API_KEY'] }
+
+export default function Hello() {
+  const [msg, setMsg] = useState('')
+  useEffect(() => {
+    getGreeting().then(setMsg) // call server fns like any async function
+  }, [])
+  return <div className="h-full w-full p-4">{msg}</div>
+}
+```
+
+Imports resolve relatively (same folder, or elsewhere under `.moi/` — e.g. `../lib/format`) or
+from `.moi/package.json` deps — no `@/` aliases. Files starting with `_` (e.g. `_utils.tsx`) in
+`widgets/` and `views/` are never applet entry points — put code shared between applets there.
+`moi bundle` tracks these local imports: editing a shared module rebuilds every applet using it.
+
+### Widgets
+
+Live cards on the Overview grid — many visible at once. `config` sets the grid footprint:
+
+```ts
+export const config = {
+  colSpan: 2, // columns the card spans — 1–4
+  rowSpan: 1, // rows the card spans — 1–4
+  requiredEnv: ['API_KEY'] // optional env-key hints (advisory; see Environment and secrets)
+} as const
+```
+
+Render **content only**: a plain `h-full w-full` region with no card chrome (`rounded-*`,
+`shadow-*`, or outer `border`) — the dashboard owns the shell, spacing, and elevation. It does not
+own the fill, so the widget must set its own opaque background.
+Changing `colSpan`/`rowSpan` needs `moi bundle --force --only widgets/<id>`. See
+`references/DESIGN.md`.
+
+### Views
+
+Full-screen apps, one per nav tab — the user switches tabs. A view has no router of its own, but it
+can be addressed: see [Applet intents](references/INTENTS.md) for `focusTab` and the `params` prop.
+
+```ts
+export const config = {
+  title: 'Customer overview', // sentence-case nav label — defaults to the file name
+  icon: 'user', // icon id; use the claimed icon for a view-builder request
+  requiredEnv: ['CRM_API_KEY'] // optional env-key hints (advisory; see Environment and secrets)
+} as const
+```
+
+A view **owns its whole page** — its own `h-full w-full` layout, scrolling
+(`overflow-auto`), padding, and chrome. Build it to read like an app screen. See `references/DESIGN.md`.
+
+#### View builder requests
+
+When the message's hidden `<moi-context>` envelope is marked `View builder request`, this chat is
+linked to a pending view tab. Before reading files, planning, or writing code, infer a short stable
+id, a clear sentence-case title, and a relevant icon from the requirements. Capitalize only the
+first word of the title. Your first action must claim them:
+
+```sh
+moi builder set <view-id> --builder <builder-id> --kind view --title "<title>" --icon <icon-id>
+```
+
+Choose the icon id from the available view icons in the hidden context. The id must use lowercase
+letters, numbers, `_`, or `-`. The first call locks the id; running the same command again may update
+its title and icon. After claiming, write `.moi/views/<view-id>.tsx`, use the same icon id in its
+config, and build it with `moi bundle --only views/<view-id>`. The tab uses the claimed title and icon
+while you work and changes into the built view after a successful bundle. (Bundling marks the view
+ready; the build state is otherwise server-managed, so you never set it to done by hand.)
+
+### Styling and UI components
+
+- Use Tailwind for static styling. Do not add custom CSS, `@apply`, or static `style={{}}` values.
+- Use `style={{}}` only for computed data such as chart geometry, progress, per-item delays, or
+  per-frame transforms.
+- Use icons from `@tabler/icons-react`. Do not add raw SVG icons or another icon pack. When the
+  project provides `.agents/rules/icons.md`, follow its size and stroke policy.
+- Applets cannot import the host project's `cn`. If `.moi/ui/utils.ts` exists, import `cn` from
+  `../ui/utils`; otherwise use a local `cx()` when classes are conditional. Never build class
+  names with template-literal ternaries.
+
+```tsx
+function cx(...classes: (string | false | undefined | null)[]) {
+  return classes.filter(Boolean).join(' ')
+}
+```
+
+Use bundled components for standard controls. Read the
+[shared usage rules](references/UI-COMPONENTS.md) before composing them.
+
+- `moi ui-components` lists available components and recipes with installed state.
+- `moi ui-components docs <name…>` prints bundled usage docs. Read them before using an
+  unfamiliar component or when its API may have changed.
+- `moi ui-components add <name…> --install` copies source into `.moi/ui/` and installs npm
+  dependencies. Pass all needed names in one call.
+- Import relatively, e.g. `import { Button } from '../ui/button'`, then run `moi bundle`
+  after editing applets.
+
+Reuse familiar installed components without rereading their catalog entries, docs, or source.
+Inspect source only for local customizations, doc conflicts, or concrete build issues.
+
+### Server functions
+
+In `<name>.server.ts`, export named `async function`s (only — no `const`, sync, or class) and call
+them from the component like ordinary async functions; arguments and return values are auto-serialized (`Date`, `Map`,
+`Set`, … work). They run on the Bun server with `process.env` and full filesystem access, at
+`cwd = <workspace root>` (the parent of `.moi/`, where you operate) — so workspace files are plain
+relative paths:
+
+```ts
+// hello.server.ts — read files, call APIs, query DBs…
+export async function getGreeting(): Promise<string> {
+  return (await Bun.file('./notes.md').text()).split('\n')[0]
+}
+```
+
+The component fetches on mount; after you change underlying data a server fn reads, run
+`moi refresh` to re-pull it without a rebuild.
+
+It's plain Bun — every Bun API is available with no setup: `bun:sqlite`, `Bun.redis`, `Bun.s3`,
+`Bun.file`, `fetch`, …
+
+### Files and assets
+
+- **Bundled asset** — `import logo from './logo.png'` resolves to a URL at build time (images &
+  fonts: `png jpg gif svg webp avif ico woff woff2 ttf otf`). For small art shipped beside the
+  `.tsx`.
+- **Workspace file** — stream a file from the workspace via `fileUrl` from the **`moi`** package:
+
+  ```tsx
+  import { fileUrl } from 'moi'
+  ;<video src={fileUrl('clips/intro.mp4')} controls />
+  ```
+
+  `fileUrl(path)` maps a **workspace-root-relative** path to a streaming URL (HTTP range — media
+  seeks, nothing is base64-inlined). Media/asset extensions only; `.env`, source, JSON and dotfiles
+  are rejected. The path is plain data, so a `.server.ts` can return it and the component renders
+  `fileUrl(clip.file)`.
+
+Rule of thumb: small own art → `import`; structured data → `.server.ts` returns it; large/streamable
+media → `.server.ts` returns the **path**, render with `fileUrl()`.
+
+### Applet intents
+
+Use intents to make applets feel like part of the wider workspace: navigate between tabs, open
+another view with a specific item selected, add context to chat, or send a message on the user's
+behalf when they click a button. For example, a chart can open a detailed view, or an order card
+can ask the agent to investigate a delay. Read [Applet intents](references/INTENTS.md) for the
+available functions and when to use them.
+
+### Verification and handoff
 
 Use `moi check --only views/<id>` or `moi check --only widgets/<id>` for the applet you changed. Use
 the kind alone only when the work spans several applets. The command owns the supported applet
@@ -351,25 +398,7 @@ After the final successful checks, always make tab focus the final workspace act
 The focused applet is the handoff. Keep the final reply brief and user-facing. Do not include file
 or storage links, file paths, or bundle, test, and runtime-log summaries.
 
-## Widgets
-
-Live cards on the Overview grid — many visible at once. `config` sets the grid footprint:
-
-```ts
-export const config = {
-  colSpan: 2, // columns the card spans — 1–4
-  rowSpan: 1, // rows the card spans — 1–4
-  requiredEnv: ['API_KEY'] // optional env-key hints (advisory; see Environment & secrets)
-} as const
-```
-
-Render **content only**: a plain `h-full w-full` region with no card chrome (`rounded-*`,
-`shadow-*`, or outer `border`) — the dashboard owns the shell, spacing, and elevation. It does not
-own the fill, so the widget must set its own opaque background.
-Changing `colSpan`/`rowSpan` needs `moi bundle --force --only widgets/<id>`. See
-`references/DESIGN.md`.
-
-## Debugging applets
+### Debugging
 
 `moi bundle` only proves an applet compiles — it can still fail to load in the browser, crash on
 render, or throw in its server functions. For frontend rebuilds, check runtime logs as required
@@ -392,39 +421,16 @@ problem:
 `moi bundle`'s footer also mentions when runtime errors are on record, so standing breakage
 surfaces on its own.
 
-## Views
+## Chats and messages
 
-Full-screen apps, one per nav tab — the user switches tabs. A view has no router of its own, but it
-can be addressed: see Driving the workspace for `focusTab` and the `params` prop.
-
-### View builder requests
-
-When the message's hidden `<moi-context>` envelope is marked `View builder request`, this chat is
-linked to a pending view tab. Before reading files, planning, or writing code, infer a short stable
-id, a clear sentence-case title, and a relevant icon from the requirements. Capitalize only the
-first word of the title. Your first action must claim them:
-
-```sh
-moi builder set <view-id> --builder <builder-id> --kind view --title "<title>" --icon <icon-id>
-```
-
-Choose the icon id from the available view icons in the hidden context. The id must use lowercase
-letters, numbers, `_`, or `-`. The first call locks the id; running the same command again may update
-its title and icon. After claiming, write `.moi/views/<view-id>.tsx`, use the same icon id in its
-config, and build it with `moi bundle --only views/<view-id>`. The tab uses the claimed title and icon
-while you work and changes into the built view after a successful bundle. (Bundling marks the view
-ready; the build state is otherwise server-managed, so you never set it to done by hand.)
-
-```ts
-export const config = {
-  title: 'Customer overview', // sentence-case nav label — defaults to the file name
-  icon: 'user', // icon id from the view-builder request
-  requiredEnv: ['CRM_API_KEY'] // optional env-key hints (advisory; see Environment & secrets)
-} as const
-```
-
-The inverse of a widget: a view **owns its whole page** — its own `h-full w-full` layout, scrolling
-(`overflow-auto`), padding, and chrome. Build it to read like an app screen. See `references/DESIGN.md`.
+A workspace is driven through agent conversations (this chat is one). Depending on your
+harness (Claude Code, openclaw, others differ in the details) there can be **multiple chats**, but
+they all share **one** workspace **and one Project folder** — the same filesystem, the same `.moi`
+folder, applets, config, and theme. Anything you build is visible to every chat, and another chat
+may have changed the workspace or the Project files since you last looked. Treat `.moi` and the
+Project folder as shared state, not yours alone. Internally, "chats" are sometimes aliased as
+"threads" — "chat" is product language, while "thread" is reserved for internal SDK, session, and
+persistence concepts.
 
 ## Keeping this skill current
 
