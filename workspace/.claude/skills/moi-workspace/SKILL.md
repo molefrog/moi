@@ -259,9 +259,11 @@ media → `.server.ts` returns the **path**, render with `fileUrl()`.
 
 ### Applet intents
 
-Intents connect applet interactions to other views and the wider workspace through the host API.
-When building applet interactions, read [Applet intents](references/INTENTS.md) to see which
-behaviors the host supports and when to use them.
+Use intents to make applets feel like part of the wider workspace: navigate between tabs, open
+another view with a specific item selected, add context to chat, or send a message on the user's
+behalf when they click a button. For example, a chart can open a detailed view, or an order card
+can ask the agent to investigate a delay. Read [Applet intents](references/INTENTS.md) for the
+available functions and when to use them.
 
 ### Environment & secrets
 
