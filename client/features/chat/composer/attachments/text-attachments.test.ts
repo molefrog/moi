@@ -2,11 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { appletRuntime } from '../../../applets/applet-runtime'
 import { stageTextAttachment, stageChatAttachment } from './draft-attachments'
 import { attachmentKey, liveStore } from '../../chat-store'
-import {
-  attachmentsForSend,
-  prepareDraftAttachments,
-  withAttachmentDirectives
-} from '../../chat-send'
+import { attachmentsForSend, prepareDraftAttachments } from '../../chat-send'
 
 const workspaceId = 'context-test'
 const target = { workspaceId, sessionId: null }
@@ -20,7 +16,12 @@ describe('text staging and sends', () => {
       void stageChatAttachment(target, value)
     })
     const { bridge, dispose } = runtime.connect({ kind: 'view', name: 'orders' })
-    const input = { type: 'text', label: 'Order', text: 'Status: pending', source: 'widget:forged' }
+    const input = {
+      type: 'text',
+      label: 'Order',
+      text: 'Status: pending',
+      source: 'widget:forged'
+    }
     bridge.addChatAttachment(input)
     input.text = 'Status: done'
     dispose()
@@ -29,7 +30,9 @@ describe('text staging and sends', () => {
     expect(attachmentsForSend(workspaceId, null)).toMatchObject([
       {
         kind: 'text',
-        attachment: { source: 'view:orders', label: 'Order', text: 'Status: pending' }
+        source: 'view:orders',
+        label: 'Order',
+        text: 'Status: pending'
       }
     ])
   })
@@ -52,8 +55,14 @@ describe('text staging and sends', () => {
     )
     expect(attachmentsForSend(workspaceId, 'different')).toEqual([])
     liveStore.getState().renameSession(workspaceId, 'existing', 'renamed')
-    expect(attachmentsForSend(workspaceId, 'renamed')[0].name).toBe('Existing')
-    expect(attachmentsForSend(workspaceId, null)[0].name).toBe(attachment.label)
+    expect(attachmentsForSend(workspaceId, 'renamed')[0]).toMatchObject({
+      kind: 'text',
+      label: 'Existing'
+    })
+    expect(attachmentsForSend(workspaceId, null)[0]).toMatchObject({
+      kind: 'text',
+      label: attachment.label
+    })
     liveStore.getState().clearAttachments(workspaceId, null)
     expect(attachmentsForSend(workspaceId, 'renamed')).toHaveLength(1)
   })
@@ -76,18 +85,21 @@ describe('text staging and sends', () => {
     expect(attachmentsForSend(workspaceId, 'real')).toEqual(staged)
     liveStore.getState().clearAttachments(workspaceId, 'real')
     expect(attachmentsForSend(workspaceId, 'real')).toEqual([])
-    expect(attachmentsForSend(workspaceId, 'other')[0].name).toBe('Other chat')
+    expect(attachmentsForSend(workspaceId, 'other')[0]).toMatchObject({
+      kind: 'text',
+      label: 'Other chat'
+    })
   })
 
-  test('sends text with uploads without changing annotation image positions', () => {
+  test('sends text and drawings with their own metadata', () => {
     stageTextAttachment(target, attachment)
     liveStore.getState().addAttachments(workspaceId, null, [
       {
         kind: 'drawing',
         purpose: 'annotation',
-        sourceTab: 'view:orders',
+        source: 'view:orders',
         localId: 'image',
-        name: 'Annotation.png',
+        label: 'Annotation.png',
         mediaType: 'image/png',
         previewUrl: 'blob:annotation',
         status: 'ready',
@@ -105,21 +117,20 @@ describe('text staging and sends', () => {
     expect(prepareDraftAttachments(ready)).toEqual({
       attachments: [
         { type: 'text', ...attachment },
-        { type: 'upload', uploadId: 'up' }
+        { type: 'upload', uploadId: 'up', source: 'view:orders', purpose: 'annotation' }
       ],
       parts: [
         { type: 'text-attachment', ...attachment },
         {
           type: 'file-attachment',
-          filename: 'Annotation.png',
+          label: 'Annotation.png',
           mediaType: 'image/png',
-          url: 'blob:annotation'
+          previewUrl: 'blob:annotation',
+          source: 'view:orders',
+          purpose: 'annotation'
         }
       ]
     })
-    expect(withAttachmentDirectives(undefined, ready)?.directives).toEqual([
-      'Annotation attachment sources in attachment order: 1. "view:orders".'
-    ])
     expect(attachmentsForSend(workspaceId, null, { applet: { source: 'widget:clock' } })).toEqual(
       []
     )

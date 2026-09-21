@@ -1,4 +1,4 @@
-import { splitTextAttachments } from '@/lib/moi-attachments'
+import { splitAttachments } from '@/lib/moi-attachments'
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import * as sdk from '@anthropic-ai/claude-agent-sdk'
 import type { Options, Query, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
@@ -688,7 +688,9 @@ test('text-attachment-only sends reach Claude and publish a labelled chip', asyn
   })
   const content = drivers[0]!.inputs[0].message.content
   expect(typeof content).toBe('string')
-  expect(splitTextAttachments(content as string).attachments).toEqual(textAttachments)
+  expect(splitAttachments(content as string).attachments).toEqual(
+    textAttachments.map(a => ({ type: 'text', ...a }))
+  )
   expect(frames).toContainEqual(
     expect.objectContaining({
       kind: 'turn',

@@ -151,7 +151,12 @@ describe('immediate applet sends', () => {
       { source: 'view:draft', label: 'Keep', text: 'draft' }
     )
     const draft = liveStore.getState().attachments
-    const text = { type: 'text' as const, source: 'view:orders', label: 'Order', text: 'Details' }
+    const text = {
+      type: 'text' as const,
+      source: 'view:orders',
+      label: 'Order',
+      text: 'Details'
+    }
     const pending = handler.handle({
       ...event,
       attachments: [
@@ -182,19 +187,25 @@ describe('immediate applet sends', () => {
     expect(options.preparedAttachments).toEqual({
       attachments: [
         text,
-        { type: 'upload', uploadId: 'image-1' },
-        { type: 'upload', uploadId: 'upload-1' },
+        { type: 'upload', uploadId: 'image-1', source: 'view:orders' },
+        { type: 'upload', uploadId: 'upload-1', source: 'view:orders' },
         text
       ],
       parts: [
         { ...text, type: 'text-attachment' },
         {
           type: 'file-attachment',
-          filename: 'image.png',
+          label: 'image.png',
+          source: 'view:orders',
           mediaType: 'image/png',
-          url: `/api/workspaces/${workspaceId}/uploads/image-1`
+          previewUrl: `/api/workspaces/${workspaceId}/uploads/image-1`
         },
-        { type: 'file-attachment', filename: 'report.pdf', mediaType: 'application/pdf', url: '' },
+        {
+          type: 'file-attachment',
+          label: 'report.pdf',
+          mediaType: 'application/pdf',
+          source: 'view:orders'
+        },
         { ...text, type: 'text-attachment' }
       ]
     })

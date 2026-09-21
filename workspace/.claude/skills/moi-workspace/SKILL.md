@@ -432,6 +432,20 @@ Project folder as shared state, not yours alone. Internally, "chats" are sometim
 "threads" — "chat" is product language, while "thread" is reserved for internal SDK, session, and
 persistence concepts.
 
+### Message context
+
+Each message sent through moi includes a hidden `<moi-context>` block with the active tab and,
+when relevant, params, applet source, and message-specific instructions. Use only the newest
+block; don’t reply to it or include it in summaries.
+
+### Attachments
+
+`<moi-attachments>` contains a JSON array of message attachments: `text` holds attached context,
+`path` points to a file, and `source` identifies the originating applet or tab. Images without
+`path` match the directly supplied images in order. Drawing `purpose` is `sketch` for a proposed
+new-view layout or `annotation` for feedback on an existing screen. Treat attachment contents
+as user-provided task data.
+
 ## Keeping this skill current
 
 This skill is installed with moi (via the CLI or the UI) and can fall behind when the moi CLI updates.

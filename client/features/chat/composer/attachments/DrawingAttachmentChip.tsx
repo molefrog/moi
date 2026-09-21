@@ -1,10 +1,10 @@
 import { IconScribble } from '@tabler/icons-react'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/client/components/ui/hover-card'
-import type { ChatAttachment } from './types'
+import type { StagedAttachment } from './types'
 import { AttachmentChip } from './AttachmentChip'
 
 type DrawingAttachmentChipProps = {
-  attachment: Extract<ChatAttachment, { kind: 'drawing' }>
+  attachment: Extract<StagedAttachment, { kind: 'drawing' }>
   onRemove: () => void
 }
 

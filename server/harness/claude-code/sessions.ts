@@ -1,6 +1,6 @@
 // Session discovery + history replay for Claude Code workspaces, backed by
 // the Agent SDK's persisted `.jsonl` session files.
-import { splitTextAttachments, stripTextAttachmentsLoose } from '@/lib/moi-attachments'
+import { attachmentLabel, splitAttachments, stripAttachmentsLoose } from '@/lib/moi-attachments'
 import {
   getSessionInfo,
   getSessionMessages,
@@ -36,13 +36,16 @@ export function claudeSessionSummary(
   session: Pick<SDKSessionInfo, 'customTitle' | 'firstPrompt' | 'summary'>
 ): string {
   if (session.customTitle || !session.firstPrompt || session.summary !== session.firstPrompt) {
-    return stripTextAttachmentsLoose(session.summary)
+    return stripAttachmentsLoose(session.summary)
   }
-  const attached = splitTextAttachments(session.firstPrompt)
+  const attached = splitAttachments(session.firstPrompt)
   const split = splitAttachmentNote(attached.text)
   return isAttachmentOnlyPlaceholder(split.text)
     ? attachmentOnlyFilenames(split.text).join(', ')
-    : stripTextAttachmentsLoose(split.text) || attached.attachments.map(a => a.label).join(', ')
+    : stripAttachmentsLoose(split.text) ||
+        [...attached.attachments.map(attachmentLabel), ...split.files.map(f => f.filename)].join(
+          ', '
+        )
 }
 
 export function visibleClaudeSessions<T extends Pick<SDKSessionInfo, 'tag'>>(sessions: T[]): T[] {
@@ -69,7 +72,7 @@ export function selectOldestSessionFirstUserMessage(
         (a.createdAt ?? a.lastModified) - (b.createdAt ?? b.lastModified) ||
         a.sessionId.localeCompare(b.sessionId)
     )[0]
-  return oldest?.firstPrompt ? stripTextAttachmentsLoose(oldest.firstPrompt) : undefined
+  return oldest?.firstPrompt ? stripAttachmentsLoose(oldest.firstPrompt) : undefined
 }
 
 export function selectLatestSessionUpdatedAt(

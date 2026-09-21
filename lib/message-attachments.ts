@@ -1,5 +1,4 @@
-import { isTextAttachments } from './moi-attachments'
-import type { TextAttachment } from './types'
+import { isDrawingPurpose, isTextAttachments } from './moi-attachments'
 
 import type { MessageAttachment } from './types'
 
@@ -10,24 +9,14 @@ export function isMessageAttachments(value: unknown): value is MessageAttachment
     if (!item || typeof item !== 'object') return false
     if (item.type === 'upload') {
       if (typeof item.uploadId !== 'string' || !item.uploadId) return false
+      if (item.source !== undefined && (typeof item.source !== 'string' || !item.source))
+        return false
+      if (item.purpose !== undefined && !isDrawingPurpose(item.purpose)) return false
     } else if (item.type === 'text') {
       texts.push(item)
     } else return false
   }
   return isTextAttachments(texts)
-}
-
-export function partitionMessageAttachments(attachments: readonly MessageAttachment[] = []) {
-  const uploadIds: string[] = []
-  const textAttachments: TextAttachment[] = []
-  for (const attachment of attachments) {
-    if (attachment.type === 'upload') uploadIds.push(attachment.uploadId)
-    else {
-      const { source, label, text } = attachment
-      textAttachments.push({ source, label, text })
-    }
-  }
-  return { uploadIds, textAttachments }
 }
 
 // Shared by browser validation and both server upload routes.

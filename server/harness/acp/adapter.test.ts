@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import { appendAttachmentNote } from '@/lib/attachment-note'
 import type { Turn } from '@/lib/format'
+import { appendAttachments } from '@/lib/moi-attachments'
 import { appendMoiContext, renderMoiContext } from '@/lib/moi-context'
 
 import { rpcTimeoutMs } from './client'
@@ -217,6 +218,18 @@ describe('acpSessionToSessionInfo', () => {
     })
   })
 
+  test('uses the attachment label for an attachment-only title', () => {
+    expect(
+      acpSessionToSessionInfo({
+        sessionId: 's2',
+        cwd: '/ws',
+        title: appendAttachments('', [
+          { type: 'image', label: 'Sketch.png', mediaType: 'image/png' }
+        ])
+      }).summary
+    ).toBe('Sketch.png')
+  })
+
   // The schema marks `cwd` required, but agents in the wild trail the spec —
   // Hermes runs a pre-1.0 revision — so the mapping stays defensive. Cast
   // because a valid row cannot express the violation being guarded against.
@@ -269,8 +282,8 @@ describe('replayedUserParts', () => {
       {
         type: 'file-attachment',
         mediaType: 'application/octet-stream',
-        url: '/tmp/up/report.pdf',
-        filename: 'report.pdf'
+        path: '/tmp/up/report.pdf',
+        label: 'report.pdf'
       },
       { type: 'text', text: 'see the report' }
     ])

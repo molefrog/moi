@@ -44,7 +44,7 @@ export function useViewBuilderActions() {
       workspaceId,
       sessionId: builder.sessionId,
       text,
-      filenames: attachments.map(attachment => attachment.name)
+      filenames: attachments.map(attachment => attachment.label)
     })
     const prepared = prepareDraftAttachments(attachments)
     const parts = [...prepared.parts]

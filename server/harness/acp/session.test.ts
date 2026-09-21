@@ -1,4 +1,4 @@
-import { splitTextAttachments } from '@/lib/moi-attachments'
+import { splitAttachments } from '@/lib/moi-attachments'
 // Tests for the ACP session layer against a mock ACP agent (a tiny
 // newline-JSON-RPC script), exercising the REAL client transport + session
 // record + adapter — everything except a live backend. Covers the replay path
@@ -299,7 +299,11 @@ describe('ACP session replay', () => {
     const turns = events.flatMap(e => (e.kind === 'turn' ? [e.turn] : []))
     expect(turns.map(t => t.role)).toEqual(['user', 'assistant'])
     expect(turns[0].parts).toEqual([
-      { type: 'file-attachment', mediaType: 'image/png', url: 'data:image/png;base64,aGVsbG8=' }
+      {
+        type: 'file-attachment',
+        mediaType: 'image/png',
+        previewUrl: 'data:image/png;base64,aGVsbG8='
+      }
     ])
   })
 })
@@ -389,7 +393,7 @@ test('text-attachment-only sends reach the ACP prompt and retain display parts',
   })
   const prompt = (await agent.calls()).find(call => call.method === 'session/prompt')!
   const params = prompt.params as { prompt: Array<{ type: string; text?: string }> }
-  expect(
-    splitTextAttachments(params.prompt.find(b => b.type === 'text')!.text!).attachments
-  ).toEqual(textAttachments)
+  expect(splitAttachments(params.prompt.find(b => b.type === 'text')!.text!).attachments).toEqual(
+    textAttachments.map(a => ({ type: 'text', ...a }))
+  )
 })

@@ -1,4 +1,4 @@
-import { splitTextAttachments, textAttachmentParts } from '@/lib/moi-attachments'
+import { replayAttachmentParts } from '@/lib/moi-attachments'
 import type {
   AdapterEmit,
   Part,
@@ -16,7 +16,6 @@ import type {
   TurnOrigin
 } from '@/lib/format'
 
-import { isAttachmentOnlyPlaceholder, splitAttachmentNote } from '@/lib/attachment-note'
 import { stripMoiContext } from '@/lib/moi-context'
 import { classifySystemMessage, filterSystemText } from '@/lib/system-messages'
 
@@ -545,34 +544,7 @@ export class ClaudeAdapter {
           if (b.text) {
             let text = b.text
             if (msg.type === 'user' && !msg.isSynthetic && !systemVerdict) {
-              // Non-image attachments reach the agent as a temp-path note
-              // appended to the user's text (see lib/attachment-note.ts). The
-              // SDK persists that appended text, so fold the note back into
-              // file chips here — a reloaded bubble matches the live one
-              // instead of leaking temp paths into it.
-              const attached = splitTextAttachments(text)
-              parts.push(...textAttachmentParts(attached.attachments))
-              const split = splitAttachmentNote(attached.text)
-              // moi's own context envelope strips precisely (marker-guarded);
-              // other embedded machinery — system reminders, hook output —
-              // strips by the shared rules, keeping the typed text.
-              text = filterSystemText(stripMoiContext(split.text)).text
-              for (const f of split.files) {
-                parts.push({
-                  type: 'file-attachment',
-                  mediaType: 'application/octet-stream',
-                  url: f.path,
-                  filename: f.filename
-                })
-              }
-              // An attachment-only message carries a synthesized placeholder
-              // prompt; the bubble should show just the attachments.
-              if (
-                isAttachmentOnlyPlaceholder(text) &&
-                parts.some(p => p.type === 'file-attachment')
-              ) {
-                text = ''
-              }
+              text = filterSystemText(stripMoiContext(text)).text
             }
             if (text) {
               parts.push({ type: 'text', text })
@@ -625,13 +597,18 @@ export class ClaudeAdapter {
             }
           }
           if (url) {
-            parts.push({ type: 'file-attachment', mediaType, url, filename: b.filename })
+            parts.push({ type: 'file-attachment', mediaType, previewUrl: url, label: b.filename })
           }
           break
         }
       }
     }
 
+    if (msg.type === 'user' && !msg.isSynthetic && !systemVerdict) {
+      const restored = replayAttachmentParts(parts)
+      parts.splice(0, parts.length, ...restored)
+      firstText = parts.find(p => p.type === 'text')?.text ?? ''
+    }
     if (parts.length === 0) return undefined
 
     const role: 'user' | 'assistant' = msg.type === 'user' ? 'user' : 'assistant'

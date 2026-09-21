@@ -20,7 +20,7 @@ import { isWorkspaceAttachmentPath, MAX_UPLOAD_BYTES } from '@/lib/message-attac
 import sharp from 'sharp'
 
 import type { Part } from '@/lib/format'
-import type { UploadInfo, UploadKind } from '@/lib/types'
+import type { UploadInfo } from '@/lib/types'
 
 // Media types Claude vision accepts directly. Anything else that is still an
 // image gets transcoded to PNG; non-images are delivered as a file path.
@@ -34,15 +34,8 @@ const MAX_IMAGE_EDGE = 1568
 export { MAX_UPLOAD_BYTES } from '@/lib/message-attachments'
 const TTL_MS = 30 * 60_000
 
-export type StoredUpload = {
-  id: string
+export type StoredUpload = UploadInfo & {
   workspaceId: string
-  kind: UploadKind
-  mediaType: string
-  filename: string
-  size: number
-  width?: number
-  height?: number
   // For images: the (possibly transcoded/resized) bytes, base64-inlined into the
   // agent message. For files: undefined — see `path`.
   data?: Buffer
@@ -287,7 +280,8 @@ export function uploadToDisplayPart(u: StoredUpload): Part | null {
   return {
     type: 'file-attachment',
     mediaType: u.mediaType,
-    url: servedUploadUrl(u),
-    filename: u.filename
+    label: u.filename,
+    previewUrl: u.kind === 'image' ? servedUploadUrl(u) : undefined,
+    path: u.kind === 'file' ? u.path : undefined
   }
 }

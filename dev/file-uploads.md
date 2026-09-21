@@ -151,8 +151,8 @@ affordance.
 ## Part 5 — Adding a new adapter
 
 The display format is agent-agnostic: a `Part` of `{ type: 'file-attachment', mediaType,
-url, filename }` (url = served URL preferred, data URL only as a reload
-fallback). For a new backend: (1) convert resolved uploads into the backend's
+label?, previewUrl?, path? }` (`previewUrl` = served URL preferred, data URL only as a reload
+fallback; `path` = absolute filesystem location). For a new backend: (1) convert resolved uploads into the backend's
 message shape (base64 blocks preferred; path/file-id otherwise — `StoredUpload`
 exposes `data`, `path`, and `materializeToPath()`); (2) emit `file` display
 parts; (3) in the replay adapter, map the backend's stored image/document blocks

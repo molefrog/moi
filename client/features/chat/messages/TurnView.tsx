@@ -180,7 +180,7 @@ export const TurnView = memo(function TurnView({ turn, processing = false }: Tur
           <TextAttachmentChip key={`text-attachment:${i}`} label={p.label} />
         ))}
         {fileParts.map((p, i) => (
-          <FilePart key={i} mediaType={p.mediaType} url={p.url} filename={p.filename} />
+          <FilePart key={i} mediaType={p.mediaType} previewUrl={p.previewUrl} label={p.label} />
         ))}
         {text && (
           <p
@@ -221,7 +221,7 @@ function PartRenderer({ part }: PartRendererProps) {
       // lone tool-call segment, rendered as a one-row group.
       return <ToolCallGroup parts={[part]} cwd={null} />
     case 'file-attachment':
-      return <FilePart mediaType={part.mediaType} url={part.url} filename={part.filename} />
+      return <FilePart mediaType={part.mediaType} previewUrl={part.previewUrl} label={part.label} />
     case 'source-url':
       return <SourceLink url={part.url} title={part.title} />
     case 'source-document':
@@ -233,16 +233,16 @@ function PartRenderer({ part }: PartRendererProps) {
   }
 }
 
-type FilePartProps = { mediaType: string; url: string; filename?: string }
-function FilePart({ mediaType, url, filename }: FilePartProps) {
+type FilePartProps = { mediaType: string; previewUrl?: string; label?: string }
+function FilePart({ mediaType, previewUrl, label }: FilePartProps) {
   // Images (data/object/remote URLs) render as a thumbnail; everything else is a
-  // labelled chip. A file with no usable url (e.g. a non-image attachment whose
+  // labelled chip. A file with no preview URL (e.g. a non-image attachment whose
   // bytes live only server-side) still shows its name.
-  if (mediaType.startsWith('image/') && url) {
+  if (mediaType.startsWith('image/') && previewUrl) {
     return (
       <img
-        src={url}
-        alt={filename ?? 'attachment'}
+        src={previewUrl}
+        alt={label ?? 'attachment'}
         className="max-h-64 max-w-full rounded-lg border border-border object-contain"
       />
     )
@@ -250,7 +250,7 @@ function FilePart({ mediaType, url, filename }: FilePartProps) {
   return (
     <div className="flex items-center gap-1.5 rounded-lg border border-border bg-accent px-2.5 py-1.5 text-xs text-accent-foreground">
       <IconFile size={16} stroke={1.75} />
-      <span className="truncate">{filename ?? mediaType}</span>
+      <span className="truncate">{label ?? mediaType}</span>
     </div>
   )
 }

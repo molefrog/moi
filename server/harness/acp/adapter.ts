@@ -7,14 +7,9 @@
 // call both closes the open assistant turn and becomes a turn of its own —
 // the same item-per-turn model the Codex adapter produces.
 
-import {
-  splitTextAttachments,
-  textAttachmentParts,
-  stripTextAttachmentsLoose
-} from '@/lib/moi-attachments'
-import { splitAttachmentNote } from '@/lib/attachment-note'
+import { replayAttachmentParts } from '@/lib/moi-attachments'
+import { formatChatTitle } from '@/lib/chat-title'
 import type { Part, ToolCall, ToolState, Turn, TurnMeta } from '@/lib/format'
-import { stripMoiContext } from '@/lib/moi-context'
 
 import {
   type AcpSessionListEntry,
@@ -114,33 +109,17 @@ export function acpUsageToTurnMeta(usage: Usage | null | undefined): TurnMeta['u
   return { inputTokens, outputTokens, totalTokens }
 }
 
-// Replayed `user_message_chunk` text is the persisted prompt verbatim: the
-// typed text plus everything the sender appended to it — the attachment note
-// and the `<moi-context>` envelope (see sendAcpMessage in ./session.ts). Fold
-// that machinery back out so a reloaded bubble matches the live one. Envelope
-// first: it is appended after the note, and `splitAttachmentNote` parses the
-// note as the text's tail. An envelope-only block (an attachment-only send
-// carries the envelope as its lone text) folds to no parts — the caller skips
-// the bubble entirely.
-export function replayedUserParts(raw: string): Part[] {
-  const attached = splitTextAttachments(stripMoiContext(raw))
-  const split = splitAttachmentNote(attached.text)
-  const parts: Part[] = split.files.map(f => ({
-    type: 'file-attachment',
-    mediaType: 'application/octet-stream',
-    url: f.path,
-    filename: f.filename
-  }))
-  parts.push(...textAttachmentParts(attached.attachments))
-  if (split.text.trim()) parts.push({ type: 'text', text: split.text })
-  return parts
+// Replay collects text and image chunks before reconstructing attachments,
+// so inline images can be paired with their descriptions in message order.
+export function replayedUserParts(raw: string, images: readonly Part[] = []): Part[] {
+  return replayAttachmentParts([...images, { type: 'text', text: raw }])
 }
 
 export function acpSessionToSessionInfo(entry: AcpSessionListEntry): SessionInfo {
   const updated = entry.updatedAt ? Date.parse(entry.updatedAt) : NaN
   return {
     sessionId: entry.sessionId,
-    summary: stripTextAttachmentsLoose(entry.title?.trim() ?? '') || 'Untitled session',
+    summary: formatChatTitle(entry.title?.trim() ?? '') || 'Untitled session',
     lastModified: Number.isNaN(updated) ? 0 : updated,
     ...(entry.cwd ? { cwd: entry.cwd } : {})
   }

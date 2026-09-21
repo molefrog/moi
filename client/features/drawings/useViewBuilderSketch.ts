@@ -14,7 +14,7 @@ type UseViewBuilderSketchOptions = {
   active: boolean
   builderId: string
   sessionId: string
-  sourceTab: WorkspaceTabId
+  source: WorkspaceTabId
   workspaceId: string
   onEditingStart: () => void
   onContinueInChat: () => void
@@ -26,7 +26,7 @@ export function useViewBuilderSketch({
   active,
   builderId,
   sessionId,
-  sourceTab,
+  source,
   workspaceId,
   onEditingStart,
   onContinueInChat
@@ -59,11 +59,11 @@ export function useViewBuilderSketch({
         sessionId,
         localId: attachmentIdRef.current,
         purpose: 'sketch',
-        sourceTab,
+        source,
         blob
       })
     },
-    [sessionId, sourceTab, workspaceId]
+    [sessionId, source, workspaceId]
   )
 
   // Exports are cached per history version, so an unchanged sketch comes back
@@ -91,14 +91,14 @@ export function useViewBuilderSketch({
         sessionId,
         localId: attachmentIdRef.current,
         purpose: 'sketch',
-        sourceTab,
+        source,
         blob,
         isCurrent: () => uploadRevisionRef.current === revision
       })
       pendingStageRef.current = pending
       return pending
     },
-    [sessionId, sourceTab, workspaceId]
+    [sessionId, source, workspaceId]
   )
 
   const drawing = useDrawingLayer({

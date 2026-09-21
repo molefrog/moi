@@ -17,7 +17,7 @@ type AnnotationOrigin = 'docked' | 'popup'
 type ChatAnnotationDraft = {
   workspaceId: string
   sourceSessionId: string | null
-  sourceTab: WorkspaceTabId
+  source: WorkspaceTabId
   origin: AnnotationOrigin
   attachmentId: string
 }
@@ -70,7 +70,7 @@ export function useChatAnnotation({
       sessionId: draft.sourceSessionId,
       localId: draft.attachmentId,
       purpose: 'annotation',
-      sourceTab: draft.sourceTab,
+      source: draft.source,
       blob
     })
   }, [])
@@ -83,7 +83,7 @@ export function useChatAnnotation({
       sessionId: draft.sourceSessionId,
       localId: draft.attachmentId,
       purpose: 'annotation',
-      sourceTab: draft.sourceTab,
+      source: draft.source,
       blob,
       isCurrent: () => uploadRevisionsRef.current.get(draft.attachmentId) === revision
     })
@@ -113,7 +113,7 @@ export function useChatAnnotation({
       const draft: ChatAnnotationDraft = {
         workspaceId,
         sourceSessionId: sessionId,
-        sourceTab: activeTab,
+        source: activeTab,
         origin,
         attachmentId: crypto.randomUUID()
       }
@@ -183,7 +183,7 @@ export function useChatAnnotation({
     if (
       draft.workspaceId !== workspaceId ||
       draft.sourceSessionId !== sessionId ||
-      draft.sourceTab !== activeTab ||
+      draft.source !== activeTab ||
       mode !== expectedMode ||
       !available
     ) {

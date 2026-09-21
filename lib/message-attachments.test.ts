@@ -1,20 +1,17 @@
 import type { MessageAttachment } from './types'
 import { expect, test } from 'bun:test'
-import { isMessageAttachments, partitionMessageAttachments } from './message-attachments'
+import { isMessageAttachments } from './message-attachments'
 
-test('partitions mixed attachments and leaves saved context payloads unchanged', () => {
+test('accepts mixed attachment references', () => {
   const context = { source: 'view:orders', label: 'Order', text: 'Order ID: 1042' }
   const attachments: MessageAttachment[] = [
     { type: 'upload', uploadId: 'file' },
     { type: 'text', ...context },
-    { type: 'upload', uploadId: 'drawing' }
+    { type: 'text', label: 'Note', text: 'Context without an applet origin' },
+    { type: 'text', label: 'Overview', text: 'Workspace context', source: 'overview' },
+    { type: 'upload', uploadId: 'drawing', source: 'overview', purpose: 'annotation' }
   ]
   expect(isMessageAttachments(attachments)).toBe(true)
-  expect(partitionMessageAttachments(attachments)).toEqual({
-    uploadIds: ['file', 'drawing'],
-    textAttachments: [context]
-  })
-  expect(partitionMessageAttachments()).toEqual({ uploadIds: [], textAttachments: [] })
 })
 
 test('rejects invalid variants, legacy ids, and invalid context in mixed requests', () => {
@@ -23,13 +20,24 @@ test('rejects invalid variants, legacy ids, and invalid context in mixed request
     ['file'],
     [{ type: 'upload' }],
     [{ type: 'upload', uploadId: '' }],
+    [{ type: 'upload', uploadId: 'file', source: 42 }],
+    [{ type: 'text', label: 'Note', text: 'Context', source: 42 }],
+    [{ type: 'text', label: 'Note', text: 'Context', source: '' }],
+    [{ type: 'upload', uploadId: 'file', purpose: 'unknown' }],
+    [{ type: 'image', uploadId: 'image', purpose: 'unknown' }],
+    [{ type: 'image', uploadId: '' }],
+    [{ type: 'image', uploadId: 'image', source: 42 }],
     [{ type: 'unknown' }],
     [{ type: 'text', label: 'Bad' }]
   ]) {
     expect(isMessageAttachments(value)).toBe(false)
   }
+  expect(isMessageAttachments([{ type: 'upload', uploadId: 'image', purpose: 'sketch' }])).toBe(
+    true
+  )
   const item = { type: 'text', source: 'view:orders', label: 'Order', text: 'Order' }
   expect(isMessageAttachments(Array(20).fill(item))).toBe(true)
   expect(isMessageAttachments([{ ...item, text: 'x'.repeat(5001) }])).toBe(false)
+  expect(isMessageAttachments([{ ...item, purpose: 'sketch' }])).toBe(false)
   expect(isMessageAttachments([])).toBe(true)
 })

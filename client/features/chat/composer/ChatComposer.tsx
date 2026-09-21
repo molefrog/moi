@@ -20,7 +20,7 @@ import type { AgentAvailability } from '@/client/lib/agent-availability'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import { attachmentKey, liveStore, useLive } from '@/client/features/chat/chat-store'
-import type { ChatAttachment } from '@/client/features/chat/composer/attachments/types'
+import type { StagedAttachment } from '@/client/features/chat/composer/attachments/types'
 import { useUiStore } from '@/client/store/ui'
 
 import { ModelPicker } from './ModelPicker'
@@ -107,7 +107,7 @@ export function ChatComposer({
   // upload isn't lost.
   const sendingRef = useRef(false)
 
-  const removeAttachment = (attachment: ChatAttachment) => {
+  const removeAttachment = (attachment: StagedAttachment) => {
     if (attachment.kind === 'drawing' && onRemoveDrawing) {
       onRemoveDrawing(attachment.localId)
       return
@@ -164,7 +164,7 @@ export function ChatComposer({
               a.kind === 'text' ? (
                 <TextAttachmentChip
                   key={a.localId}
-                  label={a.name}
+                  label={a.label}
                   onRemove={() => removeAttachment(a)}
                 />
               ) : a.kind === 'drawing' ? (
@@ -284,8 +284,8 @@ export function ChatComposer({
   )
 }
 
-const EMPTY: ChatAttachment[] = []
-const ATTACHMENT_ORDER: Record<ChatAttachment['kind'], number> = {
+const EMPTY: StagedAttachment[] = []
+const ATTACHMENT_ORDER: Record<StagedAttachment['kind'], number> = {
   file: 0,
   drawing: 1,
   text: 2

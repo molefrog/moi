@@ -1,4 +1,4 @@
-import type { ChatAttachment, ChatAttachmentPatch } from './composer/attachments/types'
+import type { StagedAttachment, StagedAttachmentPatch } from './composer/attachments/types'
 import { useStore } from 'zustand'
 import { createStore } from 'zustand/vanilla'
 
@@ -88,7 +88,7 @@ export type LiveStore = {
   previews: Record<string, LivePreview>
   // Composer attachments are per chat, survive composer remounts, and clear on
   // send. Draft text is workspace-local persisted UI state (client/store/ui).
-  attachments: Record<string, ChatAttachment[]>
+  attachments: Record<string, StagedAttachment[]>
 
   setActivity: (workspaceId: string, sessionId: string, value: SessionActivity) => void
   // Authoritative reconcile from a server `status_snapshot`: exactly the listed
@@ -98,8 +98,8 @@ export type LiveStore = {
     sessions: { workspaceId: string; sessionId: string; activity: SessionActivity }[]
   ) => void
   setError: (workspaceId: string, sessionId: string, message: string | null) => void
-  addAttachments: (workspaceId: string, sessionId: string | null, items: ChatAttachment[]) => void
-  updateAttachment: (workspaceId: string, localId: string, patch: ChatAttachmentPatch) => void
+  addAttachments: (workspaceId: string, sessionId: string | null, items: StagedAttachment[]) => void
+  updateAttachment: (workspaceId: string, localId: string, patch: StagedAttachmentPatch) => void
   removeAttachment: (workspaceId: string, localId: string) => void
   clearAttachments: (workspaceId: string, sessionId: string | null) => void
   // `null` assigns the new-chat draft its first session id.

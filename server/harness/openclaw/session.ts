@@ -1,5 +1,4 @@
-import { partitionMessageAttachments } from '@/lib/message-attachments'
-import type { TextAttachment, MessageAttachment } from '@/lib/types'
+import type { MessageAttachment } from '@/lib/types'
 // Per-(workspaceId, sessionId) live OpenClaw session.
 //
 // Holds the in-memory view for one session and keeps it current from the
@@ -12,18 +11,9 @@ import type { TextAttachment, MessageAttachment } from '@/lib/types'
 // The frame families and the order they arrive in are documented in NOTES.md
 // §6; the rules that follow from it (who owns a tool card, why identity is
 // decided once) are worth reading before changing anything here.
-import {
-  appendTextAttachments,
-  splitTextAttachments,
-  textAttachmentParts
-} from '@/lib/moi-attachments'
-import { appendAttachmentNote } from '@/lib/attachment-note'
-import {
-  type MoiContext,
-  appendMoiContext,
-  renderMoiContext,
-  stripMoiContext
-} from '@/lib/moi-context'
+import { replayAttachmentParts } from '@/lib/moi-attachments'
+import { materializeAttachmentPaths, prepareAttachmentMessage } from '../../attachment-message'
+import { type MoiContext, appendMoiContext, renderMoiContext } from '@/lib/moi-context'
 import {
   type PreviewBlock,
   type ToolCall,
@@ -32,7 +22,7 @@ import {
   applyEvent,
   emptyViewState
 } from '@/lib/format'
-import type { SessionActivity, StreamEvent, ViewState } from '@/lib/types'
+import type { Part, SessionActivity, StreamEvent, ViewState } from '@/lib/types'
 
 import { messageIdempotencyKey } from './compat'
 
@@ -57,7 +47,6 @@ import {
 } from './gateway'
 import { recordOpenClawThinkingProfile, recordOpenClawThinkingRejection } from './thinking'
 import { broadcast } from '../../state'
-import { materializeToPath, resolveUploads } from '../../uploads'
 import {
   markViewBuilderBuildingBySession,
   markViewBuilderWaitingBySession,
@@ -497,17 +486,19 @@ function previewMessageId(sessionKey: string, runId: string): string {
 // between what we sent and what the gateway stored can't defeat the match.
 export function normalizeEchoText(text: string | undefined): string {
   if (typeof text !== 'string') return ''
-  const attached = splitTextAttachments(stripMoiContext(text))
-  return userEchoKey(attached.text, attached.attachments)
+  return userEchoKey(replayAttachmentParts([{ type: 'text', text }]))
 }
 
-export function userEchoKey(text: string, attachments: readonly TextAttachment[] = []): string {
+export function userEchoKey(parts: readonly Part[]): string {
+  const text = parts
+    .filter(p => p.type === 'text')
+    .map(p => p.text)
+    .join('\n')
   const visible = text.replace(/\s+/g, ' ').trim()
-  // Include attachments in the fallback key: text-attachment-only messages have no
-  // visible text, and two identical prompts may refer to different records.
-  return attachments.length
-    ? `${visible}\n${JSON.stringify(textAttachmentParts(attachments))}`
-    : visible
+  const attachments = parts.filter(
+    p => p.type === 'text-attachment' || p.type === 'file-attachment'
+  )
+  return attachments.length ? `${visible}\n${JSON.stringify(attachments)}` : visible
 }
 
 // Synthetic turns (live tool cards, live thinking spans) have no transcript
@@ -543,10 +534,7 @@ function emitTurn(rec: SessionRecord, msg: OpenClawMessage, idx: number): void {
         )
       : -1
     if (at < 0) {
-      const text = userEchoKey(
-        turn.parts.find(p => p.type === 'text')?.text ?? '',
-        turn.parts.filter(p => p.type === 'text-attachment')
-      )
+      const text = userEchoKey(turn.parts)
       if (text) at = rec.pendingUserEchoes.findIndex(e => normalizeEchoText(e.text) === text)
     }
     if (at >= 0) {
@@ -1249,20 +1237,13 @@ export async function sendOpenClawMessage(input: {
   // rendezvous keeps matching on the user's text.
   context?: MoiContext
 }): Promise<void> {
-  // Fold any attachments into the message text as file-path references.
-  const { uploadIds, textAttachments } = partitionMessageAttachments(input.attachments)
-  const uploads = resolveUploads(input.workspaceId, uploadIds)
-  let content = appendTextAttachments(input.content, textAttachments)
-  if (uploads.length > 0) {
-    const files: { filename: string; path: string }[] = []
-    for (const u of uploads) {
-      const p = await materializeToPath(u)
-      if (p) files.push({ filename: u.filename, path: p })
-    }
-    content = appendAttachmentNote(content, files)
-  }
-  // Attachment-only send whose ids all expired → nothing to say; don't open a
-  // session for an empty message.
+  await materializeAttachmentPaths(input.workspaceId, input.attachments)
+  const { text: content } = prepareAttachmentMessage(
+    input.workspaceId,
+    input.content,
+    input.attachments,
+    false
+  )
   if (!content) return
   return sendOpenClawMessageImpl({ ...input, content })
 }

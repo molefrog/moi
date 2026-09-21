@@ -15,7 +15,7 @@
 // if a host → applet direction is ever added (`moi.on(...)`), `dispose` must
 // also unbind those listeners or a disposed module leaks.
 import { snapshotTextAttachment } from '@/lib/moi-attachments'
-import type { ChatAttachmentInput } from '@/lib/types'
+import type { AttachmentInput, AttachmentOrigin } from '@/lib/types'
 import { isWorkspaceAttachmentPath, MAX_UPLOAD_BYTES } from '@/lib/message-attachments'
 import { useEffect } from 'react'
 
@@ -38,14 +38,12 @@ export const appletSource = ({ kind, name }: AppletIdentity): string => `${kind}
 export type AppletChatMessage = {
   message: string
   source: string
-  attachments: AppletChatAttachment[]
+  attachments: (AttachmentInput & AttachmentOrigin)[]
 }
-
-export type AppletChatAttachment = ChatAttachmentInput & { source: string }
 
 // Events a workspace runtime emits — already validated, typed for host code.
 export type AppletEvents = {
-  addChatAttachment: (attachment: AppletChatAttachment) => void
+  addChatAttachment: (attachment: AttachmentInput & AttachmentOrigin) => void
   // Client-local replace-navigation to a workspace tab. `params` reach the
   // target view as its `params` prop via navigation state — JSON-plain only
   // (history state is structured-cloned).
@@ -194,7 +192,10 @@ function createRuntime(workspaceId: string) {
 
 // Copy the caller's fields now so later applet mutations cannot change a send
 // or staged attachment. File contents are immutable and can be retained as-is.
-function snapshotAttachmentInput(input: unknown, source: string): AppletChatAttachment {
+function snapshotAttachmentInput(
+  input: unknown,
+  source: string
+): AttachmentInput & AttachmentOrigin {
   if (isParamsRecord(input)) {
     if (input.type === 'text') {
       const snapshot = snapshotTextAttachment(input)

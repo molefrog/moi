@@ -4,6 +4,7 @@ import { isMoiContext } from '@/lib/moi-context'
 
 import index from '../client/index.html'
 import { api } from './api'
+import { AttachmentUploadError } from './attachment-message'
 import { PORT } from './constants'
 import { control } from './control'
 import { EVENTS_TOPIC, publishEvent, setEventServer } from './events'
@@ -14,7 +15,14 @@ import { resolveScratchOp } from './scratchpad-relay'
 import { allHarnesses, harnessFor } from './harness/registry'
 import { getWorkspace } from './registry'
 import { saveSelectedSession } from './selected-session'
-import { addClient, broadcastAll, getClientCount, removeClient, sendToClient } from './state'
+import {
+  addClient,
+  broadcast,
+  broadcastAll,
+  getClientCount,
+  removeClient,
+  sendToClient
+} from './state'
 import { startServiceLogMaintenance } from './service'
 import { distShell, prebuilt } from './static'
 import { renderStatus } from './status'
@@ -157,8 +165,9 @@ export const app = Bun.serve<WsData>({
               })
             }
           }
-          // Harnesses ignore fields they don't support (see SendMessageInput);
-          // failures surface as error frames from inside the harness.
+          // Harnesses ignore fields they don't support (see SendMessageInput).
+          // Their failures surface internally; attachment resolution happens
+          // before a harness owns the send, so surface that one here.
           void harnessFor(workspace)
             .sendMessage({
               workspaceId: data.workspaceId,
@@ -175,7 +184,15 @@ export const app = Bun.serve<WsData>({
               context: data.context,
               agentId: workspace.agentId
             })
-            .catch(() => {})
+            .catch(error => {
+              if (error instanceof AttachmentUploadError) {
+                broadcast(data.workspaceId, {
+                  kind: 'error',
+                  sessionId: data.sessionId,
+                  content: error.message
+                })
+              }
+            })
         }
         if (data.type === 'stop') {
           const workspace = await getWorkspace(data.workspaceId)

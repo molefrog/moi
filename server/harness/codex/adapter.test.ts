@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
+import { appendAttachments } from '@/lib/moi-attachments'
+
 import type { CodexThread, CodexThreadItem } from './adapter'
 import { childThreadToSubagentRecord, collectSubagentActivities } from './adapter'
 import {
@@ -444,6 +446,17 @@ describe('discovery mappings', () => {
         updatedAt: 200
       }).summary
     ).toBe('My chat name')
+  })
+
+  test('uses the attachment label for an attachment-only preview', () => {
+    expect(
+      codexThreadToSessionInfo({
+        id: 'th-1',
+        preview: appendAttachments('', [
+          { type: 'image', label: 'Sketch.png', mediaType: 'image/png' }
+        ])
+      }).summary
+    ).toBe('Sketch.png')
   })
 
   test('codex model → picker Model with effort levels', () => {

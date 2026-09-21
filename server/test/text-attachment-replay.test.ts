@@ -1,21 +1,28 @@
 import { describe, expect, test } from 'bun:test'
-import { appendTextAttachments, textAttachmentParts } from '@/lib/moi-attachments'
+import { appendAttachments, attachmentPart } from '@/lib/moi-attachments'
 import { appendMoiContext, renderMoiContext, moiContextSystemReminder } from '@/lib/moi-context'
 import { ClaudeAdapter } from '../harness/claude-code/adapter'
 import { codexItemToTurn } from '../harness/codex/adapter'
 import { messageToTurn } from '../harness/openclaw/adapter'
 import { replayedUserParts } from '../harness/acp/adapter'
 import { buildUserMessage } from '../harness/claude-code/session'
+import { prepareAttachmentMessage } from '../attachment-message'
 
-const attachments = [{ source: 'view:orders', label: 'Order #1042', text: 'Order ID: 1042' }]
+const attachments = [
+  { source: 'view:orders', label: 'Order #1042', text: 'Order ID: 1042' },
+  { label: 'Note', text: 'Context without an applet origin' }
+]
 const ambient = renderMoiContext({ activeTab: 'view:orders' })
 
 describe('durable text attachments', () => {
   for (const text of ['Review this order', '', 'What does <moi-attachments> mean?']) {
-    test(`replays the same display parts across all harnesses: ${text || 'attachment only'}`, () => {
-      const raw = appendTextAttachments(text, attachments)
+    test(`replays the same display parts across all harnesses: ${text || 'attachment only'}`, async () => {
+      const raw = appendAttachments(
+        text,
+        attachments.map(a => ({ type: 'text', ...a }))
+      )
       const expected = [
-        ...textAttachmentParts(attachments),
+        ...attachments.map(a => attachmentPart({ type: 'text', ...a })),
         ...(text ? [{ type: 'text' as const, text }] : [])
       ]
       const cc = new ClaudeAdapter()
@@ -45,7 +52,13 @@ describe('durable text attachments', () => {
         )
         expect(replayedUserParts(content)).toEqual(expected)
       }
-      const sent = buildUserMessage(text, [], attachments)
+      const sent = buildUserMessage(
+        prepareAttachmentMessage(
+          'test',
+          text,
+          attachments.map(a => ({ type: 'text', ...a }))
+        )
+      )
       expect(sent.parts).toEqual(expected)
       expect(sent.content).toBe(raw)
     })

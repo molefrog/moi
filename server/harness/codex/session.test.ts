@@ -1,4 +1,4 @@
-import { splitTextAttachments } from '@/lib/moi-attachments'
+import { splitAttachments } from '@/lib/moi-attachments'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 
 import type { BroadcastFrame, StreamEvent } from '@/lib/types'
@@ -535,7 +535,9 @@ for (const native of [true, false]) {
     const start = f.calls.find(call => call.method === 'turn/start')!
     const sent = start.params.input as Array<{ type: string; text?: string }>
     const raw = sent.find(item => item.type === 'text')!.text!
-    expect(splitTextAttachments(raw).attachments).toEqual(textAttachments)
+    expect(splitAttachments(raw).attachments).toEqual(
+      textAttachments.map(a => ({ type: 'text', ...a }))
+    )
     const event = f.events().find(event => event.kind === 'turn' && event.turn.role === 'user')
     expect(event?.kind === 'turn' ? event.turn.parts : null).toEqual([
       { type: 'text-attachment', ...textAttachments[0] }

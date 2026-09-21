@@ -44,7 +44,7 @@ describe('drawing draft staging', () => {
       sessionId,
       localId: 'annotation-1',
       purpose: 'annotation',
-      sourceTab: 'overview',
+      source: 'overview',
       blob: new Blob(['first'], { type: 'image/png' })
     })
     const first = drawingAttachments()[0]
@@ -56,7 +56,7 @@ describe('drawing draft staging', () => {
       sessionId,
       localId: 'annotation-1',
       purpose: 'annotation',
-      sourceTab: 'overview',
+      source: 'overview',
       blob: new Blob(['second'], { type: 'image/png' })
     })
     const list = drawingAttachments()
@@ -79,7 +79,7 @@ describe('drawing draft staging', () => {
       sessionId,
       localId: 'annotation-1',
       purpose: 'annotation',
-      sourceTab: 'overview',
+      source: 'overview',
       blob: new Blob(['drawing'], { type: 'image/png' })
     })
     await stageDrawing({
@@ -87,7 +87,7 @@ describe('drawing draft staging', () => {
       sessionId,
       localId: 'annotation-1',
       purpose: 'annotation',
-      sourceTab: 'overview',
+      source: 'overview',
       blob: new Blob(['drawing'], { type: 'image/png' }),
       isCurrent: () => true
     })
@@ -113,7 +113,7 @@ describe('drawing attachment staging', () => {
       sessionId,
       localId: 'annotation-1',
       purpose: 'annotation',
-      sourceTab: 'overview',
+      source: 'overview',
       blob: new Blob(['first'], { type: 'image/png' }),
       isCurrent: () => revision === 1
     })
@@ -125,7 +125,7 @@ describe('drawing attachment staging', () => {
       sessionId,
       localId: 'annotation-1',
       purpose: 'annotation',
-      sourceTab: 'overview',
+      source: 'overview',
       blob: new Blob(['second'], { type: 'image/png' }),
       isCurrent: () => revision === 2
     })
@@ -161,7 +161,7 @@ describe('drawing attachment staging', () => {
       sessionId,
       localId: 'annotation-1',
       purpose: 'annotation',
-      sourceTab: 'view:roadmap',
+      source: 'view:roadmap',
       blob: new Blob(['drawing'], { type: 'image/png' }),
       isCurrent: () => true
     })
@@ -190,14 +190,14 @@ describe('drawing attachment staging', () => {
       sessionId,
       localId: 'sketch-1',
       purpose: 'sketch',
-      sourceTab: 'view-builder:draft-1',
+      source: 'view-builder:draft-1',
       blob: new Blob(['drawing'], { type: 'image/png' }),
       isCurrent: () => true
     })
 
     const attachment = drawingAttachments()[0]
     expect(attachment.kind).toBe('drawing')
-    expect(attachment.name).toBe('Sketch.png')
+    expect(attachment.label).toBe('Sketch.png')
     expect(attachment.kind === 'drawing' ? attachment.purpose : null).toBe('sketch')
   })
 })
@@ -228,7 +228,7 @@ describe('applet file staging', () => {
       const pending = stageChatAttachment({ workspaceId, sessionId: null }, input)
       expect(attachmentsForSend(workspaceId, null)).toEqual([])
       expect(liveStore.getState().attachments[attachmentKey(workspaceId, null)][0]).toMatchObject({
-        name: 'notes.txt',
+        label: 'notes.txt',
         status: 'uploading'
       })
       if (source === 'path') {
@@ -254,7 +254,7 @@ describe('applet file staging', () => {
       requests[0].resolve(Response.json(source === 'browser' ? [info] : info))
       await pending
       expect(attachmentsForSend(workspaceId, 'real')).toMatchObject([
-        { kind: 'file', status: 'ready', upload: info }
+        { kind: 'file', source: 'view:files', status: 'ready', upload: info }
       ])
       expect(attachmentsForSend(workspaceId, 'other')).toHaveLength(1)
       expect(attachmentsForSend(workspaceId, null)).toEqual([])
@@ -322,7 +322,7 @@ describe('applet file staging', () => {
       await pending
       expect(liveStore.getState().attachments[attachmentKey(workspaceId, 'real')]).toEqual(kept)
       expect(notices).toHaveBeenCalledWith({
-        title: `Couldn’t add ${failed.name}`,
+        title: `Couldn’t add ${failed.label}`,
         description: 'Upload failed',
         type: 'error'
       })
@@ -361,7 +361,7 @@ test('drawing edits and final upload reuse the moved draft after a session renam
     sessionId: null,
     localId: 'renamed-drawing',
     purpose: 'annotation' as const,
-    sourceTab: 'overview' as const,
+    source: 'overview' as const,
     blob: new Blob(['drawing'], { type: 'image/png' })
   }
   stageDrawingDraft(draft)

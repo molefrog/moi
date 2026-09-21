@@ -1,4 +1,4 @@
-import type { TextAttachment } from './types'
+import type { AttachmentOrigin, DrawingPurpose, TextAttachment } from './types'
 
 // Display-only conversation format. Agent-agnostic.
 // Source: server/harness/README.md (format section; formerly claude-code-messages.md §14) (and the research PDF under dev/report).
@@ -66,7 +66,15 @@ export type Part =
       durationMs?: number
     }
   | { type: 'tool-call'; call: ToolCall }
-  | { type: 'file-attachment'; mediaType: string; url: string; filename?: string }
+  | ({
+      type: 'file-attachment'
+      mediaType: string
+      label?: string
+      previewUrl?: string
+      path?: string
+      // Only present for drawing images.
+      purpose?: DrawingPurpose
+    } & Partial<AttachmentOrigin>)
   | { type: 'source-url'; url: string; title?: string; sourceId: string }
   | { type: 'source-document'; mediaType: string; title: string; sourceId: string }
   | { type: 'data'; name: string; data: unknown }

@@ -1,12 +1,18 @@
-import type { MessageAttachment, TextAttachment, UploadInfo } from '@/lib/types'
-import type { AppletChatAttachment } from '@/client/features/applets/applet-runtime'
+import type {
+  AttachmentInput,
+  AttachmentOrigin,
+  DrawingPurpose,
+  MessageAttachment,
+  TextAttachment,
+  UploadInfo
+} from '@/lib/types'
 import { uploadChatFile } from './composer/attachments/uploads'
-import { textAttachmentParts } from '@/lib/moi-attachments'
+import { attachmentPart } from '@/lib/moi-attachments'
 import type { QueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { attachmentKey, liveStore } from '@/client/features/chat/chat-store'
-import type { ChatAttachment } from '@/client/features/chat/composer/attachments/types'
+import type { StagedAttachment } from '@/client/features/chat/composer/attachments/types'
 import { resolveSelectedModel } from '@/client/features/chat/composer/model-order'
 import type { MoiUserMessageOptions } from '@/client/features/workspace/moi-context'
 import { STREAM_RESPONSES } from '@/client/lib/flags'
@@ -15,41 +21,47 @@ import { applyEvent, emptyViewState } from '@/lib/format'
 import type { Part, SessionInfo, ViewState, WorkspaceAgent } from '@/lib/types'
 
 // Explicit attachments belong to this send, independently of the user's draft.
-export type PreparedChatAttachments = {
+export type PreparedAttachments = {
   attachments: MessageAttachment[]
   parts: Part[]
 }
 
 export type ChatSendOptions = MoiUserMessageOptions & {
-  preparedAttachments?: PreparedChatAttachments
+  preparedAttachments?: PreparedAttachments
 }
 
 // Both send paths derive the wire reference and optimistic display together.
 function prepareAttachment(
   input: TextAttachment | UploadInfo,
-  previewUrl = ''
+  previewUrl?: string,
+  options: Partial<AttachmentOrigin> & { purpose?: DrawingPurpose } = {}
 ): { attachment: MessageAttachment; part: Part } {
   if ('id' in input) {
+    const metadata = {
+      source: options.source,
+      ...(input.kind === 'image' ? { purpose: options.purpose } : {})
+    }
     return {
-      attachment: { type: 'upload', uploadId: input.id },
+      attachment: { type: 'upload', uploadId: input.id, ...metadata },
       part: {
         type: 'file-attachment',
         mediaType: input.mediaType,
-        filename: input.filename,
-        url: input.kind === 'image' ? previewUrl : ''
+        label: input.filename,
+        ...metadata,
+        previewUrl: input.kind === 'image' ? previewUrl : undefined
       }
     }
   }
   const { source, label, text } = input
   return {
     attachment: { type: 'text', source, label, text },
-    part: textAttachmentParts([input])[0]
+    part: attachmentPart({ type: 'text', source, label, text })
   }
 }
 
 function collectPreparedAttachments(
   items: ReturnType<typeof prepareAttachment>[]
-): PreparedChatAttachments {
+): PreparedAttachments {
   return {
     attachments: items.map(item => item.attachment),
     parts: items.map(item => item.part)
@@ -58,30 +70,36 @@ function collectPreparedAttachments(
 
 export async function prepareChatAttachments(
   workspaceId: string,
-  inputs: readonly AppletChatAttachment[]
-): Promise<PreparedChatAttachments> {
+  inputs: readonly (AttachmentInput & AttachmentOrigin)[]
+): Promise<PreparedAttachments> {
   return collectPreparedAttachments(
     await Promise.all(
       inputs.map(async input => {
         if (input.type === 'text') return prepareAttachment(input)
         const upload = await uploadChatFile(workspaceId, input.file ?? input.path)
-        return prepareAttachment(upload, `/api/workspaces/${workspaceId}/uploads/${upload.id}`)
+        return prepareAttachment(upload, `/api/workspaces/${workspaceId}/uploads/${upload.id}`, {
+          source: input.source
+        })
       })
     )
   )
 }
 
 export function prepareDraftAttachments(
-  attachments: readonly ChatAttachment[]
-): PreparedChatAttachments {
+  attachments: readonly StagedAttachment[]
+): PreparedAttachments {
   return collectPreparedAttachments(
     attachments.flatMap(attachment => {
-      if (attachment.kind === 'text') return [prepareAttachment(attachment.attachment)]
+      if (attachment.kind === 'text') return [prepareAttachment(attachment)]
       if (!attachment.upload) return []
       return [
         prepareAttachment(
-          { ...attachment.upload, filename: attachment.name, mediaType: attachment.mediaType },
-          attachment.previewUrl
+          { ...attachment.upload, filename: attachment.label, mediaType: attachment.mediaType },
+          attachment.previewUrl,
+          {
+            source: attachment.source,
+            purpose: attachment.kind === 'drawing' ? attachment.purpose : undefined
+          }
         )
       ]
     })
@@ -102,46 +120,10 @@ export function attachmentsForSend(
   workspaceId: string,
   sessionId: string | null,
   options?: ChatSendOptions
-): ChatAttachment[] {
+): StagedAttachment[] {
   if (!ownsComposerAttachments(options)) return []
   const pending = liveStore.getState().attachments[attachmentKey(workspaceId, sessionId)] ?? []
   return pending.filter(a => a.kind === 'text' || (a.status === 'ready' && a.upload))
-}
-
-export function withAttachmentDirectives(
-  options: ChatSendOptions | undefined,
-  attachments: readonly ChatAttachment[]
-): ChatSendOptions | undefined {
-  if (!ownsComposerAttachments(options)) return options
-  const annotations: string[] = []
-  const sketches: string[] = []
-  let imagePosition = 0
-  for (const attachment of attachments) {
-    if (attachment.kind === 'text' || attachment.upload?.kind !== 'image') continue
-    imagePosition += 1
-    if (attachment.kind === 'drawing' && attachment.purpose === 'annotation') {
-      annotations.push(`${imagePosition}. ${JSON.stringify(attachment.sourceTab)}`)
-    }
-    if (attachment.kind === 'drawing' && attachment.purpose === 'sketch') {
-      sketches.push(`${imagePosition}. ${JSON.stringify(attachment.sourceTab)}`)
-    }
-  }
-  if (annotations.length === 0 && sketches.length === 0) return options
-
-  const directives = [...(options?.directives ?? [])]
-  if (annotations.length > 0) {
-    directives.push(`Annotation attachment sources in attachment order: ${annotations.join('; ')}.`)
-  }
-  if (sketches.length > 0) {
-    directives.push(
-      `Sketch attachment sources in attachment order: ${sketches.join('; ')}. Each sketch shows the intended layout of a new view.`
-    )
-  }
-
-  return {
-    ...options,
-    directives
-  }
 }
 
 type StartOptimisticTurnInput = {

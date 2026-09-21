@@ -19,27 +19,27 @@ async function withTempDir(run: (dir: string) => Promise<void>): Promise<void> {
 }
 
 describe('installBundledSkills', () => {
-  test('installs the ui-components section and cheat sheet for every workspace', async () => {
+  test('installs the applet guidance and cheat sheet for every workspace', async () => {
     await withTempDir(async dir => {
       await installBundledSkills(dir)
 
       const skillMd = await Bun.file(join(dir, SKILL_MD)).text()
-      expect(skillMd).toContain('Standard UI components')
+      expect(skillMd).toContain('### Styling and UI components')
       expect(skillMd).toContain('references/INTENTS.md')
       const intents = await Bun.file(join(dir, 'moi-workspace', 'references', 'INTENTS.md')).text()
       expect(intents).toContain('function addChatAttachment(input:')
       expect(intents).toContain('function sendChatMessage(input:')
       expect(intents).toContain('function focusTab(tab:')
       expect(skillMd).toContain('moi ui-components add')
-      expect(skillMd).toContain('## Customizing workspace appearance')
+      expect(skillMd).toContain('### Appearance and settings')
       expect(skillMd).toContain('moi theme --font=<key> --color=<key>')
-      expect(skillMd).toContain('### Running commands with workspace env')
+      expect(skillMd).toContain('### Environment and secrets')
       expect(skillMd).toContain('moi env exec -- bun script.ts')
       expect(skillMd).toContain('moi tabs focus')
       expect(skillMd).not.toContain('moi tab focus')
       expect(await Bun.file(join(dir, CHEAT_SHEET)).exists()).toBe(true)
       // The rest of the skill installs normally.
-      expect(skillMd).toContain('# Workspace')
+      expect(skillMd).toContain('# moi workspace')
     })
   })
 
@@ -63,23 +63,23 @@ describe('installBundledSkills', () => {
     })
   })
 
-  test('moi skill update restores the section for a workspace installed before the flag went away', async () => {
+  test('moi skill update restores changed guidance and a missing cheat sheet', async () => {
     // Skills live under <workspace>/.claude/skills for the default backend —
     // updateWorkspaceSkills re-derives that from the workspace root.
     await withTempDir(async workspace => {
       const skillsDir = join(workspace, '.claude', 'skills')
       await installBundledSkills(skillsDir)
 
-      // Simulate a pre-graduation opt-out: section stripped, cheat sheet absent.
+      // Simulate a locally changed skill and a missing cheat sheet.
       const skillMd = join(skillsDir, SKILL_MD)
-      const stripped = (await Bun.file(skillMd).text()).replace(/## Standard UI components/, '')
+      const stripped = (await Bun.file(skillMd).text()).replace(/### Styling and UI components/, '')
       await Bun.write(skillMd, stripped)
       rmSync(join(skillsDir, CHEAT_SHEET), { force: true })
 
       const result = await updateWorkspaceSkills(workspace)
 
       expect(result.changedSkills).toEqual(['moi-workspace'])
-      expect(await Bun.file(skillMd).text()).toContain('Standard UI components')
+      expect(await Bun.file(skillMd).text()).toContain('### Styling and UI components')
       expect(await Bun.file(join(skillsDir, CHEAT_SHEET)).exists()).toBe(true)
     })
   })

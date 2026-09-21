@@ -1,10 +1,13 @@
-import type { TextAttachment } from '@/lib/types'
-import type { WorkspaceTabId } from '@/lib/types'
+import type {
+  AttachmentInput,
+  AttachmentOrigin,
+  DrawingPurpose,
+  TextAttachment,
+  WorkspaceTabId
+} from '@/lib/types'
 
 import { attachmentKey, findAttachment, liveStore } from '../../chat-store'
-import type { DrawingPurpose } from './types'
 import { uploadChatFile } from './uploads'
-import type { AppletChatAttachment } from '@/client/features/applets/applet-runtime'
 import { reportAppletError } from '@/client/features/applets/applet-log'
 import { toast } from '@/client/components/ui/toast'
 
@@ -21,16 +24,18 @@ export function stageComposerFiles(target: ComposerTarget, files: File[]): void 
 async function stageFile(
   { workspaceId, sessionId }: ComposerTarget,
   input: File | string,
-  onError?: (message: string) => void
+  onError?: (message: string) => void,
+  source?: string
 ): Promise<void> {
   const file = typeof input === 'string' ? null : input
-  const name = typeof input === 'string' ? input.split('/').at(-1)! : input.name || 'file'
+  const label = typeof input === 'string' ? input.split('/').at(-1)! : input.name || 'file'
   const localId = crypto.randomUUID()
   liveStore.getState().addAttachments(workspaceId, sessionId, [
     {
       kind: 'file',
+      source,
       localId,
-      name,
+      label,
       mediaType: file?.type || 'application/octet-stream',
       previewUrl: file?.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
       status: 'uploading'
@@ -41,7 +46,7 @@ async function stageFile(
     liveStore.getState().updateAttachment(workspaceId, localId, {
       status: 'ready',
       upload,
-      name: upload.filename,
+      label: upload.filename,
       mediaType: upload.mediaType,
       ...(upload.kind === 'image' && !file?.type.startsWith('image/')
         ? { previewUrl: `/api/workspaces/${workspaceId}/uploads/${upload.id}` }
@@ -50,32 +55,37 @@ async function stageFile(
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Upload failed'
     liveStore.getState().removeAttachment(workspaceId, localId)
-    toast.add({ title: `Couldn’t add ${name}`, description: message, type: 'error' })
+    toast.add({ title: `Couldn’t add ${label}`, description: message, type: 'error' })
     onError?.(message)
   }
 }
 
 export function stageChatAttachment(
   target: ComposerTarget,
-  input: AppletChatAttachment
+  input: AttachmentInput & AttachmentOrigin
 ): Promise<void> {
   if (input.type === 'text') {
     const { source, label, text } = input
     stageTextAttachment(target, { source, label, text })
     return Promise.resolve()
   }
-  return stageFile(target, input.file ?? input.path, message => {
-    reportAppletError(target.workspaceId, {
-      source: 'runtime',
-      message: `addChatAttachment() from ${input.source}: ${message}`
-    })
-  })
+  return stageFile(
+    target,
+    input.file ?? input.path,
+    message => {
+      reportAppletError(target.workspaceId, {
+        source: 'runtime',
+        message: `addChatAttachment() from ${input.source}: ${message}`
+      })
+    },
+    input.source
+  )
 }
 
 type StageDrawingDraftInput = ComposerTarget & {
   localId: string
   purpose: DrawingPurpose
-  sourceTab: WorkspaceTabId
+  source: WorkspaceTabId
   blob: Blob
 }
 
@@ -87,7 +97,7 @@ export function stageDrawingDraft({
   sessionId,
   localId,
   purpose,
-  sourceTab,
+  source,
   blob
 }: StageDrawingDraftInput): void {
   const label = purpose === 'sketch' ? 'Sketch' : 'Annotation'
@@ -107,8 +117,8 @@ export function stageDrawingDraft({
         kind: 'drawing',
         purpose,
         localId,
-        sourceTab,
-        name: `${label}.png`,
+        source,
+        label: `${label}.png`,
         mediaType: 'image/png',
         previewUrl,
         status: 'draft'
@@ -159,13 +169,13 @@ export function stageTextAttachment(
   if (
     pending.some(
       item =>
-        item.attachment.source === attachment.source &&
-        item.attachment.label === attachment.label &&
-        item.attachment.text === attachment.text
+        item.source === attachment.source &&
+        item.label === attachment.label &&
+        item.text === attachment.text
     )
   )
     return
   store.addAttachments(workspaceId, sessionId, [
-    { kind: 'text', localId: crypto.randomUUID(), name: attachment.label, attachment }
+    { kind: 'text', localId: crypto.randomUUID(), ...attachment }
   ])
 }

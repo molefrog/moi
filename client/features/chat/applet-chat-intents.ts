@@ -9,11 +9,7 @@ import {
   appletRuntime,
   useAppletEvent
 } from '@/client/features/applets/applet-runtime'
-import {
-  prepareChatAttachments,
-  type ChatSendOptions,
-  type PreparedChatAttachments
-} from './chat-send'
+import { prepareChatAttachments, type ChatSendOptions, type PreparedAttachments } from './chat-send'
 import { useLayoutEffect } from 'react'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { appUiKeys } from '@/client/api/app-ui-keys'
@@ -108,7 +104,7 @@ export function createAppletMessageHandler(
     }
     getOptions().revealChat()
 
-    let preparedAttachments: PreparedChatAttachments
+    let preparedAttachments: PreparedAttachments
     try {
       if (event.attachments.some(attachment => attachment.type === 'file')) {
         loadingToast = toast.add({ title: 'Preparing attachments…', type: 'loading', timeout: 0 })

@@ -9,14 +9,11 @@ import {
   resolveChatRunOptions,
   startOptimisticSession,
   startOptimisticTurn,
-  withAttachmentDirectives
+  prepareDraftAttachments
 } from '@/client/features/chat/chat-send'
 import { attachmentKey, liveStore } from '@/client/features/chat/chat-store'
-import type {
-  ChatAttachment,
-  UploadedChatAttachment
-} from '@/client/features/chat/composer/attachments/types'
-import type { SessionInfo, ViewState, WorkspaceAgent } from '@/lib/types'
+import type { StagedAttachment } from '@/client/features/chat/composer/attachments/types'
+import type { SessionInfo, UploadInfo, ViewState, WorkspaceAgent } from '@/lib/types'
 import { resolveSelectedModel } from './composer/model-order'
 
 const workspaceId = 'workspace-1'
@@ -225,19 +222,19 @@ describe('Codex model selection', () => {
 // applet firing a message must not walk off with them — nor clear the list,
 // which would also drop still-uploading files the user never sent.
 describe('composer attachments', () => {
-  const staged: ChatAttachment[] = [
+  const staged: StagedAttachment[] = [
     {
       kind: 'file',
       localId: 'a1',
-      name: 'report.pdf',
+      label: 'report.pdf',
       mediaType: 'application/pdf',
       status: 'ready',
-      upload: { id: 'up-1', kind: 'file' } as UploadedChatAttachment['upload']
+      upload: { id: 'up-1', kind: 'file' } as UploadInfo
     },
     {
       kind: 'file',
       localId: 'a2',
-      name: 'big.mov',
+      label: 'big.mov',
       mediaType: 'video/quicktime',
       status: 'uploading'
     },
@@ -245,9 +242,9 @@ describe('composer attachments', () => {
       kind: 'drawing',
       purpose: 'annotation',
       localId: 'a3',
-      name: 'Annotation.png',
+      label: 'Annotation.png',
       mediaType: 'image/png',
-      sourceTab: 'overview',
+      source: 'overview',
       status: 'draft'
     }
   ]
@@ -276,78 +273,70 @@ describe('composer attachments', () => {
     ])
   })
 
-  test('adds annotation source tabs at their image positions', () => {
-    const annotations: ChatAttachment[] = [
+  test('keeps annotation source and purpose on their attachments', () => {
+    const annotations: StagedAttachment[] = [
       {
         kind: 'file',
         localId: 'image-1',
-        name: 'Reference.png',
+        label: 'Reference.png',
         mediaType: 'image/png',
         status: 'ready',
-        upload: { id: 'up-image', kind: 'image' } as UploadedChatAttachment['upload']
+        upload: { id: 'up-image', kind: 'image' } as UploadInfo
       },
       {
         kind: 'drawing',
         purpose: 'annotation',
         localId: 'annotation-1',
-        name: 'Annotation.png',
+        label: 'Annotation.png',
         mediaType: 'image/png',
-        sourceTab: 'overview',
+        source: 'overview',
         status: 'ready',
-        upload: { id: 'up-annotation', kind: 'image' } as UploadedChatAttachment['upload']
+        upload: { id: 'up-annotation', kind: 'image' } as UploadInfo
       },
       {
         kind: 'drawing',
         purpose: 'annotation',
         localId: 'annotation-2',
-        name: 'Annotation.png',
+        label: 'Annotation.png',
         mediaType: 'image/png',
-        sourceTab: 'view:roadmap',
+        source: 'view:roadmap',
         status: 'ready',
-        upload: { id: 'up-annotation-2', kind: 'image' } as UploadedChatAttachment['upload']
+        upload: { id: 'up-annotation-2', kind: 'image' } as UploadInfo
       }
     ]
 
-    expect(withAttachmentDirectives({ directives: ['Keep this concise.'] }, annotations)).toEqual({
-      directives: [
-        'Keep this concise.',
-        'Annotation attachment sources in attachment order: 2. "overview"; 3. "view:roadmap".'
-      ]
-    })
+    expect(prepareDraftAttachments(annotations).attachments).toEqual([
+      { type: 'upload', uploadId: 'up-image' },
+      { type: 'upload', uploadId: 'up-annotation', source: 'overview', purpose: 'annotation' },
+      {
+        type: 'upload',
+        uploadId: 'up-annotation-2',
+        source: 'view:roadmap',
+        purpose: 'annotation'
+      }
+    ])
   })
 
-  test('does not add composer annotation directives to applet sends', () => {
-    const annotation: ChatAttachment = {
-      kind: 'drawing',
-      purpose: 'annotation',
-      localId: 'annotation-1',
-      name: 'Annotation.png',
-      mediaType: 'image/png',
-      sourceTab: 'overview',
-      status: 'ready',
-      upload: { id: 'up-annotation', kind: 'image' } as UploadedChatAttachment['upload']
-    }
-    const options = { applet: { source: 'widget:late-orders' } }
-    expect(withAttachmentDirectives(options, [annotation])).toBe(options)
-  })
-
-  test('describes a new-view sketch at its image position', () => {
-    const sketch: ChatAttachment = {
+  test('keeps a new-view sketch purpose with its upload', () => {
+    const sketch: StagedAttachment = {
       kind: 'drawing',
       purpose: 'sketch',
       localId: 'sketch-1',
-      name: 'Sketch.png',
+      label: 'Sketch.png',
       mediaType: 'image/png',
-      sourceTab: 'view-builder:draft-1',
+      source: 'view-builder:draft-1',
       status: 'ready',
-      upload: { id: 'up-sketch', kind: 'image' } as UploadedChatAttachment['upload']
+      upload: { id: 'up-sketch', kind: 'image' } as UploadInfo
     }
 
-    expect(withAttachmentDirectives(undefined, [sketch])).toEqual({
-      directives: [
-        'Sketch attachment sources in attachment order: 1. "view-builder:draft-1". Each sketch shows the intended layout of a new view.'
-      ]
-    })
+    expect(prepareDraftAttachments([sketch]).attachments).toEqual([
+      {
+        type: 'upload',
+        uploadId: 'up-sketch',
+        source: 'view-builder:draft-1',
+        purpose: 'sketch'
+      }
+    ])
   })
 
   test('only a composer send may clear the staged list', () => {

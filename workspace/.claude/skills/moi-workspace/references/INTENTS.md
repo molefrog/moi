@@ -65,12 +65,12 @@ on their own. Staging works while the agent is busy or unavailable.
 ### API
 
 ```ts
-type ChatAttachmentInput =
+type AttachmentInput =
   | { type: 'text'; label: string; text: string }
   | { type: 'file'; file: File; path?: never }
   | { type: 'file'; path: string; file?: never }
 
-function addChatAttachment(input: ChatAttachmentInput): void
+function addChatAttachment(input: AttachmentInput): void
 ```
 
 - Text requires a non-empty `label` (up to 120 characters) and non-blank `text` (up to 5,000
@@ -124,12 +124,12 @@ immediate send clear.
 ```ts
 function sendChatMessage(input: {
   message: string
-  attachments?: ChatAttachmentInput[]
+  attachments?: AttachmentInput[]
 }): void
 ```
 
 - `message`: required user-visible message, trimmed, non-empty, and at most 1,000 characters.
-- `attachments`: optional list of `ChatAttachmentInput` values, defined above under
+- `attachments`: optional list of `AttachmentInput` values, defined above under
   `addChatAttachment`. The same limits and snapshot behavior apply. Supplied order is preserved.
 
 ### Example

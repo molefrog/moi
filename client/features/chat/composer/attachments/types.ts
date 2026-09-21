@@ -1,4 +1,4 @@
-import type { TextAttachment, UploadInfo, WorkspaceTabId } from '@/lib/types'
+import type { AttachmentOrigin, DrawingPurpose, TextAttachment, UploadInfo } from '@/lib/types'
 
 // One composer attachment, tracked per session until the message is sent. A
 // file uploads as soon as it's added (drop/paste/pick); an annotation stays a
@@ -6,27 +6,20 @@ import type { TextAttachment, UploadInfo, WorkspaceTabId } from '@/lib/types'
 // session ends. `status` reflects that lifecycle, and `upload` holds the server
 // handle once ready. `previewUrl` is a local object URL for image thumbnails
 // (revoked on remove/clear).
-type UploadAttachmentBase = {
-  localId: string
-  name: string
+type StagedUploadFields = {
+  label: string
   mediaType: string
   previewUrl?: string
   status: 'draft' | 'uploading' | 'ready'
   upload?: UploadInfo
 }
 
-export type DrawingPurpose = 'annotation' | 'sketch'
+export type StagedAttachment = { localId: string } & (
+  | ({ kind: 'file' } & StagedUploadFields & Partial<AttachmentOrigin>)
+  | ({ kind: 'drawing'; purpose: DrawingPurpose } & StagedUploadFields & AttachmentOrigin)
+  | ({ kind: 'text' } & TextAttachment)
+)
 
-export type UploadedChatAttachment = UploadAttachmentBase &
-  (
-    | { kind: 'file'; purpose?: never; sourceTab?: never }
-    | { kind: 'drawing'; purpose: DrawingPurpose; sourceTab: WorkspaceTabId }
-  )
-
-export type ChatAttachment =
-  | UploadedChatAttachment
-  | { kind: 'text'; localId: string; name: string; attachment: TextAttachment }
-
-export type ChatAttachmentPatch = Partial<
-  Pick<UploadAttachmentBase, 'name' | 'mediaType' | 'previewUrl' | 'status' | 'upload'>
+export type StagedAttachmentPatch = Partial<
+  Pick<StagedUploadFields, 'label' | 'mediaType' | 'previewUrl' | 'status' | 'upload'>
 >

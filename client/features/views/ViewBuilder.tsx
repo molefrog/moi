@@ -50,7 +50,7 @@ export function ViewBuilder({
     active: active && builder.status === 'draft',
     builderId: builder.id,
     sessionId: builder.sessionId,
-    sourceTab: viewBuilderTabId(builder.id),
+    source: viewBuilderTabId(builder.id),
     workspaceId,
     onEditingStart,
     onContinueInChat

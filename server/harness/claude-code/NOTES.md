@@ -504,7 +504,13 @@ type Part =
   | { type: 'text'; text: string; citations?: Citation[] }
   | { type: 'reasoning'; text: string; redacted?: boolean; signature?: string }
   | { type: 'tool-call'; call: ToolCall }
-  | { type: 'file-attachment'; mediaType: string; url: string; filename?: string }
+  | {
+      type: 'file-attachment'
+      mediaType: string
+      label?: string
+      previewUrl?: string
+      path?: string
+    }
   | { type: 'source-url'; url: string; title?: string; sourceId: string }
   | { type: 'source-document'; mediaType: string; title: string; sourceId: string }
   | { type: 'data'; name: string; data: unknown } // escape hatch
