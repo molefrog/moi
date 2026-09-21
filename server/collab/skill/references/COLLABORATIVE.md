@@ -23,7 +23,6 @@ import {
   Cursors,
   PresenceField,
   Selection,
-  SyncStatus,
   useSelf,
   useOthers,
   usePresence,
@@ -57,7 +56,6 @@ deduplicates its avatar stack by `identity.id`.
 | `<Cursors>`       | Wraps a surface and displays other pointers. Accepts `children`, optional stable `surface` name and `className`.          |
 | `<PresenceField>` | Wraps a control, reports focus, and shows other editors. Required stable `target`, `children`; optional `className`.      |
 | `<Selection>`     | Shows other selections around an item. Required `target`, local `selected` boolean, and `children`; optional `className`. |
-| `<SyncStatus />`  | Connection/save status. Optional `className`. Place beside controls that change shared data.                              |
 
 ```tsx
 <Cursors surface="tasks">
@@ -70,10 +68,40 @@ deduplicates its avatar stack by `identity.id`.
 </Cursors>
 ```
 
+Wrap one element and add no styling for the outline: it hugs that element and takes its corner
+radius, whether it is an input, a card, a button, or a round avatar.
+
 Targets describe data and must be stable across people, for example `task/42/title`. Do not use
 array indices, display names, or random ids generated while rendering. Field and selection
 wrappers also anchor cursors to meaningful items. For custom controls, an element may use
 `data-collab-target="task/42"` inside `<Cursors>`.
+
+## People components
+
+Store ids in shared data, not profiles. A person is always given by id: the prop is `id` for one
+person and `ids` for several. Each component resolves the current name, face, and status itself:
+live connections first, then the workspace's people directory, which remembers everyone who has
+joined. An id nobody has used renders as "Unknown person".
+
+| Component or hook  | Props and behavior                                                                                                              |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `usePerson(id)`    | `{ id, identity, status }`. `identity` is `null` for an unknown id. `status` is `active` (a visible tab), `away`, or `offline`. |
+| `<Person />`       | Avatar and name. `id`; optional `size` (`xs` keeps one line), `avatarOnly`, `you`, `detail`, `showStatus` (true), `label`.      |
+| `<Facepile />`     | Overlapping faces then a count. `ids`; optional `max` (3), `size` (`xs`, `sm`, `md`), `showStatus` (false).                     |
+| `<Cursor />`       | One pointer with a name tag. `id`, `x`, `y` in the parent's coordinates; optional `label` (true).                               |
+| `<PresenceFrame>`  | Outline and names around `children`; hugs a single child element and takes its radius. `ids`; optional `icon`.                  |
+| `<PresenceGutter>` | A face beside the block each person is on, gliding between blocks. `people` as `{ id, target }`.                                |
+
+The green dot (`showStatus`) means the person has this workspace open in a visible tab right now.
+Away people (every tab hidden) and offline people have none. Every people component also accepts
+`className`.
+
+```tsx
+// Write the id, render the person.
+await tasks.set(`${id}/assignee`, self.identity.id)
+<Person id={String(tasks.entries[`${id}/assignee`])} size="xs" />
+<Facepile ids={others.map(other => other.identity.id)} />
+```
 
 Presence is advisory. A colored field does not lock it or save its value. `<Selection>` reports
 your local selection; keep `selectedId` in local React state. Multiple cursor surfaces in one
@@ -132,6 +160,7 @@ The result exposes `value`, `exists`, `loaded`, `canWrite`, `isSaving`, `error`,
 - `unknown` means a save could not be confirmed. Keep the user's draft and let them deliberately
   reapply it after reconnecting. Do not automatically replay old or offline edits.
 - Local optimistic changes may appear while `isSaving` is true. Treat `committed` as confirmation.
+- There is no built-in save indicator. Render `isSaving` and `error` where the person is editing.
 
 ```tsx
 const outcome = await title.setValue(draft)
@@ -195,7 +224,7 @@ errors. Put it in a view source file and rebuild with `moi bundle`.
 
 ```tsx
 import { useState } from 'react'
-import { Activity, Cursors, PresenceField, SyncStatus, useSharedStore } from 'moi/collab'
+import { Activity, Cursors, PresenceField, useSharedStore } from 'moi/collab'
 
 export const config = { title: 'Team tasks' }
 
@@ -225,7 +254,6 @@ export default function TeamTasks() {
       <header className="flex items-center justify-between gap-3">
         <h1>Team tasks</h1>
         <Activity />
-        <SyncStatus />
       </header>
       <form
         className="flex gap-2"

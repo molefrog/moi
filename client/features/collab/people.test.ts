@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 
 import type { CollabParticipant } from '@/lib/collab/types'
 
-import { groupPeople } from './people'
+import { groupPeople, resolvePerson } from './people'
 
 const ada = { id: 'ada', name: 'Ada', color: '#f59e0b' }
 const ken = { id: 'ken', name: 'Ken', color: '#3b82f6' }
@@ -40,4 +40,31 @@ test('a person whose tabs are all hidden has no pages, and the local user appear
     { identity: ada, self: true, pages: [] },
     { identity: ken, self: false, pages: [] }
   ])
+})
+test('a person resolves from live connections, then the directory, then the local profile', () => {
+  const stale = { ...ken, name: 'Old Ken' }
+  const source = {
+    participants: [connection('c1', ken, 'view:board'), connection('c2', ada, null)],
+    people: { ken: stale, fig: { id: 'fig', name: 'Fig', color: '#10b981' } }
+  }
+  expect(resolvePerson(source, null, 'ken')).toEqual({ id: 'ken', identity: ken, status: 'active' })
+  expect(resolvePerson(source, null, 'ada').status).toBe('away')
+  expect(resolvePerson(source, null, 'fig')).toEqual({
+    id: 'fig',
+    identity: source.people.fig,
+    status: 'offline'
+  })
+  expect(resolvePerson(source, null, 'nobody')).toEqual({
+    id: 'nobody',
+    identity: null,
+    status: 'offline'
+  })
+  const me = { id: 'me', name: 'Me', color: '#8b5cf6' }
+  expect(resolvePerson(source, me, 'me').identity).toEqual(me)
+  // Once Ken disconnects, the directory's copy of him answers.
+  expect(resolvePerson({ ...source, participants: [] }, null, 'ken')).toEqual({
+    id: 'ken',
+    identity: stale,
+    status: 'offline'
+  })
 })

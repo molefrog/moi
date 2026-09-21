@@ -10,6 +10,7 @@ function api() {
 }
 export function useSelf(...args) { return api().useSelf(...args); }
 export function useOthers(...args) { return api().useOthers(...args); }
+export function usePerson(...args) { return api().usePerson(...args); }
 export function usePresence(...args) { return api().usePresence(...args); }
 export function useSharedState(...args) { return api().useSharedState(...args); }
 export function useSharedStore(...args) { return api().useSharedStore(...args); }
@@ -17,5 +18,9 @@ export function Cursors(props) { return createElement(api().Cursors, props); }
 export function Activity(props) { return createElement(api().Activity, props); }
 export function PresenceField(props) { return createElement(api().PresenceField, props); }
 export function Selection(props) { return createElement(api().Selection, props); }
-export function SyncStatus(props) { return createElement(api().SyncStatus, props); }
+export function Person(props) { return createElement(api().Person, props); }
+export function Facepile(props) { return createElement(api().Facepile, props); }
+export function Cursor(props) { return createElement(api().Cursor, props); }
+export function PresenceFrame(props) { return createElement(api().PresenceFrame, props); }
+export function PresenceGutter(props) { return createElement(api().PresenceGutter, props); }
 `

@@ -80,6 +80,58 @@ declare module 'moi/collab' {
     className?: string
   }
   export function Selection(props: SelectionProps): ReactElement
-  export type SyncStatusProps = { className?: string }
-  export function SyncStatus(props: SyncStatusProps): ReactElement
+
+  // People components. Store ids in shared data, not profiles: a person is
+  // always given by id (`id`, or `ids` for several) and resolves to the current
+  // name, face, and status through the workspace, including people who have left.
+  export type PersonStatus = 'active' | 'away' | 'offline'
+  export function usePerson(id: string): {
+    id: string
+    identity: CollabIdentity | null
+    status: PersonStatus
+  }
+  export type PersonSize = 'xs' | 'sm' | 'md' | 'lg'
+  export type PersonProps = {
+    id: string
+    size?: PersonSize
+    avatarOnly?: boolean
+    you?: boolean
+    detail?: ReactNode
+    // The green dot: this person has the workspace open in a visible tab now.
+    showStatus?: boolean
+    label?: string
+    className?: string
+  }
+  export function Person(props: PersonProps): ReactElement
+  export type FacepileProps = {
+    ids: string[]
+    max?: number
+    size?: 'xs' | 'sm' | 'md'
+    showStatus?: boolean
+    className?: string
+  }
+  export function Facepile(props: FacepileProps): ReactElement
+  export type CursorProps = {
+    id: string
+    x?: number
+    y?: number
+    label?: boolean
+    className?: string
+  }
+  export function Cursor(props: CursorProps): ReactElement
+  // Wraps anything: the frame hugs a single child element and takes its radius.
+  export type PresenceFrameProps = {
+    ids: string[]
+    icon?: ReactNode
+    children: ReactNode
+    className?: string
+  }
+  export function PresenceFrame(props: PresenceFrameProps): ReactElement
+  export type GutterPerson = { id: string; target: string }
+  export type PresenceGutterProps = {
+    people: GutterPerson[]
+    children: ReactNode
+    className?: string
+  }
+  export function PresenceGutter(props: PresenceGutterProps): ReactElement
 }

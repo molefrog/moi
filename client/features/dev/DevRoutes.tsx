@@ -13,6 +13,9 @@ import { UiComponentsPage } from './UiComponentsPage'
 // (and its dependencies) lives in this folder and loads as one lazy chunk —
 // see the dynamic import in AppRouter. /dev itself is the index; list new
 // routes there too.
+const DevCollabKitPage = lazy(() =>
+  import('../collab/DevCollabKitPage').then(module => ({ default: module.DevCollabKitPage }))
+)
 const DevCollabPage = lazy(() =>
   import('../collab/DevCollabPage').then(module => ({ default: module.DevCollabPage }))
 )
@@ -20,6 +23,11 @@ const DevCollabPage = lazy(() =>
 export default function DevRoutes() {
   return (
     <Switch>
+      <Route path="/dev/collab-kit">
+        <Suspense fallback={null}>
+          <DevCollabKitPage />
+        </Suspense>
+      </Route>
       <Route path="/dev/collab">
         <Suspense fallback={null}>
           <DevCollabPage />

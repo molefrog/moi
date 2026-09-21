@@ -1,26 +1,17 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import type { FocusEvent, PointerEvent, ReactNode, RefObject } from 'react'
 
-import {
-  IconCheck,
-  IconCloudOff,
-  IconCursorText,
-  IconPointer,
-  IconRefresh
-} from '@tabler/icons-react'
+import { IconCursorText, IconPointer } from '@tabler/icons-react'
 
 import { cn } from '@/client/lib/cn'
-import {
-  Avatar,
-  AvatarBadge,
-  AvatarFallback,
-  AvatarGroup,
-  AvatarImage
-} from '@/ui-components/avatar'
-import type { CollabIdentity, CollabJsonValue, CollabParticipant } from '@/lib/collab/types'
+import type { CollabJsonValue, CollabParticipant } from '@/lib/collab/types'
 
-import { facehashDataUrl } from './facehash-avatar'
-import { useConnection, useOthers, usePresenceChannel, useSelf } from './hooks'
+import { presenceChannels, useOthers, usePresenceChannel, useSelf } from './hooks'
+import { Cursor, Facepile, PresenceFrame } from './primitives'
+
+// Connected collab components: the primitives from primitives.tsx fed by the
+// workspace connection and the current applet's presence.
+export { Cursor, Facepile, Person, PresenceFrame, PresenceGutter } from './primitives'
 
 export function uniqueParticipants(participants: CollabParticipant[]): CollabParticipant[] {
   return [
@@ -28,80 +19,17 @@ export function uniqueParticipants(participants: CollabParticipant[]): CollabPar
   ]
 }
 
-export type ParticipantAvatarProps = {
-  identity: CollabIdentity
-  size?: 'sm' | 'default' | 'lg'
-  // Marks a person whose browser tab is visible right now.
-  active?: boolean
-  label?: string
-  className?: string
-}
-export function ParticipantAvatar({
-  identity,
-  size = 'sm',
-  active = false,
-  label = identity.name,
-  className
-}: ParticipantAvatarProps) {
-  // An identity without a picture gets the same generated face on every
-  // client, so nobody shows up as bare initials.
-  const face = useMemo(
-    () => identity.avatar ?? facehashDataUrl(identity.name, identity.color),
-    [identity.avatar, identity.name, identity.color]
-  )
-  return (
-    <Avatar size={size} title={label} aria-label={label} className={className}>
-      {face && <AvatarImage src={face} alt="" />}
-      <AvatarFallback>{identity.name.trim().slice(0, 2).toUpperCase()}</AvatarFallback>
-      {active && <AvatarBadge className="bg-success" />}
-    </Avatar>
-  )
-}
-
 export type ActivityProps = { scope?: 'page' | 'workspace'; className?: string }
 export function Activity({ scope = 'page', className }: ActivityProps) {
   const others = useOthers({ scope })
   const self = useSelf()
-  const participants = uniqueParticipants(self ? [self, ...others] : others)
+  const participants = self ? [self, ...others] : others
   return (
-    <AvatarGroup className={className} aria-label={`${participants.length} people online`}>
-      {participants.map(participant => (
-        <ParticipantAvatar key={participant.identity.id} identity={participant.identity} />
-      ))}
-    </AvatarGroup>
-  )
-}
-
-export type SyncStatusProps = { className?: string }
-export function SyncStatus({ className }: SyncStatusProps) {
-  const state = useConnection()
-  const message =
-    state.error ??
-    (state.status === 'connecting'
-      ? 'Connecting…'
-      : state.status === 'disconnected'
-        ? 'Disconnected'
-        : state.pendingCount
-          ? 'Saving…'
-          : 'Saved')
-  const Icon =
-    state.error || state.status === 'disconnected'
-      ? IconCloudOff
-      : state.status === 'connecting' || state.pendingCount
-        ? IconRefresh
-        : IconCheck
-  return (
-    <span
-      role="status"
-      className={cn(
-        'inline-flex items-center gap-1.5 text-xs text-muted-foreground',
-        state.error && 'text-destructive',
-        className
-      )}
-    >
-      <Icon size={12} stroke={1.75} />
-      {message}
-    </span>
+    <Facepile
+      ids={participants.map(participant => participant.identity.id)}
+      max={participants.length}
+      className={className}
+    />
   )
 }
 
@@ -121,7 +49,7 @@ function pointerPosition(value: CollabJsonValue): PointerPosition | null {
 export type CursorsProps = { surface?: string; children: ReactNode; className?: string }
 export function Cursors({ surface = 'default', children, className }: CursorsProps) {
   const root = useRef<HTMLDivElement>(null)
-  const cursor = usePresenceChannel<CollabJsonValue>(`cursor:${surface}`, null)
+  const cursor = usePresenceChannel<CollabJsonValue>(presenceChannels.cursor(surface), null)
   const move = (event: PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'touch') return
     const element = root.current
@@ -161,7 +89,7 @@ export function Cursors({ surface = 'default', children, className }: CursorsPro
               key={participant.connectionId}
               root={root}
               point={point}
-              identity={participant.identity}
+              id={participant.identity.id}
             />
           ) : null
         })}
@@ -173,17 +101,17 @@ export function Cursors({ surface = 'default', children, className }: CursorsPro
 type RemoteCursorProps = {
   root: RefObject<HTMLDivElement | null>
   point: PointerPosition
-  identity: CollabIdentity
+  id: string
 }
-function RemoteCursor({ root, point, identity }: RemoteCursorProps) {
-  const marker = useRef<HTMLDivElement>(null)
+// Anchored points follow their target element through scrolling and layout
+// changes, so the position is applied to the node directly rather than
+// re-rendered on every scroll event.
+function RemoteCursor({ root, point, id }: RemoteCursorProps) {
+  const marker = useRef<HTMLSpanElement>(null)
   useLayoutEffect(() => {
     const element = root.current
     const node = marker.current
     if (!element || !node) return
-    // Dynamic identity colors and pointer geometry are data, applied to this
-    // overlay's DOM node instead of adding arbitrary applet stylesheet rules.
-    node.style.setProperty('--collab-color', identity.color)
     const position = () => {
       let x = point.x - element.scrollLeft
       let y = point.y - element.scrollTop
@@ -213,67 +141,32 @@ function RemoteCursor({ root, point, identity }: RemoteCursorProps) {
       element.removeEventListener('scroll', position, true)
       window.removeEventListener('resize', position)
     }
-  }, [root, point, identity.color])
-  return (
-    <div
-      ref={marker}
-      className="absolute top-0 left-0 flex items-start gap-1 text-(--collab-color)"
-    >
-      <IconPointer size={16} stroke={1.75} />
-      <span className="mt-3 rounded bg-background px-1.5 py-0.5 text-xs shadow-sm">
-        {identity.name}
-      </span>
-    </div>
-  )
+  }, [root, point])
+  return <Cursor ref={marker} id={id} />
 }
 
 type PresenceOutlineProps = {
   people: CollabParticipant[]
+  icon: ReactNode
   children: ReactNode
   target: string
   className?: string
   onFocusCapture?: (event: FocusEvent<HTMLDivElement>) => void
   onBlurCapture?: (event: FocusEvent<HTMLDivElement>) => void
 }
-function PresenceOutline({
-  people,
-  children,
-  target,
-  className,
-  onFocusCapture,
-  onBlurCapture
-}: PresenceOutlineProps) {
-  const root = useRef<HTMLDivElement>(null)
-  const color = people[0]?.identity.color
-  useLayoutEffect(() => {
-    if (root.current && color) root.current.style.setProperty('--collab-color', color)
-  }, [color])
+function PresenceOutline({ people, target, ...rest }: PresenceOutlineProps) {
   return (
-    <div
-      ref={root}
+    <PresenceFrame
       data-collab-target={target}
-      className={cn('relative', className)}
-      onFocusCapture={onFocusCapture}
-      onBlurCapture={onBlurCapture}
-    >
-      {children}
-      {people.length > 0 && (
-        <div className="pointer-events-none absolute inset-0 rounded-[inherit] outline-2 outline-offset-2 outline-(--collab-color)">
-          <span className="absolute right-0 bottom-full mb-1 inline-flex max-w-full items-center gap-1 rounded bg-background px-1.5 py-0.5 text-xs text-(--collab-color) shadow-sm">
-            <IconCursorText size={12} stroke={1.75} />
-            <span className="truncate">
-              {people.map(person => person.identity.name).join(', ')}
-            </span>
-          </span>
-        </div>
-      )}
-    </div>
+      ids={people.map(person => person.identity.id)}
+      {...rest}
+    />
   )
 }
 
 export type PresenceFieldProps = { target: string; children: ReactNode; className?: string }
 export function PresenceField({ target, children, className }: PresenceFieldProps) {
-  const presence = usePresenceChannel<boolean>(`field:${target}`, false)
+  const presence = usePresenceChannel<boolean>(presenceChannels.field(target), false)
   const people = useMemo(
     () =>
       uniqueParticipants(
@@ -285,6 +178,7 @@ export function PresenceField({ target, children, className }: PresenceFieldProp
     <PresenceOutline
       target={target}
       people={people}
+      icon={<IconCursorText size={12} stroke={1.75} />}
       className={className}
       onFocusCapture={() => presence.setValue(true)}
       onBlurCapture={event => {
@@ -304,7 +198,10 @@ export type SelectionProps = {
   className?: string
 }
 export function Selection({ target, selected, children, className }: SelectionProps) {
-  const { setValue, others } = usePresenceChannel<boolean>(`selection:${target}`, selected)
+  const { setValue, others } = usePresenceChannel<boolean>(
+    presenceChannels.selection(target),
+    selected
+  )
   useEffect(() => setValue(selected), [selected, setValue])
   const people = useMemo(
     () =>
@@ -314,7 +211,12 @@ export function Selection({ target, selected, children, className }: SelectionPr
     [others]
   )
   return (
-    <PresenceOutline target={target} people={people} className={className}>
+    <PresenceOutline
+      target={target}
+      people={people}
+      icon={<IconPointer size={12} stroke={1.75} />}
+      className={className}
+    >
       {children}
     </PresenceOutline>
   )

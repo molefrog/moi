@@ -13,11 +13,19 @@ import { COLLAB_REFERENCE_SOURCE_PATH, installCollabSkill, removeCollabSkill } f
 
 type ActualHooks = Pick<
   typeof Hooks,
-  'useSelf' | 'useOthers' | 'usePresence' | 'useSharedState' | 'useSharedStore'
+  'useSelf' | 'useOthers' | 'usePerson' | 'usePresence' | 'useSharedState' | 'useSharedStore'
 >
 type ActualComponents = Pick<
   typeof Components,
-  'Activity' | 'Cursors' | 'PresenceField' | 'Selection' | 'SyncStatus'
+  | 'Activity'
+  | 'Cursor'
+  | 'Cursors'
+  | 'Facepile'
+  | 'Person'
+  | 'PresenceField'
+  | 'PresenceFrame'
+  | 'PresenceGutter'
+  | 'Selection'
 >
 // This assignment is checked by tsc without importing React into the server.
 const declarationsMatch: ActualHooks & ActualComponents extends typeof CollabApi ? true : false =

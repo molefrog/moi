@@ -23,12 +23,12 @@ import type { WorkspaceTabId } from '@/lib/types'
 import { parseWorkspaceTab } from '@/lib/workspace-tabs'
 import { Avatar, AvatarFallback } from '@/ui-components/avatar'
 
-import { ParticipantAvatar } from './components'
+import { Person } from './primitives'
 import type { CollabTabInfo } from './entry'
 import { pageFromPath, useConnection } from './hooks'
 import { getIdentity, getIdentitySource, shareWorkspace, subscribeIdentityStore } from './identity'
 import { groupPeople } from './people'
-import type { Person } from './people'
+import type { PresentPerson } from './people'
 
 type DescribeTab = (tab: WorkspaceTabId) => CollabTabInfo | null
 
@@ -93,8 +93,10 @@ export function WorkspaceCollabControls({
             }
           >
             {self && (
-              <ParticipantAvatar
-                identity={self.identity}
+              <Person
+                avatarOnly
+                id={self.identity.id}
+                showStatus={false}
                 label={`${self.identity.name} (you)`}
                 className="ring-2 ring-background"
               />
@@ -106,7 +108,7 @@ export function WorkspaceCollabControls({
           <PopoverTitle className="sr-only">People in this workspace</PopoverTitle>
           {self && (
             <div className="flex items-center gap-3 px-2 pt-1">
-              <ParticipantAvatar identity={self.identity} size="lg" />
+              <Person avatarOnly id={self.identity.id} size="lg" showStatus={false} />
               <span className="min-w-0 flex-1 truncate text-sm font-medium">
                 {self.identity.name}{' '}
                 <span className="font-normal text-muted-foreground">(you)</span>
@@ -148,7 +150,7 @@ export function WorkspaceCollabControls({
 
 type Place = { where: string; Icon?: TabIcon; target: WorkspaceTabId | null; away: boolean }
 
-function placeOf(person: Person, page: string, describeTab: DescribeTab): Place {
+function placeOf(person: PresentPerson, page: string, describeTab: DescribeTab): Place {
   const tabs = person.pages.map(candidate => {
     const tab = parseWorkspaceTab(candidate)
     return { tab, info: tab ? describeTab(tab) : null }
@@ -167,7 +169,7 @@ function placeOf(person: Person, page: string, describeTab: DescribeTab): Place 
 
 // A face in the header stack: hover names the person and where they are,
 // and a click opens the tab they are on.
-type FaceProps = { person: Person; place: Place; onJump: (tab: WorkspaceTabId) => void }
+type FaceProps = { person: PresentPerson; place: Place; onJump: (tab: WorkspaceTabId) => void }
 function Face({ person, place, onJump }: FaceProps) {
   const target = place.target
   const hint = place.away
@@ -190,7 +192,12 @@ function Face({ person, place, onJump }: FaceProps) {
           )
         }
       >
-        <ParticipantAvatar identity={person.identity} className="ring-2 ring-background" />
+        <Person
+          avatarOnly
+          id={person.identity.id}
+          showStatus={false}
+          className="ring-2 ring-background"
+        />
       </TooltipTrigger>
       <TooltipContent side="bottom">
         <span className="flex flex-col">
@@ -202,12 +209,12 @@ function Face({ person, place, onJump }: FaceProps) {
   )
 }
 
-type PersonRowProps = { person: Person; place: Place; onJump: (tab: WorkspaceTabId) => void }
+type PersonRowProps = { person: PresentPerson; place: Place; onJump: (tab: WorkspaceTabId) => void }
 function PersonRow({ person, place, onJump }: PersonRowProps) {
-  const { Icon, where, away, target } = place
+  const { Icon, where, target } = place
   const content = (
     <>
-      <ParticipantAvatar identity={person.identity} size="default" active={!away} />
+      <Person avatarOnly id={person.identity.id} size="md" />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-sm">{person.identity.name}</span>
         <span className="flex items-center gap-1 text-xs text-muted-foreground">

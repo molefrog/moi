@@ -299,7 +299,7 @@ export function AvatarGroupCountIconExample() {
 
 ## Sizes
 
-Use the `size` prop to change the size of the avatar.
+Use the `size` prop to change the size of the avatar. `xs` is 20px for dense lists and inline mentions.
 
 ```tsx
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -445,10 +445,10 @@ export function AvatarRtl() {
 
 The `Avatar` component is the root component that wraps the avatar image and fallback.
 
-| Prop        | Type                        | Default     |
-| ----------- | --------------------------- | ----------- |
-| `size`      | `"default" \| "sm" \| "lg"` | `"default"` |
-| `className` | `string`                    | -           |
+| Prop        | Type                                | Default     |
+| ----------- | ----------------------------------- | ----------- |
+| `size`      | `"default" \| "sm" \| "lg" \| "xs"` | `"default"` |
+| `className` | `string`                            | -           |
 
 ### AvatarImage
 
