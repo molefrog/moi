@@ -116,7 +116,7 @@ function ViewItem({ view, Icon, onOpen }: ViewItemProps) {
         onClick={onOpen}
         className="group flex w-20 cursor-pointer flex-col items-center gap-2 text-sm text-foreground"
       >
-        <div className="size-16 rounded-2xl transition-shadow duration-300 ease-out squircle group-hover:shadow-2xl group-hover/item:shadow-2xl">
+        <div className="size-16 rounded-2xl transition-shadow duration-300 ease-out squircle group-hover:shadow-xl group-hover/item:shadow-xl">
           <div
             data-vivid
             className="flex size-full items-center justify-center rounded-2xl bg-primary text-primary-foreground inset-shadow-[0_0_10px_color-mix(in_oklab,var(--color-white)_30%,transparent)] squircle"
@@ -150,7 +150,7 @@ function ViewItem({ view, Icon, onOpen }: ViewItemProps) {
                 variant="outline"
                 size="icon-xs"
                 aria-label={`View actions for ${label}`}
-                className="absolute -top-1 right-1 border-0 opacity-0 shadow-xs transition-opacity group-hover/item:opacity-100 group-hover/item:delay-500 focus-visible:opacity-100 data-popup-open:opacity-100"
+                className="absolute -top-1 right-1 border-0 opacity-0 shadow-xs transition-opacity group-hover/item:opacity-100 group-hover/item:delay-400 focus-visible:opacity-100 data-popup-open:opacity-100"
               >
                 <IconDots stroke={1.75} />
               </Button>

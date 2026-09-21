@@ -10,7 +10,7 @@ export function SettingsPage({ title, description, children }: SettingsPageProps
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-0.5">
-        <h2 className="text-lg font-medium tracking-tight">{title}</h2>
+        <h2 className="text-lg font-medium">{title}</h2>
         {description && <p className="text-sm text-muted-foreground">{description}</p>}
       </header>
       {children}
@@ -27,7 +27,7 @@ export function SettingsSection({ label, children }: SettingsSectionProps) {
   return (
     <section className="flex flex-col gap-2">
       {label && <p className="px-0.5 text-xs font-medium text-muted-foreground">{label}</p>}
-      <div className="flex flex-col divide-y divide-dashed divide-border overflow-hidden rounded-xl border bg-background text-foreground">
+      <div className="flex flex-col divide-y divide-dashed divide-border overflow-hidden rounded-xl border">
         {children}
       </div>
     </section>

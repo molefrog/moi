@@ -12,7 +12,10 @@ import {
 } from '@tabler/icons-react'
 
 import { useAppletThumbnails } from '@/client/features/applets/applet-thumbnail'
-import { WorkspaceSettings } from '@/client/features/settings/WorkspaceSettings'
+import {
+  WorkspaceSettingsDialog,
+  WorkspaceSettingsDialogTrigger
+} from '@/client/features/settings/WorkspaceSettingsDialog'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
 import { renderDefaultWidget } from '@/client/features/overview/default/registry'
 import { findWidgetPosition, updateStoredGridPositions } from '@/client/features/overview/grid'
@@ -139,9 +142,11 @@ function OverviewHeader({
           active={theming}
           onClick={() => onThemingChange(!theming)}
         />
-        <WorkspaceSettings
-          renderTrigger={() => <OverviewHeaderAction Icon={IconSettings} label="Settings" />}
-        />
+        <WorkspaceSettingsDialog>
+          <WorkspaceSettingsDialogTrigger
+            render={<OverviewHeaderAction Icon={IconSettings} label="Settings" />}
+          />
+        </WorkspaceSettingsDialog>
       </div>
     </div>
   )

@@ -24,6 +24,7 @@ export const APP_ICON_IDS = [
   'plug',
   'tool',
   'settings',
+  'dots',
   'bug',
   'activity',
   'chart',

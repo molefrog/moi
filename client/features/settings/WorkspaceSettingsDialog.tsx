@@ -1,13 +1,15 @@
-import { type ReactElement, useState } from 'react'
+import { type ReactNode, useState } from 'react'
 
 import { IconKey, IconPlugConnected, IconSettings } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/client/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/client/components/ui/dialog'
 
 import { ConnectorsSettings } from './ConnectorsSettings'
 import { EnvironmentSettings } from './EnvironmentSettings'
 import { GeneralSettings } from './GeneralSettings'
+
+export { DialogTrigger as WorkspaceSettingsDialogTrigger } from '@/client/components/ui/dialog'
 
 type SettingsNav = 'general' | 'connectors' | 'environment'
 
@@ -17,25 +19,23 @@ const NAV: { id: SettingsNav; label: string; icon: typeof IconSettings }[] = [
   { id: 'environment', label: 'Environment', icon: IconKey }
 ]
 
-type WorkspaceSettingsProps = {
-  renderTrigger: () => ReactElement
+type WorkspaceSettingsDialogProps = {
+  children: ReactNode
 }
 
-export function WorkspaceSettings({ renderTrigger }: WorkspaceSettingsProps) {
+export function WorkspaceSettingsDialog({ children }: WorkspaceSettingsDialogProps) {
   const [page, setPage] = useState<SettingsNav>('general')
 
   return (
     <Dialog>
-      <DialogTrigger render={renderTrigger()} />
+      {children}
       <DialogContent className="flex h-[min(680px,90vh)] w-[880px] gap-0 overflow-hidden p-0 sm:max-w-[94vw]">
         <DialogTitle className="sr-only">Space settings</DialogTitle>
 
         {/* Sidebar nav — top padding lines the "Settings" label up with the
             page title across the divider. */}
-        <nav className="flex w-48 shrink-0 flex-col gap-0.5 border-r border-border bg-muted/30 p-3">
-          <p className="px-2.5 pt-4 pb-2 text-[11px] font-semibold tracking-wider text-muted-foreground/80 uppercase">
-            Settings
-          </p>
+        <nav className="flex w-48 shrink-0 flex-col gap-0.5 border-r bg-muted p-3">
+          <p className="px-2.5 pt-4 pb-2 text-xs text-muted-foreground">Settings</p>
           {NAV.map(item => (
             <Button
               key={item.id}

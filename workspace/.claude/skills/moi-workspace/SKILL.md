@@ -100,12 +100,12 @@ with the repo — commit them as-is, just never hand-edit them. Your surface is 
 ### Using the moi CLI
 
 Treat `moi` as an external command — you cannot inspect or modify its sources. Use only the
-documented subcommands (`moi bundle`, `moi bundle --force`, etc.). Call `moi help` for
+documented subcommands (`moi bundle`, `moi bundle --force`, etc.). Call `moi --help` for
 documentation. Run all `moi` commands from the **project root** — the folder that contains `.moi/`,
 never from inside `.moi/` itself. You don't pass paths; moi resolves the workspace from where it's run.
 
 Use the task-specific sections below for workflow guidance. The CLI will grow over time, so run
-`moi help` to discover commands and `<command> --help` before using an unfamiliar command or option.
+`moi --help` to discover commands and `moi <command> --help` before using an unfamiliar command or option.
 
 - **Develop applets:** `moi check`, `moi bundle`, and `moi refresh`.
 - **Call actions:** `moi call-server-fn`.

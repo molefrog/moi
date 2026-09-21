@@ -126,6 +126,7 @@ import {
   InputGroupText
 } from '@/ui-components/input-group'
 import { Input } from '@/ui-components/input'
+import { Kbd, KbdGroup } from '@/ui-components/kbd'
 import { Label } from '@/ui-components/label'
 import {
   Pagination,
@@ -544,6 +545,25 @@ function InputGroupPreview() {
   )
 }
 
+function KbdPreview() {
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <Kbd>Esc</Kbd>
+      <KbdGroup aria-label="Command Shift K">
+        <Kbd>⌘</Kbd>
+        <Kbd>⇧</Kbd>
+        <Kbd>K</Kbd>
+      </KbdGroup>
+      <Button variant="outline">
+        Accept{' '}
+        <Kbd data-icon="inline-end" className="translate-x-0.5">
+          ⏎
+        </Kbd>
+      </Button>
+    </div>
+  )
+}
+
 function LabelPreview() {
   return (
     <div className="flex items-center gap-2">
@@ -813,6 +833,7 @@ export const UI_COMPONENT_PREVIEWS = {
   'hover-card': HoverCardPreview,
   input: InputPreview,
   'input-group': InputGroupPreview,
+  kbd: KbdPreview,
   label: LabelPreview,
   pagination: PaginationPreview,
   popover: PopoverPreview,

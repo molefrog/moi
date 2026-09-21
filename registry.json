@@ -378,6 +378,19 @@
       "description": "Input with attached addons, buttons, or icons"
     },
     {
+      "name": "kbd",
+      "type": "registry:ui",
+      "registryDependencies": ["molefrog/moi/utils"],
+      "files": [
+        {
+          "path": "ui-components/kbd.tsx",
+          "type": "registry:ui"
+        }
+      ],
+      "title": "Kbd",
+      "description": "Keyboard keys and shortcut combinations"
+    },
+    {
       "name": "label",
       "type": "registry:ui",
       "registryDependencies": ["molefrog/moi/utils"],

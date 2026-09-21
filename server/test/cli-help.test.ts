@@ -29,7 +29,7 @@ async function runHelp(
   const proc = Bun.spawn(['bun', CLI, ...(command ? [command] : []), '--help'], {
     stdin: 'ignore',
     stdout: 'pipe',
-    stderr: 'ignore',
+    stderr: 'pipe',
     // Clear every marker first (this test itself runs under an agent), then
     // apply the case's patch.
     env: {
@@ -39,7 +39,13 @@ async function runHelp(
       ...envPatch
     }
   })
-  const [out] = await Promise.all([new Response(proc.stdout).text(), proc.exited])
+  const [out, err, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited
+  ])
+  expect(err).toBe('')
+  expect(exitCode).toBe(0)
   return out
 }
 

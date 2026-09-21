@@ -7,7 +7,9 @@ import {
   IconBrowserPlus,
   IconLayout2,
   IconLayoutSidebarRight,
+  IconLetterCase,
   IconMessages,
+  IconSettings,
   IconSketching
 } from '@tabler/icons-react'
 
@@ -23,12 +25,23 @@ import { Overview } from '@/client/features/overview/Overview'
 import { PanelHeader } from '@/client/components/shared/PanelHeader'
 import { WorkspaceIcon } from '@/client/components/shared/WorkspaceIcon'
 import { Button } from '@/client/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/client/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import {
   useAppletChatMessage,
   useAppletChatAttachment
 } from '@/client/features/chat/applet-chat-intents'
 import { useChat } from '@/client/features/chat/useChat'
+import {
+  WorkspaceSettingsDialog,
+  WorkspaceSettingsDialogTrigger
+} from '@/client/features/settings/WorkspaceSettingsDialog'
 import { ViewBuilder, type ViewBuilderHandle } from '@/client/features/views/ViewBuilder'
 import { ViewManager } from '@/client/features/views/ViewManager'
 import { getViewIcon, getViewLabel } from '@/client/features/views/view-presentation'
@@ -159,8 +172,54 @@ function applyVisibleTabOrder(
   return open.map(tab => (visibleSet.has(tab) ? orderedVisible[cursor++] : tab))
 }
 
+type WorkspaceMenuProps = {
+  onOpenTheme: () => void
+}
+
+function WorkspaceMenu({ onOpenTheme }: WorkspaceMenuProps) {
+  const { layout, name, provider } = useWorkspaceLayoutCtx()
+  const [iconHovered, setIconHovered] = useState(false)
+
+  return (
+    <WorkspaceSettingsDialog>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          className="flex min-w-0 cursor-pointer items-center gap-2 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          aria-label={`${name ?? 'Workspace'} menu`}
+          onPointerEnter={() => setIconHovered(true)}
+          onPointerLeave={() => setIconHovered(false)}
+        >
+          <WorkspaceIcon
+            icon={iconHovered ? { ...layout.icon, type: 'glyph', value: 'dots' } : layout.icon}
+            workspaceType={provider}
+            workspaceTheme={layout.theme}
+            className="size-5 rounded-sm"
+          />
+          {name && <span className="truncate text-sm font-medium text-foreground">{name}</span>}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" sideOffset={6} className="w-36">
+          <DropdownMenuGroup>
+            <DropdownMenuItem onClick={onOpenTheme}>
+              <IconLetterCase stroke={1.75} />
+              Theme
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              nativeButton
+              render={<WorkspaceSettingsDialogTrigger />}
+              className="w-full"
+            >
+              <IconSettings stroke={1.75} />
+              Settings
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </WorkspaceSettingsDialog>
+  )
+}
+
 export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenProps) {
-  const { layout, setLayout, name, provider, workspaceId } = useWorkspaceLayoutCtx()
+  const { layout, setLayout, workspaceId } = useWorkspaceLayoutCtx()
   const theme = resolveWorkspaceTheme(layout.theme)
   const builderActions = useViewBuilderActions()
   const {
@@ -670,22 +729,12 @@ export function WorkspaceScreen({ widgets, views, builders }: WorkspaceScreenPro
       </div>
 
       <AnimatePresence>
-        {activeTab === 'overview' && widgetMode === 'theming' && (
-          <ThemePanel onClose={() => setWidgetMode('idle')} />
-        )}
+        {widgetMode === 'theming' && <ThemePanel onClose={() => setWidgetMode('idle')} />}
       </AnimatePresence>
 
       <PanelHeader>
         <div className="flex min-w-0 flex-1 items-center gap-4">
-          <div className="flex items-center gap-2">
-            <WorkspaceIcon
-              icon={layout.icon}
-              workspaceType={provider}
-              workspaceTheme={layout.theme}
-              className="size-5 rounded-sm"
-            />
-            {name && <span className="truncate text-sm font-medium text-foreground">{name}</span>}
-          </div>
+          <WorkspaceMenu onOpenTheme={() => setWidgetMode('theming')} />
           <WorkspaceTabs
             tabs={tabItems}
             active={activeTab}

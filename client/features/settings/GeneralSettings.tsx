@@ -39,10 +39,10 @@ export function GeneralSettings() {
           control={
             <Input
               value={cwd ?? ''}
-              readOnly
               aria-label="Workspace path"
               title={cwd ?? undefined}
               className="w-56"
+              readOnly
             />
           }
         />
