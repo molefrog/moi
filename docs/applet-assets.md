@@ -132,7 +132,7 @@ by `moi init`:
 
 ```ts
 declare module 'moi' {
-  // required: virtual module, Bun won't type it
+  // required: build-provided module, Bun won't type it
   export function fileUrl(path: string): string
   export function navigate(href: string): void
   export function resolveHref(href: string): string
@@ -163,7 +163,7 @@ declare module '*.png' {
 - **Build** (`build-applet.ts`): asset `onLoad` plugin emits each imported image/
   font as a content-hashed sibling and rewrites the import to
   `new URL('./<name>-<hash>.<ext>', import.meta.url)`. The `mei:rpc` + `moi`
-  virtual modules bake `%%MOI_APPLET_API_BASE%%` into the rpc stub + `fileUrl`.
+  runtime modules bake `%%MOI_APPLET_API_BASE%%` into the rpc stub + `fileUrl`.
   Output is a multi-file artifact written to `.build/<kind>/<name>/` (entry
   `index.js`, `chunk-*.js`, assets). `naming.entry` must be `index.[ext]` — bun
   emits the entry's CSS sibling as an "entry" output too, so a literal `index.js`

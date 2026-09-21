@@ -1,9 +1,9 @@
 // The workspace applet runtime — the host side of the applet `moi` module.
 //
-// Every applet bundle inlines its own copy of the `moi` virtual module (see
-// MOI_MODULE_SOURCE in server/applets/build-applet.ts), so each loaded module
-// instance holds a private `bridge` slot. Right after the dynamic import, the
-// host connects that instance to the workspace's runtime by attaching a thin
+// Every applet bundle inlines its own copy of the `moi` runtime module (see
+// server/applets/runtime/moi.ts), so each loaded module instance holds a
+// private `bridge` slot. Right after the dynamic import, the host connects that
+// instance to the workspace's runtime by attaching a thin
 // bridge (`attachAppletBridge`); invalidation disposes it (`disposeAppletBridge`),
 // leaving a stale module instance — old timers, old listeners — inert instead
 // of steering the app. One runtime per workspace id.
@@ -19,7 +19,7 @@ import {
   MAX_TEXT_ATTACHMENT_CHARS,
   snapshotTextAttachment
 } from '@/lib/moi-attachments'
-import type { AttachmentInput, AttachmentOrigin } from '@/lib/types'
+import type { AppletBridge, AppletKind, AttachmentInput, AttachmentOrigin } from '@/lib/types'
 import { isWorkspaceAttachmentPath, MAX_UPLOAD_BYTES } from '@/lib/message-attachments'
 import { useEffect } from 'react'
 
@@ -29,9 +29,10 @@ import { reportAppletError } from '@/client/features/applets/applet-log'
 import { toast } from '@/client/components/ui/toast'
 import { createRateLimiter, type RateLimiter } from '@/client/lib/rate-limit'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
-import type { AppletKind } from '@/lib/types'
 import { isParamsRecord } from '@/lib/workspace-tabs'
 import { resolveWorkspaceHref } from '@/lib/navigation'
+
+export type { AppletBridge } from '@/lib/types'
 
 // Which applet a bridge belongs to, supplied by the host at attach time.
 export type AppletIdentity = { kind: AppletKind; name: string }
@@ -54,16 +55,6 @@ export type AppletEvents = {
   // A message for the workspace's active chat, sent as if the user typed
   // `message`, with attachments prepared before the send.
   sendChatMessage: (message: AppletChatMessage) => void
-}
-
-// What a bundle's `moi` module calls. Args are `unknown` on purpose: they
-// cross the trust boundary from agent-authored code, and the runtime narrows
-// them before emitting.
-export type AppletBridge = {
-  addChatAttachment: (input: unknown) => void
-  navigate: (href: unknown) => void
-  resolveHref: (href: unknown) => string
-  sendChatMessage: (input: unknown, context?: unknown) => void
 }
 
 // A message longer than this is a bug, not a chat message — it would land in
@@ -142,7 +133,7 @@ function createRuntime(workspaceId: string) {
         navigate(href) {
           if (!alive) return
           try {
-            if (typeof href !== 'string') throw new Error('Navigation requires a URL string')
+            if (typeof href !== 'string') throw new Error('Navigation needs a URL')
             resolveWorkspaceHref(workspaceId, href, base)
             emitter.emit('navigate', href)
           } catch (error) {
@@ -151,7 +142,7 @@ function createRuntime(workspaceId: string) {
         },
         resolveHref(href) {
           if (!alive) return ''
-          if (typeof href !== 'string') throw new Error('resolveHref requires a URL string')
+          if (typeof href !== 'string') throw new Error('A URL is required')
           return resolveWorkspaceHref(workspaceId, href, base)
         },
         sendChatMessage(input, legacyContext) {

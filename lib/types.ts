@@ -6,6 +6,15 @@ import type { WorkspaceTheme } from './themes'
 // A custom UI unit embedded in a workspace.
 export type AppletKind = 'view' | 'widget'
 
+// What a bundled applet's `moi` module may call on its host-attached bridge.
+// Inputs stay unknown at this trust boundary; the browser host narrows them.
+export type AppletBridge = {
+  addChatAttachment: (input: unknown) => void
+  navigate: (href: unknown) => void
+  resolveHref: (href: unknown) => string
+  sendChatMessage: (input: unknown, context?: unknown) => void
+}
+
 export type AppletInfo = {
   id: string
   // Content revision of the built bundle (`<size>-<mtime>` of index.js).

@@ -18,8 +18,9 @@ import { mkdir, readdir, rm } from 'node:fs/promises'
 import { join, resolve, sep } from 'path'
 
 import { analyzeDependencies, resolveSource, scanSources } from './dependencies'
-import { APPLET_API_BASE_SENTINEL, type AppletKind } from './build-applet'
+import type { AppletKind } from './build-applet'
 import { buildAppletsInChild } from './build-worker'
+import { APPLET_API_BASE_SENTINEL } from './runtime/base'
 import { pruneAppletThumbnails } from '../thumbnails'
 
 export { scanSources } from './dependencies'

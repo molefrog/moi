@@ -15,14 +15,6 @@ import { extractViewConfig, extractWidgetConfig } from './config'
 // canonical in lib/types; re-exported here for this pipeline's consumers.
 export type { AppletKind }
 
-// Baked into the bundle wherever a runtime URL needs the workspace's API base
-// (RPC + workspace files). The serve route string-replaces it with the real
-// `/api/workspaces/<id>` in every `.js` it returns, so the on-disk bundle stays
-// workspace-agnostic. Survives the build because we never minify — it lives as
-// a plain string literal. Assets don't use it: they self-locate via
-// `import.meta.url` (see the asset loader below).
-export const APPLET_API_BASE_SENTINEL = '%%MOI_APPLET_API_BASE%%'
-
 // Extensions an applet may `import` as a bundled asset. Each is emitted as a
 // content-hashed sibling of `index.js` and the import resolves to its URL via
 // `import.meta.url`. Deliberately images + fonts only: large media (video/audio)
@@ -37,6 +29,9 @@ const EXTERNAL_MODULES = [
   'react-dom',
   'react-dom/client'
 ]
+
+const RPC_MODULE_PATH = join(import.meta.dir, 'runtime', 'rpc.ts')
+const MOI_MODULE_PATH = join(import.meta.dir, 'runtime', 'moi.ts')
 
 type ServerModule = {
   name: string
@@ -96,79 +91,6 @@ async function validateServerExports(filePath: string): Promise<string[]> {
   return runtimeExports
 }
 
-// The mei:rpc virtual module — contains the RPC call logic with devalue
-// serialization. Bundled into the applet output once, shared by all server
-// function stubs. The base is the sentinel the serve route rewrites to
-// `/api/workspaces/<id>`, so a bundle carries no workspace id of its own.
-const RPC_MODULE_SOURCE = `
-import { stringify, parse } from "devalue";
-
-const BASE = ${JSON.stringify(APPLET_API_BASE_SENTINEL)};
-
-export function rpc(module, name) {
-  return async (...args) => {
-    const res = await fetch(BASE + "/rpc/" + module + "/" + name, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: stringify(args),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return parse(await res.text());
-  };
-}
-`
-
-// The `moi` virtual module — the applet-facing runtime API.
-//
-// `fileUrl(path)` maps a workspace-relative path to its streaming URL
-// (`/api/workspaces/<id>/fs/<path>`). Same sentinel base as RPC; the path is
-// per-segment URL-encoded so spaces / unicode in filenames survive. A leading
-// slash is stripped so both `clips/a.mp4` and `/clips/a.mp4` work.
-//
-// Navigation, href resolution, and chat intents forward to the bundle's
-// host-attached bridge. This virtual module is inlined per bundle,
-// so `bridge` is private to one applet: the host attaches it right after the
-// dynamic import and neuters it on invalidation (see
-// client/features/applets/applet-runtime.ts). Optional-chained so calls no-op
-// before attach and outside the moi host. The `__` exports are host wiring,
-// surfaced from the bundle entry below — they are deliberately NOT part of the
-// author-facing `declare module 'moi'` ambient types (server/moi-scaffold.ts).
-const MOI_MODULE_SOURCE = `
-const BASE = ${JSON.stringify(APPLET_API_BASE_SENTINEL)};
-
-let bridge = null;
-
-export function __attachBridge(next) {
-  bridge = next;
-}
-
-export function __getBridge() {
-  return bridge;
-}
-
-export function fileUrl(path) {
-  const clean = String(path).replace(/^\\/+/, "");
-  return BASE + "/fs/" + clean.split("/").map(encodeURIComponent).join("/");
-}
-
-export function navigate(href) {
-  bridge?.navigate?.(href);
-}
-
-export function resolveHref(href) {
-  return bridge?.resolveHref?.(href) ?? '';
-}
-
-export function addChatAttachment(input) {
-  bridge?.addChatAttachment?.(input);
-}
-
-// Keep positional calls working for previously built applets.
-export function sendChatMessage(input, legacyContext) {
-  bridge?.sendChatMessage?.(input, legacyContext);
-}
-`
-
 // Server modules are keyed by their path relative to the moi root
 // (`.moi/widgets/hello.server.ts` → `"widgets/hello"`), posix-normalized so
 // keys are stable across platforms. Throws when the file escapes the root.
@@ -195,8 +117,8 @@ function serverModuleKey(serverPath: string, moiRoot: string): string {
 }
 
 // The applet runtime plugin wires the three I/O transports into the bundle:
-//   • `.server` imports → RPC stubs (via the `mei:rpc` virtual module)
-//   • `moi` import      → the `fileUrl` runtime
+//   • `.server` imports → RPC stubs (via the `mei:rpc` runtime module)
+//   • `moi` import      → the applet-facing runtime module
 //   • asset imports     → content-hashed sibling files, referenced by URL
 // It returns the collected server modules (for hot-reload + env aggregation)
 // and the asset files the caller must emit next to `index.js`.
@@ -214,35 +136,17 @@ function appletRuntimePlugin(
   const plugin: BunPlugin = {
     name: 'applet-runtime',
     setup(build) {
-      // Resolve mei:rpc virtual module
-      build.onResolve({ filter: /^mei:rpc$/ }, () => ({
-        path: 'mei:rpc',
-        namespace: 'mei-rpc'
-      }))
-
-      build.onLoad({ filter: /.*/, namespace: 'mei-rpc' }, () => ({
-        contents: RPC_MODULE_SOURCE,
-        loader: 'js'
-      }))
+      build.onResolve({ filter: /^mei:rpc$/ }, () => ({ path: RPC_MODULE_PATH }))
 
       // `devalue` is moi's OWN dependency, injected into every applet bundle via
-      // the mei:rpc virtual module above. A virtual module has no on-disk
-      // location, so Bun resolves the bare `devalue` specifier against the
-      // process cwd's node_modules — which breaks when the server runs from a
-      // neutral cwd (a prebuilt/global install; see serverCwd in cli.ts). A
-      // resolveDir on the onLoad is ignored for bare specifiers in Bun 1.3, so
-      // pin it to an absolute path inside moi's OWN package (this file's dir
-      // walks up to moi's node_modules), making the applet build cwd-independent.
+      // the mei:rpc runtime above. Pin it to moi's package so applet builds stay
+      // independent of the server cwd and workspace dependencies.
       build.onResolve({ filter: /^devalue$/ }, () => ({
         path: Bun.resolveSync('devalue', import.meta.dir)
       }))
 
-      // The `moi` runtime module (fileUrl). A bare specifier, so match it exactly.
-      build.onResolve({ filter: /^moi$/ }, () => ({ path: 'moi', namespace: 'moi-runtime' }))
-      build.onLoad({ filter: /.*/, namespace: 'moi-runtime' }, () => ({
-        contents: MOI_MODULE_SOURCE,
-        loader: 'js'
-      }))
+      // The applet-facing runtime. A bare specifier, so match it exactly.
+      build.onResolve({ filter: /^moi$/ }, () => ({ path: MOI_MODULE_PATH }))
 
       // Asset imports (images/fonts): emit a content-hashed sibling and resolve
       // the import to its module-relative URL. Self-locating via import.meta.url,
