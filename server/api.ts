@@ -22,6 +22,8 @@ import type {
 import type { MoiContext } from '@/lib/moi-context'
 import { viewBuilderDirectives } from '@/lib/view-builder-directives'
 
+import { getCollabReferencePath } from './collab/config'
+import { collabRoutes } from './collab/http'
 import { agentStore } from './agent'
 import { clientAppConfig, getAppConfig } from './app-config'
 import { getAppSettings, pickAppSettingsPatch, saveAppSettings } from './app-settings'
@@ -169,6 +171,7 @@ const withWorkspace = createMiddleware<ApiEnv>(async (c, next) => {
 // ---- single workspace: /api/workspaces/:id/* --------------------------------
 const one = new Hono<ApiEnv>()
 one.use('*', withWorkspace)
+one.route('/collab', collabRoutes)
 
 one.get('/preview', async c => {
   const ws = c.get('ws')
@@ -336,7 +339,9 @@ one.post('/view-builders/:builderId/submit', async c => {
     // The bootstrap instructions ride the moi-context envelope, injected by
     // the harness like any other ambient context; the user text stays bare.
     // The user submits from the builder's own tab, so that's the active tab.
+    const collabReference = await getCollabReferencePath(ws.path, ws.type)
     const context: MoiContext = {
+      ...(collabReference ? { collabReference } : {}),
       activeTab: `view-builder:${builder.id}`,
       directives: [
         ...viewBuilderDirectives(builder.id, availableIcons),
@@ -884,13 +889,16 @@ one.delete('/icon', async c => {
 one.get('/', async c => {
   const ws = c.get('ws')
   const layout = await loadLayout(ws.path)
+  const collabReference = await getCollabReferencePath(ws.path, ws.type)
   return c.json({
     ...layout,
     // Resolved display name: the settings override, or the folder name.
     name: layout.name || basename(ws.path),
     cwd: ws.path,
     provider: ws.type,
-    agentId: ws.agentId
+    agentId: ws.agentId,
+    // Undefined is omitted from JSON and overrides stale persisted metadata.
+    collabReference
   })
 })
 

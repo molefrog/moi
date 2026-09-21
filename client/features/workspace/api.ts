@@ -10,12 +10,14 @@ import type {
   HarnessLogin,
   WorkspaceAgent,
   WorkspaceLayout,
+  WorkspaceLayoutSave,
   WorkspaceSkillsStatus,
   WorkspaceSkillsUpdateFailure,
   WorkspaceType
 } from '@/lib/types'
 
 export type WorkspaceLayoutResponse = WorkspaceLayout & {
+  collabReference?: string
   cwd: string
   name: string
   provider?: WorkspaceType
@@ -122,7 +124,7 @@ export function useUpdateWorkspaceSkills(workspaceId: string) {
 
 export function useSaveLayout(workspaceId: string) {
   const queryClient = useQueryClient()
-  return useMutation<void, Error, WorkspaceLayout>({
+  return useMutation<void, Error, WorkspaceLayoutSave>({
     mutationFn: layout =>
       requestVoid(
         `/api/workspaces/${workspaceId}`,

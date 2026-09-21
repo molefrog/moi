@@ -201,6 +201,24 @@ describe('loadLayout', () => {
       })
     })
   })
+
+  test('drops legacy collab configuration and runtime metadata when loading a workspace', async () => {
+    await withWorkspaceFile(
+      {
+        ...base,
+        experimental: { collab: true },
+        collab: { enabled: true },
+        collabReference: '/workspace/references/COLLABORATIVE.md'
+      },
+      async dir => {
+        const loaded = await loadLayout(dir)
+        expect(loaded).toEqual(base)
+        expect('experimental' in loaded).toBe(false)
+        expect('collab' in loaded).toBe(false)
+        expect('collabReference' in loaded).toBe(false)
+      }
+    )
+  })
 })
 
 describe('mergeLayoutForSave', () => {
@@ -274,6 +292,50 @@ describe('mergeLayoutForSave', () => {
       agent: 'dorito'
     })
     expect(merged.name).toBe('Keep')
+  })
+
+  test('a layout save omitting tabs preserves newer authored tabs', () => {
+    const existing: WorkspaceLayout = {
+      ...base,
+      tabs: { open: ['overview', 'view:board'], active: 'view:board' }
+    }
+    // This client loaded base before another client changed the workspace tabs.
+    const { tabs: _staleTabs, ...body } = base
+    const merged = mergeLayoutForSave(existing, {
+      ...body,
+      widgetGrid: [{ i: 'w', x: 2, y: 3 }]
+    })
+    expect(merged.tabs).toEqual(existing.tabs)
+    expect(merged.widgetGrid).toEqual([{ i: 'w', x: 2, y: 3 }])
+  })
+
+  test('explicit undefined tabs have the same effect as an omitted JSON field', () => {
+    const { tabs: _tabs, ...body } = base
+    expect(mergeLayoutForSave(base, { ...body, tabs: undefined }).tabs).toEqual(base.tabs)
+  })
+
+  test('an explicit tab update still changes authored defaults after an unrelated save', () => {
+    const { tabs: _tabs, ...body } = base
+    const saved = mergeLayoutForSave(base, { ...body, layoutMode: 'split' })
+    const tabs: WorkspaceLayout['tabs'] = { open: ['overview', 'agent'], active: 'agent' }
+    expect(mergeLayoutForSave(saved, { ...saved, tabs })).toEqual({
+      ...saved,
+      tabs
+    })
+  })
+
+  test('stale saves cannot restore legacy collab configuration or runtime metadata', () => {
+    const stale = {
+      ...base,
+      experimental: { collab: true },
+      collab: { enabled: true },
+      collabReference: '/workspace/references/COLLABORATIVE.md'
+    }
+    expect(mergeLayoutForSave(stale, stale)).toEqual(base)
+    // Filtering the save must not mutate either caller-owned object.
+    expect(stale.experimental).toEqual({ collab: true })
+    expect(stale.collab).toEqual({ enabled: true })
+    expect(stale.collabReference).toBe('/workspace/references/COLLABORATIVE.md')
   })
 
   test('drops the old Widgets tab id from stale client saves', () => {

@@ -45,6 +45,7 @@ import {
   resolveCwdWorkspace
 } from './cli-env'
 import { columns, keyValue } from './cli-ui'
+import { installCollabSkill } from './collab/skill'
 import { CONTROL_HOST, CONTROL_PORT, CONTROL_URL, PORT } from './constants'
 import { type ControlProbe, controlFailureMessage, probeControlServer } from './control-client'
 import {
@@ -157,14 +158,21 @@ async function openBrowser(url: string) {
 // (see runDevSupervisor).
 function spawnServer(
   cwd: string,
-  env: Record<string, string | undefined> = process.env
+  env: Record<string, string | undefined> = process.env,
+  experimentalCollab = false
 ): ReturnType<typeof Bun.spawn> {
   return Bun.spawn(['bun', import.meta.filename, 'start'], {
     stdin: 'inherit',
     stdout: 'inherit',
     stderr: 'inherit',
     cwd,
-    env: { ...env, MOI_SERVER: '1' }
+    env: {
+      ...env,
+      MOI_SERVER: '1',
+      // Runtime opt-in comes only from `start --experimental-collab`.
+      // Override inherited values, including when `init --web` starts us.
+      MOI_EXPERIMENTAL_COLLAB: experimentalCollab ? '1' : '0'
+    }
   })
 }
 
@@ -175,11 +183,12 @@ function spawnServer(
 // (closing servers + killing function workers), so restarts leak nothing.
 async function runDevSupervisor(
   projectRoot: string,
-  env: Record<string, string | undefined>
+  env: Record<string, string | undefined>,
+  experimentalCollab: boolean
 ): Promise<void> {
   const { watch } = await import('node:fs')
 
-  let child = spawnServer(projectRoot, env)
+  let child = spawnServer(projectRoot, env, experimentalCollab)
   let restarting = false
   let debounce: ReturnType<typeof setTimeout> | undefined
 
@@ -198,7 +207,7 @@ async function runDevSupervisor(
     await child.exited
     clearTimeout(sigkill)
     restarting = false
-    child = spawnServer(projectRoot, env)
+    child = spawnServer(projectRoot, env, experimentalCollab)
   }
 
   for (const dir of ['server', 'lib']) {
@@ -334,6 +343,11 @@ const init = defineCommand({
       default: false,
       description: 'Start the web server if not already running'
     },
+    'experimental-collab': {
+      type: 'boolean',
+      default: false,
+      description: 'Include the optional collaboration guide and applet types'
+    },
     id: {
       type: 'string',
       description:
@@ -396,6 +410,11 @@ const init = defineCommand({
     // package.json + bun install). An existing `.moi/` is left untouched.
     console.log()
     const { scaffold, skillsDir } = await provisionWorkspace(target, type)
+    if (args['experimental-collab']) {
+      const { referencePath } = await installCollabSkill(target, type)
+      console.log(pc.dim('  Collaboration guide installed to ' + referencePath))
+      console.log(pc.dim('  Shared state requires moi start --experimental-collab'))
+    }
     if (scaffold !== 'exists') {
       if (scaffold === 'installing') {
         console.log(pc.dim('  Widget dependencies still installing in .moi/ (background)'))
@@ -474,6 +493,11 @@ const start = defineCommand({
     port: {
       type: 'string',
       description: 'HTTP port to listen on (default: 13337)'
+    },
+    'experimental-collab': {
+      type: 'boolean',
+      default: false,
+      description: 'Enable the collaboration runtime for views (no identity or workspace UI)'
     }
   },
   async run({ args }) {
@@ -529,17 +553,20 @@ const start = defineCommand({
         ...(debug ? { MOI_DEBUG: '1' } : {})
       }
       if (dev) {
-        await runDevSupervisor(projectRoot, env)
+        await runDevSupervisor(projectRoot, env, args['experimental-collab'])
         return
       }
       const cwd = serverCwd(projectRoot, dev)
-      const proc = spawnServer(cwd, env)
-      process.exit(await superviseServerUpdates(proc, () => spawnServer(cwd, env)))
+      const proc = spawnServer(cwd, env, args['experimental-collab'])
+      process.exit(
+        await superviseServerUpdates(proc, () => spawnServer(cwd, env, args['experimental-collab']))
+      )
     }
 
     // This IS the server process (MOI_SERVER=1). cwd is the package root when the
     // dev bundler runs (bunfig loaded at Bun startup) or a neutral dir for a
     // prebuilt install — see serverCwd().
+    if (args['experimental-collab']) process.env.MOI_EXPERIMENTAL_COLLAB = '1'
     try {
       await import('./web')
     } catch (err) {

@@ -91,7 +91,8 @@ describe('captureServiceEnv', () => {
     PORT: '9999',
     // Runtime flags the unit owns.
     MOI_DEV: '1',
-    MOI_SERVER: '1'
+    MOI_SERVER: '1',
+    MOI_EXPERIMENTAL_COLLAB: '1'
   }
 
   test('captures the allowlist, drops everything else', () => {
@@ -118,7 +119,8 @@ describe('captureServiceEnv', () => {
       'HOST',
       'HOSTNAME',
       'PORT',
-      'MOI_DEV'
+      'MOI_DEV',
+      'MOI_EXPERIMENTAL_COLLAB'
     ]) {
       expect(env).not.toHaveProperty(key)
     }

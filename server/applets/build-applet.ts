@@ -1,3 +1,4 @@
+import { COLLAB_MODULE_SOURCE } from '../collab/applet-module'
 import type { BunPlugin } from 'bun'
 import tailwind from 'bun-plugin-tailwind'
 import { realpathSync } from 'node:fs'
@@ -232,6 +233,14 @@ function appletRuntimePlugin(
       }))
 
       // The `moi` runtime module (fileUrl). A bare specifier, so match it exactly.
+      build.onResolve({ filter: /^moi\/collab$/ }, () => ({
+        path: 'moi/collab',
+        namespace: 'moi-collab'
+      }))
+      build.onLoad({ filter: /.*/, namespace: 'moi-collab' }, () => ({
+        contents: COLLAB_MODULE_SOURCE,
+        loader: 'js'
+      }))
       build.onResolve({ filter: /^moi$/ }, () => ({ path: 'moi', namespace: 'moi-runtime' }))
       build.onLoad({ filter: /.*/, namespace: 'moi-runtime' }, () => ({
         contents: MOI_MODULE_SOURCE,

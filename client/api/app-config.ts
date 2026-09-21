@@ -14,6 +14,7 @@ import { requestJson } from './http'
 
 const DEFAULTS: ClientAppConfig = {
   cloudDemo: false,
+  experimentalCollab: false,
   experiments: [],
   demoInstallUrl: 'https://moi.computer'
 }

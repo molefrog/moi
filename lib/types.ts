@@ -298,6 +298,8 @@ export type ClientAppConfig = {
   cloudDemo: boolean
   // Enabled experimental features, checked by slug.
   experiments: string[]
+  // Enabled only by the CLI's collaboration runtime startup flag.
+  experimentalCollab: boolean
   // Link target for the cloud-demo promo dialog.
   demoInstallUrl: string
 }
@@ -555,6 +557,8 @@ export type WorkspaceTabsState = {
 }
 
 export type { AgentTheme, ColorTheme, FontTheme, RadiusTheme, WorkspaceTheme } from './themes'
+
+export type WorkspaceLayoutSave = Omit<WorkspaceLayout, 'tabs'> & { tabs?: WorkspaceTabsState }
 
 export type WorkspaceLayout = {
   version: 1

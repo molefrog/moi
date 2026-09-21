@@ -1,3 +1,4 @@
+import { usePersonalTabs } from '@/client/features/collab/personal-state'
 // The workspace's tab address: which tab the URL names, how to navigate
 // elsewhere, and the persistence that keeps a bare `/workspace/:id` landing
 // somewhere sensible. The URL is the live truth for the active tab; the
@@ -20,6 +21,7 @@ import {
   resolveActiveTab
 } from '@/client/features/workspace/tab-resolution'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
+import { useCollabIdentityEnabled } from '@/client/features/collab/entry'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { ViewBuilder, ViewInfo, WorkspaceTabId, WorkspaceTabsState } from '@/lib/types'
 import {
@@ -41,6 +43,7 @@ type UseWorkspaceNavigationOptions = {
 
 export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceNavigationOptions) {
   const { layout, setLayout, workspaceId } = useWorkspaceLayoutCtx()
+  const personal = useCollabIdentityEnabled()
   const [, navigate] = useLocation()
   // The tab id is the route's wildcard segment, read from the matched route
   // instead of threaded down as a prop — so the pattern stays in AppRouter and
@@ -51,7 +54,12 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
   const historyState = useHistoryState<unknown>()
   const appletParams = useMemo(() => readAppletParams(historyState), [historyState])
 
-  const tabsState = normalizeTabsState(layout.tabs)
+  const [personalTabs, setPersonalTabs] = usePersonalTabs(
+    workspaceId,
+    personal,
+    normalizeTabsState(layout.tabs)
+  )
+  const tabsState = normalizeTabsState(personalTabs)
   // Mirror for the effects below: a debounced layout PUT can still be in flight
   // when a `workspace:updated` refetch lands, so reading the render-time value
   // could persist a stale open set (and resurrect a just-closed tab).
@@ -78,9 +86,10 @@ export function useWorkspaceNavigation({ views, builders, split }: UseWorkspaceN
   const setTabs = useCallback(
     (tabs: WorkspaceTabsState) => {
       tabsStateRef.current = tabs
-      setLayout({ tabs })
+      if (personal) setPersonalTabs(tabs)
+      else setLayout({ tabs })
     },
-    [setLayout, tabsStateRef]
+    [setLayout, tabsStateRef, personal, setPersonalTabs]
   )
 
   // Keep the URL honest. One redirect covers every case: a bare

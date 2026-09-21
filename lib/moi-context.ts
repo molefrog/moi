@@ -48,6 +48,7 @@ export type MoiAppletMessage = {
 // the server for programmatic sends (the view builder). Extend this (and
 // `renderMoiContext`) when new ambient fields land.
 export type MoiContext = {
+  collabReference?: string
   // The workspace tab the user is on when they hit send — for a view-builder
   // request that's the builder's own tab (`view-builder:<id>`).
   activeTab: WorkspaceTabId
@@ -158,6 +159,10 @@ export function renderMoiContextBody(ctx: MoiContext): string {
   const tabParams = ctx.tabParams ? renderAppletJson(ctx.tabParams) : null
   if (tabParams) tabLines.push(`Params it is rendering with right now: ${tabParams}`)
   const sections = [`# Active tab\n${tabLines.join('\n')}`]
+  if (ctx.collabReference)
+    sections.push(
+      `# Collab\nThe collab runtime is available. Before writing collaborative applets, read ${escapeTags(ctx.collabReference)}.`
+    )
   if (ctx.applet) {
     const appletLines = [
       `The message above was not typed by the user — the ${describeAppletSource(ctx.applet.source)} sent it when the user acted in its UI.`
@@ -184,6 +189,7 @@ export function renderMoiContext(ctx: MoiContext): string {
 export function isMoiContext(value: unknown): value is MoiContext {
   if (typeof value !== 'object' || value === null) return false
   const v = value as {
+    collabReference?: unknown
     activeTab?: unknown
     tabTitle?: unknown
     tabParams?: unknown
@@ -192,6 +198,7 @@ export function isMoiContext(value: unknown): value is MoiContext {
   }
   return (
     typeof v.activeTab === 'string' &&
+    (v.collabReference === undefined || typeof v.collabReference === 'string') &&
     (v.tabTitle === undefined || typeof v.tabTitle === 'string') &&
     (v.tabParams === undefined || isParamsRecord(v.tabParams)) &&
     (v.applet === undefined || isMoiAppletMessage(v.applet)) &&

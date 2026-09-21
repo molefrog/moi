@@ -9,8 +9,10 @@ import {
 } from '@/client/features/workspace/api'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
-import type { WorkspaceLayout, WorkspaceType } from '@/lib/types'
+import type { WorkspaceLayout, WorkspaceLayoutSave, WorkspaceType } from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
+
+import { accumulateLayoutSave } from './layout-save'
 
 export type WorkspaceLayoutContextValue = {
   // The persisted layout (widget grid, layout mode, theme). Falls back to an
@@ -29,6 +31,7 @@ export type WorkspaceLayoutContextValue = {
   // The workspace's registry id (the route param), so descendants can key
   // their own queries (e.g. the model picker) without prop-drilling.
   workspaceId: string
+  collabReference?: string
   isLoading: boolean
 }
 
@@ -53,7 +56,14 @@ export function useWorkspaceThemeSetting(): WorkspaceLayout['theme'] {
 // Strip the server-only metadata so what we PUT back (and expose as `layout`)
 // is just the persisted `WorkspaceLayout`.
 function stripMeta(data: WorkspaceLayoutResponse): WorkspaceLayout {
-  const { cwd: _cwd, name: _name, provider: _provider, agentId: _agentId, ...layout } = data
+  const {
+    cwd: _cwd,
+    name: _name,
+    provider: _provider,
+    agentId: _agentId,
+    collabReference: _collabReference,
+    ...layout
+  } = data
   return layout
 }
 
@@ -73,6 +83,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
   // reconcile), so reach the latest mutate via a ref instead of closing over it.
   const saveRef = useLatestRef(save.mutate)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingSave = useRef<WorkspaceLayoutSave | null>(null)
 
   const setLayout = useCallback(
     (update: Partial<WorkspaceLayout>) => {
@@ -82,6 +93,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       // Optimistic: the grid/theme reflects the change before the PUT lands.
       const next = { ...prev, ...update }
       qc.setQueryData<WorkspaceLayoutResponse>(key, next)
+      pendingSave.current = accumulateLayoutSave(stripMeta(next), update, pendingSave.current)
 
       if (timer.current) clearTimeout(timer.current)
       // Persist the value captured at call time, NOT the cache at fire time: a
@@ -92,7 +104,9 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       // optimistic write.
       timer.current = setTimeout(() => {
         timer.current = null
-        saveRef.current(stripMeta(next))
+        const payload = pendingSave.current
+        pendingSave.current = null
+        if (payload) saveRef.current(payload)
       }, 600)
     },
     [id, qc, saveRef]
@@ -110,6 +124,7 @@ export function WorkspaceLayoutProvider({ id, children }: WorkspaceLayoutProvide
       cwd: query.data?.cwd ?? null,
       provider: query.data?.provider ?? null,
       workspaceId: id,
+      collabReference: query.data?.collabReference,
       isLoading: query.isLoading
     }),
     [query.data, query.isLoading, setLayout, id]

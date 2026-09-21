@@ -19,6 +19,7 @@ test('defaults apply when no config file exists', () => {
   expect(config).toEqual({
     cloudDemo: false,
     experiments: [],
+    experimentalCollab: false,
     demoInstallUrl: 'https://moi.computer'
   })
 })
@@ -59,6 +60,28 @@ test('empty MOI_EXPERIMENTS clears file-set experiments', async () => {
   const file = await configFile(JSON.stringify({ experiments: ['from-file'] }))
   const config = loadAppConfig(file, { MOI_EXPERIMENTS: '' })
   expect(config.experiments).toEqual([])
+})
+
+test('collab ignores config files, experiment slugs and legacy environment settings', async () => {
+  const file = await configFile(
+    JSON.stringify({ experimentalCollab: true, experiments: ['collab'], collab: { enabled: true } })
+  )
+  const config = loadAppConfig(file, {
+    MOI_EXPERIMENTS: 'collab',
+    MOI_COLLAB: '1',
+    MOI_DEV: '1',
+    MOI_COLLAB_IDENTITY: 'local'
+  })
+  expect(config.experimentalCollab).toBe(false)
+  expect(config.experiments).toEqual(['collab'])
+})
+
+test('collab accepts only the CLI-owned process marker', async () => {
+  const file = await configFile(JSON.stringify({ experimentalCollab: false }))
+  for (const value of [undefined, '', '0', 'true', 'TRUE', 'false', 'yes']) {
+    expect(loadAppConfig(file, { MOI_EXPERIMENTAL_COLLAB: value }).experimentalCollab).toBe(false)
+  }
+  expect(loadAppConfig(file, { MOI_EXPERIMENTAL_COLLAB: '1' }).experimentalCollab).toBe(true)
 })
 
 test('invalid JSON falls back to defaults without throwing', async () => {

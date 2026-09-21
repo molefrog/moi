@@ -14,6 +14,7 @@
 // — no central handlers object assembled by the screen. Applet → host only;
 // if a host → applet direction is ever added (`moi.on(...)`), `dispose` must
 // also unbind those listeners or a disposed module leaks.
+import { getAppletCollabApi } from '@/client/features/collab/entry'
 import { useEffect } from 'react'
 
 import { createNanoEvents } from 'nanoevents'
@@ -54,6 +55,7 @@ export type AppletEvents = {
 // cross the trust boundary from agent-authored code, and the runtime narrows
 // them before emitting.
 export type AppletBridge = {
+  collab?: ReturnType<typeof getAppletCollabApi>
   focusTab: (tab: unknown, params?: unknown) => void
   sendChatMessage: (message: unknown, context?: unknown) => void
 }
@@ -124,6 +126,9 @@ function createRuntime(workspaceId: string) {
       let alive = true
       const source = appletSource(identity)
       const bridge: AppletBridge = {
+        get collab() {
+          return getAppletCollabApi()
+        },
         focusTab(tab, params) {
           if (!alive) return
           if (!isWorkspaceTabId(tab)) return

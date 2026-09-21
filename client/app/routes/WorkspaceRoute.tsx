@@ -1,6 +1,8 @@
+import { CollabGate, useCollabIdentityEnabled } from '@/client/features/collab/entry'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
+import { useAppConfig } from '@/client/api/app-config'
 import { LedLogo } from '@/client/components/shared/LedLogo'
 import { SidebarLayout } from '@/client/app/shell/SidebarLayout'
 import { useSelectedSession } from '@/client/features/chat/useSelectedSession'
@@ -24,11 +26,25 @@ type WorkspaceRouteProps = {
 export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
   return (
     <Workspace id={id}>
-      <WorkspaceLayoutProvider id={id}>
-        <WorkspaceLoader id={id} />
+      <WorkspaceLayoutProvider key={id} id={id}>
+        <WorkspaceFeatures id={id} />
       </WorkspaceLayoutProvider>
     </Workspace>
   )
+}
+
+function WorkspaceFeatures({ id }: WorkspaceRouteProps) {
+  const { experimentalCollab } = useAppConfig()
+  return (
+    <CollabGate workspaceId={id} enabled={experimentalCollab}>
+      <WorkspaceIdentity id={id} />
+    </CollabGate>
+  )
+}
+
+function WorkspaceIdentity({ id }: WorkspaceRouteProps) {
+  const personal = useCollabIdentityEnabled()
+  return <WorkspaceLoader key={`${id}:${personal}`} id={id} />
 }
 
 function WorkspaceLoader({ id }: WorkspaceRouteProps) {

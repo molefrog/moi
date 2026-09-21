@@ -25,6 +25,7 @@ import {
   useView
 } from '@/client/features/applets/useApplet'
 import { WidgetErrorBoundary } from '@/client/features/applets/WidgetErrorBoundary'
+import { AppletCollabMount } from '@/client/features/collab/entry'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import { cn } from '@/client/lib/cn'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
@@ -227,7 +228,13 @@ function ViewFrame({ view, build, params, entering, thumbnailTarget }: ViewFrame
           workspaceId={workspaceId}
           resetKey={build.version}
         >
-          <build.Component params={params} />
+          <AppletCollabMount
+            workspaceId={workspaceId}
+            applet={{ kind: 'view', name: view.id }}
+            active={thumbnailTarget === true}
+          >
+            <build.Component params={params} />
+          </AppletCollabMount>
         </WidgetErrorBoundary>
       </div>
     </div>

@@ -82,6 +82,7 @@
     "culori": "^4.0.2",
     "devalue": "^5.9.2",
     "env-paths": "^4.0.0",
+    "facehash": "^0.1.0",
     "frimousse": "^0.3.0",
     "highlight.js": "^10.7.3",
     "hono": "^4.13.7",

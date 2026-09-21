@@ -64,8 +64,13 @@ export async function typecheckApplets(
   if (files.length === 0) return { files, diagnostics: [] }
 
   await writeAppletEnvDts(workspaceRoot)
+  const collabTypes = join(moiRoot, 'collab-env.d.ts')
   const program = ts.createProgram({
-    rootNames: [join(moiRoot, 'applet-env.d.ts'), ...files],
+    rootNames: [
+      join(moiRoot, 'applet-env.d.ts'),
+      ...(existsSync(collabTypes) ? [collabTypes] : []),
+      ...files
+    ],
     options: {
       allowImportingTsExtensions: true,
       esModuleInterop: true,
