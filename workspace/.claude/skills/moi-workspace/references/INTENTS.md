@@ -1,9 +1,8 @@
 # Applet intents
 
-Intents are functions imported from `moi` that ask the host to navigate or interact with chat.
-Use them in user event handlers. Each returns `void`; there is no completion callback or result
-promise. moi identifies the source applet automatically for chat actions.
-For rejected chat intents, inspect `moi debug logs`.
+Intents let an applet act beyond its own UI: open another view, add context to chat, or ask the
+agent to do something. Import these functions from `moi` and call them from user event handlers,
+such as a button click; moi handles the action in the workspace.
 
 ## `focusTab(tab, params?)`
 
