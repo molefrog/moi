@@ -35,7 +35,7 @@ import { focusTab } from 'moi'
 
 A view with addressable state declares a local `Params` type in its own file. Every field is
 optional and carries a comment, because the view must render sensibly with `{}` — a fresh mount, a
-plain tab-bar click, or a new browser tab all deliver nothing.
+plain tab-bar click, or a new browser tab all deliver nothing. Keep `params` small and JSON-serializable, since browser history copies them without preserving object identity.
 
 ```tsx
 // .moi/views/orders.tsx
