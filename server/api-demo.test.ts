@@ -9,23 +9,33 @@ import { resetAppConfig } from './app-config'
 import { claudeCodeHarness } from './harness/claude-code'
 
 const originalClaudeAvailability = claudeCodeHarness.availability
+const envKeys = [
+  'MOI_CLOUD_DEMO',
+  'MOI_EXPERIMENTS',
+  'MOI_EXPERIMENTAL_COLLAB',
+  'MOI_DEMO_INSTALL_URL'
+]
+let savedEnv: Record<string, string | undefined>
 
-// All three env vars pinned so a real config.json on the machine running the
+// Deployment env vars are pinned so a real config.json on the machine running the
 // tests (env wins over file) can never change the assertions. Availability is
 // mocked because with the gate off the create route checks the harness before
 // validating the name — on a runner without the Claude CLI that 400s first.
 beforeEach(() => {
+  savedEnv = Object.fromEntries(envKeys.map(key => [key, process.env[key]]))
   process.env.MOI_CLOUD_DEMO = '1'
   process.env.MOI_EXPERIMENTS = ''
+  process.env.MOI_EXPERIMENTAL_COLLAB = '0'
   process.env.MOI_DEMO_INSTALL_URL = 'https://moi.computer'
   resetAppConfig()
   claudeCodeHarness.availability = async () => ({ status: 'available' })
 })
 
 afterEach(() => {
-  delete process.env.MOI_CLOUD_DEMO
-  delete process.env.MOI_EXPERIMENTS
-  delete process.env.MOI_DEMO_INSTALL_URL
+  for (const key of envKeys) {
+    if (savedEnv[key] === undefined) delete process.env[key]
+    else process.env[key] = savedEnv[key]
+  }
   resetAppConfig()
   claudeCodeHarness.availability = originalClaudeAvailability
 })
@@ -60,12 +70,13 @@ test('GET /api/config reports the demo flag and install url', async () => {
   expect(body).toEqual({
     cloudDemo: true,
     experiments: [],
+    experimentalCollab: false,
     demoInstallUrl: 'https://moi.computer'
   })
 })
 
 test('without the demo flag, creation is not blocked by the gate', async () => {
-  delete process.env.MOI_CLOUD_DEMO
+  process.env.MOI_CLOUD_DEMO = '0'
   resetAppConfig()
 
   const response = await api.request('/api/workspaces/create', {

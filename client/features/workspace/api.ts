@@ -16,10 +16,8 @@ import type {
   WorkspaceType
 } from '@/lib/types'
 
-import type { CollabCapability } from '@/lib/collab/types'
-
 export type WorkspaceLayoutResponse = WorkspaceLayout & {
-  collab?: CollabCapability
+  collabReference?: string
   cwd: string
   name: string
   provider?: WorkspaceType
@@ -27,14 +25,6 @@ export type WorkspaceLayoutResponse = WorkspaceLayout & {
 }
 
 export function useWorkspaceLayout(workspaceId: string) {
-  const queryClient = useQueryClient()
-  useEffect(
-    () =>
-      onWorkspaceEventsReconnect(() => {
-        void queryClient.invalidateQueries({ queryKey: workspaceKeys.layout(workspaceId) })
-      }),
-    [queryClient, workspaceId]
-  )
   return useQuery<WorkspaceLayoutResponse>({
     queryKey: workspaceKeys.layout(workspaceId),
     queryFn: () => requestJson(`/api/workspaces/${workspaceId}`),

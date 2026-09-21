@@ -20,6 +20,7 @@ function normalizeLayout(parsed: Record<string, unknown>): WorkspaceLayout {
   layout.tabs = normalizeWorkspaceTabs(layout.tabs)
   delete layout.experimental
   delete layout.collab
+  delete layout.collabReference
   if (typeof layout.icon === 'string') {
     layout.icon = { type: 'upload', value: layout.icon }
   } else if (layout.icon !== undefined && !isWorkspaceIcon(layout.icon)) {
@@ -71,6 +72,7 @@ export function mergeLayoutForSave(
   const { name: _name, icon: _icon, ...editor } = body
   delete (editor as Record<string, unknown>).experimental
   delete (editor as Record<string, unknown>).collab
+  delete (editor as Record<string, unknown>).collabReference
   // Stale clients may still round-trip the pre-`.cache` thumbnail records;
   // never let a layout PUT resurrect them in `.workspace.json`.
   delete (editor as Record<string, unknown>).appletThumbnails

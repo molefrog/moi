@@ -2,15 +2,10 @@ import { Hono } from 'hono'
 
 import { isCollabActor, isCollabCommand } from '@/lib/collab/protocol'
 import type { WorkspaceEntry } from '@/lib/types'
-import { getCollabCapability, isCollabEnabled } from './config'
+import { isCollabEnabled } from './config'
 import { callCollab } from './manager'
 
 export const collabRoutes = new Hono<{ Variables: { ws: WorkspaceEntry } }>()
-
-collabRoutes.get('/', async c => {
-  const ws = c.get('ws')
-  return c.json(await getCollabCapability(ws.path, ws.type))
-})
 
 // Agent/server callers use the same ordered writer as browsers. Identity here
 // is attribution supplied by the outer environment, never an access credential.

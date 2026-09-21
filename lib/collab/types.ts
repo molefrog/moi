@@ -13,11 +13,6 @@ export type CollabIdentity = {
   color: string
 }
 
-export type CollabCapability = {
-  enabled: boolean
-  referencePath?: string
-}
-
 export type CollabLocation = { page: string; title?: string }
 export type CollabActor = { id: string; kind: 'user' | 'agent' | 'system'; onBehalfOf?: string }
 

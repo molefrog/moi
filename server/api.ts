@@ -22,7 +22,7 @@ import type {
 import type { MoiContext } from '@/lib/moi-context'
 import { viewBuilderDirectives } from '@/lib/view-builder-directives'
 
-import { getCollabCapability } from './collab/config'
+import { getCollabReferencePath } from './collab/config'
 import { collabRoutes } from './collab/http'
 import { agentStore } from './agent'
 import { clientAppConfig, getAppConfig } from './app-config'
@@ -339,9 +339,9 @@ one.post('/view-builders/:builderId/submit', async c => {
     // The bootstrap instructions ride the moi-context envelope, injected by
     // the harness like any other ambient context; the user text stays bare.
     // The user submits from the builder's own tab, so that's the active tab.
-    const collab = await getCollabCapability(ws.path, ws.type)
+    const collabReference = await getCollabReferencePath(ws.path, ws.type)
     const context: MoiContext = {
-      ...(collab.referencePath ? { collabReference: collab.referencePath } : {}),
+      ...(collabReference ? { collabReference } : {}),
       activeTab: `view-builder:${builder.id}`,
       directives: [
         ...viewBuilderDirectives(builder.id, availableIcons),
@@ -889,6 +889,7 @@ one.delete('/icon', async c => {
 one.get('/', async c => {
   const ws = c.get('ws')
   const layout = await loadLayout(ws.path)
+  const collabReference = await getCollabReferencePath(ws.path, ws.type)
   return c.json({
     ...layout,
     // Resolved display name: the settings override, or the folder name.
@@ -896,7 +897,8 @@ one.get('/', async c => {
     cwd: ws.path,
     provider: ws.type,
     agentId: ws.agentId,
-    collab: await getCollabCapability(ws.path, ws.type)
+    // Undefined is omitted from JSON and overrides stale persisted metadata.
+    collabReference
   })
 })
 

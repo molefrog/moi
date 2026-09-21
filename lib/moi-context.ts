@@ -161,7 +161,7 @@ export function renderMoiContextBody(ctx: MoiContext): string {
   const sections = [`# Active tab\n${tabLines.join('\n')}`]
   if (ctx.collabReference)
     sections.push(
-      `# Collab\nThis workspace has collab enabled. Before writing collaborative applets, read ${escapeTags(ctx.collabReference)}.`
+      `# Collab\nThe collab runtime is available. Before writing collaborative applets, read ${escapeTags(ctx.collabReference)}.`
     )
   if (ctx.applet) {
     const appletLines = [

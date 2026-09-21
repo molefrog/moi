@@ -5,7 +5,7 @@ import index from '../client/index.html'
 import { api } from './api'
 import { PORT } from './constants'
 import { control } from './control'
-import { getCollabCapability, isCollabEnabled } from './collab/config'
+import { getCollabReferencePath, isCollabEnabled } from './collab/config'
 import { collabManager } from './collab/manager'
 import { EVENTS_TOPIC, publishEvent, setEventServer } from './events'
 import { killBuildWorkers } from './applets/build-worker'
@@ -174,12 +174,12 @@ export const app = Bun.serve<WsData>({
         if (data.type === 'chat' && (data.content?.trim() || data.attachments?.length)) {
           const workspace = await getWorkspace(data.workspaceId)
           if (!workspace) return
-          const collab = await getCollabCapability(workspace.path, workspace.type)
+          const collabReference = await getCollabReferencePath(workspace.path, workspace.type)
           const context: MoiContext | undefined =
-            data.context || collab.referencePath
+            data.context || collabReference
               ? {
                   ...(data.context ?? { activeTab: 'agent' }),
-                  collabReference: collab.referencePath
+                  collabReference
                 }
               : undefined
           if (data.isNew) {

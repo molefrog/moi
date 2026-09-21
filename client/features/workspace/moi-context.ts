@@ -24,6 +24,7 @@ import { WorkspaceLayoutContext } from './WorkspaceLayoutContext'
 //   the field in `useMoiUserMessageContext`'s builder below.
 import { useCallback, useContext } from 'react'
 
+import { useAppConfig } from '@/client/api/app-config'
 import { useViewBuilders, useViews } from '@/client/features/views/api'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import type { MoiAppletMessage, MoiContext } from '@/lib/moi-context'
@@ -112,7 +113,8 @@ export function useMoiUserMessageContext({
   appletParams
 }: WorkspaceTabAddress): (options?: MoiUserMessageOptions) => MoiContext {
   const workspaceId = useWorkspaceId()
-  const collab = useContext(WorkspaceLayoutContext)?.collab
+  const { experimentalCollab } = useAppConfig()
+  const collabReference = useContext(WorkspaceLayoutContext)?.collabReference
   const views = useViews(workspaceId).data
   const builders = useViewBuilders(workspaceId).data
   return useCallback(
@@ -121,15 +123,13 @@ export function useMoiUserMessageContext({
       const tabParams = envelopeTabParams(activeTab, appletParams)
       return {
         activeTab,
-        ...(collab?.enabled && collab.referencePath
-          ? { collabReference: collab.referencePath }
-          : {}),
+        ...(experimentalCollab && collabReference ? { collabReference } : {}),
         tabTitle: activeTabTitle(activeTab, views, builders),
         ...(tabParams ? { tabParams } : {}),
         ...(options.applet ? { applet: options.applet } : {}),
         ...(directives.length > 0 ? { directives } : {})
       }
     },
-    [workspaceId, activeTab, appletParams, views, builders, collab]
+    [workspaceId, activeTab, appletParams, views, builders, experimentalCollab, collabReference]
   )
 }

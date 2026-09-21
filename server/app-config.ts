@@ -20,6 +20,8 @@ export type AppConfig = {
   cloudDemo: boolean
   // Gated experimental features, checked by slug.
   experiments: string[]
+  // CLI-owned startup flag; never read from config.json or experiment slugs.
+  experimentalCollab: boolean
   // Link target for the cloud-demo promo dialog.
   demoInstallUrl: string
 }
@@ -27,6 +29,7 @@ export type AppConfig = {
 const DEFAULTS: AppConfig = {
   cloudDemo: false,
   experiments: [],
+  experimentalCollab: false,
   demoInstallUrl: 'https://moi.computer'
 }
 
@@ -114,6 +117,7 @@ export function loadAppConfig(
   const fromEnv: Partial<AppConfig> = {
     cloudDemo: parseBool(env.MOI_CLOUD_DEMO),
     experiments: parseList(env.MOI_EXPERIMENTS),
+    experimentalCollab: env.MOI_EXPERIMENTAL_COLLAB === '1',
     demoInstallUrl: parseString(env.MOI_DEMO_INSTALL_URL)
   }
   const merged = { ...DEFAULTS, ...fromFile }
@@ -139,6 +143,6 @@ export function resetAppConfig(): void {
 // The only shape that reaches the browser (GET /api/config). Server-only keys
 // added to AppConfig later stay out unless explicitly forwarded here.
 export function clientAppConfig(): ClientAppConfig {
-  const { cloudDemo, experiments, demoInstallUrl } = getAppConfig()
-  return { cloudDemo, experiments: [...experiments], demoInstallUrl }
+  const { cloudDemo, experiments, experimentalCollab, demoInstallUrl } = getAppConfig()
+  return { cloudDemo, experiments: [...experiments], experimentalCollab, demoInstallUrl }
 }

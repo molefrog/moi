@@ -204,12 +204,18 @@ describe('loadLayout', () => {
 
   test('drops legacy collab configuration and runtime metadata when loading a workspace', async () => {
     await withWorkspaceFile(
-      { ...base, experimental: { collab: true }, collab: { enabled: true } },
+      {
+        ...base,
+        experimental: { collab: true },
+        collab: { enabled: true },
+        collabReference: '/workspace/references/COLLABORATIVE.md'
+      },
       async dir => {
         const loaded = await loadLayout(dir)
         expect(loaded).toEqual(base)
         expect('experimental' in loaded).toBe(false)
         expect('collab' in loaded).toBe(false)
+        expect('collabReference' in loaded).toBe(false)
       }
     )
   })
@@ -319,11 +325,17 @@ describe('mergeLayoutForSave', () => {
   })
 
   test('stale saves cannot restore legacy collab configuration or runtime metadata', () => {
-    const stale = { ...base, experimental: { collab: true }, collab: { enabled: true } }
+    const stale = {
+      ...base,
+      experimental: { collab: true },
+      collab: { enabled: true },
+      collabReference: '/workspace/references/COLLABORATIVE.md'
+    }
     expect(mergeLayoutForSave(stale, stale)).toEqual(base)
     // Filtering the save must not mutate either caller-owned object.
     expect(stale.experimental).toEqual({ collab: true })
     expect(stale.collab).toEqual({ enabled: true })
+    expect(stale.collabReference).toBe('/workspace/references/COLLABORATIVE.md')
   })
 
   test('drops the old Widgets tab id from stale client saves', () => {

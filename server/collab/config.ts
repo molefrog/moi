@@ -1,26 +1,18 @@
-import { join } from 'node:path'
-
 import type { WorkspaceType } from '@/lib/types'
-import type { CollabCapability } from '@/lib/collab/types'
-import { skillsDirFor } from '../workspace-init'
+
+import { getAppConfig } from '../app-config'
+import { collabSkillReferencePath } from './skill'
 
 // The CLI owns this process setting. Workspace files and dev mode never enable it.
 export function isCollabEnabled(): boolean {
-  return process.env.MOI_EXPERIMENTAL_COLLAB === '1'
+  return getAppConfig().experimentalCollab
 }
 
-export function collabReferencePath(workspacePath: string, type?: WorkspaceType): string {
-  return join(skillsDirFor(workspacePath, type), 'moi-workspace', 'references', 'COLLABORATIVE.md')
-}
-
-export async function getCollabCapability(
+export async function getCollabReferencePath(
   workspacePath: string,
   type?: WorkspaceType
-): Promise<CollabCapability> {
-  const enabled = isCollabEnabled()
-  const referencePath = enabled ? collabReferencePath(workspacePath, type) : undefined
-  return {
-    enabled,
-    ...(referencePath && (await Bun.file(referencePath).exists()) ? { referencePath } : {})
-  }
+): Promise<string | undefined> {
+  if (!isCollabEnabled()) return undefined
+  const referencePath = collabSkillReferencePath(workspacePath, type)
+  return (await Bun.file(referencePath).exists()) ? referencePath : undefined
 }
